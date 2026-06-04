@@ -8,7 +8,7 @@
 
 import type { MemoryRow } from "@th0th-ai/core";
 import {
-  MemoryRepository,
+  getMemoryRepository,
   SearchMemoriesTool,
   StoreMemoryTool,
 } from "@th0th-ai/core";
@@ -158,53 +158,37 @@ export const memoryRoutes = new Elysia({ prefix: "/api/v1/memory" })
     "/list",
     async ({ body }) => {
       try {
-        const repo = MemoryRepository.getInstance();
-        const db = repo.getDb();
-
-        const conditions: string[] = [];
-        const params: any[] = [];
-
-        if (body.type) {
-          conditions.push("type = ?");
-          params.push(body.type);
-        }
-        if (body.minImportance != null) {
-          conditions.push("importance >= ?");
-          params.push(body.minImportance);
-        }
-
-        const whereClause =
-          conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-
+        const repo = getMemoryRepository() as any;
         const limit = body.limit ?? 50;
         const offset = body.offset ?? 0;
+        let rows: MemoryRow[];
+        let total: number;
 
-        const countSql = `SELECT COUNT(*) as total FROM memories ${whereClause}`;
-        const total = (db.prepare(countSql).get(...params) as any).total;
-
-        const sql = `
-          SELECT
-            id, content, type, level,
-            user_id, session_id, project_id, agent_id,
-            importance, tags, embedding,
-            created_at, access_count, last_accessed
-          FROM memories
-          ${whereClause}
-          ORDER BY created_at DESC
-          LIMIT ? OFFSET ?
-        `;
-        params.push(limit, offset);
-
-        const rows = db.prepare(sql).all(...params) as MemoryRow[];
+        if (typeof repo.getDb === "function") {
+          // SQLite path — raw SQL
+          const db = repo.getDb();
+          const conditions: string[] = [];
+          const params: unknown[] = [];
+          if (body.type) { conditions.push("type = ?"); params.push(body.type); }
+          if (body.minImportance) { conditions.push("importance >= ?"); params.push(body.minImportance); }
+          const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+          total = (db.prepare(`SELECT COUNT(*) as n FROM memories ${where}`).get(...params) as any).n;
+          rows = db.prepare(`SELECT id, content, type, level, user_id, session_id, project_id, agent_id, importance, tags, created_at, access_count, last_accessed FROM memories ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset) as MemoryRow[];
+        } else {
+          // PostgreSQL path — search method
+          const all = await repo.search({
+            types: body.type ? [body.type] : undefined,
+            minImportance: body.minImportance ?? 0,
+            includePersistent: true,
+            limit: 10000,
+          });
+          total = all.length;
+          rows = all.slice(offset, offset + limit);
+        }
 
         return {
           success: true,
-          data: {
-            memories: rows.map(formatRow),
-            total,
-            limit,
-            offset,
-          },
+          data: { memories: rows.map(formatRow), total, limit, offset },
         };
       } catch (error) {
         logger.error("Failed to list memories", error as Error);

@@ -7,7 +7,6 @@ export { ContextualSearchRLM } from "./search/contextual-search-rlm.js";
 export { SearchCache } from "./search/search-cache.js";
 export { getSearchCache } from "./search/cache-factory.js";
 export { SearchAnalytics } from "./search/search-analytics.js";
-export { SearchCacheWarmup } from "./search/search-warmup.js";
 export { IndexManager } from "./search/index-manager.js";
 
 // Cache
@@ -116,3 +115,73 @@ export type { WorkspaceRow, WorkspaceStatus } from "./workspace/workspace-manage
 
 // Prisma lifecycle
 export { getPrismaClient, disconnectPrisma } from "./query/prisma-client.js";
+
+// Synapse — cognitive modulation layer (focus, retention, prioritization, speed)
+export {
+  SynapseManager,
+  getSynapseManager,
+  resetSynapseManager,
+  applyDiversityPenalty,
+  applyConfidenceGate,
+  applyTemporalInhibition,
+  applyChainInhibition,
+  applyAttentionScore,
+  classifyQuery,
+  hasTemporalIndicator,
+  detectIntent,
+  analyzeSpectrum,
+  computeTaskAlignment,
+  computeAgentAffinity,
+  DEFAULT_CHAIN_BOOSTS,
+  DEFAULT_ATTENTION_WEIGHTS,
+  DEFAULT_ATTENTION_CONFIG,
+  DEFAULT_BUFFER_CONFIG,
+  SessionRegistry,
+  getSessionRegistry,
+  resetSessionRegistry,
+  WorkingMemoryBuffer,
+  computeStrengthenUpdates,
+  selectCompressionCandidates,
+  compressBatch,
+  evolveEmbeddings,
+  buildPrefetchPlan,
+  executePrefetch,
+  extractTopics,
+  DEFAULT_STRENGTHEN_CONFIG,
+  DEFAULT_COMPRESS_CONFIG,
+  DEFAULT_EMBEDDING_EVOLUTION_CONFIG,
+  DEFAULT_PREFETCH_CONFIG,
+} from "./synapse/index.js";
+export type {
+  AgentSession,
+  SpectrumFlags,
+  SynapsePipelineResult,
+  QueryClass,
+  QueryIntent,
+  ChainBoostMap,
+  DiversityPenaltyConfig,
+  ConfidenceGateConfig,
+  TemporalInhibitionConfig,
+  ChainInhibitionConfig,
+  ScoreSpectrumConfig,
+  AttentionWeights,
+  AttentionScoreConfig,
+  AttentionScoreBreakdown,
+  CreateSessionInput,
+  WorkingMemoryBufferConfig,
+  BufferGetResult,
+  MemoryUsageStats,
+  StrengthenConfig,
+  StrengthenUpdate,
+  CompressionCandidate,
+  CompressConfig,
+  CompressUpdate,
+  SummarizeFn,
+  EvolutionInput,
+  EvolutionUpdate,
+  EmbeddingEvolutionConfig,
+  PrefetchConfig,
+  PrefetchInput,
+  PrefetchPlan,
+  PrefetchEntry,
+} from "./synapse/index.js";

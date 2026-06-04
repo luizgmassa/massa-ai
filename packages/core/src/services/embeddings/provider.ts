@@ -155,7 +155,7 @@ export class AISDKEmbeddingProvider implements EmbeddingProvider {
   
   // Ollama rate limiting: Mutex to prevent overwhelming the server
   private static ollamaMutex: Promise<void> = Promise.resolve();
-  private static readonly OLLAMA_DELAY_MS = 50; // 50ms between requests
+  private static readonly OLLAMA_DELAY_MS = Number(process.env.OLLAMA_EMBED_DELAY_MS ?? "0");
 
   constructor(
     private readonly config: EmbeddingProviderConfig,
@@ -709,11 +709,3 @@ export function createProvider(
   return new AISDKEmbeddingProvider(config, providerId);
 }
 
-/**
- * Create multiple providers from configurations
- */
-export function createProviders(
-  configs: Array<[string, EmbeddingProviderConfig]>,
-): EmbeddingProvider[] {
-  return configs.map(([id, config]) => createProvider(config, id));
-}

@@ -20,14 +20,11 @@
 
 import {
   SearchResult,
-  SearchSource,
-  RetrievalOptions,
   VectorDocument,
 } from "@th0th-ai/shared";
 import { logger } from "@th0th-ai/shared";
 import { getKeywordSearch } from "../../data/sqlite/keyword-search-factory.js";
 import { getVectorStore } from "../../data/vector/vector-store-factory.js";
-import { estimateTokens } from "@th0th-ai/shared";
 import { config } from "@th0th-ai/shared";
 import { IndexManager } from "./index-manager.js";
 import { getSearchCache } from "./cache-factory.js";
@@ -38,7 +35,6 @@ import { getSymbolRepository } from "../../data/sqlite/symbol-repository-factory
 import fs from "fs/promises";
 import path from "path";
 import { glob } from "glob";
-import { minimatch } from "minimatch";
 import { FileFilterCache } from "./file-filter-cache.js";
 import { smartChunk } from "./smart-chunker.js";
 import { loadProjectIgnore } from "./ignore-patterns.js";
@@ -216,7 +212,7 @@ export class ContextualSearchRLM {
       let errors = 0;
 
       // Process files in batches to avoid overloading
-      const BATCH_SIZE = 10;
+      const BATCH_SIZE = 20;
       let processedFiles = 0;
       for (let i = 0; i < filteredFiles.length; i += BATCH_SIZE) {
         const batch = filteredFiles.slice(i, i + BATCH_SIZE);
@@ -477,6 +473,8 @@ export class ContextualSearchRLM {
         lineEnd: chunk.lineEnd,
         label: chunk.label,
         centralityScore,
+        ...(chunk.fileImports && { fileImports: chunk.fileImports }),
+        ...(chunk.parentSymbol && { parentSymbol: chunk.parentSymbol }),
       },
     }));
 
@@ -573,14 +571,16 @@ export class ContextualSearchRLM {
     }
 
     try {
-      // Parallel search across vector store and keyword search
+      const disableKeyword = process.env.SEARCH_DISABLE_KEYWORD === "true";
       const [vectorResults, keywordResults] = await Promise.all([
         this.vectorStore.search(query, maxResults * 2, projectId),
-        this.keywordSearch.searchWithFilter(
-          query,
-          { projectId },
-          maxResults * 2,
-        ),
+        disableKeyword
+          ? Promise.resolve([] as Awaited<ReturnType<typeof this.keywordSearch.searchWithFilter>>)
+          : this.keywordSearch.searchWithFilter(query, { projectId }, maxResults * 2)
+              .catch((err) => {
+                logger.warn("Keyword search failed — falling back to vector-only", { err: (err as Error).message });
+                return [] as Awaited<ReturnType<typeof this.keywordSearch.searchWithFilter>>;
+              }),
       ]);
 
       logger.debug("Search results retrieved", {
@@ -628,18 +628,28 @@ export class ContextualSearchRLM {
       //
       // Keyword-only results (no vectorScore) fall back to the normalized score
       // so they are still subject to some threshold.
-      const filtered = filteredByPattern
+      const aboveThreshold = filteredByPattern
         .filter((result) => {
           const meta = result.metadata as Record<string, unknown>;
           const rawVs = meta?._rrfRawVectorScore as number | undefined;
           return rawVs !== undefined ? rawVs >= minScore : result.score >= minScore;
         })
         .map((result) => {
-          // Strip the internal field before caching / returning to callers.
           const { _rrfRawVectorScore, ...cleanMeta } = result.metadata as Record<string, unknown>;
           return { ...result, metadata: cleanMeta };
-        })
-        .slice(0, maxResults);
+        });
+
+      const maxChunksPerFile = Number(process.env.RRF_MAX_CHUNKS_PER_FILE ?? "2");
+      const fileChunkCount = new Map<string, number>();
+      const filtered = maxChunksPerFile > 0
+        ? aboveThreshold.filter((r) => {
+            const fp = (r.metadata as Record<string, unknown>)?.filePath as string ?? r.id;
+            const count = fileChunkCount.get(fp) ?? 0;
+            if (count >= maxChunksPerFile) return false;
+            fileChunkCount.set(fp, count + 1);
+            return true;
+          }).slice(0, maxResults)
+        : aboveThreshold.slice(0, maxResults);
 
       // Add context to results
       const withContext = await this.addContextToResults(filtered, projectId);
@@ -723,7 +733,9 @@ export class ContextualSearchRLM {
     // Keyword weight multiplier (higher = more weight to keyword results)
     // For code queries: 2.5x boost to keyword matches
     // For general queries: 1.0x (equal weight)
-    const KEYWORD_BOOST = isCodeQuery ? 2.5 : 1.0;
+    const codeKeywordBoostRaw = Number(process.env.RRF_KEYWORD_BOOST ?? "2.5");
+    const codeKeywordBoost = Number.isFinite(codeKeywordBoostRaw) && codeKeywordBoostRaw > 0 ? codeKeywordBoostRaw : 2.5;
+    const KEYWORD_BOOST = isCodeQuery ? codeKeywordBoost : 1.0;
 
     logger.debug("RRF fusion parameters", {
       query,
@@ -773,6 +785,8 @@ export class ContextualSearchRLM {
     // Dynamic normalization: use the top RRF score as divisor so results
     // span the full [0, 1] range instead of being capped by a fixed constant.
     const maxRrfScore = sorted[0]?.rrfScore || 1;
+    const vectorWeightRaw = Number(process.env.RRF_VECTOR_WEIGHT ?? "0.3");
+    const vectorWeight = Number.isFinite(vectorWeightRaw) ? Math.min(1, Math.max(0, vectorWeightRaw)) : 0.3;
 
     return sorted
       .map(
@@ -792,7 +806,7 @@ export class ContextualSearchRLM {
           // Combine RRF score with vector similarity for better relevance measurement
           // Weight: 70% RRF (ranking-based) + 30% vector similarity (semantic)
           const vectorSimilarity = vectorScore || 0;
-          const combinedScore = rrfNormalized * 0.7 + vectorSimilarity * 0.3;
+          const combinedScore = rrfNormalized * (1 - vectorWeight) + vectorSimilarity * vectorWeight;
 
           // Centrality boost: symbols with higher PageRank get a mild re-ranking bonus.
           // finalScore = combined_score * (1 + 0.2 * centralityScore)
@@ -880,7 +894,7 @@ export class ContextualSearchRLM {
    */
   private async addContextToResults(
     results: SearchResult[],
-    projectId: string,
+    _projectId: string,
   ): Promise<SearchResult[]> {
     return results.map((result) => {
       const metadata = result.metadata;
@@ -1019,7 +1033,7 @@ export class ContextualSearchRLM {
    */
   async warmupCache(
     projectId: string,
-    projectPath: string,
+    _projectPath: string,
     customQueries?: string[],
   ): Promise<{ queriesWarmed: number; errors: number }> {
     await this.ensureInitialized();
@@ -1084,5 +1098,3 @@ export class ContextualSearchRLM {
   }
 }
 
-// Export singleton
-export const contextualSearch = new ContextualSearchRLM();

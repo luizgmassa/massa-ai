@@ -1,0 +1,54 @@
+{
+  "embedding provider configuration ollama setup": [
+    "packages/core/src/services/embeddings/config.ts",
+    "packages/core/src/services/embeddings/provider.ts",
+    "packages/core/src/services/embeddings/index.ts"
+  ],
+  "vector store HNSW index initialization": [
+    "packages/core/src/data/vector/postgres-vector-store.ts",
+    "packages/core/src/data/vector/base-vector-store.ts",
+    "packages/core/src/data/vector/vector-store-factory.ts"
+  ],
+  "how to fix ECONNREFUSED postgres connection": [
+    "packages/core/src/services/query/prisma-client.ts",
+    "packages/core/src/data/sqlite/prisma-client-fallback.ts",
+    "scripts/diagnose.ts"
+  ],
+  "memory consolidation job decay rate strategy": [
+    "packages/core/src/services/jobs/memory-consolidation-job.ts"
+  ],
+  "search analytics tracking duration metric": [
+    "packages/core/src/services/search/search-analytics.ts",
+    "packages/core/src/services/search/search-analytics-pg.ts"
+  ],
+  "session file cache chunk reference token": [
+    "packages/core/src/services/context/session-file-cache.ts"
+  ],
+  "ContextualSearchRLM hybrid search": [
+    "packages/core/src/services/search/contextual-search-rlm.ts"
+  ],
+  "MemoryConsolidationJob decay fields": [
+    "packages/core/src/services/jobs/memory-consolidation-job.ts"
+  ],
+  "applyDiversityPenalty MMR Jaccard tokens": [
+    "packages/core/src/services/synapse/inhibition/diversity-penalty.ts"
+  ],
+  "RedundancyFilter cosine similarity 0.95": [
+    "packages/core/src/services/memory/redundancy-filter.ts"
+  ],
+  "EmbeddingService configuration defaults": [
+    "packages/core/src/services/embeddings/config.ts",
+    "packages/core/src/services/embeddings/provider.ts"
+  ],
+  "best practice for caching queries layer": [
+    "packages/core/src/services/cache/cache-manager.ts",
+    "packages/core/src/services/cache/l1-memory-cache.ts",
+    "packages/core/src/services/cache/l2-sqlite-cache.ts"
+  ],
+  "pattern for memory invalidation on git change": [
+    "packages/core/src/services/jobs/memory-consolidation-job.ts"
+  ],
+  "idiomatic way to handle retry with backoff": [
+    "packages/core/src/services/embeddings/provider.ts"
+  ]
+}
