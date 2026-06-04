@@ -118,6 +118,7 @@ export interface SynapseRuntimeConfig {
     };
     chainInhibition: {
       enabled: boolean;
+      boosts?: Record<string, Record<string, number>>;
     };
   };
   scoring: {

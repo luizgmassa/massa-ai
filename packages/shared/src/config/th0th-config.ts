@@ -52,6 +52,10 @@ export interface SynapseConfig {
       enabled: boolean;
       thresholds: { specific: number; focused: number; broad: number };
     };
+    chainInhibition?: {
+      enabled: boolean;
+      boosts?: Record<string, number>;
+    };
   };
   metacognition: {
     enabled: boolean;
