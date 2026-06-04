@@ -50,9 +50,13 @@ export class SessionRegistry {
   }
 
   create(input: CreateSessionInput, now: number = Date.now()): AgentSession {
+    if (this.sessions.has(input.sessionId)) {
+      throw new Error(`Session already exists: ${input.sessionId}`);
+    }
     const ttl = input.ttlMs ?? this.defaultTtlMs;
     const session: AgentSession = {
       sessionId: input.sessionId,
+      ttlMs: ttl,
       agentId: input.agentId,
       workspaceId: input.workspaceId,
       taskContext: input.taskContext,
@@ -81,7 +85,7 @@ export class SessionRegistry {
       this.sessions.delete(sessionId);
       return null;
     }
-    const refreshed = now + this.defaultTtlMs;
+    const refreshed = now + (session.ttlMs ?? this.defaultTtlMs);
     if (refreshed > session.expiresAt) {
       session.expiresAt = refreshed;
     }
@@ -102,7 +106,7 @@ export class SessionRegistry {
     session.taskContext = taskContext;
     session.taskTokens = tokenize(taskContext);
     if (taskEmbedding) session.taskEmbedding = taskEmbedding;
-    session.expiresAt = now + this.defaultTtlMs;
+    session.expiresAt = now + (session.ttlMs ?? this.defaultTtlMs);
     return session;
   }
 

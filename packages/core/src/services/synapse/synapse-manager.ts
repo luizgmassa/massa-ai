@@ -139,7 +139,7 @@ export class SynapseManager {
     if (chainCfg?.enabled) {
       const out = applyChainInhibition(stream, query, {
         enabled: true,
-        boosts: DEFAULT_CHAIN_BOOSTS,
+        boosts: chainCfg.boosts ?? DEFAULT_CHAIN_BOOSTS,
       });
       stream = out.results;
       intent = out.intent;

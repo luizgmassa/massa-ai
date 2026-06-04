@@ -47,6 +47,7 @@ export interface AgentSession {
   taskContext?: string;
   taskTokens?: Set<string>; // pre-tokenized taskContext for fast Jaccard
   taskEmbedding?: Float32Array | number[]; // optional: only when caller provides
+  ttlMs: number;
   createdAt: number;
   expiresAt: number;
   /**

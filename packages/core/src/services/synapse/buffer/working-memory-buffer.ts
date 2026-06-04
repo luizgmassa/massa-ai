@@ -147,6 +147,8 @@ export class WorkingMemoryBuffer {
       const baseline = rawScores?.get(result.id);
       const existing = this.entries.get(result.id);
       if (existing) {
+        existing.result = result;
+        existing.contentTokens = tokenize(result.content || "");
         for (const t of queryTokens) existing.queryTokens.add(t);
         existing.lastAccessedAt = now;
         // Only overwrite baselineScore when an explicit raw score was given.

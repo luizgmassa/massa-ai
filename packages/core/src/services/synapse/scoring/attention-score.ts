@@ -125,7 +125,7 @@ export function applyAttentionScore(
   // huge ceiling but only N results are available, doing the work for
   // anything beyond the displayed window is wasted. The lower bound of
   // 10 guarantees enough breathing room for ties/diversity at the tail.
-  const effective = Math.max(10, config.rerankWindow);
+  const effective = config.rerankWindow > 0 ? Math.floor(config.rerankWindow) : 10;
   const window = Math.min(effective, results.length);
   const head = results.slice(0, window);
   const tail = results.slice(window);

@@ -375,6 +375,26 @@ export class Config {
         inhibition: {
           ...defaults.synapse.inhibition,
           ...overrides.synapse?.inhibition,
+          diversityPenalty: {
+            ...defaults.synapse.inhibition.diversityPenalty,
+            ...overrides.synapse?.inhibition?.diversityPenalty,
+          },
+          temporalInhibition: {
+            ...defaults.synapse.inhibition.temporalInhibition,
+            ...overrides.synapse?.inhibition?.temporalInhibition,
+          },
+          confidenceGate: {
+            ...defaults.synapse.inhibition.confidenceGate,
+            ...overrides.synapse?.inhibition?.confidenceGate,
+            thresholds: {
+              ...defaults.synapse.inhibition.confidenceGate.thresholds,
+              ...overrides.synapse?.inhibition?.confidenceGate?.thresholds,
+            },
+          },
+          chainInhibition: {
+            ...defaults.synapse.inhibition.chainInhibition,
+            ...overrides.synapse?.inhibition?.chainInhibition,
+          },
         },
         scoring: {
           ...defaults.synapse.scoring,
