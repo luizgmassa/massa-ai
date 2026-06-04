@@ -633,5 +633,3 @@ export class SearchCache {
   }
 }
 
-// Singleton instance
-export const searchCache = new SearchCache();

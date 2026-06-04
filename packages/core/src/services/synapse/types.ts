@@ -37,14 +37,6 @@ export interface SynapsePipelineResult {
 }
 
 /**
- * Context passed to inhibitors / scorers. Lightweight; built per-query.
- */
-export interface InhibitionContext {
-  query: string;
-  now: number;
-}
-
-/**
  * Agent session — ephemeral context for a single agent working on a task.
  * Kept in-memory; persistence is intentionally out of scope here.
  */

@@ -20,14 +20,11 @@
 
 import {
   SearchResult,
-  SearchSource,
-  RetrievalOptions,
   VectorDocument,
 } from "@th0th-ai/shared";
 import { logger } from "@th0th-ai/shared";
 import { getKeywordSearch } from "../../data/sqlite/keyword-search-factory.js";
 import { getVectorStore } from "../../data/vector/vector-store-factory.js";
-import { estimateTokens } from "@th0th-ai/shared";
 import { config } from "@th0th-ai/shared";
 import { IndexManager } from "./index-manager.js";
 import { getSearchCache } from "./cache-factory.js";
@@ -38,7 +35,6 @@ import { getSymbolRepository } from "../../data/sqlite/symbol-repository-factory
 import fs from "fs/promises";
 import path from "path";
 import { glob } from "glob";
-import { minimatch } from "minimatch";
 import { FileFilterCache } from "./file-filter-cache.js";
 import { smartChunk } from "./smart-chunker.js";
 import { loadProjectIgnore } from "./ignore-patterns.js";
@@ -737,7 +733,8 @@ export class ContextualSearchRLM {
     // Keyword weight multiplier (higher = more weight to keyword results)
     // For code queries: 2.5x boost to keyword matches
     // For general queries: 1.0x (equal weight)
-    const codeKeywordBoost = Number(process.env.RRF_KEYWORD_BOOST ?? "2.5");
+    const codeKeywordBoostRaw = Number(process.env.RRF_KEYWORD_BOOST ?? "2.5");
+    const codeKeywordBoost = Number.isFinite(codeKeywordBoostRaw) && codeKeywordBoostRaw > 0 ? codeKeywordBoostRaw : 2.5;
     const KEYWORD_BOOST = isCodeQuery ? codeKeywordBoost : 1.0;
 
     logger.debug("RRF fusion parameters", {
@@ -788,7 +785,8 @@ export class ContextualSearchRLM {
     // Dynamic normalization: use the top RRF score as divisor so results
     // span the full [0, 1] range instead of being capped by a fixed constant.
     const maxRrfScore = sorted[0]?.rrfScore || 1;
-    const vectorWeight = Number(process.env.RRF_VECTOR_WEIGHT ?? "0.3");
+    const vectorWeightRaw = Number(process.env.RRF_VECTOR_WEIGHT ?? "0.3");
+    const vectorWeight = Number.isFinite(vectorWeightRaw) ? Math.min(1, Math.max(0, vectorWeightRaw)) : 0.3;
 
     return sorted
       .map(
@@ -896,7 +894,7 @@ export class ContextualSearchRLM {
    */
   private async addContextToResults(
     results: SearchResult[],
-    projectId: string,
+    _projectId: string,
   ): Promise<SearchResult[]> {
     return results.map((result) => {
       const metadata = result.metadata;
@@ -1035,7 +1033,7 @@ export class ContextualSearchRLM {
    */
   async warmupCache(
     projectId: string,
-    projectPath: string,
+    _projectPath: string,
     customQueries?: string[],
   ): Promise<{ queriesWarmed: number; errors: number }> {
     await this.ensureInitialized();
@@ -1100,5 +1098,3 @@ export class ContextualSearchRLM {
   }
 }
 
-// Export singleton
-export const contextualSearch = new ContextualSearchRLM();

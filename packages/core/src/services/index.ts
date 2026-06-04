@@ -7,7 +7,6 @@ export { ContextualSearchRLM } from "./search/contextual-search-rlm.js";
 export { SearchCache } from "./search/search-cache.js";
 export { getSearchCache } from "./search/cache-factory.js";
 export { SearchAnalytics } from "./search/search-analytics.js";
-export { SearchCacheWarmup } from "./search/search-warmup.js";
 export { IndexManager } from "./search/index-manager.js";
 
 // Cache
@@ -160,7 +159,6 @@ export type {
   QueryClass,
   QueryIntent,
   ChainBoostMap,
-  InhibitionContext,
   DiversityPenaltyConfig,
   ConfidenceGateConfig,
   TemporalInhibitionConfig,

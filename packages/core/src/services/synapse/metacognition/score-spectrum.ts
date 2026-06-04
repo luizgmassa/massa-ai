@@ -49,19 +49,19 @@ export function analyzeSpectrum(
   let max = -Infinity;
   let min = Infinity;
   let sum = 0;
+  let top = -Infinity;
+  let second = -Infinity;
   for (const s of scores) {
     if (s > max) max = s;
     if (s < min) min = s;
     sum += s;
+    if (s >= top) { second = top; top = s; }
+    else if (s > second) { second = s; }
   }
+  if (second === -Infinity) second = 0;
   const mean = sum / scores.length;
   const spread = max - min;
   const confidence = spread * mean;
-
-  const top = scores.length > 0 ? scores[0] : 0;
-  // For a single-element list, treat "second" as 0 so the gap calculation
-  // still classifies a strong solo result as definitive.
-  const second = scores.length > 1 ? scores[1] : 0;
 
   const definitiveMatch =
     top >= config.definitiveTopScore && top - second >= config.definitiveGap;

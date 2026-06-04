@@ -709,11 +709,3 @@ export function createProvider(
   return new AISDKEmbeddingProvider(config, providerId);
 }
 
-/**
- * Create multiple providers from configurations
- */
-export function createProviders(
-  configs: Array<[string, EmbeddingProviderConfig]>,
-): EmbeddingProvider[] {
-  return configs.map(([id, config]) => createProvider(config, id));
-}

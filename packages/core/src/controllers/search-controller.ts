@@ -95,7 +95,7 @@ export class SearchController {
       projectId,
       projectPath,
       maxResults = 10,
-      minScore = Number(process.env.SEARCH_MIN_SCORE ?? "0.3"),
+      minScore = (() => { const v = Number(process.env.SEARCH_MIN_SCORE ?? "0.3"); return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.3; })(),
       responseMode = "summary",
       autoReindex = false,
       include,

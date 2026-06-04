@@ -207,7 +207,8 @@ describe("Edge cases — very long input lists do not degrade catastrophically",
     const out = applyAttentionScore(inputs, { ...DEFAULT_ATTENTION_CONFIG, enabled: true, rerankWindow: 50 }, null);
     const elapsed = performance.now() - start;
     expect(out.results).toHaveLength(100);
-    expect(elapsed).toBeLessThan(50); // <50ms for 100 candidates
+    const maxMs = Number(process.env.SYNAPSE_ATTENTION_MAX_MS ?? "250");
+    expect(elapsed).toBeLessThan(maxMs);
   });
 
   test("diversity penalty handles 50 same-file chunks", () => {

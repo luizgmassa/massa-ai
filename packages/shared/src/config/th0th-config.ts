@@ -102,27 +102,3 @@ export const defaultTh0thConfig: Th0thConfig = {
     },
   },
 };
-
-export const configExamples = {
-  ollama: {
-    embedding: {
-      provider: "ollama" as const,
-      model: "nomic-embed-text:latest",
-      baseURL: "http://localhost:11434",
-    },
-  },
-  mistral: {
-    embedding: {
-      provider: "mistral" as const,
-      model: "mistral-embed",
-      apiKey: "YOUR_MISTRAL_API_KEY",
-    },
-  },
-  openai: {
-    embedding: {
-      provider: "openai" as const,
-      model: "text-embedding-3-small",
-      apiKey: "YOUR_OPENAI_API_KEY",
-    },
-  },
-};

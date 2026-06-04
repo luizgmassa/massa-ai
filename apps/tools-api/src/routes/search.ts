@@ -33,7 +33,8 @@ function normalizeArrayParam(value: unknown): string[] | undefined {
     const parsed = JSON.parse(value);
     if (Array.isArray(parsed)) return parsed as string[];
   } catch { /* not JSON */ }
-  const pythonMatch = value.match(/^\[(.+)\]$/);
+  const pythonMatch = value.match(/^\[(.*)\]$/);
+  if (pythonMatch && pythonMatch[1].trim() === "") return [];
   if (pythonMatch) {
     try {
       const parsed = JSON.parse("[" + pythonMatch[1].replace(/'/g, '"') + "]");

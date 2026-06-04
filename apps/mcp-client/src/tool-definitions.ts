@@ -538,7 +538,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: "th0th_synapse_session",
-    description: "Create/resume a Synapse cognitive session. Returns sessionId to pass as synapseSessionId on every th0th_search. Activates task alignment, agent affinity, working-memory buffer. Name by intent: 'debug-auth', 'feature-payment'.",
+    description: "Create/resume a Synapse cognitive session. Returns sessionId to pass as sessionId on every th0th_search. Activates task alignment, agent affinity, working-memory buffer. Name by intent: 'debug-auth', 'feature-payment'.",
     apiEndpoint: "/api/v1/synapse/session",
     apiMethod: "POST",
     inputSchema: {

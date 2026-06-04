@@ -449,7 +449,6 @@ export const config = new Config();
 export {
   Th0thConfig,
   defaultTh0thConfig,
-  configExamples,
 } from "./th0th-config";
 
 export {

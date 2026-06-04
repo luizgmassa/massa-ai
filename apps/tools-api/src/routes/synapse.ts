@@ -263,7 +263,7 @@ export const synapseRoutes = new Elysia({ prefix: "/api/v1/synapse" })
         id: e.id,
         content: e.content,
         score: e.score ?? 0.7,
-        source: "vector" as any,
+        source: SearchSource.VECTOR,
         metadata: (e.metadata ?? {}) as any,
       }));
       session.buffer.prime(results);
