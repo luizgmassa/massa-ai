@@ -100,9 +100,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         responseMode: {
           type: "string",
-          enum: ["summary", "full"],
+          enum: ["summary", "full", "enriched"],
           description:
-            "Response format: 'summary' (preview only, saves 70% tokens) or 'full' (includes content)",
+            "Response format: 'summary' (preview only, saves 70% tokens), 'full' (includes content), or 'enriched' (full + fileImports + parentSymbol in one call)",
           default: "summary",
         },
         autoReindex: {
@@ -128,6 +128,10 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           description:
             "Include detailed score breakdown (vector, keyword, RRF components)",
           default: false,
+        },
+        sessionId: {
+          type: "string",
+          description: "Synapse session ID from th0th_synapse_session. Activates cognitive modulation: task alignment, agent affinity, working-memory boost.",
         },
       },
       required: ["query", "projectId"],
