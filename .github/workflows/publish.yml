@@ -7,7 +7,6 @@ on:
 
 env:
   NPM_TAG: ${{ github.event_name == 'release' && 'latest' || 'next' }}
-  FORCE_PUBLISH: '--tolerate-republish'
 
 jobs:
   build:
@@ -81,13 +80,13 @@ jobs:
 
       - name: Publish @th0th-ai/shared
         working-directory: packages/shared
-        run: bun publish --access public --tag ${{ env.NPM_TAG }} ${{ env.FORCE_PUBLISH }}
+        run: bun publish --access public --tag ${{ env.NPM_TAG }}
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @th0th-ai/core
         working-directory: packages/core
-        run: bun publish --access public --tag ${{ env.NPM_TAG }} ${{ env.FORCE_PUBLISH }}
+        run: bun publish --access public --tag ${{ env.NPM_TAG }}
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -112,19 +111,19 @@ jobs:
 
       - name: Publish @th0th-ai/tools-api
         working-directory: apps/tools-api
-        run: bun publish --access public --tag ${{ env.NPM_TAG }} ${{ env.FORCE_PUBLISH }}
+        run: bun publish --access public --tag ${{ env.NPM_TAG }}
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @th0th-ai/mcp-client
         working-directory: apps/mcp-client
-        run: bun publish --access public --tag ${{ env.NPM_TAG }} ${{ env.FORCE_PUBLISH }}
+        run: bun publish --access public --tag ${{ env.NPM_TAG }}
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @th0th-ai/opencode-plugin
         working-directory: apps/opencode-plugin
-        run: bun publish --access public --tag ${{ env.NPM_TAG }} ${{ env.FORCE_PUBLISH }}
+        run: bun publish --access public --tag ${{ env.NPM_TAG }}
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
