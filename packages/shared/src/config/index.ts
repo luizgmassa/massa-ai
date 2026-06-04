@@ -92,6 +92,63 @@ export interface ServerConfig {
     level: "debug" | "info" | "warn" | "error";
     enableMetrics: boolean;
   };
+
+  // Synapse — cognitive modulation layer (focus, retention, prioritization, speed).
+  // Mirrored from Th0thConfig so runtime services have a uniform access point.
+  synapse: SynapseRuntimeConfig;
+}
+
+export interface SynapseRuntimeConfig {
+  enabled: boolean;
+  inhibition: {
+    diversityPenalty: {
+      enabled: boolean;
+      threshold: number;
+      lambda: number;
+      samePathPenalty?: number;
+    };
+    temporalInhibition: {
+      enabled: boolean;
+      penaltyAgeMs: number;
+      penalty: number;
+    };
+    confidenceGate: {
+      enabled: boolean;
+      thresholds: { specific: number; focused: number; broad: number };
+    };
+    chainInhibition: {
+      enabled: boolean;
+    };
+  };
+  scoring: {
+    attention: {
+      enabled: boolean;
+      rerankWindow: number;
+      recencyHalfLifeMs: number;
+      semanticScale: number;
+      weights: {
+        semantic: number;
+        recency: number;
+        accessHeat: number;
+        taskAlign: number;
+        agentAffinity: number;
+        confidence: number;
+      };
+    };
+  };
+  metacognition: {
+    enabled: boolean;
+    lowConfidenceThreshold: number;
+    definitiveTopScore: number;
+    definitiveGap: number;
+  };
+  buffer: {
+    enabled: boolean;
+    maxSize: number;
+    ttlMs: number;
+    hitBoost: number;
+    matchThreshold: number;
+  };
 }
 
 /** Read an env var as a number; falls back to `fallback` when unset, empty, or non-finite. */
@@ -127,12 +184,15 @@ export const defaultConfig: ServerConfig = {
       defaultTTL: envNum("L1_CACHE_TTL", 300),
     },
     l2: {
-      dbPath: process.env.CACHE_DB_PATH || path.join(getGlobalDataDir(), "cache.db"),
+      dbPath:
+        process.env.CACHE_DB_PATH || path.join(getGlobalDataDir(), "cache.db"),
       maxSize: envNum("L2_CACHE_MAX_SIZE", 500 * 1024 * 1024),
       defaultTTL: envNum("L2_CACHE_TTL", 3600),
     },
     embedding: {
-      dbPath: process.env.EMBEDDING_CACHE_DB_PATH || path.join(getGlobalDataDir(), "embedding-cache.db"),
+      dbPath:
+        process.env.EMBEDDING_CACHE_DB_PATH ||
+        path.join(getGlobalDataDir(), "embedding-cache.db"),
       maxAgeHours: 168, // 7 days
     },
   },
@@ -210,6 +270,62 @@ export const defaultConfig: ServerConfig = {
     level: (process.env.LOG_LEVEL as any) || "info",
     enableMetrics: process.env.ENABLE_METRICS === "true",
   },
+
+  synapse: {
+    enabled: process.env.SYNAPSE_ENABLED !== "false",
+    inhibition: {
+      diversityPenalty: {
+        enabled: true,
+        threshold: 0.85,
+        lambda: 0.4,
+        samePathPenalty: 0.15,
+      },
+      temporalInhibition: {
+        enabled: true,
+        penaltyAgeMs: 3_600_000,
+        penalty: 0.15,
+      },
+      confidenceGate: {
+        enabled: true,
+        thresholds: { specific: 0.55, focused: 0.4, broad: 0.25 },
+      },
+      chainInhibition: { enabled: true },
+    },
+    scoring: {
+      attention: {
+        enabled: process.env.SYNAPSE_ATTENTION_ENABLED === "true",
+        rerankWindow: 50,
+        recencyHalfLifeMs: 7 * 24 * 60 * 60 * 1000,
+        semanticScale: 1.0,
+        weights: {
+          semantic: 0.25,
+          recency: 0.15,
+          accessHeat: 0.15,
+          taskAlign: 0.2,
+          agentAffinity: 0.1,
+          confidence: 0.15,
+        },
+      },
+    },
+    metacognition: {
+      enabled: true,
+      // Recalibrated against real RRF score distributions (IMP-2):
+      // production confidence values fall in 0.07-0.28 range; 0.15 catches
+      // genuinely weak clusters without flooding the metric.
+      lowConfidenceThreshold: 0.15,
+      definitiveTopScore: 0.8,
+      // RRF rarely produces 0.4+ gaps in top-2; 0.2 is the practical
+      // boundary between "obvious winner" and "competitive set".
+      definitiveGap: 0.2,
+    },
+    buffer: {
+      enabled: true,
+      maxSize: 20,
+      ttlMs: 900_000,
+      hitBoost: 1.3,
+      matchThreshold: 0.4,
+    },
+  },
 };
 
 /**
@@ -253,6 +369,34 @@ export class Config {
       rateLimit: { ...defaults.rateLimit, ...overrides.rateLimit },
       security: { ...defaults.security, ...overrides.security },
       logging: { ...defaults.logging, ...overrides.logging },
+      synapse: {
+        ...defaults.synapse,
+        ...overrides.synapse,
+        inhibition: {
+          ...defaults.synapse.inhibition,
+          ...overrides.synapse?.inhibition,
+        },
+        scoring: {
+          ...defaults.synapse.scoring,
+          ...overrides.synapse?.scoring,
+          attention: {
+            ...defaults.synapse.scoring.attention,
+            ...overrides.synapse?.scoring?.attention,
+            weights: {
+              ...defaults.synapse.scoring.attention.weights,
+              ...overrides.synapse?.scoring?.attention?.weights,
+            },
+          },
+        },
+        metacognition: {
+          ...defaults.synapse.metacognition,
+          ...overrides.synapse?.metacognition,
+        },
+        buffer: {
+          ...defaults.synapse.buffer,
+          ...overrides.synapse?.buffer,
+        },
+      },
     };
   }
 

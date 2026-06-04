@@ -18,4 +18,5 @@ export {
   config,
   defaultConfig,
   type ServerConfig,
+  type SynapseRuntimeConfig,
 } from "./config/index.js";

@@ -28,6 +28,37 @@ export interface Th0thConfig {
     level: "debug" | "info" | "warn" | "error";
     enableMetrics: boolean;
   };
+  synapse: SynapseConfig;
+}
+
+/**
+ * Synapse — cognitive modulation layer over retrieval.
+ * Every submodule has its own kill switch; the whole layer can be disabled at the top.
+ */
+export interface SynapseConfig {
+  enabled: boolean;
+  inhibition: {
+    diversityPenalty: {
+      enabled: boolean;
+      threshold: number; // cosine threshold above which results are considered redundant
+      lambda: number;    // penalty strength: score *= (1 - lambda * cosine)
+    };
+    temporalInhibition: {
+      enabled: boolean;
+      penaltyAgeMs: number; // memories younger than this get penalized when query is non-temporal
+      penalty: number;      // absolute score reduction
+    };
+    confidenceGate: {
+      enabled: boolean;
+      thresholds: { specific: number; focused: number; broad: number };
+    };
+  };
+  metacognition: {
+    enabled: boolean;
+    lowConfidenceThreshold: number;
+    definitiveTopScore: number;
+    definitiveGap: number;
+  };
 }
 
 export const defaultTh0thConfig: Th0thConfig = {
@@ -52,6 +83,23 @@ export const defaultTh0thConfig: Th0thConfig = {
   logging: {
     level: "info",
     enableMetrics: false,
+  },
+  synapse: {
+    enabled: true,
+    inhibition: {
+      diversityPenalty: { enabled: true, threshold: 0.85, lambda: 0.4 },
+      temporalInhibition: { enabled: true, penaltyAgeMs: 3_600_000, penalty: 0.15 },
+      confidenceGate: {
+        enabled: true,
+        thresholds: { specific: 0.55, focused: 0.4, broad: 0.25 },
+      },
+    },
+    metacognition: {
+      enabled: true,
+      lowConfidenceThreshold: 0.1,
+      definitiveTopScore: 0.8,
+      definitiveGap: 0.4,
+    },
   },
 };
 
