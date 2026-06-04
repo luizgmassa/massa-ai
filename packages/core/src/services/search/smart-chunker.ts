@@ -36,6 +36,8 @@ export interface Chunk {
   type: "heading_section" | "json_key" | "yaml_block" | "code_block" | "fixed";
   /** Optional label (heading text, JSON key, etc.) */
   label?: string;
+  fileImports?: string;
+  parentSymbol?: string;
 }
 
 /**
@@ -80,6 +82,8 @@ export function smartChunk(
   const cfg = { ...DEFAULT_CONFIG, ...config };
   const ext = path.extname(filePath).toLowerCase();
   const relativePath = filePath; // caller should pass relative path
+
+  const fileImports = isCodeFile(ext) ? extractFileImports(content, ext) : undefined;
 
   let chunks: Chunk[];
 
@@ -149,6 +153,15 @@ export function smartChunk(
         content: `// File: ${relativePath}\n${labelHeader}${chunk.content}`,
       };
     });
+  }
+
+  // Attach file-level imports and parentSymbol to every chunk for enriched mode
+  if (fileImports) {
+    chunks = chunks.map((c) => ({
+      ...c,
+      fileImports,
+      parentSymbol: c.label ?? undefined,
+    }));
   }
 
   // Filter out empty chunks
@@ -826,6 +839,38 @@ function splitLineByChars(line: string, maxChars: number): string[] {
   }
   if (remaining) parts.push(remaining);
   return parts;
+}
+
+/**
+ * Extract import statements from a code file and return them as a single string.
+ * Used to attach file-level import context to every chunk for enriched mode.
+ */
+function extractFileImports(content: string, ext: string): string | undefined {
+  const lines = content.split("\n");
+  const importLines: string[] = [];
+
+  if (ext === ".py") {
+    for (const line of lines) {
+      const t = line.trim();
+      if (t.startsWith("import ") || t.startsWith("from ")) {
+        importLines.push(t);
+      }
+    }
+  } else {
+    // JS/TS/Go/Java etc — collect leading import block
+    for (const line of lines) {
+      const t = line.trim();
+      if (t.startsWith("import ") || t.startsWith("const {") || t.startsWith("require(")) {
+        importLines.push(t);
+      } else if (importLines.length > 0 && t === "") {
+        // stop at first blank line after imports started
+        break;
+      }
+    }
+  }
+
+  if (importLines.length === 0) return undefined;
+  return importLines.join("\n");
 }
 
 // --- Utilities ---

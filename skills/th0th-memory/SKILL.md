@@ -40,7 +40,15 @@ Reference these guidelines when:
 | 11 | `th0th_recall` | Retrieve memories from previous sessions |
 | 12 | `th0th_compress` | Reduce context size (70-98%) |
 | 13 | `th0th_analytics` | Usage patterns and metrics |
-| 14 | Glob/Grep/Read | Only when th0th doesn't find what you need |
+| 14 | `th0th_read_file` | Read file/line-range with symbol metadata (prefer over Read when you have lineStart/lineEnd) |
+| 15 | `th0th_project_map` | One-shot project overview: PageRank backbone, symbol counts, language distribution |
+| 16 | `th0th_synapse_session` | Create/resume Synapse cognitive session (task alignment, agent affinity, working memory) |
+| 17 | `th0th_synapse_prime` | Seed Synapse buffer with recalled memories before searching |
+| 18 | `th0th_synapse_access` | Record file access for affinity scoring (call after reading/editing a file) |
+| 19 | `th0th_symbol_snippet` | Get raw code snippet by file + line range |
+| 20 | `th0th_memory_list` | Browse memories by type/importance without a query (audit mode) |
+| 21 | `th0th_reindex` | Force full reindex (when autoReindex/50-file limit is insufficient) |
+| 22 | Glob/Grep/Read | Only when th0th doesn't find what you need |
 
 ## Tool Reference
 
@@ -122,6 +130,7 @@ th0th_search({
 **responseMode:**
 - `"summary"` (default) — returns preview only; saves ~70% tokens.
 - `"full"` — includes full file content; use when you need to read code.
+- `"enriched"` — full content + `fileImports` + `parentSymbol` in every result; best for deep dives without extra tool calls. Use `chunkIndex`/`totalChunks` to navigate adjacent chunks.
 
 ### 4. th0th_optimized_context
 

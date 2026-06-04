@@ -517,6 +517,118 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ["projectId"],
     },
   },
+  {
+    name: "th0th_read_file",
+    description: "Read a specific file (or line range) with symbol metadata and imports. Use instead of Read/grep when you have filePath+lineStart+lineEnd from a search result.",
+    apiEndpoint: "/api/v1/file/read",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        filePath: { type: "string", description: "File path (absolute or relative to project root)" },
+        projectId: { type: "string", description: "Project ID for symbol metadata" },
+        lineStart: { type: "number", description: "First line to read (1-indexed)" },
+        lineEnd: { type: "number", description: "Last line to read (1-indexed)" },
+        compress: { type: "boolean", description: "Auto-compress content > 100 lines (default: true)", default: true },
+        includeSymbols: { type: "boolean", description: "Include symbol definitions/references (default: true)", default: true },
+        includeImports: { type: "boolean", description: "Extract file imports (default: true)", default: true },
+      },
+      required: ["filePath"],
+    },
+  },
+  {
+    name: "th0th_synapse_session",
+    description: "Create/resume a Synapse cognitive session. Returns sessionId to pass as synapseSessionId on every th0th_search. Activates task alignment, agent affinity, working-memory buffer. Name by intent: 'debug-auth', 'feature-payment'.",
+    apiEndpoint: "/api/v1/synapse/session",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sessionId: { type: "string", description: "Reuse existing session ID (omit to auto-generate)" },
+        agentId: { type: "string", description: "Stable agent identifier", default: "claude-code" },
+        workspaceId: { type: "string", description: "Project ID this session is scoped to" },
+        taskContext: { type: "string", description: "One-sentence description of the current task" },
+        ttlMs: { type: "number", description: "Session TTL in ms (default: 15 min)", default: 900000 },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "th0th_synapse_prime",
+    description: "Seed the Synapse working-memory buffer with recalled memories before searching. Call at session start with th0th_recall results.",
+    apiEndpoint: "/api/v1/synapse/session/:id/prime",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Session ID from th0th_synapse_session" },
+        results: { type: "array", description: "Search results to seed into the buffer", items: { type: "object" } },
+      },
+      required: ["id", "results"],
+    },
+  },
+  {
+    name: "th0th_synapse_access",
+    description: "Record file access for affinity scoring — boosts that file in future searches. Call after reading or editing a file.",
+    apiEndpoint: "/api/v1/synapse/session/:id/access",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Session ID" },
+        memoryId: { type: "string", description: "Chunk ID that was accessed" },
+        filePath: { type: "string", description: "File path that was accessed" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "th0th_symbol_snippet",
+    description: "Get raw code snippet by file + line range from an indexed project.",
+    apiEndpoint: "/api/v1/symbol/snippet",
+    apiMethod: "GET",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string" },
+        file: { type: "string", description: "Relative file path" },
+        lineStart: { type: "number" },
+        lineEnd: { type: "number" },
+      },
+      required: ["projectId", "file"],
+    },
+  },
+  {
+    name: "th0th_memory_list",
+    description: "Browse stored memories by type/importance without a semantic query (audit mode). Use th0th_recall for semantic search.",
+    apiEndpoint: "/api/v1/memory/list",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string" },
+        type: { type: "string", description: "critical | decision | pattern | code | conversation" },
+        minImportance: { type: "number", default: 0 },
+        limit: { type: "number", default: 50 },
+        offset: { type: "number", default: 0 },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "th0th_reindex",
+    description: "Force full reindex of a project workspace. Use when autoReindex (max 50 files) is insufficient after a large refactor.",
+    apiEndpoint: "/api/v1/workspace/:id/reindex",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Project ID" },
+        forceReindex: { type: "boolean", default: false },
+      },
+      required: ["id"],
+    },
+  },
 ];
 
 /**

@@ -58,3 +58,6 @@ chromadb/
 
 # Local MCP configuration (contains developer-specific paths)
 .mcp.json
+
+# Benchmark datasets
+benchmarks/datasets/

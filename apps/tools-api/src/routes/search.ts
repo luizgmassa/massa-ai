@@ -25,6 +25,24 @@ function getSearchCodeTool(): SearchCodeTool {
   return searchCodeTool;
 }
 
+function normalizeArrayParam(value: unknown): string[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (Array.isArray(value)) return value as string[];
+  if (typeof value !== "string") return undefined;
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed as string[];
+  } catch { /* not JSON */ }
+  const pythonMatch = value.match(/^\[(.+)\]$/);
+  if (pythonMatch) {
+    try {
+      const parsed = JSON.parse("[" + pythonMatch[1].replace(/'/g, '"') + "]");
+      if (Array.isArray(parsed)) return parsed as string[];
+    } catch { /* not Python-style */ }
+  }
+  return [value];
+}
+
 export const searchRoutes = new Elysia({ prefix: "/api/v1/search" })
   .post(
     "/project",
@@ -32,6 +50,10 @@ export const searchRoutes = new Elysia({ prefix: "/api/v1/search" })
       return await getSearchProjectTool().handle(body);
     },
     {
+      transform({ body }: any) {
+        if (body.include !== undefined) body.include = normalizeArrayParam(body.include);
+        if (body.exclude !== undefined) body.exclude = normalizeArrayParam(body.exclude);
+      },
       body: t.Object({
         query: t.String({
           description: "Search query (natural language or keywords)",
@@ -50,7 +72,7 @@ export const searchRoutes = new Elysia({ prefix: "/api/v1/search" })
           }),
         ),
         responseMode: t.Optional(
-          t.Union([t.Literal("summary"), t.Literal("full")], {
+          t.Union([t.Literal("summary"), t.Literal("full"), t.Literal("enriched")], {
             default: "summary",
           }),
         ),
