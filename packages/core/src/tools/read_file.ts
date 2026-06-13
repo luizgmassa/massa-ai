@@ -395,6 +395,7 @@ export class ReadFileTool implements IToolHandler {
       ".tsx": "TypeScript",
       ".js": "JavaScript",
       ".jsx": "JavaScript",
+      ".vue": "Vue",
       ".py": "Python",
       ".go": "Go",
       ".rs": "Rust",
