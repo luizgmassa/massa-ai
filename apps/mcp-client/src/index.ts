@@ -90,7 +90,7 @@ function textContent(text: string) {
 // Auto-configure on first run
 if (!configExists()) {
   initConfig();
-  console.error(`
+  console.log(`
 [th0th] Initialized with default configuration
 [th0th] Config: ~/.config/th0th/config.json
 [th0th] Provider: Ollama (local, free)
@@ -227,7 +227,6 @@ class McpProxyServer {
       return textContent(JSON.stringify({ success: false, error: `Path not found: ${projectPath}` }));
     }
 
-    console.error(`[th0th-mcp] Collecting files from ${projectPath}...`);
     const files = await collectFiles(projectPath);
 
     if (files.length === 0) {
@@ -236,8 +235,6 @@ class McpProxyServer {
         error: `No indexable files found in ${projectPath}`,
       }));
     }
-
-    console.error(`[th0th-mcp] Uploading ${files.length} files to remote API...`);
 
     const response = await this.apiClient.uploadAndIndex({
       projectPath,
@@ -255,16 +252,12 @@ class McpProxyServer {
     // Check API health before starting
     const healthy = await this.apiClient.healthCheck();
     if (!healthy) {
-      console.error(
+      console.log(
         "[th0th-mcp] Warning: Tools API is not reachable. Requests will fail until API is available.",
       );
     }
 
     await this.server.connect(this.transport);
-    console.error("[th0th-mcp] MCP Client running on stdio");
-    console.error(
-      `[th0th-mcp] Proxying to: ${process.env.TH0TH_API_URL || "http://localhost:3333"}`,
-    );
   }
 
   async close(): Promise<void> {
