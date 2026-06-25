@@ -316,6 +316,24 @@ export class CodeCompressor implements ICompressor {
    * Detect programming language from content
    */
   private detectLanguage(content: string): string {
+    // Kotlin (check before Dart — both use import-without-from, but Kotlin has `fun`/`val`/`var`/`package`)
+    const hasKtFun = /\bfun\s+\w+\s*\(/.test(content);
+    const hasKtValVar = /\b(?:val|var)\s+\w+\s*(?::\s*\w+[?*<>]*\s*)?(?:=)/.test(content);
+    const hasKtPackage = /^package\s+[\w.]+/m.test(content);
+    const hasKtImport = /^import\s+[\w.]+\.\w+/m.test(content);
+    const hasKtClassLike = /\b(?:data\s+class|sealed\s+class|object\s+\w+|companion\s+object|expect\s+(?:class|fun)|actual\s+(?:class|fun))\b/.test(content);
+
+    if (
+      (hasKtFun || hasKtValVar || hasKtClassLike) &&
+      (hasKtPackage || hasKtImport)
+    ) {
+      return "kotlin";
+    }
+
+    if (hasKtFun && !content.includes("import ") && !content.includes("from ")) {
+      return "kotlin";
+    }
+
     const hasDartOnlyDirective = /(\blibrary\s+[a-zA-Z_][\w.]*\s*;|\bpart\s+of\s+[a-zA-Z_][\w.]*\s*;)/.test(content);
     const hasDartType = /\b(class|enum|mixin|extension)\s+\w+/.test(content);
     const hasDartMain = /\bvoid\s+main\s*\(/.test(content);

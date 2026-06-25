@@ -409,6 +409,7 @@ export class ReadFileTool implements IToolHandler {
       ".php": "PHP",
       ".swift": "Swift",
       ".kt": "Kotlin",
+      ".kts": "Kotlin",
       ".scala": "Scala",
       ".md": "Markdown",
       ".json": "JSON",

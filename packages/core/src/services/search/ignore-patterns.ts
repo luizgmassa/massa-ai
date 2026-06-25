@@ -10,7 +10,7 @@ import { logger } from "@th0th-ai/shared";
 
 const ignore = (ignoreModule as unknown as { default: typeof ignoreModule }).default ?? ignoreModule;
 
-export const DEFAULT_EXTENSIONS = [".ts", ".js", ".tsx", ".jsx", ".dart", ".py"];
+export const DEFAULT_EXTENSIONS = [".ts", ".js", ".tsx", ".jsx", ".dart", ".py", ".kt", ".kts"];
 
 export const DEFAULT_IGNORES = [
   // `**/` prefix required so these match anywhere in the tree (not just root).

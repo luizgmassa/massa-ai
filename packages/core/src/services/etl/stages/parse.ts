@@ -152,6 +152,9 @@ export class ParseStage {
         return this.extractPySymbols(content);
       case ".dart":
         return this.extractDartSymbols(content);
+      case ".kt":
+      case ".kts":
+        return this.extractKtSymbols(content);
       default:
         return [];
     }
@@ -294,6 +297,117 @@ export class ParseStage {
     return symbols;
   }
 
+  /**
+   * Kotlin symbol extractor.
+   *
+   * Covers standard Kotlin, Android, and KMP (expect/actual) declarations.
+   * Uses regex + brace tracking like the JS extractor — no kotlin-compiler dependency.
+   */
+  private extractKtSymbols(content: string): RawSymbol[] {
+    const lines = content.split("\n");
+    const symbols: RawSymbol[] = [];
+
+    // Visibility/annotation/modifier prefixes (optional, not captured).
+    const modPrefix =
+      /^(?:(?:public|private|protected|internal)\s+)?(?:expect\s+|actual\s+)?(?:abstract\s+|open\s+|data\s+|sealed\s+|inner\s+|enum\s+|companion\s+)?(?:suspend\s+|inline\s+|operator\s+|infix\s+|tailrec\s+|override\s+|external\s+)?/;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trimStart();
+
+      // fun name(...) — covers suspend, inline, expect, actual, etc.
+      const fnMatch = new RegExp(`^${modPrefix.source}fun\\s+(\\w+)\\s*[(<]`).exec(line);
+      if (fnMatch && !["if", "when", "for", "while"].includes(fnMatch[1])) {
+        const lineEnd = this.findBlockEnd(lines, i);
+        symbols.push({
+          kind: "function",
+          name: fnMatch[1],
+          lineStart: i + 1,
+          lineEnd,
+          exported: !line.startsWith("private"),
+        });
+        continue;
+      }
+
+      // class / data class / sealed class / abstract class / open class / enum class
+      // Also: expect class / actual class (KMP)
+      const clsMatch = new RegExp(
+        `^${modPrefix.source}(?:class|enum\\s+class)\\s+(\\w+)`,
+      ).exec(line);
+      if (clsMatch) {
+        const lineEnd = this.findBlockEnd(lines, i);
+        symbols.push({
+          kind: "class",
+          name: clsMatch[1],
+          lineStart: i + 1,
+          lineEnd,
+          exported: !line.startsWith("private"),
+        });
+        continue;
+      }
+
+      // interface Name
+      const ifaceMatch = new RegExp(
+        `^${modPrefix.source}interface\\s+(\\w+)`,
+      ).exec(line);
+      if (ifaceMatch) {
+        const lineEnd = this.findBlockEnd(lines, i);
+        symbols.push({
+          kind: "interface",
+          name: ifaceMatch[1],
+          lineStart: i + 1,
+          lineEnd,
+          exported: !line.startsWith("private"),
+        });
+        continue;
+      }
+
+      // object Name (Kotlin singleton) — but NOT companion object (class-level only)
+      const objMatch = /^(?:public\s+|private\s+|protected\s+|internal\s+)?object\s+(\w+)/.exec(line);
+      if (objMatch && !line.includes("companion")) {
+        symbols.push({
+          kind: "class",
+          name: objMatch[1],
+          lineStart: i + 1,
+          lineEnd: this.findBlockEnd(lines, i),
+          exported: !line.startsWith("private"),
+        });
+        continue;
+      }
+
+      // Top-level val/var/const val (constants and properties)
+      // Match: val/var/const val name (optionally with type annotation and =)
+      const propMatch =
+        /^(?:(?:public|private|protected|internal)\s+)?(?:expect\s+|actual\s+)?(?:const\s+)?(?:val|var)\s+(\w+)\s*(?::[^=]+)?\s*=/.exec(
+          line,
+        );
+      if (propMatch && !line.includes("(")) {
+        symbols.push({
+          kind: "variable",
+          name: propMatch[1],
+          lineStart: i + 1,
+          lineEnd: i + 1,
+          exported: !line.startsWith("private"),
+        });
+        continue;
+      }
+
+      // typealias Name = ...
+      const taMatch =
+        /^(?:(?:public|private|protected|internal)\s+)?typealias\s+(\w+)\s*=/.exec(line);
+      if (taMatch) {
+        symbols.push({
+          kind: "type",
+          name: taMatch[1],
+          lineStart: i + 1,
+          lineEnd: i + 1,
+          exported: !line.startsWith("private"),
+        });
+      }
+    }
+
+    return symbols;
+  }
+
   // ─── Import extraction ────────────────────────────────────────────────────
 
   private extractImports(content: string, ext: string): RawImport[] {
@@ -305,6 +419,9 @@ export class ParseStage {
         return this.extractJsImports(content);
       case ".py":
         return this.extractPyImports(content);
+      case ".kt":
+      case ".kts":
+        return this.extractKtImports(content);
       default:
         return [];
     }
@@ -361,6 +478,36 @@ export class ParseStage {
       for (const n of names) {
         imports.push({ specifier: n.replace(/\./g, "/"), names: ["*"], isTypeOnly: false });
       }
+    }
+
+    return imports;
+  }
+
+  /**
+   * Kotlin import extraction.
+   *
+   * Handles:
+   *   import com.example.Foo          → specifier "com.example", names ["Foo"]
+   *   import com.example.*            → specifier "com.example", names ["*"]
+   *   import com.example.Foo as Bar   → specifier "com.example", names ["Bar"]
+   */
+  private extractKtImports(content: string): RawImport[] {
+    const imports: RawImport[] = [];
+
+    // import package.name.ClassName (with optional 'as Alias')
+    // Also matches: import package.name.*
+    const importRe = /^import\s+([\w.]+)\.(\*|\w+)(?:\s+as\s+(\w+))?/gm;
+    let m: RegExpExecArray | null;
+    while ((m = importRe.exec(content)) !== null) {
+      const specifier = m[1];
+      const rawName = m[2];
+      const alias = m[3];
+      const name = alias ?? rawName;
+      imports.push({
+        specifier,
+        names: [name],
+        isTypeOnly: false,
+      });
     }
 
     return imports;

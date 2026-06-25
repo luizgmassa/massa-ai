@@ -6,7 +6,7 @@ export interface CollectedFile {
   content: string;
 }
 
-const ALLOWED_EXTENSIONS = new Set([".ts", ".js", ".tsx", ".jsx", ".dart", ".py"]);
+const ALLOWED_EXTENSIONS = new Set([".ts", ".js", ".tsx", ".jsx", ".dart", ".py", ".kt", ".kts"]);
 
 const SKIP_DIRS = new Set([
   "node_modules", ".git", "dist", "build", "coverage",

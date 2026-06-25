@@ -260,6 +260,7 @@ export const defaultConfig: ServerConfig = {
       ".rb",
       ".swift",
       ".kt",
+      ".kts",
       ".scala",
       ".lua",
       ".zig",

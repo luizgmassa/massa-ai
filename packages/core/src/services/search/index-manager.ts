@@ -255,6 +255,8 @@ export class IndexManager {
         ".jsx",
         ".dart",
         ".py",
+        ".kt",
+        ".kts",
       ];
 
       // Single combined glob pattern (avoids N separate directory traversals)

@@ -899,6 +899,7 @@ const CODE_EXTENSIONS = new Set([
   ".rb",
   ".swift",
   ".kt",
+  ".kts",
   ".scala",
   ".lua",
   ".zig",
