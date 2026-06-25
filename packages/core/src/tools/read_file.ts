@@ -13,6 +13,7 @@ import { IToolHandler, ToolResponse, estimateTokens } from "@th0th-ai/shared";
 import { logger } from "@th0th-ai/shared";
 import { CodeCompressor } from "../services/compression/code-compressor.js";
 import { SymbolGraphService } from "../services/symbol/symbol-graph.service.js";
+import { workspaceManager } from "../services/workspace/workspace-manager.js";
 import fs from "fs/promises";
 import path from "path";
 
@@ -117,7 +118,9 @@ export class ReadFileTool implements IToolHandler {
   private compressor: CodeCompressor;
   private symbolGraph?: SymbolGraphService;
   private fileCache: Map<string, CachedFile> = new Map();
+  private projectRootCache: Map<string, string> = new Map();
   private readonly CACHE_TTL = 60000; // 1 minute
+  private readonly ROOT_CACHE_TTL = 300000; // 5 minutes
 
   constructor(symbolGraph?: SymbolGraphService) {
     this.compressor = new CodeCompressor();
@@ -133,17 +136,21 @@ export class ReadFileTool implements IToolHandler {
     const includeImports = p.includeImports !== false;
 
     try {
-      // Resolve file path
-      const filePath = this.resolveFilePath(p.filePath, p.projectId);
-      
+      // Resolve file path (async — looks up project root when projectId provided)
+      const filePath = await this.resolveFilePath(p.filePath, p.projectId);
+
+      // Keep original relative path for symbol DB queries (DB stores relative paths)
+      const relativePath = p.filePath;
+
       // Calculate line range
       const range = this.calculateRange(p);
-      
+
       // Read file with cache
       const { content, metadata } = await this.readFileWithCache(filePath, {
         includeSymbols,
         includeImports,
         projectId: p.projectId,
+        relativePath,
       });
 
       // Extract requested lines
@@ -252,11 +259,33 @@ export class ReadFileTool implements IToolHandler {
     }
   }
 
-  private resolveFilePath(filePath: string, projectId?: string): string {
+  private async resolveFilePath(filePath: string, projectId?: string): Promise<string> {
     if (path.isAbsolute(filePath)) {
       return filePath;
     }
+    if (projectId) {
+      const root = await this.getProjectRoot(projectId);
+      if (root) {
+        return path.resolve(root, filePath);
+      }
+    }
     return path.resolve(filePath);
+  }
+
+  private async getProjectRoot(projectId: string): Promise<string | null> {
+    const cached = this.projectRootCache.get(projectId);
+    if (cached) return cached;
+
+    try {
+      const workspace = await workspaceManager.getWorkspace(projectId);
+      if (workspace?.project_path) {
+        this.projectRootCache.set(projectId, workspace.project_path);
+        return workspace.project_path;
+      }
+    } catch (error) {
+      logger.warn("Failed to look up project root", { projectId, error: (error as Error).message });
+    }
+    return null;
   }
 
   private calculateRange(params: ReadFileParams): ReadRange {
@@ -298,6 +327,7 @@ export class ReadFileTool implements IToolHandler {
       includeSymbols: boolean;
       includeImports: boolean;
       projectId?: string;
+      relativePath?: string;
     }
   ): Promise<{ content: string; metadata: FileMetadata }> {
     const cacheKey = filePath;
@@ -335,6 +365,7 @@ export class ReadFileTool implements IToolHandler {
       includeSymbols: boolean;
       includeImports: boolean;
       projectId?: string;
+      relativePath?: string;
     }
   ): Promise<FileMetadata> {
     const lines = content.split("\n");
@@ -353,10 +384,12 @@ export class ReadFileTool implements IToolHandler {
     // Get symbol metadata if symbol graph available
     if (options.includeSymbols && this.symbolGraph && options.projectId) {
       try {
+        // Symbol DB stores relative paths — use original relative path for queries
+        const queryPath = options.relativePath || filePath;
         const definitions = await this.symbolGraph.listDefinitions(
           options.projectId,
           {
-            file: filePath,
+            file: queryPath,
             limit: 100,
           }
         );

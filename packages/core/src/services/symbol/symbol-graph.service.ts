@@ -14,6 +14,7 @@ import path from "path";
 import fs from "fs/promises";
 import { logger } from "@th0th-ai/shared";
 import { getSymbolRepository } from "../../data/sqlite/symbol-repository-factory.js";
+import { workspaceManager } from "../workspace/workspace-manager.js";
 import type {
   SymbolDefinition,
   SymbolReference,
@@ -102,6 +103,7 @@ export interface GetProjectMapOptions {
 
 export class SymbolGraphService {
   private static instance: SymbolGraphService | null = null;
+  private projectRootCache: Map<string, string> = new Map();
 
   private constructor() {}
 
@@ -165,7 +167,7 @@ export class SymbolGraphService {
     const top = results.slice(0, 3);
     await Promise.all(
       top.map(async (r) => {
-        r.snippet = await this.readSnippet(r.file, r.lineStart, r.lineEnd);
+        r.snippet = await this.readSnippet(r.file, r.lineStart, r.lineEnd, projectId);
       }),
     );
 
@@ -202,7 +204,7 @@ export class SymbolGraphService {
     const toEnrich = results.slice(0, 20);
     await Promise.all(
       toEnrich.map(async (r) => {
-        r.context = await this.readContext(r.fromFile, r.fromLine, 3);
+        r.context = await this.readContext(r.fromFile, r.fromLine, 3, projectId);
       }),
     );
 
@@ -379,12 +381,11 @@ export class SymbolGraphService {
     relativePath: string,
     lineStart: number,
     lineEnd: number,
-    projectPath?: string,
+    projectId: string,
   ): Promise<string | undefined> {
-    // SymbolGraphService doesn't have direct access to projectPath at this layer;
-    // snippet is best-effort — resolved via absolute path if file exists.
     try {
-      const content = await fs.readFile(relativePath, "utf-8");
+      const absolutePath = await this.resolveToAbsolute(relativePath, projectId);
+      const content = await fs.readFile(absolutePath, "utf-8");
       const lines = content.split("\n");
       return lines
         .slice(Math.max(0, lineStart - 1), Math.min(lines.length, lineEnd))
@@ -399,9 +400,11 @@ export class SymbolGraphService {
     relativePath: string,
     lineNumber: number,
     contextLines: number,
+    projectId: string,
   ): Promise<string | undefined> {
     try {
-      const content = await fs.readFile(relativePath, "utf-8");
+      const absolutePath = await this.resolveToAbsolute(relativePath, projectId);
+      const content = await fs.readFile(absolutePath, "utf-8");
       const lines = content.split("\n");
       const start = Math.max(0, lineNumber - contextLines - 1);
       const end = Math.min(lines.length, lineNumber + contextLines);
@@ -409,6 +412,27 @@ export class SymbolGraphService {
     } catch {
       return undefined;
     }
+  }
+
+  /** Resolve a relative path against the project root (best-effort). */
+  private async resolveToAbsolute(relativePath: string, projectId: string): Promise<string> {
+    const root = await this.getProjectRoot(projectId);
+    return root ? path.resolve(root, relativePath) : relativePath;
+  }
+
+  private async getProjectRoot(projectId: string): Promise<string | null> {
+    const cached = this.projectRootCache.get(projectId);
+    if (cached) return cached;
+    try {
+      const workspace = await workspaceManager.getWorkspace(projectId);
+      if (workspace?.project_path) {
+        this.projectRootCache.set(projectId, workspace.project_path);
+        return workspace.project_path;
+      }
+    } catch {
+      // best-effort — return null on failure
+    }
+    return null;
   }
 }
 
