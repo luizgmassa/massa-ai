@@ -32,6 +32,8 @@ import { getSearchAnalytics } from "./analytics-factory.js";
 import { SearchAnalytics } from "./search-analytics.js";
 import type { SearchAnalyticsPg } from "./search-analytics-pg.js";
 import { getSymbolRepository } from "../../data/sqlite/symbol-repository-factory.js";
+import { getGraphStore } from "../graph/graph-store-factory.js";
+import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
 import fs from "fs/promises";
 import path from "path";
 import { glob } from "glob";
@@ -713,6 +715,17 @@ export class ContextualSearchRLM {
         resultSets = [vectorResults, keywordResults];
       }
 
+      // Phase 7c: graph-neighbor as an extra RRF stream. BFS depth-2 over
+      // outgoing memory-graph edges from the top-N vector-hit ids; resolved to
+      // SearchResults via the memory repo at a fixed sub-hit score (0.45) so
+      // RRF surfaces them mid-list. Silent-omit when empty/unavailable (the
+      // resultSets length — and thus the search:reranked streamCount — reflects
+      // the actual stream count). No throw escapes search().
+      const graphStream = await this.buildGraphStream(resultSets, maxResults);
+      if (graphStream.length > 0) {
+        resultSets = [...resultSets, graphStream];
+      }
+
       // Combine results using RRF (with score explanation if requested)
       const fusedResults = this.fuseResults(resultSets, query, explainScores);
 
@@ -812,6 +825,86 @@ export class ContextualSearchRLM {
       logger.error("Contextual search failed", error as Error, {
         query,
         projectId,
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Phase 7c: build the graph-neighbor RRF stream. BFS depth-2 over outgoing
+   * memory-graph edges from the top-N vector-hit ids; resolved to SearchResults
+   * via the memory repository at a fixed sub-hit score (0.45).
+   *
+   * Degradation (silent-omit): returns [] when the neighbor set is empty, the
+   * graph store throws, or the memory repo returns nothing. The caller only
+   * appends the stream when non-empty, so `resultSets.length` (and thus the
+   * `search:reranked` streamCount) always reflects the real stream count.
+   *
+   * Domain note: graph edges connect MEMORY ids. Vector hits on code-chunk ids
+   * usually won't be in the memory graph, so this stream is typically empty for
+   * pure code search (the designed degradation) and surfaces graph-adjacent
+   * context when memories are seeded with the searched ids (e.g. memory search).
+   */
+  private async buildGraphStream(
+    resultSets: SearchResult[][],
+    maxResults: number,
+  ): Promise<SearchResult[]> {
+    try {
+      // Seed = top-N ids from the first (vector) stream.
+      const vectorStream = resultSets[0] ?? [];
+      const seedIds = vectorStream
+        .slice(0, Math.min(maxResults, 20))
+        .map((r) => r.id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+      if (seedIds.length === 0) return [];
+
+      const graph = getGraphStore();
+      // SQLite bfsNeighbors is sync; Pg is async. Normalize via Promise.resolve
+      // so both backends work without an isPostgres short-circuit.
+      const ns = await Promise.resolve(
+        typeof (graph as { bfsNeighbors?: unknown }).bfsNeighbors === "function"
+          ? (graph as { bfsNeighbors: (ids: string[], d: number) => string[] | Promise<string[]> }).bfsNeighbors(seedIds, 2)
+          : [],
+      );
+      if (!Array.isArray(ns) || ns.length === 0) return [];
+      // Filter out ids already in the result set (avoid double-counting RRF).
+      const present = new Set<string>();
+      for (const set of resultSets)
+        for (const r of set) present.add(r.id);
+      const fresh = ns.filter((id) => !present.has(id));
+      if (fresh.length === 0) return [];
+
+      const repo = getMemoryRepository();
+      const out: SearchResult[] = [];
+      for (const id of fresh) {
+        try {
+          // Backend-polymorphic: SQLite getById is sync, Pg is async. Normalize.
+          const row = await Promise.resolve(repo.getById(id));
+          if (!row || row.deleted_at !== null) continue;
+          out.push({
+            id: row.id,
+            content: row.content,
+            // Fixed sub-hit score: below a typical direct vector hit, above
+            // the minScore 0.3 floor, so RRF surfaces neighbors mid-list.
+            score: 0.45,
+            source: "memory" as SearchResult["source"],
+            metadata: {
+              projectId: row.project_id ?? undefined,
+              context: {
+                memoryType: row.type,
+                graphNeighbor: true,
+                importance: row.importance,
+              },
+            },
+          });
+        } catch {
+          // Defensive: a single missing memory never aborts the stream.
+        }
+      }
+      return out;
+    } catch (e) {
+      logger.debug("graph stream omitted", {
+        err: (e as Error).message,
       });
       return [];
     }

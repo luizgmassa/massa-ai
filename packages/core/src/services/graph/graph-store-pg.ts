@@ -185,6 +185,39 @@ export class GraphStorePg {
   }
 
   /**
+   * Phase 7c: async BFS over outgoing edges (mirror of GraphStore.bfsNeighbors,
+   * but Pg's getOutgoingEdges is async). See graph-store.ts for semantics.
+   */
+  async bfsNeighbors(seedIds: string[], depth: number): Promise<string[]> {
+    const d = Math.max(1, Math.floor(depth));
+    const seeds = new Set(seedIds);
+    const visited = new Set<string>(seedIds);
+    const out = new Set<string>();
+    let frontier: string[] = seedIds.filter((id) => id != null && id !== "");
+
+    for (let hop = 0; hop < d && frontier.length > 0; hop++) {
+      const next: string[] = [];
+      for (const id of frontier) {
+        try {
+          const edges = await this.getOutgoingEdges(id);
+          for (const e of edges) {
+            const t = e.targetId;
+            if (!visited.has(t)) {
+              visited.add(t);
+              out.add(t);
+              next.push(t);
+            }
+          }
+        } catch {
+          // Defensive: a single broken seed never aborts the whole BFS.
+        }
+      }
+      frontier = next;
+    }
+    return [...out];
+  }
+
+  /**
    * Get all edges connected to a memory (both incoming and outgoing)
    */
   async getConnectedEdges(memoryId: string, limit: number = 100): Promise<MemoryEdge[]> {

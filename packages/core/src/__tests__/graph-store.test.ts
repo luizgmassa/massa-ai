@@ -428,4 +428,72 @@ describe("GraphStore", () => {
       console.log("Active indexes:", indexNames.join(", "));
     });
   });
+
+  // ── Phase 7c: bfsNeighbors ─────────────────────────────────
+  describe("bfsNeighbors (Phase 7c)", () => {
+    test("returns ids reachable within depth via outgoing edges", () => {
+      // A -> B -> C ; A -> D
+      store.createEdge("A", "B", MemoryRelationType.RELATES_TO);
+      store.createEdge("B", "C", MemoryRelationType.RELATES_TO);
+      store.createEdge("A", "D", MemoryRelationType.SUPERSEDES);
+      const neighbors = store.bfsNeighbors(["A"], 2);
+      // Depth-2 from A reaches B, D (hop 1) and C (hop 2).
+      expect(neighbors.sort()).toEqual(["B", "C", "D"]);
+    });
+
+    test("depth=1 returns only direct successors", () => {
+      store.createEdge("A", "B", MemoryRelationType.RELATES_TO);
+      store.createEdge("B", "C", MemoryRelationType.RELATES_TO);
+      expect(store.bfsNeighbors(["A"], 1).sort()).toEqual(["B"]);
+    });
+
+    test("excludes seeds from neighbor output", () => {
+      // A -> B -> A (cycle). A is a seed; visited as a seed, so excluded from
+      // the neighbor output. C is a fresh successor of B.
+      store.createEdge("A", "B", MemoryRelationType.RELATES_TO);
+      store.createEdge("B", "A", MemoryRelationType.RELATES_TO);
+      store.createEdge("B", "C", MemoryRelationType.RELATES_TO);
+      const neighbors = store.bfsNeighbors(["A"], 2).sort();
+      expect(neighbors).toEqual(["B", "C"]);
+      expect(neighbors).not.toContain("A");
+    });
+
+    test("dedups neighbors reachable via multiple paths", () => {
+      // A -> B, A -> C, B -> D, C -> D : D reached twice.
+      store.createEdge("A", "B", MemoryRelationType.RELATES_TO);
+      store.createEdge("A", "C", MemoryRelationType.RELATES_TO);
+      store.createEdge("B", "D", MemoryRelationType.RELATES_TO);
+      store.createEdge("C", "D", MemoryRelationType.RELATES_TO);
+      const neighbors = store.bfsNeighbors(["A"], 2).sort();
+      expect(neighbors).toEqual(["B", "C", "D"]);
+      // D appears exactly once (dedup).
+      expect(neighbors.filter((n) => n === "D")).toHaveLength(1);
+    });
+
+    test("seed with no outgoing edges contributes nothing", () => {
+      store.createEdge("A", "B", MemoryRelationType.RELATES_TO);
+      const neighbors = store.bfsNeighbors(["A", "lonely"], 2).sort();
+      expect(neighbors).toEqual(["B"]);
+    });
+
+    test("empty seed list returns empty", () => {
+      store.createEdge("A", "B", MemoryRelationType.RELATES_TO);
+      expect(store.bfsNeighbors([], 2)).toEqual([]);
+    });
+
+    test("cyclic graph terminates (visited set prevents infinite loop)", () => {
+      // Tight cycle A <-> B. Must terminate and return B only.
+      store.createEdge("A", "B", MemoryRelationType.RELATES_TO);
+      store.createEdge("B", "A", MemoryRelationType.RELATES_TO);
+      const neighbors = store.bfsNeighbors(["A"], 5).sort();
+      expect(neighbors).toEqual(["B"]);
+    });
+
+    // Discrimination sensor: if bfsNeighbors returned seeds, this fails.
+    test("discrimination sensor — seeds are excluded (mutant kill)", () => {
+      store.createEdge("A", "B", MemoryRelationType.RELATES_TO);
+      const neighbors = store.bfsNeighbors(["A"], 2);
+      expect(neighbors).not.toContain("A");
+    });
+  });
 });

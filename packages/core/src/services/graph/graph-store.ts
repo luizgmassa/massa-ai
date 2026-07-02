@@ -218,6 +218,45 @@ export class GraphStore {
   }
 
   /**
+   * Phase 7c: BFS over outgoing edges from `seedIds`, returning the set of
+   * memory ids reachable within `depth` hops (excluding the seeds themselves
+   * unless re-reached via a cycle). Follows outgoing edges only — SUPERSEDES/
+   * RELATED are directional, and outgoing surfaces the fresh/related memory
+   * rather than the stale one an incoming traversal would return.
+   *
+   * Dedup'd; visited set prevents infinite loops on cyclic graphs. Depth ≥1.
+   * Built on getOutgoingEdges. Pure over the graph state + inputs.
+   */
+  bfsNeighbors(seedIds: string[], depth: number): string[] {
+    const d = Math.max(1, Math.floor(depth));
+    const seeds = new Set(seedIds);
+    const visited = new Set<string>(seedIds);
+    const out = new Set<string>();
+    let frontier: string[] = seedIds.filter((id) => id != null && id !== "");
+
+    for (let hop = 0; hop < d && frontier.length > 0; hop++) {
+      const next: string[] = [];
+      for (const id of frontier) {
+        try {
+          const edges = this.getOutgoingEdges(id);
+          for (const e of edges) {
+            const t = e.targetId;
+            if (!visited.has(t)) {
+              visited.add(t);
+              out.add(t);
+              next.push(t);
+            }
+          }
+        } catch {
+          // Defensive: a single broken seed never aborts the whole BFS.
+        }
+      }
+      frontier = next;
+    }
+    return [...out];
+  }
+
+  /**
    * Get all edges connected to a memory (both directions).
    * 
    * Optimized to use UNION ALL instead of OR for better index utilization.
