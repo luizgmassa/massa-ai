@@ -169,6 +169,20 @@ describe("MemoryController update (merge tags) + delete (sever edges)", () => {
     expect(result.updated).toBe(false);
   });
 
+  test("update rejects empty/whitespace content", async () => {
+    insertMemory(repo, "c-empty", "has content");
+    await expect(
+      controller.update({ id: "c-empty", content: "   " }),
+    ).rejects.toThrow(/content must not be empty/);
+  });
+
+  test("update with empty tags + mergeTags:false explicitly clears tags", async () => {
+    insertMemory(repo, "c-clear", "has content", ["old", "stale"]);
+    const result = await controller.update({ id: "c-clear", tags: [] });
+    expect(result.updated).toBe(true);
+    expect(JSON.parse(result.memory?.tags ?? "[]")).toEqual([]);
+  });
+
   test("delete hard-deletes the memory and severs its graph edges", async () => {
     insertMemory(repo, "c2", "edge source");
     insertMemory(repo, "c3", "edge target");
