@@ -90,5 +90,35 @@ export type {
   SeedMemories,
 } from "./services/bootstrap/bootstrap-service.js";
 
+// Phase 6 — cross-session handoffs (G2)
+export {
+  SqliteHandoffStore,
+  MemoryHandoffStore,
+  getHandoffStore,
+  resetHandoffStore,
+  newHandoffId,
+  HANDOFF_STATUSES,
+} from "./data/handoff/handoff-repository.js";
+export type {
+  HandoffStore,
+  HandoffRecord,
+  HandoffStatus,
+} from "./data/handoff/handoff-repository.js";
+export {
+  HandoffService,
+  getHandoffService,
+  resetHandoffService,
+  buildHandoffMemoryInput,
+  formatMemoryContent,
+} from "./services/handoff/handoff-service.js";
+export type {
+  BeginHandoffInput,
+  BeginResult,
+  AcceptCancelResult,
+  HandoffMemorySeam,
+  HandoffDeps,
+} from "./services/handoff/handoff-service.js";
+export { HandoffAutoInjector } from "./services/handoff/handoff-auto-injector.js";
+
 // Re-export types from shared for convenience
 export type { ToolResponse, IToolHandler } from "@th0th-ai/shared";
