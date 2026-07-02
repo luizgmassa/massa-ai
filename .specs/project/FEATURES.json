@@ -6,9 +6,16 @@
     {
       "slug": "phase-0-quick-wins",
       "title": "Phase 0 — Quick wins (0a upload gate, 0b reindex cap, 0c memory CRUD, 0d checkpoint MCP)",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P1",
       "phases": { "specify": true, "design": false, "tasks": "inline", "execute": true }
+    },
+    {
+      "slug": "phase-1-memory-foundation",
+      "title": "Phase 1 — Memory-quality foundation (decay fn, LLM consolidation, durable sessions/jobs)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": { "specify": true, "design": true, "tasks": true, "execute": true }
     }
   ]
 }

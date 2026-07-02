@@ -68,7 +68,39 @@ schema, EventBus events, seams). Not the spec; canonical state stays in
 
 ## Per-phase integration deltas (append as phases complete)
 
-### Phase 1 — (pending)
+### Phase 1 — landed (commits befa3cb, e49ffa9, 12fe002, 1ccb42c)
+
+**Config keys (new):**
+- `memory.decay: { lambda=0.02; sigma=0.6; mu=0.04; coldThreshold=0.20 }` (`DecayParams`, exported from `@th0th-ai/shared`).
+- Top-level `llm: { enabled; baseUrl; apiKey; model; temperature; maxOutputTokens; timeoutMs }` — Ollama defaults (`http://localhost:11434/v1`, `qwen2.5-coder:7b`, `apiKey "ollama"`), **default-off** (env `RLM_LLM_ENABLED=true`).
+- `compression.llm` is now a **deprecated alias** of `llm` (same env vars; `prompt` stays compression-specific). Migrate readers to `config.get("llm")`.
+- New env helpers in `packages/shared/src/config`: `envBool`, `envString` (alongside `envNum`).
+
+**Services exported (path + symbol) — what Phase 2+ consumes:**
+- `packages/core/src/services/memory/decay.ts` → `decayScore(mem, params?, now?)`, `isCold(mem, params?, now?)`, `DEFAULT_DECAY_PARAMS`, `DecayMemory`.
+- `packages/core/src/services/memory/llm-client.ts` → `llmComplete(prompt, opts?)`, `llmObject(prompt, zodSchema, opts?)`, `isLlmEnabled()`, `llm` (bundled handle), `LlmResult<T>`. `_setLlmEnabledForTesting` is an internal test seam.
+- `packages/core/src/services/memory/consolidator.ts` → `consolidateWindow(candidates, llmSurface, opts?)`, `pickConsolidationWindow`, `cosineSimilarity`, `ConsolidatedBatch`, `ConsolidatedBatchSchema`, `rowsToCandidates`, `LlmSurface`.
+- `packages/core/src/services/synapse/session/session-store.ts` → `SessionStore`, `SqliteSessionStore`, `MemorySessionStore`, `getSessionStore()`, `resetSessionStore()`.
+- `packages/core/src/services/jobs/index-job-store.ts` → `JobStore`, `SqliteJobStore`, `getJobStore()`, `resetJobStore()`.
+- `packages/core/src/services/jobs/memory-consolidation-job.ts` → `MemoryConsolidationJob` (ctor accepts `{ llm?: LlmSurface }`), `ConsolidationStats` (now `{promoted, decayed, pruned, edgesCleaned, merged, batchesCreated}`), singleton `memoryConsolidationJob`.
+
+**Schema delta (additive, both backends):**
+- `memories`: `pinned` (SQLite `INTEGER NOT NULL DEFAULT 0` / PG `Boolean @default(false)`) + `deleted_at` (SQLite `INTEGER` nullable / PG `DateTime?`). Indexes on `deleted_at`.
+- `memory_edges`: now also ensured by `MemoryRepository` (so the SUPERSEDES read filter works even when GraphStore isn't instantiated). SQLite cols unchanged (`source_id/target_id/relation_type/evidence/auto_extracted`); PG unchanged (`from_id/to_id/edge_type/metadata`). Batch id carried via SQLite `evidence` (JSON) / PG `metadata`.
+- `synapse_sessions` + `synapse_access_history` (new, SQLite-canonical; `synapse-sessions.db`).
+- `index_jobs` (new, SQLite-canonical; `index-jobs.db`).
+
+**EventBus events emitted:**
+- `memory:consolidated: { batchId, sourceIds[], newMemoryId, projectId?, stats:{merged, batchesCreated} }` (added to `EventMap`).
+
+**Read-side seams (must be respected by new recall paths):**
+- SQLite FTS + PG FTS + `listMemories` all exclude `deleted_at IS NOT NULL` AND targets of a `SUPERSEDES` edge. Any new recall path MUST apply both filters.
+
+**Backend-polymorphic dispatch pattern:** use `getMemoryRepository()` / `getGraphStore()` / `getSessionStore()` / `getJobStore()`. Never re-introduce `isPostgresEnabled()` short-circuits.
+
+**Latent landmine removed:** `graph-store-pg.ts` no longer eagerly constructs the Prisma client at module-eval (lazy Proxy) — importing `graph-store-factory` is now side-effect-free in SQLite-only environments.
+
+**Test-isolation rule (IMPORTANT for Phase 2+):** bun `mock.module("@th0th-ai/shared")` is process-wide and collides across files. Only ONE test file (memory-crud.test.ts) mocks shared config for the memory subsystem; co-locate new memory tests there or avoid mocking config (pass explicit dbPaths / use the `_setLlmEnabledForTesting` seam). The SQLite consolidation tests live in memory-crud.test.ts for this reason.
 ### Phase 2 — (pending)
 ### Phase 3 — (pending)
 ### Phase 4 — (pending)
@@ -81,3 +113,4 @@ schema, EventBus events, seams). Not the spec; canonical state stays in
 | Phase | Commit(s) | Summary |
 | --- | --- | --- |
 | 0 | 538fe66 4e27925 c25f9d3 b84ea3e be65877 a1e5ca2 3fb4eb1 | quick wins + specs + validation |
+| 1 | befa3cb e49ffa9 12fe002 1ccb42c | memory foundation: decay/pinned/soft-delete, llm-client+consolidator+polymorphic job+read-side, durable sessions/jobs |

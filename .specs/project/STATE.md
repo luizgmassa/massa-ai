@@ -4,11 +4,11 @@
 - projectId: `massa-th0th`
 - workflowSessionId: `spec-virtual-lantern-plan`
 - workflow: spec-driven
-- feature: `phase-0-quick-wins` (complete — verified PASS)
+- feature: `phase-1-memory-foundation` (complete — same-author verified PASS)
 - branch: main
 
 ## Next Step
-Phase 0 done + independently verified. Next session: Phase 1 (memory-quality foundation: decay fn, LLM consolidation, durable sessions/jobs) per `i-want-to-understand-virtual-lantern.md`. Phase 1 needs Design (migrations, llm-client, session store).
+Phase 1 done. Next session: Phase 2 (retrieval quality — query rewrite + HyDE) per `i-want-to-understand-virtual-lantern.md`. Phase 2 consumes the shared `llm-client` + top-level `llm` config + `memory:consolidated` event landed here. Then Phase 3 (passive capture, needs llm-client + consolidation from here).
 
 ## Decisions
 - Scope this session = Phase 0 (0a-0d) only. Phases 1-8 deferred.
@@ -25,6 +25,14 @@ Phase 0 done + independently verified. Next session: Phase 1 (memory-quality fou
 - Gates: `bun run test` 609 pass / 0 fail (61 pre-existing env-dependent skips); `bun run type-check` 5/5 clean; `bun run lint` N/A (no package-level lint task configured).
 - Independent verifier: PASS, all 3 discrimination-sensor mutants killed, every AC has file:line evidence. Report: `.specs/features/phase-0-quick-wins/validation.md`.
 - Residual (non-blocking): config-failure fallback branch (0a) and the `>100→maxSyncFiles` literal (0b) covered by inspection/transitive, not direct tests.
+
+## Completion (Phase 1)
+- Commits: befa3cb (specs), e49ffa9 (item 1 — decay/pinned/soft-delete), 12fe002 (item 2 — llm-client/consolidator/job/read-side), 1ccb42c (item 3 — durable sessions/jobs).
+- Gates: `bun run test` 677 pass / 0 fail / 46 skip (baseline 611 → +66); `bun run type-check` 5/5 clean.
+- Same-author verifier: PASS (sole agent — caveat labeled in validation.md). All 3 discrimination mutants killed. Report: `.specs/features/phase-1-memory-foundation/validation.md`.
+- Landed: pure `decayScore` (+DEFAULT_DECAY_PARAMS) replacing temporalScore; `pinned`+`deleted_at` columns both backends (additive); soft-delete recall filtering; shared `llm-client` (default-off, silent degrade) + top-level `llm` config (Ollama defaults, `compression.llm` deprecated alias); `consolidator` (zod-enforced ConsolidatedBatch, cosine prefilter); backend-polymorphic `MemoryConsolidationJob` (no isPostgresEnabled short-circuit, decay+prune-soft+merge phases, SUPERSEDES edges, `memory:consolidated` event, ConsolidationStats extended); read-side hides superseded; durable `SessionStore`/`SqliteJobStore` (write-through + lazy-load + crash recovery).
+- Accepted assumptions (non-blocking): PG parity for synapse_sessions/index_jobs deferred (SQLite-canonical runtime state, interfaces portable); WorkingMemoryBuffer snapshot best-effort; edge batch-id via SQLite `evidence` vs PG `metadata`.
+- Verified source facts (corrections to plan): `GraphStore.createEdge` (not addEdge); SQLite edge cols `source_id/target_id/relation_type` (no metadata); `temporalScore` was at :200 not :146; only `envNum` helper existed (added envBool/envString); true baseline 611 (plan said 609).
 
 ## Verified Source Facts (grounded this session)
 - file-collector.ts:9 hardcoded 8 exts; index-manager.ts:251-260 duplicated the 8-ext fallback. → fixed via shared `DEFAULT_ALLOWED_EXTENSIONS`.
