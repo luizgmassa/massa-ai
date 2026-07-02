@@ -293,23 +293,28 @@ export class QueryUnderstandingService {
 // ─── FTS5 query construction (design §3.1) ────────────────────────────────────
 
 /**
- * Build a quoted FTS5 OR query from the original query + keywords. Quoting
- * neutralizes FTS5 operator injection; `sanitizeFTS5Query` is applied as a
- * belt-and-braces second layer (it is what the keyword search itself runs).
- * Returns the original query (sanitized) when keywords is empty.
+ * Build a quoted FTS5 OR query from the original query + keywords. Each term
+ * is FTS5-quoted (internal `"` doubled) and joined with `OR` so the keyword
+ * search treats them as a recall-broadening disjunction. Mirrors the per-term
+ * quoting that `sanitizeFTS5Query` applies, but operates on already-distinct
+ * terms (calling sanitizeFTS5Query on the composed string would re-split the
+ * quoted phrases). Returns a sanitized form of the original query when no
+ * keywords survive cleaning.
  */
 export function buildRewrittenFTSQuery(
   query: string,
   keywords: string[],
 ): string {
+  const quoteTerm = (t: string): string => `"${t.replace(/"/g, '""')}"`;
   const parts: string[] = [];
-  if (query && query.trim()) parts.push(`"${query.replace(/"/g, "")}"`);
+  const q = query?.trim();
+  if (q) parts.push(quoteTerm(q));
   for (const kw of keywords) {
-    const clean = kw.replace(/"/g, "").trim();
-    if (clean) parts.push(`"${clean}"`);
+    const clean = kw.trim();
+    if (clean) parts.push(quoteTerm(clean));
   }
   if (parts.length === 0) return sanitizeFTS5Query(query);
-  return sanitizeFTS5Query(parts.join(" OR "));
+  return parts.join(" OR ");
 }
 
 // ─── Shared EmbeddingService singleton (lazy) ─────────────────────────────────
