@@ -5,52 +5,99 @@
   "features": [
     {
       "slug": "phase-0-quick-wins",
-      "title": "Phase 0 — Quick wins (0a upload gate, 0b reindex cap, 0c memory CRUD, 0d checkpoint MCP)",
+      "title": "Phase 0 \u2014 Quick wins (0a upload gate, 0b reindex cap, 0c memory CRUD, 0d checkpoint MCP)",
       "status": "complete",
       "priority": "P1",
-      "phases": { "specify": true, "design": false, "tasks": "inline", "execute": true }
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": "inline",
+        "execute": true
+      }
     },
     {
       "slug": "phase-1-memory-foundation",
-      "title": "Phase 1 — Memory-quality foundation (decay fn, LLM consolidation, durable sessions/jobs)",
+      "title": "Phase 1 \u2014 Memory-quality foundation (decay fn, LLM consolidation, durable sessions/jobs)",
       "status": "complete",
       "priority": "P1",
-      "phases": { "specify": true, "design": true, "tasks": true, "execute": true }
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
     },
     {
       "slug": "phase-2-query-understanding",
-      "title": "Phase 2 — Query understanding (LLM rewrite + HyDE, config-gated, silent-degrade)",
+      "title": "Phase 2 \u2014 Query understanding (LLM rewrite + HyDE, config-gated, silent-degrade)",
       "status": "complete",
       "priority": "P1",
-      "phases": { "specify": true, "design": true, "tasks": true, "execute": true }
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
     },
     {
       "slug": "phase-3-hook-capture",
-      "title": "Phase 3 — Passive memory capture (hook ingestion, Observation store, single-writer queue + 429, consolidation bridge, hook scripts)",
+      "title": "Phase 3 \u2014 Passive memory capture (hook ingestion, Observation store, single-writer queue + 429, consolidation bridge, hook scripts)",
       "status": "complete",
       "priority": "P1",
-      "phases": { "specify": true, "design": true, "tasks": true, "execute": true }
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
     },
     {
       "slug": "phase-4-bootstrap",
-      "title": "Phase 4 — Bootstrap from repo (scan git/README/docs/manifests/centrality → LLM/rule-based seed memories, idempotent, bootstrap:completed event)",
+      "title": "Phase 4 \u2014 Bootstrap from repo (scan git/README/docs/manifests/centrality \u2192 LLM/rule-based seed memories, idempotent, bootstrap:completed event)",
       "status": "complete",
       "priority": "P1",
-      "phases": { "specify": true, "design": true, "tasks": true, "execute": true }
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
     },
     {
       "slug": "phase-6-handoffs",
-      "title": "Phase 6 — Cross-session handoffs (HandoffStore + HandoffService begin/accept/cancel/listPending + dual-write memory + handoff:accepted event + auto-injector + MCP tools + route)",
+      "title": "Phase 6 \u2014 Cross-session handoffs (HandoffStore + HandoffService begin/accept/cancel/listPending + dual-write memory + handoff:accepted event + auto-injector + MCP tools + route)",
       "status": "complete",
       "priority": "P1",
-      "phases": { "specify": true, "design": true, "tasks": true, "execute": true }
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
     },
     {
       "slug": "phase-5-auto-improve",
-      "title": "Phase 5 — Auto-improvement loop (ProposalStore + AutoImproveJob rule-based pattern detection + LLM-optional enrichment + review-gate/auto-approve + apply/reject state machine + memory:auto-improved event + MCP tools + route)",
+      "title": "Phase 5 \u2014 Auto-improvement loop (ProposalStore + AutoImproveJob rule-based pattern detection + LLM-optional enrichment + review-gate/auto-approve + apply/reject state machine + memory:auto-improved event + MCP tools + route)",
       "status": "complete",
       "priority": "P1",
-      "phases": { "specify": true, "design": true, "tasks": true, "execute": true }
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "phase-7-retrieval-polish",
+      "title": "Phase 7 \u2014 Retrieval + compression polish (reranker, salience-judge, graph BFS stream, LLM compression, chromadb dead-code removal)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
     }
   ]
 }

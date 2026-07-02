@@ -4,18 +4,19 @@
 - projectId: `massa-th0th`
 - workflowSessionId: `spec-virtual-lantern-plan`
 - workflow: spec-driven
-- feature: `phase-5-auto-improve` (complete — same-author verified PASS)
+- feature: `phase-7-retrieval-polish` (complete — same-author verified PASS)
 - branch: main
 
 ## Next Step
-Phase 5 done. Next session: Phase 7 (retrieval + compression polish) per
-`i-want-to-understand-virtual-lantern.md` (recommended order
-0→1→2→3→4→6→5→7(e first, then 7a–7d, 7f last)→8). Phase 7a/7b may consume
-auto-improved memories (normal rows; `memory.create` proposals have
-`embedding:[]` so they enter FTS but not the vector stream unless re-embedded —
-salience-judge 7b can score them; rerank 7a is unaffected). Phase 7d (LLM
-compression) is independent. Phase 7e (test coverage) + 7f (dead-code removal)
-gated last.
+Phase 7 done. Next session: Phase 8 (Web UI, G5) per
+`i-want-to-understand-virtual-lantern.md`. Phase 8 consumes the now-stable
+search/recall/memory surfaces: `ContextualSearchRLM.search` (2–3 RRF streams +
+optional 7a LLM-judge rerank + 7c graph stream), `MemoryController.store`
+(optional 7b auto-salience), `code-compressor.compress` (7d LLM path), the
+`search:reranked` / `memory:salience-scored` / `memory:auto-improved` EventBus
+events, and the read surfaces (`listPending`, `/api/v1/proposal`,
+`/api/v1/handoff`). Embeddings now import from `services/embeddings/index.js`
+(7f relocated out of the deleted `data/chromadb`).
 
 ## Decisions
 - Scope this session = Phase 0 (0a-0d) only. Phases 1-8 deferred.
@@ -84,3 +85,10 @@ gated last.
 - Landed: `memory.autoImprove` config block (default-on detection, reviewGate default false = auto-approve, env `AUTO_IMPROVE_*`); `ProposalStore` (SQLite WAL `proposals.db` + Memory fallback + factory, no isPostgresEnabled); `AutoImproveJob` (ctor-seam {llm?, observationStore?, proposalStore?, memoryRepo?, thresholds?, reviewGate?, idFactory?}, `detectPatterns` pure rule-based query/file/fix signals, `enrichWithLlm` optional silent-degrade, `runOnce` debounce, reviewGate=false auto-approve reuses `approve()` single code path, apply/reject state machine pending→approved|rejected with defense-in-depth WHERE guard, `listPending`); `memory:auto-improved` event; 3 MCP tools (`th0th_list_proposals`/`approve`/`reject`); API route `POST /api/v1/proposal/{list,approve,reject}` (423 disabled, 400 missing); Prisma `Proposal` model (PG parity); core barrel re-exports.
 - Accepted assumptions (non-blocking): PG ProposalStore runtime deferred (Prisma model parity; SQLite-canonical like observations/handoffs); no OS scheduler (trigger-driven debounce mirrors Phase-3); Synapse-session mining is a seam only (v1 keys on observation payloads); no proposal TTL; P5 423 verified by inspection; same-author verification.
 - Bug fixed in 67e9ed6: `approve` now surfaces the freshly-assigned memory id onto the returned record + `memory:auto-improved` event payload (previously shadowed by the store's getById result → event emitted targetMemoryId=undefined for memory.create). Caught by P5-APPROVE-01.
+
+## Completion (Phase 7)
+- Commits: 3d7fa86 (specs/design/tasks — prior invocation), b201531 (7e tests + injected-deps seam), 2c043f2 (7a reranker), 3716e66 (7b salience-judge), d0adee1 (7c graph BFS stream), 784fe00 (7d LLM compression), 9bded69 (7f dead-code removal).
+- Gates: `bun run --filter @th0th-ai/core test` 893 pass / 0 fail / 46 skip (baseline 822 → +71); `bun run type-check` 5/5 clean.
+- Same-author verifier: PASS (sole resumed agent — caveat labeled in validation.md). All 4 discrimination mutants killed (7a degrade guard, 7b degrade guard, 7c seed-exclusion, 7d {ok:false}/length guard). Report: `.specs/features/phase-7-retrieval-polish/validation.md`.
+- Landed: `search.rerank` config (default-off, SEARCH_RERANK_*); `LLMJudgeReranker` (services/search/reranker.ts, llmObject + RerankVerdictSchema, top-K window=50, silent-degrade to RRF order on LLM off/{ok:false}/throw); wired into SearchController after applyBoost + optional `source:"llm-judge"` on `search:reranked` (back-compat optional field); `memory.autoImportance` config (default-off, AUTO_IMPORTANCE_ENABLED); `SalienceJudge` (services/memory/salience-judge.ts, llmObject + SalienceSchema, caller-wins in MemoryController.store, neutral 0.5 default, embedding-independent, feeds Phase-1 decay); `memory:salience-scored` event; `GraphStore.bfsNeighbors(seedIds, depth)` (SQLite + Pg, outgoing-only, visited dedup, cyclic-safe) + 3rd RRF stream in ContextualSearchRLM.search (fixed 0.45 score, silent-omit when empty); code-compressor LLM branch (regex-always-first fallback, isLlmEnabled gate, metadata.compressionSource); chromadb dead-code removed (EmbeddingService relocated to services/embeddings/embedding-service.ts + barrel re-export, 4 live importers + hybrid-search dead importer redirected, data/chromadb/{vector-store,index}.ts deleted, postgres getCollection already clear-errors); ContextualSearchRLM injected-deps ctor seam (test-only) to bypass the process-wide mock.module landmine.
+- Accepted assumptions (non-blocking): 7c graph stream is typically empty for pure code search (graph edges are memory ids, code-search vector ids aren't memory ids) — designed silent-omit, surfaces context on memory-search reuse; 7a controller-level streamCount=2 (precise 2/3 owned by RLM pre-rerank emit); same-author verification.

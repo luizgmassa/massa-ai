@@ -283,7 +283,45 @@ schema, EventBus events, seams). Not the spec; canonical state stays in
 **Seams Phase 7/8 reuse:**
 - Phase 7b (salience): auto-improved `memory.create` proposals are inserted with `embedding:[]` (FTS-only, consistent with bootstrap/handoff seeds). They enter FTS search but NOT the vector stream unless a future step re-embeds them. Salience-judge can still score them on insert. Rerank (7a) + compression (7d) are unaffected.
 - Phase 8 (web UI): `AutoImproveJob.listPending` + `GET`-equivalent `/api/v1/proposal/list` give a read surface for a proposal-review view.
-### Phase 7 — (pending)
+### Phase 7 — retrieval + compression polish (COMPLETE)
+
+**New exports:**
+- `LLMJudgeReranker` (`services/search/reranker.ts`) + `RerankVerdictSchema` + `applyVerdict`. `rerank(query, results, window?)` re-orders top-K via `llmObject`; silent-degrade to input order.
+- `SalienceJudge` (`services/memory/salience-judge.ts`) + `SalienceSchema` + `NEUTRAL_SALIENCE` + `getSalienceJudge`/`_setSalienceJudgeForTesting`. `scoreSalience(content, type)` → `{salience, source}`.
+- `GraphStore.bfsNeighbors(seedIds, depth)` + `GraphStorePg.bfsNeighbors` (async). Outgoing-only BFS, visited dedup, cyclic-safe.
+- `EmbeddingService` relocated to `services/embeddings/embedding-service.ts`, re-exported from `services/embeddings/index.ts` (was `data/chromadb/vector-store.ts`).
+
+**New config keys (default-off, silent-degrade):**
+- `search.rerank { enabled (SEARCH_RERANK_ENABLED, false); rerankWindow (SEARCH_RERANK_WINDOW, 50) }` — shallow-merged in `mergeConfig`.
+- `memory.autoImportance { enabled (AUTO_IMPORTANCE_ENABLED, false) }` — shallow-merged in `mergeConfig`.
+
+**EventMap additions (additive, backward-compatible):**
+- `search:reranked` gains optional `source?: "rrf" | "llm-judge"` (Phase-2 publishers omit it; 7a publisher sets `"llm-judge"`).
+- NEW `memory:salience-scored: { memoryId, projectId?, salience, source: "llm" | "default" }` (published after `repo.insert`, only when caller omitted `importance`).
+
+**CompressionMetadata:** new optional `compressionSource?: "regex" | "llm"` (records which path produced `compressed`).
+
+**`search:reranked` reuse:** 7a reuses the Phase-2 event (not duplicated). The Phase-2 publisher (inside `ContextualSearchRLM.fuseResults` path) emits pre-rerank with the precise `streamCount` (2 or 3 after 7c); the 7a publisher (in `SearchController`, after `applyBoost`) emits post-rerank with `source: "llm-judge"` and `streamCount: 2` (the controller-level fused baseline). Both are backward-compatible.
+
+**Dead-code removal (7f) confirmation:**
+- `data/chromadb/vector-store.ts` + `data/chromadb/index.ts` **DELETED**; directory gone. `grep -rn "data/chromadb" packages/core/src` now returns only comment references.
+- `hybrid-search.ts:10` dead `VectorStore` import redirected to the real `SQLiteVectorStore` (`./sqlite-vector-store.js`); field type updated to `SQLiteVectorStore`. `SQLiteVectorStore.search(query, limit, projectId?)` is API-compatible with the prior `new VectorStore().search(query, n)` call.
+- `EmbeddingService` live importers redirected to `services/embeddings/index.js`: `data/vector/sqlite-vector-store.ts` (dropped `ChromaEmbeddingService` alias), `services/memory/memory-service.ts`, `services/graph/relation-extractor.ts`, `services/search/query-understanding.ts`.
+- `postgres-vector-store.ts:681 getCollection` already throws `Error('getCollection not implemented for PostgresVectorStore')` — plan's "implement or clearly-error" satisfied; no code change (documented in design.md).
+- 5 test files' `mock.module` target retargeted from `../data/chromadb/vector-store.js` → `../services/embeddings/index.js` (behavior-preserving mock retarget so their `MockEmbeddingService` still intercepts; otherwise the real EmbeddingService would hit Ollama and time out).
+
+**Backend-polymorphic dispatch (no `isPostgresEnabled()`):**
+- `GraphStore.bfsNeighbors` is sync (SQLite) / async (Pg); `ContextualSearchRLM.buildGraphStream` normalizes via `Promise.resolve(graph.bfsNeighbors(...))`.
+- `MemoryRepository.getById` is sync (SQLite) / async (Pg); `buildGraphStream` normalizes via `Promise.resolve(repo.getById(id))`.
+
+**Silent-degradation contract (mirrors Phase-1..6):** every 7a–7d path is default-off (config gate) + silent-degrade. 7a rerank → input order verbatim on LLM off/`{ok:false}`/throw. 7b salience → 0.5 neutral default. 7c graph stream → omitted (resultSets stays 2/3). 7d compression → regex output. 7f redirect → type-check + e2e gate (objective).
+
+**Seams Phase 8 (web UI) reuses:**
+- `ContextualSearchRLM` injected-deps ctor seam (`new ContextualSearchRLM({ keywordSearch, vectorStore, searchCache, analytics, symbolRepo })`) for test/isolated construction; production callers resolve via factories (unchanged). Phase 8 may use it for a scoped search context.
+- Stable read surfaces: `ContextualSearchRLM.search` (2–3 RRF streams + optional 7a LLM-judge rerank + 7c graph stream), `MemoryController.store` (optional 7b auto-salience), `code-compressor.compress` (7d LLM path), `AutoImproveJob.listPending`, `/api/v1/proposal`, `/api/v1/handoff`.
+- EventBus events for a live UI: `search:reranked` (with `source`), `memory:salience-scored`, `memory:auto-improved`, `handoff:accepted`, `bootstrap:completed`, `observation:ingested`.
+- Embeddings import canonical path is now `services/embeddings/index.js` — Phase 8 must NOT re-introduce a `data/chromadb` import.
+
 ### Phase 8 — (pending)
 
 ## Commit ledger (append)
@@ -296,3 +334,4 @@ schema, EventBus events, seams). Not the spec; canonical state stays in
 | 4 | c022731 1be1a1c ae296e7 773a130 3fec6fd | bootstrap from repo: memory.bootstrap config + bootstrap:completed event + BootstrapService (scan git/README/docs/manifests/centrality, LLM llmObject+SeedMemoriesSchema, rule-based fallback, idempotent bootstrap:<projectId> tag marker, silent degradation) + th0th_bootstrap MCP tool + /api/v1/bootstrap route + barrel re-exports, tests |
 | 6 | d3ccd2e 60e799b 4d8ac60 8f2f0a0 1a4bc40 | cross-session handoffs: handoffs.enabled config + handoff:accepted event + HandoffStore (SQLite WAL handoffs.db + Memory fallback + factory) + HandoffService (begin/accept/cancel/listPending, state machine open→accepted|expired, dual-write conversation memory PROJECT/0.7/handoff:<id> tags/no embedding, optional LLM summary-polish default-off silent-degrade, never throws) + HandoffAutoInjector (observation:ingested session-start → listPending) + 4 MCP tools + /api/v1/handoff routes + Prisma Handoff model + barrel re-exports, tests |
 | 5 | a4c86ff d42086a d3242cb ba971b0 67e9ed6 | auto-improvement loop: memory.autoImprove config (default-on detect, reviewGate=false auto-approve, env AUTO_IMPROVE_*) + memory:auto-improved event + ProposalStore (SQLite WAL proposals.db + Memory fallback + factory, no isPostgresEnabled) + AutoImproveJob (ctor-seam, detectPatterns pure rule-based query/file/fix signals, enrichWithLlm optional silent-degrade, runOnce debounce, reviewGate=false auto-approve reuses approve() single code path, apply/reject state machine pending→approved|rejected with defense-in-depth WHERE guard, listPending) + 3 MCP tools + /api/v1/proposal routes + Prisma Proposal model + barrel re-exports + approve targetMemoryId fix, tests |
+| 7 | 3d7fa86 b201531 2c043f2 3716e66 d0adee1 784fe00 9bded69 | retrieval + compression polish: 7e characterization tests (etl-pipeline/smart-chunker/code-compressor/csrlm-e2e) + ContextualSearchRLM injected-deps ctor seam; 7a LLMJudgeReranker (services/search/reranker.ts, llmObject+RerankVerdictSchema, top-K window=50, silent-degrade) wired into SearchController after applyBoost + search.rerank config + optional source:"llm-judge" on search:reranked; 7b SalienceJudge (services/memory/salience-judge.ts) + caller-wins wire in MemoryController.store + memory.autoImportance config + memory:salience-scored event; 7c GraphStore.bfsNeighbors (SQLite sync + Pg async, outgoing-only, visited dedup) + 3rd RRF stream in ContextualSearchRLM.search (fixed 0.45, silent-omit); 7d code-compressor LLM branch (regex-always-first fallback, isLlmEnabled gate, metadata.compressionSource on CompressionMetadata); 7f EmbeddingService relocated to services/embeddings/embedding-service.ts + barrel re-export, 4 live importers + hybrid-search dead importer redirected, data/chromadb/{vector-store,index}.ts deleted, postgres getCollection already clear-errors, 5 test mock.module targets retargeted; tests |

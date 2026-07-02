@@ -1,14 +1,14 @@
 # Handoff
 
 ## Snapshot
-- feature: phase-2-query-understanding — COMPLETE, same-author verified (PASS)
+- feature: phase-7-retrieval-polish — COMPLETE, same-author verified (PASS)
 - phase/task: Execute done; validation.md written
-- completed: `search.queryUnderstanding` config block (default-off); `query-understanding.ts` service (`rewriteQuery` + `hyde` + bounded cache + `QueryUnderstandingService.understand()` + `buildRewrittenFTSQuery`); `ContextualSearchRLM.search()` 3-stream fan-out (original vector + HyDE vector via `searchByEmbedding` + rewritten-FTS → existing `fuseResults`) with silent-degrade outer try/catch; `search:query-rewritten` + `search:reranked` EventBus events; `sessionId` threaded on `search()` options.
+- completed: 7e characterization tests (etl-pipeline, smart-chunker, code-compressor, contextual-search-rlm e2e) + injected-deps ctor seam on ContextualSearchRLM; 7a `LLMJudgeReranker` (services/search/reranker.ts, llmObject + RerankVerdictSchema, top-K window=50, silent-degrade) wired into SearchController after applyBoost + optional `source:"llm-judge"` on `search:reranked`; 7b `SalienceJudge` (services/memory/salience-judge.ts) + caller-wins wire in MemoryController.store + `memory:salience-scored` event; 7c `GraphStore.bfsNeighbors(seedIds, depth)` (SQLite + Pg) + 3rd RRF stream in ContextualSearchRLM.search; 7d code-compressor LLM branch (regex-always-first fallback, metadata.compressionSource); 7f EmbeddingService relocated to services/embeddings/embedding-service.ts, 4 live importers + hybrid-search dead importer redirected, data/chromadb/ deleted. New config: `search.rerank { enabled, rerankWindow }`, `memory.autoImportance { enabled }`.
 - in-progress: none
-- next step: Phase 3 (passive memory capture — observation ingestion + hooks). Consumes `llm-client` + the new `search:*` events + Phase 1's `SessionStore`/`JobStore`.
+- next step: Phase 8 (Web UI, G5). Consumes the stable search/recall/memory surfaces (see STATE.md Next Step).
 - blockers: none
 - uncommitted files: none (STATE.md/FEATURES.json/HANDOFF.md/PHASE-INTEGRATION.md/validation.md updates pending this commit)
-- branch: main; commits 538fe66..3fb4eb1 (Phase 0), befa3cb..1ccb42c (Phase 1), ebcc202 (Phase 2 specs), 5b0ba18, 6a7598f, 6cb5edb, f2acceb (Phase 2 impl)
+- branch: main; commits 3d7fa86 (Phase 7 specs — prior invocation), b201531 (7e), 2c043f2 (7a), 3716e66 (7b), d0adee1 (7c), 784fe00 (7d), 9bded69 (7f)
 
 ## Key decisions for Phase 3 (and later phases)
 - Query understanding gate: `config.get("search").queryUnderstanding.enabled` (default `false`, env `SEARCH_QUERY_UNDERSTANDING_ENABLED`). Sub-keys `hydeEnabled` (default true), `cacheTtlMs` (300_000), `cacheMaxSize` (256). Read via `config.get("search").queryUnderstanding`; the service also has defensive readers that fall back to these defaults if the block is absent (process-wide shared-config mock landmine).
