@@ -890,6 +890,71 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ["projectId"],
     },
   },
+  {
+    name: "th0th_handoff_begin",
+    description:
+      "Begin a cross-session handoff: leave a structured record (summary, open questions, next steps, files) for a later agent to discover on session start. The handoff is persisted in the Handoff table AND dual-written as a searchable memory (FTS-discoverable). Optional LLM summary-polish (default-off). Never throws.",
+    apiEndpoint: "/api/v1/handoff/begin",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string", description: "Project identifier (required)" },
+        sourceSessionId: { type: "string", description: "Session leaving the handoff" },
+        targetAgent: { type: "string", description: "Target agent name (omit = broadcast)" },
+        summary: { type: "string", description: "Handoff summary (max 1024 chars; empty = auto-polish when LLM on)" },
+        openQuestions: { type: "array", items: { type: "string" } },
+        nextSteps: { type: "array", items: { type: "string" } },
+        files: { type: "array", items: { type: "string" } },
+      },
+      required: ["projectId"],
+    },
+  },
+  {
+    name: "th0th_handoff_accept",
+    description:
+      "Accept an open handoff by id. Flips status open→accepted, sets accepted_at, emits handoff:accepted. Missing/expired/already-accepted/project-mismatch ids return a clear {ok:false, reason}. Never throws.",
+    apiEndpoint: "/api/v1/handoff/accept",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Handoff id (required)" },
+        projectId: { type: "string", description: "Optional project scope check" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "th0th_handoff_cancel",
+    description:
+      "Cancel (expire) an open handoff by id. Flips status open→expired (no event). Same failure semantics as accept on missing/non-open/project-mismatch. Never throws.",
+    apiEndpoint: "/api/v1/handoff/cancel",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Handoff id (required)" },
+        projectId: { type: "string", description: "Optional project scope check" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "th0th_handoff_list_pending",
+    description:
+      "List open handoffs for a project (optionally filtered by target agent), ordered oldest-first. The recall-path surfacing primitive for auto-inject on session start. Never throws.",
+    apiEndpoint: "/api/v1/handoff/list",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string", description: "Project identifier (required)" },
+        targetAgent: { type: "string", description: "Optional target agent filter" },
+      },
+      required: ["projectId"],
+    },
+  },
 ];
 
 /**

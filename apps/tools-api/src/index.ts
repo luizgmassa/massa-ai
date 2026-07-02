@@ -27,6 +27,7 @@ import { fileRoutes } from "./routes/file.js";
 import { synapseRoutes } from "./routes/synapse.js";
 import { hookRoutes } from "./routes/hooks.js";
 import { bootstrapRoutes } from "./routes/bootstrap.js";
+import { handoffRoutes } from "./routes/handoff.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
 import { getHealthChecker, searchSessionHook, coRetrievalHook } from "@th0th-ai/core";
@@ -61,6 +62,7 @@ const app = new Elysia({ adapter: node() })
           { name: "file", description: "Optimized file reading with automatic compression" },
           { name: "synapse", description: "Cognitive modulation layer: session, buffer, priming" },
           { name: "hooks", description: "Passive lifecycle capture (observation ingestion)" },
+          { name: "handoffs", description: "Cross-session handoff begin/accept/cancel" },
         ],
         components: {
           securitySchemes: {
@@ -91,6 +93,7 @@ const app = new Elysia({ adapter: node() })
   .use(synapseRoutes)
   .use(hookRoutes)
   .use(bootstrapRoutes)
+  .use(handoffRoutes)
   .get("/health", () => ({
     status: "ok",
     service: "th0th-tools-api",
