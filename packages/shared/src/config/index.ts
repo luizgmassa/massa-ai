@@ -114,6 +114,13 @@ export interface ServerConfig {
     };
   };
 
+  // Cross-session handoffs (Phase 6, G2). The begin/accept/cancel primitive
+  // has no LLM dependency; the optional summary-polish inherits the top-level
+  // `llm.enabled` gate and silent-degrades to the caller-provided summary.
+  handoffs: {
+    enabled: boolean;
+  };
+
   // Compression Configuration
   // NOTE: compression.llm is a DEPRECATED alias of the top-level `llm` block
   // (kept for one release so existing readers like code-compressor.ts see no
@@ -412,6 +419,11 @@ export const defaultConfig: ServerConfig = {
     },
   },
 
+  handoffs: {
+    // Phase 6: cross-session handoffs. begin/accept/cancel have no LLM dep.
+    enabled: envBool("HANDOFFS_ENABLED", true),
+  },
+
   compression: {
     defaultStrategy: "code_structure",
     minTokensForCompression: envNum("MIN_TOKENS_FOR_COMPRESSION", 100),
@@ -571,6 +583,10 @@ export class Config {
         ...overrides.hooks,
         queue: { ...defaults.hooks.queue, ...overrides.hooks?.queue },
         bridge: { ...defaults.hooks.bridge, ...overrides.hooks?.bridge },
+      },
+      handoffs: {
+        ...defaults.handoffs,
+        ...overrides.handoffs,
       },
       compression: {
         ...defaults.compression,

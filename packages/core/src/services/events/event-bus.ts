@@ -107,6 +107,14 @@ export interface EventMap {
     signalCount: number;
     memoryCount: number;
   };
+  /** Phase 6: emitted after a handoff is accepted (status open→accepted). */
+  "handoff:accepted": {
+    handoffId: string;
+    projectId?: string;
+    sourceSessionId?: string;
+    targetAgent?: string;
+    acceptedAt: number;
+  };
 }
 
 export type EventName = keyof EventMap;

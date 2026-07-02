@@ -282,6 +282,30 @@ model Observation {
 }
 
 // ========================================
+// Handoff (Phase 6, G2) — cross-session handoff records.
+// SQLite-canonical; this model provides PG parity so a Postgres deployment
+// can also store handoffs. The default local-first path uses the
+// SqliteHandoffStore (handoffs.db) via the polymorphic factory.
+// ========================================
+model Handoff {
+  id               String    @id
+  projectId        String    @map("project_id")
+  sourceSessionId  String?   @map("source_session_id")
+  targetAgent      String?   @map("target_agent")
+  summary          String    @default("")
+  openQuestionsJson String   @map("open_questions_json") @default("[]")
+  nextStepsJson    String    @map("next_steps_json") @default("[]")
+  filesJson        String    @map("files_json") @default("[]")
+  status           String    @default("open") // open | accepted | expired
+  createdAt        DateTime  @default(now()) @map("created_at")
+  acceptedAt       DateTime? @map("accepted_at")
+
+  @@index([projectId, status])
+  @@index([targetAgent, status])
+  @@map("handoffs")
+}
+
+// ========================================
 // Embedding Cache
 // ========================================
 model EmbeddingCache {
