@@ -827,6 +827,46 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ["id"],
     },
   },
+  {
+    name: "th0th_hook_ingest",
+    description:
+      "Passively ingest a batch of lifecycle events (session-start, user-prompt, pre/post-tool-use, pre-compact, session-end) as Observations. Fire-and-forget; consolidated into memories later by the LLM bridge. Useful for non-Claude hosts.",
+    apiEndpoint: "/api/v1/hook/batch",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        events: {
+          type: "array",
+          description: "Lifecycle events to ingest (validated atomically)",
+          items: {
+            type: "object",
+            properties: {
+              event: {
+                type: "string",
+                enum: [
+                  "session-start",
+                  "user-prompt",
+                  "pre-tool-use",
+                  "post-tool-use",
+                  "pre-compact",
+                  "session-end",
+                ],
+              },
+              projectId: { type: "string" },
+              sessionId: { type: "string" },
+              payload: { type: "object", description: "Event-specific payload" },
+              importance: { type: "number", minimum: 0, maximum: 1 },
+              agentId: { type: "string" },
+              ts: { type: "number", description: "Epoch ms (defaults to now)" },
+            },
+            required: ["event", "projectId", "payload"],
+          },
+        },
+      },
+      required: ["events"],
+    },
+  },
 ];
 
 /**

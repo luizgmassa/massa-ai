@@ -25,6 +25,7 @@ import { eventsRoutes } from "./routes/events.js";
 import { workspaceRoutes } from "./routes/workspace.js";
 import { fileRoutes } from "./routes/file.js";
 import { synapseRoutes } from "./routes/synapse.js";
+import { hookRoutes } from "./routes/hooks.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
 import { getHealthChecker, searchSessionHook, coRetrievalHook } from "@th0th-ai/core";
@@ -58,6 +59,7 @@ const app = new Elysia({ adapter: node() })
           { name: "events", description: "SSE for real-time indexing progress" },
           { name: "file", description: "Optimized file reading with automatic compression" },
           { name: "synapse", description: "Cognitive modulation layer: session, buffer, priming" },
+          { name: "hooks", description: "Passive lifecycle capture (observation ingestion)" },
         ],
         components: {
           securitySchemes: {
@@ -86,6 +88,7 @@ const app = new Elysia({ adapter: node() })
   .use(workspaceRoutes)
   .use(fileRoutes)
   .use(synapseRoutes)
+  .use(hookRoutes)
   .get("/health", () => ({
     status: "ok",
     service: "th0th-tools-api",

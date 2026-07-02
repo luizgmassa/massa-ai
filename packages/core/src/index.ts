@@ -31,5 +31,37 @@ export type {
 export { getVectorStore, resetVectorStore } from "./data/vector/index.js";
 export { SQLiteVectorStore } from "./data/vector/index.js";
 
+// Phase 3 — passive lifecycle capture (hook ingestion)
+export {
+  SqliteObservationStore,
+  MemoryObservationStore,
+  getObservationStore,
+  resetObservationStore,
+  newObservationId,
+  LIFECYCLE_EVENTS,
+} from "./data/memory/observation-repository.js";
+export type { ObservationStore } from "./data/memory/observation-repository.js";
+export type {
+  Observation,
+  ObservationRow,
+  LifecycleEventKind,
+} from "./data/memory/observation-repository.js";
+export {
+  HookService,
+  ValidationError,
+  getHookService,
+  resetHookService,
+  validateEvent,
+} from "./services/hooks/hook-service.js";
+export type {
+  IncomingEvent,
+  NormalizedEvent,
+  BridgeTrigger,
+} from "./services/hooks/hook-service.js";
+export {
+  WriterQueue,
+  QueueSaturatedError,
+} from "./services/hooks/writer-queue.js";
+
 // Re-export types from shared for convenience
 export type { ToolResponse, IToolHandler } from "@th0th-ai/shared";
