@@ -31,6 +31,10 @@ model Memory {
   updatedAt     DateTime  @updatedAt @map("updated_at")
   accessCount   Int       @default(0) @map("access_count")
   lastAccessed  DateTime? @map("last_accessed")
+  // Phase 1: pinned memories are decay-exempt.
+  pinned        Boolean   @default(false) @map("pinned")
+  // Phase 1: soft-delete tombstone. Null = live row.
+  deletedAt     DateTime? @map("deleted_at")
 
   // Relations
   edgesFrom MemoryEdge[] @relation("EdgeFrom")
@@ -44,6 +48,7 @@ model Memory {
   @@index([importance(sort: Desc)])
   @@index([createdAt(sort: Desc)])
   @@index([tags]) // GIN index for array containment queries
+  @@index([deletedAt]) // sparse — most rows null
   @@map("memories")
 }
 

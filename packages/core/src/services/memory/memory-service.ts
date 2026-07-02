@@ -6,9 +6,10 @@
  * and embedding coordination. No DB calls — those live in MemoryRepository.
  */
 
-import { MemoryType, MemoryLevel } from "@th0th-ai/shared";
+import { MemoryType, MemoryLevel, config } from "@th0th-ai/shared";
 import { EmbeddingService } from "../../data/chromadb/vector-store.js";
 import type { MemoryRow } from "../../data/memory/memory-repository.js";
+import { decayScore } from "./decay.js";
 
 // ── Public types ─────────────────────────────────────────────
 
@@ -26,6 +27,8 @@ export interface Memory {
   createdAt: number;
   accessCount: number;
   lastAccessed: number | null;
+  /** Pinned memories are decay-exempt (Phase 1). 0/1 from the row. */
+  pinned?: number;
   score?: number;
   embedding?: any;
 }
@@ -132,6 +135,7 @@ export class MemoryService {
       createdAt: row.created_at,
       accessCount: row.access_count || 0,
       lastAccessed: row.last_accessed || null,
+      pinned: (row as MemoryRow).pinned ?? 0,
       embedding: row.embedding,
     };
   }
@@ -198,14 +202,22 @@ export class MemoryService {
   }
 
   /**
-   * Ebbinghaus-inspired forgetting curve. Half-life ~72 h.
+   * Temporal salience curve — delegates to the pure, tested `decayScore`
+   * (Phase 1, borrowed from ai-memory decay.rs). Blends a recency-decayed
+   * salience term with an access-reinforcement term; pinned memories are
+   * exempt. Tunable via `config.memory.decay`.
    */
   private temporalScore(memory: Memory): number {
-    const now = Date.now();
-    const reference = memory.lastAccessed || memory.createdAt;
-    const ageHours = Math.max(0, (now - reference) / (1000 * 60 * 60));
-    const decay = Math.pow(0.5, ageHours / 72);
-    return Math.max(0.1, Math.min(1, decay));
+    return decayScore(
+      {
+        importance: memory.importance,
+        accessCount: memory.accessCount,
+        createdAt: memory.createdAt,
+        lastAccessed: memory.lastAccessed,
+        pinned: memory.pinned,
+      },
+      config.get("memory").decay,
+    );
   }
 
   /**

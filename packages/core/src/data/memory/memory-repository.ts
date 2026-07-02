@@ -30,6 +30,10 @@ export interface MemoryRow {
   updated_at: number;
   access_count: number;
   last_accessed: number | null;
+  /** Pinned memories are decay-exempt (Phase 1). 0/1. */
+  pinned: number;
+  /** Soft-delete tombstone (Phase 1). Null = live. */
+  deleted_at: number | null;
 }
 
 export interface InsertMemoryInput {
@@ -45,6 +49,8 @@ export interface InsertMemoryInput {
   tags: string[];
   embedding: number[];
   metadata?: Record<string, unknown>;
+  /** Pinned memories are decay-exempt. Default false. */
+  pinned?: boolean;
 }
 
 export interface SearchFilters {
@@ -64,6 +70,8 @@ export interface UpdateMemoryPatch {
   tags?: string[];
   /** Re-computed embedding; required when content changes (caller's responsibility). */
   embedding?: number[];
+  /** Toggle pinned status (Phase 1). */
+  pinned?: boolean;
 }
 
 // ── Repository ───────────────────────────────────────────────
@@ -103,7 +111,7 @@ export class MemoryRepository {
     this.db = new Database(dbPath);
 
     // Check if table exists and needs migration BEFORE creating it
-    let needsMigration = false;
+    const migrationCols: string[] = [];
     try {
       const tables = this.db
         .prepare(
@@ -115,8 +123,16 @@ export class MemoryRepository {
         const columns = this.db
           .prepare("PRAGMA table_info(memories)")
           .all() as any[];
-        const hasAgentId = columns.some((col: any) => col.name === "agent_id");
-        needsMigration = !hasAgentId;
+        if (!columns.some((col: any) => col.name === "agent_id")) {
+          migrationCols.push("agent_id");
+        }
+        // Phase 1: pinned + deleted_at (additive).
+        if (!columns.some((col: any) => col.name === "pinned")) {
+          migrationCols.push("pinned");
+        }
+        if (!columns.some((col: any) => col.name === "deleted_at")) {
+          migrationCols.push("deleted_at");
+        }
       }
     } catch {
       // Ignore errors, will create table below
@@ -140,7 +156,9 @@ export class MemoryRepository {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         access_count INTEGER DEFAULT 0,
-        last_accessed INTEGER
+        last_accessed INTEGER,
+        pinned INTEGER NOT NULL DEFAULT 0,
+        deleted_at INTEGER
       );
 
       CREATE INDEX IF NOT EXISTS idx_memories_user_id ON memories(user_id);
@@ -159,11 +177,29 @@ export class MemoryRepository {
       );
     `);
 
-    // Run migration if needed
-    if (needsMigration) {
+    // Run additive migrations if needed
+    if (migrationCols.includes("agent_id")) {
       logger.info("Migrating database: adding agent_id column");
       this.db.exec("ALTER TABLE memories ADD COLUMN agent_id TEXT");
     }
+    if (migrationCols.includes("pinned")) {
+      logger.info("Migrating database: adding pinned column");
+      this.db.exec(
+        "ALTER TABLE memories ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0",
+      );
+    }
+    if (migrationCols.includes("deleted_at")) {
+      logger.info("Migrating database: adding deleted_at column");
+      this.db.exec("ALTER TABLE memories ADD COLUMN deleted_at INTEGER");
+    }
+
+    // Always ensure indexes exist
+    this.db.exec(
+      "CREATE INDEX IF NOT EXISTS idx_memories_agent_id ON memories(agent_id)",
+    );
+    this.db.exec(
+      "CREATE INDEX IF NOT EXISTS idx_memories_deleted_at ON memories(deleted_at)",
+    );
 
     // Always ensure agent_id index exists
     this.db.exec(
@@ -186,8 +222,8 @@ export class MemoryRepository {
         id, content, type, level,
         user_id, session_id, project_id, agent_id,
         importance, tags, embedding, metadata,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        created_at, updated_at, pinned, deleted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
     `);
 
     stmt.run(
@@ -211,6 +247,7 @@ export class MemoryRepository {
       ),
       now,
       now,
+      input.pinned ? 1 : 0,
     );
 
     // Index in FTS5
@@ -271,6 +308,9 @@ export class MemoryRepository {
     conditions.push("m.importance >= ?");
     params.push(filters.minImportance);
 
+    // Phase 1: never return soft-deleted rows from recall.
+    conditions.push("m.deleted_at IS NULL");
+
     if (!filters.includePersistent && filters.sessionId) {
       conditions.push("m.session_id = ?");
       params.push(filters.sessionId);
@@ -306,7 +346,8 @@ export class MemoryRepository {
         m.id, m.content, m.type, m.level,
         m.user_id, m.session_id, m.project_id, m.agent_id,
         m.importance, m.tags, m.embedding,
-        m.created_at, m.access_count, m.last_accessed
+        m.created_at, m.access_count, m.last_accessed,
+        m.pinned, m.deleted_at
       FROM memories m
       ${hasFts ? "JOIN memories_fts fts ON m.rowid = fts.rowid" : ""}
       ${whereClause}
@@ -326,7 +367,8 @@ export class MemoryRepository {
       .prepare(
         `SELECT id, content, type, level, importance, tags, embedding, metadata,
                 created_at, updated_at, access_count, last_accessed,
-                user_id, session_id, project_id, agent_id
+                user_id, session_id, project_id, agent_id,
+                pinned, deleted_at
          FROM memories WHERE id = ?`,
       )
       .get(id) as MemoryRow | null;
@@ -355,8 +397,39 @@ export class MemoryRepository {
   }
 
   /**
-   * Delete a single memory by id. Returns true if a row was deleted.
+   * Soft-delete a single memory by id (Phase 1). Sets `deleted_at` and removes
+   * the row from the FTS index so it stops matching recall, but keeps the row
+   * for potential restore. Returns true if a live row was tombstoned.
+   * Idempotent: re-deleting an already-tombstoned (or missing) row returns false.
+   */
+  softDeleteById(id: string): boolean {
+    // Only tombstone live rows (deleted_at IS NULL).
+    const live = this.db
+      .prepare(
+        `SELECT 1 FROM memories WHERE id = ? AND deleted_at IS NULL`,
+      )
+      .get(id);
+    if (!live) return false;
+
+    // Remove from FTS so the tombstoned row stops matching queries.
+    this.db
+      .prepare(
+        `INSERT INTO memories_fts(memories_fts, rowid, content, tags)
+         SELECT 'delete', rowid, content, tags FROM memories WHERE id = ?`,
+      )
+      .run(id);
+
+    this.db
+      .prepare(`UPDATE memories SET deleted_at = ?, updated_at = ? WHERE id = ?`)
+      .run(Date.now(), Date.now(), id);
+    return true;
+  }
+
+  /**
+   * Delete a single memory by id (HARD delete — back-compat with Phase 0).
    * Also removes its FTS index entry (external-content table → manual).
+   * Returns true if a row was deleted. Callers that want soft-delete
+   * (tombstone) semantics should use `softDeleteById`.
    */
   deleteById(id: string): boolean {
     this.db
@@ -401,6 +474,10 @@ export class MemoryRepository {
     if (patch.embedding !== undefined) {
       sets.push("embedding = ?");
       params.push(Buffer.from(new Float32Array(patch.embedding).buffer));
+    }
+    if (patch.pinned !== undefined) {
+      sets.push("pinned = ?");
+      params.push(patch.pinned ? 1 : 0);
     }
 
     if (sets.length === 0) {

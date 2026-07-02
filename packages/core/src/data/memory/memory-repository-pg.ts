@@ -34,6 +34,8 @@ interface RawMemory {
   updated_at: Date;
   access_count: number;
   last_accessed: Date | null;
+  pinned: boolean | number | null; // Phase 1
+  deleted_at: Date | null; // Phase 1
 }
 
 export class MemoryRepositoryPg {
@@ -74,6 +76,8 @@ export class MemoryRepositoryPg {
       updated_at: m.updated_at instanceof Date ? m.updated_at.getTime() : Number(m.updated_at),
       access_count: m.access_count,
       last_accessed: m.last_accessed instanceof Date ? m.last_accessed.getTime() : (m.last_accessed ? Number(m.last_accessed) : null),
+      pinned: m.pinned === true || m.pinned === 1 ? 1 : 0,
+      deleted_at: m.deleted_at instanceof Date ? m.deleted_at.getTime() : (m.deleted_at ? Number(m.deleted_at) : null),
     };
   }
 
@@ -96,7 +100,7 @@ export class MemoryRepositoryPg {
         id, content, type, level,
         user_id, session_id, project_id, agent_id,
         importance, tags, embedding, metadata,
-        created_at, updated_at, access_count
+        created_at, updated_at, access_count, pinned
       ) VALUES (
         ${input.id},
         ${input.content},
@@ -112,7 +116,8 @@ export class MemoryRepositoryPg {
         ${metadataJson}::jsonb,
         ${now},
         ${now},
-        0
+        0,
+        ${input.pinned === true}
       )
     `;
   }
@@ -125,7 +130,8 @@ export class MemoryRepositoryPg {
       SELECT id, content, type, level,
              user_id, session_id, project_id, agent_id,
              importance, tags, embedding, metadata,
-             created_at, updated_at, access_count, last_accessed
+             created_at, updated_at, access_count, last_accessed,
+             pinned, deleted_at
       FROM memories
       WHERE id = ${id}
       LIMIT 1
@@ -139,6 +145,8 @@ export class MemoryRepositoryPg {
   async search(filters: SearchFilters): Promise<MemoryRow[]> {
     const conditions: Prisma.Sql[] = [
       Prisma.sql`importance >= ${filters.minImportance}`,
+      // Phase 1: never return soft-deleted rows from recall.
+      Prisma.sql`deleted_at IS NULL`,
     ];
 
     if (filters.userId)    conditions.push(Prisma.sql`user_id = ${filters.userId}`);
@@ -156,7 +164,8 @@ export class MemoryRepositoryPg {
       SELECT id, content, type, level,
              user_id, session_id, project_id, agent_id,
              importance, tags, embedding, metadata,
-             created_at, updated_at, access_count, last_accessed
+             created_at, updated_at, access_count, last_accessed,
+             pinned, deleted_at
       FROM memories
       ${whereClause}
       ORDER BY importance DESC, created_at DESC
@@ -196,6 +205,8 @@ export class MemoryRepositoryPg {
     const contentCondition = Prisma.sql`(${Prisma.join(tokenClauses, ' OR ')})`;
 
     const conditions: Prisma.Sql[] = [contentCondition];
+    // Phase 1: never return soft-deleted rows from recall.
+    conditions.push(Prisma.sql`deleted_at IS NULL`);
 
     if (filters?.userId)        conditions.push(Prisma.sql`user_id = ${filters.userId}`);
     if (filters?.sessionId)     conditions.push(Prisma.sql`session_id = ${filters.sessionId}`);
@@ -211,7 +222,8 @@ export class MemoryRepositoryPg {
       SELECT id, content, type, level,
              user_id, session_id, project_id, agent_id,
              importance, tags, embedding, metadata,
-             created_at, updated_at, access_count, last_accessed
+             created_at, updated_at, access_count, last_accessed,
+             pinned, deleted_at
       FROM memories
       ${whereClause}
       ORDER BY importance DESC, created_at DESC
@@ -275,6 +287,7 @@ export class MemoryRepositoryPg {
       const buf = Buffer.from(new Float32Array(patch.embedding).buffer);
       sets.push(Prisma.sql`embedding = ${buf}`);
     }
+    if (patch.pinned !== undefined) sets.push(Prisma.sql`pinned = ${patch.pinned === true}`);
 
     if (sets.length === 0) {
       const row = await this.getById(id);
@@ -284,6 +297,21 @@ export class MemoryRepositoryPg {
 
     const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
       UPDATE memories SET ${Prisma.join(sets, ", ")} WHERE id = ${id} RETURNING id
+    `;
+    return rows.length > 0;
+  }
+
+  /**
+   * Soft-delete a single memory by id (Phase 1). Sets `deleted_at`; the row
+   * is hidden from recall by the `deleted_at IS NULL` filters. Returns true
+   * only if a previously-live row was tombstoned. Idempotent.
+   */
+  async softDeleteById(id: string): Promise<boolean> {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      UPDATE memories
+      SET deleted_at = NOW(), updated_at = NOW()
+      WHERE id = ${id} AND deleted_at IS NULL
+      RETURNING id
     `;
     return rows.length > 0;
   }
@@ -306,8 +334,10 @@ export class MemoryRepositoryPg {
       SELECT id, content, type, level,
              user_id, session_id, project_id, agent_id,
              importance, tags, embedding, metadata,
-             created_at, updated_at, access_count, last_accessed
+             created_at, updated_at, access_count, last_accessed,
+             pinned, deleted_at
       FROM memories
+      WHERE deleted_at IS NULL
       ORDER BY created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `;
@@ -361,6 +391,7 @@ export class MemoryRepositoryPg {
     const conditions: Prisma.Sql[] = [
       Prisma.sql`id != ${excludeId}`,
       Prisma.sql`embedding IS NOT NULL`,
+      Prisma.sql`deleted_at IS NULL`,
     ];
 
     if (projectId) {
@@ -373,7 +404,8 @@ export class MemoryRepositoryPg {
       SELECT id, content, type, level,
              user_id, session_id, project_id, agent_id,
              importance, tags, embedding, metadata,
-             created_at, updated_at, access_count, last_accessed
+             created_at, updated_at, access_count, last_accessed,
+             pinned, deleted_at
       FROM memories
       ${whereClause}
       ORDER BY created_at DESC

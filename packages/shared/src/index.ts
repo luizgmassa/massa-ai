@@ -19,5 +19,6 @@ export {
   defaultConfig,
   type ServerConfig,
   type SynapseRuntimeConfig,
+  type DecayParams,
   DEFAULT_ALLOWED_EXTENSIONS,
 } from "./config/index.js";

@@ -1,0 +1,83 @@
+# Phase Integration Ledger (massa-th0th improvement plan)
+
+Working aid for the spec-driven multi-phase rollout of
+`i-want-to-understand-virtual-lantern.md`. Updated after each phase so the next
+phase's sub-agent inherits exact integration points (config keys, services,
+schema, EventBus events, seams). Not the spec; canonical state stays in
+`project/STATE.md`, `project/FEATURES.json`, `HANDOFF.md`.
+
+## Project / session
+- projectId: `massa-th0th` (the TS MCP server repo — NOT the useful-agent-skills skills repo).
+- workflowSessionId: `spec-virtual-lantern-plan`. workflow: `spec-driven`. branch: `main`.
+- Recommended phase order: 1 → 2 → 3 → 4 → 6 → 5 → 7(7e first, then 7a–7d, 7f last) → 8.
+- One sub-agent per phase, sequential; prior phase's summary feeds the next.
+
+## Repo facts (every agent assumes these)
+- Runtime: **bun** (`bun:test`). Build via turborepo. `bun run test` (all),
+  `bun run type-check` (5 tasks, must be clean). No package-level lint task.
+- Baseline after Phase 0: **609 pass / 0 fail** (61 pre-existing env-dependent
+  skips). New work must not regress this.
+- `node_modules`/`dist` may be absent at agent start → run `bun install` first if
+  `node_modules` is missing, then build/type-check.
+- **`th0th_search`/index is N/A for this repo** (not indexed; only massa-vault +
+  useful-agent-skills are). Use direct source reads + `grep`/Glob/Read.
+- Architecture tiers: MCP client (`apps/mcp-client`) → Tools API
+  (`apps/tools-api`, routes under `src/routes/`) → core (`packages/core`) +
+  shared config (`packages/shared/src/config`).
+- Phase 0 commit range `4e27925^..be65877` is the precedent for spec/artifact +
+  per-task commit style.
+
+## Cross-cutting architecture decisions (apply to every phase)
+1. **One shared LLM client, local-first.** `packages/core/src/services/memory/llm-client.ts`
+   wrapping `generateText`/`generateObject` (`ai` + `@ai-sdk/openai` already in
+   `package.json`). New top-level `llm` config block in `packages/shared/src/config/index.ts`,
+   Ollama defaults (`baseUrl http://localhost:11434/v1`, model `qwen2.5-coder:7b`,
+   `apiKey "ollama"`). Migrate `compression.llm` → `llm` (keep deprecated alias one
+   release). Expose `llmComplete(prompt, opts?)` + `llmObject(prompt, zodSchema)`.
+   Every call: (a) respect `timeoutMs`, (b) degrade silently to non-LLM path on
+   failure, (c) config-gated default-off. Env toggle observed in Phase 0:
+   `RLM_LLM_ENABLED`.
+2. **SQLite is first-class.** No new feature may repeat the `isPostgresEnabled()`
+   short-circuit (`memory-consolidation-job.ts:36-42`). New jobs route through
+   backend-polymorphic dispatch mirroring factories
+   (`data/vector/vector-store-factory.ts:86`, `data/memory/memory-repository-factory.ts:13`).
+3. **EventBus is the integration bus** (`services/events/event-bus.ts`). New stages
+   emit typed events: `memory:consolidated`, `search:query-rewritten`,
+   `search:reranked`, `memory:salience-scored`, `observation:ingested`,
+   `handoff:accepted`, `bootstrap:completed`. No new plugin system.
+4. **SQLite write discipline.** Enable **WAL mode**; serialize observation/hook
+   ingestion through a single-writer queue; 429 on saturation (protects readers).
+5. **Migrations additive-only**, both backends (`ALTER TABLE … ADD COLUMN` /
+   `CREATE TABLE IF NOT EXISTS`; pattern at `memory-repository.ts:148-160`).
+
+## Phase 0 landed (reference, do not redo)
+- 0a upload-gate: shared `DEFAULT_ALLOWED_EXTENSIONS` (34) in
+  `packages/shared/src/config/index.ts` consumed by config default + index-manager
+  + `apps/mcp-client/src/file-collector.ts` (old 8-ext drift killed).
+- 0b reindex cap: `config.search.autoReindexMaxFiles` (default 200, env
+  `AUTOREINDEX_MAX_FILES`); 3 sites derive (`search-controller.ts:246`,
+  `contextual-search-rlm.ts:290-291,317,346`).
+- 0c memory CRUD: `MemoryRepository`(SQLite) + `MemoryRepositoryPg` gained
+  `update`/`deleteById`; MCP tools `th0th_memory_update` + `th0th_memory_delete`;
+  routes under `apps/tools-api/src/routes/memory.ts`. **Delete = HARD delete +
+  sever GraphStore edges via `MemoryGraphService.onMemoryDeleted(id)`.** Soft-delete
+  (`deleted_at` + recall filtering) deferred to Phase 1. Update re-embeds + rebuilds
+  FTS5 external-content index on content/tag change.
+- 0d checkpoint MCP: 3 tools wired into `tool-definitions.ts` + thin
+  `routes/checkpoints.ts` over existing core tools.
+
+## Per-phase integration deltas (append as phases complete)
+
+### Phase 1 — (pending)
+### Phase 2 — (pending)
+### Phase 3 — (pending)
+### Phase 4 — (pending)
+### Phase 6 — (pending)
+### Phase 5 — (pending)
+### Phase 7 — (pending)
+### Phase 8 — (pending)
+
+## Commit ledger (append)
+| Phase | Commit(s) | Summary |
+| --- | --- | --- |
+| 0 | 538fe66 4e27925 c25f9d3 b84ea3e be65877 a1e5ca2 3fb4eb1 | quick wins + specs + validation |

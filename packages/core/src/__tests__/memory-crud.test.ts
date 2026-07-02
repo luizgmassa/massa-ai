@@ -201,3 +201,52 @@ describe("MemoryController update (merge tags) + delete (sever edges)", () => {
     expect(result.deleted).toBe(false);
   });
 });
+
+// ── Phase 1: soft-delete (deleted_at) + recall filtering ────────────────
+describe("MemoryRepository.softDeleteById + recall filtering (Phase 1)", () => {
+  let repo: MemoryRepository;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "th0th-soft-"));
+    (MemoryRepository as any).instance = null;
+    repo = MemoryRepository.getInstance();
+  });
+
+  afterEach(() => {
+    try { (repo as any).db?.close?.(); } catch {}
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test("softDeleteById tombstones the row (sets deleted_at) and hides it from recall", () => {
+    insertMemory(repo, "s1", "soft delete me please");
+    expect(repo.getById("s1")?.deleted_at).toBeNull();
+
+    const ok = repo.softDeleteById("s1");
+    expect(ok).toBe(true);
+
+    // Row still exists (tombstoned, not hard-deleted) — getById is unfiltered.
+    const row = repo.getById("s1");
+    expect(row).not.toBeNull();
+    expect(row?.deleted_at).not.toBeNull();
+
+    // FTS recall excludes it.
+    const hits = repo.fullTextSearch("soft", 10, { minImportance: 0, includePersistent: true, limit: 10 });
+    expect(hits.map((r) => r.id)).not.toContain("s1");
+  });
+
+  test("softDeleteById is idempotent — second call returns false, no error", () => {
+    insertMemory(repo, "s2", "idempotent tombstone");
+    expect(repo.softDeleteById("s2")).toBe(true);
+    expect(repo.softDeleteById("s2")).toBe(false);
+  });
+
+  test("softDeleteById on a missing id returns false", () => {
+    expect(repo.softDeleteById("ghost")).toBe(false);
+  });
+
+  test("hard deleteById still works (back-compat) and removes the row entirely", () => {
+    insertMemory(repo, "s3", "hard delete target");
+    expect(repo.deleteById("s3")).toBe(true);
+    expect(repo.getById("s3")).toBeNull();
+  });
+});

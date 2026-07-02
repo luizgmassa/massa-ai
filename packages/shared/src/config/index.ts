@@ -59,7 +59,29 @@ export interface ServerConfig {
     autoReindexMaxFiles: number;
   };
 
+  // Shared local-first LLM configuration (cross-cutting §1).
+  // Consumed by consolidation (Phase 1), query rewrite (Phase 2),
+  // compression (Phase 7), bootstrap (Phase 4), auto-improve (Phase 5).
+  // Default-off; env RLM_LLM_ENABLED=true opts in. Ollama-local defaults.
+  llm: {
+    enabled: boolean;
+    baseUrl: string;
+    apiKey: string;
+    model: string;
+    temperature: number;
+    maxOutputTokens: number;
+    timeoutMs: number;
+  };
+
+  // Memory-quality configuration (Phase 1).
+  memory: {
+    decay: DecayParams;
+  };
+
   // Compression Configuration
+  // NOTE: compression.llm is a DEPRECATED alias of the top-level `llm` block
+  // (kept for one release so existing readers like code-compressor.ts see no
+  // behavior change). `prompt` stays compression-specific.
   compression: {
     defaultStrategy: string;
     minTokensForCompression: number;
@@ -165,6 +187,39 @@ function envNum(key: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/** Read an env var as a boolean; "true"/"1" (case-insensitive) are truthy. */
+function envBool(key: string, fallback: boolean): boolean {
+  const s = process.env[key];
+  if (s === undefined || s === "") return fallback;
+  const lower = s.toLowerCase();
+  if (lower === "true" || lower === "1") return true;
+  if (lower === "false" || lower === "0") return false;
+  return fallback;
+}
+
+/** Read an env var as a string; falls back to `fallback` when unset or empty. */
+function envString(key: string, fallback: string): string {
+  const s = process.env[key];
+  return s === undefined || s === "" ? fallback : s;
+}
+
+/**
+ * Decay parameters for memory salience scoring (Phase 1, borrowed from
+ * ai-memory decay.rs). Used by `decayScore`:
+ *   score = salience·exp(-λ·Δt_days) + σ·log(1+access)·exp(-μ·Δt_access_days)
+ * Memories scoring below `coldThreshold` are prune candidates.
+ */
+export interface DecayParams {
+  /** Per-day exponential decay rate of the salience term. */
+  lambda: number;
+  /** Weight of the access-reinforcement term. */
+  sigma: number;
+  /** Per-day exponential decay rate of the access term (since last access). */
+  mu: number;
+  /** Score below which a memory is a candidate for pruning. */
+  coldThreshold: number;
+}
+
 /**
  * Get global data directory
  * Creates ~/.rlm/ directory for all projects
@@ -263,18 +318,43 @@ export const defaultConfig: ServerConfig = {
     autoReindexMaxFiles: envNum("AUTOREINDEX_MAX_FILES", 200),
   },
 
+  // Shared local-first LLM block (cross-cutting §1). Ollama defaults; the
+  // OpenAI-compatible provider is created from these in services/memory/llm-client.ts.
+  llm: {
+    enabled: envBool("RLM_LLM_ENABLED", false),
+    baseUrl: envString("RLM_LLM_BASE_URL", "http://localhost:11434/v1"),
+    apiKey: envString("RLM_LLM_API_KEY", "ollama"),
+    model: envString("RLM_LLM_MODEL", "qwen2.5-coder:7b"),
+    temperature: envNum("RLM_LLM_TEMPERATURE", 0.2),
+    maxOutputTokens: envNum("RLM_LLM_MAX_OUTPUT_TOKENS", 2000),
+    timeoutMs: envNum("RLM_LLM_TIMEOUT_MS", 30000),
+  },
+
+  memory: {
+    // Defaults borrowed from ai-memory decay.rs. Tunable via the `memory.decay`
+    // config override or by constructing a Config with overrides.
+    decay: {
+      lambda: 0.02,
+      sigma: 0.6,
+      mu: 0.04,
+      coldThreshold: 0.2,
+    },
+  },
+
   compression: {
     defaultStrategy: "code_structure",
     minTokensForCompression: envNum("MIN_TOKENS_FOR_COMPRESSION", 100),
     targetCompressionRatio: envNum("TARGET_COMPRESSION_RATIO", 0.7),
+    // DEPRECATED alias of top-level `llm`. Same env vars, same shape; `prompt`
+    // remains compression-specific. Readers should migrate to `config.get("llm")`.
     llm: {
-      enabled: process.env.RLM_LLM_ENABLED === "true",
-      baseUrl: process.env.RLM_LLM_BASE_URL || "https://api.openai.com/v1",
-      apiKey: process.env.RLM_LLM_API_KEY || "",
-      model: process.env.RLM_LLM_MODEL || "gpt-4o-mini",
-      temperature: Number(process.env.RLM_LLM_TEMPERATURE || "0.2"),
-      maxOutputTokens: Number(process.env.RLM_LLM_MAX_OUTPUT_TOKENS || "800"),
-      timeoutMs: Number(process.env.RLM_LLM_TIMEOUT_MS || "20000"),
+      enabled: envBool("RLM_LLM_ENABLED", false),
+      baseUrl: envString("RLM_LLM_BASE_URL", "http://localhost:11434/v1"),
+      apiKey: envString("RLM_LLM_API_KEY", "ollama"),
+      model: envString("RLM_LLM_MODEL", "qwen2.5-coder:7b"),
+      temperature: envNum("RLM_LLM_TEMPERATURE", 0.2),
+      maxOutputTokens: envNum("RLM_LLM_MAX_OUTPUT_TOKENS", 2000),
+      timeoutMs: envNum("RLM_LLM_TIMEOUT_MS", 30000),
       prompt: process.env.RLM_LLM_PROMPT || undefined,
     },
   },
@@ -399,6 +479,12 @@ export class Config {
       vectorStore: { ...defaults.vectorStore, ...overrides.vectorStore },
       keywordSearch: { ...defaults.keywordSearch, ...overrides.keywordSearch },
       search: { ...defaults.search, ...overrides.search },
+      llm: { ...defaults.llm, ...overrides.llm },
+      memory: {
+        ...defaults.memory,
+        ...overrides.memory,
+        decay: { ...defaults.memory.decay, ...overrides.memory?.decay },
+      },
       compression: {
         ...defaults.compression,
         ...overrides.compression,

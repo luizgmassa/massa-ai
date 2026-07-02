@@ -55,6 +55,8 @@ export class MemoryQueryService {
 
     const where: any = {
       importance: { gte: minImportance },
+      // Phase 1: never list soft-deleted (tombstoned) memories.
+      deletedAt: { equals: null },
     };
 
     if (type) where.type = type;
@@ -91,18 +93,22 @@ export class MemoryQueryService {
 
   async getStats() {
     const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
+    const live = { deletedAt: { equals: null } };
+
     const [total, byType, avgImportance, recentCount] = await Promise.all([
-      this.prisma.memory.count(),
+      this.prisma.memory.count({ where: live }),
       this.prisma.memory.groupBy({
         by: ["type"],
         _count: true,
+        where: live,
       }),
       this.prisma.memory.aggregate({
         _avg: { importance: true },
+        where: live,
       }),
       this.prisma.memory.count({
         where: {
+          ...live,
           createdAt: { gt: last24Hours },
         },
       }),
@@ -123,7 +129,7 @@ export class MemoryQueryService {
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
     const memories = await this.prisma.memory.findMany({
-      where: { createdAt: { gt: since } },
+      where: { createdAt: { gt: since }, deletedAt: { equals: null } },
       orderBy: { createdAt: "desc" },
       take: limit,
     });
