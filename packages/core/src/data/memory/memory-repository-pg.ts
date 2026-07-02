@@ -13,7 +13,7 @@ import { logger, MemoryType } from "@th0th-ai/shared";
 import { Prisma } from "../../generated/prisma/index.js";
 import { getPrismaClient } from "../../services/query/prisma-client.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
-import type { InsertMemoryInput, MemoryRow, SearchFilters } from "./memory-repository.js";
+import type { InsertMemoryInput, MemoryRow, SearchFilters, UpdateMemoryPatch } from "./memory-repository.js";
 
 // ── Raw row shape returned by $queryRaw ──────────────────────────────────────
 
@@ -248,6 +248,44 @@ export class MemoryRepositoryPg {
    */
   async delete(id: string): Promise<void> {
     await this.prisma.$executeRaw`DELETE FROM memories WHERE id = ${id}`;
+  }
+
+  /**
+   * Delete a memory by ID. Returns true if a row was deleted.
+   * Uses RETURNING so an absent id reports false (idempotent).
+   */
+  async deleteById(id: string): Promise<boolean> {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      DELETE FROM memories WHERE id = ${id} RETURNING id
+    `;
+    return rows.length > 0;
+  }
+
+  /**
+   * Partially update a memory. Only provided fields are changed.
+   * PostgreSQL uses ILIKE (no external FTS table), so no FTS reindex needed.
+   * Returns true if a row was updated.
+   */
+  async update(id: string, patch: UpdateMemoryPatch): Promise<boolean> {
+    const sets: Prisma.Sql[] = [];
+    if (patch.content !== undefined) sets.push(Prisma.sql`content = ${patch.content}`);
+    if (patch.importance !== undefined) sets.push(Prisma.sql`importance = ${patch.importance}`);
+    if (patch.tags !== undefined) sets.push(Prisma.sql`tags = ${patch.tags}`);
+    if (patch.embedding !== undefined) {
+      const buf = Buffer.from(new Float32Array(patch.embedding).buffer);
+      sets.push(Prisma.sql`embedding = ${buf}`);
+    }
+
+    if (sets.length === 0) {
+      const row = await this.getById(id);
+      return row !== null;
+    }
+    sets.push(Prisma.sql`updated_at = NOW()`);
+
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      UPDATE memories SET ${Prisma.join(sets, ", ")} WHERE id = ${id} RETURNING id
+    `;
+    return rows.length > 0;
   }
 
   /**

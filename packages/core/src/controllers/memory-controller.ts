@@ -11,6 +11,7 @@
 
 import { logger, MemoryType, MemoryLevel } from "@th0th-ai/shared";
 import { getMemoryRepository } from "../data/memory/memory-repository-factory.js";
+import type { MemoryRow } from "../data/memory/memory-repository.js";
 import {
   MemoryService,
   type Memory,
@@ -58,6 +59,26 @@ export interface SearchMemoryResult {
   relatedSummaries: Record<string, string>;
   query: string;
   total: number;
+}
+
+export interface UpdateMemoryInput {
+  id: string;
+  content?: string;
+  importance?: number;
+  tags?: string[];
+  /** When true, union `tags` with existing tags instead of replacing. */
+  mergeTags?: boolean;
+}
+
+export interface UpdateMemoryResult {
+  id: string;
+  updated: boolean;
+  memory?: Omit<MemoryRow, "embedding">;
+}
+
+export interface DeleteMemoryResult {
+  id: string;
+  deleted: boolean;
 }
 
 // ── Controller ───────────────────────────────────────────────
@@ -141,6 +162,77 @@ export class MemoryController {
     void this.graph.onMemoryStored(id, linkTo);
 
     return { memoryId: id, stored: "local", level, type };
+  }
+
+  // ── Update ────────────────────────────────────────────────
+
+  async update(input: UpdateMemoryInput): Promise<UpdateMemoryResult> {
+    const { id, content, importance, tags, mergeTags = false } = input;
+
+    if (content !== undefined && content.trim().length === 0) {
+      throw new Error("content must not be empty");
+    }
+
+    const existing = await this.repo.getById(id);
+    if (!existing) {
+      return { id, updated: false };
+    }
+
+    // Resolve tags: merge with existing or replace.
+    let resolvedTags: string[] | undefined;
+    if (tags !== undefined) {
+      let current: string[] = [];
+      try {
+        current = existing.tags ? JSON.parse(existing.tags) : [];
+      } catch {
+        current = [];
+      }
+      resolvedTags = mergeTags
+        ? Array.from(new Set([...current, ...tags]))
+        : [...tags];
+    }
+
+    // Re-embed when content changes; leave embedding untouched otherwise.
+    let embedding: number[] | undefined;
+    if (content !== undefined) {
+      embedding = await this.service.generateEmbedding(content);
+    }
+
+    const updated = await this.repo.update(id, {
+      content,
+      importance,
+      tags: resolvedTags,
+      embedding,
+    });
+
+    if (!updated) {
+      return { id, updated: false };
+    }
+
+    const memory = await this.repo.getById(id);
+    logger.info("Memory updated", { id, fields: Object.keys(input).filter((k) => k !== "id") });
+
+    if (!memory) {
+      return { id, updated: true };
+    }
+    // Never return the embedding blob to clients.
+    const { embedding: _embedding, ...memoryWithoutEmbedding } = memory;
+    void _embedding;
+    return { id, updated: true, memory: memoryWithoutEmbedding };
+  }
+
+  // ── Delete ────────────────────────────────────────────────
+
+  async delete(id: string): Promise<DeleteMemoryResult> {
+    const deleted = await this.repo.deleteById(id);
+
+    if (deleted) {
+      // Sever graph edges (best-effort; never fails the delete).
+      this.graph.onMemoryDeleted(id);
+      logger.info("Memory deleted", { id });
+    }
+
+    return { id, deleted };
   }
 
   // ── Search ─────────────────────────────────────────────────

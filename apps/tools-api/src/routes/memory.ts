@@ -11,12 +11,16 @@ import {
   getMemoryRepository,
   SearchMemoriesTool,
   StoreMemoryTool,
+  UpdateMemoryTool,
+  DeleteMemoryTool,
 } from "@th0th-ai/core";
 import { logger } from "@th0th-ai/shared";
 import { Elysia, t } from "elysia";
 
 let storeMemoryTool: StoreMemoryTool | null = null;
 let searchMemoriesTool: SearchMemoriesTool | null = null;
+let updateMemoryTool: UpdateMemoryTool | null = null;
+let deleteMemoryTool: DeleteMemoryTool | null = null;
 
 function getStoreMemoryTool(): StoreMemoryTool {
   if (!storeMemoryTool) {
@@ -30,6 +34,20 @@ function getSearchMemoriesTool(): SearchMemoriesTool {
     searchMemoriesTool = new SearchMemoriesTool();
   }
   return searchMemoriesTool;
+}
+
+function getUpdateMemoryTool(): UpdateMemoryTool {
+  if (!updateMemoryTool) {
+    updateMemoryTool = new UpdateMemoryTool();
+  }
+  return updateMemoryTool;
+}
+
+function getDeleteMemoryTool(): DeleteMemoryTool {
+  if (!deleteMemoryTool) {
+    deleteMemoryTool = new DeleteMemoryTool();
+  }
+  return deleteMemoryTool;
 }
 
 /** Convert a raw MemoryRow into the same shape the search endpoint returns. */
@@ -151,6 +169,74 @@ export const memoryRoutes = new Elysia({ prefix: "/api/v1/memory" })
         summary: "Search memories",
         description:
           "Search stored memories using semantic search across sessions",
+      },
+    },
+  )
+  .post(
+    "/update",
+    async ({ body }) => {
+      try {
+        return await getUpdateMemoryTool().handle(body);
+      } catch (error) {
+        logger.error("Failed to initialize UpdateMemoryTool", error as Error);
+        return {
+          success: false,
+          error: `Memory service unavailable: ${(error as Error).message}`,
+        };
+      }
+    },
+    {
+      body: t.Object({
+        id: t.String({ description: "ID of the memory to update" }),
+        content: t.Optional(t.String({ description: "New content (re-embedded when set)" })),
+        importance: t.Optional(
+          t.Number({ minimum: 0, maximum: 1, description: "New importance score (0-1)" }),
+        ),
+        tags: t.Optional(
+          t.Array(t.String(), {
+            description: "Tags (replace existing unless mergeTags is true)",
+          }),
+        ),
+        mergeTags: t.Optional(
+          t.Boolean({ default: false, description: "Union tags with existing" }),
+        ),
+        format: t.Optional(
+          t.Union([t.Literal("json"), t.Literal("toon")], { default: "toon" }),
+        ),
+      }),
+      detail: {
+        tags: ["memory"],
+        summary: "Update memory",
+        description:
+          "Partially update a memory by id (content, importance, tags). Content changes are re-embedded.",
+      },
+    },
+  )
+  .post(
+    "/delete",
+    async ({ body }) => {
+      try {
+        return await getDeleteMemoryTool().handle(body);
+      } catch (error) {
+        logger.error("Failed to initialize DeleteMemoryTool", error as Error);
+        return {
+          success: false,
+          error: `Memory service unavailable: ${(error as Error).message}`,
+        };
+      }
+    },
+    {
+      body: t.Object({
+        id: t.String({ description: "ID of the memory to delete" }),
+        format: t.Optional(
+          t.Union([t.Literal("json"), t.Literal("toon")], { default: "toon" }),
+        ),
+      }),
+      detail: {
+        tags: ["memory"],
+        summary: "Delete memory",
+        description:
+          "Hard-delete a memory by id and sever its graph edges.",
       },
     },
   )

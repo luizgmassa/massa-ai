@@ -58,6 +58,14 @@ export interface SearchFilters {
   limit: number;
 }
 
+export interface UpdateMemoryPatch {
+  content?: string;
+  importance?: number;
+  tags?: string[];
+  /** Re-computed embedding; required when content changes (caller's responsibility). */
+  embedding?: number[];
+}
+
 // ── Repository ───────────────────────────────────────────────
 
 export class MemoryRepository {
@@ -344,6 +352,92 @@ export class MemoryRepository {
       .run(projectId);
 
     return result.changes;
+  }
+
+  /**
+   * Delete a single memory by id. Returns true if a row was deleted.
+   * Also removes its FTS index entry (external-content table → manual).
+   */
+  deleteById(id: string): boolean {
+    this.db
+      .prepare(
+        `INSERT INTO memories_fts(memories_fts, rowid, content, tags)
+         SELECT 'delete', rowid, content, tags FROM memories WHERE id = ?`,
+      )
+      .run(id);
+
+    const result = this.db
+      .prepare(`DELETE FROM memories WHERE id = ?`)
+      .run(id);
+
+    return result.changes > 0;
+  }
+
+  /**
+   * Partially update a memory. Only provided fields are changed.
+   * When content or tags change, the FTS index entry is rebuilt
+   * (external-content table → delete-then-insert around the row update).
+   * Returns true if a row was updated.
+   */
+  update(id: string, patch: UpdateMemoryPatch): boolean {
+    const sets: string[] = [];
+    const params: any[] = [];
+    let ftsDirty = false;
+
+    if (patch.content !== undefined) {
+      sets.push("content = ?");
+      params.push(patch.content);
+      ftsDirty = true;
+    }
+    if (patch.importance !== undefined) {
+      sets.push("importance = ?");
+      params.push(patch.importance);
+    }
+    if (patch.tags !== undefined) {
+      sets.push("tags = ?");
+      params.push(JSON.stringify(patch.tags));
+      ftsDirty = true;
+    }
+    if (patch.embedding !== undefined) {
+      sets.push("embedding = ?");
+      params.push(Buffer.from(new Float32Array(patch.embedding).buffer));
+    }
+
+    if (sets.length === 0) {
+      // Nothing to change — report existence so callers can distinguish
+      // "no-op on existing row" from "missing id".
+      return this.getById(id) !== null;
+    }
+
+    sets.push("updated_at = ?");
+    params.push(Date.now());
+
+    // FTS external-content: delete the OLD entry before the row changes.
+    if (ftsDirty) {
+      this.db
+        .prepare(
+          `INSERT INTO memories_fts(memories_fts, rowid, content, tags)
+           SELECT 'delete', rowid, content, tags FROM memories WHERE id = ?`,
+        )
+        .run(id);
+    }
+
+    params.push(id);
+    const result = this.db
+      .prepare(`UPDATE memories SET ${sets.join(", ")} WHERE id = ?`)
+      .run(...params);
+
+    // FTS external-content: insert the NEW entry after the row changes.
+    if (result.changes > 0 && ftsDirty) {
+      this.db
+        .prepare(
+          `INSERT INTO memories_fts(rowid, content, tags)
+           SELECT rowid, content, tags FROM memories WHERE id = ?`,
+        )
+        .run(id);
+    }
+
+    return result.changes > 0;
   }
 
   /**

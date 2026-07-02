@@ -235,6 +235,66 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: "th0th_memory_update",
+    description:
+      "Update an existing memory by id (content, importance, or tags). Content changes are re-embedded.",
+    apiEndpoint: "/api/v1/memory/update",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "ID of the memory to update" },
+        content: {
+          type: "string",
+          description: "New content (re-embedded when set)",
+        },
+        importance: {
+          type: "number",
+          description: "New importance score (0-1)",
+          minimum: 0,
+          maximum: 1,
+        },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description: "Tags (replace existing unless mergeTags is true)",
+        },
+        mergeTags: {
+          type: "boolean",
+          description: "Union tags with existing instead of replacing",
+          default: false,
+        },
+        format: {
+          type: "string",
+          enum: ["json", "toon"],
+          description: "Output format (json or toon)",
+          default: "toon",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "th0th_memory_delete",
+    description:
+      "Delete a memory by id (hard delete). Also removes its graph edges.",
+    apiEndpoint: "/api/v1/memory/delete",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "ID of the memory to delete" },
+        format: {
+          type: "string",
+          enum: ["json", "toon"],
+          description: "Output format (json or toon)",
+          default: "toon",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
     name: "th0th_compress",
     description:
       "Compress context using semantic compression (keeps structure, removes details)",
