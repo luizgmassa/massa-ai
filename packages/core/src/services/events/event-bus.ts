@@ -98,6 +98,15 @@ export interface EventMap {
     source: string;
     importance: number;
   };
+  /** Phase 4: emitted after a successful bootstrap stores ≥1 seed memory. */
+  "bootstrap:completed": {
+    projectId: string;
+    bootstrapId: string;
+    seedMemoryIds: string[];
+    source: "llm" | "rule-based";
+    signalCount: number;
+    memoryCount: number;
+  };
 }
 
 export type EventName = keyof EventMap;

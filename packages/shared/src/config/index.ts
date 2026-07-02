@@ -85,6 +85,16 @@ export interface ServerConfig {
   // Memory-quality configuration (Phase 1).
   memory: {
     decay: DecayParams;
+    // Bootstrap from repo (Phase 4). The service is default-on for scan +
+    // rule-based seeding; the LLM-driven summarization inherits the top-level
+    // `llm.enabled` gate and silent-degrades to rule-based seeds when off.
+    bootstrap: {
+      enabled: boolean;
+      maxSeedMemories: number;
+      centralityLimit: number;
+      gitLogLimit: number;
+      refreshEnabled: boolean;
+    };
   };
 
   // Passive lifecycle capture (Phase 3). Ingestion is default-on (no LLM dep);
@@ -375,6 +385,14 @@ export const defaultConfig: ServerConfig = {
       mu: 0.04,
       coldThreshold: 0.2,
     },
+    bootstrap: {
+      // Phase 4: repo bootstrap. Scan + rule-based seed have no LLM dep.
+      enabled: envBool("BOOTSTRAP_ENABLED", true),
+      maxSeedMemories: envNum("BOOTSTRAP_MAX_SEED_MEMORIES", 8),
+      centralityLimit: envNum("BOOTSTRAP_CENTRALITY_LIMIT", 10),
+      gitLogLimit: envNum("BOOTSTRAP_GIT_LOG_LIMIT", 20),
+      refreshEnabled: envBool("BOOTSTRAP_REFRESH_ENABLED", true),
+    },
   },
 
   hooks: {
@@ -546,6 +564,7 @@ export class Config {
         ...defaults.memory,
         ...overrides.memory,
         decay: { ...defaults.memory.decay, ...overrides.memory?.decay },
+        bootstrap: { ...defaults.memory.bootstrap, ...overrides.memory?.bootstrap },
       },
       hooks: {
         ...defaults.hooks,
