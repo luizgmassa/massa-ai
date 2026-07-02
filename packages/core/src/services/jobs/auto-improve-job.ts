@@ -634,14 +634,13 @@ export class AutoImproveJob {
       return { ok: false, reason: "not-pending" };
     }
 
-    // Apply the edit.
+    // Apply the edit. Capture the affected memory id (fresh for create,
+    // existing for update/tag) so the event + returned record carry it even
+    // though the proposal row's `targetMemoryId` column may not have been
+    // persisted with the freshly-assigned id.
+    let appliedMemoryId: string | null = null;
     try {
-      const targetId = await this.applyProposal(row);
-      // For create/tag we have a fresh memory id; for update it is the
-      // existing target. Update the row's targetMemoryId when newly assigned.
-      if (targetId && !row.targetMemoryId) {
-        row = { ...row, targetMemoryId: targetId };
-      }
+      appliedMemoryId = await this.applyProposal(row);
     } catch (e) {
       logger.warn("proposal:apply-failed", {
         id,
@@ -660,6 +659,12 @@ export class AutoImproveJob {
     }
     if (!updated) return { ok: false, reason: "store-failed" };
     if (updated.status !== "approved") return { ok: false, reason: "not-pending" };
+
+    // If a fresh memory id was assigned on apply, surface it on the returned
+    // record + event payload (the store row keeps the original targetMemoryId).
+    if (appliedMemoryId && !updated.targetMemoryId) {
+      updated = { ...updated, targetMemoryId: appliedMemoryId };
+    }
 
     // Emit (only on approve).
     eventBus.publish("memory:auto-improved", {
