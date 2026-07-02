@@ -71,7 +71,8 @@ export class CompressedContent implements ICompressedContent {
     compressed: string,
     strategy: CompressionStrategy,
     language?: string,
-    preservedElements: string[] = []
+    preservedElements: string[] = [],
+    compressionSource?: "regex" | "llm"
   ): CompressedContent {
     const originalTokens = CompressedContent.estimateTokens(original);
     const compressedTokens = CompressedContent.estimateTokens(compressed);
@@ -89,7 +90,8 @@ export class CompressedContent implements ICompressedContent {
         originalTokens,
         compressedTokens,
         preservedElements,
-        timestamp: new Date()
+        timestamp: new Date(),
+        compressionSource
       }
     });
   }

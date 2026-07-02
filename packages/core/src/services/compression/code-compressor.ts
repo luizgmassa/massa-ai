@@ -8,8 +8,18 @@
 import { ICompressor } from '@th0th-ai/shared';
 import { CompressedContent, CompressionStrategy } from '@th0th-ai/shared';
 import { CompressedContent as CompressedContentModel } from '../../models/CompressedContent.js';
-import { logger } from '@th0th-ai/shared';
+import { config, logger } from '@th0th-ai/shared';
 import { MetricsCollector } from '@th0th-ai/shared';
+import { llmComplete, isLlmEnabled, type LlmResult } from '../memory/llm-client.js';
+
+/**
+ * Injectable LLM-complete surface (mirrors the real `llmComplete` signature).
+ * Tests inject a fake; production uses the default export.
+ */
+export type CompressLlmComplete = (
+  prompt: string,
+  opts?: { system?: string; timeoutMs?: number },
+) => Promise<LlmResult<string>>;
 
 /**
  * Code structure patterns to preserve
@@ -25,6 +35,17 @@ interface CodeStructure {
 export class CodeCompressor implements ICompressor {
   private strategy: CompressionStrategy = CompressionStrategy.CODE_STRUCTURE;
   private languageCache: Map<string, string> = new Map();
+  private readonly llmCompleteFn: CompressLlmComplete;
+
+  /**
+   * @param llmCompleteFn Optional injectable LLM-complete surface for tests.
+   *   Production callers omit it; the real `llmComplete` is used. The LLM path
+   *   is gated on `config.get("llm").enabled` and silent-degrades to the regex
+   *   path on LLM off / {ok:false} / throw / over-long / empty output.
+   */
+  constructor(llmCompleteFn: CompressLlmComplete = llmComplete) {
+    this.llmCompleteFn = llmCompleteFn;
+  }
 
   /**
    * Compress source code
@@ -45,11 +66,81 @@ export class CodeCompressor implements ICompressor {
       let preservedElements: string[] = [];
 
       switch (useStrategy) {
-        case CompressionStrategy.CODE_STRUCTURE:
+        case CompressionStrategy.CODE_STRUCTURE: {
+          // Phase 7d: regex output is ALWAYS computed first (cheap) so the
+          // fallback is instant. Then, if the LLM is enabled, try to improve on
+          // it toward config.compression.targetCompressionRatio.
           const result = await this.compressStructure(content);
           compressed = result.compressed;
           preservedElements = result.preserved;
-          break;
+          let compressionSource: "regex" | "llm" = "regex";
+
+          // Phase 7d: LLM path gated on isLlmEnabled() (which honors the test
+          // seam + reads config defensively). No separate config.get("llm")
+          // gate, so the LLM-off/feature-off path is test-seam-driven and
+          // immune to process-wide mock.module config collisions.
+          if (isLlmEnabled() && content.trim().length > 0) {
+            const language = this.getCachedLanguage(content);
+            let targetRatio = 0.7;
+            let timeoutMs: number | undefined;
+            try {
+              targetRatio = config.get("compression").targetCompressionRatio ?? 0.7;
+            } catch {
+              targetRatio = 0.7;
+            }
+            try {
+              timeoutMs = config.get("llm").timeoutMs;
+            } catch {
+              timeoutMs = undefined;
+            }
+            const prompt = buildLlmCompressPrompt(
+              content,
+              language,
+              targetRatio,
+              preservedElements,
+            );
+            try {
+              const res = await this.llmCompleteFn(prompt, { timeoutMs });
+              if (
+                res.ok &&
+                typeof res.value === "string" &&
+                res.value.trim().length > 0 &&
+                res.value.length <= content.length
+              ) {
+                compressed = res.value;
+                compressionSource = "llm";
+              } else if (!res.ok) {
+                logger.debug("LLM compression {ok:false} — using regex output");
+              }
+            } catch (e) {
+              logger.debug("LLM compression threw — using regex output", {
+                error: (e as Error).message,
+              });
+            }
+          }
+
+          const language = this.getCachedLanguage(content);
+          const compressedContent = CompressedContentModel.create(
+            content,
+            compressed,
+            useStrategy,
+            language || 'unknown',
+            preservedElements,
+            compressionSource
+          );
+
+          MetricsCollector.recordCompression(
+            compressedContent.metadata.originalTokens,
+            compressedContent.metadata.compressedTokens
+          );
+          logger.info('Code compressed', {
+            ratio: compressedContent.compressionRatio,
+            tokensSaved: compressedContent.tokensSaved,
+            language,
+            compressionSource,
+          });
+          return compressedContent;
+        }
 
         case CompressionStrategy.SEMANTIC_DEDUP:
           compressed = await this.deduplicateSemantics(content);
@@ -396,3 +487,40 @@ export class CodeCompressor implements ICompressor {
     return this.languageCache.get(hash)!;
   }
 }
+
+// ─── Phase 7d: LLM compress prompt builder ────────────────────────────────────
+
+/** Cap content fed to the LLM to bound prompt size. */
+const LLM_COMPRESS_CONTENT_CAP = 6000;
+
+/**
+ * Build the LLM compression prompt. Targets `targetRatio` and lists the
+ * regex-extracted `preservedSignatures` as "must preserve" so the LLM output
+ * keeps the same load-bearing structure the regex path would have surfaced.
+ */
+function buildLlmCompressPrompt(
+  content: string,
+  language: string,
+  targetRatio: number,
+  preservedSignatures: string[],
+): string {
+  const slice = content.slice(0, LLM_COMPRESS_CONTENT_CAP);
+  const sigs =
+    preservedSignatures.length > 0
+      ? preservedSignatures.slice(0, 30).join("\n")
+      : "(none detected)";
+  return [
+    `Compress the following ${language || "source"} code to ~${Math.round(
+      targetRatio * 100,
+    )}% of its length while preserving every public signature (imports, exported functions, classes, interfaces) and the overall structure.`,
+    "Remove comments, blank lines, and implementation bodies; keep signatures and type info.",
+    "Output ONLY the compressed code, no prose.",
+    "",
+    "Must-preserve signatures:",
+    sigs,
+    "",
+    "Code:",
+    slice,
+  ].join("\n");
+}
+

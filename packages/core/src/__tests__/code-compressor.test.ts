@@ -14,9 +14,11 @@
  * the structural case, with one isolated detection spot-check.
  */
 
-import { describe, test, expect, beforeEach } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { CompressionStrategy } from "@th0th-ai/shared";
-import { CodeCompressor } from "../services/compression/code-compressor.js";
+import { CodeCompressor, type CompressLlmComplete } from "../services/compression/code-compressor.js";
+import { _setLlmEnabledForTesting } from "../services/memory/llm-client.js";
+import type { LlmResult } from "../services/memory/llm-client.js";
 
 describe("CodeCompressor — characterization (regex path)", () => {
   let compressor: CodeCompressor;
@@ -111,5 +113,97 @@ describe("CodeCompressor — characterization (regex path)", () => {
     ].join("\n");
     const result = await fresh.compress(ts);
     expect(result.metadata.language).toBe("typescript");
+  });
+});
+
+// ─── Phase 7d: LLM branch ────────────────────────────────────────────────────
+
+describe("CodeCompressor — 7d LLM branch", () => {
+  beforeEach(() => {
+    _setLlmEnabledForTesting(true);
+  });
+
+  afterEach(() => {
+    _setLlmEnabledForTesting(null);
+  });
+
+  function fakeComplete(
+    value: string | null,
+    opts: { throws?: boolean } = {},
+  ): CompressLlmComplete {
+    return async () => {
+      if (opts.throws) throw new Error("llm boom");
+      if (value == null) return { ok: false, error: "disabled" } as LlmResult<string>;
+      return { ok: true, value } as LlmResult<string>;
+    };
+  }
+
+  test("LLM-on path uses the LLM output when valid + shorter (source=llm)", async () => {
+    const original = [
+      "import { a } from 'b';",
+      "export function longBody() {",
+      "  // comment one",
+      "  // comment two",
+      "  // comment three",
+      "  return 42;",
+      "}",
+    ].join("\n");
+    const llmOut = "import { a } from 'b';\nexport function longBody() { /* ... */ }";
+    const compressor = new CodeCompressor(fakeComplete(llmOut));
+    const result = await compressor.compress(original);
+    expect(result.compressed).toBe(llmOut);
+    expect(result.metadata.compressionSource).toBe("llm");
+    expect(result.compressed.length).toBeLessThan(original.length);
+  });
+
+  test("LLM-off path uses the regex output (source=regex)", async () => {
+    _setLlmEnabledForTesting(false);
+    const original = "export function f() { return 1; }\n";
+    // Even with a valid LLM return, LLM-off → regex path + source=regex.
+    const compressor = new CodeCompressor(fakeComplete("SHOULD NOT BE USED"));
+    const result = await compressor.compress(original);
+    expect(result.metadata.compressionSource).toBe("regex");
+    expect(result.compressed).not.toContain("SHOULD NOT BE USED");
+  });
+
+  test("LLM returns {ok:false} → regex fallback (source=regex)", async () => {
+    const original = "export function f() { return 1; }\n";
+    const compressor = new CodeCompressor(fakeComplete(null));
+    const result = await compressor.compress(original);
+    expect(result.metadata.compressionSource).toBe("regex");
+  });
+
+  test("LLM throws → regex fallback (source=regex)", async () => {
+    const original = "export function f() { return 1; }\n";
+    const compressor = new CodeCompressor(fakeComplete("x", { throws: true }));
+    const result = await compressor.compress(original);
+    expect(result.metadata.compressionSource).toBe("regex");
+  });
+
+  test("LLM returns output longer than original → regex fallback", async () => {
+    const original = "export function f() { return 1; }\n";
+    const tooLong = original + "\n".repeat(50) + "x".repeat(200);
+    const compressor = new CodeCompressor(fakeComplete(tooLong));
+    const result = await compressor.compress(original);
+    // Over-long LLM output violates the target ratio → fallback to regex.
+    expect(result.metadata.compressionSource).toBe("regex");
+    expect(result.compressed).not.toBe(tooLong);
+  });
+
+  test("LLM returns empty → regex fallback", async () => {
+    const original = "export function f() { return 1; }\n";
+    const compressor = new CodeCompressor(fakeComplete("   "));
+    const result = await compressor.compress(original);
+    expect(result.metadata.compressionSource).toBe("regex");
+  });
+
+  // Discrimination sensor: if the {ok:false} guard were removed, source would
+  // be "llm" or the compressed text would be the (absent) LLM value. This test
+  // pins the guard as load-bearing.
+  test("discrimination sensor — {ok:false} guard is load-bearing", async () => {
+    const original = "export function f() { return 1; }\n";
+    const compressor = new CodeCompressor(fakeComplete(null));
+    const result = await compressor.compress(original);
+    expect(result.metadata.compressionSource).toBe("regex");
   });
 });

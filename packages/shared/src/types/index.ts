@@ -124,6 +124,8 @@ export interface CompressionMetadata {
   compressedTokens: number;
   preservedElements: string[];
   timestamp: Date;
+  /** Phase 7d: which compressor path produced `compressed`. */
+  compressionSource?: "regex" | "llm";
 }
 
 /**
