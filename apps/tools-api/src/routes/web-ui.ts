@@ -17,13 +17,21 @@ import { fileURLToPath } from "url";
 
 const STATIC_DIR_CANDIDATES = (() => {
   const here = path.dirname(fileURLToPath(import.meta.url));
+  const candidates: string[] = [];
   // source layout: apps/tools-api/src/routes/  ->  ../../web-ui/src/static
-  const sourceStatic = path.resolve(here, "../../web-ui/src/static");
+  candidates.push(path.resolve(here, "../../web-ui/src/static"));
   // dist layout fallback: apps/tools-api/dist/  ->  ../web-ui/src/static
-  const distStatic = path.resolve(here, "../web-ui/src/static");
-  // cwd fallback (monorepo root)
-  const cwdStatic = path.resolve(process.cwd(), "apps/web-ui/src/static");
-  return [sourceStatic, distStatic, cwdStatic];
+  candidates.push(path.resolve(here, "../web-ui/src/static"));
+  // Walk up from cwd looking for apps/web-ui/src/static (robust to test-runner
+  // cwd being the package dir, the monorepo root, or a parent).
+  let dir = process.cwd();
+  for (let i = 0; i < 8; i++) {
+    candidates.push(path.resolve(dir, "apps/web-ui/src/static"));
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return candidates;
 })();
 
 async function resolveStaticDir(): Promise<string | null> {
