@@ -24,3 +24,29 @@ Sole resumed agent verified its own work — no independent verifier sub-agent. 
 
 ## Plan reference
 `i-want-to-understand-virtual-lantern.md` Phase 0 (done) → Phase 1 (done) → Phase 2 (done) → Phase 3 next.
+
+## Phase 3 handoff (PASS — same-author verified)
+
+- in-progress: none
+- next step: Phase 4 (bootstrap from repo — G6). Independent of Phase 3 observations; consumes `llm-client` + `project_map` PageRank. Phase 6 (handoffs) may consume the SessionStart hook + `observation:ingested`.
+- blockers: none
+- uncommitted files: none
+- branch: main; commits 9f8b7a1 (specs), f28c30e (store+config+event), b950df7 (hook-service+queue+429), 8fb0cac (routes+bridge+scripts+mcp).
+
+## Key decisions for Phase 4+ (and later phases)
+- Hook ingestion: `POST /api/v1/hook` (single) + `POST /api/v1/hook/batch` (atomic). Returns 202 + id(s) on admission; 429 when the single-writer queue is saturated (`hooks.queue.maxPending`, default 256, env `HOOKS_QUEUE_MAX_PENDING`); 400/413 on validation; 423 when `hooks.enabled=false`.
+- Config block: `config.get("hooks")` = `{ enabled (true), maxPayloadBytes (65536), queue.{maxPending}, bridge.{enabled, minObservations(8), minIntervalMs(300000), maxWindow(8)} }`. Env knobs: `HOOKS_ENABLED`, `HOOKS_MAX_PAYLOAD_BYTES`, `HOOKS_QUEUE_MAX_PENDING`, `HOOKS_BRIDGE_ENABLED`, `HOOKS_BRIDGE_MIN_OBS`, `HOOKS_BRIDGE_MIN_INTERVAL_MS`, `HOOKS_BRIDGE_MAX_WINDOW`.
+- Observation store: `import { getObservationStore, SqliteObservationStore, MemoryObservationStore, resetObservationStore } from "packages/core/src/data/memory/observation-repository.js"`. SQLite-canonical (`observations.db`, WAL + busy_timeout=3000); MemoryObservationStore no-op fallback. Factory mirrors SessionStore/JobStore. PG parity via Prisma `Observation` model (no PgObservationStore code yet — SQLite-canonical like synapse_sessions/index_jobs).
+- Writer queue: `WriterQueue` (promise-chain mutex, mirrors `provider.ts:323`). `QueueSaturatedError` carries `retryAfterSeconds`. The route maps it to HTTP 429 + `Retry-After` header.
+- Consolidation bridge: `ObservationConsolidationJob` (`services/jobs/observation-consolidation-job.ts`). Debounce trigger (every minObservations OR minIntervalMs). Bypasses `consolidateWindow` (observations have no embeddings) → builds a recency window + calls `llm.object(prompt, ConsolidatedBatchSchema)` directly. Silent-skip when `!isEnabled()` / `{ok:false}` / throw. Injectable `memoryRepo` for tests (avoids the process-wide MemoryRepository singleton closed-DB landmine).
+- EventBus: `observation:ingested` ({ observationId, projectId, sessionId?, source, importance }) added to EventMap. Published inside the writer turn after `store.insert`.
+- Hook scripts: `apps/claude-plugin/hooks/{session-start,user-prompt-submit,post-tool-use,stop}.sh` + shared `_post.sh`. 2s curl timeout, exit 0, env `TH0TH_API_BASE` / `TH0TH_API_KEY` / `TH0TH_PROJECT_ID`. README in the same dir.
+- MCP tool: `th0th_hook_ingest` (POST /api/v1/hook/batch) for non-Claude hosts.
+- Core exports: Phase-3 hook symbols are exported from `packages/core/src/index.ts` (and consumed by routes via `@th0th-ai/core`).
+- Test isolation (still applies): hook tests inject `MemoryObservationStore` + fake `BridgeTrigger` + explicit `maxPending` (no shared-config mock). The consolidation-job test injects a fake `LlmSurface` + fake `memoryRepo` (the real MemoryRepository singleton is closed by memory-crud.test.ts in the full suite — injection avoids the closed-DB landmine).
+
+## Same-author caveat (Phase 3)
+Sole agent verified its own work — no independent verifier sub-agent. Mitigations: per-AC file:line evidence, discrimination sensor (saturation-check mutant killed), objective gate (738/0). See `.specs/features/phase-3-hook-capture/validation.md`.
+
+## Plan reference
+`i-want-to-understand-virtual-lantern.md` Phase 0 (done) → Phase 1 (done) → Phase 2 (done) → Phase 3 (done) → Phase 4 next.

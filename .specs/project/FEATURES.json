@@ -23,6 +23,13 @@
       "status": "complete",
       "priority": "P1",
       "phases": { "specify": true, "design": true, "tasks": true, "execute": true }
+    },
+    {
+      "slug": "phase-3-hook-capture",
+      "title": "Phase 3 — Passive memory capture (hook ingestion, Observation store, single-writer queue + 429, consolidation bridge, hook scripts)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": { "specify": true, "design": true, "tasks": true, "execute": true }
     }
   ]
 }

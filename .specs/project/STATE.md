@@ -4,11 +4,11 @@
 - projectId: `massa-th0th`
 - workflowSessionId: `spec-virtual-lantern-plan`
 - workflow: spec-driven
-- feature: `phase-2-query-understanding` (complete — same-author verified PASS)
+- feature: `phase-3-hook-capture` (complete — same-author verified PASS)
 - branch: main
 
 ## Next Step
-Phase 2 done. Next session: Phase 3 (passive memory capture — observation ingestion + hooks) per `i-want-to-understand-virtual-lantern.md`. Phase 3 consumes the `llm-client` surface + the `search:query-rewritten` / `search:reranked` EventBus events landed here, plus Phase 1's `SessionStore`/`JobStore`.
+Phase 3 done. Next session: Phase 4 (bootstrap from repo — G6) per `i-want-to-understand-virtual-lantern.md`. Phase 4 consumes the `llm-client` surface + the `project_map` PageRank output; it is independent of Phase 3's observations. Phase 6 (handoffs) may consume the SessionStart hook landed here.
 
 ## Decisions
 - Scope this session = Phase 0 (0a-0d) only. Phases 1-8 deferred.
@@ -48,3 +48,10 @@ Phase 2 done. Next session: Phase 3 (passive memory capture — observation inge
 - MemoryRepository (SQLite) gained update/deleteById; PG gained update + deleteById (RETURNING) for union parity.
 - MemoryGraphService.onMemoryDeleted(id) already existed (severs edges) — reused by controller.delete.
 - 3 checkpoint tools now wired into tool-definitions + new routes/checkpoints.ts.
+
+## Completion (Phase 3)
+- Commits: 9f8b7a1 (specs), f28c30e (observation store + config + event), b950df7 (hook-service + writer-queue + 429), 8fb0cac (routes + bridge + hook scripts + mcp tool).
+- Gates: `bun run test` 738 pass / 0 fail / 46 skip (baseline 700 → +38); `bun run type-check` 5/5 clean.
+- Same-author verifier: PASS (sole agent — caveat labeled in validation.md). Discrimination mutant killed (saturation-check removal → P3-BACKPRESSURE-01 fails). Report: `.specs/features/phase-3-hook-capture/validation.md`.
+- Landed: `hooks` config block (default-on ingestion, bridge inherits llm.enabled); `ObservationStore` (SQLite WAL + Memory fallback + factory); `WriterQueue` (promise-chain mutex + 429 on saturation); `HookService` (validate/normalize, fire-and-forget 202, batch atomic, observation:ingested event); Elysia routes `POST /api/v1/hook` + `/hook/batch`; `ObservationConsolidationJob` (debounce bridge, recency-window + direct LlmSurface.object with ConsolidatedBatchSchema, silent-skip when off/{ok:false}/throw); Claude Code hook scripts (SessionStart/UserPromptSubmit/PostToolUse/Stop); `th0th_hook_ingest` MCP tool; Prisma Observation model (PG parity).
+- Accepted assumptions (non-blocking): bridge bypasses consolidateWindow prefilter (observations have no embeddings → recency window + direct schema-validated LLM call); no OS-level scheduler (trigger-driven debounce); PG ObservationStore code deferred (Prisma model provides parity; SQLite-canonical like synapse_sessions/index_jobs); fire-and-forget write failures logged not retried; sourceIds in memory:consolidated are observation ids (informational, no edge to non-memory rows).

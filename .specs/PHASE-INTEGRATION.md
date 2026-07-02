@@ -124,7 +124,46 @@ schema, EventBus events, seams). Not the spec; canonical state stays in
 
 **Test-isolation note (extends Phase-1 rule):** `query-understanding.test.ts` does NOT mock `@th0th-ai/shared`. It injects a fake `QueryLlmSurface` + fake `EmbedFn` (no config, no DB, no network). The `QueryUnderstandingService` constructor has defensive config readers (fall back to spec defaults) because other test files' process-wide shared-config mock omits the `queryUnderstanding` block — this is a no-op in production.
 
-### Phase 3 — (pending)
+### Phase 3 — landed (commits 9f8b7a1 specs, f28c30e store+config+event, b950df7 hook-service+queue+429, 8fb0cac routes+bridge+scripts+mcp)
+
+**Config keys (new):**
+- `hooks: { enabled (envBool HOOKS_ENABLED=true); maxPayloadBytes (envNum HOOKS_MAX_PAYLOAD_BYTES=65536); queue.{ maxPending (envNum HOOKS_QUEUE_MAX_PENDING=256) }; bridge.{ enabled (envBool HOOKS_BRIDGE_ENABLED=true); minObservations (8); minIntervalMs (300_000); maxWindow (8) } }`. Additive nested block in `ServerConfig`; `mergeConfig` shallow-merges `hooks` + nested `queue`/`bridge`.
+
+**Services exported (path + symbol) — what Phase 4+ consumes:**
+- `packages/core/src/data/memory/observation-repository.ts` → `ObservationStore` (interface), `MemoryObservationStore` (no-op fallback), `SqliteObservationStore` (lazy open, WAL + busy_timeout=3000, `observations` table), `getObservationStore()`/`resetObservationStore()` (factory mirrors SessionStore/JobStore), `newObservationId()`, `LIFECYCLE_EVENTS` (const tuple of the 6 event kinds), `LifecycleEventKind`/`Observation`/`ObservationRow` types.
+- `packages/core/src/services/hooks/writer-queue.ts` → `WriterQueue` (promise-chain mutex mirroring `provider.ts:323`), `QueueSaturatedError` (carries `retryAfterSeconds`).
+- `packages/core/src/services/hooks/hook-service.ts` → `HookService` (ctor `{ store?, maxPending?, maxPayloadBytes?, bridge?, idFactory? }`), `validateEvent(raw, maxPayloadBytes)` (pure), `ingestOne`/`ingestBatch`, `ValidationError` (code 400|413), `getHookService()`/`resetHookService()` singleton, `IncomingEvent`/`NormalizedEvent`/`BridgeTrigger` types.
+- `packages/core/src/services/jobs/observation-consolidation-job.ts` → `ObservationConsolidationJob` (ctor `{ llm?, store?, memoryRepo?, minObservations?, minIntervalMs?, maxWindow? }`), `maybeRun(projectId)` (debounce trigger), `runOnce(projectId)` (silent-skip on LLM-off/`{ok:false}`/throw), singleton `observationConsolidationJob`.
+- Core barrel re-exports Phase-3 hook symbols from `packages/core/src/index.ts` (consumed by routes via `@th0th-ai/core`).
+
+**Routes (new, Elysia):**
+- `POST /api/v1/hook` → single lifecycle event → 202 + `{ id }`; 429 + `Retry-After` when saturated; 400/413 validation; 423 when `hooks.enabled=false`.
+- `POST /api/v1/hook/batch` → `{ events: [...] }` atomic validation → 202 + `{ ids: [] }`; same error mapping.
+- Wired into `apps/tools-api/src/index.ts` (`.use(hookRoutes)`) + swagger tag `hooks`.
+
+**Schema delta (additive, both backends):**
+- SQLite: new `observations` table (`id TEXT PK, project_id, session_id, source, payload_json, importance, created_at`) + 2 indexes (`idx_obs_project_created`, `idx_obs_session`). DB file `observations.db` (WAL + busy_timeout=3000). No ALTER (new table).
+- PG: additive Prisma `Observation` model (`@@map("observations")`, indexes on `[projectId, createdAt(sort:Desc)]` + `[sessionId]`). No PgObservationStore code yet (SQLite-canonical runtime state, like synapse_sessions/index_jobs).
+
+**EventBus events emitted (new):**
+- `observation:ingested: { observationId, projectId, sessionId?, source, importance }` — published inside the writer turn after `store.insert`.
+
+**Single-writer queue + 429 design (cross-cutting §4):**
+- `WriterQueue` serializes the persist step via a promise-chain mutex (mirrors `provider.ts:323`). `saturated = pending >= maxPending` (default 256); `enqueue` throws `QueueSaturatedError` BEFORE any side effect → route maps to 429. WAL + busy_timeout protect readers from the fire-hose. The queue lives on the `HookService` singleton.
+
+**Consolidation bridge design:**
+- Separate job (`ObservationConsolidationJob`), NOT extending `memory-consolidation-job.ts` — observations are a different source stream (no embeddings) with a different trigger. Reuses `ConsolidatedBatchSchema` + `LlmSurface` contract. Bypasses `consolidateWindow`'s cosine prefilter (observations have no embeddings → recency window + direct `llm.object` call). Silent-skip when `!isEnabled()` / `{ok:false}` / throw; observations ALWAYS retained. Debounce trigger from the ingest path (every `minObservations` OR `minIntervalMs`); fire-and-forget, never blocks the 202.
+
+**Hook scripts + MCP tool:**
+- `apps/claude-plugin/hooks/{session-start,user-prompt-submit,post-tool-use,stop}.sh` + shared `_post.sh` (2s curl timeout, `exit 0`, env `TH0TH_API_BASE`/`TH0TH_API_KEY`/`TH0TH_PROJECT_ID`) + `README.md`.
+- MCP tool `th0th_hook_ingest` (POST /api/v1/hook/batch) for non-Claude hosts.
+
+**Test-isolation note (extends Phase-1/2 rule):** Phase-3 tests do NOT mock `@th0th-ai/shared`. `observation-repository.test.ts` uses explicit temp `dbPath`; `hook-service.test.ts` injects `MemoryObservationStore` + fake `BridgeTrigger` + explicit `maxPending`; `observation-consolidation-job.test.ts` injects a fake `LlmSurface` + fake `memoryRepo` (the real `MemoryRepository` singleton is closed by `memory-crud.test.ts` in the full suite — the `memoryRepo` injection seam avoids the closed-DB landmine).
+
+**Seams Phase 4/5/6 reuse:**
+- Phase 4 (bootstrap): independent of observations; consumes `llm-client` + `project_map` PageRank.
+- Phase 5 (auto-improve): consumes `observation:ingested` + the Observation store (`listRecent`) to detect patterns; may emit proposals.
+- Phase 6 (handoffs): may consume the SessionStart hook (auto-inject a pending handoff on session-start) + the `observation:ingested` stream.
 ### Phase 4 — (pending)
 ### Phase 6 — (pending)
 ### Phase 5 — (pending)
@@ -137,3 +176,4 @@ schema, EventBus events, seams). Not the spec; canonical state stays in
 | 0 | 538fe66 4e27925 c25f9d3 b84ea3e be65877 a1e5ca2 3fb4eb1 | quick wins + specs + validation |
 | 1 | befa3cb e49ffa9 12fe002 1ccb42c | memory foundation: decay/pinned/soft-delete, llm-client+consolidator+polymorphic job+read-side, durable sessions/jobs |
 | 2 | ebcc202 5b0ba18 6a7598f 6cb5edb f2acceb | query understanding: config gate, rewrite+hyde+cache service, search fan-out, search:query-rewritten/reranked events, tests |
+| 3 | 9f8b7a1 f28c30e b950df7 8fb0cac | passive capture: hooks config + Observation store (WAL) + writer queue + 429 + HookService + Elysia routes + consolidation bridge + Claude Code hook scripts + th0th_hook_ingest + observation:ingested event, tests |
