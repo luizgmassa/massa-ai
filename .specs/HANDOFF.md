@@ -79,7 +79,7 @@ Sole agent verified its own work — no independent verifier sub-agent. Mitigati
 - next step: Phase 5 (auto-improvement loop — G7). May consume the `handoff:accepted` event + the Observation store (`listRecent`) + Synapse sessions to detect patterns. The `bootstrap:<projectId>` seed memories (Phase 4) + the handoff dual-write memories (Phase 6) give a baseline for proposed edits.
 - blockers: none
 - uncommitted files: none (this commit)
-- branch: main; commits d3ccd2e (specs), 60e799b (config+event+prisma), 4d8ac60 (store+service+injector+barrel), 8f2f0a0 (mcp+route), ebceebf (tests+validation).
+- branch: main; commits d3ccd2e (specs), 60e799b (config+event+prisma), 4d8ac60 (store+service+injector+barrel), 8f2f0a0 (mcp+route), 1a4bc40 (tests+validation).
 
 ## Key decisions for Phase 5+ (and later phases)
 - Handoff service: `import { HandoffService, getHandoffService, buildHandoffMemoryInput } from "packages/core/src/services/handoff/handoff-service.js"` (or via `@th0th-ai/core`). `begin({projectId, sourceSessionId?, targetAgent?, summary?, openQuestions?, nextSteps?, files?})` → `{ok, id, status:"open", memoryId}`. `accept({id, projectId?})` → `{ok, handoff}` (emits `handoff:accepted`). `cancel({id, projectId?})` → `{ok, handoff}`. `listPending(projectId, targetAgent?)` → open handoffs oldest-first.
