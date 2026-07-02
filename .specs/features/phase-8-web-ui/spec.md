@@ -33,7 +33,8 @@ REST read surfaces already exposed by `apps/tools-api`. Vanilla HTML/CSS/JS only
 
 ### R8-SERVE-01 — UI is served by the Tools API
 - **AC:** `GET /` (or the configured UI prefix root) returns HTTP 200 with
-  `text/html` and a body containing the app shell `<div id="app">`.
+  `text/html` and a body containing the app shell element `id="app"` (the
+  mount target, `<main id="app">`).
 - **AC:** The static assets (CSS, JS) under the UI prefix return 200 with the
   correct content-type.
 

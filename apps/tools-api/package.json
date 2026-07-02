@@ -17,7 +17,8 @@
     "start": "bun src/index.ts",
     "start:insecure": "NODE_TLS_REJECT_UNAUTHORIZED=0 bun src/index.ts",
     "build": "bun build src/index.ts --outdir=dist --target=bun --external prisma-adapter-bun-sqlite --external pg --external @prisma/adapter-pg",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "bun test"
   },
   "dependencies": {
     "@th0th-ai/core": "workspace:*",
