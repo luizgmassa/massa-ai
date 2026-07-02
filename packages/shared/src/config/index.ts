@@ -54,6 +54,11 @@ export interface ServerConfig {
     ftsVersion: "fts5";
   };
 
+  // Search / Auto-Reindex Configuration
+  search: {
+    autoReindexMaxFiles: number;
+  };
+
   // Compression Configuration
   compression: {
     defaultStrategy: string;
@@ -252,6 +257,12 @@ export const defaultConfig: ServerConfig = {
     ftsVersion: "fts5",
   },
 
+  search: {
+    // Max files an auto-reindex (latency-sensitive) path will sync before
+    // deferring. Overridable via AUTOREINDEX_MAX_FILES env var.
+    autoReindexMaxFiles: envNum("AUTOREINDEX_MAX_FILES", 200),
+  },
+
   compression: {
     defaultStrategy: "code_structure",
     minTokensForCompression: envNum("MIN_TOKENS_FOR_COMPRESSION", 100),
@@ -387,6 +398,7 @@ export class Config {
       },
       vectorStore: { ...defaults.vectorStore, ...overrides.vectorStore },
       keywordSearch: { ...defaults.keywordSearch, ...overrides.keywordSearch },
+      search: { ...defaults.search, ...overrides.search },
       compression: {
         ...defaults.compression,
         ...overrides.compression,

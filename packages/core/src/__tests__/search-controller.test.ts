@@ -20,6 +20,7 @@ mock.module("@th0th-ai/shared", () => {
           keywordSearch: { dbPath: "/tmp/th0th-test-kw.db", ftsVersion: "fts5" },
           cache: { l1: { maxSize: 1024, defaultTTL: 60 }, l2: { dbPath: "/tmp/th0th-test-cache.db", maxSize: 1024, defaultTTL: 60 }, embedding: { dbPath: "/tmp/th0th-test-emb-cache.db", maxAgeHours: 1 } },
           security: { maxInputLength: 10000, sanitizeInputs: true, maxIndexSize: 1000, maxFileSize: 1048576, allowedExtensions: [".ts"], excludePatterns: [] },
+          search: { autoReindexMaxFiles: 200 },
         };
         return defaults[key];
       },
@@ -170,6 +171,34 @@ describe("SearchController", () => {
       const a = SearchController.getInstance();
       const b = SearchController.getInstance();
       expect(a).toBe(b);
+    });
+  });
+
+  // ── handleAutoReindex cap (config-driven) ─────────────────
+  describe("handleAutoReindex", () => {
+    test("passes config search.autoReindexMaxFiles as maxSyncFiles (not hardcoded)", async () => {
+      const captured: Array<Record<string, unknown>> = [];
+      const ctx = (controller as any).contextualSearch;
+      const original = ctx.ensureFreshIndex.bind(ctx);
+      ctx.ensureFreshIndex = async (
+        _projectId: string,
+        _projectPath: string,
+        opts: Record<string, unknown>,
+      ) => {
+        captured.push(opts);
+        return { wasStale: false, reindexed: false };
+      };
+      try {
+        await (controller as any).handleAutoReindex("proj-x", "/tmp/proj-x");
+      } finally {
+        ctx.ensureFreshIndex = original;
+      }
+
+      expect(captured.length).toBe(1);
+      // 200 comes from the mocked config — proves the cap is config-driven,
+      // not the old hardcoded literal 50.
+      expect(captured[0].maxSyncFiles).toBe(200);
+      expect(captured[0].allowFullReindex).toBe(false);
     });
   });
 });

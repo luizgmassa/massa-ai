@@ -6,7 +6,7 @@
  * coordination from the SearchProjectTool.
  */
 
-import { logger } from "@th0th-ai/shared";
+import { logger, config } from "@th0th-ai/shared";
 import { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js";
 import { eventBus } from "../services/events/event-bus.js";
 import { minimatch } from "minimatch";
@@ -241,7 +241,10 @@ export class SearchController {
     const info = await this.contextualSearch.ensureFreshIndex(
       projectId,
       projectPath,
-      { allowFullReindex: false, maxSyncFiles: 50 },
+      {
+        allowFullReindex: false,
+        maxSyncFiles: config.get("search").autoReindexMaxFiles,
+      },
     );
 
     logger.info("Index freshness check completed", {

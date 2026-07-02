@@ -621,7 +621,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: "th0th_reindex",
-    description: "Force full reindex of a project workspace. Use when autoReindex (max 50 files) is insufficient after a large refactor.",
+    description: "Force full reindex of a project workspace. Use when autoReindex (configurable via search.autoReindexMaxFiles, default 200) is insufficient after a large refactor.",
     apiEndpoint: "/api/v1/workspace/:id/reindex",
     apiMethod: "POST",
     inputSchema: {

@@ -287,7 +287,8 @@ export class ContextualSearchRLM {
   }> {
     await this.ensureInitialized();
     const allowFullReindex = options.allowFullReindex ?? false;
-    const maxSyncFiles = options.maxSyncFiles ?? 100;
+    const maxSyncFiles =
+      options.maxSyncFiles ?? config.get("search").autoReindexMaxFiles;
 
     const staleCheck = await this.indexManager.isIndexStale(
       projectId,
@@ -342,7 +343,7 @@ export class ContextualSearchRLM {
     const needsFullReindex =
       staleCheck.reason === "no_index" ||
       staleCheck.reason === "path_mismatch" ||
-      filesToReindex.length > 100;
+      filesToReindex.length > maxSyncFiles;
 
     if (needsFullReindex && !allowFullReindex) {
       logger.warn("Deferring full reindex in latency-sensitive path", {
