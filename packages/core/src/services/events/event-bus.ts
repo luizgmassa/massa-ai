@@ -90,6 +90,14 @@ export interface EventMap {
     streamCount: number;
     resultCount: number;
   };
+  /** Phase 3: emitted after an observation is persisted (hook ingestion). */
+  "observation:ingested": {
+    observationId: string;
+    projectId: string;
+    sessionId?: string;
+    source: string;
+    importance: number;
+  };
 }
 
 export type EventName = keyof EventMap;

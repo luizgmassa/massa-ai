@@ -87,6 +87,23 @@ export interface ServerConfig {
     decay: DecayParams;
   };
 
+  // Passive lifecycle capture (Phase 3). Ingestion is default-on (no LLM dep);
+  // the LLM-driven consolidation bridge inherits the top-level `llm.enabled`
+  // gate and silent-degrades to a no-op when the LLM is off.
+  hooks: {
+    enabled: boolean;
+    maxPayloadBytes: number;
+    queue: {
+      maxPending: number;
+    };
+    bridge: {
+      enabled: boolean;
+      minObservations: number;
+      minIntervalMs: number;
+      maxWindow: number;
+    };
+  };
+
   // Compression Configuration
   // NOTE: compression.llm is a DEPRECATED alias of the top-level `llm` block
   // (kept for one release so existing readers like code-compressor.ts see no
@@ -360,6 +377,23 @@ export const defaultConfig: ServerConfig = {
     },
   },
 
+  hooks: {
+    // Phase 3: passive lifecycle capture. Ingestion has no LLM dependency.
+    enabled: envBool("HOOKS_ENABLED", true),
+    maxPayloadBytes: envNum("HOOKS_MAX_PAYLOAD_BYTES", 65_536),
+    queue: {
+      // Saturation threshold — once exceeded, /api/v1/hook returns 429.
+      maxPending: envNum("HOOKS_QUEUE_MAX_PENDING", 256),
+    },
+    bridge: {
+      // LLM-driven observation→memory summarization. No-ops when llm.enabled=false.
+      enabled: envBool("HOOKS_BRIDGE_ENABLED", true),
+      minObservations: envNum("HOOKS_BRIDGE_MIN_OBS", 8),
+      minIntervalMs: envNum("HOOKS_BRIDGE_MIN_INTERVAL_MS", 5 * 60 * 1000),
+      maxWindow: envNum("HOOKS_BRIDGE_MAX_WINDOW", 8),
+    },
+  },
+
   compression: {
     defaultStrategy: "code_structure",
     minTokensForCompression: envNum("MIN_TOKENS_FOR_COMPRESSION", 100),
@@ -512,6 +546,12 @@ export class Config {
         ...defaults.memory,
         ...overrides.memory,
         decay: { ...defaults.memory.decay, ...overrides.memory?.decay },
+      },
+      hooks: {
+        ...defaults.hooks,
+        ...overrides.hooks,
+        queue: { ...defaults.hooks.queue, ...overrides.hooks?.queue },
+        bridge: { ...defaults.hooks.bridge, ...overrides.hooks?.bridge },
       },
       compression: {
         ...defaults.compression,
