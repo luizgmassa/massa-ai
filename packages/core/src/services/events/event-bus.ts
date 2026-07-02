@@ -115,6 +115,16 @@ export interface EventMap {
     targetAgent?: string;
     acceptedAt: number;
   };
+  /** Phase 5: emitted after an auto-improve proposal is applied (status pending→approved). */
+  "memory:auto-improved": {
+    proposalId: string;
+    projectId?: string;
+    kind: "memory.create" | "memory.update" | "memory.tag";
+    targetMemoryId?: string;
+    status: "approved";
+    appliedAt: number;
+    source: "llm" | "rule-based";
+  };
 }
 
 export type EventName = keyof EventMap;

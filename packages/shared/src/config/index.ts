@@ -95,6 +95,20 @@ export interface ServerConfig {
       gitLogLimit: number;
       refreshEnabled: boolean;
     };
+    // Auto-improvement loop (Phase 5, G7). Pattern detection is rule-based
+    // (no LLM dep); LLM enrichment is optional and inherits the top-level
+    // `llm.enabled` gate. Default auto-approve (reviewGate=false) with
+    // logging; flip reviewGate=true for human-in-the-loop surfacing.
+    autoImprove: {
+      enabled: boolean;
+      reviewGate: boolean;
+      minObservations: number;
+      minIntervalMs: number;
+      maxWindow: number;
+      minQueryHits: number;
+      minFileHits: number;
+      minFixHits: number;
+    };
   };
 
   // Passive lifecycle capture (Phase 3). Ingestion is default-on (no LLM dep);
@@ -400,6 +414,20 @@ export const defaultConfig: ServerConfig = {
       gitLogLimit: envNum("BOOTSTRAP_GIT_LOG_LIMIT", 20),
       refreshEnabled: envBool("BOOTSTRAP_REFRESH_ENABLED", true),
     },
+    autoImprove: {
+      // Phase 5: auto-improvement loop. Rule-based pattern detection has
+      // no LLM dep; LLM enrichment inherits the top-level llm.enabled gate.
+      // Default auto-approve + logging; reviewGate=true surfaces pending
+      // proposals via th0th_list_proposals / th0th_approve_proposal.
+      enabled: envBool("AUTO_IMPROVE_ENABLED", true),
+      reviewGate: envBool("AUTO_IMPROVE_REVIEW_GATE", false),
+      minObservations: envNum("AUTO_IMPROVE_MIN_OBS", 8),
+      minIntervalMs: envNum("AUTO_IMPROVE_MIN_INTERVAL_MS", 5 * 60 * 1000),
+      maxWindow: envNum("AUTO_IMPROVE_MAX_WINDOW", 16),
+      minQueryHits: envNum("AUTO_IMPROVE_MIN_QUERY_HITS", 3),
+      minFileHits: envNum("AUTO_IMPROVE_MIN_FILE_HITS", 3),
+      minFixHits: envNum("AUTO_IMPROVE_MIN_FIX_HITS", 2),
+    },
   },
 
   hooks: {
@@ -577,6 +605,7 @@ export class Config {
         ...overrides.memory,
         decay: { ...defaults.memory.decay, ...overrides.memory?.decay },
         bootstrap: { ...defaults.memory.bootstrap, ...overrides.memory?.bootstrap },
+        autoImprove: { ...defaults.memory.autoImprove, ...overrides.memory?.autoImprove },
       },
       hooks: {
         ...defaults.hooks,

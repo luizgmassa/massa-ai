@@ -306,6 +306,27 @@ model Handoff {
 }
 
 // ========================================
+// Proposal (Phase 5, G7) — auto-improvement proposals.
+// SQLite-canonical; this model provides PG parity so a Postgres deployment
+// can also store proposals. The default local-first path uses the
+// SqliteProposalStore (proposals.db) via the polymorphic factory.
+// ========================================
+model Proposal {
+  id              String    @id
+  projectId       String    @map("project_id")
+  kind            String    // memory.create | memory.update | memory.tag
+  targetMemoryId  String?   @map("target_memory_id")
+  payloadJson     String    @map("payload_json")
+  rationale       String    @default("")
+  status          String    @default("pending") // pending | approved | rejected
+  createdAt       DateTime  @default(now()) @map("created_at")
+  decidedAt       DateTime? @map("decided_at")
+
+  @@index([projectId, status])
+  @@map("proposals")
+}
+
+// ========================================
 // Embedding Cache
 // ========================================
 model EmbeddingCache {
