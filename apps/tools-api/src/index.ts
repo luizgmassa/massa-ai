@@ -26,6 +26,7 @@ import { workspaceRoutes } from "./routes/workspace.js";
 import { fileRoutes } from "./routes/file.js";
 import { synapseRoutes } from "./routes/synapse.js";
 import { hookRoutes } from "./routes/hooks.js";
+import { bootstrapRoutes } from "./routes/bootstrap.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
 import { getHealthChecker, searchSessionHook, coRetrievalHook } from "@th0th-ai/core";
@@ -89,6 +90,7 @@ const app = new Elysia({ adapter: node() })
   .use(fileRoutes)
   .use(synapseRoutes)
   .use(hookRoutes)
+  .use(bootstrapRoutes)
   .get("/health", () => ({
     status: "ok",
     service: "th0th-tools-api",

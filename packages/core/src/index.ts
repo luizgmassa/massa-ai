@@ -63,5 +63,32 @@ export {
   QueueSaturatedError,
 } from "./services/hooks/writer-queue.js";
 
+// Phase 4 — repo bootstrap (seed memories)
+export {
+  BootstrapService,
+  getBootstrapService,
+  resetBootstrapService,
+  bootstrapService,
+  SeedMemoriesSchema,
+  scanSignals,
+  summarizeWithLlm,
+  ruleBasedSeed,
+  storeSeeds,
+  countSignals,
+} from "./services/bootstrap/bootstrap-service.js";
+export type {
+  BootstrapSeed,
+  BootstrapSignals,
+  BootstrapResult,
+  BootstrapOptions,
+  BootstrapDeps,
+  BootstrapSource,
+  SeedType,
+  MemoryRepoSeam,
+  CentralitySource,
+  GitRunner,
+  SeedMemories,
+} from "./services/bootstrap/bootstrap-service.js";
+
 // Re-export types from shared for convenience
 export type { ToolResponse, IToolHandler } from "@th0th-ai/shared";

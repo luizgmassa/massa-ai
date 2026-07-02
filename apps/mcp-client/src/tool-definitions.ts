@@ -867,6 +867,29 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ["events"],
     },
   },
+  {
+    name: "th0th_bootstrap",
+    description:
+      "Scan a project (git log, README, docs, package manifests, top central files from PageRank) and create LLM-summarized seed memories so an agent begins with usable context. Idempotent — skips if already bootstrapped unless force=true. LLM-off degrades silently to rule-based seeds. Never throws.",
+    apiEndpoint: "/api/v1/bootstrap",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string", description: "Project identifier" },
+        projectPath: {
+          type: "string",
+          description: "Project root path (defaults to server cwd)",
+        },
+        force: {
+          type: "boolean",
+          default: false,
+          description: "Refresh even if already bootstrapped",
+        },
+      },
+      required: ["projectId"],
+    },
+  },
 ];
 
 /**
