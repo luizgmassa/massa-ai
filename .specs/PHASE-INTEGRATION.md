@@ -196,8 +196,49 @@ schema, EventBus events, seams). Not the spec; canonical state stays in
 - Phase 6 (handoffs): may consume the SessionStart hook (Phase 3) to auto-inject a pending handoff; the `bootstrap:<projectId>` seed memories give initial project context on session start. The `MemoryRepoSeam` + `LlmSurface` ctor-seam pattern is the reusable test-isolation template.
 - Phase 7 (compression): unaffected; seed memories have no embeddings (FTS-only), so they do not enter the vector-search/compression paths.
 
-### Phase 6 — (pending)
-### Phase 5 — (pending)
+### Phase 6 — landed (commits d3ccd2e specs, 60e799b config+event+prisma, 4d8ac60 store+service+injector+barrel, 8f2f0a0 mcp+route, ebceebf)
+
+**Config keys (new):**
+- `handoffs: { enabled (envBool HANDOFFS_ENABLED=true) }`. Additive top-level block in `ServerConfig`. `mergeConfig` shallow-merges `handoffs`. Default-on (begin/accept/cancel have no LLM dep; R7 summary-polish inherits `llm.enabled`).
+
+**Services exported (path + symbol) — what Phase 5/7/8 consumes:**
+- `packages/core/src/data/handoff/handoff-repository.ts` → `HandoffStore` (interface), `MemoryHandoffStore` (in-memory fallback), `SqliteHandoffStore` (lazy open, WAL + busy_timeout=3000, `handoffs` table + 3 indexes), `getHandoffStore()`/`resetHandoffStore()` (factory mirrors ObservationStore), `newHandoffId()`, `HANDOFF_STATUSES`, `HandoffRecord`/`HandoffStatus` types.
+- `packages/core/src/services/handoff/handoff-service.ts` → `HandoffService` (ctor `HandoffDeps { store?, memoryRepo?, llm?, idFactory? }`; methods `begin(input): Promise<BeginResult>`, `accept({id, projectId?}): Promise<AcceptCancelResult>`, `cancel({id, projectId?}): Promise<AcceptCancelResult>`, `listPending(projectId, targetAgent?): HandoffRecord[]`), pure helpers `buildHandoffMemoryInput`, `formatMemoryContent`, singleton `getHandoffService()`/`resetHandoffService()`. Types: `BeginHandoffInput`, `BeginResult`, `AcceptCancelResult`, `HandoffMemorySeam`, `HandoffDeps`.
+- `packages/core/src/services/handoff/handoff-auto-injector.ts` → `HandoffAutoInjector` (ctor takes a `HandoffService`; `start()` returns an unsubscribe; subscribes `observation:ingested` → on `source:"session-start"` calls `listPending` + logs).
+- Core barrel re-exports Phase-6 handoff symbols from `packages/core/src/index.ts` (consumed by routes via `@th0th-ai/core`).
+
+**Handoff table schema (additive, both backends):**
+- SQLite: new `handoffs` table (`id TEXT PK, project_id, source_session_id, target_agent, summary, open_questions_json, next_steps_json, files_json, status(open|accepted|expired), created_at, accepted_at`) + 3 indexes (`idx_handoffs_project_status`, `idx_handoffs_target_agent`, `idx_handoffs_created`). DB file `handoffs.db` (WAL + busy_timeout=3000, separate from memories.db/observations.db). No ALTER (new table).
+- PG: additive Prisma `Handoff` model (`@@map("handoffs")`, indexes on `[projectId, status]` + `[targetAgent, status]`). No PgHandoffStore code yet (SQLite-canonical runtime state, like observations/synapse_sessions/index_jobs).
+
+**Status state machine:** `open` → `accepted` (via `accept`, sets `accepted_at`, emits `handoff:accepted`) | `open` → `expired` (via `cancel`, no event). Both terminal. `accept`/`cancel` on missing/non-open/project-mismatch → `{ok:false, reason}` (never a silent no-op). Defense-in-depth: the SQLite `setStatus` uses `WHERE status='open'`; the service post-checks `updated.status !== target`.
+
+**`handoff:accepted` event shape (EventMap):**
+- `{ handoffId: string; projectId?: string; sourceSessionId?: string; targetAgent?: string; acceptedAt: number }`. Published once after a successful `open`→`accepted` transition. NOT published on missing/non-open/expired/throw.
+
+**Dual-write to memory (searchability):**
+- On `begin`, a `conversation` memory is stored via `MemoryRepository.insert` with `tags:["handoff","handoff:<id>","handoff:<projectId>"]`, `level:PROJECT(1)` (so it passes the FTS `level <= USER` filter — Phase-4 correction), `importance:0.7`, `embedding:[]` (FTS-only, consistent with bootstrap seeds), `metadata.source:"handoff"`. Searchable via `MemoryRepository.fullTextSearch`. Best-effort (memory insert throw → `memoryId:null`, begin still ok).
+
+**Auto-inject seam (consumes Phase-3 `observation:ingested`):**
+- `HandoffAutoInjector` subscribes `observation:ingested`; on `source:"session-start"` calls `service.listPending(projectId, agentId?)` + logs count. Deterministic surfacing primitive is `listPending` (recall path / `th0th_handoff_list_pending` MCP tool). When the Phase-3 hook is not installed, the event never fires and `listPending` still works (graceful degrade). Never blocks; never throws. Justification: reusing the typed `observation:ingested` seam keeps a single integration bus (cross-cutting §3) and avoids coupling the memory recall path to the handoff table.
+
+**MCP tools + route (new):**
+- `th0th_handoff_begin` / `th0th_handoff_accept` / `th0th_handoff_cancel` / `th0th_handoff_list_pending` (POST `/api/v1/handoff/{begin,accept,cancel,list}`) in `TOOL_DEFINITIONS`.
+- `apps/tools-api/src/routes/handoff.ts` (Elysia prefix `/api/v1/handoff`): 4 POST handlers; 423 when `handoffs.enabled=false`; 400 on missing `projectId`/`id`; 200 + `{success, data}`. Wired into `apps/tools-api/src/index.ts` via `.use(handoffRoutes)` after `.use(bootstrapRoutes)`. Swagger tag `handoffs`.
+
+**Silent-degradation contract (mirrors Phase-2/3/4):**
+- Optional LLM summary-polish: only when `llm.isEnabled()` AND `summary===""`. `{ok:false}`/throw → empty summary. Never blocks begin. Default-off (NF3).
+- Store insert throws → `{ok:false, reason:"store-failed"}`, no event. Memory insert throws → `memoryId:null`, begin still ok. `accept`/`cancel` on missing/non-open/project-mismatch → `{ok:false, reason}`. `listPending` throws → `[]`. Outer methods never throw to caller.
+
+**Backend-polymorphic dispatch pattern:** use `getHandoffStore()`. Never re-introduce `isPostgresEnabled()` short-circuits (NF1).
+
+**Test-isolation note (extends Phase-1/2/3/4 rule):** `handoff-service.test.ts` does NOT mock `@th0th-ai/shared`. It injects `MemoryHandoffStore` + fake `HandoffMemorySeam` + fake `LlmSurface` + deterministic `idFactory`. The single P6-SEARCH-01 block resets the MemoryRepository singleton to a temp DB (mirrors P4-SEARCH-01) + restores it. `handoff-repository.test.ts` uses explicit temp `dbPath`. No `mock.module`.
+
+**Seams Phase 5/7/8 reuse:**
+- Phase 5 (auto-improve): may consume `handoff:accepted` as a trigger + `HandoffService.listPending` + the Observation store (`listRecent`) + Synapse sessions to detect patterns; the handoff dual-write memories + bootstrap seed memories give a baseline for proposed edits.
+- Phase 7 (compression): unaffected; handoff dual-write memories have no embeddings (FTS-only).
+- Phase 8 (web UI): `HandoffService.listPending` + `getById` give a read surface for a handoff list view.
+
 ### Phase 5 — (pending)
 ### Phase 7 — (pending)
 ### Phase 8 — (pending)
@@ -210,3 +251,4 @@ schema, EventBus events, seams). Not the spec; canonical state stays in
 | 2 | ebcc202 5b0ba18 6a7598f 6cb5edb f2acceb | query understanding: config gate, rewrite+hyde+cache service, search fan-out, search:query-rewritten/reranked events, tests |
 | 3 | 9f8b7a1 f28c30e b950df7 8fb0cac | passive capture: hooks config + Observation store (WAL) + writer queue + 429 + HookService + Elysia routes + consolidation bridge + Claude Code hook scripts + th0th_hook_ingest + observation:ingested event, tests |
 | 4 | c022731 1be1a1c ae296e7 773a130 3fec6fd | bootstrap from repo: memory.bootstrap config + bootstrap:completed event + BootstrapService (scan git/README/docs/manifests/centrality, LLM llmObject+SeedMemoriesSchema, rule-based fallback, idempotent bootstrap:<projectId> tag marker, silent degradation) + th0th_bootstrap MCP tool + /api/v1/bootstrap route + barrel re-exports, tests |
+| 6 | d3ccd2e 60e799b 4d8ac60 8f2f0a0 ebceebf | cross-session handoffs: handoffs.enabled config + handoff:accepted event + HandoffStore (SQLite WAL handoffs.db + Memory fallback + factory) + HandoffService (begin/accept/cancel/listPending, state machine open→accepted|expired, dual-write conversation memory PROJECT/0.7/handoff:<id> tags/no embedding, optional LLM summary-polish default-off silent-degrade, never throws) + HandoffAutoInjector (observation:ingested session-start → listPending) + 4 MCP tools + /api/v1/handoff routes + Prisma Handoff model + barrel re-exports, tests |

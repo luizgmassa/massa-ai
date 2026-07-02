@@ -72,3 +72,26 @@ Sole agent verified its own work — no independent verifier sub-agent. Mitigati
 
 ## Same-author caveat (Phase 4)
 Sole agent verified its own work — no independent verifier sub-agent. Mitigations: per-AC file:line evidence, discrimination sensor (idempotency-guard mutant killed), objective gate (754/0). See `.specs/features/phase-4-bootstrap/validation.md`.
+
+## Phase 6 handoff (PASS — same-author verified)
+
+- in-progress: none
+- next step: Phase 5 (auto-improvement loop — G7). May consume the `handoff:accepted` event + the Observation store (`listRecent`) + Synapse sessions to detect patterns. The `bootstrap:<projectId>` seed memories (Phase 4) + the handoff dual-write memories (Phase 6) give a baseline for proposed edits.
+- blockers: none
+- uncommitted files: none (this commit)
+- branch: main; commits d3ccd2e (specs), 60e799b (config+event+prisma), 4d8ac60 (store+service+injector+barrel), 8f2f0a0 (mcp+route), ebceebf (tests+validation).
+
+## Key decisions for Phase 5+ (and later phases)
+- Handoff service: `import { HandoffService, getHandoffService, buildHandoffMemoryInput } from "packages/core/src/services/handoff/handoff-service.js"` (or via `@th0th-ai/core`). `begin({projectId, sourceSessionId?, targetAgent?, summary?, openQuestions?, nextSteps?, files?})` → `{ok, id, status:"open", memoryId}`. `accept({id, projectId?})` → `{ok, handoff}` (emits `handoff:accepted`). `cancel({id, projectId?})` → `{ok, handoff}`. `listPending(projectId, targetAgent?)` → open handoffs oldest-first.
+- Config block: `config.get("handoffs")` = `{ enabled(true) }`. Env `HANDOFFS_ENABLED`. begin/accept/cancel have no LLM dep; optional summary-polish inherits `llm.enabled`.
+- Handoff store: `import { getHandoffStore, SqliteHandoffStore, MemoryHandoffStore, resetHandoffStore } from "packages/core/src/data/handoff/handoff-repository.js"`. SQLite-canonical (`handoffs.db`, WAL + busy_timeout=3000); MemoryHandoffStore fallback. Factory mirrors ObservationStore. PG parity via Prisma `Handoff` model (no PgHandoffStore code yet — SQLite-canonical like observations/synapse_sessions/index_jobs).
+- State machine: `open` → `accepted` (via accept) | `expired` (via cancel). Both terminal. `accept`/`cancel` on missing/non-open/project-mismatch → `{ok:false, reason}` (never a silent no-op).
+- Dual-write memory: on `begin`, a `conversation` memory is stored via `MemoryRepository.insert` with `tags:["handoff","handoff:<id>","handoff:<projectId>"]`, `level:PROJECT(1)`, `importance:0.7`, `embedding:[]` (FTS-only), `metadata.source:"handoff"`. Searchable via `MemoryRepository.fullTextSearch`.
+- Auto-injector: `HandoffAutoInjector` (`services/handoff/handoff-auto-injector.ts`) subscribes `observation:ingested`; on `source:"session-start"` calls `listPending` + logs count. Deterministic surfacing primitive is `listPending` (recall path / `th0th_handoff_list_pending` MCP tool). Never blocks; never throws.
+- EventBus: `handoff:accepted` ({ handoffId, projectId?, sourceSessionId?, targetAgent?, acceptedAt }) added to EventMap. Published only on a successful `open`→`accepted` transition.
+- MCP tools: `th0th_handoff_begin` / `th0th_handoff_accept` / `th0th_handoff_cancel` / `th0th_handoff_list_pending` (POST /api/v1/handoff/{begin,accept,cancel,list}). Route: 423 when disabled, 400 on missing required fields.
+- Silent degradation: empty summary + LLM off → stores empty/auto summary; LLM `{ok:false}`/throw → empty summary; store insert throws → `{ok:false, store-failed}`; memory insert throws → still ok with `memoryId:null`. Never throws.
+- Test isolation (still applies): handoff tests inject `MemoryHandoffStore` + fake `HandoffMemorySeam` + fake `LlmSurface` (no shared-config mock). P6-SEARCH-01 resets the MemoryRepository singleton to a temp DB (mirrors P4-SEARCH-01) + restores it.
+
+## Same-author caveat (Phase 6)
+Sole agent verified its own work — no independent verifier sub-agent. Mitigations: per-AC file:line evidence, discrimination sensor (status-guard mutant killed, 2 failing tests), objective gate (791/0). See `.specs/features/phase-6-handoffs/validation.md`.

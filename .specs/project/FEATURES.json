@@ -37,6 +37,13 @@
       "status": "complete",
       "priority": "P1",
       "phases": { "specify": true, "design": true, "tasks": true, "execute": true }
+    },
+    {
+      "slug": "phase-6-handoffs",
+      "title": "Phase 6 — Cross-session handoffs (HandoffStore + HandoffService begin/accept/cancel/listPending + dual-write memory + handoff:accepted event + auto-injector + MCP tools + route)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": { "specify": true, "design": true, "tasks": true, "execute": true }
     }
   ]
 }
