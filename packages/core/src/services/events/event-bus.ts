@@ -75,6 +75,21 @@ export interface EventMap {
     projectId?: string;
     stats: { merged: number; batchesCreated: number };
   };
+  /** Phase 2: emitted after a successful query rewrite (LLM on, valid output). */
+  "search:query-rewritten": {
+    query: string;
+    projectId: string;
+    expansions: string[];
+    keywords: string[];
+    hydeUsed: boolean;
+  };
+  /** Phase 2: emitted after fusing the expanded streams (vector + keyword + HyDE). */
+  "search:reranked": {
+    query: string;
+    projectId: string;
+    streamCount: number;
+    resultCount: number;
+  };
 }
 
 export type EventName = keyof EventMap;
