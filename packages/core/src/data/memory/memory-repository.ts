@@ -175,6 +175,25 @@ export class MemoryRepository {
         content='memories',
         content_rowid='rowid'
       );
+
+      -- Phase 1: the read-side SUPERSEDES filter joins memory_edges. This is
+      -- the SAME memories.db file GraphStore opens, but a process that never
+      -- instantiates GraphStore (e.g. memory-only tests) would otherwise see
+      -- "no such table: memory_edges". CREATE TABLE IF NOT EXISTS is a no-op
+      -- when GraphStore has already created it, so this is safe to mirror here.
+      CREATE TABLE IF NOT EXISTS memory_edges (
+        id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        relation_type TEXT NOT NULL,
+        weight REAL DEFAULT 1.0,
+        evidence TEXT,
+        auto_extracted INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        UNIQUE(source_id, target_id, relation_type)
+      );
+      CREATE INDEX IF NOT EXISTS idx_edges_target ON memory_edges(target_id);
+      CREATE INDEX IF NOT EXISTS idx_edges_type ON memory_edges(relation_type);
     `);
 
     // Run additive migrations if needed
@@ -352,6 +371,10 @@ export class MemoryRepository {
       ${hasFts ? "JOIN memories_fts fts ON m.rowid = fts.rowid" : ""}
       ${whereClause}
       ${hasFts ? "AND fts.content MATCH ?" : ""}
+      AND NOT EXISTS (
+        SELECT 1 FROM memory_edges me
+        WHERE me.target_id = m.id AND me.relation_type = 'SUPERSEDES'
+      )
       ORDER BY ${hasFts ? "rank," : ""} m.importance DESC, m.created_at DESC
       LIMIT ?
     `;
@@ -542,5 +565,29 @@ export class MemoryRepository {
 
   incrementAccessCount(memoryId: string): void {
     this.updateAccessCounts([memoryId]);
+  }
+
+  /**
+   * List live, non-pinned memories with embeddings older than `staleSinceMs`
+   * for the consolidation job (Phase 1). Candidates have `deleted_at IS NULL`
+   * and `pinned = 0`. Bounded by `limit`.
+   */
+  listConsolidationCandidates(staleSinceMs: number, limit = 200): MemoryRow[] {
+    return this.db
+      .prepare(
+        `SELECT id, content, type, level,
+                user_id, session_id, project_id, agent_id,
+                importance, tags, embedding, metadata,
+                created_at, updated_at, access_count, last_accessed,
+                pinned, deleted_at
+         FROM memories
+         WHERE deleted_at IS NULL
+           AND pinned = 0
+           AND embedding IS NOT NULL
+           AND created_at < ?
+         ORDER BY created_at DESC
+         LIMIT ?`,
+      )
+      .all(staleSinceMs, limit) as MemoryRow[];
   }
 }

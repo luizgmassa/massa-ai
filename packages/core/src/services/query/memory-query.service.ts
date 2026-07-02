@@ -57,6 +57,8 @@ export class MemoryQueryService {
       importance: { gte: minImportance },
       // Phase 1: never list soft-deleted (tombstoned) memories.
       deletedAt: { equals: null },
+      // Phase 1: hide superseded memories (those with an incoming SUPERSEDES edge).
+      NOT: { edgesTo: { some: { edgeType: "SUPERSEDES" } } },
     };
 
     if (type) where.type = type;

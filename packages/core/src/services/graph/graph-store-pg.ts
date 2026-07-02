@@ -11,8 +11,28 @@ import {
   MemoryRelationType,
   logger,
 } from "@th0th-ai/shared";
+import type { PrismaClient } from "../../generated/prisma/index.js";
 
-const prisma = getPrismaClient();
+/**
+ * Lazily-initialized Prisma client proxy.
+ *
+ * The original `const prisma = getPrismaClient()` ran at module-eval, which
+ * forced every importer of this module (transitively, of graph-store-factory)
+ * to construct a Prisma client — and that throws in environments where the
+ * PG/Bun-SQLite prisma adapter isn't installed (e.g. SQLite-only test/dev).
+ * The Proxy defers construction to first actual use, so merely importing the
+ * module is side-effect-free.
+ */
+const prisma: PrismaClient = new Proxy(
+  {} as PrismaClient,
+  {
+    get(_target, prop) {
+      const client = getPrismaClient();
+      const value = Reflect.get(client, prop);
+      return typeof value === "function" ? value.bind(client) : value;
+    },
+  },
+);
 
 interface EdgeFilter {
   sourceId?: string;

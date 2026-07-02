@@ -216,7 +216,11 @@ export class MemoryRepositoryPg {
     if (filters?.types && filters.types.length > 0)
       conditions.push(Prisma.sql`type = ANY(${filters.types}::text[])`);
 
-    const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
+    const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}
+      AND NOT EXISTS (
+        SELECT 1 FROM memory_edges me
+        WHERE me.to_id = memories.id AND me.edge_type = 'SUPERSEDES'
+      )`;
 
     const rows = await this.prisma.$queryRaw<RawMemory[]>`
       SELECT id, content, type, level,
@@ -408,6 +412,29 @@ export class MemoryRepositoryPg {
              pinned, deleted_at
       FROM memories
       ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `;
+    return rows.map(r => this.toMemoryRow(r));
+  }
+
+  /**
+   * List live, non-pinned memories with embeddings older than `staleSinceMs`
+   * for the consolidation job (Phase 1). Bounded by `limit`.
+   */
+  async listConsolidationCandidates(staleSinceMs: number, limit = 200): Promise<MemoryRow[]> {
+    const stale = new Date(staleSinceMs);
+    const rows = await this.prisma.$queryRaw<RawMemory[]>`
+      SELECT id, content, type, level,
+             user_id, session_id, project_id, agent_id,
+             importance, tags, embedding, metadata,
+             created_at, updated_at, access_count, last_accessed,
+             pinned, deleted_at
+      FROM memories
+      WHERE deleted_at IS NULL
+        AND pinned = false
+        AND embedding IS NOT NULL
+        AND created_at < ${stale}
       ORDER BY created_at DESC
       LIMIT ${limit}
     `;

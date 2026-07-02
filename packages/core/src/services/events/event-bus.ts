@@ -67,6 +67,14 @@ export interface EventMap {
     sessionId?: string;
     query: string;
   };
+  /** Phase 1: emitted after a consolidation batch produces a merged memory. */
+  "memory:consolidated": {
+    batchId: string;
+    sourceIds: string[];
+    newMemoryId: string;
+    projectId?: string;
+    stats: { merged: number; batchesCreated: number };
+  };
 }
 
 export type EventName = keyof EventMap;

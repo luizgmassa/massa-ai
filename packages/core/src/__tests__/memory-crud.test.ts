@@ -27,6 +27,8 @@ mock.module("@th0th-ai/shared", () => {
           vectorStore: { type: "sqlite", dbPath: path.join(tmpDir, "vector.db"), collectionName: "test", embeddingModel: "default" },
           keywordSearch: { dbPath: path.join(tmpDir, "kw.db"), ftsVersion: "fts5" },
           security: { maxInputLength: 10000, sanitizeInputs: true, maxIndexSize: 1000, maxFileSize: 1048576, allowedExtensions: [".ts"], excludePatterns: [] },
+          memory: { decay: { lambda: 0.02, sigma: 0.6, mu: 0.04, coldThreshold: 0.2 } },
+          llm: { enabled: false, baseUrl: "http://localhost:11434/v1", apiKey: "ollama", model: "qwen2.5-coder:7b", temperature: 0.2, maxOutputTokens: 2000, timeoutMs: 5000 },
         };
         return defaults[key];
       },
@@ -50,6 +52,27 @@ import { GraphStore } from "../services/graph/graph-store.js";
 import { MemoryService } from "../services/memory/memory-service.js";
 
 const synthEmbedding = () => [0.01, 0.02, 0.03, 0.04];
+
+/** Injectable fake LLM surface for MemoryConsolidationJob (Phase 1, no network). */
+function makeFakeLlm(opts: { enabled?: boolean; ok?: boolean; value?: any } = {}) {
+  return {
+    isEnabled: () => opts.enabled ?? false,
+    object: async () =>
+      opts.ok === false
+        ? { ok: false, error: "boom" }
+        : {
+            ok: true,
+            value:
+              opts.value ?? {
+                summary: "consolidated alpha summary",
+                type: "decision",
+                level: MemoryLevel.USER,
+                rationale: "near-dup",
+                sourceIds: ["a", "b"],
+              },
+          },
+  };
+}
 
 function insertMemory(repo: MemoryRepository, id: string, content: string, tags: string[] = []) {
   const input: InsertMemoryInput = {
@@ -248,5 +271,125 @@ describe("MemoryRepository.softDeleteById + recall filtering (Phase 1)", () => {
     insertMemory(repo, "s3", "hard delete target");
     expect(repo.deleteById("s3")).toBe(true);
     expect(repo.getById("s3")).toBeNull();
+  });
+});
+
+// ── Phase 1: MemoryConsolidationJob — SQLite integration ─────────────────
+// Lives here (not in memory-consolidation-job.test.ts) because bun's
+// mock.module is process-wide and two files mocking "@th0th-ai/shared"
+// collide. The throttle + PG-skip tests stay in the other file (no config
+// mock needed).
+describe("MemoryConsolidationJob — SQLite integration (Phase 1)", () => {
+  let repo: MemoryRepository;
+  let graph: GraphStore;
+  let job: any;
+
+  beforeEach(async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "th0th-consol-"));
+    (MemoryRepository as any).instance = null;
+    (GraphStore as any).instance = null;
+    const { resetGraphStore } = await import("../services/graph/graph-store-factory.js");
+    await resetGraphStore();
+    repo = MemoryRepository.getInstance();
+    graph = GraphStore.getInstance();
+    const { MemoryConsolidationJob } = await import("../services/jobs/memory-consolidation-job.js");
+    job = new MemoryConsolidationJob({ llm: makeFakeLlm({ enabled: false }) });
+  });
+
+  afterEach(() => {
+    try { (repo as any).db?.close?.(); } catch {}
+    try { (graph as any).db?.close?.(); } catch {}
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  const VEC_A = [1, 0, 0, 0];
+  const VEC_A_NEAR = [0.99, 0.01, 0, 0];
+
+  function ageRows(ids: string[], daysAgo: number) {
+    const old = Date.now() - daysAgo * 24 * 60 * 60 * 1000;
+    (repo as any).db
+      .prepare(`UPDATE memories SET created_at = ? WHERE id IN (${ids.map(() => "?").join(",")})`)
+      .run(old, ...ids);
+  }
+
+  function insertEmb(id: string, content: string, embedding: number[], over: Partial<InsertMemoryInput> = {}) {
+    repo.insert({
+      id, content, type: "decision", level: MemoryLevel.PERSISTENT,
+      importance: 0.5, tags: [], embedding, ...over,
+    });
+  }
+
+  test("SQLite path runs (no isPostgresEnabled short-circuit) and does not throw", async () => {
+    insertEmb("old1", "stale memory", VEC_A, { importance: 0.3 });
+    const stats = await job.consolidate();
+    expect(stats.merged).toBe(0);
+    expect(stats.batchesCreated).toBe(0);
+  });
+
+  test("LLM off → rule-based only, merged=0, no SUPERSEDES edges", async () => {
+    insertEmb("a", "alpha content", VEC_A);
+    insertEmb("b", "alpha content dup", VEC_A_NEAR);
+    ageRows(["a", "b"], 8);
+    const stats = await job.consolidate();
+    expect(stats.batchesCreated).toBe(0);
+    const sup = graph
+      .getIncomingEdges("a")
+      .filter((e: any) => e.relationType === MemoryRelationType.SUPERSEDES);
+    expect(sup.length).toBe(0);
+  });
+
+  test("LLM on + ok → SUPERSEDES edges + memory:consolidated event + recall hides sources", async () => {
+    const { MemoryConsolidationJob } = await import("../services/jobs/memory-consolidation-job.js");
+    const { eventBus } = await import("../services/events/event-bus.js");
+    const llmJob = new MemoryConsolidationJob({ llm: makeFakeLlm({ enabled: true }) });
+    insertEmb("a", "alpha content", VEC_A);
+    insertEmb("b", "alpha content dup", VEC_A_NEAR);
+    ageRows(["a", "b"], 8);
+
+    let fired: any = null;
+    const off = eventBus.subscribe("memory:consolidated", (p: any) => { fired = p; });
+
+    const stats = await llmJob.consolidate();
+    off();
+
+    expect(stats.batchesCreated).toBe(1);
+    expect(stats.merged).toBe(2);
+    expect(fired).not.toBeNull();
+    expect(fired.sourceIds.sort()).toEqual(["a", "b"]);
+
+    const supA = graph.getIncomingEdges("a").find(
+      (e: any) => e.relationType === MemoryRelationType.SUPERSEDES && e.targetId === "a",
+    );
+    const supB = graph.getIncomingEdges("b").find(
+      (e: any) => e.relationType === MemoryRelationType.SUPERSEDES && e.targetId === "b",
+    );
+    expect(supA).toBeDefined();
+    expect(supB).toBeDefined();
+    expect(supA!.sourceId).toBe(supB!.sourceId);
+
+    const hits = repo
+      .fullTextSearch("alpha", 10, { minImportance: 0, includePersistent: true, limit: 10 })
+      .map((r) => r.id);
+    expect(hits).not.toContain("a");
+    expect(hits).not.toContain("b");
+    expect(hits).toContain(supA!.sourceId);
+  });
+
+  test("LLM returns not-ok → silent degrade (no throw, merged=0)", async () => {
+    const { MemoryConsolidationJob } = await import("../services/jobs/memory-consolidation-job.js");
+    const llmJob = new MemoryConsolidationJob({ llm: makeFakeLlm({ enabled: true, ok: false }) });
+    insertEmb("a", "alpha", VEC_A);
+    insertEmb("b", "alpha dup", VEC_A_NEAR);
+    ageRows(["a", "b"], 8);
+    const stats = await llmJob.consolidate();
+    expect(stats.batchesCreated).toBe(0);
+    expect(stats.merged).toBe(0);
+  });
+
+  test("pinned memories are decay-exempt (importance unchanged)", async () => {
+    insertEmb("p1", "pinned content", VEC_A, { importance: 0.9, pinned: true });
+    const before = repo.getById("p1")?.importance;
+    await job.consolidate();
+    expect(repo.getById("p1")?.importance).toBe(before);
   });
 });

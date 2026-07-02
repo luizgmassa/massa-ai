@@ -1,56 +1,108 @@
-import { logger, MemoryLevel } from "@th0th-ai/shared";
-import type { PrismaClient } from "../../generated/prisma/index.js";
-import { Prisma } from "../../generated/prisma/index.js";
-import { getPrismaClient } from "../query/prisma-client.js";
+/**
+ * Background consolidation for long-running memory quality (Phase 1).
+ *
+ * Phase-1 changes vs the legacy Postgres-only job:
+ *   - Removed the `isPostgresEnabled()` short-circuit. The job is now
+ *     backend-polymorphic via `getMemoryRepository()` (mirror of the
+ *     memory-repository-factory dispatch) and `getGraphStore()`.
+ *   - Decay now delegates to the pure `decayScore` (services/memory/decay.ts)
+ *     for BOTH backends; pinned memories are exempt.
+ *   - Prune is now SOFT-delete (`deleted_at` tombstone) instead of hard DELETE,
+ *     and is pinned-aware + deleted_at-aware.
+ *   - New merge phase: clusters near-duplicates via `consolidateWindow` and,
+ *     for each batch, inserts a new memory + a SUPERSEDES edge per source.
+ *   - Emits `memory:consolidated` via EventBus per batch.
+ *   - `ConsolidationStats` extended with `{ merged, batchesCreated }`.
+ *   - LLM-gated + silent-degrade: when the LLM is disabled or fails, the merge
+ *     phase is skipped and the rule-based (decay + prune) path completes with
+ *     `merged=0, batchesCreated=0` and no error propagated.
+ */
 
-interface ConsolidationStats {
+import { logger, MemoryLevel, MemoryType, MemoryRelationType } from "@th0th-ai/shared";
+import { randomUUID } from "crypto";
+import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
+import { getGraphStore } from "../graph/graph-store-factory.js";
+import { eventBus } from "../events/event-bus.js";
+import { decayScore, DEFAULT_DECAY_PARAMS } from "../memory/decay.js";
+import { consolidateWindow, rowsToCandidates, type LlmSurface } from "../memory/consolidator.js";
+import { llm as defaultLlmSurface } from "../memory/llm-client.js";
+import type { MemoryRow } from "../../data/memory/memory-repository.js";
+import type { GraphStore } from "../graph/graph-store.js";
+import type { GraphStorePg } from "../graph/graph-store-pg.js";
+
+export interface ConsolidationStats {
   promoted: number;
   decayed: number;
   pruned: number;
   edgesCleaned: number;
+  /** Phase 1: number of source memories folded into batches. */
+  merged: number;
+  /** Phase 1: number of consolidation batches created. */
+  batchesCreated: number;
+}
+
+const DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Add a SUPERSEDES edge polymorphically across the GraphStore union.
+ * SQLite createEdge is sync (sourceId, targetId, relationType, options);
+ * PG createEdge is async ({sourceId, targetId, relationType, ...}).
+ */
+async function addSupercedesEdge(
+  store: GraphStore | GraphStorePg,
+  newId: string,
+  sourceId: string,
+  batchId: string,
+): Promise<void> {
+  const evidence = JSON.stringify({ batchId, consolidated: true });
+  // Detect the PG shape by arity/prototype. Both classes expose createEdge;
+  // the PG variant takes a single object argument.
+  // We use a duck-type: PG createEdge has arity 1.
+  const anyStore = store as any;
+  if (anyStore.createEdge.length === 1) {
+    // GraphStorePg
+    await anyStore.createEdge({
+      sourceId: newId,
+      targetId: sourceId,
+      relationType: MemoryRelationType.SUPERSEDES,
+      weight: 1.0,
+      evidence,
+    });
+  } else {
+    // GraphStore (SQLite) — sync, but normalize to a promise.
+    anyStore.createEdge(newId, sourceId, MemoryRelationType.SUPERSEDES, {
+      weight: 1.0,
+      evidence,
+      autoExtracted: true,
+    });
+  }
 }
 
 /**
- * Per-type decay rates (applied every 7 days without access).
+ * Insert a new memory polymorphically (SQLite insert is sync, PG is async).
  */
-const DECAY_RATES: Record<string, number> = {
-  critical: 0.97,
-  decision: 0.95,
-  pattern: 0.94,
-  code: 0.93,
-  conversation: 0.88,
-};
+async function insertMemoryAsync(repo: any, input: any): Promise<void> {
+  await Promise.resolve(repo.insert(input));
+}
 
-const DEFAULT_DECAY_RATE = 0.92;
-
-/**
- * Background consolidation for long-running memory quality.
- * Uses Prisma/PostgreSQL for all database operations.
- */
 export class MemoryConsolidationJob {
   private running = false;
   private lastRunAt = 0;
   private runCount = 0;
   private readonly minIntervalMs = 5 * 60 * 1000;
+  private readonly llm: LlmSurface;
 
-  private isPostgresEnabled(): boolean {
-    const databaseUrl = process.env.DATABASE_URL;
-    return (
-      databaseUrl?.startsWith("postgresql://") === true ||
-      databaseUrl?.startsWith("postgres://") === true
-    );
+  constructor(opts: { llm?: LlmSurface } = {}) {
+    // Injectable for tests; defaults to the shared llm-client so production
+    // picks up config + silent-degrade behavior without extra wiring.
+    this.llm = opts.llm ?? (defaultLlmSurface as unknown as LlmSurface);
   }
 
   maybeRun(trigger: "store" | "search" = "store"): void {
-    if (!this.isPostgresEnabled()) {
-      return;
-    }
-
     const now = Date.now();
     if (this.running || now - this.lastRunAt < this.minIntervalMs) {
       return;
     }
-
     this.lastRunAt = now;
     void this.runOnce(trigger);
   }
@@ -61,9 +113,7 @@ export class MemoryConsolidationJob {
     const startedAt = Date.now();
 
     try {
-      const prisma = getPrismaClient();
-      const stats = await this.consolidate(prisma);
-
+      const stats = await this.consolidate();
       logger.info("Memory consolidation completed", {
         trigger,
         cycle: this.runCount,
@@ -71,6 +121,8 @@ export class MemoryConsolidationJob {
         durationMs: Date.now() - startedAt,
       });
     } catch (error) {
+      // Defensive: the inner phases swallow their own errors, but a top-level
+      // guard ensures a job-cycle failure never crashes the host process.
       logger.warn("Memory consolidation skipped", {
         trigger,
         error: (error as Error).message,
@@ -80,122 +132,253 @@ export class MemoryConsolidationJob {
     }
   }
 
-  private async consolidate(prisma: PrismaClient): Promise<ConsolidationStats> {
-    const now = new Date();
-    const day = 24 * 60 * 60 * 1000;
+  /**
+   * Run one consolidation cycle against the active backend. Exposed for tests.
+   */
+  async consolidate(): Promise<ConsolidationStats> {
+    const now = Date.now();
+    const staleSinceMs = now - 7 * DAY;
 
-    const promoted = await this.promoteSessionMemories(prisma, now, day);
-    const decayed = await this.decayStaleMemories(prisma, now, day);
-    const pruned = await this.pruneOldLowSignalMemories(prisma, now, day);
+    const repo = getMemoryRepository();
 
-    return { promoted, decayed, pruned, edgesCleaned: 0 };
+    // Phase 1: decay — read candidates, compute decayScore, write back.
+    const decayed = await this.decayStaleMemories(repo, staleSinceMs, now);
+    // Phase 1: prune — soft-delete cold + old + low-access memories.
+    const pruned = await this.pruneColdMemories(repo, now);
+    // Phase 0 behavior preserved (session→user promotion) on PG; SQLite no-op.
+    const promoted = await this.promoteSessionMemories(repo, now).catch(() => 0);
+    // Phase 1: merge — cluster + LLM-summarize + SUPERSEDES edges.
+    const graphStore = getGraphStore();
+    const { merged, batchesCreated } = await this.mergeMemories(
+      repo,
+      graphStore,
+      staleSinceMs,
+      now,
+    );
+
+    return { promoted, decayed, pruned, edgesCleaned: 0, merged, batchesCreated };
   }
 
-  private async promoteSessionMemories(
-    prisma: PrismaClient,
-    now: Date,
-    day: number,
-  ): Promise<number> {
-    const cutoff = new Date(now.getTime() - day);
-
-    // Uses $executeRaw to avoid the Prisma 7.7.0 + @prisma/adapter-pg + Bun
-    // isObjectEnumValue bug that crashes all ORM filter methods at runtime.
-    //
-    // Promotes SESSION memories (level=3) → USER (level=2) when they:
-    //   - are > 24h old
-    //   - have type in conversation/decision/pattern
-    //   - have importance >= 0.7
-    //   - have been accessed at least 3 times
-    // Capped at 120 rows per cycle to keep the job fast.
-    const result = await prisma.$executeRaw`
-      UPDATE memories
-      SET   level      = ${MemoryLevel.USER},
-            importance = LEAST(1.0, importance + 0.08),
-            updated_at = NOW()
-      WHERE id IN (
-        SELECT id FROM memories
-        WHERE level        = ${MemoryLevel.SESSION}
-          AND type         IN ('conversation', 'decision', 'pattern')
-          AND created_at   < ${cutoff}
-          AND importance  >= 0.7
-          AND access_count >= 3
-        LIMIT 120
-      )
-    `;
-
-    return result;
-  }
-
+  /**
+   * Decay: for each candidate, compute the pure decayScore and write it back
+   * as the new importance. Pinned + soft-deleted rows are excluded by the
+   * candidate query. Errors per-row are swallowed.
+   */
   private async decayStaleMemories(
-    prisma: PrismaClient,
-    now: Date,
-    day: number,
+    repo: any,
+    staleSinceMs: number,
+    now: number,
   ): Promise<number> {
-    const staleThreshold = new Date(now.getTime() - 7 * day);
-    let totalDecayed = 0;
+    let candidates: MemoryRow[] = [];
+    try {
+      candidates = await Promise.resolve(
+        repo.listConsolidationCandidates(staleSinceMs, 500),
+      );
+    } catch (e) {
+      logger.warn("consolidation: candidate list failed (decay)", {
+        error: (e as Error).message,
+      });
+      return 0;
+    }
 
-    // One UPDATE per type — no N+1. Uses raw SQL because Prisma's updateMany
-    // does not support multiplying the current column value in a single query.
-    // PostgreSQL does not support LIMIT in UPDATE, so we use a CTE to cap rows.
-    for (const [memType, rate] of Object.entries(DECAY_RATES)) {
+    let decayed = 0;
+    for (const row of candidates) {
+      const score = decayScore(
+        {
+          importance: row.importance,
+          accessCount: row.access_count,
+          createdAt: row.created_at,
+          lastAccessed: row.last_accessed,
+          pinned: row.pinned,
+        },
+        DEFAULT_DECAY_PARAMS,
+        now,
+      );
+      // Only write when the score actually changed (avoid churn).
+      if (Math.abs(score - row.importance) < 1e-6) continue;
+      try {
+        const updated = await Promise.resolve(repo.update(row.id, { importance: score }));
+        if (updated) decayed++;
+      } catch (e) {
+        logger.warn("consolidation: decay write failed", {
+          id: row.id,
+          error: (e as Error).message,
+        });
+      }
+    }
+    return decayed;
+  }
+
+  /**
+   * Prune: soft-delete memories that are old + cold + low-access. Pinned and
+   * already-tombstoned rows are excluded. Uses the soft-delete path so rows
+   * remain restorable; a future ops job can hard-purge long-tombstoned rows.
+   */
+  private async pruneColdMemories(repo: any, now: number): Promise<number> {
+    const cutoff = now - 45 * DAY;
+    let pruned = 0;
+    // Reuse the candidate list shape but query for cold/old/low-access.
+    // Both repos expose softDeleteById; we drive pruning off a small SQL scan.
+    try {
+      const rows: MemoryRow[] = await Promise.resolve(
+        (repo as any).listConsolidationCandidates(now, 500),
+      );
+      for (const row of rows) {
+        if (row.created_at >= cutoff) continue;
+        const score = decayScore(
+          {
+            importance: row.importance,
+            accessCount: row.access_count,
+            createdAt: row.created_at,
+            lastAccessed: row.last_accessed,
+            pinned: row.pinned,
+          },
+          DEFAULT_DECAY_PARAMS,
+          now,
+        );
+        if (score < DEFAULT_DECAY_PARAMS.coldThreshold && (row.access_count ?? 0) < 2) {
+          try {
+            const ok = await Promise.resolve(repo.softDeleteById(row.id));
+            if (ok) pruned++;
+          } catch (e) {
+            logger.warn("consolidation: soft-delete failed", {
+              id: row.id,
+              error: (e as Error).message,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      logger.warn("consolidation: prune scan failed", {
+        error: (e as Error).message,
+      });
+    }
+    return pruned;
+  }
+
+  /**
+   * Merge: cluster near-duplicates and, via the LLM, produce a consolidated
+   * memory that SUPERSEDES its sources. LLM-gated + silent-degrade.
+   */
+  private async mergeMemories(
+    repo: any,
+    graphStore: GraphStore | GraphStorePg,
+    staleSinceMs: number,
+    now: number,
+  ): Promise<{ merged: number; batchesCreated: number }> {
+    let candidates: MemoryRow[] = [];
+    try {
+      candidates = await Promise.resolve(
+        repo.listConsolidationCandidates(staleSinceMs, 200),
+      );
+    } catch (e) {
+      logger.warn("consolidation: candidate list failed (merge)", {
+        error: (e as Error).message,
+      });
+      return { merged: 0, batchesCreated: 0 };
+    }
+
+    const batch = await consolidateWindow(
+      rowsToCandidates(candidates),
+      this.llm,
+      { idFactory: () => `batch-${now}-${randomUUID().slice(0, 8)}` },
+    ).catch(() => null);
+
+    if (!batch) return { merged: 0, batchesCreated: 0 };
+
+    // Build the new memory from the batch.
+    const sourceRows = candidates.filter((c) => batch.sourceIds.includes(c.id));
+    const newId = `mem-${now}-${randomUUID().slice(0, 8)}`;
+    const importance = sourceRows.length
+      ? Math.min(1, Math.max(...sourceRows.map((r) => r.importance)))
+      : 0.7;
+    const projectId = sourceRows.find((r) => r.project_id)?.project_id ?? null;
+
+    try {
+      await insertMemoryAsync(repo, {
+        id: newId,
+        content: batch.summary,
+        type: batch.type as MemoryType,
+        level: batch.level as MemoryLevel,
+        projectId,
+        importance,
+        tags: [],
+        embedding: [], // no embedding for the summary; recall is graph-driven
+        metadata: { batchId: batch.id, consolidated: true, rationale: batch.rationale },
+      });
+    } catch (e) {
+      logger.warn("consolidation: merge insert failed", {
+        batchId: batch.id,
+        error: (e as Error).message,
+      });
+      return { merged: 0, batchesCreated: 0 };
+    }
+
+    // Add a SUPERSEDES edge per source.
+    let edgesAdded = 0;
+    for (const sourceId of batch.sourceIds) {
+      try {
+        await addSupercedesEdge(graphStore, newId, sourceId, batch.id);
+        edgesAdded++;
+      } catch (e) {
+        logger.warn("consolidation: addSupercedesEdge failed", {
+          newId,
+          sourceId,
+          error: (e as Error).message,
+        });
+      }
+    }
+
+    eventBus.publish("memory:consolidated", {
+      batchId: batch.id,
+      sourceIds: batch.sourceIds,
+      newMemoryId: newId,
+      projectId: projectId ?? undefined,
+      stats: { merged: batch.sourceIds.length, batchesCreated: 1 },
+    });
+
+    return { merged: batch.sourceIds.length, batchesCreated: 1 };
+  }
+
+  /**
+   * Phase-0 session→user promotion. Preserved for PG; on SQLite this is a
+   * no-op (the original raw-SQL used Postgres `NOW()`/CTE features). Soft-fail.
+   */
+  private async promoteSessionMemories(repo: any, now: number): Promise<number> {
+    // The PG path used prisma raw SQL; SQLite repo has no equivalent. To keep
+    // this backend-polymorphic without duplicating logic, we skip promotion on
+    // SQLite (candidates already decay via decayScore). PG promotion remains
+    // available via the prisma client if needed in a future phase.
+    const isPg = process.env.DATABASE_URL?.startsWith("postgresql");
+    if (!isPg) return 0;
+    try {
+      // Lazy-import to avoid pulling prisma into the SQLite path.
+      const { getPrismaClient } = await import("../query/prisma-client.js");
+      const prisma = getPrismaClient();
+      const cutoff = new Date(now - DAY);
       const result = await prisma.$executeRaw`
         UPDATE memories
-        SET   importance = GREATEST(0.1, importance * ${rate}),
+        SET   level      = ${MemoryLevel.USER},
+              importance = LEAST(1.0, importance + 0.08),
               updated_at = NOW()
         WHERE id IN (
           SELECT id FROM memories
-          WHERE type        = ${memType}
-            AND importance  < 0.8
-            AND created_at  < ${staleThreshold}
-            AND (last_accessed IS NULL OR last_accessed < ${staleThreshold})
-          LIMIT 500
+          WHERE level        = ${MemoryLevel.SESSION}
+            AND type         IN ('conversation', 'decision', 'pattern')
+            AND created_at   < ${cutoff}
+            AND importance  >= 0.7
+            AND access_count >= 3
+            AND deleted_at IS NULL
+          LIMIT 120
         )
       `;
-      totalDecayed += result;
+      return result as unknown as number;
+    } catch (e) {
+      logger.warn("consolidation: promote (PG) failed", {
+        error: (e as Error).message,
+      });
+      return 0;
     }
-
-    // Catch-all for types not in DECAY_RATES
-    const knownTypes = Object.keys(DECAY_RATES);
-    const othersResult = await prisma.$executeRaw`
-      UPDATE memories
-      SET   importance = GREATEST(0.1, importance * ${DEFAULT_DECAY_RATE}),
-            updated_at = NOW()
-      WHERE id IN (
-        SELECT id FROM memories
-        WHERE type        NOT IN (${Prisma.join(knownTypes)})
-          AND importance  < 0.8
-          AND created_at  < ${staleThreshold}
-          AND (last_accessed IS NULL OR last_accessed < ${staleThreshold})
-        LIMIT 500
-      )
-    `;
-    totalDecayed += othersResult;
-
-    return totalDecayed;
-  }
-
-  private async pruneOldLowSignalMemories(
-    prisma: PrismaClient,
-    now: Date,
-    day: number,
-  ): Promise<number> {
-    const cutoff = new Date(now.getTime() - 45 * day);
-
-    // Uses $executeRaw to avoid the Prisma 7.7.0 + @prisma/adapter-pg + Bun
-    // isObjectEnumValue bug. PostgreSQL does not support LIMIT in DELETE, so we
-    // use a subquery with LIMIT to cap the affected rows per cycle.
-    const result = await prisma.$executeRaw`
-      DELETE FROM memories
-      WHERE id IN (
-        SELECT id FROM memories
-        WHERE created_at   < ${cutoff}
-          AND importance   < 0.25
-          AND access_count < 2
-        LIMIT 200
-      )
-    `;
-
-    return result;
   }
 }
 
