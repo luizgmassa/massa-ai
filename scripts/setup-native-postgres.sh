@@ -15,6 +15,19 @@
 # ============================================
 set -euo pipefail
 
+# Ensure Homebrew (and its keg-only PG clients) are discoverable regardless of
+# how this script was invoked (e.g. as a subprocess of setup-local-first.sh,
+# which may run with a minimal PATH). brew itself is keg-only on Apple Silicon
+# (/opt/homebrew/bin) and Intel (/usr/local/bin); the PG clients (pg_isready,
+# psql) are resolved separately below via resolve_pg_bin().
+for _hb in /opt/homebrew/bin /usr/local/bin "$HOME"/.homebrew/bin; do
+  case ":${PATH}:" in
+    *":${_hb}:"*) ;;
+    *) if [ -d "${_hb}" ]; then PATH="${_hb}:${PATH}"; fi ;;
+  esac
+done
+export PATH
+
 # ── Config (env-overridable) ──────────────────────────────────
 PG_VERSION="${MASSA_TH0TH_PG_VERSION:-postgresql@17}"
 PG_ROLE="${MASSA_TH0TH_PG_ROLE:-massa_th0th}"

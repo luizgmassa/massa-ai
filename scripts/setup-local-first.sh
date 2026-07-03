@@ -172,6 +172,7 @@ if [ "$DB_CHOICE" = "1" ]; then
         else
             echo "$NATIVE_OUTPUT" >&2
             echo -e "  ${YELLOW}⚠${NC} Native PostgreSQL setup failed. Provide a connection URL (blank = SQLite):"
+            echo -e "  ${DIM}(To self-diagnose, run: bash \"$NATIVE_HELPER\")${NC}"
             read -rp "  DATABASE_URL: " DATABASE_URL </dev/tty || true
             [ -n "$DATABASE_URL" ] && USE_POSTGRES=true
         fi
