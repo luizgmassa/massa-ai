@@ -13,6 +13,14 @@ set -e
 # shellcheck source=scripts/banner.sh
 source "$(dirname "${BASH_SOURCE[0]}")/banner.sh"
 massa_th0th_banner
+
+# Back up an existing config file to <file>.bak before it gets regenerated.
+backup_if_exists() {
+    [ -f "$1" ] || return 0
+    cp "$1" "$1.bak"
+    echo -e "  ${YELLOW}⚠${NC} Backed up existing $1 → $1.bak"
+}
+
 # ---- Step 1: Check Ollama ----
 echo -e "${BOLD}[1/5] Checking Ollama...${NC}"
 
@@ -276,8 +284,8 @@ ENV_FILE="${PROJECT_ROOT}/.env"
 SEARCH_QU_ENABLED=false
 SEARCH_RERANK_ENABLED=false
 
-# Create .env file if not exists
-if [ ! -f "$ENV_FILE" ]; then
+# Regenerate the .env file, backing up any existing copy first.
+backup_if_exists "$ENV_FILE"
     # Interactively offer the LLM search-quality toggles (off by default; both
     # run synchronously on every search and add LLM latency).
     echo ""
@@ -367,25 +375,9 @@ SEARCH_RERANK_ENABLED=${SEARCH_RERANK_ENABLED:-false}
 ENVEOF
 
     echo -e "  ${GREEN}✓${NC} Created .env file: ${ENV_FILE}"
-else
-    if [ "$USE_POSTGRES" = true ]; then
-        # Update existing .env with DATABASE_URL
-        if grep -q "^DATABASE_URL=" "$ENV_FILE"; then
-            # Replace existing DATABASE_URL
-            sed -i.bak "s|^DATABASE_URL=.*|DATABASE_URL=${DATABASE_URL}|" "$ENV_FILE"
-            echo -e "  ${GREEN}✓${NC} Updated DATABASE_URL in .env: ${ENV_FILE}"
-        else
-            # Add DATABASE_URL at the beginning
-            echo -e "\n# Database Configuration (added by setup-local-first.sh)\nDATABASE_URL=${DATABASE_URL}\n$(cat $ENV_FILE)" > "$ENV_FILE.tmp"
-            mv "$ENV_FILE.tmp" "$ENV_FILE"
-            echo -e "  ${GREEN}✓${NC} Added DATABASE_URL to .env: ${ENV_FILE}"
-        fi
-    fi
-    echo -e "  ${YELLOW}⚠${NC} .env file already exists: ${ENV_FILE}"
-fi
 
-# Create config file if not exists
-if [ ! -f "$CONFIG_FILE" ]; then
+# Regenerate the config file, backing up any existing copy first.
+backup_if_exists "$CONFIG_FILE"
     cat > "$CONFIG_FILE" << EOF
 {
   "embedding": {
@@ -413,9 +405,6 @@ if [ ! -f "$CONFIG_FILE" ]; then
 }
 EOF
     echo -e "  ${GREEN}✓${NC} Created config: ${CONFIG_FILE}"
-else
-    echo -e "  ${YELLOW}⚠${NC} Config already exists: ${CONFIG_FILE}"
-fi
 
 # Run Prisma migrations if using PostgreSQL
 if [ "$USE_POSTGRES" = true ]; then

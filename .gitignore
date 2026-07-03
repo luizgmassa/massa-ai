@@ -24,6 +24,7 @@ packages/*/data/
 .env
 .env.local
 .env.*.local
+*.bak
 
 # Logs
 logs/

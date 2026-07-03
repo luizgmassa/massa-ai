@@ -7,7 +7,7 @@
 #    curl -fsSL https://raw.githubusercontent.com/luizgmassa/massa-th0th/main/install.sh | bash
 #
 #  Environment overrides (export before piping):
-#    MASSA_TH0TH_MODE=docker|build|source   Installation mode (default: docker)
+#    MASSA_TH0TH_MODE=docker|build|source   Installation mode (default: source)
 #    MASSA_TH0TH_DIR=/path/to/install        Where to install (default: ~/.massa-th0th)
 #    MASSA_TH0TH_API_PORT=3333               API port
 #    MASSA_TH0TH_POSTGRES_PORT=5432          PostgreSQL port
@@ -152,18 +152,69 @@ select_mode() {
   # echo -e "  ${CYAN}1)${NC} ${BOLD}Docker${NC} ${DIM}(recommended)${NC}" >&2
   # echo -e "     Pull pre-built images from DockerHub. Requires Docker only." >&2
   # echo ""                                                                 >&2
-  echo -e "  ${CYAN}1)${NC} ${BOLD}Docker build${NC}"                    >&2
-  echo -e "     Clone the repo and build Docker images locally (PostgreSQL via Docker/colima, ~5GB RAM)." >&2
-  echo ""                                                                 >&2
-  echo -e "  ${CYAN}2)${NC} ${BOLD}From source${NC}"                     >&2
+  echo -e "  ${CYAN}1)${NC} ${BOLD}From source${NC}"                     >&2
   echo -e "     Clone the repo and run with Bun. Pick SQLite, Native PostgreSQL (~100MB), or Docker at setup." >&2
+  echo ""                                                                 >&2
+  echo -e "  ${CYAN}2)${NC} ${BOLD}Docker build${NC}"                    >&2
+  echo -e "     Clone the repo and build Docker images locally (PostgreSQL via Docker/colima, ~5GB RAM)." >&2
   echo ""                                                                 >&2
   read -rp "  Enter your choice [1]: " choice <>/dev/tty
   case "${choice:-1}" in
-    1) echo "build"  ;;
-    2) echo "source" ;;
-    *) echo "build"  ;;
+    1) echo "source" ;;
+    2) echo "build"  ;;
+    *) echo "source" ;;
   esac
+}
+
+# ── Install directory prompt (source mode) ────────────────────
+# Lets the user pick where massa-th0th is cloned. Honours MASSA_TH0TH_DIR
+# (already in $INSTALL_DIR) as a non-interactive override; otherwise prompts
+# with a default and validates the path before proceeding.
+prompt_install_dir() {
+  if [ -n "${MASSA_TH0TH_DIR:-}" ]; then
+    ok "Using install dir from MASSA_TH0TH_DIR: ${INSTALL_DIR}"
+    echo "$INSTALL_DIR"
+    return
+  fi
+
+  local default="$HOME/.massa-th0th"
+  local input parent confirm
+  while true; do
+    echo -e "${BOLD}Clone path:${NC}" >&2
+    echo -e "  ${DIM}Where to clone massa-th0th. Press ENTER for: ${default}${NC}" >&2
+    read -rp "  Path [${default}]: " input <>/dev/tty
+    input="${input:-$default}"
+
+    # Normalize: expand a leading ~, strip trailing slash, absolutize relative paths.
+    input="${input/#\~/$HOME}"
+    input="${input%/}"
+    case "$input" in
+      /*) ;;
+      *) input="$PWD/$input" ;;
+    esac
+
+    # Parent directory must exist and be writable (so the target can be created).
+    parent="$(dirname "$input")"
+    if [ ! -d "$parent" ] || [ ! -w "$parent" ]; then
+      err "Parent directory '${parent}' does not exist or is not writable."
+      continue
+    fi
+
+    # An existing non-empty target is fine if it's a git repo (we'll pull);
+    # otherwise confirm before reusing it.
+    if [ -d "$input" ] && [ -n "$(ls -A "$input" 2>/dev/null)" ]; then
+      if [ -d "$input/.git" ]; then
+        ok "Existing git repo at ${input} — will pull latest"
+      else
+        warn "'${input}' exists and is not empty (not a git repo)."
+        read -rp "  Use this path anyway? [y/N]: " confirm <>/dev/tty
+        case "${confirm:-n}" in y|Y) ;; *) continue ;; esac
+      fi
+    fi
+
+    echo "$input"
+    return
+  done
 }
 
 # ── Preflight ─────────────────────────────────────────────────
@@ -254,10 +305,10 @@ write_env() {
   local mcp_image="${5:-$DOCKER_MCP_IMAGE}"
   local env_file="${dir}/.env"
 
-  # Don't overwrite existing .env — just update key fields
+  # Regenerate .env, backing up any existing copy first.
   if [ -f "$env_file" ]; then
-    warn ".env already exists at ${env_file} — skipping (delete it to regenerate)"
-    return
+    cp "$env_file" "${env_file}.bak"
+    warn "Backed up existing .env → ${env_file}.bak (regenerating)"
   fi
 
   # Auto-enable LLM-gated features only when the configured model is actually
@@ -776,6 +827,13 @@ main() {
   # Select mode interactively if not set via env
   if [ -z "$MODE" ]; then
     MODE=$(select_mode)
+  fi
+
+  # Source mode: let the user pick (and validate) the clone path.
+  if [ "$MODE" = "source" ]; then
+    INSTALL_DIR="$(prompt_install_dir)"
+    echo ""
+    echo -e "${BOLD}Installation directory:${NC} ${INSTALL_DIR}"
   fi
 
   echo ""
