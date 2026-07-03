@@ -136,12 +136,12 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
   })(),
 
   ollama: (() => {
-    const model = process.env.OLLAMA_EMBEDDING_MODEL || "bge-m3";
+    const model = process.env.OLLAMA_EMBEDDING_MODEL || "qwen3-embedding:8b";
     return {
       provider: "ollama",
       model,
       baseURL: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
-      dimensions: Number(process.env.OLLAMA_EMBEDDING_DIMENSIONS || "1024"),
+      dimensions: Number(process.env.OLLAMA_EMBEDDING_DIMENSIONS || "4096"),
       priority: process.env.EMBEDDING_PROVIDER === "ollama" || !process.env.EMBEDDING_PROVIDER ? 1 : 50, // Highest priority by default
       timeout: 300000, // 5 minutes (local can be slow on first run)
       maxRetries: 2,

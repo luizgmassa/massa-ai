@@ -341,7 +341,7 @@ export class IndexManager {
         {
           id: `_metadata:${metadata.projectId}`,
           content: JSON.stringify(metadata),
-          embedding: new Array(1024).fill(0), // Zero vector for metadata docs
+          embedding: new Array(4096).fill(0), // Zero vector for metadata docs
           metadata: {
             type: "_metadata",
             projectId: metadata.projectId,

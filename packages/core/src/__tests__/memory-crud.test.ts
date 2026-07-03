@@ -28,7 +28,7 @@ mock.module("@massa-th0th/shared", () => {
           keywordSearch: { dbPath: path.join(tmpDir, "kw.db"), ftsVersion: "fts5" },
           security: { maxInputLength: 10000, sanitizeInputs: true, maxIndexSize: 1000, maxFileSize: 1048576, allowedExtensions: [".ts"], excludePatterns: [] },
           memory: { decay: { lambda: 0.02, sigma: 0.6, mu: 0.04, coldThreshold: 0.2 } },
-          llm: { enabled: false, baseUrl: "http://localhost:11434/v1", apiKey: "ollama", model: "qwen2.5-coder:7b", temperature: 0.2, maxOutputTokens: 2000, timeoutMs: 5000 },
+          llm: { enabled: false, baseUrl: "http://localhost:11434/v1", apiKey: "ollama", model: "qwen3.5:9b", temperature: 0.2, maxOutputTokens: 8000, timeoutMs: 5000 },
         };
         return defaults[key];
       },

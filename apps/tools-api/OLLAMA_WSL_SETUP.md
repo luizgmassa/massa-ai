@@ -52,7 +52,7 @@ O Ollama está rodando no Windows mas escuta apenas em `127.0.0.1:11434`, imposs
 
 2. **Baixar o modelo:**
    ```bash
-   ollama pull bge-m3
+   ollama pull qwen3-embedding:8b
    ```
 
 3. **Iniciar o servidor:**
@@ -87,5 +87,5 @@ Se funcionar, você verá a lista de modelos instalados.
 
 ### Modelo não encontrado
 ```bash
-ollama pull bge-m3
+ollama pull qwen3-embedding:8b
 ```

@@ -64,10 +64,10 @@ function getLlmConfig() {
   return {
     baseUrl: cfg?.baseUrl ?? "http://localhost:11434/v1",
     apiKey: cfg?.apiKey ?? "ollama",
-    model: cfg?.model ?? "qwen2.5-coder:7b",
+    model: cfg?.model ?? "qwen3.5:9b",
     temperature: cfg?.temperature ?? 0.2,
-    maxOutputTokens: cfg?.maxOutputTokens ?? 2000,
-    timeoutMs: cfg?.timeoutMs ?? 30000,
+    maxOutputTokens: cfg?.maxOutputTokens ?? 8000,
+    timeoutMs: cfg?.timeoutMs ?? 90000,
   };
 }
 
