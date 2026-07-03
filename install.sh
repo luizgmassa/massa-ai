@@ -359,27 +359,32 @@ resolve_ports() {
 }
 
 # ── Post-install optional setup scripts ──────────────────────
-# Prints (never auto-writes) the Claude Code passive-capture hooks guide.
-# Printing avoids clobbering the user's existing .claude/settings.json.
+# Prints (never auto-writes) the passive-capture hooks guide for Claude Code,
+# Codex, and Cursor. Printing avoids clobbering the user's existing hook config
+# (.claude/settings.json, ~/.codex/hooks.json, ~/.cursor/hooks.json). The 4 hook
+# scripts are platform-neutral shells that POST observations to the API; only the
+# config wrapper differs per platform.
 print_hooks_guide() {
   local mode="$1"
   local install_dir="$2"
   local hooks_dir="${install_dir}/apps/claude-plugin/hooks"
 
   echo ""
-  echo -e "${BOLD}Passive-capture hooks (Claude Code)${NC}"
-  echo -e "${DIM}These fire-and-forget scripts POST observations to the API with a 2s${NC}"
-  echo -e "${DIM}timeout and always exit 0 — they never block the agent.${NC}"
+  echo -e "${BOLD}Passive-capture hooks (Claude Code · Codex · Cursor)${NC}"
+  echo -e "${DIM}Fire-and-forget scripts POST observations to the API with a 2s timeout${NC}"
+  echo -e "${DIM}and always exit 0 — they never block the agent. The same 4 shell scripts${NC}"
+  echo -e "${DIM}serve all 3 platforms; only the config wrapper differs.${NC}"
   echo ""
 
   if [ "$mode" = "docker" ]; then
-    # Docker mode may not have cloned the repo locally, so point at GitHub raw URLs.
-    echo -e "  ${BOLD}Hook scripts (raw):${NC}"
+    # Docker mode may not have cloned the repo locally, so point at GitHub raw
+    # URLs and the platform-neutral batch endpoint.
+    echo -e "  ${BOLD}Hook scripts (raw, any platform):${NC}"
     for s in session-start.sh user-prompt-submit.sh post-tool-use.sh stop.sh; do
       echo -e "    ${GITHUB_RAW}/${BRANCH}/apps/claude-plugin/hooks/${s}"
     done
     echo ""
-    echo -e "  ${DIM}Or skip the scripts and POST directly:${NC}"
+    echo -e "  ${DIM}Or skip the scripts and POST directly (works from any platform hook):${NC}"
     echo -e "    curl -X POST ${TH0TH_API_BASE:-http://localhost:3333}/api/v1/hook/batch \\"
     echo -e "      -H 'Content-Type: application/json' \\"
     echo -e "      -d '{\"events\":[{\"event\":\"user-prompt\",\"projectId\":\"my-proj\",\"payload\":{}}]}'"
@@ -387,20 +392,56 @@ print_hooks_guide() {
     return
   fi
 
-  # source/build: repo is cloned locally — emit the settings.json JSONc block
-  # with absolute script paths.
-  echo -e "  ${BOLD}Add this to your project or user .claude/settings.json:${NC}"
+  # source/build: repo is cloned locally — emit per-platform config blocks with
+  # absolute script paths. Paths are inner-quoted so install dirs containing
+  # spaces still exec cleanly.
+  echo -e "  ${DIM}Scripts live at: ${hooks_dir}/${NC}"
+  echo ""
+
+  # ── Claude Code (nested matcher-group + hooks[] form) ──
+  echo -e "  ${BOLD}Claude Code — merge into .claude/settings.json (or ~/.claude/settings.json):${NC}"
   echo ""
   echo -e '  {'
   echo -e '    "hooks": {'
-  echo -e "      \"SessionStart\":     [{ \"command\": \"${hooks_dir}/session-start.sh\" }],"
-  echo -e "      \"UserPromptSubmit\": [{ \"command\": \"${hooks_dir}/user-prompt-submit.sh\" }],"
-  echo -e "      \"PostToolUse\":      [{ \"command\": \"${hooks_dir}/post-tool-use.sh\" }],"
-  echo -e "      \"Stop\":             [{ \"command\": \"${hooks_dir}/stop.sh\" }]"
+  echo -e "      \"SessionStart\":     [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/session-start.sh\\\"\" }] }],"
+  echo -e "      \"UserPromptSubmit\": [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/user-prompt-submit.sh\\\"\" }] }],"
+  echo -e "      \"PostToolUse\":      [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/post-tool-use.sh\\\"\" }] }],"
+  echo -e "      \"Stop\":             [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/stop.sh\\\"\" }] }]"
   echo -e '    }'
   echo -e '  }'
   echo ""
-  echo -e "  ${BOLD}Env vars (set in your shell or .env):${NC}"
+
+  # ── Codex (same nested form; supports UserPromptSubmit too) ──
+  echo -e "  ${BOLD}Codex — save as ~/.codex/hooks.json (or inline [hooks] in ~/.codex/config.toml):${NC}"
+  echo ""
+  echo -e '  {'
+  echo -e '    "hooks": {'
+  echo -e "      \"SessionStart\":     [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/session-start.sh\\\"\" }] }],"
+  echo -e "      \"UserPromptSubmit\": [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/user-prompt-submit.sh\\\"\" }] }],"
+  echo -e "      \"PostToolUse\":      [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/post-tool-use.sh\\\"\" }] }],"
+  echo -e "      \"Stop\":             [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/stop.sh\\\"\" }] }]"
+  echo -e '    }'
+  echo -e '  }'
+  echo -e "  ${DIM}Then run /hooks in Codex to review and trust each hook — non-managed hooks${NC}"
+  echo -e "  ${DIM}are skipped until trusted.${NC}"
+  echo ""
+
+  # ── Cursor (flat, camelCase; beta) ──
+  echo -e "  ${BOLD}Cursor — save as ~/.cursor/hooks.json (or project .cursor/hooks.json):${NC}"
+  echo ""
+  echo -e '  {'
+  echo -e '    "version": 1,'
+  echo -e '    "hooks": {'
+  echo -e "      \"beforeSubmitPrompt\": [{ \"command\": \"\\\"${hooks_dir}/user-prompt-submit.sh\\\"\" }],"
+  echo -e "      \"afterFileEdit\":      [{ \"command\": \"\\\"${hooks_dir}/post-tool-use.sh\\\"\" }],"
+  echo -e "      \"stop\":               [{ \"command\": \"\\\"${hooks_dir}/stop.sh\\\"\" }]"
+  echo -e '    }'
+  echo -e '  }'
+  echo -e "  ${DIM}Cursor hooks are beta. There is no SessionStart event, and afterFileEdit${NC}"
+  echo -e "  ${DIM}fires on file edits only (not every tool call).${NC}"
+  echo ""
+
+  echo -e "  ${BOLD}Env vars (set in your shell or .env; all platforms):${NC}"
   echo -e "    ${CYAN}TH0TH_API_BASE${NC}   default http://localhost:3333"
   echo -e "    ${CYAN}TH0TH_API_KEY${NC}    optional (x-api-key header)"
   echo -e "    ${CYAN}TH0TH_PROJECT_ID${NC} optional (defaults to cwd basename)"
@@ -454,7 +495,7 @@ post_install() {
     if [ -f "${scripts_dir}/validate-vscode-integration.sh" ]; then
       echo -e "  ${CYAN}t)${NC} Run integration tests"
     fi
-    echo -e "  ${CYAN}c)${NC} Configure Claude Code passive-capture hooks"
+    echo -e "  ${CYAN}c)${NC} Configure passive-capture hooks (Claude Code, Codex, Cursor)"
     echo -e "  ${CYAN}s)${NC} Skip (finish)"
     echo ""
 
