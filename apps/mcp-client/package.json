@@ -2,7 +2,7 @@
   "name": "@massa-th0th/mcp-client",
   "version": "1.0.0",
   "description": "massa-th0th MCP server - Semantic code search, memory, and context compression via Model Context Protocol",
-  "author": "S1LV4",
+  "author": "luizgmassa",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -31,6 +31,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/S1LV4/massa-th0th"
+    "url": "https://github.com/luizgmassa/massa-th0th"
   }
 }

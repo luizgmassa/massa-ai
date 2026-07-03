@@ -1,7 +1,7 @@
 {
   "name": "@massa-th0th/shared",
   "version": "1.0.0",
-  "author": "S1LV4",
+  "author": "luizgmassa",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

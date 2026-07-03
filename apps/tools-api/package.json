@@ -1,7 +1,7 @@
 {
   "name": "@massa-th0th/tools-api",
   "version": "1.0.0",
-  "author": "S1LV4",
+  "author": "luizgmassa",
   "description": "massa-th0th REST API server - Semantic code search, memory, and context compression",
   "type": "module",
   "main": "dist/index.js",
@@ -35,6 +35,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/S1LV4/massa-th0th"
+    "url": "https://github.com/luizgmassa/massa-th0th"
   }
 }

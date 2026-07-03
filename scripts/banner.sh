@@ -54,8 +54,8 @@ massa_th0th_banner() {
     ███████  ███   ████    ████████     ███████░ ████  ████
      ░████  █████  █████    █████         ████   ████░ █████
 
-   Ancient knowledge keeper for modern code.  v${MASSA_TH0TH_VERSION}
-   https://github.com/S1LV4/massa-th0th
+   Context, memory and cross-agent management.  v${MASSA_TH0TH_VERSION}
+   https://github.com/luizgmassa/massa-th0th
 
 EOF
 }

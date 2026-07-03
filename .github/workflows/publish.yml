@@ -159,7 +159,7 @@ jobs:
         id: meta-api
         uses: docker/metadata-action@v5
         with:
-          images: s1lv4/massa-th0th
+          images: massa/massa-th0th
           tags: |
             type=raw,value=api-${{ steps.version.outputs.version }},enable=${{ github.event_name == 'release' }}
             type=raw,value=api-latest,enable=${{ github.event_name == 'release' }}
@@ -169,7 +169,7 @@ jobs:
         id: meta-mcp
         uses: docker/metadata-action@v5
         with:
-          images: s1lv4/massa-th0th
+          images: massa/massa-th0th
           tags: |
             type=raw,value=mcp-${{ steps.version.outputs.version }},enable=${{ github.event_name == 'release' }}
             type=raw,value=mcp-latest,enable=${{ github.event_name == 'release' }}

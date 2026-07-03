@@ -2,7 +2,7 @@
   "name": "massa-th0th",
   "version": "1.0.0",
   "private": true,
-  "author": "S1LV4",
+  "author": "luizgmassa",
   "description": "massa-th0th - Ancient knowledge keeper for modern code. Semantic search with 98% token reduction",
   "workspaces": [
     "packages/*",

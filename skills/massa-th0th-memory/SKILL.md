@@ -3,7 +3,7 @@ name: massa-th0th-memory
 description: Mandatory rules for using massa-th0th semantic search, compression, memory, and symbol graph tools. Prioritize massa-th0th tools over native tools (Glob, Grep, Read) to explore and understand code. Triggers on tasks involving code search, context compression, storing decisions, symbol navigation, or retrieving project knowledge.
 license: MIT
 metadata:
-  author: S1LV4
+  author: S1LV4, luizgmassa
   version: "2.0.0"
 ---
 
@@ -342,7 +342,7 @@ Need a clean slate before reindexing?
 ### One-command (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/S1LV4/massa-th0th/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/luizgmassa/massa-th0th/main/install.sh | bash
 ```
 
 Supports three modes (select interactively or override with `MASSA_TH0TH_MODE`):
@@ -357,7 +357,7 @@ Non-interactive example:
 
 ```bash
 MASSA_TH0TH_MODE=docker MASSA_TH0TH_API_PORT=4000 MASSA_TH0TH_NO_START=1 \
-  curl -fsSL https://raw.githubusercontent.com/S1LV4/massa-th0th/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/luizgmassa/massa-th0th/main/install.sh | bash
 ```
 
 ## Configuration

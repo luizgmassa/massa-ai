@@ -40,7 +40,7 @@ services:
       retries: 5
 
   api:
-    image: ${MASSA_TH0TH_API_IMAGE:-s1lv4/massa-th0th:api-latest}
+    image: ${MASSA_TH0TH_API_IMAGE:-massa/massa-th0th:api-latest}
     container_name: massa-th0th-api
     restart: unless-stopped
     ports:
@@ -71,7 +71,7 @@ services:
       retries: 3
 
   mcp:
-    image: ${MASSA_TH0TH_MCP_IMAGE:-s1lv4/massa-th0th:mcp-latest}
+    image: ${MASSA_TH0TH_MCP_IMAGE:-massa/massa-th0th:mcp-latest}
     container_name: massa-th0th-mcp
     stdin_open: true
     environment:

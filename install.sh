@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # ============================================================
 #  massa-th0th - Installer
-#  https://github.com/S1LV4/massa-th0th
+#  https://github.com/luizgmassa/massa-th0th
 #
 #  Usage:
-#    curl -fsSL https://raw.githubusercontent.com/S1LV4/massa-th0th/main/install.sh | bash
+#    curl -fsSL https://raw.githubusercontent.com/luizgmassa/massa-th0th/main/install.sh | bash
 #
 #  Environment overrides (export before piping):
 #    MASSA_TH0TH_MODE=docker|build|source   Installation mode (default: docker)
@@ -33,7 +33,7 @@ die()  { err "$*"; exit 1; }
 # Fetches version from GitHub (non-blocking — shows "latest" on failure).
 # install.sh runs before any local clone exists, so we can't source banner.sh.
 _MASSA_TH0TH_INSTALLER_VERSION="$(curl -fsSL --max-time 3 \
-  "https://raw.githubusercontent.com/${GITHUB_REPO:-S1LV4/massa-th0th}/main/package.json" \
+  "https://raw.githubusercontent.com/${GITHUB_REPO:-luizgmassa/massa-th0th}/main/package.json" \
   2>/dev/null \
   | grep '"version"' | head -1 \
   | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' \
@@ -52,13 +52,13 @@ cat << EOF
     ███████  ███   ████    ████████     ███████░ ████  ████
      ░████  █████  █████    █████         ████   ████░ █████
 
-   Ancient knowledge keeper for modern code.  v${_MASSA_TH0TH_INSTALLER_VERSION}
-   https://github.com/S1LV4/massa-th0th
+   Context, memory and cross-agent management.  v${_MASSA_TH0TH_INSTALLER_VERSION}
+   https://github.com/luizgmassa/massa-th0th
 
 EOF
 
 # ── Constants ─────────────────────────────────────────────────
-GITHUB_REPO="S1LV4/massa-th0th"
+GITHUB_REPO="luizgmassa/massa-th0th"
 GITHUB_RAW="https://raw.githubusercontent.com/${GITHUB_REPO}"
 GITHUB_URL="https://github.com/${GITHUB_REPO}"
 # Docker Hub org is the lowercase GitHub owner (Docker requires lowercase).

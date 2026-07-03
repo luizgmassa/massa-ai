@@ -3,7 +3,7 @@ name: synapse-usage
 description: Use the massa-th0th Synapse cognitive modulation layer to get focused, low-noise retrieval during multi-step coding tasks. Open a session, prime the buffer with known-relevant memories, pass synapseSessionId on every search, and prefetch when opening a file. Triggers on tasks involving repeated searches in the same context (debugging, code review, refactor, onboarding) where retrieval quality matters more than one-shot speed.
 license: MIT
 metadata:
-  author: S1LV4
+  author: S1LV4, luizgmassa
   version: "1.0.0"
 ---
 
