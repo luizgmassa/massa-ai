@@ -6,7 +6,9 @@
  * Uses webUiRoutes.handle(Request) directly (no server boot).
  */
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll } from "bun:test";
+import { Elysia } from "elysia";
+import { node } from "@elysiajs/node";
 import { webUiRoutes } from "../routes/web-ui.js";
 
 async function get(p: string): Promise<Response> {
@@ -34,6 +36,10 @@ describe("web-ui serve (R8-SERVE-01)", () => {
     // The app shell mounts into the #app element (<main id="app">).
     expect(body).toContain('id="app"');
     expect(body).toContain("app.js");
+    // Asset refs must be absolute under /ui so they resolve at the no-slash
+    // entry URL /ui (relative refs would 404 as /styles.css, /app.js).
+    expect(body).toContain('href="/ui/styles.css"');
+    expect(body).toContain('src="/ui/app.js"');
   });
 
   test("GET /ui/styles.css returns 200 + text/css", async () => {
@@ -70,5 +76,57 @@ describe("web-ui serve (R8-SERVE-01)", () => {
     process.env.WEB_UI_ENABLED = "false";
     const res = await get("/ui");
     expect(res.status).toBe(404);
+  });
+});
+
+// Real-wire regression guard.
+//
+// The in-process tests above use webUiRoutes.handle(Request), which builds a
+// Response in-process. That path does NOT exhibit the failure mode where a
+// handler returning a JS string gets Content-Type text/plain on the wire:
+// when the node adapter writes the response, a bare-string body overrides the
+// manually-set content-type header. Only a real socket reproduces it, so this
+// boots the same adapter production uses (index.ts) and fetches over it.
+// web-ui.ts: /ui and SPA fallback now return a Buffer (not a string) so the
+// manual text/html header is honored.
+//
+// Note: @elysiajs/node does not surface the resolved ephemeral port (port 0
+// reads back as 0, app.server is undefined), so a fixed high port is used.
+const REGRESSION_PORT = 14781;
+describe("web-ui serve — real node-adapter wire (R8-SERVE-01 regression)", () => {
+  const app = new Elysia({ adapter: node() }).use(webUiRoutes);
+  let server: { stop?: () => void } | undefined;
+  const base = `http://localhost:${REGRESSION_PORT}`;
+
+  beforeAll(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error("node-adapter server did not listen in time")),
+          5000,
+        );
+        app.listen(REGRESSION_PORT, (srv: unknown) => {
+          clearTimeout(timeout);
+          server = srv as { stop?: () => void };
+          resolve();
+        });
+      }),
+  );
+
+  afterAll(() => {
+    server?.stop?.();
+  });
+
+  test("GET /ui over a real socket returns text/html (not text/plain)", async () => {
+    const res = await fetch(`${base}/ui`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    expect(await res.text()).toContain('id="app"');
+  });
+
+  test("SPA fallback over a real socket returns text/html", async () => {
+    const res = await fetch(`${base}/ui/some/unknown/path`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
   });
 });

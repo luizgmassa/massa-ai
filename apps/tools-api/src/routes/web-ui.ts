@@ -108,7 +108,7 @@ export const webUiRoutes = new Elysia()
       }
       const indexPath = path.join(dir, "index.html");
       try {
-        const body = await fs.readFile(indexPath, "utf-8");
+        const body = await fs.readFile(indexPath);
         set.headers["content-type"] = contentTypeFor(indexPath);
         return body;
       } catch {
@@ -156,7 +156,7 @@ export const webUiRoutes = new Elysia()
       }
       // SPA-style fallback: unknown (non-traversal) path -> index.html
       try {
-        const body = await fs.readFile(path.join(dir, "index.html"), "utf-8");
+        const body = await fs.readFile(path.join(dir, "index.html"));
         set.headers["content-type"] = "text/html; charset=utf-8";
         return body;
       } catch {
