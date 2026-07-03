@@ -1,13 +1,8 @@
-<img src="https://i.imgur.com/WP7ivBc.png" alt="th0th" style="visibility: visible; max-width: 60%; display: block; margin: 0 auto;" />
+# massa-th0th
 
-# th0th
+massa-th0th is a local-first MCP server that indexes your codebase — semantic search, keyword search, and a symbol graph ranked by dependency centrality — and keeps a persistent, cross-session memory of decisions, patterns, and critical facts.
 
-**Ancient knowledge keeper for modern code**
-
-Semantic search with 98% token reduction for AI assistants.
-
-Como reduzi 98% do uso de contexto (e custos) de IA no meu workflow / How I reduced AI context usage (and costs) by 98% in my workflow
-https://www.tabnews.com.br/S1LV4/como-reduzi-em-98-por-cento-o-uso-de-contexto-e-os-custos-de-ia-no-meu-workflow
+Instead of loading whole files into context, your assistant retrieves just the relevant symbols, references, and memories, so it reads less, forgets nothing between sessions, and costs less to run. It runs on Ollama (free, offline), with optional LLM consolidation, rerank, and query understanding, and plugs into Claude Code, Codex, and Cursor via MCP plus passive-capture hooks.
 
 ---
 
@@ -16,7 +11,7 @@ https://www.tabnews.com.br/S1LV4/como-reduzi-em-98-por-cento-o-uso-de-contexto-e
 ### One-line install (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/S1LV4/th0th/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/luizgmassa/massa-th0th/main/install.sh | bash
 ```
 
 Installs interactively. Three modes:
@@ -32,21 +27,21 @@ Non-interactive (CI/scripted):
 ```bash
 # Docker mode, custom port, skip start
 TH0TH_MODE=docker TH0TH_API_PORT=4000 TH0TH_NO_START=1 \
-  curl -fsSL https://raw.githubusercontent.com/S1LV4/th0th/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/luizgmassa/massa-th0th/main/install.sh | bash
 ```
 
 ### Manual setup (from source)
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/S1LV4/th0th.git
+git clone https://github.com/luizgmassa/massa-th0th.git
 cd th0th
 bun install
 
 # 2. Setup (100% offline with Ollama)
 ./scripts/setup-local-first.sh
 # - Installs/starts Ollama
-# - Pulls bge-m3 embedding model (1024 dimensions)
+# - Pulls bge-m3 embedding model (1024 dimensions) and qwen2.5-coder:7b
 # - Creates .env with defaults
 # - Runs bun run diagnose to validate the stack
 
