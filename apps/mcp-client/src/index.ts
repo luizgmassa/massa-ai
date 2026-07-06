@@ -87,12 +87,20 @@ function textContent(text: string) {
   return { content: [{ type: "text" as const, text }] };
 }
 
+// Reject unknown CLI flags (usage error, exit code 2).
+const KNOWN_FLAGS = ["--config-show", "--config-path", "--config-dir", "--config-init", "--help", "-h"];
+const unknown = args.filter((a) => a.startsWith("-") && !KNOWN_FLAGS.includes(a));
+if (unknown.length) {
+  console.error(`Unknown flag: ${unknown[0]}\nRun 'massa-th0th --help' for usage.`);
+  process.exit(2);
+}
+
 // Auto-configure on first run
 if (!configExists()) {
   initConfig();
   console.log(`
 [massa-th0th] Initialized with default configuration
-[massa-th0th] Config: ~/.config/massa-th0th/config.json
+[massa-th0th] Config: ${getConfigPath()}
 [massa-th0th] Provider: Ollama (local, free)
 [massa-th0th] To change: npx @massa-th0th/mcp-client massa-th0th-config use mistral --api-key YOUR_KEY
 `);
@@ -167,8 +175,22 @@ class McpProxyServer {
 
           response = await this.apiClient.get(endpoint, queryParams);
         } else {
-          // POST request with body
-          response = await this.apiClient.post(toolDef.apiEndpoint, args);
+          // POST request: replace :pathParam placeholders, rest go into the body.
+          // A clean body is required — Elysia 1.2.25 t.Object is strict on
+          // additional properties, so a leftover id (or filePath) key would 422.
+          let endpoint = toolDef.apiEndpoint;
+          const body: Record<string, unknown> = {};
+          const params = (args ?? {}) as Record<string, unknown>;
+
+          for (const [key, value] of Object.entries(params)) {
+            if (endpoint.includes(`:${key}`)) {
+              endpoint = endpoint.replace(`:${key}`, encodeURIComponent(String(value)));
+            } else {
+              body[key] = value;
+            }
+          }
+
+          response = await this.apiClient.post(endpoint, body);
         }
 
         // Format response for MCP

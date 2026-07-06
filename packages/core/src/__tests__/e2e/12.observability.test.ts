@@ -30,8 +30,13 @@
  *  - /health → {status:"ok", service, version, timestamp}.
  *  - /api/v1/system/ollama → {available, latency, details:{embeddingModel,...},
  *    configuredModel, baseUrl, models:[...]} (no top-level embeddingModel).
- *  - /api/v1/system/status may report "degraded" when embeddingCache.db is
- *    absent (observed live) — assert shape, not the healthy string.
+ *  - /api/v1/system/status reports {status, services, timestamp}. `status` is
+ *    "healthy" when all six SQLite DB files exist, else "degraded". On a
+ *    PostgreSQL-backed (dedicated) stack the optional `embedding-cache.db` is
+ *    not materialized (vectors/analytics run on PG), so `embeddingCache:false`
+ *    + `status:"degraded"` is the CORRECT observed shape — not a defect
+ *    (Finding #13 is informational, test-only). The status test asserts the
+ *    well-formed shape and tolerates BOTH `healthy` and `degraded`.
  */
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import {
@@ -380,13 +385,46 @@ describe.skipIf(!READY)("T11 — Observability", () => {
       expect(r?.databases?.sizes).toBeTypeOf("object");
     }, 15_000);
 
-    test("/api/v1/system/status → status + services map (shape; may be degraded)", async () => {
+    test("/api/v1/system/status → well-formed status + services map (Finding #13: informational)", async () => {
+      // Finding #13 is INFORMATIONAL, not a defect: system.ts derives `status`
+      // from SQLite DB file existence. On a PostgreSQL-backed (dedicated) stack
+      // the optional `embedding-cache.db` is NOT materialized — vectors and
+      // analytics run on PG — so the endpoint faithfully reports
+      // `status:"degraded"` + `services.embeddingCache:false`. That is the
+      // correct observed shape, so this scenario asserts the well-formed shape
+      // and explicitly tolerates BOTH `healthy` (all six DBs present, e.g. a
+      // fully SQLite-backed stack) and `degraded` (one or more optional DBs
+      // absent, e.g. the PG-backed dedicated stack). The six service keys are
+      // always present; each is a boolean.
       const r = await httpGet<any>("/api/v1/system/status");
       console.log(`[T11:system:status] ${JSON.stringify(r).slice(0, 300)}`);
-      // Verified live: status may be "degraded" (e.g. embeddingCache.db absent).
-      // Assert shape, not the healthy string.
-      expect(["healthy", "degraded", "unhealthy"]).toContain(r?.status);
+
+      // status is healthy OR degraded — both valid depending on which optional
+      // DBs the backing stack materializes. ("unhealthy" is never emitted by
+      // system.ts:107-113, which only toggles between healthy/degraded.)
+      expect(["healthy", "degraded"]).toContain(r?.status);
+
+      // All six service keys present, each a boolean.
       expect(r?.services).toBeTypeOf("object");
+      const services = r?.services ?? {};
+      const EXPECTED_KEYS = [
+        "memories",
+        "vectorStore",
+        "searchCache",
+        "analytics",
+        "keywordSearch",
+        "embeddingCache",
+      ] as const;
+      for (const key of EXPECTED_KEYS) {
+        expect(key in services).toBe(true);
+        expect(typeof services[key]).toBe("boolean");
+      }
+
+      // embeddingCache may legitimately be false on a PG-backed stack (optional
+      // SQLite cache not materialized when vectors/analytics run on PG). This is
+      // NOT a failure — assert it stays a boolean, not that it is true.
+      expect(typeof services.embeddingCache).toBe("boolean");
+
       expect(typeof r?.timestamp).toBe("string");
     }, 15_000);
 

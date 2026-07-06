@@ -4,19 +4,14 @@
  * Runs the built CLI binaries (apps/mcp-client/dist/index.js and
  * dist/config-cli.js) against the live environment. Gated on the dist files
  * existing. Read-only commands run against the real user config; mutating
- * commands are isolated through a throwaway XDG_CONFIG_HOME where supported.
+ * commands are isolated through a throwaway XDG_CONFIG_HOME.
  *
- * Real product bug discovered during T12 (reported via test.skip + printed
- * reason, no production edits per hard constraints):
- *   - packages/shared/src/config/config-loader.ts hardcodes
- *     `os.homedir()/.config/massa-th0th` (line 6) and IGNORES
- *     XDG_CONFIG_HOME. As a result every config-cli command AND
- *     `massa-th0th --config-init` always operate on the user's REAL config,
- *     regardless of XDG_CONFIG_HOME. To honor the hard constraint "do NOT
- *     mutate the user's real config.json", every mutating scenario is skipped
- *     until the loader honors XDG_CONFIG_HOME.
- *   - Additionally, `massa-th0th <unknown-flag>` exits 0 with no help/error,
- *     i.e. argv is not validated in dist/index.js.
+ * Fixed product bugs (previously reported via test.skip + printed reason):
+ *   - config-loader.ts now honors XDG_CONFIG_HOME (prefers it when set + non-
+ *     empty, else falls back to ~/.config). All mutating CLI scenarios now run
+ *     against a per-test mkdtempSync temp dir and assert the command reads/
+ *     writes under that dir — NOT the real user config.
+ *   - `massa-th0th <unknown-flag>` now exits 2 (usage error).
  */
 import { describe, test, expect, beforeAll } from "bun:test";
 import { spawn } from "child_process";
@@ -87,36 +82,32 @@ const REAL_CONFIG_MARKER = `${os.homedir()}/.config/massa-th0th`;
 // ── Suite ───────────────────────────────────────────────────────────────────
 
 describe.skipIf(!READY)("T12 — CLI smoke", () => {
-  // Probe once: does the CLI honor XDG_CONFIG_HOME? This is deterministic
-  // (config-loader.ts hardcodes os.homedir()), so we gate all mutating tests
-  // on it instead of trying to skip mid-test.
-  let xdgHonored = true;
-  let xdgProbeReason = "";
-
+  // Probe once: confirm the CLI honors XDG_CONFIG_HOME. After the loader fix
+  // this is expected to pass; assert it here so a regression fails loudly
+  // rather than silently skipping every mutating test.
   beforeAll(async () => {
     const tmp = await makeTempXdg();
+    let line = "";
+    let probeError: string | null = null;
     try {
       const r = await runBin(MASSA_BIN, ["--config-path"], { XDG_CONFIG_HOME: tmp });
-      const line = stripBanner(r.stdout)
+      line = stripBanner(r.stdout)
         .split("\n")
         .map((s) => s.trim())
         .filter(Boolean)
         .pop() ?? "";
-      xdgHonored = !line.startsWith(REAL_CONFIG_MARKER) && line.includes(tmp);
-      if (!xdgHonored) {
-        xdgProbeReason =
-          `config-loader.ts ignores XDG_CONFIG_HOME (resolved path was "${line}", ` +
-          `expected it under "${tmp}"). Mutating CLI tests skipped to protect the ` +
-          `real user config at ${REAL_CONFIG_MARKER}/config.json.`;
-        console.log(`[T12 SKIP] ${xdgProbeReason}`);
-      }
     } catch (e) {
-      xdgHonored = false;
-      xdgProbeReason = `XDG probe threw: ${(e as Error).message}`;
-      console.log(`[T12 SKIP] ${xdgProbeReason}`);
+      probeError = (e as Error).message;
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
+    // Hard gate: the loader MUST honor XDG_CONFIG_HOME. Failing here is the
+    // correct signal — mutating tests below depend on temp-dir isolation.
+    const honored = !probeError && !line.startsWith(REAL_CONFIG_MARKER) && line.includes(tmp);
+    const reason = probeError
+      ? `XDG probe threw: ${probeError}`
+      : `config-loader ignores XDG_CONFIG_HOME (resolved "${line}", expected under "${tmp}")`;
+    expect(honored).toBe(true);
   });
 
   // ── massa-th0th flags ────────────────────────────────────────────────────
@@ -169,17 +160,19 @@ describe.skipIf(!READY)("T12 — CLI smoke", () => {
       expect(line.endsWith("config.json")).toBe(false);
     });
 
-    test("--config-init stays off the real config under XDG_CONFIG_HOME", async () => {
+    test("--config-init writes under XDG_CONFIG_HOME, never the real config", async () => {
       const tmp = await makeTempXdg();
       try {
         const r = await runBin(MASSA_BIN, ["--config-init"], { XDG_CONFIG_HOME: tmp });
-        if (!xdgHonored) {
-          console.log(`[T12 SKIP] --config-init: ${xdgProbeReason}`);
-          expect(true).toBe(true); // skipped-by-convention; gate below
-          return;
-        }
         expect(r.code).toBe(0);
         expect(/Initializ|Configuration initialized/i.test(r.stdout)).toBe(true);
+        // The config file must land inside the temp XDG dir, not the real one.
+        const cfgPath = path.join(tmp, "massa-th0th", "config.json");
+        const realCfgPath = path.join(REAL_CONFIG_MARKER, "config.json");
+        const tmpExists = await fs.stat(cfgPath).then(() => true).catch(() => false);
+        expect(tmpExists).toBe(true);
+        // Sanity: ensure we did NOT touch the real config path string in output.
+        expect(r.stdout).not.toContain(realCfgPath);
         const created = r.stdout.match(/Configuration initialized at:\s*(\S+)/);
         if (created) expect(created[1].startsWith(tmp)).toBe(true);
       } finally {
@@ -191,28 +184,22 @@ describe.skipIf(!READY)("T12 — CLI smoke", () => {
       const tmp = await makeTempXdg();
       try {
         const r1 = await runBin(MASSA_BIN, ["--config-init"], { XDG_CONFIG_HOME: tmp });
-        if (!xdgHonored) {
-          console.log(`[T12 SKIP] --config-init idempotency: ${xdgProbeReason}`);
-          return;
-        }
         expect(r1.code).toBe(0);
         const r2 = await runBin(MASSA_BIN, ["--config-init"], { XDG_CONFIG_HOME: tmp });
         expect(r2.code).toBe(0);
+        // Idempotency: second run does not error, config still under temp dir.
+        const cfgPath = path.join(tmp, "massa-th0th", "config.json");
+        const exists = await fs.stat(cfgPath).then(() => true).catch(() => false);
+        expect(exists).toBe(true);
       } finally {
         await fs.rm(tmp, { recursive: true, force: true });
       }
     });
 
-    test("unknown flag is rejected (non-zero exit OR help printed)", async () => {
+    test("unknown flag is rejected (exit 2 + usage on stderr)", async () => {
       const r = await runBin(MASSA_BIN, ["--definitely-not-a-flag"]);
-      if (r.code === 0 && !/usage|options/i.test(r.stdout)) {
-        console.log(
-          "[T12 SKIP] Unknown flag --definitely-not-a-flag exited 0 with no help/error " +
-            "(argv not validated in dist/index.js).",
-        );
-        return; // document actual; don't fail on the bug
-      }
-      expect(r.code !== 0 || /usage|options/i.test(r.stdout)).toBe(true);
+      expect(r.code).toBe(2);
+      expect(/Unknown flag|--help|usage/i.test(r.stderr + r.stdout)).toBe(true);
     });
   });
 
@@ -223,13 +210,11 @@ describe.skipIf(!READY)("T12 — CLI smoke", () => {
       const tmp = await makeTempXdg();
       try {
         const r = await runBin(CONFIG_CLI, ["init"], { XDG_CONFIG_HOME: tmp });
-        if (!xdgHonored) {
-          console.log(`[T12 SKIP] config-cli init: ${xdgProbeReason}`);
-          return;
-        }
         expect(r.code).toBe(0);
         const files = await fs.readdir(path.join(tmp, "massa-th0th")).catch(() => [] as string[]);
         expect(files).toContain("config.json");
+        // Isolation: never created a config dir at the real user path.
+        expect(r.stdout + r.stderr).not.toContain(REAL_CONFIG_MARKER);
       } finally {
         await fs.rm(tmp, { recursive: true, force: true });
       }
@@ -266,10 +251,6 @@ describe.skipIf(!READY)("T12 — CLI smoke", () => {
       const tmp = await makeTempXdg();
       try {
         const initR = await runBin(CONFIG_CLI, ["init"], { XDG_CONFIG_HOME: tmp });
-        if (!xdgHonored) {
-          console.log(`[T12 SKIP] config-cli set: ${xdgProbeReason}`);
-          return;
-        }
         expect(initR.code).toBe(0);
         // Safe key: logging.level (string, low blast radius).
         const setR = await runBin(CONFIG_CLI, ["set", "logging.level", "debug"], {
@@ -279,6 +260,12 @@ describe.skipIf(!READY)("T12 — CLI smoke", () => {
         const showR = await runBin(CONFIG_CLI, ["show"], { XDG_CONFIG_HOME: tmp });
         const cfg = extractJson(showR.stdout) as { logging?: { level?: string } };
         expect(cfg.logging?.level).toBe("debug");
+        // Isolation: the persisted file lives under temp, never the real path.
+        const persisted = await fs
+          .readFile(path.join(tmp, "massa-th0th", "config.json"), "utf-8")
+          .catch(() => null);
+        expect(persisted).not.toBeNull();
+        expect(persisted).toContain('"debug"');
       } finally {
         await fs.rm(tmp, { recursive: true, force: true });
       }
@@ -288,10 +275,6 @@ describe.skipIf(!READY)("T12 — CLI smoke", () => {
       const tmp = await makeTempXdg();
       try {
         const initR = await runBin(CONFIG_CLI, ["init"], { XDG_CONFIG_HOME: tmp });
-        if (!xdgHonored) {
-          console.log(`[T12 SKIP] config-cli use: ${xdgProbeReason}`);
-          return;
-        }
         expect(initR.code).toBe(0);
         const useR = await runBin(CONFIG_CLI, ["use", "ollama"], { XDG_CONFIG_HOME: tmp });
         expect(useR.code).toBe(0);

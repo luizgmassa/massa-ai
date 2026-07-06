@@ -13,20 +13,10 @@
  *
  * KNOWN PRODUCT LIMITATIONS (asserted defensively or skipped+reported — never
  * worked around by editing source):
- *  - search_definitions on the PostgreSQL backend SILENTLY DROPS the `search`,
- *    `kind`, and `file` filters. Root cause: the route
- *    (apps/tools-api/src/routes/workspace.ts:160-166) calls
- *    `symbolGraphService.listDefinitions(projectId, { search, kind, file,
- *    exportedOnly, limit })`, but the PG repository's `listDefinitions`
- *    (packages/core/src/data/sqlite/symbol-repository-pg.ts:767-783) reads
- *    `opts.query`/`opts.kinds` (wrong keys) and forwards to `searchDefinitions`
- *    which has NO `file` parameter at all. `exportedOnly` and `limit` are the
- *    only filters that survive. The SQLite repository's `listDefinitions`
- *    (packages/core/src/data/sqlite/symbol-repository.ts:344-) uses the correct
- *    keys, so the bug is PostgreSQL-specific.
- *    → F41/F43/F44 skip their name/kind/file assertions with a printed reason
- *      and report the bug. F42 (exportedOnly) and the limit cap are asserted
- *      positively since those filters work.
+ *  - (previously) search_definitions on the PostgreSQL backend silently dropped
+ *    the `search`, `kind`, and `file` filters. FIXED: the PG repository's
+ *    listDefinitions now reads {search,kind,file} and searchDefinitions carries
+ *    a filePath clause. F41/F43 assert all three filters positively.
  */
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import {
@@ -184,16 +174,16 @@ describe.skipIf(!READY)("T4 symbol graph", () => {
 
   // ── search_definitions (F41–F44) ─────────────────────────────────────────
   //
-  // PRODUCT BUG (PG backend): the `search`, `kind`, and `file` filters are
-  // silently dropped (see file header). F41/F43/F44 skip their name/kind/file
-  // assertions and report the bug; F42 (exportedOnly) and the limit cap are
-  // asserted positively since those filters survive.
+  // All four filters (search/kind/file/exportedOnly) and the limit cap are now
+  // honored on the PostgreSQL backend. F41 asserts search+kind, F42 exportedOnly,
+  // F43 the file filter, F44 the limit cap.
 
   test(
-    "F41: search + kind filter — SKIP (PG bug drops both filters)",
+    "F41: search + kind filter returns the matching class (PG honors both filters)",
     async () => {
-      // Probe: with the bug, search=ContextualSearchRLM&kind=class returns the
-      // alphabetical default-order rows (limit applied) and NOT the class.
+      // search=ContextualSearchRLM&kind=class must return the class (not the
+      // alphabetical default-order list). All returned rows must satisfy BOTH
+      // filters: name ILIKE %ContextualSearchRLM% AND kind = class.
       const r = await httpGet<any>("/api/v1/symbol/definitions", {
         projectId: pid,
         search: "ContextualSearchRLM",
@@ -202,28 +192,16 @@ describe.skipIf(!READY)("T4 symbol graph", () => {
       });
       expect(r?.success).toBe(true);
       const defs = r?.data?.definitions ?? [];
+      expect(defs.length).toBeGreaterThan(0);
       const hit = defs.find((d: any) => d.name === "ContextualSearchRLM");
-      if (hit && hit.kind === "class") {
-        // If a future fix lands, assert positively that the right file is hit.
-        expect(String(hit.file)).toMatch(/contextual-search-rlm/);
-        return;
+      expect(hit).toBeDefined();
+      expect(hit.kind).toBe("class");
+      expect(String(hit.file)).toMatch(/contextual-search-rlm/);
+      // Every returned row honors the search AND kind filters.
+      for (const d of defs) {
+        expect(d.kind).toBe("class");
+        expect(String(d.name).toLowerCase()).toContain("contextualsearchrlm");
       }
-      // BUG: filters dropped — the returned defs are NOT filtered by name/kind.
-      const allHaveCorrectName = defs.every((d: any) => d.name === "ContextualSearchRLM");
-      const allAreClass = defs.every((d: any) => d.kind === "class");
-      console.log(
-        "[T4:F41] SKIP name/kind filter assertion: search_definitions on the " +
-          "PostgreSQL backend silently drops the `search` and `kind` filters " +
-          "(apps/tools-api/src/routes/workspace.ts:160-166 passes " +
-          "{search,kind,file} but the PG repo's listDefinitions reads " +
-          "{query,kinds} and never maps them — see " +
-          "packages/core/src/data/sqlite/symbol-repository-pg.ts:767-783). " +
-          "Returned defs were all the searched name: " +
-          allHaveCorrectName +
-          "; all class kind: " +
-          allAreClass +
-          ". Reported as a real product bug; not worked around.",
-      );
     },
     30_000,
   );
@@ -255,7 +233,7 @@ describe.skipIf(!READY)("T4 symbol graph", () => {
   );
 
   test(
-    "F43: file filter — SKIP (PG bug drops the file filter)",
+    "F43: file filter returns only definitions in the target file (PG honors the file filter)",
     async () => {
       const target = "packages/core/src/services/search/contextual-search-rlm.ts";
       const r = await httpGet<any>("/api/v1/symbol/definitions", {
@@ -265,22 +243,14 @@ describe.skipIf(!READY)("T4 symbol graph", () => {
       });
       expect(r?.success).toBe(true);
       const defs = r?.data?.definitions ?? [];
-      const allInTarget = defs.every((d: any) => d.file === target);
-      if (allInTarget && defs.length > 0) {
-        // Future-fix positive path.
-        return;
+      expect(defs.length).toBeGreaterThan(0);
+      // Every returned row honors the file filter.
+      for (const d of defs) {
+        expect(d.file).toBe(target);
       }
-      console.log(
-        "[T4:F43] SKIP file-filter assertion: search_definitions on the PG " +
-          "backend silently drops the `file` filter — the PG repo's " +
-          "`searchDefinitions` has no file clause at all " +
-          "(packages/core/src/data/sqlite/symbol-repository-pg.ts:387-407), " +
-          "and listDefinitions never forwards it. Returned " +
-          defs.length +
-          " defs, of which " +
-          defs.filter((d: any) => d.file === target).length +
-          " were in the target file. Reported as a real product bug; not worked around.",
-      );
+      // The file's class is expected to surface.
+      const names = new Set(defs.map((d: any) => d.name));
+      expect(names.has("ContextualSearchRLM")).toBe(true);
     },
     30_000,
   );
@@ -712,10 +682,12 @@ describe.skipIf(!READY)("T4 symbol graph", () => {
   test(
     "matrix: search_definitions equivalent on both transports",
     async () => {
-      // exportedOnly + limit (the filters that survive the PG bug) so the matrix
-      // exercises a deterministic, comparable result set.
+      // Exercise search + kind + exportedOnly + limit (all PG filters now honored)
+      // so the matrix compares a deterministic, filtered result set.
       const http = await httpGet<any>("/api/v1/symbol/definitions", {
         projectId: pid,
+        search: "ContextualSearchRLM",
+        kind: "class",
         exportedOnly: "true",
         limit: 5,
       });
@@ -724,6 +696,8 @@ describe.skipIf(!READY)("T4 symbol graph", () => {
       try {
         mcpRes = await mcpCall(fresh.client, "search_definitions", {
           projectId: pid,
+          search: "ContextualSearchRLM",
+          kind: "class",
           exportedOnly: true,
           limit: 5,
         });

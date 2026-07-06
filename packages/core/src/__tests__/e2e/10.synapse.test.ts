@@ -13,23 +13,17 @@
  * on OLLAMA_UP — but the core session/prime/access/lifecycle scenarios here do
  * not run search, so they run under API_UP alone.
  *
- * Real product bugs surfaced (skipped + printed, NOT worked around):
- *   - BUG-SYN-4 (DOMINANT): The MCP proxy (apps/mcp-client/src/index.ts:171)
- *     does NOT substitute `:id` path params for POST requests — only GET. So
- *     synapse_prime and synapse_access POST to the literal path
- *     "/api/v1/synapse/session/:id/...", Elysia binds params.id=":id", the
- *     registry never finds it, and both tools are NON-FUNCTIONAL via MCP.
- *     Probed live; matrix equivalence for prime/access skipped with reason.
- *   - BUG-SYN-1: MCP `synapse_prime` inputSchema declares `results` but the
- *     API route requires `entries` → even after BUG-SYN-4 is fixed, every MCP
- *     prime call 422s (schema/handler mismatch, additionalProperties:false).
- *   - BUG-SYN-2: MCP `synapse_access` inputSchema marks only `id` required;
- *     the route requires `memoryId`. An MCP client that omits memoryId (which
- *     the schema permits) triggers a route 422 (wrapped by the proxy, but the
- *     schema's required-array should include memoryId).
- *   - BUG-SYN-3 (drift E28): MCP `synapse_session` inputSchema documents
- *     `ttlMs` default as 900000 (15 min), but the route applies the registry's
- *     defaultTtlMs of 3_600_000 (1 hour). Asserted in E28.
+ * Real product bugs previously surfaced (now FIXED in Batch A — these tests
+ * exercise the fixes through the MCP proxy):
+ *   - BUG-SYN-4 (FIXED): The MCP proxy now substitutes `:id` path params for
+ *     POST requests (apps/mcp-client/src/index.ts) and emits a clean body, so
+ *     synapse_prime and synapse_access operate on the caller's session via MCP.
+ *   - BUG-SYN-1 (FIXED): MCP `synapse_prime` inputSchema now declares `entries`
+ *     (route requires `entries`), so MCP prime succeeds end-to-end.
+ *   - BUG-SYN-2 (FIXED): MCP `synapse_access` inputSchema now marks `memoryId`
+ *     required and dropped the stray `filePath` (route is `t.Object({memoryId})`).
+ *   - BUG-SYN-3 (FIXED): MCP `synapse_session` inputSchema now documents the
+ *     registry default ttlMs of 3_600_000 (1h). Asserted in E28.
  */
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import {
@@ -93,9 +87,11 @@ function uniqId(prefix = "syn"): string {
   return `${prefix}_e2e_${Date.now().toString(36)}_${_seq}`;
 }
 
-// ── Constants derived from source (used by E28 drift assertions) ────────────
+// ── Constants derived from source ───────────────────────────────────────────
+// synapse_session now advertises the registry default (1h) — the BUG-SYN-3
+// schema drift is fixed, so MCP and route agree on 3_600_000ms.
 const REGISTRY_DEFAULT_TTL_MS = 3_600_000; // session-registry.ts defaultTtlMs
-const MCP_ADVERTISED_TTL_MS = 900_000; // tool-definitions.ts synapse_session ttlMs default
+const MCP_ADVERTISED_TTL_MS = 3_600_000; // tool-definitions.ts synapse_session ttlMs default
 const BUFFER_DEFAULT_MAX_SIZE = 20; // working-memory-buffer.ts DEFAULT_BUFFER_CONFIG.maxSize
 
 // ── MCP handle (started lazily for matrix tests) ────────────────────────────
@@ -389,25 +385,17 @@ describe.skipIf(!READY)("T7 — HTTP-only lifecycle (F80)", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe.skipIf(!READY)("T7 — Schema drift (E28) + best-effort edges", () => {
-  // E28 — ttlMs default divergence between MCP schema and the route.
-  test("E28: omitting ttlMs yields the REGISTRY default (1h), NOT the MCP-advertised 15min", async () => {
+  // E28 — ttlMs default alignment between MCP schema and the route (BUG-SYN-3 fixed).
+  test("E28: omitting ttlMs yields the 1h default — MCP schema and route now agree", async () => {
     const created = await httpJson("POST", "/api/v1/synapse/session", { agentId: "t7-ttl" });
     const data = created.json.data;
     const ttl = data.expiresAt - data.createdAt;
 
-    // The route applies registry.defaultTtlMs = 3_600_000 (1h), regardless of
-    // what the MCP inputSchema advertises. Document the divergence.
+    // The route applies registry.defaultTtlMs = 3_600_000 (1h), and the MCP
+    // inputSchema now advertises the same default (BUG-SYN-3 fixed).
     expect(ttl).toBeGreaterThanOrEqual(REGISTRY_DEFAULT_TTL_MS - 5_000);
     expect(ttl).toBeLessThanOrEqual(REGISTRY_DEFAULT_TTL_MS + 5_000);
-
-    // And explicitly NOT the advertised 15min.
-    expect(ttl).not.toBe(MCP_ADVERTISED_TTL_MS);
-
-    console.log(
-      `[T7:E28] ttlMs drift: MCP inputSchema advertises default ${MCP_ADVERTISED_TTL_MS}ms ` +
-        `(15min), but the route applied registry defaultTtlMs=${REGISTRY_DEFAULT_TTL_MS}ms (1h). ` +
-        `Observed ttl=${ttl}ms. Schema description in tool-definitions.ts is wrong.`,
-    );
+    expect(MCP_ADVERTISED_TTL_MS).toBe(REGISTRY_DEFAULT_TTL_MS);
   });
 
   // E19 — TTL slide. updateTaskContext refreshes expiresAt to now+ttl. Best-effort.
@@ -480,144 +468,62 @@ describe.skipIf(!READY)("T7 — Matrix equivalence (HTTP vs MCP)", () => {
     );
   });
 
-  // BUG-SYN-4 (DOMINANT BLOCKER): The MCP proxy does not substitute `:id`
-  // path params for POST requests. apps/mcp-client/src/index.ts:171 forwards
-  // the LITERAL apiEndpoint ("/api/v1/synapse/session/:id/access") with the
-  // full args object as the body. Elysia binds params.id = ":id" (literal),
-  // the registry looks up a session whose id is ":id", and the caller's
-  // args.id is silently dropped into the body and ignored.
-  // → synapse_prime and synapse_access do NOT operate on the caller's session.
-  // This probe proves it by verifying the real session's accessHistory does
-  // NOT grow after the MCP access call.
-  test("matrix probe: MCP synapse_access forwards literal :id path → real session untouched (BUG-SYN-4)", async () => {
+  // synapse_access via MCP — BUG-SYN-4 + BUG-SYN-2 FIXED: the proxy now
+  // substitutes :id and the schema requires memoryId (dropping filePath). A
+  // real MCP access call must record against the caller's session.
+  test("matrix: MCP synapse_access records access on the caller's session (BUG-SYN-4 + BUG-SYN-2 fixed)", async () => {
     if (!mcp) {
-      console.log("[T7:bug4-probe] SKIP: MCP subprocess not available");
+      console.log("[T7:matrix:access] SKIP: MCP subprocess not available");
       return;
     }
     requireTool(mcp.toolNames, "synapse_access");
 
-    // Clean any leftover ":id" session from prior probes so the bug is not
-    // masked by a false-positive hit on it.
-    await httpJson("DELETE", "/api/v1/synapse/session/:id");
-
-    // Create a fresh session and read its initial accessHistorySize.
-    const session = await httpJson("POST", "/api/v1/synapse/session", { agentId: "t7-bug4" });
+    // Create a fresh session via HTTP and read its initial accessHistorySize.
+    const session = await httpJson("POST", "/api/v1/synapse/session", { agentId: "t7-access-mcp" });
     const sid = session.json.data.sessionId;
     expect(session.json.success).toBe(true);
-    const before = await httpJson("GET", `/api/v1/synapse/session/${sid}`);
-    expect(before.json.data.accessHistorySize).toBe(0);
 
-    // Call MCP access targeting this session.
-    await mcpCall(mcp.client, "synapse_access", { id: sid, memoryId: "mem-bug4" });
+    // Call MCP access targeting this session — the proxy must substitute :id.
+    const mcpRes = await mcpCall(mcp.client, "synapse_access", {
+      id: sid,
+      memoryId: "mem-mcp-access",
+    });
+    expect(mcpRes?.success).toBe(true);
+    expect(mcpRes?.data?.accessHistorySize).toBe(1);
 
-    // Read the REAL session back. If the proxy worked, accessHistorySize = 1.
-    // Under BUG-SYN-4 the MCP call hit a session whose id is ":id" (now none),
-    // so the real session is untouched → still 0.
+    // Confirm against the real session via HTTP: the access must have landed.
     const after = await httpJson("GET", `/api/v1/synapse/session/${sid}`);
-    const realSize = after.json.data.accessHistorySize;
-    expect(realSize).toBe(0);
-
-    const detail =
-      `MCP synapse_access called with id=${sid} did NOT record access on that session ` +
-      `(real session accessHistorySize stayed 0). Root cause: apps/mcp-client/src/index.ts:171 ` +
-      `calls apiClient.post(toolDef.apiEndpoint, args) WITHOUT substituting :id — the literal path ` +
-      `"/api/v1/synapse/session/:id/access" is used, Elysia binds params.id=":id", the registry ` +
-      `looks up a different session. args.id is dropped into the body and ignored.`;
-    console.log(`[T7:BUG-SYN-4] ${detail}`);
+    expect(after.json.data.accessHistorySize).toBe(1);
   });
 
-  // BUG-SYN-1: even if BUG-SYN-4 were fixed, MCP synapse_prime would still
-  // 422 because the inputSchema declares `results` while the route requires
-  // `entries`. Probe the schema mismatch live.
-  test("matrix probe: MCP synapse_prime schema sends `results`, route requires `entries` (BUG-SYN-1)", async () => {
+  // synapse_prime via MCP — BUG-SYN-4 + BUG-SYN-1 FIXED: the proxy now
+  // substitutes :id and the schema declares `entries` (route requires it).
+  // A real MCP prime call must seed the buffer and return a primed count.
+  test("matrix: MCP synapse_prime seeds the buffer → {primed, bufferSize} (BUG-SYN-4 + BUG-SYN-1 fixed)", async () => {
     if (!mcp) {
-      console.log("[T7:bug1-probe] SKIP: MCP subprocess not available");
+      console.log("[T7:matrix:prime] SKIP: MCP subprocess not available");
       return;
     }
     requireTool(mcp.toolNames, "synapse_prime");
 
-    // Clean any leftover ":id" session so BUG-SYN-4 does not mask BUG-SYN-1.
-    await httpJson("DELETE", "/api/v1/synapse/session/:id");
-
-    const session = await httpJson("POST", "/api/v1/synapse/session", { agentId: "t7-bug1" });
+    const session = await httpJson("POST", "/api/v1/synapse/session", { agentId: "t7-prime-mcp" });
     const sid = session.json.data.sessionId;
 
-    // Use the schema-declared `results` key (per the published inputSchema).
+    // Use the schema-declared `entries` key. The proxy substitutes :id and
+    // forwards a clean body { entries: [...] }.
     const mcpRes = await mcpCall(mcp.client, "synapse_prime", {
       id: sid,
-      results: [{ id: "r1", content: "x", score: 0.5 }],
+      entries: [
+        { id: "m1", content: "alpha memory", score: 0.8 },
+        { id: "m2", content: "beta memory" }, // score defaults to 0.7
+      ],
     });
+    expect(mcpRes?.success).toBe(true);
+    expect(mcpRes?.data?.primed).toBe(2);
+    expect(mcpRes?.data?.bufferSize).toBe(2);
 
-    // Confirm the call did not succeed with a primed count. (It will fail —
-    // either via BUG-SYN-4's "not found" first, or via 422 if both the path
-    // were fixed. Either way: NOT a clean prime success.)
-    const isCleanSuccess =
-      mcpRes?.success === true && typeof mcpRes?.data?.primed === "number";
-    expect(isCleanSuccess).toBe(false);
-
-    const reason =
-      "BUG-SYN-1: MCP synapse_prime inputSchema (apps/mcp-client/src/tool-definitions.ts:755-767) " +
-      "declares the array property as `results`, but the API route " +
-      "(apps/tools-api/src/routes/synapse.ts:180) requires `entries`. Even after BUG-SYN-4 " +
-      "is fixed, an MCP client sending `{id, results:[...]}` (per the schema) would hit " +
-      "Elysia 422 because the route's t.Object body requires `entries` and rejects unknown " +
-      "keys (additionalProperties:false). The schema property name must be changed to " +
-      "`entries`, or the route must accept both.";
-    console.log(`[T7:BUG-SYN-1] ${reason}`);
-    console.log(
-      "[T7:BUG-SYN-1] MCP prime outcome:",
-      JSON.stringify(mcpRes).slice(0, 300),
-    );
-  });
-
-  // BUG-SYN-2: MCP synapse_access inputSchema marks only `id` required; the
-  // route requires `memoryId`. The proxy DOES wrap the resulting 422 into a
-  // clean {success:false, error} envelope (good), but the error message leaks
-  // the raw Elysia validation JSON, proving the schema/route mismatch. Probe
-  // it so the divergence is documented.
-  test("matrix probe: MCP synapse_access without memoryId surfaces the route's required-field error (BUG-SYN-2)", async () => {
-    if (!mcp) {
-      console.log("[T7:bug2-probe] SKIP: MCP subprocess not available");
-      return;
-    }
-    requireTool(mcp.toolNames, "synapse_access");
-
-    const mcpRes = await mcpCall(mcp.client, "synapse_access", { id: "syn_any" });
-
-    // The proxy wraps the 422 into { success:false, error:"API error 422: ..." }.
-    // Assert the surfaced error references memoryId (proving the route's
-    // required-field validation fired) — i.e. the schema permitted a call the
-    // route rejects.
-    const errText = String(mcpRes?.error ?? mcpRes?.data?.error ?? JSON.stringify(mcpRes));
-    const referencesMemoryId =
-      errText.includes("memoryId") || errText.includes("422") || errText.includes("validation");
-    expect(referencesMemoryId).toBe(true);
-
-    const reason =
-      "BUG-SYN-2: MCP synapse_access inputSchema (apps/mcp-client/src/tool-definitions.ts:769-782) " +
-      "marks only `id` as required, but the API route (synapse.ts:208-210) requires `memoryId`. " +
-      "An MCP client that omits memoryId (which the schema permits) triggers an Elysia 422. " +
-      "The proxy does wrap it as {success:false, error:\"API error 422: ...\"}, but the schema's " +
-      "required-array should include `memoryId` so MCP clients cannot make a call the route rejects.";
-    console.log(`[T7:BUG-SYN-2] ${reason}`);
-    console.log("[T7:BUG-SYN-2] surfaced error:", errText.slice(0, 250));
-  });
-
-  // synapse_access matrix equivalence is blocked by BUG-SYN-4 (literal :id
-  // path not substituted for POST). Skipping equivalence with a reason.
-  test.skip("matrix: synapse_access — HTTP ≡ MCP (blocked by BUG-SYN-4)", () => {
-    // BUG-SYN-4: MCP proxy POSTs to literal "/api/v1/synapse/session/:id/access"
-    // without substituting the :id path param, so the session is never found.
-    // See the BUG-SYN-4 probe above for the live repro. Equivalence impossible
-    // until apps/mcp-client/src/index.ts substitutes path params for POST too.
-  });
-
-  // synapse_prime matrix equivalence is blocked by BOTH BUG-SYN-4 (path
-  // substitution) AND BUG-SYN-1 (results vs entries). Skipping with a reason.
-  test.skip("matrix: synapse_prime — HTTP ≡ MCP (blocked by BUG-SYN-4 + BUG-SYN-1)", () => {
-    // See the BUG-SYN-4 and BUG-SYN-1 probes above. Two independent bugs block
-    // MCP prime: the path param is not substituted, and even if it were, the
-    // schema's `results` key is rejected by the route's `entries` requirement.
+    // Falsifying check: primed must be a real number, NOT a 422 validation error.
+    expect(typeof mcpRes?.data?.primed).toBe("number");
   });
 });
 

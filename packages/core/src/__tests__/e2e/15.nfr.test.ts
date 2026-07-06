@@ -456,7 +456,7 @@ describe.skipIf(!READY)("T9 N8 — concurrent Synapse access (HTTP-direct, bound
 // PG data integrity (backend is PostgreSQL — high-value)
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe.skipIf(!READY)("T9 N14 — target_fqn NOT NULL under unresolved import", () => {
+describe.skipIf(!READY)("T9 N14 — unresolved-target refs retained (SQLite parity)", () => {
   const pid = makePid(14);
 
   afterAll(async () => {
@@ -464,58 +464,44 @@ describe.skipIf(!READY)("T9 N14 — target_fqn NOT NULL under unresolved import"
   });
 
   test(
-    "indexing a fixture with an unresolvable import does NOT throw a PG NOT-NULL violation",
+    "indexing a fixture with an unresolvable import retains the null-target reference row on PG",
     async () => {
-      // The polyglot fixture's unresolvable-import.ts imports from
-      // "./does-not-exist" → alias resolver cannot map it → import edge has
-      // no resolved target_fqn. PG schema declares target_fqn TEXT NOT NULL.
-      // If the indexer passes a NULL through, the insert 500s. The observed
-      // production behavior is that unresolved refs are silently DROPPED
-      // (symbol-repository-pg.ts:620,675 `if (!ref.target_fqn) continue;`).
+      // The polyglot fixture's unresolvable-import.ts imports `ghost` from
+      // "./does-not-exist" → alias resolver cannot map it → the call reference
+      // to `ghost` inside `usesGhost` carries no resolved target_fqn.
+      // Previously the PG repository dropped these refs entirely
+      // (guard `if (!ref.target_fqn) continue;` + NOT NULL column). After the
+      // fix (NOT NULL dropped + guards removed), the null-target reference row
+      // is retained, matching the SQLite backend which stores ref.target_fqn ?? null.
       const ir = await indexTinyAndWait(pid);
       console.log(`[N14] fixture with unresolvable import indexed → job status: ${ir.status}`);
       expect(ir.status === "completed" || ir.status === "indexed").toBe(true);
 
-      // Now exercise every symbol tool — none should 500 (PG NOT-NULL).
+      // Symbol tools must not 500 (the NOT-NULL violation is gone).
       const checks: { label: string; status: number; json: any }[] = [];
-
-      // search_definitions
       let r = await getLong(`/api/v1/symbol/definitions?projectId=${encodeURIComponent(pid)}&search=usesGhost`);
       checks.push({ label: "search_definitions", status: r.status, json: r.json });
-      // get_references (usesGhost is the symbol that uses the unresolved import)
       r = await getLong(`/api/v1/symbol/references?projectId=${encodeURIComponent(pid)}&symbolName=${encodeURIComponent("usesGhost")}`);
-      checks.push({ label: "get_references", status: r.status, json: r.json });
-      // search (semantic) — POST /api/v1/search/project (route exists at this path)
-      const searchR = await postLong("/api/v1/search/project", {
-        query: "ghost unresolvable",
-        projectId: pid,
-        maxResults: 3,
-        minScore: 0.05,
-        format: "json",
-      });
-      checks.push({ label: "search", status: searchR.status, json: searchR.json });
+      checks.push({ label: "get_references (usesGhost)", status: r.status, json: r.json });
+      // `ghost` is the unresolved-target call site — its reference row was
+      // previously dropped; it must now be retained.
+      const ghostRefs = await getLong(`/api/v1/symbol/references?projectId=${encodeURIComponent(pid)}&symbolName=${encodeURIComponent("ghost")}`);
+      checks.push({ label: "get_references (ghost)", status: ghostRefs.status, json: ghostRefs.json });
 
-      const fiveHundreds = checks.filter((c) => c.status >= 500);
       for (const c of checks) {
         console.log(`[N14] ${c.label}: status=${c.status}`);
-      }
-
-      if (fiveHundreds.length > 0) {
-        const reason = `PG NOT-NULL (or other 5xx) on unresolved import: ${JSON.stringify(fiveHundreds)}`;
-        console.log(`[N14] BUG: ${reason}`);
-        // Product bug — skip + report per contract.
-        expect.unreachable(reason);
-      }
-
-      // No 500s → assertion holds. Document the silent-drop finding.
-      for (const c of checks) {
         expect(c.status).toBeLessThan(500);
       }
+
+      // The null-target reference to `ghost` must now be present (previously
+      // silently dropped). get_references matches on symbol_name OR target_fqn,
+      // so the call-site row with symbol_name="ghost" surfaces here.
+      const ghostRefRows = ghostRefs.json?.data?.references ?? [];
       console.log(
-        `[N14] FINDING (non-blocking): unresolved-target refs are silently dropped ` +
-          `(symbol-repository-pg.ts guard \`if (!ref.target_fqn) continue;\`). ` +
-          `No 500 surfaced — schema NOT-NULL constraint held.`,
+        `[N14] get_references(ghost) returned ${ghostRefRows.length} row(s); ` +
+          `null-target retention is asserted by at least one reference surfacing.`,
       );
+      expect(ghostRefRows.length).toBeGreaterThan(0);
     },
     600_000,
   );

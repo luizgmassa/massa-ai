@@ -9,12 +9,15 @@
  * e2e-th0th- prefix and reset in afterAll.
  *
  * KNOWN PRODUCT LIMITATIONS (asserted defensively, not worked around):
- *  - Async job tracker (indexJobTracker) does not reliably reach a terminal
- *    state: the ETL writes data fully but progress events stall early and
- *    setResult() is frequently never reached. We determine "indexed" from the
- *    DATA PLANE (/project/list documentCount, search hits, symbol defs) rather
- *    than the job-tracker `status`. The tracker's progress OBJECT SHAPE is
- *    still asserted in F8.
+ *  - Job-tracker terminal-state contract (Batch D fix): indexJobTracker now
+ *    reliably reaches completed/failed once the ETL resolves (pipeline emits a
+ *    belt-and-suspenders setResult, non-terminal jobs are never evicted, and
+ *    durable-store write failures are logged). F9b asserts this. The DATA-PLANE
+ *    isSearchable probe (/project/list documentCount, search hits, symbol defs)
+ *    remains the AUTHORITATIVE "indexed" check because an OOM crash mid-flight
+ *    can still leave a job that never resolves — see the shared-index strategy
+ *    residual in COVERAGE.md. The tracker's progress OBJECT SHAPE is asserted
+ *    in F8.
  *  - SearchProjectTool defaults to format:"toon" → the HTTP body is
  *    {success:true, data:"<string>"}; we pass format:"json" so data.results is
  *    a real array we can count.
@@ -286,6 +289,45 @@ describe.skipIf(!READY)("T2 indexing & project lifecycle", () => {
   );
 
   test(
+    "F9b: index_status reaches a TERMINAL state (completed/failed) after a real index job — job-tracker contract",
+    async () => {
+      // Job-tracker reliability contract (Batch D): once the ETL has finished
+      // (the data plane already settled in beforeAll via awaitIndexedData), the
+      // tracker MUST surface a terminal status — not stay pinned at "running".
+      // This is independent of the isSearchable data-plane probe (F10), which
+      // remains the authoritative "indexed" check. Here we assert the
+      // job-tracker state machine specifically.
+      expect(primaryJobId).toEqual(expect.any(String));
+
+      const terminal = await pollUntil(
+        async () => {
+          const s = await httpGet<any>(
+            `/api/v1/project/index/status/${primaryJobId}`,
+          );
+          const status = s?.data?.status;
+          if (status === "completed" || status === "failed") return true;
+          return false;
+        },
+        { timeoutMs: 60_000, intervalMs: 3_000 },
+      );
+
+      expect(terminal).toBe(true);
+
+      const s = await httpGet<any>(
+        `/api/v1/project/index/status/${primaryJobId}`,
+      );
+      expect(["completed", "failed"]).toContain(s?.data?.status);
+      // On a successful terminal, percentage must be 100 and/or completedAt set.
+      if (s?.data?.status === "completed") {
+        const pct = s?.data?.progress?.percentage;
+        const completedAt = s?.data?.completedAt;
+        expect(pct === 100 || completedAt != null).toBe(true);
+      }
+    },
+    90_000,
+  );
+
+  test(
     "F10: indexed data is searchable (data-plane completion proof)",
     async () => {
       // Search embeds the query through qwen3-embedding:8b (~tens of seconds
@@ -440,40 +482,29 @@ describe.skipIf(!READY)("T2 indexing & project lifecycle", () => {
   );
 
   test(
-    "matrix: reindex returns {success} on both transports (shape only)",
+    "matrix: reindex via MCP returns {success:true} + jobId (functional POST with projectPath)",
     async () => {
-      // Start a reindex to capture the HTTP envelope, then await its settle so
-      // we don't leave a zombie ETL wedging Ollama.
-      const httpR = await httpPost<any>(
-        `/api/v1/workspace/${encodeURIComponent(PID)}/reindex`,
-        { projectPath: PROJECT_PATH },
-      );
-      expect(httpR?.success).toBe(true);
-
+      // MCP reindex tool now posts {id, projectPath} — the proxy substitutes
+      // :id and the route's t.Object({projectPath}) body is satisfied. Assert
+      // a real reindex result (success + a jobId), then await settle so the
+      // background ETL is finished before later tests.
       const fresh = await startMcp();
       let mcpR: any;
       try {
-        // MCP reindex tool posts {id, forceReindex} but the HTTP route requires
-        // projectPath → the proxy surfaces a validation-error envelope. We do
-        // NOT fire it (that would 422 and leave no zombie, but it also doesn't
-        // exercise the operation). Instead assert the HTTP leg succeeded and
-        // that the MCP tool is at least advertised with a boolean envelope by
-        // sending a deliberately minimal call.
-        try {
-          mcpR = await mcpCall(fresh.client, "reindex", {
-            id: PID,
-            forceReindex: false,
-          });
-        } catch (e) {
-          mcpR = { success: false, error: String((e as Error).message) };
-        }
+        mcpR = await mcpCall(fresh.client, "reindex", {
+          id: PID,
+          projectPath: PROJECT_PATH,
+        });
       } finally {
         await fresh.stop();
       }
 
-      expect(typeof mcpR?.success).toBe("boolean");
-      // Await the HTTP-triggered reindex so Ollama is free for F14.
-      await awaitIndexedData(PID, { timeoutMs: 420_000 });
+      expect(mcpR?.success).toBe(true);
+      expect(mcpR?.data?.jobId).toEqual(expect.any(String));
+
+      // Await the MCP-triggered reindex so Ollama is free for F14.
+      const docs = await awaitIndexedData(PID, { timeoutMs: 420_000 });
+      expect(docs).toBeGreaterThan(0);
     },
     480_000,
   );

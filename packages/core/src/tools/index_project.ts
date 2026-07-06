@@ -193,7 +193,15 @@ export class IndexProjectTool implements IToolHandler {
         logger.info("Cache warmup completed", { jobId, projectId, ...warmupStats });
       }
 
-      // Mark job complete
+      // Mark job complete. Emit 100% progress immediately before the terminal
+      // transition so any poller that reads progress atomically with status sees
+      // a consistent completed+100% shape (the pipeline also emits this; this is
+      // belt-and-suspenders in case the pipeline path changes).
+      indexJobTracker.updateProgress(
+        jobId,
+        etlResult.filesIndexed,
+        etlResult.filesIndexed,
+      );
       indexJobTracker.setResult(jobId, {
         filesIndexed: etlResult.filesIndexed,
         chunksIndexed: etlResult.chunksIndexed,

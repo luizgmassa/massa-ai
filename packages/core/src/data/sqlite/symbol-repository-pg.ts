@@ -178,7 +178,7 @@ interface RefRaw {
   from_file: string;
   from_line: number;
   symbol_name: string;
-  target_fqn: string;
+  target_fqn: string | null;
   ref_kind: string;
 }
 
@@ -189,7 +189,7 @@ function mapRef(r: RefRaw): SymbolReference {
     from_file: r.from_file,
     from_line: Number(r.from_line),
     symbol_name: r.symbol_name,
-    target_fqn: r.target_fqn,
+    target_fqn: r.target_fqn ?? undefined,
     ref_kind: r.ref_kind as RefKind,
   };
 }
@@ -390,9 +390,11 @@ export class SymbolRepositoryPg {
     kinds?: SymbolKind[],
     exportedOnly?: boolean,
     limit: number = 20,
+    filePath?: string,
   ): Promise<SymbolDefinition[]> {
     const p = getPrismaClient();
-    // Build dynamic WHERE clauses via raw SQL
+    // Build dynamic WHERE clauses via raw SQL. Each optional filter uses the
+    // same null-guard idiom (mirrors the SQLite listDefinitions reference impl).
     const kindList = kinds && kinds.length > 0 ? kinds : null;
     const rows = await p.$queryRaw<DefRaw[]>`
       SELECT * FROM symbol_definitions
@@ -400,6 +402,7 @@ export class SymbolRepositoryPg {
         AND (${query ?? null}::text IS NULL OR name ILIKE ${"%" + (query ?? "") + "%"})
         AND (${kindList}::text[] IS NULL OR kind = ANY(${kindList}::text[]))
         AND (${exportedOnly ?? false} = false OR exported = true)
+        AND (${filePath ?? null}::text IS NULL OR file_path = ${filePath ?? ""})
       ORDER BY name ASC
       LIMIT ${limit}
     `;
@@ -617,10 +620,9 @@ export class SymbolRepositoryPg {
     const p = getPrismaClient();
     await p.$transaction(async (tx) => {
       for (const ref of refs) {
-        if (!ref.target_fqn) continue;
         await tx.$executeRaw`
           INSERT INTO symbol_references (project_id, from_file, from_line, symbol_name, target_fqn, ref_kind)
-          VALUES (${ref.project_id}, ${ref.from_file}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn}, ${ref.ref_kind})
+          VALUES (${ref.project_id}, ${ref.from_file}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn ?? null}, ${ref.ref_kind})
         `;
       }
     });
@@ -672,10 +674,9 @@ export class SymbolRepositoryPg {
       }
 
       for (const ref of refs) {
-        if (!ref.target_fqn) continue;
         await tx.$executeRaw`
           INSERT INTO symbol_references (project_id, from_file, from_line, symbol_name, target_fqn, ref_kind)
-          VALUES (${projectId}, ${filePath}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn}, ${ref.ref_kind})
+          VALUES (${projectId}, ${filePath}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn ?? null}, ${ref.ref_kind})
         `;
       }
 
@@ -767,18 +768,20 @@ export class SymbolRepositoryPg {
   async listDefinitions(
     projectId: string,
     opts: {
-      query?: string;
-      kinds?: SymbolKind[];
+      search?: string;
+      kind?: string[];
+      file?: string;
       exportedOnly?: boolean;
       limit?: number;
     } = {},
   ): Promise<SymbolDefinition[]> {
     return this.searchDefinitions(
       projectId,
-      opts.query,
-      opts.kinds,
+      opts.search,
+      opts.kind as SymbolKind[] | undefined,
       opts.exportedOnly,
       opts.limit ?? 100,
+      opts.file,
     );
   }
 

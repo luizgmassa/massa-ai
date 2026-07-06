@@ -746,7 +746,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         agentId: { type: "string", description: "Stable agent identifier", default: "claude-code" },
         workspaceId: { type: "string", description: "Project ID this session is scoped to" },
         taskContext: { type: "string", description: "One-sentence description of the current task" },
-        ttlMs: { type: "number", description: "Session TTL in ms (default: 15 min)", default: 900000 },
+        ttlMs: { type: "number", description: "Session TTL in ms (default: 1h)", default: 3600000 },
       },
       required: [],
     },
@@ -760,9 +760,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       type: "object",
       properties: {
         id: { type: "string", description: "Session ID from synapse_session" },
-        results: { type: "array", description: "Search results to seed into the buffer", items: { type: "object" } },
+        entries: { type: "array", description: "Search results to seed into the buffer", items: { type: "object" } },
       },
-      required: ["id", "results"],
+      required: ["id", "entries"],
     },
   },
   {
@@ -775,9 +775,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       properties: {
         id: { type: "string", description: "Session ID" },
         memoryId: { type: "string", description: "Chunk ID that was accessed" },
-        filePath: { type: "string", description: "File path that was accessed" },
       },
-      required: ["id"],
+      required: ["id", "memoryId"],
     },
   },
   {
@@ -815,16 +814,16 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: "reindex",
-    description: "Force full reindex of a project workspace. Use when autoReindex (configurable via search.autoReindexMaxFiles, default 200) is insufficient after a large refactor.",
+    description: "Force full reindex of a project workspace. Use when autoReindex (configurable via search.autoReindexMaxFiles, default 200) is insufficient after a large refactor. Requires the project's absolute path.",
     apiEndpoint: "/api/v1/workspace/:id/reindex",
     apiMethod: "POST",
     inputSchema: {
       type: "object",
       properties: {
         id: { type: "string", description: "Project ID" },
-        forceReindex: { type: "boolean", default: false },
+        projectPath: { type: "string", description: "Absolute path to project directory" },
       },
-      required: ["id"],
+      required: ["id", "projectPath"],
     },
   },
   {

@@ -6,6 +6,7 @@
  */
 
 import { randomUUID } from "crypto";
+import { logger } from "@massa-th0th/shared";
 import type { JobStore } from "./index-job-store.js";
 
 export interface IndexJob {
@@ -158,7 +159,17 @@ export class IndexJobTracker {
     }
 
     job.completedAt = new Date();
-    try { this.store?.save(job); } catch { /* best-effort */ }
+    try {
+      this.store?.save(job);
+    } catch (err) {
+      // Surfacing (not rethrowing): a silent catch here hides the fact that
+      // the durable job store never recorded completion, so a caller polling
+      // via the durable path would see the job stuck in "running".
+      logger.warn(
+        `indexJobTracker: job store write failed for ${jobId} on setResult`,
+        { jobId, error: (err as Error)?.message ?? String(err) },
+      );
+    }
   }
 
   /**
@@ -178,14 +189,45 @@ export class IndexJobTracker {
   }
 
   /**
-   * Clean up old completed jobs (keep last MAX_JOBS)
+   * Clean up old jobs (keep last MAX_JOBS).
+   *
+   * Never evict a non-terminal (pending/running) job: a long-running
+   * full-repo index can be dropped before the caller polls, making the job
+   * appear to never reach a terminal state. Only terminal (completed/failed)
+   * jobs are evictable; the oldest terminal job is dropped first. If the cap
+   * can only be met by dropping a non-terminal job (pathological case: more
+   * than MAX_JOBS in-flight jobs at once), the OLDEST non-terminal job is
+   * dropped as an absolute last resort with a warning.
    */
   private cleanupOldJobs(): void {
-    const jobs = this.listJobs();
-    
-    if (jobs.length > this.MAX_JOBS) {
-      const toRemove = jobs.slice(this.MAX_JOBS);
-      toRemove.forEach((job) => this.jobs.delete(job.jobId));
+    const jobs = this.listJobs(); // newest-first by createdAt
+    if (jobs.length <= this.MAX_JOBS) return;
+
+    const isTerminal = (j: IndexJob) =>
+      j.status === "completed" || j.status === "failed";
+
+    // Drop oldest terminal jobs first (jobs is newest-first → last = oldest).
+    const terminalOld = jobs
+      .filter(isTerminal)
+      .slice(this.MAX_JOBS) // beyond the cap, oldest terminal first
+      .reverse(); // oldest-first for readability of eviction order
+    for (const job of terminalOld) {
+      this.jobs.delete(job.jobId);
+    }
+
+    // Recompute; if still over cap, evict oldest non-terminal as last resort.
+    if (this.jobs.size > this.MAX_JOBS) {
+      const remaining = this.listJobs();
+      const survivors = remaining.slice(0, this.MAX_JOBS);
+      const overflow = remaining.slice(this.MAX_JOBS); // oldest non-terminal
+      for (const job of overflow) {
+        logger.warn(
+          `indexJobTracker: evicting non-terminal job ${job.jobId} (status=${job.status}) to honor MAX_JOBS cap — caller may lose visibility`,
+          { jobId: job.jobId, projectId: job.projectId, status: job.status },
+        );
+        this.jobs.delete(job.jobId);
+      }
+      void survivors; // survivors remain in this.jobs untouched
     }
   }
 

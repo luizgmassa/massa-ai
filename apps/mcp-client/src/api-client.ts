@@ -22,7 +22,7 @@ export class ApiClient {
     this.baseUrl =
       config?.baseUrl || process.env.MASSA_TH0TH_API_URL || "http://localhost:3333";
     this.apiKey = config?.apiKey || process.env.MASSA_TH0TH_API_KEY || "";
-    this.timeoutMs = config?.timeoutMs || 30000;
+    this.timeoutMs = config?.timeoutMs || Number(process.env.MASSA_TH0TH_PROXY_TIMEOUT_MS) || 120000;
     this.maxRetries = config?.maxRetries || 2;
   }
 

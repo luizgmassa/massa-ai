@@ -159,6 +159,19 @@ export class EtlPipeline {
         durationMs,
       });
 
+      // Belt-and-suspenders terminal signal: mark the job completed the moment
+      // the pipeline resolves, independent of the caller's warmup path (which
+      // may OOM or hang before reaching its own setResult). Idempotent —
+      // setResult overwrites status/result. updateProgress first so percentage
+      // is recorded at 100 before the terminal transition.
+      indexJobTracker.updateProgress(jobId, result.filesIndexed, result.filesIndexed);
+      indexJobTracker.setResult(jobId, {
+        filesIndexed: result.filesIndexed,
+        chunksIndexed: result.chunksIndexed,
+        errors: result.errors,
+        duration: durationMs,
+      });
+
       logger.info("EtlPipeline: run completed", { projectId, jobId, ...result });
       return result;
     } catch (err) {
@@ -166,6 +179,16 @@ export class EtlPipeline {
       const error = (err as Error).message;
 
       eventBus.publish("indexing:failed", { jobId, projectId, error, durationMs });
+
+      // Belt-and-suspenders terminal signal on failure: mark the job failed so
+      // a poller sees a terminal state rather than a stuck "running". Idempotent
+      // — the caller may also call setResult with the error; last write wins.
+      indexJobTracker.setResult(
+        jobId,
+        { filesIndexed: 0, chunksIndexed: 0, errors: 1, duration: durationMs },
+        error,
+      );
+
       logger.error("EtlPipeline: run failed", err as Error, { projectId, jobId, durationMs });
       throw err;
     }

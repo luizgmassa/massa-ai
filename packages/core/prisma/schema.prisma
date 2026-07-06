@@ -194,7 +194,7 @@ model SymbolReference {
   fromFile   String @map("from_file")
   fromLine   Int    @map("from_line")
   symbolName String @map("symbol_name")
-  targetFqn  String @map("target_fqn") // NOT NULL: reference without FQN is invalid
+  targetFqn  String? @map("target_fqn") // nullable: unresolved-target refs are retained (SQLite parity)
   refKind    String @map("ref_kind") // call, type_ref, import, extend, implement
 
   workspace Workspace @relation(fields: [projectId], references: [projectId], onDelete: Cascade)
