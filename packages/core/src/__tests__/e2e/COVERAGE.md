@@ -386,18 +386,16 @@ confirming the fresh `@massa-th0th/core` dist is served. Server-side fixes #5,
 BUG-SYN-4/1/2/3, #10, #12 — take effect for any host that rebuilds + relaunches
 the MCP client.)
 
-**⚠️ #14 migration NOT applied to the shared DB — code/DB mismatch (fix ASAP).**
-The shared `massa_th0th` DB still has `symbol_references.target_fqn` **NOT NULL**
-(`_prisma_migrations` has 0 rows for `…target_fqn…`). The restarted API now runs
-the #14 code (the two `if (!ref.target_fqn) continue;` guards are removed and
-the INSERT binds `target_fqn ?? null`), so any re-index of a file containing an
-unresolved-target reference will hit a `NOT NULL constraint violation` on
-`target_fqn` and fail that symbol write. The app does **not** auto-migrate on
-boot (a bare restart does not apply migrations). **Action:** apply the migration
-to the shared DB —
-`DATABASE_URL='postgresql://…massa_th0th' bunx prisma migrate deploy --schema packages/core/prisma/schema.prisma`
-(or the repo's migrate step) — before re-indexing anything with unresolved
-imports. Until then, indexing on the shared stack is at risk.
+**✅ #14 migration applied to the shared DB (2026-07-06).** Migration
+`20260706105826_drop_symbol_refs_target_fqn_not_null` is now applied to the
+shared `massa_th0th` DB — `symbol_references.target_fqn` is nullable (`YES`) and
+the row is recorded in `_prisma_migrations`. The earlier code/DB mismatch (code
+live, constraint still NOT NULL) is resolved; re-indexing files with unresolved
+imports no longer risks a NOT NULL violation. Applied via the repo-local prisma
+(run from `packages/core/` so `prisma.config.ts` loads the root `.env` — note:
+`bunx prisma` resolves a broken global `~/node_modules/prisma`, so use
+`packages/core/node_modules/.bin/prisma migrate deploy`). The app does not
+auto-migrate on boot; migrations must be applied explicitly after each deploy.
 
 **#12 (MCP `bootstrap` proxy-timeout) — live-verify still deferred.** Client
 timeout budget raised + env-tunable (`MASSA_TH0TH_PROXY_TIMEOUT_MS`, 120 s
@@ -432,4 +430,5 @@ full suite on a memory-constrained box still OOMs.
 `20260706105826_drop_symbol_refs_target_fqn_not_null/` + this COVERAGE update.
 `packages/core/dist` and `apps/mcp-client/dist` are rebuilt locally but
 **gitignored** (build artifacts — not in the commit; each deploy rebuilds them).
-**Reminder:** migration #14 still needs applying to the shared DB (see above).
+Migration #14 has been applied to the shared DB; **all 11 fixes are now fully
+live on `:3333`** (code + DB schema aligned).
