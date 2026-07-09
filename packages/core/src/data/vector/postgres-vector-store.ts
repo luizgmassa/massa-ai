@@ -678,8 +678,16 @@ export class PostgresVectorStore extends BaseVectorStore {
 
   // ── Misc ───────────────────────────────────────────────────────────────────
 
+  /**
+   * Get or create a collection (for IVectorStore interface compatibility).
+   *
+   * Mirrors SQLiteVectorStore.getCollection semantics: returns a handle bound
+   * to this store's pool/table that scopes read/write by `name` (the projectId).
+   * IndexManager uses this for _metadata document lookup/persistence.
+   */
   async getCollection(name: string): Promise<IVectorCollection> {
-    throw new Error('getCollection not implemented for PostgresVectorStore');
+    const pool = await this.ensureInitialized();
+    return new PostgresVectorCollection(pool, name, this.tableName, this);
   }
 
   async healthCheck(): Promise<boolean> {
@@ -698,6 +706,179 @@ export class PostgresVectorStore extends BaseVectorStore {
       this.pool = null;
       this.initialized = false;
       logger.info('PostgresVectorStore closed');
+    }
+  }
+
+  // ── Package-internal accessors for PostgresVectorCollection ─────────────────
+
+  /** Embedding dimensions declared by the table schema, or null if unknown. */
+  getSchemaDimensions(): number | null {
+    return this.schemaDimensions;
+  }
+
+  /** True when the table has the embedding_bq column + index. */
+  isBqEnabled(): boolean {
+    return this.bqEnabled;
+  }
+
+  /** Encode a float embedding to a pgvector bit-string (binary quantization). */
+  toBitString(embedding: number[]): string {
+    return this.floatsToBit(embedding);
+  }
+
+  /** Batch-embed texts via the shared provider (exposed for the collection). */
+  async embedBatchPublic(contents: string[]): Promise<number[][]> {
+    return this.embedBatch(contents);
+  }
+}
+
+/**
+ * PostgreSQL Vector Collection implementation.
+ *
+ * Mirrors SQLiteVectorCollection semantics so IndexManager (the only caller of
+ * getCollection) works identically across backends. Scopes all read/write by
+ * `name` (the projectId). `query` supports the `where.id` fast path used for
+ * _metadata document lookup; `add` embeds content on demand when no embedding
+ * is supplied.
+ */
+class PostgresVectorCollection implements IVectorCollection {
+  constructor(
+    private pool: Pool,
+    public name: string,
+    private tableName: string,
+    private store: PostgresVectorStore,
+  ) {}
+
+  async count(): Promise<number> {
+    const { rows } = await this.pool.query(
+      `SELECT COUNT(*)::int AS count FROM ${this.tableName} WHERE project_id = $1`,
+      [this.name],
+    );
+    return rows[0]?.count || 0;
+  }
+
+  async query(params: any): Promise<SearchResult[]> {
+    const nResults = params?.nResults || 10;
+    const whereId = params?.where?.id as string | undefined;
+
+    // Fast path used by IndexManager for metadata lookup
+    if (whereId) {
+      const { rows } = await this.pool.query(
+        `SELECT id, content, metadata
+         FROM ${this.tableName}
+         WHERE project_id = $1 AND id = $2
+         LIMIT $3`,
+        [this.name, whereId, nResults],
+      );
+
+      return rows.map((row: any) => ({
+        id: row.id,
+        content: row.content,
+        score: 1,
+        source: SearchSource.VECTOR,
+        metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata || '{}') : (row.metadata ?? {}),
+      }));
+    }
+
+    // Fallback: simple project-scoped fetch
+    const { rows } = await this.pool.query(
+      `SELECT id, content, metadata
+       FROM ${this.tableName}
+       WHERE project_id = $1
+       ORDER BY updated_at DESC
+       LIMIT $2`,
+      [this.name, nResults],
+    );
+
+    return rows.map((row: any) => ({
+      id: row.id,
+      content: row.content,
+      score: 1,
+      source: SearchSource.VECTOR,
+      metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata || '{}') : (row.metadata ?? {}),
+    }));
+  }
+
+  async add(documents: VectorDocument[]): Promise<void> {
+    if (!documents.length) return;
+
+    // Embed any documents that arrived without a pre-computed embedding.
+    const needsEmbedding = documents.filter((d) => !d.embedding);
+    if (needsEmbedding.length > 0) {
+      const embeddings = await this.store.embedBatchPublic(
+        needsEmbedding.map((d) => d.content),
+      );
+      needsEmbedding.forEach((d, i) => {
+        d.embedding = embeddings[i];
+      });
+    }
+
+    const schemaDims = this.store.getSchemaDimensions();
+    const bqEnabled = this.store.isBqEnabled();
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      for (const doc of documents) {
+        const embedding = doc.embedding!;
+        const projectId = (doc.metadata?.projectId as string) || this.name;
+
+        if (schemaDims && embedding.length !== schemaDims) {
+          throw new Error(
+            `Embedding dimension mismatch: got ${embedding.length}, expected ${schemaDims}`,
+          );
+        }
+
+        const vectorString = `[${embedding.join(',')}]`;
+
+        if (bqEnabled) {
+          const bqString = this.store.toBitString(embedding);
+          await client.query(
+            `INSERT INTO ${this.tableName} (id, project_id, content, metadata, embedding, embedding_bq)
+             VALUES ($1, $2, $3, $4, $5::vector, $6::bit(${schemaDims}))
+             ON CONFLICT (id) DO UPDATE SET
+               content = EXCLUDED.content,
+               metadata = EXCLUDED.metadata,
+               embedding = EXCLUDED.embedding,
+               embedding_bq = EXCLUDED.embedding_bq,
+               updated_at = NOW()`,
+            [doc.id, projectId, doc.content, JSON.stringify(doc.metadata ?? {}), vectorString, bqString],
+          );
+        } else {
+          await client.query(
+            `INSERT INTO ${this.tableName} (id, project_id, content, metadata, embedding)
+             VALUES ($1, $2, $3, $4, $5::vector)
+             ON CONFLICT (id) DO UPDATE SET
+               content = EXCLUDED.content,
+               metadata = EXCLUDED.metadata,
+               embedding = EXCLUDED.embedding,
+               updated_at = NOW()`,
+            [doc.id, projectId, doc.content, JSON.stringify(doc.metadata ?? {}), vectorString],
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async delete(ids: string[]): Promise<void> {
+    if (!ids.length) return;
+    const client = await this.pool.connect();
+    try {
+      for (const id of ids) {
+        await client.query(
+          `DELETE FROM ${this.tableName} WHERE id = $1 AND project_id = $2`,
+          [id, this.name],
+        );
+      }
+    } finally {
+      client.release();
     }
   }
 }
