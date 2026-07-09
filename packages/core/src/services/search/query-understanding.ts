@@ -41,12 +41,12 @@ export type QueryRewrite = z.infer<typeof QueryRewriteSchema>;
 export interface QueryLlmSurface {
   complete(
     prompt: string,
-    opts?: { system?: string; timeoutMs?: number },
+    opts?: { system?: string; timeoutMs?: number; modelRole?: "instruct" | "code" },
   ): Promise<{ ok: boolean; value?: string; error?: string }>;
   object<T>(
     prompt: string,
     schema: z.ZodSchema<T>,
-    opts?: { system?: string; timeoutMs?: number },
+    opts?: { system?: string; timeoutMs?: number; modelRole?: "instruct" | "code" },
   ): Promise<{ ok: boolean; value?: T; error?: string }>;
   isEnabled(): boolean;
 }

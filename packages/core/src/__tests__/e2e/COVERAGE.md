@@ -524,68 +524,204 @@ toon=string/json=object; dedicated-vector boot refuses; PG `index_jobs` 42
 completed / 0 failed (no spurious reaper kills). Unit aggregate 39 pass (A 15 +
 D-pg 17 + D-sqlite 7) + C 11.
 
-### Side findings / possible bugs (OPEN — follow-ups, not blockers for this rollout)
+### Side-findings follow-up rollouts (2026-07-09) — 9 of 10 RESOLVED
 
-- **[med] `th0th_compress` still burns the full 90 s timeout (distinct from
-  the structured-output fix in A).** During `05.memory` / `11.lifecycle` runs
-  the tools-api log emits recurring
-  `[WARN] llmComplete failed — degrading to non-LLM path {"error":"The operation timed out."}`
-  ~every 90 s. Root cause: compress
-  (`packages/core/src/services/compression/code-compressor.ts:103` →
-  `llm-client.ts` `llmComplete`) sends **large code-context prompts**; qwen3.5:9b
-  thinking on big input exceeds the 90 s **wall-clock** budget —
-  `AbortSignal.timeout(90000)` fires before any response returns. Fix A's
-  reasoning-channel recovery CANNOT help here (it only fires on a *returned*
-  empty-content response, not a hard timeout with no response). Impact:
-  compress silently degrades to regex → latency + quality leak, not correctness
-  (still returns a value). Levers: separate compress timeout knob
-  (`COMPRESSION_LLM_TIMEOUT_MS` > 90 s), shrink compress input chunks, or route
-  compress to a non-thinking model (disable-thinking was proven ineffective for
-  this SDK path in A, so a model swap is the real lever). (Found in verify.)
+Two more serial sub-agent rollouts closed 9 of the 10 items that were OPEN
+after the A–E pass (only the `adsads/` junk-path item remains deferred). Each
+fix landed in its own isolated sub-agent against the live `:3333` / real-PG
+stack; a final verify sub-agent re-ran the cross-cutting E2E sweep + targeted
+probes after each rollout.
+
+**Rollout 4 — model-swap + follow-ups (T1–T6):** closed the 7 non-deferred
+OPEN items.
+
+- **[med→FIXED] `th0th_compress` 90 s timeout (T4).** Root fix = swap the
+  structured-output default away from the thinking model. Default is now
+  `qwen2.5:7b-instruct` (pure instruct, non-thinking); a new **per-task model
+  routing** sends the 3 code-oriented sites (bootstrap `SeedMemoriesSchema`,
+  reranker, `code-compressor`) to a configurable coder model
+  `qwen2.5-coder:7b`, while the 8 NL-judgment sites keep the instruct model.
+  Non-thinking finishes in ~5 s on big code prompts → the recurring
+  `[WARN] llmComplete failed — degrading` every 90 s is GONE (0 occurrences
+  post-swap); compress now uses the LLM path (`compressionSource:"llm"`), not
+  regex. See the model-selection analysis below (now IMPLEMENTED).
+- **[low→FIXED] `read_file` relative path vs cwd (T3).** When `projectId` is
+  absent AND `filePath` is relative, `read_file.ts` `resolveFilePath` now
+  returns a clear error instead of guessing `process.cwd()` (`"Relative
+  filePath requires a projectId ... or an absolute path."`). Absolute paths and
+  the projectId path are unchanged. New unit test `read-file.test.ts` (3 pass).
+- **[low→FIXED] `Number(env) || fallback` falsy-0 in two more places (T1).**
+  `embeddings/config.ts` (`getRateLimits`/`getMaxChars`: rpm/tpm/rpd/batchSize/
+  batchDelay/maxChars) and `vector-store-factory.ts` (HNSW/IVFFLAT) migrated to
+  `parsePositiveIntEnv`; `batchDelayMs` uses `{allowZero:true}`. New
+  `embeddings-config.test.ts` (7 pass).
+- **[low→FIXED] hardcoded `qwen3.5:9b` fallback literal (T4).** New shared
+  constants `DEFAULT_LLM_MODEL` (`qwen2.5:7b-instruct`) + `DEFAULT_LLM_CODE_MODEL`
+  (`qwen2.5-coder:7b`) in `packages/shared/src/config/index.ts`;
+  `getLlmConfig()` fallback imports the constant (0 bare literals in source).
+  Adds a `codeModel` config field + `RLM_LLM_CODE_MODEL` env knob.
+- **[NOTE→FIXED] `markStaleRunningFailed` mirror-count vs rowCount (T2).**
+  `index-job-store-pg.ts` now captures the `$executeRaw` result and logs the
+  true flipped count (`flipped: result`), mirroring `ensureHydrated()`. The
+  sync `(): number` signature + mirror-snapshot return are preserved (no caller
+  depends on the number). `index-job-store-pg.test.ts` 18 pass.
+- **[NOTE→FIXED] Responses-API silent degrade (T4).** `llm-client.ts` now emits
+  `logger.warn("llm reasoning-recovery empty", ...)` when the
+  reasoning-recovery path is attempted but yields empty — a future Ollama
+  Responses-API shape shift is now observable instead of silent. Dormant under
+  the non-thinking default (safety net).
+- **[NOTE→FIXED] `packages/shared` tsconfig/test symmetry (T5).** Added
+  `@types/bun` devDep + `"test":"bun test"` script to
+  `packages/shared/package.json` (runner parity with core/mcp-client; the
+  forward-looking NOTE's guard is now concrete).
+
+**Rollout 4 verify:** rebuilt shared/core/tools-api/mcp-client, restarted
+`:3333`. E2E 02.indexing 19/0, 05.memory 25/0 (LLM paths green), 08.search
+36/0, 11.lifecycle 20/2 (bootstrap seed via `qwen2.5-coder:7b` succeeded),
+12.observability 24/1, 14.needles 0.500/0.786/0.604 (unchanged), 15.nfr 10/2/0.
+0 LLM errors/timeouts in the log. Unit aggregate 66 pass / 0 fail.
+
+**Rollout 5 — `read_file` cache-key + `@types/bun` align:** closed the 2
+side-findings surfaced by Rollout 4's verify.
+
+- **[med→FIXED] `read_file` cache-key ignored option flags.**
+  `readFileWithCache` keyed its cache on `filePath` only, so a later read of
+  the same file with different `includeSymbols`/`includeImports` got stale,
+  options-baked metadata — the only e2e red (`08.search` **F33** failed
+  in-suite, passed isolated). The key now serializes `{ filePath,
+  includeSymbols, includeImports, projectId, relativePath }` (deliberately
+  excludes offset/limit/lineStart/lineEnd/compress/targetRatio/format — those
+  are applied post-cache in `handle()`). New `read-file.test.ts` regression
+  (injects a stub `SymbolGraphService`, else it passes vacuously; 4 pass); F33
+  green in-suite.
+- **[low→FIXED] `@types/bun` skew.** `packages/shared` + `packages/core`
+  bumped `^1.3.8 → ^1.3.9` (matches `apps/mcp-client`); bun.lock resolves all
+  three to `1.3.14` (manifest-only, no-op re-resolution).
+
+**Rollout 5 verify:** full rebuild + restart; 08.search 36/0/0 (F33 green),
+05.memory 25/0, 11.lifecycle 20/2; unit 67 pass / 0 fail; both per-finding
+probes PASS.
+
+### Still OPEN (follow-ups)
+
 - **[med] `adsads/` junk path indexed in `e2e-th0th-shared`** — needle N11's
   top hit is `adsads/packages/core/src/services/etl/stage-context.ts`. A
-  stray/typo'd directory was indexed into the shared project. Audit the
-  indexed file list / `projectPath` and drop the junk prefix. (Deferred by
-  request this rollout.)
-- **[low] `read_file` relative `filePath` resolves against the API cwd, not
-  the repo root.** When a caller omits `projectId`, `read_file.ts` resolves
-  relative paths against the tools-api process cwd (`apps/tools-api/`), so a
-  relative `filePath: "packages/core/src/..."` 404s via the HTTP route. The e2e
-  suite sidesteps by always passing `projectId` (handler then resolves via the
-  workspace `project_path`). External HTTP callers hitting `/api/v1/file/read`
-  without `projectId` + a relative path hit this. Fix: resolve relative to repo
-  root when no `projectId`, or require absolute paths + document it. (Found in B.)
-- **[low] `Number(env) || fallback` falsy-`0` idiom survives in two more
-  places C did not touch.** (a) `packages/core/src/services/embeddings/config.ts:40-49,67-68`
-  — RPM/TPM/batch-size/max-chars knobs; literal `0` silently takes the fallback.
-  Low impact (throughput caps; 0 nonsensical). (b)
-  `packages/core/src/data/vector/vector-store-factory.ts:93-95` — `POSTGRES_HNSW_M`
-  etc. use bare `Number(env)` then truthy-gate via `if (hnswM)`, so `0`/`NaN`
-  are silently dropped (arguably correct here, but inconsistent now that
-  `parsePositiveIntEnv` exists). Fix: migrate both to the C helper. (Found in C.)
-- **[low] `llm-client.ts:67` hardcodes the `qwen3.5:9b` fallback string** —
-  `cfg?.model ?? "qwen3.5:9b"` in `getLlmConfig()`. Consistent with the current
-  config default, but if the default model ever changes in `config/index.ts:412`/
-  `:488`, this stale literal stays. Drift risk. Fix: derive the fallback from a
-  single shared constant. (Found in A.)
-- **[NOTE] `markStaleRunningFailed` returns the mirror-snapshot count, not the
-  actual UPDATE `rowCount`** (`index-job-store-pg.ts`). After D, this is now an
-  over-estimate in mixed fresh/stale scenarios (the mirror may hold
-  fresh-running jobs the heartbeat predicate won't flip). Fire-and-forget
-  semantics unchanged; no caller depends on the exact number. Return
-  `$executeRaw` `rowCount` if a precise count is ever needed. (Found in D.)
-- **[NOTE] Responses-API coupling in the LLM path.** qwen3.5:9b over the Vercel
-  AI SDK uses Ollama's OpenAI **Responses API** (`/responses`), not
-  `/chat/completions`; reasoning surfaces as `result.reasoning` or, on a thrown
-  `AI_NoObjectGeneratedError`, `e.response.body.output[].summary[].text`. Fix A's
-  `_reasoningToText` handles multiple shapes defensively, but if a future
-  Ollama drops/changes Responses-API support the reasoning shape shifts and the
-  helper's fallbacks would need re-validation. Non-blocking; note for any
-  Ollama upgrade. (Found in A.)
-- **[NOTE] `packages/shared` tsconfig now excludes `src/**/__tests__`** (added
-  in C, matches core's pattern) so db-guard/int-env tests don't compile into
-  dist or trigger `bun:test` type errors at build. If `packages/shared` ever
-  hosts non-excluded tests, add `bun-types` to devDeps. (Found in C.)
+  stray/typo'd directory was indexed into the shared project. Audit the indexed
+  file list / `projectPath` and drop the junk prefix. (Deferred by request
+  across both rollouts.)
+- **[low] `read_file` `fileCache` has no size cap/eviction** — only TTL (60 s).
+  An adversarial caller cycling `projectId`/`relativePath` (now part of the
+  cache key) grows the map for the process lifetime. Add an LRU / size bound.
+  (`packages/core/src/tools/read_file.ts:121`.)
+- **[low] `@types/node` major skew** — `apps/mcp-client` `^22.10.5` vs
+  `packages/core` `^25.2.2` (`packages/shared` has none). Out of scope for both
+  rollouts; align in a dedicated dependency pass.
+- **[low] `dotenv` patch + classification skew** — `packages/shared` `^17.2.3`
+  vs `packages/core` `^17.2.4`, and shared declares it a `dependency` while
+  core declares it a `devDependency`. Same dep pass.
+- **[note] dead `||` fallback** — `read_file.ts:385`
+  `cached.metadata || await extractMetadata(...)` never fires (metadata is
+  always set on write); harmless after the cache-key fix, cosmetic cleanup.
+- **[note] `e2e-th0th-shared` `vector_documents` empty on the live DB** — the
+  workspace row claims `indexed` (251 files) but `vector_documents` is 0 rows
+  (only symbol_files/search_cache survived). Vectors re-seed on demand
+  (02.indexing did so cleanly). Explains N7-class environmental fragility on a
+  cold/dedicated stack; not a correctness issue.
+
+### LLM model-selection analysis (2026-07-09, follow-up to fix A) — IMPLEMENTED 2026-07-09 (Rollout 4 / T4)
+
+**STATUS: IMPLEMENTED 2026-07-09 (Rollout 4 / T4).** Recommendation #1
+shipped: `qwen2.5:7b-instruct` is the new instruct default; the 3 code-oriented
+sites (bootstrap `SeedMemoriesSchema`, reranker, `code-compressor`) route to
+`qwen2.5-coder:7b` via per-call `modelRole` routing in `llm-client.ts`.
+Live-verified: 0 LLM timeouts in the log, compress uses the LLM path (~5 s),
+`05.memory` / `11.lifecycle` green, `14.needles` unchanged (0.500/0.786/0.604).
+The reasoning-channel recovery (fix A) stays as a dormant safety net. The
+analysis below is retained as the rationale + candidate ranking.
+
+Fix A made the thinking-model (`qwen3.5:9b`) tolerable by recovering the
+answer from the reasoning channel, but the cleaner long-term fix is to switch
+the structured-output default to a **non-thinking instruct** model. Analysis
+of whether thinking is actually needed + candidate ranking. **Not benchmarked
+on this workload** — reasoned from task shape; real tiebreak = `14.needles`
++ a consolidator/salience eval per finalist.
+
+**Does each feature need a thinking model? No.** The 11 LLM call sites are
+extraction / classification / short summarization over small input, not
+multi-step math or code synthesis. Thinking buys little and costs ~20–30 s/call
+(was 90 s pre-A). Per-feature drop estimate if switched to non-thinking:
+*minimal* — salience judge, query rewrite, HyDE, code compression (possibly
+*better* — less verbose drift); *small* — bootstrap seed, handoff summary,
+auto-improve enrich; *small* — reranker (thinking only helps on ambiguous
+ties); *small-medium* — consolidator (may miss subtle semantic dupes or merge
+non-dupes → cumulative memory pollution, the one real risk).
+
+**Capabilities massa-th0th needs:** (1) structured-output reliability (fills
+zod schema / valid JSON — all 11 sites); (2) non-thinking / pure instruct
+(avoid the reasoning-channel bug + latency); (3) Ollama-native; (4) params
+≤ ~9B (RAM parity; smaller = faster); (5) context ≥ 32K, ideally 128K
+(workspaces, consolidator batches); (6) low latency (~2–5 s target vs 20–30 s);
+(7) extraction/classification/summarization quality; (8) open-weight,
+commercial-OK license.
+
+**Ranked candidate models:**
+
+| Rank | Model | Params | Context | License | Non-thinking | Structured output | Ollama tag | Fit |
+|---|---|---|---|---|---|---|---|---|
+| #1 | Qwen2.5-7B-Instruct | 7B | 128K | Apache 2.0 | pure instruct | very strong (top small-model BFCL) | `qwen2.5:7b-instruct` | Best balance; smaller→faster; same Qwen family (prompt tuning transfers); Apache clean |
+| #2 | Llama 3.1 8B Instruct | 8B | 128K | Llama 3.1 (commercial OK, Meta caps) | pure instruct | strong (proven BFCL) | `llama3.1:8b` | Excellent instruction-following; slightly bigger; license has use-case caps |
+| #3 | Qwen3-8B (`/no_think`) | 8B | 128K | Apache 2.0 | toggle (risk) | very strong | `qwen3:8b` | Highest raw quality IF suppression holds; **caveat:** fix A showed `think:false` unreliable over the AI SDK — `/no_think` system token may differ, needs live test |
+| #4 | Ministral 8B | 8B | 128K | Mistral (commercial w/ conditions) | pure instruct | strong (function-calling focus) | `ministral` | Strong tool-calling; less community structured-output validation than Qwen |
+| #5 | Gemma 3 4B | 4B | 128K | Gemma (commercial OK) | pure instruct | good | `gemma3:4b` | Fastest + smallest RAM; lower extraction quality → consolidator/salience weaker |
+| #6 | Phi-3.5 mini | 3.8B | 128K | MIT | pure instruct | fair | `phi3.5` | Tiny + MIT; weakest instruction/structured quality → risk on consolidator/reranker |
+
+Structured-output column = reputation + search signal; BFCL V4 is live-updated
+— verify exact scores on the
+[Berkeley Function Calling Leaderboard](https://gorilla.cs.berkeley.edu/leaderboard.html).
+No fabricated numbers.
+
+**Recommendation:** #1 `qwen2.5:7b-instruct` as new structured default (pure
+instruct → fix A's reasoning-recovery goes dormant-but-harmless, bug class
+gone; smaller + Apache + 128K + same family). Configurable via existing
+`RLM_LLM_MODEL`. Cheapest experiment first (**option #0**, zero download):
+test the `/no_think` system token on the *current* `qwen3.5:9b` — if
+suppression holds over the AI SDK, keep the model and just disable thinking;
+if not, pull `qwen2.5:7b-instruct`. See also the
+[Qwen3 Ollama page](https://ollama.com/library/qwen3) and the
+[Ollama structured-outputs announcement](https://ollama.com/blog/structured-outputs)
+(Ollama supports native `format: json_schema` constrained decoding, which the
+AI SDK `generateObject` path could leverage for stricter schema adherence).
+(Analysis 2026-07-09.)
+
+**Qwen2.5-7B-Instruct vs Qwen2.5-Coder-7B — which? Pick `qwen2.5:7b-instruct`
+for the structured default.** Deciding factor = what the 11 LLM sites actually
+do: **NL judgment + extraction + schema-fill OVER code context**, not code
+generation. The model reads code but emits JSON / scores / summaries — it never
+generates code. Workload split: ~8 of 11 sites are pure-NL judgment
+(salience, consolidator, handoff, memory/observation/auto-improve jobs, query
+rewrite, HyDE); 1 reads code but judges relevance (reranker); only 1 is
+genuine code-synthesis (code-compressor).
+
+| Capability | `qwen2.5:7b-instruct` | `qwen2.5-coder:7b` |
+|---|---|---|
+| Structured output / JSON / zod schema | excellent (canonical) | very good (also instruct-tuned) |
+| Instruction-following + NL reasoning | excellent | good (weaker on pure-NL) |
+| Code understanding | good | excellent |
+| Salience / consolidator / handoff (NL memory) | better | good |
+| Query rewrite / HyDE (NL) | better | good |
+| Code compression / reranker-over-code | good | better (deeper code semantics) |
+
+For "read code → emit JSON score", instruct wins; coder's code-gen strength is
+wasted here. Recommendation: **default `qwen2.5:7b-instruct`** for all 11
+sites. **Optional per-task override:** route `code-compressor`
+(`packages/core/src/services/compression/code-compressor.ts:103`) — and
+optionally the code-over-`projectId` reranker path — to `qwen2.5-coder:7b` via
+the existing `llm-client.ts` chokepoint + config (`RLM_LLM_MODEL`, extended
+with a per-task knob). Best of both: instruct for the NL-judgment majority,
+coder for the one genuine code-synthesis path. Caveat: gap likely small
+either way (modern coder variants retain most general ability) and neither is
+benchmarked here — real pick = `14.needles` + a consolidator/salience eval + a
+code-compress eval head-to-head. (Analysis 2026-07-09.)
 
 **Committed 2026-07-09 (residual-fix rollout T1–T9b):** source/test/migration
 changes across `packages/core`, `packages/shared`, `apps/tools-api`,

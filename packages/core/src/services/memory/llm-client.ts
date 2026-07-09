@@ -17,14 +17,24 @@
 
 import { generateText, generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-import { config, logger } from "@massa-th0th/shared";
+import { config, logger, DEFAULT_LLM_MODEL } from "@massa-th0th/shared";
 import type { z } from "zod";
+
+/**
+ * Which model role a call targets. `"instruct"` (default) selects the
+ * NL/instruction model (`config.llm.model`); `"code"` selects the coder model
+ * (`config.llm.codeModel`) for code-oriented sites (bootstrap, reranker,
+ * compression). This is the per-task routing knob (COVERAGE #1/#5/#7).
+ */
+export type LlmModelRole = "instruct" | "code";
 
 export interface LlmCompleteOptions {
   /** Optional system prompt. */
   system?: string;
   /** Per-call timeout override (ms). Defaults to `config.llm.timeoutMs`. */
   timeoutMs?: number;
+  /** Model role: `"instruct"` (default) or `"code"`. */
+  modelRole?: LlmModelRole;
 }
 
 export interface LlmObjectOptions extends LlmCompleteOptions {
@@ -79,12 +89,19 @@ export function _setLlmEnabledForTesting(flag: boolean | null): void {
  */
 
 /** Read the llm config block with safe defaults (defensive against partial/missing config). */
-function getLlmConfig() {
+function getLlmConfig(opts?: { modelRole?: LlmModelRole }) {
   const cfg = config.get("llm");
+  const role = opts?.modelRole ?? "instruct";
+  // Resolve the per-call model. Instruct → `model`, code → `codeModel`. The
+  // instruct fallback uses the shared DEFAULT_LLM_MODEL constant (no bare literal).
+  const model =
+    role === "code"
+      ? cfg?.codeModel ?? cfg?.model ?? DEFAULT_LLM_MODEL
+      : cfg?.model ?? DEFAULT_LLM_MODEL;
   return {
     baseUrl: cfg?.baseUrl ?? "http://localhost:11434/v1",
     apiKey: cfg?.apiKey ?? "ollama",
-    model: cfg?.model ?? "qwen3.5:9b",
+    model,
     temperature: cfg?.temperature ?? 0.2,
     maxOutputTokens: cfg?.maxOutputTokens ?? 8000,
     timeoutMs: cfg?.timeoutMs ?? 90000,
@@ -122,8 +139,7 @@ export function _wrapFetchDisableThink(
   return wrapped as unknown as typeof globalThis.fetch;
 }
 
-function buildProvider() {
-  const llm = getLlmConfig();
+function buildProvider(llm: ReturnType<typeof getLlmConfig>) {
   // Ollama exposes an OpenAI-compatible API at /v1; createOpenAI over baseURL
   // is sufficient (no special compatibility flag in @ai-sdk/openai v3).
   const openai = createOpenAI({
@@ -239,11 +255,11 @@ export async function llmComplete(
   if (!isLlmEnabled()) {
     return { ok: false, error: "llm disabled" };
   }
-  const llm = getLlmConfig();
+  const llm = getLlmConfig({ modelRole: opts.modelRole });
   const timeoutMs = opts.timeoutMs ?? llm.timeoutMs;
   try {
     const result = await generateText({
-      model: buildProvider(),
+      model: buildProvider(llm),
       prompt,
       system: opts.system,
       temperature: llm.temperature,
@@ -261,6 +277,13 @@ export async function llmComplete(
         });
         return { ok: true, value: reasoning };
       }
+      // #7 safety net: reasoning recovery yielded nothing. With the pure-instruct
+      // default this branch should be dormant (no reasoning channel); a hit here
+      // signals an Ollama shape shift or an env override back to a thinking model.
+      logger.warn("llm reasoning-recovery empty", {
+        hasReasoning: false,
+        finishReason: (result as any)?.finishReason ?? null,
+      });
     }
     logger.warn("llmComplete: empty content and no reasoning — degrading", {});
     return { ok: false, error: "empty content (thinking model)" };
@@ -287,12 +310,12 @@ export async function llmObject<T>(
   if (!isLlmEnabled()) {
     return { ok: false, error: "llm disabled" };
   }
-  const llm = getLlmConfig();
+  const llm = getLlmConfig({ modelRole: opts.modelRole });
   const timeoutMs = opts.timeoutMs ?? llm.timeoutMs;
   let result: any = null;
   try {
     result = await generateObject({
-      model: buildProvider(),
+      model: buildProvider(llm),
       prompt,
       system: opts.system,
       schema,
@@ -324,6 +347,12 @@ export async function llmObject<T>(
           }
         }
       }
+      // #7 safety net: reasoning recovery yielded nothing. Dormant with the
+      // pure-instruct default; a hit signals a shape shift / thinking-model override.
+      logger.warn("llm reasoning-recovery empty", {
+        hasReasoning: false,
+        finishReason: (e as any)?.finishReason ?? null,
+      });
     }
     logger.warn("llmObject failed — degrading to non-LLM path", {
       error: (e as Error).message,

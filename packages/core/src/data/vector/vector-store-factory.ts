@@ -7,6 +7,7 @@
 
 import { IVectorStore } from '@massa-th0th/shared';
 import { logger } from '@massa-th0th/shared';
+import { parsePositiveIntEnv } from '@massa-th0th/shared/config';
 import { PostgresConfig } from './postgres-vector-store.js';
 
 export type VectorStoreType = 'sqlite' | 'postgres';
@@ -90,9 +91,13 @@ function getConfigFromEnv(): VectorStoreConfig {
     (!explicitType && postgresUrl?.startsWith('postgresql'));
 
   if (isPostgres && postgresUrl) {
-    const hnswM = Number(process.env.POSTGRES_HNSW_M);
-    const hnswEfConstruction = Number(process.env.POSTGRES_HNSW_EF_CONSTRUCTION);
-    const ivfflatLists = Number(process.env.POSTGRES_IVFFLAT_LISTS);
+    // parsePositiveIntEnv replaces bare `Number(env)` + truthy gating: it
+    // rejects unset/garbage/negative (and 0, which is invalid for HNSW `m`
+    // anyway) by flooring to 0, which the truthy gate then drops. The
+    // indexParams fields stay optional exactly as before.
+    const hnswM = parsePositiveIntEnv(process.env.POSTGRES_HNSW_M, 0);
+    const hnswEfConstruction = parsePositiveIntEnv(process.env.POSTGRES_HNSW_EF_CONSTRUCTION, 0);
+    const ivfflatLists = parsePositiveIntEnv(process.env.POSTGRES_IVFFLAT_LISTS, 0);
 
     const indexParams: { m?: number; efConstruction?: number; lists?: number } = {};
     if (hnswM) indexParams.m = hnswM;

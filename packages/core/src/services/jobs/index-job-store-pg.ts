@@ -354,13 +354,21 @@ export class PgJobStore implements JobStore {
         // reached a terminal state via save() (whose terminal persist is ordered
         // by the per-jobId inflight chain) cannot be matched here.
         const cutoff = this.staleHeartbeatCutoffMs(now);
-        await prisma.$executeRaw`
+        // Capture the true affected-row count from PG ($executeRaw returns the
+        // rowCount). The returned `stale.length` is an in-memory mirror snapshot
+        // that over-counts in mixed fresh/stale scenarios (a fresh-heartbeat
+        // running job appears in listRunning() but is NOT flipped by the UPDATE's
+        // heartbeat predicate). Only the logged count is authoritative.
+        const result = await prisma.$executeRaw`
           UPDATE index_jobs
           SET status = 'failed', error = 'process restart', completed_at = ${now}::bigint
           WHERE status = 'running'
             AND COALESCE(heartbeat_at, started_at) IS NOT NULL
             AND COALESCE(heartbeat_at, started_at) < ${cutoff}::bigint
         `;
+        if (typeof result === "number" && result > 0) {
+          logger.info("PgJobStore markStaleRunningFailed", { flipped: result });
+        }
       } catch (e) {
         logger.warn("PgJobStore markStaleRunningFailed failed (best-effort)", {
           error: (e as Error).message,

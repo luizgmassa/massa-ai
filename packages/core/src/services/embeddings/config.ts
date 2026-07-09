@@ -5,6 +5,8 @@
  * Supports: OpenAI, Google, Cohere, Ollama (local), Mistral
  */
 
+import { parsePositiveIntEnv } from "@massa-th0th/shared/config";
+
 export interface EmbeddingProviderConfig {
   provider: "openai" | "google" | "cohere" | "ollama" | "mistral" | "vercel" | "custom" | "litellm" | string;
   model: string;
@@ -36,36 +38,71 @@ export interface EmbeddingProviderConfig {
  * 
  * Falls back to generic EMBEDDING_* vars if provider-specific not set
  */
-function getRateLimits(providerPrefix: string): EmbeddingProviderConfig['rateLimits'] {
-  const rpm = Number(process.env[`${providerPrefix}_EMBEDDING_RPM`]) || 
-              Number(process.env.EMBEDDING_RPM);
-  const tpm = Number(process.env[`${providerPrefix}_EMBEDDING_TPM`]) || 
-              Number(process.env.EMBEDDING_TPM);
-  const rpd = Number(process.env[`${providerPrefix}_EMBEDDING_RPD`]) || 
-              Number(process.env.EMBEDDING_RPD);
-  const batchSize = Number(process.env[`${providerPrefix}_EMBEDDING_BATCH_SIZE`]) || 
-                    Number(process.env.EMBEDDING_BATCH_SIZE);
-  const batchDelayMs = Number(process.env[`${providerPrefix}_EMBEDDING_BATCH_DELAY`]) || 
-                       Number(process.env.EMBEDDING_BATCH_DELAY);
+export function getRateLimits(providerPrefix: string): EmbeddingProviderConfig['rateLimits'] {
+  // Prefix-specific var wins; empty/unset falls back to the generic
+  // EMBEDDING_* var (so `||`, not `??`, to match the original fall-through for
+  // an explicitly-empty prefix var). The single winning raw value is then
+  // handed to parsePositiveIntEnv, which fixes the falsy-`0` footgun of
+  // `Number(env) || ...`: an explicit positive int survives, while
+  // unset/garbage/non-integer floors to 0. `batchDelayMs` opts into
+  // `{ allowZero: true }` because a zero delay is a legitimate "no delay
+  // between batches" intent.
+  const rpmRaw = process.env[`${providerPrefix}_EMBEDDING_RPM`] || process.env.EMBEDDING_RPM;
+  const tpmRaw = process.env[`${providerPrefix}_EMBEDDING_TPM`] || process.env.EMBEDDING_TPM;
+  const rpdRaw = process.env[`${providerPrefix}_EMBEDDING_RPD`] || process.env.EMBEDDING_RPD;
+  const batchSizeRaw =
+    process.env[`${providerPrefix}_EMBEDDING_BATCH_SIZE`] || process.env.EMBEDDING_BATCH_SIZE;
+  const batchDelayRaw =
+    process.env[`${providerPrefix}_EMBEDDING_BATCH_DELAY`] || process.env.EMBEDDING_BATCH_DELAY;
 
-  // Only return rateLimits if at least one value is configured
-  if (!rpm && !tpm && !rpd && !batchSize && !batchDelayMs) {
+  const rpm = parsePositiveIntEnv(rpmRaw, 0);
+  const tpm = parsePositiveIntEnv(tpmRaw, 0);
+  const rpd = parsePositiveIntEnv(rpdRaw, 0);
+  const batchSize = parsePositiveIntEnv(batchSizeRaw, 0);
+  const batchDelayMs = parsePositiveIntEnv(batchDelayRaw, 0, { allowZero: true });
+
+  // A knob counts as "configured" when its raw winner is a non-empty string
+  // AND the helper accepted it (positive int, or a deliberate 0 for
+  // batchDelayMs via allowZero). This keeps a garbage value from masquerading
+  // as configured while still honoring an explicit batchDelayMs=0.
+  const isConfigured = (raw: string | undefined, parsed: number): boolean =>
+    raw !== undefined && raw !== "" && parsed > 0;
+
+  const rpmOn = isConfigured(rpmRaw, rpm);
+  const tpmOn = isConfigured(tpmRaw, tpm);
+  const rpdOn = isConfigured(rpdRaw, rpd);
+  const batchSizeOn = isConfigured(batchSizeRaw, batchSize);
+  // batchDelayMs=0 is a deliberate no-delay value, so 0 counts as configured.
+  const batchDelayOn =
+    batchDelayRaw !== undefined &&
+    batchDelayRaw !== "" &&
+    (batchDelayMs > 0 || Number(batchDelayRaw) === 0);
+
+  // Only return rateLimits if at least one knob is configured.
+  if (!(rpmOn || tpmOn || rpdOn || batchSizeOn || batchDelayOn)) {
     return undefined;
   }
 
   return {
-    requestsPerMinute: rpm || undefined,
-    tokensPerMinute: tpm || undefined,
-    requestsPerDay: rpd || undefined,
-    batchSize: batchSize || undefined,
-    batchDelayMs: batchDelayMs || undefined,
+    requestsPerMinute: rpmOn ? rpm : undefined,
+    tokensPerMinute: tpmOn ? tpm : undefined,
+    requestsPerDay: rpdOn ? rpd : undefined,
+    batchSize: batchSizeOn ? batchSize : undefined,
+    // Preserve an explicit "0" (no-delay intent); otherwise emit the parsed
+    // positive value, or undefined when unconfigured.
+    batchDelayMs: batchDelayOn
+      ? Number(batchDelayRaw) === 0
+        ? 0
+        : batchDelayMs
+      : undefined,
   };
 }
 
-function getMaxChars(providerPrefix: string, model: string): number {
-  const fromEnv =
-    Number(process.env[`${providerPrefix}_EMBEDDING_MAX_CHARS`]) ||
-    Number(process.env.EMBEDDING_MAX_CHARS);
+export function getMaxChars(providerPrefix: string, model: string): number {
+  const fromEnv = parsePositiveIntEnv(
+    process.env[`${providerPrefix}_EMBEDDING_MAX_CHARS`] || process.env.EMBEDDING_MAX_CHARS,
+    0,
+  );
   if (fromEnv) return fromEnv;
 
   const lower = model.toLowerCase();

@@ -89,7 +89,7 @@ export class LLMJudgeReranker {
 
     let verdict: RerankVerdict | null;
     try {
-      const res = await this.llm.object(prompt, RerankVerdictSchema);
+      const res = await this.llm.object(prompt, RerankVerdictSchema, { modelRole: "code" });
       verdict = res.ok ? (res.value ?? null) : null;
     } catch (e) {
       logger.warn("LLMJudgeReranker threw — degrading to input order", {

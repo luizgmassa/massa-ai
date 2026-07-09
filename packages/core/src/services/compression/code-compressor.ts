@@ -18,7 +18,7 @@ import { llmComplete, isLlmEnabled, type LlmResult } from '../memory/llm-client.
  */
 export type CompressLlmComplete = (
   prompt: string,
-  opts?: { system?: string; timeoutMs?: number },
+  opts?: { system?: string; timeoutMs?: number; modelRole?: "instruct" | "code" },
 ) => Promise<LlmResult<string>>;
 
 /**
@@ -100,7 +100,7 @@ export class CodeCompressor implements ICompressor {
               preservedElements,
             );
             try {
-              const res = await this.llmCompleteFn(prompt, { timeoutMs });
+              const res = await this.llmCompleteFn(prompt, { timeoutMs, modelRole: "code" });
               if (
                 res.ok &&
                 typeof res.value === "string" &&

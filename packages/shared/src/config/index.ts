@@ -15,6 +15,22 @@ import "../env.js";
 import path from "path";
 import os from "os";
 
+/**
+ * Default LLM model for NL/instruction-shaped sites. Pure-instruct (non-thinking)
+ * so structured/free-text calls finish fast and never stall on a reasoning
+ * channel (the qwen3 thinking-model 90s-timeout degrade). Single source of
+ * truth — `llm-client.ts` falls back to this constant instead of a bare literal.
+ * Override via RLM_LLM_MODEL.
+ */
+export const DEFAULT_LLM_MODEL = "qwen2.5:7b-instruct";
+
+/**
+ * Default LLM model for code-oriented sites (bootstrap summarization, reranker
+ * verdict, code compression). Coder-tuned instruct model. Override via
+ * RLM_LLM_CODE_MODEL.
+ */
+export const DEFAULT_LLM_CODE_MODEL = "qwen2.5-coder:7b";
+
 export interface ServerConfig {
   // Server Info
   name: string;
@@ -82,7 +98,19 @@ export interface ServerConfig {
     enabled: boolean;
     baseUrl: string;
     apiKey: string;
+    /**
+     * Default model for NL/instruction-shaped LLM sites (consolidation,
+     * salience, query rewrite, handoff polish, etc.). Pure-instruct by default
+     * so structured/free-text calls finish fast and never stall on a reasoning
+     * channel. Override via RLM_LLM_MODEL.
+     */
     model: string;
+    /**
+     * Model for code-oriented LLM sites (bootstrap summarization, reranker
+     * verdict, code compression). Defaults to a coder-tuned instruct model.
+     * Override via RLM_LLM_CODE_MODEL.
+     */
+    codeModel: string;
     temperature: number;
     maxOutputTokens: number;
     timeoutMs: number;
@@ -161,6 +189,7 @@ export interface ServerConfig {
       baseUrl: string;
       apiKey: string;
       model: string;
+      codeModel: string;
       temperature: number;
       maxOutputTokens: number;
       timeoutMs: number;
@@ -411,7 +440,8 @@ export const defaultConfig: ServerConfig = {
     enabled: envBool("RLM_LLM_ENABLED", false),
     baseUrl: envString("RLM_LLM_BASE_URL", "http://localhost:11434/v1"),
     apiKey: envString("RLM_LLM_API_KEY", "ollama"),
-    model: envString("RLM_LLM_MODEL", "qwen3.5:9b"),
+    model: envString("RLM_LLM_MODEL", DEFAULT_LLM_MODEL),
+    codeModel: envString("RLM_LLM_CODE_MODEL", DEFAULT_LLM_CODE_MODEL),
     temperature: envNum("RLM_LLM_TEMPERATURE", 0.2),
     maxOutputTokens: envNum("RLM_LLM_MAX_OUTPUT_TOKENS", 8000),
     timeoutMs: envNum("RLM_LLM_TIMEOUT_MS", 90000),
@@ -419,6 +449,9 @@ export const defaultConfig: ServerConfig = {
     // content channel can come back empty when thinking consumes the token
     // budget. disableThink (a) asks Ollama to stop thinking (best-effort) and
     // (b) enables the reasoning-channel fallback in llm-client.ts. Default "1".
+    // NB: with the pure-instruct default model there is no reasoning channel,
+    // so this fallback is dormant — kept as a safety net for any Ollama shape
+    // shift or an env override back to a thinking model.
     disableThink: envBool("RLM_LLM_DISABLE_THINK", true),
   },
 
@@ -492,7 +525,8 @@ export const defaultConfig: ServerConfig = {
       enabled: envBool("RLM_LLM_ENABLED", false),
       baseUrl: envString("RLM_LLM_BASE_URL", "http://localhost:11434/v1"),
       apiKey: envString("RLM_LLM_API_KEY", "ollama"),
-      model: envString("RLM_LLM_MODEL", "qwen3.5:9b"),
+      model: envString("RLM_LLM_MODEL", DEFAULT_LLM_MODEL),
+      codeModel: envString("RLM_LLM_CODE_MODEL", DEFAULT_LLM_CODE_MODEL),
       temperature: envNum("RLM_LLM_TEMPERATURE", 0.2),
       maxOutputTokens: envNum("RLM_LLM_MAX_OUTPUT_TOKENS", 8000),
       timeoutMs: envNum("RLM_LLM_TIMEOUT_MS", 90000),

@@ -25,10 +25,29 @@ import {
   beforeEach,
   describe,
   expect,
+  mock,
   test,
 } from "bun:test";
 import { randomUUID } from "crypto";
 
+// ── Mock logger only (shared, no dedicated test file) ───────────────────────
+// Lets the markStaleRunningFailed test assert the true flipped rowCount is
+// logged (mirrors co-retrieval-hook.test.ts). Must precede the PgJobStore
+// import so Bun hoists the swap above the module's `import { logger }`.
+const mockLogger = {
+  info: mock(() => {}),
+  warn: mock(() => {}),
+  error: mock(() => {}),
+  debug: mock(() => {}),
+  metric: mock(() => {}),
+};
+
+mock.module("@massa-th0th/shared", () => {
+  const actual = require("@massa-th0th/shared");
+  return { ...actual, logger: mockLogger };
+});
+
+// ── Import after mock ───────────────────────────────────────────────────────
 import { PgJobStore } from "../services/jobs/index-job-store-pg.js";
 import { IndexJobTracker } from "../services/jobs/index-job-tracker.js";
 import type { IndexJob } from "../services/jobs/index-job-tracker.js";
@@ -119,7 +138,10 @@ describe.skipIf(!DB_AVAILABLE)("PgJobStore — unit tests on PostgreSQL", () => 
     }
   });
 
-  beforeEach(pgCleanup);
+  beforeEach(() => {
+    mockLogger.info.mockClear();
+    return pgCleanup();
+  });
   afterEach(pgCleanup);
 
   // ── mirror sync read (the sync JobStore contract) ────────────────────────
@@ -438,6 +460,68 @@ describe.skipIf(!DB_AVAILABLE)("PgJobStore — unit tests on PostgreSQL", () => 
       expect(row).not.toBeNull();
       expect(row.status).toBe("failed");
       expect(row.error).toMatch(/process restart/);
+    });
+
+    test("mixed fresh+stale running jobs: logs the TRUE flipped count (not the mirror snapshot) and spares the fresh job", async () => {
+      // The returned number (stale.length) over-counts in a mixed scenario:
+      // listRunning() sees BOTH the fresh and stale running jobs, but the PG
+      // UPDATE's heartbeat predicate only flips the stale ones. The LOGGED
+      // `flipped` count must be the true affected-row count, not the mirror
+      // snapshot. This is the COVERAGE finding #6 assertion.
+      const store = new PgJobStore();
+      await hydrateStore(store);
+      const pid = testProjectId();
+      const now = Date.now();
+      const fresh = makeJob({
+        projectId: pid,
+        status: "running",
+        startedAt: new Date(now),
+        heartbeatAt: new Date(now),
+      });
+      const staleTime = new Date(Date.now() - 600_000); // 10 min ago > default 5 min
+      const staleA = makeJob({
+        projectId: pid,
+        status: "running",
+        startedAt: staleTime,
+        heartbeatAt: staleTime,
+      });
+      const staleB = makeJob({
+        projectId: pid,
+        status: "running",
+        startedAt: staleTime,
+        heartbeatAt: staleTime,
+      });
+      store.save(fresh);
+      store.save(staleA);
+      store.save(staleB);
+      await Promise.all([
+        waitForPGRow(fresh.jobId),
+        waitForPGRow(staleA.jobId),
+        waitForPGRow(staleB.jobId),
+      ]);
+
+      // Mirror snapshot sees all THREE running jobs → stale.length === 3.
+      // But only the TWO stale ones match the UPDATE's heartbeat predicate.
+      mockLogger.info.mockClear();
+      const returned = store.markStaleRunningFailed();
+      expect(returned).toBe(3); // signature still returns the mirror snapshot
+
+      // Let the fire-and-forget UPDATE land.
+      await new Promise((r) => setTimeout(r, 250));
+
+      // The LOGGED flipped count is the true rowCount (2), NOT the mirror
+      // snapshot (3). Find the markStaleRunningFailed info call.
+      const flipCalls = mockLogger.info.mock.calls.filter(
+        ([msg]: [unknown]) => msg === "PgJobStore markStaleRunningFailed",
+      );
+      expect(flipCalls.length).toBe(1);
+      const meta = flipCalls[0]![1] as { flipped: number };
+      expect(meta.flipped).toBe(2);
+
+      // The fresh running job is spared; the two stale ones are flipped.
+      expect((await pgGetRow(fresh.jobId)).status).toBe("running");
+      expect((await pgGetRow(staleA.jobId)).status).toBe("failed");
+      expect((await pgGetRow(staleB.jobId)).status).toBe("failed");
     });
 
     test("does NOT touch terminal (completed/failed/pending) jobs", async () => {

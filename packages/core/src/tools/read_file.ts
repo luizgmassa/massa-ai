@@ -137,8 +137,19 @@ export class ReadFileTool implements IToolHandler {
     const includeImports = p.includeImports !== false;
 
     try {
-      // Resolve file path (async — looks up project root when projectId provided)
-      const filePath = await this.resolveFilePath(p.filePath, p.projectId);
+      // Resolve file path (async — looks up project root when projectId provided).
+      // Returns null when the path is ambiguous (relative + no projectId) — we must
+      // NOT guess against process.cwd(), so surface a distinct error here rather
+      // than letting the generic "Failed to read file" catch swallow it.
+      const resolved = await this.resolveFilePath(p.filePath, p.projectId);
+      if (resolved === null) {
+        return {
+          success: false,
+          error:
+            "Relative filePath requires a projectId (to resolve against the workspace) or an absolute path.",
+        };
+      }
+      const filePath = resolved;
 
       // Keep original relative path for symbol DB queries (DB stores relative paths)
       const relativePath = p.filePath;
@@ -259,17 +270,37 @@ export class ReadFileTool implements IToolHandler {
     }
   }
 
-  private async resolveFilePath(filePath: string, projectId?: string): Promise<string> {
+  /**
+   * Resolve a filePath to an absolute path.
+   *
+   * Resolution rules:
+   *  - Absolute path → returned verbatim (still normalized via path.resolve, but base-independent).
+   *  - `projectId` present → resolved against the workspace `project_path`. If the
+   *    workspace lookup fails (no root), this returns null (ambiguous).
+   *  - No `projectId` AND relative `filePath` → returns null. We deliberately do NOT
+   *    fall back to `path.resolve(filePath)` against process.cwd(), because a
+ relative
+   *    path arriving without a projectId is ambiguous and historically read from
+   *    the
+   *    server's cwd (COVERAGE finding #3). Callers must provide an absolute path or
+   *    a projectId.
+   *
+   * Returns null to signal an ambiguous/unsatisfiable path so `handle()` can map it
+   * to a distinct, clear error instead of the generic "Failed to read file" catch.
+   */
+  private async resolveFilePath(filePath: string, projectId?: string): Promise<string | null> {
     if (path.isAbsolute(filePath)) {
-      return filePath;
+      return path.resolve(filePath);
     }
     if (projectId) {
       const root = await this.getProjectRoot(projectId);
       if (root) {
         return path.resolve(root, filePath);
       }
+      return null;
     }
-    return path.resolve(filePath);
+    // Relative path with no projectId — do not guess against cwd.
+    return null;
   }
 
   private async getProjectRoot(projectId: string): Promise<string | null> {
@@ -330,7 +361,20 @@ export class ReadFileTool implements IToolHandler {
       relativePath?: string;
     }
   ): Promise<{ content: string; metadata: FileMetadata }> {
-    const cacheKey = filePath;
+    // Cache key MUST include every option that changes metadata extraction.
+    // Keying on filePath alone returned stale, options-baked metadata for a
+    // later read of the same file with different includeSymbols/includeImports/
+    // projectId/relativePath (the only e2e red — 08.search F33). Deliberately
+    // exclude offset/limit/lineStart/lineEnd/compress/targetRatio/format: those
+    // are applied AFTER the cache in handle(), and coalescing them across reads
+    // is the cache's purpose.
+    const cacheKey = JSON.stringify({
+      filePath,
+      includeSymbols: options.includeSymbols ?? false,
+      includeImports: options.includeImports ?? false,
+      projectId: options.projectId ?? null,
+      relativePath: options.relativePath ?? null,
+    });
     const cached = this.fileCache.get(cacheKey);
 
     // Check cache validity

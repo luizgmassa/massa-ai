@@ -45,7 +45,8 @@ bun install
 # 2. Setup (100% offline with Ollama)
 ./scripts/setup-local-first.sh
 # - Installs/starts Ollama
-# - Pulls qwen3-embedding:8b embedding model (4096 dimensions) and qwen3.5:9b
+# - Pulls qwen3-embedding:8b (embeddings, 4096 dims), qwen2.5:7b-instruct (default LLM),
+#   and qwen2.5-coder:7b (code-oriented LLM sites)
 # - Creates .env with defaults
 # - Runs bun run diagnose to validate the stack
 
@@ -286,7 +287,7 @@ restore_checkpoint { checkpointId: "<cp-id>" }
 | `get_references` | Find all usages of a symbol across the project |
 | `go_to_definition` | Jump to definition with file + line context |
 | `symbol_snippet` | Get raw code snippet by file + line range |
-| `read_file` | Read a file with symbol metadata and imports |
+| `read_file` | Read a file with symbol metadata and imports. A relative `filePath` requires a `projectId` (resolves vs the workspace) or an absolute path |
 
 ### Memory & Lifecycle
 
@@ -367,7 +368,8 @@ ollama serve
 
 # Pull models
 ollama pull qwen3-embedding:8b    # embeddings (4096 dims)
-ollama pull qwen3.5:9b            # completion (consolidation, rerank, query rewrite)
+ollama pull qwen2.5:7b-instruct   # default LLM (consolidation, salience, handoff, query rewrite, HyDE)
+ollama pull qwen2.5-coder:7b      # code-oriented LLM sites (bootstrap seed, reranker, code compression)
 ```
 
 ### Validate the stack
@@ -383,13 +385,27 @@ status.
 RLM_LLM_ENABLED=true
 RLM_LLM_BASE_URL=http://localhost:11434/v1
 RLM_LLM_API_KEY=ollama
-RLM_LLM_MODEL=qwen3.5:9b
+RLM_LLM_MODEL=qwen2.5:7b-instruct        # default instruct model (NL-judgment sites)
+RLM_LLM_CODE_MODEL=qwen2.5-coder:7b      # code-oriented sites (bootstrap seed, reranker, compress)
+# RLM_LLM_DISABLE_THINK=true             # best-effort thinking-disable (default true; safety net)
 ```
 
 With `RLM_LLM_ENABLED=true` you get: hook→memory consolidation, handoff-summary
 polish, query understanding (rewrite + HyDE), LLM-judge rerank, and auto
 importance scoring. Set it `false` (the default) and every one of those silently
 falls back to its rule-based path.
+
+> **Per-task model routing (new 2026-07-09):** the 11 LLM call sites split by
+> task shape. The 8 NL-judgment sites (salience judge, consolidator,
+> observation/auto-improve jobs, handoff summary, query rewrite, HyDE) use
+> `RLM_LLM_MODEL`; the 3 code-oriented sites (bootstrap `SeedMemoriesSchema`,
+> reranker, `code-compressor`) use `RLM_LLM_CODE_MODEL`. Routing is per-call via
+> a `modelRole` option in `packages/core/src/services/memory/llm-client.ts`.
+> Both default to **non-thinking instruct** models so structured-output calls
+> return fast (~5 s) and reliably, instead of burning a 90 s wall-clock timeout
+> on a thinking model (the prior `qwen3.5:9b` default routed answers into the
+> reasoning channel and silently degraded). Override either with the env vars
+> above.
 
 > **Embeddings note:** `qwen3-embedding:8b` (4096d) gives stronger recall than
 > `bge-m3` but is slower — bulk indexing a large corpus takes minutes. The old
@@ -586,7 +602,9 @@ rows default **OFF** and degrade silently when disabled.
 | `llm.enabled` | `RLM_LLM_ENABLED` | `false` | **OFF** |
 | `llm.baseUrl` | `RLM_LLM_BASE_URL` | `http://localhost:11434/v1` | — |
 | `llm.apiKey` | `RLM_LLM_API_KEY` | `ollama` | — |
-| `llm.model` | `RLM_LLM_MODEL` | `qwen3.5:9b` | — |
+| `llm.model` | `RLM_LLM_MODEL` | `qwen2.5:7b-instruct` | default instruct model (NL-judgment sites) |
+| `llm.codeModel` | `RLM_LLM_CODE_MODEL` | `qwen2.5-coder:7b` | code-oriented sites (bootstrap seed, reranker, compress) |
+| `llm.disableThink` | `RLM_LLM_DISABLE_THINK` | `true` | best-effort thinking-disable (safety net for thinking models) |
 | `llm.temperature` | `RLM_LLM_TEMPERATURE` | `0.2` | — |
 | `llm.maxOutputTokens` | `RLM_LLM_MAX_OUTPUT_TOKENS` | `8000` | — |
 | `llm.timeoutMs` | `RLM_LLM_TIMEOUT_MS` | `90000` | — |

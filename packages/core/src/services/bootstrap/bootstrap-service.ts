@@ -493,7 +493,7 @@ export async function summarizeWithLlm(
 
   const prompt = buildSummarizePrompt(signals, maxSeedMemories);
   try {
-    const res = await surface.object(prompt, SeedMemoriesSchema);
+    const res = await surface.object(prompt, SeedMemoriesSchema, { modelRole: "code" });
     if (!res.ok || !res.value) {
       return { ok: false, reason: res.error || "llm returned no value" };
     }

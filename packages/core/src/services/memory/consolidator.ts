@@ -69,9 +69,11 @@ export interface ConsolidateCandidate {
 
 /** Injectable LLM surface (matches the `llm` export from llm-client.ts). */
 export interface LlmSurface {
-  object<T>(prompt: string, schema: z.ZodSchema<T>, opts?: { timeoutMs?: number }): Promise<
-    { ok: boolean; value?: T; error?: string }
-  >;
+  object<T>(
+    prompt: string,
+    schema: z.ZodSchema<T>,
+    opts?: { timeoutMs?: number; modelRole?: "instruct" | "code" },
+  ): Promise<{ ok: boolean; value?: T; error?: string }>;
   isEnabled(): boolean;
 }
 

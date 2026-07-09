@@ -21,4 +21,6 @@ export {
   type SynapseRuntimeConfig,
   type DecayParams,
   DEFAULT_ALLOWED_EXTENSIONS,
+  DEFAULT_LLM_MODEL,
+  DEFAULT_LLM_CODE_MODEL,
 } from "./config/index.js";
