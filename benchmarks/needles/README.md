@@ -7,9 +7,11 @@ real codebases.
 
 ```
 benchmarks/needles/
+├── run.ts               # Standalone harness: chunk → embed → rank → score (no live API)
 ├── scorer.ts            # CLI: reads dataset + harness output, writes report
 ├── fixtures/            # Per-project needle datasets (versioned)
-│   └── sicad.json       # 12 needles validated against the Sicad codebase
+│   ├── sicad.json       # 12 needles validated against the Sicad codebase
+│   └── massa-th0th.json # 14 needles (dogfood) validated against this repo
 └── reports/             # Harness outputs and generated reports (gitignored)
 ```
 
@@ -34,6 +36,34 @@ fixtures/<project>.json ──┐
   `filePath` to match the needle's expected file AND the chunk's
   `[lineStart, lineEnd]` to intersect the expected range within
   `lineTolerance` (default 5).
+
+## Standalone harness (`run.ts`)
+
+`run.ts` is a self-contained chunker-quality harness that does NOT need the
+live tools-api stack or a database. It chunks each referenced source file with
+`smartChunk`, embeds the query + every chunk via the Ollama embedding endpoint
+(`qwen3-embedding:8b` by default — the same model as the E2E baseline), and
+cosine-ranks chunks per query. This isolates chunker effects from API/DB/RRF
+variance, giving stable, reproducible before/after numbers for tuning.
+
+```sh
+# Default config (uses the smart-chunker DEFAULT_CONFIG):
+bun benchmarks/needles/run.ts
+
+# Tune chunker params for a sweep:
+bun benchmarks/needles/run.ts --codeChunkTarget 50 --chunkOverlapLines 6
+
+# CI regression gate (exit 1 if hit@1/MRR below floor env vars):
+bun run bench:needles:gate
+#   NEEDLE_FLOOR_HIT1=0.5 NEEDLE_FLOOR_MRR=0.65
+```
+
+Env: `OLLAMA_HOST` (default `http://localhost:11434`), `NEEDLE_MODEL` (default
+`qwen3-embedding:8b`), `NEEDLE_FLOOR_HIT1`, `NEEDLE_FLOOR_MRR`. Results are
+written under `reports/` (gitignored).
+
+The full-stack gate (live API + Postgres + RRF) lives in the E2E suite:
+`packages/core/src/__tests__/e2e/14.needles.test.ts` (run with `RUN_E2E=1`).
 
 ## Adding a new project
 

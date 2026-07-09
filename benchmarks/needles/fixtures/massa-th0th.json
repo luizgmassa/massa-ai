@@ -1,6 +1,6 @@
 {
   "projectId": "massa-th0th",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Needles validated against the massa-th0th codebase itself (dogfooding). Each needle targets a non-obvious heuristic, magic constant, or scoring rule that pure keyword search would miss. Captured 2026-04-20.",
   "scoring": {
     "topK": 10,
@@ -40,10 +40,10 @@
       "query": "fator multiplicador aplicado a resultados de keyword search quando a query parece código",
       "expected": {
         "filePath": "packages/core/src/services/search/contextual-search-rlm.ts",
-        "lineStart": 968,
-        "lineEnd": 976
+        "lineStart": 1113,
+        "lineEnd": 1120
       },
-      "rationale": "isCodeQuery + KEYWORD_BOOST=2.5 hardcoded inline; heurística não é exposta como config."
+      "rationale": "isCodeQuery + KEYWORD_BOOST (RRF_KEYWORD_BOOST env, default 2.5). Heurística de boost para code queries."
     },
     {
       "id": "N04-rrf-vector-blend",
@@ -52,10 +52,10 @@
       "query": "proporção entre score RRF e similaridade vetorial bruta na composição do score final",
       "expected": {
         "filePath": "packages/core/src/services/search/contextual-search-rlm.ts",
-        "lineStart": 1042,
-        "lineEnd": 1047
+        "lineStart": 1187,
+        "lineEnd": 1208
       },
-      "rationale": "70/30 split (rrfNormalized * 0.7 + vectorSimilarity * 0.3) sem constantes nomeadas."
+      "rationale": "vectorWeight (RRF_VECTOR_WEIGHT env, default 0.3) → combinedScore = rrfNormalized*(1-w) + vectorSimilarity*w. Split 70/30 sem constantes nomeadas."
     },
     {
       "id": "N05-centrality-rerank-bonus",
@@ -64,10 +64,10 @@
       "query": "bônus aplicado no ranking final para arquivos com alta centralidade no graph",
       "expected": {
         "filePath": "packages/core/src/services/search/contextual-search-rlm.ts",
-        "lineStart": 1049,
-        "lineEnd": 1056
+        "lineStart": 1209,
+        "lineEnd": 1218
       },
-      "rationale": "combinedScore * (1 + 0.2 * centralityScore). Multiplicador 0.2 nu, sem constante."
+      "rationale": "normalizedScore = combinedScore * (1 + 0.2 * centralityScore). Multiplicador 0.2 nu, sem constante."
     },
     {
       "id": "N06-minscore-on-raw-vector",
@@ -76,8 +76,8 @@
       "query": "filtro de score mínimo aplicado na similaridade vetorial bruta e não no score normalizado por RRF",
       "expected": {
         "filePath": "packages/core/src/services/search/contextual-search-rlm.ts",
-        "lineStart": 778,
-        "lineEnd": 798
+        "lineStart": 847,
+        "lineEnd": 863
       },
       "rationale": "Decisão crítica: minScore usa _rrfRawVectorScore quando disponível porque RRF normaliza top=1.0."
     },

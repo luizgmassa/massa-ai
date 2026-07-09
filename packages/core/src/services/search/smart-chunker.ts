@@ -73,11 +73,18 @@ export interface ChunkerConfig {
 const DEFAULT_CONFIG: ChunkerConfig = {
   maxChunkLines: 200,
   minChunkLines: 5,
-  codeChunkTarget: 80,
+  // Tuned via the standalone needle harness (benchmarks/needles/run.ts) against
+  // the massa-th0th fixture. A larger code target keeps long methods cohesive
+  // (splitting them washes out semantic signal) and lifts hit@3 ~7pp with no
+  // hit@1 regression. See benchmarks/needles/reports/ for the sweep data.
+  codeChunkTarget: 100,
   fixedChunkSize: 50,
   addFileContext: true,
   maxChunkChars: 7500, // 90% of 8000 char Ollama maxChars default, leaves room for file-context prefix
-  chunkOverlapLines: 4, // adjacent code chunks share 4 lines (boundary-recall insurance)
+  // Overlap raised 4→6: a concept straddling a chunk boundary is now embedded
+  // in BOTH chunks with a wider shared tail, recovering a couple of mid-rank
+  // needles. Only applied to the semantic code path (chunkCode).
+  chunkOverlapLines: 6,
 };
 
 /**
