@@ -44,6 +44,7 @@ import {
   QueryUnderstandingService,
   buildRewrittenFTSQuery,
 } from "./query-understanding.js";
+import { applyProximityRerank, extractQueryTerms } from "./lexical-search.js";
 import { eventBus } from "../events/event-bus.js";
 
 const globAsync = glob;
@@ -707,27 +708,80 @@ export class ContextualSearchRLM {
       }
 
       if (!usedQueryUnderstanding) {
-        // ORIGINAL Phase-1 path — byte-for-byte the pre-Phase-2 single-stream search.
-        const [vectorResults, keywordResults] = await Promise.all([
-          this.vectorStore.search(query, maxResults * 2, projectId),
-          disableKeyword
-            ? Promise.resolve([] as SearchResult[])
-            : this.keywordSearch
-                .searchWithFilter(query, { projectId }, maxResults * 2)
-                .catch((err) => {
-                  logger.warn(
-                    "Keyword search failed — falling back to vector-only",
-                    { err: (err as Error).message },
-                  );
-                  return [] as SearchResult[];
-                }),
-        ]);
+        // ORIGINAL Phase-1 path, now with two additional lexical RRF streams:
+        // trigram (identifier-substring recall) and fuzzy-corrected keyword
+        // (Levenshtein correction over the per-store vocabulary). All four
+        // streams fuse via RRF; empty streams contribute nothing.
+        const fetchN = maxResults * 2;
+        const [vectorResults, keywordResults, trigramResults] =
+          await Promise.all([
+            this.vectorStore.search(query, fetchN, projectId),
+            disableKeyword
+              ? Promise.resolve([] as SearchResult[])
+              : this.keywordSearch
+                  .searchWithFilter(query, { projectId }, fetchN)
+                  .catch((err) => {
+                    logger.warn(
+                      "Keyword search failed — falling back to vector-only",
+                      { err: (err as Error).message },
+                    );
+                    return [] as SearchResult[];
+                  }),
+            // Trigram stream (best-effort; [] when tokenizer unavailable).
+            disableKeyword || !this.keywordSearch.searchTrigram
+              ? Promise.resolve([] as SearchResult[])
+              : this.keywordSearch
+                  .searchTrigram!(query, { projectId }, fetchN)
+                  .catch((err) => {
+                    logger.debug("Trigram search failed (non-fatal)", {
+                      err: (err as Error).message,
+                    });
+                    return [] as SearchResult[];
+                  }),
+          ]);
 
         logger.debug("Search results retrieved", {
           vectorCount: vectorResults.length,
           keywordCount: keywordResults.length,
+          trigramCount: trigramResults.length,
         });
-        resultSets = [vectorResults, keywordResults];
+        resultSets = [vectorResults, keywordResults, trigramResults].filter(
+          (s) => s.length > 0,
+        );
+
+        // Fuzzy correction stream: if any query word corrects to a different
+        // vocabulary word, re-run keyword + trigram on the corrected query and
+        // add both as RRF streams. This recovers typos like "useEffct" →
+        // "useEffect" that porter/trigram miss. Best-effort; skipped when no
+        // correction applies or fuzzyCorrect is unavailable.
+        if (!disableKeyword && typeof this.keywordSearch.fuzzyCorrect === "function") {
+          const corrected = await this.correctQuery(query);
+          if (corrected && corrected !== query.toLowerCase().trim()) {
+            try {
+              const [fuzzyKeyword, fuzzyTrigram] = await Promise.all([
+                this.keywordSearch
+                  .searchWithFilter(corrected, { projectId }, fetchN)
+                  .catch(() => [] as SearchResult[]),
+                this.keywordSearch.searchTrigram
+                  ? this.keywordSearch
+                      .searchTrigram!(corrected, { projectId }, fetchN)
+                      .catch(() => [] as SearchResult[])
+                  : Promise.resolve([] as SearchResult[]),
+              ]);
+              if (fuzzyKeyword.length > 0) resultSets.push(fuzzyKeyword);
+              if (fuzzyTrigram.length > 0) resultSets.push(fuzzyTrigram);
+              logger.debug("Fuzzy correction stream added", {
+                corrected,
+                fuzzyKeywordCount: fuzzyKeyword.length,
+                fuzzyTrigramCount: fuzzyTrigram.length,
+              });
+            } catch (err) {
+              logger.debug("Fuzzy correction stream failed (non-fatal)", {
+                err: (err as Error).message,
+              });
+            }
+          }
+        }
       }
 
       // Phase 7c: graph-neighbor as an extra RRF stream. BFS depth-2 over
@@ -736,13 +790,26 @@ export class ContextualSearchRLM {
       // RRF surfaces them mid-list. Silent-omit when empty/unavailable (the
       // resultSets length — and thus the search:reranked streamCount — reflects
       // the actual stream count). No throw escapes search().
-      const graphStream = await this.buildGraphStream(resultSets, maxResults);
+      const graphStream = await this.buildGraphStream(resultSets, maxResults, projectId);
       if (graphStream.length > 0) {
         resultSets = [...resultSets, graphStream];
       }
 
       // Combine results using RRF (with score explanation if requested)
       const fusedResults = this.fuseResults(resultSets, query, explainScores);
+
+      // A2: proximity + title re-ranking pass (post-RRF, pre-filter). Stable
+      // re-rank on top of RRF: boosts results whose title contains query terms
+      // and whose body positions the terms close together; code chunks get a
+      // stronger title boost. Applied to a bounded candidate pool so the cost
+      // stays low; equally-boosted results keep their RRF order.
+      const rerankPool = Math.max(maxResults * 3, 20);
+      const rerankInput = fusedResults.slice(0, rerankPool);
+      const rerankedTop = applyProximityRerank(rerankInput, query);
+      const fusedReranked = [
+        ...rerankedTop,
+        ...fusedResults.slice(rerankPool),
+      ];
 
       if (usedQueryUnderstanding) {
         eventBus.publish("search:reranked", {
@@ -756,18 +823,18 @@ export class ContextualSearchRLM {
       // Apply file pattern filters if provided
       // Note: For maximum efficiency, filters could be applied DURING vector/keyword search
       // by pre-computing valid files. For now, we apply post-search but cache the filter computation.
-      let filteredByPattern = fusedResults;
+      let filteredByPattern = fusedReranked;
       if (includeFilters || excludeFilters) {
         const filterStartTime = performance.now();
         filteredByPattern = this.filterByPatterns(
-          fusedResults,
+          fusedReranked,
           includeFilters,
           excludeFilters,
         );
         const filterDuration = performance.now() - filterStartTime;
 
         logger.debug("Applied file pattern filters", {
-          beforeFilter: fusedResults.length,
+          beforeFilter: fusedReranked.length,
           afterFilter: filteredByPattern.length,
           includePatterns: includeFilters,
           excludePatterns: excludeFilters,
@@ -846,39 +913,116 @@ export class ContextualSearchRLM {
   }
 
   /**
+   * Fuzzy-correct each non-stopword query term via the keyword store's
+   * vocabulary. Returns the corrected query string (lowercased, space-joined),
+   * or null when no term corrects to a different word or fuzzyCorrect is
+   * unavailable. Only words of length >= 3 are considered (shorter tokens
+   * can't be reliably corrected).
+   */
+  private async correctQuery(query: string): Promise<string | null> {
+    if (typeof this.keywordSearch.fuzzyCorrect !== "function") return null;
+    const terms = extractQueryTerms(query).filter((w) => w.length >= 3);
+    if (terms.length === 0) return null;
+    const corrected: string[] = [];
+    let changed = false;
+    for (const term of terms) {
+      const fix = await this.keywordSearch.fuzzyCorrect!(term);
+      if (fix && fix !== term) {
+        corrected.push(fix);
+        changed = true;
+      } else {
+        corrected.push(term);
+      }
+    }
+    return changed ? corrected.join(" ") : null;
+  }
+
+  /**
    * Phase 7c: build the graph-neighbor RRF stream. BFS depth-2 over outgoing
-   * memory-graph edges from the top-N vector-hit ids; resolved to SearchResults
-   * via the memory repository at a fixed sub-hit score (0.45).
+   * memory-graph edges; resolved to SearchResults via the memory repository at
+   * a fixed sub-hit score (0.45).
+   *
+   * Id-bridge fix (A3): graph edges connect MEMORY ids, but vector/code-search
+   * results key on chunk ids (e.g. "projectId:path:0"). Seeding BFS with chunk
+   * ids therefore silently omitted the stream for code queries — the primary
+   * use case. We now bridge the two id spaces: collect graph seeds by (a)
+   * trying the raw hit ids (preserves the original behavior for memory search
+   * where memory ids already flow in), AND (b) mapping each code chunk to
+   * memory ids that reference the same filePath/symbol via fullTextSearch.
+   * This makes the graph stream participate for code queries while remaining
+   * a silent-omit no-op when no bridged seeds resolve.
    *
    * Degradation (silent-omit): returns [] when the neighbor set is empty, the
    * graph store throws, or the memory repo returns nothing. The caller only
    * appends the stream when non-empty, so `resultSets.length` (and thus the
    * `search:reranked` streamCount) always reflects the real stream count.
-   *
-   * Domain note: graph edges connect MEMORY ids. Vector hits on code-chunk ids
-   * usually won't be in the memory graph, so this stream is typically empty for
-   * pure code search (the designed degradation) and surfaces graph-adjacent
-   * context when memories are seeded with the searched ids (e.g. memory search).
    */
   private async buildGraphStream(
     resultSets: SearchResult[][],
     maxResults: number,
+    projectId?: string,
   ): Promise<SearchResult[]> {
     try {
-      // Seed = top-N ids from the first (vector) stream.
+      // Seed candidates = top-N ids + derived filePath/symbol anchors from the
+      // first (vector) stream's chunk metadata.
       const vectorStream = resultSets[0] ?? [];
-      const seedIds = vectorStream
-        .slice(0, Math.min(maxResults, 20))
+      const topHits = vectorStream.slice(0, Math.min(maxResults, 20));
+      const rawIds = topHits
         .map((r) => r.id)
         .filter((id): id is string => typeof id === "string" && id.length > 0);
-      if (seedIds.length === 0) return [];
 
+      // Derive anchor terms (filePath / symbol) from code-chunk metadata.
+      // These are used to find MEMORY ids whose content references the same
+      // code, bridging the chunk-id → memory-id gap.
+      const anchors = new Set<string>();
+      for (const r of topHits) {
+        const meta = (r.metadata ?? {}) as Record<string, unknown>;
+        const fp = meta.filePath;
+        if (typeof fp === "string" && fp.length > 0) {
+          // Use the basename + the full path; basename is the most common
+          // reference form in memories ("updated store.ts ...").
+          anchors.add(fp);
+          const base = fp.split("/").pop();
+          if (base && base.length >= 3) anchors.add(base);
+        }
+        for (const key of ["parentSymbol", "symbolName", "label"] as const) {
+          const v = meta[key];
+          if (typeof v === "string" && v.length >= 3) anchors.add(v);
+        }
+      }
+
+      const seedIds = new Set<string>(rawIds);
+      // Bridge: resolve anchors to memory ids via fullTextSearch. Bounded to
+      // the top few anchors to keep latency in check.
+      if (anchors.size > 0) {
+        const repo = getMemoryRepository();
+        const anchorTerms = [...anchors].slice(0, 6);
+        for (const term of anchorTerms) {
+          try {
+            // fullTextSearch(query, filters) — pass a SearchFilters object as
+            // the second arg so both the number and object overloads resolve.
+            const rows = await Promise.resolve(
+              repo.fullTextSearch(term, 5, {
+                projectId,
+                minImportance: 0,
+              }),
+            );
+            for (const row of rows) {
+              if (typeof row.id === "string") seedIds.add(row.id);
+            }
+          } catch {
+            // Defensive: a single anchor lookup never aborts bridging.
+          }
+        }
+      }
+
+      if (seedIds.size === 0) return [];
       const graph = getGraphStore();
       // SQLite bfsNeighbors is sync; Pg is async. Normalize via Promise.resolve
       // so both backends work without an isPostgres short-circuit.
       const ns = await Promise.resolve(
         typeof (graph as { bfsNeighbors?: unknown }).bfsNeighbors === "function"
-          ? (graph as { bfsNeighbors: (ids: string[], d: number) => string[] | Promise<string[]> }).bfsNeighbors(seedIds, 2)
+          ? (graph as { bfsNeighbors: (ids: string[], d: number) => string[] | Promise<string[]> }).bfsNeighbors([...seedIds], 2)
           : [],
       );
       if (!Array.isArray(ns) || ns.length === 0) return [];
@@ -983,11 +1127,22 @@ export class ContextualSearchRLM {
       keywordResults: resultSets[1]?.length || 0,
     });
 
-    // Calculate RRF score for each result
+    // Calculate RRF score for each result.
+    // Stream roles: index 0 is always the vector stream (see search()). All
+    // other streams are lexical (porter keyword, trigram, fuzzy) or memory
+    // (graph). Lexical streams get the code-query keyword boost; the memory
+    // graph stream gets neutral weight (1.0) since it surfaces context, not a
+    // direct lexical match.
     for (let i = 0; i < resultSets.length; i++) {
       const results = resultSets[i];
-      const isVector = i === 0; // First set is vector, second is keyword
-      const boost = isVector ? 1.0 : KEYWORD_BOOST;
+      const isVector = i === 0;
+      const isMemoryStream = results.some(
+        (r) =>
+          (r.source as string) === "memory" ||
+          ((r.metadata as Record<string, unknown>)?.context as Record<string, unknown>)
+            ?.graphNeighbor === true,
+      );
+      const boost = isVector ? 1.0 : isMemoryStream ? 1.0 : KEYWORD_BOOST;
 
       results.forEach((result, rank) => {
         const rrfScore = (1 / (this.RRF_K + rank + 1)) * boost;
@@ -999,18 +1154,24 @@ export class ContextualSearchRLM {
           if (isVector) {
             existing.vectorRank = rank;
             existing.vectorScore = result.score;
-          } else {
-            existing.keywordRank = rank;
-            existing.keywordScore = result.score;
+          } else if (!isMemoryStream) {
+            // Record the best lexical rank/score (porter/trigram/fuzzy).
+            if (
+              existing.keywordRank === undefined ||
+              rank < existing.keywordRank
+            ) {
+              existing.keywordRank = rank;
+              existing.keywordScore = result.score;
+            }
           }
         } else {
           scoreMap.set(result.id, {
             result: { ...result },
             rrfScore,
             vectorRank: isVector ? rank : undefined,
-            keywordRank: isVector ? undefined : rank,
+            keywordRank: !isVector && !isMemoryStream ? rank : undefined,
             vectorScore: isVector ? result.score : undefined,
-            keywordScore: isVector ? undefined : result.score,
+            keywordScore: !isVector && !isMemoryStream ? result.score : undefined,
           });
         }
       });

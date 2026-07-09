@@ -190,6 +190,24 @@ export interface IKeywordSearch {
   search(query: string, limit?: number): Promise<SearchResult[]>;
   delete(id: string): Promise<boolean>;
   update(id: string, content: string): Promise<void>;
+  /**
+   * Trigram (3-char substring) lexical search for identifier-substring recall
+   * (e.g. "useEff" → chunks containing "useEffect"). Returns [] when the
+   * backend lacks a trigram index or the sanitized query is empty.
+   */
+  searchTrigram?(
+    query: string,
+    filters: { projectId?: string },
+    limit?: number,
+  ): Promise<SearchResult[]>;
+  /**
+   * Levenshtein fuzzy correction of a single word against the per-store
+   * vocabulary table, length-bounded by maxEditDistance. Returns the closest
+   * vocabulary word within tolerance, or null when none qualifies (including
+   * when no vocabulary table exists). Exact matches return null (no correction
+   * needed).
+   */
+  fuzzyCorrect?(word: string): Promise<string | null>;
 }
 
 /**
