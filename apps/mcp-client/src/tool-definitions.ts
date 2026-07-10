@@ -736,6 +736,52 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
 
+  {
+    name: "impact_analysis",
+    description:
+      "Analyze a git diff and report impacted symbols (callers/dependents of changed code) ranked by centrality-weighted risk. " +
+      "Scope: unstaged | staged | committed (vs base_branch/since). " +
+      "Answers 'what else breaks if I change X?' without grepping the whole repo.",
+    apiEndpoint: "/api/v1/symbol/impact",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string", description: "The project ID to analyze" },
+        projectPath: {
+          type: "string",
+          description: "Absolute path to the project working tree (where `git` runs). Required for the diff.",
+        },
+        scope: {
+          type: "string",
+          enum: ["unstaged", "staged", "committed"],
+          default: "unstaged",
+          description: "unstaged = working-tree changes; staged = index; committed = diff vs base_branch (or since).",
+        },
+        base_branch: {
+          type: "string",
+          default: "main",
+          description: "For committed scope: diff against this branch (default main).",
+        },
+        since: {
+          type: "string",
+          description: "For committed scope: commits since this ref/date (e.g. '2026-07-01' or a SHA). Wins over base_branch.",
+        },
+        depth: {
+          type: "number",
+          description: "How far to propagate impact through the reverse import graph (default 2, hard cap 4).",
+          default: 2,
+        },
+        paths: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional filter — only analyze these changed relative paths.",
+        },
+      },
+      required: ["projectId", "projectPath"],
+    },
+  },
+
   // ── Project reset ───────────────────────────────────────────────────────
 
   {

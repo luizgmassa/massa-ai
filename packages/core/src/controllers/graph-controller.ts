@@ -20,6 +20,12 @@ import type {
   TraceMode,
 } from "../services/symbol/trace-path.js";
 import type { EdgeType } from "../services/symbol/symbol-graph.service.js";
+import { impactAnalysisService } from "../services/symbol/impact-analysis.js";
+import type {
+  ImpactAnalysisOptions,
+  ImpactAnalysisResult,
+  ImpactScope,
+} from "../services/symbol/impact-analysis.js";
 
 export interface TracePathInput {
   projectId: string;
@@ -48,6 +54,32 @@ export interface TracePathOutput {
   edges: TracePathResult["edges"];
   /** Surfaced when the seed did not resolve — agent-actionable hint. */
   notFoundHint?: string;
+}
+
+export interface ImpactAnalysisInput {
+  projectId: string;
+  projectPath: string;
+  scope?: ImpactScope;
+  base_branch?: string;
+  since?: string;
+  depth?: number;
+  paths?: string[];
+  /** Injectable diff runner (tests). */
+  diffRunner?: ImpactAnalysisOptions["diffRunner"];
+}
+
+export interface ImpactAnalysisOutput {
+  projectId: string;
+  scope: ImpactScope;
+  baseBranch?: string;
+  since?: string;
+  depth: number;
+  changedFileCount: number;
+  changedFiles: ImpactAnalysisResult["changedFiles"];
+  impactedCount: number;
+  truncated: boolean;
+  impacted: ImpactAnalysisResult["impacted"];
+  note?: string;
 }
 
 export class GraphController {
@@ -128,6 +160,53 @@ export class GraphController {
         nodes: result.nodes,
         edges: result.edges,
       },
+    };
+  }
+
+  /**
+   * Run impact analysis via {@link ImpactAnalysisService}: scoped git diff →
+   * changed files → reverse traversal of importers + references → ranked
+   * impacted symbols. Returns the raw service result shaped for tool/API
+   * consumers.
+   */
+  async analyzeImpact(input: ImpactAnalysisInput): Promise<ImpactAnalysisOutput> {
+    if (!input.projectId) throw new Error("projectId is required");
+    if (!input.projectPath) throw new Error("projectPath is required");
+
+    const t0 = performance.now();
+
+    const result = await impactAnalysisService.analyze({
+      projectId: input.projectId,
+      projectPath: input.projectPath,
+      scope: input.scope ?? "unstaged",
+      baseBranch: input.base_branch,
+      since: input.since,
+      depth: input.depth,
+      paths: input.paths,
+      diffRunner: input.diffRunner,
+    });
+
+    logger.info("GraphController: impact_analysis", {
+      projectId: input.projectId,
+      scope: result.scope,
+      changedFiles: result.changedFiles.length,
+      impacted: result.impacted.length,
+      truncated: result.truncated,
+      durationMs: Math.round(performance.now() - t0),
+    });
+
+    return {
+      projectId: result.projectId,
+      scope: result.scope,
+      baseBranch: result.baseBranch,
+      since: result.since,
+      depth: result.depth,
+      changedFileCount: result.changedFiles.length,
+      changedFiles: result.changedFiles,
+      impactedCount: result.impacted.length,
+      truncated: result.truncated,
+      impacted: result.impacted,
+      note: result.note,
     };
   }
 }

@@ -29,3 +29,4 @@ export { ExecutorController } from "./executor-controller.js";
 
 export { GraphController } from "./graph-controller.js";
 export type { TracePathInput, TracePathOutput } from "./graph-controller.js";
+export type { ImpactAnalysisInput, ImpactAnalysisOutput } from "./graph-controller.js";

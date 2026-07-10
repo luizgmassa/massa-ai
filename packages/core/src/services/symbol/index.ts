@@ -13,6 +13,14 @@ export type {
   TraceDirection,
   TraceMode,
 } from "./trace-path.js";
+export { ImpactAnalysisService, impactAnalysisService, defaultDiffRunner } from "./impact-analysis.js";
+export type {
+  ImpactAnalysisOptions,
+  ImpactAnalysisResult,
+  ImpactScope,
+  ChangedFile,
+  ImpactedSymbol,
+} from "./impact-analysis.js";
 export type {
   DefinitionResult,
   ReferenceResult,

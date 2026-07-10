@@ -352,6 +352,87 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
     },
   )
 
+  .post(
+    "/symbol/impact",
+    async ({ body }) => {
+      try {
+        const {
+          projectId,
+          projectPath,
+          scope,
+          base_branch,
+          since,
+          depth,
+          paths,
+        } = body as Record<string, unknown> as {
+          projectId: string;
+          projectPath: string;
+          scope?: string;
+          base_branch?: string;
+          since?: string;
+          depth?: number;
+          paths?: string[];
+        };
+
+        if (!projectId)
+          return { success: false, error: "projectId is required" };
+        if (!projectPath)
+          return {
+            success: false,
+            error:
+              "projectPath is required (absolute path to the working tree where git runs).",
+          };
+
+        const result = await getGraphController().analyzeImpact({
+          projectId,
+          projectPath,
+          scope: (scope as "unstaged" | "staged" | "committed" | undefined) ?? "unstaged",
+          base_branch,
+          since,
+          depth,
+          paths,
+        });
+
+        return { success: true, data: result };
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    },
+    {
+      body: t.Object({
+        projectId: t.String({ description: "The project ID to analyze" }),
+        projectPath: t.String({
+          description: "Absolute path to the project working tree (where git runs)",
+        }),
+        scope: t.Optional(
+          t.Union(
+            [t.Literal("unstaged"), t.Literal("staged"), t.Literal("committed")],
+            { description: "unstaged (default) | staged | committed" },
+          ),
+        ),
+        base_branch: t.Optional(
+          t.String({ description: "For committed scope: diff vs this branch (default main)" }),
+        ),
+        since: t.Optional(
+          t.String({ description: "For committed scope: commits since this ref/date (wins over base_branch)" }),
+        ),
+        depth: t.Optional(
+          t.Number({ description: "Propagation depth through reverse import graph (default 2, max 4)" }),
+        ),
+        paths: t.Optional(
+          t.Array(t.String(), { description: "Optional filter — only these changed relative paths" }),
+        ),
+      }),
+      detail: {
+        tags: ["symbol"],
+        summary: "Impact analysis — git diff → impacted symbols ranked by centrality risk",
+        description:
+          "Runs a scoped git diff, maps changed files → symbols, then reverse-traverses importers + references to find impacted consumers, ranked by PageRank centrality + proximity. " +
+          "Params: projectId, projectPath, scope (unstaged|staged|committed), base_branch/since (committed), depth (default 2), paths (filter).",
+      },
+    },
+  )
+
   .get(
     "/workspace/:id/map",
     async ({ params, query }) => {
