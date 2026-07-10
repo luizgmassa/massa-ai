@@ -5,6 +5,8 @@
  * and batch loading performance optimizations.
  *
  * Performance focus: Validates that batch loading eliminates N+1 queries.
+ *
+ * All store + query methods are async (IGraphStore contract, structural gap #14).
  */
 
 import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
@@ -142,23 +144,32 @@ describe("GraphQueries", () => {
 
   // ── getRelatedContext ──────────────────────────────────────
   describe("getRelatedContext - Batch Loading", () => {
-    test("batch loads memories per BFS level (reduces queries from O(N) to O(depth))", () => {
+    test("batch loads memories per BFS level (reduces queries from O(N) to O(depth))", async () => {
       // Create a graph: mem1 -> mem2, mem3, mem4, mem5 (depth 1)
       //                 mem2 -> mem6, mem7 (depth 2)
       for (let i = 2; i <= 5; i++) {
-        store.createEdge("mem1", `mem${i}`, MemoryRelationType.RELATES_TO, {
+        await store.createEdge({
+          sourceId: "mem1",
+          targetId: `mem${i}`,
+          relationType: MemoryRelationType.RELATES_TO,
           weight: 0.8,
         });
       }
-      store.createEdge("mem2", "mem6", MemoryRelationType.RELATES_TO, {
+      await store.createEdge({
+        sourceId: "mem2",
+        targetId: "mem6",
+        relationType: MemoryRelationType.RELATES_TO,
         weight: 0.7,
       });
-      store.createEdge("mem2", "mem7", MemoryRelationType.RELATES_TO, {
+      await store.createEdge({
+        sourceId: "mem2",
+        targetId: "mem7",
+        relationType: MemoryRelationType.RELATES_TO,
         weight: 0.7,
       });
 
       counter.start();
-      const related = queries.getRelatedContext("mem1", { maxDepth: 2 });
+      const related = await queries.getRelatedContext("mem1", { maxDepth: 2 });
       counter.stop();
 
       // Expected: 2 batch queries (one per BFS level)
@@ -168,16 +179,19 @@ describe("GraphQueries", () => {
       expect(related.length).toBe(6); // mem2-5 at depth 1, mem6-7 at depth 2
     });
 
-    test("handles large fan-out efficiently (50+ neighbors)", () => {
+    test("handles large fan-out efficiently (50+ neighbors)", async () => {
       // Create hub: mem1 connects to mem2-mem51 (50 neighbors)
       for (let i = 2; i <= 51; i++) {
-        store.createEdge("mem1", `mem${i}`, MemoryRelationType.RELATES_TO, {
+        await store.createEdge({
+          sourceId: "mem1",
+          targetId: `mem${i}`,
+          relationType: MemoryRelationType.RELATES_TO,
           weight: 0.5,
         });
       }
 
       counter.start();
-      const related = queries.getRelatedContext("mem1", {
+      const related = await queries.getRelatedContext("mem1", {
         maxDepth: 1,
         limit: 50,
       });
@@ -193,19 +207,20 @@ describe("GraphQueries", () => {
 
   // ── findContradictions ─────────────────────────────────────
   describe("findContradictions - Batch Loading", () => {
-    test("batch loads all memories in one query", () => {
+    test("batch loads all memories in one query", async () => {
       // Create 10 contradiction edges
       for (let i = 1; i <= 10; i++) {
-        store.createEdge(
-          `mem${i}`,
-          `mem${i + 10}`,
-          MemoryRelationType.CONTRADICTS,
-          { weight: 0.9, evidence: `Contradiction ${i}` }
-        );
+        await store.createEdge({
+          sourceId: `mem${i}`,
+          targetId: `mem${i + 10}`,
+          relationType: MemoryRelationType.CONTRADICTS,
+          weight: 0.9,
+          evidence: `Contradiction ${i}`,
+        });
       }
 
       counter.start();
-      const contradictions = queries.findContradictions(10);
+      const contradictions = await queries.findContradictions(10);
       counter.stop();
 
       // Should use 1 batch query for all 20 memories (10 pairs)
@@ -214,20 +229,29 @@ describe("GraphQueries", () => {
       expect(contradictions.length).toBe(10);
     });
 
-    test("handles overlapping memory IDs efficiently", () => {
+    test("handles overlapping memory IDs efficiently", async () => {
       // Create contradictions where some memories appear multiple times
-      store.createEdge("mem1", "mem2", MemoryRelationType.CONTRADICTS, {
+      await store.createEdge({
+        sourceId: "mem1",
+        targetId: "mem2",
+        relationType: MemoryRelationType.CONTRADICTS,
         weight: 0.9,
       });
-      store.createEdge("mem1", "mem3", MemoryRelationType.CONTRADICTS, {
+      await store.createEdge({
+        sourceId: "mem1",
+        targetId: "mem3",
+        relationType: MemoryRelationType.CONTRADICTS,
         weight: 0.8,
       });
-      store.createEdge("mem2", "mem4", MemoryRelationType.CONTRADICTS, {
+      await store.createEdge({
+        sourceId: "mem2",
+        targetId: "mem4",
+        relationType: MemoryRelationType.CONTRADICTS,
         weight: 0.7,
       });
 
       counter.start();
-      const contradictions = queries.findContradictions(10);
+      const contradictions = await queries.findContradictions(10);
       counter.stop();
 
       // Should deduplicate mem1, mem2 and batch load 4 unique memories
@@ -238,24 +262,24 @@ describe("GraphQueries", () => {
 
   // ── getHubMemories ─────────────────────────────────────────
   describe("getHubMemories - Batch Loading", () => {
-    test("batch loads all hub memories in one query", () => {
+    test("batch loads all hub memories in one query", async () => {
       // Create 10 hub nodes with varying degrees
       for (let i = 1; i <= 10; i++) {
         for (let j = 0; j < i * 5; j++) {
           const targetIdx = 10 + i * 10 + j;
           if (targetIdx <= 100) {
-            store.createEdge(
-              `mem${i}`,
-              `mem${targetIdx}`,
-              MemoryRelationType.RELATES_TO,
-              { weight: 0.5 }
-            );
+            await store.createEdge({
+              sourceId: `mem${i}`,
+              targetId: `mem${targetIdx}`,
+              relationType: MemoryRelationType.RELATES_TO,
+              weight: 0.5,
+            });
           }
         }
       }
 
       counter.start();
-      const hubs = queries.getHubMemories(10);
+      const hubs = await queries.getHubMemories(10);
       counter.stop();
 
       // Should use 1 batch query instead of 10 individual queries
@@ -267,23 +291,15 @@ describe("GraphQueries", () => {
 
   // ── findPath + reconstructPath ─────────────────────────────
   describe("findPath - Batch Loading", () => {
-    test("batch loads path memories in one query", () => {
+    test("batch loads path memories in one query", async () => {
       // Create a path: mem1 -> mem2 -> mem3 -> mem4 -> mem5
-      store.createEdge("mem1", "mem2", MemoryRelationType.RELATES_TO, {
-        weight: 0.8,
-      });
-      store.createEdge("mem2", "mem3", MemoryRelationType.RELATES_TO, {
-        weight: 0.8,
-      });
-      store.createEdge("mem3", "mem4", MemoryRelationType.RELATES_TO, {
-        weight: 0.8,
-      });
-      store.createEdge("mem4", "mem5", MemoryRelationType.RELATES_TO, {
-        weight: 0.8,
-      });
+      await store.createEdge({ sourceId: "mem1", targetId: "mem2", relationType: MemoryRelationType.RELATES_TO, weight: 0.8 });
+      await store.createEdge({ sourceId: "mem2", targetId: "mem3", relationType: MemoryRelationType.RELATES_TO, weight: 0.8 });
+      await store.createEdge({ sourceId: "mem3", targetId: "mem4", relationType: MemoryRelationType.RELATES_TO, weight: 0.8 });
+      await store.createEdge({ sourceId: "mem4", targetId: "mem5", relationType: MemoryRelationType.RELATES_TO, weight: 0.8 });
 
       counter.start();
-      const graphPath = queries.findPath("mem1", "mem5", 5);
+      const graphPath = await queries.findPath("mem1", "mem5", 5);
       counter.stop();
 
       // Should use 1 batch query for path reconstruction (5 nodes)
@@ -294,10 +310,10 @@ describe("GraphQueries", () => {
       expect(graphPath!.length).toBe(4);
     });
 
-    test("handles no path found without excessive queries", () => {
+    test("handles no path found without excessive queries", async () => {
       // No edges, so no path exists
       counter.start();
-      const graphPath = queries.findPath("mem1", "mem50", 3);
+      const graphPath = await queries.findPath("mem1", "mem50", 3);
       counter.stop();
 
       expect(graphPath).toBeNull();
@@ -308,26 +324,26 @@ describe("GraphQueries", () => {
 
   // ── Performance Benchmark ──────────────────────────────────
   describe("Performance Benchmark", () => {
-    test("demonstrates O(depth) queries instead of O(N) for deep BFS", () => {
+    test("demonstrates O(depth) queries instead of O(N) for deep BFS", async () => {
       // Create a linear chain for predictable testing
       // mem1 -> mem2 -> mem3 -> mem4 -> mem5
       // Also add siblings at each level to test batch loading
       // Level 1: mem2, mem11
       // Level 2: mem3, mem12 (from mem2)
       // Level 3: mem4, mem13 (from mem3)
-      
-      store.createEdge("mem1", "mem2", MemoryRelationType.RELATES_TO, { weight: 0.8 });
-      store.createEdge("mem1", "mem11", MemoryRelationType.RELATES_TO, { weight: 0.8 });
-      
-      store.createEdge("mem2", "mem3", MemoryRelationType.RELATES_TO, { weight: 0.7 });
-      store.createEdge("mem2", "mem12", MemoryRelationType.RELATES_TO, { weight: 0.7 });
-      
-      store.createEdge("mem3", "mem4", MemoryRelationType.RELATES_TO, { weight: 0.6 });
-      store.createEdge("mem3", "mem13", MemoryRelationType.RELATES_TO, { weight: 0.6 });
+
+      await store.createEdge({ sourceId: "mem1", targetId: "mem2", relationType: MemoryRelationType.RELATES_TO, weight: 0.8 });
+      await store.createEdge({ sourceId: "mem1", targetId: "mem11", relationType: MemoryRelationType.RELATES_TO, weight: 0.8 });
+
+      await store.createEdge({ sourceId: "mem2", targetId: "mem3", relationType: MemoryRelationType.RELATES_TO, weight: 0.7 });
+      await store.createEdge({ sourceId: "mem2", targetId: "mem12", relationType: MemoryRelationType.RELATES_TO, weight: 0.7 });
+
+      await store.createEdge({ sourceId: "mem3", targetId: "mem4", relationType: MemoryRelationType.RELATES_TO, weight: 0.6 });
+      await store.createEdge({ sourceId: "mem3", targetId: "mem13", relationType: MemoryRelationType.RELATES_TO, weight: 0.6 });
 
       const startTime = performance.now();
       counter.start();
-      const related = queries.getRelatedContext("mem1", { maxDepth: 3, limit: 50 });
+      const related = await queries.getRelatedContext("mem1", { maxDepth: 3, limit: 50 });
       counter.stop();
       const endTime = performance.now();
 

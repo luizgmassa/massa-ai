@@ -253,7 +253,7 @@ export class MemoryController {
 
     if (deleted) {
       // Sever graph edges (best-effort; never fails the delete).
-      this.graph.onMemoryDeleted(id);
+      void this.graph.onMemoryDeleted(id);
       logger.info("Memory deleted", { id });
     }
 
@@ -331,7 +331,7 @@ export class MemoryController {
     if (includeRelated && rankedResults.length > 0) {
       try {
         for (const mem of rankedResults.slice(0, 3)) {
-          const summary = this.graph.getNeighborhoodSummary(mem.id);
+          const summary = await this.graph.getNeighborhoodSummary(mem.id);
           if (summary) {
             relatedSummaries[mem.id] = summary;
           }

@@ -22,13 +22,12 @@ import { logger, MemoryLevel, MemoryType, MemoryRelationType } from "@massa-th0t
 import { randomUUID } from "crypto";
 import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
 import { getGraphStore } from "../graph/graph-store-factory.js";
+import type { IGraphStore } from "../graph/types.js";
 import { eventBus } from "../events/event-bus.js";
 import { decayScore, DEFAULT_DECAY_PARAMS } from "../memory/decay.js";
 import { consolidateWindow, rowsToCandidates, type LlmSurface } from "../memory/consolidator.js";
 import { llm as defaultLlmSurface } from "../memory/llm-client.js";
 import type { MemoryRow } from "../../data/memory/memory-repository.js";
-import type { GraphStore } from "../graph/graph-store.js";
-import type { GraphStorePg } from "../graph/graph-store-pg.js";
 
 export interface ConsolidationStats {
   promoted: number;
@@ -44,38 +43,25 @@ export interface ConsolidationStats {
 const DAY = 24 * 60 * 60 * 1000;
 
 /**
- * Add a SUPERSEDES edge polymorphically across the GraphStore union.
- * SQLite createEdge is sync (sourceId, targetId, relationType, options);
- * PG createEdge is async ({sourceId, targetId, relationType, ...}).
+ * Add a SUPERSEDES edge polymorphically via the unified `IGraphStore` contract.
+ * Both backends accept the same async single-object `createEdge` signature
+ * (structural gap #14), so no duck-typed dispatch is needed.
  */
 async function addSupercedesEdge(
-  store: GraphStore | GraphStorePg,
+  store: IGraphStore,
   newId: string,
   sourceId: string,
   batchId: string,
 ): Promise<void> {
   const evidence = JSON.stringify({ batchId, consolidated: true });
-  // Detect the PG shape by arity/prototype. Both classes expose createEdge;
-  // the PG variant takes a single object argument.
-  // We use a duck-type: PG createEdge has arity 1.
-  const anyStore = store as any;
-  if (anyStore.createEdge.length === 1) {
-    // GraphStorePg
-    await anyStore.createEdge({
-      sourceId: newId,
-      targetId: sourceId,
-      relationType: MemoryRelationType.SUPERSEDES,
-      weight: 1.0,
-      evidence,
-    });
-  } else {
-    // GraphStore (SQLite) — sync, but normalize to a promise.
-    anyStore.createEdge(newId, sourceId, MemoryRelationType.SUPERSEDES, {
-      weight: 1.0,
-      evidence,
-      autoExtracted: true,
-    });
-  }
+  await store.createEdge({
+    sourceId: newId,
+    targetId: sourceId,
+    relationType: MemoryRelationType.SUPERSEDES,
+    weight: 1.0,
+    evidence,
+    autoExtracted: true,
+  });
 }
 
 /**
@@ -262,7 +248,7 @@ export class MemoryConsolidationJob {
    */
   private async mergeMemories(
     repo: any,
-    graphStore: GraphStore | GraphStorePg,
+    graphStore: IGraphStore,
     staleSinceMs: number,
     now: number,
   ): Promise<{ merged: number; batchesCreated: number }> {

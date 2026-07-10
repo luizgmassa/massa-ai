@@ -210,13 +210,13 @@ describe("MemoryController update (merge tags) + delete (sever edges)", () => {
     insertMemory(repo, "c2", "edge source");
     insertMemory(repo, "c3", "edge target");
 
-    graph.linkMemories("c2", "c3", MemoryRelationType.RELATES_TO);
-    expect(graph.getEdges("c2").length).toBeGreaterThan(0);
+    await graph.linkMemories("c2", "c3", MemoryRelationType.RELATES_TO);
+    expect((await graph.getEdges("c2")).length).toBeGreaterThan(0);
 
     const result = await controller.delete("c2");
     expect(result.deleted).toBe(true);
     expect(repo.getById("c2")).toBeNull();
-    expect(graph.getEdges("c2").length).toBe(0);
+    expect((await graph.getEdges("c2")).length).toBe(0);
   });
 
   test("delete on a missing id returns deleted:false", async () => {
@@ -332,8 +332,7 @@ describe("MemoryConsolidationJob — SQLite integration (Phase 1)", () => {
     ageRows(["a", "b"], 8);
     const stats = await job.consolidate();
     expect(stats.batchesCreated).toBe(0);
-    const sup = graph
-      .getIncomingEdges("a")
+    const sup = (await graph.getIncomingEdges("a"))
       .filter((e: any) => e.relationType === MemoryRelationType.SUPERSEDES);
     expect(sup.length).toBe(0);
   });
@@ -357,10 +356,10 @@ describe("MemoryConsolidationJob — SQLite integration (Phase 1)", () => {
     expect(fired).not.toBeNull();
     expect(fired.sourceIds.sort()).toEqual(["a", "b"]);
 
-    const supA = graph.getIncomingEdges("a").find(
+    const supA = (await graph.getIncomingEdges("a")).find(
       (e: any) => e.relationType === MemoryRelationType.SUPERSEDES && e.targetId === "a",
     );
-    const supB = graph.getIncomingEdges("b").find(
+    const supB = (await graph.getIncomingEdges("b")).find(
       (e: any) => e.relationType === MemoryRelationType.SUPERSEDES && e.targetId === "b",
     );
     expect(supA).toBeDefined();

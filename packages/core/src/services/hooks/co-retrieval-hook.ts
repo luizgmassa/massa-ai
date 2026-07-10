@@ -25,7 +25,8 @@
 import { logger, MemoryRelationType } from "@massa-th0th/shared";
 import { eventBus } from "../events/event-bus.js";
 import type { EventMap } from "../events/event-bus.js";
-import { GraphStore } from "../graph/graph-store.js";
+import { getGraphStore } from "../graph/graph-store-factory.js";
+import type { IGraphStore } from "../graph/types.js";
 import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
 import type { MemoryRepositoryPg } from "../../data/memory/memory-repository-pg.js";
 
@@ -36,11 +37,22 @@ const SESSION_WINDOW_MS = 10 * 60 * 1000; // 10-minute co-session window
 const MAX_PEERS = 5;                        // limit combinatorial pairs
 const AUTO_SEARCH_TAG = "auto:search-session";
 
-/** Subset of GraphStore used by CoRetrievalHook — injectable for testing. */
+/**
+ * Subset of `IGraphStore` used by CoRetrievalHook — injectable for testing.
+ * All methods are async to match the backend-agnostic `IGraphStore` contract
+ * (structural gap #14).
+ */
 export interface IGraphStoreEdges {
-  getEdge(sourceId: string, targetId: string, relationType: MemoryRelationType): any;
-  createEdge(sourceId: string, targetId: string, relationType: MemoryRelationType, opts?: any): any;
-  incrementEdgeWeight(sourceId: string, targetId: string, relationType: MemoryRelationType, delta: number, maxWeight?: number): boolean;
+  getEdge(sourceId: string, targetId: string, relationType: MemoryRelationType): Promise<any>;
+  createEdge(edge: {
+    sourceId: string;
+    targetId: string;
+    relationType: MemoryRelationType;
+    weight?: number;
+    evidence?: string;
+    autoExtracted?: boolean;
+  }): Promise<any>;
+  incrementEdgeWeight(sourceId: string, targetId: string, relationType: MemoryRelationType, delta: number, maxWeight?: number): Promise<boolean>;
 }
 
 export class CoRetrievalHook {
@@ -49,7 +61,10 @@ export class CoRetrievalHook {
   private readonly graphStore: IGraphStoreEdges;
 
   private constructor(graphStore?: IGraphStoreEdges) {
-    this.graphStore = graphStore ?? GraphStore.getInstance();
+    // Route through the factory so the PG store is used when DATABASE_URL
+    // points at PostgreSQL (structural gap #14). The factory returns an
+    // IGraphStore, which satisfies IGraphStoreEdges structurally.
+    this.graphStore = graphStore ?? (getGraphStore() as unknown as IGraphStoreEdges);
   }
 
   static getInstance(): CoRetrievalHook {
@@ -119,10 +134,10 @@ export class CoRetrievalHook {
       // Deterministic pair ordering prevents duplicate edges (A↔B == B↔A)
       const [from, to] = [memoryId, peer.id].sort();
 
-      const existing = this.graphStore.getEdge(from, to, MemoryRelationType.RELATES_TO);
+      const existing = await this.graphStore.getEdge(from, to, MemoryRelationType.RELATES_TO);
 
       if (existing) {
-        const ok = this.graphStore.incrementEdgeWeight(
+        const ok = await this.graphStore.incrementEdgeWeight(
           from,
           to,
           MemoryRelationType.RELATES_TO,
@@ -131,7 +146,10 @@ export class CoRetrievalHook {
         );
         if (ok) reinforced++;
       } else {
-        const edge = this.graphStore.createEdge(from, to, MemoryRelationType.RELATES_TO, {
+        const edge = await this.graphStore.createEdge({
+          sourceId: from,
+          targetId: to,
+          relationType: MemoryRelationType.RELATES_TO,
           weight: INITIAL_WEIGHT,
           evidence: "co-retrieved in session",
           autoExtracted: true,

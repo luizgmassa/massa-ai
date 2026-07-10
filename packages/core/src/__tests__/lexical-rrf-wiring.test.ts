@@ -109,7 +109,7 @@ afterAll(async () => {
   const graph = getGraphStore();
   for (const id of memoryIds) {
     try {
-      (graph as any).deleteEdgesForMemory?.(id);
+      await (graph as any).deleteEdgesForMemory?.(id);
     } catch { /* ignore */ }
   }
   try {
@@ -206,7 +206,11 @@ describe("A3: code-graph stream id-bridge", () => {
 
     let edgeCreated = false;
     try {
-      repo.insert({
+      // Await the inserts: the PG repo's insert is async, and the edge
+      // creation below has an FK constraint on memories.id. Without await,
+      // the insert promise may not have committed when createEdge runs —
+      // causing a foreign-key violation under batch timing (the A3 flake).
+      await repo.insert({
         id: mem1Id,
         content: "Decision: payment.ts processPayment handles all checkout flows",
         type: "decision",
@@ -217,7 +221,7 @@ describe("A3: code-graph stream id-bridge", () => {
         userId: "test",
         projectId: PROJECT_ID,
       } as any);
-      repo.insert({
+      await repo.insert({
         id: mem2Id,
         content: "Related: the payment pipeline also validates currency",
         type: "pattern",
@@ -229,34 +233,17 @@ describe("A3: code-graph stream id-bridge", () => {
         projectId: PROJECT_ID,
       } as any);
 
-      // Edge creation is backend-divergent: SQLite GraphStore.createEdge takes
-      // positional args (sourceId, targetId, relationType, opts) and is sync,
-      // while the PG GraphStorePg.createEdge takes a single object and is async.
-      // Try the positional form first (SQLite), then the object form (PG).
+      // createEdge is now unified across backends (IGraphStore contract,
+      // structural gap #14): async + single-object. No more divergent dispatch.
       try {
-        const r = await Promise.resolve(
-          (graph as any).createEdge?.(
-            mem1Id,
-            mem2Id,
-            "references",
-            { weight: 0.8, autoExtracted: false },
-          ),
-        ).catch(() => null);
-        if (r == null) {
-          // Fall back to the PG object form.
-          const r2 = await (graph as any)
-            .createEdge?.({
-              sourceId: mem1Id,
-              targetId: mem2Id,
-              relationType: "references",
-              weight: 0.8,
-              autoExtracted: false,
-            })
-            .catch(() => null);
-          edgeCreated = r2 != null;
-        } else {
-          edgeCreated = true;
-        }
+        const r = await graph.createEdge({
+          sourceId: mem1Id,
+          targetId: mem2Id,
+          relationType: "references" as any,
+          weight: 0.8,
+          autoExtracted: false,
+        });
+        edgeCreated = r != null;
       } catch (e2) {
         console.warn("A3 edge creation skipped:", (e2 as Error).message);
       }

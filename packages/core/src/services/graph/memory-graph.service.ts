@@ -8,6 +8,10 @@
  * and GraphQueries. Tools and other services interact with the graph
  * exclusively through this service, keeping them decoupled from
  * graph internals.
+ *
+ * Uses `getGraphStore()` (the factory) so the active backend is selected
+ * by `DATABASE_URL` — SQLite or PostgreSQL — rather than hardcoding the
+ * SQLite singleton (structural gap #14).
  */
 
 import {
@@ -17,10 +21,10 @@ import {
   ContradictionPair,
   logger,
 } from "@massa-th0th/shared";
-import { GraphStore } from "./graph-store.js";
+import { getGraphStore } from "./graph-store-factory.js";
 import { RelationExtractor } from "./relation-extractor.js";
 import { GraphQueries } from "./graph-queries.js";
-import type { RelatedMemory, MemoryRow } from "./types.js";
+import type { IGraphStore, RelatedMemory, MemoryRow } from "./types.js";
 
 // Re-export for consumers
 export type { GraphQueryOptions, ContradictionPair, RelatedMemory, MemoryRow };
@@ -28,12 +32,14 @@ export type { GraphQueryOptions, ContradictionPair, RelatedMemory, MemoryRow };
 export class MemoryGraphService {
   private static instance: MemoryGraphService | null = null;
 
-  private readonly store: GraphStore;
+  private readonly store: IGraphStore;
   private readonly extractor: RelationExtractor;
   private readonly queries: GraphQueries;
 
   private constructor() {
-    this.store = GraphStore.getInstance();
+    // Route through the factory so the PG store is used when DATABASE_URL
+    // points at PostgreSQL (structural gap #14).
+    this.store = getGraphStore();
     this.extractor = new RelationExtractor(this.store);
     this.queries = new GraphQueries(this.store);
   }
@@ -58,12 +64,13 @@ export class MemoryGraphService {
     try {
       // 1. Create explicit edges requested by the caller
       for (const targetId of linkTo) {
-        this.store.createEdge(
-          memoryId,
+        await this.store.createEdge({
+          sourceId: memoryId,
           targetId,
-          MemoryRelationType.RELATES_TO,
-          { weight: 0.8, evidence: "Explicit link by user/agent" },
-        );
+          relationType: MemoryRelationType.RELATES_TO,
+          weight: 0.8,
+          evidence: "Explicit link by user/agent",
+        });
       }
 
       // 2. Extract automatic relations (non-blocking)
@@ -89,9 +96,9 @@ export class MemoryGraphService {
    * Called when a memory is deleted.
    * Cleans up all connected edges.
    */
-  onMemoryDeleted(memoryId: string): void {
+  async onMemoryDeleted(memoryId: string): Promise<void> {
     try {
-      const removed = this.store.deleteEdgesForMemory(memoryId);
+      const removed = await this.store.deleteEdgesForMemory(memoryId);
       if (removed > 0) {
         logger.info("Graph edges cleaned after memory delete", {
           memoryId,
@@ -111,35 +118,35 @@ export class MemoryGraphService {
   /**
    * Get memories related to a given memory via graph traversal.
    */
-  getRelatedContext(memoryId: string, options?: GraphQueryOptions) {
+  async getRelatedContext(memoryId: string, options?: GraphQueryOptions) {
     return this.queries.getRelatedContext(memoryId, options);
   }
 
   /**
    * Find the shortest path between two memories.
    */
-  findPath(fromId: string, toId: string, maxDepth?: number) {
+  async findPath(fromId: string, toId: string, maxDepth?: number) {
     return this.queries.findPath(fromId, toId, maxDepth);
   }
 
   /**
    * Detect contradictions in the memory graph.
    */
-  findContradictions(limit?: number): ContradictionPair[] {
+  async findContradictions(limit?: number): Promise<ContradictionPair[]> {
     return this.queries.findContradictions(limit);
   }
 
   /**
    * Follow the decision chain leading to a memory.
    */
-  getDecisionChain(memoryId: string, maxDepth?: number) {
+  async getDecisionChain(memoryId: string, maxDepth?: number) {
     return this.queries.getDecisionChain(memoryId, maxDepth);
   }
 
   /**
    * Get hub memories (most connected nodes).
    */
-  getHubMemories(limit?: number) {
+  async getHubMemories(limit?: number) {
     return this.queries.getHubMemories(limit);
   }
 
@@ -147,7 +154,7 @@ export class MemoryGraphService {
    * Get a human-readable summary of a memory's neighborhood.
    * Useful for injecting into LLM context alongside search results.
    */
-  getNeighborhoodSummary(memoryId: string): string {
+  async getNeighborhoodSummary(memoryId: string): Promise<string> {
     return this.queries.getNeighborhoodSummary(memoryId);
   }
 
@@ -156,13 +163,16 @@ export class MemoryGraphService {
   /**
    * Create a manual edge between two memories.
    */
-  linkMemories(
+  async linkMemories(
     sourceId: string,
     targetId: string,
     relationType: MemoryRelationType,
     options?: { weight?: number; evidence?: string },
-  ): MemoryEdge | null {
-    return this.store.createEdge(sourceId, targetId, relationType, {
+  ): Promise<MemoryEdge | null> {
+    return this.store.createEdge({
+      sourceId,
+      targetId,
+      relationType,
       ...options,
       autoExtracted: false,
     });
@@ -171,14 +181,14 @@ export class MemoryGraphService {
   /**
    * Remove an edge by ID.
    */
-  unlinkMemories(edgeId: string): boolean {
+  async unlinkMemories(edgeId: string): Promise<boolean> {
     return this.store.deleteEdge(edgeId);
   }
 
   /**
    * Get all edges for a memory.
    */
-  getEdges(memoryId: string) {
+  async getEdges(memoryId: string) {
     return this.store.getAllEdges(memoryId);
   }
 
@@ -187,14 +197,14 @@ export class MemoryGraphService {
   /**
    * Get graph-level statistics.
    */
-  getStats() {
+  async getStats() {
     return this.store.getStats();
   }
 
   /**
    * Get degree centrality for a specific memory.
    */
-  getDegree(memoryId: string) {
+  async getDegree(memoryId: string) {
     return this.store.getDegree(memoryId);
   }
 }

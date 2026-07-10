@@ -16,9 +16,10 @@ import {
   logger,
 } from "@massa-th0th/shared";
 import { EmbeddingService } from "../embeddings/index.js";
-import { GraphStore } from "./graph-store.js";
+import { getGraphStore } from "./graph-store-factory.js";
 import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
 import type { MemoryRow } from "../../data/memory/memory-repository.js";
+import type { IGraphStore } from "./types.js";
 
 interface ExtractionOptions {
   /** Max similar memories to compare against */
@@ -98,11 +99,11 @@ const SUPPORT_SIGNALS = [
 
 export class RelationExtractor {
   private embeddingService: EmbeddingService;
-  private graphStore: GraphStore;
+  private graphStore: IGraphStore;
 
-  constructor(graphStore?: GraphStore) {
+  constructor(graphStore?: IGraphStore) {
     this.embeddingService = new EmbeddingService();
-    this.graphStore = graphStore ?? GraphStore.getInstance();
+    this.graphStore = graphStore ?? getGraphStore();
   }
 
   /**
@@ -165,16 +166,14 @@ export class RelationExtractor {
           relation.relation !== "NONE" &&
           relation.confidence >= opts.confidenceThreshold
         ) {
-          const edge = this.graphStore.createEdge(
-            memoryId,
-            candidate.id,
-            relation.relation as MemoryRelationType,
-            {
-              weight: relation.confidence,
-              evidence: relation.evidence,
-              autoExtracted: true,
-            },
-          );
+          const edge = await this.graphStore.createEdge({
+            sourceId: memoryId,
+            targetId: candidate.id,
+            relationType: relation.relation as MemoryRelationType,
+            weight: relation.confidence,
+            evidence: relation.evidence,
+            autoExtracted: true,
+          });
 
           if (edge) {
             edgesCreated++;

@@ -54,8 +54,8 @@ import {
   config,
   logger,
 } from "@massa-th0th/shared";
-import { GraphStore } from "./graph-store.js";
-import type { MemoryRow, RelatedMemory } from "./types.js";
+import { getGraphStore } from "./graph-store-factory.js";
+import type { IGraphStore, MemoryRow, RelatedMemory } from "./types.js";
 
 export type { RelatedMemory, MemoryRow };
 
@@ -69,10 +69,10 @@ const DEFAULT_OPTIONS: Required<GraphQueryOptions> = {
 
 export class GraphQueries {
   private db!: Database;
-  private graphStore: GraphStore;
+  private graphStore: IGraphStore;
 
-  constructor(graphStore?: GraphStore) {
-    this.graphStore = graphStore ?? GraphStore.getInstance();
+  constructor(graphStore?: IGraphStore) {
+    this.graphStore = graphStore ?? getGraphStore();
     this.initDb();
   }
 
@@ -92,10 +92,10 @@ export class GraphQueries {
    * Performance: Batch loads all memories per BFS level, reducing
    * query count from O(N) to O(maxDepth).
    */
-  getRelatedContext(
+  async getRelatedContext(
     memoryId: string,
     options?: GraphQueryOptions,
-  ): RelatedMemory[] {
+  ): Promise<RelatedMemory[]> {
     const opts = { ...DEFAULT_OPTIONS, ...options };
     const visited = new Set<string>([memoryId]);
     const result: RelatedMemory[] = [];
@@ -119,7 +119,7 @@ export class GraphQueries {
         if (depth >= opts.maxDepth) continue;
 
         // Get edges from current node
-        const edges = this.graphStore.getAllEdges(currentId, {
+        const edges = await this.graphStore.getAllEdges(currentId, {
           relationTypes:
             opts.relationTypes.length > 0 ? opts.relationTypes : undefined,
           minWeight: opts.minWeight,
@@ -184,11 +184,11 @@ export class GraphQueries {
    * Find shortest path between two memories using BFS.
    * Returns null if no path exists within maxDepth.
    */
-  findPath(
+  async findPath(
     fromId: string,
     toId: string,
     maxDepth: number = 5,
-  ): GraphPath | null {
+  ): Promise<GraphPath | null> {
     if (fromId === toId) {
       const memory = this.loadMemory(fromId);
       return memory
@@ -210,7 +210,7 @@ export class GraphQueries {
 
       if (depth >= maxDepth) continue;
 
-      const edges = this.graphStore.getAllEdges(currentId, { limit: 30 });
+      const edges = await this.graphStore.getAllEdges(currentId, { limit: 30 });
 
       for (const edge of edges) {
         const neighborId =
@@ -281,7 +281,7 @@ export class GraphQueries {
    * Performance: Batch loads all memories in one query instead of
    * 2×limit individual queries.
    */
-  findContradictions(limit: number = 20): ContradictionPair[] {
+  async findContradictions(limit: number = 20): Promise<ContradictionPair[]> {
     const rows = this.db
       .prepare(
         `
@@ -333,10 +333,10 @@ export class GraphQueries {
    * Follow the chain of decisions that led to a given memory.
    * Traverses DERIVED_FROM, CAUSES, and SUPPORTS edges backwards.
    */
-  getDecisionChain(
+  async getDecisionChain(
     memoryId: string,
     maxDepth: number = 5,
-  ): RelatedMemory[] {
+  ): Promise<RelatedMemory[]> {
     return this.getRelatedContext(memoryId, {
       maxDepth,
       relationTypes: [
@@ -358,10 +358,10 @@ export class GraphQueries {
    * Performance: Batch loads all hub memories in one query instead of
    * limit individual queries.
    */
-  getHubMemories(
+  async getHubMemories(
     limit: number = 10,
-  ): { memory: MemoryRow; degree: number }[] {
-    const hubs = this.graphStore.getHubMemories(limit);
+  ): Promise<{ memory: MemoryRow; degree: number }[]> {
+    const hubs = await this.graphStore.getHubMemories(limit);
     const memoryIds = hubs.map((h) => h.memoryId);
     
     // Batch load all hub memories
@@ -384,8 +384,8 @@ export class GraphQueries {
    * Get a compact summary of a memory's neighborhood.
    * Useful for injecting into LLM context.
    */
-  getNeighborhoodSummary(memoryId: string): string {
-    const related = this.getRelatedContext(memoryId, {
+  async getNeighborhoodSummary(memoryId: string): Promise<string> {
+    const related = await this.getRelatedContext(memoryId, {
       maxDepth: 1,
       limit: 10,
     });

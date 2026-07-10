@@ -32,15 +32,22 @@ import { eventBus } from "../services/events/event-bus.js";
 
 function makeMockGraphStore() {
   return {
-    getEdge: mock((_from: string, _to: string, _type: string) => null as any),
-    createEdge: mock((_from: string, _to: string, _type: string, _opts?: any) => ({
+    getEdge: mock(async (_from: string, _to: string, _type: string) => null as any),
+    createEdge: mock(async (edge: {
+      sourceId: string;
+      targetId: string;
+      relationType: string;
+      weight?: number;
+      evidence?: string;
+      autoExtracted?: boolean;
+    }) => ({
       id: "edge_test",
-      sourceId: _from,
-      targetId: _to,
-      relationType: _type,
-      weight: 0.15,
+      sourceId: edge.sourceId,
+      targetId: edge.targetId,
+      relationType: edge.relationType,
+      weight: edge.weight ?? 0.15,
     })),
-    incrementEdgeWeight: mock((..._args: any[]) => true),
+    incrementEdgeWeight: mock(async (..._args: any[]) => true),
   };
 }
 
@@ -152,11 +159,17 @@ describe("CoRetrievalHook", () => {
 
       expect(mockGraph.createEdge).toHaveBeenCalledTimes(1);
       const call = mockGraph.createEdge.mock.calls[0];
+      const edge = call[0] as {
+        sourceId: string;
+        targetId: string;
+        weight?: number;
+        autoExtracted?: boolean;
+      };
       const [from, to] = ["mem_new", "peer_1"].sort();
-      expect(call[0]).toBe(from);
-      expect(call[1]).toBe(to);
-      expect(call[3].weight).toBe(0.15);
-      expect(call[3].autoExtracted).toBe(true);
+      expect(edge.sourceId).toBe(from);
+      expect(edge.targetId).toBe(to);
+      expect(edge.weight).toBe(0.15);
+      expect(edge.autoExtracted).toBe(true);
     });
 
     test("IDs are ordered deterministically (lexicographic min → max)", async () => {
@@ -167,8 +180,11 @@ describe("CoRetrievalHook", () => {
       eventBus.publish("memory:session-stored", makePayload({ memoryId: "aaa_new" }));
       await sleep(20);
 
-      const [from, to] = mockGraph.createEdge.mock.calls[0];
-      expect(from < to).toBe(true);
+      const edge = mockGraph.createEdge.mock.calls[0][0] as {
+        sourceId: string;
+        targetId: string;
+      };
+      expect(edge.sourceId < edge.targetId).toBe(true);
     });
 
     test("does nothing when no peers found", async () => {

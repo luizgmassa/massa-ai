@@ -1,9 +1,13 @@
 /**
- * Graph Store
+ * Graph Store — SQLite implementation.
  *
  * CRUD operations for memory edges in the knowledge graph.
  * Uses SQLite for storage, maintaining consistency with the
  * existing memory architecture.
+ *
+ * Implements the backend-agnostic `IGraphStore` contract (structural gap #14).
+ * All public methods are async so the contract matches the PostgreSQL store;
+ * the sync SQLite logic is wrapped in `async` with no behavioral change.
  */
 
 import { Database } from "bun:sqlite";
@@ -15,6 +19,7 @@ import {
   config,
   logger,
 } from "@massa-th0th/shared";
+import type { EdgeCreateInput, EdgeFilter, IGraphStore } from "./types.js";
 
 interface EdgeRow {
   id: string;
@@ -27,16 +32,7 @@ interface EdgeRow {
   created_at: number;
 }
 
-interface EdgeFilter {
-  sourceId?: string;
-  targetId?: string;
-  relationTypes?: MemoryRelationType[];
-  minWeight?: number;
-  autoExtractedOnly?: boolean;
-  limit?: number;
-}
-
-export class GraphStore {
+export class GraphStore implements IGraphStore {
   private db!: Database;
   private static instance: GraphStore | null = null;
 
@@ -88,7 +84,7 @@ export class GraphStore {
       CREATE INDEX IF NOT EXISTS idx_edges_target ON memory_edges(target_id);
       CREATE INDEX IF NOT EXISTS idx_edges_type ON memory_edges(relation_type);
       CREATE INDEX IF NOT EXISTS idx_edges_weight ON memory_edges(weight DESC);
-      
+
       -- Migration: Drop redundant index if it exists
       DROP INDEX IF EXISTS idx_edges_source;
     `);
@@ -98,19 +94,21 @@ export class GraphStore {
 
   /**
    * Create a new edge between two memories.
-   * Returns the edge if created, null if it already exists.
+   * Returns the edge if created, null if it already exists or on failure.
+   *
+   * Async + single-object signature to satisfy the `IGraphStore` contract
+   * (structural gap #14). The underlying SQLite write is synchronous; the
+   * async wrapper keeps the contract backend-agnostic.
    */
-  createEdge(
-    sourceId: string,
-    targetId: string,
-    relationType: MemoryRelationType,
-    options: {
-      weight?: number;
-      evidence?: string;
-      autoExtracted?: boolean;
-    } = {},
-  ): MemoryEdge | null {
-    const { weight = 1.0, evidence, autoExtracted = false } = options;
+  async createEdge(input: EdgeCreateInput): Promise<MemoryEdge | null> {
+    const {
+      sourceId,
+      targetId,
+      relationType,
+      weight = 1.0,
+      evidence,
+      autoExtracted = false,
+    } = input;
 
     if (sourceId === targetId) {
       logger.warn("Cannot create self-referencing edge", { sourceId });
@@ -186,11 +184,11 @@ export class GraphStore {
   /**
    * Get a specific edge by source, target, and relation type.
    */
-  getEdge(
+  async getEdge(
     sourceId: string,
     targetId: string,
     relationType: MemoryRelationType,
-  ): MemoryEdge | null {
+  ): Promise<MemoryEdge | null> {
     const row = this.db
       .prepare(
         `
@@ -205,15 +203,18 @@ export class GraphStore {
 
   /**
    * Get all edges from a source memory.
+   *
+   * Not on the `IGraphStore` contract (used internally by `bfsNeighbors`),
+   * but kept async for consistency with the PG store.
    */
-  getOutgoingEdges(memoryId: string, filter?: EdgeFilter): MemoryEdge[] {
+  async getOutgoingEdges(memoryId: string, filter?: EdgeFilter): Promise<MemoryEdge[]> {
     return this.queryEdges({ ...filter, sourceId: memoryId });
   }
 
   /**
    * Get all edges pointing to a target memory.
    */
-  getIncomingEdges(memoryId: string, filter?: EdgeFilter): MemoryEdge[] {
+  async getIncomingEdges(memoryId: string, filter?: EdgeFilter): Promise<MemoryEdge[]> {
     return this.queryEdges({ ...filter, targetId: memoryId });
   }
 
@@ -227,9 +228,8 @@ export class GraphStore {
    * Dedup'd; visited set prevents infinite loops on cyclic graphs. Depth ≥1.
    * Built on getOutgoingEdges. Pure over the graph state + inputs.
    */
-  bfsNeighbors(seedIds: string[], depth: number): string[] {
+  async bfsNeighbors(seedIds: string[], depth: number): Promise<string[]> {
     const d = Math.max(1, Math.floor(depth));
-    const seeds = new Set(seedIds);
     const visited = new Set<string>(seedIds);
     const out = new Set<string>();
     let frontier: string[] = seedIds.filter((id) => id != null && id !== "");
@@ -238,7 +238,7 @@ export class GraphStore {
       const next: string[] = [];
       for (const id of frontier) {
         try {
-          const edges = this.getOutgoingEdges(id);
+          const edges = await this.getOutgoingEdges(id);
           for (const e of edges) {
             const t = e.targetId;
             if (!visited.has(t)) {
@@ -258,11 +258,11 @@ export class GraphStore {
 
   /**
    * Get all edges connected to a memory (both directions).
-   * 
+   *
    * Optimized to use UNION ALL instead of OR for better index utilization.
    * Queries source_id and target_id separately, then combines and sorts.
    */
-  getAllEdges(memoryId: string, filter?: EdgeFilter): MemoryEdge[] {
+  async getAllEdges(memoryId: string, filter?: EdgeFilter): Promise<MemoryEdge[]> {
     const conditions: string[] = [];
     const params: any[] = [];
 
@@ -287,9 +287,9 @@ export class GraphStore {
       SELECT * FROM (
         SELECT * FROM memory_edges
         WHERE source_id = ? ${whereClause}
-        
+
         UNION ALL
-        
+
         SELECT * FROM memory_edges
         WHERE target_id = ? ${whereClause}
       )
@@ -297,7 +297,7 @@ export class GraphStore {
       LIMIT ?
     `;
 
-    // Build final params: memoryId + filter params for source query, 
+    // Build final params: memoryId + filter params for source query,
     // then memoryId + filter params again for target query, then limit
     const finalParams = [
       memoryId,
@@ -312,7 +312,7 @@ export class GraphStore {
     // Deduplicate edges that appear in both directions (though rare with current schema)
     const seen = new Set<string>();
     const uniqueRows: EdgeRow[] = [];
-    
+
     for (const row of rows) {
       if (!seen.has(row.id)) {
         seen.add(row.id);
@@ -326,7 +326,7 @@ export class GraphStore {
   /**
    * Delete an edge by ID.
    */
-  deleteEdge(edgeId: string): boolean {
+  async deleteEdge(edgeId: string): Promise<boolean> {
     const result = this.db
       .prepare("DELETE FROM memory_edges WHERE id = ?")
       .run(edgeId);
@@ -336,7 +336,7 @@ export class GraphStore {
   /**
    * Delete all edges connected to a memory (called when memory is deleted).
    */
-  deleteEdgesForMemory(memoryId: string): number {
+  async deleteEdgesForMemory(memoryId: string): Promise<number> {
     const result = this.db
       .prepare(
         "DELETE FROM memory_edges WHERE source_id = ? OR target_id = ?",
@@ -348,7 +348,7 @@ export class GraphStore {
   /**
    * Update edge weight (set).
    */
-  updateWeight(edgeId: string, weight: number): boolean {
+  async updateWeight(edgeId: string, weight: number): Promise<boolean> {
     const clamped = Math.max(0, Math.min(1, weight));
     const result = this.db
       .prepare("UPDATE memory_edges SET weight = ? WHERE id = ?")
@@ -360,13 +360,13 @@ export class GraphStore {
    * Atomically increment edge weight by delta, capped at maxWeight.
    * Safer than read-modify-write for the reinforcement pattern.
    */
-  incrementEdgeWeight(
+  async incrementEdgeWeight(
     sourceId: string,
     targetId: string,
     relationType: MemoryRelationType,
     delta: number,
     maxWeight = 1.0,
-  ): boolean {
+  ): Promise<boolean> {
     const result = this.db
       .prepare(
         `UPDATE memory_edges
@@ -382,7 +382,7 @@ export class GraphStore {
   /**
    * Count edges for a given memory (degree centrality).
    */
-  getDegree(memoryId: string): { in: number; out: number; total: number } {
+  async getDegree(memoryId: string): Promise<{ in: number; out: number; total: number }> {
     const outRow = this.db
       .prepare(
         "SELECT COUNT(*) as count FROM memory_edges WHERE source_id = ?",
@@ -405,7 +405,7 @@ export class GraphStore {
   /**
    * Find memories with the most connections (hub nodes).
    */
-  getHubMemories(limit: number = 10): { memoryId: string; degree: number }[] {
+  async getHubMemories(limit: number = 10): Promise<{ memoryId: string; degree: number }[]> {
     const rows = this.db
       .prepare(
         `
@@ -428,12 +428,12 @@ export class GraphStore {
   /**
    * Get graph stats.
    */
-  getStats(): {
+  async getStats(): Promise<{
     totalEdges: number;
     byRelation: Record<string, number>;
     autoExtracted: number;
     avgWeight: number;
-  } {
+  }> {
     const total = (
       this.db
         .prepare("SELECT COUNT(*) as count FROM memory_edges")
@@ -541,6 +541,14 @@ export class GraphStore {
 
   private generateId(): string {
     return `edge_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  }
+
+  /**
+   * Clear all edges (for testing).
+   */
+  async clear(): Promise<void> {
+    this.db.exec("DELETE FROM memory_edges");
+    logger.info("GraphStore cleared");
   }
 
   /**
