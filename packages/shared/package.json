@@ -27,7 +27,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "rm -f tsconfig.tsbuildinfo && tsc",
     "test": "bun test",
     "clean": "rm -rf dist"
   },

@@ -29,7 +29,7 @@
   },
   "scripts": {
     "prebuild": "bunx prisma generate",
-    "build": "tsc && cp -r src/generated dist/",
+    "build": "rm -f tsconfig.tsbuildinfo && tsc && cp -r src/generated dist/",
     "dev": "bunx tsc --watch",
     "clean": "rm -rf dist",
     "test": "bun test",
