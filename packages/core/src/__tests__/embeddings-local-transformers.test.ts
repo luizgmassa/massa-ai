@@ -13,7 +13,7 @@ import { CachedEmbeddingProvider, withCache } from "../services/embeddings/cache
  * Unit coverage for the local transformers.js embedding provider (roadmap A5).
  *
  * The ONNX model is never loaded here — we mock the dynamic
- * `import("@xenova/transformers")` so the suite stays fast and offline. We
+ * `import("@huggingface/transformers")` so the suite stays fast and offline. We
  * exercise: provider instantiation, the embed-call shape (dims/length/count,
  * NaN/garbage rejection), cache composition, dimension declaration, and the
  * config/registration wiring (provider map, hasApiKey, createProvider
@@ -32,7 +32,7 @@ function makeEmbedding(seed: number, dim: number): number[] {
 }
 
 /**
- * Install a mock for `@xenova/transformers` that returns a pipeline producing
+ * Install a mock for `@huggingface/transformers` that returns a pipeline producing
  * the given per-text vectors (in order). Returns a spy so tests can assert
  * call shape.
  */
@@ -61,12 +61,18 @@ function mockTransformers(vectors: number[][], opts?: { failOnce?: boolean }) {
     return extractor;
   });
 
-  const moduleFactory = mock(async () => ({ pipeline: pipelineFactory }));
+  // The provider also reads `transformers.env` (allowLocalModels /
+  // allowRemoteModels) to pin model-loading behavior. Include a stub `env` so
+  // the v3 code path is exercised without changing the mock contract.
+  const moduleFactory = mock(async () => ({
+    pipeline: pipelineFactory,
+    env: { allowLocalModels: true, allowRemoteModels: true },
+  }));
 
   // Bun resolves the dynamic import via the module registry. We mock the module
-  // path so `await import("@xenova/transformers")` inside ensureModel returns
+  // path so `await import("@huggingface/transformers")` inside ensureModel returns
   // our factory's result.
-  mock.module("@xenova/transformers", moduleFactory);
+  mock.module("@huggingface/transformers", moduleFactory);
 
   return { extractor, pipelineFactory, moduleFactory };
 }

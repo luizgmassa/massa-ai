@@ -1,5 +1,5 @@
 /**
- * Local in-process embedding provider backed by transformers.js (Xenova ONNX).
+ * Local in-process embedding provider backed by transformers.js (@huggingface/transformers v3+, ONNX).
  *
  * Goal (roadmap A5): a fully offline, no-server, no-API-key embedding backend
  * that composes with the existing EmbeddingProvider machinery (priority-ordered
@@ -14,10 +14,17 @@
  * so concurrent embed calls share one load.
  *
  * The transformers.js dependency is optional at the type level: we import it
- * dynamically (`await import("@xenova/transformers")`) so the package only has
- * to be present when this provider is actually selected. This keeps the dep
+ * dynamically (`await import("@huggingface/transformers")`) so the package only
+ * has to be present when this provider is actually selected. This keeps the dep
  * cost off the default install path and lets tests mock the pipeline without
  * pulling a multi-megabyte ONNX runtime.
+ *
+ * Migration note (@xenova/transformers v2 → @huggingface/transformers v3):
+ * the v3 package dropped the `quantized` pipeline option in favor of `dtype`.
+ * We pass `dtype: "q8"` to preserve the v2 `quantized: true` behavior
+ * (8-bit weights → ~25MB download, negligible retrieval-quality loss). The
+ * `pipeline`, `env`, and Tensor `.data` (typed Float32Array) surfaces are
+ * otherwise API-compatible.
  */
 
 import type { EmbeddingProvider } from "../provider.js";
@@ -30,6 +37,10 @@ import { logger } from "@massa-th0th/shared";
  * general-purpose sentence embedding model with 384 dimensions and solid
  * semantic-search quality for its size. It is a reasonable offline default for
  * code+text retrieval; users can override via TRANSFORMERS_EMBEDDING_MODEL.
+ *
+ * The `Xenova/...` model id remains resolvable by @huggingface/transformers v3
+ * (the weights live on the Hugging Face Hub under the Xenova org); changing it
+ * would be an out-of-scope behavioral change.
  */
 export const DEFAULT_LOCAL_MODEL = "Xenova/all-MiniLM-L6-v2";
 
@@ -44,13 +55,28 @@ interface FeatureExtractionPipeline {
   };
 }
 
-/** Lazily-loaded transformers.js module surface (subset). */
+/**
+ * Lazily-loaded transformers.js module surface (subset).
+ *
+ * v3 pipeline options: `{ progress_callback, dtype, device, ... }`. The v2
+ * `quantized` flag is gone; `dtype: "q8"` is the v3 equivalent of quantized
+ * weights. `env` exposes `allowLocalModels` / `allowRemoteModels`.
+ */
 interface TransformersModule {
   pipeline: (
     task: "feature-extraction",
     model: string,
-    options?: { quantized?: boolean; progress_callback?: (data: unknown) => void },
+    options?: {
+      dtype?: "q8" | "fp32" | "fp16" | "q4" | "int8" | "uint8" | "q4f16";
+      progress_callback?: (data: unknown) => void;
+    },
   ) => Promise<FeatureExtractionPipeline>;
+  env: {
+    allowLocalModels?: boolean;
+    allowRemoteModels?: boolean;
+    remoteHost?: string;
+    localModelPath?: string;
+  };
 }
 
 /**
@@ -93,23 +119,37 @@ export class LocalTransformersEmbeddingProvider implements EmbeddingProvider {
     this.modelPromise = (async () => {
       let transformers: TransformersModule;
       try {
-        // Dynamic import keeps @xenova/transformers out of the hot path for
-        // every other provider. `import()` of an ESM package returns the
+        // Dynamic import keeps @huggingface/transformers out of the hot path
+        // for every other provider. `import()` of an ESM package returns the
         // namespace; pull the named exports we need.
-        const mod = (await import("@xenova/transformers")) as unknown;
+        const mod = (await import("@huggingface/transformers")) as unknown;
         transformers = mod as TransformersModule;
       } catch (err) {
         throw new Error(
-          `[${this.id}] @xenova/transformers is not installed. Install it in packages/core to use the local embedding provider.`,
+          `[${this.id}] @huggingface/transformers is not installed. Install it in packages/core to use the local embedding provider.`,
         );
+      }
+
+      // Make model-loading behavior explicit & forward-compatible. In a Node
+      // (non-browser) runtime v3 defaults allowLocalModels=true and
+      // allowRemoteModels=true, but pinning both here keeps the provider robust
+      // to env overrides and documents intent: first run downloads from the HF
+      // Hub, subsequent runs load from the local cache.
+      if (transformers.env) {
+        // allowRemoteModels defaults true; allowLocalModels defaults true on
+        // Node. Set both explicitly so a partial env override (e.g. CI setting
+        // allowRemoteModels=false) does not break the cache-fallback path.
+        transformers.env.allowLocalModels = transformers.env.allowLocalModels ?? true;
+        transformers.env.allowRemoteModels = transformers.env.allowRemoteModels ?? true;
       }
 
       logger.info(`[${this.id}] Loading local model "${this.model}" (offline ONNX)...`);
       const extractor = await transformers.pipeline("feature-extraction", this.model, {
-        // Use quantized weights by default: smaller download (~25MB for
+        // v3 replaced the v2 `quantized: true` flag with `dtype`. "q8" is the
+        // 8-bit-quantized weight format: smaller download (~25MB for
         // all-MiniLM-L6-v2) and faster inference, with negligible quality loss
-        // for retrieval. Override is a future concern, not a config knob today.
-        quantized: true,
+        // for retrieval. This preserves the v2 default behavior.
+        dtype: "q8",
       });
       logger.info(`[${this.id}] Local model ready (dimensions: ${this.dimensions}).`);
       return extractor;
