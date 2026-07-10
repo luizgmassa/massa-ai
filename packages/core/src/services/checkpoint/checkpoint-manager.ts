@@ -1,8 +1,8 @@
 /**
  * Checkpoint Manager
  *
- * CRUD operations for task checkpoints in SQLite.
- * Serializes task state as gzip-compressed JSON blobs.
+ * Domain facade + storage for task/INDEX state checkpoints. Serializes task
+ * state as gzip-compressed JSON blobs.
  *
  * This versions TASK/INDEX execution state (progress, decisions, files), NOT
  * session continuity. It is the complement of `CompactionSnapshotService`
@@ -11,7 +11,18 @@
  * observations.db. See `packages/core/src/services/SESSION-STATE.md` for the
  * full reconciliation.
  *
- * Follows the same singleton + raw-SQLite pattern as GraphStore.
+ * Structural gap #16: checkpoints were SQLite-only. The storage contract is now
+ * `ICheckpointStore` (checkpoint-store.ts). `CheckpointManager` is BOTH:
+ *   - the SQLite-canonical `ICheckpointStore` implementation (raw bun:sqlite,
+ *     same schema as before), AND
+ *   - a domain facade that holds the restore integrity logic (memory existence
+ *     + file-conflict checks + restore-instruction generation), which is
+ *     backend-agnostic.
+ * `getInstance()` selects the PG store (PgCheckpointStore) when DATABASE_URL is
+ * postgres and delegates storage to it, keeping the restore domain logic here
+ * so the MCP tools and AutoCheckpointer keep calling `CheckpointManager`
+ * unchanged (one-backend rule, mirroring getMemoryRepository /
+ * getScheduledJobStore / getSessionStore).
  *
  * Performance Optimizations:
  * - Lazy deserialization: listCheckpointsMetadata() skips state decompression
@@ -31,6 +42,13 @@ import {
   config,
   logger,
 } from "@massa-th0th/shared";
+import type {
+  ICheckpointStore,
+  CheckpointMetadata,
+  ListCheckpointsOptions,
+  CreateCheckpointOptions,
+  CheckpointStats,
+} from "./checkpoint-store.js";
 
 // ── Internal row type ────────────────────────────────────────
 
@@ -50,29 +68,19 @@ interface CheckpointRow {
   expires_at: number | null;
 }
 
-/**
- * Lightweight checkpoint metadata without deserialized state.
- * Used for listing operations to avoid expensive decompression.
- */
-export interface CheckpointMetadata {
-  id: string;
-  taskId: string;
-  taskDescription?: string;
-  agentId?: string;
-  projectId?: string;
-  checkpointType: CheckpointType;
-  parentCheckpointId?: string;
-  createdAt: number;
-  expiresAt?: number;
-  compressedSizeBytes: number;
-  memoryCount: number;
-  fileChangeCount: number;
-}
+// Re-export metadata type for backward compatibility (previously defined here).
+export type { CheckpointMetadata } from "./checkpoint-store.js";
 
 // ── Implementation ───────────────────────────────────────────
 
-export class CheckpointManager {
+export class CheckpointManager implements ICheckpointStore {
   private db!: Database;
+  /**
+   * When DATABASE_URL is postgres, storage is delegated to this store; the
+   * restore integrity logic stays on CheckpointManager (domain facade).
+   * Null means SQLite mode (this.db is the storage).
+   */
+  private delegate: ICheckpointStore | null = null;
   private static instance: CheckpointManager | null = null;
 
   static getInstance(): CheckpointManager {
@@ -87,6 +95,38 @@ export class CheckpointManager {
   }
 
   private initialize(): void {
+    const databaseUrl = process.env.DATABASE_URL;
+    const isPostgres =
+      databaseUrl?.startsWith("postgresql://") ||
+      databaseUrl?.startsWith("postgres://");
+
+    if (isPostgres) {
+      // PG backend: delegate storage to PgCheckpointStore (async-mirror +
+      // write-through, same discipline as PgSynapseSessionStore). Keep the
+      // restore domain logic on this facade. Lazy require so bun:sqlite /
+      // the pg adapter stay out of the PG path's import graph.
+      try {
+        const { PgCheckpointStore } = require("./checkpoint-store-pg.js") as {
+          PgCheckpointStore: new () => ICheckpointStore;
+        };
+        this.delegate = new PgCheckpointStore();
+        logger.info("CheckpointManager initialized (PostgreSQL backend)");
+      } catch (e) {
+        // Fall back to SQLite if the PG store cannot be constructed.
+        logger.warn(
+          "PgCheckpointStore unavailable — falling back to SQLite (best-effort)",
+          { error: (e as Error).message },
+        );
+        this.delegate = null;
+        this.initializeSqlite();
+      }
+      return;
+    }
+
+    this.initializeSqlite();
+  }
+
+  private initializeSqlite(): void {
     const dataDir = config.get("dataDir") as string;
     const dbPath = path.join(dataDir, "memories.db");
 
@@ -100,7 +140,7 @@ export class CheckpointManager {
     this.db.exec("PRAGMA journal_mode = WAL");
 
     this.createSchema();
-    logger.info("CheckpointManager initialized");
+    logger.info("CheckpointManager initialized (SQLite backend)");
   }
 
   private createSchema(): void {
@@ -138,17 +178,9 @@ export class CheckpointManager {
    */
   createCheckpoint(
     state: TaskState,
-    options: {
-      agentId?: string;
-      projectId?: string;
-      checkpointType?: CheckpointType;
-      memoryIds?: string[];
-      fileChanges?: string[];
-      parentCheckpointId?: string;
-      /** TTL in milliseconds (default: 7 days) */
-      ttlMs?: number;
-    } = {},
+    options: CreateCheckpointOptions = {},
   ): TaskCheckpoint {
+    if (this.delegate) return this.delegate.createCheckpoint(state, options);
     const {
       agentId,
       projectId,
@@ -227,6 +259,7 @@ export class CheckpointManager {
    * Get a checkpoint by ID.
    */
   getCheckpoint(checkpointId: string): TaskCheckpoint | null {
+    if (this.delegate) return this.delegate.getCheckpoint(checkpointId);
     const row = this.db
       .prepare("SELECT * FROM task_checkpoints WHERE id = ?")
       .get(checkpointId) as CheckpointRow | null;
@@ -237,14 +270,8 @@ export class CheckpointManager {
   /**
    * List checkpoints with optional filters.
    */
-  listCheckpoints(options: {
-    taskId?: string;
-    projectId?: string;
-    checkpointType?: CheckpointType;
-    includeExpired?: boolean;
-    limit?: number;
-    offset?: number;
-  } = {}): TaskCheckpoint[] {
+  listCheckpoints(options: ListCheckpointsOptions = {}): TaskCheckpoint[] {
+    if (this.delegate) return this.delegate.listCheckpoints(options);
     const {
       taskId,
       projectId,
@@ -312,14 +339,8 @@ export class CheckpointManager {
    * // Then deserialize only the one you need:
    * const state = manager.getCheckpointState(selectedId);
    */
-  listCheckpointsMetadata(options: {
-    taskId?: string;
-    projectId?: string;
-    checkpointType?: CheckpointType;
-    includeExpired?: boolean;
-    limit?: number;
-    offset?: number;
-  } = {}): CheckpointMetadata[] {
+  listCheckpointsMetadata(options: ListCheckpointsOptions = {}): CheckpointMetadata[] {
+    if (this.delegate) return this.delegate.listCheckpointsMetadata(options);
     const {
       taskId,
       projectId,
@@ -386,6 +407,7 @@ export class CheckpointManager {
    * @returns Deserialized task state, or null if not found
    */
   getCheckpointState(checkpointId: string): TaskState | null {
+    if (this.delegate) return this.delegate.getCheckpointState(checkpointId);
     const row = this.db
       .prepare("SELECT state FROM task_checkpoints WHERE id = ?")
       .get(checkpointId) as { state: Buffer } | null;
@@ -402,6 +424,7 @@ export class CheckpointManager {
    * Get the latest checkpoint for a task.
    */
   getLatestCheckpoint(taskId: string): TaskCheckpoint | null {
+    if (this.delegate) return this.delegate.getLatestCheckpoint(taskId);
     const row = this.db
       .prepare(
         `
@@ -426,19 +449,13 @@ export class CheckpointManager {
     const checkpoint = this.getCheckpoint(checkpointId);
     if (!checkpoint) return null;
 
-    // Check which referenced memories still exist
+    // Check which referenced memories still exist (backend-aware: SQLite queries
+    // the memories table; PG queries via the PG store / prisma best-effort).
     const validMemoryIds: string[] = [];
     const missingMemoryIds: string[] = [];
 
     if (checkpoint.memoryIds.length > 0) {
-      const placeholders = checkpoint.memoryIds.map(() => "?").join(",");
-      const existingRows = this.db
-        .prepare(
-          `SELECT id FROM memories WHERE id IN (${placeholders})`,
-        )
-        .all(...checkpoint.memoryIds) as Array<{ id: string }>;
-
-      const existingSet = new Set(existingRows.map((r) => r.id));
+      const existingSet = new Set(this.countExistingMemoryIds(checkpoint.memoryIds));
       for (const mid of checkpoint.memoryIds) {
         if (existingSet.has(mid)) {
           validMemoryIds.push(mid);
@@ -493,6 +510,7 @@ export class CheckpointManager {
    * Delete a checkpoint by ID.
    */
   deleteCheckpoint(checkpointId: string): boolean {
+    if (this.delegate) return this.delegate.deleteCheckpoint(checkpointId);
     const result = this.db
       .prepare("DELETE FROM task_checkpoints WHERE id = ?")
       .run(checkpointId);
@@ -503,6 +521,7 @@ export class CheckpointManager {
    * Purge expired checkpoints.
    */
   purgeExpired(): number {
+    if (this.delegate) return this.delegate.purgeExpired();
     const result = this.db
       .prepare(
         "DELETE FROM task_checkpoints WHERE expires_at IS NOT NULL AND expires_at < ?",
@@ -517,14 +536,47 @@ export class CheckpointManager {
     return count;
   }
 
+  // ── Backend-aware memory existence (restore integrity check) ─
+
+  /**
+   * Count which of the given memory ids still exist. SQLite queries the
+   * memories table (same DB as task_checkpoints). PG backends query via the PG
+   * store / prisma best-effort. Used by restoreCheckpoint's integrity check.
+   */
+  countExistingMemoryIds(memoryIds: string[]): string[] {
+    if (this.delegate) return this.delegate.countExistingMemoryIds(memoryIds);
+    if (memoryIds.length === 0) return [];
+    const placeholders = memoryIds.map(() => "?").join(",");
+    try {
+      const existingRows = this.db
+        .prepare(`SELECT id FROM memories WHERE id IN (${placeholders})`)
+        .all(...memoryIds) as Array<{ id: string }>;
+      return existingRows.map((r) => r.id);
+    } catch (e) {
+      // memories table missing or query failed — best-effort: assume all exist
+      // so a restore is never blocked by an unrelated query error.
+      logger.warn("countExistingMemoryIds failed (best-effort: assuming all exist)", {
+        error: (e as Error).message,
+      });
+      return memoryIds;
+    }
+  }
+
+  /**
+   * Await backend readiness before a read (hydration race fix, #16).
+   * SQLite reads are synchronous (bun:sqlite) so this resolves immediately;
+   * the PG backend awaits its mirror hydration so the first read after a
+   * process restart observes persisted rows.
+   */
+  ensureReady(): Promise<void> {
+    if (this.delegate) return this.delegate.ensureReady();
+    return Promise.resolve();
+  }
+
   // ── Stats ────────────────────────────────────────────────
 
-  getStats(): {
-    totalCheckpoints: number;
-    byType: Record<string, number>;
-    totalSizeBytes: number;
-    oldestCheckpointAge?: number;
-  } {
+  getStats(): CheckpointStats {
+    if (this.delegate) return this.delegate.getStats();
     const total = (
       this.db
         .prepare("SELECT COUNT(*) as count FROM task_checkpoints")
@@ -695,6 +747,10 @@ export class CheckpointManager {
   }
 
   close(): void {
+    if (this.delegate) {
+      this.delegate.close();
+      this.delegate = null;
+    }
     this.db?.close();
     CheckpointManager.instance = null;
   }

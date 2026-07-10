@@ -91,15 +91,24 @@ function makeTaskState(overrides?: Partial<TaskState>): TaskState {
 
 describe("CheckpointManager", () => {
   let manager: CheckpointManager;
+  // These tests exercise the SQLite backend (bun:sqlite, memories.db,
+  // gzip compression). Pin DATABASE_URL="" so CheckpointManager.getInstance()
+  // routes to the SQLite store — otherwise bun auto-loads .env (postgres) and
+  // the manager delegates to the PG store (#16), which never reads the local
+  // memories.db these tests populate.
+  let savedDatabaseUrl: string | undefined;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "massa-th0th-test-ckpt-"));
+    savedDatabaseUrl = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = "";
     (CheckpointManager as any).instance = null;
     manager = new CheckpointManager();
   });
 
   afterEach(() => {
     manager.close();
+    process.env.DATABASE_URL = savedDatabaseUrl;
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -454,9 +463,13 @@ describe("CheckpointManager", () => {
 
 describe("AutoCheckpointer", () => {
   let autoCheckpointer: AutoCheckpointer;
+  let savedDatabaseUrl: string | undefined;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "massa-th0th-test-autocp-"));
+    // Pin SQLite (see CheckpointManager describe note above).
+    savedDatabaseUrl = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = "";
     (CheckpointManager as any).instance = null;
     (AutoCheckpointer as any).instance = null;
     autoCheckpointer = new AutoCheckpointer({
@@ -469,6 +482,7 @@ describe("AutoCheckpointer", () => {
     autoCheckpointer.close();
     (CheckpointManager as any).instance?.close();
     (CheckpointManager as any).instance = null;
+    process.env.DATABASE_URL = savedDatabaseUrl;
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 

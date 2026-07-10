@@ -531,3 +531,37 @@ model SynapseAccessHistory {
   @@index([sessionId])
   @@map("synapse_access_history")
 }
+
+// ========================================
+// Task Checkpoints (Phase 3 — PG parity for the checkpoint store, #16)
+// Durable task/INDEX execution state (progress, decisions, files) for the
+// checkpoint manager. SQLite-canonical via CheckpointManager
+// (memories.db / task_checkpoints); this model provides PG parity so a
+// Postgres deployment persists checkpoints in the same backend as the rest of
+// the data plane (one-backend rule). The factory branch inside
+// CheckpointManager.getInstance() selects PgCheckpointStore when DATABASE_URL
+// is postgres, else the SQLite path. State is a gzip-compressed JSON blob
+// (parity with the SQLite store's Bun.deflateSync). Timestamps are BigInt
+// ms-epochs (parity with IndexJob/ScheduledJob/SynapseSession).
+// ========================================
+model Checkpoint {
+  id                  String  @id @map("id")
+  taskId              String  @map("task_id")
+  taskDescription     String? @map("task_description")
+  agentId             String? @map("agent_id")
+  projectId           String? @map("project_id")
+  state               Bytes   @map("state") // gzip-compressed JSON
+  stateSchemaVersion  Int     @default(1) @map("state_schema_version")
+  memoryIds           String? @map("memory_ids") // JSON array
+  fileChanges         String? @map("file_changes") // JSON array
+  checkpointType      String  @map("checkpoint_type")
+  parentCheckpointId  String? @map("parent_checkpoint_id")
+  createdAt           BigInt  @map("created_at")
+  expiresAt           BigInt? @map("expires_at")
+
+  @@index([taskId])
+  @@index([projectId])
+  @@index([createdAt])
+  @@index([checkpointType])
+  @@map("task_checkpoints")
+}
