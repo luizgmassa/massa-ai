@@ -24,3 +24,5 @@ export type {
   GetOptimizedContextInput,
   OptimizedContextResult,
 } from "./context-controller.js";
+
+export { ExecutorController } from "./executor-controller.js";

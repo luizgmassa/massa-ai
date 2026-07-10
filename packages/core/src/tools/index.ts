@@ -25,3 +25,11 @@ export { GoToDefinitionTool } from "./go_to_definition.js";
 
 // File tools
 export { ReadFileTool } from "./read_file.js";
+
+// Executor tools (polyglot sandbox)
+export { ExecuteTool } from "./execute.js";
+export type { ExecuteParams } from "./execute.js";
+export { ExecuteFileTool } from "./execute_file.js";
+export type { ExecuteFileParams } from "./execute_file.js";
+export { BatchExecuteTool } from "./batch_execute.js";
+export type { BatchExecuteParams, BatchCommand } from "./batch_execute.js";

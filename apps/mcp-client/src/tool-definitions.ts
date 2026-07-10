@@ -1009,6 +1009,89 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ["id"],
     },
   },
+  {
+    name: "execute",
+    description:
+      "Run code in a detected polyglot sandbox runtime (js/ts/python/shell/ruby/go/rust/php/perl/r). " +
+      "Returns stdout/stderr. Local-dev trust model: code runs on the host as the current user — " +
+      "no OS-level isolation. Timeout default 30s, cap 300s. Pass `intent` to trim large outputs.",
+    apiEndpoint: "/api/v1/executor/execute",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        language: {
+          type: "string",
+          enum: ["javascript", "typescript", "python", "shell", "ruby", "go", "rust", "php", "perl", "r"],
+          description: "Language/runtime to execute the code in.",
+        },
+        code: { type: "string", description: "Source code to execute." },
+        timeout: { type: "number", description: "Max runtime in ms (default 30000, cap 300000)." },
+        background: { type: "boolean", description: "Detach instead of killing on timeout (default false).", default: false },
+        cwd: { type: "string", description: "Working directory (defaults to project root)." },
+        intent: {
+          type: "string",
+          description: "Optional query. When output > ~5KB, only sections matching this intent are returned.",
+        },
+      },
+      required: ["language", "code"],
+    },
+  },
+  {
+    name: "execute_file",
+    description:
+      "Read a file into a sandboxed FILE_CONTENT variable and run code over it. Only what your code " +
+      "prints enters the conversation. Enforces project-root containment + a secrets deny-glob by default.",
+    apiEndpoint: "/api/v1/executor/execute_file",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Project-relative (or absolute, under root) file path." },
+        language: {
+          type: "string",
+          enum: ["javascript", "typescript", "python", "shell", "ruby", "go", "rust", "php", "perl", "r"],
+          description: "Language/runtime to execute the code in.",
+        },
+        code: {
+          type: "string",
+          description: "Code to run over the file. FILE_CONTENT (text) and file_path (absolute) are in scope.",
+        },
+        timeout: { type: "number", description: "Max runtime in ms (default 30000, cap 300000)." },
+        intent: { type: "string", description: "Optional intent query to trim large outputs." },
+      },
+      required: ["path", "language", "code"],
+    },
+  },
+  {
+    name: "batch_execute",
+    description:
+      "Run N shell commands in parallel via run-pool (order-preserving, concurrency-capped). " +
+      "Returns per-command stdout/stderr/exitCode in input order. Default concurrency = cpu count; " +
+      "failures do not abort siblings.",
+    apiEndpoint: "/api/v1/executor/batch_execute",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        commands: {
+          type: "array",
+          items: { type: "string" },
+          description: "Shell commands to run (order is preserved in results).",
+        },
+        queries: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional queries to scope auto-indexing of outputs (reserved; currently a no-op stub).",
+        },
+        timeout: { type: "number", description: "Per-command timeout in ms (default 30000)." },
+        concurrency: { type: "number", description: "Max in-flight commands (default = host cpu count)." },
+        cwd: { type: "string", description: "Working directory (defaults to project root)." },
+        query_scope: { type: "string", description: "Optional scope label for the batch (diagnostics only)." },
+      },
+      required: ["commands"],
+    },
+  },
 ];
 
 /**

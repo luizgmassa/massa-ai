@@ -120,6 +120,31 @@ export type { WorkspaceRow, WorkspaceStatus } from "./workspace/workspace-manage
 // Prisma lifecycle
 export { getPrismaClient, disconnectPrisma } from "./query/prisma-client.js";
 
+// Executor — polyglot sandbox + run-pool + intent progressive disclosure
+export {
+  PolyglotExecutor,
+  runPool,
+  fulfilledValues,
+  detectRuntimes,
+  getRuntimeSummary,
+  getAvailableLanguages,
+  intentSearch,
+  renderIntentResult,
+  DEFAULT_TIMEOUT_MS,
+  MAX_TIMEOUT_MS,
+} from "./executor/index.js";
+export type {
+  ExecResult,
+  ExecuteOptions,
+  ExecuteFileOptions,
+  PoolJob,
+  RunPoolOptions,
+  RunPoolResult,
+  Language,
+  RuntimeMap,
+  IntentSearchResult,
+} from "./executor/index.js";
+
 // Synapse — cognitive modulation layer (focus, retention, prioritization, speed)
 export {
   SynapseManager,

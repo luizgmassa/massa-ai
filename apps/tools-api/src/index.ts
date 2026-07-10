@@ -35,6 +35,7 @@ import { hookRoutes } from "./routes/hooks.js";
 import { bootstrapRoutes } from "./routes/bootstrap.js";
 import { handoffRoutes } from "./routes/handoff.js";
 import { proposalRoutes } from "./routes/proposals.js";
+import { executorRoutes } from "./routes/executor.js";
 import { webUiRoutes } from "./routes/web-ui.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
@@ -85,6 +86,7 @@ const app = new Elysia({ adapter: node() })
           { name: "hooks", description: "Passive lifecycle capture (observation ingestion)" },
           { name: "handoffs", description: "Cross-session handoff begin/accept/cancel" },
           { name: "proposals", description: "Auto-improvement proposal list/approve/reject" },
+          { name: "executor", description: "Polyglot sandbox: execute code, run code over files, batch shell commands" },
           { name: "webUi", description: "Read-only memory/search web browser (Phase 8)" },
         ],
         components: {
@@ -118,6 +120,7 @@ const app = new Elysia({ adapter: node() })
   .use(bootstrapRoutes)
   .use(handoffRoutes)
   .use(proposalRoutes)
+  .use(executorRoutes)
   .use(webUiRoutes)
   .get("/health", () => ({
     status: "ok",
