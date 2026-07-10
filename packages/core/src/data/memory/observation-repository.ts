@@ -304,18 +304,35 @@ export class SqliteObservationStore implements ObservationStore {
 let cachedStore: ObservationStore | null = null;
 
 /**
- * Returns a SqliteObservationStore, falling back to MemoryObservationStore on
- * failure. Mirrors getSessionStore() / getJobStore().
+ * Returns a PgObservationStore when DATABASE_URL is postgres, otherwise a
+ * SqliteObservationStore, falling back to MemoryObservationStore on failure.
+ * Mirrors getScheduledJobStore() / getSessionStore() / getJobStore()
+ * (one-backend rule). The factory never short-circuits on isPostgresEnabled().
  */
 export function getObservationStore(): ObservationStore {
   if (cachedStore) return cachedStore;
+  const databaseUrl = process.env.DATABASE_URL;
+  const isPostgres =
+    databaseUrl?.startsWith("postgresql://") ||
+    databaseUrl?.startsWith("postgres://");
   try {
-    const store = new SqliteObservationStore();
-    // Probe: force the DB to open + create the schema. If it throws, fall back.
-    store.countByProject("__probe__");
-    cachedStore = store;
-  } catch {
-    logger.warn("SqliteObservationStore unavailable — using ephemeral MemoryObservationStore");
+    if (isPostgres) {
+      const { PgObservationStore } = require("./observation-repository-pg.js") as {
+        PgObservationStore: new () => ObservationStore;
+      };
+      cachedStore = new PgObservationStore();
+      logger.info("Using PostgreSQL ObservationStore");
+    } else {
+      const store = new SqliteObservationStore();
+      // Probe: force the DB to open + create the schema. If it throws, fall back.
+      store.countByProject("__probe__");
+      cachedStore = store;
+    }
+  } catch (e) {
+    logger.warn("ObservationStore unavailable — using ephemeral MemoryObservationStore", {
+      backend: isPostgres ? "postgres" : "sqlite",
+      error: (e as Error).message,
+    });
     cachedStore = new MemoryObservationStore();
   }
   return cachedStore;

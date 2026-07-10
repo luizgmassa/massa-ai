@@ -41,6 +41,7 @@ export {
   LIFECYCLE_EVENTS,
   OBSERVATION_CATEGORIES,
 } from "./data/memory/observation-repository.js";
+export { PgObservationStore } from "./data/memory/observation-repository-pg.js";
 export type { ObservationStore } from "./data/memory/observation-repository.js";
 export type {
   Observation,
