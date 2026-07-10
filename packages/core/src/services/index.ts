@@ -39,6 +39,29 @@ export type {
 export { IndexJobTracker, indexJobTracker } from "./jobs/index-job-tracker.js";
 export type { IndexJob } from "./jobs/index-job-tracker.js";
 
+// Scheduler (in-process cron-like scheduler for clock-triggered jobs)
+export {
+  Scheduler,
+  getScheduler,
+  resetScheduler,
+  getScheduledJobStore,
+  resetScheduledJobStore,
+  registerDefaultJobs,
+  parseCron,
+  nextCronRun,
+} from "./scheduler/index.js";
+export type {
+  SchedulerOptions,
+  ScheduledJobStore,
+  JobHandler,
+  JobKind,
+  ScheduledJob as ScheduledJobDef,
+  ScheduleSpec,
+  SchedulerStatus,
+  TickResult,
+  ParsedCron,
+} from "./scheduler/index.js";
+
 // Pricing (local-first with cache)
 export {
   ModelsDevClient,

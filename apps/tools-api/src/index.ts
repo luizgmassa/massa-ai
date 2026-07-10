@@ -41,7 +41,7 @@ import { webUiRoutes } from "./routes/web-ui.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
 import { getHealthChecker, searchSessionHook, coRetrievalHook } from "@massa-th0th/core";
-import { indexJobTracker } from "@massa-th0th/core/services";
+import { indexJobTracker, getScheduler, registerDefaultJobs } from "@massa-th0th/core/services";
 
 const PORT = process.env.MASSA_TH0TH_API_PORT || 3333;
 
@@ -158,11 +158,26 @@ const jobReaperTimer = setInterval(() => {
 }, JOB_REAPER_INTERVAL_MS);
 jobReaperTimer.unref?.(); // never keep the event loop alive solely for the reaper
 
+// In-process scheduler (Phase 3, C2): runs periodic jobs on a clock alongside
+// the existing event-debounce triggers. Default OFF — a deployment opts in via
+// MASSA_TH0TH_SCHEDULER_ENABLED=true + per-kind enable env vars. The scheduler
+// only fires memory/decay/consolidation/auto-improve/observation jobs (NEVER
+// indexing jobs — OOM risk). registerDefaultJobs is idempotent and preserves
+// nextRunAt/lastRunAt across restarts so the schedule resumes on boot.
+const scheduler = getScheduler();
+try {
+  registerDefaultJobs(scheduler);
+  scheduler.start();
+} catch (err) {
+  console.error(`[scheduler] init error:`, err instanceof Error ? err.message : err);
+}
+
 // Graceful shutdown
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.on(signal, async () => {
     console.log(`${signal} received, shutting down gracefully...`);
     clearInterval(jobReaperTimer);
+    try { scheduler.stop(); } catch {}
     try {
       const { disconnectPrisma } = await import('@massa-th0th/core/services');
       await disconnectPrisma();

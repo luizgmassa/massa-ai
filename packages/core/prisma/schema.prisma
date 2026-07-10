@@ -452,3 +452,30 @@ model IndexJob {
   @@index([status])
   @@map("index_jobs")
 }
+
+// ========================================
+// Scheduled Jobs (Phase 3, C2 — OS-level in-process scheduler)
+// Durable job definitions for the cron-like scheduler. SQLite-canonical via
+// SqliteScheduledJobStore (scheduled-jobs.db); this model provides PG parity so
+// a Postgres deployment can keep scheduler state in the same backend as the
+// rest of the data plane. The factory (getScheduledJobStore) selects
+// PgScheduledJobStore when DATABASE_URL is postgres, else SqliteScheduledJobStore.
+// Timestamps are BigInt ms-epochs (parity with IndexJob and the SQLite store's
+// INTEGER epoch columns).
+// ========================================
+model ScheduledJob {
+  id           String  @id @map("id")
+  name         String
+  jobKind      String  @map("job_kind")
+  scheduleType String  @map("schedule_type") // "interval" | "cron"
+  intervalMs   BigInt? @map("interval_ms")
+  cron         String?
+  nextRunAt    BigInt  @map("next_run_at")
+  lastRunAt    BigInt  @default(0) @map("last_run_at")
+  enabled      Int     @default(1)
+  payload      String? // JSON
+
+  @@index([enabled])
+  @@index([nextRunAt])
+  @@map("scheduled_jobs")
+}
