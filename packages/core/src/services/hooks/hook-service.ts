@@ -27,6 +27,7 @@ import {
 } from "../../data/memory/observation-repository.js";
 import { QueueSaturatedError, WriterQueue } from "./writer-queue.js";
 import { extractCategory } from "./observation-extractor.js";
+import { observationConsolidationJob } from "../jobs/observation-consolidation-job.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -315,11 +316,39 @@ function readHooksConfig() {
 
 // ── Singleton ───────────────────────────────────────────────────────────────
 
+/**
+ * Resolve the default bridge for the production singleton. Returns the real
+ * ObservationConsolidationJob (which implements BridgeTrigger with its own
+ * debounce + silent-degrade); falls back to NoopBridge if the job is somehow
+ * unavailable so hook ingestion never crashes.
+ *
+ * Note: this is ONLY the default for getHookService() (the production path).
+ * Tests construct HookService directly with an injected bridge; the NoopBridge
+ * default in the ctor preserves the isolation contract (no LLM/store touch).
+ */
+function resolveDefaultBridge(): BridgeTrigger {
+  try {
+    // observationConsolidationJob.maybeRun is the debounced, fire-and-forget,
+    // never-throwing entrypoint (see observation-consolidation-job.ts). It also
+    // honors `hooks.bridge.enabled` internally, so disabling the feature flag
+    // makes it a safe no-op without unwiring here.
+    if (
+      observationConsolidationJob &&
+      typeof observationConsolidationJob.maybeRun === "function"
+    ) {
+      return observationConsolidationJob as BridgeTrigger;
+    }
+  } catch {
+    /* fall through to NoopBridge */
+  }
+  return new NoopBridge();
+}
+
 let cachedService: HookService | null = null;
 
 export function getHookService(): HookService {
   if (cachedService) return cachedService;
-  cachedService = new HookService();
+  cachedService = new HookService({ bridge: resolveDefaultBridge() });
   return cachedService;
 }
 
