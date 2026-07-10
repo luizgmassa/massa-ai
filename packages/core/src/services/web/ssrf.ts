@@ -90,8 +90,22 @@ export function classifyIp(rawIp: string): IpClass {
   // IPv6 (detected by presence of `:` so IPv4-mapped addresses route correctly).
   if (lower.includes(":")) {
     // IPv4-mapped IPv6 (`::ffff:127.0.0.1`) — recurse through IPv4 classifier.
-    const v4MappedMatch = lower.match(/^::ffff:([\d.]+)$/);
-    if (v4MappedMatch) return classifyIp(v4MappedMatch[1]);
+    // Node's URL normalizes these to hex (`::ffff:7f00:1`), so handle BOTH the
+    // dotted-decimal and the hex-compressed forms. Without the hex form, an
+    // attacker could reach IMDS via `http://[::ffff:169.254.169.254]/` because
+    // URL.hostname yields `[::ffff:a9fe:a9fe]` which the decimal-only regex missed.
+    const v4MappedDecimal = lower.match(/^::ffff:([\d.]+)$/);
+    if (v4MappedDecimal) return classifyIp(v4MappedDecimal[1]);
+    const v4MappedHex = lower.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (v4MappedHex) {
+      const hi = parseInt(v4MappedHex[1], 16);
+      const lo = parseInt(v4MappedHex[2], 16);
+      const a = (hi >> 8) & 0xff;
+      const b = hi & 0xff;
+      const c = (lo >> 8) & 0xff;
+      const d = lo & 0xff;
+      return classifyIp(`${a}.${b}.${c}.${d}`);
+    }
     if (lower === "::") return "block"; // unspecified
     // fe80::/10 link-local — match the high-nibble range fe8..feb.
     if (
@@ -160,8 +174,12 @@ export async function assertUrlSafe(rawUrl: string): Promise<void> {
     );
   }
 
-  // Bracketed IPv6 host literal (`[::1]`) — URL already strips the brackets.
-  const hostname = parsed.hostname;
+  // Bracketed IPv6 host literal (`[::1]`) — Node's `URL.hostname` does NOT
+  // strip the brackets (it returns `"[::1]"`, `"[fe80::1]"`, etc.); the old
+  // comment claiming otherwise was wrong and caused a CRITICAL SSRF bypass
+  // where `http://[::1]/` and `http://[fe80::1]/` fell through to "public".
+  // Strip brackets so classifyIp sees the bare IPv6 literal.
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, "");
 
   // Literal IP in the URL (no DNS needed): URL parses `http://127.0.0.1/`
   // with hostname === "127.0.0.1". classifyIp handles it directly. A hostname

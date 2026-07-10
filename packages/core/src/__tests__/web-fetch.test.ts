@@ -61,9 +61,12 @@ describe("classifyIp — pure IP classifier", () => {
     "::", // IPv6 unspecified
     "fc00::1",
     "fd00::1", // IPv6 ULA fc00::/7
-    "::ffff:127.0.0.1", // IPv4-mapped loopback
+    "::ffff:127.0.0.1", // IPv4-mapped loopback (dotted-decimal)
     "::ffff:10.0.0.1", // IPv4-mapped private
     "::ffff:169.254.169.254", // IPv4-mapped IMDS
+    "::ffff:7f00:1", // IPv4-mapped loopback (hex, as Node URL normalizes)
+    "::ffff:a9fe:a9fe", // IPv4-mapped IMDS (hex)
+    "::ffff:a00:1", // IPv4-mapped 10.x (hex)
     "fe80::1%eth0", // RFC 6874 zone id
     "fe80::1%25eth0", // URL-encoded zone id
     "not-an-ip",
@@ -126,6 +129,35 @@ describe("assertUrlSafe — scheme + DNS resolution", () => {
       // through the DNS mock below. We assert literal IPs here directly.
       if (u.includes("localhost")) continue;
       await expect(assertUrlSafe(u)).rejects.toThrow(SsrfBlockedError);
+    }
+  });
+
+  test("rejects bracketed IPv6 private/loopback URL literals (regression)", async () => {
+    // Node's URL.hostname does NOT strip brackets — it returns "[::1]" etc.
+    // Without bracket-stripping in assertUrlSafe, these bypass the guard.
+    // Also covers IPv4-mapped IPv6 in Node's hex normalization
+    // ([::ffff:a9fe:a9fe] == 169.254.169.254 IMDS).
+    for (const u of [
+      "http://[::1]/", // loopback
+      "http://[fe80::1]/", // link-local
+      "http://[::ffff:127.0.0.1]/", // mapped loopback (decimal)
+      "http://[::ffff:169.254.169.254]/", // mapped IMDS (decimal)
+      "http://[::ffff:a9fe:a9fe]/", // mapped IMDS (hex, Node-normalized)
+      "http://[::ffff:7f00:1]/", // mapped loopback (hex)
+      "http://[fc00::1]/", // ULA
+      "http://[ff02::1]/", // multicast
+      "http://[::]/", // unspecified
+    ]) {
+      await expect(assertUrlSafe(u)).rejects.toThrow(SsrfBlockedError);
+    }
+  });
+
+  test("allows bracketed public IPv6 URL literals", async () => {
+    for (const u of [
+      "http://[2606:4700:4700::1111]/", // Cloudflare
+      "http://[2001:4860:4860::8888]/", // Google
+    ]) {
+      await expect(assertUrlSafe(u)).resolves.toBeUndefined();
     }
   });
 
