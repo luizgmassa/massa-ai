@@ -1,6 +1,13 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin"
 import { tool, type ToolContext } from "@opencode-ai/plugin"
 import { configExists, initConfig, loadConfig } from "@massa-th0th/shared/config"
+import {
+  ObservationEmitter,
+  makeDefaultDeps,
+  buildToolPayload,
+  buildPromptPayload,
+  buildSessionPayload,
+} from "./observation-emitter"
 
 // ---------------------------------------------------------------------------
 // Config
@@ -116,6 +123,17 @@ export const MassaTh0thPlugin: Plugin = async ({ project, directory, worktree, c
   let reindexTimer: ReturnType<typeof setTimeout> | null = null
   let reindexInFlight = false
   let apiAvailable = true
+
+  // Lifecycle observation emitter (SG-7/#21). Non-blocking, batched, debounced.
+  // Mirrors apps/claude-plugin/hooks: emits raw host events to
+  // POST /api/v1/hook/batch; the server classifies into the 33-category taxonomy.
+  const observations = new ObservationEmitter({
+    deps: makeDefaultDeps({
+      apiUrl: MASSA_TH0TH_API_URL,
+      log,
+      enabled: () => apiAvailable,
+    }),
+  })
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -515,12 +533,35 @@ export const MassaTh0thPlugin: Plugin = async ({ project, directory, worktree, c
         apiAvailable = false
         log("warn", `massa-th0th API unreachable at ${MASSA_TH0TH_API_URL}`)
       }
+      // Emit session-start observation (best-effort, non-blocking).
+      observations.emit({
+        event: "session-start",
+        projectId,
+        payload: buildSessionPayload({ cwd: projectPath }),
+      })
     },
 
     // Capture git operations after bash execution
     // Hooks interface: tool.execute.after(input: { tool, sessionID, callID, args }, output: { title, output, metadata })
     "tool.execute.after": async (input, output) => {
       if (!apiAvailable) return
+
+      // Emit a post-tool-use observation for EVERY tool (SG-7/#21). The server
+      // classifies via payload.tool_name (Read/Write/Bash/Edit/etc.). We pass
+      // OpenCode tool names raw; TOOL_NAME_NORMALIZE maps them. Non-blocking.
+      observations.emit({
+        event: "post-tool-use",
+        projectId,
+        sessionId: input.sessionID,
+        payload: buildToolPayload({
+          tool: input.tool,
+          args: input.args,
+          output: output.output,
+          cwd: projectPath,
+          sessionId: input.sessionID,
+        }),
+      })
+
       if (input.tool !== "bash") return
 
       const cmd = String(input.args?.command || "")
@@ -598,16 +639,74 @@ export const MassaTh0thPlugin: Plugin = async ({ project, directory, worktree, c
       output.env.MASSA_TH0TH_API_URL = MASSA_TH0TH_API_URL
     },
 
-    // Unified event handler for file tracking + LSP diagnostics
+    // Unified event handler for file tracking + LSP diagnostics + observations
     event: async ({ event }) => {
       // Track file edits for incremental reindex
       if (event.type === "file.edited") {
         trackFile(event.properties.file)
+        // fall through — also emit nothing here (file.edited has no lifecycle kind)
         return
       }
       if (event.type === "file.watcher.updated") {
         trackFile(event.properties.file)
         return
+      }
+
+      // ── Lifecycle observations (SG-7/#21) ──────────────────────────────
+      // OpenCode has no dedicated session-start/stop or user-prompt-submit
+      // hooks (unlike Claude Code). The closest lifecycle signals flow through
+      // the generic `event` hook:
+      //  - command.executed       → user-prompt (typed command / slash cmd)
+      //  - message.part.updated   → post-tool-use for tool parts reaching
+      //                              completed/error (covers MCP + agent tools
+      //                              that bypass tool.execute.after)
+      //  - session.idle/deleted   → session-end
+      if (apiAvailable && event.type === "command.executed") {
+        const p = event.properties as { arguments?: string; name?: string; sessionID?: string }
+        const text = [p.name, p.arguments].filter(Boolean).join(" ").trim()
+        if (text) {
+          observations.emit({
+            event: "user-prompt",
+            projectId,
+            sessionId: p.sessionID,
+            payload: buildPromptPayload({ prompt: text, cwd: projectPath }),
+          })
+        }
+      }
+
+      if (apiAvailable && event.type === "message.part.updated") {
+        const part = (event.properties as { part?: { type?: string; tool?: string; state?: { status?: string; error?: string; output?: string; input?: unknown }; sessionID?: string; messageID?: string } }).part
+        if (part?.type === "tool" && part.tool && part.state) {
+          const status = part.state.status
+          if (status === "completed" || status === "error") {
+            observations.emit({
+              event: "post-tool-use",
+              projectId,
+              sessionId: part.sessionID,
+              payload: buildToolPayload({
+                tool: part.tool,
+                args: part.state.input,
+                output: status === "error" ? part.state.error : part.state.output,
+                cwd: projectPath,
+                sessionId: part.sessionID,
+              }),
+              importance: status === "error" ? 0.7 : undefined,
+            })
+          }
+        }
+      }
+
+      if (apiAvailable && (event.type === "session.idle" || event.type === "session.deleted")) {
+        const p = event.properties as { sessionID?: string }
+        observations.emit({
+          event: "session-end",
+          projectId,
+          sessionId: p.sessionID,
+          payload: buildSessionPayload({ cwd: projectPath }),
+        })
+        // On session.idle, also best-effort flush buffered observations so a
+        // short session doesn't lose events to the debounce window.
+        if (event.type === "session.idle") void observations.flush()
       }
 
       // LSP diagnostics: track persistent errors
@@ -630,6 +729,15 @@ export const MassaTh0thPlugin: Plugin = async ({ project, directory, worktree, c
           importance: 0.4,
           format: "toon",
         }, "lsp-diagnostics")
+      }
+    },
+
+    // Best-effort flush on plugin teardown.
+    dispose: async () => {
+      try {
+        await observations.dispose()
+      } catch {
+        // swallow — dispose must never throw
       }
     },
   }
