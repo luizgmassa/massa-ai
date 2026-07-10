@@ -23,6 +23,14 @@ import type {
   RefKind,
 } from "../../data/sqlite/symbol-repository.js";
 import { computePageRank } from "./centrality.js";
+import { runLouvain, type WeightedEdge } from "./communities.js";
+import {
+  computeArchitectureMap,
+  type ArchitectureMap,
+  type HttpEdgeLite,
+  type InternalImport,
+  type SymbolDefLite,
+} from "./architecture.js";
 
 // ─── Typed-edge types (D1) ────────────────────────────────────────────────────
 
@@ -124,6 +132,19 @@ export interface ProjectMapResult {
   recentFiles: Array<{ filePath: string; indexedAt: string | null }>;
   /** Counts of typed structural edges grouped by ref_kind (D1). */
   edgesByKind?: Record<string, number>;
+  // ─── Architecture intelligence (D4) — additive, optional ────────────────────
+  /** Files grouped by top-level package/module boundary. */
+  packages?: ArchitectureMap["packages"];
+  /** Bootstrap / entry-point candidates. */
+  entryPoints?: ArchitectureMap["entryPoints"];
+  /** API surface: HTTP routes / handlers. */
+  routes?: ArchitectureMap["routes"];
+  /** Most-depended-on files (centrality + in-degree + symbol count). */
+  hotspots?: ArchitectureMap["hotspots"];
+  /** De-facto modules from community detection over the file-import graph. */
+  communities?: ArchitectureMap["communities"];
+  /** De-facto layers inferred from community structure + fan-in/out. */
+  layers?: ArchitectureMap["layers"];
 }
 
 export interface GetProjectMapOptions {
@@ -370,6 +391,20 @@ export class SymbolGraphService {
       ),
     ]);
 
+    // ── Architecture intelligence (D4) — best-effort, fully isolated. ──────────
+    // Every step is wrapped so a failure in any analyzer leaves the existing
+    // project_map fields byte-for-byte intact. New fields are additive (only
+    // attached when non-empty).
+    const arch = await this.computeArchitectureMapSafe(projectId, repo).catch(
+      (err) => {
+        logger.warn("getProjectMap: architecture map failed; skipping", {
+          projectId,
+          error: (err as Error)?.message?.slice(0, 160),
+        });
+        return null;
+      },
+    );
+
     return {
       projectId,
       stats: {
@@ -389,7 +424,110 @@ export class SymbolGraphService {
         indexedAt: r.indexedAt ? new Date(r.indexedAt).toISOString() : null,
       })),
       edgesByKind: Object.keys(edgesByKind).length > 0 ? edgesByKind : undefined,
+      // D4 additive fields — present only when computed and non-empty.
+      packages: arch && arch.packages.length > 0 ? arch.packages : undefined,
+      entryPoints: arch && arch.entryPoints.length > 0 ? arch.entryPoints : undefined,
+      routes: arch && arch.routes.length > 0 ? arch.routes : undefined,
+      hotspots: arch && arch.hotspots.length > 0 ? arch.hotspots : undefined,
+      communities: arch && arch.communities.length > 0 ? arch.communities : undefined,
+      layers: arch && arch.layers.length > 0 ? arch.layers : undefined,
     };
+  }
+
+  /**
+   * Compute the architecture map (D4): packages, entry points, routes,
+   * hotspots, layers, and communities. Best-effort — returns null when there
+   * isn't enough graph data to produce a meaningful map.
+   *
+   * Isolation: each repo call is awaited separately and any thrown error
+   * propagates to the caller, which catches and logs it, leaving the existing
+   * project_map response intact.
+   */
+  private async computeArchitectureMapSafe(
+    projectId: string,
+    repo: ReturnType<typeof getSymbolRepository>,
+  ): Promise<ArchitectureMap | null> {
+    // Gather the file-import graph + definitions + HTTP edges in parallel.
+    // Each is wrapped in Promise.resolve so the SQLite (sync) and PG (async)
+    // repo contracts both work.
+    const [filesRaw, importEdgesRaw, defsRaw, httpEdgesRaw, centralityRaw] =
+      await Promise.all([
+        Promise.resolve(repo.allFiles(projectId)).catch(() => [] as string[]),
+        Promise.resolve(repo.allImportEdges(projectId)).catch(
+          () => [] as Array<{ from_file: string; to_file?: string }>,
+        ),
+        Promise.resolve(
+          repo.listDefinitions(projectId, { limit: 1000 }),
+        ).catch(() => [] as SymbolDefinition[]),
+        Promise.resolve(
+          repo.findEdges(projectId, { types: ["http_call"], limit: 200 }),
+        ).catch(() => [] as SymbolReference[]),
+        Promise.resolve(repo.getCentrality(projectId)).catch(
+          () => new Map<string, number>(),
+        ),
+      ]);
+
+    if (!filesRaw || filesRaw.length === 0) return null;
+
+    const files = filesRaw;
+    const fileIndex = new Map(files.map((f, i) => [f, i] as const));
+
+    // Internal import edges (both endpoints known, non-external).
+    const internalEdges: InternalImport[] = [];
+    const weightMap = new Map<string, number>(); // "lo:hi" → weight (import count)
+    for (const e of importEdgesRaw) {
+      if (!e.to_file) continue;
+      internalEdges.push({ fromFile: e.from_file, toFile: e.to_file });
+      const a = fileIndex.get(e.from_file);
+      const b = fileIndex.get(e.to_file);
+      if (a === undefined || b === undefined) continue;
+      const lo = a < b ? a : b;
+      const hi = a < b ? b : a;
+      const key = lo + ":" + hi;
+      weightMap.set(key, (weightMap.get(key) ?? 0) + 1);
+    }
+
+    // Build the weighted edge list for community detection.
+    const weightedEdges: WeightedEdge[] = [];
+    for (const [key, w] of weightMap) {
+      const sep = key.indexOf(":");
+      weightedEdges.push({ a: +key.slice(0, sep), b: +key.slice(sep + 1), w });
+    }
+
+    // Definitions (lite view) + per-file symbol counts.
+    const definitions: SymbolDefLite[] = defsRaw.map((d) => ({
+      filePath: d.file_path,
+      name: d.name,
+      kind: d.kind,
+      exported: d.exported,
+    }));
+    const symbolCounts = new Map<string, number>();
+    for (const d of defsRaw) {
+      symbolCounts.set(d.file_path, (symbolCounts.get(d.file_path) ?? 0) + 1);
+    }
+
+    // HTTP edges (lite view) with route/method metadata.
+    const httpEdges: HttpEdgeLite[] = httpEdgesRaw.map((r) => ({
+      fromFile: r.from_file,
+      symbolName: r.symbol_name,
+      targetFqn: r.target_fqn,
+      method: (r.meta?.method as string | undefined) ?? undefined,
+      route: (r.meta?.route as string | undefined) ?? undefined,
+    }));
+
+    // Run community detection over the file-import graph.
+    const commResult = runLouvain(files.length, weightedEdges);
+
+    // Hand off to the pure analyzers.
+    return computeArchitectureMap({
+      files,
+      internalEdges,
+      definitions,
+      httpEdges,
+      centrality: centralityRaw,
+      symbolCounts,
+      communities: commResult.communities,
+    });
   }
 
   // ── centrality recomputation ─────────────────────────────────────────────

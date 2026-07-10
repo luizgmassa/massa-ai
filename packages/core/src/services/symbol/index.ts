@@ -4,6 +4,35 @@
 
 export { symbolGraphService, SymbolGraphService } from "./symbol-graph.service.js";
 export { computePageRank } from "./centrality.js";
+export { runLouvain } from "./communities.js";
+export type {
+  Community,
+  CommunityResult,
+  CommunityOptions,
+  WeightedEdge,
+} from "./communities.js";
+export {
+  computeArchitectureMap,
+  detectPackages,
+  detectEntryPoints,
+  detectRoutes,
+  detectHotspots,
+  labelCommunities,
+  classifyLayers,
+} from "./architecture.js";
+export type {
+  ArchitectureMap,
+  ArchitectureInput,
+  PackageInfo,
+  EntryPoint,
+  RouteInfo,
+  HotspotInfo,
+  LayerInfo,
+  CommunityInfo,
+  InternalImport,
+  SymbolDefLite,
+  HttpEdgeLite,
+} from "./architecture.js";
 export { TracePathService, tracePathService } from "./trace-path.js";
 export type {
   TracePathOptions,
