@@ -179,7 +179,8 @@ describe("PolyglotExecutor", () => {
       timeout: 10_000,
     });
     expect(result.exitCode).toBe(0);
-    expect(result.stdout.trim()).toBe("massa-th0th");
+    // process.cwd() is packages/core; its package.json name is the scoped one.
+    expect(result.stdout.trim()).toBe("@massa-th0th/core");
   });
 });
 
