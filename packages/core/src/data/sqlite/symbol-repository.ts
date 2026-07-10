@@ -21,7 +21,17 @@ export type SymbolKind =
   | "interface"
   | "export";
 
-export type RefKind = "call" | "type_ref" | "import" | "extend" | "implement";
+export type RefKind =
+  | "call"
+  | "type_ref"
+  | "import"
+  | "extend"
+  | "implement"
+  // Typed structural edges (D1) — TS/JS best-effort extraction
+  | "data_flow"
+  | "http_call"
+  | "emit"
+  | "listen";
 
 export type WorkspaceStatus = "pending" | "indexing" | "indexed" | "error";
 
@@ -57,6 +67,9 @@ export interface SymbolReference {
   symbol_name: string;
   target_fqn?: string;
   ref_kind: RefKind;
+  /** Typed-edge metadata (D1): { route?, event?, paramIndex?, callerFqn? }.
+   *  Serialized as a JSON string in SQLite; stored natively in PG. */
+  meta?: Record<string, unknown> | null;
 }
 
 export interface SymbolImport {
@@ -175,8 +188,8 @@ export class SymbolRepository {
 
       upsertRef: this.db.prepare(`
         INSERT INTO symbol_references
-          (project_id, from_file, from_line, symbol_name, target_fqn, ref_kind)
-        VALUES (?, ?, ?, ?, ?, ?)
+          (project_id, from_file, from_line, symbol_name, target_fqn, ref_kind, meta)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `),
 
       deleteRefs: this.db.prepare(`
@@ -292,6 +305,7 @@ export class SymbolRepository {
           ref.symbol_name,
           ref.target_fqn ?? null,
           ref.ref_kind,
+          ref.meta ? JSON.stringify(ref.meta) : null,
         );
       }
 
@@ -382,19 +396,92 @@ export class SymbolRepository {
   // ─── References ──────────────────────────────────────────────────────────
 
   findReferencesByFqn(projectId: string, targetFqn: string): SymbolReference[] {
-    return this.db
-      .prepare(
-        `SELECT * FROM symbol_references WHERE project_id = ? AND target_fqn = ? ORDER BY from_file, from_line`,
-      )
-      .all(projectId, targetFqn) as SymbolReference[];
+    return (
+      this.db
+        .prepare(
+          `SELECT * FROM symbol_references WHERE project_id = ? AND target_fqn = ? ORDER BY from_file, from_line`,
+        )
+        .all(projectId, targetFqn) as SymbolReference[]
+    ).map(this.normalizeRef);
   }
 
   findReferencesByName(projectId: string, symbolName: string): SymbolReference[] {
-    return this.db
+    return (
+      this.db
+        .prepare(
+          `SELECT * FROM symbol_references WHERE project_id = ? AND symbol_name = ? COLLATE NOCASE ORDER BY from_file, from_line`,
+        )
+        .all(projectId, symbolName) as SymbolReference[]
+    ).map(this.normalizeRef);
+  }
+
+  /**
+   * Query typed structural edges with optional filtering.
+   *
+   * Supports filtering by:
+   *   - `types`: a set of ref_kind values (e.g. ['call','http_call'])
+   *   - `fromSymbol` / `toSymbol`: FQN prefixes ('rel/path.ts#Name')
+   *   - `fromFile`: constrain to a single source file
+   *   - `direction`: 'outgoing' (fromSymbol), 'incoming' (toSymbol), or 'both'
+   *
+   * Returns normalized SymbolReference rows (meta parsed from JSON).
+   */
+  findEdges(
+    projectId: string,
+    opts: {
+      types?: RefKind[];
+      fromSymbol?: string;
+      toSymbol?: string;
+      fromFile?: string;
+      direction?: "outgoing" | "incoming" | "both";
+      limit?: number;
+    } = {},
+  ): SymbolReference[] {
+    const conditions: string[] = ["project_id = ?"];
+    const params: unknown[] = [projectId];
+
+    const direction = opts.direction ?? "both";
+
+    if (opts.types && opts.types.length > 0) {
+      conditions.push(`ref_kind IN (${opts.types.map(() => "?").join(",")})`);
+      params.push(...opts.types);
+    }
+    if (opts.fromFile) {
+      conditions.push("from_file = ?");
+      params.push(opts.fromFile);
+    }
+    if (opts.fromSymbol && (direction === "outgoing" || direction === "both")) {
+      // fromSymbol is a FQN 'rel/path.ts#Name' — match callerFqn in meta OR
+      // rows whose from_file matches the FQN's file path.
+      const [file] = opts.fromSymbol.split("#");
+      conditions.push("from_file = ?");
+      params.push(file);
+    }
+    if (opts.toSymbol && (direction === "incoming" || direction === "both")) {
+      conditions.push("target_fqn = ?");
+      params.push(opts.toSymbol);
+    }
+
+    const limit = opts.limit ?? 200;
+    const sql = `SELECT * FROM symbol_references WHERE ${conditions.join(" AND ")} ORDER BY from_file, from_line LIMIT ?`;
+    params.push(limit);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (this.db.prepare(sql).all(...(params as any[])) as SymbolReference[]).map(
+      this.normalizeRef,
+    );
+  }
+
+  /** Count edges grouped by ref_kind — used by project_map for typed-edge stats. */
+  countEdgesByKind(projectId: string): Record<string, number> {
+    const rows = this.db
       .prepare(
-        `SELECT * FROM symbol_references WHERE project_id = ? AND symbol_name = ? COLLATE NOCASE ORDER BY from_file, from_line`,
+        `SELECT ref_kind, COUNT(*) AS count FROM symbol_references WHERE project_id = ? GROUP BY ref_kind`,
       )
-      .all(projectId, symbolName) as SymbolReference[];
+      .all(projectId) as Array<{ ref_kind: string; count: number }>;
+    const out: Record<string, number> = {};
+    for (const r of rows) out[r.ref_kind] = r.count;
+    return out;
   }
 
   // ─── Imports ─────────────────────────────────────────────────────────────
@@ -591,6 +678,19 @@ export class SymbolRepository {
       is_external: Boolean(row.is_external),
       is_type_only: Boolean(row.is_type_only),
     };
+  }
+
+  /** Parse the JSON `meta` column (SQLite stores it as TEXT). */
+  private normalizeRef(row: SymbolReference): SymbolReference {
+    if (row.meta == null) return row;
+    if (typeof row.meta === "string") {
+      try {
+        return { ...row, meta: JSON.parse(row.meta) };
+      } catch {
+        return { ...row, meta: null };
+      }
+    }
+    return row;
   }
 }
 

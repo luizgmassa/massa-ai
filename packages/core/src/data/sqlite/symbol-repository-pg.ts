@@ -18,7 +18,17 @@ export type SymbolKind =
   | "interface"
   | "export";
 
-export type RefKind = "call" | "type_ref" | "import" | "extend" | "implement";
+export type RefKind =
+  | "call"
+  | "type_ref"
+  | "import"
+  | "extend"
+  | "implement"
+  // Typed structural edges (D1) — TS/JS best-effort extraction
+  | "data_flow"
+  | "http_call"
+  | "emit"
+  | "listen";
 
 export type WorkspaceStatus = "pending" | "indexing" | "indexed" | "error";
 
@@ -54,6 +64,8 @@ export interface SymbolReference {
   symbol_name: string;
   target_fqn?: string;
   ref_kind: RefKind;
+  /** Typed-edge metadata (D1): stored natively as JSONB in PG. */
+  meta?: Record<string, unknown> | null;
 }
 
 export interface SymbolImport {
@@ -180,6 +192,7 @@ interface RefRaw {
   symbol_name: string;
   target_fqn: string | null;
   ref_kind: string;
+  meta: Record<string, unknown> | null;
 }
 
 function mapRef(r: RefRaw): SymbolReference {
@@ -191,6 +204,7 @@ function mapRef(r: RefRaw): SymbolReference {
     symbol_name: r.symbol_name,
     target_fqn: r.target_fqn ?? undefined,
     ref_kind: r.ref_kind as RefKind,
+    meta: r.meta ?? null,
   };
 }
 
@@ -425,8 +439,8 @@ export class SymbolRepositoryPg {
   async insertReference(ref: SymbolReference): Promise<void> {
     const p = getPrismaClient();
     await p.$executeRaw`
-      INSERT INTO symbol_references (project_id, from_file, from_line, symbol_name, target_fqn, ref_kind)
-      VALUES (${ref.project_id}, ${ref.from_file}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn ?? "unknown"}, ${ref.ref_kind})
+      INSERT INTO symbol_references (project_id, from_file, from_line, symbol_name, target_fqn, ref_kind, meta)
+      VALUES (${ref.project_id}, ${ref.from_file}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn ?? "unknown"}, ${ref.ref_kind}, ${ref.meta ?? null}::jsonb)
     `;
   }
 
@@ -621,8 +635,8 @@ export class SymbolRepositoryPg {
     await p.$transaction(async (tx) => {
       for (const ref of refs) {
         await tx.$executeRaw`
-          INSERT INTO symbol_references (project_id, from_file, from_line, symbol_name, target_fqn, ref_kind)
-          VALUES (${ref.project_id}, ${ref.from_file}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn ?? null}, ${ref.ref_kind})
+          INSERT INTO symbol_references (project_id, from_file, from_line, symbol_name, target_fqn, ref_kind, meta)
+          VALUES (${ref.project_id}, ${ref.from_file}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn ?? null}, ${ref.ref_kind}, ${ref.meta ?? null}::jsonb)
         `;
       }
     });
@@ -675,8 +689,8 @@ export class SymbolRepositoryPg {
 
       for (const ref of refs) {
         await tx.$executeRaw`
-          INSERT INTO symbol_references (project_id, from_file, from_line, symbol_name, target_fqn, ref_kind)
-          VALUES (${projectId}, ${filePath}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn ?? null}, ${ref.ref_kind})
+          INSERT INTO symbol_references (project_id, from_file, from_line, symbol_name, target_fqn, ref_kind, meta)
+          VALUES (${projectId}, ${filePath}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn ?? null}, ${ref.ref_kind}, ${ref.meta ?? null}::jsonb)
         `;
       }
 
@@ -762,6 +776,73 @@ export class SymbolRepositoryPg {
       ORDER BY from_file ASC, from_line ASC
     `;
     return rows.map(mapRef);
+  }
+
+  /**
+   * Query typed structural edges with optional filtering (D1).
+   * Mirrors the SQLite SymbolRepository.findEdges contract.
+   */
+  async findEdges(
+    projectId: string,
+    opts: {
+      types?: RefKind[];
+      fromSymbol?: string;
+      toSymbol?: string;
+      fromFile?: string;
+      direction?: "outgoing" | "incoming" | "both";
+      limit?: number;
+    } = {},
+  ): Promise<SymbolReference[]> {
+    const p = getPrismaClient();
+    // Build a parameterized query — Prisma raw SQL doesn't expand arrays for IN,
+    // so we interpolate placeholders with explicit casts to text.
+    const conditions: string[] = [`project_id = $1::text`];
+    const params: unknown[] = [projectId];
+    let idx = 2;
+    const direction = opts.direction ?? "both";
+
+    if (opts.fromFile) {
+      conditions.push(`from_file = $${idx}::text`);
+      params.push(opts.fromFile);
+      idx++;
+    }
+    if (opts.toSymbol && (direction === "incoming" || direction === "both")) {
+      conditions.push(`target_fqn = $${idx}::text`);
+      params.push(opts.toSymbol);
+      idx++;
+    }
+    if (opts.fromSymbol && (direction === "outgoing" || direction === "both")) {
+      const [file] = opts.fromSymbol.split("#");
+      conditions.push(`from_file = $${idx}::text`);
+      params.push(file);
+      idx++;
+    }
+    // types IN clause
+    if (opts.types && opts.types.length > 0) {
+      const placeholders = opts.types.map(() => `$${idx++}::text`).join(",");
+      conditions.push(`ref_kind IN (${placeholders})`);
+      params.push(...opts.types);
+    }
+
+    const limit = opts.limit ?? 200;
+    params.push(limit);
+    const sql = `SELECT * FROM symbol_references WHERE ${conditions.join(" AND ")} ORDER BY from_file, from_line LIMIT $${idx}::int`;
+
+    const rows = await p.$queryRawUnsafe<RefRaw[]>(sql, ...params);
+    return rows.map(mapRef);
+  }
+
+  /** Count edges grouped by ref_kind — used by project_map for typed-edge stats. */
+  async countEdgesByKind(projectId: string): Promise<Record<string, number>> {
+    const p = getPrismaClient();
+    const rows = await p.$queryRaw<{ ref_kind: string; count: bigint }[]>`
+      SELECT ref_kind, COUNT(*) AS count FROM symbol_references
+      WHERE project_id = ${projectId}
+      GROUP BY ref_kind
+    `;
+    const out: Record<string, number> = {};
+    for (const r of rows) out[r.ref_kind] = Number(r.count);
+    return out;
   }
 
   /** List definitions with filter options (mirrors SQLite SymbolRepository.listDefinitions). */

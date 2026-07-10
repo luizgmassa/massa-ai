@@ -68,12 +68,41 @@ export interface RawImport {
   isTypeOnly: boolean;
 }
 
+/**
+ * A raw typed structural edge extracted by the Parse stage (D1).
+ *
+ * These are TS/JS best-effort call/control-flow edges resolved to FQNs in the
+ * Resolve stage and persisted as `symbol_references` rows with the new typed
+ * `ref_kind` values + `meta` JSON metadata.
+ *
+ * Edge types:
+ *   - call       : A() calls B() — caller → callee
+ *   - data_flow  : a value flows source → call-arg → callee-param (param binding)
+ *   - http_call  : fetch/axios/http/GraphQL/tRPC call site → route/URL/service
+ *   - emit       : emitter.emit('event', ...) — event producer
+ *   - listen     : emitter.on('event', ...) — event consumer
+ */
+export type RawEdgeKind = "call" | "data_flow" | "http_call" | "emit" | "listen";
+
+export interface RawEdge {
+  kind: RawEdgeKind;
+  /** 1-based line where the edge originates. */
+  line: number;
+  /** The callee/target symbol name (e.g. 'fetch', 'bar', 'on'). */
+  symbolName: string;
+  /** Best-effort caller symbol (enclosing function/method name). */
+  callerSymbol?: string;
+  /** Typed-edge metadata. Resolved target_fqn is filled by Resolve stage. */
+  meta?: Record<string, unknown>;
+}
+
 /** Output of Parse stage / Input of Resolve stage */
 export interface ParsedFile {
   file: DiscoveredFile;
   chunks: Chunk[]; // from smart-chunker, used by Load stage
   symbols: RawSymbol[];
   rawImports: RawImport[];
+  rawEdges: RawEdge[]; // typed structural edges (D1)
 }
 
 /** A resolved import with the concrete file path (or null if external). */
@@ -83,9 +112,16 @@ export interface ResolvedImport {
   external: boolean;
 }
 
+/** A typed structural edge with its target FQN resolved where possible. */
+export interface ResolvedEdge extends RawEdge {
+  /** '{relativePath}#{symbolName}' if the callee/target was resolved, else undefined. */
+  targetFqn?: string;
+}
+
 /** Output of Resolve stage / Input of Load stage */
 export interface ResolvedFile extends ParsedFile {
   resolvedImports: ResolvedImport[];
+  resolvedEdges: ResolvedEdge[];
 }
 
 // ─── Pipeline result ──────────────────────────────────────────────────────────

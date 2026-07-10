@@ -20,8 +20,38 @@ import type {
   SymbolReference,
   SymbolImport,
   CentralityEntry,
+  RefKind,
 } from "../../data/sqlite/symbol-repository.js";
 import { computePageRank } from "./centrality.js";
+
+// ─── Typed-edge types (D1) ────────────────────────────────────────────────────
+
+/** Public edge-type names surfaced by the query layer. */
+export type EdgeType = "call" | "data_flow" | "http_call" | "emit" | "listen" | "import" | "type_ref" | "extend" | "implement";
+
+export interface EdgeQueryOptions {
+  /** Filter by edge type(s). Omit for all types. */
+  types?: EdgeType[];
+  /** Source symbol FQN ('rel/path.ts#Name') — restricts to outgoing edges. */
+  fromSymbol?: string;
+  /** Target symbol FQN — restricts to incoming edges. */
+  toSymbol?: string;
+  /** Constrain to edges originating from a specific file. */
+  fromFile?: string;
+  /** Edge direction relative to fromSymbol/toSymbol. Default 'both'. */
+  direction?: "outgoing" | "incoming" | "both";
+  limit?: number;
+}
+
+export interface EdgeResult {
+  fromFile: string;
+  fromLine: number;
+  symbolName: string;
+  refKind: string;
+  targetFqn?: string;
+  /** Typed-edge metadata (route, event, paramIndex, callerFqn). */
+  meta?: Record<string, unknown> | null;
+}
 
 // ─── Return types ─────────────────────────────────────────────────────────────
 
@@ -92,6 +122,8 @@ export interface ProjectMapResult {
   symbolsByKind: Record<string, number>;
   filesByLanguage: Record<string, number>;
   recentFiles: Array<{ filePath: string; indexedAt: string | null }>;
+  /** Counts of typed structural edges grouped by ref_kind (D1). */
+  edgesByKind?: Record<string, number>;
 }
 
 export interface GetProjectMapOptions {
@@ -211,6 +243,37 @@ export class SymbolGraphService {
     return results;
   }
 
+  // ── get_edges (typed structural edges — D1) ─────────────────────────────────
+
+  /**
+   * Query typed structural edges (CALLS / IMPORTS / DATA_FLOWS / HTTP_CALLS /
+   * EMITS / LISTENS) with optional filtering by edge type, source/target
+   * symbol, file, and direction.
+   *
+   * Backed by `symbol_references` rows with typed `ref_kind` values + `meta`.
+   * Designed for later trace_path / impact_analysis traversal.
+   */
+  async getEdges(projectId: string, opts: EdgeQueryOptions = {}): Promise<EdgeResult[]> {
+    const repo = getSymbolRepository();
+    const refs = await repo.findEdges(projectId, {
+      types: opts.types as RefKind[] | undefined,
+      fromSymbol: opts.fromSymbol,
+      toSymbol: opts.toSymbol,
+      fromFile: opts.fromFile,
+      direction: opts.direction,
+      limit: opts.limit,
+    });
+
+    return refs.map((r) => ({
+      fromFile: r.from_file,
+      fromLine: r.from_line,
+      symbolName: r.symbol_name,
+      refKind: r.ref_kind,
+      targetFqn: r.target_fqn,
+      meta: r.meta ?? null,
+    }));
+  }
+
   // ── get_dependencies ────────────────────────────────────────────────────────
 
   /**
@@ -296,9 +359,15 @@ export class SymbolGraphService {
     const workspace = await repo.getWorkspace(projectId);
     if (!workspace) return null;
 
-    const [topCentralFiles, aggregates] = await Promise.all([
+    const [topCentralFiles, aggregates, edgesByKind] = await Promise.all([
       this.getTopCentralFiles(projectId, centralityLimit),
       repo.getProjectMapAggregates(projectId, recentLimit),
+      // Typed-edge counts (D1) — cheap single GROUP BY; surface when non-empty.
+      // Wrapped in Promise.resolve so it works whether the repo returns a
+      // plain value (SQLite sync) or a Promise (PG async).
+      Promise.resolve(repo.countEdgesByKind(projectId)).catch(
+        () => ({}) as Record<string, number>,
+      ),
     ]);
 
     return {
@@ -319,6 +388,7 @@ export class SymbolGraphService {
         filePath: r.filePath,
         indexedAt: r.indexedAt ? new Date(r.indexedAt).toISOString() : null,
       })),
+      edgesByKind: Object.keys(edgesByKind).length > 0 ? edgesByKind : undefined,
     };
   }
 

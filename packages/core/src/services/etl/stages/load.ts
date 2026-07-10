@@ -21,6 +21,7 @@ import type {
   EtlStageContext,
   ResolvedFile,
   RawSymbol,
+  ResolvedEdge,
 } from "../stage-context.js";
 
 export interface LoadResult {
@@ -256,7 +257,7 @@ export class LoadStage {
     }));
 
     // Build SymbolReference from imports (import is a ref of kind 'import')
-    const refs: SymbolReference[] = file.resolvedImports
+    const importRefs: SymbolReference[] = file.resolvedImports
       .filter((imp) => !imp.external)
       .flatMap((imp) =>
         imp.raw.names.map((name) => ({
@@ -268,6 +269,20 @@ export class LoadStage {
           ref_kind: "import" as const,
         })),
       );
+
+    // Build SymbolReference rows from resolved typed structural edges (D1).
+    // Each edge becomes one row with its typed ref_kind + meta JSON metadata.
+    const edgeRefs: SymbolReference[] = (file.resolvedEdges ?? []).map((edge: ResolvedEdge) => ({
+      project_id: ctx.projectId,
+      from_file: filePath,
+      from_line: edge.line,
+      symbol_name: edge.symbolName,
+      target_fqn: edge.targetFqn,
+      ref_kind: edge.kind,
+      meta: edge.meta ?? null,
+    }));
+
+    const refs: SymbolReference[] = [...importRefs, ...edgeRefs];
 
     // Build SymbolImport edges
     const imports: SymbolImport[] = file.resolvedImports.map((imp) => ({

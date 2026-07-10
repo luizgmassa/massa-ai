@@ -18,7 +18,9 @@ import type {
   ParsedFile,
   ResolvedFile,
   ResolvedImport,
+  ResolvedEdge,
   RawImport,
+  RawSymbol,
 } from "../stage-context.js";
 
 const TS_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.js"];
@@ -49,9 +51,18 @@ export class ResolveStage {
     // Build lookup set of all known relative paths (for O(1) membership checks)
     const knownRelPaths = new Set(files.map((f) => f.file.relativePath));
 
+    // Build a global symbol-name → FQN index across ALL parsed files.
+    // Used to resolve call-edge callee names to concrete definitions. A name
+    // may map to multiple FQNs (overloads, re-exports); we keep the first.
+    // (Best-effort: only the current indexing batch is visible — symbols from
+    // unchanged files fingerprint-skipped are NOT in this batch. Acceptable
+    // for "best-effort" edge resolution; missing targets are retained as
+    // rows with target_fqn = null.)
+    const symbolIndex = this.buildSymbolIndex(files);
+
     // Parse tsconfig.json compilerOptions.paths for workspace alias resolution
     const rootAliases = this.loadTsConfigPaths(ctx.projectPath);
-    
+
     // Detect monorepo packages and load their tsconfigs
     const monorepoPackages = this.detectMonorepoPackages(ctx.projectPath, files);
 
@@ -65,6 +76,7 @@ export class ResolveStage {
         knownRelPaths,
         rootAliases,
         monorepoPackages,
+        symbolIndex,
       );
       resolved.push(resolvedFile);
       processed++;
@@ -103,12 +115,13 @@ export class ResolveStage {
     knownRelPaths: Set<string>,
     rootAliases: TsPathAlias[],
     monorepoPackages: MonorepoPackage[],
+    symbolIndex: Map<string, string>,
   ): ResolvedFile {
     const fromDir = path.dirname(path.join(projectPath, parsed.file.relativePath));
 
     // Determine which package this file belongs to
     const packageAliases = this.getPackageAliases(parsed.file.relativePath, monorepoPackages);
-    
+
     // Merge package-specific aliases with root aliases (package aliases take precedence)
     const allAliases = [...packageAliases, ...rootAliases];
 
@@ -124,11 +137,81 @@ export class ResolveStage {
       fqn: `${parsed.file.relativePath}#${sym.name}`,
     }));
 
+    // Build an import-name → resolved-path map for this file (so a call to an
+    // imported symbol resolves to its defining file).
+    const importNameToPath = new Map<string, string | null>();
+    for (const ri of resolvedImports) {
+      if (!ri.external && ri.resolvedPath) {
+        for (const name of ri.raw.names) {
+          importNameToPath.set(name, ri.resolvedPath);
+        }
+      }
+    }
+
+    // Resolve typed structural edges (D1): map each edge's callee/target name
+    // to a FQN via (1) same-file symbol, (2) import resolution, (3) global index.
+    const localNames = new Set(parsed.symbols.map((s) => s.name));
+    const resolvedEdges: ResolvedEdge[] = (parsed.rawEdges ?? []).map((edge) => {
+      const targetFqn = this.resolveEdgeTarget(
+        edge.symbolName,
+        parsed.file.relativePath,
+        localNames,
+        importNameToPath,
+        symbolIndex,
+      );
+      // Stamp the caller FQN into meta for downstream traversal.
+      const meta = { ...(edge.meta ?? {}) };
+      if (edge.callerSymbol) {
+        meta.callerFqn = `${parsed.file.relativePath}#${edge.callerSymbol}`;
+      }
+      return { ...edge, meta, targetFqn };
+    });
+
     return {
       ...parsed,
       symbols: symbolsWithFqn,
       resolvedImports,
+      resolvedEdges,
     };
+  }
+
+  /**
+   * Resolve a callee/target symbol name to a FQN.
+   * Strategy:
+   *   1. Defined in the same file → '{thisFile}#{name}'
+   *   2. Imported from a resolved path → '{resolvedPath}#{name}'
+   *   3. Unique global definition across the batch → that FQN
+   *   4. Otherwise undefined (target_fqn left null; row still retained)
+   */
+  private resolveEdgeTarget(
+    name: string,
+    thisFile: string,
+    localNames: Set<string>,
+    importNameToPath: Map<string, string | null>,
+    symbolIndex: Map<string, string>,
+  ): string | undefined {
+    if (localNames.has(name)) return `${thisFile}#${name}`;
+    const importedPath = importNameToPath.get(name);
+    if (importedPath) return `${importedPath}#${name}`;
+    const globalFqn = symbolIndex.get(name);
+    return globalFqn; // may be undefined
+  }
+
+  /**
+   * Build a symbol-name → FQN index across all parsed files. When a name maps
+   * to multiple FQNs (e.g. overloads across files), the FIRST definition wins.
+   * This is a best-effort disambiguator; precise overload selection is out of
+   * scope for the regex-based extractor.
+   */
+  private buildSymbolIndex(files: ParsedFile[]): Map<string, string> {
+    const index = new Map<string, string>();
+    for (const f of files) {
+      for (const sym of f.symbols) {
+        if (index.has(sym.name)) continue;
+        index.set(sym.name, `${f.file.relativePath}#${sym.name}`);
+      }
+    }
+    return index;
   }
 
   private resolveSpecifier(

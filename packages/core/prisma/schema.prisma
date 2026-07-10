@@ -187,7 +187,7 @@ model SymbolDefinition {
   @@map("symbol_definitions")
 }
 
-// Symbol references - one row per usage site
+// Symbol references - one row per usage site (typed structural edge)
 model SymbolReference {
   id         Int    @id @default(autoincrement())
   projectId  String @map("project_id")
@@ -195,13 +195,15 @@ model SymbolReference {
   fromLine   Int    @map("from_line")
   symbolName String @map("symbol_name")
   targetFqn  String? @map("target_fqn") // nullable: unresolved-target refs are retained (SQLite parity)
-  refKind    String @map("ref_kind") // call, type_ref, import, extend, implement
+  refKind    String @map("ref_kind") // call, type_ref, import, extend, implement, data_flow, http_call, emit, listen
+  meta       Json?  // typed-edge metadata: { route?, event?, paramIndex?, callerFqn? }
 
   workspace Workspace @relation(fields: [projectId], references: [projectId], onDelete: Cascade)
 
   @@index([projectId])
   @@index([projectId, targetFqn]) // CRITICAL: find references query
   @@index([projectId, fromFile])
+  @@index([projectId, refKind]) // typed-edge filtering by edge type
   @@map("symbol_references")
 }
 

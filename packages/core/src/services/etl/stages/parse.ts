@@ -15,12 +15,14 @@ import fs from "fs/promises";
 import path from "path";
 import { logger } from "@massa-th0th/shared";
 import { smartChunk, type Chunk } from "../../search/smart-chunker.js";
+import { extractTypedEdges, TYPED_EDGE_EXTENSIONS } from "../typed-edges.js";
 import type {
   EtlStageContext,
   DiscoveredFile,
   ParsedFile,
   RawSymbol,
   RawImport,
+  RawEdge,
 } from "../stage-context.js";
 
 const BATCH_SIZE = 20;
@@ -94,7 +96,7 @@ export class ParseStage {
   private async parseFile(ctx: EtlStageContext, file: DiscoveredFile): Promise<ParsedFile> {
     if (!file.needsReparse) {
       // Fingerprint cache hit — pass through with empty collections
-      return { file, chunks: [], symbols: [], rawImports: [] };
+      return { file, chunks: [], symbols: [], rawImports: [], rawEdges: [] };
     }
 
     try {
@@ -110,6 +112,11 @@ export class ParseStage {
       const symbols = this.extractSymbols(content, ext);
       const rawImports = this.extractImports(content, ext);
 
+      // Typed structural edges (D1) — TS/JS only, best-effort.
+      const rawEdges: RawEdge[] = TYPED_EDGE_EXTENSIONS.has(ext)
+        ? extractTypedEdges(content, symbols)
+        : [];
+
       ctx.emit({
         type: "file_processed",
         stage: "parse",
@@ -118,12 +125,13 @@ export class ParseStage {
           symbols: symbols.length,
           chunks: chunks.length,
           imports: rawImports.length,
+          edges: rawEdges.length,
           status: "ok",
         },
         timestamp: Date.now(),
       });
 
-      return { file, chunks, symbols, rawImports };
+      return { file, chunks, symbols, rawImports, rawEdges };
     } catch (err) {
       ctx.emit({
         type: "file_error",
@@ -135,7 +143,7 @@ export class ParseStage {
         filePath: file.relativePath,
         error: (err as Error).message,
       });
-      return { file, chunks: [], symbols: [], rawImports: [] };
+      return { file, chunks: [], symbols: [], rawImports: [], rawEdges: [] };
     }
   }
 

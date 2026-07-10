@@ -96,6 +96,32 @@ export class SymbolDb {
         .run(1, Date.now());
       logger.info("SymbolDb migration 1 applied");
     }
+
+    // Migration 2: add `meta` JSON column + ref_kind index for typed edges (D1).
+    // Backward-compatible: existing rows get NULL meta. Fresh DBs already have
+    // the column from applyMigration1's CREATE TABLE (idempotent ALTER guards
+    // the upgrade path).
+    if (currentVersion < 2) {
+      this.applyMigration2();
+      this.db
+        .prepare("INSERT INTO _schema_version (version, applied_at) VALUES (?, ?)")
+        .run(2, Date.now());
+      logger.info("SymbolDb migration 2 applied (typed-edge meta column)");
+    }
+  }
+
+  private applyMigration2(): void {
+    // Add meta column if missing (existing DBs upgraded from v1).
+    const cols = this.db
+      .prepare("PRAGMA table_info(symbol_references)")
+      .all() as Array<{ name: string }>;
+    const hasMeta = cols.some((c) => c.name === "meta");
+    if (!hasMeta) {
+      this.db.exec("ALTER TABLE symbol_references ADD COLUMN meta TEXT");
+    }
+    this.db.exec(
+      "CREATE INDEX IF NOT EXISTS idx_sym_ref_kind ON symbol_references(project_id, ref_kind)",
+    );
   }
 
   private applyMigration1(): void {
@@ -135,7 +161,7 @@ export class SymbolDb {
       CREATE INDEX IF NOT EXISTS idx_sym_def_name    ON symbol_definitions(project_id, name);
 
       -- ─── Symbol references ────────────────────────────────────────
-      -- One row per usage site of a symbol.
+      -- One row per usage site of a symbol (typed structural edge).
       CREATE TABLE IF NOT EXISTS symbol_references (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         project_id  TEXT NOT NULL,
@@ -143,12 +169,17 @@ export class SymbolDb {
         from_line   INTEGER NOT NULL,
         symbol_name TEXT NOT NULL,
         target_fqn  TEXT,
-        ref_kind    TEXT NOT NULL
+        ref_kind    TEXT NOT NULL,
         -- ref_kind: 'call'|'type_ref'|'import'|'extend'|'implement'
+        --        OR 'data_flow'|'http_call'|'emit'|'listen' (typed edges, D1)
+        meta        TEXT
+        -- meta: JSON string for typed-edge metadata
+        --       { route?, event?, paramIndex?, callerFqn? }
       );
       CREATE INDEX IF NOT EXISTS idx_sym_ref_project ON symbol_references(project_id);
       CREATE INDEX IF NOT EXISTS idx_sym_ref_target  ON symbol_references(project_id, target_fqn);
       CREATE INDEX IF NOT EXISTS idx_sym_ref_file    ON symbol_references(project_id, from_file);
+      CREATE INDEX IF NOT EXISTS idx_sym_ref_kind    ON symbol_references(project_id, ref_kind);
 
       -- ─── Import edges ─────────────────────────────────────────────
       -- One row per import statement. Encodes file-level dependency graph.
