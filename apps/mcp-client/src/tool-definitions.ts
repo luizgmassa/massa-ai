@@ -1092,6 +1092,60 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ["commands"],
     },
   },
+  {
+    name: "fetch_and_index",
+    description:
+      "Fetch URL(s), convert HTML to markdown (JSON → key-path chunks), and " +
+      "index them for search. SSRF-guarded: loopback/private/link-local/IMDS " +
+      "IPs are blocked, including redirect-to-internal and DNS-rebind. Parallel " +
+      "fetch (run-pool, cpu-capped), serial per-URL indexing. TTL-cached (~24h).",
+    apiEndpoint: "/api/v1/web/fetch_and_index",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "Single URL to fetch and index (single-shape).",
+        },
+        source: {
+          type: "string",
+          description: "Label for the indexed content when using single `url`.",
+        },
+        requests: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              url: { type: "string", description: "URL to fetch." },
+              source: {
+                type: "string",
+                description: "Label for this URL's indexed content.",
+              },
+            },
+            required: ["url"],
+          },
+          description:
+            "Batch shape: array of {url, source?}. Use with concurrency>1 for " +
+            "parallel fetch. Output preserves input order.",
+        },
+        concurrency: {
+          type: "number",
+          description:
+            "Max URLs fetched in parallel (1-8, default 1). Capped by cpu count.",
+        },
+        force: {
+          type: "boolean",
+          description: "Skip cache and re-fetch even if recently indexed.",
+        },
+        ttl: {
+          type: "number",
+          description:
+            "Override cache freshness window in ms (0 bypasses cache like force).",
+        },
+      },
+    },
+  },
 ];
 
 /**

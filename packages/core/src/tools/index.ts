@@ -33,3 +33,6 @@ export { ExecuteFileTool } from "./execute_file.js";
 export type { ExecuteFileParams } from "./execute_file.js";
 export { BatchExecuteTool } from "./batch_execute.js";
 export type { BatchExecuteParams, BatchCommand } from "./batch_execute.js";
+
+// Web tools (SSRF-guarded fetch + HTML→md + index)
+export { FetchAndIndexTool } from "./fetch_and_index.js";

@@ -145,6 +145,40 @@ export type {
   IntentSearchResult,
 } from "./executor/index.js";
 
+// Keyword search factory (SQLite/PG backend resolution, sibling to getVectorStore)
+export {
+  getKeywordSearch,
+  resetKeywordSearch,
+} from "../data/sqlite/keyword-search-factory.js";
+
+// Web — SSRF-guarded fetch + HTML→md + index (fetch_and_index)
+export {
+  WebController,
+  classifyIp,
+  assertUrlSafe,
+  fetchWithSsrfGuard,
+  SsrfBlockedError,
+  setDnsResolver,
+  fetchAndConvertOne,
+  composeFetchCacheKey,
+  htmlToMarkdown,
+  jsonToKeyPathChunks,
+  MAX_FETCH_BYTES,
+  DEFAULT_FETCH_TTL_MS,
+  MAX_REDIRECTS,
+} from "./web/index.js";
+export type {
+  FetchRequest,
+  FetchAndIndexParams,
+  WebControllerDeps,
+  FetchOneResult,
+  FetchOneOptions,
+  IndexedChunk,
+  WebIndexDeps,
+  IpClass,
+  JsonChunk,
+} from "./web/index.js";
+
 // Synapse — cognitive modulation layer (focus, retention, prioritization, speed)
 export {
   SynapseManager,
