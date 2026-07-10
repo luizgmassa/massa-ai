@@ -20,17 +20,22 @@
  *
  * Schema parity: synapse_sessions + synapse_access_history (see Prisma model
  * SynapseSession / SynapseAccessHistory and PG migration
- * 20260710120000_add_synapse_sessions_pg). The buffer snapshot is a best-effort
- * JSON blob persisted for diagnostics/future restore; the live
- * WorkingMemoryBuffer is NOT reconstructed on load (the caller wires a fresh
- * buffer that refills naturally — see session-store.ts design note, matching
- * the SQLite store).
+ * 20260710120000_add_synapse_sessions_pg). The buffer snapshot + bufferConfig
+ * are reconstructed into a live WorkingMemoryBuffer on load (#17), matching the
+ * SQLite store. ensureReady() exposes the awaited-hydration hook the registry's
+ * resume path uses so a session resume immediately after a process restart
+ * observes PG-persisted sessions (#18).
  */
 
 import { logger } from "@massa-th0th/shared";
 import { getPrismaClient } from "../../query/prisma-client.js";
 import type { PrismaClient } from "../../../generated/prisma/index.js";
 import type { AgentSession } from "../types.js";
+import {
+  restoreWorkingMemoryBuffer,
+  type BufferSnapshot,
+  type WorkingMemoryBufferConfig,
+} from "../buffer/working-memory-buffer.js";
 import type { SessionStore } from "./session-store.js";
 
 // ── Raw row shapes returned by $queryRaw ────────────────────────────────────
@@ -172,10 +177,19 @@ export class PgSynapseSessionStore implements SessionStore {
 
     const accessHistory = accessMap ?? new Map<string, number>();
 
-    // Buffer: best-effort snapshot is stored but the live WorkingMemoryBuffer
-    // is not reconstructed here — the caller wires a fresh buffer (it refills
-    // naturally as the agent works). See design.md assumption, matching the
-    // SQLite store.
+    // Buffer (#17): reconstruct the live WorkingMemoryBuffer from the persisted
+    // bufferConfig + best-effort snapshot so a session resumed after a process
+    // restart keeps its primed working-set. Mirrors the SQLite store's restore.
+    const bufferConfig = row.buffer_config
+      ? (JSON.parse(row.buffer_config) as WorkingMemoryBufferConfig)
+      : undefined;
+    const snapshot = row.buffer_snapshot
+      ? (JSON.parse(row.buffer_snapshot) as BufferSnapshot)
+      : undefined;
+    const buffer = bufferConfig
+      ? restoreWorkingMemoryBuffer(snapshot ?? { entries: [], config: bufferConfig })
+      : undefined;
+
     const session: AgentSession = {
       sessionId: row.session_id,
       agentId: row.agent_id,
@@ -188,7 +202,7 @@ export class PgSynapseSessionStore implements SessionStore {
       expiresAt: Number(row.expires_at),
       accessHistory,
       accessHistoryLimit: Number(row.access_history_limit),
-      buffer: undefined,
+      buffer,
     };
     return session;
   }
@@ -269,6 +283,20 @@ export class PgSynapseSessionStore implements SessionStore {
   load(sessionId: string): AgentSession | null {
     void this.ensureHydrated();
     return this.mirror.get(sessionId) ?? null;
+  }
+
+  /**
+   * Await mirror hydration before a read (hydration race fix, #18).
+   *
+   * The SessionStore read contract is synchronous, but this store serves reads
+   * from an in-memory mirror hydrated from PG on first use. The very first
+   * `load()` after a process restart returns null until hydration settles
+   * (typically <100ms). Callers that must observe a persisted session
+   * immediately after restart (session resume) await this before reading.
+   * Sync backends resolve immediately.
+   */
+  ensureReady(): Promise<void> {
+    return this.ensureHydrated();
   }
 
   delete(sessionId: string): void {

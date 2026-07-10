@@ -78,10 +78,44 @@ export class SessionRegistry {
   }
 
   /**
+   * Await backend readiness before a read (hydration race fix, #18).
+   *
+   * Sync backends (SQLite, Memory) resolve immediately. The PG backend awaits
+   * its in-memory mirror hydration so a session resume immediately after a
+   * process restart observes PG-persisted sessions. Call this before the first
+   * `get()` of a resume flow; the sync `get()` used by the modulation pipeline
+   * stays synchronous.
+   */
+  async ensureReady(): Promise<void> {
+    try {
+      await this.store?.ensureReady();
+    } catch {
+      /* store swallows + warns */
+    }
+  }
+
+  /**
+   * Async resume path: await backend hydration, then return the session via the
+   * sync `get()`. Use this for session-resume entry points (REST/MCP) where a
+   * caller must observe a persisted session immediately after a process
+   * restart. The hot-path `process()` pipeline continues to use the sync
+   * `get()` (the modulation layer is out of scope).
+   */
+  async getAsync(sessionId: string, now: number = Date.now()): Promise<AgentSession | null> {
+    await this.ensureReady();
+    return this.get(sessionId, now);
+  }
+
+  /**
    * Retrieve a live session. IMP-10: an active `get()` slides the TTL
    * forward so a session in use does not silently expire mid-task.
    * The slide is bounded to defaultTtlMs from `now` — accessing a session
    * never extends it beyond what a fresh `create()` would give.
+   *
+   * NOTE: this is the sync hot path. For backends with an async-warmed read
+   * mirror (PG), the very first call after a process restart may return null
+   * until hydration settles (<100ms). Resume entry points should use
+   * `getAsync()` / `ensureReady()` first.
    */
   get(sessionId: string, now: number = Date.now()): AgentSession | null {
     let session = this.sessions.get(sessionId);

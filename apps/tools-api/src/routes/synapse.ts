@@ -99,8 +99,12 @@ export const synapseRoutes = new Elysia({ prefix: "/api/v1/synapse" })
   // ────────────────────────────────────────────────────────────────────────
   .get(
     "/session/:id",
-    ({ params }) => {
-      const session = getSessionRegistry().get(params.id);
+    async ({ params }) => {
+      // #18: await PG mirror hydration so a resume immediately after a process
+      // restart observes a persisted session (sync backends resolve instantly).
+      const registry = getSessionRegistry();
+      await registry.ensureReady();
+      const session = registry.get(params.id);
       if (!session) {
         return { success: false, error: "Session not found or expired" };
       }
@@ -114,8 +118,10 @@ export const synapseRoutes = new Elysia({ prefix: "/api/v1/synapse" })
   // ────────────────────────────────────────────────────────────────────────
   .patch(
     "/session/:id",
-    ({ params, body }) => {
+    async ({ params, body }) => {
+      // #18: await hydration before the resume-style update.
       const registry = getSessionRegistry();
+      await registry.ensureReady();
       const updated = registry.updateTaskContext(
         params.id,
         body.taskContext,
@@ -152,8 +158,11 @@ export const synapseRoutes = new Elysia({ prefix: "/api/v1/synapse" })
   // ────────────────────────────────────────────────────────────────────────
   .post(
     "/session/:id/prime",
-    ({ params, body }) => {
-      const session = getSessionRegistry().get(params.id);
+    async ({ params, body }) => {
+      // #18: await hydration so priming a resumed session works right after restart.
+      const registry = getSessionRegistry();
+      await registry.ensureReady();
+      const session = registry.get(params.id);
       if (!session) return { success: false, error: "Session not found or expired" };
       if (!session.buffer) {
         return { success: false, error: "Session has no working-memory buffer" };
@@ -192,8 +201,10 @@ export const synapseRoutes = new Elysia({ prefix: "/api/v1/synapse" })
   // ────────────────────────────────────────────────────────────────────────
   .post(
     "/session/:id/access",
-    ({ params, body }) => {
+    async ({ params, body }) => {
+      // #18: await hydration so an access on a resumed session is recorded.
       const registry = getSessionRegistry();
+      await registry.ensureReady();
       registry.recordAccess(params.id, body.memoryId);
       const session = registry.get(params.id);
       return {
@@ -215,7 +226,10 @@ export const synapseRoutes = new Elysia({ prefix: "/api/v1/synapse" })
   .post(
     "/session/:id/prefetch",
     async ({ params, body }) => {
-      const session = getSessionRegistry().get(params.id);
+      // #18: await hydration so prefetch on a resumed session works after restart.
+      const registry = getSessionRegistry();
+      await registry.ensureReady();
+      const session = registry.get(params.id);
       if (!session) {
         return { success: false, error: "Session not found or expired" };
       }

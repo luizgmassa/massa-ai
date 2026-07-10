@@ -233,3 +233,64 @@ export const DEFAULT_BUFFER_CONFIG: WorkingMemoryBufferConfig = {
   hitBoost: 1.3,
   matchThreshold: 0.4,
 };
+
+// ── Snapshot / restore (survive process restart) ───────────────────────────
+
+/**
+ * Serializable snapshot of one buffer entry. Token Sets are regenerable from
+ * `result.content` / the (absent on primed entries) query, so only scalars +
+ * the result are persisted. Mirrors the shape written by the session stores.
+ */
+export interface BufferEntrySnapshot {
+  id: string;
+  addedAt: number;
+  lastAccessedAt: number;
+  baselineScore: number;
+  result: SearchResult;
+}
+
+export interface BufferSnapshot {
+  entries: BufferEntrySnapshot[];
+  config: WorkingMemoryBufferConfig;
+}
+
+/**
+ * Reconstruct a LIVE WorkingMemoryBuffer from a persisted snapshot.
+ *
+ * The snapshot stores per-entry scalars (`addedAt`, `lastAccessedAt`,
+ * `baselineScore`) + the result. We replay each entry so the primed working-set
+ * survives a process restart: queryTokens is rebuilt empty (primed semantics —
+ * matched via contentTokens) and contentTokens is re-tokenized from the result,
+ * which is exactly how `prime()` would have built the entry. This keeps the
+ * restored buffer observationally equivalent to the pre-restart one for the
+ * purpose of `get()` matching and score boosting.
+ *
+ * Returns `undefined` when the snapshot is missing or malformed, so callers can
+ * treat a failed restore as "fresh buffer that refills naturally" (the original
+ * documented behavior).
+ */
+export function restoreWorkingMemoryBuffer(
+  snapshot: BufferSnapshot | null | undefined,
+): WorkingMemoryBuffer | undefined {
+  if (!snapshot || !snapshot.config || !Array.isArray(snapshot.entries)) {
+    return undefined;
+  }
+  const buf = new WorkingMemoryBuffer(snapshot.config);
+  const now = Date.now();
+  for (const e of snapshot.entries) {
+    if (!e || !e.result || typeof e.id !== "string") continue;
+    // Skip entries already past TTL at restore time — they would be evicted on
+    // the first get() anyway, so don't bother rehydrating dead weight.
+    if (now - (e.lastAccessedAt ?? 0) >= snapshot.config.ttlMs) continue;
+    const result = e.result;
+    (buf as any).entries.set(e.id, {
+      result,
+      queryTokens: new Set<string>(),
+      contentTokens: tokenize(result.content || ""),
+      addedAt: e.addedAt ?? now,
+      lastAccessedAt: e.lastAccessedAt ?? now,
+      baselineScore: e.baselineScore ?? result.score,
+    });
+  }
+  return buf;
+}

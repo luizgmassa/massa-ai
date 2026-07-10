@@ -7,10 +7,10 @@
  *   - scalar session fields (agentId, workspaceId, taskContext, ttl, timestamps)
  *   - accessHistory (memoryId → count, LRU-bounded) — drives agent-affinity
  *   - taskTokens (pre-tokenized taskContext) and taskEmbedding
- *   - a best-effort buffer snapshot (the WorkingMemoryBuffer is a hot cache;
- *     on reload the session is created with a fresh buffer that refills
- *     naturally, so only a JSON snapshot is persisted for diagnostics/future
- *     restore — see assumption in design.md).
+ *   - a best-effort buffer snapshot + bufferConfig; on reload the live
+ *     WorkingMemoryBuffer is RECONSTRUCTED from the snapshot so a resumed
+ *     session keeps its primed working-set (#17). See
+ *     restoreWorkingMemoryBuffer in working-memory-buffer.ts.
  *
  * Backend: SQLite-canonical (sessions are agent-runtime state, not analytics).
  * A `MemorySessionStore` (no-op) is provided for ephemeral/test runs and as a
@@ -22,7 +22,11 @@ import { Database } from "bun:sqlite";
 import fs from "fs";
 import path from "path";
 import type { AgentSession } from "../types.js";
-import type { WorkingMemoryBufferConfig } from "../buffer/working-memory-buffer.js";
+import {
+  restoreWorkingMemoryBuffer,
+  type BufferSnapshot,
+  type WorkingMemoryBufferConfig,
+} from "../buffer/working-memory-buffer.js";
 
 const TOKEN_RE = /[a-z0-9_]{2,}/g;
 
@@ -41,6 +45,20 @@ export interface SessionStore {
   delete(sessionId: string): void;
   /** Persist one access-history touch (LRU recency is encoded by row order). */
   recordAccess(sessionId: string, memoryId: string, count: number): void;
+  /**
+   * Await backend readiness before a read (hydration race fix, #18).
+   *
+   * The SessionStore contract is synchronous — `load()` returns immediately.
+   * For backends with an async-warmed read mirror (the PG store hydrates its
+   * in-memory mirror from PG on first use), the very first `load()` after a
+   * process restart can miss a session that exists in PG because hydration
+   * hasn't settled. Callers that need to observe a persisted session
+   * immediately after restart (session resume) await this before reading.
+   *
+   * Sync backends (SQLite, Memory) resolve immediately. The PG backend awaits
+   * its mirror hydration.
+   */
+  ensureReady(): Promise<void>;
 }
 
 // ── No-op store (ephemeral / test fallback) ─────────────────────────────────
@@ -50,6 +68,9 @@ export class MemorySessionStore implements SessionStore {
   load(): AgentSession | null { return null; }
   delete(): void {}
   recordAccess(): void {}
+  ensureReady(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 
 // ── SQLite store ────────────────────────────────────────────────────────────
@@ -236,9 +257,19 @@ export class SqliteSessionStore implements SessionStore {
       const accessHistory = new Map<string, number>();
       for (const r of accessRows) accessHistory.set(r.memory_id, r.access_count);
 
-      // Buffer: best-effort snapshot is stored but the live WorkingMemoryBuffer
-      // is not reconstructed here — the caller wires a fresh buffer (it refills
-      // naturally as the agent works). See design.md assumption.
+      // Buffer (#17): reconstruct the live WorkingMemoryBuffer from the
+      // persisted bufferConfig + best-effort snapshot so a session resumed
+      // after a process restart keeps its primed working-set.
+      const bufferConfig = row.buffer_config
+        ? (JSON.parse(row.buffer_config) as WorkingMemoryBufferConfig)
+        : undefined;
+      const snapshot = row.buffer_snapshot
+        ? (JSON.parse(row.buffer_snapshot) as BufferSnapshot)
+        : undefined;
+      const buffer = bufferConfig
+        ? restoreWorkingMemoryBuffer(snapshot ?? { entries: [], config: bufferConfig })
+        : undefined;
+
       const session: AgentSession = {
         sessionId: row.session_id,
         agentId: row.agent_id,
@@ -251,7 +282,7 @@ export class SqliteSessionStore implements SessionStore {
         expiresAt: row.expires_at,
         accessHistory,
         accessHistoryLimit: row.access_history_limit,
-        buffer: undefined,
+        buffer,
       };
       return session;
     } catch (e) {
@@ -294,6 +325,15 @@ export class SqliteSessionStore implements SessionStore {
         sessionId, memoryId, error: (e as Error).message,
       });
     }
+  }
+
+  /**
+   * SQLite reads are synchronous (bun:sqlite), so readiness is immediate —
+   * the awaited-hydration hook is a no-op here. Exists for interface parity
+   * with the PG store so the registry can call `ensureReady()` uniformly.
+   */
+  ensureReady(): Promise<void> {
+    return Promise.resolve();
   }
 
   /** Best-effort buffer snapshot — scalars only (token Sets are regenerable). */
