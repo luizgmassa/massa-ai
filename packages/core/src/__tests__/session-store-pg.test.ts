@@ -152,10 +152,9 @@ describe.skipIf(!DB_AVAILABLE)("PgSynapseSessionStore — unit tests on PostgreS
   afterAll(async () => {
     if (prisma) {
       await pgCleanup();
-      const { disconnectPrisma } = await import(
-        "../services/query/prisma-client.js"
-      );
-      await disconnectPrisma();
+      // NOTE: do NOT disconnectPrisma() — kills the shared process-wide pool
+      // for sibling suites in the same bun batch. Fixture rows are already
+      // removed by pgCleanup(); the singleton client stays alive.
     }
   });
 

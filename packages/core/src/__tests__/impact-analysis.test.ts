@@ -13,7 +13,7 @@
  * dead (same [D3:SKIP] pattern P4-T1/T2 used).
  */
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll } from "bun:test";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
@@ -23,6 +23,24 @@ import { ImpactAnalysisTool } from "../tools/impact_analysis.js";
 import { getSymbolRepository } from "../data/sqlite/symbol-repository-factory.js";
 
 const TEST_PROJECT = "p4d3-impact-analysis";
+
+// ── Isolation pin ───────────────────────────────────────────────────────────
+// SQLite-canonical suite: the fixture TS files are indexed into the SQLite
+// SymbolRepository (clearProject/upsertFile/writeFileSymbols shape). Bun
+// auto-loads repo-root .env (DATABASE_URL=postgresql://…), which would route
+// the ETL pipeline + getSymbolRepository() to PG and fail with FK violations
+// (symbol_definitions_project_id_fkey) because the throwaway TEST_PROJECT is
+// never registered in the PG `workspaces` table. Pin DATABASE_URL="" so the
+// whole ETL stack resolves to SQLite. Save/restore to keep sibling PG suites
+// in the same bun process unaffected.
+let savedDatabaseUrl: string | undefined;
+beforeAll(() => {
+  savedDatabaseUrl = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = "";
+});
+afterAll(() => {
+  process.env.DATABASE_URL = savedDatabaseUrl;
+});
 
 async function makeTempProject(files: Record<string, string>): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "massa-th0th-d3-"));
@@ -74,7 +92,9 @@ const FIXTURE: Record<string, string> = {
 };
 
 describe("impact_analysis", () => {
-  const repo = getSymbolRepository();
+  // Resolved in beforeEach so the DATABASE_URL pin (file-scope beforeAll) is
+  // already in effect — guarantees the SQLite backend.
+  let repo: ReturnType<typeof getSymbolRepository>;
 
   /** Env-broken sentinel (pre-existing disconnectPrisma debt). */
   let ENV_BROKEN = false;
@@ -82,6 +102,7 @@ describe("impact_analysis", () => {
   let INDEXED = false;
 
   beforeEach(() => {
+    repo = getSymbolRepository();
     try {
       repo.clearProject(TEST_PROJECT);
     } catch {

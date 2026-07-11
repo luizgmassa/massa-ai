@@ -116,8 +116,9 @@ describe.skipIf(!DB_AVAILABLE)("PgObservationStore — unit tests on PostgreSQL"
   afterAll(async () => {
     if (prisma) {
       await pgCleanup();
-      const { disconnectPrisma } = await import("../services/query/prisma-client.js");
-      await disconnectPrisma();
+      // NOTE: do NOT disconnectPrisma() — kills the shared process-wide pool
+      // for sibling suites in the same bun batch. Fixture rows are already
+      // removed by pgCleanup(); the singleton client stays alive.
     }
   });
 
@@ -237,11 +238,22 @@ describe.skipIf(!DB_AVAILABLE)("PgObservationStore — unit tests on PostgreSQL"
       await store.__hydrate();
       const pid = testProjectId();
       const id = newObservationId();
+      // insert()'s PG write is fire-and-forget (no ordering guarantee between
+      // two concurrent same-id upserts). Serialize at the test level: let the
+      // v:1 write settle before issuing v:2, then wait for v:2 to be the final
+      // committed value. Otherwise the two async upserts can commit out of order
+      // and leave v:1 as the last-write-wins row.
       store.insert(makeObs({ id, projectId: pid, payloadJson: JSON.stringify({ v: 1 }) }));
+      await waitForPGObservation(id);
       store.insert(makeObs({ id, projectId: pid, payloadJson: JSON.stringify({ v: 2 }) }));
-      await store.__drain();
 
-      const row = await waitForPGObservation(id);
+      const deadline = Date.now() + 3000;
+      let row: any = null;
+      while (Date.now() < deadline) {
+        row = await pgGetObservationRow(id);
+        if (row && JSON.parse(row.payload_json).v === 2) break;
+        await new Promise((r) => setTimeout(r, 25));
+      }
       expect(row).not.toBeNull();
       expect(JSON.parse(row.payload_json).v).toBe(2);
     });

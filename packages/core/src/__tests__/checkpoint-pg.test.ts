@@ -100,7 +100,6 @@ const ORIGINAL_DATABASE_URL = process.env.DATABASE_URL;
 /** Clean any rows this test created from PG (idempotent, scoped by taskId). */
 async function cleanupTaskRows(taskIds: string[]): Promise<void> {
   const { getPrismaClient } = await import("../services/query/prisma-client.js");
-  const { disconnectPrisma } = await import("../services/query/prisma-client.js");
   try {
     const prisma = getPrismaClient();
     for (const tid of taskIds) {
@@ -108,9 +107,11 @@ async function cleanupTaskRows(taskIds: string[]): Promise<void> {
     }
   } catch {
     // best-effort
-  } finally {
-    await disconnectPrisma();
   }
+  // NOTE: intentionally do NOT call disconnectPrisma() here. In the shared bun
+  // test process this kills the process-wide PrismaClient pool and cascades
+  // into every alphabetically-later suite that touches PG. The fixture rows
+  // are already deleted above; the singleton client stays alive for siblings.
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────

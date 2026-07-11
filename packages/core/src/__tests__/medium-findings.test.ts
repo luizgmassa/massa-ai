@@ -21,6 +21,17 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 
+// Capture the REAL repository classes at module-load time. The M7 test mocks
+// the symbol-repository-factory to inject a stub repo; bun's mock.module is
+// process-wide, pre-scanned before this file's body runs, and persists after
+// the test — so every later suite calling getSymbolRepository() would inherit
+// the stub and break with "upsertFile/clearProject is not a function". We
+// cannot require the factory itself (bun intercepts it), but the underlying
+// repository modules are NOT mocked, so we rebuild a real getSymbolRepository
+// in afterEach from these classes.
+import { SymbolRepository } from "../data/sqlite/symbol-repository.js";
+import { SymbolRepositoryPg } from "../data/sqlite/symbol-repository-pg.js";
+
 // ── M1: Rust temp-dir leak ─────────────────────────────────────────────────
 
 describe("M1: Rust temp-dir cleanup", () => {
@@ -250,6 +261,27 @@ describe("M4: ensureHydrated backoff (no retry storm)", () => {
 // repository factory so the service picks up an instrumented repo.
 
 describe("M7: impact-analysis definitions cache + bound", () => {
+  // Re-register a REAL getSymbolRepository (rebuilt from the un-muted classes)
+  // after the stub-mock test so sibling suites in the bun process keep working.
+  afterEach(() => {
+    mock.module("../data/sqlite/symbol-repository-factory.js", () => ({
+      getSymbolRepository: () => {
+        const databaseUrl = process.env.DATABASE_URL;
+        const isPostgres =
+          databaseUrl?.startsWith("postgresql://") ||
+          databaseUrl?.startsWith("postgres://");
+        return isPostgres
+          ? SymbolRepositoryPg.getInstance()
+          : SymbolRepository.getInstance();
+      },
+      resetSymbolRepository: async () => {},
+    }));
+    // Reset the ImpactAnalysisService singleton so it re-binds to the restored
+    // factory on its next use (it captured the stub repo at getInstance() time).
+    const { ImpactAnalysisService } = require("../services/symbol/impact-analysis.js");
+    (ImpactAnalysisService as any).instance = null;
+  });
+
   test("listDefinitionsByFile is called once per unique importer file across changed files", async () => {
     // Topology:
     //   hub.ts and leaf.ts are changed (the importees).
@@ -290,6 +322,7 @@ describe("M7: impact-analysis definitions cache + bound", () => {
       getSymbolRepository: () => repo,
     }));
     const { ImpactAnalysisService } = await import("../services/symbol/impact-analysis.js");
+    (ImpactAnalysisService as any).instance = null; // force rebind to the stub
     const svc = ImpactAnalysisService.getInstance();
 
     // hub.ts and leaf.ts changed. a.ts/b.ts import hub.ts → impacted at hop 1.

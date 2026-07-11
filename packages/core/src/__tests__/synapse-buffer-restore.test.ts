@@ -277,8 +277,9 @@ describe.skipIf(!DB_AVAILABLE)("#18 PG resume immediately after restart", () => 
   afterAll(async () => {
     if (prisma) {
       await pgCleanup();
-      const { disconnectPrisma } = await import("../services/query/prisma-client.js");
-      await disconnectPrisma();
+      // NOTE: do NOT disconnectPrisma() — kills the shared process-wide pool
+      // for sibling suites in the same bun batch. Fixture rows are already
+      // removed by pgCleanup(); the singleton client stays alive.
     }
   });
 

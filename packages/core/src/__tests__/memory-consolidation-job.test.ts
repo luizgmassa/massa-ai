@@ -87,13 +87,19 @@ async function pgInsertMemory(opts: {
   const createdAt = opts.createdAt ?? stale;
   const lastAccessed = opts.lastAccessed !== undefined ? opts.lastAccessed : stale;
   const accessCount = opts.accessCount ?? 0;
+  // Non-null embedding is required: listConsolidationCandidates filters on
+  // `embedding IS NOT NULL` (both SQLite and PG), so a NULL embedding would
+  // make decay/prune silently skip this row and the assertions no-op. A small
+  // placeholder byte payload is enough — decayScore reads importance/access,
+  // never the embedding bytes.
+  const embedding = Buffer.from([0x01, 0x02, 0x03, 0x04]);
 
   await prisma.$executeRaw`
     INSERT INTO memories (id, content, type, importance, level, created_at, updated_at,
                           last_accessed, access_count, embedding)
     VALUES (
       ${id}, ${"Test memory for " + opts.type}, ${opts.type}, ${opts.importance},
-      ${level}, ${createdAt}, ${createdAt}, ${lastAccessed}, ${accessCount}, NULL
+      ${level}, ${createdAt}, ${createdAt}, ${lastAccessed}, ${accessCount}, ${embedding}
     )
   `;
   return id;
@@ -127,8 +133,13 @@ describe.skipIf(!DB_AVAILABLE)(
     });
     afterAll(async () => {
       await pgCleanup();
-      const { disconnectPrisma } = await import("../services/query/prisma-client.js");
-      await disconnectPrisma();
+      // NOTE: intentionally do NOT call disconnectPrisma() here. In the shared
+      // bun test process this kills the process-wide PrismaClient pool and
+      // cascades into every alphabetically-later suite that touches PG
+      // (memory-crud, observation-repository-pg, prisma-client-fallback …) with
+      // "Cannot use a pool after end on the pool" / FK / timeout failures. The
+      // per-suite fixture rows are already removed by pgCleanup() above; the
+      // client itself is a singleton reused by sibling suites.
     });
     beforeEach(pgCleanup);
 

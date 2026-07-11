@@ -12,7 +12,7 @@
  * No `mock.module("@massa-th0th/shared")`.
  */
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll } from "bun:test";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
@@ -23,6 +23,25 @@ import { getSymbolRepository } from "../data/sqlite/symbol-repository-factory.js
 import { eventBus } from "../services/events/event-bus.js";
 
 const TEST_PROJECT = "p7e-etl-probe";
+
+// ── Isolation pin ───────────────────────────────────────────────────────────
+// This is a SQLite-canonical characterization suite (the factory's SQLite
+// SymbolRepository is the only backend whose clearProject/upsertFile shape these
+// tests assert). Bun auto-loads repo-root .env (DATABASE_URL=postgresql://…),
+// which would route getSymbolRepository() → PG and fail with FK violations
+// (symbol_files_project_id_fkey) because the throwaway TEST_PROJECT is never
+// inserted into the PG `workspaces` registry. Pin DATABASE_URL="" for the whole
+// file so every internal getSymbolRepository() call (DiscoverStage, LoadStage,
+// EtlPipeline) resolves to the SQLite singleton. Save/restore so sibling PG
+// integration suites in the same bun process are unaffected.
+let savedDatabaseUrl: string | undefined;
+beforeAll(() => {
+  savedDatabaseUrl = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = "";
+});
+afterAll(() => {
+  process.env.DATABASE_URL = savedDatabaseUrl;
+});
 
 async function makeTempProject(files: Record<string, string>): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "massa-th0th-etl-"));
@@ -42,9 +61,12 @@ function sha(s: string): string {
 
 describe("ETL — DiscoverStage SHA-256 skip (characterization)", () => {
   let stage: DiscoverStage;
-  const repo = getSymbolRepository();
+  // Resolved in beforeEach so the DATABASE_URL pin (file-scope beforeAll) is
+  // already in effect — guarantees the SQLite backend, not the PG singleton.
+  let repo: ReturnType<typeof getSymbolRepository>;
 
   beforeEach(() => {
+    repo = getSymbolRepository();
     stage = new DiscoverStage();
     try {
       repo.clearProject(TEST_PROJECT);
@@ -165,9 +187,10 @@ describe("ETL — DiscoverStage SHA-256 skip (characterization)", () => {
 });
 
 describe("ETL — EtlPipeline.run orchestration shape (characterization)", () => {
-  const repo = getSymbolRepository();
+  let repo: ReturnType<typeof getSymbolRepository>;
 
   beforeEach(() => {
+    repo = getSymbolRepository();
     try {
       repo.clearProject(TEST_PROJECT);
     } catch {

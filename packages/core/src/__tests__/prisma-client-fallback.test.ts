@@ -71,6 +71,16 @@ function captureError(): Error {
 describe("getPrismaClient() — missing adapter fallback (Issue #25)", () => {
   const savedDatabaseUrl = process.env.DATABASE_URL;
 
+  // Reset the module-level singleton BEFORE each test, not only after. In the
+  // shared bun batch, a sibling PG-integration suite (observation-repository-pg,
+  // checkpoint-pg, …) has already populated prismaInstance via getPrismaClient();
+  // without this reset the first test here would short-circuit on the stale
+  // singleton (getPrismaClient returns it without re-entering the adapter-load
+  // path) and never throw. afterEach alone is too late for the first test.
+  beforeEach(() => {
+    _resetPrismaForTesting();
+  });
+
   afterEach(() => {
     // Always restore adapters and reset singleton so tests are independent.
     restoreAdapters();

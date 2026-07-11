@@ -8,7 +8,7 @@
  * tested with tag changes (no embedding call).
  */
 
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll, mock } from "bun:test";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -28,7 +28,7 @@ mock.module("@massa-th0th/shared", () => {
           keywordSearch: { dbPath: path.join(tmpDir, "kw.db"), ftsVersion: "fts5" },
           security: { maxInputLength: 10000, sanitizeInputs: true, maxIndexSize: 1000, maxFileSize: 1048576, allowedExtensions: [".ts"], excludePatterns: [] },
           memory: { decay: { lambda: 0.02, sigma: 0.6, mu: 0.04, coldThreshold: 0.2 } },
-          llm: { enabled: false, baseUrl: "http://localhost:11434/v1", apiKey: "ollama", model: "qwen3.5:9b", temperature: 0.2, maxOutputTokens: 8000, timeoutMs: 5000 },
+          llm: { enabled: false, baseUrl: "http://localhost:11434/v1", apiKey: "ollama", model: "qwen3.5:9b", codeModel: "qwen2.5-coder:7b", temperature: 0.2, maxOutputTokens: 8000, timeoutMs: 5000 },
         };
         return defaults[key];
       },
@@ -52,6 +52,25 @@ import { GraphStore } from "../services/graph/graph-store.js";
 import { MemoryService } from "../services/memory/memory-service.js";
 
 const synthEmbedding = () => [0.01, 0.02, 0.03, 0.04];
+
+// ── Isolation pin ───────────────────────────────────────────────────────────
+// This whole file is SQLite-canonical: the mocked config points every store at
+// throwaway temp SQLite DBs, and MemoryRepository.insert is exercised directly
+// against the SQLite singleton. But MemoryController.getInstance() resolves its
+// repository via getMemoryRepository(), which keys off DATABASE_URL — and bun
+// auto-loads repo-root .env (postgresql://…). Without this pin, controller
+// writes hit PG while the test's repo hits SQLite → update returns updated:false
+// and delete hits FK violations (different backends, no shared row). Pin
+// DATABASE_URL="" so the factory returns the same SQLite singleton. Save/restore
+// so sibling PG integration suites in the same bun process are unaffected.
+let savedDatabaseUrl: string | undefined;
+beforeAll(() => {
+  savedDatabaseUrl = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = "";
+});
+afterAll(() => {
+  process.env.DATABASE_URL = savedDatabaseUrl;
+});
 
 /** Injectable fake LLM surface for MemoryConsolidationJob (Phase 1, no network). */
 function makeFakeLlm(opts: { enabled?: boolean; ok?: boolean; value?: any } = {}) {
@@ -161,13 +180,18 @@ describe("MemoryController update (merge tags) + delete (sever edges)", () => {
   let controller: MemoryController;
   let graph: MemoryGraphService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "massa-th0th-crud-ctrl-"));
     (GraphStore as any).instance = null;
     (MemoryGraphService as any).instance = null;
     (MemoryRepository as any).instance = null;
     (MemoryService as any).instance = null;
     (MemoryController as any).instance = null;
+    // Reset the graph-store FACTORY cache too: getGraphStore() keeps its own
+    // module-level cachedStore, so nulling GraphStore.instance alone leaves a
+    // stale handle to a prior tmpDir's DB → SQLITE_IOERR_VNODE on getEdges.
+    const { resetGraphStore } = await import("../services/graph/graph-store-factory.js");
+    await resetGraphStore();
     repo = MemoryRepository.getInstance();
     controller = MemoryController.getInstance();
     graph = MemoryGraphService.getInstance();
