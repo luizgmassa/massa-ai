@@ -174,3 +174,124 @@ describe("ReadFileTool — cache key includes option flags", () => {
     expect(d2.metadata?.symbols).toBeUndefined();
   });
 });
+
+// ── T3: fileCache LRU cap (512) + cache-hit metadata writeback ──────────────
+//
+// The fileCache and projectRootCache are bounded LRU maps mirroring
+// WebController's 512-cap pattern. On GET a key is promoted to
+// most-recently-used (delete+set); on SET the oldest entry is evicted while
+// over the cap. Separately, a legacy cache entry with undefined metadata used
+// to re-extract on EVERY hit without persisting; it now writes back so the
+// second hit is served from cache.
+
+describe("ReadFileTool — fileCache LRU cap + promotion", () => {
+  // CAP+1 distinct inserts → oldest evicted, a touched (LRU-promoted) hot key
+  // survives. We drive this through the private fileCache directly via a cast,
+  // since constructing CAP+1 real files is wasteful and the cap logic lives in
+  // evictOldest() which is agnostic to the cache type.
+  const CAP = 512;
+
+  test("inserting CAP+1 distinct keys evicts the oldest; a promoted hot key survives", () => {
+    const tool = new ReadFileTool() as unknown as {
+      fileCache: Map<string, unknown>;
+      projectRootCache: Map<string, unknown>;
+      evictOldest: <K, V>(cache: Map<K, V>) => void;
+      FILE_CACHE_MAX_ENTRIES: number;
+    };
+
+    expect(tool.FILE_CACHE_MAX_ENTRIES).toBe(CAP);
+
+    // Seed CAP entries. The first-inserted is the eviction candidate.
+    for (let i = 0; i < CAP; i++) {
+      tool.evictOldest(tool.fileCache);
+      tool.fileCache.set(`key-${i}`, { content: `c${i}`, timestamp: Date.now() });
+    }
+    expect(tool.fileCache.size).toBe(CAP);
+    expect(tool.fileCache.has("key-0")).toBe(true);
+
+    // Touch key-0 (LRU promote via delete+set) — it must NOT be evicted next.
+    const v0 = tool.fileCache.get("key-0")!;
+    tool.fileCache.delete("key-0");
+    tool.fileCache.set("key-0", v0);
+
+    // Insert one more → evict oldest in insertion order. After the key-0
+    // promotion, the oldest is now key-1.
+    tool.evictOldest(tool.fileCache);
+    tool.fileCache.set(`key-${CAP}`, { content: `c${CAP}`, timestamp: Date.now() });
+
+    expect(tool.fileCache.size).toBe(CAP);
+    // Hot (promoted) key survived.
+    expect(tool.fileCache.has("key-0")).toBe(true);
+    // Oldest non-promoted key evicted.
+    expect(tool.fileCache.has("key-1")).toBe(false);
+    // New key present.
+    expect(tool.fileCache.has(`key-${CAP}`)).toBe(true);
+  });
+});
+
+describe("ReadFileTool — cache-hit metadata writeback", () => {
+  let tmpFile: string;
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "massa-th0th-readfile-writeback-"));
+    tmpFile = path.join(tmpDir, "sample.ts");
+    fs.writeFileSync(tmpFile, "import { x } from 'y';\nexport function foo() {}\n");
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test("undefined-metadata entry: first hit re-extracts + persists, second hit does NOT re-extract", async () => {
+    const tool = new ReadFileTool();
+
+    // Spy extractMetadata by replacing it on the instance.
+    let callCount = 0;
+    const realExtract = tool.extractMetadata.bind(tool);
+    tool.extractMetadata = async (...args: Parameters<typeof realExtract>) => {
+      callCount++;
+      return realExtract(...args);
+    };
+
+    // Seed a cache entry with undefined metadata — the legacy/edge shape.
+    // Use the SAME cache key shape the tool computes in readFileWithCache:
+    // handle() passes options.projectId = p.projectId (undefined here → null)
+    // and options.relativePath = p.filePath (the raw caller param, NOT the
+    // resolved absolute path). includeSymbols/includeImports default to true.
+    const cacheKey = JSON.stringify({
+      filePath: tmpFile,
+      includeSymbols: true,
+      includeImports: true,
+      projectId: null,
+      relativePath: tmpFile,
+    });
+    const content = fs.readFileSync(tmpFile, "utf-8");
+    (tool as unknown as { fileCache: Map<string, unknown> }).fileCache.set(cacheKey, {
+      content,
+      timestamp: Date.now(),
+      // metadata deliberately omitted → undefined
+    });
+
+    // Hit 1: cache valid (fresh), metadata undefined → re-extract + persist.
+    const r1 = await tool.handle({ filePath: tmpFile, compress: false });
+    expect(r1.success).toBe(true);
+    expect(callCount).toBe(1);
+    const d1 = r1.data as { metadata?: { language?: string } };
+    expect(d1.metadata?.language).toBe("TypeScript");
+
+    // The cache entry must now have metadata persisted (no longer undefined).
+    const entry = (tool as unknown as { fileCache: Map<string, unknown> }).fileCache.get(cacheKey) as
+      | { metadata?: unknown }
+      | undefined;
+    expect(entry).toBeDefined();
+    expect(entry?.metadata).toBeDefined();
+
+    // Hit 2: cache valid, metadata now defined → served from cache, NO re-extract.
+    const r2 = await tool.handle({ filePath: tmpFile, compress: false });
+    expect(r2.success).toBe(true);
+    expect(callCount).toBe(1); // still 1, not 2 — writeback worked
+    const d2 = r2.data as { metadata?: { language?: string } };
+    expect(d2.metadata?.language).toBe("TypeScript");
+  });
+});

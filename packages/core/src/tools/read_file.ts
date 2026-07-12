@@ -122,6 +122,14 @@ export class ReadFileTool implements IToolHandler {
   private projectRootCache: Map<string, string> = new Map();
   private readonly CACHE_TTL = 60000; // 1 minute
   private readonly ROOT_CACHE_TTL = 300000; // 5 minutes
+  /**
+   * Maximum entries retained in each in-memory cache. Without a cap, an
+   * adversarial caller cycling distinct cache keys grows the map for the
+   * process lifetime. Map preserves INSERTION order in JS; we promote a key
+   * to most-recently-used on GET via delete+set, and evict the oldest key on
+   * SET while over the cap. Mirrors WebController's WEB_CACHE_MAX_ENTRIES.
+   */
+  private readonly FILE_CACHE_MAX_ENTRIES = 512;
 
   constructor(symbolGraph?: SymbolGraphService) {
     this.compressor = new CodeCompressor();
@@ -305,11 +313,17 @@ export class ReadFileTool implements IToolHandler {
 
   private async getProjectRoot(projectId: string): Promise<string | null> {
     const cached = this.projectRootCache.get(projectId);
-    if (cached) return cached;
+    if (cached !== undefined) {
+      // LRU touch: promote this key to most-recently-used.
+      this.projectRootCache.delete(projectId);
+      this.projectRootCache.set(projectId, cached);
+      return cached;
+    }
 
     try {
       const workspace = await workspaceManager.getWorkspace(projectId);
       if (workspace?.project_path) {
+        this.evictOldest(this.projectRootCache);
         this.projectRootCache.set(projectId, workspace.project_path);
         return workspace.project_path;
       }
@@ -317,6 +331,19 @@ export class ReadFileTool implements IToolHandler {
       logger.warn("Failed to look up project root", { projectId, error: (error as Error).message });
     }
     return null;
+  }
+
+  /**
+   * Evict the oldest (first-inserted) entries from a cache Map until it is
+   * under FILE_CACHE_MAX_ENTRIES. Called BEFORE the new insert so the cap is
+   * honored post-insert with a single iteration.
+   */
+  private evictOldest<K, V>(cache: Map<K, V>): void {
+    while (cache.size >= this.FILE_CACHE_MAX_ENTRIES) {
+      const oldest = cache.keys().next().value;
+      if (oldest === undefined) break;
+      cache.delete(oldest);
+    }
   }
 
   private calculateRange(params: ReadFileParams): ReadRange {
@@ -380,9 +407,22 @@ export class ReadFileTool implements IToolHandler {
     // Check cache validity
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
       logger.debug("File cache hit", { filePath });
+      // LRU touch: promote this key to most-recently-used so hot files survive
+      // eviction. delete+set reorders the key to the end (newest).
+      this.fileCache.delete(cacheKey);
+      this.fileCache.set(cacheKey, cached);
+
+      // Legacy/edge entries may have undefined metadata. Re-extract once and
+      // WRITE IT BACK into the cache entry so subsequent hits are served from
+      // cache instead of re-extracting on every request.
+      if (!cached.metadata) {
+        const metadata = await this.extractMetadata(cached.content, filePath, options);
+        this.fileCache.set(cacheKey, { ...cached, metadata });
+        return { content: cached.content, metadata };
+      }
       return {
         content: cached.content,
-        metadata: cached.metadata || await this.extractMetadata(cached.content, filePath, options),
+        metadata: cached.metadata,
       };
     }
 
@@ -390,7 +430,8 @@ export class ReadFileTool implements IToolHandler {
     const content = await fs.readFile(filePath, "utf-8");
     const metadata = await this.extractMetadata(content, filePath, options);
 
-    // Update cache
+    // Update cache (evict oldest if at cap).
+    this.evictOldest(this.fileCache);
     this.fileCache.set(cacheKey, {
       content,
       timestamp: Date.now(),
