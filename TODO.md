@@ -179,10 +179,10 @@ PG-integration skips are the only ones worth revisiting for the unit batch.
 - **Fix:** audit and remove the now-redundant guards so the Phase-4 integration
   tests run in the default batch (raises the green count further).
 
-### [low] Dep / type skew
-- `@types/node`: mcp-client `^22.10.5` vs core `^25.2.2` (shared has none).
-- `dotenv`: shared `^17.2.3` (dep) vs core `^17.2.4` (devDep).
-- **Fix:** align in a dedicated dependency pass.
+### [done] Dep / type skew (2026-07-12)
+- `@types/node`: mcp-client `^22.10.5` → `^25.2.2` (aligned with core/tools-api).
+- `dotenv`: shared `^17.2.3` → `^17.2.4` (dep; aligned with core/tools-api).
+- Build 5/5 green; `tsc --noEmit` clean on mcp-client (no 22→25 type regressions).
 
 ### [note] `e2e-th0th-shared` vectors empty on a cold live DB
 - **What:** workspace claims `indexed` (251 files) but `vector_documents` is 0
@@ -213,11 +213,18 @@ PG-integration skips are the only ones worth revisiting for the unit batch.
 
 ## Tech-debt / docs (lower priority)
 
-- **Config-interface drift** — the typed `MassaTh0thConfig` TS interface doesn't
-  declare `llm`/`hooks`/`memory`/`search`/`synapse`/`scheduler` even though the
-  runtime loader reads them. Loader works; interface is stale.
-- **`compression.llm` deprecated alias** still mirrored in
-  `packages/shared/src/config/index.ts`. Schedule removal after one release.
+- **Config-interface drift** — DONE (2026-07-12): `MassaTh0thConfig` now
+  declares `llm`/`hooks`/`memory`/`search`/`synapse` matching the runtime
+  `ServerConfig` shape; `compression` + `synapse` reconciled to the runtime
+  canonical shape; `config-loader.ts` deep-merges the newly-declared keys;
+  `scheduler` left env-driven (one-line comment added). Moved to Completed.
+- **`compression.llm` deprecated alias** — DONE (2026-07-12): the mirror block,
+  its deprecation comment, and the `mergeConfig` alias line are removed from
+  `packages/shared/src/config/index.ts`. The only compression-specific field
+  (`prompt`, env `RLM_LLM_PROMPT`) is preserved under `compression.prompt`;
+  the only runtime reader (`code-compressor.ts`) already read `config.get("llm")`
+  + `config.get("compression").targetCompressionRatio`, so no reader migration
+  was needed. Moved to Completed.
 - **E2E ops knobs undocumented in README** — `MASSA_TH0TH_DEDICATED`,
   `MASSA_TH0TH_JOB_STALE_MS` / `_JOB_REAPER_INTERVAL_MS`,
   `MASSA_TH0TH_PROXY_TIMEOUT_MS`, `MASSA_TH0TH_SCHEDULER_ENABLED`. All in
