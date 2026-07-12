@@ -160,12 +160,22 @@ worth revisiting.
   in `missingMemoryIds` and the real id in `validMemoryIds`. SQLite + PG suites
   green; `tsc` clean.
 
-### [med] Benchmark the qwen2.5 swap on LLM-judge paths
-- **What:** the model swap (`qwen3.5:9b` → `qwen2.5:7b-instruct` + coder) is live
-  but LLM-judge quality (consolidator / salience / reranker) is unmeasured —
+### [done] Benchmark the qwen2.5 swap on LLM-judge paths (2026-07-12, T9)
+- **What:** the model swap (`qwen3.5:9b` → `qwen2.5:7b-instruct` + coder) was live
+  but LLM-judge quality (consolidator / salience / reranker) was unmeasured —
   `14.needles` is deterministic and does not exercise the judge.
-- **Fix:** fixture of known-dup + known-distinct memory batches; score merge
-  precision/recall head-to-head vs the old model.
+- **Resolution:** added `benchmarks/llm-judge/` (fixtures of known-dup groups +
+  known-distinct pairs, a `run.ts` harness that drives the REAL qwen2.5 LLM
+  through the three judge paths, and a pure `scorer.ts` computing
+  precision/recall/F1 + salience consistency + rerank hit@1). Added a gated
+  test `packages/core/src/__tests__/llm-judge.benchmark.test.ts`
+  (`describe.skipIf(!OLLAMA_UP)`) that asserts non-regression floors and skips
+  cleanly when Ollama is down (verified: 3 skip / 1 pass / 0 fail in 63 ms).
+- **Recorded baseline** (qwen2.5:7b-instruct + qwen2.5-coder:7b, 2026-07-12):
+  consolidator merge precision 1.000, recall 0.500, F1 0.667, accuracy 0.800;
+  salience consistency 0.500 (meanSpread 0.375); rerank hit@1 0.667. Committed
+  floors sit below the baseline (precision ≥ 0.6, recall ≥ 0.4, rerank hit@1 ≥
+  0.5, salience consistency ≥ 0.4) to tolerate sampling noise.
 
 ### [low] `adsads/` junk path indexed in `e2e-th0th-shared`
 - **Where:** shared index `e2e-th0th-shared`; surfaces as needle N11 top hit
@@ -191,16 +201,23 @@ worth revisiting.
 - `dotenv`: shared `^17.2.3` → `^17.2.4` (dep; aligned with core/tools-api).
 - Build 5/5 green; `tsc --noEmit` clean on mcp-client (no 22→25 type regressions).
 
-### [note] `e2e-th0th-shared` vectors empty on a cold live DB
+### [note] `e2e-th0th-shared` vectors empty on a cold live DB — [documented] (2026-07-12)
 - **What:** workspace claims `indexed` (251 files) but `vector_documents` is 0
   rows on a cold/dedicated stack; vectors re-seed on demand (~95 s).
-- **Fix:** none required; re-index to warm. Worth a one-line e2e README note.
+- **Fix:** none required; re-index to warm.
+- **Documented (2026-07-12):** cold-DB caveat added as a header note on
+  `ensureSharedIndex` in `packages/core/src/__tests__/e2e/_helpers.ts`
+  (the strong-probe gate already forces the re-index, so callers block until
+  the store is richly searchable).
 
-### [note] observation same-id concurrent insert ordering
+### [note] observation same-id concurrent insert ordering — [documented] (2026-07-12)
 - **Where:** `observation-repository-pg.ts:158` (fire-and-forget async IIFE).
 - **What:** two concurrent same-id upserts can commit out of order;
   `__drain()` is a 10 ms settle, not a flush. Low impact (best-effort
   telemetry); nondeterministic only for same-id concurrent writes.
+- **Documented (2026-07-12):** ordering caveat added as a code comment at the
+  fire-and-forget IIFE in `packages/core/src/data/memory/observation-repository-pg.ts`.
+  No behavior change — comment only.
 
 ---
 
@@ -232,10 +249,14 @@ worth revisiting.
   the only runtime reader (`code-compressor.ts`) already read `config.get("llm")`
   + `config.get("compression").targetCompressionRatio`, so no reader migration
   was needed. Moved to Completed.
-- **E2E ops knobs undocumented in README** — `MASSA_TH0TH_DEDICATED`,
-  `MASSA_TH0TH_JOB_STALE_MS` / `_JOB_REAPER_INTERVAL_MS`,
-  `MASSA_TH0TH_PROXY_TIMEOUT_MS`, `MASSA_TH0TH_SCHEDULER_ENABLED`. All in
-  `.env.example`; add a short "Operational knobs" README subsection.
+- **E2E ops knobs undocumented in README** — DONE (2026-07-12): added an
+  "Operational knobs" subsection to `README.md` documenting
+  `MASSA_TH0TH_DEDICATED`, `MASSA_TH0TH_JOB_STALE_MS`,
+  `MASSA_TH0TH_JOB_REAPER_INTERVAL_MS`, `MASSA_TH0TH_PROXY_TIMEOUT_MS`, and
+  `MASSA_TH0TH_SCHEDULER_ENABLED` (defaults + purpose, sourced from the code).
+  These knobs are NOT in `.env.example` (they are operational guards for
+  dedicated/verify stacks, not user-tunable config); the README subsection
+  notes this explicitly. Moved to Completed.
 - **Dead `||` fallback in `read_file`** (`read_file.ts:385`) — never fires;
   cosmetic.
   - **Done (2026-07-12):** reframed — the `||` DID fire for legacy/edge
