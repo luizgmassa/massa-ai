@@ -14,10 +14,33 @@ import type { Ignore } from "ignore";
 import fs from "fs/promises";
 import path from "path";
 import { createHash } from "crypto";
+import ignoreModule from "ignore";
 import { config, logger } from "@massa-th0th/shared";
 import { getSymbolRepository } from "../../../data/sqlite/symbol-repository-factory.js";
 import type { EtlStageContext, DiscoveredFile } from "../stage-context.js";
-import { DEFAULT_EXTENSIONS, loadProjectIgnore } from "../../search/ignore-patterns.js";
+import { DEFAULT_EXTENSIONS, DEFAULT_IGNORES, loadProjectIgnore } from "../../search/ignore-patterns.js";
+
+const ignore = (ignoreModule as unknown as { default: typeof ignoreModule }).default ?? ignoreModule;
+
+// Test/benchmark glob patterns inside DEFAULT_IGNORES (ignore-patterns.ts:33-45).
+// When includeTests is true, the discover-local Ignore omits ONLY these so test
+// files are indexed; everything else in DEFAULT_IGNORES (build artifacts, locks,
+// generated, etc.) still applies. loadProjectIgnore itself is untouched so
+// query-time callers keep excluding tests.
+const TEST_IGNORE_PATTERNS = new Set([
+  "**/__tests__/**",
+  "**/tests/**",
+  "**/*.test.ts",
+  "**/*.test.tsx",
+  "**/*.test.js",
+  "**/*.test.jsx",
+  "**/*.spec.ts",
+  "**/*.spec.tsx",
+  "**/*.spec.js",
+  "**/*.spec.jsx",
+  "**/benchmarks/**",
+  "**/fixtures/**",
+]);
 
 export class DiscoverStage {
   /**
@@ -26,12 +49,17 @@ export class DiscoverStage {
    * @param ctx - Stage execution context (projectId, projectPath, jobId, emit)
    * @param opts.forceReindex - When true, marks all files as needsReparse=true
    * @param opts.filesToProcess - Explicit list of relative paths for incremental reindex
+   * @param opts.includeTests - When true, do NOT exclude test/benchmark files.
+   *   Builds a discover-local Ignore that omits the test globs from
+   *   DEFAULT_IGNORES; loadProjectIgnore itself is unchanged so query-time
+   *   callers (index-manager, contextual-search-rlm) still ignore tests.
    */
   async run(
     ctx: EtlStageContext,
     opts: {
       forceReindex?: boolean;
       filesToProcess?: string[];
+      includeTests?: boolean;
     } = {},
   ): Promise<DiscoveredFile[]> {
     const t0 = performance.now();
@@ -43,7 +71,7 @@ export class DiscoverStage {
       timestamp: Date.now(),
     });
 
-    const ig = await this.loadIgnore(ctx.projectPath);
+    const ig = await this.loadIgnore(ctx.projectPath, opts.includeTests ?? false);
     const allowedExts: string[] =
       (config.get("security") as Record<string, unknown>).allowedExtensions as string[] ??
       DEFAULT_EXTENSIONS;
@@ -163,7 +191,34 @@ export class DiscoverStage {
     }
   }
 
-  private loadIgnore(projectPath: string): Promise<Ignore> {
-    return loadProjectIgnore(projectPath);
+  /**
+   * Build the project Ignore. When includeTests is false (default), delegates
+   * to {@link loadProjectIgnore} unchanged (keeps query-time callers ignoring
+   * tests). When includeTests is true, constructs a discover-local Ignore that
+   * omits the test/benchmark globs from DEFAULT_IGNORES so test files are
+   * indexed but everything else (build artifacts, locks, generated, etc.)
+   * stays ignored. This does NOT mutate loadProjectIgnore.
+   */
+  private async loadIgnore(projectPath: string, includeTests: boolean): Promise<Ignore> {
+    if (!includeTests) return loadProjectIgnore(projectPath);
+
+    // Build a discover-local Ignore with test globs stripped.
+    const ig = ignore();
+    for (const pattern of DEFAULT_IGNORES) {
+      if (TEST_IGNORE_PATTERNS.has(pattern)) continue;
+      ig.add(pattern);
+    }
+    try {
+      const gitignorePath = path.join(projectPath, ".gitignore");
+      const gitignoreContent = await fs.readFile(gitignorePath, "utf8");
+      const rules = gitignoreContent
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith("#"));
+      ig.add(rules);
+    } catch {
+      // No .gitignore — defaults only.
+    }
+    return ig;
   }
 }

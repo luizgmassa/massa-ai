@@ -13,6 +13,7 @@
 import path from "path";
 import fs from "fs";
 import { logger } from "@massa-th0th/shared";
+import { getSymbolRepository } from "../../../data/sqlite/symbol-repository-factory.js";
 import type {
   EtlStageContext,
   ParsedFile,
@@ -51,14 +52,15 @@ export class ResolveStage {
     // Build lookup set of all known relative paths (for O(1) membership checks)
     const knownRelPaths = new Set(files.map((f) => f.file.relativePath));
 
-    // Build a global symbol-name → FQN index across ALL parsed files.
-    // Used to resolve call-edge callee names to concrete definitions. A name
-    // may map to multiple FQNs (overloads, re-exports); we keep the first.
-    // (Best-effort: only the current indexing batch is visible — symbols from
-    // unchanged files fingerprint-skipped are NOT in this batch. Acceptable
-    // for "best-effort" edge resolution; missing targets are retained as
-    // rows with target_fqn = null.)
-    const symbolIndex = this.buildSymbolIndex(files);
+    // Build a global symbol-name → FQN index. SEED from the repo (all
+    // definitions persisted for this project — includes symbols from
+    // fingerprint-skipped unchanged files) then OVERLAY in-batch symbols so
+    // files parsed THIS run take precedence (strictly fresher). A name may
+    // map to multiple FQNs (overloads, re-exports); first definition wins
+    // within each source. This closes the D1 cross-file gap: a call edge in
+    // a newly-indexed file can now resolve to a callee defined in an
+    // unchanged file that was fingerprint-skipped this run.
+    const symbolIndex = await this.buildSymbolIndex(ctx.projectId, files);
 
     // Parse tsconfig.json compilerOptions.paths for workspace alias resolution
     const rootAliases = this.loadTsConfigPaths(ctx.projectPath);
@@ -137,12 +139,26 @@ export class ResolveStage {
       fqn: `${parsed.file.relativePath}#${sym.name}`,
     }));
 
-    // Build an import-name → resolved-path map for this file (so a call to an
-    // imported symbol resolves to its defining file).
+    // Build import resolution maps for this file:
+    //   importNameToPath  — named import binding → defining file path
+    //   namespaceToPath   — namespace/default binding ('*' or 'default') → file path
+    // so a call to an imported symbol OR a member of a namespace import
+    // (`svc.fetch()`, `Lib.helper()`) resolves to its defining file. Namespace
+    // member resolution is best-effort: the extractor captures only the final
+    // callee token, so we fall back to the project-wide symbol index when the
+    // bare callee is not itself a direct named import.
     const importNameToPath = new Map<string, string | null>();
+    const namespaceToPath = new Map<string, string>();
     for (const ri of resolvedImports) {
-      if (!ri.external && ri.resolvedPath) {
-        for (const name of ri.raw.names) {
+      if (ri.external || !ri.resolvedPath) continue;
+      for (const name of ri.raw.names) {
+        if (name === "*" || name === "default") {
+          // Whole-module binding: the local alias is the FIRST identifier in
+          // the import statement; raw.names only records '*'/'default' so we
+          // can't recover the alias here without the parse stage exposing it.
+          // Record the path under both sentinel names as a fallback.
+          namespaceToPath.set(name, ri.resolvedPath);
+        } else {
           importNameToPath.set(name, ri.resolvedPath);
         }
       }
@@ -157,6 +173,7 @@ export class ResolveStage {
         parsed.file.relativePath,
         localNames,
         importNameToPath,
+        namespaceToPath,
         symbolIndex,
       );
       // Stamp the caller FQN into meta for downstream traversal.
@@ -179,37 +196,80 @@ export class ResolveStage {
    * Resolve a callee/target symbol name to a FQN.
    * Strategy:
    *   1. Defined in the same file → '{thisFile}#{name}'
-   *   2. Imported from a resolved path → '{resolvedPath}#{name}'
-   *   3. Unique global definition across the batch → that FQN
-   *   4. Otherwise undefined (target_fqn left null; row still retained)
+   *   2. Direct named import from a resolved path → '{resolvedPath}#{name}'
+   *   3. Namespace/default import bound — try the resolved module, then the
+   *      project-wide index for the bare callee (covers `ns.method()`)
+   *   4. Unique global definition across repo+batch → that FQN
+   *   5. Otherwise undefined (target_fqn left null; row still retained)
    */
   private resolveEdgeTarget(
     name: string,
     thisFile: string,
     localNames: Set<string>,
     importNameToPath: Map<string, string | null>,
+    namespaceToPath: Map<string, string>,
     symbolIndex: Map<string, string>,
   ): string | undefined {
     if (localNames.has(name)) return `${thisFile}#${name}`;
     const importedPath = importNameToPath.get(name);
     if (importedPath) return `${importedPath}#${name}`;
+    // Namespace/default binding: the bare callee may be a member of the
+    // imported module. First try the imported module's file-scoped FQN, then
+    // fall through to the project-wide index (handles re-exports + aliases).
+    const nsPath = namespaceToPath.get("*") ?? namespaceToPath.get("default");
+    if (nsPath) {
+      const nsFqn = `${nsPath}#${name}`;
+      if (symbolIndex.has(name)) return symbolIndex.get(name);
+      return nsFqn; // best-effort: assume the module exports the callee
+    }
     const globalFqn = symbolIndex.get(name);
     return globalFqn; // may be undefined
   }
 
   /**
-   * Build a symbol-name → FQN index across all parsed files. When a name maps
-   * to multiple FQNs (e.g. overloads across files), the FIRST definition wins.
-   * This is a best-effort disambiguator; precise overload selection is out of
-   * scope for the regex-based extractor.
+   * Build a symbol-name → FQN index. SEED from the repo (all persisted
+   * definitions for the project, including fingerprint-skipped unchanged
+   * files) then OVERLAY in-batch symbols UNCONDITIONALLY so the just-parsed
+   * files take precedence over stale repo rows. First definition wins within
+   * each source, but in-batch always overrides repo for the same name.
+   * Project-wide resolution closes the D1 cross-file gap.
+   *
+   * Note: {@link getSymbolRepository} is sync for SQLite and async for PG;
+   * `await` works for both (await on a non-thenable returns the value).
    */
-  private buildSymbolIndex(files: ParsedFile[]): Map<string, string> {
+  private async buildSymbolIndex(
+    projectId: string,
+    files: ParsedFile[],
+  ): Promise<Map<string, string>> {
     const index = new Map<string, string>();
+
+    // 1. Seed from the repo (project-wide), first-def-wins. Catches unchanged
+    //    files that are fingerprint-skipped this run.
+    try {
+      const repoSyms = await getSymbolRepository().listAllDefinitions(projectId);
+      for (const def of repoSyms) {
+        if (index.has(def.name)) continue;
+        index.set(def.name, `${def.file_path}#${def.name}`);
+      }
+    } catch (err) {
+      logger.warn("buildSymbolIndex: repo seed failed, in-batch only", {
+        projectId,
+        error: (err as Error)?.message,
+      });
+    }
+
+    // 2. Overlay in-batch symbols. First-def-wins WITHIN the batch, but the
+    //    batch UNCONDITIONALLY overrides repo rows for the same name (in-batch
+    //    is strictly fresher — those files were just parsed this run).
+    const inBatch = new Map<string, string>();
     for (const f of files) {
       for (const sym of f.symbols) {
-        if (index.has(sym.name)) continue;
-        index.set(sym.name, `${f.file.relativePath}#${sym.name}`);
+        if (inBatch.has(sym.name)) continue;
+        inBatch.set(sym.name, `${f.file.relativePath}#${sym.name}`);
       }
+    }
+    for (const [name, fqn] of inBatch) {
+      index.set(name, fqn);
     }
     return index;
   }

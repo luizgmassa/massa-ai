@@ -25,6 +25,8 @@ interface IndexProjectParams {
   forceReindex?: boolean;
   warmCache?: boolean;
   warmupQueries?: string[];
+  /** Include test/benchmark files so typed edges from `.test.ts` etc. are indexed. */
+  include_tests?: boolean;
 }
 
 export class IndexProjectTool implements IToolHandler {
@@ -58,6 +60,12 @@ export class IndexProjectTool implements IToolHandler {
         items: { type: "string" },
         description: "Custom queries to pre-cache (uses defaults if not provided)",
       },
+      include_tests: {
+        type: "boolean",
+        description:
+          "Index test/benchmark files too so typed edges from .test.ts files are captured (default false)",
+        default: false,
+      },
     },
     required: ["projectPath"],
   };
@@ -75,6 +83,7 @@ export class IndexProjectTool implements IToolHandler {
       forceReindex = false,
       warmCache = false,
       warmupQueries,
+      include_tests = false,
     } = params as IndexProjectParams;
 
     try {
@@ -98,7 +107,8 @@ export class IndexProjectTool implements IToolHandler {
         projectPath,
         forceReindex,
         warmCache,
-        warmupQueries
+        warmupQueries,
+        include_tests
       ).catch((error) => {
         logger.error("Background indexing failed", error as Error, {
           jobId: job.jobId,
@@ -144,7 +154,8 @@ export class IndexProjectTool implements IToolHandler {
     projectPath: string,
     forceReindex: boolean,
     warmCache: boolean,
-    warmupQueries?: string[]
+    warmupQueries?: string[],
+    include_tests: boolean = false,
   ): Promise<void> {
     const startTime = Date.now();
 
@@ -157,6 +168,7 @@ export class IndexProjectTool implements IToolHandler {
         projectId,
         forceReindex,
         warmCache,
+        include_tests,
       });
 
       // ETL Pipeline: discover → parse → resolve → load
@@ -166,6 +178,7 @@ export class IndexProjectTool implements IToolHandler {
         projectPath,
         jobId,
         forceReindex,
+        include_tests,
       });
 
       const duration = Date.now() - startTime;

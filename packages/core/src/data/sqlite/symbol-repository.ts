@@ -393,6 +393,36 @@ export class SymbolRepository {
     return (this.db.prepare(sql).all(...(params as any[])) as SymbolDefinition[]).map(this.normalizeDef);
   }
 
+  /**
+   * Return ALL symbol definitions for a project (no default LIMIT). Capped only
+   * by a high safety ceiling (200k) to guard against pathological repos. Use
+   * this for resolve-stage project-wide name→FQN maps where silent truncation
+   * by {@link listDefinitions} (LIMIT 50) would drop cross-file callees. Paged
+   * UI callers should keep using {@link listDefinitions}.
+   */
+  listAllDefinitions(
+    projectId: string,
+    opts: { kind?: string[]; exportedOnly?: boolean } = {},
+  ): SymbolDefinition[] {
+    const conditions: string[] = ["project_id = ?"];
+    const params: unknown[] = [projectId];
+
+    if (opts.kind && opts.kind.length > 0) {
+      conditions.push(`kind IN (${opts.kind.map(() => "?").join(",")})`);
+      params.push(...opts.kind);
+    }
+    if (opts.exportedOnly) {
+      conditions.push("exported = 1");
+    }
+
+    const SAFETY_CAP = 200000;
+    const sql = `SELECT * FROM symbol_definitions WHERE ${conditions.join(" AND ")} LIMIT ?`;
+    params.push(SAFETY_CAP);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (this.db.prepare(sql).all(...(params as any[])) as SymbolDefinition[]).map(this.normalizeDef);
+  }
+
   // ─── References ──────────────────────────────────────────────────────────
 
   findReferencesByFqn(projectId: string, targetFqn: string): SymbolReference[] {

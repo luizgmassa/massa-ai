@@ -885,6 +885,30 @@ export class SymbolRepositoryPg {
     );
   }
 
+  /**
+   * Return ALL symbol definitions for a project (no default LIMIT). Capped only
+   * by a high safety ceiling (200k) to guard against pathological repos. Used
+   * by the resolve-stage project-wide name→FQN map where the default LIMIT 100
+   * of {@link listDefinitions} would silently truncate and drop cross-file
+   * callees. Mirrors the SQLite {@link SymbolRepository.listAllDefinitions}.
+   */
+  async listAllDefinitions(
+    projectId: string,
+    opts: { kind?: string[]; exportedOnly?: boolean } = {},
+  ): Promise<SymbolDefinition[]> {
+    const SAFETY_CAP = 200000;
+    const p = getPrismaClient();
+    const kindList = opts.kind && opts.kind.length > 0 ? opts.kind : null;
+    const rows = await p.$queryRaw<DefRaw[]>`
+      SELECT * FROM symbol_definitions
+      WHERE project_id = ${projectId}
+        AND (${kindList}::text[] IS NULL OR kind = ANY(${kindList}::text[]))
+        AND (${opts.exportedOnly ?? false} = false OR exported = true)
+      LIMIT ${SAFETY_CAP}
+    `;
+    return rows.map(mapDef);
+  }
+
   /** Batch-update centrality scores computed by PageRank. */
   async updateCentrality(
     projectId: string,

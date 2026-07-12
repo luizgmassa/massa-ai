@@ -31,6 +31,13 @@ export interface PipelineInput {
   forceReindex?: boolean;
   /** If provided, only process these relative paths (incremental mode). */
   filesToProcess?: string[];
+  /**
+   * When true, the Discover stage does NOT exclude test/benchmark files
+   * (`.test.ts`, `__tests__/`, `*.spec.*`, etc.), so typed edges from test
+   * files are indexed. Default false (preserve search-recall hygiene —
+   * {@link loadProjectIgnore} stays unchanged for query-time callers).
+   */
+  include_tests?: boolean;
 }
 
 export class EtlPipeline {
@@ -51,7 +58,7 @@ export class EtlPipeline {
   }
 
   async run(input: PipelineInput): Promise<EtlResult> {
-    const { projectId, projectPath, jobId, forceReindex = false, filesToProcess } = input;
+    const { projectId, projectPath, jobId, forceReindex = false, filesToProcess, include_tests = false } = input;
     const t0 = performance.now();
     const stageTimings: Record<EtlStage, number> = {
       discover: 0,
@@ -112,7 +119,7 @@ export class EtlPipeline {
     try {
       // ── Stage 1: Discover ─────────────────────────────────────────────────
       const st1 = performance.now();
-      const discovered = await this.discover.run(ctx, { forceReindex, filesToProcess });
+      const discovered = await this.discover.run(ctx, { forceReindex, filesToProcess, includeTests: include_tests });
       stageTimings.discover = Math.round(performance.now() - st1);
 
       eventBus.publish("indexing:started", {

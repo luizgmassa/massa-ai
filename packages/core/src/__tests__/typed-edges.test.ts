@@ -369,3 +369,173 @@ describe("typed-edges ETL integration (fixture pipeline)", () => {
     }
   }, 30000);
 });
+
+// ─── (3) Cross-file callee resolution falsifier + include_tests ───────────
+//
+// These tests gate the D1 cross-file fix. The falsifier creates a scenario
+// where the callee definition is ONLY in the repo (fingerprint-skipped this
+// run) and NOT in the current parse batch. Before the fix (batch-only symbol
+// index), the A→B CALL edge would resolve to target_fqn=null. After the fix
+// (repo-seeded project-wide index), it resolves to callee.ts#calleeFn.
+
+describe("typed-edges cross-file resolution + include_tests", () => {
+  const repo = getSymbolRepository();
+
+  beforeEach(() => {
+    try {
+      repo.clearProject(TEST_PROJECT);
+    } catch {
+      /* noop */
+    }
+  });
+  afterEach(() => {
+    try {
+      repo.clearProject(TEST_PROJECT);
+    } catch {
+      /* noop */
+    }
+  });
+
+  const CALLEE_SRC = `
+    export function calleeFn(input: unknown): void {
+      // defined in callee.ts
+    }
+  `;
+
+  const CALLER_SRC = `
+    import { calleeFn } from './callee.js';
+
+    export function callerFn() {
+      calleeFn({ value: 1 });
+    }
+  `;
+
+  /**
+   * FALSIFIER: caller in batch, callee only in repo (fingerprint-skipped).
+   *
+   * Run 1 indexes callee.ts alone (forceReindex). Run 2 adds caller.ts and
+   * runs forceReindex=false: callee.ts is fingerprint-skipped, caller.ts is
+   * parsed. The CALL edge in caller.ts → calleeFn must resolve to
+   * callee.ts#calleeFn via the repo-seeded project-wide symbol index.
+   *
+   * Before the fix (batch-only index) the target would be null because
+   * calleeFn's definition is not in the current parse batch.
+   */
+  test("cross-file CALL edge resolves when callee is fingerprint-skipped (repo-seed)", async () => {
+    // Run 1: index callee.ts alone so its symbols land in the repo.
+    const dir1 = await makeTempProject({ "callee.ts": CALLEE_SRC });
+    try {
+      const pipeline = EtlPipeline.getInstance();
+      await pipeline.run({
+        projectId: TEST_PROJECT,
+        projectPath: dir1,
+        jobId: "d1-xfile-seed",
+        forceReindex: true,
+      });
+    } finally {
+      await fs.rm(dir1, { recursive: true, force: true });
+    }
+
+    // Run 2: project now has BOTH callee.ts (unchanged) + caller.ts (new).
+    // forceReindex=false → callee.ts fingerprint-skipped, caller.ts parsed.
+    const dir2 = await makeTempProject({
+      "callee.ts": CALLEE_SRC,
+      "caller.ts": CALLER_SRC,
+    });
+    try {
+      const pipeline = EtlPipeline.getInstance();
+      await pipeline.run({
+        projectId: TEST_PROJECT,
+        projectPath: dir2,
+        jobId: "d1-xfile-2",
+        forceReindex: false,
+      });
+
+      const calls = await symbolGraphService.getEdges(TEST_PROJECT, {
+        types: ["call"],
+        fromFile: "caller.ts",
+      });
+      const edge = calls.find((e) => e.symbolName === "calleeFn");
+      expect(edge).toBeDefined();
+      // The go/no-go signal: target_fqn MUST be non-null and resolve to the
+      // repo-seeded callee. Falsifies both the batch-only bug and stale reads.
+      expect(edge!.targetFqn).toBe("callee.ts#calleeFn");
+      expect(edge!.meta?.callerFqn).toBe("caller.ts#callerFn");
+    } finally {
+      await fs.rm(dir2, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  /**
+   * include_tests=true: the Discover stage does NOT exclude test files, so a
+   * `.test.ts` file's typed edges are indexed. include_tests=false (default)
+   * emits no edges from test files.
+   */
+  test("include_tests=true indexes edges from .test.ts files", async () => {
+    const dir = await makeTempProject({
+      "sum.ts": `export function sum(a: number, b: number) { return a + b; }`,
+      "sum.test.ts": `
+        import { sum } from './sum.js';
+        export function testSum() {
+          sum(1, 2);
+          fetch('/api/result');
+        }
+      `,
+    });
+    try {
+      const pipeline = EtlPipeline.getInstance();
+      await pipeline.run({
+        projectId: TEST_PROJECT,
+        projectPath: dir,
+        jobId: "d1-include-tests-true",
+        forceReindex: true,
+        include_tests: true,
+      });
+
+      const edges = await symbolGraphService.getEdges(TEST_PROJECT, {
+        fromFile: "sum.test.ts",
+      });
+      // At least the CALL edge to sum() and the http_call to fetch().
+      expect(edges.length).toBeGreaterThanOrEqual(1);
+      const sumCall = edges.find((e) => e.symbolName === "sum");
+      expect(sumCall).toBeDefined();
+      expect(sumCall!.targetFqn).toBe("sum.ts#sum");
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  test("include_tests=false (default) emits NO edges from .test.ts files", async () => {
+    const dir = await makeTempProject({
+      "sum.ts": `export function sum(a: number, b: number) { return a + b; }`,
+      "sum.test.ts": `
+        import { sum } from './sum.js';
+        export function testSum() { sum(1, 2); }
+      `,
+    });
+    try {
+      const pipeline = EtlPipeline.getInstance();
+      await pipeline.run({
+        projectId: TEST_PROJECT,
+        projectPath: dir,
+        jobId: "d1-include-tests-false",
+        forceReindex: true,
+        // include_tests omitted → default false
+      });
+
+      // sum.ts still indexed; sum.test.ts excluded by DEFAULT_IGNORES.
+      const testEdges = await symbolGraphService.getEdges(TEST_PROJECT, {
+        fromFile: "sum.test.ts",
+      });
+      expect(testEdges.length).toBe(0);
+
+      // Non-test file edges still present.
+      const sumEdges = await symbolGraphService.getEdges(TEST_PROJECT, {
+        fromFile: "sum.ts",
+      });
+      expect(sumEdges.length).toBe(0); // sum.ts has no call sites of its own
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  }, 30000);
+});
