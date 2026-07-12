@@ -8,9 +8,7 @@
  * `diffRunner` so no real `git` runs in tests (and never on the whole repo).
  *
  * Isolation: throwaway projectId cleared in beforeEach/afterEach (mirrors
- * trace-path.test.ts). Guards against the known batch-only disconnectPrisma
- * debt via an ENV_BROKEN sentinel — skips gracefully when the shared pool is
- * dead (same [D3:SKIP] pattern P4-T1/T2 used).
+ * trace-path.test.ts).
  */
 
 import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll } from "bun:test";
@@ -96,11 +94,6 @@ describe("impact_analysis", () => {
   // already in effect — guarantees the SQLite backend.
   let repo: ReturnType<typeof getSymbolRepository>;
 
-  /** Env-broken sentinel (pre-existing disconnectPrisma debt). */
-  let ENV_BROKEN = false;
-  let ENV_REASON = "";
-  let INDEXED = false;
-
   beforeEach(() => {
     repo = getSymbolRepository();
     try {
@@ -119,40 +112,13 @@ describe("impact_analysis", () => {
 
   async function indexFixture(dir: string, jobId: string): Promise<Record<string, number>> {
     const pipeline = EtlPipeline.getInstance();
-    try {
-      await pipeline.run({
-        projectId: TEST_PROJECT,
-        projectPath: dir,
-        jobId,
-        forceReindex: true,
-      });
-    } catch (e) {
-      ENV_BROKEN = true;
-      ENV_REASON = `pipeline.run threw: ${String((e as Error)?.message ?? e).slice(0, 120)}`;
-      return {};
-    }
-    let counts: Record<string, number> = {};
-    try {
-      counts = await Promise.resolve(repo.countEdgesByKind(TEST_PROJECT));
-    } catch (e) {
-      ENV_BROKEN = true;
-      ENV_REASON = `countEdgesByKind threw: ${String((e as Error)?.message ?? e).slice(0, 120)}`;
-      return {};
-    }
-    if (Object.keys(counts).length === 0) {
-      ENV_BROKEN = true;
-      ENV_REASON = "zero edges after forceReindex (pool dead or repo stubbed)";
-    }
-    INDEXED = true;
-    return counts;
-  }
-
-  function skipIfBroken(label: string): boolean {
-    if (ENV_BROKEN) {
-      console.log(`[D3:SKIP] ${label}: ${ENV_REASON}`);
-      return true;
-    }
-    return false;
+    await pipeline.run({
+      projectId: TEST_PROJECT,
+      projectPath: dir,
+      jobId,
+      forceReindex: true,
+    });
+    return await Promise.resolve(repo.countEdgesByKind(TEST_PROJECT));
   }
 
   /** Fixture diff runner — returns a fixed list of "changed" files. */
@@ -186,7 +152,6 @@ describe("impact_analysis", () => {
   test("maps changed file to its defined symbols", async () => {
     const dir = await makeTempProject(FIXTURE);
     await indexFixture(dir, "d3-symbols");
-    if (skipIfBroken("changed-file→symbols")) return;
 
     const result = await impactAnalysisService.analyze({
       projectId: TEST_PROJECT,
@@ -205,7 +170,6 @@ describe("impact_analysis", () => {
   test("reverse-import traversal finds importers of the changed file", async () => {
     const dir = await makeTempProject(FIXTURE);
     await indexFixture(dir, "d3-importers");
-    if (skipIfBroken("reverse-import")) return;
 
     // depth 1: only direct importers of util.ts (mid.ts, other.ts)
     const result = await impactAnalysisService.analyze({
@@ -226,7 +190,6 @@ describe("impact_analysis", () => {
   test("depth propagation reaches transitive importers", async () => {
     const dir = await makeTempProject(FIXTURE);
     await indexFixture(dir, "d3-depth");
-    if (skipIfBroken("depth-propagation")) return;
 
     // depth 2: mid.ts (1) + entry.ts (2, imports mid.ts)
     const result = await impactAnalysisService.analyze({
@@ -247,7 +210,6 @@ describe("impact_analysis", () => {
   test("risk ranking is descending by risk score", async () => {
     const dir = await makeTempProject(FIXTURE);
     await indexFixture(dir, "d3-risk");
-    if (skipIfBroken("risk-ranking")) return;
 
     const result = await impactAnalysisService.analyze({
       projectId: TEST_PROJECT,
@@ -271,7 +233,6 @@ describe("impact_analysis", () => {
   test("impacted entries carry centrality + proximity-weighted risk", async () => {
     const dir = await makeTempProject(FIXTURE);
     await indexFixture(dir, "d3-formula");
-    if (skipIfBroken("risk-formula")) return;
 
     const result = await impactAnalysisService.analyze({
       projectId: TEST_PROJECT,
@@ -295,7 +256,6 @@ describe("impact_analysis", () => {
   test("path filter narrows to the requested changed files", async () => {
     const dir = await makeTempProject(FIXTURE);
     await indexFixture(dir, "d3-filter");
-    if (skipIfBroken("path-filter")) return;
 
     // diff says two files changed, but paths filter restricts to util.ts only
     const twoFileDiff = (): string[] => ["util.ts", "mid.ts"];
@@ -314,7 +274,6 @@ describe("impact_analysis", () => {
   test("empty diff returns a note + zero impacted", async () => {
     const dir = await makeTempProject(FIXTURE);
     await indexFixture(dir, "d3-empty");
-    if (skipIfBroken("empty-diff")) return;
 
     const result = await impactAnalysisService.analyze({
       projectId: TEST_PROJECT,
@@ -332,7 +291,6 @@ describe("impact_analysis", () => {
   test("result count is bounded (MAX_IMPACTED respected)", async () => {
     const dir = await makeTempProject(FIXTURE);
     await indexFixture(dir, "d3-bound");
-    if (skipIfBroken("bound-count")) return;
 
     const result = await impactAnalysisService.analyze({
       projectId: TEST_PROJECT,
@@ -351,7 +309,6 @@ describe("impact_analysis", () => {
   test("tool handle returns shaped impact result", async () => {
     const dir = await makeTempProject(FIXTURE);
     await indexFixture(dir, "d3-tool");
-    if (skipIfBroken("tool-e2e")) return;
 
     // The tool uses the REAL default diff runner; inject a stub via the service
     // by calling the service directly with the diffRunner, then also exercise

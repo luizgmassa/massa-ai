@@ -7,9 +7,7 @@
  * the include_tests toggle. NEVER a full-repo index — fixture only.
  *
  * Isolation: throwaway projectId cleared in beforeEach/afterEach (mirrors
- * typed-edges.test.ts). Guards against the known batch-only disconnectPrisma
- * debt via an ENV_BROKEN sentinel — skips gracefully when the shared pool is
- * dead (same [D2:SKIP] pattern P4-T1 used).
+ * typed-edges.test.ts).
  */
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
@@ -74,11 +72,6 @@ const FIXTURE: Record<string, string> = {
 describe("trace_path", () => {
   const repo = getSymbolRepository();
 
-  /** Env-broken sentinel (pre-existing disconnectPrisma debt). */
-  let ENV_BROKEN = false;
-  let ENV_REASON = "";
-  let INDEXED = false;
-
   beforeEach(() => {
     try {
       repo.clearProject(TEST_PROJECT);
@@ -96,40 +89,13 @@ describe("trace_path", () => {
 
   async function indexFixture(dir: string, jobId: string): Promise<Record<string, number>> {
     const pipeline = EtlPipeline.getInstance();
-    try {
-      await pipeline.run({
-        projectId: TEST_PROJECT,
-        projectPath: dir,
-        jobId,
-        forceReindex: true,
-      });
-    } catch (e) {
-      ENV_BROKEN = true;
-      ENV_REASON = `pipeline.run threw: ${String((e as Error)?.message ?? e).slice(0, 120)}`;
-      return {};
-    }
-    let counts: Record<string, number> = {};
-    try {
-      counts = await Promise.resolve(repo.countEdgesByKind(TEST_PROJECT));
-    } catch (e) {
-      ENV_BROKEN = true;
-      ENV_REASON = `countEdgesByKind threw: ${String((e as Error)?.message ?? e).slice(0, 120)}`;
-      return {};
-    }
-    if (Object.keys(counts).length === 0) {
-      ENV_BROKEN = true;
-      ENV_REASON = "zero edges after forceReindex (pool dead or repo stubbed)";
-    }
-    INDEXED = true;
-    return counts;
-  }
-
-  function skipIfBroken(label: string): boolean {
-    if (ENV_BROKEN) {
-      console.log(`[D2:SKIP] ${label}: ${ENV_REASON}`);
-      return true;
-    }
-    return false;
+    await pipeline.run({
+      projectId: TEST_PROJECT,
+      projectPath: dir,
+      jobId,
+      forceReindex: true,
+    });
+    return await Promise.resolve(repo.countEdgesByKind(TEST_PROJECT));
   }
 
   // ── Tool-level smoke (pure, no DB) ──────────────────────────────────────
@@ -152,7 +118,6 @@ describe("trace_path", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d2-nf-1");
-      if (skipIfBroken("not-found hint")) return;
       const tool = new TracePathTool();
       const res = await tool.handle({
         projectId: TEST_PROJECT,
@@ -171,7 +136,6 @@ describe("trace_path", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d2-out-1");
-      if (skipIfBroken("outbound traversal")) return;
 
       const res = await tracePathService.tracePath({
         projectId: TEST_PROJECT,
@@ -204,7 +168,6 @@ describe("trace_path", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d2-in-1");
-      if (skipIfBroken("inbound traversal")) return;
 
       const res = await tracePathService.tracePath({
         projectId: TEST_PROJECT,
@@ -229,7 +192,6 @@ describe("trace_path", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d2-both-1");
-      if (skipIfBroken("both direction")) return;
 
       const res = await tracePathService.tracePath({
         projectId: TEST_PROJECT,
@@ -252,7 +214,6 @@ describe("trace_path", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d2-mode-1");
-      if (skipIfBroken("mode calls filter")) return;
 
       const res = await tracePathService.tracePath({
         projectId: TEST_PROJECT,
@@ -275,7 +236,6 @@ describe("trace_path", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d2-xs-1");
-      if (skipIfBroken("cross_service HTTP_CALL")) return;
 
       const res = await tracePathService.tracePath({
         projectId: TEST_PROJECT,
@@ -301,7 +261,6 @@ describe("trace_path", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d2-depth-1");
-      if (skipIfBroken("depth cap")) return;
 
       // depth=1 from alpha → only beta is reachable (gamma is depth 2).
       const res = await tracePathService.tracePath({
@@ -324,7 +283,6 @@ describe("trace_path", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d2-maxdepth-1");
-      if (skipIfBroken("max depth cap")) return;
 
       // Request an absurd depth; service must clamp to 6 without throwing.
       const res = await tracePathService.tracePath({
@@ -354,7 +312,6 @@ describe("trace_path", () => {
     const dir = await makeTempProject(cyclic);
     try {
       await indexFixture(dir, "d2-cycle-1");
-      if (skipIfBroken("cycle guard")) return;
 
       // Must terminate. The self-edge to loop is visited once, then skipped.
       const res = await tracePathService.tracePath({
@@ -376,7 +333,6 @@ describe("trace_path", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d2-tests-1");
-      if (skipIfBroken("include_tests false")) return;
 
       // Seed alpha (chain.ts, not a test file). With include_tests=false, no
       // node originating from a test file should survive the filter.
@@ -437,7 +393,6 @@ describe("trace_path", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d2-override-1");
-      if (skipIfBroken("edge_types override")) return;
 
       const res = await tracePathService.tracePath({
         projectId: TEST_PROJECT,
@@ -460,7 +415,6 @@ describe("trace_path", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d2-fqn-1");
-      if (skipIfBroken("qualifiedName")) return;
 
       const res = await tracePathService.tracePath({
         projectId: TEST_PROJECT,
@@ -487,7 +441,6 @@ describe("trace_path", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d2-fqn-filter-1");
-      if (skipIfBroken("caller-FQN SQL filter")) return;
 
       // Query edges originating from chain.ts#alpha specifically.
       const edges = await symbolGraphService.getEdges(TEST_PROJECT, {

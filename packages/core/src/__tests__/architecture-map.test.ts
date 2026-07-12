@@ -13,8 +13,7 @@
  *       pre-existing fields (backward-compat).
  *
  * Isolation: the integration test uses a throwaway projectId, never triggers a
- * full-repo index, and bails gracefully (skip) if the shared symbol DB is in a
- * broken state (pre-existing sibling-suite pollution — see typed-edges.test.ts).
+ * full-repo index (mirrors typed-edges.test.ts).
  */
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
@@ -363,13 +362,6 @@ async function makeTempProject(files: Record<string, string>): Promise<string> {
 describe("getProjectMap enriched fields (fixture pipeline)", () => {
   const repo = getSymbolRepository();
 
-  // Same env-broken sentinel pattern as typed-edges.test.ts: sibling suites in
-  // the full batch can leave the shared symbol DB unusable. We index the
-  // fixture; if it throws or yields no files, we skip the assertions with a
-  // reason rather than reporting a false failure.
-  let ENV_BROKEN = false;
-  let ENV_REASON = "";
-
   beforeEach(() => {
     try {
       repo.clearProject(TEST_PROJECT);
@@ -385,35 +377,19 @@ describe("getProjectMap enriched fields (fixture pipeline)", () => {
     }
   });
 
-  async function indexFixture(dir: string, jobId: string): Promise<boolean> {
-    try {
-      await EtlPipeline.getInstance().run({
-        projectId: TEST_PROJECT,
-        projectPath: dir,
-        jobId,
-        forceReindex: true,
-      });
-    } catch (e) {
-      ENV_BROKEN = true;
-      ENV_REASON = `pipeline.run threw: ${String((e as Error)?.message ?? e).slice(0, 120)}`;
-      return false;
-    }
-    return true;
-  }
-
-  function skipIfBroken(label: string): boolean {
-    if (ENV_BROKEN) {
-      console.log(`[D4:SKIP] ${label}: ${ENV_REASON}`);
-      return true;
-    }
-    return false;
+  async function indexFixture(dir: string, jobId: string): Promise<void> {
+    await EtlPipeline.getInstance().run({
+      projectId: TEST_PROJECT,
+      projectPath: dir,
+      jobId,
+      forceReindex: true,
+    });
   }
 
   test("existing fields are unchanged (backward-compat) + new additive fields present", async () => {
     const dir = await makeTempProject(FIXTURE);
     try {
-      const ok = await indexFixture(dir, "d4-compat-1");
-      if (!ok || skipIfBroken("backward-compat")) return;
+      await indexFixture(dir, "d4-compat-1");
 
       const map = await symbolGraphService.getProjectMap(TEST_PROJECT);
       expect(map).toBeDefined();
@@ -470,8 +446,7 @@ describe("getProjectMap enriched fields (fixture pipeline)", () => {
   test("routes surfaced from http_call edges (fetch('/api/items'))", async () => {
     const dir = await makeTempProject(FIXTURE);
     try {
-      const ok = await indexFixture(dir, "d4-routes-1");
-      if (!ok || skipIfBroken("routes")) return;
+      await indexFixture(dir, "d4-routes-1");
 
       const map = await symbolGraphService.getProjectMap(TEST_PROJECT);
       expect(map).toBeDefined();

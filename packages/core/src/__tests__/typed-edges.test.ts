@@ -192,21 +192,6 @@ const FIXTURE: Record<string, string> = {
 describe("typed-edges ETL integration (fixture pipeline)", () => {
   const repo = getSymbolRepository();
 
-  /**
-   * Environment-broken sentinel. In the full unit batch, sibling suites leave
-   * the shared symbol DB in a broken state for later files:
-   *   - memory-crud.test.ts afterAll disconnects the PG pool (writes silently
-   *     produce no rows).
-   *   - some suites replace/mock the repo singleton so clearProject is missing
-   *     (TypeError: clearProject is not a function — the SAME failure
-   *     etl-pipeline.test.ts suffers in the batch).
-   * Both are pre-existing test-isolation issues, NOT typed-edges bugs. We run
-   * the fixture; if indexing throws or yields zero edges, we mark the env
-   * broken and skip the remaining assertions with a reason.
-   */
-  let ENV_BROKEN = false;
-  let ENV_REASON = "";
-
   beforeEach(() => {
     try {
       repo.clearProject(TEST_PROJECT);
@@ -223,53 +208,23 @@ describe("typed-edges ETL integration (fixture pipeline)", () => {
   });
 
   /**
-   * Run the pipeline on the fixture. Sets ENV_BROKEN if indexing throws or no
-   * edges land (pre-existing env-pollution symptoms). Returns edge counts, or
-   * an empty record when broken.
+   * Run the pipeline on the fixture and return per-kind edge counts.
    */
   async function indexFixture(dir: string, jobId: string): Promise<Record<string, number>> {
     const pipeline = EtlPipeline.getInstance();
-    try {
-      await pipeline.run({
-        projectId: TEST_PROJECT,
-        projectPath: dir,
-        jobId,
-        forceReindex: true,
-      });
-    } catch (e) {
-      ENV_BROKEN = true;
-      ENV_REASON = `pipeline.run threw: ${String((e as Error)?.message ?? e).slice(0, 120)}`;
-      return {};
-    }
-    let counts: Record<string, number> = {};
-    try {
-      counts = await Promise.resolve(repo.countEdgesByKind(TEST_PROJECT));
-    } catch (e) {
-      ENV_BROKEN = true;
-      ENV_REASON = `countEdgesByKind threw: ${String((e as Error)?.message ?? e).slice(0, 120)}`;
-      return {};
-    }
-    if (Object.keys(counts).length === 0) {
-      ENV_BROKEN = true;
-      ENV_REASON = "zero edges after forceReindex (pool dead or repo stubbed)";
-    }
-    return counts;
-  }
-
-  /** Skip helper: bail out gracefully when the env is broken. */
-  function skipIfBroken(label: string): boolean {
-    if (ENV_BROKEN) {
-      console.log(`[D1:SKIP] ${label}: ${ENV_REASON}`);
-      return true;
-    }
-    return false;
+    await pipeline.run({
+      projectId: TEST_PROJECT,
+      projectPath: dir,
+      jobId,
+      forceReindex: true,
+    });
+    return await Promise.resolve(repo.countEdgesByKind(TEST_PROJECT));
   }
 
   test("forceReindex emits typed edges into symbol_references", async () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       const counts = await indexFixture(dir, "d1-int-1");
-      if (skipIfBroken("forceReindex")) return;
       expect(counts.http_call ?? 0).toBeGreaterThanOrEqual(1);
       expect(counts.emit ?? 0).toBeGreaterThanOrEqual(1);
       expect(counts.listen ?? 0).toBeGreaterThanOrEqual(1);
@@ -285,7 +240,6 @@ describe("typed-edges ETL integration (fixture pipeline)", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d1-filter-1");
-      if (skipIfBroken("getEdges by type")) return;
 
       // Filter: only http_call edges.
       const http = await symbolGraphService.getEdges(TEST_PROJECT, {
@@ -312,7 +266,6 @@ describe("typed-edges ETL integration (fixture pipeline)", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d1-dir-1");
-      if (skipIfBroken("getEdges by fromFile")) return;
 
       // All edges should originate from handler.ts (the file with the call sites).
       const fromHandler = await symbolGraphService.getEdges(TEST_PROJECT, {
@@ -337,7 +290,6 @@ describe("typed-edges ETL integration (fixture pipeline)", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d1-resolve-1");
-      if (skipIfBroken("CALLS FQN resolution")) return;
 
       // The call to processEvent should resolve target_fqn → emitter.ts#processEvent
       const calls = await symbolGraphService.getEdges(TEST_PROJECT, {
@@ -357,7 +309,6 @@ describe("typed-edges ETL integration (fixture pipeline)", () => {
     const dir = await makeTempProject(FIXTURE);
     try {
       await indexFixture(dir, "d1-map-1");
-      if (skipIfBroken("project_map edgesByKind")) return;
 
       const map = await symbolGraphService.getProjectMap(TEST_PROJECT);
       expect(map).toBeDefined();
