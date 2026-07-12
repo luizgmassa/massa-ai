@@ -38,6 +38,10 @@ export function loadConfig(): MassaTh0thConfig {
       compression: { ...defaultMassaTh0thConfig.compression, ...userConfig.compression },
       cache: { ...defaultMassaTh0thConfig.cache, ...userConfig.cache },
       logging: { ...defaultMassaTh0thConfig.logging, ...userConfig.logging },
+      search: { ...defaultMassaTh0thConfig.search, ...userConfig.search },
+      llm: { ...defaultMassaTh0thConfig.llm, ...userConfig.llm },
+      memory: { ...defaultMassaTh0thConfig.memory, ...userConfig.memory },
+      hooks: { ...defaultMassaTh0thConfig.hooks, ...userConfig.hooks },
     };
   } catch (error) {
     console.error(`Error loading config from ${CONFIG_FILE}:`, error);

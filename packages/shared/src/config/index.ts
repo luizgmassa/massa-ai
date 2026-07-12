@@ -177,25 +177,13 @@ export interface ServerConfig {
   };
 
   // Compression Configuration
-  // NOTE: compression.llm is a DEPRECATED alias of the top-level `llm` block
-  // (kept for one release so existing readers like code-compressor.ts see no
-  // behavior change). `prompt` stays compression-specific.
+  // The LLM connection fields live in the top-level `llm` block; only
+  // compression-specific knobs (strategy/thresholds) live here.
   compression: {
     defaultStrategy: string;
     minTokensForCompression: number;
     targetCompressionRatio: number; // 0-1
-    llm: {
-      enabled: boolean;
-      baseUrl: string;
-      apiKey: string;
-      model: string;
-      codeModel: string;
-      temperature: number;
-      maxOutputTokens: number;
-      timeoutMs: number;
-      disableThink: boolean;
-      prompt?: string;
-    };
+    prompt?: string;
   };
 
   // Rate Limiting
@@ -519,20 +507,9 @@ export const defaultConfig: ServerConfig = {
     defaultStrategy: "code_structure",
     minTokensForCompression: envNum("MIN_TOKENS_FOR_COMPRESSION", 100),
     targetCompressionRatio: envNum("TARGET_COMPRESSION_RATIO", 0.7),
-    // DEPRECATED alias of top-level `llm`. Same env vars, same shape; `prompt`
-    // remains compression-specific. Readers should migrate to `config.get("llm")`.
-    llm: {
-      enabled: envBool("RLM_LLM_ENABLED", false),
-      baseUrl: envString("RLM_LLM_BASE_URL", "http://localhost:11434/v1"),
-      apiKey: envString("RLM_LLM_API_KEY", "ollama"),
-      model: envString("RLM_LLM_MODEL", DEFAULT_LLM_MODEL),
-      codeModel: envString("RLM_LLM_CODE_MODEL", DEFAULT_LLM_CODE_MODEL),
-      temperature: envNum("RLM_LLM_TEMPERATURE", 0.2),
-      maxOutputTokens: envNum("RLM_LLM_MAX_OUTPUT_TOKENS", 8000),
-      timeoutMs: envNum("RLM_LLM_TIMEOUT_MS", 90000),
-      disableThink: envBool("RLM_LLM_DISABLE_THINK", true),
-      prompt: process.env.RLM_LLM_PROMPT || undefined,
-    },
+    // Compression-specific prompt override (env RLM_LLM_PROMPT). The LLM
+    // connection fields (model/baseUrl/etc.) live in the top-level `llm` block.
+    prompt: process.env.RLM_LLM_PROMPT || undefined,
   },
 
   rateLimit: {
@@ -691,7 +668,6 @@ export class Config {
       compression: {
         ...defaults.compression,
         ...overrides.compression,
-        llm: { ...defaults.compression.llm, ...overrides.compression?.llm },
       },
       rateLimit: { ...defaults.rateLimit, ...overrides.rateLimit },
       security: { ...defaults.security, ...overrides.security },
