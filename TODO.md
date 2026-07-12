@@ -74,6 +74,15 @@ security hardening + test-isolation fixes, all on `main`, all verified GREEN.
 
 Commits (`0acfc05..75b7394`): 15 atomic commits. See `git log` for detail.
 
+### Graph query layer parity (2026-07-12, T1)
+- **PG `findImporters`** added (`symbol-repository-pg.ts`) — reverse-import query
+  parity with SQLite; PG consumers of "who imports file X?" now have a direct
+  query (was forward `findDependencies` only).
+- **`findEdges` caller-FQN pushdown (SF5)** on both backends — `fromSymbol`
+  with a `#Name` segment now narrows by `meta.callerFqn` in SQL (SQLite
+  `json_extract`, PG `->>'callerFqn'`); file-only fallback unchanged.
+  `trace_path` client-side filter reduced to a defensive assert.
+
 ---
 
 ## Skipped unit tests (284) — why they skip and how to run them
@@ -116,6 +125,9 @@ PG-integration skips are the only ones worth revisiting for the unit batch.
   is its own entry; an adversarial caller cycling keys grows the map for the
   process lifetime.
 - **Fix:** LRU / max-size bound (mirror the WebController 512-cap pattern).
+- **Done (2026-07-12):** both `fileCache` and `projectRootCache` are now
+  512-cap LRU (`FILE_CACHE_MAX_ENTRIES`, `evictOldest`), with delete+set
+  promotion on GET. Moved to Completed.
 
 ### [med] `countExistingMemoryIds` no-op under PG
 - **Where:** `packages/core/src/services/checkpoint/checkpoint-store-pg.ts:341`.
@@ -138,19 +150,6 @@ PG-integration skips are the only ones worth revisiting for the unit batch.
   `adsads/packages/core/src/services/etl/stage-context.ts`.
 - **Fix:** audit the indexed file list / `projectPath`; drop the `adsads/`
   entries; re-index clean. Do NOT delete `e2e-th0th-shared` itself.
-
-### [low] PG symbol repo lacks `findImporters` (reverse-import query)
-- **Where:** `packages/core/src/data/sqlite/symbol-repository-pg.ts:746` has only
-  forward `findDependencies`; SQLite has `findImporters`.
-- **What:** `impact_analysis` works around it by reversing `allImportEdges`
-  client-side, but PG consumers of "who imports file X?" have no direct query.
-- **Fix:** add PG `findImporters` parity.
-
-### [low] `findEdges` filters `fromSymbol` by file, not caller FQN
-- **Where:** `symbol-repository.ts:453` / `symbol-repository-pg.ts:814`.
-- **What:** `getEdges(fromSymbol)` returns file-level results; `trace_path`
-  works around it with client-side `meta.callerFqn` filtering.
-- **Fix:** push the caller-FQN filter into the query.
 
 ### [low] Phase-4 `Dx:SKIP` env guards now largely redundant
 - **Where:** `D1/D2/D3/D4:SKIP` sentinels in the Phase-4 integration tests.
@@ -204,6 +203,11 @@ PG-integration skips are the only ones worth revisiting for the unit batch.
   `.env.example`; add a short "Operational knobs" README subsection.
 - **Dead `||` fallback in `read_file`** (`read_file.ts:385`) — never fires;
   cosmetic.
+  - **Done (2026-07-12):** reframed — the `||` DID fire for legacy/edge
+    cache entries with undefined metadata, re-extracting on every hit without
+    persisting. Fixed by writing the extracted metadata back into the cache
+    entry on first hit; the `||` RHS is now removed (metadata always defined
+    post-writeback). Moved to Completed.
 
 ---
 
