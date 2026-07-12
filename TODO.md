@@ -83,6 +83,28 @@ Commits (`0acfc05..75b7394`): 15 atomic commits. See `git log` for detail.
   `json_extract`, PG `->>'callerFqn'`); file-only fallback unchanged.
   `trace_path` client-side filter reduced to a defensive assert.
 
+### D1 cross-file callee resolution + include_tests (2026-07-12, T2)
+- **Cross-file callee resolution** — the resolve-stage symbol index now SEEDS
+  from the repo (`listAllDefinitions`, all persisted defs incl. fingerprint-
+  skipped unchanged files) then OVERLAYS in-batch symbols unconditionally
+  (in-batch is strictly fresher). A CALL edge in a newly-parsed file now
+  resolves to a callee defined in a fingerprint-skipped file. Closes the
+  batch-only symbol-index gap that made inbound `trace_path` sparse across
+  files.
+- **SF1 `listAllDefinitions`** — added on both backends (no default LIMIT; 200k
+  safety cap). The capped `listDefinitions` (SQLite LIMIT 50 / PG LIMIT 100)
+  is left for paged callers; the resolve read can no longer be silently
+  truncated.
+- **`include_tests` toggle** — `PipelineInput.include_tests` (default false)
+  threads through `index_project` → pipeline → `DiscoverStage`, which builds a
+  discover-local `Ignore` that omits test/benchmark globs when true. `loadProjectIgnore`
+  itself is unchanged so query-time callers (index-manager,
+  contextual-search-rlm) still exclude tests and keep search recall clean.
+- **Import tier broadened** — namespace/default bindings (`*`, `default`) are
+  now recorded so `ns.method()` callees can resolve via the project-wide index.
+- **Deferred:** multi-language tree-sitter extraction (TS/JS regex extractor
+  remains; other languages are a separate effort).
+
 ---
 
 ## Skipped unit tests (284) — why they skip and how to run them
@@ -108,16 +130,6 @@ PG-integration skips are the only ones worth revisiting for the unit batch.
 
 ## OPEN findings (bug fixes)
 
-### [med] D1 typed-edge extraction is TS/JS + same-file only
-- **Where:** `packages/core/src/services/etl/typed-edges.ts`; resolve stage.
-- **What:** CALL edges are extracted for **same-file** calls only — cross-file
-  callee resolution is incomplete, so inbound `trace_path` across files is
-  sparse. No typed edges are emitted from `.test.ts` files. Multi-language
-  breadth is out of scope (TS/JS only).
-- **Fix:** complete cross-file callee resolution in the resolve stage; index
-  edges from test files behind the `include_tests` toggle. Multi-language
-  tree-sitter is a larger separate effort.
-
 ### [med] `read_file` `fileCache` unbounded growth
 - **Where:** `packages/core/src/tools/read_file.ts:121` (`fileCache: Map`).
 - **What:** no size cap / eviction — only TTL freshness. Each distinct
@@ -129,14 +141,23 @@ PG-integration skips are the only ones worth revisiting for the unit batch.
   512-cap LRU (`FILE_CACHE_MAX_ENTRIES`, `evictOldest`), with delete+set
   promotion on GET. Moved to Completed.
 
-### [med] `countExistingMemoryIds` no-op under PG
-- **Where:** `packages/core/src/services/checkpoint/checkpoint-store-pg.ts:341`.
-- **What:** PG restore memory-integrity check returns the input unchanged
-  (`missingMemoryIds` always empty); SQLite runs the real
+### [med] `countExistingMemoryIds` no-op under PG — DONE (2026-07-12)
+- **Where:** `packages/core/src/services/checkpoint/checkpoint-store-pg.ts`.
+- **What:** PG restore memory-integrity check returned the input unchanged
+  (`missingMemoryIds` always empty); SQLite ran the real
   `SELECT id FROM memories WHERE id IN (...)`. The sync `restoreCheckpoint`
-  contract can't await an async PG query.
-- **Fix:** needs the restore path to become async (MCP tool contract change) OR
-  a PG-backed in-memory mirror of memory ids. Documented in code for now.
+  contract couldn't await an async PG query.
+- **Fix (landed):** made the restore path async end-to-end —
+  `ICheckpointStore.countExistingMemoryIds` + `CheckpointManager.restoreCheckpoint`
+  are now `Promise`-returning; the PG store runs a real chunked
+  `SELECT id FROM memories WHERE id IN (...)` via prisma (`Prisma.join`, 1000/batch,
+  try/catch → best-effort fallback). Pre-mortem (SF4) confirmed exactly one
+  production caller (`restore_checkpoint.ts` tool handler, already async; the
+  tools-api route + MCP contract are already Promise-based), so the async
+  reversal was contained. SF2 falsifier added (`checkpoint-pg.test.ts`): inserts
+  a real memory row + a fabricated missing id, asserts the fabricated id lands
+  in `missingMemoryIds` and the real id in `validMemoryIds`. SQLite + PG suites
+  green; `tsc` clean.
 
 ### [med] Benchmark the qwen2.5 swap on LLM-judge paths
 - **What:** the model swap (`qwen3.5:9b` → `qwen2.5:7b-instruct` + coder) is live
