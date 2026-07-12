@@ -7,14 +7,18 @@
  * checkpoints in the same backend as the rest of the data plane (one-backend
  * rule, mirroring getMemoryRepository / getScheduledJobStore / getSessionStore).
  *
- * The contract is SYNCHRONOUS: the MCP tools (create_checkpoint /
- * list_checkpoints / restore_checkpoint) and AutoCheckpointer call these methods
- * without await, matching the original SQLite store. The PG store
- * (PgCheckpointStore) honors the sync contract with an in-memory mirror hydrated
- * from PG on first use + write-through fire-and-forget persists — the same
- * discipline as PgSynapseSessionStore / PgScheduledJobStore. Callers that must
- * observe persisted rows immediately after a process restart await
- * `ensureReady()` before reading (sync backends resolve immediately).
+ * Mostly SYNCHRONOUS: create_checkpoint / list_checkpoints + AutoCheckpointer
+ * call these methods without await (create/list stay sync, matching the
+ * SQLite store). `restoreCheckpoint` + `countExistingMemoryIds` ARE async
+ * (Promise-returning) so the PG backend can run a real `SELECT id FROM
+ * memories WHERE id IN (...)` memory-existence check on the restore path
+ * (was a no-op under PG). The single production restore caller
+ * (restore_checkpoint tool handler) already awaits. The PG store otherwise
+ * honors the sync discipline with an in-memory mirror hydrated from PG on
+ * first use + write-through fire-and-forget persists — the same discipline as
+ * PgSynapseSessionStore / PgScheduledJobStore. Callers that must observe
+ * persisted rows immediately after a process restart await `ensureReady()`
+ * before reading (sync backends resolve immediately).
  */
 
 import type {
@@ -101,9 +105,11 @@ export interface ICheckpointStore {
    * Count how many of the given memory ids still exist. Used by the restore
    * integrity check (valid vs missing referenced memories). Backends that cannot
    * reach the memories table return all ids as existing (best-effort — never
-   * blocks a restore).
+   * blocks a restore). Returns a Promise so the PG backend can run a real
+   * `SELECT id FROM memories WHERE id IN (...)` via prisma; the SQLite backend
+   * resolves immediately (it wraps its synchronous result in Promise.resolve).
    */
-  countExistingMemoryIds(memoryIds: string[]): string[];
+  countExistingMemoryIds(memoryIds: string[]): Promise<string[]>;
 
   /**
    * Await backend readiness before a read (hydration race fix, #16/#18).

@@ -84,7 +84,7 @@ export class RestoreCheckpointTool implements IToolHandler {
         resolvedId = latest.id;
       }
 
-      const result = this.checkpointManager.restoreCheckpoint(resolvedId!);
+      const result = await this.checkpointManager.restoreCheckpoint(resolvedId!);
       if (!result) {
         return {
           success: false,

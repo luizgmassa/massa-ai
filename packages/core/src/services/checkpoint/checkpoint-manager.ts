@@ -444,8 +444,16 @@ export class CheckpointManager implements ICheckpointStore {
 
   /**
    * Restore a checkpoint, verifying memory and file integrity.
+   *
+   * Async because the memory-existence check (`countExistingMemoryIds`) is async
+   * under the PG backend (real `SELECT id FROM memories WHERE id IN (...)` via
+   * prisma). Pre-mortem (SF4) confirmed exactly one production caller
+   * (`restore_checkpoint.ts` tool handler, already async; the tools-api route
+   * and MCP contract are already Promise-based), so making this async is a
+   * contained reversal. `AutoCheckpointer` only calls `createCheckpoint`, never
+   * restore, so it is unaffected.
    */
-  restoreCheckpoint(checkpointId: string): RestoreResult | null {
+  async restoreCheckpoint(checkpointId: string): Promise<RestoreResult | null> {
     const checkpoint = this.getCheckpoint(checkpointId);
     if (!checkpoint) return null;
 
@@ -455,7 +463,7 @@ export class CheckpointManager implements ICheckpointStore {
     const missingMemoryIds: string[] = [];
 
     if (checkpoint.memoryIds.length > 0) {
-      const existingSet = new Set(this.countExistingMemoryIds(checkpoint.memoryIds));
+      const existingSet = new Set(await this.countExistingMemoryIds(checkpoint.memoryIds));
       for (const mid of checkpoint.memoryIds) {
         if (existingSet.has(mid)) {
           validMemoryIds.push(mid);
@@ -541,9 +549,12 @@ export class CheckpointManager implements ICheckpointStore {
   /**
    * Count which of the given memory ids still exist. SQLite queries the
    * memories table (same DB as task_checkpoints). PG backends query via the PG
-   * store / prisma best-effort. Used by restoreCheckpoint's integrity check.
+   * store / prisma best-effort (async real SELECT). Used by restoreCheckpoint's
+   * integrity check. Returns a Promise so the PG backend can await prisma;
+   * the SQLite branch stays synchronous internally but wraps its return in
+   * `Promise.resolve(...)`.
    */
-  countExistingMemoryIds(memoryIds: string[]): string[] {
+  async countExistingMemoryIds(memoryIds: string[]): Promise<string[]> {
     if (this.delegate) return this.delegate.countExistingMemoryIds(memoryIds);
     if (memoryIds.length === 0) return [];
     const placeholders = memoryIds.map(() => "?").join(",");
@@ -551,14 +562,14 @@ export class CheckpointManager implements ICheckpointStore {
       const existingRows = this.db
         .prepare(`SELECT id FROM memories WHERE id IN (${placeholders})`)
         .all(...memoryIds) as Array<{ id: string }>;
-      return existingRows.map((r) => r.id);
+      return Promise.resolve(existingRows.map((r) => r.id));
     } catch (e) {
       // memories table missing or query failed — best-effort: assume all exist
       // so a restore is never blocked by an unrelated query error.
       logger.warn("countExistingMemoryIds failed (best-effort: assuming all exist)", {
         error: (e as Error).message,
       });
-      return memoryIds;
+      return Promise.resolve(memoryIds);
     }
   }
 

@@ -114,10 +114,27 @@ async function cleanupTaskRows(taskIds: string[]): Promise<void> {
   // are already deleted above; the singleton client stays alive for siblings.
 }
 
+/** Clean memory rows the SF2 falsifier inserted (idempotent, scoped by prefix). */
+async function cleanupMemoryRows(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { getPrismaClient } = await import("../services/query/prisma-client.js");
+  try {
+    const prisma = getPrismaClient();
+    for (const id of ids) {
+      await prisma.$executeRaw`DELETE FROM memories WHERE id = ${id}`;
+    }
+  } catch {
+    // best-effort
+  }
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────
 
 describe("PgCheckpointStore (structural gap #16)", () => {
   const createdTaskIds: string[] = [];
+  /** Prefix for memory rows inserted by the SF2 falsifier; cleaned up in afterEach. */
+  const MEM_PREFIX = "mem_sf2_ckpt_";
+  const createdMemoryIds: string[] = [];
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "massa-th0th-ckpt-pg-"));
@@ -132,6 +149,7 @@ describe("PgCheckpointStore (structural gap #16)", () => {
   afterEach(async () => {
     resetManagerSingleton();
     await cleanupTaskRows(createdTaskIds.splice(0));
+    await cleanupMemoryRows(createdMemoryIds.splice(0));
     process.env.DATABASE_URL = ORIGINAL_DATABASE_URL;
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
@@ -192,26 +210,55 @@ describe("PgCheckpointStore (structural gap #16)", () => {
     expect(manager.getCheckpoint(created.id)).toBeNull();
   });
 
-  test("restore runs through the manager over a PG-backed store", async () => {
+  test("restore runs through the manager over a PG-backed store (SF2 falsifier: real missing-memory detection)", async () => {
     const manager = CheckpointManager.getInstance();
     const store = (manager as any).delegate as PgCheckpointStore;
     await store.ensureReady();
 
+    // SF2: insert a REAL memory row into the PG memories table + reference it
+    // alongside a FABRICATED missing id in the checkpoint. Pre-fix, the PG
+    // countExistingMemoryIds was a no-op (returned input unchanged) so
+    // missingMemoryIds was always empty. Post-fix it runs a real SELECT IN,
+    // so the fabricated id must land in missingMemoryIds and the real id in
+    // validMemoryIds. Mirrors the SQLite falsifier in checkpoint.test.ts.
+    const realMemoryId = `${MEM_PREFIX}${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const fabricatedMissingId = `${MEM_PREFIX}does_not_exist_${Math.random().toString(36).slice(2, 6)}`;
+    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const prisma = getPrismaClient();
+    await prisma.$executeRaw`
+      INSERT INTO memories (id, content, type, importance, level, created_at, updated_at)
+      VALUES (
+        ${realMemoryId},
+        ${"SF2 falsifier real memory"},
+        ${"decision"},
+        ${0.7},
+        ${1},
+        NOW(),
+        NOW()
+      )
+    `;
+    createdMemoryIds.push(realMemoryId);
+
     const state = makeTaskState({
-      context: { decisions: ["mem_dec_pg_1"], filesRead: [], filesModified: [], errors: [], learnings: [] },
+      context: {
+        decisions: [realMemoryId],
+        filesRead: [], filesModified: [], errors: [], learnings: [],
+      },
     });
     createdTaskIds.push(state.taskId);
 
     const created = manager.createCheckpoint(state, {
-      memoryIds: ["mem_dec_pg_1"],
+      memoryIds: [realMemoryId, fabricatedMissingId],
       fileChanges: [],
     });
     await store.__drain();
 
-    const result = manager.restoreCheckpoint(created.id);
+    const result = await manager.restoreCheckpoint(created.id);
     expect(result).not.toBeNull();
     expect(result!.checkpoint.id).toBe(created.id);
-    // Best-effort under PG: referenced memories assumed existing (non-blocking).
+    // The load-bearing SF2 assertions: the PG path now runs a real SELECT IN.
+    expect(result!.validMemoryIds).toContain(realMemoryId);
+    expect(result!.missingMemoryIds).toContain(fabricatedMissingId);
     expect(result!.restoreInstructions).toContain(state.description);
   });
 
@@ -271,7 +318,7 @@ describe("CheckpointManager SQLite path (no regression, #16)", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  test("SQLite backend is used when DATABASE_URL is empty", () => {
+  test("SQLite backend is used when DATABASE_URL is empty", async () => {
     const manager = CheckpointManager.getInstance();
     // No PG delegate under SQLite.
     expect((manager as any).delegate).toBeNull();
@@ -286,7 +333,7 @@ describe("CheckpointManager SQLite path (no regression, #16)", () => {
     expect(manager.getLatestCheckpoint(state.taskId)?.id).toBe(created.id);
 
     // restore integrity + instructions
-    const restored = manager.restoreCheckpoint(created.id);
+    const restored = await manager.restoreCheckpoint(created.id);
     expect(restored).not.toBeNull();
     expect(restored!.checkpoint.id).toBe(created.id);
 

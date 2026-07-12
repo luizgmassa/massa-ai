@@ -7,9 +7,12 @@
  * data plane (one-backend rule).
  *
  * Mirrors PgSynapseSessionStore / PgScheduledJobStore's discipline: the
- * ICheckpointStore contract is SYNCHRONOUS (the MCP tools + AutoCheckpointer
- * call create/list/restore with no await, matching the SQLite store and
- * bun:sqlite API). PG is inherently async, so this store:
+ * ICheckpointStore contract is MOSTLY SYNCHRONOUS (create/list + AutoCheckpointer
+ * call them with no await, matching the SQLite store and bun:sqlite API);
+ * `restoreCheckpoint` + `countExistingMemoryIds` are async so this store can
+ * run a real `SELECT id FROM memories WHERE id IN (...)` on the restore path
+ * (the single production restore caller already awaits). PG is inherently
+ * async, so this store:
  *   - Writes fire-and-forget (best-effort, logged on failure — matching the
  *     SQLite store's try/catch best-effort semantics).
  *   - Reads are served from an in-memory mirror hydrated from PG on first use
@@ -39,6 +42,7 @@ import {
   logger,
 } from "@massa-th0th/shared";
 import { getPrismaClient } from "../query/prisma-client.js";
+import { Prisma } from "../../generated/prisma/index.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type {
   ICheckpointStore,
@@ -358,27 +362,43 @@ export class PgCheckpointStore implements ICheckpointStore {
   // ── Backend-aware memory existence ───────────────────────────────────────
 
   /**
-   * KNOWN LIMITATION (PG): returns the input unchanged (assumes all referenced
-   * memories exist). The ICheckpointStore contract is SYNCHRONOUS
-   * (`countExistingMemoryIds(): string[]`), consumed synchronously by
-   * CheckpointManager.restoreCheckpoint. PG is inherently async (prisma
-   * `$queryRaw` returns a Promise we cannot await here without making
-   * restoreCheckpoint async, which would ripple up and change the public MCP
-   * tool response contract). So under PG the restore memory-integrity check is
-   * silently permissive: `missingMemoryIds` is always empty. SQLite runs a real
-   * `SELECT id FROM memories WHERE id IN (...)` and reports missing ids.
+   * Real PG check: `SELECT id FROM memories WHERE id IN (...)` via prisma, so
+   * the restore integrity check reports genuinely missing referenced memories
+   * (was a no-op that returned the input unchanged — silently permissive). The
+   * id list is chunked (BATCH_SIZE per query) to stay under PG's parameter /
+   * packet limits for large checkpoints. On any failure the method falls back to
+   * returning the full input (best-effort, mirroring the SQLite store's
+   * try/catch) so a restore is never blocked by an unrelated query error.
    *
-   * A future fix that preserves the contract could maintain a PG-backed
-   * in-memory mirror of memory ids (hydrated alongside checkpoints) and check
-   * membership against it here; that mirror is out of scope for this store.
+   * Now async: `restoreCheckpoint` was made `Promise<RestoreResult|null>`
+   * (pre-mortem SF4 confirmed exactly one production caller, already-async tool
+   * handler, Promise-based MCP/tools-api contract), so the PG store can finally
+   * await prisma here.
    */
-  countExistingMemoryIds(memoryIds: string[]): string[] {
+  async countExistingMemoryIds(memoryIds: string[]): Promise<string[]> {
     if (memoryIds.length === 0) return [];
     void this.ensureHydrated();
-    // Best-effort: assume all referenced memories exist (the restore is never
-    // blocked). Mirrors the SQLite store's behavior when the memories table
-    // query fails (its try/catch fallback also returns the full input).
-    return memoryIds;
+    const BATCH_SIZE = 1000;
+    const existing: string[] = [];
+    try {
+      const prisma = this.getClient();
+      for (let i = 0; i < memoryIds.length; i += BATCH_SIZE) {
+        const batch = memoryIds.slice(i, i + BATCH_SIZE);
+        const rows = await prisma.$queryRaw<{ id: string }[]>`
+          SELECT id FROM memories WHERE id IN (${Prisma.join(batch)})
+        `;
+        for (const row of rows) existing.push(row.id);
+      }
+      return existing;
+    } catch (e) {
+      // Query failed (memories table missing, connection error, ...) —
+      // best-effort: assume all referenced memories exist so a restore is never
+      // blocked by an unrelated query error. Mirrors the SQLite store's catch.
+      logger.warn("countExistingMemoryIds failed (best-effort: assuming all exist)", {
+        error: (e as Error).message,
+      });
+      return memoryIds;
+    }
   }
 
   // ── Stats ────────────────────────────────────────────────────────────────

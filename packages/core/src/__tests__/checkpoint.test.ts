@@ -235,7 +235,7 @@ describe("CheckpointManager", () => {
   });
 
   describe("restoreCheckpoint", () => {
-    test("restores checkpoint with integrity info", () => {
+    test("restores checkpoint with integrity info", async () => {
       // We need to create a memories table for the restore to check
       const { Database } = require("bun:sqlite");
       const db = new Database(path.join(tmpDir, "memories.db"));
@@ -250,7 +250,7 @@ describe("CheckpointManager", () => {
         memoryIds: ["mem_dec_1", "mem_missing"],
       });
 
-      const result = manager.restoreCheckpoint(ckpt.id);
+      const result = await manager.restoreCheckpoint(ckpt.id);
       expect(result).not.toBeNull();
       expect(result!.checkpoint.id).toBe(ckpt.id);
       expect(result!.validMemoryIds).toContain("mem_dec_1");
@@ -258,8 +258,8 @@ describe("CheckpointManager", () => {
       expect(result!.restoreInstructions).toContain("Test task");
     });
 
-    test("returns null for non-existent checkpoint", () => {
-      expect(manager.restoreCheckpoint("nonexistent")).toBeNull();
+    test("returns null for non-existent checkpoint", async () => {
+      expect(await manager.restoreCheckpoint("nonexistent")).toBeNull();
     });
   });
 
