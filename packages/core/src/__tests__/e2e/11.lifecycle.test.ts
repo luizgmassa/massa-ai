@@ -396,6 +396,40 @@ describe.skipIf(!READY)("T8 — Lifecycle", () => {
       expect(Array.isArray(r?.ids) ? r.ids.length : 0).toBe(0);
     }, 60_000);
 
+    test("F86b all 6 opencode lifecycle event kinds admitted (session-start/user-prompt/pre-tool-use/post-tool-use/pre-compact/session-end)", async () => {
+      // The hook_ingest tool + /api/v1/hook/batch route accept a CLOSED enum of
+      // exactly 6 lifecycle event kinds (observation-repository.ts
+      // LIFECYCLE_EVENTS). F86 covers 3 of them; this submits the full set so
+      // a regression that drops a kind (e.g. pre-compact or session-end) is
+      // caught. Each kind must be admitted (202/ids) with no validation 400.
+      const allKinds = [
+        "session-start",
+        "user-prompt",
+        "pre-tool-use",
+        "post-tool-use",
+        "pre-compact",
+        "session-end",
+      ];
+      const events = allKinds.map((event, i) => ({
+        event,
+        projectId: PID,
+        payload: { kind: event, n: i, src: "F86b" },
+      }));
+      const r = await httpPost<any>("/api/v1/hook/batch", { events });
+      console.log(`[T8:F86b] all-6-kinds response: ${JSON.stringify(r).slice(0, 300)}`);
+      // Admission shape: either {status:202, ids} or {success:true, data:{ids}}.
+      const ids = r?.ids ?? r?.data?.ids;
+      const admitted = r?.status === 202 || r?.success === true || Array.isArray(ids);
+      expect(admitted).toBe(true);
+      // Every one of the 6 must be persisted (no validation rejection for any
+      // canonical kind). The OpenCode plugin only emits 4 of these in practice
+      // (never pre-tool-use / pre-compact), but the server-side enum accepts
+      // all 6 — assert the full contract.
+      if (Array.isArray(ids)) {
+        expect(ids).toHaveLength(allKinds.length);
+      }
+    }, 60_000);
+
     test("matrix: MCP hook_ingest ≡ HTTP hook/batch ({success}+id-count, drop ids)", async () => {
       if (!mcp) {
         if (skipMatrix("MCP not started — skipping hook_ingest matrix")) return;

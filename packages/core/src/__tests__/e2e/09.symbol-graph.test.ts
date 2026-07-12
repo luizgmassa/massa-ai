@@ -153,6 +153,47 @@ describe.skipIf(!READY)("T4 symbol graph", () => {
       expect(Object.keys(data.filesByLanguage ?? {}).length).toBeGreaterThan(0);
       // recent files
       expect(Array.isArray(data.recentFiles)).toBe(true);
+
+      // D4 enriched fields (packages/entryPoints/routes/hotspots/communities/
+      // layers/edgesByKind). These are CONDITIONAL: attached only when the
+      // architecture pass succeeded AND each array is non-empty. For a real
+      // monorepo the symbol-graph edges feed at least edgesByKind + usually
+      // packages/hotspots. Assert type/shape when present; report (not fail)
+      // when absent so the suite stays green on stacks where the architecture
+      // pass produced nothing. This strengthens coverage of the D4 contract
+      // without weakening the base-field assertions above.
+      const enrichedKeys = [
+        "packages", "entryPoints", "routes", "hotspots",
+        "communities", "layers", "edgesByKind",
+      ] as const;
+      const present = enrichedKeys.filter((k) => data[k] !== undefined);
+      for (const k of present) {
+        // Every enriched field that is present must be a non-empty array
+        // (packages/routes/etc.) or a non-empty object (edgesByKind).
+        const v = data[k];
+        if (k === "edgesByKind") {
+          expect(v).toEqual(expect.any(Object));
+          expect(Object.keys(v ?? {}).length).toBeGreaterThan(0);
+        } else {
+          expect(Array.isArray(v)).toBe(true);
+          expect((v as unknown[]).length).toBeGreaterThan(0);
+        }
+      }
+      // edgesByKind comes from the typed-edge count (D1) over the symbol
+      // graph; a warm index of a real repo is expected to surface it. If it
+      // is absent on this stack, log a defensive note (best-effort).
+      if (data.edgesByKind === undefined) {
+        console.log(
+          "[T4:F39] NOTE: edgesByKind absent — the symbol graph's typed-edge " +
+            "count returned nothing for " + pid + ". The base map contract " +
+            "holds; the D4 enriched edge breakdown is not asserted further.",
+        );
+      }
+      console.log(
+        "[T4:F39] enriched fields present: " +
+          present.join(", ") +
+          (present.length === 0 ? " (none — architecture pass produced nothing on this index)" : ""),
+      );
     },
     30_000,
   );
