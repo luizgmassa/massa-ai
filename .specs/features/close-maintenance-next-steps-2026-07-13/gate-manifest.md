@@ -19,7 +19,7 @@ Frozen before implementation. Rows may gain measured evidence; they may not be r
 | G03 | Type-check | `bun run type-check`, all tasks pass | PENDING |
 | G04 | Focused unit/PG gates | Synapse, filters/cache, outage, embedding cache, workspace/index identity all pass | PENDING |
 | G05 | Uncached root aggregate | Explicit dedicated env, `TURBO_FORCE=true`, `RUN_E2E=`; all tasks pass | PENDING |
-| G06 | Test-owned destructive suite | N1/N3/E25/F88 execute, pass, recover, no unexplained skip | PENDING |
+| G06 | Test-owned destructive suite | N1/N3/E25/F88 execute, pass, recover, no unexplained skip | PASS — focused owned-stack gate; final T8 rerun still required |
 | G07 | Clean reprovision | Dedicated PostgreSQL/API/Ollama rebuilt; exact identity/version/provider/model/dimension | PENDING |
 | G08 | Standard qwen G10 | Commit-locked fixture; all sequential groups and cleanup pass within unchanged gates | PENDING |
 | G09 | PostgreSQL path/cleanup sentinels | No prefixed leaks, `adsads/`, absolute, traversal, or out-of-manifest paths | PENDING |
@@ -72,6 +72,18 @@ Every measured row records exact command, exit code, duration, pass/fail/skip co
 - Direct dedicated PostgreSQL sentinel: 468 vectors across 34 distinct metadata paths and 34 symbol-file paths; every path is relative, traversal-free, excludes `adsads/`, and belongs to the checked manifest. Search regression 36/36 in 35.33 s; symbol/workspace regression 23/23 in 6.48 s.
 - Type-check: 6/6 Turbo tasks; latest 3.963 s; exit 0. Owned listeners: PostgreSQL PID 23481, Ollama PID 24780, API PID 64524. Shared `:3333` remains PID 9754 and healthy; it was not otherwise contacted or mutated.
 - Conditional skip ledger: search reasons are unchanged from TASK-005. Symbol F46 and F49 lacked duplicate/FQN ambiguity in the sparse index and executed their documented best-effort assertions; Bun reported zero skips.
+
+## TASK-007 Measured Evidence
+
+- Exact gate: explicit dedicated PostgreSQL/vector/API/Ollama env plus `RUN_E2E=1 RUN_OWNED_DESTRUCTIVE=1 bun test --max-concurrency 1 src/__tests__/e2e/23.owned-destructive.test.ts`; exit 0; 4 pass, 0 fail, 0 skip; 73 assertions; Bun 14.44 s.
+- Backend identity: native PostgreSQL 17 + pgvector at `127.0.0.1:5433/massa_th0th_test`; Ollama `qwen3-embedding:8b`, dimension 4096; isolated home/config and temporary PostgreSQL data directory. The harness refused preoccupied dedicated ports and used repository-local Prisma migrations.
+- Ownership proof: initial PostgreSQL PID 77391/data directory `/var/folders/2s/y7r9gt5d15s48_z4nxkhyldr0000gn/T/massa-th0th-owned-destructive-JY5G71/postgres`/executable `/opt/homebrew/Cellar/postgresql@17/17.10/bin/postgres`, Ollama PID 77417/executable `/Applications/Ollama.app/Contents/Resources/ollama`, and API PID 77428/executable `/Users/luizmassa/.bun/bin/bun`. Listener PID, process start/executable/command, and PostgreSQL `postmaster.pid` were revalidated before every signal.
+- N1: after warm unique search/recall/remember operations, uncached search, recall, and remember each returned structured `success:false` while owned Ollama was stopped; Ollama restarted as PID 77475 and uncached search recovered with `success:true`.
+- N3: PostgreSQL outage returned HTTP and MCP `success:false`; PostgreSQL restarted as PID 77503, API restarted as PID 77526, and the data-plane probe recovered with `success:true`.
+- E25: API termination left durable job `58b0ff53-3e9c-441a-9fbb-f66f3a8f98eb` running; restart PID 77574 marked it failed with exact error `process restart`; recovery job `c384fdf6-9957-49f9-9d6f-90bb91a45368` completed.
+- F88: single and batch hooks returned 202 when enabled, 423 after dedicated API restart PID 77601 with `HOOKS_ENABLED=false`, and 202 after enabled restart PID 77626.
+- Teardown: all owned `3334`, `5433`, and `11435` listeners stopped and the temporary run directory was removed. Shared `:3333` remained healthy at PID 9754 before and after. Skip ledger: none.
+- Type-check after the final harness: 6/6 Turbo tasks; 3.286 s; exit 0.
 
 ## Artifact Checksums
 

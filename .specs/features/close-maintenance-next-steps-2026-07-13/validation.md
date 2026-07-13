@@ -10,9 +10,9 @@
 | --- | --- | --- |
 | CMT-01 Synapse search | 82 focused pass; type-check 6/6; live dedicated PG/qwen F24 1 pass with same-project injection, cross-project rejection, material result change, and cap | FOCUSED PASS — final G10 pending |
 | CMT-02 bounded filters | 25 focused pass; SQLite/PG cache-key parity; live dedicated PG/qwen F18 1 pass; type-check 6/6 | FOCUSED PASS — final G10 pending |
-| CMT-03 outage transparency | 52 focused pass: zero-hit `[]`, required vector rejection, optional-stream degradation, structured tool envelope; type-check 6/6 | FOCUSED PASS — destructive N1/N3 pending TASK-007 |
+| CMT-03 outage transparency | 52 focused pass plus owned N1/N3 HTTP/MCP failure and recovery; zero-hit `[]`, required vector rejection, optional-stream degradation, structured tool envelope; type-check 6/6 | FOCUSED PASS — final aggregate pending |
 | CMT-04 cold-qwen G10 | 10-file cold sample at .193 files/s; commit-locked sparse fixture; dimension-mismatch rejection in SQLite/PG; focused live qwen sequence 66/66 file-level tests plus 1 needle benchmark and 1 negative sensor; unchanged floors .643/.857/.732 twice | FOCUSED PASS — final reprovisioned G10 pending |
-| CMT-05 destructive recovery | pending | PENDING |
+| CMT-05 destructive recovery | owned native PostgreSQL/Ollama/API harness; N1/N3/E25/F88 4/4, 73 assertions, 0 skip; exact failure/recovery envelopes, PID/start/executable/command/listener/data-dir checks, full teardown, shared PID 9754 unchanged | FOCUSED PASS — final destructive rerun pending |
 | CMT-06 identity/path hygiene | canonical-root production refusal; five-field hashed shared ID; warm wrong-root guarded rebuild; direct PG validation of 468 vectors/34 vector paths/34 symbol paths against the manifest | FOCUSED PASS — final cleanup sentinel pending |
 
 Independent validation, discrimination sensors, diff range, skip audit, cleanup status, and shared before/after identity are required before this report can become PASS.
@@ -84,3 +84,16 @@ Non-shallow check: the initial dimension sensors failed before implementation; t
 | Existing shared consumers | live search 36/36 and symbol/workspace 23/23 | Hashed ID remains transparent to E2E transports and shared-index consumers | Covered |
 
 Non-shallow check: the wrong-root seed was confirmed richly searchable before `ensureSharedIndex`, so a probe-only implementation would have reused the wrong clone and failed the canonical-path assertion. The live non-force API test verifies the production seam rather than only the helper. Direct SQL checks do not infer metadata from API responses. Verdict: PASS.
+
+## TASK-007 Test Adequacy Review
+
+| CMT-05 criterion | Assertion evidence | Spec outcome | Verdict |
+| --- | --- | --- | --- |
+| Refuse unowned resources | `23.owned-destructive.test.ts` preflight plus `assertOwned` before every signal | Occupied dedicated ports abort; PID/start/command/listener and PG data identity must match | Covered |
+| N1 embedding outage | Warm all three embedding paths, stop owned Ollama, issue unique uncached operations | Search, recall, and remember surface `success:false`; restarted Ollama restores success | Covered |
+| N3 PostgreSQL outage | Stop owned PostgreSQL and exercise HTTP plus MCP | Both transports surface structured failure; PG/API restart restores indexed data-plane behavior | Covered |
+| E25 durable job restart | Kill owned API only after durable `running`, wait beyond short positive stale threshold | Old job becomes failed with `process restart`; a new job completes | Covered |
+| F88 hook configuration | Restart only owned API with explicit disabled/enabled environment | Both single and batch return 423 while disabled and 202 before/after | Covered |
+| Isolation and teardown | Shared snapshot before/after; owned listeners checked after stop | Shared PID 9754 stayed healthy; dedicated ports were free after temp-root removal | Covered |
+
+Non-shallow check: the initial run failed N1 recall because its provider had not been warmed and failed F88 because JSON configuration was not the documented runtime control. The corrected harness warms each unique path and uses `HOOKS_ENABLED` on process restart; the final gate passes 4/4 with no skips. No shared service, qwen threshold, or timeout was changed. Verdict: PASS.

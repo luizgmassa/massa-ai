@@ -19,6 +19,8 @@
 | E-015 | TASK-005 qwen needles | Stale sensor metadata | Four unchanged rules had moved outside captured line spans, yielding hit@5 .571 despite top chunks containing the rules | 1 | Closed by source-verified span refresh only; unchanged queries/floors yield .643/.857/.732 twice; prerequisite commit `66607d3` |
 | E-016 | TASK-005 graph fixture | Fixture coverage gap | Sparse profile omitted the typed-edge extractor, so `project_map.routes` was absent and D4 failed | 1 | Closed by adding tracked production `typed-edges.ts` as support; warm reindex 34 files/468 chunks; graph 9/9 |
 | E-017 | TASK-006 first direct SQL sentinel | Test/schema mismatch | Sentinel queried `symbol_files.file_path`; PostgreSQL schema exposes `relative_path` | 1 | Closed by aliasing the verified `relative_path` column; complete wrong-root/path gate 3/3 with 351 assertions |
+| E-018 | TASK-007 first owned destructive run | Harness setup defects | N1 recall initialized only after Ollama stopped and entered dev fallback; F88 wrote JSON although the documented server runtime control is `HOOKS_ENABLED` | 1 | Closed by warming search/recall/remember before outage and passing the explicit env on owned API restart; final gate 4/0/0 with 73 assertions |
+| E-019 | TASK-007 executable-attestation hardening | Environment portability defect | `/usr/bin/proc_pidpath` is absent on this host, so the hardened harness failed during initial PostgreSQL ownership capture | 1 | Closed by using the already-required portable `lsof -d txt` executable set; failed run left all dedicated ports free and shared PID 9754 healthy |
 
 ## Iteration Policy
 
