@@ -11,7 +11,6 @@
   ],
   "how to fix ECONNREFUSED postgres connection": [
     "packages/core/src/services/query/prisma-client.ts",
-    "packages/core/src/data/sqlite/prisma-client-fallback.ts",
     "scripts/diagnose.ts"
   ],
   "memory consolidation job decay rate strategy": [
@@ -41,9 +40,8 @@
     "packages/core/src/services/embeddings/provider.ts"
   ],
   "best practice for caching queries layer": [
-    "packages/core/src/services/cache/cache-manager.ts",
     "packages/core/src/services/cache/l1-memory-cache.ts",
-    "packages/core/src/services/cache/l2-sqlite-cache.ts"
+    "packages/core/src/services/search/search-cache-pg.ts"
   ],
   "pattern for memory invalidation on git change": [
     "packages/core/src/services/jobs/memory-consolidation-job.ts"

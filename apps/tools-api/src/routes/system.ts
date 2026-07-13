@@ -1,11 +1,11 @@
 /**
  * System Routes
  *
- * GET /api/v1/system/info         - Informações do sistema
- * GET /api/v1/system/status       - Status dos serviços
- * GET /api/v1/system/metrics      - Métricas gerais
- * GET /api/v1/system/health/local - Health check local-first (Ollama, DBs, etc.)
- * GET /api/v1/system/ollama       - Status do Ollama e modelos disponíveis
+ * GET /api/v1/system/info         - System information
+ * GET /api/v1/system/status       - Required service status
+ * GET /api/v1/system/metrics      - Aggregate metrics
+ * GET /api/v1/system/health/local - PostgreSQL/pgvector and local-service health
+ * GET /api/v1/system/ollama       - Ollama status and available models
  */
 
 import { Elysia } from "elysia";
@@ -15,32 +15,35 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 
-function getDatabaseSizes() {
-  const dataDir = config.get("dataDir");
-  const databases = [
-    "memories.db",
-    "vector-store.db",
-    "search-cache.db",
-    "search-analytics.db",
-    "keyword-search.db",
-    "embedding-cache.db",
-  ];
+interface DatabaseInfo {
+  backend: "postgres";
+  database: string;
+  host: string;
+  port: number;
+  sizeBytes: number | null;
+}
 
-  const sizes: Record<string, number> = {};
-  let totalSize = 0;
+function databaseUrlParts(): Omit<DatabaseInfo, "backend" | "sizeBytes"> {
+  const url = new URL(process.env.DATABASE_URL!);
+  return {
+    database: decodeURIComponent(url.pathname.slice(1)),
+    host: url.hostname,
+    port: url.port ? Number(url.port) : 5432,
+  };
+}
 
-  for (const db of databases) {
-    const dbPath = path.join(dataDir, db);
-    if (fs.existsSync(dbPath)) {
-      const stats = fs.statSync(dbPath);
-      sizes[db] = stats.size;
-      totalSize += stats.size;
-    } else {
-      sizes[db] = 0;
-    }
-  }
+/**
+ * Return safe database metadata only. Credentials and query parameters never
+ * leave the process, even when the size query cannot be completed.
+ */
+async function getDatabaseInfo(): Promise<DatabaseInfo> {
+  const parts = databaseUrlParts();
+  const status = await getHealthChecker().checkPostgres();
+  const details = status.details as { sizeBytes?: unknown } | undefined;
+  const size = Number(details?.sizeBytes);
+  const sizeBytes = Number.isFinite(size) ? size : null;
 
-  return { sizes, totalSize };
+  return { backend: "postgres", ...parts, sizeBytes };
 }
 
 function formatBytes(bytes: number): string {
@@ -48,14 +51,14 @@ function formatBytes(bytes: number): string {
   const k = 1024;
   const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 }
 
 export const systemRoutes = new Elysia({ prefix: "/api/v1/system" })
   .get(
     "/info",
-    () => {
-      const { sizes, totalSize } = getDatabaseSizes();
+    async () => {
+      const database = await getDatabaseInfo();
 
       return {
         version: "1.0.0",
@@ -71,13 +74,7 @@ export const systemRoutes = new Elysia({ prefix: "/api/v1/system" })
           process: process.memoryUsage(),
         },
         dataDir: config.get("dataDir"),
-        databases: {
-          sizes: Object.fromEntries(
-            Object.entries(sizes).map(([k, v]) => [k, formatBytes(v)])
-          ),
-          total: formatBytes(totalSize),
-          totalBytes: totalSize,
-        },
+        databases: database,
         timestamp: new Date().toISOString(),
       };
     },
@@ -85,30 +82,31 @@ export const systemRoutes = new Elysia({ prefix: "/api/v1/system" })
       detail: {
         tags: ["system"],
         summary: "Get system information",
-        description: "Get detailed system and environment information",
+        description: "Get system details and redacted PostgreSQL metadata",
       },
     },
   )
   .get(
     "/status",
-    () => {
-      const dataDir = config.get("dataDir");
-      
-      // Check if critical databases exist
-      const services = {
-        memories: fs.existsSync(path.join(dataDir, "memories.db")),
-        vectorStore: fs.existsSync(path.join(dataDir, "vector-store.db")),
-        searchCache: fs.existsSync(path.join(dataDir, "search-cache.db")),
-        analytics: fs.existsSync(path.join(dataDir, "search-analytics.db")),
-        keywordSearch: fs.existsSync(path.join(dataDir, "keyword-search.db")),
-        embeddingCache: fs.existsSync(path.join(dataDir, "embedding-cache.db")),
+    async () => {
+      const report = await getHealthChecker().checkAll();
+      const services = report.services as Record<string, { available: boolean }>;
+      const databaseDetails = report.services.vectorStore.details as
+        | { pgvector?: unknown }
+        | undefined;
+      const requiredServices = {
+        postgresql: services.vectorStore?.available ?? false,
+        pgvector:
+          services.vectorStore?.available === true &&
+          databaseDetails?.pgvector === true,
+        ollama: services.ollama?.available ?? false,
+        dataDirectory: services.dataDirectory?.available ?? false,
       };
-
-      const allHealthy = Object.values(services).every((s) => s);
+      const allHealthy = Object.values(requiredServices).every(Boolean);
 
       return {
         status: allHealthy ? "healthy" : "degraded",
-        services,
+        services: requiredServices,
         timestamp: new Date().toISOString(),
       };
     },
@@ -116,33 +114,31 @@ export const systemRoutes = new Elysia({ prefix: "/api/v1/system" })
       detail: {
         tags: ["system"],
         summary: "Get system status",
-        description: "Check health status of all services",
+        description: "Check PostgreSQL, pgvector, Ollama, and local artifact directory health",
       },
     },
   )
   .get(
     "/metrics",
-    () => {
-      const dataDir = config.get("dataDir");
+    async () => {
       const metricsPath = path.join(process.cwd(), "data", "metrics.json");
-      
+
       let metrics = {};
       if (fs.existsSync(metricsPath)) {
         try {
-          const data = fs.readFileSync(metricsPath, "utf-8");
-          metrics = JSON.parse(data);
-        } catch (error) {
-          // Metrics file might be empty or corrupted
+          metrics = JSON.parse(fs.readFileSync(metricsPath, "utf-8"));
+        } catch {
+          // Metrics file might be empty or corrupted.
         }
       }
 
-      const { totalSize } = getDatabaseSizes();
+      const database = await getDatabaseInfo();
 
       return {
         ...metrics,
         system: {
-          dataSize: formatBytes(totalSize),
-          dataSizeBytes: totalSize,
+          databaseSize: database.sizeBytes === null ? null : formatBytes(database.sizeBytes),
+          databaseSizeBytes: database.sizeBytes,
           uptime: process.uptime(),
           memory: {
             heapUsed: formatBytes(process.memoryUsage().heapUsed),
@@ -157,23 +153,19 @@ export const systemRoutes = new Elysia({ prefix: "/api/v1/system" })
       detail: {
         tags: ["system"],
         summary: "Get system metrics",
-        description: "Get aggregated metrics and performance data",
+        description: "Get aggregate metrics including PostgreSQL database size",
       },
     },
   )
   .get(
     "/health/local",
-    async () => {
-      const checker = getHealthChecker();
-      return await checker.checkAll();
-    },
+    async () => getHealthChecker().checkAll(),
     {
       detail: {
         tags: ["system"],
-        summary: "Local-first health check",
+        summary: "Local service health check",
         description:
-          "Comprehensive health check of all local services: Ollama, SQLite databases, data directory. " +
-          "Returns status, latency, and recommendations for local-first operation.",
+          "Comprehensive PostgreSQL/pgvector, Ollama, and local artifact-directory health check.",
       },
     },
   )

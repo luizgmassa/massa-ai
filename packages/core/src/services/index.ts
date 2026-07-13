@@ -4,16 +4,14 @@
 
 // Search
 export { ContextualSearchRLM } from "./search/contextual-search-rlm.js";
-export { SearchCache } from "./search/search-cache.js";
+export { SearchCachePg } from "./search/search-cache-pg.js";
 export { getSearchCache } from "./search/cache-factory.js";
-export { SearchAnalytics } from "./search/search-analytics.js";
+export { SearchAnalyticsPg } from "./search/search-analytics-pg.js";
 export { IndexManager } from "./search/index-manager.js";
 
 // Cache
-export { CacheManager } from "./cache/cache-manager.js";
 export { L1MemoryCache } from "./cache/l1-memory-cache.js";
-export { L2SQLiteCache } from "./cache/l2-sqlite-cache.js";
-export { EmbeddingCache } from "./cache/embedding-cache.js";
+export { EmbeddingCachePg } from "./cache/embedding-cache-pg.js";
 
 // Compression
 export { CodeCompressor } from "./compression/code-compressor.js";
@@ -71,7 +69,7 @@ export type { ModelPricing } from "./pricing/models-dev-client.js";
 
 // Graph (knowledge graph over memories)
 export { MemoryGraphService } from "./graph/memory-graph.service.js";
-export { GraphStore } from "./graph/graph-store.js";
+export { GraphStorePg } from "./graph/graph-store-pg.js";
 export { GraphQueries } from "./graph/graph-queries.js";
 export { RelationExtractor } from "./graph/relation-extractor.js";
 export type {
@@ -196,11 +194,11 @@ export type {
   IntentSearchResult,
 } from "./executor/index.js";
 
-// Keyword search factory (SQLite/PG backend resolution, sibling to getVectorStore)
+// Keyword search factory (PostgreSQL/PG backend resolution, sibling to getVectorStore)
 export {
   getKeywordSearch,
   resetKeywordSearch,
-} from "../data/sqlite/keyword-search-factory.js";
+} from "../data/keyword/keyword-search-factory.js";
 
 // Web — SSRF-guarded fetch + HTML→md + index (fetch_and_index)
 export {

@@ -4,25 +4,16 @@
  * Provides unified cache implementation based on database configuration.
  */
 
-import { SearchCache } from './search-cache.js';
 import { SearchCachePg } from './search-cache-pg.js';
 import { logger } from '@massa-th0th/shared';
-import { getDbConfig } from '../../data/db-connection.js';
 
-let cachedCache: SearchCache | SearchCachePg | null = null;
+let cachedCache: SearchCachePg | null = null;
 
-export function getSearchCache(): SearchCache | SearchCachePg {
+export function getSearchCache(): SearchCachePg {
   if (cachedCache) return cachedCache;
 
-  const dbType = getDbConfig().type;
-  
-  if (dbType === 'postgres') {
-    cachedCache = new SearchCachePg();
-    logger.info('Using PostgreSQL search cache');
-  } else {
-    cachedCache = new SearchCache();
-    logger.info('Using SQLite search cache');
-  }
+  cachedCache = new SearchCachePg();
+  logger.info('Using PostgreSQL search cache');
   
   return cachedCache;
 }

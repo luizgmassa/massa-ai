@@ -319,7 +319,7 @@ export function buildRewrittenFTSQuery(
 
 // ─── Shared EmbeddingService singleton (lazy) ─────────────────────────────────
 // One instance reused by all QueryUnderstandingService consumers — mirrors how
-// SQLiteVectorStore instantiates its own. Do NOT spawn extra providers.
+// PostgresVectorStore instantiates its own. Do NOT spawn extra providers.
 let embeddingSingleton: EmbeddingService;
 function getEmbeddingSingleton(): EmbeddingService {
   if (!embeddingSingleton) embeddingSingleton = new EmbeddingService();

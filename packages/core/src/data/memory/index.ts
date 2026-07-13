@@ -2,9 +2,10 @@
  * @massa-th0th/core - Memory Data Layer
  */
 
-export { MemoryRepository } from "./memory-repository.js";
+export { MemoryRepositoryPg } from "./memory-repository-pg.js";
 export type {
   MemoryRow,
   InsertMemoryInput,
   SearchFilters,
-} from "./memory-repository.js";
+  UpdateMemoryPatch,
+} from "./memory-repository-contract.js";

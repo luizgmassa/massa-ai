@@ -3,10 +3,10 @@
  *
  * Mirrors PgScheduledJobStore / PgJobStore's discipline: the SessionStore
  * interface is SYNCHRONOUS (the SessionRegistry calls store.save/load with no
- * await, matching the SQLite store and bun:sqlite API). PG is inherently async,
+ * await, matching the PostgreSQL store and legacy local database API). PG is inherently async,
  * so this store:
  *   - Writes fire-and-forget (best-effort, logged on failure — matching the
- *     SQLite store's try/catch best-effort semantics).
+ *     PostgreSQL store's try/catch best-effort semantics).
  *   - Reads are served from an in-memory mirror hydrated from PG on first use
  *     (async) and kept in sync by every save. The mirror is the hot read path
  *     within a process; PG is the durability + cross-process recovery layer
@@ -22,7 +22,7 @@
  * SynapseSession / SynapseAccessHistory and PG migration
  * 20260710120000_add_synapse_sessions_pg). The buffer snapshot + bufferConfig
  * are reconstructed into a live WorkingMemoryBuffer on load (#17), matching the
- * SQLite store. ensureReady() exposes the awaited-hydration hook the registry's
+ * PostgreSQL store. ensureReady() exposes the awaited-hydration hook the registry's
  * resume path uses so a session resume immediately after a process restart
  * observes PG-persisted sessions (#18).
  */
@@ -182,7 +182,7 @@ export class PgSynapseSessionStore implements SessionStore {
 
     // Buffer (#17): reconstruct the live WorkingMemoryBuffer from the persisted
     // bufferConfig + best-effort snapshot so a session resumed after a process
-    // restart keeps its primed working-set. Mirrors the SQLite store's restore.
+    // restart keeps its primed working-set. Mirrors the PostgreSQL store's restore.
     const bufferConfig = row.buffer_config
       ? (JSON.parse(row.buffer_config) as WorkingMemoryBufferConfig)
       : undefined;
@@ -266,7 +266,7 @@ export class PgSynapseSessionStore implements SessionStore {
       `;
 
       // Persist access history (replace strategy: clear + reinsert, matching
-      // the SQLite store). Runs in the same chained write so it stays ordered
+      // the PostgreSQL store). Runs in the same chained write so it stays ordered
       // relative to the session upsert.
       await prisma.$executeRaw`
         DELETE FROM synapse_access_history WHERE session_id = ${session.sessionId}

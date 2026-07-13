@@ -24,7 +24,7 @@ import { extractTypedEdges } from "../services/etl/typed-edges.js";
 import type { RawSymbol } from "../services/etl/stage-context.js";
 import { EtlPipeline } from "../services/etl/pipeline.js";
 import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
-import { getSymbolRepository } from "../data/sqlite/symbol-repository-factory.js";
+import { getSymbolRepository } from "../data/symbol/symbol-repository-factory.js";
 
 // ─── (1) Extractor unit tests (pure function, no DB) ───────────────────────
 
@@ -196,7 +196,7 @@ describe("typed-edges ETL integration (fixture pipeline)", () => {
     try {
       await Promise.resolve(repo.clearProject(TEST_PROJECT));
     } catch {
-      /* clearProject is SQLite-only on the SQLite repo; PG path is best-effort */
+      /* clearProject is PostgreSQL-only on the PostgreSQL repo; PG path is best-effort */
     }
   });
   afterEach(async () => {

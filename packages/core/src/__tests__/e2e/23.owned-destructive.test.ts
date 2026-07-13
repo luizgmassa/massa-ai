@@ -184,8 +184,6 @@ function serviceEnv(): Record<string, string> {
     HOME: home,
     XDG_CONFIG_HOME: configHome,
     DATABASE_URL,
-    POSTGRES_VECTOR_URL: DATABASE_URL,
-    VECTOR_STORE_TYPE: "postgres",
     MASSA_TH0TH_DEDICATED: "1",
     MASSA_TH0TH_API_URL: API,
     MASSA_TH0TH_API_PORT: "3334",

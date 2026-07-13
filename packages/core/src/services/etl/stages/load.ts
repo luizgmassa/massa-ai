@@ -6,19 +6,19 @@
  *   2. Keyword store  — lexical/trigram/fuzzy search over the same chunks
  *   3. Symbol DB      — definitions, references, imports for graph navigation
  *
- * Each file is written atomically (SQLite transaction per file).
+ * Each file is written atomically (PostgreSQL transaction per file).
  * Updates the symbol_files fingerprint table on success.
  */
 
 import { logger } from "@massa-th0th/shared";
 import { getVectorStore } from "../../../data/vector/vector-store-factory.js";
-import { getKeywordSearch } from "../../../data/sqlite/keyword-search-factory.js";
-import { getSymbolRepository } from "../../../data/sqlite/symbol-repository-factory.js";
+import { getKeywordSearch } from "../../../data/keyword/keyword-search-factory.js";
+import { getSymbolRepository } from "../../../data/symbol/symbol-repository-factory.js";
 import type {
   SymbolDefinition,
   SymbolReference,
   SymbolImport,
-} from "../../../data/sqlite/symbol-repository.js";
+} from "../../../data/symbol/symbol-repository-pg.js";
 import type {
   EtlStageContext,
   ResolvedFile,

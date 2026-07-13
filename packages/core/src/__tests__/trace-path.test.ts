@@ -18,7 +18,7 @@ import { EtlPipeline } from "../services/etl/pipeline.js";
 import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
 import { tracePathService } from "../services/symbol/trace-path.js";
 import { TracePathTool } from "../tools/trace_path.js";
-import { getSymbolRepository } from "../data/sqlite/symbol-repository-factory.js";
+import { getSymbolRepository } from "../data/symbol/symbol-repository-factory.js";
 
 const TEST_PROJECT = "p4d2-trace-path";
 
@@ -76,7 +76,7 @@ describe("trace_path", () => {
     try {
       repo.clearProject(TEST_PROJECT);
     } catch {
-      /* SQLite-only / best-effort */
+      /* PostgreSQL-only / best-effort */
     }
   });
   afterEach(() => {

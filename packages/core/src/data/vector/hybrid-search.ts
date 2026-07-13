@@ -7,8 +7,9 @@
 
 import { IHybridSearch } from '@massa-th0th/shared';
 import { SearchResult, RetrievalOptions } from '@massa-th0th/shared';
-import { SQLiteVectorStore } from './sqlite-vector-store.js';
-import { KeywordSearch } from '../sqlite/keyword-search.js';
+import type { IVectorStore } from '@massa-th0th/shared';
+import { getVectorStore } from './vector-store-factory.js';
+import { KeywordSearchPg } from '../keyword/keyword-search-pg.js';
 import { logger } from '@massa-th0th/shared';
 
 /**
@@ -21,12 +22,12 @@ const RRF_K = 60;
  * Hybrid Search implementation
  */
 export class HybridSearch implements IHybridSearch {
-  private vectorStore: SQLiteVectorStore;
-  private keywordSearch: KeywordSearch;
+  private vectorStore: Promise<IVectorStore>;
+  private keywordSearch: KeywordSearchPg;
 
   constructor() {
-    this.vectorStore = new SQLiteVectorStore();
-    this.keywordSearch = new KeywordSearch();
+    this.vectorStore = getVectorStore();
+    this.keywordSearch = new KeywordSearchPg();
 
     logger.info('Hybrid Search initialized');
   }
@@ -46,7 +47,7 @@ export class HybridSearch implements IHybridSearch {
 
       // Execute searches in parallel (2x results to have buffer for fusion)
       const [vectorResults, keywordResults] = await Promise.all([
-        this.vectorStore.search(query, maxResults * 2),
+        (await this.vectorStore).search(query, maxResults * 2),
         this.keywordSearch.search(query, maxResults * 2)
       ]);
 
@@ -178,7 +179,7 @@ export class HybridSearch implements IHybridSearch {
     try {
       // Get results from both sources
       const [vectorResults, keywordResults] = await Promise.all([
-        this.vectorStore.search(query, maxResults * 2),
+        (await this.vectorStore).search(query, maxResults * 2),
         this.keywordSearch.search(query, maxResults * 2)
       ]);
 

@@ -49,7 +49,7 @@ export interface RelatedMemory {
 /**
  * Input shape for creating an edge.
  *
- * Canonical form: a single object. Both the SQLite (`GraphStore`) and
+ * Canonical form: a single object. Both the PostgreSQL (`GraphStore`) and
  * PostgreSQL (`GraphStorePg`) implementations accept this shape so callers
  * are backend-agnostic. `createEdge` is always async because the PG store
  * requires a Prisma round-trip.
@@ -78,13 +78,13 @@ export interface EdgeFilter {
 /**
  * Canonical graph-store contract.
  *
- * All methods are async so the contract is backend-agnostic: SQLite
+ * All methods are async so the contract is backend-agnostic: PostgreSQL
  * implementations wrap their sync logic in `async`/`Promise.resolve`, while
  * the PostgreSQL implementation is natively async. This eliminates the
  * signature divergence (sync positional vs async object) that silently broke
  * callers when `DATABASE_URL` pointed at PostgreSQL.
  *
- * Both `GraphStore` (SQLite) and `GraphStorePg` implement this interface, and
+ * Both `GraphStore` (PostgreSQL) and `GraphStorePg` implement this interface, and
  * `getGraphStore()` returns an `IGraphStore` so consumers never depend on a
  * concrete backend.
  */

@@ -1,4 +1,3 @@
-export { GraphStore } from './graph-store.js';
 export { GraphStorePg } from './graph-store-pg.js';
 export { RelationExtractor } from './relation-extractor.js';
 export { GraphQueries } from './graph-queries.js';

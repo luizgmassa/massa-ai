@@ -1,20 +1,20 @@
 /**
  * PgCheckpointStore — PostgreSQL parity for the checkpoint store.
  *
- * Structural gap #16: checkpoints were SQLite-only (raw bun:sqlite inside
+ * Structural gap #16: checkpoints were PostgreSQL-only (raw legacy local database inside
  * CheckpointManager). This store provides PG parity so a Postgres deployment
  * persists task/INDEX execution state in the same backend as the rest of the
  * data plane (one-backend rule).
  *
  * Mirrors PgSynapseSessionStore / PgScheduledJobStore's discipline: the
  * ICheckpointStore contract is MOSTLY SYNCHRONOUS (create/list + AutoCheckpointer
- * call them with no await, matching the SQLite store and bun:sqlite API);
+ * call them with no await, matching the PostgreSQL store and legacy local database API);
  * `restoreCheckpoint` + `countExistingMemoryIds` are async so this store can
  * run a real `SELECT id FROM memories WHERE id IN (...)` on the restore path
  * (the single production restore caller already awaits). PG is inherently
  * async, so this store:
  *   - Writes fire-and-forget (best-effort, logged on failure — matching the
- *     SQLite store's try/catch best-effort semantics).
+ *     PostgreSQL store's try/catch best-effort semantics).
  *   - Reads are served from an in-memory mirror hydrated from PG on first use
  *     (async) and kept in sync by every create/delete. The mirror is the hot
  *     read path within a process; PG is the durability + cross-process recovery
@@ -29,7 +29,7 @@
  *
  * Schema parity: task_checkpoints (see Prisma model Checkpoint and PG migration
  * 20260710160000_add_task_checkpoints_pg). State is stored compressed with the
- * SAME algorithm as the SQLite store (Bun.deflateSync on the JSON) so a row
+ * SAME algorithm as the PostgreSQL store (Bun.deflateSync on the JSON) so a row
  * round-trips byte-for-byte; decompression uses Bun.inflateSync. Note: the PG
  * store keeps a deserialized in-memory mirror (TaskCheckpoint objects), so the
  * compressed bytes only matter for parity with any future direct-SQL consumer.
@@ -80,13 +80,13 @@ function toNum(v: number | bigint | null | undefined): number | null {
   return typeof v === "bigint" ? Number(v) : v;
 }
 
-/** Compress state JSON the same way the SQLite store does (Bun.deflateSync). */
+/** Compress state JSON the same way the PostgreSQL store does (Bun.deflateSync). */
 function compressState(state: TaskState): Buffer {
   const json = JSON.stringify(state);
   return Buffer.from(Bun.deflateSync(Buffer.from(json, "utf-8")));
 }
 
-/** Decompress state bytes the same way the SQLite store does (Bun.inflateSync). */
+/** Decompress state bytes the same way the PostgreSQL store does (Bun.inflateSync). */
 function decompressState(data: Buffer): TaskState {
   const buf = Buffer.isBuffer(data) ? data : Buffer.from(data as unknown as ArrayBuffer);
   const inflated = Bun.inflateSync(new Uint8Array(buf));
@@ -367,7 +367,7 @@ export class PgCheckpointStore implements ICheckpointStore {
    * (was a no-op that returned the input unchanged — silently permissive). The
    * id list is chunked (BATCH_SIZE per query) to stay under PG's parameter /
    * packet limits for large checkpoints. On any failure the method falls back to
-   * returning the full input (best-effort, mirroring the SQLite store's
+   * returning the full input (best-effort, mirroring the PostgreSQL store's
    * try/catch) so a restore is never blocked by an unrelated query error.
    *
    * Now async: `restoreCheckpoint` was made `Promise<RestoreResult|null>`
@@ -393,7 +393,7 @@ export class PgCheckpointStore implements ICheckpointStore {
     } catch (e) {
       // Query failed (memories table missing, connection error, ...) —
       // best-effort: assume all referenced memories exist so a restore is never
-      // blocked by an unrelated query error. Mirrors the SQLite store's catch.
+      // blocked by an unrelated query error. Mirrors the PostgreSQL store's catch.
       logger.warn("countExistingMemoryIds failed (best-effort: assuming all exist)", {
         error: (e as Error).message,
       });

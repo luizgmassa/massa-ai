@@ -71,9 +71,7 @@ export function isOwnedDedicatedE2eEnvironment(
     env.MASSA_TH0TH_DEDICATED === "1" &&
     !!env.MASSA_TH0TH_E2E_PROJECT_PATH?.trim() &&
     apiOrigin === "http://127.0.0.1:3334" &&
-    env.VECTOR_STORE_TYPE === "postgres" &&
-    matchesDedicatedDatabaseUrl(env.DATABASE_URL) &&
-    matchesDedicatedDatabaseUrl(env.POSTGRES_VECTOR_URL)
+    matchesDedicatedDatabaseUrl(env.DATABASE_URL)
   );
 }
 
@@ -96,7 +94,7 @@ export function assertSafeE2eEnvironment(
 ): void {
   if (hasDedicatedE2eIntent(env) && !isOwnedDedicatedE2eEnvironment(env)) {
     throw new Error(
-      "Refusing incomplete dedicated E2E environment: require explicit fixture, API 127.0.0.1:3334, PostgreSQL 127.0.0.1:5433/massa_th0th_test, and VECTOR_STORE_TYPE=postgres",
+      "Refusing incomplete dedicated E2E environment: require explicit fixture, API 127.0.0.1:3334, and DATABASE_URL=postgresql://…@127.0.0.1:5433/massa_th0th_test",
     );
   }
 }
@@ -168,7 +166,7 @@ function resolveSharedProfileIdentity(): string | null {
 
 export const SHARED_PROFILE_IDENTITY = resolveSharedProfileIdentity();
 
-export type Backend = "sqlite" | "postgres" | "unknown";
+export type Backend = "postgres" | "unknown";
 
 export interface Availability {
   API_UP: boolean;
@@ -184,28 +182,17 @@ export interface Availability {
 /**
  * Resolve the backend attested by the E2E environment.
  *
- * `/system/info` reports the API's local cache files, which legitimately
- * include SQLite databases even when PostgreSQL is the primary data plane.
- * A dedicated E2E stack therefore uses its explicit VECTOR_STORE_TYPE as the
- * authoritative declaration. Non-dedicated runs retain the legacy cache-file
- * heuristic because their local environment may not describe the remote API.
+ * A dedicated E2E stack must declare its isolated PostgreSQL URL. No local
+ * database-file inference is permitted.
  */
 export function resolveBackendAttestation(
   dedicated: boolean,
   explicitType: string | undefined,
-  databaseSizes: unknown,
+  _databaseSizes: unknown,
 ): Backend {
-  if (dedicated && (explicitType === "postgres" || explicitType === "sqlite")) {
-    return explicitType;
-  }
-
-  if (databaseSizes && typeof databaseSizes === "object" && !Array.isArray(databaseSizes)) {
-    return Object.keys(databaseSizes).some((key) => key.endsWith(".db"))
-      ? "sqlite"
-      : "unknown";
-  }
-
-  return "unknown";
+  return dedicated && /^postgres(?:ql)?:\/\//.test(explicitType ?? "")
+    ? "postgres"
+    : "unknown";
 }
 
 // ── Prefix guard ────────────────────────────────────────────────────────────
@@ -272,7 +259,7 @@ export async function probeAvailability(): Promise<Availability> {
       }).then((r) => r.json() as Promise<any>);
       BACKEND = resolveBackendAttestation(
         process.env.MASSA_TH0TH_DEDICATED === "1",
-        process.env.VECTOR_STORE_TYPE,
+        process.env.DATABASE_URL,
         info?.databases?.sizes,
       );
     } catch {

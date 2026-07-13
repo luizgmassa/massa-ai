@@ -9,9 +9,9 @@
  * Memory Hierarchy Levels
  * 
  * Level 4: Working Memory (Context Window)
- * Level 3: Session Memory (Local SQLite)
- * Level 2: User Memory (Local SQLite)
- * Level 1: Project Memory (Vector DB + SQLite)
+ * Level 3: Session Memory (PostgreSQL)
+ * Level 2: User Memory (PostgreSQL)
+ * Level 1: Project Memory (PostgreSQL + pgvector)
  * Level 0: Persistent Memory (Files)
  */
 export enum MemoryLevel {
@@ -90,7 +90,7 @@ export interface CacheEntry<T = unknown> {
  */
 export enum CacheLevel {
   L1 = 1, // In-memory Map
-  L2 = 2  // SQLite
+  L2 = 2  // PostgreSQL-backed durable memory
 }
 
 /**

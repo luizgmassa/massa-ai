@@ -8,7 +8,7 @@
  *   tools/        → Thin MCP handlers (schema + delegation)
  *   controllers/  → Orchestration (composes services, side-effects)
  *   services/     → Domain logic (scoring, embedding, graph)
- *   data/         → Persistence (SQLite, FTS, migrations)
+ *   data/         → Persistence (PostgreSQL, FTS, migrations)
  */
 
 // Tools
@@ -21,19 +21,17 @@ export * from "./controllers/index.js";
 export * from "./services/index.js";
 
 // Data
-export { MemoryRepository } from "./data/memory/memory-repository.js";
+export { MemoryRepositoryPg } from "./data/memory/memory-repository-pg.js";
 export { getMemoryRepository } from "./data/memory/memory-repository-factory.js";
 export type {
   MemoryRow,
   InsertMemoryInput,
   SearchFilters,
-} from "./data/memory/memory-repository.js";
+} from "./data/memory/memory-repository-contract.js";
 export { getVectorStore, resetVectorStore } from "./data/vector/index.js";
-export { SQLiteVectorStore } from "./data/vector/index.js";
 
 // Phase 3 — passive lifecycle capture (hook ingestion)
 export {
-  SqliteObservationStore,
   MemoryObservationStore,
   getObservationStore,
   resetObservationStore,
@@ -106,7 +104,6 @@ export type {
 
 // Phase 6 — cross-session handoffs (G2)
 export {
-  SqliteHandoffStore,
   MemoryHandoffStore,
   getHandoffStore,
   resetHandoffStore,
@@ -136,7 +133,6 @@ export { HandoffAutoInjector } from "./services/handoff/handoff-auto-injector.js
 
 // Phase 5 — auto-improvement loop (G7)
 export {
-  SqliteProposalStore,
   MemoryProposalStore,
   getProposalStore,
   resetProposalStore,

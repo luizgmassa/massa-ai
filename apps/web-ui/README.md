@@ -1,6 +1,6 @@
 # massa-th0th Web UI (read-only)
 
-A dependency-free HTML browser over the massa-th0th SQLite-canonical memories, FTS5
+A dependency-free HTML browser over massa-th0th PostgreSQL/pgvector-backed memories,
 search, handoffs, checkpoints, and indexed projects. **Read-only** — no mutating
 controls. Served by the Tools API.
 

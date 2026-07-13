@@ -2,7 +2,7 @@
  * List Projects Tool (list_projects)
  *
  * Lists all indexed workspaces with their status and statistics.
- * Data sourced from WorkspaceManager (SQLite workspaces table).
+ * Data sourced from WorkspaceManager (PostgreSQL workspaces table).
  */
 
 import { IToolHandler, ToolResponse } from "@massa-th0th/shared";

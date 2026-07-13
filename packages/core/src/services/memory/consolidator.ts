@@ -80,7 +80,7 @@ export interface LlmSurface {
 function vecFrom(raw: ConsolidateCandidate["embedding"]): number[] | null {
   if (!raw) return null;
   // Buffer, Uint8Array, and Float32Array are all ArrayBufferView-backed.
-  // bun:sqlite returns BLOB columns as Uint8Array (not always a Buffer), so
+  // legacy local database returns BLOB columns as Uint8Array (not always a Buffer), so
   // duck-type on the byte-length rather than `instanceof Buffer`.
   if (Array.isArray(raw)) return raw.length > 0 ? raw : null;
   if (typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView(raw as any)) {

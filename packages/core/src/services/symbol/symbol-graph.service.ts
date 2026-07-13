@@ -13,7 +13,7 @@
 import path from "path";
 import fs from "fs/promises";
 import { logger } from "@massa-th0th/shared";
-import { getSymbolRepository } from "../../data/sqlite/symbol-repository-factory.js";
+import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import { workspaceManager } from "../workspace/workspace-manager.js";
 import type {
   SymbolDefinition,
@@ -21,7 +21,7 @@ import type {
   SymbolImport,
   CentralityEntry,
   RefKind,
-} from "../../data/sqlite/symbol-repository.js";
+} from "../../data/symbol/symbol-repository-pg.js";
 import { computePageRank } from "./centrality.js";
 import { runLouvain, type WeightedEdge } from "./communities.js";
 import {
@@ -393,7 +393,7 @@ export class SymbolGraphService {
       repo.getProjectMapAggregates(projectId, recentLimit),
       // Typed-edge counts (D1) — cheap single GROUP BY; surface when non-empty.
       // Wrapped in Promise.resolve so it works whether the repo returns a
-      // plain value (SQLite sync) or a Promise (PG async).
+      // plain value (PostgreSQL sync) or a Promise (PG async).
       Promise.resolve(repo.countEdgesByKind(projectId)).catch(
         () => ({}) as Record<string, number>,
       ),
@@ -456,7 +456,7 @@ export class SymbolGraphService {
     repo: ReturnType<typeof getSymbolRepository>,
   ): Promise<ArchitectureMap | null> {
     // Gather the file-import graph + definitions + HTTP edges in parallel.
-    // Each is wrapped in Promise.resolve so the SQLite (sync) and PG (async)
+    // Each is wrapped in Promise.resolve so the PostgreSQL (sync) and PG (async)
     // repo contracts both work.
     const [filesRaw, importEdgesRaw, defsRaw, httpEdgesRaw, centralityRaw] =
       await Promise.all([

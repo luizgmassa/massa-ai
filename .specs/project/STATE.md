@@ -3,35 +3,32 @@
 ## Current
 
 - projectId: `massa-th0th`
-- workflowSessionId: `spec-close-maintenance-next-steps-2026-07-13`
+- workflowSessionId: `spec-sqlite-removal`
 - workflow: spec-driven
 - persona: AI Engineer
-- feature: `close-maintenance-next-steps-2026-07-13`
-- status: COMPLETE WITH USER WAIVER AND REMOTE DRIFT EXCEPTION
+- feature: `sqlite-removal`
+- status: COMPLETE WITH DOCUMENTED FOLLOW-UP
 - branch: `main`
-- baseline: `cc985905fae3495a31a16aaf0fbd75435a2e63df`
-- push: forbidden; `origin/main` independently advanced during execution and was not repaired
+- push: not attempted
 
 ## Objective
 
-Execute the approved maintenance closure plan sequentially: Synapse-aware search, bounded filtered retrieval, dependency-outage transparency, deterministic qwen G10, shared-index identity/path hygiene, and test-owned destructive recovery.
+Remove SQLite runtime support and require PostgreSQL with pgvector for configuration, persistence, installer, operations, tests, CI, and active documentation.
 
 ## Active Constraints
 
-- PostgreSQL/pgvector is acceptance; SQLite is non-gating without assertion-equivalent PostgreSQL coverage.
-- Shared `127.0.0.1:3333` is developer-owned and receives PID plus `/health` probes only.
-- Dedicated resources: PostgreSQL `:5433/massa_th0th_test`, Tools API `:3334`, Ollama `:11435` with explicit env.
-- No threshold weakening, timeout increase, shared mutation, unowned signal, prior-evidence rewrite, or push.
-- Sequential execution, one subagent maximum, atomic commits after each cluster gate.
+- `DATABASE_URL` is the only runtime database/vector connection source.
+- SQLite data is neither migrated nor deleted; historical specs and immutable Prisma migration comments may retain historical references.
+- Validation uses an owned isolated PostgreSQL with pgvector; Docker is optional when a separately owned local instance is available.
+- No push or commit was attempted.
 
 ## Final State
 
-- All implementation clusters and local acceptance gates pass; final read-only review accepted technical and documentation evidence under the explicit downstream waiver.
-- Final qwen G10 from fixture HEAD `02b7475`: 245 pass, 6 explained skips, 0 fail across 18 files; cleanup ran last.
-- Final safety delta `2e5ad3d` fails closed before incomplete-dedicated probes/HTTP/indexing and passed focused 12/12 plus type-check 6/6. The user explicitly waived repeating full qwen G10 after this test-helper-only change.
-- Dedicated ports are free and shared `:3333` remains healthy at PID 9754.
-- `origin/main` independently advanced from `cc98590` to `8dad87a` during execution. No push was invoked by this orchestrator, the actor is unknown, and the remote was not repaired; no-push compliance therefore remains uncertifiable.
-- Final documentation/review commit is the continuation boundary; do not push.
+- Configuration, installer, core persistence, API/health, CI, docs, and active test/E2E paths have been converted to PostgreSQL-only behavior.
+- Workspace type-check/build, validator discrimination, bootstrap regression, installer tests, active-reference scan, and diff integrity pass.
+- Isolated PostgreSQL 17 + pgvector completed 14 migrations, vector CRUD integration (16/16), CRUD/scheduler restart checks (44), smoke (4/4), CLI (13/13), and destructive E2E (4/4; 79 assertions). Owned `:5433`, `:3334`, and `:11435` resources were removed; shared `:3333` remained healthy.
+- Residual follow-up: rerun a legacy migration smoke after its checked Prisma fixture repair, rebuild/re-run the frozen qwen fixture, and capture a concise aggregate root-test result.
+- Canonical evidence: `.specs/features/sqlite-removal/validation.md`.
 
 ## Historical Plan Spec Capture
 

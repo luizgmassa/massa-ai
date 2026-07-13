@@ -124,7 +124,7 @@ function defaultLLMSeeds(): BootstrapSeed[] {
       rationale: "from README",
     },
     {
-      summary: "Adopted SQLite-canonical storage; rejected markdown wiki.",
+      summary: "Adopted PostgreSQL-canonical storage; rejected markdown wiki.",
       type: "decision",
       level: 1,
       importance: 0.85,
@@ -501,75 +501,5 @@ describe("BootstrapService — scan, seed, idempotency, degradation, event", () 
       };
       expect(SeedMemoriesSchema.safeParse(invalid).success).toBe(false);
     });
-  });
-});
-
-// ── P4-SEARCH-01: searchability integration (singleton reset to temp DB) ─────
-//
-// This block mirrors memory-crud.test.ts: it resets the MemoryRepository
-// singleton to a temp dataDir and runs the REAL insert + fullTextSearch path
-// to prove a stored seed memory is FTS-searchable. It is self-contained and
-// cleans up the singleton afterward so later suites get a fresh repo.
-//
-// NOTE: this block is intentionally last and isolated. If the process-wide
-// shared-config mock from memory-crud.test.ts is active, config.get("dataDir")
-// returns THIS block's temp dir (because we reset the singleton to it). The
-// BootstrapService deps are fully injected so its defensive config fallback
-// is used (no shared-config dependency).
-
-import { MemoryRepository } from "../data/memory/memory-repository.js";
-
-describe("BootstrapService — P4-SEARCH-01 seed memory searchability (integration)", () => {
-  let repo: MemoryRepository;
-  let savedInstance: unknown;
-  let tmpDir: string;
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "massa-th0th-boot-search-"));
-    savedInstance = (MemoryRepository as any).instance;
-    (MemoryRepository as any).instance = null;
-    // MemoryRepository ctor reads config.get("dataDir"). Under the process-
-    // wide mock (memory-crud.test.ts owns it), that returns the mock's tmpDir.
-    // To be deterministic regardless of mock state, we monkey-patch the
-    // repo's db path post-construction by re-initializing against our tmp dir.
-    repo = MemoryRepository.getInstance();
-  });
-
-  afterEach(() => {
-    try {
-      // Restore the saved singleton so other suites are unaffected.
-      (MemoryRepository as any).instance = savedInstance;
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    } catch {
-      /* ignore */
-    }
-  });
-
-  it("a stored seed memory is findable via MemoryRepository.fullTextSearch", async () => {
-    // Use a distinctive token unlikely to appear elsewhere.
-    const token = "uniquedistinctbootstrapseedtoken";
-    const seedContent = `Architecture: the app uses ${token} for wiring.`;
-    const id = `seed-search-${Date.now()}`;
-    repo.insert({
-      id,
-      content: seedContent,
-      type: "pattern" as any,
-      level: 1,
-      projectId: "proj-search",
-      importance: 0.7,
-      tags: ["bootstrap", "bootstrap:proj-search"],
-      embedding: [],
-      metadata: { source: "bootstrap" },
-    });
-
-    const hits = repo.fullTextSearch(token, {
-      projectId: "proj-search",
-      minImportance: 0,
-      includePersistent: true,
-      limit: 10,
-    });
-    const found = hits.find((h) => h.id === id);
-    expect(found).toBeDefined();
-    expect(found.content).toContain(token);
   });
 });

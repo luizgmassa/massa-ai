@@ -13,7 +13,7 @@
  * - Integration with existing embedding service
  *
  * Architecture:
- * - Uses SQLite as single backend (vector + keyword + cache)
+ * - Uses PostgreSQL as single backend (vector + keyword + cache)
  * - Per-projectId namespace for isolation
  * - Embedding reuse across projects
  */
@@ -23,7 +23,7 @@ import {
   VectorDocument,
 } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
-import { getKeywordSearch } from "../../data/sqlite/keyword-search-factory.js";
+import { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
 import { getVectorStore } from "../../data/vector/vector-store-factory.js";
 import { config } from "@massa-th0th/shared";
 import { IndexManager } from "./index-manager.js";
@@ -31,7 +31,7 @@ import { getSearchCache } from "./cache-factory.js";
 import { getSearchAnalytics } from "./analytics-factory.js";
 import { SearchAnalytics } from "./search-analytics.js";
 import type { SearchAnalyticsPg } from "./search-analytics-pg.js";
-import { getSymbolRepository } from "../../data/sqlite/symbol-repository-factory.js";
+import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import { getGraphStore } from "../graph/graph-store-factory.js";
 import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
 import fs from "fs/promises";
@@ -1109,7 +1109,7 @@ export class ContextualSearchRLM {
 
       if (seedIds.size === 0) return [];
       const graph = getGraphStore();
-      // SQLite bfsNeighbors is sync; Pg is async. Normalize via Promise.resolve
+      // PostgreSQL bfsNeighbors is sync; Pg is async. Normalize via Promise.resolve
       // so both backends work without an isPostgres short-circuit.
       const ns = await Promise.resolve(
         typeof (graph as { bfsNeighbors?: unknown }).bfsNeighbors === "function"
@@ -1128,7 +1128,7 @@ export class ContextualSearchRLM {
       const out: SearchResult[] = [];
       for (const id of fresh) {
         try {
-          // Backend-polymorphic: SQLite getById is sync, Pg is async. Normalize.
+          // Backend-polymorphic: PostgreSQL getById is sync, Pg is async. Normalize.
           const row = await Promise.resolve(repo.getById(id));
           if (!row || row.deleted_at !== null) continue;
           out.push({

@@ -13,7 +13,7 @@ import { logger, MemoryType } from "@massa-th0th/shared";
 import { Prisma } from "../../generated/prisma/index.js";
 import { getPrismaClient } from "../../services/query/prisma-client.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
-import type { InsertMemoryInput, MemoryRow, SearchFilters, UpdateMemoryPatch } from "./memory-repository.js";
+import type { InsertMemoryInput, MemoryRow, SearchFilters, UpdateMemoryPatch } from "./memory-repository-contract.js";
 
 // ── Raw row shape returned by $queryRaw ──────────────────────────────────────
 
@@ -238,7 +238,7 @@ export class MemoryRepositoryPg {
 
   /**
    * Full-text search: word-level ILIKE OR matching, with scope filters.
-   * Mirrors the SQLite FTS5 behaviour: each whitespace-separated token is
+   * Mirrors the PostgreSQL FTS5 behaviour: each whitespace-separated token is
    * searched independently; results are returned if ANY token matches.
    */
   async fullTextSearch(
@@ -253,7 +253,7 @@ export class MemoryRepositoryPg {
       types?: MemoryType[];
     },
   ): Promise<MemoryRow[]> {
-    // Match the SQLite FTS input contract: punctuation is a separator, and a
+    // Match the PostgreSQL FTS input contract: punctuation is a separator, and a
     // blank/punctuation-only query applies only the scope filters.  Building a
     // Prisma.join() expression from zero tokens produces invalid `()` SQL.
     const tokens = query

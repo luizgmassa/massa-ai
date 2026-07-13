@@ -8,8 +8,8 @@ Last updated: 2026-07-13. Acceptance backend: PostgreSQL 17 + pgvector 0.8.4.
 
 - Standard E2E runs sequentially against a dedicated Tools API, PostgreSQL database, MCP build,
   and Ollama instance. The shared developer API on `:3333` is never a test target.
-- `MASSA_TH0TH_DEDICATED=1`, explicit `DATABASE_URL`/`POSTGRES_VECTOR_URL`, and
-  `VECTOR_STORE_TYPE=postgres` are required. Backend attestation must fail closed rather than infer
+- `MASSA_TH0TH_DEDICATED=1`, explicit `DATABASE_URL`/`DATABASE_URL`, and
+  `DATABASE_URL=postgres` are required. Backend attestation must fail closed rather than infer
   PostgreSQL from API-local cache files.
 - Commit-locked fixture recovery additionally requires an explicit fixture path, API origin
   `http://127.0.0.1:3334`, and both database URLs at
@@ -61,7 +61,7 @@ the responsible suite row and add HTTP/MCP equivalence where both transports exi
 
 ## Tests updated in the 2026-07-13 maintenance pass
 
-- `backend-attestation.test.ts`: 4 assertions cover authoritative dedicated PostgreSQL/SQLite
+- `backend-attestation.test.ts`: 4 assertions cover authoritative dedicated PostgreSQL/PostgreSQL
   declarations, remote non-dedicated behavior, and unknown fallback.
 - `02.indexing.test.ts`: readiness now waits for stable documents plus the exact job's terminal
   completion and reports terminal failures directly.
@@ -72,7 +72,7 @@ the responsible suite row and add HTTP/MCP equivalence where both transports exi
 - `20.new-features.test.ts`: Synapse prime fixtures use the current memory shape and assert both
   `primed` and reconstructed buffer size.
 - `_helpers.ts`: dedicated backend attestation uses the explicit vector-store declaration; API
-  cache-file listings no longer misclassify a PostgreSQL data plane as SQLite.
+  cache-file listings no longer misclassify a PostgreSQL data plane as PostgreSQL.
 - `_helpers.ts`: shared-index checks coalesce only while in flight, then revalidate canonical
   workspace identity before every later reuse in the same Bun process.
 - `read_file.ts`: the process-lifetime read-file tool refreshes an affected cached project root

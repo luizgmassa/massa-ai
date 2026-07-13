@@ -80,7 +80,7 @@ export class SessionRegistry {
   /**
    * Await backend readiness before a read (hydration race fix, #18).
    *
-   * Sync backends (SQLite, Memory) resolve immediately. The PG backend awaits
+   * Sync backends (PostgreSQL, Memory) resolve immediately. The PG backend awaits
    * its in-memory mirror hydration so a session resume immediately after a
    * process restart observes PG-persisted sessions. Call this before the first
    * `get()` of a resume flow; the sync `get()` used by the modulation pipeline
@@ -228,10 +228,10 @@ let registry: SessionRegistry | null = null;
 
 export function getSessionRegistry(): SessionRegistry {
   if (!registry) {
-    // Phase 1: wire the durable SQLite store with an ephemeral fallback.
+    // Phase 1: wire the durable PostgreSQL store with an ephemeral fallback.
     let store: SessionStore;
     try {
-      // Lazy require to avoid importing bun:sqlite at module-eval.
+      // Lazy require to avoid importing legacy local database at module-eval.
       const { getSessionStore } = require("./session-store.js") as {
         getSessionStore: () => SessionStore;
       };

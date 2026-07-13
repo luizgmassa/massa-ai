@@ -10,8 +10,8 @@
  * graph internals.
  *
  * Uses `getGraphStore()` (the factory) so the active backend is selected
- * by `DATABASE_URL` — SQLite or PostgreSQL — rather than hardcoding the
- * SQLite singleton (structural gap #14).
+ * by `DATABASE_URL` — PostgreSQL or PostgreSQL — rather than hardcoding the
+ * PostgreSQL singleton (structural gap #14).
  */
 
 import {

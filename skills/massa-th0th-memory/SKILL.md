@@ -351,7 +351,7 @@ Supports three modes (select interactively or override with `MASSA_TH0TH_MODE`):
 |------|--------------|--------------|---------|
 | Docker | `docker` | Docker | Production, quick start (~5GB RAM, Docker/colima) |
 | Docker build | `build` | Docker + Git | Custom builds, local changes (~5GB RAM, Docker/colima) |
-| From source | `source` | Git + Bun | Development (SQLite / Native PG / Docker) |
+| From source | `source` | Git + Bun | Development (Native PostgreSQL / Docker PostgreSQL) |
 
 Non-interactive example:
 
@@ -395,6 +395,6 @@ bun run diagnose   # checks Ollama, database, embeddings, migration status
 
 - **Docker mode** (colima + Docker, ~5GB RAM): PostgreSQL + auto-migration via entrypoint script on container startup. Uses `qwen3-embedding:8b` / 4096d by default.
 - **Native PostgreSQL (macOS)**: ~100MB RAM, no Docker. Run `./scripts/setup-native-postgres.sh` (brew install postgresql@17 + pgvector) or pick it in `setup-local-first.sh`. Migrations: `cd packages/core && bunx prisma migrate deploy`.
-- **Source mode**: SQLite via `prisma-adapter-bun-sqlite`. Run `bun run diagnose` after setup.
+- **Source mode**: PostgreSQL/pgvector is required. Run `bun run diagnose` after setup.
 - **WSL / Linux**: Ollama connectivity via `host.docker.internal:host-gateway` in `docker-compose.yml`.
 - **PostgreSQL (native or Docker)**: set `DATABASE_URL` + `POSTGRES_PASSWORD`. Migrations run automatically on `docker compose up` (Docker) or via `bunx prisma migrate deploy` (native).

@@ -18,8 +18,6 @@
       "cache": false,
       "passThroughEnv": [
         "DATABASE_URL",
-        "POSTGRES_VECTOR_URL",
-        "VECTOR_STORE_TYPE",
         "MASSA_TH0TH_API_URL",
         "MASSA_TH0TH_API_KEY",
         "MASSA_TH0TH_DEDICATED",

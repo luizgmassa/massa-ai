@@ -25,7 +25,7 @@ interface StoreMemoryParams {
 
 export class StoreMemoryTool implements IToolHandler {
   name = "store_memory";
-  description = "Store memory in the hierarchical memory system (local SQLite)";
+  description = "Store memory in the hierarchical memory system (local PostgreSQL)";
   inputSchema = {
     type: "object",
     properties: {

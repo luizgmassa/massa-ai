@@ -195,6 +195,18 @@ export class SearchAnalyticsPg {
       }));
   }
 
+  async getTopQueries(projectId: string, limit: number): Promise<Array<{ query: string; count: number }>> {
+    const pool = await this.getPool();
+    const { rows } = await pool.query(`SELECT query, COUNT(*)::int AS count FROM search_analytics WHERE project_id = $1 GROUP BY query ORDER BY count DESC, query ASC LIMIT $2`, [projectId, limit]);
+    return rows.map((row) => ({ query: row.query as string, count: Number(row.count) }));
+  }
+
+  async getActiveProjects(): Promise<string[]> {
+    const pool = await this.getPool();
+    const { rows } = await pool.query(`SELECT DISTINCT project_id FROM search_analytics WHERE project_id IS NOT NULL ORDER BY project_id`);
+    return rows.map((row) => row.project_id as string);
+  }
+
   async clear(): Promise<void> {
     const pool = await this.getPool();
     await pool.query('DELETE FROM search_analytics');

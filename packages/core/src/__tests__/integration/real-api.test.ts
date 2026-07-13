@@ -145,7 +145,7 @@ describe.skipIf(!API_AVAILABLE)("massa-th0th API — real integration (using mas
 
     test("finds Prisma client initialization code", async () => {
       const res = await post("/api/v1/search/project", {
-        query: "PrismaClient PostgreSQL SQLite adapter singleton initialization",
+        query: "PrismaClient PostgreSQL PostgreSQL adapter singleton initialization",
         projectId: PROJECT_ID,
         maxResults: 5,
         responseMode: "summary",
@@ -300,7 +300,7 @@ describe.skipIf(!API_AVAILABLE)("massa-th0th API — real integration (using mas
 
     test("stores a decision memory successfully", async () => {
       const res = await post("/api/v1/memory/store", {
-        content: "Using PostgreSQL with pgvector for production deployments; SQLite for development",
+        content: "Using PostgreSQL with pgvector for production deployments; PostgreSQL for development",
         type: "decision",
         importance: 0.9,
         tags: ["database", "architecture", "deployment"],

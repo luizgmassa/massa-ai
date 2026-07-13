@@ -43,16 +43,13 @@
  *   - Returns Map for O(1) lookup after batch load
  */
 
-import { Database } from "bun:sqlite";
-import path from "path";
+import { getPrismaClient } from "../query/prisma-client.js";
 import {
   MemoryEdge,
   MemoryRelationType,
   GraphQueryOptions,
   GraphPath,
   ContradictionPair,
-  config,
-  logger,
 } from "@massa-th0th/shared";
 import { getGraphStore } from "./graph-store-factory.js";
 import type { IGraphStore, MemoryRow, RelatedMemory } from "./types.js";
@@ -68,19 +65,10 @@ const DEFAULT_OPTIONS: Required<GraphQueryOptions> = {
 };
 
 export class GraphQueries {
-  private db!: Database;
   private graphStore: IGraphStore;
 
   constructor(graphStore?: IGraphStore) {
     this.graphStore = graphStore ?? getGraphStore();
-    this.initDb();
-  }
-
-  private initDb(): void {
-    const dataDir = config.get("dataDir") as string;
-    const dbPath = path.join(dataDir, "memories.db");
-    this.db = new Database(dbPath);
-    this.db.exec("PRAGMA busy_timeout = 3000");
   }
 
   // ── Traversal ──────────────────────────────────────────────
@@ -150,7 +138,7 @@ export class GraphQueries {
       // Batch load all neighbors for this level
       if (neighborData.length > 0) {
         const neighborIds = neighborData.map((n) => n.neighborId);
-        const memoryMap = this.loadMemoriesByIds(neighborIds);
+        const memoryMap = await this.loadMemoriesByIds(neighborIds);
 
         for (const { neighborId, edge, depth } of neighborData) {
           const memory = memoryMap.get(neighborId);
@@ -190,7 +178,7 @@ export class GraphQueries {
     maxDepth: number = 5,
   ): Promise<GraphPath | null> {
     if (fromId === toId) {
-      const memory = this.loadMemory(fromId);
+      const memory = await this.loadMemory(fromId);
       return memory
         ? { nodes: [memory as any], edges: [], length: 0, totalWeight: 0 }
         : null;
@@ -231,14 +219,14 @@ export class GraphQueries {
     return null; // No path found
   }
 
-  private reconstructPath(
+  private async reconstructPath(
     fromId: string,
     toId: string,
     visited: Map<
       string,
       { parentId: string | null; edge: MemoryEdge | null }
     >,
-  ): GraphPath | null {
+  ): Promise<GraphPath | null> {
     const nodeIds: string[] = [];
     const edges: MemoryEdge[] = [];
     let current = toId;
@@ -253,7 +241,7 @@ export class GraphQueries {
     nodeIds.unshift(fromId);
 
     // Batch load all path memories (eliminates N+1 query)
-    const memoryMap = this.loadMemoriesByIds(nodeIds);
+    const memoryMap = await this.loadMemoriesByIds(nodeIds);
     const nodes = nodeIds
       .map((id) => memoryMap.get(id))
       .filter(Boolean) as any[];
@@ -282,22 +270,15 @@ export class GraphQueries {
    * 2×limit individual queries.
    */
   async findContradictions(limit: number = 20): Promise<ContradictionPair[]> {
-    const rows = this.db
-      .prepare(
-        `
-      SELECT e.source_id, e.target_id, e.evidence, e.weight
-      FROM memory_edges e
-      WHERE e.relation_type = ?
-      ORDER BY e.weight DESC, e.created_at DESC
-      LIMIT ?
-    `,
-      )
-      .all(MemoryRelationType.CONTRADICTS, limit) as {
+    const rows = await getPrismaClient().$queryRaw<{
       source_id: string;
       target_id: string;
       evidence: string | null;
       weight: number;
-    }[];
+    }[]>`SELECT from_id AS source_id, to_id AS target_id,
+        metadata->>'evidence' AS evidence, weight
+      FROM memory_edges WHERE edge_type = ${MemoryRelationType.CONTRADICTS}
+      ORDER BY weight DESC, created_at DESC LIMIT ${limit}`;
 
     // Collect all unique memory IDs
     const memoryIds = new Set<string>();
@@ -307,7 +288,7 @@ export class GraphQueries {
     }
 
     // Batch load all memories
-    const memoryMap = this.loadMemoriesByIds(Array.from(memoryIds));
+    const memoryMap = await this.loadMemoriesByIds(Array.from(memoryIds));
 
     // Build pairs
     const pairs: ContradictionPair[] = [];
@@ -365,7 +346,7 @@ export class GraphQueries {
     const memoryIds = hubs.map((h) => h.memoryId);
     
     // Batch load all hub memories
-    const memoryMap = this.loadMemoriesByIds(memoryIds);
+    const memoryMap = await this.loadMemoriesByIds(memoryIds);
     
     const result: { memory: MemoryRow; degree: number }[] = [];
     for (const hub of hubs) {
@@ -418,17 +399,9 @@ export class GraphQueries {
   /**
    * Load a single memory by ID.
    */
-  private loadMemory(memoryId: string): MemoryRow | null {
-    return this.db
-      .prepare(
-        `
-      SELECT id, content, type, level, importance, tags,
-             created_at, updated_at, access_count,
-             user_id, session_id, project_id, agent_id
-      FROM memories WHERE id = ?
-    `,
-      )
-      .get(memoryId) as MemoryRow | null;
+  private async loadMemory(memoryId: string): Promise<MemoryRow | null> {
+    const values = await this.loadMemoriesByIds([memoryId]);
+    return values.get(memoryId) ?? null;
   }
 
   /**
@@ -439,30 +412,22 @@ export class GraphQueries {
    * 
    * Example: Loading 100 neighbors goes from 100 queries → 1 query.
    */
-  private loadMemoriesByIds(memoryIds: string[]): Map<string, MemoryRow> {
+  private async loadMemoriesByIds(memoryIds: string[]): Promise<Map<string, MemoryRow>> {
     if (memoryIds.length === 0) {
       return new Map();
     }
 
-    // Build placeholders for IN clause
-    const placeholders = memoryIds.map(() => "?").join(",");
-    
-    const rows = this.db
-      .prepare(
-        `
-      SELECT id, content, type, level, importance, tags,
-             created_at, updated_at, access_count,
-             user_id, session_id, project_id, agent_id
-      FROM memories
-      WHERE id IN (${placeholders})
-    `,
-      )
-      .all(...memoryIds) as MemoryRow[];
+    const rows = await getPrismaClient().$queryRaw<Array<any>>`
+      SELECT id, content, type, level, importance, array_to_json(tags)::text AS tags,
+             created_at, updated_at, access_count, user_id, session_id, project_id, agent_id,
+             NULL::bytea AS embedding, NULL::text AS metadata, NULL::timestamp AS last_accessed,
+             pinned::integer AS pinned, deleted_at
+      FROM memories WHERE id = ANY(${memoryIds}::text[])`;
 
     // Convert to map for O(1) lookup
     const result = new Map<string, MemoryRow>();
     for (const row of rows) {
-      result.set(row.id, row);
+      result.set(row.id, { ...row, created_at: new Date(row.created_at).getTime(), updated_at: new Date(row.updated_at).getTime(), last_accessed: null, deleted_at: row.deleted_at ? new Date(row.deleted_at).getTime() : null });
     }
 
     return result;
@@ -471,7 +436,5 @@ export class GraphQueries {
   /**
    * Close database connection.
    */
-  close(): void {
-    this.db?.close();
-  }
+  close(): void {}
 }

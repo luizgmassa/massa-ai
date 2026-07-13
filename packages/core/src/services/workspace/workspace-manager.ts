@@ -2,15 +2,15 @@
  * Workspace Manager
  *
  * Single source of truth for project registration and indexing status.
- * Persists all state to the `workspaces` table in the symbol SQLite DB
+ * Persists all state to the `workspaces` table in the symbol PostgreSQL DB
  * (replacing the zero-embedding _metadata docs in the vector store).
  *
  * Subscribes to EventBus to auto-update status on indexing lifecycle events.
  */
 
 import { logger } from "@massa-th0th/shared";
-import { getSymbolRepository } from "../../data/sqlite/symbol-repository-factory.js";
-import type { WorkspaceRow, WorkspaceStatus } from "../../data/sqlite/symbol-repository.js";
+import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
+import type { WorkspaceRow, WorkspaceStatus } from "../../data/symbol/symbol-repository-pg.js";
 import { eventBus } from "../events/event-bus.js";
 import { symbolGraphService } from "../symbol/symbol-graph.service.js";
 

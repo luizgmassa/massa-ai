@@ -3,9 +3,9 @@
  *
  * Mirrors PgJobStore's discipline: the ScheduledJobStore interface is
  * SYNCHRONOUS (the scheduler calls store.save/get with no await, matching the
- * SQLite store). PG is inherently async, so this store:
+ * PostgreSQL store). PG is inherently async, so this store:
  *   - Writes fire-and-forget (best-effort, logged on failure — matching the
- *     SQLite store's try/catch best-effort semantics).
+ *     PostgreSQL store's try/catch best-effort semantics).
  *   - Reads are served from an in-memory mirror hydrated from PG on first use
  *     (async) and kept in sync by every save.
  *
@@ -158,7 +158,7 @@ export class PgScheduledJobStore implements ScheduledJobStore {
     this.localDeletes.delete(job.id);
 
     // Capture values at save() time. The scheduler mutates job objects later,
-    // while SQLite persists synchronously at the call boundary.
+    // while PostgreSQL persists synchronously at the call boundary.
     const persisted = {
       id: job.id,
       name: job.name,

@@ -7,7 +7,7 @@
  * raw events stay in the observation store; the snapshot just points to them.
  *
  * SESSION continuity, NOT task state. This is distinct from `create_checkpoint`
- * (which versions TASK progress/decisions/files in memories.db). See
+ * (which versions TASK progress/decisions/files in PostgreSQL memories table). See
  * `packages/core/src/services/SESSION-STATE.md` for the full reconciliation.
  *
  * Optionally persists the snapshot itself as an observation of category
@@ -31,8 +31,8 @@ export class CompactSnapshotTool implements IToolHandler {
     "runnable search/recall calls for the current session's observations (SESSION " +
     "continuity, not task state). Zero information loss — raw events stay in the " +
     "observation store; the snapshot points to them. Distinct from checkpoints " +
-    "(which version TASK progress in memories.db). Optionally persists the snapshot " +
-    "as an observation of category 'compaction-snapshots' in observations.db.";
+    "(which version TASK progress in PostgreSQL memories table). Optionally persists the snapshot " +
+    "as an observation of category 'compaction-snapshots' in PostgreSQL observations table.";
   inputSchema = {
     type: "object",
     properties: {

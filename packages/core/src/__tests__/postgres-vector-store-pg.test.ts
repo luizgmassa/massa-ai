@@ -25,7 +25,7 @@ function vector(axis = 0): number[] {
   return result;
 }
 
-describe.skipIf(!DB_AVAILABLE)("PostgresVectorStore — SQLite assertion parity", () => {
+describe.skipIf(!DB_AVAILABLE)("PostgresVectorStore — PostgreSQL assertion parity", () => {
   const stores: DeterministicStore[] = [];
   const projects = new Set<string>();
   const ids = new Set<string>();

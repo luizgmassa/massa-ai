@@ -7,7 +7,7 @@
  * - Common similarity/distance conversion utilities
  * - Embedding dimension discovery
  * 
- * Implementations: SQLiteVectorStore, PostgresVectorStore
+ * Implementations: PostgresVectorStore, PostgresVectorStore
  */
 
 import { IVectorStore, SearchResult, VectorDocument, VectorStoreStats, ProjectInfo } from '@massa-th0th/shared';
@@ -115,7 +115,7 @@ export abstract class BaseVectorStore implements IVectorStore {
    * - distance 1 → similarity 0 (orthogonal)
    * - distance 2 → similarity -1 (opposite)
    * 
-   * We clamp to [0, 1] for consistency with SQLite implementation.
+   * We clamp to [0, 1] for consistency with PostgreSQL implementation.
    * 
    * @param distance Cosine distance from pgvector (0-2)
    * @returns Similarity score (0-1)

@@ -48,7 +48,7 @@ describe("web-ui views (R8-VIEW-*-01)", () => {
             type: "decision",
             level: 1,
             importance: 0.9,
-            content: "Use SQLite-canonical",
+            content: "Use PostgreSQL-canonical",
             tags: [],
           },
           {
@@ -68,7 +68,7 @@ describe("web-ui views (R8-VIEW-*-01)", () => {
     const html = ui.renderMemoryBrowser(data, { filters: {} });
     expect(html).toContain("decision");
     expect(html).toContain("pattern");
-    expect(html).toContain("Use SQLite-canonical");
+    expect(html).toContain("Use PostgreSQL-canonical");
     expect(html).toContain("factory dispatch");
     // filter controls present
     expect(html).toContain('data-filter="type"');

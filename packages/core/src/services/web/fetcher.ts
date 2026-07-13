@@ -11,7 +11,7 @@
  *   5. Convert: HTML → markdown (turndown+gfm), JSON → key-path chunks,
  *      everything else → plain text.
  *   6. Index SERIALY via the injected `indexChunk` seam (single-writer safety —
- *      the underlying SQLite FTS5 / pgvector stores are not safe under
+ *      the underlying PostgreSQL FTS5 / pgvector stores are not safe under
  *      concurrent writers, and even pgvector embeddings serialize better one
  *      doc at a time). The PARALLEL phase is the fetch (run-pool in the
  *      controller); the SERIAL phase is always this drain.

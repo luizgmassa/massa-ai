@@ -5,7 +5,7 @@ export interface EmbeddingCacheStats {
   avgDimensions: number;
 }
 
-/** Shared contract implemented by the SQLite and PostgreSQL embedding caches. */
+/** Shared contract implemented by the PostgreSQL and PostgreSQL embedding caches. */
 export interface EmbeddingCacheStore {
   get(text: string): Promise<number[] | null>;
   set(text: string, embedding: number[]): Promise<void>;

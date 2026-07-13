@@ -119,7 +119,7 @@ export const memoryRoutes = new Elysia({ prefix: "/api/v1/memory" })
         tags: ["memory"],
         summary: "Store memory",
         description:
-          "Store a new memory in the hierarchical memory system (local SQLite)",
+          "Store a new memory in the PostgreSQL-backed hierarchical memory system",
       },
     },
   )
@@ -250,40 +250,22 @@ export const memoryRoutes = new Elysia({ prefix: "/api/v1/memory" })
         let rows: MemoryRow[];
         let total: number;
 
-        if (typeof repo.getDb === "function") {
-          // SQLite path — raw SQL
-          const db = repo.getDb();
-          const conditions: string[] = [];
-          const params: unknown[] = [];
-          if (body.type) { conditions.push("type = ?"); params.push(body.type); }
-          if (body.projectId) { conditions.push("project_id = ?"); params.push(body.projectId); }
-          if (body.userId) { conditions.push("user_id = ?"); params.push(body.userId); }
-          if (body.sessionId) { conditions.push("session_id = ?"); params.push(body.sessionId); }
-          if (body.agentId) { conditions.push("agent_id = ?"); params.push(body.agentId); }
-          if (body.level !== undefined && body.level !== null) {
-            conditions.push("level = ?");
-            params.push(body.level);
-          }
-          if (body.minImportance) { conditions.push("importance >= ?"); params.push(body.minImportance); }
-          const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-          total = (db.prepare(`SELECT COUNT(*) as n FROM memories ${where}`).get(...params) as any).n;
-          rows = db.prepare(`SELECT id, content, type, level, user_id, session_id, project_id, agent_id, importance, tags, created_at, access_count, last_accessed FROM memories ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset) as MemoryRow[];
-        } else {
-          // PostgreSQL path — search method (supports projectId scoping).
-          const all = await repo.search({
-            types: body.type ? [body.type] : undefined,
-            minImportance: body.minImportance ?? 0,
-            projectId: body.projectId,
-            includePersistent: true,
-            limit: 10000,
-          });
-          const filtered =
-            body.level !== undefined && body.level !== null
-              ? all.filter((r: MemoryRow) => r.level === body.level)
-              : all;
-          total = filtered.length;
-          rows = filtered.slice(offset, offset + limit);
-        }
+        const all = await repo.search({
+          types: body.type ? [body.type] : undefined,
+          minImportance: body.minImportance ?? 0,
+          projectId: body.projectId,
+          userId: body.userId,
+          sessionId: body.sessionId,
+          agentId: body.agentId,
+          includePersistent: true,
+          limit: 10000,
+        });
+        const filtered =
+          body.level !== undefined && body.level !== null
+            ? all.filter((r: MemoryRow) => r.level === body.level)
+            : all;
+        total = filtered.length;
+        rows = filtered.slice(offset, offset + limit);
 
         return {
           success: true,

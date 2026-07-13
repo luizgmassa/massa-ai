@@ -3,7 +3,7 @@
  *
  * The chromadb vector-store.ts file exported BOTH a dead ChromaDB-stub
  * `VectorStore` AND this live `EmbeddingService`. Four production importers
- * (sqlite-vector-store, memory-service, relation-extractor, query-understanding)
+ * (postgres-vector-store, memory-service, relation-extractor, query-understanding)
  * read the LIVE EmbeddingService from that file; one dead importer
  * (hybrid-search) read the dead VectorStore. To delete the chromadb file
  * cleanly, the live EmbeddingService moves here and importers are redirected.

@@ -9,6 +9,23 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://massa_th0th:massa_th0th_password@localhost:5432/massa_th0th
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: massa_th0th
+          POSTGRES_PASSWORD: massa_th0th_password
+          POSTGRES_DB: massa_th0th
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U massa_th0th"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
 
     steps:
       - name: Checkout repository
@@ -21,6 +38,9 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Deploy Prisma migrations
+        run: cd packages/core && bunx prisma migrate deploy
 
       - name: Type check
         run: bun run type-check

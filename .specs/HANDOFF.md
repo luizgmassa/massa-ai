@@ -1,5 +1,11 @@
 # AI Engineering Handoff
 
+## Current: SQLite Removal
+
+Feature `sqlite-removal` has implementation plus local deterministic validation. PostgreSQL is now mandatory through `DATABASE_URL`; active SQLite runtime stores, adapters, selector variables, installer fallback, and health heuristics were removed. Local evidence is in `.specs/features/sqlite-removal/validation.md`.
+
+Live PostgreSQL gates completed on an owned local PG17/pgvector database: 14 migrations, vector integration 16/16, CRUD/scheduler restart 44 checks, smoke 4/4, CLI 13/13, and destructive E2E 4/4 with 79 assertions. Its `:5433`, `:3334`, and `:11435` resources were removed; shared `:3333` stayed healthy. Follow-up only: rerun the repaired legacy migration smoke, rebuild/re-run the frozen qwen fixture, and capture a concise aggregate root-test result.
+
 ## Completed Work
 
 Feature `close-maintenance-next-steps-2026-07-13` completed under workflow session `spec-close-maintenance-next-steps-2026-07-13`. Approved source plan: `/Users/luizmassa/Downloads/PLAN-final.md`.

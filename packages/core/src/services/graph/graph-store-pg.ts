@@ -5,7 +5,7 @@
  * Natively async.
  *
  * Implements the backend-agnostic `IGraphStore` contract (structural gap #14).
- * Method names are normalized to match the SQLite store so `getGraphStore()`
+ * Method names are normalized to match the PostgreSQL store so `getGraphStore()`
  * can return an `IGraphStore` without backend-specific dispatch.
  */
 
@@ -64,7 +64,7 @@ function rowToEdge(row: RawMemoryEdge): MemoryEdge {
  * The original `const prisma = getPrismaClient()` ran at module-eval, which
  * forced every importer of this module (transitively, of graph-store-factory)
  * to construct a Prisma client — and that throws in environments where the
- * PG/Bun-SQLite prisma adapter isn't installed (e.g. SQLite-only test/dev).
+ * PG/Bun-PostgreSQL prisma adapter isn't installed (e.g. PostgreSQL-only test/dev).
  * The Proxy defers construction to first actual use, so merely importing the
  * module is side-effect-free.
  */
@@ -100,7 +100,7 @@ export class GraphStorePg implements IGraphStore {
    * Automatically updates weight if edge already exists.
    *
    * Accepts the canonical `EdgeCreateInput` (single object) so it satisfies
-   * `IGraphStore.createEdge` exactly like the SQLite store.
+   * `IGraphStore.createEdge` exactly like the PostgreSQL store.
    */
   async createEdge(edge: EdgeCreateInput): Promise<MemoryEdge | null> {
     if (edge.sourceId === edge.targetId) {
@@ -406,7 +406,7 @@ export class GraphStorePg implements IGraphStore {
   /**
    * Get statistics about the graph.
    * IGraphStore-conformant alias for getGraphStats, normalizing the return
-   * shape to match the SQLite store (byRelation/autoExtracted/avgWeight).
+   * shape to match the PostgreSQL store (byRelation/autoExtracted/avgWeight).
    */
   async getStats(): Promise<{
     totalEdges: number;

@@ -7,7 +7,7 @@
  * their existing entrypoints at scheduled times.
  *
  * Design:
- *  - Durable job table (SQLite + PG parity): persists job definitions +
+ *  - Durable job table (PostgreSQL + PG parity): persists job definitions +
  *    nextRunAt/lastRunAt so a restart resumes the schedule.
  *  - Job registry: handlers keyed by jobKind. The scheduler invokes the
  *    registered handler; never the job implementation directly.

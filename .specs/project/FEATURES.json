@@ -210,7 +210,7 @@
     {
       "slug": "close-maintenance-next-steps-2026-07-13",
       "title": "Close maintenance next steps: Synapse, bounded search, deterministic qwen, destructive recovery, and path identity",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
@@ -218,7 +218,19 @@
         "tasks": true,
         "execute": false
       }
+    },
+    {
+      "slug": "sqlite-removal",
+      "title": "PostgreSQL-only storage; SQLite runtime removal",
+      "status": "in_progress",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
     }
   ],
-  "active_feature": "close-maintenance-next-steps-2026-07-13"
+  "active_feature": "sqlite-removal"
 }

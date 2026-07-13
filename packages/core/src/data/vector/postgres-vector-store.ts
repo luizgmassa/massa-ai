@@ -354,7 +354,7 @@ export class PostgresVectorStore extends BaseVectorStore {
   /**
    * Insert documents, embedding them in sub-batches to avoid overwhelming
    * the embedding backend. Each sub-batch is its own short transaction
-   * (matches SQLiteVectorStore semantics — partial progress survives an
+   * (matches PostgresVectorStore semantics — partial progress survives an
    * Ollama crash mid-file, instead of rolling back the whole file).
    * Fails-open per-document when a whole sub-batch's embed call errors.
    */
@@ -362,7 +362,7 @@ export class PostgresVectorStore extends BaseVectorStore {
     if (documents.length === 0) return;
     const pool = await this.ensureInitialized();
 
-    // Match SQLiteVectorStore: Ollama bge-m3 crashes on large batches (50+)
+    // Match PostgresVectorStore: Ollama bge-m3 crashes on large batches (50+)
     const EMBED_SUB_BATCH_SIZE = 8;
 
     let totalInserted = 0;
@@ -681,7 +681,7 @@ export class PostgresVectorStore extends BaseVectorStore {
   /**
    * Get or create a collection (for IVectorStore interface compatibility).
    *
-   * Mirrors SQLiteVectorStore.getCollection semantics: returns a handle bound
+   * Mirrors PostgresVectorStore.getCollection semantics: returns a handle bound
    * to this store's pool/table that scopes read/write by `name` (the projectId).
    * IndexManager uses this for _metadata document lookup/persistence.
    */
@@ -735,7 +735,7 @@ export class PostgresVectorStore extends BaseVectorStore {
 /**
  * PostgreSQL Vector Collection implementation.
  *
- * Mirrors SQLiteVectorCollection semantics so IndexManager (the only caller of
+ * Mirrors PostgreSQLVectorCollection semantics so IndexManager (the only caller of
  * getCollection) works identically across backends. Scopes all read/write by
  * `name` (the projectId). `query` supports the `where.id` fast path used for
  * _metadata document lookup; `add` embeds content on demand when no embedding

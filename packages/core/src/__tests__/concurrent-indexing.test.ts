@@ -20,7 +20,7 @@ mock.restore();
 // indexProject replaces ensureInitialized() with a stub, so getVectorStore()
 // is never called. Mocking it would break vector-store-factory.test.ts
 // by contaminating Bun's shared module registry.
-mock.module("../data/sqlite/keyword-search-factory.js", () => ({
+mock.module("../data/keyword/keyword-search-factory.js", () => ({
   getKeywordSearch: mock(async () => ({})),
 }));
 mock.module("../services/search/cache-factory.js", () => ({
@@ -29,7 +29,7 @@ mock.module("../services/search/cache-factory.js", () => ({
 mock.module("../services/search/analytics-factory.js", () => ({
   getSearchAnalytics: mock(async () => ({})),
 }));
-mock.module("../data/sqlite/symbol-repository-factory.js", () => ({
+mock.module("../data/symbol/symbol-repository-factory.js", () => ({
   getSymbolRepository: mock(async () => ({})),
 }));
 mock.module("../services/search/index-manager.js", () => ({

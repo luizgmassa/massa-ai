@@ -117,9 +117,9 @@ describe("commit-locked qwen E2E fixture", () => {
       MASSA_TH0TH_DEDICATED: "1",
       MASSA_TH0TH_E2E_PROJECT_PATH: "/tmp/explicit-fixture",
       MASSA_TH0TH_API_URL: "http://127.0.0.1:3334",
-      VECTOR_STORE_TYPE: "postgres",
       DATABASE_URL: "postgresql://test:test@127.0.0.1:5433/massa_th0th_test",
-      POSTGRES_VECTOR_URL: "postgresql://test:test@127.0.0.1:5433/massa_th0th_test",
+      DATABASE_URL: "postgresql://test:test@127.0.0.1:5433/massa_th0th_test",
+      DATABASE_URL: "postgresql://test:test@127.0.0.1:5433/massa_th0th_test",
     })).toBe("/tmp/explicit-fixture");
   });
 
@@ -128,16 +128,16 @@ describe("commit-locked qwen E2E fixture", () => {
       MASSA_TH0TH_DEDICATED: "1",
       MASSA_TH0TH_E2E_PROJECT_PATH: "/tmp/explicit-fixture",
       MASSA_TH0TH_API_URL: "http://127.0.0.1:3334",
-      VECTOR_STORE_TYPE: "postgres",
       DATABASE_URL: "postgresql://test:test@127.0.0.1:5433/massa_th0th_test",
-      POSTGRES_VECTOR_URL: "postgresql://test:test@127.0.0.1:5433/massa_th0th_test",
+      DATABASE_URL: "postgresql://test:test@127.0.0.1:5433/massa_th0th_test",
+      DATABASE_URL: "postgresql://test:test@127.0.0.1:5433/massa_th0th_test",
     };
     expect(isOwnedDedicatedE2eEnvironment(complete)).toBe(true);
     for (const key of [
       "MASSA_TH0TH_API_URL",
       "DATABASE_URL",
-      "POSTGRES_VECTOR_URL",
-      "VECTOR_STORE_TYPE",
+      "DATABASE_URL",
+      "DATABASE_URL",
     ] as const) {
       expect(isOwnedDedicatedE2eEnvironment({ ...complete, [key]: undefined })).toBe(false);
     }

@@ -153,7 +153,7 @@ select_mode() {
   # echo -e "     Pull pre-built images from DockerHub. Requires Docker only." >&2
   # echo ""                                                                 >&2
   echo -e "  ${CYAN}1)${NC} ${BOLD}From source${NC}"                     >&2
-  echo -e "     Clone the repo and run with Bun. Pick SQLite, Native PostgreSQL (~100MB), or Docker at setup." >&2
+  echo -e "     Clone the repo and run with Bun. Pick Native PostgreSQL (~100MB) or Docker PostgreSQL at setup." >&2
   echo ""                                                                 >&2
   echo -e "  ${CYAN}2)${NC} ${BOLD}Docker build${NC}"                    >&2
   echo -e "     Clone the repo and build Docker images locally (PostgreSQL via Docker/colima, ~5GB RAM)." >&2
@@ -537,7 +537,7 @@ print_hooks_guide() {
   echo -e "    ${CYAN}MASSA_TH0TH_API_KEY${NC}    optional (x-api-key header)"
   echo -e "    ${CYAN}MASSA_TH0TH_PROJECT_ID${NC} optional (defaults to cwd basename)"
   echo ""
-  echo -e "  ${DIM}Observations land in ~/.massa-th0th-data/observations.db and are consolidated into${NC}"
+  echo -e "  ${DIM}Observations are stored in PostgreSQL and consolidated into${NC}"
   echo -e "  ${DIM}memories only when RLM_LLM_ENABLED=true (otherwise stored raw).${NC}"
   echo ""
 }

@@ -1,4 +1,4 @@
-// Prisma Schema para massa-th0th.db
+// Prisma Schema para PostgreSQL database
 // Base de dados consolidada para queries e relatórios
 // Read-only - dados sincronizados via triggers dos bancos operacionais
 
@@ -12,7 +12,7 @@ datasource db {
 }
 
 // ========================================
-// Memories (sincronizado de memories.db)
+// Memories (sincronizado de PostgreSQL memories table)
 // ========================================
 model Memory {
   id            String    @id
@@ -53,7 +53,7 @@ model Memory {
 }
 
 // ========================================
-// Projects (sincronizado de vector-store.db)
+// Projects (sincronizado de PostgreSQL vector table)
 // ========================================
 model Project {
   id            String    @id @default(cuid())
@@ -194,7 +194,7 @@ model SymbolReference {
   fromFile   String @map("from_file")
   fromLine   Int    @map("from_line")
   symbolName String @map("symbol_name")
-  targetFqn  String? @map("target_fqn") // nullable: unresolved-target refs are retained (SQLite parity)
+  targetFqn  String? @map("target_fqn") // nullable: unresolved-target refs are retained (PostgreSQL parity)
   refKind    String @map("ref_kind") // call, type_ref, import, extend, implement, data_flow, http_call, emit, listen
   meta       Json?  // typed-edge metadata: { route?, event?, paramIndex?, callerFqn? }
 
@@ -265,9 +265,9 @@ model MemoryEdge {
 
 // ========================================
 // Observations (Phase 3 — passive lifecycle capture)
-// SQLite-canonical; this model provides PG parity so a Postgres deployment
+// PostgreSQL-canonical; this model provides PG parity so a Postgres deployment
 // can also store observations. The default local-first path uses the
-// SqliteObservationStore (observations.db) via the polymorphic factory.
+// PgStore (PostgreSQL observations table) via the polymorphic factory.
 //
 // `source` = one of the six lifecycle event kinds (session-start, user-prompt,
 // pre-tool-use, post-tool-use, pre-compact, session-end) — the raw hook trigger.
@@ -293,7 +293,7 @@ model Observation {
 // ========================================
 // Handoff (Phase 6, G2) — cross-session handoff records.
 // PostgreSQL deployments use PgHandoffStore; local deployments retain the
-// SQLite-canonical handoffs.db store via the polymorphic factory.
+// PostgreSQL-canonical PostgreSQL handoffs table store via the polymorphic factory.
 // ========================================
 model Handoff {
   id               String    @id
@@ -317,7 +317,7 @@ model Handoff {
 // ========================================
 // Proposal (Phase 5, G7) — auto-improvement proposals.
 // PostgreSQL deployments use PgProposalStore; local deployments retain the
-// SQLite-canonical proposals.db store via the polymorphic factory.
+// PostgreSQL-canonical PostgreSQL proposals table store via the polymorphic factory.
 // ========================================
 model Proposal {
   id              String    @id
@@ -432,12 +432,12 @@ model VectorDocument4096 {
 
 // ========================================
 // Index Jobs (Phase 1, T9 — PG parity for the job store)
-// Runtime state for async indexing jobs. SQLite-canonical via SqliteJobStore
-// (index-jobs.db); this model provides PG parity so a Postgres deployment can
+// Runtime state for async indexing jobs. PostgreSQL-canonical via PgStore
+// (PostgreSQL index-jobs table); this model provides PG parity so a Postgres deployment can
 // keep jobs in the same backend as the rest of the data plane. The factory
 // (getJobStore) selects PgJobStore when DATABASE_URL is postgres, else
-// SqliteJobStore. Timestamps are BigInt ms-epochs (parity with SymbolFile.mtime
-// and the SQLite store's INTEGER epoch columns).
+// PgStore. Timestamps are BigInt ms-epochs (parity with SymbolFile.mtime
+// and the PostgreSQL store's INTEGER epoch columns).
 // ========================================
 model IndexJob {
   jobId         String  @id @map("job_id")
@@ -464,12 +464,12 @@ model IndexJob {
 
 // ========================================
 // Scheduled Jobs (Phase 3, C2 — OS-level in-process scheduler)
-// Durable job definitions for the cron-like scheduler. SQLite-canonical via
-// SqliteScheduledJobStore (scheduled-jobs.db); this model provides PG parity so
+// Durable job definitions for the cron-like scheduler. PostgreSQL-canonical via
+// PgStore (PostgreSQL scheduled-jobs table); this model provides PG parity so
 // a Postgres deployment can keep scheduler state in the same backend as the
 // rest of the data plane. The factory (getScheduledJobStore) selects
-// PgScheduledJobStore when DATABASE_URL is postgres, else SqliteScheduledJobStore.
-// Timestamps are BigInt ms-epochs (parity with IndexJob and the SQLite store's
+// PgScheduledJobStore when DATABASE_URL is postgres, else PgStore.
+// Timestamps are BigInt ms-epochs (parity with IndexJob and the PostgreSQL store's
 // INTEGER epoch columns).
 // ========================================
 model ScheduledJob {
@@ -492,12 +492,12 @@ model ScheduledJob {
 // ========================================
 // Synapse Sessions (Phase 3, C4 — PG parity for the Synapse session store)
 // Durable agent-session + working-memory buffer state for the cognitive
-// modulation layer. SQLite-canonical via SqliteSessionStore
-// (synapse-sessions.db); this model provides PG parity so a Postgres
+// modulation layer. PostgreSQL-canonical via PgStore
+// (PostgreSQL sessions table); this model provides PG parity so a Postgres
 // deployment persists Synapse state across process restarts (one-backend
 // rule). The factory (getSessionStore) selects PgSynapseSessionStore when
-// DATABASE_URL is postgres, else SqliteSessionStore. Timestamps are BigInt
-// ms-epochs (parity with IndexJob/ScheduledJob and the SQLite store's INTEGER
+// DATABASE_URL is postgres, else PgStore. Timestamps are BigInt
+// ms-epochs (parity with IndexJob/ScheduledJob and the PostgreSQL store's INTEGER
 // epoch columns). The buffer snapshot is a best-effort JSON blob; the live
 // WorkingMemoryBuffer is a hot cache reconstructed fresh on load (refills
 // naturally as the agent works — see session-store.ts design note).
@@ -535,13 +535,13 @@ model SynapseAccessHistory {
 // ========================================
 // Task Checkpoints (Phase 3 — PG parity for the checkpoint store, #16)
 // Durable task/INDEX execution state (progress, decisions, files) for the
-// checkpoint manager. SQLite-canonical via CheckpointManager
-// (memories.db / task_checkpoints); this model provides PG parity so a
+// checkpoint manager. PostgreSQL-canonical via CheckpointManager
+// (PostgreSQL memories table / task_checkpoints); this model provides PG parity so a
 // Postgres deployment persists checkpoints in the same backend as the rest of
 // the data plane (one-backend rule). The factory branch inside
 // CheckpointManager.getInstance() selects PgCheckpointStore when DATABASE_URL
-// is postgres, else the SQLite path. State is a gzip-compressed JSON blob
-// (parity with the SQLite store's Bun.deflateSync). Timestamps are BigInt
+// is postgres, else the PostgreSQL path. State is a gzip-compressed JSON blob
+// (parity with the PostgreSQL store's Bun.deflateSync). Timestamps are BigInt
 // ms-epochs (parity with IndexJob/ScheduledJob/SynapseSession).
 // ========================================
 model Checkpoint {

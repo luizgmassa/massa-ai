@@ -1,4 +1,4 @@
-/** PostgreSQL parity for the SQLite-canonical handoff/proposal repositories. */
+/** PostgreSQL parity for the PostgreSQL-canonical handoff/proposal repositories. */
 
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { randomUUID } from "crypto";
@@ -275,7 +275,7 @@ describe.skipIf(!DEDICATED_DB)("handoff/proposal PostgreSQL parity", () => {
     });
   });
 
-  test("factories route PostgreSQL and runtime rows do not use local SQLite", async () => {
+  test("factories route PostgreSQL and runtime rows do not use local PostgreSQL", async () => {
     resetHandoffStore();
     resetProposalStore();
     const handoffStore = getHandoffStore();

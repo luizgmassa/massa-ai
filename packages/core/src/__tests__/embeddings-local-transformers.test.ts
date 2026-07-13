@@ -280,7 +280,7 @@ describe("local-transformers provider: cache composition", () => {
 
     // Minimal in-memory cache stub matching the EmbeddingCache surface that
     // CachedEmbeddingProvider consumes (get/getBatch/set/setBatch). Casting via
-    // unknown keeps the stub lightweight without spinning up the SQLite-backed
+    // unknown keeps the stub lightweight without spinning up the PostgreSQL-backed
     // EmbeddingCache in a unit test.
     const store = new Map<string, number[]>();
     const cache = {

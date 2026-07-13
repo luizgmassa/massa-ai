@@ -54,7 +54,7 @@ export class IndexJobTracker {
 
   static getInstance(): IndexJobTracker {
     if (!IndexJobTracker.instance) {
-      // Phase 1: wire the durable SQLite job store (with crash recovery on
+      // Phase 1: wire the durable PostgreSQL job store (with crash recovery on
       // first open). Falls back to in-memory only if construction throws.
       let store: JobStore | undefined;
       try {

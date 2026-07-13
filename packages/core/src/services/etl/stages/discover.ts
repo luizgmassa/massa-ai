@@ -16,7 +16,7 @@ import path from "path";
 import { createHash } from "crypto";
 import ignoreModule from "ignore";
 import { config, logger } from "@massa-th0th/shared";
-import { getSymbolRepository } from "../../../data/sqlite/symbol-repository-factory.js";
+import { getSymbolRepository } from "../../../data/symbol/symbol-repository-factory.js";
 import type { EtlStageContext, DiscoveredFile } from "../stage-context.js";
 import { DEFAULT_EXTENSIONS, DEFAULT_IGNORES, loadProjectIgnore } from "../../search/ignore-patterns.js";
 

@@ -29,8 +29,8 @@
 
 import { execFileSync } from "node:child_process";
 import { logger } from "@massa-th0th/shared";
-import { getSymbolRepository } from "../../data/sqlite/symbol-repository-factory.js";
-import type { SymbolDefinition } from "../../data/sqlite/symbol-repository.js";
+import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
+import type { SymbolDefinition } from "../../data/symbol/symbol-repository-pg.js";
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -361,7 +361,7 @@ export class ImpactAnalysisService {
    * Reverse import graph: importerOf(file) = list of importer file paths for
    * every file that imports `file` (i.e. symbol_imports where to_file === file).
    * Built once from allImportEdges (client-side reverse; PG repo lacks
-   * findImporters). SQLite allImportEdges returns a minimal {from_file,to_file}
+   * findImporters). PostgreSQL allImportEdges returns a minimal {from_file,to_file}
    * row (no specifier); PG returns full SymbolImport — we coerce to the minimal
    * shape so both backends unify.
    */

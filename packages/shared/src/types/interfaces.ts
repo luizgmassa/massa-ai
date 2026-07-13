@@ -99,7 +99,7 @@ export interface ICompressor {
 /**
  * Vector Store Interface
  * 
- * Abstracts vector database operations (SQLite, PostgreSQL+pgvector)
+ * Abstracts PostgreSQL + pgvector database operations.
  * Supports multiple backend implementations with consistent API.
  */
 export interface IVectorStore {
@@ -183,7 +183,7 @@ export interface VectorDocument {
 /**
  * Keyword Search Interface
  * 
- * SQLite FTS5 operations
+ * PostgreSQL full-text search operations.
  */
 export interface IKeywordSearch {
   index(id: string, content: string, metadata?: Record<string, unknown>): Promise<void>;

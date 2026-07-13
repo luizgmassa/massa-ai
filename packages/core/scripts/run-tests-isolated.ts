@@ -86,7 +86,7 @@ function isolationReason(file: string, source: string): IsolationReason | undefi
   if (
     relativePath.startsWith(`integration${path.sep}`) ||
     /(?:^|[.-])(?:e2e|integration)\.test\.ts$/.test(path.basename(file)) ||
-    /\b(?:DATABASE_URL|POSTGRES_VECTOR_URL)\b/.test(source) ||
+    /\b(?:DATABASE_URL|DATABASE_URL)\b/.test(source) ||
     /\b(?:getPrismaClient|disconnectPrisma|PrismaClient)\s*\(/.test(source) ||
     /\b(?:PostgresVectorStore|PostgresGraphRepository|PostgresSymbolRepository)\b/.test(source) ||
     /\b(?:EtlPipeline|ContextualSearchRLM|WorkspaceManager)\b/.test(source) ||

@@ -7,9 +7,8 @@
 import { SearchResult } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
 import crypto from "crypto";
-import { getPgPool, getSqliteDb, DbConfig } from "../../data/db-connection.js";
+import { getPgPool } from "../../data/db-connection.js";
 import type { Pool } from "pg";
-import type { Database } from "bun:sqlite";
 
 interface CacheEntry {
   key: string;

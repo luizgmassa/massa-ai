@@ -14,9 +14,8 @@
  * bounded to `maxMemories` to keep wall-time reasonable.
  */
 
-import { Database } from "bun:sqlite";
-import path from "path";
-import { config, logger } from "@massa-th0th/shared";
+import { logger } from "@massa-th0th/shared";
+import { getPrismaClient } from "../query/prisma-client.js";
 import type { MemoryRowWithEmbedding } from "../graph/types.js";
 
 // ── Public types ─────────────────────────────────────────────
@@ -43,7 +42,6 @@ export interface ClusteringResult {
 // ── Implementation ───────────────────────────────────────────
 
 export class MemoryClustering {
-  private db!: Database;
   private static instance: MemoryClustering | null = null;
 
   static getInstance(): MemoryClustering {
@@ -53,16 +51,7 @@ export class MemoryClustering {
     return MemoryClustering.instance;
   }
 
-  constructor() {
-    this.initDb();
-  }
-
-  private initDb(): void {
-    const dataDir = config.get("dataDir") as string;
-    const dbPath = path.join(dataDir, "memories.db");
-    this.db = new Database(dbPath);
-    this.db.exec("PRAGMA busy_timeout = 3000");
-  }
+  constructor() {}
 
   // ── Core API ─────────────────────────────────────────────
 
@@ -73,27 +62,18 @@ export class MemoryClustering {
    * @param maxIter    Max K-means iterations
    * @param maxMemories Max memories to consider (most recent)
    */
-  clusterMemories(
+  async clusterMemories(
     k?: number,
     maxIter: number = 20,
     maxMemories: number = 500,
-  ): ClusteringResult {
+  ): Promise<ClusteringResult> {
     const start = Date.now();
 
     // Load memories with valid embeddings
-    const rows = this.db
-      .prepare(
-        `
-        SELECT id, content, type, level, importance, tags,
-               embedding, created_at, updated_at, access_count,
-               user_id, session_id, project_id, agent_id
-        FROM memories
-        WHERE embedding IS NOT NULL
-        ORDER BY created_at DESC
-        LIMIT ?
-      `,
-      )
-      .all(maxMemories) as MemoryRowWithEmbedding[];
+    const rows = await getPrismaClient().$queryRaw<MemoryRowWithEmbedding[]>`
+      SELECT id, content, type, level, importance, array_to_json(tags)::text AS tags,
+        embedding, created_at, updated_at, access_count, user_id, session_id, project_id, agent_id
+      FROM memories WHERE embedding IS NOT NULL ORDER BY created_at DESC LIMIT ${maxMemories}`;
 
     const items: { row: MemoryRowWithEmbedding; vec: number[] }[] = [];
     for (const row of rows) {
@@ -228,8 +208,8 @@ export class MemoryClustering {
    * Find which cluster a memory belongs to.
    * Re-runs clustering if needed (lightweight for small sets).
    */
-  findCluster(memoryId: string, cached?: ClusteringResult): MemoryCluster | null {
-    const result = cached ?? this.clusterMemories();
+  async findCluster(memoryId: string, cached?: ClusteringResult): Promise<MemoryCluster | null> {
+    const result = cached ?? await this.clusterMemories();
     for (const cluster of result.clusters) {
       if (cluster.memberIds.includes(memoryId)) {
         return cluster;
@@ -242,22 +222,12 @@ export class MemoryClustering {
    * Generate a short summary of a cluster from member content.
    * Uses keyword extraction (no LLM dependency).
    */
-  summarizeCluster(cluster: MemoryCluster): string {
-    const members = this.db
-      .prepare(
-        `
-        SELECT content, type, importance
-        FROM memories
-        WHERE id IN (${cluster.memberIds.map(() => "?").join(",")})
-        ORDER BY importance DESC
-        LIMIT 5
-      `,
-      )
-      .all(...cluster.memberIds) as Array<{
+  async summarizeCluster(cluster: MemoryCluster): Promise<string> {
+    const members = await getPrismaClient().$queryRaw<Array<{
       content: string;
       type: string;
       importance: number;
-    }>;
+    }>>`SELECT content, type, importance FROM memories WHERE id = ANY(${cluster.memberIds}::text[]) ORDER BY importance DESC LIMIT 5`;
 
     if (members.length === 0) return cluster.label;
 
@@ -401,8 +371,5 @@ export class MemoryClustering {
     return sum;
   }
 
-  close(): void {
-    this.db?.close();
-    MemoryClustering.instance = null;
-  }
+  close(): void { MemoryClustering.instance = null; }
 }

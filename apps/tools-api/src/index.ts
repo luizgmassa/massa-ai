@@ -5,16 +5,17 @@
  * API REST com ElysiaJS que expõe todas as ferramentas do massa-th0th.
  * Separada do protocolo MCP para permitir múltiplos clientes.
  *
- * Local-First: Funciona 100% offline com Ollama + SQLite.
+ * Local-first: PostgreSQL/pgvector persistence with local Ollama embeddings.
  */
 
 import "@massa-th0th/shared/config";
-import { assertDedicatedDbAllowed, parsePositiveIntEnv } from "@massa-th0th/shared/config";
+import { parsePositiveIntEnv } from "@massa-th0th/shared/config";
+import { validateApiStartup } from "./startup-config.js";
 
 // Fail fast if a DEDICATE-flagged process would bind the shared production DB.
 // Must run AFTER env loading and BEFORE any DB/client initialization. No-op
 // unless MASSA_TH0TH_DEDICATED=1, so the normal :3333 shared stack is unaffected.
-assertDedicatedDbAllowed();
+validateApiStartup();
 
 import { Elysia } from "elysia";
 import { node } from "@elysiajs/node";

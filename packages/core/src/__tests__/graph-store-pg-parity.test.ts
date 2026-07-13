@@ -1,5 +1,5 @@
 /**
- * Assertion-level PostgreSQL parity for the SQLite-canonical GraphStore.
+ * Assertion-level PostgreSQL parity for the PostgreSQL-canonical GraphStore.
  *
  * The suite is hard-gated to the disposable maintenance database. Fixtures
  * use a unique prefix and cleanup relies on the memory_edges foreign-key
@@ -35,7 +35,7 @@ async function createMemory(label: string): Promise<string> {
   return id;
 }
 
-describe.skipIf(!DEDICATED_DB)("GraphStorePg — SQLite graph parity", () => {
+describe.skipIf(!DEDICATED_DB)("GraphStorePg — PostgreSQL graph parity", () => {
   beforeAll(async () => {
     const { getPrismaClient } = await import("../services/query/prisma-client.js");
     prisma = getPrismaClient();

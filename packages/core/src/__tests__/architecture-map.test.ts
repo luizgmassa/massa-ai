@@ -311,7 +311,7 @@ import path from "path";
 import os from "os";
 import { EtlPipeline } from "../services/etl/pipeline.js";
 import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
-import { getSymbolRepository } from "../data/sqlite/symbol-repository-factory.js";
+import { getSymbolRepository } from "../data/symbol/symbol-repository-factory.js";
 
 const TEST_PROJECT = "p4d4-arch-map";
 
@@ -366,7 +366,7 @@ describe("getProjectMap enriched fields (fixture pipeline)", () => {
     try {
       repo.clearProject(TEST_PROJECT);
     } catch {
-      /* SQLite-only / mocked repo: best-effort */
+      /* PostgreSQL-only / mocked repo: best-effort */
     }
   });
   afterEach(() => {

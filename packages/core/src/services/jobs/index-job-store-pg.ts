@@ -1,15 +1,15 @@
 /**
  * PgJobStore — PostgreSQL durability for indexing jobs (Phase 1, T9).
  *
- * Mirrors SqliteJobStore's semantics so the job store follows the same
+ * Mirrors PgJobStore's semantics so the job store follows the same
  * one-backend rule as the rest of the data plane: getJobStore() selects this
- * variant when DATABASE_URL is postgres, else SqliteJobStore.
+ * variant when DATABASE_URL is postgres, else PgJobStore.
  *
  * Interface contract: JobStore is SYNCHRONOUS (the tracker calls
  * `store?.save(job)` and `store.get(id)` with no await, mirroring the sync
- * bun:sqlite API). PG is inherently async, so this store:
+ * legacy local database API). PG is inherently async, so this store:
  *   - Writes fire-and-forget (best-effort, logged on failure — matching the
- *     SQLite store's try/catch best-effort semantics).
+ *     PostgreSQL store's try/catch best-effort semantics).
  *   - Reads are served from an in-memory mirror that is hydrated from PG on
  *     first use (async) and kept in sync by every save. The mirror is the hot
  *     read path within a process; PG is the durability + cross-process recovery
@@ -26,7 +26,7 @@ import { parsePositiveIntEnv } from "@massa-th0th/shared/config";
 import { getPrismaClient } from "../../services/query/prisma-client.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type { IndexJob } from "./index-job-tracker.js";
-import type { JobStore } from "./index-job-store.js";
+import type { JobStore } from "./index-job-store-contract.js";
 
 // Raw row shape returned by $queryRaw. Timestamps are BIGINT ms-epochs → come
 // back as bigint under pg. We coerce to number for Date(ms) parity.
@@ -143,7 +143,7 @@ export class PgJobStore implements JobStore {
       try {
         const prisma = this.getClient();
         // Crash recovery FIRST: flip stale `running` → `failed` before we read,
-        // so the mirror reflects recovered state (parity with SqliteJobStore's
+        // so the mirror reflects recovered state (parity with PgJobStore's
         // recovery-on-open). Runs once per process.
         if (!this.recovered) {
           try {
@@ -337,9 +337,9 @@ export class PgJobStore implements JobStore {
   }
 
   markStaleRunningFailed(): number {
-    // Parity with the SQLite store's markStaleRunningFailed. Fire-and-forget:
+    // Parity with the PostgreSQL store's markStaleRunningFailed. Fire-and-forget:
     // returns the count from the CURRENT mirror snapshot (the actual PG update
-    // runs async). This matches the SQLite store's "best-effort, never crash
+    // runs async). This matches the PostgreSQL store's "best-effort, never crash
     // the API" contract; the reaper itself calls setResult → save which lands
     // the `failed` row synchronously in the mirror and async in PG.
     const stale = this.listRunning();

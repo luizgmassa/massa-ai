@@ -59,7 +59,7 @@ COPY --from=base /app/bunfig.toml ./bunfig.toml
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Data directory for SQLite databases
+# Data directory for non-database runtime artifacts
 RUN mkdir -p /data
 
 ENV NODE_ENV=production

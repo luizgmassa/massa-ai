@@ -8,7 +8,7 @@
  * Ranking pipeline (2 phases):
  *   Phase 1 — Graph prefilter: if query looks like a symbol name,
  *             fetch structural context (definition + references) from
- *             the Symbol Graph (pure SQLite, <20ms).
+ *             the Symbol Graph (pure PostgreSQL, <20ms).
  *   Phase 2 — Hybrid semantic search: vector + FTS5 + RRF, with
  *             centrality boost and graph-file boosting applied.
  */
@@ -115,7 +115,7 @@ export class ContextController {
 
     // ── Phase 1: Graph prefilter (structural context) ───────────────────
     // If query looks like a symbol name (<= 60 chars, no complex phrases)
-    // fetch definition + references from the Symbol Graph (SQLite, ~10ms).
+    // fetch definition + references from the Symbol Graph (PostgreSQL, ~10ms).
     // The graph-mentioned files are passed to the semantic search as boostFiles.
     let graphContextSection = "";
     let graphBoostFiles: string[] = [];

@@ -190,7 +190,7 @@ export class BootstrapService {
         insert: (i: InsertMemoryInput) => getMemoryRepository().insert(i),
         hasBootstrapMarker: (pid: string) => {
           const repo = getMemoryRepository();
-          // getDb() exists on the SQLite repo; PG repo lacks it. Fall back to
+          // getDb() exists on the PostgreSQL repo; PG repo lacks it. Fall back to
           // "not bootstrapped" when the seam is unavailable (PG path: a future
           // dedicated bootstrap_state table would replace this).
           const db = (repo as any).getDb;

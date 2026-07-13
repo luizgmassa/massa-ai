@@ -7,7 +7,7 @@ import type {
   HandoffRecord,
   HandoffStatus,
   HandoffStore,
-} from "./handoff-repository.js";
+} from "./handoff-contract.js";
 
 interface PgHandoffRow {
   id: string;

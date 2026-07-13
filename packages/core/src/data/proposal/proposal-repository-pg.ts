@@ -9,7 +9,7 @@ import type {
   ProposalRecord,
   ProposalStatus,
   ProposalStore,
-} from "./proposal-repository.js";
+} from "./proposal-contract.js";
 
 interface PgProposalRow {
   id: string;

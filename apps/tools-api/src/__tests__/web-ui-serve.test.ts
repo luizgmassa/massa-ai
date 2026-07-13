@@ -7,6 +7,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll } from "bun:test";
+import { createServer } from "node:net";
 import { Elysia } from "elysia";
 import { node } from "@elysiajs/node";
 import { webUiRoutes } from "../routes/web-ui.js";
@@ -90,28 +91,41 @@ describe("web-ui serve (R8-SERVE-01)", () => {
 // web-ui.ts: /ui and SPA fallback now return a Buffer (not a string) so the
 // manual text/html header is honored.
 //
-// Note: @elysiajs/node does not surface the resolved ephemeral port (port 0
-// reads back as 0, app.server is undefined), so a fixed high port is used.
-const REGRESSION_PORT = 14781;
+async function allocateTcpPort(): Promise<number> {
+  return await new Promise((resolve, reject) => {
+    const reservation = createServer();
+    reservation.once("error", reject);
+    reservation.listen(0, "127.0.0.1", () => {
+      const address = reservation.address();
+      if (!address || typeof address === "string") {
+        reservation.close(() => reject(new Error("failed to allocate a TCP port")));
+        return;
+      }
+      reservation.close((error) => (error ? reject(error) : resolve(address.port)));
+    });
+  });
+}
+
 describe("web-ui serve — real node-adapter wire (R8-SERVE-01 regression)", () => {
   const app = new Elysia({ adapter: node() }).use(webUiRoutes);
   let server: { stop?: () => void } | undefined;
-  const base = `http://localhost:${REGRESSION_PORT}`;
+  let base = "";
 
-  beforeAll(
-    () =>
-      new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(
-          () => reject(new Error("node-adapter server did not listen in time")),
-          5000,
-        );
-        app.listen(REGRESSION_PORT, (srv: unknown) => {
-          clearTimeout(timeout);
-          server = srv as { stop?: () => void };
-          resolve();
-        });
-      }),
-  );
+  beforeAll(async () => {
+    const port = await allocateTcpPort();
+    base = `http://127.0.0.1:${port}`;
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error("node-adapter server did not listen in time")),
+        5000,
+      );
+      app.listen(port, (srv: unknown) => {
+        clearTimeout(timeout);
+        server = srv as { stop?: () => void };
+        resolve();
+      });
+    });
+  });
 
   afterAll(() => {
     server?.stop?.();

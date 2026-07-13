@@ -7,7 +7,7 @@
  *   oven-sh/bun#31316). Several sibling suites (`concurrent-indexing.test.ts`,
  *   `search-controller.test.ts`, and others) mock shared infrastructure —
  *   `@massa-th0th/shared` (replacing `config` with a stub missing `.set`),
- *   `data/sqlite/symbol-repository-factory.js` (stub repo with no
+ *   `data/symbol/symbol-repository-factory.js` (stub repo with no
  *   `clearProject`), and `services/search/ignore-patterns.js`
  *   (`loadProjectIgnore → null`) — to load `ContextualSearchRLM` without real
  *   DB/Ollama. Those mocks leak into the ETL-driving Phase-4 suites
@@ -32,7 +32,7 @@
  */
 
 import { describe } from "bun:test";
-import { getSymbolRepository } from "../data/sqlite/symbol-repository-factory.js";
+import { getSymbolRepository } from "../data/symbol/symbol-repository-factory.js";
 
 const _repo: any = getSymbolRepository();
 const _config: any =

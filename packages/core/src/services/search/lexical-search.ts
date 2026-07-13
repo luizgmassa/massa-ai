@@ -3,7 +3,7 @@
  * correction, and proximity/title re-ranking.
  *
  * These are pure functions (no I/O, no DB coupling) so they can be unit-tested
- * in isolation and shared across the SQLite + PG keyword stores and the fusion
+ * in isolation and shared across the PostgreSQL + PG keyword stores and the fusion
  * layer in contextual-search-rlm.ts.
  *
  * Algorithm references (rewritten fresh in TS, not copied):

@@ -4,25 +4,16 @@
  * Provides unified analytics implementation based on database configuration.
  */
 
-import { SearchAnalytics } from "./search-analytics.js";
 import { SearchAnalyticsPg } from "./search-analytics-pg.js";
 import { logger } from "@massa-th0th/shared";
-import { getDbConfig } from "../../data/db-connection.js";
 
-let cachedAnalytics: SearchAnalytics | SearchAnalyticsPg | null = null;
+let cachedAnalytics: SearchAnalyticsPg | null = null;
 
-export function getSearchAnalytics(): SearchAnalytics | SearchAnalyticsPg {
+export function getSearchAnalytics(): SearchAnalyticsPg {
   if (cachedAnalytics) return cachedAnalytics;
 
-  const dbType = getDbConfig().type;
-  
-  if (dbType === 'postgres') {
-    cachedAnalytics = new SearchAnalyticsPg();
-    logger.info('Using PostgreSQL search analytics');
-  } else {
-    cachedAnalytics = new SearchAnalytics();
-    logger.info('Using SQLite search analytics');
-  }
+  cachedAnalytics = new SearchAnalyticsPg();
+  logger.info('Using PostgreSQL search analytics');
   
   return cachedAnalytics;
 }

@@ -16,9 +16,10 @@
  * Environment variables:
  *   OLLAMA_BASE_URL           - Ollama API URL (default: http://localhost:11434)
  *   OLLAMA_EMBEDDING_MODEL    - Model to test (default: qwen3-embedding:8b)
- *   DATABASE_URL              - PostgreSQL connection string (optional)
+ *   DATABASE_URL              - Required PostgreSQL connection string
  */
 import { spawn } from "bun";
+import { requirePostgresDatabaseUrl } from "../packages/shared/src/config/index.js";
 
 const BOLD = "\x1b[1m";
 const GREEN = "\x1b[32m";
@@ -232,15 +233,15 @@ async function checkOllama(): Promise<boolean> {
 // ─── PostgreSQL Checks ───────────────────────────────────────────────
 
 async function checkPostgres(): Promise<boolean> {
-  const databaseUrl = process.env.DATABASE_URL;
+  let databaseUrl: string;
 
   // 5. Check DATABASE_URL configuration
   console.log(`\n${BOLD}[5/7] Checking PostgreSQL configuration...${NC}`);
-  if (!databaseUrl) {
-    console.log(`  ${YELLOW}!${NC} DATABASE_URL not set`);
-    console.log(`  ${DIM}  PostgreSQL is optional. SQLite will be used as fallback.${NC}`);
-    console.log(`  ${DIM}  Set DATABASE_URL in .env to enable PostgreSQL + pgvector.${NC}`);
-    return true; // Not an error, PostgreSQL is optional
+  try {
+    databaseUrl = requirePostgresDatabaseUrl();
+  } catch (error) {
+    console.log(`  ${RED}✗${NC} ${(error as Error).message}`);
+    return false;
   }
 
   const masked = maskDatabaseUrl(databaseUrl);
@@ -251,7 +252,7 @@ async function checkPostgres(): Promise<boolean> {
   console.log(`\n${BOLD}[6/7] Testing PostgreSQL connectivity...${NC}`);
   let pgOk = false;
   try {
-    // Dynamic import - pg is an optional dependency
+    // pg is required for PostgreSQL diagnostics.
     const { default: pg } = (await import("pg")) as any;
 
     // In WSL2 with mirrored networking, "localhost" may resolve to ::1 (IPv6)
@@ -339,38 +340,8 @@ async function checkPostgres(): Promise<boolean> {
     const message = (err as Error).message;
 
     if (message.includes("Cannot find module") || message.includes("Cannot find package")) {
-      console.log(`  ${YELLOW}!${NC} 'pg' module not installed (optional dependency)`);
-      console.log(`  ${DIM}  Install with: bun add pg${NC}`);
-
-      // Fallback: try psql CLI
-      console.log(`  ${DIM}  Trying psql CLI as fallback...${NC}`);
-      const psqlVersion = await run(["psql", "--version"]);
-      if (psqlVersion) {
-        const psqlResult = await run(
-          ["psql", databaseUrl, "-c", "SELECT 1"],
-          5000,
-        );
-        if (psqlResult) {
-          console.log(`  ${GREEN}✓${NC} PostgreSQL reachable via psql`);
-          console.log(`\n${BOLD}[7/7] Checking pgvector extension...${NC}`);
-          const extCheck = await run(
-            ["psql", databaseUrl, "-tAc", "SELECT extversion FROM pg_extension WHERE extname='vector'"],
-            5000,
-          );
-          if (extCheck) {
-            console.log(`  ${GREEN}✓${NC} pgvector v${extCheck} installed`);
-          } else {
-            console.log(`  ${YELLOW}!${NC} pgvector status unknown (query failed or not installed)`);
-          }
-          pgOk = true;
-        } else {
-          console.log(`  ${RED}✗${NC} PostgreSQL unreachable via psql`);
-        }
-      } else {
-        console.log(`  ${YELLOW}!${NC} psql not available either. Cannot verify PostgreSQL.`);
-        console.log(`\n${BOLD}[7/7] Checking pgvector extension...${NC}`);
-        console.log(`  ${YELLOW}!${NC} Skipped (no PostgreSQL client available)`);
-      }
+      console.log(`  ${RED}✗${NC} 'pg' module is required but unavailable`);
+      console.log(`  ${YELLOW}!${NC} Install dependencies with: bun install`);
     } else if (message.includes("ECONNREFUSED")) {
       console.log(`  ${RED}✗${NC} Connection refused`);
       console.log(`  ${YELLOW}!${NC} Start PostgreSQL: ${BOLD}docker compose up -d postgres${NC}`);
@@ -410,7 +381,7 @@ console.log(
   `  Ollama:     ${ollamaOk ? `${GREEN}OK${NC}` : `${RED}FAILED${NC}`}`,
 );
 console.log(
-  `  PostgreSQL: ${pgOk ? `${GREEN}OK${NC}` : `${RED}FAILED${NC}`}  ${!process.env.DATABASE_URL ? `${DIM}(not configured)${NC}` : ""}`,
+  `  PostgreSQL: ${pgOk ? `${GREEN}OK${NC}` : `${RED}FAILED${NC}`}`,
 );
 console.log("");
 

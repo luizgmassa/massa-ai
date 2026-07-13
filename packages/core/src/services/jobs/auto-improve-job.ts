@@ -445,7 +445,7 @@ export class AutoImproveJob {
       ({
         insert: (i: InsertMemoryInput) => getMemoryRepository().insert(i),
         update: (id: string, p: UpdateMemoryPatch) => getMemoryRepository().update(id, p),
-      } as MemoryApplySeam);
+      } as unknown as MemoryApplySeam);
 
     const cfg = readAutoImproveConfig();
     this.minObservations = opts.minObservations ?? cfg.minObservations;

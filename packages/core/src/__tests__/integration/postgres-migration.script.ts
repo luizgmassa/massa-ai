@@ -4,6 +4,7 @@
 
 import { getPrismaClient } from '../../services/query/prisma-client.js';
 import { logger } from '@massa-th0th/shared';
+import type { Prisma } from '../../generated/prisma/index.js';
 
 const prisma = getPrismaClient();
 
@@ -23,16 +24,16 @@ async function testPostgreSQLMigration() {
 
     // Test 3: Create a test memory
     logger.info('Test 3: Creating test memory...');
-    const testMemory = await prisma.memory.create({
-      data: {
-        id: `test_${Date.now()}`,
-        content: 'PostgreSQL migration test memory',
-        type: 'conversation',
-        level: 1,
-        importance: 0.5,
-        projectId: 'test-project',
-      },
-    });
+    const memoryData = {
+      id: `test_${Date.now()}`,
+      content: 'PostgreSQL migration test memory',
+      type: 'conversation',
+      level: 1,
+      // `Memory.tags` is a PostgreSQL String[] field. Use the checked create
+      // shape so Prisma serializes it as a list rather than a scalar value.
+      tags: { set: ['test', 'postgresql', 'migration'] },
+    } satisfies Prisma.MemoryCreateInput;
+    const testMemory = await prisma.memory.create({ data: memoryData });
     logger.info(`✅ Test memory created: ${testMemory.id}`);
 
     // Test 4: Read the test memory

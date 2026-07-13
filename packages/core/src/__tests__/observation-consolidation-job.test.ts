@@ -114,7 +114,7 @@ function makeStoreWith(n: number): MemoryObservationStore {
 // not allowed (process-wide). Instead, the job calls getMemoryRepository() at
 // run-time; we cannot easily intercept it. So we verify via the EventBus event
 // (memory:consolidated) which carries newMemoryId, and we accept that the real
-// repository.insert is also invoked (it writes to the real SQLite store; this
+// repository.insert is also invoked (it writes to the real PostgreSQL store; this
 // is fine — it's additive and isolated by projectId). The captured-insert
 // assertion is replaced by event-shape + runOnce return assertions.
 

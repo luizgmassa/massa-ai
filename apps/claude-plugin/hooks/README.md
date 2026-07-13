@@ -42,7 +42,7 @@ into a structured memory.
 
 3. Start the API: `bun run dev:api` (defaults to `http://localhost:3333`).
 4. Run a Claude Code session — Observation rows appear in
-   `~/.massa-th0th-data/observations.db` and are consolidated into memories when the LLM is
+   PostgreSQL and are consolidated into memories when the LLM is
    on (`RLM_LLM_ENABLED=true`); otherwise they're stored raw and the bridge
    silently skips.
 

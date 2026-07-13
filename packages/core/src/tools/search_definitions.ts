@@ -2,7 +2,7 @@
  * Search Definitions Tool (search_definitions)
  *
  * Browse symbols (functions, classes, types, etc.) in a project.
- * Uses the Symbol Graph's SQLite index for fast, exact results.
+ * Uses the Symbol Graph's PostgreSQL index for fast, exact results.
  */
 
 import { IToolHandler, ToolResponse } from "@massa-th0th/shared";

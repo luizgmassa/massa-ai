@@ -13,11 +13,11 @@ Last updated: 2026-07-13.
 - PostgreSQL/pgvector now owns vectors, lexical search, memory, observations, checkpoints,
   Synapse sessions, jobs, graph data, embedding cache, handoffs, and proposals.
 - Migration `20260713090000_add_handoffs_proposals_pg` closes the remaining handoff/proposal
-  schema gap. PG factories no longer route those features to local SQLite.
+  schema gap. PostgreSQL factories own those features directly.
 - Handoff/proposal terminal transitions use atomic compare-and-set semantics. Scheduler writes
   use per-ID FIFO ordering and a real drain contract. Both have concurrency and restart tests.
-- Every inventoried SQLite behavior group has assertion-equivalent PostgreSQL evidence. Add new
-  backend-specific behavior to `parity-matrix.md` and its PG test in the same change.
+- Every persistence behavior group has PostgreSQL assertion evidence. Add new
+  database behavior to `parity-matrix.md` and its PostgreSQL test in the same change.
 
 ### Indexing and retrieval consistency
 
@@ -35,7 +35,7 @@ Last updated: 2026-07-13.
 
 ### Graph, memory, and lifecycle behavior
 
-- `IGraphStore` is shared by SQLite and PostgreSQL. PostgreSQL preserves zero/false values,
+- `IGraphStore` uses PostgreSQL and preserves zero/false values,
   applies filters, clamps weights, increments atomically, and reports accurate batch counts.
 - Typed edges, path tracing, git-diff impact analysis, architecture maps, and Louvain community
   detection form the supported graph layer. Test indexing remains opt-in through

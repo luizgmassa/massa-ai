@@ -483,7 +483,7 @@ describe.skipIf(!READY)("T9 N8 — concurrent Synapse access (HTTP-direct, bound
 // PG data integrity (backend is PostgreSQL — high-value)
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe.skipIf(!READY)("T9 N14 — unresolved-target refs retained (SQLite parity)", () => {
+describe.skipIf(!READY)("T9 N14 — unresolved-target refs retained (PostgreSQL parity)", () => {
   const pid = makePid(14);
 
   afterAll(async () => {
@@ -499,7 +499,7 @@ describe.skipIf(!READY)("T9 N14 — unresolved-target refs retained (SQLite pari
       // Previously the PG repository dropped these refs entirely
       // (guard `if (!ref.target_fqn) continue;` + NOT NULL column). After the
       // fix (NOT NULL dropped + guards removed), the null-target reference row
-      // is retained, matching the SQLite backend which stores ref.target_fqn ?? null.
+      // is retained, matching the PostgreSQL backend which stores ref.target_fqn ?? null.
       const ir = await indexTinyAndWait(pid);
       console.log(`[N14] fixture with unresolvable import indexed → job status: ${ir.status}`);
       expect(ir.status === "completed" || ir.status === "indexed").toBe(true);

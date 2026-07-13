@@ -6,7 +6,7 @@
  * This preserves SESSION continuity (what happened in the conversation), NOT
  * index/task state. It is the complement of `CheckpointManager`
  * (packages/core/src/services/checkpoint/checkpoint-manager.ts), which versions
- * TASK execution state (progress, decisions, files) in memories.db. See
+ * TASK execution state (progress, decisions, files) in PostgreSQL memories table. See
  * `packages/core/src/services/SESSION-STATE.md` for the full reconciliation.
  *
  * Design contract:

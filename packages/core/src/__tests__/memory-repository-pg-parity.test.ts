@@ -1,5 +1,5 @@
 /**
- * Assertion-level PostgreSQL parity for the SQLite-canonical memory CRUD/FTS
+ * Assertion-level PostgreSQL parity for the PostgreSQL-canonical memory CRUD/FTS
  * contract in memory-crud.test.ts.
  *
  * This suite is deliberately restricted to the dedicated maintenance DB. It
@@ -54,7 +54,7 @@ async function cleanup(): Promise<void> {
   await prisma.$executeRaw`DELETE FROM memories WHERE project_id LIKE ${TEST_PREFIX + "%"}`;
 }
 
-describe.skipIf(!DEDICATED_DB)("MemoryRepositoryPg — SQLite CRUD/FTS parity", () => {
+describe.skipIf(!DEDICATED_DB)("MemoryRepositoryPg — PostgreSQL CRUD/FTS parity", () => {
   beforeAll(async () => {
     const { getPrismaClient } = await import("../services/query/prisma-client.js");
     prisma = getPrismaClient();
@@ -88,7 +88,7 @@ describe.skipIf(!DEDICATED_DB)("MemoryRepositoryPg — SQLite CRUD/FTS parity", 
     expect(punctuation.map((row) => row.id)).toEqual([first, second]);
   });
 
-  test("punctuation separates OR terms like SQLite FTS", async () => {
+  test("punctuation separates OR terms like PostgreSQL FTS", async () => {
     const agent = await insert("hyphen-agent", "Agente orchestration notes");
     const unrelated = await insert("hyphen-other", "unrelated material");
 

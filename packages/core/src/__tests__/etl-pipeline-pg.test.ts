@@ -4,7 +4,7 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 import { DiscoverStage } from "../services/etl/stages/discover.js";
-import { getSymbolRepository } from "../data/sqlite/symbol-repository-factory.js";
+import { getSymbolRepository } from "../data/symbol/symbol-repository-factory.js";
 
 const DB_AVAILABLE = /^(postgres|postgresql):/.test(process.env.DATABASE_URL ?? "");
 

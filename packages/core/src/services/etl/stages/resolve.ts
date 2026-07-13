@@ -13,7 +13,7 @@
 import path from "path";
 import fs from "fs";
 import { logger } from "@massa-th0th/shared";
-import { getSymbolRepository } from "../../../data/sqlite/symbol-repository-factory.js";
+import { getSymbolRepository } from "../../../data/symbol/symbol-repository-factory.js";
 import type {
   EtlStageContext,
   ParsedFile,
@@ -234,7 +234,7 @@ export class ResolveStage {
    * each source, but in-batch always overrides repo for the same name.
    * Project-wide resolution closes the D1 cross-file gap.
    *
-   * Note: {@link getSymbolRepository} is sync for SQLite and async for PG;
+   * Note: {@link getSymbolRepository} is sync for PostgreSQL and async for PG;
    * `await` works for both (await on a non-thenable returns the value).
    */
   private async buildSymbolIndex(

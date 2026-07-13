@@ -9,9 +9,9 @@
  *      for batch). Each job runs fetchAndConvertOne, whose internal index drain
  *      is already SERIAL — so even when N fetches race, the per-URL indexing
  *      never overlaps with itself. Cross-URL overlap is acceptable for
- *      pgvector (row locks) but would contend on SQLite WAL; the per-URL
+ *      pgvector (row locks) but would contend on PostgreSQL WAL; the per-URL
  *      serial drain keeps the worst case to N concurrent single-writers, which
- *      SQLite tolerates and pgvector handles trivially.
+ *      PostgreSQL tolerates and pgvector handles trivially.
  *   3. Drain the allSettled-shaped results in input order and return per-URL
  *      status + chunk counts.
  *

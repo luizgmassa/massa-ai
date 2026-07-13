@@ -20,7 +20,7 @@ Installs interactively. Three modes:
 |------|----------|----------|
 | **Docker** (default) | Docker | Production, quick start (PostgreSQL via Docker/colima, ~5GB RAM) |
 | **Docker build** | Docker + Git | Custom builds, local changes (PostgreSQL via Docker/colima, ~5GB RAM) |
-| **Source** | Git + Bun | Development (SQLite / Native PostgreSQL ~100MB / Docker PostgreSQL) |
+| **Source** | Git + Bun | Development (Native PostgreSQL ~100MB or Docker PostgreSQL) |
 
 > ⚠️ **Docker modes run PostgreSQL through Docker/colima and reserve ~5GB RAM.**
 > For native PostgreSQL (~100MB, no Docker), use **Source mode** (`./scripts/setup-local-first.sh`)
@@ -197,8 +197,8 @@ streamed to `/api/v1/hook`. Non-Claude hosts use `hook_ingest` or
 `POST /api/v1/hook/batch`.
 
 ```bash
-# Observations land in ~/.massa-th0th-data/observations.db; consolidated to memories
-# only when RLM_LLM_ENABLED=true (else stored raw, bridge skips silently).
+# Observations persist in PostgreSQL and are consolidated into memories only
+# when RLM_LLM_ENABLED=true (else stored raw, bridge skips silently).
 ```
 
 ### 3. Work — recall and search
@@ -460,7 +460,7 @@ so the agent's behaviour is recorded without any change to how you prompt.
 
 3. Start the API: `bun run dev:api` (defaults to `http://localhost:3333`).
 4. Run a Claude Code session — Observation rows appear in
-   `~/.massa-th0th-data/observations.db` and are consolidated into memories only when
+   PostgreSQL and are consolidated into memories only when
    `RLM_LLM_ENABLED=true`; otherwise they're stored raw and the bridge silently
    skips.
 
@@ -610,11 +610,10 @@ rows default **OFF** and degrade silently when disabled.
 
 | Key | Env var | Default | State |
 |-----|---------|---------|-------|
-| `database.url` | `DATABASE_URL` | _(unset → SQLite)_ | PostgreSQL connection string (native or Docker) |
-| `database.vectorStoreType` | `VECTOR_STORE_TYPE` | auto (from DATABASE_URL) | `postgres`/`sqlite` |
+| `database.url` | `DATABASE_URL` | _(required)_ | PostgreSQL connection string (native or Docker) |
 | `database.postgresPassword` | `POSTGRES_PASSWORD` | `massa_th0th_password` | Docker postgres container |
 | `database.port` | `MASSA_TH0TH_POSTGRES_PORT` | `5432` | host port (Docker) |
-| `database.backend` | `MASSA_TH0TH_DB_BACKEND` | _(interactive)_ | installer: `native`/`docker`/`sqlite` |
+| `database.backend` | `MASSA_TH0TH_DB_BACKEND` | _(interactive)_ | installer provisioning: `native`/`docker` |
 | `llm.enabled` | `RLM_LLM_ENABLED` | `false` | **OFF** |
 | `llm.baseUrl` | `RLM_LLM_BASE_URL` | `http://localhost:11434/v1` | — |
 | `llm.apiKey` | `RLM_LLM_API_KEY` | `ollama` | — |
@@ -770,7 +769,7 @@ massa-th0th/
 | **Symbol Graph** | PageRank-based centrality, definitions, references, go-to-definition |
 | **Embeddings** | Ollama (local) or Mistral/OpenAI API |
 | **Compression** | Rule-based code structure extraction (70-98% reduction) |
-| **Memory** | Persistent SQLite/PostgreSQL storage across sessions |
+| **Memory** | Persistent PostgreSQL/pgvector storage across sessions |
 | **Cache** | Multi-level L1/L2 with TTL |
 | **Passive Capture** | Fire-and-forget Claude Code hooks → Observations → LLM bridge → memories |
 | **Bootstrap** | Repo scan (git log/README/docs/centrality) → idempotent seed memories |

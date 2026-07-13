@@ -5,7 +5,7 @@
  *
  * Architecture:
  * - Global cache with projectId namespace (multi-tenant)
- * - All data isolated by project_id in the same SQLite database
+ * - All data isolated by project_id in the same PostgreSQL database
  * - Optimized for multiple projects with embedding reuse
  */
 
@@ -46,28 +46,12 @@ export interface ServerConfig {
       defaultTTL: number; // seconds
     };
     l2: {
-      dbPath: string;
       maxSize: number;
       defaultTTL: number;
     };
     embedding: {
-      dbPath: string;
       maxAgeHours: number;
     };
-  };
-
-  // Vector Store Configuration (SQLite-based com embeddings)
-  vectorStore: {
-    type: "sqlite";
-    dbPath: string;
-    collectionName: string;
-    embeddingModel?: string;
-  };
-
-  // Keyword Search Configuration
-  keywordSearch: {
-    dbPath: string;
-    ftsVersion: "fts5";
   };
 
   // Search / Auto-Reindex Configuration
@@ -375,29 +359,12 @@ export const defaultConfig: ServerConfig = {
       defaultTTL: envNum("L1_CACHE_TTL", 300),
     },
     l2: {
-      dbPath:
-        process.env.CACHE_DB_PATH || path.join(getGlobalDataDir(), "cache.db"),
       maxSize: envNum("L2_CACHE_MAX_SIZE", 500 * 1024 * 1024),
       defaultTTL: envNum("L2_CACHE_TTL", 3600),
     },
     embedding: {
-      dbPath:
-        process.env.EMBEDDING_CACHE_DB_PATH ||
-        path.join(getGlobalDataDir(), "embedding-cache.db"),
       maxAgeHours: 168, // 7 days
     },
-  },
-
-  vectorStore: {
-    type: "sqlite",
-    dbPath: path.join(getGlobalDataDir(), "vector-store.db"),
-    collectionName: "rlm_memories",
-    embeddingModel: "default",
-  },
-
-  keywordSearch: {
-    dbPath: path.join(getGlobalDataDir(), "keyword-search.db"),
-    ftsVersion: "fts5",
   },
 
   search: {
@@ -629,8 +596,6 @@ export class Config {
           ...overrides.cache?.embedding,
         },
       },
-      vectorStore: { ...defaults.vectorStore, ...overrides.vectorStore },
-      keywordSearch: { ...defaults.keywordSearch, ...overrides.keywordSearch },
       search: {
         ...defaults.search,
         ...overrides.search,
@@ -791,6 +756,7 @@ export {
   getDbName,
   isSharedDb,
   assertDedicatedDbAllowed,
+  requirePostgresDatabaseUrl,
 } from "./db-guard";
 
 // Integer env-var parser — fixes the falsy-`0` footgun in `Number(env) || d`.

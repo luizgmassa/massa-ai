@@ -13,7 +13,7 @@ mock.module("../data/vector/vector-store-factory.js", () => ({
   }),
 }));
 
-mock.module("../data/sqlite/keyword-search-factory.js", () => ({
+mock.module("../data/keyword/keyword-search-factory.js", () => ({
   getKeywordSearch: () => ({
     addBatch: async (documents: unknown[]) => {
       keywordBatches.push(documents);
@@ -22,7 +22,7 @@ mock.module("../data/sqlite/keyword-search-factory.js", () => ({
   }),
 }));
 
-mock.module("../data/sqlite/symbol-repository-factory.js", () => ({
+mock.module("../data/symbol/symbol-repository-factory.js", () => ({
   getSymbolRepository: () => ({
     writeFileSymbols: async () => {},
     upsertFile: async (file: unknown) => {

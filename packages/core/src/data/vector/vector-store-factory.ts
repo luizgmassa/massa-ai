@@ -1,119 +1,52 @@
-/**
- * Vector Store Factory
- * 
- * Provides unified access to vector stores with automatic configuration.
- * Maintains backward compatibility with existing singleton pattern.
- */
+/** Backend-neutral vector-store factory backed exclusively by PostgreSQL. */
 
-import { IVectorStore } from '@massa-th0th/shared';
-import { logger } from '@massa-th0th/shared';
-import { parsePositiveIntEnv } from '@massa-th0th/shared/config';
-import { PostgresConfig } from './postgres-vector-store.js';
-
-export type VectorStoreType = 'sqlite' | 'postgres';
+import type { IVectorStore } from "@massa-th0th/shared";
+import { logger } from "@massa-th0th/shared";
+import { parsePositiveIntEnv, requirePostgresDatabaseUrl } from "@massa-th0th/shared/config";
+import { PostgresVectorStore, type PostgresConfig } from "./postgres-vector-store.js";
 
 export interface VectorStoreConfig {
-  type: VectorStoreType;
-  postgres?: PostgresConfig;
+  postgres?: Partial<PostgresConfig>;
 }
 
 let cachedStore: IVectorStore | null = null;
-let cachedConfig: VectorStoreConfig | null = null;
 let initializationPromise: Promise<IVectorStore> | null = null;
 
 export async function getVectorStore(config?: VectorStoreConfig): Promise<IVectorStore> {
-  if (cachedStore && configMatches(config, cachedConfig)) {
-    return cachedStore;
-  }
-
-  // Serialize concurrent initialization: reuse the in-flight promise
-  if (initializationPromise) {
-    return initializationPromise;
-  }
+  if (cachedStore) return cachedStore;
+  if (initializationPromise) return initializationPromise;
 
   initializationPromise = (async () => {
-    const resolvedConfig = config || getConfigFromEnv();
-
-    let store: IVectorStore;
-    if (resolvedConfig.type === 'postgres' && resolvedConfig.postgres?.connectionString) {
-      const { PostgresVectorStore } = await import('./postgres-vector-store.js');
-      const pg = new PostgresVectorStore(resolvedConfig.postgres);
-      await pg.ensureInitialized();
-      store = pg;
-    } else {
-      const { SQLiteVectorStore } = await import('./sqlite-vector-store.js');
-      store = new SQLiteVectorStore();
+    const connectionString = config?.postgres?.connectionString ?? requirePostgresDatabaseUrl();
+    const hnswM = parsePositiveIntEnv(process.env.POSTGRES_HNSW_M, 0);
+    const hnswEfConstruction = parsePositiveIntEnv(process.env.POSTGRES_HNSW_EF_CONSTRUCTION, 0);
+    const ivfflatLists = parsePositiveIntEnv(process.env.POSTGRES_IVFFLAT_LISTS, 0);
+    const indexParams = {
+      ...(hnswM ? { m: hnswM } : {}),
+      ...(hnswEfConstruction ? { efConstruction: hnswEfConstruction } : {}),
+      ...(ivfflatLists ? { lists: ivfflatLists } : {}),
+    };
+    const store = new PostgresVectorStore({
+      connectionString,
+      poolSize: Number.parseInt(process.env.POSTGRES_VECTOR_POOL_SIZE || "10", 10),
+      indexType: (process.env.POSTGRES_VECTOR_INDEX as "ivfflat" | "hnsw") || "hnsw",
+      ...(Object.keys(indexParams).length ? { indexParams } : {}),
+      ...config?.postgres,
+    });
+    await store.ensureInitialized();
+    if (!await Promise.race([store.healthCheck(), new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5_000))])) {
+      await store.close().catch(() => undefined);
+      throw new Error("PostgreSQL vector store health check failed");
     }
-
-    const healthy = await Promise.race([
-      store.healthCheck(),
-      new Promise<boolean>(r => setTimeout(() => r(false), 5000)),
-    ]);
-
-    if (!healthy) {
-      await store.close().catch(() => {});
-      throw new Error(`Vector store ${resolvedConfig.type} health check failed`);
-    }
-
     cachedStore = store;
-    cachedConfig = resolvedConfig;
-    logger.info('Vector store initialized', { type: resolvedConfig.type });
-    return cachedStore;
-  })().finally(() => {
-    initializationPromise = null;
-  });
-
+    logger.info("PostgreSQL vector store initialized");
+    return store;
+  })().finally(() => { initializationPromise = null; });
   return initializationPromise;
 }
 
 export async function resetVectorStore(): Promise<void> {
-  if (cachedStore) {
-    await cachedStore.close();
-    cachedStore = null;
-    cachedConfig = null;
-  }
-}
-
-function configMatches(a?: VectorStoreConfig, b?: VectorStoreConfig | null): boolean {
-  const resolvedA = a || getConfigFromEnv();
-  const resolvedB = b || getConfigFromEnv();
-  return resolvedA.type === resolvedB.type;
-}
-
-function getConfigFromEnv(): VectorStoreConfig {
-  // Explicit override takes precedence
-  const explicitType = process.env.VECTOR_STORE_TYPE as VectorStoreType | undefined;
-
-  // Resolve connection string: prefer POSTGRES_VECTOR_URL, fall back to DATABASE_URL
-  const postgresUrl = process.env.POSTGRES_VECTOR_URL || process.env.DATABASE_URL;
-  const isPostgres =
-    explicitType === 'postgres' ||
-    (!explicitType && postgresUrl?.startsWith('postgresql'));
-
-  if (isPostgres && postgresUrl) {
-    // parsePositiveIntEnv replaces bare `Number(env)` + truthy gating: it
-    // rejects unset/garbage/negative (and 0, which is invalid for HNSW `m`
-    // anyway) by flooring to 0, which the truthy gate then drops. The
-    // indexParams fields stay optional exactly as before.
-    const hnswM = parsePositiveIntEnv(process.env.POSTGRES_HNSW_M, 0);
-    const hnswEfConstruction = parsePositiveIntEnv(process.env.POSTGRES_HNSW_EF_CONSTRUCTION, 0);
-    const ivfflatLists = parsePositiveIntEnv(process.env.POSTGRES_IVFFLAT_LISTS, 0);
-
-    const indexParams: { m?: number; efConstruction?: number; lists?: number } = {};
-    if (hnswM) indexParams.m = hnswM;
-    if (hnswEfConstruction) indexParams.efConstruction = hnswEfConstruction;
-    if (ivfflatLists) indexParams.lists = ivfflatLists;
-
-    return {
-      type: 'postgres',
-      postgres: {
-        connectionString: postgresUrl,
-        poolSize: parseInt(process.env.POSTGRES_VECTOR_POOL_SIZE || '10'),
-        indexType: (process.env.POSTGRES_VECTOR_INDEX as 'ivfflat' | 'hnsw') || 'hnsw',
-        ...(Object.keys(indexParams).length > 0 ? { indexParams } : {}),
-      },
-    };
-  }
-
-  return { type: 'sqlite' };
+  if (!cachedStore) return;
+  await cachedStore.close();
+  cachedStore = null;
 }

@@ -65,7 +65,7 @@ async function addSupercedesEdge(
 }
 
 /**
- * Insert a new memory polymorphically (SQLite insert is sync, PG is async).
+ * Insert a new memory polymorphically (PostgreSQL insert is sync, PG is async).
  */
 async function insertMemoryAsync(repo: any, input: any): Promise<void> {
   await Promise.resolve(repo.insert(input));
@@ -131,7 +131,7 @@ export class MemoryConsolidationJob {
     const decayed = await this.decayStaleMemories(repo, staleSinceMs, now);
     // Phase 1: prune — soft-delete cold + old + low-access memories.
     const pruned = await this.pruneColdMemories(repo, now);
-    // Phase 0 behavior preserved (session→user promotion) on PG; SQLite no-op.
+    // Phase 0 behavior preserved (session→user promotion) on PG; PostgreSQL no-op.
     const promoted = await this.promoteSessionMemories(repo, now).catch(() => 0);
     // Phase 1: merge — cluster + LLM-summarize + SUPERSEDES edges.
     const graphStore = getGraphStore();
@@ -327,18 +327,18 @@ export class MemoryConsolidationJob {
   }
 
   /**
-   * Phase-0 session→user promotion. Preserved for PG; on SQLite this is a
+   * Phase-0 session→user promotion. Preserved for PG; on PostgreSQL this is a
    * no-op (the original raw-SQL used Postgres `NOW()`/CTE features). Soft-fail.
    */
   private async promoteSessionMemories(repo: any, now: number): Promise<number> {
-    // The PG path used prisma raw SQL; SQLite repo has no equivalent. To keep
+    // The PG path used prisma raw SQL; PostgreSQL repo has no equivalent. To keep
     // this backend-polymorphic without duplicating logic, we skip promotion on
-    // SQLite (candidates already decay via decayScore). PG promotion remains
+    // PostgreSQL (candidates already decay via decayScore). PG promotion remains
     // available via the prisma client if needed in a future phase.
     const isPg = process.env.DATABASE_URL?.startsWith("postgresql");
     if (!isPg) return 0;
     try {
-      // Lazy-import to avoid pulling prisma into the SQLite path.
+      // Lazy-import to avoid pulling prisma into the PostgreSQL path.
       const { getPrismaClient } = await import("../query/prisma-client.js");
       const prisma = getPrismaClient();
       const cutoff = new Date(now - DAY);

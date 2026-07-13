@@ -298,7 +298,7 @@ export function restoreWorkingMemoryBuffer(
 /**
  * Snapshot a live WorkingMemoryBuffer for persistence. Best-effort: scalars
  * only (token Sets are regenerable from result content on restore). Shared by
- * the SQLite and PG session stores so the snapshot shape stays consistent.
+ * the PostgreSQL and PG session stores so the snapshot shape stays consistent.
  * Returns `null` when the session has no buffer or it has no entries.
  */
 export function snapshotWorkingMemoryBuffer(

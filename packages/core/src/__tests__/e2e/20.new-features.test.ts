@@ -190,7 +190,7 @@ describe.skipIf(!READY)("T11c compaction snapshots (compact_snapshot)", () => {
         expect(typeof data.persistedId).toBe("string");
         // The persisted observation should be listable via the observation
         // surface. Poll the memory/list endpoint filtered to the category.
-        // (observations are stored in observations.db, surfaced via memory
+        // (observations are stored in PostgreSQL observations table, surfaced via memory
         // search; the persistedId is a valid observation id.)
         expect(data.persistedId.length).toBeGreaterThan(0);
       } else {

@@ -18,7 +18,7 @@
  */
 
 import { logger } from "@massa-th0th/shared";
-import { getSymbolRepository } from "../../data/sqlite/symbol-repository-factory.js";
+import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import { symbolGraphService } from "./symbol-graph.service.js";
 import type { EdgeType, EdgeResult } from "./symbol-graph.service.js";
 

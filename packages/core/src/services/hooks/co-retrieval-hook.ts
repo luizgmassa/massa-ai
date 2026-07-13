@@ -7,7 +7,7 @@
  * together in future neighborhood queries (optimized_context).
  *
  * Architecture decisions vs. the original spec:
- *  - Uses GraphStore (SQLite) not Prisma — edges already live there.
+ *  - Uses GraphStore (PostgreSQL) not Prisma — edges already live there.
  *  - Uses MemoryRelationType.RELATES_TO — no new edge type/migration.
  *  - Weights in [0, 1] — consistent with GraphStore design.
  *  - Only the "retrieved" signal — richer signals (used_in_answer,
@@ -177,7 +177,7 @@ export class CoRetrievalHook {
     const repo: any = (this as any)._testRepo ?? (getMemoryRepository() as MemoryRepositoryPg);
 
     // The method is only available on the Pg implementation.
-    // If running against SQLite repo in tests, skip gracefully.
+    // If running against PostgreSQL repo in tests, skip gracefully.
     if (typeof repo.findRecentByTag !== "function") return [];
 
     return repo.findRecentByTag(AUTO_SEARCH_TAG, {

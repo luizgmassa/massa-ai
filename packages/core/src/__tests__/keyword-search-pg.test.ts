@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { KeywordSearchPg } from "../data/sqlite/keyword-search-pg.js";
+import { KeywordSearchPg } from "../data/keyword/keyword-search-pg.js";
 
 const READY =
   process.env.RUN_POSTGRES_TESTS === "1" &&

@@ -1,7 +1,7 @@
 /**
  * ICheckpointStore — storage contract for task/INDEX state checkpoints.
  *
- * Structural gap #16: checkpoints were SQLite-only (raw bun:sqlite inside
+ * Structural gap #16: checkpoints were PostgreSQL-only (raw legacy local database inside
  * CheckpointManager). This interface decouples the storage backend from the
  * CheckpointManager domain facade so a Postgres deployment can persist
  * checkpoints in the same backend as the rest of the data plane (one-backend
@@ -9,7 +9,7 @@
  *
  * Mostly SYNCHRONOUS: create_checkpoint / list_checkpoints + AutoCheckpointer
  * call these methods without await (create/list stay sync, matching the
- * SQLite store). `restoreCheckpoint` + `countExistingMemoryIds` ARE async
+ * PostgreSQL store). `restoreCheckpoint` + `countExistingMemoryIds` ARE async
  * (Promise-returning) so the PG backend can run a real `SELECT id FROM
  * memories WHERE id IN (...)` memory-existence check on the restore path
  * (was a no-op under PG). The single production restore caller
@@ -106,19 +106,19 @@ export interface ICheckpointStore {
    * integrity check (valid vs missing referenced memories). Backends that cannot
    * reach the memories table return all ids as existing (best-effort — never
    * blocks a restore). Returns a Promise so the PG backend can run a real
-   * `SELECT id FROM memories WHERE id IN (...)` via prisma; the SQLite backend
+   * `SELECT id FROM memories WHERE id IN (...)` via prisma; the PostgreSQL backend
    * resolves immediately (it wraps its synchronous result in Promise.resolve).
    */
   countExistingMemoryIds(memoryIds: string[]): Promise<string[]>;
 
   /**
    * Await backend readiness before a read (hydration race fix, #16/#18).
-   * Sync backends (SQLite) resolve immediately. The PG backend awaits its
+   * Sync backends (PostgreSQL) resolve immediately. The PG backend awaits its
    * mirror hydration so the first read after a process restart observes
    * persisted rows.
    */
   ensureReady(): Promise<void>;
 
-  /** Release resources (SQLite closes the DB handle; PG flushes writes). */
+  /** Release resources (PostgreSQL closes the DB handle; PG flushes writes). */
   close(): void;
 }

@@ -345,7 +345,7 @@ export class IndexManager {
       );
 
       // Resolve the real embedding dimension from the backend (PG reports the
-      // schema's vector(N); SQLite ignores length). Fall back to 768 (a common
+      // schema's vector(N); PostgreSQL ignores length). Fall back to 768 (a common
       // small-model default) only when the backend doesn't report one.
       let dim = 768;
       try {

@@ -20,11 +20,11 @@ import { ParseStage } from "./stages/parse.js";
 import { ResolveStage } from "./stages/resolve.js";
 import { LoadStage } from "./stages/load.js";
 import { eventBus } from "../events/event-bus.js";
-import { getSymbolRepository } from "../../data/sqlite/symbol-repository-factory.js";
+import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import { indexJobTracker } from "../jobs/index-job-tracker.js";
 import { getSearchCache } from "../search/cache-factory.js";
 import { getVectorStore } from "../../data/vector/vector-store-factory.js";
-import { getKeywordSearch } from "../../data/sqlite/keyword-search-factory.js";
+import { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
 import type { EtlStageContext, EtlEvent, EtlResult, EtlStage } from "./stage-context.js";
 
 export interface PipelineInput {

@@ -4,10 +4,10 @@
  * Mirrors PgScheduledJobStore / PgSynapseSessionStore's discipline: the
  * ObservationStore interface is SYNCHRONOUS (the hook-service and
  * CompactionSnapshotService call store.insert / listBySession / listRecent
- * with no await, matching the SQLite store and bun:sqlite API). PG is
+ * with no await, matching the PostgreSQL store and legacy local database API). PG is
  * inherently async, so this store:
  *   - Writes fire-and-forget (best-effort, logged on failure — matching the
- *     SQLite store's try/catch best-effort semantics).
+ *     PostgreSQL store's try/catch best-effort semantics).
  *   - Reads are served from an in-memory mirror hydrated from PG on first use
  *     (async) and kept in sync by every insert. The mirror is the hot read
  *     path within a process; PG is the durability + cross-process recovery
@@ -34,7 +34,7 @@ import type {
   Observation,
   ObservationStore,
   ObservationRow,
-} from "./observation-repository.js";
+} from "./observation-contract.js";
 
 // ── Raw row shape returned by $queryRaw ────────────────────────────────────
 
@@ -65,7 +65,7 @@ function pgRowToObservation(r: PgObservationRow): Observation {
     importance: r.importance,
     created_at: toNum(r.created_at) ?? 0,
   };
-  // Reuse the shared row mapper for parity with the SQLite store.
+  // Reuse the shared row mapper for parity with the PostgreSQL store.
   // (rowToObservation is not exported, so inline the identical mapping.)
   return {
     id: row.id,

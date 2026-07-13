@@ -4,6 +4,7 @@ import {
   getDbName,
   isSharedDb,
   assertDedicatedDbAllowed,
+  requirePostgresDatabaseUrl,
 } from "../db-guard";
 import { parsePositiveIntEnv } from "../int-env";
 
@@ -32,6 +33,26 @@ describe("getDbName / isSharedDb", () => {
   });
 });
 
+describe("requirePostgresDatabaseUrl", () => {
+  test("accepts postgres and postgresql URLs with a database name", () => {
+    expect(requirePostgresDatabaseUrl("postgres://u:p@localhost:5432/app")).toBe(
+      "postgres://u:p@localhost:5432/app",
+    );
+    expect(requirePostgresDatabaseUrl(ISOLATED_URL)).toBe(ISOLATED_URL);
+  });
+
+  test("rejects missing, malformed, non-PostgreSQL, and database-less URLs", () => {
+    const original = process.env.DATABASE_URL;
+    delete process.env.DATABASE_URL;
+    expect(() => requirePostgresDatabaseUrl()).toThrow(/DATABASE_URL/);
+    process.env.DATABASE_URL = original;
+
+    for (const value of ["", "not a url", "mysql://u:p@localhost/app", "postgresql://u:p@localhost/"]) {
+      expect(() => requirePostgresDatabaseUrl(value)).toThrow(/DATABASE_URL/);
+    }
+  });
+});
+
 describe("assertDedicatedDbAllowed — dedicated-vector guard", () => {
   const ORIG = { ...process.env };
 
@@ -46,35 +67,18 @@ describe("assertDedicatedDbAllowed — dedicated-vector guard", () => {
   test("inert (no throw) when MASSA_TH0TH_DEDICATED is unset", () => {
     delete process.env.MASSA_TH0TH_DEDICATED;
     process.env.DATABASE_URL = SHARED_URL;
-    process.env.POSTGRES_VECTOR_URL = SHARED_URL;
     expect(() => assertDedicatedDbAllowed()).not.toThrow();
   });
 
   test("throws when DEDICATED=1 + shared DATABASE_URL (vector unset)", () => {
     process.env.MASSA_TH0TH_DEDICATED = "1";
     process.env.DATABASE_URL = SHARED_URL;
-    delete process.env.POSTGRES_VECTOR_URL; // vector falls back to shared DATABASE_URL
     expect(() => assertDedicatedDbAllowed()).toThrow(/refuses to bind the shared DB/);
   });
 
-  test("throws when DEDICATED=1 + isolated DATABASE_URL + shared POSTGRES_VECTOR_URL", () => {
+  test("no throw when DEDICATED=1 + isolated DATABASE_URL", () => {
     process.env.MASSA_TH0TH_DEDICATED = "1";
     process.env.DATABASE_URL = ISOLATED_URL;
-    process.env.POSTGRES_VECTOR_URL = SHARED_URL; // vector still binds shared DB
-    expect(() => assertDedicatedDbAllowed()).toThrow(/POSTGRES_VECTOR_URL/);
-  });
-
-  test("no throw when DEDICATED=1 + both URLs isolated", () => {
-    process.env.MASSA_TH0TH_DEDICATED = "1";
-    process.env.DATABASE_URL = ISOLATED_URL;
-    process.env.POSTGRES_VECTOR_URL = ISOLATED_URL;
-    expect(() => assertDedicatedDbAllowed()).not.toThrow();
-  });
-
-  test("no throw when DEDICATED=1 + isolated DATABASE_URL + vector unset (fallback isolated)", () => {
-    process.env.MASSA_TH0TH_DEDICATED = "1";
-    process.env.DATABASE_URL = ISOLATED_URL;
-    delete process.env.POSTGRES_VECTOR_URL;
     expect(() => assertDedicatedDbAllowed()).not.toThrow();
   });
 });

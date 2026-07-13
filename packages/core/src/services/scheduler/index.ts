@@ -5,9 +5,6 @@
 export { Scheduler, getScheduler, resetScheduler } from "./scheduler.js";
 export type { SchedulerOptions } from "./scheduler.js";
 
-export {
-  SqliteScheduledJobStore,
-} from "./scheduler-store.js";
 export type { ScheduledJobStore } from "./scheduler-store.js";
 
 export { PgScheduledJobStore } from "./scheduler-store-pg.js";

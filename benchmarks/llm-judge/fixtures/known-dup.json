@@ -4,7 +4,7 @@
   "distractors": [
     {
       "id": "D1",
-      "content": "The Postgres connection string lives in DATABASE_URL; SQLite is used when it is empty.",
+      "content": "The PostgreSQL connection string lives in DATABASE_URL and is required for runtime persistence.",
       "type": "decision",
       "expectedSalienceBand": "any"
     },
@@ -89,7 +89,7 @@
         },
         {
           "id": "G4b",
-          "content": "The Phase-4 Dx:SKIP scaffolding is gone; those tests now run un-skipped in the default SQLite batch.",
+          "content": "The Phase-4 Dx:SKIP scaffolding is gone; those tests now run un-skipped in the default PostgreSQL batch.",
           "type": "pattern"
         }
       ]

@@ -15,7 +15,7 @@ contributors know which to use, how they compose, and why they do not collide.
 | Data shape | gzip-compressed `TaskState` JSON blob | Bounded XML table-of-contents with runnable retrieval calls |
 | Persisted content | Full task state (progress, decisions, files, agent state) | Event references + retrieval calls (NOT the raw events) |
 | Keyed by | `taskId` (+ optional `projectId`) | `sessionId` (+ `projectId`) |
-| Storage | `task_checkpoints` table in **`memories.db`** (SQLite-only) | `observations` table in **`observations.db`** (SQLite) + PG parity via Prisma |
+| Storage | `task_checkpoints` table in **`PostgreSQL memories table`** (PostgreSQL-only) | `observations` table in **`PostgreSQL observations table`** (PostgreSQL) + PG parity via Prisma |
 | Service | `CheckpointManager` (`services/checkpoint/`) | `CompactionSnapshotService` (`services/hooks/`) |
 | Tools | `create_checkpoint`, `restore_checkpoint`, `list_checkpoints` | `compact_snapshot` |
 | TTL | 7 days (manual) / 14 days (milestone) / 3 days (auto) | Inherits observation TTL (no separate expiry) |
@@ -46,7 +46,7 @@ is gzip-compressed and stored as an opaque blob.
 - **Milestone marking** before a risky, irreversible, or experimental step.
 
 ### Data model
-Table: `task_checkpoints` (in `memories.db`, SQLite-only — no Prisma/PG model)
+Table: `task_checkpoints` (in `PostgreSQL memories table`, PostgreSQL-only — no Prisma/PG model)
 
 ```
 id, task_id, task_description, agent_id, project_id,
@@ -136,7 +136,7 @@ still retrievable). Structural bounds, not a byte budget that silently discards
 data.
 
 ### Storage / PG parity
-- SQLite-canonical: `observations.db` via `SqliteObservationStore`.
+- PostgreSQL-backed observations via `PgObservationStore`.
 - PG parity: the Prisma `Observation` model (`packages/core/prisma/schema.prisma`)
   maps to the same `observations` table shape, so a Postgres deployment can
   store snapshots identically.
@@ -180,12 +180,12 @@ retrieval calls (to recover session context) — the two are complementary.
 
 | Store | DB file | Table | Backend | Keyed by |
 |---|---|---|---|---|
-| Checkpoints | `memories.db` | `task_checkpoints` | SQLite-only | `task_id` |
-| Snapshots (persisted) | `observations.db` | `observations` | SQLite + PG (Prisma) | `session_id` |
+| Checkpoints | `PostgreSQL memories table` | `task_checkpoints` | PostgreSQL-only | `task_id` |
+| Snapshots (persisted) | `PostgreSQL observations table` | `observations` | PostgreSQL + PG (Prisma) | `session_id` |
 
-- **Different DB files**: `memories.db` ≠ `observations.db`. No shared table.
+- **Different DB files**: `PostgreSQL memories table` ≠ `PostgreSQL observations table`. No shared table.
 - **Different primary keys**: `task_id` vs `session_id`. No key overlap.
-- **Different services**: `CheckpointManager` (singleton, raw SQLite) vs
+- **Different services**: `CheckpointManager` (singleton, raw PostgreSQL) vs
   `CompactionSnapshotService` (factory over `ObservationStore`). No shared
   mutable state, no import cycle.
 - **Different backends**: checkpoints have no Prisma model and no PG path;
@@ -204,8 +204,8 @@ surfaces both. After analysis, **we deliberately did not add one**, because:
 1. **No shared key**: checkpoints are keyed by `taskId`, snapshots by
    `sessionId`. A unified view would need to join across two stores with no
    natural join key — it would be an artificial aggregator.
-2. **Different backends**: checkpoint is SQLite-only; snapshot is SQLite+PG.
-   A unified accessor would either (a) be SQLite-only (losing PG parity) or
+2. **Different backends**: checkpoint is PostgreSQL-only; snapshot is PostgreSQL+PG.
+   A unified accessor would either (a) be PostgreSQL-only (losing PG parity) or
    (b) require a PG checkpoint model that does not exist (scope creep).
 3. **Marginal clarity, real coupling**: the two are used at different times
    (checkpoints = explicit task milestones; snapshots = compact/resume).

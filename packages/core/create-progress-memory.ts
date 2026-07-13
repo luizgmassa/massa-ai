@@ -23,7 +23,7 @@ async function createProgressMemory() {
 - Singleton pattern para conexões
 
 ### 2. Schema e Migrations
-- Provider: sqlite → postgresql
+- Provider: postgres → postgresql
 - Campos adicionados ao Memory: embedding (Bytes), lastAccessed (DateTime)
 - Todas as tabelas criadas no Prisma Cloud PostgreSQL
 - DATABASE_URL: postgres://...@db.prisma.io:5432/postgres
@@ -57,7 +57,7 @@ async function createProgressMemory() {
 - Search Queries ✅
 - Cache Stats ✅
 
-**SQLite Local (Performance):**
+**PostgreSQL Local (Performance):**
 - SearchCache (mantido local)
 - SearchAnalytics (pendente migração)
 - SymbolDb (pendente migração)

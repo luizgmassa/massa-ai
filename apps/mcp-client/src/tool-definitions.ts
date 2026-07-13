@@ -140,7 +140,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "remember",
     description:
-      "Store memory in the hierarchical memory system (local SQLite)",
+      "Store memory in the PostgreSQL-backed hierarchical memory system",
     apiEndpoint: "/api/v1/memory/store",
     apiMethod: "POST",
     inputSchema: {
@@ -975,7 +975,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "compact_snapshot",
     description:
-      "Build a reference-based compaction snapshot — bounded <~2KB table-of-contents with runnable recall/search calls for the current session's observations (SESSION continuity, not task state). Zero information loss — raw events stay in the store; the snapshot points to them. Distinct from checkpoints (which version TASK progress in memories.db). Optionally persists the snapshot as an observation of category 'compaction-snapshots'. Use on /compact or PreCompact for session continuity.",
+      "Build a reference-based compaction snapshot — bounded <~2KB table-of-contents with runnable recall/search calls for the current session's observations (SESSION continuity, not task state). Zero information loss — raw events stay in PostgreSQL; the snapshot points to them. Distinct from checkpoints (which version task progress). Optionally persists the snapshot as an observation of category 'compaction-snapshots'. Use on /compact or PreCompact for session continuity.",
     apiEndpoint: "/api/v1/hook/compact-snapshot",
     apiMethod: "POST",
     inputSchema: {
