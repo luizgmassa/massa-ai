@@ -201,4 +201,58 @@ describe("SearchController", () => {
       expect(captured[0].allowFullReindex).toBe(false);
     });
   });
+
+  // ── response modes ────────────────────────────────────────
+  describe("response modes", () => {
+    test("summary is preview-only while full and enriched add their documented fields", async () => {
+      const ctx = (controller as any).contextualSearch;
+      const original = ctx.search.bind(ctx);
+      ctx.search = async () => [{
+        id: "result-1",
+        score: 0.9,
+        content: "export function serializeWithMutex() { return queue.run(); }".repeat(30),
+        metadata: {
+          filePath: "src/mutex.ts",
+          lineStart: 10,
+          lineEnd: 20,
+          language: "typescript",
+          parentSymbol: "serializeWithMutex",
+          fileImports: 'import { queue } from "./queue";',
+          chunkIndex: 1,
+          totalChunks: 3,
+        },
+      }];
+
+      try {
+        const input = { query: "mutex queue", projectId: "project-1" };
+        const summary = await controller.searchProject({ ...input, responseMode: "summary" });
+        const full = await controller.searchProject({ ...input, responseMode: "full" });
+        const enriched = await controller.searchProject({ ...input, responseMode: "enriched" });
+
+        expect(summary.results[0]).not.toHaveProperty("content");
+        expect(summary.results[0]).not.toHaveProperty("chunkIndex");
+        expect(summary.results[0]).not.toHaveProperty("totalChunks");
+        expect(summary.results[0]).not.toHaveProperty("parentSymbol");
+        expect(summary.results[0]).not.toHaveProperty("fileImports");
+
+        expect(typeof full.results[0].content).toBe("string");
+        expect((full.results[0].content ?? "").length).toBeGreaterThan(1_500);
+        expect(full.results[0].chunkIndex).toBe(1);
+        expect(full.results[0].totalChunks).toBe(3);
+        expect(full.results[0]).not.toHaveProperty("parentSymbol");
+        expect(full.results[0]).not.toHaveProperty("fileImports");
+
+        expect(typeof enriched.results[0].content).toBe("string");
+        expect(enriched.results[0].chunkIndex).toBe(1);
+        expect(enriched.results[0].totalChunks).toBe(3);
+        expect(enriched.results[0].parentSymbol).toBe("serializeWithMutex");
+        expect(enriched.results[0].fileImports).toBe('import { queue } from "./queue";');
+        const summaryLength = JSON.stringify(summary).length;
+        const fullLength = JSON.stringify(full).length;
+        expect(summaryLength / fullLength).toBeLessThanOrEqual(0.6);
+      } finally {
+        ctx.search = original;
+      }
+    });
+  });
 });

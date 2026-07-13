@@ -9,6 +9,10 @@ import { createHash } from "crypto";
 import { Database } from "bun:sqlite";
 import { logger } from "@massa-th0th/shared";
 import { config } from "@massa-th0th/shared";
+import type {
+  EmbeddingCacheStats,
+  EmbeddingCacheStore,
+} from "./embedding-cache-contract.js";
 
 export interface EmbeddingCacheEntry {
   provider: string;
@@ -19,12 +23,7 @@ export interface EmbeddingCacheEntry {
   createdAt: number;
 }
 
-export interface EmbeddingCacheStats {
-  totalEntries: number;
-  cacheSize: number; // bytes
-  hitRate: number;
-  avgDimensions: number;
-}
+export type { EmbeddingCacheStats } from "./embedding-cache-contract.js";
 
 /**
  * Embedding Cache using SQLite
@@ -35,7 +34,7 @@ export interface EmbeddingCacheStats {
  * - Track dimensions for validation
  * - Automatic cleanup of old entries
  */
-export class EmbeddingCache {
+export class EmbeddingCache implements EmbeddingCacheStore {
   private db!: Database;
   private dbPath: string;
   private provider: string;
@@ -315,10 +314,10 @@ export class EmbeddingCache {
         .prepare(
           `
         DELETE FROM embedding_cache
-        WHERE created_at < ?
+        WHERE provider = ? AND model = ? AND created_at < ?
       `,
         )
-        .run(cutoff);
+        .run(this.provider, this.model, cutoff);
 
       if (result.changes > 0) {
         logger.info("Embedding cache cleaned up", {
@@ -359,7 +358,10 @@ export class EmbeddingCache {
 
       logger.info("Embedding cache closed", {
         hitRate:
-          ((this.hits / (this.hits + this.misses)) * 100).toFixed(1) + "%",
+          (this.hits + this.misses > 0
+            ? (this.hits / (this.hits + this.misses)) * 100
+            : 0
+          ).toFixed(1) + "%",
         hits: this.hits,
         misses: this.misses,
       });

@@ -15,8 +15,48 @@ import {
   MemoryRelationType,
   logger,
 } from "@massa-th0th/shared";
+import { Prisma } from "../../generated/prisma/index.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type { EdgeCreateInput, EdgeFilter, IGraphStore } from "./types.js";
+
+interface RawMemoryEdge {
+  id: number;
+  from_id: string;
+  to_id: string;
+  edge_type: string;
+  weight: number;
+  metadata: unknown | null;
+  created_at: Date;
+}
+
+function metadataForEdge(edge: EdgeCreateInput): Record<string, unknown> {
+  return {
+    autoExtracted: edge.autoExtracted ?? false,
+    ...(edge.evidence !== undefined ? { evidence: edge.evidence } : {}),
+  };
+}
+
+function rowToEdge(row: RawMemoryEdge): MemoryEdge {
+  const metadata = row.metadata && typeof row.metadata === "object"
+    ? row.metadata as Record<string, unknown>
+    : {};
+  const storedEvidence = metadata.evidence;
+
+  return {
+    id: row.id.toString(),
+    sourceId: row.from_id,
+    targetId: row.to_id,
+    relationType: row.edge_type as MemoryRelationType,
+    weight: row.weight,
+    evidence: typeof storedEvidence === "string"
+      ? storedEvidence
+      : row.metadata
+        ? JSON.stringify(row.metadata)
+        : undefined,
+    autoExtracted: metadata.autoExtracted === true,
+    createdAt: row.created_at,
+  };
+}
 
 /**
  * Lazily-initialized Prisma client proxy.
@@ -68,48 +108,35 @@ export class GraphStorePg implements IGraphStore {
       return null;
     }
 
-    // Parse evidence string to JSON if provided, otherwise null
-    let metadataJson = null;
-    if (edge.evidence) {
-      try {
-        metadataJson = JSON.parse(edge.evidence);
-      } catch {
-        // If parsing fails, store the string as-is in a wrapper object
-        metadataJson = { evidence: edge.evidence };
-      }
+    const weight = edge.weight ?? 1.0;
+    const metadata = JSON.stringify(metadataForEdge(edge));
+    try {
+      const rows = await prisma.$queryRaw<RawMemoryEdge[]>`
+        INSERT INTO memory_edges
+          (from_id, to_id, edge_type, weight, metadata, created_at, updated_at)
+        VALUES
+          (${edge.sourceId}, ${edge.targetId}, ${edge.relationType}, ${weight}, ${metadata}::jsonb, NOW(), NOW())
+        ON CONFLICT (from_id, to_id, edge_type) DO UPDATE SET
+          weight = GREATEST(memory_edges.weight, EXCLUDED.weight),
+          metadata = CASE
+            WHEN EXCLUDED.metadata ? 'evidence'
+            THEN jsonb_set(
+              COALESCE(memory_edges.metadata, '{}'::jsonb),
+              '{evidence}',
+              EXCLUDED.metadata->'evidence',
+              true
+            )
+            ELSE memory_edges.metadata
+          END,
+          updated_at = NOW()
+        RETURNING id, from_id, to_id, edge_type, weight, metadata, created_at
+      `;
+
+      return rows[0] ? rowToEdge(rows[0]) : null;
+    } catch (error) {
+      logger.error("Failed to create edge", error as Error);
+      return null;
     }
-
-    const result = await prisma.memoryEdge.upsert({
-      where: {
-        fromId_toId_edgeType: {
-          fromId: edge.sourceId,
-          toId: edge.targetId,
-          edgeType: edge.relationType,
-        },
-      },
-      create: {
-        fromId: edge.sourceId,
-        toId: edge.targetId,
-        edgeType: edge.relationType,
-        weight: edge.weight || 1.0,
-        metadata: metadataJson,
-      },
-      update: {
-        weight: edge.weight || 1.0,
-        metadata: metadataJson,
-      },
-    });
-
-    return {
-      id: result.id.toString(),
-      sourceId: result.fromId,
-      targetId: result.toId,
-      relationType: result.edgeType as MemoryRelationType,
-      weight: result.weight,
-      evidence: result.metadata ? JSON.stringify(result.metadata) : undefined,
-      autoExtracted: false, // PostgreSQL doesn't store this field yet
-      createdAt: result.createdAt,
-    };
   }
 
   /**
@@ -121,26 +148,16 @@ export class GraphStorePg implements IGraphStore {
     targetId: string,
     relationType: MemoryRelationType,
   ): Promise<MemoryEdge | null> {
-    const edge = await prisma.memoryEdge.findFirst({
-      where: {
-        fromId: sourceId,
-        toId: targetId,
-        edgeType: relationType,
-      },
-    });
+    const rows = await prisma.$queryRaw<RawMemoryEdge[]>`
+      SELECT id, from_id, to_id, edge_type, weight, metadata, created_at
+      FROM memory_edges
+      WHERE from_id = ${sourceId}
+        AND to_id = ${targetId}
+        AND edge_type = ${relationType}
+      LIMIT 1
+    `;
 
-    if (!edge) return null;
-
-    return {
-      id: edge.id.toString(),
-      sourceId: edge.fromId,
-      targetId: edge.toId,
-      relationType: edge.edgeType as MemoryRelationType,
-      weight: edge.weight,
-      evidence: edge.metadata ? JSON.stringify(edge.metadata) : undefined,
-      autoExtracted: false,
-      createdAt: edge.createdAt,
-    };
+    return rows[0] ? rowToEdge(rows[0]) : null;
   }
 
   /**
@@ -235,27 +252,30 @@ export class GraphStorePg implements IGraphStore {
    * IGraphStore-conformant; replaces the legacy `getConnectedEdges` name.
    */
   async getAllEdges(memoryId: string, filter?: EdgeFilter): Promise<MemoryEdge[]> {
-    const edges = await prisma.memoryEdge.findMany({
-      where: {
-        OR: [
-          { fromId: memoryId },
-          { toId: memoryId },
-        ],
-      },
-      orderBy: { weight: 'desc' },
-      take: filter?.limit || 100,
-    });
+    const conditions: Prisma.Sql[] = [
+      Prisma.sql`(from_id = ${memoryId} OR to_id = ${memoryId})`,
+    ];
+    if (filter?.relationTypes?.length) {
+      conditions.push(Prisma.sql`edge_type = ANY(${filter.relationTypes}::text[])`);
+    }
+    if (filter?.minWeight !== undefined) {
+      conditions.push(Prisma.sql`weight >= ${filter.minWeight}`);
+    }
+    if (filter?.autoExtractedOnly) {
+      conditions.push(
+        Prisma.sql`COALESCE((metadata->>'autoExtracted')::boolean, false) = true`,
+      );
+    }
+    const limit = filter?.limit ?? 50;
+    const rows = await prisma.$queryRaw<RawMemoryEdge[]>(Prisma.sql`
+      SELECT id, from_id, to_id, edge_type, weight, metadata, created_at
+      FROM memory_edges
+      WHERE ${Prisma.join(conditions, " AND ")}
+      ORDER BY weight DESC, created_at DESC
+      LIMIT ${limit}
+    `);
 
-    return edges.map(edge => ({
-      id: edge.id.toString(),
-      sourceId: edge.fromId,
-      targetId: edge.toId,
-      relationType: edge.edgeType as MemoryRelationType,
-      weight: edge.weight,
-      evidence: edge.metadata ? JSON.stringify(edge.metadata) : undefined,
-      autoExtracted: false,
-      createdAt: edge.createdAt,
-    }));
+    return rows.map(rowToEdge);
   }
 
   /**
@@ -269,21 +289,20 @@ export class GraphStorePg implements IGraphStore {
    * Legacy alias kept for callers that used the PG-specific name.
    */
   async updateEdgeWeight(id: string, weight: number): Promise<boolean> {
-    try {
-      await prisma.memoryEdge.update({
-        where: { id: parseInt(id) },
-        data: { weight },
-      });
-      return true;
-    } catch {
-      return false;
-    }
+    const numericId = Number.parseInt(id, 10);
+    if (!Number.isSafeInteger(numericId)) return false;
+    const clamped = Math.max(0, Math.min(1, weight));
+    const changed = await prisma.$executeRaw`
+      UPDATE memory_edges SET weight = ${clamped}, updated_at = NOW()
+      WHERE id = ${numericId}
+    `;
+    return changed > 0;
   }
 
   /**
    * Atomically increment edge weight by delta, capped at maxWeight.
-   * IGraphStore-conformant; PG implementation uses a read-modify-write
-   * guarded by the unique (fromId,toId,edgeType) constraint.
+   * IGraphStore-conformant; the single UPDATE prevents lost increments when
+   * multiple reinforcement calls race.
    */
   async incrementEdgeWeight(
     sourceId: string,
@@ -292,10 +311,14 @@ export class GraphStorePg implements IGraphStore {
     delta: number,
     maxWeight = 1.0,
   ): Promise<boolean> {
-    const existing = await this.getEdge(sourceId, targetId, relationType);
-    if (!existing) return false;
-    const newWeight = Math.min(maxWeight, existing.weight + delta);
-    return this.updateEdgeWeight(existing.id, newWeight);
+    const changed = await prisma.$executeRaw`
+      UPDATE memory_edges
+      SET weight = LEAST(weight + ${delta}, ${maxWeight}), updated_at = NOW()
+      WHERE from_id = ${sourceId}
+        AND to_id = ${targetId}
+        AND edge_type = ${relationType}
+    `;
+    return changed > 0;
   }
 
   /**
@@ -343,7 +366,7 @@ export class GraphStorePg implements IGraphStore {
     const results = await Promise.all(
       edges.map(edge => this.createEdge(edge))
     );
-    return results.length;
+    return results.filter((edge) => edge !== null).length;
   }
 
   // ── Analytics ──────────────────────────────────────────────────
@@ -391,28 +414,36 @@ export class GraphStorePg implements IGraphStore {
     autoExtracted: number;
     avgWeight: number;
   }> {
-    const totalEdges = await prisma.memoryEdge.count();
-
-    const edgesByTypeRaw = await prisma.memoryEdge.groupBy({
-      by: ['edgeType'],
-      _count: { edgeType: true },
-    });
-
+    const totals = await prisma.$queryRaw<Array<{
+      total: bigint;
+      auto_extracted: bigint;
+      avg_weight: number | null;
+    }>>`
+      SELECT
+        COUNT(*) AS total,
+        COUNT(*) FILTER (
+          WHERE COALESCE((metadata->>'autoExtracted')::boolean, false) = true
+        ) AS auto_extracted,
+        AVG(weight) AS avg_weight
+      FROM memory_edges
+    `;
+    const relationRows = await prisma.$queryRaw<Array<{
+      edge_type: string;
+      count: bigint;
+    }>>`
+      SELECT edge_type, COUNT(*) AS count
+      FROM memory_edges
+      GROUP BY edge_type
+    `;
     const byRelation: Record<string, number> = {};
-    for (const group of edgesByTypeRaw) {
-      byRelation[group.edgeType] = group._count.edgeType;
-    }
-
-    const avgWeightResult = await prisma.memoryEdge.aggregate({
-      _avg: { weight: true },
-    });
+    for (const row of relationRows) byRelation[row.edge_type] = Number(row.count);
+    const total = totals[0];
 
     return {
-      totalEdges,
+      totalEdges: Number(total?.total ?? 0),
       byRelation,
-      // PG schema doesn't track auto-extraction yet; report 0 for parity.
-      autoExtracted: 0,
-      avgWeight: avgWeightResult._avg.weight || 0,
+      autoExtracted: Number(total?.auto_extracted ?? 0),
+      avgWeight: Math.round((total?.avg_weight ?? 0) * 100) / 100,
     };
   }
 

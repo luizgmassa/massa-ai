@@ -110,6 +110,18 @@
         "tasks": true,
         "execute": true
       }
+    },
+    {
+      "slug": "repository-maintenance-2026-07-12",
+      "title": "Repository maintenance and PostgreSQL verification",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
     }
   ]
 }

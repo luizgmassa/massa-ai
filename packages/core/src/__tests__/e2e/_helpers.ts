@@ -37,6 +37,33 @@ export interface Availability {
   EMBEDDING_MODEL?: string;
 }
 
+/**
+ * Resolve the backend attested by the E2E environment.
+ *
+ * `/system/info` reports the API's local cache files, which legitimately
+ * include SQLite databases even when PostgreSQL is the primary data plane.
+ * A dedicated E2E stack therefore uses its explicit VECTOR_STORE_TYPE as the
+ * authoritative declaration. Non-dedicated runs retain the legacy cache-file
+ * heuristic because their local environment may not describe the remote API.
+ */
+export function resolveBackendAttestation(
+  dedicated: boolean,
+  explicitType: string | undefined,
+  databaseSizes: unknown,
+): Backend {
+  if (dedicated && (explicitType === "postgres" || explicitType === "sqlite")) {
+    return explicitType;
+  }
+
+  if (databaseSizes && typeof databaseSizes === "object" && !Array.isArray(databaseSizes)) {
+    return Object.keys(databaseSizes).some((key) => key.endsWith(".db"))
+      ? "sqlite"
+      : "unknown";
+  }
+
+  return "unknown";
+}
+
 // ── Prefix guard ────────────────────────────────────────────────────────────
 
 /** Hard guard: refuse to operate on any projectId outside the e2e prefix. */
@@ -98,10 +125,11 @@ export async function probeAvailability(): Promise<Availability> {
       const info = await fetch(`${API}/api/v1/system/info`, {
         signal: AbortSignal.timeout(4000),
       }).then((r) => r.json() as Promise<any>);
-      const sizes = info?.databases?.sizes;
-      if (sizes && typeof sizes === "object") {
-        BACKEND = Object.keys(sizes).some((k) => k.endsWith(".db")) ? "sqlite" : "unknown";
-      }
+      BACKEND = resolveBackendAttestation(
+        process.env.MASSA_TH0TH_DEDICATED === "1",
+        process.env.VECTOR_STORE_TYPE,
+        info?.databases?.sizes,
+      );
     } catch {
       /* leave unknown */
     }

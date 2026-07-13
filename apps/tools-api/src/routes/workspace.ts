@@ -51,6 +51,30 @@ function boundedInt(
   return Math.max(min, Math.min(max, i));
 }
 
+function firstQueryValue(
+  value: string | string[] | undefined,
+): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+const TRACE_EDGE_TYPES = [
+  "call",
+  "data_flow",
+  "http_call",
+  "emit",
+  "listen",
+  "import",
+  "type_ref",
+  "extend",
+  "implement",
+] as const;
+
+type TraceEdgeType = (typeof TRACE_EDGE_TYPES)[number];
+
+function isTraceEdgeType(value: string): value is TraceEdgeType {
+  return (TRACE_EDGE_TYPES as readonly string[]).includes(value);
+}
+
 /**
  * Resolve a path to its canonical realpath, falling back to the lexical
  * absolute path if the target doesn't exist (so the boundary check still
@@ -324,7 +348,8 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
           edge_types,
         } = query as Record<string, string | string[] | undefined>;
 
-        if (!projectId)
+        const normalizedProjectId = firstQueryValue(projectId);
+        if (!normalizedProjectId)
           return { success: false, error: "projectId is required" };
         const seed = (function_name ?? symbol ?? qualifiedName) as
           | string
@@ -336,7 +361,7 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
           };
 
         const result = await getGraphController().tracePath({
-          projectId,
+          projectId: normalizedProjectId,
           function_name: function_name as string | undefined,
           symbol: symbol as string | undefined,
           qualifiedName: qualifiedName as string | undefined,
@@ -360,6 +385,7 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
             ? (Array.isArray(edge_types) ? edge_types : (edge_types as string).split(","))
                 .filter(Boolean)
                 .map((t) => t.trim())
+                .filter(isTraceEdgeType)
             : undefined,
         });
 

@@ -14,7 +14,24 @@
       "dependsOn": ["^build"]
     },
     "test": {
-      "dependsOn": ["build"]
+      "dependsOn": ["build"],
+      "cache": false,
+      "passThroughEnv": [
+        "DATABASE_URL",
+        "POSTGRES_VECTOR_URL",
+        "VECTOR_STORE_TYPE",
+        "MASSA_TH0TH_API_URL",
+        "MASSA_TH0TH_API_KEY",
+        "MASSA_TH0TH_DEDICATED",
+        "LLM_JUDGE_PROBE_URL",
+        "OLLAMA_BASE_URL",
+        "RLM_LLM_BASE_URL",
+        "RLM_LLM_CODE_MODEL",
+        "RLM_LLM_ENABLED",
+        "RLM_LLM_MODEL",
+        "RUN_E2E",
+        "RUN_E2E_DESTRUCTIVE"
+      ]
     },
     "lint": {}
   }

@@ -52,6 +52,14 @@ export interface ImpactAnalysisOptions {
   paths?: string[];
   /** Injectable diff runner (tests pass a stub; production runs real git). */
   diffRunner?: (projectPath: string, scope: ImpactScope, baseBranch?: string, since?: string) => string[];
+  /**
+   * Injectable symbol repository (tests pass an instrumented stub; production
+   * resolves the singleton via {@link getSymbolRepository}). Using this seam
+   * instead of `mock.module` on the factory avoids a process-wide mock that
+   * leaks into concurrently-run sibling suites (which then crash the ETL
+   * pipeline with "clearProject is not a function" on the real repo).
+   */
+  repoOverride?: ReturnType<typeof getSymbolRepository>;
 }
 
 export interface ChangedFile {
@@ -133,7 +141,7 @@ export class ImpactAnalysisService {
     const projectId = opts.projectId;
     const scope = opts.scope;
     const depth = Math.max(0, Math.min(MAX_DEPTH, opts.depth ?? DEFAULT_DEPTH));
-    const repo = getSymbolRepository();
+    const repo = opts.repoOverride ?? getSymbolRepository();
 
     // ── 1. Changed files (scoped git diff) ──────────────────────────────────
     const runDiff = opts.diffRunner ?? defaultDiffRunner;
@@ -420,8 +428,45 @@ export function defaultDiffRunner(
   if (scope === "staged") {
     args.push("--cached");
   } else if (scope === "committed") {
-    const ref = since ?? baseBranch ?? "main";
-    args.push(`${ref}...HEAD`);
+    let ref = baseBranch ?? "main";
+    let diffRange: string | undefined;
+    if (since) {
+      try {
+        // A commit-ish (branch, tag, or SHA) can be used directly.
+        ref = execFileSync("git", ["-C", projectPath, "rev-parse", "--verify", `${since}^{commit}`], {
+          cwd: projectPath,
+          encoding: "utf-8",
+          stdio: ["ignore", "pipe", "pipe"],
+        }).trim();
+      } catch {
+        // `since` also accepts a date. Resolve it to the newest commit at or
+        // before that date before constructing the diff range; Git does not
+        // accept a raw date as the left side of `<ref>...HEAD`.
+        ref = execFileSync(
+          "git",
+          ["-C", projectPath, "rev-list", "-1", `--before=${since}`, "HEAD"],
+          {
+            cwd: projectPath,
+            encoding: "utf-8",
+            stdio: ["ignore", "pipe", "pipe"],
+          },
+        ).trim();
+        if (!ref) {
+          // The requested date predates repository history. Diff HEAD against
+          // Git's canonical empty tree so every file introduced since that
+          // date is included; a three-dot range cannot use a tree as a merge
+          // base, so record the explicit two-endpoint range here.
+          const emptyTree = execFileSync("git", ["hash-object", "-t", "tree", "--stdin"], {
+            cwd: projectPath,
+            encoding: "utf-8",
+            input: "",
+            stdio: ["ignore", "pipe", "pipe"],
+          }).trim();
+          diffRange = `${emptyTree}..HEAD`;
+        }
+      }
+    }
+    args.push(diffRange ?? `${ref}...HEAD`);
   }
   // unstaged: no extra args (working-tree vs index)
 

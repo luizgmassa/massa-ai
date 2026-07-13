@@ -8,13 +8,8 @@
  * (both terminal). Approved proposals are applied to the memory store;
  * rejected proposals are retained for the audit trail.
  *
- * Backend: SQLite-canonical (same posture as HandoffStore /
- * ObservationStore / SessionStore / JobStore — proposals are agent-runtime
- * state, not analytics queried cross-project on PG). A
- * MemoryProposalStore (in-memory) is provided as a test / fallback impl.
- * PG parity is provided via the additive Prisma `Proposal` model in
- * packages/core/prisma/schema.prisma; a future PgProposalStore can use it.
- * The factory never short-circuits on `isPostgresEnabled()`.
+ * Backend-polymorphic: PostgreSQL deployments use PgProposalStore; local
+ * deployments retain the SQLite-canonical store and in-memory fallback.
  */
 
 import { config, logger } from "@massa-th0th/shared";
@@ -287,18 +282,31 @@ export class SqliteProposalStore implements ProposalStore {
 let cachedStore: ProposalStore | null = null;
 
 /**
- * Returns a SqliteProposalStore, falling back to MemoryProposalStore on
- * failure. Mirrors getHandoffStore() / getObservationStore().
+ * Selects PostgreSQL from DATABASE_URL, otherwise SQLite; construction
+ * failures fall back to MemoryProposalStore.
  */
 export function getProposalStore(): ProposalStore {
   if (cachedStore) return cachedStore;
+  const databaseUrl = process.env.DATABASE_URL;
+  const isPostgres =
+    databaseUrl?.startsWith("postgresql://") || databaseUrl?.startsWith("postgres://");
   try {
-    const store = new SqliteProposalStore();
-    // Probe: force the DB to open + create the schema. If it throws, fall back.
-    store.journalMode();
-    cachedStore = store;
+    if (isPostgres) {
+      const { PgProposalStore } = require("./proposal-repository-pg.js") as {
+        PgProposalStore: new () => ProposalStore;
+      };
+      cachedStore = new PgProposalStore();
+      logger.info("Using PostgreSQL ProposalStore");
+    } else {
+      const store = new SqliteProposalStore();
+      // Probe: force the DB to open + create the schema. If it throws, fall back.
+      store.journalMode();
+      cachedStore = store;
+    }
   } catch {
-    logger.warn("SqliteProposalStore unavailable — using ephemeral MemoryProposalStore");
+    logger.warn("ProposalStore unavailable — using ephemeral MemoryProposalStore", {
+      backend: isPostgres ? "postgres" : "sqlite",
+    });
     cachedStore = new MemoryProposalStore();
   }
   return cachedStore;

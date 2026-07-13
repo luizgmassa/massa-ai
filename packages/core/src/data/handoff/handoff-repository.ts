@@ -7,13 +7,8 @@
  * questions, next steps, and referenced files. The status state machine
  * is open → accepted | expired (both terminal).
  *
- * Backend: SQLite-canonical (same posture as ObservationStore /
- * SessionStore / JobStore — handoffs are agent-runtime state, not
- * analytics queried cross-project on PG). A MemoryHandoffStore (in-memory)
- * is provided as a test / fallback impl. PG parity is provided via the
- * additive Prisma `Handoff` model in packages/core/prisma/schema.prisma;
- * a future PgHandoffStore can use it. The factory never short-circuits on
- * `isPostgresEnabled()`.
+ * Backend-polymorphic: PostgreSQL deployments use PgHandoffStore; local
+ * deployments retain the SQLite-canonical store and in-memory fallback.
  */
 
 import { config, logger } from "@massa-th0th/shared";
@@ -292,18 +287,31 @@ export class SqliteHandoffStore implements HandoffStore {
 let cachedStore: HandoffStore | null = null;
 
 /**
- * Returns a SqliteHandoffStore, falling back to MemoryHandoffStore on
- * failure. Mirrors getObservationStore() / getSessionStore() / getJobStore().
+ * Selects PostgreSQL from DATABASE_URL, otherwise SQLite; construction
+ * failures fall back to MemoryHandoffStore.
  */
 export function getHandoffStore(): HandoffStore {
   if (cachedStore) return cachedStore;
+  const databaseUrl = process.env.DATABASE_URL;
+  const isPostgres =
+    databaseUrl?.startsWith("postgresql://") || databaseUrl?.startsWith("postgres://");
   try {
-    const store = new SqliteHandoffStore();
-    // Probe: force the DB to open + create the schema. If it throws, fall back.
-    store.journalMode();
-    cachedStore = store;
+    if (isPostgres) {
+      const { PgHandoffStore } = require("./handoff-repository-pg.js") as {
+        PgHandoffStore: new () => HandoffStore;
+      };
+      cachedStore = new PgHandoffStore();
+      logger.info("Using PostgreSQL HandoffStore");
+    } else {
+      const store = new SqliteHandoffStore();
+      // Probe: force the DB to open + create the schema. If it throws, fall back.
+      store.journalMode();
+      cachedStore = store;
+    }
   } catch {
-    logger.warn("SqliteHandoffStore unavailable — using ephemeral MemoryHandoffStore");
+    logger.warn("HandoffStore unavailable — using ephemeral MemoryHandoffStore", {
+      backend: isPostgres ? "postgres" : "sqlite",
+    });
     cachedStore = new MemoryHandoffStore();
   }
   return cachedStore;

@@ -22,6 +22,9 @@ import { LoadStage } from "./stages/load.js";
 import { eventBus } from "../events/event-bus.js";
 import { getSymbolRepository } from "../../data/sqlite/symbol-repository-factory.js";
 import { indexJobTracker } from "../jobs/index-job-tracker.js";
+import { getSearchCache } from "../search/cache-factory.js";
+import { getVectorStore } from "../../data/vector/vector-store-factory.js";
+import { getKeywordSearch } from "../../data/sqlite/keyword-search-factory.js";
 import type { EtlStageContext, EtlEvent, EtlResult, EtlStage } from "./stage-context.js";
 
 export interface PipelineInput {
@@ -42,6 +45,7 @@ export interface PipelineInput {
 
 export class EtlPipeline {
   private static instance: EtlPipeline | null = null;
+  private static runTails = new Map<string, Promise<void>>();
 
   private readonly discover = new DiscoverStage();
   private readonly parse = new ParseStage();
@@ -58,6 +62,32 @@ export class EtlPipeline {
   }
 
   async run(input: PipelineInput): Promise<EtlResult> {
+    const previous = EtlPipeline.runTails.get(input.projectId);
+    let release!: () => void;
+    const tail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    EtlPipeline.runTails.set(input.projectId, tail);
+
+    if (previous) {
+      logger.info("EtlPipeline: waiting for prior project run", {
+        projectId: input.projectId,
+        jobId: input.jobId,
+      });
+      await previous;
+    }
+
+    try {
+      return await this.runInternal(input);
+    } finally {
+      if (EtlPipeline.runTails.get(input.projectId) === tail) {
+        EtlPipeline.runTails.delete(input.projectId);
+      }
+      release();
+    }
+  }
+
+  private async runInternal(input: PipelineInput): Promise<EtlResult> {
     const { projectId, projectPath, jobId, forceReindex = false, filesToProcess, include_tests = false } = input;
     const t0 = performance.now();
     const stageTimings: Record<EtlStage, number> = {
@@ -67,10 +97,22 @@ export class EtlPipeline {
       load: 0,
     };
 
-    // If force, wipe all symbol data for this project
+    // If force, wipe every search representation for this project. Clearing
+    // only symbols leaves stale vector/keyword chunks when files shrink or
+    // disappear between full reindexes.
     if (forceReindex) {
-      await getSymbolRepository().clearProject(projectId);
-      logger.info("EtlPipeline: cleared symbol data for full reindex", { projectId });
+      const vectorStore = await getVectorStore();
+      const keywordSearch = getKeywordSearch();
+      const [vectorDeleted, keywordDeleted] = await Promise.all([
+        vectorStore.deleteByProject(projectId),
+        keywordSearch.deleteByProject(projectId),
+        getSymbolRepository().clearProject(projectId),
+      ]);
+      logger.info("EtlPipeline: cleared project data for full reindex", {
+        projectId,
+        vectorDeleted,
+        keywordDeleted,
+      });
     }
 
     // Build stage context with event emission
@@ -156,6 +198,19 @@ export class EtlPipeline {
         durationMs,
         stageTimings,
       };
+
+      if (result.errors > 0) {
+        throw new Error(
+          `ETL completed with ${result.errors} file error${result.errors === 1 ? "" : "s"}`,
+        );
+      }
+
+      // Index mutations invalidate every cached result for this project,
+      // including cached misses created while the index was still cold. Do
+      // this before publishing completion / marking the job terminal so a
+      // status poller can safely query the newly materialized data as soon as
+      // it observes `completed`.
+      await getSearchCache().invalidateProject(projectId);
 
       eventBus.publish("indexing:completed", {
         jobId,

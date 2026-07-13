@@ -8,8 +8,10 @@
 import { createHash } from "crypto";
 import { getPrismaClient } from "../query/prisma-client.js";
 import { logger } from "@massa-th0th/shared";
-
-const prisma = getPrismaClient();
+import type {
+  EmbeddingCacheStats,
+  EmbeddingCacheStore,
+} from "./embedding-cache-contract.js";
 
 export interface EmbeddingCacheEntry {
   provider?: string;
@@ -20,24 +22,20 @@ export interface EmbeddingCacheEntry {
   createdAt: number;
 }
 
-export interface EmbeddingCacheStats {
-  totalEntries: number;
-  cacheSize: number; // bytes
-  hitRate: number;
-  avgDimensions: number;
-}
+export type { EmbeddingCacheStats } from "./embedding-cache-contract.js";
 
 /**
  * Embedding Cache using PostgreSQL
  *
  * Pattern:
  * - Use SHA-256 hash of content as cache key
- * - Store model + hash as composite key
+ * - Namespace the primary key by provider + model + exact content hash
  * - Track dimensions for validation
  * - Automatic cleanup of old entries
  */
-export class EmbeddingCachePg {
-  private model: string;
+export class EmbeddingCachePg implements EmbeddingCacheStore {
+  private readonly model: string;
+  private readonly namespace: string;
 
   // Stats tracking
   private hits: number = 0;
@@ -45,14 +43,22 @@ export class EmbeddingCachePg {
 
   constructor(provider: string, model: string) {
     this.model = model;
-    logger.info("EmbeddingCachePg initialized (PostgreSQL)", { model });
+    this.namespace = createHash("sha256")
+      .update(`${provider}\0${model}`, "utf8")
+      .digest("hex");
+    logger.info("EmbeddingCachePg initialized (PostgreSQL)", { provider, model });
+  }
+
+  private get prisma() {
+    return getPrismaClient();
   }
 
   /**
    * Hash text content using SHA-256
    */
   private hashContent(text: string): string {
-    return createHash("sha256").update(text.trim()).digest("hex");
+    const contentHash = createHash("sha256").update(text, "utf8").digest("hex");
+    return `${this.namespace}:${contentHash}`;
   }
 
   /**
@@ -85,16 +91,16 @@ export class EmbeddingCachePg {
   async get(text: string): Promise<number[] | null> {
     const contentHash = this.hashContent(text);
 
-    const entry = await prisma.embeddingCache.findFirst({
-      where: { textHash: contentHash, model: this.model },
+    const entry = await this.prisma.embeddingCache.findUnique({
+      where: { textHash: contentHash },
     });
 
     if (entry) {
       this.hits++;
 
       // Update access stats for this (hash, model) pair only
-      await prisma.embeddingCache.updateMany({
-        where: { textHash: contentHash, model: this.model },
+      await this.prisma.embeddingCache.update({
+        where: { textHash: contentHash },
         data: {
           accessedAt: new Date(),
           hitCount: { increment: 1 },
@@ -115,26 +121,19 @@ export class EmbeddingCachePg {
     const contentHash = this.hashContent(text);
     const embeddingBytes = this.serializeEmbedding(embedding) as any;
 
-    const existing = await prisma.embeddingCache.findFirst({
-      where: { textHash: contentHash, model: this.model },
-      select: { textHash: true },
+    const now = new Date();
+    await this.prisma.embeddingCache.upsert({
+      where: { textHash: contentHash },
+      update: { embedding: embeddingBytes, model: this.model, createdAt: now, accessedAt: now },
+      create: {
+        textHash: contentHash,
+        embedding: embeddingBytes,
+        model: this.model,
+        createdAt: now,
+        accessedAt: now,
+        hitCount: 0,
+      },
     });
-
-    if (existing) {
-      await prisma.embeddingCache.updateMany({
-        where: { textHash: contentHash, model: this.model },
-        data: { embedding: embeddingBytes, accessedAt: new Date() },
-      });
-    } else {
-      await prisma.embeddingCache.create({
-        data: {
-          textHash: contentHash,
-          embedding: embeddingBytes,
-          model: this.model,
-          hitCount: 1,
-        },
-      });
-    }
   }
 
   /**
@@ -143,10 +142,10 @@ export class EmbeddingCachePg {
   async getBatch(texts: string[]): Promise<(number[] | null)[]> {
     const hashes = texts.map(text => this.hashContent(text));
 
-    const entries = await prisma.embeddingCache.findMany({
+    if (texts.length === 0) return [];
+    const entries = await this.prisma.embeddingCache.findMany({
       where: {
         textHash: { in: hashes },
-        model: this.model,
       },
     });
 
@@ -154,30 +153,67 @@ export class EmbeddingCachePg {
       entries.map(entry => [entry.textHash, this.deserializeEmbedding(entry.embedding)])
     );
 
-    return hashes.map(hash => entryMap.get(hash) || null);
+    const now = new Date();
+    const foundHashes = new Set(entries.map((entry) => entry.textHash));
+    if (foundHashes.size > 0) {
+      await this.prisma.embeddingCache.updateMany({
+        where: { textHash: { in: [...foundHashes] } },
+        data: { accessedAt: now, hitCount: { increment: 1 } },
+      });
+    }
+
+    return hashes.map((hash) => {
+      const embedding = entryMap.get(hash);
+      if (embedding) {
+        this.hits++;
+        return embedding;
+      }
+      this.misses++;
+      return null;
+    });
   }
 
   /**
    * Batch store embeddings
    */
-  async setBatch(items: Array<{ text: string; embedding: number[] }>): Promise<void> {
-    for (const item of items) {
-      await this.set(item.text, item.embedding);
+  async setBatch(texts: string[], embeddings: number[][]): Promise<void> {
+    if (texts.length !== embeddings.length) {
+      throw new Error("Texts and embeddings arrays must have same length");
     }
+    const now = new Date();
+    await this.prisma.$transaction(
+      texts.map((text, index) => {
+        const textHash = this.hashContent(text);
+        const embedding = this.serializeEmbedding(embeddings[index]!) as any;
+        return this.prisma.embeddingCache.upsert({
+          where: { textHash },
+          update: { embedding, model: this.model, createdAt: now, accessedAt: now },
+          create: {
+            textHash,
+            embedding,
+            model: this.model,
+            createdAt: now,
+            accessedAt: now,
+            hitCount: 0,
+          },
+        });
+      }),
+    );
   }
 
   /**
    * Get cache statistics
    */
   async getStats(): Promise<EmbeddingCacheStats> {
-    const [stats] = await prisma.$queryRaw<
+    const prefix = `${this.namespace}:%`;
+    const [stats] = await this.prisma.$queryRaw<
       Array<{ total_entries: bigint; total_size: bigint }>
     >`
       SELECT
         COUNT(*)                                    AS total_entries,
         COALESCE(SUM(octet_length(embedding)), 0)   AS total_size
-      FROM "EmbeddingCache"
-      WHERE model = ${this.model}
+      FROM embedding_cache
+      WHERE model = ${this.model} AND text_hash LIKE ${prefix}
     `;
 
     const totalEntries = Number(stats?.total_entries ?? 0);
@@ -194,14 +230,14 @@ export class EmbeddingCachePg {
   /**
    * Clean up old entries
    */
-  async cleanup(maxAgeDays: number = 30): Promise<number> {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - maxAgeDays);
+  async cleanup(maxAgeMs: number): Promise<number> {
+    const cutoffDate = new Date(Date.now() - maxAgeMs);
 
-    const result = await prisma.embeddingCache.deleteMany({
+    const result = await this.prisma.embeddingCache.deleteMany({
       where: {
         model: this.model,
-        accessedAt: { lt: cutoffDate },
+        textHash: { startsWith: `${this.namespace}:` },
+        createdAt: { lt: cutoffDate },
       },
     });
 
@@ -212,8 +248,11 @@ export class EmbeddingCachePg {
    * Clear all cache entries for this model
    */
   async clear(): Promise<number> {
-    const result = await prisma.embeddingCache.deleteMany({
-      where: { model: this.model },
+    const result = await this.prisma.embeddingCache.deleteMany({
+      where: {
+        model: this.model,
+        textHash: { startsWith: `${this.namespace}:` },
+      },
     });
 
     this.hits = 0;

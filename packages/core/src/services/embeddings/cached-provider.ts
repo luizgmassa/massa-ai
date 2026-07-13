@@ -15,7 +15,7 @@
 
 import type { EmbeddingProvider } from "./provider.js";
 import type { EmbeddingProviderConfig } from "./config.js";
-import { EmbeddingCache } from "../cache/embedding-cache.js";
+import type { EmbeddingCacheStore } from "../cache/embedding-cache-contract.js";
 
 /**
  * Cache statistics for monitoring performance
@@ -43,7 +43,7 @@ export class CachedEmbeddingProvider implements EmbeddingProvider {
 
   constructor(
     private readonly baseProvider: EmbeddingProvider,
-    private readonly cache: EmbeddingCache,
+    private readonly cache: EmbeddingCacheStore,
   ) {
     this.id = `${baseProvider.id}-cached`;
     this.model = baseProvider.model;
@@ -197,7 +197,7 @@ export class CachedEmbeddingProvider implements EmbeddingProvider {
  */
 export function withCache(
   provider: EmbeddingProvider,
-  cache: EmbeddingCache,
+  cache: EmbeddingCacheStore,
 ): CachedEmbeddingProvider {
   return new CachedEmbeddingProvider(provider, cache);
 }

@@ -292,9 +292,8 @@ model Observation {
 
 // ========================================
 // Handoff (Phase 6, G2) — cross-session handoff records.
-// SQLite-canonical; this model provides PG parity so a Postgres deployment
-// can also store handoffs. The default local-first path uses the
-// SqliteHandoffStore (handoffs.db) via the polymorphic factory.
+// PostgreSQL deployments use PgHandoffStore; local deployments retain the
+// SQLite-canonical handoffs.db store via the polymorphic factory.
 // ========================================
 model Handoff {
   id               String    @id
@@ -311,14 +310,14 @@ model Handoff {
 
   @@index([projectId, status])
   @@index([targetAgent, status])
+  @@index([createdAt(sort: Desc)])
   @@map("handoffs")
 }
 
 // ========================================
 // Proposal (Phase 5, G7) — auto-improvement proposals.
-// SQLite-canonical; this model provides PG parity so a Postgres deployment
-// can also store proposals. The default local-first path uses the
-// SqliteProposalStore (proposals.db) via the polymorphic factory.
+// PostgreSQL deployments use PgProposalStore; local deployments retain the
+// SQLite-canonical proposals.db store via the polymorphic factory.
 // ========================================
 model Proposal {
   id              String    @id
@@ -332,6 +331,7 @@ model Proposal {
   decidedAt       DateTime? @map("decided_at")
 
   @@index([projectId, status])
+  @@index([createdAt(sort: Desc)])
   @@map("proposals")
 }
 

@@ -10,6 +10,7 @@ import {
   GetIndexStatusTool,
   IndexProjectTool,
   getMemoryRepository,
+  getKeywordSearch,
   getSearchCache,
   getVectorStore,
   workspaceManager,
@@ -119,7 +120,15 @@ export const projectRoutes = new Elysia({ prefix: "/api/v1/project" })
       if (clearVectors) {
         try {
           const vectorStore = await getVectorStore();
-          result.vectorsDeleted = await vectorStore.deleteByProject(projectId);
+          const keywordSearch = getKeywordSearch();
+          const [vectorsDeleted, keywordsDeleted] = await Promise.all([
+            vectorStore.deleteByProject(projectId),
+            keywordSearch.deleteByProject(projectId),
+          ]);
+          result.vectorsDeleted = vectorsDeleted;
+          // Lexical rows are another representation of the indexed chunks,
+          // so clearVectors governs both semantic and lexical search data.
+          result.keywordsDeleted = keywordsDeleted;
           // Invalidate the in-process search cache (L1 + L2). Without this,
           // queries served from L1 keep returning stale chunk metadata
           // (file/lineStart/lineEnd) until the process restarts.

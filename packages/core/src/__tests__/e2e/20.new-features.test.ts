@@ -313,13 +313,15 @@ describe.skipIf(!READY)("T11c synapse PG persistence (session create + re-fetch)
       const prime = await httpPost<any>(`/api/v1/synapse/session/${sessionId}/prime`, {
         entries: [
           {
-            memoryId: `t11c-mem-${RUN_STAMP}-1`,
+            id: `t11c-mem-${RUN_STAMP}-1`,
             content: "T11c prime entry 1",
             score: 0.9,
-            filePath: "packages/core/src/__tests__/e2e/20.new-features.test.ts",
+            metadata: {
+              filePath: "packages/core/src/__tests__/e2e/20.new-features.test.ts",
+            },
           },
           {
-            memoryId: `t11c-mem-${RUN_STAMP}-2`,
+            id: `t11c-mem-${RUN_STAMP}-2`,
             content: "T11c prime entry 2",
             score: 0.7,
           },
@@ -327,6 +329,8 @@ describe.skipIf(!READY)("T11c synapse PG persistence (session create + re-fetch)
       });
       console.log(`[T11c:SP2] prime response: ${JSON.stringify(prime).slice(0, 300)}`);
       expect(prime?.success).toBe(true);
+      expect(prime?.data?.primed).toBe(2);
+      expect(prime?.data?.bufferSize).toBeGreaterThanOrEqual(2);
 
       // Access: record an access for affinity scoring.
       const access = await httpPost<any>(`/api/v1/synapse/session/${sessionId}/access`, {

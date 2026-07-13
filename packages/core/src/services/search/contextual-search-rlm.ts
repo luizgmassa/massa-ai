@@ -598,7 +598,13 @@ export class ContextualSearchRLM {
     });
 
     // Check cache first
-    const cacheOptions = { maxResults, minScore, explainScores };
+    const cacheOptions = {
+      maxResults,
+      minScore,
+      explainScores,
+      includeFilters,
+      excludeFilters,
+    };
     const cachedResults = await this.searchCache.get(
       query,
       projectId,
@@ -922,7 +928,11 @@ export class ContextualSearchRLM {
   private async correctQuery(query: string): Promise<string | null> {
     if (typeof this.keywordSearch.fuzzyCorrect !== "function") return null;
     const terms = extractQueryTerms(query).filter((w) => w.length >= 3);
-    if (terms.length === 0) return null;
+    // Vocabulary-nearest correction is reliable for identifier typo probes
+    // ("useEffct") but unsafe for natural-language sentences: ordinary
+    // Portuguese words were rewritten to unrelated English code tokens and
+    // added as an entire extra RRF stream.
+    if (terms.length !== 1) return null;
     const corrected: string[] = [];
     let changed = false;
     for (const term of terms) {
@@ -1090,6 +1100,9 @@ export class ContextualSearchRLM {
         keywordRank?: number;
         vectorScore?: number;
         keywordScore?: number;
+        vectorRrfScore: number;
+        lexicalRrfScore: number;
+        memoryRrfScore: number;
       }
     >();
 
@@ -1149,12 +1162,21 @@ export class ContextualSearchRLM {
 
         if (scoreMap.has(result.id)) {
           const existing = scoreMap.get(result.id)!;
-          existing.rrfScore += rrfScore;
 
           if (isVector) {
+            existing.vectorRrfScore += rrfScore;
             existing.vectorRank = rank;
             existing.vectorScore = result.score;
-          } else if (!isMemoryStream) {
+          } else if (isMemoryStream) {
+            existing.memoryRrfScore += rrfScore;
+          } else {
+            // Porter, trigram, and fuzzy are correlated lexical views of the
+            // same document. Count the best lexical rank once so duplicate
+            // matches cannot overwhelm a strong vector-only result.
+            existing.lexicalRrfScore = Math.max(
+              existing.lexicalRrfScore,
+              rrfScore,
+            );
             // Record the best lexical rank/score (porter/trigram/fuzzy).
             if (
               existing.keywordRank === undefined ||
@@ -1164,10 +1186,20 @@ export class ContextualSearchRLM {
               existing.keywordScore = result.score;
             }
           }
+          existing.rrfScore =
+            existing.vectorRrfScore +
+            existing.lexicalRrfScore +
+            existing.memoryRrfScore;
         } else {
+          const vectorRrfScore = isVector ? rrfScore : 0;
+          const lexicalRrfScore = !isVector && !isMemoryStream ? rrfScore : 0;
+          const memoryRrfScore = isMemoryStream ? rrfScore : 0;
           scoreMap.set(result.id, {
             result: { ...result },
-            rrfScore,
+            rrfScore: vectorRrfScore + lexicalRrfScore + memoryRrfScore,
+            vectorRrfScore,
+            lexicalRrfScore,
+            memoryRrfScore,
             vectorRank: isVector ? rank : undefined,
             keywordRank: !isVector && !isMemoryStream ? rank : undefined,
             vectorScore: isVector ? result.score : undefined,
@@ -1395,16 +1427,20 @@ export class ContextualSearchRLM {
   async clearProjectIndex(projectId: string): Promise<{ deleted: number }> {
     await this.ensureInitialized();
     try {
-      const deleted = await this.vectorStore.deleteByProject(projectId);
-
-      // Also clears keyword search
-      // Note: KeywordSearch would need a deleteByProject method
+      const [deleted, keywordDeleted] = await Promise.all([
+        this.vectorStore.deleteByProject(projectId),
+        this.keywordSearch.deleteByProject(projectId),
+      ]);
 
       // Clear associated caches
       await this.searchCache.invalidateProject(projectId);
       this.fileFilterCache.invalidateProject(projectId);
 
-      logger.info("Project index and caches cleared", { projectId, deleted });
+      logger.info("Project index and caches cleared", {
+        projectId,
+        deleted,
+        keywordDeleted,
+      });
       return { deleted };
     } catch (error) {
       logger.error("Failed to clear project index", error as Error, {
@@ -1496,4 +1532,3 @@ export class ContextualSearchRLM {
     return this.analytics;
   }
 }
-

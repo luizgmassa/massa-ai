@@ -483,6 +483,24 @@ export class KeywordSearch implements IKeywordSearch {
     }
   }
 
+  /** Delete every lexical row for a project during force/reset lifecycle. */
+  async deleteByProject(projectId: string): Promise<number> {
+    const rows = this.db
+      .prepare(`SELECT id FROM memories_metadata WHERE project_id = ?`)
+      .all(projectId) as Array<{ id: string }>;
+    const remove = this.db.transaction((ids: Array<{ id: string }>) => {
+      for (const { id } of ids) {
+        this.db.prepare(`DELETE FROM ${this.tableName} WHERE id = ?`).run(id);
+        if (this.trigramAvailable) {
+          this.db.prepare(`DELETE FROM ${this.trigramTableName} WHERE id = ?`).run(id);
+        }
+        this.db.prepare(`DELETE FROM memories_metadata WHERE id = ?`).run(id);
+      }
+    });
+    remove(rows);
+    return rows.length;
+  }
+
   /**
    * Update indexed content
    */

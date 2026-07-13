@@ -343,6 +343,25 @@ describe.skipIf(!DB_AVAILABLE)("PgSynapseSessionStore — unit tests on PostgreS
       expect(loaded!.accessHistory.get("mem-2")).toBe(1);
     });
 
+    test("an expired persisted session is discarded by a fresh registry", async () => {
+      const storeA = new PgSynapseSessionStore();
+      await hydrateStore(storeA);
+      const sid = testSessionId();
+      const now = Date.now();
+      storeA.save(mkSession({
+        sessionId: sid,
+        createdAt: now - 10_000,
+        expiresAt: now - 1,
+      }));
+      await storeA.__drain();
+      expect(await pgGetSessionRow(sid)).not.toBeNull();
+
+      const storeB = new PgSynapseSessionStore();
+      await hydrateStore(storeB);
+      const registry = new SessionRegistry(3_600_000, storeB);
+      expect(registry.get(sid)).toBeNull();
+    });
+
     test("delete removes the session and its access history from PG", async () => {
       const store = new PgSynapseSessionStore();
       await hydrateStore(store);

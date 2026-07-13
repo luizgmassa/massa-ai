@@ -232,6 +232,23 @@ describe("applyProximityRerank", () => {
     const out = applyProximityRerank([a, b], "zzznomatch");
     expect(out.map((r) => r.id)).toEqual(["a", "b"]);
   });
+
+  test("a weak incidental title match cannot leapfrog a strong result", () => {
+    const strong = makeResult(
+      "strong",
+      "the semantically relevant implementation",
+      { label: "relevantImplementation", type: "code_block" },
+      0.9,
+    );
+    const weak = makeResult(
+      "weak",
+      "unrelated content",
+      { label: "node", type: "code_block" },
+      0.2,
+    );
+    const out = applyProximityRerank([strong, weak], "no centralidade");
+    expect(out.map((result) => result.id)).toEqual(["strong", "weak"]);
+  });
 });
 
 // ─── A1: SQLite KeywordSearch trigram + fuzzy ───────────────────────────────

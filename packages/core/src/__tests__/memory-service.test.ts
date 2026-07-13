@@ -285,6 +285,43 @@ describe("MemoryService", () => {
       expect(ranked.length).toBe(3);
     });
 
+    test("recomputes a higher score after access reinforcement", () => {
+      const now = Date.now();
+      const queryEmbedding = new Array(384).fill(0);
+      queryEmbedding[0] = 1;
+      const embedding = Buffer.from(
+        new Float32Array(queryEmbedding).buffer,
+      );
+      const base = {
+        id: "reinforced",
+        content: "same memory",
+        type: MemoryType.DECISION,
+        level: MemoryLevel.PERSISTENT,
+        userId: null,
+        sessionId: null,
+        projectId: null,
+        agentId: null,
+        importance: 0.6,
+        tags: [],
+        createdAt: now,
+        lastAccessed: now,
+        embedding,
+      };
+
+      const before = service.semanticRank(
+        [{ ...base, accessCount: 0 }],
+        queryEmbedding,
+        1,
+      )[0].score;
+      const after = service.semanticRank(
+        [{ ...base, accessCount: 1 }],
+        queryEmbedding,
+        1,
+      )[0].score;
+
+      expect(after).toBeGreaterThan(before);
+    });
+
     test("handles memories with no embedding (assigns 0.5 base score)", () => {
       const queryEmbedding = new Array(384).fill(0.1);
 

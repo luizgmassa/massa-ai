@@ -42,6 +42,8 @@ const PROJECT_ID = "p7e-csrlm-e2e";
 let search: ContextualSearchRLM;
 let vs: SQLiteVectorStore;
 let ks: KeywordSearch;
+let cache: SearchCache;
+let analytics: SearchAnalytics;
 const docIds: string[] = [];
 
 function doc(id: string, content: string, filePath: string, lineStart: number, lineEnd: number): VectorDocument {
@@ -95,11 +97,13 @@ beforeAll(async () => {
 
   // Build the search service with the injected-deps ctor seam so it uses these
   // real instances, not the process-wide mocked factories.
+  cache = new SearchCache();
+  analytics = new SearchAnalytics();
   search = new ContextualSearchRLM({
     keywordSearch: ks,
     vectorStore: vs,
-    searchCache: new SearchCache(),
-    analytics: new SearchAnalytics(),
+    searchCache: cache,
+    analytics,
     symbolRepo: symbolRepository,
   });
 });
@@ -114,6 +118,10 @@ afterAll(async () => {
   } catch {
     /* best-effort cleanup */
   }
+  await vs.close().catch(() => {});
+  try { ks.close(); } catch { /* best-effort cleanup */ }
+  try { cache.close(); } catch { /* best-effort cleanup */ }
+  try { analytics.close(); } catch { /* best-effort cleanup */ }
 });
 
 describe("ContextualSearchRLM — e2e (characterization)", () => {

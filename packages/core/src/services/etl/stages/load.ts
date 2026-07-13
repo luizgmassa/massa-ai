@@ -2,8 +2,9 @@
  * ETL Stage 4 — Load
  *
  * Persists ResolvedFile data in parallel to:
- *   1. SQLite Vector Store  — embedding chunks for semantic search
- *   2. Symbol DB            — definitions, references, imports for graph navigation
+ *   1. Vector store   — embedding chunks for semantic search
+ *   2. Keyword store  — lexical/trigram/fuzzy search over the same chunks
+ *   3. Symbol DB      — definitions, references, imports for graph navigation
  *
  * Each file is written atomically (SQLite transaction per file).
  * Updates the symbol_files fingerprint table on success.
@@ -11,6 +12,7 @@
 
 import { logger } from "@massa-th0th/shared";
 import { getVectorStore } from "../../../data/vector/vector-store-factory.js";
+import { getKeywordSearch } from "../../../data/sqlite/keyword-search-factory.js";
 import { getSymbolRepository } from "../../../data/sqlite/symbol-repository-factory.js";
 import type {
   SymbolDefinition,
@@ -45,12 +47,20 @@ function formatDuration(ms: number): string {
 
 export class LoadStage {
   private vectorStore: Awaited<ReturnType<typeof getVectorStore>> | null = null;
+  private keywordSearch: ReturnType<typeof getKeywordSearch> | null = null;
 
   private async ensureVectorStore() {
     if (!this.vectorStore) {
       this.vectorStore = await getVectorStore();
     }
     return this.vectorStore;
+  }
+
+  private ensureKeywordSearch() {
+    if (!this.keywordSearch) {
+      this.keywordSearch = getKeywordSearch();
+    }
+    return this.keywordSearch;
   }
 
   async run(ctx: EtlStageContext, files: ResolvedFile[]): Promise<LoadResult> {
@@ -91,7 +101,7 @@ export class LoadStage {
 
           try {
             const [chunkCount, symCount] = await Promise.all([
-              this.loadToVectorStore(ctx, file),
+              this.loadToSearchStores(ctx, file),
               this.loadToSymbolDb(ctx, file),
             ]);
 
@@ -211,11 +221,12 @@ export class LoadStage {
     return { filesLoaded, chunksLoaded, symbolsLoaded, errors };
   }
 
-  /** Insert semantic chunks into the vector store. Returns chunk count. */
-  private async loadToVectorStore(ctx: EtlStageContext, file: ResolvedFile): Promise<number> {
+  /** Insert identical chunks into both semantic and lexical stores. */
+  private async loadToSearchStores(ctx: EtlStageContext, file: ResolvedFile): Promise<number> {
     if (file.chunks.length === 0) return 0;
-    
+
     const vs = await this.ensureVectorStore();
+    const keywordSearch = this.ensureKeywordSearch();
 
     const documents = file.chunks.map((chunk, i) => ({
       id: `${ctx.projectId}:${file.file.relativePath}:${i}`,
@@ -233,7 +244,16 @@ export class LoadStage {
       },
     }));
 
-    await vs.addDocuments(documents);
+    await Promise.all([
+      vs.addDocuments(documents),
+      "addBatch" in keywordSearch && typeof keywordSearch.addBatch === "function"
+        ? keywordSearch.addBatch(documents)
+        : Promise.all(
+            documents.map((doc) =>
+              keywordSearch.index(doc.id, doc.content, doc.metadata),
+            ),
+          ),
+    ]);
     return documents.length;
   }
 

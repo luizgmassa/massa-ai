@@ -253,21 +253,26 @@ export class MemoryRepositoryPg {
       types?: MemoryType[];
     },
   ): Promise<MemoryRow[]> {
-    // Split the query into individual tokens and build per-token ILIKE clauses.
-    // Each token is escaped for ILIKE special chars (%, _) so stray underscores
-    // in random strings don't act as wildcards.
-    const tokens = query.trim().split(/\s+/).filter((t) => t.length > 0);
+    // Match the SQLite FTS input contract: punctuation is a separator, and a
+    // blank/punctuation-only query applies only the scope filters.  Building a
+    // Prisma.join() expression from zero tokens produces invalid `()` SQL.
+    const tokens = query
+      .trim()
+      .replace(/[^\w\s]/gi, " ")
+      .split(/\s+/)
+      .filter((t) => t.length > 0);
+
+    // Each token is escaped for ILIKE special chars (%, _, \) so token text
+    // cannot accidentally broaden the match through SQL wildcard semantics.
     const escaped = tokens.map((t) => `%${t.replace(/[%_\\]/g, '\\$&')}%`);
 
-    // Build: (content ILIKE 'token1' OR content ILIKE 'token2' …)
-    const tokenClauses: Prisma.Sql[] = escaped.map(
-      (pat) => Prisma.sql`content ILIKE ${pat}`,
-    );
-    const contentCondition = Prisma.sql`(${Prisma.join(tokenClauses, ' OR ')})`;
-
-    const conditions: Prisma.Sql[] = [contentCondition];
     // Phase 1: never return soft-deleted rows from recall.
-    conditions.push(Prisma.sql`deleted_at IS NULL`);
+    const conditions: Prisma.Sql[] = [Prisma.sql`deleted_at IS NULL`];
+    if (escaped.length > 0) {
+      // Build: (content ILIKE 'token1' OR content ILIKE 'token2' …)
+      const tokenClauses = escaped.map((pat) => Prisma.sql`content ILIKE ${pat}`);
+      conditions.unshift(Prisma.sql`(${Prisma.join(tokenClauses, ' OR ')})`);
+    }
 
     if (filters?.userId)        conditions.push(Prisma.sql`user_id = ${filters.userId}`);
     if (filters?.sessionId)     conditions.push(Prisma.sql`session_id = ${filters.sessionId}`);

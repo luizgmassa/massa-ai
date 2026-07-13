@@ -184,13 +184,17 @@ export class SearchController {
         lineEnd: meta.lineEnd as number | undefined,
         language: meta.language as string | undefined,
         preview: this.generatePreview(r, query),
-        chunkIndex: meta.chunkIndex as number | undefined,
-        totalChunks: meta.totalChunks as number | undefined,
       };
-      if (meta.parentSymbol) base.parentSymbol = meta.parentSymbol as string;
       if (r.explanation) base.explanation = r.explanation;
-      if (responseMode === "full" || responseMode === "enriched") base.content = r.content;
-      if (responseMode === "enriched" && meta.fileImports) base.fileImports = meta.fileImports as string;
+      if (responseMode === "full" || responseMode === "enriched") {
+        base.content = r.content;
+        base.chunkIndex = meta.chunkIndex as number | undefined;
+        base.totalChunks = meta.totalChunks as number | undefined;
+      }
+      if (responseMode === "enriched") {
+        if (meta.parentSymbol) base.parentSymbol = meta.parentSymbol as string;
+        if (meta.fileImports) base.fileImports = meta.fileImports as string;
+      }
       return base;
     });
 

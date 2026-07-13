@@ -130,11 +130,8 @@ export class SearchCache {
   /**
    * Normalize options for consistent cache keys
    *
-   * IMPORTANT: Only include parameters that affect WHAT is searched,
-   * not HOW results are displayed/formatted.
-   *
-   * Search-affecting params: maxResults, include, exclude
-   * Presentation params (ignored): explainScores, responseMode, minScore
+   * Only omit options that are truly invariant for the raw SearchResult[].
+   * `responseMode`, for example, is applied later by SearchController.
    */
   private normalizeOptions(
     options: Record<string, unknown>,
@@ -142,6 +139,10 @@ export class SearchCache {
     // Parameters that affect the actual search results
     const searchAffectingParams = [
       "maxResults", // Limits number of results returned
+      "minScore", // Filters the result set
+      "explainScores", // Adds/removes result explanations
+      "includeFilters", // ContextualSearchRLM file pattern filters
+      "excludeFilters", // ContextualSearchRLM file pattern filters
       "include", // File pattern filters
       "exclude", // File pattern filters
     ];
@@ -632,4 +633,3 @@ export class SearchCache {
     logger.info("SearchCache closed");
   }
 }
-

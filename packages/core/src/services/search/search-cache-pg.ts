@@ -97,6 +97,10 @@ export class SearchCachePg {
   ): Record<string, unknown> {
     const searchAffectingParams = [
       "maxResults",
+      "minScore",
+      "explainScores",
+      "includeFilters",
+      "excludeFilters",
       "include",
       "exclude",
     ];

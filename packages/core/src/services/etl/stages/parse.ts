@@ -528,7 +528,13 @@ export class ParseStage {
     let depth = 0;
     let found = false;
 
-    for (let i = startLine; i < Math.min(lines.length, startLine + 500); i++) {
+    // Scan to EOF. The old 500-line ceiling silently collapsed a valid block
+    // longer than 500 lines to its declaration line, which in turn prevented
+    // typed-edge extraction from associating calls with the enclosing class.
+    // This parser already visits every source line, and declarations are
+    // sparse relative to file size, so correctness is preferable to an
+    // arbitrary per-block cutoff.
+    for (let i = startLine; i < lines.length; i++) {
       for (const ch of lines[i]) {
         if (ch === "{") { depth++; found = true; }
         if (ch === "}") { depth--; }

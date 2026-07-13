@@ -164,8 +164,8 @@ async function indexTinyAndWait(
 
 // Track throwaway projectIds for cleanup in afterAll.
 const throwaway: string[] = [];
-function makePid(n: number): string {
-  const id = `${PREFIX}nfr-${RUN_STAMP}-${n}`;
+function makePid(n: number, suffix?: string): string {
+  const id = `${PREFIX}nfr-${RUN_STAMP}-${n}${suffix ? `-${suffix}` : ""}`;
   assertE2ePrefix(id);
   throwaway.push(id);
   return id;
@@ -250,9 +250,9 @@ describe.skipIf(!READY)("T9 N5 — concurrent index SAME projectId serializes", 
 });
 
 describe.skipIf(!READY)("T9 N6 — concurrent index DIFFERENT projectIds parallelize", () => {
-  const pidA = makePid(6);
-  const pidB = makePid(6);
-  const pidC = makePid(6);
+  const pidA = makePid(6, "a");
+  const pidB = makePid(6, "b");
+  const pidC = makePid(6, "c");
 
   afterAll(async () => {
     await Promise.all([resetProject(pidA), resetProject(pidB), resetProject(pidC)]);
@@ -323,7 +323,17 @@ describe.skipIf(!READY)("T9 N6 — concurrent index DIFFERENT projectIds paralle
       // polyglot fixture (no cross-project corruption). The search response
       // returns basenames or relative paths; sanity-check against the known
       // polyglot fixture filenames.
-      const polyFiles = ["poly.dart", "poly.go", "poly.kt", "poly.rs", "indent-method.py", "decorator-heavy.ts", "unresolvable-import.ts"];
+      const polyFiles = [
+        "README.md",
+        "tsconfig.json",
+        "poly.dart",
+        "poly.go",
+        "poly.kt",
+        "poly.rs",
+        "indent-method.py",
+        "decorator-heavy.ts",
+        "unresolvable-import.ts",
+      ];
       const probes = await Promise.all(
         [pidA, pidB, pidC].map((p) =>
           httpPost<any>("/api/v1/search/project", {

@@ -71,8 +71,13 @@ function rowToJob(r: ScheduledJobRow): ScheduledJob {
 export class PgScheduledJobStore implements ScheduledJobStore {
   private prisma!: PrismaClient;
   private mirror: Map<string, ScheduledJob> = new Map();
+  /** IDs deleted locally before/during hydration must not be resurrected. */
+  private localDeletes = new Set<string>();
   private hydrated = false;
   private hydrating: Promise<void> | null = null;
+  /** Serialize mutations per job ID and expose their real settlement to tests. */
+  private pendingById = new Map<string, Promise<void>>();
+  private pendingOperations = new Set<Promise<void>>();
 
   private getClient(): PrismaClient {
     if (!this.prisma) this.prisma = getPrismaClient();
@@ -94,18 +99,17 @@ export class PgScheduledJobStore implements ScheduledJobStore {
           SELECT * FROM scheduled_jobs
         `;
         const next: Map<string, ScheduledJob> = new Map();
-        const inflightIds = new Set(this.mirror.keys());
-        const dbIds = new Set<string>();
         for (const row of rows) {
-          dbIds.add(row.id);
           next.set(row.id, rowToJob(row));
         }
-        // Re-apply any in-flight save whose row isn't in the DB snapshot yet.
-        for (const id of inflightIds) {
-          if (!dbIds.has(id)) {
-            const existing = this.mirror.get(id);
-            if (existing) next.set(id, existing);
-          }
+        // Local synchronous mutations are authoritative over the async DB
+        // snapshot. Overlay every local value (not only IDs absent from PG),
+        // otherwise hydration can replace a rapid update with an older row.
+        for (const [id, job] of this.mirror) {
+          next.set(id, job);
+        }
+        for (const id of this.localDeletes) {
+          next.delete(id);
         }
         this.mirror = next;
         this.hydrated = true;
@@ -121,32 +125,72 @@ export class PgScheduledJobStore implements ScheduledJobStore {
     return this.hydrating;
   }
 
+  private enqueueMutation(
+    id: string,
+    action: () => Promise<void>,
+    operation: "save" | "delete",
+  ): void {
+    const previous = this.pendingById.get(id);
+    const run = async (): Promise<void> => {
+      try {
+        await action();
+      } catch (e) {
+        logger.warn(`PgScheduledJobStore.${operation} failed (best-effort)`, {
+          id,
+          error: (e as Error).message,
+        });
+      }
+    };
+    // Continue after an earlier best-effort failure so a later mutation can
+    // recover. Per-ID serialization makes invocation order equal commit order.
+    const pending = previous ? previous.then(run, run) : run();
+    this.pendingById.set(id, pending);
+    this.pendingOperations.add(pending);
+    void pending.finally(() => {
+      this.pendingOperations.delete(pending);
+      if (this.pendingById.get(id) === pending) this.pendingById.delete(id);
+    });
+  }
+
   save(job: ScheduledJob): void {
     // Mirror update is synchronous so a subsequent sync get() sees the value.
     this.mirror.set(job.id, job);
-    void this.ensureHydrated();
-    // Fire-and-forget persist (best-effort, matching PgJobStore).
-    void (async () => {
-      try {
-        const prisma = this.getClient();
-        const intervalMs = job.schedule.intervalMs ?? null;
-        const cron = job.schedule.cron ?? null;
-        const payload = job.payload ? JSON.stringify(job.payload) : null;
-        await prisma.$executeRaw`
+    this.localDeletes.delete(job.id);
+
+    // Capture values at save() time. The scheduler mutates job objects later,
+    // while SQLite persists synchronously at the call boundary.
+    const persisted = {
+      id: job.id,
+      name: job.name,
+      jobKind: job.jobKind,
+      scheduleType: job.schedule.type,
+      intervalMs: job.schedule.intervalMs ?? null,
+      cron: job.schedule.cron ?? null,
+      nextRunAt: job.nextRunAt,
+      lastRunAt: job.lastRunAt,
+      enabled: job.enabled,
+      payload: job.payload ? JSON.stringify(job.payload) : null,
+    };
+
+    // Fire-and-forget remains the public contract, but same-ID writes are
+    // chained so a slower old write cannot overwrite a newer save.
+    this.enqueueMutation(job.id, async () => {
+      const prisma = this.getClient();
+      await prisma.$executeRaw`
           INSERT INTO scheduled_jobs (
             id, name, job_kind, schedule_type, interval_ms, cron,
             next_run_at, last_run_at, enabled, payload
           ) VALUES (
-            ${job.id},
-            ${job.name},
-            ${job.jobKind},
-            ${job.schedule.type},
-            ${intervalMs !== null ? intervalMs : null}::bigint,
-            ${cron},
-            ${job.nextRunAt}::bigint,
-            ${job.lastRunAt}::bigint,
-            ${job.enabled ? 1 : 0}::int,
-            ${payload}
+            ${persisted.id},
+            ${persisted.name},
+            ${persisted.jobKind},
+            ${persisted.scheduleType},
+            ${persisted.intervalMs}::bigint,
+            ${persisted.cron},
+            ${persisted.nextRunAt}::bigint,
+            ${persisted.lastRunAt}::bigint,
+            ${persisted.enabled ? 1 : 0}::int,
+            ${persisted.payload}
           )
           ON CONFLICT (id) DO UPDATE SET
             name = EXCLUDED.name,
@@ -158,14 +202,9 @@ export class PgScheduledJobStore implements ScheduledJobStore {
             last_run_at = EXCLUDED.last_run_at,
             enabled = EXCLUDED.enabled,
             payload = EXCLUDED.payload
-        `;
-      } catch (e) {
-        logger.warn("PgScheduledJobStore.save failed (best-effort)", {
-          id: job.id,
-          error: (e as Error).message,
-        });
-      }
-    })();
+      `;
+    }, "save");
+    void this.ensureHydrated();
   }
 
   get(id: string): ScheduledJob | null {
@@ -187,20 +226,24 @@ export class PgScheduledJobStore implements ScheduledJobStore {
 
   delete(id: string): void {
     this.mirror.delete(id);
-    void (async () => {
-      try {
-        const prisma = this.getClient();
-        await prisma.$executeRaw`DELETE FROM scheduled_jobs WHERE id = ${id}`;
-      } catch {
-        /* best-effort */
-      }
-    })();
+    this.localDeletes.add(id);
+    this.enqueueMutation(id, async () => {
+      const prisma = this.getClient();
+      await prisma.$executeRaw`DELETE FROM scheduled_jobs WHERE id = ${id}`;
+    }, "delete");
+    void this.ensureHydrated();
   }
 
   /** Test helper: await in-flight writes. Not for production use. */
   async __drain(): Promise<void> {
-    // No per-id chain (scheduler saves are low-frequency); a short settle delay
-    // covers the fire-and-forget persist. Kept for API parity with PgJobStore.
-    await new Promise((r) => setTimeout(r, 10));
+    // Work can be enqueued while hydration or an earlier mutation settles, so
+    // re-check until the tracked set is genuinely empty.
+    while (this.hydrating || this.pendingOperations.size > 0) {
+      const pending = [
+        ...(this.hydrating ? [this.hydrating] : []),
+        ...this.pendingOperations,
+      ];
+      await Promise.all(pending);
+    }
   }
 }

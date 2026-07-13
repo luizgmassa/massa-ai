@@ -62,6 +62,7 @@ mock.module("@massa-th0th/shared", () => {
 
 import { CheckpointManager } from "../services/checkpoint/checkpoint-manager.js";
 import { PgCheckpointStore } from "../services/checkpoint/checkpoint-store-pg.js";
+import { AutoCheckpointer } from "../services/checkpoint/auto-checkpointer.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -93,6 +94,7 @@ function makeTaskState(overrides?: Partial<TaskState>): TaskState {
 function resetManagerSingleton(): void {
   (CheckpointManager as any).instance?.close();
   (CheckpointManager as any).instance = null;
+  (AutoCheckpointer as any).instance = null;
 }
 
 const ORIGINAL_DATABASE_URL = process.env.DATABASE_URL;
@@ -215,6 +217,78 @@ describe.skipIf(!DB_AVAILABLE)("PgCheckpointStore (structural gap #16)", () => {
     expect(manager.getCheckpoint(created.id)).toBeNull();
   });
 
+  test("expired checkpoints are excluded by default and purge removes the durable row", async () => {
+    const manager = CheckpointManager.getInstance();
+    const store = (manager as any).delegate as PgCheckpointStore;
+    await store.ensureReady();
+    const expiredState = makeTaskState();
+    const activeState = makeTaskState();
+    createdTaskIds.push(expiredState.taskId, activeState.taskId);
+
+    const expired = manager.createCheckpoint(expiredState, { ttlMs: -1 });
+    const active = manager.createCheckpoint(activeState, { ttlMs: 60_000 });
+    await store.__drain();
+
+    expect(manager.listCheckpoints({ taskId: expiredState.taskId })).toEqual([]);
+    expect(manager.listCheckpoints({ taskId: expiredState.taskId, includeExpired: true }))
+      .toHaveLength(1);
+    expect(manager.purgeExpired()).toBe(1);
+    await store.__drain();
+    expect(manager.getCheckpoint(expired.id)).toBeNull();
+    expect(manager.getCheckpoint(active.id)).not.toBeNull();
+
+    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const rows = await getPrismaClient().$queryRaw<{ id: string }[]>`
+      SELECT id FROM task_checkpoints WHERE id = ${expired.id}
+    `;
+    expect(rows).toEqual([]);
+  });
+
+  test("stats, missing delete, and lazy state access match the SQLite contract", async () => {
+    const manager = CheckpointManager.getInstance();
+    const store = (manager as any).delegate as PgCheckpointStore;
+    await store.ensureReady();
+    const stateA = makeTaskState({ description: "PG lazy state A" });
+    const stateB = makeTaskState({ description: "PG lazy state B" });
+    createdTaskIds.push(stateA.taskId, stateB.taskId);
+
+    const auto = manager.createCheckpoint(stateA, { checkpointType: CheckpointType.AUTO });
+    manager.createCheckpoint(stateB, { checkpointType: CheckpointType.MILESTONE });
+    await store.__drain();
+
+    const stats = manager.getStats();
+    expect(stats.totalCheckpoints).toBeGreaterThanOrEqual(2);
+    expect(stats.byType[CheckpointType.AUTO]).toBeGreaterThanOrEqual(1);
+    expect(stats.byType[CheckpointType.MILESTONE]).toBeGreaterThanOrEqual(1);
+    expect(stats.totalSizeBytes).toBeGreaterThan(0);
+    expect(stats.oldestCheckpointAge).toBeDefined();
+    expect(manager.deleteCheckpoint(`missing-${randomToken()}`)).toBe(false);
+    expect(manager.getCheckpointState(auto.id)?.description).toBe("PG lazy state A");
+    expect(manager.getCheckpointState(`missing-${randomToken()}`)).toBeNull();
+  });
+
+  test("AutoCheckpointer threshold persists an AUTO checkpoint through the PG store", async () => {
+    const manager = CheckpointManager.getInstance();
+    const store = (manager as any).delegate as PgCheckpointStore;
+    await store.ensureReady();
+    const state = makeTaskState();
+    createdTaskIds.push(state.taskId);
+    const auto = new AutoCheckpointer({ operationInterval: 2, agentId: "pg-parity" });
+
+    expect(auto.recordOperation(state)).toBeNull();
+    const created = auto.recordOperation(state);
+    expect(created?.checkpointType).toBe(CheckpointType.AUTO);
+    expect(auto.getOperationCount()).toBe(0);
+    await store.__drain();
+
+    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const rows = await getPrismaClient().$queryRaw<{ checkpoint_type: string }[]>`
+      SELECT checkpoint_type FROM task_checkpoints WHERE id = ${created!.id}
+    `;
+    expect(rows).toEqual([{ checkpoint_type: CheckpointType.AUTO }]);
+    auto.close();
+  });
+
   test("restore runs through the manager over a PG-backed store (SF2 falsifier: real missing-memory detection)", async () => {
     const manager = CheckpointManager.getInstance();
     const store = (manager as any).delegate as PgCheckpointStore;
@@ -305,6 +379,10 @@ describe.skipIf(!DB_AVAILABLE)("PgCheckpointStore (structural gap #16)", () => {
     expect(managerB.listCheckpoints({ taskId: state.taskId }).length).toBe(1);
   });
 });
+
+function randomToken(): string {
+  return Math.random().toString(36).slice(2);
+}
 
 describe("CheckpointManager SQLite path (no regression, #16)", () => {
   let savedUrl: string | undefined;

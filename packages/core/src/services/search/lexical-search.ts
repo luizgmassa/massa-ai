@@ -274,8 +274,7 @@ export function applyProximityRerank(
   const terms = extractQueryTerms(query);
   if (results.length === 0) return results;
 
-  return results
-    .map((result, index) => {
+  const decorated = results.map((result, index) => {
       const titleLower = resolveTitle(result).toLowerCase();
       const titleHits = terms.filter((t) => titleLower.includes(t)).length;
       const titleWeight = isCodeResult(result) ? 0.6 : 0.3;
@@ -302,7 +301,28 @@ export function applyProximityRerank(
         boost: titleBoost + proximityBoost + phraseBoost,
         rank: index,
       };
-    })
-    .sort((a, b) => b.boost - a.boost || a.rank - b.rank)
-    .map(({ result }) => result);
+    });
+
+  // RRF remains the primary ranking contract. Proximity only breaks ties
+  // inside contiguous groups whose final scores differ by <= 1 percentage
+  // point. Sorting the entire pool by raw lexical boost previously let a weak
+  // rank-40 result jump to rank 1 on an incidental short substring match.
+  const output: SearchResult[] = [];
+  for (let start = 0; start < decorated.length;) {
+    let end = start + 1;
+    while (
+      end < decorated.length &&
+      Math.abs(
+        decorated[end].result.score - decorated[start].result.score,
+      ) <= 0.01
+    ) {
+      end++;
+    }
+    const group = decorated
+      .slice(start, end)
+      .sort((a, b) => b.boost - a.boost || a.rank - b.rank);
+    output.push(...group.map(({ result }) => result));
+    start = end;
+  }
+  return output;
 }

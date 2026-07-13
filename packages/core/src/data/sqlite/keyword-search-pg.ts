@@ -16,7 +16,9 @@ import {
 
 export class KeywordSearchPg {
   private pool: Pool | null = null;
+  private poolPromise: Promise<Pool> | null = null;
   private initialized = false;
+  private initializationPromise: Promise<void> | null = null;
   private trigramAvailable = false;
   // Process-local LRU for fuzzyCorrect (parity with SQLite store).
   private fuzzyCache = new Map<string, string | null>();
@@ -25,18 +27,38 @@ export class KeywordSearchPg {
   constructor() {}
 
   private async getPool(): Promise<Pool> {
-    if (!this.pool) {
-      this.pool = await getPgPool();
-      if (!this.initialized) {
-        await this.initTable();
-        this.initialized = true;
+    let pool = this.pool;
+    if (!pool) {
+      if (!this.poolPromise) {
+        this.poolPromise = getPgPool()
+          .then((resolvedPool) => {
+            this.pool = resolvedPool;
+            return resolvedPool;
+          })
+          .finally(() => {
+            this.poolPromise = null;
+          });
       }
+      pool = await this.poolPromise;
     }
-    return this.pool;
+
+    if (!this.initialized) {
+      if (!this.initializationPromise) {
+        this.initializationPromise = this.initTable(pool)
+          .then(() => {
+            this.initialized = true;
+          })
+          .finally(() => {
+            this.initializationPromise = null;
+          });
+      }
+      await this.initializationPromise;
+    }
+
+    return pool;
   }
 
-  private async initTable(): Promise<void> {
-    const pool = await this.getPool();
+  private async initTable(pool: Pool): Promise<void> {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS keyword_documents (
         id TEXT PRIMARY KEY,
@@ -108,35 +130,7 @@ export class KeywordSearchPg {
       [id, projectId, content, JSON.stringify(metadata || {})]
     );
 
-    // Populate vocabulary for fuzzy correction (best-effort; never breaks add).
-    try {
-      const rawTokens = content.split(/[^a-zA-Z0-9]+/);
-      const vocabWords = new Set<string>();
-      for (const tok of rawTokens) {
-        if (tok.length < 3) continue;
-        vocabWords.add(tok.toLowerCase());
-        for (const part of tok.split(/(?<=[a-z])(?=[A-Z])/)) {
-          if (part.length >= 3) vocabWords.add(part.toLowerCase());
-        }
-      }
-      const unique = [...vocabWords];
-      if (unique.length > 0) {
-        const values = unique
-          .map((_, i) => `($${i + 1})`)
-          .join(",");
-        await pool.query(
-          `INSERT INTO keyword_vocabulary (word)
-           VALUES ${values}
-           ON CONFLICT (word) DO NOTHING`,
-          unique,
-        );
-      }
-    } catch (err) {
-      logger.debug('vocabulary population failed (non-fatal)', {
-        id,
-        err: (err as Error).message,
-      });
-    }
+    await this.populateVocabulary(pool, [content], id);
   }
 
   // Alias for compatibility
@@ -171,14 +165,60 @@ export class KeywordSearchPg {
     } finally {
       client.release();
     }
+
+    await this.populateVocabulary(
+      pool,
+      documents.map((document) => document.content),
+      `batch:${documents.length}`,
+    );
+  }
+
+  /** Populate fuzzy vocabulary in bounded inserts; lexical indexing remains successful on failure. */
+  private async populateVocabulary(
+    pool: Pool,
+    contents: string[],
+    source: string,
+  ): Promise<void> {
+    try {
+      const vocabWords = new Set<string>();
+      for (const content of contents) {
+        for (const token of content.split(/[^a-zA-Z0-9]+/)) {
+          if (token.length < 3) continue;
+          vocabWords.add(token.toLowerCase());
+          for (const part of token.split(/(?<=[a-z])(?=[A-Z])/)) {
+            if (part.length >= 3) vocabWords.add(part.toLowerCase());
+          }
+        }
+      }
+
+      const words = [...vocabWords];
+      const INSERT_BATCH_SIZE = 5_000;
+      for (let offset = 0; offset < words.length; offset += INSERT_BATCH_SIZE) {
+        const batch = words.slice(offset, offset + INSERT_BATCH_SIZE);
+        const values = batch.map((_, index) => `($${index + 1})`).join(",");
+        await pool.query(
+          `INSERT INTO keyword_vocabulary (word)
+           VALUES ${values}
+           ON CONFLICT (word) DO NOTHING`,
+          batch,
+        );
+      }
+    } catch (err) {
+      logger.debug('vocabulary population failed (non-fatal)', {
+        source,
+        err: (err as Error).message,
+      });
+    }
   }
 
   async search(
     query: string,
-    projectId?: string,
+    projectIdOrLimit?: string | number,
     limit: number = 10
   ): Promise<SearchResult[]> {
     const pool = await this.getPool();
+    const projectId = typeof projectIdOrLimit === 'string' ? projectIdOrLimit : undefined;
+    const resultLimit = typeof projectIdOrLimit === 'number' ? projectIdOrLimit : limit;
     
     const searchTerms = query
       .toLowerCase()
@@ -205,7 +245,9 @@ export class KeywordSearchPg {
          ORDER BY rank DESC
          LIMIT $2`;
     
-    const params = projectId ? [searchTerms, projectId, limit] : [searchTerms, limit];
+    const params = projectId
+      ? [searchTerms, projectId, resultLimit]
+      : [searchTerms, resultLimit];
     
     const { rows } = await pool.query(queryText, params);
     
@@ -303,27 +345,44 @@ export class KeywordSearchPg {
     const sanitized = sanitizeTrigramQuery(query, 'OR');
     if (!sanitized) return [];
     const pool = await this.getPool();
-    // Drop FTS5-style quoting; pg_trgm uses raw substring via similarity/%.
-    const trgmTerm = sanitized.replace(/["']/g, "").split(/\s+(?:OR|AND)\s+/)[0];
-    if (!trgmTerm) return [];
+    // Match SQLite's trigram OR semantics with exact case-insensitive
+    // substrings. PostgreSQL's `content % wholeQuery` compares a short query
+    // to the entire chunk and returned no rows for identifier substrings.
+    const trgmTerms = sanitized
+      .replace(/["']/g, "")
+      .split(/\s+(?:OR|AND)\s+/)
+      .map((term) => term.trim())
+      .filter(Boolean);
+    if (trgmTerms.length === 0) return [];
 
     try {
       const text = filters.projectId
         ? `SELECT id, content, metadata,
-                  similarity(content, $1) AS sim
+                  (SELECT COUNT(*)::float / cardinality($1::text[])
+                   FROM unnest($1::text[]) AS term
+                   WHERE content ILIKE '%' || term || '%') AS sim
            FROM keyword_documents
-           WHERE project_id = $2 AND content % $1
+           WHERE project_id = $2
+             AND EXISTS (
+               SELECT 1 FROM unnest($1::text[]) AS term
+               WHERE content ILIKE '%' || term || '%'
+             )
            ORDER BY sim DESC
            LIMIT $3`
         : `SELECT id, content, metadata,
-                  similarity(content, $1) AS sim
+                  (SELECT COUNT(*)::float / cardinality($1::text[])
+                   FROM unnest($1::text[]) AS term
+                   WHERE content ILIKE '%' || term || '%') AS sim
            FROM keyword_documents
-           WHERE content % $1
+           WHERE EXISTS (
+             SELECT 1 FROM unnest($1::text[]) AS term
+             WHERE content ILIKE '%' || term || '%'
+           )
            ORDER BY sim DESC
            LIMIT $2`;
       const params = filters.projectId
-        ? [trgmTerm, filters.projectId, limit]
-        : [trgmTerm, limit];
+        ? [trgmTerms, filters.projectId, limit]
+        : [trgmTerms, limit];
       const { rows } = await pool.query(text, params);
       return rows.map((row) => ({
         id: row.id,
@@ -404,6 +463,16 @@ export class KeywordSearchPg {
     return (result.rowCount ?? 0) > 0;
   }
 
+  async update(id: string, content: string): Promise<void> {
+    const pool = await this.getPool();
+    await pool.query(
+      `UPDATE keyword_documents
+       SET content = $1, updated_at = NOW()
+       WHERE id = $2`,
+      [content, id],
+    );
+  }
+
   async deleteByProject(projectId: string): Promise<number> {
     const pool = await this.getPool();
     const result = await pool.query('DELETE FROM keyword_documents WHERE project_id = $1', [projectId]);
@@ -420,7 +489,9 @@ export class KeywordSearchPg {
     if (this.pool) {
       await this.pool.end();
       this.pool = null;
+      this.poolPromise = null;
       this.initialized = false;
+      this.initializationPromise = null;
     }
   }
 }

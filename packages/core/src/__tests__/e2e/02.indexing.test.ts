@@ -57,25 +57,32 @@ const READY = await (async () => {
 
 /**
  * Data-plane completion: poll /project/list until PID shows a stable,
- * non-zero documentCount (the ETL has finished writing embeddings). Two
- * consecutive identical, non-zero samples => settled.
+ * non-zero documentCount and the originating job is terminal-completed.
  */
 async function awaitIndexedData(
   projectId: string,
+  jobId: string,
   { timeoutMs = 420_000, intervalMs = 5_000 }: { timeoutMs?: number; intervalMs?: number } = {},
 ): Promise<number> {
   let prev = -1;
   let stableSince = 0;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const list = await httpGet<any>("/api/v1/project/list");
+    const [list, job] = await Promise.all([
+      httpGet<any>("/api/v1/project/list"),
+      httpGet<any>(`/api/v1/project/index/status/${jobId}`),
+    ]);
+    const status = job?.data?.status;
+    if (status === "failed") {
+      throw new Error(`index job ${jobId} failed: ${job?.data?.error ?? "unknown error"}`);
+    }
     const projects = list?.data?.projects ?? [];
     const mine = projects.find((p: any) => p.projectId === projectId);
     const docs = mine?.documentCount ?? 0;
     if (docs > 0) {
       if (docs === prev) {
         stableSince++;
-        if (stableSince >= 1) return docs;
+        if (stableSince >= 1 && status === "completed") return docs;
       } else {
         stableSince = 0;
       }
@@ -84,7 +91,7 @@ async function awaitIndexedData(
     await new Promise((r) => setTimeout(r, intervalMs));
   }
   throw new Error(
-    `awaitIndexedData(${projectId}) never stabilized within ${timeoutMs}ms (last docs=${prev})`,
+    `awaitIndexedData(${projectId}, ${jobId}) never reached stable data and terminal completion within ${timeoutMs}ms (last docs=${prev})`,
   );
 }
 
@@ -120,7 +127,7 @@ describe.skipIf(!READY)("T2 indexing & project lifecycle", () => {
       warmCache: false,
     });
     primaryJobId = start?.data?.jobId;
-    primaryDocs = await awaitIndexedData(PID, { timeoutMs: 420_000 });
+    primaryDocs = await awaitIndexedData(PID, primaryJobId, { timeoutMs: 420_000 });
   }, 480_000);
 
   afterAll(async () => {
@@ -164,7 +171,7 @@ describe.skipIf(!READY)("T2 indexing & project lifecycle", () => {
       expect(start?.data?.status).toBe("started");
       // Await full settle so the background ETL is done before later searches
       // (concurrent embedding would wedge Ollama for the search tests).
-      const docs = await awaitIndexedData(PID, { timeoutMs: 420_000 });
+      const docs = await awaitIndexedData(PID, start.data.jobId, { timeoutMs: 420_000 });
       expect(docs).toBeGreaterThan(0);
     },
     480_000,
@@ -182,7 +189,7 @@ describe.skipIf(!READY)("T2 indexing & project lifecycle", () => {
       expect(start?.success).toBe(true);
       expect(start?.data?.jobId).toEqual(expect.any(String));
       expect(start?.data?.status).toBe("started");
-      await awaitIndexedData(PID, { timeoutMs: 420_000 });
+      await awaitIndexedData(PID, start.data.jobId, { timeoutMs: 420_000 });
     },
     480_000,
   );
@@ -199,7 +206,7 @@ describe.skipIf(!READY)("T2 indexing & project lifecycle", () => {
       });
       expect(start?.success).toBe(true);
       expect(start?.data?.jobId).toEqual(expect.any(String));
-      await awaitIndexedData(PID, { timeoutMs: 420_000 });
+      await awaitIndexedData(PID, start.data.jobId, { timeoutMs: 420_000 });
     },
     480_000,
   );
@@ -354,7 +361,7 @@ describe.skipIf(!READY)("T2 indexing & project lifecycle", () => {
       expect(r?.data?.jobId).toEqual(expect.any(String));
       // Await settle so the background ETL is finished before later tests
       // (avoids wedging Ollama during the matrix/search blocks).
-      const docs = await awaitIndexedData(PID, { timeoutMs: 420_000 });
+      const docs = await awaitIndexedData(PID, r.data.jobId, { timeoutMs: 420_000 });
       expect(docs).toBeGreaterThan(0);
     },
     480_000,
@@ -503,7 +510,7 @@ describe.skipIf(!READY)("T2 indexing & project lifecycle", () => {
       expect(mcpR?.data?.jobId).toEqual(expect.any(String));
 
       // Await the MCP-triggered reindex so Ollama is free for F14.
-      const docs = await awaitIndexedData(PID, { timeoutMs: 420_000 });
+      const docs = await awaitIndexedData(PID, mcpR.data.jobId, { timeoutMs: 420_000 });
       expect(docs).toBeGreaterThan(0);
     },
     480_000,

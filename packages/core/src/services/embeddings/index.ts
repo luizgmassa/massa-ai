@@ -26,7 +26,8 @@
 
 import { EmbeddingProvider, createProvider } from "./provider.js";
 import { CachedEmbeddingProvider, withCache } from "./cached-provider.js";
-import { EmbeddingCache } from "../cache/embedding-cache.js";
+import type { EmbeddingCacheStore } from "../cache/embedding-cache-contract.js";
+import { createEmbeddingCache } from "../cache/embedding-cache-factory.js";
 import {
   embeddingProviders,
   getProvidersByPriority,
@@ -68,7 +69,7 @@ export interface CreateProviderOptions {
    * Custom cache instance (optional)
    * If not provided, a new cache will be created with default settings
    */
-  cacheInstance?: EmbeddingCache;
+  cacheInstance?: EmbeddingCacheStore;
 
   /**
    * Skip health check before returning provider
@@ -187,7 +188,7 @@ export async function createEmbeddingProvider(
   // Wrap with cache if requested
   if (enableCache) {
     const cache =
-      cacheInstance || new EmbeddingCache(baseProvider.id, baseProvider.model);
+      cacheInstance || createEmbeddingCache(baseProvider.id, baseProvider.model);
 
     const cachedProvider = withCache(baseProvider, cache);
     logger.info(`Cache enabled for ${baseProvider.id}`);
@@ -216,7 +217,7 @@ export async function createAllProviders(
     const provider = await tryCreateProvider(config, id, skipHealthCheck);
     if (provider) {
       if (enableCache) {
-        const cache = new EmbeddingCache(provider.id, provider.model);
+        const cache = createEmbeddingCache(provider.id, provider.model);
         results.push(withCache(provider, cache));
       } else {
         results.push(provider);

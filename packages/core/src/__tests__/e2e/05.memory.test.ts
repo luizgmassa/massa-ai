@@ -155,6 +155,23 @@ const memUpdate = (body: any) => postLong<any>("/api/v1/memory/update", body);
 const memDelete = (body: any) => postLong<any>("/api/v1/memory/delete", body);
 const memList = (body: any) => postLong<any>("/api/v1/memory/list", body);
 
+/**
+ * Recall scores are response-local relevance values. A recall increments each
+ * returned memory's access count, so a subsequent transport call can
+ * legitimately compute a different score from the same memory set. Keep the
+ * score contract strong without treating two sequential recalls as snapshots.
+ */
+function assertRecallScores(payload: any, label: string): void {
+  const memories = payload?.data?.memories;
+  expect(Array.isArray(memories), `${label} memories`).toBe(true);
+  for (const memory of memories as any[]) {
+    expect(typeof memory.score, `${label} score for ${memory.content}`).toBe("number");
+    expect(Number.isFinite(memory.score), `${label} finite score for ${memory.content}`).toBe(true);
+    expect(memory.score, `${label} score lower bound for ${memory.content}`).toBeGreaterThanOrEqual(0);
+    expect(memory.score, `${label} score upper bound for ${memory.content}`).toBeLessThanOrEqual(1);
+  }
+}
+
 // ── Seed (one batch, shared across read-side tests) ───────────────────────
 
 interface Seed {
@@ -698,8 +715,12 @@ describe.skipIf(!READY)("T5 memory: matrix (MCP ≡ HTTP, format:json)", () => {
 
     expect(http.success).toBe(true);
     expect(mcpRes.success).toBe(true);
-    // memories[] entries carry volatile id/createdAt/accessCount/score; normalize handles those.
-    assertMatrix(http, mcpRes, { scoreTolerance: 0.05 }, "recall");
+    assertRecallScores(http, "HTTP recall");
+    assertRecallScores(mcpRes, "MCP recall");
+    // These calls are sequential. The HTTP leg increments accessCount before
+    // the MCP leg ranks the same rows, so score is intentionally mutable even
+    // when result order/content/type/tags/importance are transport-equivalent.
+    assertMatrix(http, mcpRes, { dropKeys: ["score"] }, "recall");
   }, 30_000);
 
   test("matrix: memory_update (drop id) equivalent on both transports", async () => {

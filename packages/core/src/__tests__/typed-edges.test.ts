@@ -192,16 +192,16 @@ const FIXTURE: Record<string, string> = {
 describe("typed-edges ETL integration (fixture pipeline)", () => {
   const repo = getSymbolRepository();
 
-  beforeEach(() => {
+  beforeEach(async () => {
     try {
-      repo.clearProject(TEST_PROJECT);
+      await Promise.resolve(repo.clearProject(TEST_PROJECT));
     } catch {
       /* clearProject is SQLite-only on the SQLite repo; PG path is best-effort */
     }
   });
-  afterEach(() => {
+  afterEach(async () => {
     try {
-      repo.clearProject(TEST_PROJECT);
+      await Promise.resolve(repo.clearProject(TEST_PROJECT));
     } catch {
       /* noop */
     }
@@ -332,16 +332,16 @@ describe("typed-edges ETL integration (fixture pipeline)", () => {
 describe("typed-edges cross-file resolution + include_tests", () => {
   const repo = getSymbolRepository();
 
-  beforeEach(() => {
+  beforeEach(async () => {
     try {
-      repo.clearProject(TEST_PROJECT);
+      await Promise.resolve(repo.clearProject(TEST_PROJECT));
     } catch {
       /* noop */
     }
   });
-  afterEach(() => {
+  afterEach(async () => {
     try {
-      repo.clearProject(TEST_PROJECT);
+      await Promise.resolve(repo.clearProject(TEST_PROJECT));
     } catch {
       /* noop */
     }
