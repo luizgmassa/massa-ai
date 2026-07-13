@@ -11,6 +11,7 @@ import {
 import {
   decideSharedWorkspaceIdentity,
   deriveSharedProfileIdentity,
+  isOwnedDedicatedE2eEnvironment,
   resolveE2EProjectPath,
 } from "./e2e/_helpers.js";
 
@@ -111,6 +112,34 @@ describe("commit-locked qwen E2E fixture", () => {
     expect(resolveE2EProjectPath(fallback, {
       MASSA_TH0TH_DEDICATED: "1",
     })).toBe(fallback);
+  });
+
+  test("destructive fixture behavior requires explicit owned API and PostgreSQL targets", () => {
+    const complete = {
+      MASSA_TH0TH_DEDICATED: "1",
+      MASSA_TH0TH_E2E_PROJECT_PATH: "/tmp/explicit-fixture",
+      MASSA_TH0TH_API_URL: "http://127.0.0.1:3334",
+      VECTOR_STORE_TYPE: "postgres",
+      DATABASE_URL: "postgresql://test:test@127.0.0.1:5433/massa_th0th_test",
+      POSTGRES_VECTOR_URL: "postgresql://test:test@127.0.0.1:5433/massa_th0th_test",
+    };
+    expect(isOwnedDedicatedE2eEnvironment(complete)).toBe(true);
+    for (const key of [
+      "MASSA_TH0TH_API_URL",
+      "DATABASE_URL",
+      "POSTGRES_VECTOR_URL",
+      "VECTOR_STORE_TYPE",
+    ] as const) {
+      expect(isOwnedDedicatedE2eEnvironment({ ...complete, [key]: undefined })).toBe(false);
+    }
+    expect(isOwnedDedicatedE2eEnvironment({
+      ...complete,
+      MASSA_TH0TH_API_URL: "http://127.0.0.1:3333",
+    })).toBe(false);
+    expect(isOwnedDedicatedE2eEnvironment({
+      ...complete,
+      DATABASE_URL: "postgresql://test:test@127.0.0.1:5432/massa_th0th_test",
+    })).toBe(false);
   });
 
   test("shared identity binds commit, manifest, provider, model, and dimensions", () => {

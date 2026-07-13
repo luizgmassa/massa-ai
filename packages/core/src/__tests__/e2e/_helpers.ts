@@ -37,6 +37,46 @@ export function resolveE2EProjectPath(
     : defaultPath;
 }
 
+function matchesDedicatedDatabaseUrl(raw: string | undefined): boolean {
+  if (!raw) return false;
+  try {
+    const url = new URL(raw);
+    return (
+      (url.protocol === "postgres:" || url.protocol === "postgresql:") &&
+      url.hostname === "127.0.0.1" &&
+      url.port === "5433" &&
+      url.pathname === "/massa_th0th_test"
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Destructive fixture/profile behavior is allowed only when every mutable
+ * service target is explicitly pinned to the acceptance stack. Environment
+ * flags alone are insufficient because the HTTP helper otherwise defaults to
+ * the developer-owned API on :3333.
+ */
+export function isOwnedDedicatedE2eEnvironment(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  let apiOrigin = "";
+  try {
+    apiOrigin = new URL(env.MASSA_TH0TH_API_URL ?? "").origin;
+  } catch {
+    return false;
+  }
+  return (
+    env.MASSA_TH0TH_DEDICATED === "1" &&
+    !!env.MASSA_TH0TH_E2E_PROJECT_PATH?.trim() &&
+    apiOrigin === "http://127.0.0.1:3334" &&
+    env.VECTOR_STORE_TYPE === "postgres" &&
+    matchesDedicatedDatabaseUrl(env.DATABASE_URL) &&
+    matchesDedicatedDatabaseUrl(env.POSTGRES_VECTOR_URL)
+  );
+}
+
 export const PROJECT_PATH = resolveE2EProjectPath(DEFAULT_PROJECT_PATH);
 export const POLY_FIXTURE_PATH = path.join(
   PROJECT_PATH,
@@ -74,9 +114,7 @@ export function deriveSharedProfileIdentity(profile: SharedFixtureProfile): stri
     .slice(0, 16);
 }
 
-const DEDICATED_FIXTURE =
-  process.env.MASSA_TH0TH_DEDICATED === "1" &&
-  !!process.env.MASSA_TH0TH_E2E_PROJECT_PATH?.trim();
+const DEDICATED_FIXTURE = isOwnedDedicatedE2eEnvironment();
 
 function resolveSharedProfileIdentity(): string | null {
   if (!DEDICATED_FIXTURE) return null;

@@ -12,6 +12,7 @@ import {
   httpGet,
   httpPost,
   indexAndAwait,
+  isOwnedDedicatedE2eEnvironment,
   isSharedIndexWarm,
   probeAvailability,
 } from "./_helpers.js";
@@ -21,9 +22,7 @@ import {
   type QwenFixtureManifest,
 } from "./qwen-fixture.js";
 
-const DEDICATED_FIXTURE =
-  process.env.MASSA_TH0TH_DEDICATED === "1" &&
-  !!process.env.MASSA_TH0TH_E2E_PROJECT_PATH?.trim();
+const DEDICATED_FIXTURE = isOwnedDedicatedE2eEnvironment();
 const READY = await (async () => {
   if (!E2E_ENABLED || !DEDICATED_FIXTURE || !process.env.DATABASE_URL) return false;
   const availability = await probeAvailability();
