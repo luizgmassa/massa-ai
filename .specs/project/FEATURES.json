@@ -122,6 +122,19 @@
         "tasks": true,
         "execute": true
       }
+    },
+    {
+      "slug": "close-maintenance-next-steps-2026-07-13",
+      "title": "Close maintenance next steps: Synapse, bounded search, deterministic qwen, destructive recovery, and path identity",
+      "status": "in_progress",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": false
+      }
     }
-  ]
+  ],
+  "active_feature": "close-maintenance-next-steps-2026-07-13"
 }
