@@ -191,8 +191,8 @@ function serviceEnv(): Record<string, string> {
     MASSA_TH0TH_API_PORT: "3334",
     MASSA_TH0TH_API_KEY: "",
     MASSA_TH0TH_SCHEDULER_ENABLED: "false",
-    MASSA_TH0TH_JOB_STALE_MS: "1000",
-    MASSA_TH0TH_JOB_REAPER_INTERVAL_MS: "250",
+    MASSA_TH0TH_JOB_STALE_MS: "300000",
+    MASSA_TH0TH_JOB_REAPER_INTERVAL_MS: "60000",
     OLLAMA_BASE_URL: "http://127.0.0.1:11435",
     OLLAMA_HOST: "127.0.0.1:11435",
     OLLAMA_MODELS: path.join(homedir(), ".ollama", "models"),
@@ -273,7 +273,9 @@ async function indexProject(projectPath: string, projectId: string): Promise<str
     return value === "completed" || value === "indexed" || value === "failed";
   }, 420_000);
   const final = await json(`/api/v1/project/index/status/${jobId}`);
-  expect(["completed", "indexed"]).toContain(final.body?.data?.status);
+  if (!["completed", "indexed"].includes(final.body?.data?.status)) {
+    throw new Error(`index job failed: ${JSON.stringify(final.body?.data)}`);
+  }
   return jobId;
 }
 
@@ -498,13 +500,19 @@ describe.skipIf(!ENABLED)("owned destructive recovery harness", () => {
     await stopOwned(api!);
     api = null;
     await Bun.sleep(1_300);
-    await startApi();
+    await startApi({
+      MASSA_TH0TH_JOB_STALE_MS: "1000",
+      MASSA_TH0TH_JOB_REAPER_INTERVAL_MS: "250",
+    });
     await waitFor(async () => {
       const status = await json(`/api/v1/project/index/status/${jobId}`);
       return status.body?.data?.status === "failed";
     });
     const failed = await json(`/api/v1/project/index/status/${jobId}`);
     expect(failed.body?.data?.error).toContain("process restart");
+    await stopOwned(api!);
+    api = null;
+    await startApi();
 
     const recoveryFixture = await createFixture("e25-recovery", 1);
     const recoveryJob = await indexProject(
