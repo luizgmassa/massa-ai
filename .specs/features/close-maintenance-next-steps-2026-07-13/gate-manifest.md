@@ -29,6 +29,14 @@ Frozen before implementation. Rows may gain measured evidence; they may not be r
 
 Every measured row records exact command, exit code, duration, pass/fail/skip counts, backend/database identity, provider/model/dimension, owned PIDs, skip reasons, and artifact/log pointer. Raw secrets and root `.env` values are never recorded.
 
+## TASK-002 Measured Evidence
+
+- Focused unit/Synapse gate: explicit dedicated env; 8 files; 82 pass, 0 fail, 0 skip; Bun-reported 181 ms, command wall 4.9 s; exit 0.
+- Live F24: explicit PostgreSQL `127.0.0.1:5433/massa_th0th_test`, API `:3334`, Ollama `:11435`, qwen3-embedding:8b/4096; 1 pass, 0 fail, 0 skip, 35 filtered; 1.66 s; exit 0.
+- Type-check: latest 6/6 Turbo tasks; 3.741 s; exit 0.
+- Owned listeners: PostgreSQL PID 23481/data directory `/tmp/massa-th0th-close-20260713-1424/postgres`; Ollama PID 24780; API PID 25391. Shared `:3333` remained PID 9754 and healthy.
+- Temporary F24 index: 4 files/4 chunks, 0 errors, 3.517 s; project `e2e-th0th-shared` inside the dedicated DB only. This stack is disposable and will be reprovisioned before fixture/G10 acceptance.
+
 ## Artifact Checksums
 
 Initial SHA-256 freeze (before plan challenge):

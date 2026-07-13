@@ -15,6 +15,12 @@ Feature `close-maintenance-next-steps-2026-07-13` is active under workflow sessi
 
 Follow `.specs/features/close-maintenance-next-steps-2026-07-13/tasks.md` in order. Preserve `.specs/features/repository-maintenance-2026-07-12/` byte-for-byte. Use explicit dedicated PostgreSQL/API/Ollama environment. Commit each cluster only after focused verification. Do not push.
 
+## Completed
+
+- TASK-001 committed as `d42eb81`.
+- TASK-002 implemented and focused-verified: 82 unit/Synapse tests, live dedicated PG/qwen F24, and type-check 6/6.
+- Dedicated stack is active under `/tmp/massa-th0th-close-20260713-1424` with PG PID 23481, Ollama PID 24780, API PID 25391. It is owned by this run; do not signal without revalidating identity.
+
 ## Current Next Step
 
-Run full evidence-audit plan challenge, incorporate serious safety/evidence findings without redesigning approved decisions, then use one read-only analysis subagent to map implementation seams.
+Commit TASK-002 after final diff/adequacy review, then implement TASK-003 bounded include/exclude retrieval. Reprovision the dedicated DB before fixture/G10 acceptance because the current disposable F24 index intentionally uses a temporary path.

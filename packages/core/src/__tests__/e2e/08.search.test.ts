@@ -358,28 +358,77 @@ describe.skipIf(!READY)("T3 search & context", () => {
   );
 
   test(
-    "F24: sessionId from synapse_session accepted by search",
+    "F24: matching Synapse session changes results without cross-project injection",
     async () => {
-      // Create a throwaway synapse session scoped to the shared project.
+      const f24Stamp = Date.now().toString(36);
+      const query = `F24 session-aware retrieval ${f24Stamp}`;
+      const baseline = await searchProject({
+        query,
+        projectId: pid,
+        maxResults: 3,
+        format: "json",
+      });
+      expect(baseline?.success).toBe(true);
+      const baselineIds = (baseline?.data?.results ?? []).map(
+        (entry: { id: string }) => entry.id,
+      );
+
       const sess = await postLong<any>("/api/v1/synapse/session", {
-        taskContext: "T3 F24 search accepts sessionId",
+        taskContext: query,
         workspaceId: pid,
         agentId: "e2e-t3",
+        enableBuffer: true,
       });
       expect(sess?.success).toBe(true);
       const sessionId = sess?.data?.sessionId;
       expect(typeof sessionId).toBe("string");
-      // Search with the sessionId — assert no error and results returned.
-      // (Full synapse modulation is T7's domain; here we only assert acceptance.)
+
+      const injectedId = `${f24Stamp}-f24-same-project`;
+      const crossProjectId = `${f24Stamp}-f24-cross-project`;
+      const primed = await postLong<any>(
+        `/api/v1/synapse/session/${sessionId}/prime`,
+        {
+          entries: [
+            {
+              id: injectedId,
+              content: query,
+              score: 0.99,
+              metadata: {
+                projectId: pid,
+                filePath: "fixtures/f24-same-project.ts",
+              },
+            },
+            {
+              id: crossProjectId,
+              content: query,
+              score: 1,
+              metadata: {
+                projectId: `${pid}-other`,
+                filePath: "fixtures/f24-cross-project.ts",
+              },
+            },
+          ],
+        },
+      );
+      expect(primed?.success).toBe(true);
+      expect(primed?.data?.primed).toBe(2);
+
       const r = await searchProject({
-        query: "mutex queue",
+        query,
         projectId: pid,
         maxResults: 3,
         sessionId,
         format: "json",
       });
       expect(r?.success).toBe(true);
-      expect((r?.data?.results ?? []).length).toBeGreaterThanOrEqual(0);
+      const sessionIds = (r?.data?.results ?? []).map(
+        (entry: { id: string }) => entry.id,
+      );
+      expect(baselineIds).not.toContain(injectedId);
+      expect(sessionIds).toContain(injectedId);
+      expect(sessionIds).not.toContain(crossProjectId);
+      expect(sessionIds).not.toEqual(baselineIds);
+      expect(sessionIds.length).toBeLessThanOrEqual(3);
     },
     120_000,
   );

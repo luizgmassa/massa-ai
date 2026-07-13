@@ -254,5 +254,32 @@ describe("SearchController", () => {
         ctx.search = original;
       }
     });
+
+    test("forwards sessionId to contextual search without changing the public response", async () => {
+      const ctx = (controller as any).contextualSearch;
+      const original = ctx.search.bind(ctx);
+      const calls: Array<Record<string, unknown>> = [];
+      ctx.search = async (
+        _query: string,
+        _projectId: string,
+        options: Record<string, unknown>,
+      ) => {
+        calls.push(options);
+        return [];
+      };
+
+      try {
+        const response = await controller.searchProject({
+          query: "session-aware search",
+          projectId: "project-1",
+          sessionId: "syn-1",
+        });
+        expect(calls[0].sessionId).toBe("syn-1");
+        expect(response).not.toHaveProperty("sessionId");
+        expect(response.results).toEqual([]);
+      } finally {
+        ctx.search = original;
+      }
+    });
   });
 });

@@ -35,6 +35,12 @@ import type {
 
 export interface ProcessOptions {
   sessionId?: string;
+  /** Pre-resolved session for async-backed project-search callers. */
+  session?: AgentSession | null;
+  /** Project boundary used to restrict working-memory candidates. */
+  projectId?: string;
+  /** Disable both buffer reads and writes for valid unscoped sessions. */
+  allowBufferInjection?: boolean;
   now?: number;
 }
 
@@ -89,17 +95,27 @@ export class SynapseManager {
 
     let stream = results;
     let intent: QueryIntent = "general";
-    const session: AgentSession | null = options.sessionId
-      ? getSessionRegistry().get(options.sessionId, now)
-      : null;
+    const session: AgentSession | null = options.session !== undefined
+      ? options.session
+      : options.sessionId
+        ? getSessionRegistry().get(options.sessionId, now)
+        : null;
 
     // 0) Buffer merge — pull warm hits from the session and fold them into the
     // fresh stream. Hits already carry hitBoost via the buffer.
-    const buffer = this.config.buffer?.enabled ? session?.buffer : undefined;
+    const buffer = this.config.buffer?.enabled && options.allowBufferInjection !== false
+      ? session?.buffer
+      : undefined;
     if (buffer) {
       const hot = buffer.get(query, now);
-      if (hot.results.length > 0) {
-        stream = mergeById(stream, hot.results);
+      const scopedHotResults = options.projectId
+        ? hot.results.filter((result) => {
+            const metadata = result.metadata as Record<string, unknown> | undefined;
+            return metadata?.projectId === options.projectId;
+          })
+        : hot.results;
+      if (scopedHotResults.length > 0) {
+        stream = mergeById(stream, scopedHotResults);
         applied.push("buffer-hit");
       }
     }

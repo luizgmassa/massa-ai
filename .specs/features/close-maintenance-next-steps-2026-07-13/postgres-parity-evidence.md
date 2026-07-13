@@ -4,7 +4,7 @@ PostgreSQL/pgvector is the acceptance backend. This file adds evidence for the n
 
 | ID | Behavior | Required PostgreSQL evidence | Status |
 | --- | --- | --- | --- |
-| NPAR-01 | Session-aware search scoping/ranking | Live PostgreSQL F24 plus project/session matrix | PENDING |
+| NPAR-01 | Session-aware search scoping/ranking | 82 focused tests plus live PostgreSQL/qwen F24: matching session injected same-project result, rejected malicious cross-project result, changed identity/rank, and respected `maxResults`; invalid/mismatch/unscoped unit matrix passed | FOCUSED PASS — final G10 pending |
 | NPAR-02 | Filtered bounded retrieval/cache | PostgreSQL search/cache assertions for include/exclude/combined and cap behavior | PENDING |
 | NPAR-03 | Retrieval outage envelope | Required PostgreSQL/vector dependency outage differs from zero-hit success | PENDING |
 | NPAR-04 | Embedding cache dimension identity | Mismatched cached dimension rejected under qwen profile | PENDING |

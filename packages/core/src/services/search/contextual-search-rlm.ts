@@ -46,6 +46,11 @@ import {
 } from "./query-understanding.js";
 import { applyProximityRerank, extractQueryTerms } from "./lexical-search.js";
 import { eventBus } from "../events/event-bus.js";
+import { getSynapseManager } from "../synapse/index.js";
+import { getSessionRegistry } from "../synapse/session/index.js";
+import type { SynapseManager } from "../synapse/synapse-manager.js";
+import type { SessionRegistry } from "../synapse/session/session-registry.js";
+import type { AgentSession } from "../synapse/types.js";
 
 const globAsync = glob;
 
@@ -80,6 +85,8 @@ export class ContextualSearchRLM {
     searchCache?: Awaited<ReturnType<typeof getSearchCache>>;
     analytics?: Awaited<ReturnType<typeof getSearchAnalytics>>;
     symbolRepo?: Awaited<ReturnType<typeof getSymbolRepository>>;
+    sessionRegistry?: Pick<SessionRegistry, "getAsync">;
+    synapseManager?: Pick<SynapseManager, "process">;
   };
 
   constructor(deps?: {
@@ -88,6 +95,8 @@ export class ContextualSearchRLM {
     searchCache?: Awaited<ReturnType<typeof getSearchCache>>;
     analytics?: Awaited<ReturnType<typeof getSearchAnalytics>>;
     symbolRepo?: Awaited<ReturnType<typeof getSymbolRepository>>;
+    sessionRegistry?: Pick<SessionRegistry, "getAsync">;
+    synapseManager?: Pick<SynapseManager, "process">;
   }) {
     this.fileFilterCache = new FileFilterCache();
     this.queryUnderstanding = new QueryUnderstandingService();
@@ -642,7 +651,12 @@ export class ContextualSearchRLM {
         durationMs: `${duration}ms`,
         preciseMs: `${(endTime - startTime).toFixed(3)}ms`,
       });
-      return cachedResults;
+      return this.applySynapseState(
+        cachedResults,
+        query,
+        projectId,
+        options.sessionId,
+      );
     }
 
     try {
@@ -908,7 +922,12 @@ export class ContextualSearchRLM {
         duration,
       });
 
-      return withContext;
+      return this.applySynapseState(
+        withContext,
+        query,
+        projectId,
+        options.sessionId,
+      );
     } catch (error) {
       logger.error("Contextual search failed", error as Error, {
         query,
@@ -916,6 +935,51 @@ export class ContextualSearchRLM {
       });
       return [];
     }
+  }
+
+  /**
+   * Apply session state after the session-independent base result is cached.
+   * Invalid and workspace-mismatched sessions return the exact base array.
+   */
+  private async applySynapseState(
+    baseResults: SearchResult[],
+    query: string,
+    projectId: string,
+    sessionId?: string,
+  ): Promise<SearchResult[]> {
+    if (!sessionId) return baseResults;
+
+    const registry = this.injectedDeps?.sessionRegistry ?? getSessionRegistry();
+    let session: AgentSession | null;
+    try {
+      session = await registry.getAsync(sessionId);
+    } catch (error) {
+      logger.warn("Synapse session lookup failed — using stateless search", {
+        sessionId,
+        projectId,
+        error: (error as Error).message,
+      });
+      return baseResults;
+    }
+
+    if (!session || (session.workspaceId && session.workspaceId !== projectId)) {
+      return baseResults;
+    }
+
+    const synapseManager = this.injectedDeps?.synapseManager ?? getSynapseManager();
+    const allowBufferInjection = session.workspaceId === projectId;
+    const processed = synapseManager.process(baseResults, query, {
+      session,
+      projectId,
+      allowBufferInjection,
+    });
+    const baseIds = new Set(baseResults.map((result) => result.id));
+
+    return processed.results.filter((result) => {
+      if (baseIds.has(result.id)) return true;
+      const metadata = result.metadata as Record<string, unknown> | undefined;
+      return allowBufferInjection && metadata?.projectId === projectId;
+    });
   }
 
   /**

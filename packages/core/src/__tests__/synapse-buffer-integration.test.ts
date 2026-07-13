@@ -15,13 +15,18 @@ import * as session from "../services/synapse/session/session-registry.js";
 const ORIGINAL_GET = session.getSessionRegistry;
 let registry: SessionRegistry;
 
-function r(id: string, content: string, score: number): SearchResult {
+function r(
+  id: string,
+  content: string,
+  score: number,
+  projectId?: string,
+): SearchResult {
   return {
     id,
     content,
     score,
     source: SearchSource.VECTOR,
-    metadata: {},
+    metadata: projectId ? { projectId } : {},
   };
 }
 
@@ -127,5 +132,62 @@ describe("SynapseManager + WorkingMemoryBuffer", () => {
     const ids = out.results.map((x) => x.id);
     expect(ids).toContain("primed");
     expect(ids).toContain("fresh");
+  });
+
+  test("project-scoped processing rejects cross-project buffered entries", () => {
+    resetSessionRegistry();
+    registry = ORIGINAL_GET();
+    const scopedSession = registry.create({
+      sessionId: "scoped",
+      agentId: "claude",
+      workspaceId: "project-a",
+      bufferConfig: { ...DEFAULT_BUFFER_CONFIG, matchThreshold: 0.3 },
+    });
+    scopedSession.buffer!.prime([
+      r("same-project", "auth middleware token", 0.9, "project-a"),
+      r("other-project", "auth middleware token", 0.99, "project-b"),
+    ]);
+
+    const mgr = new SynapseManager(makeConfig());
+    const out = mgr.process(
+      [r("fresh", "auth middleware flow", 0.6, "project-a")],
+      "auth middleware behavior",
+      {
+        session: scopedSession,
+        projectId: "project-a",
+        allowBufferInjection: true,
+      },
+    );
+
+    expect(out.results.map((entry) => entry.id)).toContain("same-project");
+    expect(out.results.map((entry) => entry.id)).not.toContain("other-project");
+  });
+
+  test("unscoped processing disables both buffer reads and writes", () => {
+    resetSessionRegistry();
+    registry = ORIGINAL_GET();
+    const unscopedSession = registry.create({
+      sessionId: "unscoped",
+      agentId: "claude",
+      bufferConfig: { ...DEFAULT_BUFFER_CONFIG, matchThreshold: 0.3 },
+    });
+    unscopedSession.buffer!.prime([
+      r("primed", "auth middleware token", 0.9, "project-a"),
+    ]);
+
+    const mgr = new SynapseManager(makeConfig());
+    const out = mgr.process(
+      [r("fresh", "auth middleware flow", 0.6, "project-a")],
+      "auth middleware behavior",
+      {
+        session: unscopedSession,
+        projectId: "project-a",
+        allowBufferInjection: false,
+      },
+    );
+
+    expect(out.results.map((entry) => entry.id)).toEqual(["fresh"]);
+    expect(out.appliedFilters).not.toContain("buffer-hit");
+    expect(out.appliedFilters).not.toContain("buffer-put");
   });
 });

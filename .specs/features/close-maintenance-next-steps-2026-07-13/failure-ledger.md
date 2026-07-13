@@ -3,6 +3,9 @@
 | ID | Cluster/gate | Classification | Decisive evidence | Attempts | Status/next |
 | --- | --- | --- | --- | ---: | --- |
 | E-001 | G01 plan challenge delegation | Orchestration timeout | Read-only critic did not return within its bounded window and was interrupted without writes | 1 | Closed by strict local full Evidence Audit; serious revisions applied before implementation |
+| E-002 | TASK-002 analysis delegation | Orchestration timeout | Read-only mapper did not return within its bounded window and was interrupted without writes | 1 | Closed by focused local source reads; no implementation assumption remained unverified |
+| E-003 | TASK-002 first unit red run | Environment/setup defect | Command omitted explicit DB/vector env; Bun loaded root `.env` and attempted PG session-store writes, which failed | 1 | Invalid evidence; shared `:3333` was not contacted; all later commands pinned dedicated `:5433/:3334/:11435` and passed |
+| E-004 | TASK-002 diagnostic runner | Orchestration timeout | Read-only Test Runner did not return within its bounded window and was interrupted without edits/service control | 1 | Main rerun is measured evidence: focused 82/0/0, F24 1/0 with 35 filtered, type-check 6/6 |
 
 ## Iteration Policy
 

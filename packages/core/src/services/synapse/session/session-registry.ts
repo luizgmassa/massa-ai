@@ -99,7 +99,7 @@ export class SessionRegistry {
    * sync `get()`. Use this for session-resume entry points (REST/MCP) where a
    * caller must observe a persisted session immediately after a process
    * restart. The hot-path `process()` pipeline continues to use the sync
-   * `get()` (the modulation layer is out of scope).
+   * `get()`. Project search uses this path before session-aware modulation.
    */
   async getAsync(sessionId: string, now: number = Date.now()): Promise<AgentSession | null> {
     await this.ensureReady();

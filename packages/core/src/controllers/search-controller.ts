@@ -127,6 +127,7 @@ export class SearchController {
       maxResults,
       minScore,
       explainScores,
+      sessionId,
     });
 
     logger.info("Project search completed", {
@@ -174,7 +175,7 @@ export class SearchController {
       });
     }
 
-    const formattedResults = rerankedResults.map((r) => {
+    const formattedResults = rerankedResults.slice(0, maxResults).map((r) => {
       const meta = (r.metadata ?? {}) as Record<string, unknown>;
       const base: FormattedResult = {
         id: r.id,
