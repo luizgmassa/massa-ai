@@ -68,6 +68,47 @@ function createSearch(candidates: SearchResult[]) {
 }
 
 describe("ContextualSearchRLM — bounded filtered retrieval", () => {
+  test("blank queries return no hits without calling retrieval providers", async () => {
+    const { search, vectorLimits, keywordLimits, trigramLimits } = createSearch([
+      candidate(0, true),
+    ]);
+
+    const results = await search.search("   ", "filter-project", {
+      maxResults: 5,
+    });
+
+    expect(results).toEqual([]);
+    expect(vectorLimits).toEqual([]);
+    expect(keywordLimits).toEqual([]);
+    expect(trigramLimits).toEqual([]);
+  });
+
+  test("minScore rejects graph-only context without direct query relevance", async () => {
+    const { search } = createSearch([
+      { ...candidate(0, true), score: 0.65 },
+    ]);
+    (search as any).buildGraphStream = async () => [
+      {
+        id: "graph-only-memory",
+        content: "context connected to an unrelated low-score seed",
+        score: 0.45,
+        source: SearchSource.MEMORY,
+        metadata: {
+          projectId: "filter-project",
+          context: { graphNeighbor: true },
+        },
+      },
+    ];
+
+    const results = await search.search(
+      "zzzqzx unicorn frobnicate",
+      "filter-project",
+      { maxResults: 5, minScore: 0.7 },
+    );
+
+    expect(results).toEqual([]);
+  });
+
   test("include-only fills maxResults beyond the old 2N window in one pass", async () => {
     const candidates = [
       ...Array.from({ length: 20 }, (_, index) => candidate(index, false)),

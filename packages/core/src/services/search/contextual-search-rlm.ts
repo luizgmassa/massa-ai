@@ -600,6 +600,16 @@ export class ContextualSearchRLM {
       return [];
     }
 
+    // Embedding providers such as Ollama reject an empty input. Treat a blank
+    // query as the valid no-hit search the public API has historically
+    // advertised, and avoid fan-out to vector/keyword dependencies entirely.
+    if (!query.trim()) {
+      logger.debug("Blank query — returning empty result set", {
+        projectId,
+      });
+      return [];
+    }
+
     const startTime = performance.now(); // Use performance.now() for sub-millisecond precision
 
     logger.debug("Starting contextual search", {
@@ -1300,6 +1310,9 @@ export class ContextualSearchRLM {
             keywordRank,
             vectorScore,
             keywordScore,
+            vectorRrfScore,
+            lexicalRrfScore,
+            memoryRrfScore,
           },
           index,
         ) => {
@@ -1318,6 +1331,8 @@ export class ContextualSearchRLM {
               ? ((result.metadata as Record<string, unknown>).centralityScore as number)
               : 0;
           const normalizedScore = Math.min(1, combinedScore * (1 + 0.2 * centralityScore));
+          const memoryOnly =
+            memoryRrfScore > 0 && vectorRrfScore === 0 && lexicalRrfScore === 0;
 
           // Generate explanation if requested
           const explanation = explainScores
@@ -1342,7 +1357,12 @@ export class ContextualSearchRLM {
             // therefore cannot filter semantic noise). Stripped before caching.
             metadata: {
               ...(result.metadata as Record<string, unknown>),
-              _rrfRawVectorScore: vectorScore,
+              // Graph-only context has no direct query-relevance signal. Give
+              // it an explicit zero for minScore gating so dynamic RRF
+              // normalization cannot turn an unrelated neighbor into a 0.7
+              // hit. A result also found by vector/lexical retrieval keeps its
+              // direct relevance behavior.
+              _rrfRawVectorScore: vectorScore ?? (memoryOnly ? 0 : undefined),
             } as typeof result.metadata,
           };
         },
