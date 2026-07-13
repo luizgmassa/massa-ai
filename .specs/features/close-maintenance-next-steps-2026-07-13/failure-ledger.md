@@ -9,6 +9,8 @@
 | E-005 | TASK-003 first green run | Implementation defect | `retrievalWindow` was added to logging instead of the cache options; two focused assertions remained red | 1 | Closed by moving the field to the cache identity; final focused gate 25/0/0 |
 | E-006 | TASK-003 live F18 | Implementation defect | Pathless graph candidates passed an include whitelist and serialized without `filePath` | 1 | Closed by making an include pattern reject pathless candidates in RLM and controller; regression assertions added |
 | E-007 | TASK-003 live F18 | Implementation defect | The RLM's ad-hoc glob conversion made `**/` require a subdirectory, so a direct child under `services/` underfilled | 1 | Closed by using the existing `minimatch` semantics at both search layers; direct-child regression and final live F18 pass |
+| E-008 | TASK-004 analysis delegation | Orchestration timeout | Read-only outage mapper did not return within its bounded window and was interrupted without writes or service control | 1 | Closed by local source-backed path inspection from RLM through tool, API route, and MCP proxy |
+| E-009 | TASK-004 red gate | Expected implementation defect | Required vector error was logged but resolved as `[]`; zero-hit, optional lexical degradation, and tool envelope already passed | 1 | Closed by rethrowing the outer required retrieval failure; focused green gate 52/0/0 |
 
 ## Iteration Policy
 

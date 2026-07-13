@@ -7,7 +7,7 @@
 - workflow: spec-driven
 - persona: AI Engineer
 - feature: `close-maintenance-next-steps-2026-07-13`
-- status: IN PROGRESS — TASK-003 COMPLETE
+- status: IN PROGRESS — TASK-004 COMPLETE
 - branch: `main`
 - baseline: `cc985905fae3495a31a16aaf0fbd75435a2e63df`
 - push: forbidden
@@ -26,4 +26,4 @@ Execute the approved maintenance closure plan sequentially: Synapse-aware search
 
 ## Next Step
 
-Implement TASK-004 dependency-outage transparency, preserving optional-stream degradation while surfacing required retrieval failures through the structured tool/MCP envelope.
+Execute TASK-005: record the bounded cold-qwen throughput sample, then add the commit-locked deterministic qwen fixture, negative discrimination profile, and embedding-dimension cache rejection.

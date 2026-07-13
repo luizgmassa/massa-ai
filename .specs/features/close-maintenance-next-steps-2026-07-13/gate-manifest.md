@@ -46,6 +46,14 @@ Every measured row records exact command, exit code, duration, pass/fail/skip co
 - Shared `:3333` remained PID 9754 and healthy after TASK-003. No shared process or data was mutated.
 - Skip ledger: none. The 35 F18 entries reported as filtered are non-selected tests, not runtime skips.
 
+## TASK-004 Measured Evidence
+
+- Red sensor: 4 new zero-hit/outage/tool-envelope tests; 3 pass and the required-vector rejection assertion fails because the promise resolves `[]`; 1 fail; Bun-reported 106 ms, command wall 4.0 s; exit 1.
+- Focused green gate: explicit dedicated env; 5 files covering outage transparency plus existing query-understanding/HyDE, lexical/graph, filters, and controller behavior; 52 pass, 0 fail, 0 skip; Bun-reported 1.75 s, command wall 6.3 s; exit 0.
+- Type-check: 6/6 Turbo tasks; 3.221 s; exit 0.
+- Structured transport seam: `SearchProjectTool` converts the surfaced required-vector rejection into the existing `{success:false,error}` response consumed unchanged by Tools API and MCP proxy. Live owned PostgreSQL/Ollama outage execution remains assigned to TASK-007 N1/N3.
+- Shared `:3333` remained PID 9754 and healthy after TASK-004. No shared process or data was mutated. Skip ledger: none.
+
 ## Artifact Checksums
 
 Initial SHA-256 freeze (before plan challenge):

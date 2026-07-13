@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | CMT-01 Synapse search | 82 focused pass; type-check 6/6; live dedicated PG/qwen F24 1 pass with same-project injection, cross-project rejection, material result change, and cap | FOCUSED PASS — final G10 pending |
 | CMT-02 bounded filters | 25 focused pass; SQLite/PG cache-key parity; live dedicated PG/qwen F18 1 pass; type-check 6/6 | FOCUSED PASS — final G10 pending |
-| CMT-03 outage transparency | pending | PENDING |
+| CMT-03 outage transparency | 52 focused pass: zero-hit `[]`, required vector rejection, optional-stream degradation, structured tool envelope; type-check 6/6 | FOCUSED PASS — destructive N1/N3 pending TASK-007 |
 | CMT-04 cold-qwen G10 | pending | PENDING |
 | CMT-05 destructive recovery | pending | PENDING |
 | CMT-06 identity/path hygiene | pending | PENDING |
@@ -45,3 +45,15 @@ Non-shallow check: each assertion fails under a plausible wrong implementation (
 | Controller and live PostgreSQL behavior | `search-controller.test.ts:286`; `e2e/08.search.test.ts:175` | Filters forwarded; live F18 returns only matching paths | Covered |
 
 Non-shallow check: the red gate failed 8 assertions before implementation; live F18 then exposed pathless and recursive-glob defects that focused tests were expanded to discriminate. No retry, timeout, threshold, response-tier, ranking, minimum-score, deduplication, or per-file-limit behavior was weakened. Verdict: PASS.
+
+## TASK-004 Test Adequacy Review
+
+| CMT-03 criterion | Assertion evidence | Spec outcome | Verdict |
+| --- | --- | --- | --- |
+| Genuine zero hit remains successful empty search | `search-dependency-outage.test.ts:51` | Resolves `[]` and caches the valid empty result | Covered |
+| Required vector/backend failure is not a zero hit | `search-dependency-outage.test.ts:62` | Rejects with the original backend error and performs no cache write | Covered |
+| Optional keyword/trigram failures remain vector-only | `search-dependency-outage.test.ts:75` | Vector hit is returned despite both lexical failures | Covered |
+| Optional query-understanding/HyDE and graph behavior remains graceful | `query-understanding.test.ts` P2-DEGRADE/FANOUT matrix; `lexical-rrf-wiring.test.ts` A1/A3 | Existing optional paths remain green in the focused gate | Covered |
+| Surfaced failure uses structured public envelope | `search-dependency-outage.test.ts:93`; `search_project.ts:110-129`; MCP proxy `apps/mcp-client/src/index.ts:219-230` | Tool returns `success:false` with dependency message; API delegates the tool response; MCP serializes it | Covered |
+
+Non-shallow check: the red gate distinguished a zero-hit resolution from a dependency rejection while the adjacent success and degradation sensors stayed green. The production patch changes only the outer catch from `return []` to `throw`; optional catches remain intact. Actual owned-service outage and recovery are intentionally not inferred here and remain mandatory in TASK-007. Verdict: PASS.

@@ -816,7 +816,7 @@ export class ContextualSearchRLM {
       // SearchResults via the memory repo at a fixed sub-hit score (0.45) so
       // RRF surfaces them mid-list. Silent-omit when empty/unavailable (the
       // resultSets length — and thus the search:reranked streamCount — reflects
-      // the actual stream count). No throw escapes search().
+      // the actual stream count). No graph-stream throw escapes this optional path.
       const graphStream = await this.buildGraphStream(resultSets, maxResults, projectId);
       if (graphStream.length > 0) {
         resultSets = [...resultSets, graphStream];
@@ -940,7 +940,7 @@ export class ContextualSearchRLM {
         query,
         projectId,
       });
-      return [];
+      throw error;
     }
   }
 
