@@ -54,6 +54,16 @@ Every measured row records exact command, exit code, duration, pass/fail/skip co
 - Structured transport seam: `SearchProjectTool` converts the surfaced required-vector rejection into the existing `{success:false,error}` response consumed unchanged by Tools API and MCP proxy. Live owned PostgreSQL/Ollama outage execution remains assigned to TASK-007 N1/N3.
 - Shared `:3333` remained PID 9754 and healthy after TASK-004. No shared process or data was mutated. Skip ledger: none.
 
+## TASK-005 Measured Evidence
+
+- Bounded full-repository cold-qwen sample: empty dedicated PostgreSQL database; qwen3-embedding:8b/4096; stopped at 10 distinct completed files before the 180-second cap; 97 chunks and 97 embedding-cache rows; indexing job active for 51.795 s, measured throughput 0.193 files/s.
+- Commit-locked fixture: local sparse clone at tested HEAD; 5 unique needle targets, 20 tracked source distractors, and 21 explicitly required support files; SHA-256 validation rejects changed, missing, secret, generated, `adsads/`, absolute, and traversal paths. Fixture selection requires both `MASSA_TH0TH_DEDICATED=1` and an explicit path.
+- Cache dimension red/green: 8 pass/2 expected fail before dimension enforcement; final SQLite/PostgreSQL parity 10 pass, 0 fail. Final combined fixture/cache/search regression gate: 28 pass, 0 fail, 0 skip; Bun 1.468 s; exit 0.
+- Focused live qwen/PostgreSQL sequence: `02.indexing` 19/19 in 401.15 s; `08.search` 36/36 in 24.84 s; `14.needles` 1/1 in 171 ms with identical sweeps at hit@1 .643, hit@5 .857, hit@10 .929, MRR .732; `18.graph-phase4` 9/9 in 896 ms; disposable negative fixture 1/1 in 3.63 s. No Bun test was skipped.
+- Search relevance prerequisite exposed by the live fixture is independently committed as `e995ea6`; stale needle source spans are independently committed as `66607d3`. Neither qwen threshold, query, nor timeout changed.
+- Type-check after final implementation: 6/6 Turbo tasks; 3.804 s; exit 0. Current owned listeners: PostgreSQL PID 23481, Ollama PID 24780, API PID 53768. Shared `:3333` remains PID 9754 and healthy.
+- Conditional skip ledger from `08.search`: F21 stale auto-reindex path not isolated because the shared fixture was fresh; E5 cache internals lack public introspection; E6 keyword-only score breakdown is not publicly isolatable; E7 would require stopping Ollama and belongs to TASK-007; E29 is an internal fusion detail without a public toggle. Each test executed and passed its documented contract; Bun reported zero skips.
+
 ## Artifact Checksums
 
 Initial SHA-256 freeze (before plan challenge):

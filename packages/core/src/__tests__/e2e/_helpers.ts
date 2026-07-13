@@ -21,8 +21,23 @@ export const RUN_STAMP = Date.now().toString(36);
 export const PREFIX = "e2e-th0th-";
 export const PROJECT_ID = `${PREFIX}self-${RUN_STAMP}`;
 export const POLY_PROJECT_ID = `${PREFIX}poly-${RUN_STAMP}`;
-export const PROJECT_PATH = path.resolve(import.meta.dir, "../../../../../");
-export const POLY_FIXTURE_PATH = path.resolve(import.meta.dir, "./fixtures/polyglot");
+export const DEFAULT_PROJECT_PATH = path.resolve(import.meta.dir, "../../../../../");
+
+export function resolveE2EProjectPath(
+  defaultPath: string,
+  env: Record<string, string | undefined> = process.env,
+): string {
+  const explicitPath = env.MASSA_TH0TH_E2E_PROJECT_PATH?.trim();
+  return env.MASSA_TH0TH_DEDICATED === "1" && explicitPath
+    ? path.resolve(explicitPath)
+    : defaultPath;
+}
+
+export const PROJECT_PATH = resolveE2EProjectPath(DEFAULT_PROJECT_PATH);
+export const POLY_FIXTURE_PATH = path.join(
+  PROJECT_PATH,
+  "packages/core/src/__tests__/e2e/fixtures/polyglot",
+);
 
 export type Backend = "sqlite" | "postgres" | "unknown";
 

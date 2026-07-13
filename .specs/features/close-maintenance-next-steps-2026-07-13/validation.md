@@ -11,7 +11,7 @@
 | CMT-01 Synapse search | 82 focused pass; type-check 6/6; live dedicated PG/qwen F24 1 pass with same-project injection, cross-project rejection, material result change, and cap | FOCUSED PASS — final G10 pending |
 | CMT-02 bounded filters | 25 focused pass; SQLite/PG cache-key parity; live dedicated PG/qwen F18 1 pass; type-check 6/6 | FOCUSED PASS — final G10 pending |
 | CMT-03 outage transparency | 52 focused pass: zero-hit `[]`, required vector rejection, optional-stream degradation, structured tool envelope; type-check 6/6 | FOCUSED PASS — destructive N1/N3 pending TASK-007 |
-| CMT-04 cold-qwen G10 | pending | PENDING |
+| CMT-04 cold-qwen G10 | 10-file cold sample at .193 files/s; commit-locked sparse fixture; dimension-mismatch rejection in SQLite/PG; focused live qwen sequence 66/66 file-level tests plus 1 needle benchmark and 1 negative sensor; unchanged floors .643/.857/.732 twice | FOCUSED PASS — final reprovisioned G10 pending |
 | CMT-05 destructive recovery | pending | PENDING |
 | CMT-06 identity/path hygiene | pending | PENDING |
 
@@ -57,3 +57,17 @@ Non-shallow check: the red gate failed 8 assertions before implementation; live 
 | Surfaced failure uses structured public envelope | `search-dependency-outage.test.ts:93`; `search_project.ts:110-129`; MCP proxy `apps/mcp-client/src/index.ts:219-230` | Tool returns `success:false` with dependency message; API delegates the tool response; MCP serializes it | Covered |
 
 Non-shallow check: the red gate distinguished a zero-hit resolution from a dependency rejection while the adjacent success and degradation sensors stayed green. The production patch changes only the outer catch from `return []` to `throw`; optional catches remain intact. Actual owned-service outage and recovery are intentionally not inferred here and remain mandatory in TASK-007. Verdict: PASS.
+
+## TASK-005 Test Adequacy Review
+
+| CMT-04 criterion | Assertion evidence | Spec outcome | Verdict |
+| --- | --- | --- | --- |
+| Bounded full-repository calibration | Empty dedicated PG; stop at 10 durable files/97 chunks/97 cache rows after 51.795 s | Establishes .193 files/s without waiting for the known full-repo run | Covered |
+| Commit and content identity | `qwen-e2e-fixture.test.ts` validates HEAD, exact materialized set, hashes, five targets, twenty distractors, and forbidden paths | Local/no-network fixture cannot silently drift or import secrets/generated paths | Covered |
+| Dedicated-only selection | `_helpers.ts` resolver matrix | Explicit fixture path is ignored outside a dedicated run | Covered |
+| Wrong embedding dimension | `embedding-cache-parity.test.ts` on SQLite and dedicated PostgreSQL | Wrong-length query and batch entries miss and are replaced | Covered |
+| Unchanged qwen relevance | `14.needles.test.ts` two identical sweeps | hit@1 .643, hit@5 .857, hit@10 .929, MRR .732; original floors retained | Covered |
+| Negative discrimination | `21.qwen-fixture.test.ts` omits rank-1 `centrality.ts` target | Positive sensor passes; non-empty negative search cannot surface omitted path | Covered |
+| Representative production/E2E surface | Indexing 19/19; search 36/36; graph 9/9 | Fixture supports lifecycle, transport, relevance, and graph assertions | Covered |
+
+Non-shallow check: the initial dimension sensors failed before implementation; the initial needle sweep failed its unchanged hit@5 floor; the graph suite failed when a required tracked production source was absent; and the negative profile physically omits its positive rank-1 target. No threshold or timeout increased, and no public contract was weakened. Verdict: PASS.

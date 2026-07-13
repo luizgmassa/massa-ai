@@ -61,7 +61,7 @@ export class CachedEmbeddingProvider implements EmbeddingProvider {
   async embedQuery(text: string): Promise<number[]> {
     // Try cache first
     const cached = await this.cache.get(text);
-    if (cached) {
+    if (cached && cached.length === this.dimensions) {
       this.hits++;
       return cached;
     }
@@ -99,7 +99,7 @@ export class CachedEmbeddingProvider implements EmbeddingProvider {
     const missTexts: string[] = [];
 
     cachedResults.forEach((cached, idx) => {
-      if (cached === null) {
+      if (cached === null || cached.length !== this.dimensions) {
         missIndices.push(idx);
         missTexts.push(texts[idx]);
       } else {
@@ -124,7 +124,10 @@ export class CachedEmbeddingProvider implements EmbeddingProvider {
     let missIdx = 0;
 
     for (let i = 0; i < texts.length; i++) {
-      if (cachedResults[i] !== null) {
+      if (
+        cachedResults[i] !== null &&
+        cachedResults[i]!.length === this.dimensions
+      ) {
         results.push(cachedResults[i] as number[]);
       } else {
         results.push(newEmbeddings[missIdx]);

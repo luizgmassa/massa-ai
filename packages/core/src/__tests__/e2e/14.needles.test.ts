@@ -51,6 +51,7 @@ import {
   E2E_ENABLED,
   probeAvailability,
   ensureSharedIndex,
+  PROJECT_PATH,
 } from "./_helpers";
 
 // ── Gating ────────────────────────────────────────────────────────────────
@@ -83,9 +84,9 @@ async function postLong<T = any>(endpoint: string, body?: unknown, timeoutMs = 1
 }
 
 // ── Dataset + scorer (imported from the repo, read-only) ────────────────────
-const FIXTURE_PATH = path.resolve(
-  import.meta.dir,
-  "../../../../../benchmarks/needles/fixtures/massa-th0th.json",
+const FIXTURE_PATH = path.join(
+  PROJECT_PATH,
+  "benchmarks/needles/fixtures/massa-th0th.json",
 );
 
 interface NeedleExpected {

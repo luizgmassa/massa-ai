@@ -4,6 +4,8 @@ import { EmbeddingCache } from "../services/cache/embedding-cache.js";
 import { EmbeddingCachePg } from "../services/cache/embedding-cache-pg.js";
 import { createEmbeddingCache } from "../services/cache/embedding-cache-factory.js";
 import type { EmbeddingCacheStore } from "../services/cache/embedding-cache-contract.js";
+import { CachedEmbeddingProvider } from "../services/embeddings/cached-provider.js";
+import type { EmbeddingProvider } from "../services/embeddings/provider.js";
 import { disconnectPrisma, getPrismaClient } from "../services/query/prisma-client.js";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
@@ -34,6 +36,56 @@ async function expectCommonContract(cache: EmbeddingCacheStore): Promise<void> {
   expect(stats.hitRate).toBeCloseTo(3 / 6);
 }
 
+async function expectDimensionMismatchRejected(
+  cache: EmbeddingCacheStore,
+  providerId: string,
+  model: string,
+): Promise<void> {
+  await cache.set("dimension-query", [9, 9]);
+  await cache.setBatch(
+    ["dimension-batch-bad", "dimension-batch-good"],
+    [[8, 8], [1, 2, 3, 4]],
+  );
+
+  let queryCalls = 0;
+  const batchCalls: string[][] = [];
+  const base: EmbeddingProvider = {
+    id: providerId,
+    model,
+    dimensions: 4,
+    embedQuery: async () => {
+      queryCalls++;
+      return [1, 2, 3, 4];
+    },
+    embedBatch: async (texts) => {
+      batchCalls.push(texts);
+      return texts.map(() => [4, 3, 2, 1]);
+    },
+    isAvailable: async () => true,
+    getConfig: () => ({
+      provider: "ollama",
+      model,
+      dimensions: 4,
+      priority: 1,
+    }),
+  };
+  const provider = new CachedEmbeddingProvider(base, cache);
+
+  expect(await provider.embedQuery("dimension-query")).toEqual([1, 2, 3, 4]);
+  expect(queryCalls).toBe(1);
+  expect(await cache.get("dimension-query")).toEqual([1, 2, 3, 4]);
+
+  expect(await provider.embedBatch([
+    "dimension-batch-bad",
+    "dimension-batch-good",
+  ])).toEqual([
+    [4, 3, 2, 1],
+    [1, 2, 3, 4],
+  ]);
+  expect(batchCalls).toEqual([["dimension-batch-bad"]]);
+  expect(await cache.get("dimension-batch-bad")).toEqual([4, 3, 2, 1]);
+}
+
 describe("Embedding cache — SQLite contract regression", () => {
   const suffix = `${process.pid}-${randomUUID()}`;
   const provider = `sqlite-provider-${suffix}`;
@@ -60,6 +112,16 @@ describe("Embedding cache — SQLite contract regression", () => {
     caches.push(providerPeer, modelPeer);
     expect(await providerPeer.get(" exact ")).toBeNull();
     expect(await modelPeer.get(" exact ")).toBeNull();
+  });
+
+  test("configured dimensions reject and replace mismatched cached vectors", async () => {
+    const cache = new EmbeddingCache(`${provider}-dimension`, `${model}-dimension`);
+    caches.push(cache);
+    await expectDimensionMismatchRejected(
+      cache,
+      `${provider}-dimension`,
+      `${model}-dimension`,
+    );
   });
 
   test("cleanup uses millisecond creation age", async () => {
@@ -128,6 +190,16 @@ describe.skipIf(!DEDICATED_DB)("Embedding cache — exact dedicated PostgreSQL p
     expect(await modelPeer.get("same-content")).toEqual([3]);
     expect((await base.getStats()).totalEntries).toBe(1);
     expect((await providerPeer.getStats()).totalEntries).toBe(1);
+  });
+
+  test("configured dimensions reject and replace mismatched cached vectors", async () => {
+    const cache = new EmbeddingCachePg(`${provider}-dimension`, `${model}-dimension`);
+    caches.push(cache);
+    await expectDimensionMismatchRejected(
+      cache,
+      `${provider}-dimension`,
+      `${model}-dimension`,
+    );
   });
 
   test("cleanup accepts milliseconds and uses creation age like SQLite", async () => {
