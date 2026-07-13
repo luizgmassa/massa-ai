@@ -13,7 +13,7 @@
 | CMT-03 outage transparency | 52 focused pass: zero-hit `[]`, required vector rejection, optional-stream degradation, structured tool envelope; type-check 6/6 | FOCUSED PASS — destructive N1/N3 pending TASK-007 |
 | CMT-04 cold-qwen G10 | 10-file cold sample at .193 files/s; commit-locked sparse fixture; dimension-mismatch rejection in SQLite/PG; focused live qwen sequence 66/66 file-level tests plus 1 needle benchmark and 1 negative sensor; unchanged floors .643/.857/.732 twice | FOCUSED PASS — final reprovisioned G10 pending |
 | CMT-05 destructive recovery | pending | PENDING |
-| CMT-06 identity/path hygiene | pending | PENDING |
+| CMT-06 identity/path hygiene | canonical-root production refusal; five-field hashed shared ID; warm wrong-root guarded rebuild; direct PG validation of 468 vectors/34 vector paths/34 symbol paths against the manifest | FOCUSED PASS — final cleanup sentinel pending |
 
 Independent validation, discrimination sensors, diff range, skip audit, cleanup status, and shared before/after identity are required before this report can become PASS.
 
@@ -71,3 +71,16 @@ Non-shallow check: the red gate distinguished a zero-hit resolution from a depen
 | Representative production/E2E surface | Indexing 19/19; search 36/36; graph 9/9 | Fixture supports lifecycle, transport, relevance, and graph assertions | Covered |
 
 Non-shallow check: the initial dimension sensors failed before implementation; the initial needle sweep failed its unchanged hit@5 floor; the graph suite failed when a required tracked production source was absent; and the negative profile physically omits its positive rank-1 target. No threshold or timeout increased, and no public contract was weakened. Verdict: PASS.
+
+## TASK-006 Test Adequacy Review
+
+| CMT-06 criterion | Assertion evidence | Spec outcome | Verdict |
+| --- | --- | --- | --- |
+| Canonical production roots | `index-project-identity.test.ts` plus live non-force API case | Symlink aliases converge; different root fails before job creation unless force is explicit | Covered |
+| Profile-derived shared ID | `_helpers.ts` identity sensitivity test | Commit, manifest, provider, model, and dimensions each alter the 16-hex identity | Covered |
+| Warm wrong-root rejection | `22.path-identity.test.ts` seeds a fully searchable duplicate clone under the target ID | Warm probes cannot bypass identity; guarded dedicated reset rebuilds expected canonical path | Covered |
+| Mutation boundary | pure decision matrix plus live project-prefix path | Non-dedicated mismatch throws; only dedicated `e2e-th0th-*` target can rebuild | Covered |
+| PostgreSQL path containment | direct vector metadata and `symbol_files.relative_path` queries | 34+34 distinct path sets are relative, traversal/`adsads`-free, and manifest-contained | Covered |
+| Existing shared consumers | live search 36/36 and symbol/workspace 23/23 | Hashed ID remains transparent to E2E transports and shared-index consumers | Covered |
+
+Non-shallow check: the wrong-root seed was confirmed richly searchable before `ensureSharedIndex`, so a probe-only implementation would have reused the wrong clone and failed the canonical-path assertion. The live non-force API test verifies the production seam rather than only the helper. Direct SQL checks do not infer metadata from API responses. Verdict: PASS.

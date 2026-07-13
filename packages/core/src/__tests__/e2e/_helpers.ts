@@ -8,6 +8,10 @@
  * Gating: the whole suite is skipped unless RUN_E2E=1 AND the API /health is
  * reachable (matches the real-api.test.ts self-skip pattern).
  */
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { realpath as fsRealpath } from "node:fs/promises";
 import path from "path";
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -38,6 +42,69 @@ export const POLY_FIXTURE_PATH = path.join(
   PROJECT_PATH,
   "packages/core/src/__tests__/e2e/fixtures/polyglot",
 );
+
+export interface SharedFixtureProfile {
+  commit: string;
+  manifestHash: string;
+  provider: string;
+  model: string;
+  dimensions: number;
+}
+
+export function deriveSharedProfileIdentity(profile: SharedFixtureProfile): string {
+  if (
+    !profile.commit ||
+    !profile.manifestHash ||
+    !profile.provider ||
+    !profile.model ||
+    !Number.isInteger(profile.dimensions) ||
+    profile.dimensions <= 0
+  ) {
+    throw new Error("Shared fixture profile identity requires complete positive-dimension inputs");
+  }
+  return createHash("sha256")
+    .update(JSON.stringify([
+      profile.commit,
+      profile.manifestHash,
+      profile.provider,
+      profile.model,
+      profile.dimensions,
+    ]))
+    .digest("hex")
+    .slice(0, 16);
+}
+
+const DEDICATED_FIXTURE =
+  process.env.MASSA_TH0TH_DEDICATED === "1" &&
+  !!process.env.MASSA_TH0TH_E2E_PROJECT_PATH?.trim();
+
+function resolveSharedProfileIdentity(): string | null {
+  if (!DEDICATED_FIXTURE) return null;
+  const manifestPath = path.resolve(
+    import.meta.dir,
+    "./fixtures/qwen-profile.json",
+  );
+  const manifestBytes = readFileSync(manifestPath);
+  const manifest = JSON.parse(manifestBytes.toString("utf8")) as {
+    provider: string;
+    model: string;
+    dimensions: number;
+  };
+  const commit = execFileSync("git", ["-C", PROJECT_PATH, "rev-parse", "HEAD"], {
+    encoding: "utf8",
+  }).trim();
+  return deriveSharedProfileIdentity({
+    commit,
+    manifestHash: createHash("sha256").update(manifestBytes).digest("hex"),
+    provider: process.env.EMBEDDING_PROVIDER ?? manifest.provider,
+    model: process.env.OLLAMA_EMBEDDING_MODEL ?? manifest.model,
+    dimensions: Number(
+      process.env.OLLAMA_EMBEDDING_DIMENSIONS ?? manifest.dimensions,
+    ),
+  });
+}
+
+export const SHARED_PROFILE_IDENTITY = resolveSharedProfileIdentity();
 
 export type Backend = "sqlite" | "postgres" | "unknown";
 
@@ -279,7 +346,59 @@ export async function getJobStatus(jobId: string): Promise<any> {
 // and reused by every search/symbol/NFR file. NOT reset in afterAll — it
 // persists so separate `bun test` invocations skip re-indexing.
 
-export const SHARED_PID = `${PREFIX}shared`;
+export const SHARED_PID = SHARED_PROFILE_IDENTITY
+  ? `${PREFIX}shared-${SHARED_PROFILE_IDENTITY}`
+  : `${PREFIX}shared`;
+
+export type SharedWorkspaceDecision = "index" | "reuse" | "rebuild";
+
+export function decideSharedWorkspaceIdentity(options: {
+  projectId: string;
+  expectedCanonicalPath: string;
+  storedCanonicalPath?: string | null;
+  dedicatedFixture: boolean;
+}): SharedWorkspaceDecision {
+  if (!options.storedCanonicalPath) return "index";
+  if (options.storedCanonicalPath === options.expectedCanonicalPath) return "reuse";
+  if (options.dedicatedFixture && options.projectId.startsWith(PREFIX)) {
+    return "rebuild";
+  }
+  throw new Error(
+    `Refusing shared-index reuse: ${options.projectId} stores canonical root ` +
+      `"${options.storedCanonicalPath}", expected "${options.expectedCanonicalPath}"`,
+  );
+}
+
+async function canonicalPath(projectPath: string): Promise<string> {
+  try {
+    return await fsRealpath(projectPath);
+  } catch {
+    return path.resolve(projectPath);
+  }
+}
+
+async function prepareSharedWorkspaceIdentity(): Promise<SharedWorkspaceDecision> {
+  const response = await httpGet<any>("/api/v1/workspace/list");
+  const workspaces: any[] = response?.data?.workspaces ?? [];
+  const workspace = workspaces.find((entry) => entry?.projectId === SHARED_PID);
+  const decision = decideSharedWorkspaceIdentity({
+    projectId: SHARED_PID,
+    expectedCanonicalPath: await canonicalPath(PROJECT_PATH),
+    storedCanonicalPath: workspace?.projectPath
+      ? await canonicalPath(workspace.projectPath)
+      : null,
+    dedicatedFixture: DEDICATED_FIXTURE,
+  });
+  if (decision === "rebuild") {
+    const reset = await resetProject(SHARED_PID);
+    if (reset?.success !== true) {
+      throw new Error(
+        `Failed guarded shared-index reset for ${SHARED_PID}: ${JSON.stringify(reset)}`,
+      );
+    }
+  }
+  return decision;
+}
 
 /** True when the project has searchable vectors for a probe query. */
 export async function isSearchable(
@@ -353,11 +472,14 @@ export function ensureSharedIndex(): Promise<string> {
 
 async function doSharedIndex(): Promise<string> {
   assertE2ePrefix(SHARED_PID);
+  const identityDecision = await prepareSharedWorkspaceIdentity();
   // Strong gate: require every probe query to hit. If already richly warm,
   // reuse without re-indexing. (This supersedes the old 1-probe short-circuit
   // which could pass on a single borderline file before the full-repo index
   // had materialized.)
-  if (await isSharedIndexWarm(SHARED_PID)) return SHARED_PID;
+  if (identityDecision === "reuse" && await isSharedIndexWarm(SHARED_PID)) {
+    return SHARED_PID;
+  }
 
   const start = await httpPost<any>("/api/v1/project/index", {
     projectPath: PROJECT_PATH,

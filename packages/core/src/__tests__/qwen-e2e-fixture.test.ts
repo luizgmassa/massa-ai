@@ -8,7 +8,11 @@ import {
   validateQwenFixtureManifest,
   type QwenFixtureManifest,
 } from "./e2e/qwen-fixture.js";
-import { resolveE2EProjectPath } from "./e2e/_helpers.js";
+import {
+  decideSharedWorkspaceIdentity,
+  deriveSharedProfileIdentity,
+  resolveE2EProjectPath,
+} from "./e2e/_helpers.js";
 
 const REPOSITORY_ROOT = path.resolve(import.meta.dir, "../../../..");
 const temporaryRoots: string[] = [];
@@ -107,5 +111,51 @@ describe("commit-locked qwen E2E fixture", () => {
     expect(resolveE2EProjectPath(fallback, {
       MASSA_TH0TH_DEDICATED: "1",
     })).toBe(fallback);
+  });
+
+  test("shared identity binds commit, manifest, provider, model, and dimensions", () => {
+    const base = {
+      commit: "a".repeat(40),
+      manifestHash: "b".repeat(64),
+      provider: "ollama",
+      model: "qwen3-embedding:8b",
+      dimensions: 4096,
+    };
+    const identity = deriveSharedProfileIdentity(base);
+    expect(identity).toHaveLength(16);
+    for (const [key, value] of [
+      ["commit", "c".repeat(40)],
+      ["manifestHash", "d".repeat(64)],
+      ["provider", "other"],
+      ["model", "other-model"],
+      ["dimensions", 1024],
+    ] as const) {
+      expect(deriveSharedProfileIdentity({ ...base, [key]: value })).not.toBe(identity);
+    }
+    expect(() => deriveSharedProfileIdentity({
+      ...base,
+      dimensions: Number.NaN,
+    })).toThrow("complete positive-dimension inputs");
+  });
+
+  test("wrong-root warm identity rebuilds only for a dedicated guarded project", () => {
+    const common = {
+      projectId: "e2e-th0th-shared-profile",
+      expectedCanonicalPath: "/fixture/expected",
+      storedCanonicalPath: "/fixture/wrong",
+    };
+    expect(decideSharedWorkspaceIdentity({
+      ...common,
+      dedicatedFixture: true,
+    })).toBe("rebuild");
+    expect(() => decideSharedWorkspaceIdentity({
+      ...common,
+      dedicatedFixture: false,
+    })).toThrow("Refusing shared-index reuse");
+    expect(decideSharedWorkspaceIdentity({
+      ...common,
+      storedCanonicalPath: common.expectedCanonicalPath,
+      dedicatedFixture: false,
+    })).toBe("reuse");
   });
 });

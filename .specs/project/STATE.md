@@ -7,7 +7,7 @@
 - workflow: spec-driven
 - persona: AI Engineer
 - feature: `close-maintenance-next-steps-2026-07-13`
-- status: IN PROGRESS — TASK-005 COMPLETE
+- status: IN PROGRESS — TASK-006 COMPLETE
 - branch: `main`
 - baseline: `cc985905fae3495a31a16aaf0fbd75435a2e63df`
 - push: forbidden
@@ -26,4 +26,4 @@ Execute the approved maintenance closure plan sequentially: Synapse-aware search
 
 ## Next Step
 
-Execute TASK-006: bind the shared E2E identity to canonical fixture root/profile identity, reject wrong-root reuse, and add direct PostgreSQL path/manifest sentinels including `adsads/` prevention.
+Execute TASK-007: add the sequential test-owned PostgreSQL/Ollama/Tools API harness and run N1, N3, E25, and F88 with ownership revalidation and recovery after every scenario.

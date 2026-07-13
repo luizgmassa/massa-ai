@@ -18,6 +18,7 @@
 | E-014 | TASK-005 first live rerun | Build-state defect | API imports `@massa-th0th/core/dist`; source-only restart still ran old search code | 1 | Invalid rerun; rebuilt core, recycled only owned `:3334`, cleared only run-owned search cache, then 36/36 passed |
 | E-015 | TASK-005 qwen needles | Stale sensor metadata | Four unchanged rules had moved outside captured line spans, yielding hit@5 .571 despite top chunks containing the rules | 1 | Closed by source-verified span refresh only; unchanged queries/floors yield .643/.857/.732 twice; prerequisite commit `66607d3` |
 | E-016 | TASK-005 graph fixture | Fixture coverage gap | Sparse profile omitted the typed-edge extractor, so `project_map.routes` was absent and D4 failed | 1 | Closed by adding tracked production `typed-edges.ts` as support; warm reindex 34 files/468 chunks; graph 9/9 |
+| E-017 | TASK-006 first direct SQL sentinel | Test/schema mismatch | Sentinel queried `symbol_files.file_path`; PostgreSQL schema exposes `relative_path` | 1 | Closed by aliasing the verified `relative_path` column; complete wrong-root/path gate 3/3 with 351 assertions |
 
 ## Iteration Policy
 

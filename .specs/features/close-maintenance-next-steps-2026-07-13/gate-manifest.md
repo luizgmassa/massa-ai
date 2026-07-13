@@ -64,6 +64,15 @@ Every measured row records exact command, exit code, duration, pass/fail/skip co
 - Type-check after final implementation: 6/6 Turbo tasks; 3.804 s; exit 0. Current owned listeners: PostgreSQL PID 23481, Ollama PID 24780, API PID 53768. Shared `:3333` remains PID 9754 and healthy.
 - Conditional skip ledger from `08.search`: F21 stale auto-reindex path not isolated because the shared fixture was fresh; E5 cache internals lack public introspection; E6 keyword-only score breakdown is not publicly isolatable; E7 would require stopping Ollama and belongs to TASK-007; E29 is an internal fusion detail without a public toggle. Each test executed and passed its documented contract; Bun reported zero skips.
 
+## TASK-006 Measured Evidence
+
+- Canonical/profile unit gate: 10 pass, 0 fail, 0 skip; 27 assertions; latest Bun 1.404 s; exit 0. Covers symlink realpath, same-root alias reuse, non-force wrong-root refusal, force-owned replacement, five-field profile identity sensitivity, invalid-dimension fail-closed behavior, and dedicated-only guarded rebuild.
+- Live wrong-root/path gate: seeded a fully warm duplicate fixture under the derived shared ID, proved all three warm probes hit, then `ensureSharedIndex` reset only the guarded dedicated prefix and rebuilt the canonical root. Final 3 pass, 0 fail, 0 skip; 351 assertions; Bun 8.63 s; exit 0. A live non-force API request for the wrong root returned structured `success:false` without changing the workspace.
+- Derived identity `e2e-th0th-shared-cf1a4754d3e50a0f` binds fixture commit `7d680fd329578dfaec60e73cbfd3ae88224989c7`, manifest hash, provider `ollama`, model `qwen3-embedding:8b`, and dimension `4096`. Stored canonical root is `/private/tmp/massa-th0th-close-20260713-1424/qwen-fixture-t6`.
+- Direct dedicated PostgreSQL sentinel: 468 vectors across 34 distinct metadata paths and 34 symbol-file paths; every path is relative, traversal-free, excludes `adsads/`, and belongs to the checked manifest. Search regression 36/36 in 35.33 s; symbol/workspace regression 23/23 in 6.48 s.
+- Type-check: 6/6 Turbo tasks; latest 3.963 s; exit 0. Owned listeners: PostgreSQL PID 23481, Ollama PID 24780, API PID 64524. Shared `:3333` remains PID 9754 and healthy; it was not otherwise contacted or mutated.
+- Conditional skip ledger: search reasons are unchanged from TASK-005. Symbol F46 and F49 lacked duplicate/FQN ambiguity in the sparse index and executed their documented best-effort assertions; Bun reported zero skips.
+
 ## Artifact Checksums
 
 Initial SHA-256 freeze (before plan challenge):

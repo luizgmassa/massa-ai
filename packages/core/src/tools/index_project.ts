@@ -17,6 +17,8 @@ import { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js
 import { logger } from "@massa-th0th/shared";
 import { indexJobTracker } from "../services/jobs/index-job-tracker.js";
 import { etlPipeline } from "../services/etl/pipeline.js";
+import { workspaceManager } from "../services/workspace/workspace-manager.js";
+import { realpath } from "node:fs/promises";
 import path from "path";
 
 interface IndexProjectParams {
@@ -27,6 +29,39 @@ interface IndexProjectParams {
   warmupQueries?: string[];
   /** Include test/benchmark files so typed edges from `.test.ts` etc. are indexed. */
   include_tests?: boolean;
+}
+
+type CanonicalizePath = (projectPath: string) => Promise<string>;
+
+export async function canonicalizeProjectRoot(
+  projectPath: string,
+  canonicalize: CanonicalizePath = realpath,
+): Promise<string> {
+  return canonicalize(path.resolve(projectPath));
+}
+
+export async function assertProjectRootReuse(options: {
+  projectId: string;
+  canonicalProjectPath: string;
+  storedProjectPath?: string | null;
+  forceReindex: boolean;
+  canonicalize?: CanonicalizePath;
+}): Promise<void> {
+  if (!options.storedProjectPath || options.forceReindex) return;
+  const canonicalize = options.canonicalize ?? realpath;
+  let storedCanonical: string;
+  try {
+    storedCanonical = await canonicalize(path.resolve(options.storedProjectPath));
+  } catch {
+    storedCanonical = path.resolve(options.storedProjectPath);
+  }
+  if (storedCanonical !== options.canonicalProjectPath) {
+    throw new Error(
+      `Project ID "${options.projectId}" already indexes canonical root ` +
+        `"${storedCanonical}", not "${options.canonicalProjectPath}"; ` +
+        "use forceReindex only after verifying ownership of the existing project",
+    );
+  }
 }
 
 export class IndexProjectTool implements IToolHandler {
@@ -87,16 +122,24 @@ export class IndexProjectTool implements IToolHandler {
     } = params as IndexProjectParams;
 
     try {
+      const canonicalProjectPath = await canonicalizeProjectRoot(projectPath);
       // Gera projectId se não fornecido
       const finalProjectId =
-        projectId || path.basename(projectPath) || "default";
+        projectId || path.basename(canonicalProjectPath) || "default";
+      const existing = await workspaceManager.getWorkspace(finalProjectId);
+      await assertProjectRootReuse({
+        projectId: finalProjectId,
+        canonicalProjectPath,
+        storedProjectPath: existing?.project_path,
+        forceReindex,
+      });
 
       // Cria job de indexação
-      const job = indexJobTracker.createJob(finalProjectId, projectPath);
+      const job = indexJobTracker.createJob(finalProjectId, canonicalProjectPath);
 
       logger.info("Indexing job created", {
         jobId: job.jobId,
-        projectPath,
+        projectPath: canonicalProjectPath,
         projectId: finalProjectId,
       });
 
@@ -104,7 +147,7 @@ export class IndexProjectTool implements IToolHandler {
       this.executeIndexing(
         job.jobId,
         finalProjectId,
-        projectPath,
+        canonicalProjectPath,
         forceReindex,
         warmCache,
         warmupQueries,
@@ -121,7 +164,7 @@ export class IndexProjectTool implements IToolHandler {
         data: {
           jobId: job.jobId,
           projectId: finalProjectId,
-          projectPath,
+          projectPath: canonicalProjectPath,
           status: "started",
           message:
             "Indexing started in background. Use get_index_status(jobId) to check progress.",
