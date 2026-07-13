@@ -15,6 +15,7 @@ import path from "path";
 import os from "os";
 
 import { ReadFileTool } from "../tools/read_file.js";
+import { eventBus } from "../services/events/event-bus.js";
 import type { SymbolGraphService } from "../services/symbol/symbol-graph.service.js";
 
 // Stub the workspaceManager singleton BEFORE the tool imports it transitively.
@@ -24,9 +25,29 @@ const FAKE_WORKSPACE_ROOT = path.join(
   os.tmpdir(),
   `massa-th0th-readfile-ws-${process.pid}`
 );
+type IndexingStartedPayload = {
+  jobId: string;
+  projectId: string;
+  projectPath: string;
+  totalFiles?: number;
+};
+const indexingStartedListeners = new Set<(payload: IndexingStartedPayload) => void>();
 beforeEach(() => {
   fs.mkdirSync(FAKE_WORKSPACE_ROOT, { recursive: true });
 });
+mock.module("../services/events/event-bus.js", () => ({
+  eventBus: {
+    subscribe: (event: string, listener: (payload: IndexingStartedPayload) => void) => {
+      if (event === "indexing:started") indexingStartedListeners.add(listener);
+      return () => indexingStartedListeners.delete(listener);
+    },
+    publish: (event: string, payload: IndexingStartedPayload) => {
+      if (event === "indexing:started") {
+        for (const listener of indexingStartedListeners) listener(payload);
+      }
+    },
+  },
+}));
 mock.module("../services/workspace/workspace-manager.js", () => ({
   workspaceManager: {
     getWorkspace: async (_projectId: string) => ({
@@ -82,6 +103,39 @@ describe("ReadFileTool — resolveFilePath branches", () => {
 
     // cleanup the synthetic workspace file
     fs.rmSync(path.join(FAKE_WORKSPACE_ROOT, rel), { force: true });
+  });
+
+  test("reindex lifecycle refreshes a cached project root on the same tool instance", async () => {
+    const projectId = "proj-moved-root";
+    const rel = "nested/file.txt";
+    const oldAbs = path.resolve(FAKE_WORKSPACE_ROOT, rel);
+    const nextRoot = fs.mkdtempSync(path.join(os.tmpdir(), "massa-th0th-readfile-moved-"));
+    const nextAbs = path.resolve(nextRoot, rel);
+
+    fs.mkdirSync(path.dirname(oldAbs), { recursive: true });
+    fs.writeFileSync(oldAbs, "old root\n");
+    fs.mkdirSync(path.dirname(nextAbs), { recursive: true });
+    fs.writeFileSync(nextAbs, "new root\n");
+
+    try {
+      const tool = new ReadFileTool();
+      const before = await tool.handle({ filePath: rel, projectId });
+      expect(before.success).toBe(true);
+      expect((before.data as { absolutePath: string }).absolutePath).toBe(oldAbs);
+
+      eventBus.publish("indexing:started", {
+        jobId: "job-moved-root",
+        projectId,
+        projectPath: nextRoot,
+      });
+
+      const after = await tool.handle({ filePath: rel, projectId });
+      expect(after.success).toBe(true);
+      expect((after.data as { absolutePath: string; content: string }).absolutePath).toBe(nextAbs);
+      expect((after.data as { content: string }).content).toContain("new root");
+    } finally {
+      fs.rmSync(nextRoot, { recursive: true, force: true });
+    }
   });
 
   afterEach(() => {

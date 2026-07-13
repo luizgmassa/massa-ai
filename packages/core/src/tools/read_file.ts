@@ -13,6 +13,7 @@ import { IToolHandler, ToolResponse, estimateTokens } from "@massa-th0th/shared"
 import { logger } from "@massa-th0th/shared";
 import { encode as toTOON } from "@toon-format/toon";
 import { CodeCompressor } from "../services/compression/code-compressor.js";
+import { eventBus } from "../services/events/event-bus.js";
 import { SymbolGraphService } from "../services/symbol/symbol-graph.service.js";
 import { workspaceManager } from "../services/workspace/workspace-manager.js";
 import fs from "fs/promises";
@@ -134,6 +135,17 @@ export class ReadFileTool implements IToolHandler {
   constructor(symbolGraph?: SymbolGraphService) {
     this.compressor = new CodeCompressor();
     this.symbolGraph = symbolGraph;
+
+    // The API keeps one ReadFileTool instance for the process lifetime. A
+    // guarded reset/reindex may legitimately move the same projectId to a new
+    // canonical root, so refresh the cached root as soon as ETL announces the
+    // new run. Without this, relative reads keep resolving against the prior
+    // workspace path until the API restarts.
+    eventBus.subscribe("indexing:started", ({ projectId, projectPath }) => {
+      this.projectRootCache.delete(projectId);
+      this.evictOldest(this.projectRootCache);
+      this.projectRootCache.set(projectId, projectPath);
+    });
   }
 
   async handle(params: unknown): Promise<ToolResponse> {
