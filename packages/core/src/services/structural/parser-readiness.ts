@@ -80,6 +80,8 @@ type GrammarLoader = (
 
 let grammarLoader: GrammarLoader = loadNativeGrammarSet;
 let validationPromise: Promise<ParserReadinessSnapshot> | null = null;
+let validatedGrammarSet: LoadedNativeGrammarSet | null = null;
+let readinessGeneration = 0;
 let readiness: ParserReadinessSnapshot = Object.freeze({
   status: "pending",
   requiredExtensions: LANGUAGE_MANIFEST.length,
@@ -112,7 +114,10 @@ function uniqueArtifacts(): GrammarArtifact[] {
   return [...artifacts.values()];
 }
 
-async function runValidation(): Promise<ParserReadinessSnapshot> {
+async function runValidation(
+  generation: number,
+  loader: GrammarLoader,
+): Promise<ParserReadinessSnapshot> {
   readiness = Object.freeze({
     status: "validating",
     requiredExtensions: LANGUAGE_MANIFEST.length,
@@ -121,7 +126,7 @@ async function runValidation(): Promise<ParserReadinessSnapshot> {
   });
 
   try {
-    const loaded = await grammarLoader(uniqueArtifacts());
+    const loaded = await loader(uniqueArtifacts());
     let validatedExtensions = 0;
     for (const entry of LANGUAGE_MANIFEST) {
       const fixture = MINIMAL_FIXTURES[entry.extension];
@@ -157,6 +162,9 @@ async function runValidation(): Promise<ParserReadinessSnapshot> {
       validatedExtensions += 1;
     }
 
+    if (generation !== readinessGeneration) {
+      throw new Error("Parser readiness validation was superseded by a test reset");
+    }
     readiness = Object.freeze({
       status: "ready",
       requiredExtensions: LANGUAGE_MANIFEST.length,
@@ -164,8 +172,11 @@ async function runValidation(): Promise<ParserReadinessSnapshot> {
       errors: Object.freeze([]),
       checkedAt: new Date().toISOString(),
     });
+    validatedGrammarSet = loaded;
     return readiness;
   } catch (error) {
+    if (generation !== readinessGeneration) throw error;
+    validatedGrammarSet = null;
     readiness = Object.freeze({
       status: "failed",
       requiredExtensions: LANGUAGE_MANIFEST.length,
@@ -183,12 +194,20 @@ export function validateAllGrammars(): Promise<ParserReadinessSnapshot> {
   if (readiness.status === "failed") {
     return Promise.reject(new ParserReadinessError(readiness));
   }
-  validationPromise ??= runValidation();
+  validationPromise ??= runValidation(readinessGeneration, grammarLoader);
   return validationPromise;
 }
 
 export function getParserReadiness(): ParserReadinessSnapshot {
   return readiness;
+}
+
+/** Return the startup-validated immutable grammar cache; never loads modules. */
+export function getValidatedNativeGrammarSet(): LoadedNativeGrammarSet {
+  if (readiness.status !== "ready" || !validatedGrammarSet) {
+    throw new ParserReadinessError(readiness);
+  }
+  return validatedGrammarSet;
 }
 
 export async function assertParserReadyForIndexing(): Promise<void> {
@@ -200,7 +219,9 @@ export function resetParserReadinessForTests(
   loader: GrammarLoader = loadNativeGrammarSet,
 ): void {
   grammarLoader = loader;
+  readinessGeneration += 1;
   validationPromise = null;
+  validatedGrammarSet = null;
   readiness = Object.freeze({
     status: "pending",
     requiredExtensions: LANGUAGE_MANIFEST.length,

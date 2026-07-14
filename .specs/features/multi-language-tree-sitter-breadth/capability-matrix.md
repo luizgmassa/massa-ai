@@ -157,6 +157,8 @@ Stock `tree-sitter@0.25.0` exposes no public disposal API. Repeated 32 KiB parse
 
 The acceptance stress uses 100 explicit-delete cycles with `Bun.gc(true)` after each. Median RSS for cycles 81-100 may exceed cycles 21-40 by at most 16 MiB, and a separate no-delete child process must exceed that bound so the sensor discriminates a missing/no-op patch.
 
+The production macOS arm64 parser pool freezes a default capacity of 4 and a hard maximum of 32 parser instances. Its FIFO acquisition timeout defaults to 5,000 ms with a 60,000 ms hard maximum. Constructor overrides inside those bounds are test/benchmark seams; timeout is an infrastructure failure and never an empty successful structure.
+
 Packaging feasibility was proven from a clean exact-runtime build. Exact Node `22.22.2`/npm `10.9.7` packed shared and core; the core tarball contained `node_modules/tree-sitter/build/Release/tree_sitter_runtime_binding.node`. A normal non-workspace Bun `1.3.0` consumer installed the local shared/core tarballs, imported built core `dist`, resolved `tree-sitter` strictly from the core's nested bundled path, parsed JavaScript, and double-deleted the patched tree. The nested addon was a Mach-O 64-bit arm64 bundle linked only to system `libc++` and `libSystem`. Bun `1.3.0` packing was rejected for this artifact because its tarball omitted both `bundledDependencies` and `bundleDependencies` payloads.
 
 Rejected candidates are recorded rather than silently substituted: legacy `tree-sitter-clojure@0.4.0` failed against current V8/NAN APIs; npm `tree-sitter-dart@1.0.0` and `tree-sitter-vue@0.2.1` carry native ABI 127 while Bun 1.3.0 requires ABI 137. The selected replacements are Clojure Orchard, the exact canonical Dart Git commit, and HTML as the Vue SFC host.

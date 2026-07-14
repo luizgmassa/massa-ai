@@ -7,7 +7,7 @@
 - workflow: spec-driven
 - persona: AI Engineer
 - feature: `multi-language-tree-sitter-breadth`
-- status: EXECUTE ACTIVE; TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 READY
+- status: EXECUTE ACTIVE; TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 PASS; TASK-006 READY
 - branch: `main`
 - baseline: `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`
 - push: not attempted
@@ -34,6 +34,7 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 | AD-003 | proposed; activate after FQN transport parity | One versioned FQN codec owns modern IDs, legacy aliases, collision failure, and ambiguity payloads across persistence/HTTP/MCP. | `design.md`, full pre-mortem |
 | AD-004 | active after TASK-004 PASS | Exact Bun 1.3.0 loads upstream native packages through one serialized compatibility loader that snapshots, removes, and restores the full `process.versions.bun` descriptor before parsing. Exact Node 22.22.2 is build-only. | TASK-001 native evidence; TASK-004 fault, readiness, startup, and direct-guard gates |
 | AD-005 | active after TASK-002 PASS | The runtime identity combines upstream `tree-sitter@0.25.0` SRI with patch SHA-256 `b0f73d0031e70f3585fca701076e1c6a05c30968b62f2d939de32af6df39a06a`, adding idempotent cursor/tree deletion, stale-object guards, immutable JS owner identity, same-tree cursor reset enforcement, and generated-addon packaging. Core bundles the patched dependency for packed consumers. | TASK-002 no-delete control, hardened prototype, independent crash reviews, fresh normal packed consumer, final independent PASS |
+| AD-006 | active after TASK-005 PASS | Production uses one process-global FIFO parser pool: default capacity 4/hard max 32 and default acquisition timeout 5,000 ms/hard max 60,000 ms. Runtime owns cursor-before-tree cleanup and never returns empty success without a query executor. | TASK-005 overlap, timeout, retarget recovery, hard-outcome, native lifetime, RSS, and independent review gates |
 
 ## Progress
 
@@ -56,14 +57,15 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 - Clean build exposed pre-existing direct `zod` imports in core without a direct declaration; TASK-002 added `zod` as the minimal required dependency.
 - TASK-003 froze the normalized structural contracts and exact ordered 33-extension manifest. Exact Bun 1.3.0 focused tests passed 6/6 with 451 assertions; uncached type-check/build passed; independent review's sole `parameterIndex` versus `paramIndex` mismatch was remediated and accepted.
 - TASK-004 added literal lazy native grammar loading, exact serialized Bun-marker restoration, cached all-33 readiness, live-but-parser-failed health, startup validation ordering, and pre-side-effect guards for the tool, ETL, and legacy direct index paths. Focused/native/regression/type/build/dist gates and independent review passed.
+- TASK-005 added the process-global bounded FIFO parser pool, structural runtime, bounded diagnostics with total counts, validated grammar-cache handoff, and native lifetime ownership. Review-driven fixes closed per-runtime cap multiplication, poisoned retarget-slot reuse, and public raw grammar access.
 
 ## Blocker
 
-No blocker at the TASK-004 boundary. T23 still owns the durable all-grammar packed-artifact test introduced by the task plan.
+No blocker at the TASK-005 boundary. T23 still owns the durable all-grammar packed-artifact test introduced by the task plan.
 
 ## Next Step
 
-Freeze and commit TASK-004, then execute TASK-005 bounded parser pool and structural runtime.
+Freeze and commit TASK-005, then execute TASK-006 SourceSpan and versioned FQN codec.
 
 ## Previous Feature
 

@@ -31,19 +31,20 @@ Implement `plan-multi-language.md` under workflow session `spec-multi-language`.
 - Exact Node 22.22.2/npm 10.9.7 packed shared/core. A normal non-workspace Bun 1.3.0 consumer imported built core, resolved the nested patched runtime, parsed/double-deleted, and loaded a system-only Mach-O arm64 addon. Bun's own 1.3.0 pack path was rejected because it omitted the bundle payload.
 - TASK-003 added normalized structural contracts plus the ordered exhaustive 33-extension manifest and deterministic fingerprint inputs. Exact Bun 1.3.0 focused tests passed 6/6 with 451 assertions; forced uncached type-check/build passed. Independent review's sole `parameterIndex`/`paramIndex` finding was fixed and accepted.
 - TASK-004 added lazy literal native grammar loading, exact serialized Bun-marker restoration, cached 33/33 parser readiness, additive live health status, startup validation-before-listen, and pre-side-effect indexing guards. Focused 10/10, queue regressions 13/13, native verifier, uncached type/build, built-dist readiness, and independent review passed.
+- TASK-005 added one process-global FIFO parser pool (capacity 4/max 32; timeout 5s/max 60s), typed runtime outcomes, bounded diagnostics with total counts, and cursor-before-tree lifetime ownership. Focused 21/21, native/RSS, uncached type/build, and independent review passed after fixing cap multiplication, poisoned retarget slots, and raw grammar-cache exposure.
 
 ## Blocking Gate
 
-TASK-004 passed focused/native/regression/type/build/dist gates and independent review. The production loader restores the complete Bun-version property descriptor before parsing and fails indexing without failing API liveness.
+TASK-005 passed focused/native/RSS/type/build/diff gates and independent review. The runtime now fails hard when query execution is absent or native cleanup/acquisition fails; it never converts those paths to empty success.
 
 ## Exact Next Step
 
-Freeze and commit TASK-004, then execute TASK-005. Do not touch excluded platform files.
+Freeze and commit TASK-005, then execute TASK-006. Do not touch excluded platform files.
 
 ## Worktree and Safety
 
 - Branch: `main`; baseline `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`.
 - `plan-multi-language.md` was supplied untracked and is now an in-scope revised artifact.
 - No push attempted.
-- TASK-001 through TASK-004 are claimed with recorded gates: native discovery, dependency/verifier/patch, normalized contracts/manifest, and production readiness/guards. No graph migration, container build, or parser benchmark has been claimed.
+- TASK-001 through TASK-005 are claimed with recorded gates: native discovery, dependency/verifier/patch, normalized contracts/manifest, readiness/guards, and bounded runtime/lifetime. No graph migration, container build, or final parser benchmark has been claimed.
 - Preserve existing SQLite-removal artifacts and follow-up status.

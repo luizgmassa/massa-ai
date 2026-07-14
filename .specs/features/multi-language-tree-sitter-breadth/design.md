@@ -193,9 +193,9 @@ The final capability matrix records `required`, `forbidden`, or `unsupported` fo
 
 ## Parser Pool and Runtime
 
-- One process-global pool, keyed by language/dialect, with a configured total parser-instance cap. Default and maximum are frozen by the feasibility/benchmark slice.
+- One process-global pool, keyed by language/dialect, with a configured total parser-instance cap. The macOS arm64 default is 4 instances and the hard maximum is 32; constructor overrides within that range keep focused tests and later benchmark isolation deterministic.
 - A lease owns one parser instance until the parse/query/cursor-delete/tree-delete `finally` completes.
-- Waiting requests use FIFO order and bounded acquisition timeout; timeout is a hard infrastructure parse failure, not empty structure.
+- Waiting requests use FIFO order and bounded acquisition timeout. The default is 5,000 ms and the hard maximum is 60,000 ms; constructor overrides within that range are allowed. Timeout is a hard infrastructure parse failure, not empty structure.
 - Grammar objects and compiled queries are immutable caches after successful startup validation.
 - `validateAllGrammars()` loads every required manifest grammar and parses a minimal fixture before readiness becomes true. Direct core consumers call an idempotent guard.
 - Custom semantic-only extensions bypass the native runtime and receive `unsupported_structural_language`.

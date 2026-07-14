@@ -6,7 +6,7 @@ Implement with the active `massa-th0th` Spec Driven Execute flow, `coding-guidel
 
 **Design:** `.specs/features/multi-language-tree-sitter-breadth/design.md`  
 **Capability contract:** `.specs/features/multi-language-tree-sitter-breadth/capability-matrix.md`  
-**Status:** TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 READY
+**Status:** TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 PASS; TASK-006 READY
 
 ## Project Testing Guidelines Scan
 
@@ -155,7 +155,7 @@ Phase 7 Validate:
 
 ### T5 / TASK-005: Implement bounded parser pool and structural runtime
 
-**Status:** READY after TASK-004 PASS.
+**Status:** PASS on 2026-07-14. Exact Bun 1.3.0 focused tests passed 21/21 with 212 assertions; the native verifier, forced uncached type-check/build, diff integrity, and independent review passed after remediating process-global cap bypass, poisoned retarget-slot reuse, and raw grammar-cache exposure.
 
 **What:** Add FIFO bounded parser leases, per-language reuse, acquisition timeout, parse/query/cursor-delete/tree-delete `finally`, recovered/hard outcomes, and diagnostics bounding using the T2-frozen patched binding.  
 **Where:** structural parser pool/runtime/diagnostic modules and tests.  
@@ -165,6 +165,8 @@ Phase 7 Validate:
 **Commit:** `feat(parser): add bounded structural runtime`
 
 ### T6 / TASK-006: Implement SourceSpan and versioned FQN codec
+
+**Status:** READY after TASK-005 PASS.
 
 **What:** Add byte/point mapping, embedded remap/newline index, line compatibility derivation, canonical signatures, full SHA-256 FQNs, legacy aliases, deterministic ambiguity payload, and collision failure.  
 **Where:** structural span/FQN modules and golden tests.  
@@ -465,5 +467,5 @@ Counts below are minimum new focused cases/sensors, not total repository pass co
 ## Artifact Store Evidence
 
 - Active key: `.specs/features/multi-language-tree-sitter-breadth/tasks.md`
-- Version: 8; TASK-004 PASS and TASK-005 READY
+- Version: 9; TASK-005 PASS and TASK-006 READY
 - Checksum: recorded in `gate-manifest.md` after artifact freeze.

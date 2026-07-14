@@ -162,12 +162,18 @@ export type StructuralParseOutcome =
   | {
       status: "ok" | "recovered";
       structure: NormalizedStructure;
+      diagnosticCount: number;
       diagnostics: readonly ParseDiagnostic[];
     }
-  | { status: "unsupported"; diagnostics: readonly ParseDiagnostic[] }
+  | {
+      status: "unsupported";
+      diagnosticCount: number;
+      diagnostics: readonly ParseDiagnostic[];
+    }
   | {
       status: "failed";
       failureKind: StructuralFailureKind;
+      diagnosticCount: number;
       diagnostics: readonly ParseDiagnostic[];
     };
 

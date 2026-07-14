@@ -116,6 +116,39 @@ export type {
   ParserReadinessSnapshot,
   ParserReadinessStatus,
 } from "./structural/parser-readiness.js";
+export {
+  StructuralParserPool,
+  ParserAcquireTimeoutError,
+  DEFAULT_STRUCTURAL_PARSER_CAPACITY,
+  MAX_STRUCTURAL_PARSER_CAPACITY,
+  DEFAULT_STRUCTURAL_ACQUIRE_TIMEOUT_MS,
+  MAX_STRUCTURAL_ACQUIRE_TIMEOUT_MS,
+} from "./structural/parser-pool.js";
+export type {
+  ParserLease,
+  ParserPoolOptions,
+} from "./structural/parser-pool.js";
+export {
+  StructuralRuntime,
+  structuralRuntime,
+} from "./structural/structural-runtime.js";
+export type {
+  StructuralParseRequest,
+  StructuralQueryContext,
+  StructuralQueryExecutor,
+  StructuralQueryTree,
+  StructuralRuntimeOptions,
+  StructuralSyntaxNode,
+} from "./structural/structural-runtime.js";
+export {
+  MAX_STRUCTURAL_DIAGNOSTIC_DETAILS,
+  boundDiagnostics,
+} from "./structural/diagnostics.js";
+export type {
+  ParseDiagnostic,
+  StructuralFailureKind,
+  StructuralParseOutcome,
+} from "./structural/types.js";
 
 // Symbol Graph
 export { symbolGraphService, SymbolGraphService } from "./symbol/symbol-graph.service.js";

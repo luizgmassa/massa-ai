@@ -11,13 +11,19 @@ export interface NativeTree {
     readonly type: string;
     readonly hasError: boolean;
     readonly endIndex: number;
+    readonly startIndex?: number;
+    walk?(): NativeTreeCursor;
   };
+  delete(): void;
+}
+
+export interface NativeTreeCursor {
   delete(): void;
 }
 
 export interface NativeParserInstance {
   setLanguage(language: unknown): void;
-  parse(source: string): NativeTree;
+  parse(source: string | ((index: number) => string | null)): NativeTree;
 }
 
 export interface NativeParserConstructor {

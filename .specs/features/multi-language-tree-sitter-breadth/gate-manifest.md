@@ -1,7 +1,7 @@
 # Multi-Language Tree-sitter Breadth Gate Manifest
 
 **Workflow session:** `spec-multi-language`  
-**Feature status:** Execute active; TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 READY
+**Feature status:** Execute active; TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 PASS; TASK-006 READY
 **Baseline commit:** `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`  
 **Baseline worktree:** supplied `plan-multi-language.md` was the only user-owned untracked file before feature artifact creation.
 
@@ -163,6 +163,28 @@ The equality test fails on any omitted, duplicate, extra, or reordered extension
 
 The fault adapters kill value-only restoration, leaked markers, poisoned queues, overlapping loads, and parsing inside the masked callback. The single-flight fixture kills load-only, 27-artifact-as-33, repeated-validation, missing-delete, and premature-ready implementations. Health/startup tests distinguish service liveness from parser readiness. Tool/ETL/legacy guards kill background-only or post-side-effect rejection. The durable verifier confirms the real source/dist artifact set and native linkage. These assertions map directly to T4 done-when, MLTS-002-003/017-019, and AC-002/007. Parser pooling/runtime behavior remains T5; ETL structural routing remains T9. **Verdict: sufficient, non-shallow, independently accepted PASS.**
 
+## TASK-005 Execution Result (2026-07-14)
+
+**Result:** PASS. Structural parsing now uses one process-wide bounded FIFO pool in production, keyed by language/dialect, with deterministic capacity/timeout bounds, safe idle retargeting, and idempotent leases. The runtime owns all tracked cursors and trees, preserves recovered structure, returns typed hard failures, and retains exact diagnostic totals while exposing at most ten details.
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| Focused exact-runtime tests | PASS | Exact Bun 1.3.0: 21 tests, 212 assertions, zero failures/skips across T4 readiness and T5 pool/runtime suites. |
+| Pool bounds and fairness | PASS | Default capacity 4, hard max 32; default acquisition timeout 5,000 ms, hard max 60,000 ms; FIFO ordering, matching reuse, wrong-key retarget, deterministic timeout, idempotent release. |
+| Process-wide cap | PASS | Five independent default runtime instances admit exactly four concurrent leases; the fifth proceeds only after a release. |
+| Failure recovery | PASS | Factory and retarget `setLanguage` failures reclaim capacity; potentially mutated native slots are evicted before reuse. |
+| Runtime outcomes | PASS | Semantic-only bypass, recovered syntax with retained structure, hard grammar/ABI/query/infrastructure outcomes, and absent executor as `structural_query_executor_unavailable`; no empty successful fallback. |
+| Native cleanup | PASS | All tracked cursors delete in reverse creation order before tree deletion and lease release, including forced query/cleanup failures; stale node/cursor access throws and double delete is safe. |
+| Diagnostic bounding | PASS | Exact `diagnosticCount` survives while exposed details stop at ten. |
+| Runtime RSS | PASS | 100 real 32 KiB runtime parses call `Bun.gc(true)` every cycle; cycles 81-100 median remains within 16 MiB of cycles 21-40. |
+| Durable native verifier | PASS | Source/dist 33+33 parses, 27+27 native modules, 54 Mach-O arm64 linkage checks, ten lifecycle sensors; patched median delta 475,136 bytes versus no-delete growth 125,075,456 bytes. |
+| Type-check and build | PASS | Forced uncached type-check 6/6 and build 5/5; diff integrity clean. |
+| Independent review | PASS after remediation | Review found and verified fixes for per-runtime default pools, poisoned retarget slots, and public raw grammar-cache bypass; no remaining findings or scope drift. |
+
+### TASK-005 Post-Gate Adequacy Review
+
+FIFO/capacity tests kill overlapping same-slot use, newcomer queue bypass, wrong-language deadlock, timeout leakage, and per-runtime cap multiplication. Failure sensors kill poisoned parser reuse and silent factory-capacity loss. Runtime tests kill missing-query empty success, cleanup-order inversion, lost diagnostic totals, partial readiness-cache publication, and hard-failure-to-empty conversion. The real native lifetime and no-delete discrimination gates prove the patched binding rather than mocks. These assertions map directly to T5 done-when, MLTS-004/007-009/012/017, and AC-003/004/005/007. Query-pack extraction remains T7 and ETL routing remains T9. **Verdict: sufficient, non-shallow, independently accepted PASS.**
+
 ## Planned Gate Commands
 
 - `bun run verify:tree-sitter-native`
@@ -313,3 +335,27 @@ These draft checksums are retained as failed-review evidence and are not an acti
 | `packages/core/src/__tests__/indexing-readiness-guard.test.ts` | `6c9a7451b5e7501513748c366fe974a1b631a9a737036310cb450d27bbb2d429` |
 
 `gate-manifest.md` cannot embed its own stable checksum; record its Git blob ID at the TASK-004 commit.
+
+## TASK-005 Accepted Artifact Freeze v9
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `plan-multi-language.md` | `02f183d2a23b9f9a2694289cc04c2a4c7614f87ec22918e3b59b7de66add9b10` |
+| `spec.md` | `43ed4c1c37ecbcaef52750d263f93410dffcc9372a99ac4a73cd6e7f3a54f50e` |
+| `context.md` | `af3339803245375d6a69890cfe49e60902a21d71ba969580f555b20fc460a7a9` |
+| `design.md` | `171cdcda9412cc7ede9b523d25fa47fa98de76cdd0b5ea87b84f4551602fea65` |
+| `tasks.md` | `7223c97b10140e557fa7c4cc362672830c68fa7f583e9570630b1a6e2e7e1523` |
+| `capability-matrix.md` | `fe462385096d97ad1fc002d4eafa5b59bcfadf2b1d0457b76d39106338df3b16` |
+| `.specs/project/FEATURES.json` | `851c7662bebb18fe138d1324d6f29d8a945b03e737b016f761359e20d8f5eced` |
+| `.specs/project/STATE.md` | `6eadbaa56d3bc901667fc693355b86b09e34c4e0c3498231c26bd662f73ccd95` |
+| `.specs/HANDOFF.md` | `53efbac972ce234026f2d50108f496b986ec82716bdac7fd749ed39bedfd563e` |
+| `packages/core/src/services/index.ts` | `d78569eee3a103b3ed7bc5ec09b066edfc962128b2d74c9abf9379cdd7aa62bd` |
+| `packages/core/src/services/structural/types.ts` | `202b7cdafb24b27c55a7617423b8f5fd916fc94a864795e2d6854857fb984d0a` |
+| `packages/core/src/services/structural/grammar-loaders.ts` | `d943c556350edd5ce94a471d32ca4112466b255aed53e5e6322a92340605f3d2` |
+| `packages/core/src/services/structural/parser-readiness.ts` | `0b621cda71e51b3c10ed0f7341fa9f9c14eb7aae9881ab710b35d109a3d656c0` |
+| `packages/core/src/services/structural/diagnostics.ts` | `27068e87391b64739ef51b5a1b1b0048c38a2b6aab316e7d0d55242d6f7e35fd` |
+| `packages/core/src/services/structural/parser-pool.ts` | `5a7c511026d95decfd8ca904e118a48a0ad46ffef2aabcefd3872f3161d2bbe7` |
+| `packages/core/src/services/structural/structural-runtime.ts` | `44d060b5f33d8331941014799f2c2af482ec02586b39ece79604b74cc657a45a` |
+| `packages/core/src/__tests__/structural-runtime.test.ts` | `dc3113d72764d0bfd98be632a3d89354056166f01b7b41c7c9d6257a5568927e` |
+
+`gate-manifest.md` cannot embed its own stable checksum; record its Git blob ID at the TASK-005 commit.
