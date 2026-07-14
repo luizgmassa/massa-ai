@@ -7,7 +7,7 @@
 - workflow: spec-driven
 - persona: AI Engineer
 - feature: `multi-language-tree-sitter-breadth`
-- status: EXECUTE ACTIVE; TASK-001 PASS; TASK-002 PASS; TASK-003 READY
+- status: EXECUTE ACTIVE; TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 READY
 - branch: `main`
 - baseline: `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`
 - push: not attempted
@@ -54,14 +54,15 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 - Fresh npm-packed shared/core installed into a normal consumer. Built core resolved only the nested runtime; immutable owners, same-tree reset, cross-tree reset/resetTo rejection, stale throw, and system-only Mach-O arm64 linkage passed.
 - Exact Node 22.22.2/npm 10.9.7 packed shared/core after Bun 1.3.0 packing was proven to omit bundle payloads. A normal non-workspace Bun consumer imported built core, resolved the nested patched runtime, parsed/double-deleted, and loaded a system-only Mach-O arm64 addon.
 - Clean build exposed pre-existing direct `zod` imports in core without a direct declaration; TASK-002 added `zod` as the minimal required dependency.
+- TASK-003 froze the normalized structural contracts and exact ordered 33-extension manifest. Exact Bun 1.3.0 focused tests passed 6/6 with 451 assertions; uncached type-check/build passed; independent review's sole `parameterIndex` versus `paramIndex` mismatch was remediated and accepted.
 
 ## Blocker
 
-No blocker at the TASK-002 boundary. T23 still owns the durable all-grammar packed-artifact test introduced by the task plan.
+No blocker at the TASK-003 boundary. T23 still owns the durable all-grammar packed-artifact test introduced by the task plan.
 
 ## Next Step
 
-Freeze and commit TASK-002, then execute TASK-003 normalized contracts and exhaustive manifest.
+Freeze and commit TASK-003, then execute TASK-004 grammar loaders and parser readiness.
 
 ## Previous Feature
 

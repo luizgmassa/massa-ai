@@ -1,7 +1,7 @@
 # Multi-Language Tree-sitter Breadth Gate Manifest
 
 **Workflow session:** `spec-multi-language`  
-**Feature status:** Execute active; TASK-001 PASS; TASK-002 PASS; TASK-003 READY
+**Feature status:** Execute active; TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 READY
 **Baseline commit:** `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`  
 **Baseline worktree:** supplied `plan-multi-language.md` was the only user-owned untracked file before feature artifact creation.
 
@@ -122,6 +122,26 @@ Bun 1.3.0 `pm pack` was rejected for core distribution because both accepted npm
 
 Reverse mapping: every assertion maps to T2 done-when, MLTS-001-004/020, and AC-002. The no-delete process, corrupted lock identities, owner/cursor-transfer crash probes, module-path rejection, and removed/incompatible sensors each distinguish a plausible wrong implementation. No spec, fixture, or threshold was weakened. **Verdict: sufficient, non-shallow, independently accepted PASS.**
 
+## TASK-003 Execution Result (2026-07-14)
+
+**Result:** PASS. Normalized structural contracts and the exact manifest are frozen for all 33 canonical extensions. Independent review found one divergent edge-field spelling (`parameterIndex`); remediation aligned it to the design and existing graph vocabulary (`paramIndex`) and added a compile-time/runtime fixture assertion.
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| Focused exact-runtime tests | PASS | Exact Bun 1.3.0: 6 tests, 451 assertions, zero failures/skips. |
+| Manifest exhaustiveness | PASS | Ordered equality with `DEFAULT_ALLOWED_EXTENSIONS`: 33 expected, 33 actual, no missing, extras, or duplicates. |
+| Contract coverage | PASS | 18 symbol kinds, 9 edge kinds, UTF-8/end-exclusive `SourceSpan`, typed parse outcomes/diagnostics, all capability fields, and `paramIndex` data-flow metadata. |
+| Artifact pins and policies | PASS | Exact TASK-002 grammar versions/selectors, Bun/runtime/ABI/patch identity, C/C++ header handling, Vue HTML host, Markdown policy, and unhashed deterministic fingerprint inputs. |
+| Unknown-extension behavior | PASS | `.toml` resolves semantic-only with `unsupported_structural_language`, remains outside required readiness, and does not mutate the manifest. |
+| Type-check | PASS | Six of six workspace tasks, uncached forced execution. |
+| Build | PASS | Five of five workspace tasks, uncached forced execution. |
+| Diff integrity | PASS | `git diff --check` returned zero. |
+| Independent review | PASS after remediation | Reviewer accepted manifest, pins, tiers, fallback, task boundary, and macOS arm64 scope after the `paramIndex` correction. |
+
+### TASK-003 Post-Gate Adequacy Review
+
+The equality test fails on any omitted, duplicate, extra, or reordered extension; per-entry assertions fail on wrong packages, versions, selectors, tiers, or capability keys; special-policy assertions distinguish the header/Vue/Markdown decisions; the unknown-extension test distinguishes semantic-only handling from readiness failure or hidden fallback; and the edge fixture prevents reintroduction of dual `paramIndex` vocabulary. These assertions map directly to T3 done-when, MLTS-001/005/007-009/019, and AC-001/004/005. No runtime loader, ETL routing, query pack, platform, or generation behavior was claimed. **Verdict: sufficient, non-shallow, independently accepted PASS.**
+
 ## Planned Gate Commands
 
 - `bun run verify:tree-sitter-native`
@@ -226,3 +246,22 @@ These draft checksums are retained as failed-review evidence and are not an acti
 | `scripts/tests/verify-tree-sitter-grammars.test.ts` | `dbdb332626ff151a22625ae80edb78811b7fa685c18dd2b680cb583a22701bb3` |
 
 `gate-manifest.md` cannot embed its own stable checksum; record its Git blob ID at the TASK-002 commit.
+
+## TASK-003 Accepted Artifact Freeze v7
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `plan-multi-language.md` | `02f183d2a23b9f9a2694289cc04c2a4c7614f87ec22918e3b59b7de66add9b10` |
+| `spec.md` | `43ed4c1c37ecbcaef52750d263f93410dffcc9372a99ac4a73cd6e7f3a54f50e` |
+| `context.md` | `af3339803245375d6a69890cfe49e60902a21d71ba969580f555b20fc460a7a9` |
+| `design.md` | `fc0fa42186326d126455fc85b12177c5f5df238f9aaf878a219baacb562ce42a` |
+| `tasks.md` | `01463547d5df56d9490ecb3ed79f812986f748117f69c83b7c06e8376cfe5f53` |
+| `capability-matrix.md` | `ded3f112b391aa7042e9f8bc957cb016642ea0e8e16a2f2ebe128ad189473e18` |
+| `.specs/project/FEATURES.json` | `851c7662bebb18fe138d1324d6f29d8a945b03e737b016f761359e20d8f5eced` |
+| `.specs/project/STATE.md` | `5391aa74a6965ee38f361625a49cfeba9b4ba61b368e12082a28710c584e9da4` |
+| `.specs/HANDOFF.md` | `aaabe0e45b65d7749675a6c28cd156f4f2251b867cbf8d038a7207794a7340f5` |
+| `packages/core/src/services/structural/types.ts` | `4d6b1133b9570219714825aed47e10391c7c7dfc46549a87443714ac5ed7e53e` |
+| `packages/core/src/services/structural/language-manifest.ts` | `2902b1572ed28f33fb70295f5f8348cebbcfd9cf54cd4c364ac0a4c689e62237` |
+| `packages/core/src/__tests__/language-manifest.test.ts` | `49c77e53e71349a1b8939a361356ee909e0ba8df3ce88a89041d032fbfe78503` |
+
+`gate-manifest.md` cannot embed its own stable checksum; record its Git blob ID at the TASK-003 commit.

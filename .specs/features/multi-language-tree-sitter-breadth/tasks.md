@@ -6,7 +6,7 @@ Implement with the active `massa-th0th` Spec Driven Execute flow, `coding-guidel
 
 **Design:** `.specs/features/multi-language-tree-sitter-breadth/design.md`  
 **Capability contract:** `.specs/features/multi-language-tree-sitter-breadth/capability-matrix.md`  
-**Status:** TASK-001 PASS; TASK-002 PASS; TASK-003 READY
+**Status:** TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 READY
 
 ## Project Testing Guidelines Scan
 
@@ -133,7 +133,7 @@ Phase 7 Validate:
 
 ### T3 / TASK-003: Define normalized structural contracts and exhaustive manifest
 
-**Status:** READY after TASK-002 PASS.
+**Status:** PASS on 2026-07-14. The exact 33-entry manifest and normalized contracts passed 6 focused tests/451 assertions, uncached workspace type-check/build, diff integrity, and independent review after remediating the `paramIndex` vocabulary finding.
 
 **What:** Add normalized symbol/edge kinds, `SourceSpan`, parse outcomes, diagnostics, capability types, and the exact 33-extension manifest/fingerprint inputs.  
 **Where:** `packages/core/src/services/structural/{types,language-manifest}.ts` and unit tests.  
@@ -143,6 +143,8 @@ Phase 7 Validate:
 **Commit:** `feat(parser): define structural language manifest`
 
 ### T4 / TASK-004: Implement grammar loaders and parser readiness
+
+**Status:** READY after TASK-003 PASS.
 
 **What:** Add explicit native imports, a serialized Bun-marker compatibility loader with exact descriptor restoration in `finally`, idempotent `validateAllGrammars`, parser readiness state, `/health` liveness separation, and indexing guard.
 **Where:** structural grammar loader/readiness modules, Tools API startup/routes, direct-core guard, tests.  
@@ -461,5 +463,5 @@ Counts below are minimum new focused cases/sensors, not total repository pass co
 ## Artifact Store Evidence
 
 - Active key: `.specs/features/multi-language-tree-sitter-breadth/tasks.md`
-- Version: 6; TASK-002 PASS and TASK-003 READY
+- Version: 7; TASK-003 PASS and TASK-004 READY
 - Checksum: recorded in `gate-manifest.md` after artifact freeze.
