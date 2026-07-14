@@ -191,6 +191,26 @@ export type {
   StructuralIdentityScope,
   StructuralSignatureInput,
 } from "./structural/fqn-codec.js";
+export {
+  StructuralResolverRegistry,
+  StructuralResolverSession,
+  buildStructuralResolverDefinitions,
+} from "./structural/resolver.js";
+export type {
+  StructuralBuildMetadata,
+  StructuralLanguageResolver,
+  StructuralPathAlias,
+  StructuralReference,
+  StructuralResolverDefinition,
+  StructuralResolverDocument,
+  StructuralResolverFile,
+  StructuralResolverOutcome,
+  StructuralResolutionSource,
+} from "./structural/resolver.js";
+export {
+  TYPESCRIPT_LANGUAGE_RESOLVER,
+  TYPESCRIPT_RESOLVER_VERSION,
+} from "./structural/resolvers/typescript.js";
 
 // Symbol Graph
 export { symbolGraphService, SymbolGraphService } from "./symbol/symbol-graph.service.js";

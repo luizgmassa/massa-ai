@@ -1,7 +1,7 @@
 # Multi-Language Tree-sitter Breadth Gate Manifest
 
 **Workflow session:** `spec-multi-language`  
-**Feature status:** Execute active; TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 PASS; TASK-006 PASS; TASK-007 PASS; TASK-008 READY
+**Feature status:** Execute active; TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 PASS; TASK-006 PASS; TASK-007 PASS; TASK-008 PASS; TASK-009 READY
 **Baseline commit:** `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`  
 **Baseline worktree:** supplied `plan-multi-language.md` was the only user-owned untracked file before feature artifact creation.
 
@@ -224,6 +224,25 @@ The byte fixture kills character-column, CR-only newline, BOM stripping, and inc
 
 Exact output sets and negative assertions kill capture-presence-only tests, declaration-as-call, specialized-call duplication, non-bare flow, lossy import aliases, private/public field collision, and unsupported-capability placeholders. Native dialect fixtures kill TSX/JSX-only assumptions and cross-grammar node leakage. Compile-cache, overflow, recovered-tree, deep-freeze, and T5 lifetime regressions kill raw grammar exposure, partial success, retained native nodes, and cleanup regressions. Signature probes kill body-dependent hashes, type-literal truncation, comment-inflated arity, decorator-string modifiers, and lost async arrows. These assertions map directly to T7 done-when, MLTS-005/008-009/014, and AC-004/005/008. Resolution remains T8 and ETL parity/removal remains T9. **Verdict: sufficient, non-shallow, independently accepted PASS.**
 
+## TASK-008 Execution Result (2026-07-14)
+
+**Result:** PASS. Structural resolution now uses an exact `(dialect, resolverVersion)` registry and one generation-scoped session/FQN registry. The TS/JS family resolver preserves valid modern targets, resolves tightest same-file lexical scope, deterministic imports/re-exports/namespaces/default owners/CommonJS/path aliases, exact exported globals, and unique legacy aliases while retaining frozen T6-ordered ambiguity and stable unresolved outcomes.
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| Exact focused resolver/query/identity | PASS | Exact Bun 1.3.0 passed 76/76 tests with 265 assertions. |
+| Runtime regression | PASS | Combined runtime gate passed with native lifetime/RSS behavior unchanged. |
+| Native source/dist verification | PASS | `verify:tree-sitter-native` passed darwin-arm64: 33 extensions, 27 native artifacts, source/dist 33+33 parses, behavior sensors, and bounded patched RSS. |
+| Forced uncached type-check | PASS | 6/6 packages. |
+| Forced uncached build | PASS | 5/5 packages. |
+| Diff integrity | PASS | `git diff --check` clean. |
+| Independent review | PASS after remediation | Direct probes closed exact-version registration, generation identity/collision, overload inference, named-import basename leakage, dynamic namespaces, re-export/barrel/default forwarding, lexical/private `%23`, type-only gating, TS-first probing, and default-owner member qualification. |
+| Excluded-platform non-touch | PASS | No Linux, Docker, container, workflow, or non-arm64 implementation path changed. |
+
+### TASK-008 Post-Gate Adequacy Review
+
+Registry/version and generation-session tests kill fallback ownership, partial duplicate registration, process-global identities, late collisions, and first-overload wins. Import probes kill nested basename leakage, fabricated path targets, JS-before-TS selection, re-exports entering local scope, missing dynamic namespaces, type-only value leakage, barrel-marker capture, and default-owner/top-level confusion. Lexical/private/global/legacy tests kill public leakage, wrong enclosing scope, unqualified nested globals, trusted unknown FQNs, and nondeterministic ambiguity. These assertions map directly to T8 done-when, MLTS-006/008-009/014, and AC-005/008. ETL routing and regex retirement remain exclusively T9. **Verdict: sufficient, non-shallow, independently accepted PASS.**
+
 ## Planned Gate Commands
 
 - `bun run verify:tree-sitter-native`
@@ -445,3 +464,26 @@ These draft checksums are retained as failed-review evidence and are not an acti
 | `fixtures/structural/javascript-native.js` | `1120c33cf795c4f89b04acad2efc9ab08dd91dbad211965657013762a3de52ea` |
 
 `gate-manifest.md` cannot embed its own stable checksum; record its Git blob ID at the TASK-007 commit.
+
+## TASK-008 Accepted Artifact Freeze v12
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `plan-multi-language.md` | `02f183d2a23b9f9a2694289cc04c2a4c7614f87ec22918e3b59b7de66add9b10` |
+| `spec.md` | `43ed4c1c37ecbcaef52750d263f93410dffcc9372a99ac4a73cd6e7f3a54f50e` |
+| `context.md` | `af3339803245375d6a69890cfe49e60902a21d71ba969580f555b20fc460a7a9` |
+| `design.md` | `171cdcda9412cc7ede9b523d25fa47fa98de76cdd0b5ea87b84f4551602fea65` |
+| `tasks.md` | `5666b15447b0a7ad878971b9b7f48fdfc0e366406e756576e73c512c64954fb4` |
+| `capability-matrix.md` | `fe462385096d97ad1fc002d4eafa5b59bcfadf2b1d0457b76d39106338df3b16` |
+| `.specs/project/FEATURES.json` | `851c7662bebb18fe138d1324d6f29d8a945b03e737b016f761359e20d8f5eced` |
+| `.specs/project/STATE.md` | `f6550524e6bd3432f64031110aa000e0d4114e00845ae44c0131d47aa2162568` |
+| `.specs/HANDOFF.md` | `b4092720175c918f967515047649929f7ff419a8960121257423ab093f10cd1d` |
+| `packages/core/src/services/index.ts` | `725a63c84a3b8a70138fb1f42fcfcd04a3a853f50a226fcc473d7b39c85a8b2c` |
+| `packages/core/src/services/structural/types.ts` | `eeb2f0613738d5c96248aed24b2e992631a25abf05da29f7a12c4935557842e5` |
+| `packages/core/src/services/structural/query-pack.ts` | `18f223565f00730c7c84ae2394e27ea27db3326e7c87904ad078202d572329bf` |
+| `packages/core/src/services/structural/resolver.ts` | `291f078b4ae33911d6b1c4f95c2caee6d9d9b37c6e27fde71bd17edfc759085d` |
+| `packages/core/src/services/structural/resolvers/typescript.ts` | `2777836f9b86ef08f85c83296875904a758804dd16239484404d0db384c23b72` |
+| `packages/core/src/__tests__/structural-query-pack.test.ts` | `68644bb0e40ee3e20ce4682e90c3b3f7e9439ed10ef5efd5fe89dea06614ccbc` |
+| `packages/core/src/__tests__/structural-resolver.test.ts` | `aa2786a5491b653be7b683db3d891f630e0902dc44ef1edbece8dd80382d8f12` |
+
+`gate-manifest.md` cannot embed its own stable checksum; record its Git blob ID at the TASK-008 commit.

@@ -62,6 +62,8 @@ export interface NormalizedStructuralSymbol {
   span: SourceSpan;
   selectionSpan?: SourceSpan;
   exported: boolean;
+  /** True only for the declaration selected by an `export default` wrapper. */
+  defaultExport: boolean;
   documentation?: string;
   signature?: string;
   /** Syntax-owned inputs consumed by the FQN codec after native trees are deleted. */
@@ -97,6 +99,7 @@ export interface NormalizedStructuralEdge {
 }
 
 export interface NormalizedStructuralImport {
+  form: "esm_import" | "esm_re_export" | "commonjs_require" | "dynamic_import";
   specifier: string;
   span: SourceSpan;
   bindings: readonly Readonly<{

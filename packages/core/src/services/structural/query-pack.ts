@@ -315,6 +315,8 @@ function buildSymbols(
       span: frozenSpan(index, draft.node.startIndex, draft.node.endIndex),
       ...(nameNode ? { selectionSpan: frozenSpan(index, nameNode.startIndex, nameNode.endIndex) } : {}),
       exported: draft.kind === "export" || Boolean(declarationExportWrapper(draft.node)) || text(source, draft.node).trimStart().startsWith("export "),
+      defaultExport: draft.name === "default" ||
+        text(source, declarationExportWrapper(draft.node) ?? draft.node).trimStart().startsWith("export default"),
       ...(documentation ? { documentation } : {}),
       signature: structuralSignature(source, draft),
       signatureMaterial: signatureMaterial(source, draft),
@@ -388,8 +390,12 @@ function buildImports(
       const sourceNode = field(capture.node, "source");
       if (!sourceNode) return [];
       const statement = text(source, capture.node).trimStart();
-      const bindings = importBindings(capture.node, source);
+      const parsedBindings = importBindings(capture.node, source);
+      const bindings = capture.name === "export.statement" && parsedBindings.length === 0 && /^export\s*\*/u.test(statement)
+        ? frozenBindings([{ imported: "*", local: "*", typeOnly: false }])
+        : parsedBindings;
       return [Object.freeze({
+        form: capture.name === "export.statement" ? "esm_re_export" : "esm_import",
         specifier: unquote(text(source, sourceNode)),
         span: frozenSpan(index, capture.node.startIndex, capture.node.endIndex),
         bindings,
@@ -407,10 +413,27 @@ function buildImports(
       if (!targetNode || !["require", "import"].includes(target) || !argument || argument.type !== "string") return [];
       const declarator = ancestor(capture.node, "variable_declarator");
       const localNode = declarator ? field(declarator, "name") : null;
-      const bindings = localNode
-        ? frozenBindings([{ imported: "default", local: text(source, localNode), typeOnly: false }])
-        : frozenBindings([]);
+      const rawBindings: { imported: string; local: string; typeOnly: boolean }[] = [];
+      if (target === "require" && localNode?.type === "identifier") {
+        rawBindings.push({ imported: "default", local: text(source, localNode), typeOnly: false });
+      } else if (target === "import" && localNode?.type === "identifier") {
+        rawBindings.push({ imported: "*", local: text(source, localNode), typeOnly: false });
+      } else if (target === "require" && localNode) {
+        for (const child of localNode.namedChildren ?? []) {
+          const importedNode = field(child, "key") ?? field(child, "name") ?? child;
+          const localBinding = field(child, "value") ?? field(child, "alias") ?? importedNode;
+          const importedName = text(source, importedNode).trim();
+          const localName = text(source, localBinding).trim();
+          if (importedName && localName) rawBindings.push({
+            imported: importedName,
+            local: localName,
+            typeOnly: false,
+          });
+        }
+      }
+      const bindings = frozenBindings(rawBindings);
       return [Object.freeze({
+        form: target === "require" ? "commonjs_require" : "dynamic_import",
         specifier: unquote(text(source, argument)),
         span: frozenSpan(index, capture.node.startIndex, capture.node.endIndex),
         bindings,

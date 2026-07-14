@@ -42,6 +42,47 @@ async function parseTypeScriptWithCapabilities(
 }
 
 describe("declarative structural query packs", () => {
+  test("normalizes CommonJS default and destructured bindings for resolvers", async () => {
+    const outcome = await parseTypeScriptWithCapabilities(
+      'const service = require("./service"); const { execute: run, stop } = require("./worker");',
+      {
+        declarations: "required", documentation: "required", imports: "required",
+        type_relations: "required", calls: "required", data_flow: "required", specialized_edges: "required",
+      },
+    );
+    expect(outcome.status).toBe("ok");
+    if (outcome.status !== "ok" && outcome.status !== "recovered") throw new Error("expected parse success");
+    expect(outcome.structure.imports.map((item) => ({
+      form: item.form,
+      specifier: item.specifier,
+      bindings: item.bindings,
+    }))).toEqual([
+      { form: "commonjs_require", specifier: "./service", bindings: [{ imported: "default", local: "service", typeOnly: false }] },
+      { form: "commonjs_require", specifier: "./worker", bindings: [
+        { imported: "execute", local: "run", typeOnly: false },
+        { imported: "stop", local: "stop", typeOnly: false },
+      ] },
+    ]);
+  });
+
+  test("distinguishes ESM imports, reexports, and dynamic imports", async () => {
+    const outcome = await parseTypeScriptWithCapabilities(
+      'import { run } from "./a"; export { stop } from "./b"; const mod = import("./c"); export * from "./d";',
+      {
+        declarations: "required", documentation: "required", imports: "required",
+        type_relations: "required", calls: "required", data_flow: "required", specialized_edges: "required",
+      },
+    );
+    expect(outcome.status).toBe("ok");
+    if (outcome.status !== "ok" && outcome.status !== "recovered") throw new Error("expected parse success");
+    expect(outcome.structure.imports.map((item) => [item.form, item.specifier, item.bindings.length])).toEqual([
+      ["esm_import", "./a", 1],
+      ["esm_re_export", "./b", 1],
+      ["dynamic_import", "./c", 1],
+      ["esm_re_export", "./d", 1],
+    ]);
+  });
+
   test("registers one immutable versioned pack across TS/JS/TSX/JSX", () => {
     const ts = structuralQueryPackForDialect("typescript");
     expect(ts?.version).toBe("1.0.0");
