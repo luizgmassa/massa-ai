@@ -22,15 +22,15 @@ Implement `plan-multi-language.md` under workflow session `spec-multi-language`.
 - Ran two source investigators and a full pre-mortem Plan Critic. Revised the plan through two rounds; final critic found no critical/high contradiction.
 - Created/activated feature spec, context, design, capability matrix, tasks, gate manifest, project state, and this handoff.
 - User explicitly permitted sub-agents. Tasks select one sequential worker per Execute phase plus an independent verifier.
-- Phase 0 worker ran TASK-001 target discovery. It measured macOS 26.5.2 arm64 and Bun 1.3.11, found no Linux/container/VM/emulation executor, recorded the exact evidence, and made no production changes.
+- Phase 0 worker ran TASK-001 target discovery and measured macOS 26.5.2 arm64 with Bun 1.3.11. The user subsequently narrowed native implementation scope to macOS arm64 only.
 
 ## Blocking Gate
 
-TASK-001 must prove clean frozen install/load/parse and native linkage for every required grammar on the exact supported macOS, Linux glibc, and Alpine musl CPU matrix. Linux glibc amd64/arm64 and Linux musl amd64/arm64 cannot execute locally because no container engine, VM runtime, or QEMU CPU emulator is installed. The plan explicitly says block without fallback if the target matrix cannot pass.
+TASK-001 must prove clean frozen install/load/parse and native linkage for every required grammar on exact Bun/macOS arm64. Other platforms, container-native packaging, and other architectures are outside the user-approved scope.
 
 ## Exact Next Step
 
-Provide a local multi-architecture Linux glibc/musl executor for amd64 and arm64, or authorize creation and push of a dedicated remote CI matrix. Rerun TASK-001 from clean caches with one exact Bun release; only after every artifact/target row passes may TASK-002 begin.
+Run TASK-001 from clean caches on macOS arm64, testing repository-declared Bun 1.2.0 first and the lowest exact Bun 1.3.x candidate only if required. Only after every grammar row passes may TASK-002 begin.
 
 ## Worktree and Safety
 

@@ -1,6 +1,6 @@
 # Multi-Language Tree-sitter Capability and Native Feasibility Matrix
 
-**Status:** BLOCKED at TASK-001 target discovery; native feasibility unproven  
+**Status:** TASK-001 active for macOS arm64; grammar feasibility unproven  
 **Canonical source:** `packages/shared/src/config/index.ts` (`DEFAULT_ALLOWED_EXTENSIONS`)  
 **Legend:** `R` required and tested; `F` forbidden false positive; `U` unsupported/no output; `E` embedded-child capability.
 
@@ -77,27 +77,19 @@ Broad-language benchmark measurements are informative; TS/JS performance thresho
 
 Each unique grammar artifact receives one row during TASK-001:
 
-| Artifact | Version/commit | Source repository | License | Lifecycle scripts | Tree-sitter peer/ABI | macOS arm64 | Linux glibc amd64/arm64 | Linux musl amd64/arm64 | Source/dist/runtime load | Status |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| _Not attempted: mandatory Linux execution targets were unavailable before the artifact loop_ | | | | | | NOT RUN | NOT RUN | NOT RUN | NOT RUN | BLOCKED |
+| Artifact | Version/commit | Source repository | License | Lifecycle scripts | Tree-sitter peer/ABI | macOS arm64 clean install | Minimal module load/parse | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| _Populated by measured macOS arm64 feasibility_ | | | | | | NOT RUN | NOT RUN | ACTIVE |
 
-Evidence includes clean frozen install, integrity/commit, architecture/libc linkage, minimal parse, and a missing/incompatible negative sensor. `tree-sitter-vue`, `tree-sitter-dart`, `tree-sitter-clojure`, and the pinned Erlang Git artifact are called out as current high-risk candidates because their npm/native publication path is old or absent.
+Evidence includes clean frozen install, integrity/commit, Mach-O arm64 linkage, minimal parse, and a missing/incompatible negative sensor. `tree-sitter-vue`, `tree-sitter-dart`, `tree-sitter-clojure`, and the pinned Erlang Git artifact are called out as current high-risk candidates because their npm/native publication path is old or absent.
 
 ### TASK-001 Target Discovery (2026-07-13)
 
 | Required execution target | Sensor result | Grammar install/load/parse | Status |
 | --- | --- | --- | --- |
-| Bun on macOS arm64 | `uname -s` -> `Darwin`; `uname -m` -> `arm64`; `sw_vers` -> macOS `26.5.2` (`25F84`); `bun --version` -> `1.3.11`; Bun binary -> Mach-O arm64 | Not run: all-target gate stopped before artifact probing when mandatory Linux targets were absent | AVAILABLE SENSOR; UNMEASURED MATRIX |
-| Bun on Linux glibc amd64 | No local Linux host, VM, container engine, or x86_64 emulator discovered | Not run | BLOCKED: TARGET UNAVAILABLE |
-| Bun on Linux glibc arm64 | No local Linux host, VM, or container engine discovered | Not run | BLOCKED: TARGET UNAVAILABLE |
-| Bun on Linux musl amd64 | No Alpine/musl host, VM, container engine, or x86_64 emulator discovered | Not run | BLOCKED: TARGET UNAVAILABLE |
-| Bun on Linux musl arm64 | No Alpine/musl host, VM, or container engine discovered | Not run | BLOCKED: TARGET UNAVAILABLE |
+| Bun on macOS arm64 | `uname -s` -> `Darwin`; `uname -m` -> `arm64`; `sw_vers` -> macOS `26.5.2` (`25F84`); `bun --version` -> `1.3.11`; Bun binary -> Mach-O arm64 | Pending clean artifact loop | AVAILABLE SENSOR; ACTIVE |
 
-Target-discovery commands were all executed locally with the repository-required `rtk` prefix. `which docker`, `podman`, `colima`, `limactl`, `lima`, `nerdctl`, `orbctl`, `buildah`, `qemu-aarch64`, `qemu-x86_64`, and `multipass` each exited `1` with no path. The local Bun path is `/Users/luizmassa/.bun/bin/bun`; `file` identified it as `Mach-O 64-bit executable arm64`.
-
-No grammar dependency was downloaded or installed and no load/parse or negative ABI sensor was attempted. Continuing the macOS artifact loop could not make the mandatory all-target gate pass and would not provide the missing Linux glibc/musl CPU evidence.
-
-**Unblock contract:** provide an execution environment that can run clean throwaway probes on Linux glibc amd64 and arm64 plus Linux musl amd64 and arm64, while retaining the measured macOS arm64 target. Acceptable examples are a local multi-architecture container/VM setup with executable CPU emulation or authorized remote CI runners. Static Docker/CI definitions are not execution evidence. The same exact Bun release must then be selected and measured on every target before any artifact row can become PASS.
+The user explicitly limited native implementation and verification to macOS arm64. The local Bun path is `/Users/luizmassa/.bun/bin/bun`; `file` identified it as `Mach-O 64-bit executable arm64`. TASK-001 now proceeds on this target only.
 
 ## Out-of-Manifest Extensions
 
@@ -106,5 +98,5 @@ An extension allowed by `security.allowedExtensions` but absent above remains el
 ## Artifact Store Evidence
 
 - Active key: `.specs/features/multi-language-tree-sitter-breadth/capability-matrix.md`
-- Version: 2 (TASK-001 blocked target-discovery evidence)
+- Version: 3 (macOS arm64-only scope override)
 - Checksum: recorded in `gate-manifest.md` after artifact freeze.

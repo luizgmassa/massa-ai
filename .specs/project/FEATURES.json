@@ -234,7 +234,7 @@
     {
       "slug": "multi-language-tree-sitter-breadth",
       "title": "Native Tree-sitter structural indexing across 33 extensions",
-      "status": "blocked",
+      "status": "in_progress",
       "priority": "P1",
       "phases": {
         "specify": true,

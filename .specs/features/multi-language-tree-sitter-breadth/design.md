@@ -37,7 +37,7 @@ flowchart LR
 - Native load happens in-process with direct syntax-tree/query access.
 - Repository code owns normalized contracts, capability tiers, FQNs, spans, resolvers, diagnostics, and compatibility.
 - Builder-only compilation and explicit lifecycle trust satisfy offline/runtime constraints.
-- This is the approach specified by `plan-multi-language.md`; execution remains blocked until the native matrix proves it.
+- This is the approach specified by `plan-multi-language.md`; production changes remain gated until macOS arm64 native feasibility passes.
 
 ### Rejected: precompiled multi-language pack
 
@@ -46,7 +46,7 @@ flowchart LR
 
 ### Rejected: `web-tree-sitter` plus WASM assets
 
-- Portable and compiler-free runtime.
+- Portable runtime.
 - Not native Tree-sitter as requested; changes performance, packaging, and memory premises. It is not a silent fallback if native feasibility fails.
 
 ## Current Codebase Evidence
@@ -67,8 +67,7 @@ flowchart LR
 | `packages/core/prisma/schema.prisma:126` | Workspace and graph tables are unversioned | Migration/backfill adds graph generation ownership. |
 | `packages/core/src/services/workspace/workspace-manager.ts:125` | Workspace completion is event-driven | Activation/counts happen synchronously before terminal job visibility. |
 | `apps/tools-api/src/index.ts:129` | Unconditional `/health` | Preserve liveness; add parser readiness and indexing guard. |
-| `Dockerfile:31` | `bun install --ignore-scripts` | Replace with explicit trusted native dependencies and builder tooling. |
-| `.github/workflows/ci.yml:37` | Bun uses `latest` | Pin one feasibility-proven Bun version across package, Docker, CI, and publish. |
+| `.github/workflows/ci.yml:37` | Bun uses `latest` | Pin one feasibility-proven Bun version for the new macOS arm64 native smoke; non-macOS jobs remain unchanged. |
 | `packages/core/src/__tests__/e2e/09.symbol-graph.test.ts:650` | Go/Rust/Markdown zero-symbol behavior is expected | Replace limitation assertions with manifest-tier outcomes. |
 
 ## Active Decision Handling
@@ -98,7 +97,7 @@ packages/core/src/services/graph-generation/
 └── graph-generation-repository.ts
 ```
 
-Query strings remain TypeScript-owned constants unless the feasibility slice proves `.scm` assets can be copied identically into source, `dist`, npm package, and runtime images. This avoids a new asset-copy contract by default.
+Query strings remain TypeScript-owned constants unless the feasibility slice proves `.scm` assets can be copied identically into source, `dist`, and the packed package. This avoids a new asset-copy contract by default.
 
 ## Core Interfaces
 
@@ -264,26 +263,26 @@ Incremental hard failure does not delete active definitions/references/imports. 
 - Ambiguity response is one shared core type serialized by both transports.
 - Existing symbol-name/kind inputs remain supported. Substring name search is separated from exact modern/legacy FQN resolution.
 
-## Native Packaging and Supply Chain
+## macOS arm64 Packaging and Supply Chain
 
-- `capability-matrix.md` records exact npm/Git artifacts, source repository, version/commit, license, scripts, Tree-sitter peer/ABI, architecture/libc, and smoke result.
-- Root `packageManager`, Docker images, CI, and publish workflows use one exact feasibility-proven Bun release.
+- `capability-matrix.md` records exact npm/Git artifacts, source repository, version/commit, license, scripts, Tree-sitter peer/ABI, arm64 linkage, and smoke result.
+- Root `packageManager` and the macOS arm64 native CI/publish checks use one exact feasibility-proven Bun release.
 - Native grammar packages are exact dependencies. Only packages with required lifecycle scripts are named in root `trustedDependencies`.
-- Docker builder installs Python, make, C/C++; API/MCP runtime stages copy compiled native artifacts and contain no compiler packages.
-- Source, built `dist`, npm package, macOS, Linux glibc, Linux musl, and API/MCP runtime-image load smokes are separate assertions.
+- Source, built `dist`, and packed-package load smokes run independently on macOS arm64.
+- Docker, Linux, Alpine, and non-arm64 packaging are untouched and outside this design.
 
 ## Verification Design
 
 | High-risk contract | Deterministic proof |
 | --- | --- |
-| Manifest/native feasibility | Exact 33-entry comparison; clean frozen installs; load/parse all grammars; removed/ABI-incompatible negative sensor; linkage and compiler inventory. |
+| Manifest/native feasibility | Exact 33-entry comparison; clean frozen macOS arm64 installs; load/parse all grammars; removed/ABI-incompatible negative sensor; Mach-O linkage evidence. |
 | Parser concurrency/disposal | Lease overlap detector, acquisition timeout test, forced query failure cleanup, 100-iteration RSS stress. |
 | TS/JS compatibility | Regex baseline characterization fixtures; approved-difference ledger; unchanged `smartChunk` snapshots. |
 | FQN compatibility | Golden codec fixtures, forced digest collision, nested/overload aliases, identical PG/HTTP/MCP ambiguity payload. |
 | Span correctness | UTF-8/emoji/BOM/CRLF/tab/nested remap byte slices and snippet round trips. |
 | Generation safety | Backfill, active filter, old visibility, lease loss, stale snapshot, interruption, retry, concurrent process, centrality/diagnostic filter, deleted-file cleanup, synchronous job ordering. |
 | Per-language correctness | Capability-matrix positive/negative fixtures and unresolved-edge payloads. |
-| Packaging | macOS/Linux/Alpine smoke; API/MCP runtime load; no compiler in final image. |
+| Packaging | macOS arm64 clean install plus source, built-dist, and packed-package native load. |
 | Performance | Frozen corpus SHA-256, exact baseline commit/Bun/host, five warmups, ten fresh-process samples, declared variance rule, RSS method, 100 disposal loops. |
 
 Independent validation mutates at least one query capture, grammar dependency, generation fingerprint, active-generation filter/CAS, coordinate offset, and legacy-FQN resolver. All relevant tests must kill each mutation in scratch state.
@@ -300,7 +299,7 @@ Independent validation mutates at least one query capture, grammar dependency, g
 | Existing FQN/name lookup hides ambiguity | Resolve/repository/trace evidence | Wrong navigation | Shared exact FQN codec/resolver and transport parity. |
 | Custom extension override exceeds manifest | security config | Hidden unsupported behavior | Semantic-only explicit diagnostic; no structural fallback. |
 | `.scm` assets may not ship in `dist` | current TypeScript build | Source works, published package fails | Default typed query strings; explicit source/dist/package smoke if assets selected. |
-| Startup validation may exceed 20-second CI wait | current Docker CI | False readiness failure | Measure and set a bounded parser-readiness wait from evidence; `/health` stays liveness. |
+| Startup validation may exceed the current CI readiness window | current startup checks | False readiness failure | Measure and set a bounded parser-readiness wait from evidence; `/health` stays liveness. |
 | Scope spans many languages/modules | 33 extensions and cross-cutting migration | Planning fallacy | Cohort vertical slices, task gates, phase workers, and no cohort expansion before its gate passes. |
 
 ## Security and Privacy
@@ -329,7 +328,6 @@ Independent validation mutates at least one query capture, grammar dependency, g
 ## Artifact Store Evidence
 
 - Active key: `.specs/features/multi-language-tree-sitter-breadth/design.md`
-- Version: 1
+- Version: 2 (macOS arm64-only scope override)
 - Checksum: recorded in `gate-manifest.md` after artifact freeze.
 - MCP/skill decision: use `massa-th0th`, `coding-guidelines`, direct repository tools, official Tree-sitter/Bun/npm evidence, phase implementers with disjoint ownership, and an independent verifier. Synapse is unavailable in the current build, so indexed retrieval fell back to stateless search plus current-source confirmation.
-

@@ -15,7 +15,7 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 ## Goals
 
 - [ ] Every default extension maps exactly once to an auditable structural-language manifest entry.
-- [ ] Native grammars install, load, and parse reproducibly on the supported Bun/OS/libc/CPU matrix before breadth work proceeds.
+- [ ] Native grammars install, load, and parse reproducibly on the supported Bun/macOS arm64 target before breadth work proceeds.
 - [ ] Structural symbols, imports, references, diagnostics, FQNs, and graph generations have explicit versioned contracts.
 - [ ] All required per-language capabilities have deterministic positive and negative fixtures.
 - [ ] Graph generation changes preserve an old active graph until a complete pending generation activates atomically.
@@ -26,7 +26,7 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 | ID | Priority | Requirement |
 | --- | --- | --- |
 | MLTS-001 | P1 | `LanguageManifestEntry` SHALL exhaustively map the 33 unique extensions in `DEFAULT_ALLOWED_EXTENSIONS` to language/dialect, pinned grammar artifact and version, query-pack version, resolver version, capability tier, and mixed-language policy. |
-| MLTS-002 | P1 | A frozen native feasibility gate SHALL verify provenance, license, lifecycle scripts, ABI, architecture, libc linkage, clean-cache installation, load, and parse for every required grammar on the declared exact Bun/platform matrix. |
+| MLTS-002 | P1 | A frozen native feasibility gate SHALL verify provenance, license, lifecycle scripts, ABI, arm64 linkage, clean-cache installation, load, and parse for every required grammar on the declared exact Bun/macOS arm64 target. |
 | MLTS-003 | P1 | Service liveness SHALL remain independent from parser/indexing readiness; required grammar absence or ABI incompatibility SHALL fail parser readiness before indexing without misreporting unrelated APIs as dead. |
 | MLTS-004 | P1 | A bounded parser pool SHALL serialize each parser instance, key leases by language/dialect, release every syntax tree in `finally`, and expose deterministic exhaustion/failure behavior. |
 | MLTS-005 | P1 | Normalized symbols SHALL support `module`, `namespace`, `class`, `interface`, `trait`, `enum`, `function`, `method`, `constructor`, `property`, `field`, `variable`, `constant`, `type`, `type_parameter`, `export`, `heading`, and `key`. |
@@ -44,15 +44,15 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 | MLTS-017 | P1 | Per-file parser metadata SHALL persist language, grammar version, query/resolver versions, parser status, error count, generation, and last-known-good/stale state. Detailed diagnostic ranges SHALL be bounded to ten per file. |
 | MLTS-018 | P1 | `ParserDiagnosticsSummary` SHALL appear consistently in durable index-job status and project-map HTTP/MCP results with counts by language, recovered errors, hard failures, stale files, and active generation identity. |
 | MLTS-019 | P1 | Unknown user-configured allowed extensions outside the default manifest SHALL remain semantic-only, report `unsupported_structural_language`, avoid regex fallback, and not fail required-grammar readiness. |
-| MLTS-020 | P1 | Docker builders SHALL contain native build tooling while runtime images remain compiler-free and pass native link/load smoke tests. Lifecycle scripts SHALL be enabled only through explicit `trustedDependencies`; blanket `--ignore-scripts` SHALL be removed. |
-| MLTS-021 | P1 | CI SHALL pin the selected Bun version and verify macOS native smoke, Linux native smoke, Alpine API/MCP images, database migration/backfill, focused units, type-check, build, and owned sequential indexing/graph/NFR E2E gates. |
+| MLTS-020 | P1 | macOS arm64 source, built `dist`, and packed-package installs SHALL pass native link/load/parse smoke tests. Lifecycle scripts SHALL be enabled only through explicit `trustedDependencies`. |
+| MLTS-021 | P1 | CI SHALL pin the selected Bun version and verify a macOS arm64 native smoke plus database migration/backfill, focused units, type-check, build, and owned sequential indexing/graph/NFR E2E gates. Existing non-macOS and Docker jobs SHALL remain unchanged by this feature. |
 | MLTS-022 | P1 | `bench:parser` SHALL compare the candidate with commit `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03` using one frozen corpus/checksum, exact Bun/host, parser-only scope, five warmups, ten isolated measurements, declared variance handling, RSS semantics, and 100 disposal iterations. TS/JS throughput SHALL regress no more than 25% and RSS no more than 50%. |
 | MLTS-023 | P1 | Active docs, examples, fixtures, API schemas, MCP definitions, and compatibility notes SHALL describe graph schema v2, automatic structural rebuild, temporary old-generation visibility, diagnostics, supported capability tiers, and legacy ambiguity behavior. |
 
 ## Acceptance Criteria
 
 1. **AC-001 / MLTS-001,019:** WHEN manifest exhaustiveness runs THEN it SHALL report exactly the same 33 unique extensions as `DEFAULT_ALLOWED_EXTENSIONS`, no extras, and explicit semantic-only behavior for a configured unknown extension.
-2. **AC-002 / MLTS-002,003,020,021:** WHEN each frozen target performs a clean install/startup smoke THEN every required grammar SHALL load and parse, native linkage SHALL be recorded, runtime images SHALL contain no compiler toolchain, and a removed/incompatible grammar SHALL make parser readiness fail while `/health` remains live.
+2. **AC-002 / MLTS-002,003,020,021:** WHEN the frozen macOS arm64 target performs a clean install/startup smoke THEN every required grammar SHALL load and parse, Mach-O arm64 linkage SHALL be recorded, and a removed/incompatible grammar SHALL make parser readiness fail while `/health` remains live.
 3. **AC-003 / MLTS-004:** WHEN concurrent parse requests exceed pool capacity THEN parser instances SHALL never overlap, leases SHALL settle deterministically, all trees SHALL be disposed, and the 100-iteration stress run SHALL show no unbounded RSS growth.
 4. **AC-004 / MLTS-005,006,007:** WHEN nested, overloaded, Unicode, CRLF, BOM, tabbed, and signature-collision fixtures are parsed THEN normalized kinds, FQNs, aliases, spans, display names, and ambiguity candidates SHALL match golden expected values.
 5. **AC-005 / MLTS-008,009,015:** WHEN every language golden runs THEN each manifest-required capability SHALL meet its declared recall/precision floor, forbidden false positives SHALL be zero, unsupported capabilities SHALL emit nothing, and unresolved edges SHALL match the defined payload.
@@ -62,7 +62,7 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 9. **AC-009 / MLTS-016:** WHEN Vue/Markdown embedded fixtures include declared/unknown languages, repeated fences, Unicode, malformed blocks, and recursion beyond two levels THEN remapped spans, stable scope FQNs, dedupe, fallback, and diagnostics SHALL match goldens.
 10. **AC-010 / MLTS-006,018,023:** WHEN a modern or legacy FQN is sent through PostgreSQL-backed definition/reference/trace, HTTP, and MCP surfaces THEN all transports SHALL return the same unique result or the same explicit ambiguity candidate payload.
 11. **AC-011 / MLTS-017,018:** WHEN more than ten detailed errors exist in one file THEN persistence/status SHALL retain exact aggregate counts but expose at most ten ranges for that file.
-12. **AC-012 / MLTS-021,022:** WHEN final gates run THEN focused parser/query tests, core unit tests, type-check, build, owned sequential E2E, native images, and the frozen benchmark SHALL pass their exact thresholds with no unexplained skips.
+12. **AC-012 / MLTS-021,022:** WHEN final gates run THEN focused parser/query tests, core unit tests, type-check, build, owned sequential E2E, macOS arm64 native package checks, and the frozen benchmark SHALL pass their exact thresholds with no unexplained skips.
 
 ## User Stories
 
@@ -82,7 +82,7 @@ As an operator, I want structural schema/parser upgrades to build beside the act
 
 As a maintainer, I want pinned grammar/runtime artifacts and explicit readiness diagnostics so native packaging failures are caught before indexing and can be reproduced across supported targets.
 
-**Independent test:** Clean-cache native smoke matrix plus a removed-grammar negative sensor.
+**Independent test:** Clean-cache macOS arm64 native smoke plus a removed-grammar negative sensor.
 
 ## Edge Cases and Failure Modes
 
@@ -97,7 +97,7 @@ As a maintainer, I want pinned grammar/runtime artifacts and explicit readiness 
 - UTF-8 multibyte text, emoji, BOM, CRLF, tabs, and nested host offsets round-trip to the original snippet.
 - Unknown Markdown fence language stays a plain chunk; embedded recursion stops after two levels.
 - More than ten diagnostic ranges remain bounded without losing aggregate counts.
-- Runtime images missing native artifacts fail parser readiness before accepting indexing work.
+- The supported macOS arm64 runtime missing required native artifacts fails parser readiness before accepting indexing work.
 
 ## Implicit-Requirement Sweep
 
@@ -114,9 +114,9 @@ As a maintainer, I want pinned grammar/runtime artifacts and explicit readiness 
 | State-transition integrity | Generation states are pending -> active or pending -> failed/cleaned; CAS, lease ownership, and synchronous job ordering guard transitions. |
 | Users, permissions, ownership | Existing authenticated API/MCP callers and operators remain actors; no ownership model changes. |
 | Migration & compatibility | MLTS-006,010,011,013,018,023 cover backfill, versioned FQNs, old-generation visibility, and transport compatibility. |
-| Privacy & security | No new user data class; native dependency provenance, licenses, lifecycle scripts, and compiler-free runtime are mandatory. |
+| Privacy & security | No new user data class; native dependency provenance, licenses, integrity, and lifecycle scripts are mandatory. |
 | Accessibility & localization | N/A because this is a backend indexing contract with no UI or localized content. |
-| Platform behavior | Exact Bun/macOS/Linux/Alpine, CPU, and libc combinations are frozen by MLTS-002/020/021. |
+| Platform behavior | Exact Bun, macOS release, and arm64 target are frozen by MLTS-002/020/021; other platforms are excluded. |
 | Performance | MLTS-004,022 define bounded resources, disposal stress, and deterministic throughput/RSS limits. |
 
 ## Assumptions and Decisions
@@ -131,7 +131,9 @@ As a maintainer, I want pinned grammar/runtime artifacts and explicit readiness 
 | Grammar readiness impact | Indexing readiness fails; service liveness and unrelated memory/search APIs remain available | Avoids turning one native grammar fault into a whole-service false outage | Accepted conservative default | MLTS-003 |
 | Compiler/LSP resolution | Out of scope; deterministic syntax/build-metadata resolution only | Explicit source plan | Yes, user source | MLTS-008-009,015 |
 
-**Open questions:** none. Native package/platform viability is a blocking execution measurement, not an unresolved product requirement; failure follows the plan's no-fallback blocker.
+| Supported native platform | macOS arm64 only | Explicit user scope override on 2026-07-13 | Yes, user instruction | MLTS-002,020-021 |
+
+**Open questions:** none. Native package viability on macOS arm64 is a blocking execution measurement, not an unresolved product requirement; failure follows the plan's no-fallback blocker.
 
 ## Out of Scope
 
@@ -145,6 +147,7 @@ As a maintainer, I want pinned grammar/runtime artifacts and explicit readiness 
 | New auth, rate-limit, or UI behavior | Not required for structural indexing breadth. |
 | Unbounded embedded-language recursion | Maximum depth is two. |
 | Lowering performance gates or accepting unexplained skips | Verification contract is fixed. |
+| Linux, Alpine, Docker-native packaging, and non-arm64 targets | Explicit user scope override; do not implement or add gates for them. |
 
 ## Verification Approach
 
@@ -153,7 +156,7 @@ As a maintainer, I want pinned grammar/runtime artifacts and explicit readiness 
 - Per-language golden fixtures for required/forbidden/unsupported capabilities and unresolved edges.
 - PostgreSQL migration/backfill, active-generation filters, DB lease/snapshot/CAS, activation ordering, rollback, retry, deletion, and stale-result tests.
 - HTTP/MCP transport parity for symbol kinds, FQNs, ambiguity, diagnostics, and project-map/index status.
-- macOS/Linux/Alpine native smoke plus compiler-free runtime inspection.
+- macOS arm64 clean install plus source, built-dist, and packed-package native smoke.
 - Frozen parser-only benchmark and expanded independent discrimination sensor mutations.
 - Final author-independent verifier maps every AC to exact assertions and kills behavior-level mutants.
 
@@ -166,6 +169,5 @@ As a maintainer, I want pinned grammar/runtime artifacts and explicit readiness 
 ## Artifact Store Evidence
 
 - Active key: `.specs/features/multi-language-tree-sitter-breadth/spec.md`
-- Version: 1
+- Version: 2 (macOS arm64-only scope override)
 - Checksum: recorded in `gate-manifest.md` after artifact freeze.
-

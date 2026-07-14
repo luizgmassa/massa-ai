@@ -15,7 +15,7 @@ Replace regex structural extraction for the 33 canonical default extensions with
 - Exact Bun/runtime/platform combinations are evidence, not assumptions.
 - Required grammars are present before indexing starts; runtime downloads are forbidden.
 - `/health` remains liveness. Parser readiness is separately observable and gates indexing.
-- Only native packages with lifecycle scripts enter `trustedDependencies`; Docker builders own compilers, runtime images do not.
+- Only native packages with required lifecycle scripts enter `trustedDependencies`; native packaging proof is limited to macOS arm64 source, built `dist`, and packed-package checks.
 
 ### Structural generations
 
@@ -88,6 +88,5 @@ Replace regex structural extraction for the 33 canonical default extensions with
 ## Artifact Store Evidence
 
 - Active key: `.specs/features/multi-language-tree-sitter-breadth/context.md`
-- Version: 1
+- Version: 2 (macOS arm64-only scope override)
 - Checksum: recorded in `gate-manifest.md` after artifact freeze.
-

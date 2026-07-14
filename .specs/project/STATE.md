@@ -7,7 +7,7 @@
 - workflow: spec-driven
 - persona: AI Engineer
 - feature: `multi-language-tree-sitter-breadth`
-- status: SPEC/DESIGN/TASKS APPROVED; EXECUTE BLOCKED ON TASK-001 NATIVE MATRIX
+- status: EXECUTE ACTIVE; TASK-001 MACOS ARM64 FEASIBILITY
 - branch: `main`
 - baseline: `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`
 - push: not attempted
@@ -18,7 +18,7 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 
 ## Active Constraints
 
-- TASK-001 is a no-fallback feasibility gate. Every declared exact Bun/OS/libc/CPU target must install, load, and parse all required grammars before production implementation.
+- TASK-001 is a no-fallback feasibility gate on exact Bun/macOS arm64. Every required grammar must install, load, and parse before production implementation.
 - Native runtime downloads, WASM fallback, raw CST persistence, compiler/LSP resolution, and semantic-search changes are out of scope.
 - Structural generations cover files, definitions, references, imports, centrality, diagnostics, and full counts; DB lease/snapshot/CAS activation must finish before terminal job state.
 - Required-file hard failure blocks generation activation; incremental hard failure retains last-known-good active structure with stale diagnostics.
@@ -40,15 +40,15 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 - Canonical `spec.md`, `context.md`, `design.md`, `tasks.md`, `capability-matrix.md`, and initial `gate-manifest.md` created.
 - 23 requirements, 12 acceptance criteria, 26 atomic tasks, seven phases, and independent verifier contract are frozen.
 - Current source evidence: 33 allowed extensions; structural extraction supports 8 symbol extensions, 7 import extensions, and 4 typed-edge extensions.
-- TASK-001 target discovery measured macOS 26.5.2 arm64 with Bun 1.3.11, then stopped before grammar downloads because every mandatory Linux target sensor was unavailable. No production file changed.
+- TASK-001 target discovery measured macOS 26.5.2 arm64 with Bun 1.3.11. The user then narrowed platform scope to macOS arm64 only, reopening the grammar artifact loop. No production file changed yet.
 
 ## Blocker
 
-Local host is Darwin arm64 with Bun 1.3.11. Root metadata declares Bun 1.2.0; Docker uses Bun 1.3 Alpine; CI uses latest. No Docker/Podman/Colima/Lima/nerdctl/OrbStack/Buildah, QEMU CPU emulator, or Multipass executable is available. Linux glibc amd64/arm64 and Linux musl amd64/arm64 are therefore unexecutable. Static workflow definitions cannot count as target evidence.
+None before TASK-001 execution. Local target is Darwin arm64 with Bun 1.3.11; root metadata declares Bun 1.2.0 and must be tested first per the approved fallback rule.
 
 ## Next Step
 
-Provide a local multi-architecture Linux glibc/musl executor for amd64 and arm64, or authorize a dedicated pushed remote CI matrix. Then rerun TASK-001 from clean caches using one exact Bun release. TASK-002 remains blocked until every native matrix row passes.
+Run TASK-001 from clean caches on macOS arm64. Test repository-declared Bun 1.2.0 first, then the lowest exact Bun 1.3.x candidate only if required. Record every grammar artifact result before TASK-002.
 
 ## Previous Feature
 

@@ -63,16 +63,16 @@ Feature artifacts will live under .specs/features/multi-language-tree-sitter-bre
 1. Specification and native feasibility gate
     - Create approved spec, context, design, capability matrix, tasks, and registry/state artifacts.
     - Produce a 33-extension matrix marking each symbol and edge capability required, forbidden, or unsupported with rationale.
-    - Pin tree-sitter and vetted grammar packages. Prove clean frozen installation plus load-and-parse for every grammar on Bun/macOS, Bun/Linux, and Alpine Docker.
-    - Standardize on repository-declared Bun 1.2.0 if it passes; otherwise use the lowest exact Bun 1.3.x release passing every target. Block without fallback if neither passes.
-    - Audit package provenance, licenses, lifecycle scripts, ABI, architecture, libc linkage, and clean-cache reproducibility.
-    - Freeze the exact Bun, lockfile, grammar artifact, OS, libc, and CPU matrix. Unsupported combinations are explicit blockers, never inferred successes.
+    - Pin tree-sitter and vetted grammar packages. Prove clean frozen installation plus load-and-parse for every grammar on Bun/macOS arm64.
+    - Standardize on repository-declared Bun 1.2.0 if it passes; otherwise use the lowest exact Bun 1.3.x release passing macOS arm64. Block without fallback if neither passes.
+    - Audit package provenance, licenses, lifecycle scripts, ABI, arm64 linkage, and clean-cache reproducibility.
+    - Freeze the exact Bun, lockfile, grammar artifact, macOS release, and arm64 target. Other operating systems and CPU architectures are outside this implementation.
     - Split service liveness from parser readiness. Missing or ABI-incompatible grammars fail parser/indexing readiness without making unrelated health and memory APIs appear dead.
     - Prove one vertical slice per resolver/language cohort, including correctness and false-positive floors, before expanding the cohort to every listed extension.
 
-2. Native packaging and parser runtime
-    - Add only lifecycle-script packages to Bun trustedDependencies; remove blanket Docker --ignore-scripts.
-    - Install python3, make, and C/C++ tooling only in Docker builder stages. Keep runtime images free of compilers and run native-link/load smoke tests there.
+2. Native dependencies and parser runtime
+    - Add only lifecycle-script packages to Bun trustedDependencies.
+    - Prove native-link/load behavior for source, built dist, and the packed package on macOS arm64. Do not change Docker or non-macOS packaging.
     - Implement a bounded parser pool keyed by language/dialect. Trees are always disposed in finally; parser instances are never used concurrently.
     - Validate every grammar at API startup. Missing or ABI-incompatible grammars fail readiness before indexing begins.
 
@@ -124,7 +124,7 @@ Feature artifacts will live under .specs/features/multi-language-tree-sitter-bre
     - Preserve legacy symbol-name and kind queries where unambiguous; document automatic graph rebuild and temporary old-generation visibility.
 
 7. Rollout and verification
-    - Update CI with native smoke jobs for macOS and Linux, plus Alpine API/MCP Docker builds. Record runtime architecture and linkage.
+    - Update CI with a macOS arm64 native smoke job. Record runtime architecture and linkage; leave Linux, Alpine, Docker, and other CPU targets unchanged and outside this implementation.
     - Add bench:parser comparing candidate against baseline commit 5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03 on the same host and exact Bun version: five warmups, ten isolated measurements,
       median throughput, peak/steady-state RSS, and a 100-iteration tree-disposal stress run.
 
@@ -155,7 +155,7 @@ Feature artifacts will live under .specs/features/multi-language-tree-sitter-bre
     - bun run type-check
     - bun run build
     - Owned-stack sequential 02.indexing, 09.symbol-graph, and 15.nfr E2E tests.
-    - Alpine API and MCP image builds.
+    - macOS arm64 source, built-dist, and packed-package native load checks.
     - Parser throughput/RSS benchmark.
 
 - Independent verifier mutates one query capture, generation fingerprint, grammar dependency, coordinate offset, and legacy-FQN resolver; tests must kill every mutation.
@@ -168,4 +168,4 @@ Feature artifacts will live under .specs/features/multi-language-tree-sitter-bre
 
 - Native lifecycle scripts are explicitly allowlisted through Bun trustedDependencies, not globally enabled (Bun lifecycle documentation (https://bun.sh/docs/pm/lifecycle)).
 - Plan Challenge: full pre-mortem completed; capability, native-compatibility, generation-migration, mixed-language-coordinate, and benchmark contracts were strengthened.
-- Planning changed no files; worktree remains clean. Durable memory was intentionally not written because Plan Mode permits read-only planning only.
+- Platform scope was explicitly narrowed by the user to macOS arm64; Linux, Alpine, Docker-native packaging, and other CPU architectures are not implementation targets.

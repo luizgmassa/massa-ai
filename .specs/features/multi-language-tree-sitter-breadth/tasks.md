@@ -6,14 +6,14 @@ Implement with the active `massa-th0th` Spec Driven Execute flow, `coding-guidel
 
 **Design:** `.specs/features/multi-language-tree-sitter-breadth/design.md`  
 **Capability contract:** `.specs/features/multi-language-tree-sitter-breadth/capability-matrix.md`  
-**Status:** Execute blocked; TASK-001 cannot run the mandatory Linux glibc/musl CPU matrix
+**Status:** Execute reopened by explicit macOS arm64-only scope; TASK-001 is active
 
 ## Project Testing Guidelines Scan
 
 - Startup/project policy: user-supplied `AGENTS.md` requires `caveman full`, `coding-guidelines`, `massa-th0th`, persona routing, RTK-prefixed shell commands, and evidence-backed completion.
 - Package commands: root `package.json` defines `bun run type-check`, `bun run build`, and `bun run test`; `packages/core/package.json` defines isolated `test:unit` and sequential `test:e2e` runners.
 - Test isolation: `packages/core/scripts/run-tests-isolated.ts` groups pure tests but isolates module mocks, PostgreSQL/integration tests, and process-global state. E2E files always run sequentially.
-- CI: `.github/workflows/ci.yml` runs frozen install, migrations, type-check, build, tests, and Docker API/MCP builds, but currently floats Bun `latest`.
+- CI: `.github/workflows/ci.yml` currently floats Bun `latest`; this feature adds only the macOS arm64 native smoke and leaves other platform jobs unchanged.
 - Existing style sampled: `typed-edges.test.ts`, `etl-pipeline-pg.test.ts`, `etl-cache-invalidation.test.ts`, `symbol-repository-pg-mtime.test.ts`, `symbol-graph-service.test.ts`, `index-project-identity.test.ts`, `apps/tools-api/src/__tests__/startup-config.test.ts`, `apps/mcp-client/src/tool-definitions-checkpoints.test.ts`, plus E2E `02.indexing`, `09.symbol-graph`, and `15.nfr`.
 - Strong default: every spec AC and listed edge case needs deterministic evidence; existing best-effort skips are not an acceptance ceiling.
 
@@ -28,7 +28,7 @@ Implement with the active `massa-th0th` Spec Driven Execute flow, `coding-guidel
 | ETL Parse/Resolve/Load | unit + PostgreSQL integration | Recovered/hard outcomes, no empty-success erasure, generation context, deleted/stale behavior | `packages/core/src/__tests__/etl-*.test.ts` | `bun test --max-concurrency 1 <focused files>` |
 | Graph generation repository/migration | PostgreSQL integration | Backfill, active filters, lease/CAS, interruption, retry, stale snapshot, centrality/diagnostic ownership | `packages/core/src/__tests__/graph-generation-*.test.ts` | `bun test --max-concurrency 1 <focused files>` with owned `DATABASE_URL` |
 | HTTP/MCP controllers and schemas | unit/contract + E2E | Exact modern/legacy FQN results, ambiguity parity, diagnostics summaries, additive kinds | Tools API/MCP tests and core E2E | focused Bun tests; owned sequential E2E command |
-| Docker/native packaging and CI | artifact/native smoke | Frozen clean build, runtime grammar load, architecture/libc evidence, compiler absent | `Dockerfile`, `.github/workflows/*.yml`, native verifier | `docker build --target api .`; `docker build --target mcp .`; runtime verifier |
+| macOS arm64 packaging and CI | artifact/native smoke | Frozen clean install, source/dist/packed-package grammar load, arm64 linkage | package scripts, `.github/workflows/*.yml`, native verifier | `bun run verify:tree-sitter-native` on macOS arm64 |
 | Parser performance | benchmark | Frozen corpus/checksum, exact baseline/candidate isolation, throughput/RSS thresholds, disposal stress | `benchmarks/parser/**`, root/core scripts | `bun run bench:parser -- --baseline 5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03` |
 | End-to-end graph behavior | owned sequential E2E | `02.indexing`, `09.symbol-graph`, `15.nfr`: happy, edge, error, concurrency, old visibility, polyglot results | `packages/core/src/__tests__/e2e/*.test.ts` | `RUN_E2E=1 bun test --max-concurrency 1 src/__tests__/e2e/02.indexing.test.ts src/__tests__/e2e/09.symbol-graph.test.ts src/__tests__/e2e/15.nfr.test.ts` from `packages/core` with owned stack env |
 | Schema/config-only changes | build/migration | Prisma generation, migration deploy/backfill sentinels, type declarations compile | Prisma schema/migrations and config | `bun run type-check`; `bun run build`; owned migration gate |
@@ -43,7 +43,7 @@ Implement with the active `massa-th0th` Spec Driven Execute flow, `coding-guidel
 | PostgreSQL integration | No | Owned database; unique project/generation IDs; sequential cleanup | `run-tests-isolated.ts` database classification |
 | Tools API startup/global env | No | Isolated process/env restore | Existing startup test and process-global classification |
 | Owned E2E | No | One dedicated API/PostgreSQL/Ollama stack; `--max-concurrency 1` | Existing E2E runner and maintenance evidence |
-| OS CI smoke jobs | Yes across runners | Independent GitHub runners/images | CI job isolation |
+| macOS native CI smoke | Yes | Dedicated macOS arm64 runner and clean package cache | CI job isolation |
 | Benchmark | No | One fresh process per measurement on one otherwise-idle host | Spec benchmark contract |
 
 ## Gate Check Commands
@@ -57,16 +57,15 @@ Implement with the active `massa-th0th` Spec Driven Execute flow, `coding-guidel
 | Native | TASK-001/TASK-002 and packaging phases | `bun run verify:tree-sitter-native` |
 | PostgreSQL | Generation/migration tasks | `bun test --max-concurrency 1 <task-owned PG tests>` with an owned migrated `DATABASE_URL` |
 | E2E | After public integration | `RUN_E2E=1 bun test --max-concurrency 1 src/__tests__/e2e/02.indexing.test.ts src/__tests__/e2e/09.symbol-graph.test.ts src/__tests__/e2e/15.nfr.test.ts` from `packages/core`, using the owned-stack environment frozen in `gate-manifest.md` |
-| Docker | Packaging phase | `docker build --target api .` and `docker build --target mcp .`, followed by runtime native verifier and compiler inventory |
 | Benchmark | Performance phase/final validation | `bun run bench:parser -- --baseline 5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03` |
-| Final | Before verifier | Native matrix; focused/core tests; type; build; owned PG/E2E; Docker; benchmark; artifact checksum/stale-reference checks |
+| Final | Before verifier | macOS arm64 native package checks; focused/core tests; type; build; owned PG/E2E; benchmark; artifact checksum/stale-reference checks |
 
 ## MCP and Skill Decision
 
 - Selected skills: `caveman full`, `coding-guidelines`, `massa-th0th` Spec Driven, and the routed AI Engineer persona.
 - Selected MCP: th0th recall/search for discovery only; current source and `.specs/` remain authoritative. Synapse is unavailable due the current shared `dist` export mismatch, so searches fall back to stateless retrieval.
 - External research: official Tree-sitter, Bun, npm registry, and grammar repositories only when native API/package behavior is not proven locally.
-- Local tools: `rtk`-prefixed shell commands, `apply_patch`, Bun, PostgreSQL, native linker tools, and Docker/CI when available.
+- Local tools: `rtk`-prefixed shell commands, `apply_patch`, Bun, PostgreSQL, macOS arm64 native linker tools, and macOS CI when needed.
 - Sub-agents: user authorized them. Seven phase workers run sequentially; an independent verifier runs after TASK-026. No nested workers.
 
 ## Execution Plan
@@ -108,24 +107,24 @@ Phase 7 Validate:
 
 ## Task Breakdown
 
-### T1 / TASK-001: Prove the native grammar feasibility matrix
+### T1 / TASK-001: Prove native grammar feasibility on macOS arm64
 
-**Status:** BLOCKED on 2026-07-13. macOS arm64 target discovery passed, but Linux glibc amd64/arm64 and Linux musl amd64/arm64 execution targets are unavailable. No artifact row was measured; see `gate-manifest.md`.
+**Status:** ACTIVE after the user's 2026-07-13 macOS arm64-only scope override.
 
-**What:** In throwaway clean caches, vet and load/parse every unique grammar artifact across exact Bun/macOS/Linux/Alpine/CPU targets; freeze package/commit, license, scripts, ABI, integrity, linkage, and failures in `capability-matrix.md` and `gate-manifest.md`.  
+**What:** In throwaway clean caches, vet and load/parse every unique grammar artifact on exact Bun/macOS arm64; freeze package/commit, license, scripts, ABI, integrity, arm64 linkage, and failures in `capability-matrix.md` and `gate-manifest.md`.  
 **Where:** `.specs/features/multi-language-tree-sitter-breadth/{capability-matrix,gate-manifest}.md`; throwaway `/tmp` probes only.  
-**Depends on:** None. **Requirements:** MLTS-001-003,020-021.  
+**Depends on:** None. **Requirements:** MLTS-001-003.  
 **Non-goals:** No production parser/schema code; no WASM/runtime-download fallback.  
 **Tests:** Native clean-install/load/parse and missing/incompatible negative sensors. **Gate:** Native.  
-**Done when:** Every target row is measured PASS, or execution stops Blocked with exact failed artifact/target/evidence.  
+**Done when:** Repository-declared Bun `1.2.0` is tested first; if it fails, failures are retained and exact `1.3.x` candidates are tested from lowest version upward. Every grammar row is measured PASS on the selected exact Bun/macOS build, the selected runtime is frozen for T2, or execution stops Blocked with exact failed artifact/evidence.  
 **Commit:** `docs(specs): record native tree-sitter feasibility`
 
 ### T2 / TASK-002: Pin native dependencies and one Bun runtime
 
-**What:** Add exact proven grammar/runtime dependencies, lockfile, explicit `trustedDependencies`, selected exact Bun version, and `verify:tree-sitter-native` script.  
+**What:** Consume the exact Bun and grammar selections frozen by T1; add those dependencies, lockfile, explicit `trustedDependencies`, and `verify:tree-sitter-native` script without reselecting versions.  
 **Where:** root/core package manifests, `bun.lock`, `scripts/verify-tree-sitter-grammars.ts`, focused tests.  
 **Depends on:** T1 PASS. **Requirements:** MLTS-001-004,020.  
-**Non-goals:** Docker/CI jobs are T23/T24.  
+**Non-goals:** Non-macOS and Docker packaging; macOS CI is T24.  
 **Tests:** Manifest/package exhaustiveness, source and `dist` grammar load. **Gate:** Native + Type + Build.  
 **Done when:** Frozen install and verifier pass with only audited lifecycle packages trusted.  
 **Commit:** `build(parser): pin native tree-sitter grammars`
@@ -310,23 +309,23 @@ Phase 7 Validate:
 **Done when:** All required extensions and failure/concurrency paths assert exact outcomes.  
 **Commit:** `test(e2e): enforce polyglot graph contracts`
 
-### T23 / TASK-023: Build compiler-free native runtime images
+### T23 / TASK-023: Verify macOS arm64 package artifacts
 
-**What:** Move Python/make/C/C++ tools to Docker builders, remove `--ignore-scripts`, preserve trusted installs, copy native artifacts, and add API/MCP runtime link/load plus compiler-inventory smokes.  
-**Where:** `Dockerfile`, compose/test helpers, native verifier tests.  
+**What:** Pack the core/root artifacts and prove clean source, built `dist`, and packed-package native grammar link/load/parse on macOS arm64 with only audited lifecycle scripts trusted.  
+**Where:** package manifests/scripts, packed-artifact helpers, native verifier tests.  
 **Depends on:** T2,T5,T15,T16,T17,T18,T19. **Requirements:** MLTS-002-004,020.  
-**Tests:** Alpine API/MCP builds, runtime grammar parse, linkage, no compiler executables/packages. **Gate:** Docker + Native + Build.  
-**Done when:** Both final images load every grammar and contain no build toolchain.  
-**Commit:** `build(docker): ship native parser runtime`
+**Tests:** Clean-cache source/dist/packed-package parse and arm64 linkage. **Gate:** Native + Build.  
+**Done when:** Every packed surface loads and parses every required grammar on macOS arm64.  
+**Commit:** `build(parser): verify macos native artifacts`
 
-### T24 / TASK-024: Add frozen macOS/Linux/Alpine CI and publish gates
+### T24 / TASK-024: Add frozen macOS arm64 CI and publish gates
 
-**What:** Pin exact Bun in CI/publish; add macOS/Linux native smoke and Alpine API/MCP builds for declared CPU/libc targets with provenance/linkage artifacts.  
-**Where:** `.github/workflows/ci.yml`, publish workflow, scripts/config tests.  
+**What:** Pin exact Bun for the native check; add a dedicated macOS arm64 smoke with provenance/linkage artifacts while leaving every pre-existing workflow and platform job unchanged.  
+**Where:** new `.github/workflows/native-macos-arm64.yml`, scripts/config tests.  
 **Depends on:** T23. **Requirements:** MLTS-002,020-021.  
-**Tests:** Workflow static tests plus actual CI target evidence; frozen install only. **Gate:** Native/CI artifact.  
-**Done when:** Every declared support-matrix target reports measured PASS.  
-**Commit:** `ci(parser): gate native grammar matrix`
+**Tests:** Workflow static tests, baseline non-touch allowlist sensor, plus actual macOS arm64 target evidence; frozen install only. **Gate:** Native/CI artifact.  
+**Done when:** The declared macOS arm64 target reports measured PASS.  
+**Commit:** `ci(parser): gate macos native grammars`
 
 ### T25 / TASK-025: Add frozen parser benchmark and disposal stress
 
@@ -339,7 +338,7 @@ Phase 7 Validate:
 
 ### T26 / TASK-026: Complete active documentation and compatibility guidance
 
-**What:** Document supported tiers, native matrix, readiness, graph schema v2/rebuild visibility, diagnostics, modern/legacy FQNs, examples, rollout, and exact verification evidence; remove stale regex limitation text.  
+**What:** Document supported tiers, macOS arm64 native target, readiness, graph schema v2/rebuild visibility, diagnostics, modern/legacy FQNs, examples, rollout, and exact verification evidence; remove stale regex limitation text.  
 **Where:** active README/docs/examples/spec state/handoff/gate manifest.  
 **Depends on:** T21,T22,T24,T25. **Requirements:** MLTS-023 and all acceptance evidence.  
 **Tests:** Link/stale-reference scans, manifest/docs parity, artifact checksums, Type/Build/full gates unchanged. **Gate:** Final pre-verifier gate.  
@@ -356,7 +355,7 @@ Phase 7 Validate:
 | T10-T14 | Schema, lifecycle repo, symbol repo, ETL coordinator, diagnostics | PASS |
 | T15-T19 | One independently testable language-family component each | PASS |
 | T20-T22 | Graph consumer contract, diagnostics transport, E2E fixture | PASS |
-| T23-T26 | Docker runtime, CI matrix, benchmark, docs | PASS |
+| T23-T26 | macOS arm64 package artifacts, CI, benchmark, docs | PASS |
 
 No task mixes unrelated cleanup. Tests are included with the component they protect.
 
@@ -399,13 +398,28 @@ No task mixes unrelated cleanup. Tests are included with the component they prot
 | T20 | Graph consumers | PG/unit | graph service/tool tests in task | PASS |
 | T21 | HTTP/MCP | unit/contract | Tools API/MCP tests in task | PASS |
 | T22 | E2E | owned E2E | exact E2E suites/fixture in task | PASS |
-| T23-T24 | Docker/CI | native/artifact smoke | runtime/workflow smokes in task | PASS |
+| T23-T24 | macOS package/CI | native/artifact smoke | source/dist/package/workflow smokes in task | PASS |
 | T25 | Benchmark | performance/harness | benchmark tests and corpus in task | PASS |
 | T26 | Docs/config | artifact/build | stale/link/parity scans plus unchanged full gates | PASS |
 
 ## Requirement Coverage
 
-All MLTS-001 through MLTS-023 map to at least one task and one Test Coverage Matrix row. AC-001 through AC-012 map respectively to T1-T4, T5, T6, T7-T19, T10-T14, T13-T14, T9, T19, T20-T21, T14/T21, and T22-T25. No requirement depends on hidden chat context.
+All MLTS-001 through MLTS-023 map to at least one task and one Test Coverage Matrix row. No requirement depends on hidden chat context.
+
+| Acceptance criterion | Task evidence |
+| --- | --- |
+| AC-001 | T3, T19 |
+| AC-002 | T1, T2, T4, T23, T24 |
+| AC-003 | T5, T25 |
+| AC-004 | T6-T9, T15-T19 |
+| AC-005 | T7, T15-T19 |
+| AC-006 | T10-T13, T20 |
+| AC-007 | T4, T9, T13-T14, T21 |
+| AC-008 | T7, T9, T25 |
+| AC-009 | T6, T19 |
+| AC-010 | T6, T8, T12, T20-T21 |
+| AC-011 | T14, T21 |
+| AC-012 | T22-T26 |
 
 ## Expected Test and Sensor Counts
 
@@ -413,7 +427,7 @@ Counts below are minimum new focused cases/sensors, not total repository pass co
 
 | Tasks | Minimum new cases/sensors |
 | --- | ---: |
-| T1 | One clean install/load/parse per unique grammar per declared target, plus 2 negative sensors |
+| T1 | One clean install/load/parse per unique grammar on macOS arm64, plus 2 negative sensors |
 | T2 | 4 manifest/source/dist/frozen-install cases |
 | T3 | 6 manifest/type/custom-extension cases |
 | T4 | 5 readiness/liveness/direct-core/negative cases |
@@ -435,13 +449,13 @@ Counts below are minimum new focused cases/sensors, not total repository pass co
 | T20 | 10 graph-consumer/FQN parity cases |
 | T21 | 8 HTTP/MCP/readiness/diagnostics contract cases |
 | T22 | At least 33 extension assertions across 12 deterministic E2E cases |
-| T23 | 6 API/MCP build/load/linkage/compiler-inventory sensors |
-| T24 | One measured native smoke per declared CI target plus 2 workflow static tests |
+| T23 | 6 source/dist/packed-package install/load/parse/linkage sensors |
+| T24 | One measured macOS arm64 native smoke, 2 workflow static tests, and 1 baseline non-touch sensor |
 | T25 | 4 harness tests, 20 measured processes, and 100 disposal iterations |
 | T26 | 4 docs/manifest/stale-reference/checksum scans |
 
 ## Artifact Store Evidence
 
 - Active key: `.specs/features/multi-language-tree-sitter-breadth/tasks.md`
-- Version: 1
+- Version: 2 (macOS arm64-only scope override)
 - Checksum: recorded in `gate-manifest.md` after artifact freeze.
