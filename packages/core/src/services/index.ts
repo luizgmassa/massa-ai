@@ -180,6 +180,13 @@ export {
   JAVASCRIPT_QUERY_PACK,
   TYPESCRIPT_QUERY_PACK,
 } from "./structural/query-packs/typescript.js";
+export {
+  LUA_QUERY_PACK,
+  PHP_QUERY_PACK,
+  PYTHON_QUERY_PACK,
+  RUBY_QUERY_PACK,
+  SCRIPTING_QUERY_PACKS,
+} from "./structural/query-packs/scripting.js";
 export type {
   ParsedStructuralFqn,
   SignatureDigest,
@@ -211,6 +218,7 @@ export {
   TYPESCRIPT_LANGUAGE_RESOLVER,
   TYPESCRIPT_RESOLVER_VERSION,
 } from "./structural/resolvers/typescript.js";
+export { SCRIPTING_LANGUAGE_RESOLVER } from "./structural/resolvers/scripting.js";
 
 // Symbol Graph
 export { symbolGraphService, SymbolGraphService } from "./symbol/symbol-graph.service.js";

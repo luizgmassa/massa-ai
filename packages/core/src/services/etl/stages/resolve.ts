@@ -22,6 +22,7 @@ import {
   type StructuralResolverDocument,
 } from "../../structural/resolver.js";
 import { TYPESCRIPT_LANGUAGE_RESOLVER, matchesStructuralPathAlias, resolveStructuralSpecifier } from "../../structural/resolvers/typescript.js";
+import { SCRIPTING_LANGUAGE_RESOLVER } from "../../structural/resolvers/scripting.js";
 import { createStructuralIdentity, parseStructuralFqn, type StructuralIdentity } from "../../structural/fqn-codec.js";
 import { resolveStructuralLanguage } from "../../structural/language-manifest.js";
 import { STRUCTURAL_SYMBOL_KINDS, type StructuralSymbolKind } from "../../structural/types.js";
@@ -36,7 +37,7 @@ import type {
 } from "../stage-context.js";
 
 const TS_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.js"];
-const TS_JS_FILE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx"]);
+const STRUCTURAL_SEED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".rb", ".php", ".lua"]);
 
 interface TsPathAlias {
   prefix: string;
@@ -99,7 +100,7 @@ export class ResolveStage {
     });
     const currentStructuralFiles = new Set(structuralDocuments.map((document) => document.file));
     const skippedStructuralFiles = new Set(files.filter((item) =>
-      !item.file.needsReparse && TS_JS_FILE_EXTENSIONS.has(path.extname(item.file.relativePath).toLowerCase())
+      !item.file.needsReparse && STRUCTURAL_SEED_EXTENSIONS.has(path.extname(item.file.relativePath).toLowerCase())
     ).map((item) => item.file.relativePath));
     const pathAliasesByFile = Object.fromEntries([...knownRelPaths].map((file) => [
       file,
@@ -107,7 +108,7 @@ export class ResolveStage {
     ]));
     const buildMetadata = { knownFiles: [...knownRelPaths], pathAliasesByFile };
     const seedRows = repositoryDefinitions
-      .filter((definition) => TS_JS_FILE_EXTENSIONS.has(path.extname(definition.file_path).toLowerCase()))
+      .filter((definition) => STRUCTURAL_SEED_EXTENSIONS.has(path.extname(definition.file_path).toLowerCase()))
       .filter((definition) => knownRelPaths.has(definition.file_path) && skippedStructuralFiles.has(definition.file_path))
       .filter((definition) => !currentStructuralFiles.has(definition.file_path));
     const seedIds = new Set<string>();
@@ -120,7 +121,7 @@ export class ResolveStage {
       ? new StructuralResolverSession(
           structuralDocuments,
           buildMetadata,
-          new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER]),
+          new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER, SCRIPTING_LANGUAGE_RESOLVER]),
           seedDefinitions,
         )
       : undefined;
@@ -439,7 +440,7 @@ export class ResolveStage {
       }
     } catch (err) {
       const skippedStructural = files.some((file) =>
-        !file.file.needsReparse && TS_JS_FILE_EXTENSIONS.has(path.extname(file.file.relativePath).toLowerCase())
+        !file.file.needsReparse && STRUCTURAL_SEED_EXTENSIONS.has(path.extname(file.file.relativePath).toLowerCase())
       );
       if (skippedStructural) throw new Error("structural_repository_seed_failed", { cause: err });
       logger.warn("buildSymbolIndex: repo seed failed, in-batch only", {

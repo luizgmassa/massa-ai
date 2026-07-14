@@ -83,7 +83,7 @@ describe("declarative structural query packs", () => {
     ]);
   });
 
-  test("registers one immutable versioned pack across TS/JS/TSX/JSX", () => {
+  test("registers immutable versioned packs for TypeScript and scripting dialects", () => {
     const ts = structuralQueryPackForDialect("typescript");
     expect(ts?.version).toBe("1.0.0");
     expect(structuralQueryPackForDialect("tsx")).toBe(ts);
@@ -91,7 +91,12 @@ describe("declarative structural query packs", () => {
     expect(structuralQueryPackForDialect("jsx")).toBe(js);
     expect(Object.isFrozen(ts)).toBe(true);
     expect(Object.isFrozen(ts?.querySources)).toBe(true);
-    expect(structuralQueryPackForDialect("python")).toBeUndefined();
+    for (const dialect of ["python", "ruby", "php", "lua-luajit"]) {
+      const pack = structuralQueryPackForDialect(dialect);
+      expect(pack?.version).toBe("1.0.0");
+      expect(Object.isFrozen(pack)).toBe(true);
+      expect(Object.isFrozen(pack?.querySources)).toBe(true);
+    }
   });
 
   test("normalizes capture order and removes only exact duplicate captures", () => {
@@ -339,16 +344,69 @@ describe("declarative structural query packs", () => {
     expect(outcome.structure.symbols.find((symbol) => symbol.name === "Decorated")?.signatureMaterial.modifiers).toEqual([]);
   });
 
-  test("keeps unsupported language packs a hard query failure instead of empty success", async () => {
-    const source = Buffer.from("def example():\n    pass\n");
-    const outcome = await parse(".py", source, {
-      packageName: "tree-sitter-python",
-      version: "0.25.0",
+  test("extracts exact scripting-cohort capabilities without inventing Lua type edges", async () => {
+    const cases = [
+      [".py", { packageName: "tree-sitter-python", version: "0.25.0" },
+        'import pkg.mod as pm\nfrom .base import Base as Root, helper\nclass Child(Root):\n    """Doc"""\n    def run(self, value: Input) -> Output:\n        fetch("/api/x", value)\n        bus.emit("ready")\n',
+        ["Child", "run"], ["python_import", "python_import"], ["extend", "type_ref", "http_call", "data_flow", "emit"]],
+      [".rb", { packageName: "tree-sitter-ruby", version: "0.23.1" },
+        'require_relative "./base"\n# Doc\nclass Child < Base\n  def run(value)\n    fetch("/api/x", value)\n    bus.emit("ready")\n  end\nend\n',
+        ["Child", "run"], ["ruby_require"], ["extend", "http_call", "data_flow", "emit"]],
+      [".php", { packageName: "tree-sitter-php", version: "0.24.2", exportName: "php" },
+        '<?php\nuse App\\Base as Root;\n/** Doc */\nclass Child extends Root implements Runner { function run(Input $value): Output { fetch("/api/x", $value); $bus->emit("ready"); } }\n',
+        ["Child", "run"], ["php_use"], ["extend", "implement", "type_ref", "http_call", "data_flow", "emit"]],
+      [".lua", { packageName: "@tree-sitter-grammars/tree-sitter-lua", version: "0.4.1", exportName: "default" },
+        'local dep = require("base")\n--- Doc\nfunction run(value)\n  fetch("/api/x", value)\n  bus.emit("ready")\nend\n',
+        ["run"], ["lua_require"], ["http_call", "data_flow", "emit"]],
+    ] as const;
+    for (const [extension, artifact, source, symbols, importForms, edgeKinds] of cases) {
+      const outcome = await parse(extension, Buffer.from(source), artifact);
+      expect(outcome.status, `${extension}: ${JSON.stringify(outcome.status === "failed" ? outcome.diagnostics : [])}`).toBe("ok");
+      if (outcome.status !== "ok") continue;
+      expect(outcome.structure.symbols.map((symbol) => symbol.name)).toEqual(symbols);
+      expect(outcome.structure.imports.map((item) => item.form)).toEqual(importForms);
+      expect([...new Set(outcome.structure.edges.map((edge) => edge.kind))]).toEqual(expect.arrayContaining(edgeKinds));
+      expect(outcome.structure.symbols.some((symbol) => symbol.documentation)).toBe(true);
+      if (extension === ".py") {
+        expect(outcome.structure.imports.map((item) => item.bindings)).toEqual([
+          [{ imported: "*", local: "pm", typeOnly: false }],
+          [{ imported: "Base", local: "Root", typeOnly: false }, { imported: "helper", local: "helper", typeOnly: false }],
+        ]);
+      } else if (extension === ".php") {
+        expect(outcome.structure.imports[0]?.bindings).toEqual([{ imported: "Base", local: "Root", typeOnly: false }]);
+      } else if (extension === ".rb") {
+        expect(outcome.structure.imports[0]?.bindings).toEqual([]);
+      } else if (extension === ".lua") {
+        expect(outcome.structure.imports[0]?.bindings).toEqual([{ imported: "default", local: "dep", typeOnly: false }]);
+        expect(outcome.structure.edges.some((edge) => ["type_ref", "extend", "implement"].includes(edge.kind))).toBe(false);
+      }
+    }
+  });
+
+  test("keeps multi-module Python and grouped PHP imports as distinct honest records", async () => {
+    const python = await parse(".py", Buffer.from("import a, b as bee\n"), {
+      packageName: "tree-sitter-python", version: "0.25.0",
     });
-    expect(outcome.status).toBe("failed");
-    if (outcome.status !== "failed") return;
-    expect(outcome.failureKind).toBe("query");
-    expect(outcome.diagnostics[0]?.code).toBe("structural_query_failed");
+    expect(python.status).toBe("ok");
+    if (python.status === "ok") expect(python.structure.imports.map((item) => [item.specifier, item.names])).toEqual([
+      ["a", ["a"]], ["b", ["bee"]],
+    ]);
+    const php = await parse(".php", Buffer.from("<?php use App\\A, App\\B as Bee; use App\\Group\\{C, D as Dee};"), {
+      packageName: "tree-sitter-php", version: "0.24.2", exportName: "php",
+    });
+    expect(php.status).toBe("ok");
+    if (php.status === "ok") expect(php.structure.imports.map((item) => [item.specifier, item.names])).toEqual([
+      ["App/A", ["A"]], ["App/B", ["Bee"]], ["App/Group/C", ["C"]], ["App/Group/D", ["Dee"]],
+    ]);
+  });
+
+  test("keeps configured unknown languages semantic-only without acquiring a grammar", async () => {
+    const outcome = await new StructuralRuntime({
+      grammarSet: async () => { throw new Error("semantic-only resolution must not load grammars"); },
+    }).parse({ extension: ".unknown", source: Buffer.from("def not_structural(): pass") });
+    expect(outcome.status).toBe("unsupported");
+    if (outcome.status !== "unsupported") return;
+    expect(outcome.diagnostics[0]?.code).toBe("unsupported_structural_language");
   });
 
   test("turns query compilation errors into hard query outcomes", async () => {

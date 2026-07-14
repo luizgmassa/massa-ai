@@ -79,7 +79,8 @@ export interface RawImport {
   specifier: string; // e.g. '../services/search'
   names: string[]; // e.g. ['SearchController', 'default']
   isTypeOnly: boolean;
-  form?: "esm_import" | "esm_re_export" | "commonjs_require" | "dynamic_import";
+  form?: "esm_import" | "esm_re_export" | "commonjs_require" | "dynamic_import" |
+    "python_import" | "ruby_require" | "php_use" | "lua_require";
   span?: SourceSpan;
   bindings?: readonly Readonly<{
     imported: string;

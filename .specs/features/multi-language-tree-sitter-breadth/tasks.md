@@ -6,7 +6,7 @@ Implement with the active `massa-th0th` Spec Driven Execute flow, `coding-guidel
 
 **Design:** `.specs/features/multi-language-tree-sitter-breadth/design.md`  
 **Capability contract:** `.specs/features/multi-language-tree-sitter-breadth/capability-matrix.md`  
-**Status:** TASK-001 through TASK-014 PASS; TASK-015 through TASK-019 READY
+**Status:** TASK-001 through TASK-015 PASS; TASK-016 through TASK-019 READY
 
 ## Project Testing Guidelines Scan
 
@@ -265,7 +265,7 @@ Phase 7 Validate:
 
 ### T15 / TASK-015: Implement Python/Ruby/PHP/Lua query packs and resolvers [P]
 
-**Status:** READY after TASK-014 PASS.
+**Status:** PASS on 2026-07-14. Native Python/Ruby/PHP/Lua packs, honest import forms, dialect-scoped resolvers, applicable type relations, calls/flow/HTTP/events, Lua no-type negative, and independent review passed.
 
 **What:** Add independently testable packs/resolvers/fixtures for the scripting cohort according to the capability matrix.  
 **Where:** structural packs/resolvers and golden fixtures/tests.  

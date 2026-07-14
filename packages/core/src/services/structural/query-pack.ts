@@ -21,21 +21,25 @@ import {
   JAVASCRIPT_QUERY_PACK,
   TYPESCRIPT_QUERY_PACK,
 } from "./query-packs/typescript.js";
+import { SCRIPTING_QUERY_PACKS } from "./query-packs/scripting.js";
 
 export interface StructuralQueryPack {
   readonly version: string;
   readonly dialects: readonly string[];
   readonly querySources: readonly string[];
+  readonly family?: "typescript" | "python" | "ruby" | "php" | "lua";
 }
 
 const QUERY_PACKS = new Map<string, StructuralQueryPack>(
   [...TYPESCRIPT_QUERY_PACK.dialects.map((dialect) => [dialect, TYPESCRIPT_QUERY_PACK] as const),
-   ...JAVASCRIPT_QUERY_PACK.dialects.map((dialect) => [dialect, JAVASCRIPT_QUERY_PACK] as const)],
+   ...JAVASCRIPT_QUERY_PACK.dialects.map((dialect) => [dialect, JAVASCRIPT_QUERY_PACK] as const),
+   ...SCRIPTING_QUERY_PACKS.flatMap((pack) => pack.dialects.map((dialect) => [dialect, pack] as const))],
 );
 
 const SYMBOL_KINDS = new Set<StructuralSymbolKind>([
   "class", "function", "method", "variable", "interface",
   "enum", "type", "namespace", "module", "property", "field", "type_parameter",
+  "trait", "constructor", "constant", "export", "heading", "key",
 ]);
 const LISTEN_TERMINALS = new Set([
   "on", "once", "addListener", "addEventListener", "off", "removeListener",
@@ -128,7 +132,7 @@ function descendants(node: NativeQueryNode): readonly NativeQueryNode[] {
 }
 
 function symbolName(source: Buffer, node: NativeQueryNode): string | null {
-  const nameNode = field(node, "name") ?? field(node, "property");
+  const nameNode = field(node, "name") ?? field(node, "property") ?? field(node, "left");
   if (nameNode) {
     const raw = text(source, nameNode);
     return (raw.startsWith("#") ? `%23${raw.slice(1)}` : raw).normalize("NFC");
@@ -264,6 +268,7 @@ function buildSymbols(
   source: Buffer,
   index: SourceIndex,
   includeDocumentation: boolean,
+  family: StructuralQueryPack["family"] = "typescript",
 ): readonly NormalizedStructuralSymbol[] {
   const drafts: SymbolDraft[] = [];
   for (const capture of captures) {
@@ -307,14 +312,35 @@ function buildSymbols(
     const documentationStart = draft.node.parent?.type === "export_statement"
       ? draft.node.parent.startIndex
       : draft.node.startIndex;
-    const documentation = includeDocumentation ? leadingDocumentation(source, documentationStart) : undefined;
+    const capturedDocumentation = captures
+      .filter((capture) => capture.name === "documentation")
+      .find((capture) => {
+        if (capture.node.startIndex >= draft.node.startIndex && capture.node.endIndex <= draft.node.endIndex) {
+          return family === "python" && !captures.some((item) =>
+            item.name.startsWith("symbol.") && item.node !== draft.node &&
+            item.node.startIndex <= capture.node.startIndex && item.node.endIndex >= capture.node.endIndex
+          );
+        }
+        if (capture.node.endIndex > documentationStart) return false;
+        for (let offset = capture.node.endIndex; offset < documentationStart; offset += 1) {
+          const byte = source[offset];
+          if (byte !== 9 && byte !== 10 && byte !== 13 && byte !== 32) return false;
+        }
+        return true;
+      });
+    const documentation = includeDocumentation
+      ? capturedDocumentation ? text(source, capturedDocumentation.node).trim() : family === "typescript"
+        ? leadingDocumentation(source, documentationStart)
+        : undefined
+      : undefined;
+    const scriptingExport = family !== "typescript" && !draft.qualifiedName.includes(".");
     return Object.freeze({
       kind: draft.kind,
       name: draft.name,
       qualifiedName: draft.qualifiedName,
       span: frozenSpan(index, draft.node.startIndex, draft.node.endIndex),
       ...(nameNode ? { selectionSpan: frozenSpan(index, nameNode.startIndex, nameNode.endIndex) } : {}),
-      exported: draft.kind === "export" || Boolean(declarationExportWrapper(draft.node)) || text(source, draft.node).trimStart().startsWith("export "),
+      exported: scriptingExport || draft.kind === "export" || Boolean(declarationExportWrapper(draft.node)) || text(source, draft.node).trimStart().startsWith("export "),
       defaultExport: draft.name === "default" ||
         text(source, declarationExportWrapper(draft.node) ?? draft.node).trimStart().startsWith("export default"),
       ...(documentation ? { documentation } : {}),
@@ -383,7 +409,65 @@ function buildImports(
   captures: readonly NativeQueryCapture[],
   source: Buffer,
   index: SourceIndex,
+  family: StructuralQueryPack["family"] = "typescript",
 ): readonly NormalizedStructuralImport[] {
+  const scripting = captures.filter((capture) => capture.name.startsWith("import.")).flatMap((capture) => {
+    const normalized = (
+      form: NormalizedStructuralImport["form"],
+      specifier: string,
+      bindings: readonly { imported: string; local: string; typeOnly: boolean }[],
+    ): NormalizedStructuralImport => {
+      const frozen = frozenBindings(bindings);
+      return Object.freeze({
+        form, specifier, span: frozenSpan(index, capture.node.startIndex, capture.node.endIndex),
+        bindings: frozen, names: Object.freeze(frozen.map((item) => item.local)), typeOnly: false,
+      });
+    };
+    if (capture.name === "import.python") {
+      const moduleNode = field(capture.node, "module_name") ?? field(capture.node, "name");
+      if (!moduleNode) return [];
+      if (capture.node.type === "import_statement") {
+        return (capture.node.namedChildren ?? []).map((imported) => {
+          const nameNode = field(imported, "name") ?? imported;
+          const aliasNode = field(imported, "alias");
+          const importedName = text(source, nameNode).replaceAll(".", "/");
+          return normalized("python_import", importedName, [{
+            imported: "*", local: aliasNode ? text(source, aliasNode) : importedName.split("/")[0]!, typeOnly: false,
+          }]);
+        });
+      }
+      const moduleName = text(source, moduleNode);
+      let relativeDots = 0;
+      while (moduleName[relativeDots] === ".") relativeDots += 1;
+      const modulePath = moduleName.slice(relativeDots).replaceAll(".", "/");
+      const specifier = relativeDots > 0
+        ? `${relativeDots === 1 ? "./" : "../".repeat(relativeDots - 1)}${modulePath}`
+        : modulePath;
+      const bindings: { imported: string; local: string; typeOnly: boolean }[] = [];
+      for (const imported of (capture.node.namedChildren ?? []).filter((node) => node !== moduleNode && node.type !== "import_prefix")) {
+        const nameNode = field(imported, "name") ?? imported;
+        if (!["aliased_import", "dotted_name", "identifier", "wildcard_import"].includes(imported.type)) continue;
+        const importedName = text(source, nameNode);
+        bindings.push({ imported: importedName, local: field(imported, "alias") ? text(source, field(imported, "alias")!) : importedName, typeOnly: false });
+      }
+      return [normalized("python_import", specifier, bindings)];
+    } else if (capture.name === "import.php") {
+      const group = descendants(capture.node).find((node) => node.type === "namespace_use_group");
+      const prefixNode = group
+        ? capture.node.namedChildren?.find((node) => node.type === "namespace_name")
+        : undefined;
+      return descendants(capture.node).filter((node) => node.type === "namespace_use_clause").flatMap((clause) => {
+        const nameNode = clause.namedChildren?.find((node) => node.type === "qualified_name" || node.type === "name");
+        if (!nameNode) return [];
+        const rawName = `${prefixNode ? `${text(source, prefixNode)}\\` : ""}${text(source, nameNode)}`;
+        const imported = text(source, nameNode).split("\\").at(-1)!;
+        const alias = field(clause, "alias");
+        return [normalized("php_use", rawName.replaceAll("\\", "/"), [{
+          imported, local: alias ? text(source, alias) : imported, typeOnly: false,
+        }])];
+      });
+    } else return [];
+  });
   const statements = captures
     .filter((capture) => capture.name === "import.statement" || (capture.name === "export.statement" && field(capture.node, "source")))
     .flatMap((capture) => {
@@ -406,13 +490,17 @@ function buildImports(
   const requires = captures
     .filter((capture) => capture.name === "edge.call")
     .flatMap((capture) => {
-      const targetNode = field(capture.node, "function");
+      const targetNode = field(capture.node, "function") ?? field(capture.node, "method") ?? field(capture.node, "name");
       const argumentsNode = field(capture.node, "arguments");
       const argument = argumentsNode?.namedChildren?.[0];
       const target = targetNode ? text(source, targetNode) : "";
-      if (!targetNode || !["require", "import"].includes(target) || !argument || argument.type !== "string") return [];
+      const requireTargets = family === "ruby" ? ["require", "require_relative"] : ["require", "import"];
+      if (!targetNode || !requireTargets.includes(target) || !argument || !["string", "encapsed_string"].includes(argument.type)) return [];
       const declarator = ancestor(capture.node, "variable_declarator");
-      const localNode = declarator ? field(declarator, "name") : null;
+      const luaAssignment = family === "lua" ? ancestor(capture.node, "assignment_statement") : undefined;
+      const localNode = declarator
+        ? field(declarator, "name")
+        : luaAssignment?.namedChildren?.[0]?.namedChildren?.[0] ?? null;
       const rawBindings: { imported: string; local: string; typeOnly: boolean }[] = [];
       if (target === "require" && localNode?.type === "identifier") {
         rawBindings.push({ imported: "default", local: text(source, localNode), typeOnly: false });
@@ -433,7 +521,7 @@ function buildImports(
       }
       const bindings = frozenBindings(rawBindings);
       return [Object.freeze({
-        form: target === "require" ? "commonjs_require" : "dynamic_import",
+        form: family === "ruby" ? "ruby_require" : family === "lua" ? "lua_require" : target === "require" ? "commonjs_require" : "dynamic_import",
         specifier: unquote(text(source, argument)),
         span: frozenSpan(index, capture.node.startIndex, capture.node.endIndex),
         bindings,
@@ -441,7 +529,7 @@ function buildImports(
         typeOnly: false,
       } satisfies NormalizedStructuralImport)];
     });
-  return Object.freeze([...statements, ...requires].sort((left, right) => left.span.startByte - right.span.startByte));
+  return Object.freeze([...statements, ...scripting, ...requires].sort((left, right) => left.span.startByte - right.span.startByte));
 }
 
 function unresolved(name: string, qualifier?: string): StructuralTarget {
@@ -477,12 +565,12 @@ function buildCallEdges(
   const edges: NormalizedStructuralEdge[] = [];
   for (const capture of captures) {
     if (capture.name !== "edge.call") continue;
-    const targetNode = field(capture.node, "function") ?? field(capture.node, "constructor");
+    const targetNode = field(capture.node, "function") ?? field(capture.node, "constructor") ?? field(capture.node, "method") ?? field(capture.node, "name");
     const argumentsNode = field(capture.node, "arguments");
     if (!targetNode || !argumentsNode) continue;
     const argumentNodes = argumentsNode.namedChildren ?? [];
     const rawTarget = text(source, targetNode);
-    if (rawTarget === "require" || rawTarget === "import") continue;
+    if (["require", "require_relative", "import"].includes(rawTarget)) continue;
     const firstArgument = argumentNodes[0] ? text(source, argumentNodes[0]) : undefined;
     const kind = callKind(rawTarget, firstArgument);
     const parts = targetParts(rawTarget);
@@ -509,13 +597,16 @@ function buildCallEdges(
     if (!enabled(capabilities, "data_flow")) continue;
     for (let paramIndex = 0; paramIndex < argumentNodes.length; paramIndex += 1) {
       const argument = argumentNodes[paramIndex]!;
-      if (argument.type !== "identifier") continue;
+      const flowNode = ["argument", "simple_parameter"].includes(argument.type)
+        ? argument.namedChildren?.[0] ?? argument
+        : argument;
+      if (!["identifier", "variable_name"].includes(flowNode.type)) continue;
       edges.push({
         kind: "data_flow",
-        span: frozenSpan(index, argument.startIndex, argument.endIndex),
+        span: frozenSpan(index, flowNode.startIndex, flowNode.endIndex),
         target: unresolved(parts.name, parts.qualifier),
         paramIndex,
-        metadata: Object.freeze({ argument: text(source, argument) }),
+        metadata: Object.freeze({ argument: text(source, flowNode) }),
       });
     }
   }
@@ -630,7 +721,7 @@ export function executeQueryPack(
     context.query(querySource, tree.rootNode),
   ));
   const index = new SourceIndex(source);
-  const imports = enabled(capabilities, "imports") ? buildImports(captures, source, index) : Object.freeze([]);
+  const imports = enabled(capabilities, "imports") ? buildImports(captures, source, index, pack.family) : Object.freeze([]);
   const importEdges: NormalizedStructuralEdge[] = imports.map((item) => ({
     kind: "import",
     span: item.span,
@@ -639,7 +730,7 @@ export function executeQueryPack(
   }));
   return Object.freeze({
     symbols: enabled(capabilities, "declarations")
-      ? buildSymbols(captures, source, index, enabled(capabilities, "documentation"))
+      ? buildSymbols(captures, source, index, enabled(capabilities, "documentation"), pack.family)
       : Object.freeze([]),
     edges: dedupeEdges([
       ...buildCallEdges(captures, source, index, capabilities),

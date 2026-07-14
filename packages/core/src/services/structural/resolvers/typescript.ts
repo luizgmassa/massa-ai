@@ -18,7 +18,14 @@ import type {
 } from "../resolver.js";
 
 export const TYPESCRIPT_RESOLVER_VERSION = "1.0.0";
-const PROBES = ["", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js", "/index.jsx"] as const;
+const DIALECT_PROBES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  typescript: ["", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js", "/index.jsx"],
+  tsx: ["", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js", "/index.jsx"],
+  javascript: ["", ".js", ".jsx", ".ts", ".tsx", "/index.js", "/index.jsx", "/index.ts", "/index.tsx"],
+  jsx: ["", ".js", ".jsx", ".ts", ".tsx", "/index.js", "/index.jsx", "/index.ts", "/index.tsx"],
+  python: ["", ".py", "/__init__.py"], ruby: ["", ".rb"], php: ["", ".php"],
+  "lua-luajit": ["", ".lua"],
+});
 
 function candidates(identities: readonly StructuralIdentity[]): readonly StructuralFqnCandidate[] {
   return Object.freeze(identities.map((identity) => Object.freeze({
@@ -126,11 +133,11 @@ function candidateKind(reference: NormalizedReference, definition: ResolvableDef
   return false;
 }
 
-function probe(base: string, known: ReadonlySet<string>): string | undefined {
+function probe(base: string, known: ReadonlySet<string>, dialect = "typescript"): string | undefined {
   const bases = /\.[cm]?jsx?$/u.test(base)
     ? [base.replace(/\.[cm]?jsx?$/u, ".ts"), base.replace(/\.[cm]?jsx?$/u, ".tsx"), base]
     : [base];
-  for (const candidateBase of bases) for (const suffix of PROBES) {
+  for (const candidateBase of bases) for (const suffix of DIALECT_PROBES[dialect] ?? [""]) {
     const value = path.posix.normalize(`${candidateBase}${suffix}`);
     if (!value.startsWith("../") && value !== ".." && known.has(value)) return value;
   }
@@ -141,10 +148,11 @@ export function resolveStructuralSpecifier(
   specifier: string,
   fromFile: string,
   build: StructuralBuildMetadata,
+  dialect = "typescript",
 ): string | undefined {
   const known = new Set(build.knownFiles.map(normalizeStructuralFile));
   if (specifier.startsWith("./") || specifier.startsWith("../")) {
-    return probe(path.posix.join(path.posix.dirname(fromFile), specifier), known);
+    return probe(path.posix.join(path.posix.dirname(fromFile), specifier), known, dialect);
   }
   const aliases = build.pathAliasesByFile?.[normalizeStructuralFile(fromFile)] ?? build.pathAliases ?? [];
   for (const alias of aliases) {
@@ -160,7 +168,7 @@ export function resolveStructuralSpecifier(
       capture = specifier.slice(prefix.length, specifier.length - suffix.length);
     }
     for (const target of alias.targets) {
-      const resolved = probe(target.replace("*", capture), known);
+      const resolved = probe(target.replace("*", capture), known, dialect);
       if (resolved) return resolved;
     }
   }
@@ -235,7 +243,7 @@ function importedMatches(
   const matches: ResolvableDefinition[] = [];
   let claimed = false;
   for (const imported of file.imports) {
-    if (!["esm_import", "commonjs_require", "dynamic_import"].includes(imported.form)) continue;
+    if (!["esm_import", "commonjs_require", "dynamic_import", "python_import", "ruby_require", "php_use", "lua_require"].includes(imported.form)) continue;
     const typeEdge = reference.kind === "type_ref" || reference.kind === "extend" || reference.kind === "implement";
     for (const binding of imported.bindings) {
       let sought: string | undefined;
@@ -254,7 +262,10 @@ function importedMatches(
       }
       claimed = true;
       if ((imported.typeOnly || binding.typeOnly) && !typeEdge) continue;
-      const importedFile = resolveStructuralSpecifier(imported.specifier, file.file, build);
+      const importedFile = resolveStructuralSpecifier(imported.specifier, file.file, build, file.dialect) ??
+        (["python_import", "ruby_require", "php_use", "lua_require"].includes(imported.form)
+          ? probe(imported.specifier.replace(/^\.\//u, ""), new Set(build.knownFiles.map(normalizeStructuralFile)), file.dialect)
+          : undefined);
       if (!importedFile) continue;
       const esmDefaultMember = imported.form === "esm_import" &&
         binding.imported === "default" && qualifier[0] === binding.local;
@@ -310,7 +321,11 @@ export const TYPESCRIPT_LANGUAGE_RESOLVER: StructuralLanguageResolver = Object.f
   ) {
     const normalizedFile = normalizeStructuralFile(file.file);
     const reference = normalizedReference(rawReference);
-    const { registry, definitions: allDefinitions } = indexDefinitions(rawDefinitions);
+    const familyDialects = ["typescript", "tsx", "javascript", "jsx"];
+    const scopedDefinitions = familyDialects.includes(file.dialect)
+      ? rawDefinitions.filter((definition) => familyDialects.includes(definition.identity.dialect))
+      : rawDefinitions;
+    const { registry, definitions: allDefinitions } = indexDefinitions(scopedDefinitions);
     const definitions = allDefinitions.filter((definition) => candidateKind(reference, definition));
     if (reference.existingFqn) {
       const prepared = definitions.find((definition) => definition.identity.fqn === reference.existingFqn)?.identity;

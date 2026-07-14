@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   StructuralResolverRegistry,
   StructuralResolverSession,
+  SCRIPTING_LANGUAGE_RESOLVER,
   TYPESCRIPT_LANGUAGE_RESOLVER,
   buildStructuralResolverDefinitions,
   type NormalizedStructuralImport,
@@ -140,6 +141,44 @@ describe("structural resolver registry", () => {
     };
     expect(() => registry.register(conflicting)).toThrow("duplicate");
     expect(registry.forDialect("python", "1.0.0")).toBeUndefined();
+  });
+});
+
+describe("scripting structural resolver", () => {
+  test("registers every scripting dialect and resolves same-file, alias, global, ambiguity, and unresolved cases", () => {
+    const registry = new StructuralResolverRegistry([SCRIPTING_LANGUAGE_RESOLVER]);
+    for (const dialect of ["python", "ruby", "php", "lua-luajit"]) {
+      expect(registry.requireDialect(dialect, "1.0.0")).toBe(SCRIPTING_LANGUAGE_RESOLVER);
+    }
+    const definitions = [
+      definition("src/main.py", "local", { identity: { language: "Python", dialect: "python" } }),
+      definition("src/lib.py", "run", { identity: { language: "Python", dialect: "python" } }),
+      definition("src/a.py", "shared", { identity: { language: "Python", dialect: "python" } }),
+      definition("src/b.py", "shared", { identity: { language: "Python", dialect: "python" } }),
+      definition("src/lib.ts", "run", { identity: { language: "TypeScript", dialect: "typescript" } }),
+    ];
+    const current = Object.freeze({
+      file: "src/main.py", dialect: "python", resolverVersion: "1.0.0",
+      imports: Object.freeze([imported("./lib", [{ imported: "run", local: "execute" }], { form: "python_import" })]),
+    });
+    const build = { knownFiles: ["src/main.py", "src/lib.py", "src/lib.ts", "src/a.py", "src/b.py"] };
+    expect(SCRIPTING_LANGUAGE_RESOLVER.resolve(current, reference("local"), definitions, build)).toMatchObject({ status: "resolved", source: "same_file" });
+    expect(SCRIPTING_LANGUAGE_RESOLVER.resolve(current, reference("execute"), definitions, build)).toMatchObject({ status: "resolved", source: "import" });
+    expect(SCRIPTING_LANGUAGE_RESOLVER.resolve(current, reference("run"), definitions, build)).toMatchObject({ status: "resolved", source: "global" });
+    expect(SCRIPTING_LANGUAGE_RESOLVER.resolve(current, reference("shared"), definitions, build)).toMatchObject({ status: "ambiguous" });
+    expect(SCRIPTING_LANGUAGE_RESOLVER.resolve(current, reference("missing"), definitions, build)).toEqual({ status: "unresolved", name: "missing" });
+    expect(SCRIPTING_LANGUAGE_RESOLVER.resolve(
+      { ...current, imports: [imported("./typescript_only", [{ imported: "run", local: "foreign" }], { form: "python_import" })] },
+      reference("foreign"),
+      [definition("src/typescript_only.ts", "run")],
+      { knownFiles: ["src/main.py", "src/typescript_only.ts"] },
+    )).toEqual({ status: "unresolved", name: "foreign" });
+    expect(TYPESCRIPT_LANGUAGE_RESOLVER.resolve(
+      file([imported("./python_only", [{ imported: "run", local: "foreign" }])]),
+      reference("foreign"),
+      [definition("src/python_only.py", "run", { identity: { language: "Python", dialect: "python" } })],
+      { knownFiles: ["src/main.ts", "src/python_only.py"] },
+    )).toEqual({ status: "unresolved", name: "foreign" });
   });
 });
 

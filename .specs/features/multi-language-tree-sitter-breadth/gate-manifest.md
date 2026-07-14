@@ -688,3 +688,13 @@ These draft checksums are retained as failed-review evidence and are not an acti
 - Durable evidence: parser totals/status/language summary and activated generation identity round-trip together; pre-migration-compatible NULL summary rows hydrate without a result. Top-level indexing completion preserves the pipeline summary.
 - Independent read-only review: PASS after exact hard-failure count/span remediation.
 - Scope: structural parser diagnostics and existing semantic lifecycle only; no HTTP/MCP transport exposure (TASK-021).
+
+## TASK-015 Accepted Gate Evidence v19
+
+- Platform: macOS arm64 only; exact Bun `1.3.0`.
+- Exact focused command: `bunx bun@1.3.0 test packages/core/src/__tests__/structural-query-pack.test.ts packages/core/src/__tests__/structural-resolver.test.ts packages/core/src/__tests__/structural-etl.test.ts` — PASS, 67 tests, 333 assertions.
+- `bunx turbo run build --filter=@massa-th0th/core` — PASS, shared/core TypeScript compilation and core build. `git diff --check` — PASS.
+- Native capability evidence: Python/Ruby/PHP/Lua declarations and documentation; per-module Python, per-clause/group PHP, Ruby require, and Lua local-require imports; Python/PHP type references; Python/Ruby/PHP inheritance where applicable; calls, bare-argument data flow, HTTP, and events; exact Lua no-type-edge negative; semantic-only unknown-language negative.
+- Resolver evidence: same-file, imported alias, unique global, ambiguity, unresolved, language-specific extension probing, scripting dialect isolation, and TS/scripting cross-language negative sensors.
+- Independent read-only review: initial NOT PASS identified four P1 findings (cross-language leakage, missing applicable types, dishonest multi-imports, missing Lua alias). All were remediated; independent re-review PASS with no actionable finding.
+- Scope: scripting cohort only; no systems, managed, functional, embedded/data, Linux, Docker, container, or non-arm64 implementation.
