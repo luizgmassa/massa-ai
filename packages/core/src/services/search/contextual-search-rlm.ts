@@ -52,6 +52,7 @@ import { getSessionRegistry } from "../synapse/session/index.js";
 import type { SynapseManager } from "../synapse/synapse-manager.js";
 import type { SessionRegistry } from "../synapse/session/session-registry.js";
 import type { AgentSession } from "../synapse/types.js";
+import { assertParserReadyForIndexing } from "../structural/parser-readiness.js";
 
 const globAsync = glob;
 
@@ -170,6 +171,8 @@ export class ContextualSearchRLM {
     chunksIndexed: number;
     errors: number;
   }> {
+    // This legacy direct indexing path must fail before mutating its queue.
+    await assertParserReadyForIndexing();
     // Per-project queue mutex: serializes concurrent indexing for the same project.
     //
     // Pattern: each caller chains its lock after the current tail, then waits

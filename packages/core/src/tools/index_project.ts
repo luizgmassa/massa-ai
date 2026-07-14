@@ -20,6 +20,7 @@ import { etlPipeline } from "../services/etl/pipeline.js";
 import { workspaceManager } from "../services/workspace/workspace-manager.js";
 import { realpath } from "node:fs/promises";
 import path from "path";
+import { assertParserReadyForIndexing } from "../services/structural/parser-readiness.js";
 
 interface IndexProjectParams {
   projectPath: string;
@@ -122,6 +123,8 @@ export class IndexProjectTool implements IToolHandler {
     } = params as IndexProjectParams;
 
     try {
+      // Do not create or return an accepted job while native parsing is down.
+      await assertParserReadyForIndexing();
       const canonicalProjectPath = await canonicalizeProjectRoot(projectPath);
       // Gera projectId se não fornecido
       const finalProjectId =

@@ -26,6 +26,7 @@ import { getSearchCache } from "../search/cache-factory.js";
 import { getVectorStore } from "../../data/vector/vector-store-factory.js";
 import { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
 import type { EtlStageContext, EtlEvent, EtlResult, EtlStage } from "./stage-context.js";
+import { assertParserReadyForIndexing } from "../structural/parser-readiness.js";
 
 export interface PipelineInput {
   projectId: string;
@@ -62,6 +63,8 @@ export class EtlPipeline {
   }
 
   async run(input: PipelineInput): Promise<EtlResult> {
+    // Reject before queue or destructive force-reindex mutations are created.
+    await assertParserReadyForIndexing();
     const previous = EtlPipeline.runTails.get(input.projectId);
     let release!: () => void;
     const tail = new Promise<void>((resolve) => {

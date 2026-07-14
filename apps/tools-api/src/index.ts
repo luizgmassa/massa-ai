@@ -42,7 +42,14 @@ import { webUiRoutes } from "./routes/web-ui.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
 import { getHealthChecker, searchSessionHook, coRetrievalHook } from "@massa-th0th/core";
-import { indexJobTracker, getScheduler, registerDefaultJobs } from "@massa-th0th/core/services";
+import {
+  getParserReadiness,
+  indexJobTracker,
+  getScheduler,
+  registerDefaultJobs,
+  validateAllGrammars,
+} from "@massa-th0th/core/services";
+import { buildHealthResponse, listenAfterParserValidation } from "./health.js";
 
 const PORT = process.env.MASSA_TH0TH_API_PORT || 3333;
 
@@ -126,13 +133,20 @@ const app = new Elysia({ adapter: node() })
   .use(executorRoutes)
   .use(webRoutes)
   .use(webUiRoutes)
-  .get("/health", () => ({
-    status: "ok",
-    service: "massa-th0th-tools-api",
-    version: "1.0.0",
-    timestamp: new Date().toISOString(),
-  }))
-  .listen(PORT);
+  .get("/health", () => buildHealthResponse(getParserReadiness()));
+
+await listenAfterParserValidation({
+  validate: validateAllGrammars,
+  listen: () => {
+    app.listen(PORT);
+  },
+  onValidationFailure: (error) => {
+    console.error(
+      "Structural parser readiness failed; indexing is unavailable:",
+      error instanceof Error ? error.message : error,
+    );
+  },
+});
 
 searchSessionHook.register();
 coRetrievalHook.register(); // active only when MASSA_TH0TH_CO_RETRIEVAL_HOOK=true

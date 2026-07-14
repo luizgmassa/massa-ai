@@ -104,6 +104,19 @@ export type {
 export { etlPipeline, EtlPipeline } from "./etl/pipeline.js";
 export type { PipelineInput, EtlResult, EtlStage } from "./etl/index.js";
 
+// Structural parser readiness (liveness remains transport-owned and separate)
+export {
+  assertParserReadyForIndexing,
+  getParserReadiness,
+  validateAllGrammars,
+  ParserReadinessError,
+} from "./structural/parser-readiness.js";
+export type {
+  ParserReadinessDiagnostic,
+  ParserReadinessSnapshot,
+  ParserReadinessStatus,
+} from "./structural/parser-readiness.js";
+
 // Symbol Graph
 export { symbolGraphService, SymbolGraphService } from "./symbol/symbol-graph.service.js";
 export { computePageRank } from "./symbol/centrality.js";

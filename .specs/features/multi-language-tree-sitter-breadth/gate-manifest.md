@@ -1,7 +1,7 @@
 # Multi-Language Tree-sitter Breadth Gate Manifest
 
 **Workflow session:** `spec-multi-language`  
-**Feature status:** Execute active; TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 READY
+**Feature status:** Execute active; TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 READY
 **Baseline commit:** `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`  
 **Baseline worktree:** supplied `plan-multi-language.md` was the only user-owned untracked file before feature artifact creation.
 
@@ -142,6 +142,27 @@ Reverse mapping: every assertion maps to T2 done-when, MLTS-001-004/020, and AC-
 
 The equality test fails on any omitted, duplicate, extra, or reordered extension; per-entry assertions fail on wrong packages, versions, selectors, tiers, or capability keys; special-policy assertions distinguish the header/Vue/Markdown decisions; the unknown-extension test distinguishes semantic-only handling from readiness failure or hidden fallback; and the edge fixture prevents reintroduction of dual `paramIndex` vocabulary. These assertions map directly to T3 done-when, MLTS-001/005/007-009/019, and AC-001/004/005. No runtime loader, ETL routing, query pack, platform, or generation behavior was claimed. **Verdict: sufficient, non-shallow, independently accepted PASS.**
 
+## TASK-004 Execution Result (2026-07-14)
+
+**Result:** PASS. Production readiness now lazily loads the audited native grammar packages through literal package cases while the Bun marker is serialized and masked, restores the exact descriptor before any parse, validates all 33 manifest entries in one cached flight, and keeps API liveness separate from parser/indexing readiness.
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| Focused exact-runtime tests | PASS | Exact Bun 1.3.0: 10 tests, 81 assertions, zero failures/skips. |
+| Loader fault and concurrency sensors | PASS | FIFO/non-overlap; exact descriptor restoration after success, sync throw, async rejection, delete/setup fault, and restoration-hook fault; queue remains reusable. |
+| Real readiness breadth | PASS | 33/33 manifest entries parsed with full UTF-8 consumption and no error roots; 27 package+selector artifacts loaded once; every validation tree deleted. |
+| Readiness negative behavior | PASS | Missing grammar and ABI mismatch produce bounded stable failed readiness; `.toml` remains semantic-only, triggers zero loads, and does not alter the required total. |
+| Liveness/startup ordering | PASS | Health response stays `status: ok` with additive parser state; deferred validation proves listen follows ready/failed state recording. |
+| Pre-effect indexing guards | PASS | Tool rejects before job creation; ETL and legacy direct index paths reject before queue-map insertion or destructive work. |
+| Existing queue regressions | PASS | ETL FIFO and legacy indexing mutex suites: 13 tests, 39 assertions. |
+| Durable native verifier | PASS | Source/dist 33+33 parses, 27+27 native modules, 54 Mach-O arm64/system-linkage checks, ten lifecycle sensors, bounded RSS, missing and incompatible sensors. |
+| Type-check and build | PASS | Forced uncached type-check 6/6 and build 5/5; built `dist` readiness independently reached 33/33 ready. |
+| Independent review | PASS | No findings across loader safety, selectors, readiness, startup/liveness, direct guards, exports, task boundary, or macOS arm64 scope. |
+
+### TASK-004 Post-Gate Adequacy Review
+
+The fault adapters kill value-only restoration, leaked markers, poisoned queues, overlapping loads, and parsing inside the masked callback. The single-flight fixture kills load-only, 27-artifact-as-33, repeated-validation, missing-delete, and premature-ready implementations. Health/startup tests distinguish service liveness from parser readiness. Tool/ETL/legacy guards kill background-only or post-side-effect rejection. The durable verifier confirms the real source/dist artifact set and native linkage. These assertions map directly to T4 done-when, MLTS-002-003/017-019, and AC-002/007. Parser pooling/runtime behavior remains T5; ETL structural routing remains T9. **Verdict: sufficient, non-shallow, independently accepted PASS.**
+
 ## Planned Gate Commands
 
 - `bun run verify:tree-sitter-native`
@@ -265,3 +286,30 @@ These draft checksums are retained as failed-review evidence and are not an acti
 | `packages/core/src/__tests__/language-manifest.test.ts` | `49c77e53e71349a1b8939a361356ee909e0ba8df3ce88a89041d032fbfe78503` |
 
 `gate-manifest.md` cannot embed its own stable checksum; record its Git blob ID at the TASK-003 commit.
+
+## TASK-004 Accepted Artifact Freeze v8
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `plan-multi-language.md` | `02f183d2a23b9f9a2694289cc04c2a4c7614f87ec22918e3b59b7de66add9b10` |
+| `spec.md` | `43ed4c1c37ecbcaef52750d263f93410dffcc9372a99ac4a73cd6e7f3a54f50e` |
+| `context.md` | `af3339803245375d6a69890cfe49e60902a21d71ba969580f555b20fc460a7a9` |
+| `design.md` | `fc0fa42186326d126455fc85b12177c5f5df238f9aaf878a219baacb562ce42a` |
+| `tasks.md` | `afef81a41b41e1a620d5639e5ce3e18b6a837e10b257ddbb321b6f186f131b6f` |
+| `capability-matrix.md` | `ded3f112b391aa7042e9f8bc957cb016642ea0e8e16a2f2ebe128ad189473e18` |
+| `.specs/project/FEATURES.json` | `851c7662bebb18fe138d1324d6f29d8a945b03e737b016f761359e20d8f5eced` |
+| `.specs/project/STATE.md` | `e832d9546c7cfd21ae1c4a476de8e7da500ef65640a1ac8244968ab42252b21b` |
+| `.specs/HANDOFF.md` | `c1b2223998981f0a7ed85db4b26d81a8df1639803a2b53db3e50abf83f60765e` |
+| `apps/tools-api/src/index.ts` | `9d63d3cfb5c37abd9df06fc9d886da50c4349a7dcf5e4246c39e55606c01ca22` |
+| `apps/tools-api/src/health.ts` | `a9cbfb7912f8586e00a2d11fb767b924b303a95b4ed89257520c437f8568441d` |
+| `apps/tools-api/src/__tests__/parser-readiness-health.test.ts` | `4d4238c88027b60aebbb16ad381d772cfe02fdf2e6c4590d6582615b76a3e2fd` |
+| `packages/core/src/services/structural/grammar-loaders.ts` | `c1d725ea40c5d1e54968f6143bf19045cbf4e5d77aedfdae13478707abafe006` |
+| `packages/core/src/services/structural/parser-readiness.ts` | `8999adee5235fa6f1791227da0ccc85c7923cebcb61af228fcb4f782b6820b99` |
+| `packages/core/src/services/etl/pipeline.ts` | `dcb9997b843dc551f8a102c30c026a4f75f34da2d5a2a38d10ccaa192dd158f5` |
+| `packages/core/src/services/search/contextual-search-rlm.ts` | `23e563a00452b40c9ded2544047356be6e63daed32bbefae60a2ff4e7dab7306` |
+| `packages/core/src/tools/index_project.ts` | `657e4f8a531d52d7a741e9e21c0a2cac9d0d60f4ce0fad6203a0c4e654782ac5` |
+| `packages/core/src/services/index.ts` | `f3a2e6656e3578ee25b8a8c26b4f7d148fb7831746655a8ef1aacb0c042bd434` |
+| `packages/core/src/__tests__/structural-grammar-readiness.test.ts` | `31fbaca81f72d69d188daba6653822a0b1397e1496ad4d8194be4657eb853128` |
+| `packages/core/src/__tests__/indexing-readiness-guard.test.ts` | `6c9a7451b5e7501513748c366fe974a1b631a9a737036310cb450d27bbb2d429` |
+
+`gate-manifest.md` cannot embed its own stable checksum; record its Git blob ID at the TASK-004 commit.

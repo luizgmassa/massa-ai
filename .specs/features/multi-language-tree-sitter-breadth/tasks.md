@@ -6,7 +6,7 @@ Implement with the active `massa-th0th` Spec Driven Execute flow, `coding-guidel
 
 **Design:** `.specs/features/multi-language-tree-sitter-breadth/design.md`  
 **Capability contract:** `.specs/features/multi-language-tree-sitter-breadth/capability-matrix.md`  
-**Status:** TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 READY
+**Status:** TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 READY
 
 ## Project Testing Guidelines Scan
 
@@ -144,7 +144,7 @@ Phase 7 Validate:
 
 ### T4 / TASK-004: Implement grammar loaders and parser readiness
 
-**Status:** READY after TASK-003 PASS.
+**Status:** PASS on 2026-07-14. Exact Bun 1.3.0 focused tests passed 10/10 with 81 assertions; existing queue/mutex regressions passed 13/13; the native verifier, uncached type-check/build, built-dist readiness, diff integrity, and independent review all passed.
 
 **What:** Add explicit native imports, a serialized Bun-marker compatibility loader with exact descriptor restoration in `finally`, idempotent `validateAllGrammars`, parser readiness state, `/health` liveness separation, and indexing guard.
 **Where:** structural grammar loader/readiness modules, Tools API startup/routes, direct-core guard, tests.  
@@ -154,6 +154,8 @@ Phase 7 Validate:
 **Commit:** `feat(parser): add native grammar readiness`
 
 ### T5 / TASK-005: Implement bounded parser pool and structural runtime
+
+**Status:** READY after TASK-004 PASS.
 
 **What:** Add FIFO bounded parser leases, per-language reuse, acquisition timeout, parse/query/cursor-delete/tree-delete `finally`, recovered/hard outcomes, and diagnostics bounding using the T2-frozen patched binding.  
 **Where:** structural parser pool/runtime/diagnostic modules and tests.  
@@ -463,5 +465,5 @@ Counts below are minimum new focused cases/sensors, not total repository pass co
 ## Artifact Store Evidence
 
 - Active key: `.specs/features/multi-language-tree-sitter-breadth/tasks.md`
-- Version: 7; TASK-003 PASS and TASK-004 READY
+- Version: 8; TASK-004 PASS and TASK-005 READY
 - Checksum: recorded in `gate-manifest.md` after artifact freeze.
