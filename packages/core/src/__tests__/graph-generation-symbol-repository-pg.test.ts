@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
+import fs from "node:fs/promises";
+import os from "node:os";
 import { join } from "node:path";
 import { Client } from "pg";
 import type { GraphGenerationLease } from "../data/graph-generation/graph-generation-contract.js";
@@ -29,6 +31,7 @@ interface Task12Repository {
   getTopCentralFiles(projectId: string): Promise<Array<{ file_path: string; score: number }>>;
   getProjectMapAggregates(projectId: string): Promise<{ symbolsByKind: Record<string, number>; filesByLanguage: Record<string, number> }>;
   writeFileGeneration(input: { lease: GraphGenerationLease; file: Record<string, unknown>; definitions: Record<string, unknown>[]; references: Record<string, unknown>[]; imports: Record<string, unknown>[] }): Promise<{ status: string }>;
+  copyFileGeneration(lease: GraphGenerationLease, sourceGenerationId: string, path: string): Promise<{ status: string }>;
   deleteFileGeneration(lease: GraphGenerationLease, path: string): Promise<{ status: string }>;
   markFileStaleGeneration(lease: GraphGenerationLease, path: string, input: { lastKnownGoodGenerationId: string; diagnostics: Record<string, unknown>[]; parserErrorCount: number }): Promise<{ status: string }>;
   updateCentralityGeneration(lease: GraphGenerationLease, entries: Array<{ filePath: string; score: number }>): Promise<{ status: string }>;
@@ -132,6 +135,281 @@ afterAll(async () => {
 });
 
 describe.skipIf(!requested)("owned PostgreSQL generation-scoped symbol repository", () => {
+  test("real ETL stages activate recovered syntax before durable terminal visibility and reconcile deletion", async () => {
+    await db!.query(`UPDATE workspaces SET pending_graph_generation_id=NULL,graph_lease_token=NULL,graph_lease_expires_at=NULL,graph_lease_heartbeat_at=NULL WHERE project_id=$1`, [projectId]);
+    await db!.query(`DELETE FROM graph_generations WHERE project_id=$1 AND id=$2`, [projectId, pendingId]);
+    const { EtlPipeline } = await import("../services/etl/pipeline.js");
+    const { ParseStage } = await import("../services/etl/stages/parse.js");
+    const { ResolveStage } = await import("../services/etl/stages/resolve.js");
+    const { LoadStage } = await import("../services/etl/stages/load.js");
+    const { indexJobTracker } = await import("../services/jobs/index-job-tracker.js");
+    const pipeline = EtlPipeline.getInstance() as any;
+    const originals = { parse: pipeline.parse, resolve: pipeline.resolve, load: pipeline.load };
+    const projectPath = await fs.mkdtemp(join(os.tmpdir(), "task013-real-etl-"));
+    await fs.mkdir(join(projectPath, "src"));
+    await fs.writeFile(join(projectPath, "src/active.ts"), "export const active = 1;\n");
+    await db!.query(`UPDATE workspaces SET project_path=$2 WHERE project_id=$1`, [projectId, projectPath]);
+    const emptyStructure = { symbols: [], edges: [], imports: [] };
+    pipeline.parse = new ParseStage({ parse: async () => ({
+      status: "recovered", structure: emptyStructure, diagnosticCount: 1,
+      diagnostics: [{ code: "test_recovered", severity: "recovered", message: "recovered syntax" }],
+    }) });
+    pipeline.resolve = new ResolveStage(repository as never);
+    const load = new LoadStage() as any;
+    load.vectorStore = { addDocuments: async () => {}, deleteByProject: async () => {} };
+    load.keywordSearch = { addBatch: async () => {}, deleteByProject: async () => {} };
+    pipeline.load = load;
+    const events: string[] = [];
+    const { eventBus } = await import("../services/events/event-bus.js");
+    let observedJobId = "";
+    let resolveDurableEvent!: () => void;
+    const durableEvent = new Promise<void>((resolve) => { resolveDurableEvent = resolve; });
+    const unsubscribe = eventBus.subscribe("indexing:completed", (event) => {
+      void db!.query(`SELECT status,activated_graph_generation_id FROM index_jobs WHERE job_id=$1`, [observedJobId]).then(({ rows }) => {
+        events.push(`completed:${event.activatedGraphGenerationId}:${rows[0]?.status}:${rows[0]?.activated_graph_generation_id}`);
+        resolveDurableEvent();
+      });
+    });
+    try {
+      const job = indexJobTracker.createJob(projectId, projectPath);
+      observedJobId = job.jobId;
+      indexJobTracker.updateStatus(job.jobId, "running");
+      const result = await pipeline.run({ projectId, projectPath, jobId: job.jobId });
+      await durableEvent;
+      expect(events).toEqual([`completed:${result.activatedGraphGenerationId}:completed:${result.activatedGraphGenerationId}`]);
+      expect(indexJobTracker.getJob(job.jobId)?.result?.activatedGraphGenerationId).toBe(result.activatedGraphGenerationId);
+      expect((await repository.getFile(projectId, "src/active.ts"))?.content_hash).toHaveLength(64);
+      expect((await db!.query(`SELECT parser_status,parser_error_count FROM symbol_files WHERE project_id=$1 AND generation_id=$2`, [projectId, result.activatedGraphGenerationId])).rows[0])
+        .toEqual({ parser_status: "recovered", parser_error_count: 1 });
+
+      await fs.unlink(join(projectPath, "src/active.ts"));
+      const deleteJob = indexJobTracker.createJob(projectId, projectPath);
+      observedJobId = deleteJob.jobId;
+      indexJobTracker.updateStatus(deleteJob.jobId, "running");
+      await pipeline.run({ projectId, projectPath, jobId: deleteJob.jobId });
+      expect(await repository.getFile(projectId, "src/active.ts")).toBeNull();
+    } finally {
+      unsubscribe();
+      pipeline.parse = originals.parse; pipeline.resolve = originals.resolve; pipeline.load = originals.load;
+      await fs.rm(projectPath, { recursive: true, force: true });
+    }
+  });
+
+  test("real ETL stages keep the old graph visible when a full structural parse fails", async () => {
+    await db!.query(`UPDATE workspaces SET pending_graph_generation_id=NULL,graph_lease_token=NULL,graph_lease_expires_at=NULL,graph_lease_heartbeat_at=NULL WHERE project_id=$1`, [projectId]);
+    await db!.query(`DELETE FROM graph_generations WHERE project_id=$1 AND id=$2`, [projectId, pendingId]);
+    const { EtlPipeline } = await import("../services/etl/pipeline.js");
+    const { ParseStage } = await import("../services/etl/stages/parse.js");
+    const pipeline = EtlPipeline.getInstance() as any;
+    const originalParse = pipeline.parse;
+    const projectPath = await fs.mkdtemp(join(os.tmpdir(), "task013-hard-failure-"));
+    await fs.writeFile(join(projectPath, "broken.ts"), "export const broken = true;\n");
+    await db!.query(`UPDATE workspaces SET project_path=$2 WHERE project_id=$1`, [projectId, projectPath]);
+    pipeline.parse = new ParseStage({ parse: async () => ({
+      status: "failed", failureKind: "parser", diagnosticCount: 1,
+      diagnostics: [{ code: "test_hard_failure", severity: "error", message: "hard failure" }],
+    }) });
+    try {
+      await expect(pipeline.run({ projectId, projectPath, jobId: `hard-${randomUUID()}` })).rejects.toThrow("Structural parse failed");
+      expect((await db!.query(`SELECT active_graph_generation_id,pending_graph_generation_id FROM workspaces WHERE project_id=$1`, [projectId])).rows[0])
+        .toEqual({ active_graph_generation_id: activeId, pending_graph_generation_id: null });
+      expect((await repository.getFile(projectId, "src/active.ts"))?.content_hash).toBe("active-hash");
+    } finally {
+      pipeline.parse = originalParse;
+      await fs.rm(projectPath, { recursive: true, force: true });
+    }
+  });
+
+  test("real ETL stages activate multiple incremental failures as stale LKG files and recover them", async () => {
+    await db!.query(`UPDATE workspaces SET pending_graph_generation_id=NULL,graph_lease_token=NULL,graph_lease_expires_at=NULL,graph_lease_heartbeat_at=NULL WHERE project_id=$1`, [projectId]);
+    await db!.query(`DELETE FROM graph_generations WHERE project_id=$1 AND id=$2`, [projectId, pendingId]);
+    await seedFile(activeId, "a.ts", "old-a");
+    await seedFile(activeId, "b.ts", "old-b");
+    const { EtlPipeline } = await import("../services/etl/pipeline.js");
+    const { ParseStage } = await import("../services/etl/stages/parse.js");
+    const { ResolveStage } = await import("../services/etl/stages/resolve.js");
+    const { LoadStage } = await import("../services/etl/stages/load.js");
+    const pipeline = EtlPipeline.getInstance() as any;
+    const originals = { parse: pipeline.parse, resolve: pipeline.resolve, load: pipeline.load };
+    const projectPath = await fs.mkdtemp(join(os.tmpdir(), "task013-incremental-"));
+    await fs.writeFile(join(projectPath, "a.ts"), "export const changedA = true;\n");
+    await fs.writeFile(join(projectPath, "b.ts"), "export const changedB = true;\n");
+    await db!.query(`UPDATE workspaces SET project_path=$2 WHERE project_id=$1`, [projectId, projectPath]);
+    const emptyStructure = { symbols: [], edges: [], imports: [] };
+    const load = new LoadStage() as any;
+    load.vectorStore = { addDocuments: async () => {}, deleteByProject: async () => {} };
+    load.keywordSearch = { addBatch: async () => {}, deleteByProject: async () => {} };
+    pipeline.resolve = new ResolveStage(repository as never);
+    pipeline.load = load;
+    try {
+      pipeline.parse = new ParseStage({ parse: async () => ({
+        status: "failed", failureKind: "parser", diagnosticCount: 1,
+        diagnostics: [{ code: "incremental_failure", severity: "error", message: "incremental failure" }],
+      }) });
+      const stale = await pipeline.run({
+        projectId, projectPath, jobId: `stale-${randomUUID()}`, filesToProcess: ["a.ts", "b.ts"],
+      });
+      expect((await db!.query(`SELECT count(*)::int count FROM symbol_files WHERE generation_id=$1 AND is_stale`, [stale.activatedGraphGenerationId])).rows[0].count).toBe(2);
+
+      pipeline.parse = new ParseStage({ parse: async () => ({
+        status: "ok", structure: emptyStructure, diagnosticCount: 0, diagnostics: [],
+      }) });
+      const recovered = await pipeline.run({
+        projectId, projectPath, jobId: `recover-${randomUUID()}`, filesToProcess: ["a.ts", "b.ts"],
+      });
+      expect((await db!.query(`SELECT count(*)::int count FROM symbol_files WHERE generation_id=$1 AND is_stale`, [recovered.activatedGraphGenerationId])).rows[0].count).toBe(0);
+      expect((await db!.query(`SELECT count(*)::int count FROM symbol_files WHERE generation_id=$1`, [recovered.activatedGraphGenerationId])).rows[0].count).toBe(2);
+    } finally {
+      pipeline.parse = originals.parse; pipeline.resolve = originals.resolve; pipeline.load = originals.load;
+      await fs.rm(projectPath, { recursive: true, force: true });
+    }
+  });
+
+  test("real discovery and stages abort unreadable and mid-run stale snapshots without completion", async () => {
+    await db!.query(`UPDATE workspaces SET pending_graph_generation_id=NULL,graph_lease_token=NULL,graph_lease_expires_at=NULL,graph_lease_heartbeat_at=NULL WHERE project_id=$1`, [projectId]);
+    await db!.query(`DELETE FROM graph_generations WHERE project_id=$1 AND id=$2`, [projectId, pendingId]);
+    const { EtlPipeline } = await import("../services/etl/pipeline.js");
+    const { ParseStage } = await import("../services/etl/stages/parse.js");
+    const { ResolveStage } = await import("../services/etl/stages/resolve.js");
+    const { LoadStage } = await import("../services/etl/stages/load.js");
+    const { eventBus } = await import("../services/events/event-bus.js");
+    const pipeline = EtlPipeline.getInstance() as any;
+    const originals = { parse: pipeline.parse, resolve: pipeline.resolve, load: pipeline.load };
+    const completed: string[] = [];
+    const unsubscribe = eventBus.subscribe("indexing:completed", (event) => completed.push(event.jobId));
+    const emptyStructure = { symbols: [], edges: [], imports: [] };
+    const projectPath = await fs.mkdtemp(join(os.tmpdir(), "task013-faults-"));
+    await db!.query(`UPDATE workspaces SET project_path=$2 WHERE project_id=$1`, [projectId, projectPath]);
+    pipeline.parse = new ParseStage({ parse: async () => ({ status: "ok", structure: emptyStructure, diagnosticCount: 0, diagnostics: [] }) });
+    pipeline.resolve = new ResolveStage(repository as never);
+    try {
+      await fs.symlink(join(projectPath, "missing-target"), join(projectPath, "unreadable.ts"));
+      const unreadableJob = `unreadable-${randomUUID()}`;
+      await expect(pipeline.run({ projectId, projectPath, jobId: unreadableJob })).rejects.toThrow("required_file_unreadable:unreadable.ts");
+      expect(completed).not.toContain(unreadableJob);
+      await fs.unlink(join(projectPath, "unreadable.ts"));
+
+      await fs.writeFile(join(projectPath, "changed.ts"), "export const before = 1;\n");
+      const load = new LoadStage() as any;
+      load.vectorStore = { addDocuments: async () => { await fs.writeFile(join(projectPath, "changed.ts"), "export const after = 2;\n"); } };
+      load.keywordSearch = { addBatch: async () => {} };
+      pipeline.load = load;
+      const staleJob = `stale-snapshot-${randomUUID()}`;
+      await expect(pipeline.run({ projectId, projectPath, jobId: staleJob })).rejects.toThrow("graph_generation_stale_snapshot");
+      expect(completed).not.toContain(staleJob);
+      expect((await db!.query(`SELECT active_graph_generation_id,pending_graph_generation_id FROM workspaces WHERE project_id=$1`, [projectId])).rows[0])
+        .toEqual({ active_graph_generation_id: activeId, pending_graph_generation_id: null });
+    } finally {
+      unsubscribe();
+      pipeline.parse = originals.parse; pipeline.resolve = originals.resolve; pipeline.load = originals.load;
+      await fs.rm(projectPath, { recursive: true, force: true });
+    }
+  });
+
+  test("pipeline waits for interrupted work to settle before abort cleanup and emits no completion", async () => {
+    await db!.query(`UPDATE workspaces SET pending_graph_generation_id=NULL,graph_lease_token=NULL,graph_lease_expires_at=NULL,graph_lease_heartbeat_at=NULL WHERE project_id=$1`, [projectId]);
+    await db!.query(`DELETE FROM graph_generations WHERE project_id=$1 AND id=$2`, [projectId, pendingId]);
+    const { EtlPipeline } = await import("../services/etl/pipeline.js");
+    const { ParseStage } = await import("../services/etl/stages/parse.js");
+    const { ResolveStage } = await import("../services/etl/stages/resolve.js");
+    const { LoadStage } = await import("../services/etl/stages/load.js");
+    const { GraphGenerationRepositoryPg } = await import("../data/graph-generation/graph-generation-repository-pg.js");
+    const { eventBus } = await import("../services/events/event-bus.js");
+    const graphRepository = GraphGenerationRepositoryPg.getInstance();
+    const pipeline = EtlPipeline.getInstance() as any;
+    const originals = { parse: pipeline.parse, resolve: pipeline.resolve, load: pipeline.load };
+    const projectPath = await fs.mkdtemp(join(os.tmpdir(), "task013-interrupt-"));
+    await fs.writeFile(join(projectPath, "interrupt.ts"), "export const interrupt = 1;\n");
+    await db!.query(`UPDATE workspaces SET project_path=$2 WHERE project_id=$1`, [projectId, projectPath]);
+    const completed: string[] = [];
+    const unsubscribe = eventBus.subscribe("indexing:completed", (event) => completed.push(event.jobId));
+    let externalSettled = false;
+    const load = new LoadStage() as any;
+    load.vectorStore = { addDocuments: async () => {} };
+    load.keywordSearch = { addBatch: async () => {} };
+    pipeline.parse = new ParseStage({ parse: async () => {
+      const row = (await db!.query(`SELECT g.id,g.fingerprint,g.input_snapshot_hash,g.expected_active_id,g.expected_files_count,w.graph_lease_token,EXTRACT(EPOCH FROM w.graph_lease_expires_at)*1000 lease_expires_at FROM workspaces w JOIN graph_generations g ON g.id=w.pending_graph_generation_id WHERE w.project_id=$1`, [projectId])).rows[0];
+      await graphRepository.abort({ projectId, generationId: row.id, leaseToken: row.graph_lease_token, fingerprint: row.fingerprint, inputSnapshotHash: row.input_snapshot_hash, expectedActiveGenerationId: row.expected_active_id, expectedFilesCount: row.expected_files_count, leaseExpiresAt: Number(row.lease_expires_at) }, "test_interruption");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      externalSettled = true;
+      return { status: "ok", structure: { symbols: [], edges: [], imports: [] }, diagnosticCount: 0, diagnostics: [] };
+    } });
+    pipeline.resolve = new ResolveStage(repository as never); pipeline.load = load;
+    const jobId = `interrupt-${randomUUID()}`;
+    try {
+      await expect(pipeline.run({ projectId, projectPath, jobId })).rejects.toThrow();
+      expect(externalSettled).toBe(true);
+      expect(completed).not.toContain(jobId);
+      expect((await db!.query(`SELECT active_graph_generation_id,pending_graph_generation_id FROM workspaces WHERE project_id=$1`, [projectId])).rows[0])
+        .toEqual({ active_graph_generation_id: activeId, pending_graph_generation_id: null });
+      expect((await db!.query(`SELECT count(*)::int count FROM symbol_files WHERE project_id=$1 AND generation_id<>$2`, [projectId, activeId])).rows[0].count).toBe(0);
+    } finally {
+      unsubscribe(); pipeline.parse = originals.parse; pipeline.resolve = originals.resolve; pipeline.load = originals.load;
+      await fs.rm(projectPath, { recursive: true, force: true });
+    }
+  });
+
+  test("pipeline refreshes stale active state after another owner activates", async () => {
+    await db!.query(`UPDATE workspaces SET pending_graph_generation_id=NULL,graph_lease_token=NULL,graph_lease_expires_at=NULL,graph_lease_heartbeat_at=NULL WHERE project_id=$1`, [projectId]);
+    await db!.query(`DELETE FROM graph_generations WHERE project_id=$1 AND id=$2`, [projectId, pendingId]);
+    const { GraphGenerationRepositoryPg } = await import("../data/graph-generation/graph-generation-repository-pg.js");
+    const graphRepository = GraphGenerationRepositoryPg.getInstance();
+    const owner = await graphRepository.begin({ projectId, expectedActiveGenerationId: activeId, fingerprint: "owner", inputSnapshotHash: "owner-snapshot", expectedFilesCount: 1, leaseTtlMs: 60_000 });
+    expect(owner.status).toBe("acquired"); if (owner.status !== "acquired") return;
+    expect((await repository.copyFileGeneration(owner.lease, activeId, "src/active.ts")).status).toBe("copied");
+    const { EtlPipeline } = await import("../services/etl/pipeline.js");
+    const { ParseStage } = await import("../services/etl/stages/parse.js");
+    const { ResolveStage } = await import("../services/etl/stages/resolve.js");
+    const { LoadStage } = await import("../services/etl/stages/load.js");
+    const pipeline = EtlPipeline.getInstance() as any;
+    const originals = { parse: pipeline.parse, resolve: pipeline.resolve, load: pipeline.load };
+    const projectPath = await fs.mkdtemp(join(os.tmpdir(), "task013-stale-active-"));
+    await fs.writeFile(join(projectPath, "active.ts"), "export const fresh = 1;\n");
+    await db!.query(`UPDATE workspaces SET project_path=$2 WHERE project_id=$1`, [projectId, projectPath]);
+    const load = new LoadStage() as any; load.vectorStore = { addDocuments: async () => {} }; load.keywordSearch = { addBatch: async () => {} };
+    pipeline.parse = new ParseStage({ parse: async () => ({ status: "ok", structure: { symbols: [], edges: [], imports: [] }, diagnosticCount: 0, diagnostics: [] }) });
+    pipeline.resolve = new ResolveStage(repository as never); pipeline.load = load;
+    const ownerActivation = new Promise<void>((resolve, reject) => setTimeout(() => {
+      graphRepository.complete(owner.lease).then(() => graphRepository.activate(owner.lease)).then(() => resolve(), reject);
+    }, 100));
+    try {
+      const result = await pipeline.run({ projectId, projectPath, jobId: `waiter-${randomUUID()}` });
+      await ownerActivation;
+      expect(result.activatedGraphGenerationId).not.toBe(owner.lease.generationId);
+      expect((await db!.query(`SELECT active_graph_generation_id FROM workspaces WHERE project_id=$1`, [projectId])).rows[0].active_graph_generation_id).toBe(result.activatedGraphGenerationId);
+    } finally {
+      pipeline.parse = originals.parse; pipeline.resolve = originals.resolve; pipeline.load = originals.load;
+      await fs.rm(projectPath, { recursive: true, force: true });
+    }
+  });
+
+  test("durably persists the activated generation on a terminal index job", async () => {
+    const { PgJobStore } = await import("../services/jobs/index-job-store-pg.js");
+    const store = new PgJobStore();
+    const jobId = `task013-job-${randomUUID()}`;
+    store.save({
+      jobId, projectId, projectPath: "/tmp/generation-symbol", status: "completed",
+      progress: { current: 1, total: 1, percentage: 100 },
+      result: { filesIndexed: 1, chunksIndexed: 0, errors: 0, duration: 1, activatedGraphGenerationId: activeId },
+      createdAt: new Date(), completedAt: new Date(),
+    });
+    await store.__drain(jobId);
+    const row = await db!.query(`SELECT status, activated_graph_generation_id FROM index_jobs WHERE job_id=$1`, [jobId]);
+    expect(row.rows[0]).toEqual({ status: "completed", activated_graph_generation_id: activeId });
+  });
+
+  test("copies an unchanged last-known-good file into pending ownership", async () => {
+    expect((await repository.copyFileGeneration(lease(), activeId, "src/active.ts")).status).toBe("copied");
+    const counts = await db!.query(`SELECT
+      (SELECT count(*) FROM symbol_files WHERE generation_id=$1 AND relative_path='src/active.ts')::int files,
+      (SELECT count(*) FROM symbol_definitions WHERE generation_id=$1 AND file_path='src/active.ts')::int defs,
+      (SELECT count(*) FROM symbol_references WHERE generation_id=$1 AND from_file='src/active.ts')::int refs,
+      (SELECT count(*) FROM symbol_imports WHERE generation_id=$1 AND from_file='src/active.ts')::int imports,
+      (SELECT count(*) FROM symbol_centrality WHERE generation_id=$1 AND file_path='src/active.ts')::int centrality`, [pendingId]);
+    expect(counts.rows[0]).toEqual({ files: 1, defs: 1, refs: 1, imports: 1, centrality: 1 });
+    expect((await repository.copyFileGeneration(lease(), activeId, "src/missing.ts")).status).toBe("missing");
+  });
+
   test("keeps pending files, definitions, edges, imports, centrality, and aggregates invisible", async () => {
     await seedFile(pendingId, "src/pending.ts", "pending-hash", "recovered", 3);
     await seedDefinition(pendingId, `src/pending.ts#Pending~function~${hashB}`, "src/pending.ts", "Pending", "src/pending.ts#Pending", hashB);

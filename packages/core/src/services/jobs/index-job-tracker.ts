@@ -24,6 +24,7 @@ export interface IndexJob {
     chunksIndexed: number;
     errors: number;
     duration: number;
+    activatedGraphGenerationId?: string;
   };
   error?: string;
   createdAt: Date;
@@ -244,6 +245,11 @@ export class IndexJobTracker {
         { jobId, error: (err as Error)?.message ?? String(err) },
       );
     }
+  }
+
+  async setResultAndFlush(jobId: string, result: IndexJob["result"], error?: string): Promise<void> {
+    this.setResult(jobId, result, error);
+    await this.store?.flush?.(jobId);
   }
 
   /**

@@ -77,6 +77,7 @@ export class ResolveStage {
     // a newly-indexed file can now resolve to a callee defined in an
     // unchanged file that was fingerprint-skipped this run.
     const { index: symbolIndex, definitions: repositoryDefinitions } = await this.buildSymbolIndex(ctx.projectId, files);
+    if (ctx.abortSignal?.aborted) throw ctx.abortSignal.reason;
 
     // Parse tsconfig.json compilerOptions.paths for workspace alias resolution
     const rootAliases = this.loadTsConfigPaths(ctx.projectPath);

@@ -25,6 +25,8 @@ import type {
   RawSymbol,
   ResolvedEdge,
 } from "../stage-context.js";
+import path from "node:path";
+import { getLanguageManifestEntry } from "../../structural/language-manifest.js";
 
 export interface LoadResult {
   filesLoaded: number;
@@ -32,6 +34,8 @@ export interface LoadResult {
   symbolsLoaded: number;
   errors: number;
 }
+
+export type LoadMode = "all" | "structural" | "semantic";
 
 /** Human-readable duration: "42s", "3m 12s", "1h 04m". */
 function formatDuration(ms: number): string {
@@ -121,11 +125,11 @@ export class LoadStage {
     return this.keywordSearch;
   }
 
-  async run(ctx: EtlStageContext, files: ResolvedFile[]): Promise<LoadResult> {
+  async run(ctx: EtlStageContext, files: ResolvedFile[], mode: LoadMode = "all", emitLifecycle = true): Promise<LoadResult> {
     const t0 = performance.now();
     const toLoadCount = files.filter((f) => f.file.needsReparse).length;
 
-    ctx.emit({
+    if (emitLifecycle) ctx.emit({
       type: "stage_start",
       stage: "load",
       payload: { total: files.length, toLoad: toLoadCount },
@@ -151,6 +155,7 @@ export class LoadStage {
     const BATCH = 10;
 
     for (let i = 0; i < files.length; i += BATCH) {
+      if (ctx.abortSignal?.aborted) throw ctx.abortSignal.reason;
       const batch = files.slice(i, i + BATCH);
 
       await Promise.all(
@@ -159,28 +164,29 @@ export class LoadStage {
 
           try {
             const [chunkCount, symCount] = await Promise.all([
-              this.loadToSearchStores(ctx, file),
-              this.loadToSymbolDb(ctx, file),
+              mode === "structural" ? Promise.resolve(0) : this.loadToSearchStores(ctx, file),
+              mode === "semantic" ? Promise.resolve(file.symbols.length) : this.loadToSymbolDb(ctx, file),
             ]);
 
-            // Update fingerprint table
-            await getSymbolRepository().upsertFile({
-              project_id: ctx.projectId,
-              relative_path: file.file.relativePath,
-              content_hash: file.file.contentHash,
-              mtime: file.file.mtime,
-              size: file.file.size,
-              indexed_at: Date.now(),
-              symbol_count: symCount,
-              chunk_count: chunkCount,
-            });
+            if (!ctx.graphGenerationLease && mode !== "structural") {
+              await getSymbolRepository().upsertFile({
+                project_id: ctx.projectId,
+                relative_path: file.file.relativePath,
+                content_hash: file.file.contentHash,
+                mtime: file.file.mtime,
+                size: file.file.size,
+                indexed_at: Date.now(),
+                symbol_count: symCount,
+                chunk_count: chunkCount,
+              });
+            }
 
             filesLoaded++;
             chunksLoaded += chunkCount;
             symbolsLoaded += symCount;
             processedSinceStart++;
 
-            ctx.emit({
+            if (emitLifecycle) ctx.emit({
               type: "file_processed",
               stage: "load",
               payload: {
@@ -194,7 +200,7 @@ export class LoadStage {
           } catch (err) {
             errors++;
             processedSinceStart++;
-            ctx.emit({
+            if (emitLifecycle) ctx.emit({
               type: "file_error",
               stage: "load",
               payload: { filePath: file.file.relativePath, error: (err as Error).message },
@@ -219,7 +225,7 @@ export class LoadStage {
         ? Math.round(remainingToLoad / filesPerSec * 1000)
         : 0;
 
-      ctx.emit({
+      if (emitLifecycle) ctx.emit({
         type: "progress",
         stage: "load",
         payload: {
@@ -256,7 +262,7 @@ export class LoadStage {
 
     const durationMs = Math.round(performance.now() - t0);
 
-    ctx.emit({
+    if (emitLifecycle) ctx.emit({
       type: "stage_end",
       stage: "load",
       payload: { filesLoaded, chunksLoaded, symbolsLoaded, errors, durationMs },
@@ -320,14 +326,49 @@ export class LoadStage {
     const filePath = file.file.relativePath;
     const batch = buildSymbolPersistenceBatch(ctx.projectId, file);
 
-    // Single transaction: delete old + insert new
-    await getSymbolRepository().writeFileSymbols(
-      ctx.projectId,
-      filePath,
-      batch.definitions,
-      batch.references,
-      batch.imports,
-    );
+    if (ctx.graphGenerationLease) {
+      const manifest = getLanguageManifestEntry(path.extname(filePath));
+      const diagnostics = (file.structuralDiagnostics ?? []).map((diagnostic) => ({
+        code: diagnostic.code,
+        severity: diagnostic.severity,
+        message: diagnostic.message,
+        ...(diagnostic.span ? { span: diagnostic.span } : {}),
+      }));
+      const write = await getSymbolRepository().writeFileGeneration({
+        lease: ctx.graphGenerationLease,
+        file: {
+          project_id: ctx.projectId,
+          relative_path: filePath,
+          content_hash: file.file.contentHash,
+          mtime: file.file.mtime,
+          size: file.file.size,
+          indexed_at: Date.now(),
+          symbol_count: batch.definitions.length,
+          chunk_count: file.chunks.length,
+          language: manifest?.language,
+          dialect: manifest?.dialect,
+          grammar_version: manifest?.grammarArtifact.version,
+          query_pack_version: manifest?.queryPackVersion,
+          resolver_version: manifest?.resolverVersion,
+          parser_status: file.structuralRecovered ? "recovered" : "ok",
+          parser_error_count: diagnostics.length,
+          diagnostics,
+          is_stale: false,
+        },
+        definitions: batch.definitions,
+        references: batch.references,
+        imports: batch.imports,
+      });
+      if (write.status !== "written") throw new Error("graph_generation_lease_lost");
+    } else {
+      await getSymbolRepository().writeFileSymbols(
+        ctx.projectId,
+        filePath,
+        batch.definitions,
+        batch.references,
+        batch.imports,
+      );
+    }
 
     return batch.definitions.length;
   }

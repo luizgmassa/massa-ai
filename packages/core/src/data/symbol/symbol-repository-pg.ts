@@ -1109,6 +1109,36 @@ export class SymbolRepositoryPg {
 
   // ── Generation-scoped writes ─────────────────────────────────────────────
 
+  async copyFileGeneration(
+    lease: GraphGenerationLease,
+    sourceGenerationId: string,
+    filePath: string,
+  ): Promise<{ status: "copied" | "missing" | "lease_lost" }> {
+    return getPrismaClient().$transaction(async (tx) => {
+      if (!await lockOwnedPendingGeneration(tx, lease)) return { status: "lease_lost" as const };
+      if (lease.expectedActiveGenerationId !== sourceGenerationId) return { status: "lease_lost" as const };
+      const inserted = await tx.$executeRaw`
+        INSERT INTO symbol_files (
+          project_id, generation_id, relative_path, content_hash, mtime, size, indexed_at,
+          symbol_count, chunk_count, language, dialect, grammar_version, query_pack_version,
+          resolver_version, parser_status, parser_error_count, diagnostics, is_stale,
+          last_known_good_generation_id, last_successful_at
+        ) SELECT project_id, ${lease.generationId}, relative_path, content_hash, mtime, size, indexed_at,
+          symbol_count, chunk_count, language, dialect, grammar_version, query_pack_version,
+          resolver_version, parser_status, parser_error_count, diagnostics, is_stale,
+          last_known_good_generation_id, last_successful_at
+        FROM symbol_files WHERE project_id = ${lease.projectId}
+          AND generation_id = ${sourceGenerationId} AND relative_path = ${filePath}
+      `;
+      if (inserted !== 1) return { status: "missing" as const };
+      await tx.$executeRaw`INSERT INTO symbol_definitions (id,project_id,generation_id,file_path,name,kind,line_start,line_end,exported,doc_comment,indexed_at,qualified_name,canonical_signature,signature_hash,legacy_fqn,source_span) SELECT id,project_id,${lease.generationId},file_path,name,kind,line_start,line_end,exported,doc_comment,indexed_at,qualified_name,canonical_signature,signature_hash,legacy_fqn,source_span FROM symbol_definitions WHERE project_id=${lease.projectId} AND generation_id=${sourceGenerationId} AND file_path=${filePath}`;
+      await tx.$executeRaw`INSERT INTO symbol_references (project_id,generation_id,from_file,from_line,symbol_name,target_fqn,ref_kind,meta,source_span) SELECT project_id,${lease.generationId},from_file,from_line,symbol_name,target_fqn,ref_kind,meta,source_span FROM symbol_references WHERE project_id=${lease.projectId} AND generation_id=${sourceGenerationId} AND from_file=${filePath}`;
+      await tx.$executeRaw`INSERT INTO symbol_imports (project_id,generation_id,from_file,to_file,specifier,imported_names,is_external,is_type_only) SELECT project_id,${lease.generationId},from_file,to_file,specifier,imported_names,is_external,is_type_only FROM symbol_imports WHERE project_id=${lease.projectId} AND generation_id=${sourceGenerationId} AND from_file=${filePath}`;
+      await tx.$executeRaw`INSERT INTO symbol_centrality (project_id,generation_id,file_path,score,updated_at) SELECT project_id,${lease.generationId},file_path,score,updated_at FROM symbol_centrality WHERE project_id=${lease.projectId} AND generation_id=${sourceGenerationId} AND file_path=${filePath}`;
+      return { status: "copied" as const };
+    });
+  }
+
   async writeFileGeneration(
     input: { lease: GraphGenerationLease } & GenerationFileWrite,
   ): Promise<{ status: "written" | "lease_lost" }> {

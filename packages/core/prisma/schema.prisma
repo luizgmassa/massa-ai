@@ -545,9 +545,11 @@ model IndexJob {
   startedAt     BigInt? @map("started_at")
   completedAt   BigInt? @map("completed_at")
   heartbeatAt   BigInt? @map("heartbeat_at")
+  activatedGraphGenerationId String? @map("activated_graph_generation_id")
 
   @@index([projectId])
   @@index([status])
+  @@index([activatedGraphGenerationId])
   @@map("index_jobs")
 }
 

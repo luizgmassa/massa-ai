@@ -102,6 +102,7 @@ export class DiscoverStage {
     const BATCH = 30;
 
     for (let i = 0; i < relPaths.length; i += BATCH) {
+      if (ctx.abortSignal?.aborted) throw ctx.abortSignal.reason;
       const batch = relPaths.slice(i, i + BATCH);
       const results = await Promise.all(
         batch.map((rel) => this.processFile(ctx, rel, opts.forceReindex ?? false)),
@@ -180,6 +181,7 @@ export class DiscoverStage {
         mtime: stat.mtimeMs,
         size: stat.size,
         contentHash,
+        snapshotContent: content,
         needsReparse,
       };
     } catch (err) {
@@ -187,7 +189,7 @@ export class DiscoverStage {
         relativePath,
         error: (err as Error).message,
       });
-      return null;
+      throw new Error(`required_file_unreadable:${relativePath}:${(err as Error).message}`);
     }
   }
 

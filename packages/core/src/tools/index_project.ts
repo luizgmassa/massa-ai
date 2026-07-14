@@ -261,11 +261,12 @@ export class IndexProjectTool implements IToolHandler {
         etlResult.filesIndexed,
         etlResult.filesIndexed,
       );
-      indexJobTracker.setResult(jobId, {
+      await indexJobTracker.setResultAndFlush(jobId, {
         filesIndexed: etlResult.filesIndexed,
         chunksIndexed: etlResult.chunksIndexed,
         errors: etlResult.errors,
         duration,
+        activatedGraphGenerationId: etlResult.activatedGraphGenerationId,
       });
     } catch (error) {
       const duration = Date.now() - startTime;

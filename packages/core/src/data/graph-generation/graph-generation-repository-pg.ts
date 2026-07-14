@@ -101,7 +101,6 @@ function incompleteReasons(row: CountRow, expectedFiles: number): string[] {
   if (Number(row.files) !== expectedFiles) reasons.push("file_count_mismatch");
   if (Number(row.invalid_files) > 0) reasons.push("invalid_parser_status");
   if (Number(row.hard_failures) > 0) reasons.push("hard_failures");
-  if (Number(row.stale_files) > 0) reasons.push("stale_files");
   return reasons;
 }
 
@@ -137,9 +136,9 @@ async function generationCounts(tx: TransactionClient, projectId: string, genera
       (SELECT count(*)::integer FROM symbol_centrality WHERE project_id = ${projectId} AND generation_id = ${generationId}) AS centrality,
       (SELECT COALESCE(sum(parser_error_count), 0)::integer FROM symbol_files WHERE project_id = ${projectId} AND generation_id = ${generationId}) AS diagnostics,
       (SELECT count(*)::integer FROM symbol_files WHERE project_id = ${projectId} AND generation_id = ${generationId} AND parser_status = 'recovered') AS recovered,
-      (SELECT count(*)::integer FROM symbol_files WHERE project_id = ${projectId} AND generation_id = ${generationId} AND parser_status IN ('failed','unsupported')) AS hard_failures,
+      (SELECT count(*)::integer FROM symbol_files WHERE project_id = ${projectId} AND generation_id = ${generationId} AND parser_status IN ('failed','unsupported') AND NOT is_stale) AS hard_failures,
       (SELECT count(*)::integer FROM symbol_files WHERE project_id = ${projectId} AND generation_id = ${generationId} AND is_stale) AS stale_files,
-      (SELECT count(*)::integer FROM symbol_files WHERE project_id = ${projectId} AND generation_id = ${generationId} AND parser_status NOT IN ('ok','recovered')) AS invalid_files
+      (SELECT count(*)::integer FROM symbol_files WHERE project_id = ${projectId} AND generation_id = ${generationId} AND parser_status NOT IN ('ok','recovered') AND NOT is_stale) AS invalid_files
   `;
   return rows[0]!;
 }

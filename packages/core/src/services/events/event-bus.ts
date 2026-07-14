@@ -39,6 +39,7 @@ export interface EventMap {
     chunksIndexed: number;
     symbolsIndexed: number;
     durationMs: number;
+    activatedGraphGenerationId: string;
   };
   "indexing:failed": {
     jobId: string;

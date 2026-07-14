@@ -16,6 +16,7 @@ import type {
   StructuralEdgeKind,
   StructuralSymbolKind,
 } from "../structural/types.js";
+import type { GraphGenerationLease } from "../../data/graph-generation/graph-generation-contract.js";
 
 // ─── Event types ─────────────────────────────────────────────────────────────
 
@@ -39,6 +40,8 @@ export interface EtlStageContext {
   projectId: string;
   projectPath: string;
   jobId: string;
+  graphGenerationLease?: GraphGenerationLease;
+  abortSignal?: AbortSignal;
   /** Hook for emitting progress events to the EventBus. */
   emit: (event: EtlEvent) => void;
 }
@@ -52,6 +55,8 @@ export interface DiscoveredFile {
   mtime: number;
   size: number;
   contentHash: string; // SHA-256 of raw content
+  /** Immutable UTF-8 content captured during discovery for this generation. */
+  snapshotContent?: string;
   /** True when content hash matches stored hash → skip parse/load. */
   needsReparse: boolean;
 }
@@ -156,4 +161,5 @@ export interface EtlResult {
   errors: number;
   durationMs: number;
   stageTimings: Record<EtlStage, number>;
+  activatedGraphGenerationId: string;
 }

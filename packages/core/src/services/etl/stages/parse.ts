@@ -11,8 +11,8 @@
  * Files with needsReparse=false are passed through with empty symbols/chunks.
  */
 
-import fs from "fs/promises";
 import path from "path";
+import fs from "fs/promises";
 import { logger } from "@massa-th0th/shared";
 import { smartChunk, type Chunk } from "../../search/smart-chunker.js";
 import { structuralRuntime, type StructuralRuntime } from "../../structural/structural-runtime.js";
@@ -30,7 +30,7 @@ import type {
 const BATCH_SIZE = 20;
 const STRUCTURAL_TS_JS_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx"]);
 
-class StructuralEtlParseError extends Error {
+export class StructuralEtlParseError extends Error {
   constructor(readonly filePath: string, readonly failureKind: string, message: string) {
     super(message);
     this.name = "StructuralEtlParseError";
@@ -67,6 +67,7 @@ export class ParseStage {
     let processed = 0;
 
     for (let i = 0; i < files.length; i += BATCH_SIZE) {
+      if (ctx.abortSignal?.aborted) throw ctx.abortSignal.reason;
       const batch = files.slice(i, i + BATCH_SIZE);
       const batchResults = await Promise.all(
         batch.map((file) => this.parseFile(ctx, file)),
@@ -112,7 +113,7 @@ export class ParseStage {
     }
 
     try {
-      const content = await fs.readFile(file.absolutePath, "utf-8");
+      const content = file.snapshotContent ?? await fs.readFile(file.absolutePath, "utf-8");
       const ext = path.extname(file.relativePath).toLowerCase();
 
       const chunkerMaxChars = resolveChunkerMaxChars();

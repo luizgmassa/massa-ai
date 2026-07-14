@@ -667,3 +667,14 @@ These draft checksums are retained as failed-review evidence and are not an acti
 | `packages/core/src/__tests__/graph-generation-symbol-repository-pg.test.ts` | `f74ab7e31de52080f034a66d88b4f35e5ad457e13ef4b749003bd6477ea4dcaf` |
 
 `gate-manifest.md` cannot embed its own stable checksum; record its Git blob ID at the TASK-012 commit.
+
+## TASK-013 Accepted Gate Evidence v17
+
+- Platform: macOS arm64 only; exact Bun `1.3.0`; dedicated owned PostgreSQL 17 at `127.0.0.1:5433`.
+- Exact focused/owned command: `RUN_GRAPH_GENERATION_LIFECYCLE=1 RUN_GRAPH_GENERATION_SYMBOL_REPOSITORY=1 MASSA_TH0TH_DEDICATED=1 GRAPH_GENERATION_TEST_ADMIN_URL='postgresql://test@127.0.0.1:5433/postgres' bunx bun@1.3.0 test --max-concurrency 1 packages/core/src/__tests__/graph-generation-etl-lifecycle.test.ts packages/core/src/__tests__/graph-generation-lifecycle-pg.test.ts packages/core/src/__tests__/graph-generation-symbol-repository-pg.test.ts` — PASS, 38 tests, 147 assertions.
+- `bunx bun@1.3.0 run type-check` — PASS, 6/6 packages.
+- `bunx bun@1.3.0 run build` — PASS, 5/5 packages.
+- `git diff --check` — PASS.
+- Scenario map: immutable membership/content snapshot; required unreadable file; recovered syntax; full hard failure retaining active; multi-file incremental stale LKG activation and recovery; deletion; pending invisibility; stale snapshot mutation; interruption with external operation settlement/no post-terminal writes; concurrent owner serialization and stale-active refresh; activation-before-awaited durable terminal UPSERT; terminal UPSERT rejection suppressing completion.
+- Independent read-only source review: PASS after remediation.
+- Adjudication: MLTS-013 protects structural graph generations only; the existing non-generational semantic vector/keyword lifecycle is intentionally unchanged and was not expanded.

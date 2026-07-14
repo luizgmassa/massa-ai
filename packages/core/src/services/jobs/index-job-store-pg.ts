@@ -42,6 +42,7 @@ interface JobRow {
   chunks_indexed: number | bigint | null;
   errors: number | bigint | null;
   duration: number | bigint | null;
+  activated_graph_generation_id: string | null;
   error: string | null;
   created_at: number | bigint;
   started_at: number | bigint | null;
@@ -73,6 +74,7 @@ function rowToJob(r: JobRow): IndexJob {
             chunksIndexed: toNum(r.chunks_indexed) ?? 0,
             errors: toNum(r.errors) ?? 0,
             duration: toNum(r.duration) ?? 0,
+            activatedGraphGenerationId: r.activated_graph_generation_id ?? undefined,
           }
         : undefined,
     error: r.error ?? undefined,
@@ -110,6 +112,7 @@ export class PgJobStore implements JobStore {
    * the map does not grow.
    */
   private inflight: Map<string, Promise<void>> = new Map();
+  private persistFailures: Map<string, unknown> = new Map();
 
   private getClient(): PrismaClient {
     if (!this.prisma) this.prisma = getPrismaClient();
@@ -231,11 +234,15 @@ export class PgJobStore implements JobStore {
     const next = prev.catch(() => {}).then(() => this.persist(job));
     this.inflight.set(job.jobId, next);
     // Drop the chain entry once settled so the map doesn't grow.
-    next.finally(() => {
+    void next.finally(() => {
       if (this.inflight.get(job.jobId) === next) {
         this.inflight.delete(job.jobId);
       }
-    });
+    }).catch(() => {});
+    next.then(
+      () => this.persistFailures.delete(job.jobId),
+      (error) => this.persistFailures.set(job.jobId, error),
+    );
     next.catch((e) => {
       logger.warn("PgJobStore.save failed (best-effort)", {
         jobId: job.jobId,
@@ -259,12 +266,27 @@ export class PgJobStore implements JobStore {
     if (all.length) await Promise.all(all.map((p) => p.catch(() => {})));
   }
 
+  async flush(jobId?: string): Promise<void> {
+    if (jobId) {
+      const pending = this.inflight.get(jobId);
+      if (pending) await pending;
+      const failure = this.persistFailures.get(jobId);
+      if (failure !== undefined) throw failure;
+      return;
+    }
+    const pending = Array.from(this.inflight.values());
+    if (pending.length) await Promise.all(pending);
+    const failure = this.persistFailures.values().next().value;
+    if (failure !== undefined) throw failure;
+  }
+
   private async persist(job: IndexJob): Promise<void> {
     const prisma = this.getClient();
     const filesIndexed = job.result?.filesIndexed ?? null;
     const chunksIndexed = job.result?.chunksIndexed ?? null;
     const errors = job.result?.errors ?? null;
     const duration = job.result?.duration ?? null;
+    const activatedGraphGenerationId = job.result?.activatedGraphGenerationId ?? null;
     const error = job.error ?? null;
     const createdAt = job.createdAt.getTime();
     const startedAt = job.startedAt?.getTime() ?? null;
@@ -273,7 +295,7 @@ export class PgJobStore implements JobStore {
     await prisma.$executeRaw`
       INSERT INTO index_jobs (
         job_id, project_id, project_path, status, current, total, percentage,
-        files_indexed, chunks_indexed, errors, duration, error,
+        files_indexed, chunks_indexed, errors, duration, activated_graph_generation_id, error,
         created_at, started_at, completed_at, heartbeat_at
       ) VALUES (
         ${job.jobId},
@@ -287,6 +309,7 @@ export class PgJobStore implements JobStore {
         ${chunksIndexed}::int,
         ${errors}::int,
         ${duration}::int,
+        ${activatedGraphGenerationId},
         ${error},
         ${createdAt}::bigint,
         ${startedAt !== null ? startedAt : null}::bigint,
@@ -302,6 +325,7 @@ export class PgJobStore implements JobStore {
         chunks_indexed = EXCLUDED.chunks_indexed,
         errors = EXCLUDED.errors,
         duration = EXCLUDED.duration,
+        activated_graph_generation_id = EXCLUDED.activated_graph_generation_id,
         error = EXCLUDED.error,
         started_at = EXCLUDED.started_at,
         completed_at = EXCLUDED.completed_at,

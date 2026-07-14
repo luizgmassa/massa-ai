@@ -156,6 +156,22 @@ afterAll(async () => {
 });
 
 describe.skipIf(!integrationRequested)("owned PostgreSQL graph-generation lifecycle", () => {
+  test("coordinator waits for a held cross-process owner then acquires durably", async () => {
+    const held = await begin();
+    const { GraphGenerationCoordinator } = await import("../services/etl/graph-generation-coordinator.js");
+    const coordinator = new GraphGenerationCoordinator(repository);
+    const release = new Promise<void>((resolve, reject) => setTimeout(() => {
+      repository.abort(held, "test_owner_finished").then(() => resolve(), reject);
+    }, 150));
+    const acquired = await coordinator.begin({
+      projectId, expectedActiveGenerationId: legacyGenerationId,
+      fingerprint: "structural:v2", inputSnapshotHash: "snapshot:waiter", expectedFilesCount: 1,
+    });
+    await release;
+    expect(acquired.generationId).not.toBe(held.generationId);
+    expect((await db!.query(`SELECT pending_graph_generation_id FROM workspaces WHERE project_id=$1`, [projectId])).rows[0].pending_graph_generation_id).toBe(acquired.generationId);
+  });
+
   test("serializes competing begin calls as acquired then busy", async () => {
     const [first, second] = await Promise.all([
       repository.begin({

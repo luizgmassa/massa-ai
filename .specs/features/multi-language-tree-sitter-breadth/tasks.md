@@ -6,7 +6,7 @@ Implement with the active `massa-th0th` Spec Driven Execute flow, `coding-guidel
 
 **Design:** `.specs/features/multi-language-tree-sitter-breadth/design.md`  
 **Capability contract:** `.specs/features/multi-language-tree-sitter-breadth/capability-matrix.md`  
-**Status:** TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 PASS; TASK-006 PASS; TASK-007 PASS; TASK-008 PASS; TASK-009 PASS; TASK-010 PASS; TASK-011 PASS; TASK-012 PASS; TASK-013 READY
+**Status:** TASK-001 through TASK-013 PASS; TASK-014 READY
 
 ## Project Testing Guidelines Scan
 
@@ -243,7 +243,7 @@ Phase 7 Validate:
 
 ### T13 / TASK-013: Integrate generation lifecycle into ETL and job ordering
 
-**Status:** READY after TASK-009 and TASK-012 PASS.
+**Status:** PASS on 2026-07-14. Atomic pending-generation ETL, immutable snapshot reconciliation, LKG stale retention/recovery, cross-process stale-active refresh, interruption cleanup, durable terminal generation identity, deletion, and independent review passed on macOS arm64.
 
 **What:** Thread generation/snapshot through Discover/Parse/Resolve/Load; build pending beside active; enforce completeness; retain last-good incremental rows; activate/count synchronously before terminal job; reconcile deletes.  
 **Where:** ETL stages/pipeline, workspace/job lifecycle, event ordering, tests.  
@@ -253,6 +253,8 @@ Phase 7 Validate:
 **Commit:** `feat(index): activate structural generations atomically`
 
 ### T14 / TASK-014: Persist and aggregate parser diagnostics
+
+**Status:** READY after TASK-013 PASS.
 
 **What:** Store per-file parser metadata/bounded ranges and durable job/project summaries with active-generation and stale counts.  
 **Where:** stage/job types, job store, symbol repository aggregates, tests.  
