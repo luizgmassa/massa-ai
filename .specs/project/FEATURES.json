@@ -230,7 +230,19 @@
         "tasks": true,
         "execute": true
       }
+    },
+    {
+      "slug": "multi-language-tree-sitter-breadth",
+      "title": "Native Tree-sitter structural indexing across 33 extensions",
+      "status": "blocked",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": false
+      }
     }
   ],
-  "active_feature": "sqlite-removal"
+  "active_feature": "multi-language-tree-sitter-breadth"
 }
