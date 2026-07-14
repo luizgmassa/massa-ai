@@ -17,10 +17,16 @@ describe.skipIf(!DB_AVAILABLE)("ETL fingerprint parity on PostgreSQL", () => {
     projectPath = await fs.mkdtemp(path.join(os.tmpdir(), "massa-th0th-etl-pg-"));
     const { getPrismaClient } = await import("../services/query/prisma-client.js");
     prisma = getPrismaClient();
-    await prisma.$executeRaw`
-      INSERT INTO workspaces (project_id, project_path, display_name, created_at, updated_at)
-      VALUES (${projectId}, ${projectPath}, ${"PG ETL parity"}, NOW(), NOW())
-    `;
+    const repo = getSymbolRepository();
+    await repo.upsertWorkspace({
+      project_id: projectId,
+      project_path: projectPath,
+      display_name: "PG ETL parity",
+      status: "pending",
+      files_count: 0,
+      chunks_count: 0,
+      symbols_count: 0,
+    });
   });
 
   afterAll(async () => {

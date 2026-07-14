@@ -7,6 +7,7 @@
 
 import { logger } from "@massa-th0th/shared";
 import { getPrismaClient } from "../../services/query/prisma-client.js";
+import { parseStructuralFqn } from "../../services/structural/fqn-codec.js";
 
 // ─── Domain types ────────────────────────────────────────────────────────────
 
@@ -66,6 +67,11 @@ export interface SymbolDefinition {
   exported: boolean;
   doc_comment?: string;
   indexed_at: number;
+  qualified_name?: string;
+  canonical_signature?: string;
+  signature_hash?: string;
+  legacy_fqn?: string;
+  source_span?: Record<string, unknown>;
 }
 
 export interface SymbolReference {
@@ -78,6 +84,7 @@ export interface SymbolReference {
   ref_kind: RefKind;
   /** Typed-edge metadata (D1): stored natively as JSONB in PG. */
   meta?: Record<string, unknown> | null;
+  source_span?: Record<string, unknown>;
 }
 
 export interface SymbolImport {
@@ -110,6 +117,50 @@ export interface WorkspaceRow {
   symbols_count: number;
   created_at: number;
   updated_at: number;
+}
+
+function definitionIdentityColumns(def: SymbolDefinition): {
+  qualifiedName: string;
+  canonicalSignature: string | null;
+  signatureHash: string | null;
+  legacyFqn: string;
+  sourceSpan: Record<string, unknown> | null;
+} {
+  const legacyFqn = def.legacy_fqn ?? `${def.file_path}#${def.name}`;
+  let parsedModern: Extract<ReturnType<typeof parseStructuralFqn>, { format: "qualified" }> | null = null;
+  try {
+    const parsed = parseStructuralFqn(def.id);
+    if (
+      parsed.format === "qualified" &&
+      parsed.file === def.file_path &&
+      parsed.kind === def.kind &&
+      parsed.qualifiedName.split(".").at(-1) === def.name
+    ) {
+      parsedModern = parsed;
+    }
+  } catch {
+    // Pre-codec legacy rows retain their compatibility fields without
+    // fabricating qualified identity material.
+  }
+  return {
+    qualifiedName: def.qualified_name ?? parsedModern?.qualifiedName ?? def.name,
+    canonicalSignature: def.canonical_signature ?? null,
+    signatureHash: def.signature_hash ?? parsedModern?.signatureHash ?? null,
+    legacyFqn,
+    sourceSpan: def.source_span ?? null,
+  };
+}
+
+function referenceSourceSpan(ref: SymbolReference): Record<string, unknown> | null {
+  const candidate = ref.source_span ?? ref.meta?.sourceSpan;
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
+  const span = candidate as Record<string, unknown>;
+  const start = span.start as Record<string, unknown> | undefined;
+  const end = span.end as Record<string, unknown> | undefined;
+  const integers = [span.startByte, span.endByte, start?.row, start?.column, end?.row, end?.column];
+  if (!integers.every((value) => Number.isInteger(value) && (value as number) >= 0)) return null;
+  if ((span.endByte as number) < (span.startByte as number)) return null;
+  return span;
 }
 
 // ─── Raw row types returned by $queryRaw ─────────────────────────────────────
@@ -179,6 +230,11 @@ interface DefRaw {
   exported: boolean;
   doc_comment: string | null;
   indexed_at: Date;
+  qualified_name: string;
+  canonical_signature: string | null;
+  signature_hash: string | null;
+  legacy_fqn: string;
+  source_span: Record<string, unknown> | null;
 }
 
 function mapDef(d: DefRaw): SymbolDefinition {
@@ -193,6 +249,11 @@ function mapDef(d: DefRaw): SymbolDefinition {
     exported: Boolean(d.exported),
     doc_comment: d.doc_comment ?? undefined,
     indexed_at: d.indexed_at.getTime(),
+    qualified_name: d.qualified_name,
+    canonical_signature: d.canonical_signature ?? undefined,
+    signature_hash: d.signature_hash ?? undefined,
+    legacy_fqn: d.legacy_fqn,
+    source_span: d.source_span ?? undefined,
   };
 }
 
@@ -205,6 +266,7 @@ interface RefRaw {
   target_fqn: string | null;
   ref_kind: string;
   meta: Record<string, unknown> | null;
+  source_span: Record<string, unknown> | null;
 }
 
 function mapRef(r: RefRaw): SymbolReference {
@@ -217,6 +279,7 @@ function mapRef(r: RefRaw): SymbolReference {
     target_fqn: r.target_fqn ?? undefined,
     ref_kind: r.ref_kind as RefKind,
     meta: r.meta ?? null,
+    source_span: r.source_span ?? undefined,
   };
 }
 
@@ -271,7 +334,8 @@ export class SymbolRepositoryPg {
       ? new Date(ws.last_indexed_at)
       : null;
     const p = getPrismaClient();
-    await p.$executeRaw`
+    await p.$transaction(async (tx) => {
+      await tx.$executeRaw`
       INSERT INTO workspaces (project_id, project_path, display_name, status, last_indexed_at, last_error, files_count, chunks_count, symbols_count, created_at, updated_at)
       VALUES (
         ${ws.project_id}, ${ws.project_path}, ${ws.display_name ?? null},
@@ -290,6 +354,47 @@ export class SymbolRepositoryPg {
         symbols_count   = EXCLUDED.symbols_count,
         updated_at      = NOW()
     `;
+    // Transitional bridge for workspaces first created after the generation
+    // migration. T12 replaces this legacy generation with the coordinator.
+      await tx.$executeRaw`
+      WITH locked_workspace AS (
+        SELECT project_id, project_path
+        FROM workspaces
+        WHERE project_id = ${ws.project_id}
+        FOR UPDATE
+      ), inserted AS (
+        INSERT INTO graph_generations (
+          id, project_id, status, fingerprint, input_snapshot_hash,
+          expected_files_count, completed_files_count, started_at, completed_at, activated_at
+        )
+        SELECT
+          'legacy-' || md5(project_id), project_id, 'active', 'legacy:v1',
+          'md5:' || md5(project_path || E'\n'), 0, 0, NOW(), NOW(), NOW()
+        FROM locked_workspace
+        WHERE NOT EXISTS (
+          SELECT 1 FROM workspaces current_workspace
+          WHERE current_workspace.project_id = locked_workspace.project_id
+            AND current_workspace.active_graph_generation_id IS NOT NULL
+        )
+        ON CONFLICT (id) DO NOTHING
+        RETURNING id, project_id
+      ), active_generation AS (
+        SELECT id, project_id FROM inserted
+        UNION ALL
+        SELECT generation.id, generation.project_id
+        FROM graph_generations generation
+        JOIN locked_workspace ON locked_workspace.project_id = generation.project_id
+        WHERE generation.id = 'legacy-' || md5(generation.project_id)
+      )
+      UPDATE workspaces current_workspace
+      SET active_graph_generation_id = generation.id
+      FROM active_generation generation
+      WHERE current_workspace.project_id = ${ws.project_id}
+        AND current_workspace.active_graph_generation_id IS NULL
+        AND generation.id = 'legacy-' || md5(current_workspace.project_id)
+        AND generation.project_id = current_workspace.project_id
+      `;
+    });
   }
 
   async updateWorkspaceStatus(
@@ -320,17 +425,68 @@ export class SymbolRepositoryPg {
           : undefined;
 
     const p = getPrismaClient();
-    await p.$executeRaw`
-      UPDATE workspaces SET
-        status          = ${status},
-        last_error      = ${lastError},
-        last_indexed_at = ${lastIndexedAt ?? null},
-        files_count     = COALESCE(${filesCount ?? null}, files_count),
-        chunks_count    = COALESCE(${chunksCount ?? null}, chunks_count),
-        symbols_count   = COALESCE(${symbolsCount ?? null}, symbols_count),
-        updated_at      = NOW()
-      WHERE project_id = ${projectId}
-    `;
+    await p.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        UPDATE workspaces SET
+          status          = ${status},
+          last_error      = ${lastError},
+          last_indexed_at = ${lastIndexedAt ?? null},
+          files_count     = COALESCE(${filesCount ?? null}, files_count),
+          chunks_count    = COALESCE(${chunksCount ?? null}, chunks_count),
+          symbols_count   = COALESCE(${symbolsCount ?? null}, symbols_count),
+          updated_at      = NOW()
+        WHERE project_id = ${projectId}
+      `;
+      if (status !== "indexed") return;
+      await tx.$executeRaw`
+        WITH active_counts AS (
+          SELECT
+            w.project_id,
+            w.active_graph_generation_id AS generation_id,
+            (SELECT count(*)::integer FROM symbol_files f WHERE f.project_id = w.project_id AND f.generation_id = w.active_graph_generation_id) AS files_count,
+            (SELECT count(*)::integer FROM symbol_definitions d WHERE d.project_id = w.project_id AND d.generation_id = w.active_graph_generation_id) AS definitions_count,
+            (SELECT count(*)::integer FROM symbol_references r WHERE r.project_id = w.project_id AND r.generation_id = w.active_graph_generation_id) AS references_count,
+            (SELECT count(*)::integer FROM symbol_imports i WHERE i.project_id = w.project_id AND i.generation_id = w.active_graph_generation_id) AS imports_count,
+            (SELECT count(*)::integer FROM symbol_centrality c WHERE c.project_id = w.project_id AND c.generation_id = w.active_graph_generation_id) AS centrality_count,
+            (SELECT COALESCE(sum(f.parser_error_count), 0)::integer FROM symbol_files f WHERE f.project_id = w.project_id AND f.generation_id = w.active_graph_generation_id) AS diagnostics_count,
+            (SELECT count(*)::integer FROM symbol_files f WHERE f.project_id = w.project_id AND f.generation_id = w.active_graph_generation_id AND f.parser_status = 'recovered') AS recovered_count,
+            (SELECT count(*)::integer FROM symbol_files f WHERE f.project_id = w.project_id AND f.generation_id = w.active_graph_generation_id AND f.parser_status = 'failed') AS hard_failures_count,
+            (SELECT count(*)::integer FROM symbol_files f WHERE f.project_id = w.project_id AND f.generation_id = w.active_graph_generation_id AND f.is_stale) AS stale_files_count
+          FROM workspaces w
+          WHERE w.project_id = ${projectId} AND w.active_graph_generation_id IS NOT NULL
+          FOR UPDATE
+        ), updated_generation AS (
+          UPDATE graph_generations g SET
+            expected_files_count = c.files_count,
+            completed_files_count = c.files_count,
+            files_count = c.files_count,
+            definitions_count = c.definitions_count,
+            references_count = c.references_count,
+            imports_count = c.imports_count,
+            centrality_count = c.centrality_count,
+            diagnostics_count = c.diagnostics_count,
+            recovered_count = c.recovered_count,
+            hard_failures_count = c.hard_failures_count,
+            stale_files_count = c.stale_files_count,
+            completed_at = COALESCE(g.completed_at, NOW())
+          FROM active_counts c
+          WHERE g.project_id = c.project_id AND g.id = c.generation_id
+          RETURNING g.id
+        )
+        UPDATE workspaces w SET
+          active_files_count = c.files_count,
+          active_definitions_count = c.definitions_count,
+          active_references_count = c.references_count,
+          active_imports_count = c.imports_count,
+          active_centrality_count = c.centrality_count,
+          active_diagnostics_count = c.diagnostics_count,
+          active_recovered_count = c.recovered_count,
+          active_hard_failures_count = c.hard_failures_count,
+          active_stale_files_count = c.stale_files_count
+        FROM active_counts c
+        WHERE w.project_id = c.project_id AND EXISTS (SELECT 1 FROM updated_generation)
+      `;
+    });
   }
 
   async getWorkspace(projectId: string): Promise<WorkspaceRow | null> {
@@ -359,9 +515,9 @@ export class SymbolRepositoryPg {
   async upsertFile(file: SymbolFileRow): Promise<void> {
     const p = getPrismaClient();
     await p.$executeRaw`
-      INSERT INTO symbol_files (project_id, relative_path, content_hash, mtime, size, indexed_at, symbol_count, chunk_count)
-      VALUES (${file.project_id}, ${file.relative_path}, ${file.content_hash}, ${BigInt(Math.trunc(file.mtime))}, ${file.size}, ${new Date(file.indexed_at)}, ${file.symbol_count}, ${file.chunk_count})
-      ON CONFLICT (project_id, relative_path) DO UPDATE SET
+      INSERT INTO symbol_files (project_id, generation_id, relative_path, content_hash, mtime, size, indexed_at, symbol_count, chunk_count)
+      VALUES (${file.project_id}, (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${file.project_id}), ${file.relative_path}, ${file.content_hash}, ${BigInt(Math.trunc(file.mtime))}, ${file.size}, ${new Date(file.indexed_at)}, ${file.symbol_count}, ${file.chunk_count})
+      ON CONFLICT (project_id, generation_id, relative_path) DO UPDATE SET
         content_hash = EXCLUDED.content_hash,
         mtime        = EXCLUDED.mtime,
         size         = EXCLUDED.size,
@@ -377,7 +533,9 @@ export class SymbolRepositoryPg {
   ): Promise<SymbolFileRow | null> {
     const p = getPrismaClient();
     const rows = await p.$queryRaw<FileRaw[]>`
-      SELECT * FROM symbol_files WHERE project_id = ${projectId} AND relative_path = ${relativePath} LIMIT 1
+      SELECT * FROM symbol_files WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
+        AND relative_path = ${relativePath} LIMIT 1
     `;
     return rows.length > 0 ? mapFile(rows[0]) : null;
   }
@@ -386,10 +544,11 @@ export class SymbolRepositoryPg {
 
   async upsertDefinition(def: SymbolDefinition): Promise<void> {
     const p = getPrismaClient();
+    const identity = definitionIdentityColumns(def);
     await p.$executeRaw`
-      INSERT INTO symbol_definitions (id, project_id, file_path, name, kind, line_start, line_end, exported, doc_comment, indexed_at)
-      VALUES (${def.id}, ${def.project_id}, ${def.file_path}, ${def.name}, ${def.kind}, ${def.line_start}, ${def.line_end}, ${def.exported}, ${def.doc_comment ?? null}, ${new Date(def.indexed_at)})
-      ON CONFLICT (project_id, id) DO UPDATE SET
+      INSERT INTO symbol_definitions (id, project_id, generation_id, file_path, name, kind, line_start, line_end, exported, doc_comment, indexed_at, qualified_name, canonical_signature, signature_hash, legacy_fqn, source_span)
+      VALUES (${def.id}, ${def.project_id}, (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${def.project_id}), ${def.file_path}, ${def.name}, ${def.kind}, ${def.line_start}, ${def.line_end}, ${def.exported}, ${def.doc_comment ?? null}, ${new Date(def.indexed_at)}, ${identity.qualifiedName}, ${identity.canonicalSignature}, ${identity.signatureHash}, ${identity.legacyFqn}, ${identity.sourceSpan}::jsonb)
+      ON CONFLICT (project_id, generation_id, id) DO UPDATE SET
         file_path   = EXCLUDED.file_path,
         name        = EXCLUDED.name,
         kind        = EXCLUDED.kind,
@@ -397,7 +556,12 @@ export class SymbolRepositoryPg {
         line_end    = EXCLUDED.line_end,
         exported    = EXCLUDED.exported,
         doc_comment = EXCLUDED.doc_comment,
-        indexed_at  = EXCLUDED.indexed_at
+        indexed_at  = EXCLUDED.indexed_at,
+        qualified_name = EXCLUDED.qualified_name,
+        canonical_signature = EXCLUDED.canonical_signature,
+        signature_hash = EXCLUDED.signature_hash,
+        legacy_fqn = EXCLUDED.legacy_fqn,
+        source_span = EXCLUDED.source_span
     `;
   }
 
@@ -406,7 +570,7 @@ export class SymbolRepositoryPg {
     filePath: string,
   ): Promise<number> {
     const p = getPrismaClient();
-    await p.$executeRaw`DELETE FROM symbol_definitions WHERE project_id = ${projectId} AND file_path = ${filePath}`;
+    await p.$executeRaw`DELETE FROM symbol_definitions WHERE project_id = ${projectId} AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId}) AND file_path = ${filePath}`;
     return 0; // count not needed by callers
   }
 
@@ -425,6 +589,7 @@ export class SymbolRepositoryPg {
     const rows = await p.$queryRaw<DefRaw[]>`
       SELECT * FROM symbol_definitions
       WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
         AND (${query ?? null}::text IS NULL OR name ILIKE ${"%" + (query ?? "") + "%"})
         AND (${kindList}::text[] IS NULL OR kind = ANY(${kindList}::text[]))
         AND (${exportedOnly ?? false} = false OR exported = true)
@@ -441,7 +606,9 @@ export class SymbolRepositoryPg {
   ): Promise<SymbolDefinition | null> {
     const p = getPrismaClient();
     const rows = await p.$queryRaw<DefRaw[]>`
-      SELECT * FROM symbol_definitions WHERE project_id = ${projectId} AND id = ${fqn} LIMIT 1
+      SELECT * FROM symbol_definitions WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
+        AND id = ${fqn} LIMIT 1
     `;
     return rows.length > 0 ? mapDef(rows[0]) : null;
   }
@@ -450,9 +617,10 @@ export class SymbolRepositoryPg {
 
   async insertReference(ref: SymbolReference): Promise<void> {
     const p = getPrismaClient();
+    const sourceSpan = referenceSourceSpan(ref);
     await p.$executeRaw`
-      INSERT INTO symbol_references (project_id, from_file, from_line, symbol_name, target_fqn, ref_kind, meta)
-      VALUES (${ref.project_id}, ${ref.from_file}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn ?? "unknown"}, ${ref.ref_kind}, ${ref.meta ?? null}::jsonb)
+      INSERT INTO symbol_references (project_id, generation_id, from_file, from_line, symbol_name, target_fqn, ref_kind, meta, source_span)
+      VALUES (${ref.project_id}, (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${ref.project_id}), ${ref.from_file}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn ?? "unknown"}, ${ref.ref_kind}, ${ref.meta ?? null}::jsonb, ${sourceSpan}::jsonb)
     `;
   }
 
@@ -461,7 +629,7 @@ export class SymbolRepositoryPg {
     filePath: string,
   ): Promise<number> {
     const p = getPrismaClient();
-    await p.$executeRaw`DELETE FROM symbol_references WHERE project_id = ${projectId} AND from_file = ${filePath}`;
+    await p.$executeRaw`DELETE FROM symbol_references WHERE project_id = ${projectId} AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId}) AND from_file = ${filePath}`;
     return 0;
   }
 
@@ -475,6 +643,7 @@ export class SymbolRepositoryPg {
     const rows = await p.$queryRaw<RefRaw[]>`
       SELECT * FROM symbol_references
       WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
         AND (symbol_name = ${symbolName} OR target_fqn LIKE ${"%" + suffix})
       ORDER BY from_file ASC, from_line ASC
       LIMIT ${limit}
@@ -487,8 +656,8 @@ export class SymbolRepositoryPg {
   async insertImport(imp: SymbolImport): Promise<void> {
     const p = getPrismaClient();
     await p.$executeRaw`
-      INSERT INTO symbol_imports (project_id, from_file, to_file, specifier, imported_names, is_external, is_type_only)
-      VALUES (${imp.project_id}, ${imp.from_file}, ${imp.to_file ?? null}, ${imp.specifier}, ${imp.imported_names}, ${imp.is_external}, ${imp.is_type_only})
+      INSERT INTO symbol_imports (project_id, generation_id, from_file, to_file, specifier, imported_names, is_external, is_type_only)
+      VALUES (${imp.project_id}, (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${imp.project_id}), ${imp.from_file}, ${imp.to_file ?? null}, ${imp.specifier}, ${imp.imported_names}, ${imp.is_external}, ${imp.is_type_only})
     `;
   }
 
@@ -497,7 +666,7 @@ export class SymbolRepositoryPg {
     filePath: string,
   ): Promise<number> {
     const p = getPrismaClient();
-    await p.$executeRaw`DELETE FROM symbol_imports WHERE project_id = ${projectId} AND from_file = ${filePath}`;
+    await p.$executeRaw`DELETE FROM symbol_imports WHERE project_id = ${projectId} AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId}) AND from_file = ${filePath}`;
     return 0;
   }
 
@@ -507,7 +676,9 @@ export class SymbolRepositoryPg {
   ): Promise<SymbolImport[]> {
     const p = getPrismaClient();
     const rows = await p.$queryRaw<ImpRaw[]>`
-      SELECT * FROM symbol_imports WHERE project_id = ${projectId} AND from_file = ${filePath}
+      SELECT * FROM symbol_imports WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
+        AND from_file = ${filePath}
     `;
     return rows.map(mapImp);
   }
@@ -517,9 +688,9 @@ export class SymbolRepositoryPg {
   async upsertCentrality(entry: CentralityEntry): Promise<void> {
     const p = getPrismaClient();
     await p.$executeRaw`
-      INSERT INTO symbol_centrality (project_id, file_path, score, updated_at)
-      VALUES (${entry.project_id}, ${entry.file_path}, ${entry.score}, ${new Date(entry.updated_at)})
-      ON CONFLICT (project_id, file_path) DO UPDATE SET
+      INSERT INTO symbol_centrality (project_id, generation_id, file_path, score, updated_at)
+      VALUES (${entry.project_id}, (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${entry.project_id}), ${entry.file_path}, ${entry.score}, ${new Date(entry.updated_at)})
+      ON CONFLICT (project_id, generation_id, file_path) DO UPDATE SET
         score      = EXCLUDED.score,
         updated_at = EXCLUDED.updated_at
     `;
@@ -538,7 +709,9 @@ export class SymbolRepositoryPg {
         updated_at: Date;
       }[]
     >`
-      SELECT * FROM symbol_centrality WHERE project_id = ${projectId} ORDER BY score DESC LIMIT ${limit}
+      SELECT * FROM symbol_centrality WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
+        ORDER BY score DESC LIMIT ${limit}
     `;
     return rows.map((r) => ({
       project_id: r.project_id,
@@ -568,6 +741,7 @@ export class SymbolRepositoryPg {
         SELECT kind, COUNT(*)::bigint AS count
         FROM symbol_definitions
         WHERE project_id = ${projectId}
+          AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
         GROUP BY kind
         ORDER BY count DESC
       `,
@@ -578,6 +752,7 @@ export class SymbolRepositoryPg {
                COUNT(*)::bigint AS count
         FROM symbol_files
         WHERE project_id = ${projectId}
+          AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
         GROUP BY ext
         ORDER BY count DESC
       `,
@@ -585,6 +760,7 @@ export class SymbolRepositoryPg {
         SELECT relative_path, indexed_at
         FROM symbol_files
         WHERE project_id = ${projectId}
+          AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
         ORDER BY indexed_at DESC
         LIMIT ${recentLimit}
       `,
@@ -611,6 +787,7 @@ export class SymbolRepositoryPg {
     const p = getPrismaClient();
     const rows = await p.$queryRaw<{ file_path: string; score: number }[]>`
       SELECT file_path, score FROM symbol_centrality WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
     `;
     const map = new Map<string, number>();
     for (const r of rows) map.set(r.file_path, Number(r.score));
@@ -624,10 +801,11 @@ export class SymbolRepositoryPg {
     const p = getPrismaClient();
     await p.$transaction(async (tx) => {
       for (const def of defs) {
+        const identity = definitionIdentityColumns(def);
         await tx.$executeRaw`
-          INSERT INTO symbol_definitions (id, project_id, file_path, name, kind, line_start, line_end, exported, doc_comment, indexed_at)
-          VALUES (${def.id}, ${def.project_id}, ${def.file_path}, ${def.name}, ${def.kind}, ${def.line_start}, ${def.line_end}, ${def.exported}, ${def.doc_comment ?? null}, ${new Date(def.indexed_at)})
-          ON CONFLICT (project_id, id) DO UPDATE SET
+          INSERT INTO symbol_definitions (id, project_id, generation_id, file_path, name, kind, line_start, line_end, exported, doc_comment, indexed_at, qualified_name, canonical_signature, signature_hash, legacy_fqn, source_span)
+          VALUES (${def.id}, ${def.project_id}, (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${def.project_id}), ${def.file_path}, ${def.name}, ${def.kind}, ${def.line_start}, ${def.line_end}, ${def.exported}, ${def.doc_comment ?? null}, ${new Date(def.indexed_at)}, ${identity.qualifiedName}, ${identity.canonicalSignature}, ${identity.signatureHash}, ${identity.legacyFqn}, ${identity.sourceSpan}::jsonb)
+          ON CONFLICT (project_id, generation_id, id) DO UPDATE SET
             file_path   = EXCLUDED.file_path,
             name        = EXCLUDED.name,
             kind        = EXCLUDED.kind,
@@ -635,7 +813,12 @@ export class SymbolRepositoryPg {
             line_end    = EXCLUDED.line_end,
             exported    = EXCLUDED.exported,
             doc_comment = EXCLUDED.doc_comment,
-            indexed_at  = EXCLUDED.indexed_at
+            indexed_at  = EXCLUDED.indexed_at,
+            qualified_name = EXCLUDED.qualified_name,
+            canonical_signature = EXCLUDED.canonical_signature,
+            signature_hash = EXCLUDED.signature_hash,
+            legacy_fqn = EXCLUDED.legacy_fqn,
+            source_span = EXCLUDED.source_span
         `;
       }
     });
@@ -646,9 +829,10 @@ export class SymbolRepositoryPg {
     const p = getPrismaClient();
     await p.$transaction(async (tx) => {
       for (const ref of refs) {
+        const sourceSpan = referenceSourceSpan(ref);
         await tx.$executeRaw`
-          INSERT INTO symbol_references (project_id, from_file, from_line, symbol_name, target_fqn, ref_kind, meta)
-          VALUES (${ref.project_id}, ${ref.from_file}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn ?? null}, ${ref.ref_kind}, ${ref.meta ?? null}::jsonb)
+          INSERT INTO symbol_references (project_id, generation_id, from_file, from_line, symbol_name, target_fqn, ref_kind, meta, source_span)
+          VALUES (${ref.project_id}, (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${ref.project_id}), ${ref.from_file}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn ?? null}, ${ref.ref_kind}, ${ref.meta ?? null}::jsonb, ${sourceSpan}::jsonb)
         `;
       }
     });
@@ -660,8 +844,8 @@ export class SymbolRepositoryPg {
     await p.$transaction(async (tx) => {
       for (const imp of imports) {
         await tx.$executeRaw`
-          INSERT INTO symbol_imports (project_id, from_file, to_file, specifier, imported_names, is_external, is_type_only)
-          VALUES (${imp.project_id}, ${imp.from_file}, ${imp.to_file ?? null}, ${imp.specifier}, ${imp.imported_names}, ${imp.is_external}, ${imp.is_type_only})
+          INSERT INTO symbol_imports (project_id, generation_id, from_file, to_file, specifier, imported_names, is_external, is_type_only)
+          VALUES (${imp.project_id}, (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${imp.project_id}), ${imp.from_file}, ${imp.to_file ?? null}, ${imp.specifier}, ${imp.imported_names}, ${imp.is_external}, ${imp.is_type_only})
         `;
       }
     });
@@ -679,15 +863,22 @@ export class SymbolRepositoryPg {
     const now = new Date();
 
     await getPrismaClient().$transaction(async (tx) => {
-      await tx.$executeRaw`DELETE FROM symbol_definitions WHERE project_id = ${projectId} AND file_path = ${filePath}`;
-      await tx.$executeRaw`DELETE FROM symbol_references WHERE project_id = ${projectId} AND from_file = ${filePath}`;
-      await tx.$executeRaw`DELETE FROM symbol_imports WHERE project_id = ${projectId} AND from_file = ${filePath}`;
+      const generations = await tx.$queryRaw<Array<{ active_graph_generation_id: string }>>`
+        SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId} FOR UPDATE
+      `;
+      const generationId = generations[0]?.active_graph_generation_id;
+      if (!generationId) throw new Error(`active_graph_generation_missing:${projectId}`);
+
+      await tx.$executeRaw`DELETE FROM symbol_definitions WHERE project_id = ${projectId} AND generation_id = ${generationId} AND file_path = ${filePath}`;
+      await tx.$executeRaw`DELETE FROM symbol_references WHERE project_id = ${projectId} AND generation_id = ${generationId} AND from_file = ${filePath}`;
+      await tx.$executeRaw`DELETE FROM symbol_imports WHERE project_id = ${projectId} AND generation_id = ${generationId} AND from_file = ${filePath}`;
 
       for (const def of defs) {
+        const identity = definitionIdentityColumns(def);
         await tx.$executeRaw`
-          INSERT INTO symbol_definitions (id, project_id, file_path, name, kind, line_start, line_end, exported, doc_comment, indexed_at)
-          VALUES (${def.id}, ${projectId}, ${filePath}, ${def.name}, ${def.kind}, ${def.line_start}, ${def.line_end}, ${def.exported}, ${def.doc_comment ?? null}, ${now})
-          ON CONFLICT (project_id, id) DO UPDATE SET
+          INSERT INTO symbol_definitions (id, project_id, generation_id, file_path, name, kind, line_start, line_end, exported, doc_comment, indexed_at, qualified_name, canonical_signature, signature_hash, legacy_fqn, source_span)
+          VALUES (${def.id}, ${projectId}, ${generationId}, ${filePath}, ${def.name}, ${def.kind}, ${def.line_start}, ${def.line_end}, ${def.exported}, ${def.doc_comment ?? null}, ${now}, ${identity.qualifiedName}, ${identity.canonicalSignature}, ${identity.signatureHash}, ${identity.legacyFqn}, ${identity.sourceSpan}::jsonb)
+          ON CONFLICT (project_id, generation_id, id) DO UPDATE SET
             file_path   = EXCLUDED.file_path,
             name        = EXCLUDED.name,
             kind        = EXCLUDED.kind,
@@ -695,21 +886,27 @@ export class SymbolRepositoryPg {
             line_end    = EXCLUDED.line_end,
             exported    = EXCLUDED.exported,
             doc_comment = EXCLUDED.doc_comment,
-            indexed_at  = EXCLUDED.indexed_at
+            indexed_at  = EXCLUDED.indexed_at,
+            qualified_name = EXCLUDED.qualified_name,
+            canonical_signature = EXCLUDED.canonical_signature,
+            signature_hash = EXCLUDED.signature_hash,
+            legacy_fqn = EXCLUDED.legacy_fqn,
+            source_span = EXCLUDED.source_span
         `;
       }
 
       for (const ref of refs) {
+        const sourceSpan = referenceSourceSpan(ref);
         await tx.$executeRaw`
-          INSERT INTO symbol_references (project_id, from_file, from_line, symbol_name, target_fqn, ref_kind, meta)
-          VALUES (${projectId}, ${filePath}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn ?? null}, ${ref.ref_kind}, ${ref.meta ?? null}::jsonb)
+          INSERT INTO symbol_references (project_id, generation_id, from_file, from_line, symbol_name, target_fqn, ref_kind, meta, source_span)
+          VALUES (${projectId}, ${generationId}, ${filePath}, ${ref.from_line}, ${ref.symbol_name}, ${ref.target_fqn ?? null}, ${ref.ref_kind}, ${ref.meta ?? null}::jsonb, ${sourceSpan}::jsonb)
         `;
       }
 
       for (const imp of imports) {
         await tx.$executeRaw`
-          INSERT INTO symbol_imports (project_id, from_file, to_file, specifier, imported_names, is_external, is_type_only)
-          VALUES (${projectId}, ${filePath}, ${imp.to_file ?? null}, ${imp.specifier}, ${imp.imported_names}, ${imp.is_external}, ${imp.is_type_only})
+          INSERT INTO symbol_imports (project_id, generation_id, from_file, to_file, specifier, imported_names, is_external, is_type_only)
+          VALUES (${projectId}, ${generationId}, ${filePath}, ${imp.to_file ?? null}, ${imp.specifier}, ${imp.imported_names}, ${imp.is_external}, ${imp.is_type_only})
         `;
       }
     });
@@ -741,6 +938,7 @@ export class SymbolRepositoryPg {
     const p = getPrismaClient();
     const rows = await p.$queryRaw<{ relative_path: string }[]>`
       SELECT relative_path FROM symbol_files WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
     `;
     return rows.map((r) => r.relative_path);
   }
@@ -750,6 +948,7 @@ export class SymbolRepositoryPg {
     const p = getPrismaClient();
     const rows = await p.$queryRaw<ImpRaw[]>`
       SELECT * FROM symbol_imports WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
     `;
     return rows.map(mapImp);
   }
@@ -769,7 +968,9 @@ export class SymbolRepositoryPg {
   ): Promise<SymbolImport[]> {
     const p = getPrismaClient();
     const rows = await p.$queryRaw<ImpRaw[]>`
-      SELECT * FROM symbol_imports WHERE project_id = ${projectId} AND to_file = ${filePath}
+      SELECT * FROM symbol_imports WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
+        AND to_file = ${filePath}
     `;
     return rows.map(mapImp);
   }
@@ -782,7 +983,9 @@ export class SymbolRepositoryPg {
     const p = getPrismaClient();
     const rows = await p.$queryRaw<RefRaw[]>`
       SELECT * FROM symbol_references
-      WHERE project_id = ${projectId} AND target_fqn = ${fqn}
+      WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
+        AND target_fqn = ${fqn}
       ORDER BY from_file ASC, from_line ASC
     `;
     return rows.map(mapRef);
@@ -796,7 +999,9 @@ export class SymbolRepositoryPg {
     const p = getPrismaClient();
     const rows = await p.$queryRaw<RefRaw[]>`
       SELECT * FROM symbol_references
-      WHERE project_id = ${projectId} AND symbol_name = ${symbolName}
+      WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
+        AND symbol_name = ${symbolName}
       ORDER BY from_file ASC, from_line ASC
     `;
     return rows.map(mapRef);
@@ -820,7 +1025,10 @@ export class SymbolRepositoryPg {
     const p = getPrismaClient();
     // Build a parameterized query — Prisma raw SQL doesn't expand arrays for IN,
     // so we interpolate placeholders with explicit casts to text.
-    const conditions: string[] = [`project_id = $1::text`];
+    const conditions: string[] = [
+      `project_id = $1::text`,
+      `generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = $1::text)`,
+    ];
     const params: unknown[] = [projectId];
     let idx = 2;
     const direction = opts.direction ?? "both";
@@ -869,6 +1077,7 @@ export class SymbolRepositoryPg {
     const rows = await p.$queryRaw<{ ref_kind: string; count: bigint }[]>`
       SELECT ref_kind, COUNT(*) AS count FROM symbol_references
       WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
       GROUP BY ref_kind
     `;
     const out: Record<string, number> = {};
@@ -914,6 +1123,7 @@ export class SymbolRepositoryPg {
     const rows = await p.$queryRaw<DefRaw[]>`
       SELECT * FROM symbol_definitions
       WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
         AND (${kindList}::text[] IS NULL OR kind = ANY(${kindList}::text[]))
         AND (${opts.exportedOnly ?? false} = false OR exported = true)
       LIMIT ${SAFETY_CAP + 1}
@@ -935,9 +1145,9 @@ export class SymbolRepositoryPg {
     await p.$transaction(async (tx) => {
       for (const [filePath, score] of scores) {
         await tx.$executeRaw`
-          INSERT INTO symbol_centrality (project_id, file_path, score, updated_at)
-          VALUES (${projectId}, ${filePath}, ${score}, ${now})
-          ON CONFLICT (project_id, file_path) DO UPDATE SET
+          INSERT INTO symbol_centrality (project_id, generation_id, file_path, score, updated_at)
+          VALUES (${projectId}, (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId}), ${filePath}, ${score}, ${now})
+          ON CONFLICT (project_id, generation_id, file_path) DO UPDATE SET
             score      = EXCLUDED.score,
             updated_at = EXCLUDED.updated_at
         `;

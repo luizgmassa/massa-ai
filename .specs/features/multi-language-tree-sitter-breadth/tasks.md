@@ -6,7 +6,7 @@ Implement with the active `massa-th0th` Spec Driven Execute flow, `coding-guidel
 
 **Design:** `.specs/features/multi-language-tree-sitter-breadth/design.md`  
 **Capability contract:** `.specs/features/multi-language-tree-sitter-breadth/capability-matrix.md`  
-**Status:** TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 PASS; TASK-006 PASS; TASK-007 PASS; TASK-008 PASS; TASK-009 PASS; TASK-010 READY
+**Status:** TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 PASS; TASK-006 PASS; TASK-007 PASS; TASK-008 PASS; TASK-009 PASS; TASK-010 PASS; TASK-011 READY
 
 ## Project Testing Guidelines Scan
 
@@ -210,7 +210,7 @@ Phase 7 Validate:
 
 ### T10 / TASK-010: Add graph-generation schema and legacy backfill
 
-**Status:** READY after TASK-006 and TASK-009 PASS.
+**Status:** PASS on 2026-07-14. A locked transactional PostgreSQL migration created generation ownership and safely backfilled populated/empty workspaces. Owned PostgreSQL 17 tests passed 3/3 with 62 assertions; the clean 15-migration chain, migrated ETL fingerprint regression, Prisma validation, forced type-check/build, diff integrity, and independent review passed after closing active-read leakage, cross-project pointers, unsafe database cleanup, modern-FQN/span loss, and unsafe numeric-span casts.
 
 **What:** Add generation lifecycle model, workspace active/pending/lease fields, generation ownership for all graph tables/centrality/diagnostics, FQN/span metadata, and safe legacy backfill.  
 **Where:** Prisma schema, one migration, migration/backfill tests.  
@@ -220,6 +220,8 @@ Phase 7 Validate:
 **Commit:** `feat(db): version structural graph generations`
 
 ### T11 / TASK-011: Implement graph-generation lifecycle repository
+
+**Status:** READY after TASK-010 PASS.
 
 **What:** Add begin/heartbeat/complete/activate/abort APIs with DB lease token, expiry recovery, snapshot/fingerprint separation, expected-active CAS, and pending cleanup.  
 **Where:** graph-generation repository/coordinator lifecycle modules and PG tests.  

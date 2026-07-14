@@ -1,7 +1,7 @@
 # Multi-Language Tree-sitter Breadth Gate Manifest
 
 **Workflow session:** `spec-multi-language`  
-**Feature status:** Execute active; TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 PASS; TASK-006 PASS; TASK-007 PASS; TASK-008 PASS; TASK-009 PASS; TASK-010 READY
+**Feature status:** Execute active; TASK-001 PASS; TASK-002 PASS; TASK-003 PASS; TASK-004 PASS; TASK-005 PASS; TASK-006 PASS; TASK-007 PASS; TASK-008 PASS; TASK-009 PASS; TASK-010 PASS; TASK-011 READY
 **Baseline commit:** `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`  
 **Baseline worktree:** supplied `plan-multi-language.md` was the only user-owned untracked file before feature artifact creation.
 
@@ -263,6 +263,30 @@ Registry/version and generation-session tests kill fallback ownership, partial d
 ### TASK-009 Post-Gate Adequacy Review
 
 The executable pre-T9 comparison kills fabricated parity, silent removals, reordered multiplicity, and undocumented semantic changes. Runtime rejection/recovery tests kill empty success, native parsing of skipped files, lost diagnostics, and structure loss; chunk hashes kill semantic-chunk drift. Resolver/load probes kill cross-file alias leakage, package-boundary probing, duplicate seed identities, invented import FQNs, re-export-as-local references, and duplicated query imports. Deleting the legacy extractor only after these gates makes the removal reversible from the frozen baseline. These assertions map directly to T9 done-when, MLTS-012/014, and AC-004/005/008. **Verdict: sufficient, non-shallow, independently accepted PASS with an explicit unrelated aggregate-suite exception.**
+
+## TASK-010 Execution Result (2026-07-14)
+
+**Result:** PASS. One explicit, table-locked PostgreSQL transaction creates graph generations, workspace active/pending/lease state, generation-owned graph rows, parser/FQN/span metadata, composite ownership keys, state uniqueness, and a deterministic active legacy generation for every existing workspace. The transitional repository bridge preserves current T9 operation while every graph read is active-generation scoped.
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| Owned PostgreSQL 17 migration/backfill | PASS | Dedicated native macOS PostgreSQL on `127.0.0.1:5433`; 3/3 tests with 62 assertions. |
+| Clean migration chain | PASS | All 15 migrations deployed from empty into a fresh owned database. |
+| Backfill integrity | PASS | Populated/empty workspaces, exact row/serial-ID preservation, zero null/orphan ownership, active counts, nullable legacy evidence, modern qualified/hash recovery, and validated reference spans. |
+| Concurrency and ownership constraints | PASS | Access-exclusive migration lock, pre/post cardinality sentinels, same-project composite FKs, one active/one pending partial indexes, bounded diagnostics, lease pairs, and workspace/generation deletion sensors. |
+| Active isolation and compatibility bridge | PASS | Actual repository probes hide pending files/definitions/references/imports/centrality, use canonical FQN parsing, create new workspace legacy generations atomically, and refresh complete active counts. |
+| Numeric span robustness | PASS | String, huge, and fractional legacy span evidence remains null without aborting the migration; valid JS-safe integral spans survive. |
+| Migrated ETL PostgreSQL regression | PASS | Fingerprint skip path passed against the fully migrated schema. |
+| Prisma validation | PASS with expected warnings | Schema is valid; Prisma warns because it cannot precisely encode PostgreSQL partial-column composite `SET NULL`, which the owned PG gate executes successfully. |
+| Forced uncached type-check | PASS | 6/6 packages. |
+| Forced uncached build | PASS | 5/5 build tasks. |
+| Diff integrity | PASS | `git diff --check` clean. |
+| Independent review | PASS after remediation | Two review rounds reproduced and verified fixes for active leakage, cross-project pointers, unsafe test ownership, FQN/span loss, non-atomic bridge/count drift, unsafe numeric casts, and dropped read spans. |
+| Excluded-platform non-touch | PASS | No Linux, Docker, container, workflow, or non-arm64 implementation path changed. |
+
+### TASK-010 Post-Gate Adequacy Review
+
+The real predecessor-schema backfill kills empty-workspace omission, row loss, orphan ownership, stale counts, serial-ID changes, fabricated canonical signatures/spans, and unbounded diagnostics. Pending poison rows across all five graph tables kill missing active filters. Composite-pointer and partial-state probes kill cross-project ownership and duplicate active/pending states while deletion probes kill circular-FK mistakes. Actual repository execution kills trigger-only conflict bridges, non-atomic workspace creation, stale aggregate counts, and duplicated FQN parsing. Huge/fractional JSON probes kill cast-driven migration aborts. A full clean migration deploy kills synthetic-fixture schema drift. These assertions map directly to T10 done-when, MLTS-006-007/010-013/017, and AC-006/007/010. **Verdict: sufficient, non-shallow, independently accepted PASS.**
 
 ## Planned Gate Commands
 
@@ -539,3 +563,24 @@ These draft checksums are retained as failed-review evidence and are not an acti
 | removed `packages/core/src/__tests__/typed-edges.test.ts` (pre-T9) | `22f22e58a382b8c7788cdf4b8d4ea8d5b2a500253e439006bf3d204c61faaec1` |
 
 `gate-manifest.md` cannot embed its own stable checksum; record its Git blob ID at the TASK-009 commit.
+
+## TASK-010 Accepted Artifact Freeze v14
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `plan-multi-language.md` | `02f183d2a23b9f9a2694289cc04c2a4c7614f87ec22918e3b59b7de66add9b10` |
+| `spec.md` | `43ed4c1c37ecbcaef52750d263f93410dffcc9372a99ac4a73cd6e7f3a54f50e` |
+| `context.md` | `af3339803245375d6a69890cfe49e60902a21d71ba969580f555b20fc460a7a9` |
+| `design.md` | `171cdcda9412cc7ede9b523d25fa47fa98de76cdd0b5ea87b84f4551602fea65` |
+| `tasks.md` | `148e8fadde442acb983acc1553486c587e34f1bbc7920f5d897382d8cea57055` |
+| `capability-matrix.md` | `fe462385096d97ad1fc002d4eafa5b59bcfadf2b1d0457b76d39106338df3b16` |
+| `.specs/project/FEATURES.json` | `077aca9d9f97926c5fc4a1dea66dcf8b6a3fde3e60ad5068da1292bfd89f23ec` |
+| `.specs/project/STATE.md` | `6d02d04565c83322c6c2d25584fd722ec7b0d92da68068b25f2734b127223c01` |
+| `.specs/HANDOFF.md` | `96ad4d13cf185f0e905fda17962e681d5e211eae1a7172fe8e1d3bcf92c8444f` |
+| `packages/core/prisma/schema.prisma` | `a4646c5f9678490b12abee21c1a440f27f03d03bbe807d841bca98a9f768df94` |
+| `packages/core/prisma/migrations/20260714170000_add_graph_generations/migration.sql` | `09f73b22142c91c56c9b67ab652b152703ac86b7ddacc956ea6892da1d40db6f` |
+| `packages/core/src/data/symbol/symbol-repository-pg.ts` | `0354e09ef544e3136965339646f383d5c98ca5c894bbff3118fa7e86b7aebd06` |
+| `packages/core/src/__tests__/graph-generation-migration.test.ts` | `30ed9aafbe3f7e2dfa1ec96a133c88270d028ad587366f1161299e9c3175832c` |
+| `packages/core/src/__tests__/etl-pipeline-pg.test.ts` | `a3d06872d0318cb6984ffd99d4f69b7b9d0bc46d2be25b801ed1d63a10435c46` |
+
+`gate-manifest.md` cannot embed its own stable checksum; record its Git blob ID at the TASK-010 commit.

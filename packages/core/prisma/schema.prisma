@@ -133,6 +133,20 @@ model Workspace {
   filesCount     Int       @default(0) @map("files_count")
   chunksCount    Int       @default(0) @map("chunks_count")
   symbolsCount   Int       @default(0) @map("symbols_count")
+  activeGraphGenerationId  String?   @map("active_graph_generation_id")
+  pendingGraphGenerationId String?   @map("pending_graph_generation_id")
+  graphLeaseToken     String?   @map("graph_lease_token")
+  graphLeaseExpiresAt DateTime? @map("graph_lease_expires_at")
+  graphLeaseHeartbeatAt DateTime? @map("graph_lease_heartbeat_at")
+  activeFilesCount       Int @default(0) @map("active_files_count")
+  activeDefinitionsCount Int @default(0) @map("active_definitions_count")
+  activeReferencesCount  Int @default(0) @map("active_references_count")
+  activeImportsCount     Int @default(0) @map("active_imports_count")
+  activeCentralityCount  Int @default(0) @map("active_centrality_count")
+  activeDiagnosticsCount Int @default(0) @map("active_diagnostics_count")
+  activeRecoveredCount   Int @default(0) @map("active_recovered_count")
+  activeHardFailuresCount Int @default(0) @map("active_hard_failures_count")
+  activeStaleFilesCount  Int @default(0) @map("active_stale_files_count")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
@@ -141,15 +155,63 @@ model Workspace {
   references   SymbolReference[]
   imports      SymbolImport[]
   centralities SymbolCentrality[]
+  graphGenerations GraphGeneration[] @relation("GenerationWorkspace")
+  activeGraphGeneration GraphGeneration? @relation("WorkspaceActiveGraphGeneration", fields: [projectId, activeGraphGenerationId], references: [projectId, id], onDelete: SetNull)
+  pendingGraphGeneration GraphGeneration? @relation("WorkspacePendingGraphGeneration", fields: [projectId, pendingGraphGenerationId], references: [projectId, id], onDelete: SetNull)
 
   @@index([status])
   @@index([projectPath])
+  @@index([activeGraphGenerationId])
+  @@index([pendingGraphGenerationId])
+  @@index([graphLeaseExpiresAt])
   @@map("workspaces")
+}
+
+model GraphGeneration {
+  id                    String   @id
+  projectId             String   @map("project_id")
+  status                String   @default("pending")
+  fingerprint           String
+  inputSnapshotHash     String   @map("input_snapshot_hash")
+  expectedActiveId      String?  @map("expected_active_id")
+  leaseToken            String?  @map("lease_token")
+  leaseExpiresAt        DateTime? @map("lease_expires_at")
+  expectedFilesCount    Int      @default(0) @map("expected_files_count")
+  completedFilesCount   Int      @default(0) @map("completed_files_count")
+  filesCount            Int      @default(0) @map("files_count")
+  definitionsCount      Int      @default(0) @map("definitions_count")
+  referencesCount       Int      @default(0) @map("references_count")
+  importsCount          Int      @default(0) @map("imports_count")
+  centralityCount       Int      @default(0) @map("centrality_count")
+  diagnosticsCount      Int      @default(0) @map("diagnostics_count")
+  recoveredCount        Int      @default(0) @map("recovered_count")
+  hardFailuresCount     Int      @default(0) @map("hard_failures_count")
+  staleFilesCount       Int      @default(0) @map("stale_files_count")
+  failureReason         String?  @map("failure_reason")
+  startedAt             DateTime @default(now()) @map("started_at")
+  completedAt           DateTime? @map("completed_at")
+  activatedAt           DateTime? @map("activated_at")
+  supersededAt          DateTime? @map("superseded_at")
+
+  workspace Workspace @relation("GenerationWorkspace", fields: [projectId], references: [projectId], onDelete: Cascade)
+  files SymbolFile[]
+  definitions SymbolDefinition[]
+  references SymbolReference[]
+  imports SymbolImport[]
+  centralities SymbolCentrality[]
+  activeForWorkspaces Workspace[] @relation("WorkspaceActiveGraphGeneration")
+  pendingForWorkspaces Workspace[] @relation("WorkspacePendingGraphGeneration")
+  @@unique([projectId, id])
+  @@index([projectId, status])
+  @@index([projectId, fingerprint])
+  @@index([leaseExpiresAt])
+  @@map("graph_generations")
 }
 
 // File fingerprints - tracks per-file content hash
 model SymbolFile {
   projectId    String   @map("project_id")
+  generationId String   @map("generation_id")
   relativePath String   @map("relative_path")
   contentHash  String   @map("content_hash")
   mtime        BigInt
@@ -157,11 +219,23 @@ model SymbolFile {
   indexedAt    DateTime @map("indexed_at")
   symbolCount  Int      @default(0) @map("symbol_count")
   chunkCount   Int      @default(0) @map("chunk_count")
+  language     String?
+  dialect      String?
+  grammarVersion String? @map("grammar_version")
+  queryPackVersion String? @map("query_pack_version")
+  resolverVersion String? @map("resolver_version")
+  parserStatus String @default("legacy") @map("parser_status")
+  parserErrorCount Int @default(0) @map("parser_error_count")
+  diagnostics Json @default("[]")
+  isStale Boolean @default(false) @map("is_stale")
+  lastKnownGoodGenerationId String? @map("last_known_good_generation_id")
+  lastSuccessfulAt DateTime? @map("last_successful_at")
 
   workspace Workspace @relation(fields: [projectId], references: [projectId], onDelete: Cascade)
+  generation GraphGeneration @relation(fields: [projectId, generationId], references: [projectId, id], onDelete: Cascade)
 
-  @@id([projectId, relativePath])
-  @@index([projectId])
+  @@id([projectId, generationId, relativePath])
+  @@index([projectId, generationId])
   @@map("symbol_files")
 }
 
@@ -169,6 +243,7 @@ model SymbolFile {
 model SymbolDefinition {
   id         String   @map("id")
   projectId  String   @map("project_id")
+  generationId String @map("generation_id")
   filePath   String   @map("file_path")
   name       String
   kind       String   // function, class, variable, type, interface, export
@@ -177,13 +252,20 @@ model SymbolDefinition {
   exported   Boolean  @default(false)
   docComment String?  @map("doc_comment")
   indexedAt  DateTime @map("indexed_at")
+  qualifiedName String @map("qualified_name")
+  canonicalSignature String? @map("canonical_signature")
+  signatureHash String? @map("signature_hash")
+  legacyFqn String @map("legacy_fqn")
+  sourceSpan Json? @map("source_span")
 
   workspace Workspace @relation(fields: [projectId], references: [projectId], onDelete: Cascade)
+  generation GraphGeneration @relation(fields: [projectId, generationId], references: [projectId, id], onDelete: Cascade)
 
-  @@id([projectId, id])
-  @@index([projectId])
-  @@index([projectId, filePath])
-  @@index([projectId, name])
+  @@id([projectId, generationId, id])
+  @@index([projectId, generationId])
+  @@index([projectId, generationId, filePath])
+  @@index([projectId, generationId, name])
+  @@index([projectId, generationId, legacyFqn])
   @@map("symbol_definitions")
 }
 
@@ -191,19 +273,22 @@ model SymbolDefinition {
 model SymbolReference {
   id         Int    @id @default(autoincrement())
   projectId  String @map("project_id")
+  generationId String @map("generation_id")
   fromFile   String @map("from_file")
   fromLine   Int    @map("from_line")
   symbolName String @map("symbol_name")
   targetFqn  String? @map("target_fqn") // nullable: unresolved-target refs are retained (PostgreSQL parity)
   refKind    String @map("ref_kind") // call, type_ref, import, extend, implement, data_flow, http_call, emit, listen
   meta       Json?  // typed-edge metadata: { route?, event?, paramIndex?, callerFqn? }
+  sourceSpan Json? @map("source_span")
 
   workspace Workspace @relation(fields: [projectId], references: [projectId], onDelete: Cascade)
+  generation GraphGeneration @relation(fields: [projectId, generationId], references: [projectId, id], onDelete: Cascade)
 
-  @@index([projectId])
-  @@index([projectId, targetFqn]) // CRITICAL: find references query
-  @@index([projectId, fromFile])
-  @@index([projectId, refKind]) // typed-edge filtering by edge type
+  @@index([projectId, generationId])
+  @@index([projectId, generationId, targetFqn]) // CRITICAL: find references query
+  @@index([projectId, generationId, fromFile])
+  @@index([projectId, generationId, refKind]) // typed-edge filtering by edge type
   @@map("symbol_references")
 }
 
@@ -211,6 +296,7 @@ model SymbolReference {
 model SymbolImport {
   id            Int      @id @default(autoincrement())
   projectId     String   @map("project_id")
+  generationId  String   @map("generation_id")
   fromFile      String   @map("from_file")
   toFile        String?  @map("to_file")
   specifier     String
@@ -219,9 +305,10 @@ model SymbolImport {
   isTypeOnly    Boolean  @default(false) @map("is_type_only")
 
   workspace Workspace @relation(fields: [projectId], references: [projectId], onDelete: Cascade)
+  generation GraphGeneration @relation(fields: [projectId, generationId], references: [projectId, id], onDelete: Cascade)
 
-  @@index([projectId, fromFile])
-  @@index([projectId, toFile])
+  @@index([projectId, generationId, fromFile])
+  @@index([projectId, generationId, toFile])
   @@index([importedNames]) // GIN index for "find imports of Symbol X"
   @@map("symbol_imports")
 }
@@ -229,13 +316,15 @@ model SymbolImport {
 // Centrality scores - PageRank per file
 model SymbolCentrality {
   projectId String   @map("project_id")
+  generationId String @map("generation_id")
   filePath  String   @map("file_path")
   score     Float    @default(0)
   updatedAt DateTime @map("updated_at")
 
   workspace Workspace @relation(fields: [projectId], references: [projectId], onDelete: Cascade)
+  generation GraphGeneration @relation(fields: [projectId, generationId], references: [projectId, id], onDelete: Cascade)
 
-  @@id([projectId, filePath])
+  @@id([projectId, generationId, filePath])
   @@map("symbol_centrality")
 }
 
