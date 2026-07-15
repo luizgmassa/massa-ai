@@ -26,6 +26,7 @@ import { SCRIPTING_LANGUAGE_RESOLVER } from "../../structural/resolvers/scriptin
 import { SYSTEMS_LANGUAGE_RESOLVER } from "../../structural/resolvers/systems.js";
 import { MANAGED_LANGUAGE_RESOLVER } from "../../structural/resolvers/managed.js";
 import { FUNCTIONAL_LANGUAGE_RESOLVER } from "../../structural/resolvers/functional.js";
+import { DATA_DOCUMENT_LANGUAGE_RESOLVER } from "../../structural/resolvers/data-document.js";
 import { createStructuralIdentity, parseStructuralFqn, type StructuralIdentity } from "../../structural/fqn-codec.js";
 import { resolveStructuralLanguage } from "../../structural/language-manifest.js";
 import { STRUCTURAL_SYMBOL_KINDS, type StructuralSymbolKind } from "../../structural/types.js";
@@ -40,7 +41,7 @@ import type {
 } from "../stage-context.js";
 
 const TS_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.js"];
-const STRUCTURAL_SEED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".rb", ".php", ".lua", ".c", ".h", ".cpp", ".hpp", ".go", ".rs", ".zig", ".java", ".kt", ".kts", ".scala", ".cs", ".swift", ".dart", ".ex", ".exs", ".erl", ".clj", ".ml", ".hs"]);
+const STRUCTURAL_SEED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".rb", ".php", ".lua", ".c", ".h", ".cpp", ".hpp", ".go", ".rs", ".zig", ".java", ".kt", ".kts", ".scala", ".cs", ".swift", ".dart", ".ex", ".exs", ".erl", ".clj", ".ml", ".hs", ".vue", ".md", ".json", ".yaml", ".yml"]);
 
 interface TsPathAlias {
   prefix: string;
@@ -124,7 +125,7 @@ export class ResolveStage {
       ? new StructuralResolverSession(
           structuralDocuments,
           buildMetadata,
-          new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER, SCRIPTING_LANGUAGE_RESOLVER, SYSTEMS_LANGUAGE_RESOLVER, MANAGED_LANGUAGE_RESOLVER, FUNCTIONAL_LANGUAGE_RESOLVER]),
+          new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER, SCRIPTING_LANGUAGE_RESOLVER, SYSTEMS_LANGUAGE_RESOLVER, MANAGED_LANGUAGE_RESOLVER, FUNCTIONAL_LANGUAGE_RESOLVER, DATA_DOCUMENT_LANGUAGE_RESOLVER]),
           seedDefinitions,
         )
       : undefined;

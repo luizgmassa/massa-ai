@@ -32,6 +32,7 @@ const STRUCTURAL_EXTENSIONS = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".c", ".h", ".cpp", ".hpp", ".go", ".rs", ".zig",
   ".java", ".kt", ".kts", ".scala", ".cs", ".swift", ".dart",
   ".ex", ".exs", ".erl", ".clj", ".ml", ".hs",
+  ".vue", ".md", ".json", ".yaml", ".yml",
 ]);
 
 export class StructuralEtlParseError extends Error {

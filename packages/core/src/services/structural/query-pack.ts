@@ -25,6 +25,7 @@ import { SCRIPTING_QUERY_PACKS } from "./query-packs/scripting.js";
 import { SYSTEMS_QUERY_PACKS } from "./query-packs/systems.js";
 import { MANAGED_QUERY_PACKS } from "./query-packs/managed.js";
 import { FUNCTIONAL_QUERY_PACKS } from "./query-packs/functional.js";
+import { DATA_DOCUMENT_QUERY_PACKS } from "./query-packs/data-document.js";
 
 export interface StructuralQueryPack {
   readonly version: string;
@@ -32,7 +33,8 @@ export interface StructuralQueryPack {
   readonly querySources: readonly string[];
   readonly family?: "typescript" | "python" | "ruby" | "php" | "lua" | "c" | "cpp" | "go" | "rust" | "zig" |
     "java" | "kotlin" | "scala" | "csharp" | "swift" | "dart" |
-    "elixir" | "erlang" | "clojure" | "ocaml" | "haskell";
+    "elixir" | "erlang" | "clojure" | "ocaml" | "haskell" |
+    "vue" | "markdown" | "json" | "yaml";
 }
 
 const QUERY_PACKS = new Map<string, StructuralQueryPack>(
@@ -41,7 +43,8 @@ const QUERY_PACKS = new Map<string, StructuralQueryPack>(
    ...SCRIPTING_QUERY_PACKS.flatMap((pack) => pack.dialects.map((dialect) => [dialect, pack] as const)),
    ...SYSTEMS_QUERY_PACKS.flatMap((pack) => pack.dialects.map((dialect) => [dialect, pack] as const)),
    ...MANAGED_QUERY_PACKS.flatMap((pack) => pack.dialects.map((dialect) => [dialect, pack] as const)),
-   ...FUNCTIONAL_QUERY_PACKS.flatMap((pack) => pack.dialects.map((dialect) => [dialect, pack] as const))],
+   ...FUNCTIONAL_QUERY_PACKS.flatMap((pack) => pack.dialects.map((dialect) => [dialect, pack] as const)),
+   ...DATA_DOCUMENT_QUERY_PACKS.flatMap((pack) => pack.dialects.map((dialect) => [dialect, pack] as const))],
 );
 
 const SYMBOL_KINDS = new Set<StructuralSymbolKind>([
@@ -140,6 +143,14 @@ function descendants(node: NativeQueryNode): readonly NativeQueryNode[] {
 }
 
 function symbolName(source: Buffer, node: NativeQueryNode): string | null {
+  if (["pair", "block_mapping_pair", "flow_pair"].includes(node.type)) {
+    const key = field(node, "key");
+    return key ? unquote(text(source, key)).normalize("NFC") : null;
+  }
+  if (["atx_heading", "setext_heading"].includes(node.type)) {
+    const content = field(node, "heading_content") ?? node.namedChildren?.find((child) => !child.type.includes("marker") && !child.type.includes("underline"));
+    return content ? text(source, content).trim().normalize("NFC") : null;
+  }
   const nameNode = field(node, "name") ?? field(node, "property") ?? field(node, "left");
   if (nameNode) {
     const raw = text(source, nameNode);
@@ -429,7 +440,9 @@ function buildSymbols(
     draft.qualifiedName = parent ? `${parent.qualifiedName}.${draft.name}` : draft.name;
   }
   let symbols = drafts.map((draft) => {
-    const nameNode = field(draft.node, "name") ?? field(draft.node, "property");
+    const nameNode = field(draft.node, "name") ?? field(draft.node, "property") ??
+      (["pair", "block_mapping_pair", "flow_pair"].includes(draft.node.type) ? field(draft.node, "key") : undefined) ??
+      (["atx_heading", "setext_heading"].includes(draft.node.type) ? field(draft.node, "heading_content") : undefined);
     const documentationStart = draft.node.parent?.type === "export_statement"
       ? draft.node.parent.startIndex
       : draft.node.type === "type_spec" && draft.node.parent?.type === "type_declaration"
@@ -488,6 +501,19 @@ function buildSymbols(
     if (module) symbols = symbols.map((symbol) => symbol === module || symbol.qualifiedName.includes(".")
       ? symbol
       : Object.freeze({ ...symbol, qualifiedName: `${module.name}.${symbol.qualifiedName}` }));
+  }
+  if (family === "markdown") {
+    const stack: { level: number; qualifiedName: string }[] = [];
+    symbols = symbols.map((symbol, position) => {
+      const draft = drafts[position]!;
+      const marker = draft.node.children?.find((child) => /^(?:atx_h[1-6]_marker|setext_h[12]_underline)$/u.test(child.type));
+      const match = marker?.type.match(/h([1-6])/u);
+      const level = Number(match?.[1] ?? (marker?.type.includes("h2") ? 2 : 1));
+      while (stack.length && stack.at(-1)!.level >= level) stack.pop();
+      const qualifiedName = stack.length ? `${stack.at(-1)!.qualifiedName}.${symbol.name}` : symbol.name;
+      stack.push({ level, qualifiedName });
+      return Object.freeze({ ...symbol, qualifiedName });
+    });
   }
   const seen = new Set<string>();
   return Object.freeze(symbols.filter((symbol) => {
@@ -1104,6 +1130,7 @@ export function executeQueryPack(
   context: StructuralQueryContext,
   capabilities: QueryCapabilityContract = ALL_REQUIRED_CAPABILITIES,
 ): NormalizedStructure {
+  collectEmbeddedChildren(pack, tree, source, context);
   const captures = functionalCaptures(normalizeQueryCaptures(pack.querySources.flatMap((querySource) =>
     context.query(querySource, tree.rootNode),
   )), source, pack.family);
@@ -1126,6 +1153,67 @@ export function executeQueryPack(
     ]),
     imports,
   });
+}
+
+const EMBEDDED_EXTENSIONS: Readonly<Record<string, string>> = Object.freeze({
+  js: ".js", javascript: ".js", jsx: ".jsx",
+  ts: ".ts", typescript: ".ts", tsx: ".tsx",
+  markdown: ".md", md: ".md", json: ".json", yaml: ".yaml", yml: ".yml",
+  python: ".py", py: ".py", ruby: ".rb", rb: ".rb", go: ".go", rust: ".rs", rs: ".rs",
+  java: ".java", kotlin: ".kt", scala: ".scala", c: ".c", cpp: ".cpp", csharp: ".cs",
+});
+
+function collectEmbeddedChildren(
+  pack: StructuralQueryPack,
+  tree: StructuralQueryTree,
+  source: Buffer,
+  context: StructuralQueryContext,
+): void {
+  const root = tree.rootNode as NativeQueryNode;
+  const nodes = [root, ...descendants(root)];
+  if (pack.family === "vue") {
+    let ordinal = 0;
+    for (const node of nodes.filter((candidate) => candidate.type === "script_element")) {
+      const content = node.namedChildren?.find((child) => child.type === "raw_text");
+      if (!content) continue;
+      const startTag = node.namedChildren?.find((child) => child.type === "start_tag");
+      const langAttribute = startTag?.namedChildren?.find((child) =>
+        child.type === "attribute" && child.namedChildren?.some((part) =>
+          part.type === "attribute_name" && text(source, part).toLowerCase() === "lang"
+        )
+      );
+      const langValue = langAttribute?.namedChildren?.find((part) =>
+        part.type === "quoted_attribute_value" || part.type === "attribute_value"
+      );
+      const nestedValue = langValue?.type === "quoted_attribute_value"
+        ? langValue.namedChildren?.find((part) => part.type === "attribute_value")
+        : langValue;
+      const lang = nestedValue ? text(source, nestedValue).trim().toLowerCase() : "js";
+      context.collectEmbeddedSlice({
+        extension: EMBEDDED_EXTENSIONS[lang] ?? `.${lang}`,
+        startByte: content.startIndex,
+        endByte: content.endIndex,
+        scope: `vue.script[${ordinal}]`,
+      });
+      ordinal += 1;
+    }
+  }
+  if (pack.family === "markdown") {
+    let ordinal = 0;
+    for (const node of nodes.filter((candidate) => candidate.type === "fenced_code_block")) {
+      const info = node.namedChildren?.find((child) => child.type === "info_string");
+      const content = node.namedChildren?.find((child) => child.type === "code_fence_content");
+      if (!content) continue;
+      const declared = info ? text(source, info).trim().split(/\s+/u)[0]!.toLowerCase() : "plain";
+      context.collectEmbeddedSlice({
+        extension: EMBEDDED_EXTENSIONS[declared] ?? `.${declared}`,
+        startByte: content.startIndex,
+        endByte: content.endIndex,
+        scope: `markdown.fence[${ordinal}]`,
+      });
+      ordinal += 1;
+    }
+  }
 }
 
 export const executeStructuralQueryPack: StructuralQueryExecutor = (

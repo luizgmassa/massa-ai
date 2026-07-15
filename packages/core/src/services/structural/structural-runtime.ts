@@ -33,12 +33,22 @@ import type {
   StructuralParseOutcome,
 } from "./types.js";
 import { executeStructuralQueryPack } from "./query-pack.js";
+import { SourceIndex } from "./source-span.js";
 
 export interface StructuralQueryContext {
   /** Every cursor created here is owned and deleted by the runtime. */
   createCursor(node?: StructuralSyntaxNode): NativeTreeCursor;
   /** Compile once per grammar/query source and execute against a node. */
   query(source: string, node?: StructuralSyntaxNode): readonly NativeQueryCapture[];
+  /** Queue an exact host byte slice for parsing after native host resources are released. */
+  collectEmbeddedSlice(slice: StructuralEmbeddedSlice): void;
+}
+
+export interface StructuralEmbeddedSlice {
+  readonly extension: string;
+  readonly startByte: number;
+  readonly endByte: number;
+  readonly scope: string;
 }
 
 /** Cursor creation is intentionally absent; use StructuralQueryContext. */
@@ -82,6 +92,47 @@ let processParserPool: StructuralParserPool | null = null;
 let processParserConstructor: LoadedNativeGrammarSet["Parser"] | null = null;
 const queryCaches = new WeakMap<object, WeakMap<object, Map<string, NativeQueryInstance>>>();
 export const STRUCTURAL_QUERY_MATCH_LIMIT = 4_096;
+
+function byteNodeAdapter(source: Buffer) {
+  const decoded = source.toString("utf8");
+  const offsets = new Map<number, number>([[0, 0], [decoded.length, source.length]]);
+  const nativeToWrapped = new WeakMap<object, StructuralSyntaxNode>();
+  const wrappedToNative = new WeakMap<object, StructuralSyntaxNode>();
+  const byteOffset = (utf16Offset: number): number => {
+    const cached = offsets.get(utf16Offset);
+    if (cached !== undefined) return cached;
+    const value = Buffer.byteLength(decoded.slice(0, utf16Offset), "utf8");
+    offsets.set(utf16Offset, value);
+    return value;
+  };
+  const wrap = (native: StructuralSyntaxNode): StructuralSyntaxNode => {
+    const key = native as object;
+    const cached = nativeToWrapped.get(key);
+    if (cached) return cached;
+    const wrapped: StructuralSyntaxNode = {
+      get type() { return native.type; },
+      get hasError() { return native.hasError; },
+      get startIndex() { return byteOffset(native.startIndex ?? 0); },
+      get endIndex() { return byteOffset(native.endIndex); },
+      get namedChildren() { return native.namedChildren?.map(wrap); },
+      get children() { return native.children?.map(wrap); },
+      get parent() { return native.parent ? wrap(native.parent) : native.parent; },
+      childForFieldName(name) {
+        const child = native.childForFieldName?.(name);
+        return child ? wrap(child) : null;
+      },
+    };
+    nativeToWrapped.set(key, wrapped);
+    wrappedToNative.set(wrapped as object, native);
+    return wrapped;
+  };
+  return {
+    wrap,
+    unwrap(node: StructuralSyntaxNode): StructuralSyntaxNode {
+      return wrappedToNative.get(node as object) ?? node;
+    },
+  };
+}
 
 export function executeBoundedNativeQuery(
   query: NativeQueryInstance,
@@ -178,6 +229,10 @@ export class StructuralRuntime {
   }
 
   async parse(request: StructuralParseRequest): Promise<StructuralParseOutcome> {
+    return this.#parse(request, 0);
+  }
+
+  async #parse(request: StructuralParseRequest, depth: number): Promise<StructuralParseOutcome> {
     if (!Buffer.isBuffer(request.source)) {
       return failed("infrastructure", [
         diagnostic("invalid_structural_source", "error", "Structural source must be a Buffer"),
@@ -195,6 +250,7 @@ export class StructuralRuntime {
 
     const details: ParseDiagnostic[] = [];
     const cursors: NativeTreeCursor[] = [];
+    const embeddedSlices: StructuralEmbeddedSlice[] = [];
     let lease: ParserLease | undefined;
     let tree: NativeTree | undefined;
     let result: StructuralParseOutcome | undefined;
@@ -232,13 +288,15 @@ export class StructuralRuntime {
 
       stage = "query";
       const queryExecutor = request.queryExecutor ?? this.#queryExecutor;
+      const byteNodes = byteNodeAdapter(request.source);
+      const queryTree = { rootNode: byteNodes.wrap(parsedTree.rootNode as StructuralSyntaxNode) };
       const structure = await queryExecutor(
-        parsedTree,
+        queryTree,
         request.source,
         resolution.entry,
         {
-          createCursor(node = parsedTree.rootNode) {
-            const nativeNode = node as StructuralSyntaxNode & { walk?: () => NativeTreeCursor };
+          createCursor(node = queryTree.rootNode) {
+            const nativeNode = byteNodes.unwrap(node) as StructuralSyntaxNode & { walk?: () => NativeTreeCursor };
             if (typeof nativeNode.walk !== "function") {
               throw new Error("Native syntax node does not expose walk()");
             }
@@ -246,10 +304,15 @@ export class StructuralRuntime {
             cursors.push(cursor);
             return cursor;
           },
-          query(querySource, node = parsedTree.rootNode) {
+          query(querySource, node = queryTree.rootNode) {
             return executeBoundedNativeQuery(compiledQuery(loaded, grammar, querySource),
-              node as Parameters<NativeQueryInstance["matches"]>[0],
-            );
+              byteNodes.unwrap(node) as Parameters<NativeQueryInstance["matches"]>[0],
+            ).map((capture) => Object.freeze({ ...capture, node: byteNodes.wrap(capture.node as unknown as StructuralSyntaxNode) as NativeQueryCapture["node"] }));
+          },
+          collectEmbeddedSlice(slice) {
+            const index = new SourceIndex(request.source);
+            index.span(slice.startByte, slice.endByte);
+            embeddedSlices.push(Object.freeze({ ...slice }));
           },
         },
       );
@@ -322,9 +385,74 @@ export class StructuralRuntime {
         diagnostic("structural_runtime_no_outcome", "error", "Structural runtime produced no outcome"),
       ]);
     }
-    return {
+    let finalResult: StructuralParseOutcome = {
       ...result,
       diagnosticCount: details.length,
+      diagnostics: boundDiagnostics(details),
+    };
+    if ((finalResult.status === "ok" || finalResult.status === "recovered") && embeddedSlices.length > 0) {
+      finalResult = await this.#mergeEmbedded(finalResult, request.source, embeddedSlices, depth);
+    }
+    return finalResult;
+  }
+
+  async #mergeEmbedded(
+    host: Extract<StructuralParseOutcome, { status: "ok" | "recovered" }>,
+    source: Buffer,
+    slices: readonly StructuralEmbeddedSlice[],
+    depth: number,
+  ): Promise<StructuralParseOutcome> {
+    const index = new SourceIndex(source);
+    const symbols = [...host.structure.symbols];
+    const edges = [...host.structure.edges];
+    const imports = [...host.structure.imports];
+    const details = [...host.diagnostics];
+    let total = host.diagnosticCount;
+    const locatedDiagnostic = (code: string, severity: ParseDiagnostic["severity"], message: string, slice: StructuralEmbeddedSlice): ParseDiagnostic =>
+      Object.freeze({ ...diagnostic(code, severity, message), span: index.span(slice.startByte, slice.endByte) });
+    for (const slice of slices) {
+      if (depth >= 2) {
+        total += 1;
+        details.push(locatedDiagnostic("embedded_recursion_limit", "recovered", `Embedded scope ${slice.scope} exceeds depth 2`, slice));
+        continue;
+      }
+      const childSource = source.subarray(slice.startByte, slice.endByte);
+      const child = await this.#parse({ extension: slice.extension, source: childSource }, depth + 1);
+      if (child.status === "unsupported") {
+        total += 1;
+        details.push(locatedDiagnostic("unsupported_structural_language", "recovered", `Embedded scope ${slice.scope} uses unsupported language ${slice.extension}`, slice));
+        continue;
+      }
+      total += child.diagnosticCount;
+      details.push(...child.diagnostics.map((item) => item.span ? Object.freeze({ ...item, span: index.remapChildSpan(index.span(slice.startByte, slice.endByte), item.span) }) : item));
+      if (child.status === "failed") {
+        total += 1;
+        details.push(locatedDiagnostic("embedded_parse_failed", "error", `Embedded scope ${slice.scope} failed structurally`, slice));
+        return {
+          status: "failed",
+          failureKind: child.failureKind,
+          diagnosticCount: total,
+          diagnostics: boundDiagnostics(details),
+        };
+      }
+      const hostSlice = index.span(slice.startByte, slice.endByte);
+      const remap = <T extends { span: import("./types.js").SourceSpan }>(value: T): T => Object.freeze({ ...value, span: index.remapChildSpan(hostSlice, value.span) });
+      symbols.push(...child.structure.symbols.map((symbol) => Object.freeze({
+        ...remap(symbol), qualifiedName: `${slice.scope}.${symbol.qualifiedName}`,
+        ...(symbol.selectionSpan ? { selectionSpan: index.remapChildSpan(hostSlice, symbol.selectionSpan) } : {}),
+      })));
+      edges.push(...child.structure.edges.map(remap));
+      imports.push(...child.structure.imports.map(remap));
+    }
+    const dedupe = <T>(values: readonly T[], key: (value: T) => string) => Object.freeze(values.filter((value, offset) => values.findIndex((candidate) => key(candidate) === key(value)) === offset));
+    return {
+      status: host.status === "recovered" || total > 0 ? "recovered" : "ok",
+      structure: Object.freeze({
+        symbols: dedupe(symbols, (s) => `${s.kind}\0${s.qualifiedName}\0${s.span.startByte}\0${s.span.endByte}`),
+        edges: dedupe(edges, (e) => `${e.kind}\0${e.span.startByte}\0${e.span.endByte}\0${JSON.stringify(e.target)}`),
+        imports: dedupe(imports, (i) => `${i.form}\0${i.specifier}\0${i.span.startByte}\0${i.span.endByte}`),
+      }),
+      diagnosticCount: total,
       diagnostics: boundDiagnostics(details),
     };
   }

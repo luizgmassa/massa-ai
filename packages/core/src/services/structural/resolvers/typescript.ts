@@ -23,6 +23,7 @@ const DIALECT_PROBES: Readonly<Record<string, readonly string[]>> = Object.freez
   tsx: ["", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js", "/index.jsx"],
   javascript: ["", ".js", ".jsx", ".ts", ".tsx", "/index.js", "/index.jsx", "/index.ts", "/index.tsx"],
   jsx: ["", ".js", ".jsx", ".ts", ".tsx", "/index.js", "/index.jsx", "/index.ts", "/index.tsx"],
+  sfc: ["", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js", "/index.jsx"],
   python: ["", ".py", "/__init__.py"], ruby: ["", ".rb"], php: ["", ".php"],
   "lua-luajit": ["", ".lua"],
   c: ["", ".c", ".h"], "header-default-c": ["", ".c", ".h"],
@@ -334,7 +335,7 @@ export const TYPESCRIPT_LANGUAGE_RESOLVER: StructuralLanguageResolver = Object.f
   ) {
     const normalizedFile = normalizeStructuralFile(file.file);
     const reference = normalizedReference(rawReference);
-    const familyDialects = ["typescript", "tsx", "javascript", "jsx"];
+    const familyDialects = ["typescript", "tsx", "javascript", "jsx", "sfc"];
     const scopedDefinitions = familyDialects.includes(file.dialect)
       ? rawDefinitions.filter((definition) => familyDialects.includes(definition.identity.dialect))
       : rawDefinitions;

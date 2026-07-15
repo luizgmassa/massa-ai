@@ -731,3 +731,14 @@ These draft checksums are retained as failed-review evidence and are not an acti
 - Resolver/identity evidence: EX/EXS compatibility with foreign isolation; parser-produced Erlang, Clojure, Elixir, and Haskell provider/consumer resolution; unresolved and namespace-leakage negatives; Haskell equation dedupe; BEAM import arity selects the declared overload modern identity.
 - Independent read-only review: PASS after two remediation rounds covering exposure semantics, Haskell hiding, Elixir metadata/spec association, module ownership, coverage floors, BEAM arity, and keyed-only Elixir option parsing.
 - Scope: functional/BEAM cohort only; no embedded/data, Linux, Docker, container, or non-arm64 implementation.
+
+## TASK-019 Accepted Gate Evidence v23
+
+- Platform: macOS arm64 only; exact Bun `1.3.0`.
+- Exact focused command: `bunx bun@1.3.0 test packages/core/src/__tests__/structural-data-document.test.ts packages/core/src/__tests__/structural-query-pack.test.ts packages/core/src/__tests__/structural-runtime.test.ts packages/core/src/__tests__/structural-identity.test.ts packages/core/src/__tests__/structural-resolver.test.ts packages/core/src/__tests__/structural-etl.test.ts` — PASS, 141 tests, 915 assertions.
+- `bunx bun@1.3.0 run type-check` — PASS, 6/6 packages. `bunx bun@1.3.0 run build` — PASS, 5/5 packages. `git diff --check` — PASS.
+- Native/embedding evidence: five real grammar cases per `.vue`, `.md`, `.json`, `.yaml`, and `.yml`; Vue default/declared scripts and uppercase component references; Markdown hierarchical headings and declared/repeated/unknown/nested fences; JSON/YAML qualified keys with no array indices, edges, or imports.
+- Lifecycle/span evidence: host cursors/tree/lease release before sequential child parsing at capacity one; depth-two recursion; central native UTF-16 to UTF-8 node/capture adaptation; exact BOM/Unicode/CRLF/tab remapping through `SourceIndex.remapChildSpan`; position-independent ordinal scopes and canonical duplicate suppression.
+- Failure/resolver evidence: unknown-language semantic fallback, malformed recovered children, hard child failure-kind propagation, exact diagnostic totals/bounded details, Vue TS/JS extension probes, and foreign-dialect isolation. Vue `lang` is read from native attribute/name/value nodes.
+- Independent read-only review: initial NOT PASS identified Vue resolver semantics, missing acceptance floors, and regex attribute parsing. All were remediated; independent re-review PASS with no actionable finding.
+- Scope: embedded/data cohort only; no graph-consumer integration, Linux, Docker, container, or non-arm64 implementation.

@@ -6,6 +6,7 @@ import {
   SYSTEMS_LANGUAGE_RESOLVER,
   MANAGED_LANGUAGE_RESOLVER,
   FUNCTIONAL_LANGUAGE_RESOLVER,
+  DATA_DOCUMENT_LANGUAGE_RESOLVER,
   TYPESCRIPT_LANGUAGE_RESOLVER,
   buildStructuralResolverDefinitions,
   type NormalizedStructuralImport,
@@ -126,6 +127,23 @@ const BUILD = Object.freeze({
 });
 
 describe("structural resolver registry", () => {
+  test("resolves Vue embedded TS/JS imports and excludes foreign definitions", () => {
+    const registry = new StructuralResolverRegistry([DATA_DOCUMENT_LANGUAGE_RESOLVER]);
+    expect(registry.requireDialect("sfc", "1.0.0")).toBe(DATA_DOCUMENT_LANGUAGE_RESOLVER);
+    const current = Object.freeze({
+      file: "src/View.vue", dialect: "sfc", resolverVersion: "1.0.0",
+      imports: Object.freeze([imported("./dep", [{ imported: "run", local: "execute" }])]),
+    });
+    const definitions = [
+      definition("src/dep.ts", "run"),
+      definition("src/foreign.py", "foreign", { identity: { language: "Python", dialect: "python" } }),
+    ];
+    expect(DATA_DOCUMENT_LANGUAGE_RESOLVER.resolve(current, reference("execute"), definitions, { knownFiles: ["src/View.vue", "src/dep.ts", "src/foreign.py"] }))
+      .toMatchObject({ status: "resolved", source: "import" });
+    expect(DATA_DOCUMENT_LANGUAGE_RESOLVER.resolve(current, reference("foreign"), definitions, { knownFiles: ["src/View.vue", "src/dep.ts", "src/foreign.py"] }))
+      .toEqual({ status: "unresolved", name: "foreign" });
+  });
+
   test("registers all TS/JS family dialects and rejects duplicate ownership", () => {
     const registry = new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER]);
     for (const dialect of ["typescript", "tsx", "javascript", "jsx"]) {

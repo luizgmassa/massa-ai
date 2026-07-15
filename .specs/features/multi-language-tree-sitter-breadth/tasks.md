@@ -6,7 +6,7 @@ Implement with the active `massa-th0th` Spec Driven Execute flow, `coding-guidel
 
 **Design:** `.specs/features/multi-language-tree-sitter-breadth/design.md`  
 **Capability contract:** `.specs/features/multi-language-tree-sitter-breadth/capability-matrix.md`  
-**Status:** TASK-001 through TASK-018 PASS; TASK-019 READY
+**Status:** TASK-001 through TASK-019 PASS; TASK-020 READY
 
 ## Project Testing Guidelines Scan
 
@@ -309,7 +309,7 @@ Phase 7 Validate:
 
 ### T19 / TASK-019: Implement Vue/Markdown/JSON/YAML and embedded parsing [P]
 
-**Status:** READY after TASK-014 PASS.
+**Status:** PASS on 2026-07-14. Exact Bun 1.3.0 focused tests passed 141/141 with 915 assertions; type-check 6/6, build 5/5, diff, and independent review passed after resolver, native-attribute, and acceptance-matrix remediation.
 
 **What:** Add Vue script/template, Markdown headings/fences, JSON/YAML qualified keys, two-level embedding, host remap, stable scope FQNs, fallback, and dedupe.  
 **Where:** embedded adapters, data/document packs, fixtures/tests.  
