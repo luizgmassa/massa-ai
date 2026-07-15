@@ -6,7 +6,7 @@ Implement with the active `massa-th0th` Spec Driven Execute flow, `coding-guidel
 
 **Design:** `.specs/features/multi-language-tree-sitter-breadth/design.md`  
 **Capability contract:** `.specs/features/multi-language-tree-sitter-breadth/capability-matrix.md`  
-**Status:** TASK-001 through TASK-016 PASS; TASK-017 through TASK-019 READY
+**Status:** TASK-001 through TASK-017 PASS; TASK-018 through TASK-019 READY
 
 ## Project Testing Guidelines Scan
 
@@ -287,7 +287,7 @@ Phase 7 Validate:
 
 ### T17 / TASK-017: Implement Java/Kotlin/Scala/C#/Swift/Dart packs and resolvers [P]
 
-**Status:** READY after TASK-014 PASS.
+**Status:** PASS.
 
 **What:** Add managed/mobile cohort with nesting, overloads, constructors, properties, inheritance, imports, and flow.  
 **Where:** structural packs/resolvers and golden fixtures/tests.  

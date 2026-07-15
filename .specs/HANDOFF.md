@@ -43,19 +43,20 @@ Implement `plan-multi-language.md` under workflow session `spec-multi-language`.
 - TASK-014 carries exact parser diagnostic totals separately from bounded ten-detail evidence, including original hard-failure spans through stale LKG activation. Active-generation-only status/language summaries persist with activated identity in nullable durable job columns; legacy NULL jobs hydrate unchanged. Exact Bun 1.3.0 focused/owned PostgreSQL and ETL passed 50/50 with 249 assertions; type 6/6, build 5/5, diff, and independent review passed.
 - TASK-015 adds versioned native Python/Ruby/PHP/Lua packs and a dialect-scoped scripting resolver. Grammar-derived tests cover symbols/docs, distinct honest imports and aliases, Python/PHP types, inheritance, calls/data flow/HTTP/events, unresolved/ambiguity, cross-language negatives, and Lua's no-type contract. Focused exact Bun 1.3.0 passed 67/67 with 333 assertions; build/type, diff, and independent review passed after four P1 fixes.
 - TASK-016 adds versioned native C/C++/Go/Rust/Zig packs and a dialect-scoped systems resolver. AST-derived native tests cover symbols/docs, honest includes/imports, types/inheritance/traits, calls/data flow/HTTP/events, Rust alias/group/glob/self resolution, unresolved/ambiguity/isolation, and four cases per concrete extension. `.h` defaults to C and selects C++ only from unambiguous AST importer or directory-aware build evidence, including cached importers; angle includes stay unresolved. Exact Bun 1.3.0 passed 95/95 with 1,010 assertions; core build, diff, and independent review passed after four remediation rounds.
+- TASK-017 adds versioned native Java/Kotlin/KTS/Scala/C#/Swift/Dart packs and a dialect-scoped managed resolver. Native tests cover declarations/docs, exact imports, nested owners, overloads, constructors, properties/fields, inheritance, calls/data flow/HTTP/events, unresolved/ambiguity/isolation, and stable overload FQNs. Real Java providers prove public nested/static imports resolve while private members do not; Java and C# per-declarator fields retain declaration modifiers. Exact Bun 1.3.0 passed 91/91 with 480 assertions; type-check 6/6, build 5/5, diff, and independent review passed after five remediation rounds.
 
 ## Blocking Gate
 
-TASK-016 passed systems capability, resolver isolation, AST-only honest-import, `.h` evidence/cache, build/diff, and independent-review gates. No test was weakened.
+TASK-017 passed managed/mobile capability, resolver isolation, production-definition visibility/import, overload identity, build/diff, and independent-review gates. No test was weakened.
 
 ## Exact Next Step
 
-Execute TASK-017 managed/mobile language packs/resolvers only. TASK-018 and TASK-019 are also dependency-READY but remain separate atomic tasks.
+Execute TASK-018 functional/BEAM language packs/resolvers only. TASK-019 is also dependency-READY but remains a separate atomic task.
 
 ## Worktree and Safety
 
 - Branch: `main`; baseline `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`.
 - `plan-multi-language.md` was supplied untracked and is now an in-scope revised artifact.
 - No push attempted.
-- TASK-001 through TASK-016 are claimed with recorded gates, including scripting/systems cohort support and durable bounded parser summaries. No HTTP/MCP diagnostic exposure, container build, or final parser benchmark has been claimed.
+- TASK-001 through TASK-017 are claimed with recorded gates, including scripting/systems/managed cohort support and durable bounded parser summaries. No HTTP/MCP diagnostic exposure, container build, or final parser benchmark has been claimed.
 - Preserve existing SQLite-removal artifacts and follow-up status.

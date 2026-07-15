@@ -336,6 +336,24 @@ describe("versioned structural FQN codec goldens", () => {
     }
   });
 
+  test("distinguishes managed constructors and overloads while retaining stable legacy ambiguity", () => {
+    const registry = new StructuralFqnRegistry();
+    const base = {
+      file: "src/Service.java", language: "Java", dialect: "java", scope: "nested" as const,
+      modifiers: [], overload: "overloaded" as const,
+    };
+    const identities = [
+      registry.register({ ...base, name: "Service", qualifiedName: "Service.Service", kind: "constructor", arity: 1, typeTokens: ["int"] }),
+      registry.register({ ...base, name: "Service", qualifiedName: "Service.Service", kind: "constructor", arity: 1, typeTokens: ["String"] }),
+      registry.register({ ...base, name: "run", qualifiedName: "Service.run", kind: "method", arity: 1, typeTokens: ["int", "String"] }),
+      registry.register({ ...base, name: "run", qualifiedName: "Service.run", kind: "method", arity: 1, typeTokens: ["String", "String"] }),
+      registry.register({ ...base, name: "run", qualifiedName: "Service.run", kind: "method", arity: 2, typeTokens: ["int", "int", "String"] }),
+    ];
+    expect(new Set(identities.map((identity) => identity.fqn)).size).toBe(identities.length);
+    expect(registry.resolveLegacy("src/Service.java#run")).toMatchObject({ found: false, ambiguous: true });
+    expect(registry.resolveLegacy("src/Service.java#Service")).toMatchObject({ found: false, ambiguous: true });
+  });
+
   test("returns stable not-found payloads for absent modern and legacy inputs", () => {
     const registry = new StructuralFqnRegistry();
     expect(registry.resolveModern("src/missing.ts#nope")).toEqual({

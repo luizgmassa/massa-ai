@@ -709,3 +709,14 @@ These draft checksums are retained as failed-review evidence and are not an acti
 - Resolver evidence: dialect isolation, honest Go/Rust imports, ambiguity/unresolved negatives, Rust alias/group/nested/glob/grouped-self semantics from native grammar records, and cross-language isolation.
 - Independent read-only review: PASS after four remediation rounds covering runtime ETL evidence production, Rust import honesty/AST traversal, compilation-directory resolution, cache-hit importer correctness, glob/grouped-self semantics, and fake-include negatives.
 - Scope: systems cohort only; no managed, functional, embedded/data, Linux, Docker, container, non-arm64, `.cc`, `.cxx`, or future-cohort implementation.
+
+## TASK-017 Accepted Gate Evidence v21
+
+- Platform: macOS arm64 only; exact Bun `1.3.0`.
+- Exact focused command: `bunx bun@1.3.0 test packages/core/src/__tests__/structural-query-pack.test.ts packages/core/src/__tests__/structural-resolver.test.ts packages/core/src/__tests__/structural-identity.test.ts` — PASS, 91 tests, 480 assertions.
+- `bunx bun@1.3.0 run type-check` — PASS, 6/6 packages. `bunx bun@1.3.0 run build` — PASS, 5/5 packages. `git diff --check` — PASS.
+- Native capability evidence: Java/Kotlin/KTS/Scala/C#/Swift/Dart declarations, documentation, nested owners, overloads, constructors, properties and per-declarator fields, applicable type/inheritance relations, calls, bare-argument data flow, HTTP, and events.
+- Import/resolver evidence: honest Java normal/static/nested imports, Kotlin/KTS compatibility, Scala and C# imports, Swift modules, Dart alias/unprefixed/show/hide; dialect isolation, ambiguity, and unresolved negatives. Real Java provider/consumer definitions prove public nested types and public static methods/fields resolve through named/wildcard imports while private members remain unavailable.
+- Identity evidence: managed constructor/method overload FQNs remain unique and legacy ambiguity remains stable; Java/C# field declarators inherit exact declaration modifiers.
+- Independent read-only review: PASS after five remediation rounds covering static/nested owner qualification, Dart unprefixed imports, multi-declarator and primary-constructor extraction, Kotlin/KTS compatibility, production-derived Java visibility, and static-field modifier inheritance.
+- Scope: managed/mobile cohort only; no functional, embedded/data, Linux, Docker, container, or non-arm64 implementation.

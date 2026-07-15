@@ -497,6 +497,107 @@ describe("declarative structural query packs", () => {
     }
   });
 
+  test("extracts managed/mobile native capabilities with honest import policy", async () => {
+    const cases = [
+      [".java", { packageName: "tree-sitter-java", version: "0.23.5" },
+        'import a.b.Base; /** Doc */ class Child extends Base implements Face { class Nested {} T value; Child(T x){} U run(T x){ fetch("/api/x", x); emit("ready"); return new U(); } }',
+        "java_import", ["class", "field", "constructor", "method"]],
+      [".kt", { packageName: "@tree-sitter-grammars/tree-sitter-kotlin", version: "1.1.0" },
+        'import a.b.Base as Root\n/** Doc */ class Child(val value:T): Root(), Face { class Nested; fun run(x:T):U { fetch("/api/x", x); emit("ready"); return U() }; }',
+        "kotlin_import", ["class", "property", "function"]],
+      [".kts", { packageName: "@tree-sitter-grammars/tree-sitter-kotlin", version: "1.1.0" },
+        'import a.b.Helper\n/** Doc */ val value:T=T()\nfun run(x:T):U { fetch("/api/x", x); emit("ready"); return U() }',
+        "kotlin_import", ["property", "function"]],
+      [".scala", { packageName: "tree-sitter-scala", version: "0.24.0" },
+        'import a.b.{Base => Root, helper}\n/** Doc */ class Child(val value:T) extends Root with Face { class Nested; def run(x:T):U = { fetch("/api/x", x); emit("ready"); U() } }',
+        "scala_import", ["class", "function"]],
+      [".cs", { packageName: "tree-sitter-c-sharp", version: "0.23.5", exportName: "default" },
+        'using A.B; /** Doc */ class Child : Base, IFace { class Nested {} T value; Child(T x){} U Run(T x){ fetch("/api/x", x); emit("ready"); return new U(); } }',
+        "csharp_using", ["class", "field", "constructor", "method"]],
+      [".swift", { packageName: "tree-sitter-swift", version: "0.7.1" },
+        'import Foundation\n/// Doc\nclass Child: Base, Face { class Nested {}; var value:T; init(x:T){ fetch("/api/x", x) }; func run(x:T)->U { fetch("/api/x", x); emit("ready"); return U() } }',
+        "swift_import", ["class", "property", "constructor", "function"]],
+      [".dart", { packageName: "tree-sitter-dart", version: "github:UserNobody14/tree-sitter-dart#be07cf7118d3ba06236a3f19541685a68209934" },
+        'import "base.dart" as b; /// Doc\nclass Child extends Base implements Face { T value; Child(this.value); U run(T x){ fetch("/api/x", x); emit("ready"); return U(); } }',
+        "dart_import", ["class", "field", "constructor", "method"]],
+    ] as const;
+    for (const [extension, artifact, source, importForm, kinds] of cases) {
+      const outcome = await parse(extension, Buffer.from(source), artifact);
+      expect(outcome.status, `${extension}:${outcome.status === "failed" ? outcome.diagnostics[0]?.message : ""}`).toBe("ok");
+      if (outcome.status !== "ok") continue;
+      expect(outcome.structure.symbols.map((item) => item.kind), extension).toEqual(expect.arrayContaining(kinds));
+      expect(outcome.structure.symbols.some((item) => item.documentation), extension).toBe(true);
+      expect(outcome.structure.imports.map((item) => item.form), extension).toContain(importForm);
+      expect(outcome.structure.edges.map((item) => item.kind), extension).toEqual(expect.arrayContaining(["type_ref", "http_call", "data_flow", "emit"]));
+      if ([".java", ".kt", ".scala", ".cs", ".swift"].includes(extension)) expect(outcome.structure.symbols.map((item) => item.qualifiedName), extension).toContain("Child.Nested");
+      if ([".java", ".dart"].includes(extension)) expect(outcome.structure.edges.map((item) => item.kind), extension).toContain("implement");
+      else if (extension !== ".kts") expect(outcome.structure.edges.map((item) => item.kind), extension).toContain("extend");
+    }
+  });
+
+  test("keeps managed overload and constructor signature material distinct", async () => {
+    const outcome = await parse(".java", Buffer.from(
+      "class Service { Service(int x){} Service(String x){} String run(int x){ return helper(x); } String run(String x){ return helper(x); } String run(int x, int y){ return helper(x); } }",
+    ), { packageName: "tree-sitter-java", version: "0.23.5" });
+    expect(outcome.status).toBe("ok");
+    if (outcome.status !== "ok") return;
+    const constructors = outcome.structure.symbols.filter((item) => item.kind === "constructor");
+    const methods = outcome.structure.symbols.filter((item) => item.kind === "method" && item.name === "run");
+    expect(constructors.map((item) => item.signatureMaterial)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ arity: 1, typeTokens: ["int"] }),
+      expect.objectContaining({ arity: 1, typeTokens: ["String"] }),
+    ]));
+    expect(methods.map((item) => item.signatureMaterial)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ arity: 1, typeTokens: ["int", "String"] }),
+      expect.objectContaining({ arity: 1, typeTokens: ["String", "String"] }),
+      expect.objectContaining({ arity: 2, typeTokens: ["int", "int", "String"] }),
+    ]));
+  });
+
+  test("normalizes Java static imports, every field declarator, and primary constructors", async () => {
+    const java = await parse(".java", Buffer.from(
+      "import static a.b.Util.run; import static a.b.Util.*; class Fields { int a, b; }",
+    ), { packageName: "tree-sitter-java", version: "0.23.5" });
+    expect(java.status).toBe("ok");
+    if (java.status === "ok") {
+      expect(java.structure.imports.map(({ form, specifier, bindings }) => ({ form, specifier, bindings }))).toEqual([
+        { form: "java_static_import", specifier: "a/b/Util", bindings: [{ imported: "run", local: "run", typeOnly: false }] },
+        { form: "java_static_import", specifier: "a/b/Util", bindings: [{ imported: "*", local: "*", typeOnly: false }] },
+      ]);
+      expect(java.structure.symbols.filter((item) => item.kind === "field").map((item) => item.qualifiedName)).toEqual(["Fields.a", "Fields.b"]);
+    }
+    const csharp = await parse(".cs", Buffer.from("class Fields { public static int a, b; }"), {
+      packageName: "tree-sitter-c-sharp", version: "0.23.5", exportName: "default",
+    });
+    expect(csharp.status).toBe("ok");
+    if (csharp.status === "ok") expect(csharp.structure.symbols.filter((item) => item.kind === "field").map((item) => ({
+      qualifiedName: item.qualifiedName, modifiers: item.signatureMaterial.modifiers,
+    }))).toEqual([
+      { qualifiedName: "Fields.a", modifiers: ["public", "static"] },
+      { qualifiedName: "Fields.b", modifiers: ["public", "static"] },
+    ]);
+    const kotlin = await parse(".kt", Buffer.from("class Child(val x:Int)"), {
+      packageName: "@tree-sitter-grammars/tree-sitter-kotlin", version: "1.1.0",
+    });
+    expect(kotlin.status).toBe("ok");
+    if (kotlin.status === "ok") expect(kotlin.structure.symbols).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "constructor", name: "Child", qualifiedName: "Child.Child", signatureMaterial: expect.objectContaining({ arity: 1, typeTokens: ["Int"] }) }),
+    ]));
+    const scala = await parse(".scala", Buffer.from("class Child(x:Int)"), { packageName: "tree-sitter-scala", version: "0.24.0" });
+    expect(scala.status).toBe("ok");
+    if (scala.status === "ok") expect(scala.structure.symbols).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "constructor", name: "Child", qualifiedName: "Child.Child", signatureMaterial: expect.objectContaining({ arity: 1, typeTokens: ["Int"] }) }),
+    ]));
+    const dart = await parse(".dart", Buffer.from('import "base.dart" show Base; import "other.dart" hide Hidden;'), {
+      packageName: "tree-sitter-dart", version: "github:UserNobody14/tree-sitter-dart#be07cf7118d3ba06236a3f19541685a68209934",
+    });
+    expect(dart.status).toBe("ok");
+    if (dart.status === "ok") expect(dart.structure.imports.map(({ specifier, bindings }) => ({ specifier, bindings }))).toEqual([
+      { specifier: "./base.dart", bindings: [{ imported: "Base", local: "Base", typeOnly: false }] },
+      { specifier: "./other.dart", bindings: [{ imported: "*", local: "*", typeOnly: false }, { imported: "!Hidden", local: "!Hidden", typeOnly: false }] },
+    ]);
+  });
+
   test("turns query compilation errors into hard query outcomes", async () => {
     const source = Buffer.from("function valid() {}\n");
     const grammarSet = await loadNativeGrammarSet([{

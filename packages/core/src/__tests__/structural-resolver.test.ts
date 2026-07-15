@@ -4,6 +4,7 @@ import {
   StructuralResolverSession,
   SCRIPTING_LANGUAGE_RESOLVER,
   SYSTEMS_LANGUAGE_RESOLVER,
+  MANAGED_LANGUAGE_RESOLVER,
   TYPESCRIPT_LANGUAGE_RESOLVER,
   buildStructuralResolverDefinitions,
   type NormalizedStructuralImport,
@@ -232,6 +233,117 @@ describe("systems structural resolver", () => {
     expect(SYSTEMS_LANGUAGE_RESOLVER.resolve(current, reference("run"), definitions, build)).toMatchObject({ status: "resolved", source: "global" });
     expect(SYSTEMS_LANGUAGE_RESOLVER.resolve(current, reference("shared"), definitions, build)).toMatchObject({ status: "ambiguous" });
     expect(SYSTEMS_LANGUAGE_RESOLVER.resolve(current, reference("missing"), definitions, build)).toEqual({ status: "unresolved", name: "missing" });
+  });
+});
+
+describe("managed structural resolver", () => {
+  test("resolves grammar-derived imports while isolating dialects and non-path modules", async () => {
+    const grammarSet = await loadNativeGrammarSet([{ packageName: "tree-sitter-java", version: "0.23.5" }]);
+    const outcome = await new StructuralRuntime({ grammarSet: () => grammarSet }).parse({
+      extension: ".java", source: Buffer.from("import a.b.Base; class Main { void run(){ Base(); } }"),
+    });
+    expect(outcome.status).toBe("ok");
+    if (outcome.status !== "ok") return;
+    const current = { file: "src/Main.java", dialect: "java", resolverVersion: "1.0.0", imports: outcome.structure.imports };
+    const definitions = [
+      definition("a/b/Base.java", "Base", { identity: { language: "Java", dialect: "java" } }),
+      definition("src/Other.java", "shared", { identity: { language: "Java", dialect: "java" } }),
+      definition("src/Again.java", "shared", { identity: { language: "Java", dialect: "java" } }),
+      definition("a/b/Base.kt", "Base", { identity: { language: "Kotlin", dialect: "kotlin" } }),
+    ];
+    const build = { knownFiles: ["src/Main.java", "a/b/Base.java", "a/b/Base.kt", "src/Other.java", "src/Again.java"] };
+    expect(MANAGED_LANGUAGE_RESOLVER.resolve(current, reference("Base"), definitions, build))
+      .toMatchObject({ status: "resolved", fqn: "a/b/Base.java#Base", source: "import" });
+    expect(MANAGED_LANGUAGE_RESOLVER.resolve(current, reference("shared"), definitions, build)).toMatchObject({ status: "ambiguous" });
+    expect(MANAGED_LANGUAGE_RESOLVER.resolve(current, reference("missing"), definitions, build)).toEqual({ status: "unresolved", name: "missing" });
+    const staticOutcome = await new StructuralRuntime({ grammarSet: () => grammarSet }).parse({
+      extension: ".java", source: Buffer.from("import static a.b.Util.run; import static a.b.Util.VALUE; import static a.b.Util.SECRET; import static a.b.Util.*; class Main {}"),
+    });
+    const staticProvider = await new StructuralRuntime({ grammarSet: () => grammarSet }).parse({
+      extension: ".java",
+      source: Buffer.from("package a.b; public class Util { public static int VALUE; private static int SECRET; public static void run() {} public static void other() {} private static void hidden() {} }")
+    });
+    expect(staticOutcome.status).toBe("ok");
+    expect(staticProvider.status).toBe("ok");
+    if (staticOutcome.status === "ok" && staticProvider.status === "ok") {
+      const staticFile = { file: "src/Main.java", dialect: "java", resolverVersion: "1.0.0", imports: staticOutcome.structure.imports };
+      const staticDefinitions = buildStructuralResolverDefinitions([{
+        file: "a/b/Util.java", language: "Java", dialect: "java", resolverVersion: "1.0.0",
+        structure: staticProvider.structure,
+      }]);
+      const staticBuild = { knownFiles: ["src/Main.java", "a/b/Util.java"] };
+      expect(staticDefinitions.find((item) => item.identity.qualifiedName === "Util.run")).toMatchObject({ exported: true });
+      expect(staticDefinitions.find((item) => item.identity.qualifiedName === "Util.hidden")).toMatchObject({ exported: false });
+      expect(staticDefinitions.find((item) => item.identity.qualifiedName === "Util.VALUE")).toMatchObject({
+        exported: true, identity: { modifiers: ["public", "static"] },
+      });
+      expect(staticDefinitions.find((item) => item.identity.qualifiedName === "Util.SECRET")).toMatchObject({ exported: false });
+      expect(MANAGED_LANGUAGE_RESOLVER.resolve(staticFile, reference("run"), staticDefinitions, staticBuild)).toMatchObject({ status: "resolved", fqn: expect.stringContaining("a/b/Util.java#Util.run"), source: "import" });
+      expect(MANAGED_LANGUAGE_RESOLVER.resolve(staticFile, reference("other"), staticDefinitions, staticBuild)).toMatchObject({ status: "resolved", fqn: expect.stringContaining("a/b/Util.java#Util.other"), source: "import" });
+      expect(MANAGED_LANGUAGE_RESOLVER.resolve(staticFile, reference("VALUE"), staticDefinitions, staticBuild)).toMatchObject({ status: "resolved", fqn: expect.stringContaining("a/b/Util.java#Util.VALUE"), source: "import" });
+      expect(MANAGED_LANGUAGE_RESOLVER.resolve(staticFile, reference("SECRET"), staticDefinitions, staticBuild)).toEqual({ status: "unresolved", name: "SECRET" });
+      expect(MANAGED_LANGUAGE_RESOLVER.resolve(staticFile, reference("hidden"), staticDefinitions, staticBuild)).toEqual({ status: "unresolved", name: "hidden" });
+    }
+    const nestedOutcome = await new StructuralRuntime({ grammarSet: () => grammarSet }).parse({
+      extension: ".java", source: Buffer.from("import a.b.Outer.Inner; class Main {}"),
+    });
+    const nestedProvider = await new StructuralRuntime({ grammarSet: () => grammarSet }).parse({
+      extension: ".java", source: Buffer.from("package a.b; public class Outer { public static class Inner {} private static class Hidden {} }")
+    });
+    expect(nestedOutcome.status).toBe("ok");
+    expect(nestedProvider.status).toBe("ok");
+    if (nestedOutcome.status === "ok" && nestedProvider.status === "ok") {
+      const nestedDefinitions = buildStructuralResolverDefinitions([{
+        file: "a/b/Outer.java", language: "Java", dialect: "java", resolverVersion: "1.0.0",
+        structure: nestedProvider.structure,
+      }]);
+      expect(nestedDefinitions.find((item) => item.identity.qualifiedName === "Outer.Inner")).toMatchObject({ exported: true });
+      expect(nestedDefinitions.find((item) => item.identity.qualifiedName === "Outer.Hidden")).toMatchObject({ exported: false });
+      expect(MANAGED_LANGUAGE_RESOLVER.resolve(
+        { file: "src/Main.java", dialect: "java", resolverVersion: "1.0.0", imports: nestedOutcome.structure.imports },
+        reference("Inner"), nestedDefinitions,
+        { knownFiles: ["src/Main.java", "a/b/Outer.java"] },
+      )).toMatchObject({ status: "resolved", fqn: expect.stringContaining("a/b/Outer.java#Outer.Inner"), source: "import" });
+    }
+    const kotlinGrammars = await loadNativeGrammarSet([{ packageName: "@tree-sitter-grammars/tree-sitter-kotlin", version: "1.1.0" }]);
+    const ktsOutcome = await new StructuralRuntime({ grammarSet: () => kotlinGrammars }).parse({
+      extension: ".kts", source: Buffer.from("import a.b.Base\nBase()"),
+    });
+    expect(ktsOutcome.status).toBe("ok");
+    if (ktsOutcome.status === "ok") {
+      const kotlinDefinitions = [
+        definition("a/b/Base.kt", "Base", { identity: { language: "Kotlin", dialect: "kotlin", kind: "class" } }),
+        definition("a/b/Base.java", "Base", { identity: { language: "Java", dialect: "java", kind: "class" } }),
+      ];
+      expect(MANAGED_LANGUAGE_RESOLVER.resolve(
+        { file: "src/main.kts", dialect: "kotlin-script", resolverVersion: "1.0.0", imports: ktsOutcome.structure.imports },
+        reference("Base"), kotlinDefinitions, { knownFiles: ["src/main.kts", "a/b/Base.kt", "a/b/Base.java"] },
+      )).toMatchObject({ status: "resolved", fqn: "a/b/Base.kt#Base", source: "import" });
+      expect(MANAGED_LANGUAGE_RESOLVER.resolve(
+        { file: "src/Main.kt", dialect: "kotlin", resolverVersion: "1.0.0", imports: [imported("a/b/Script", [{ imported: "Script", local: "Script" }], { form: "kotlin_import" })] },
+        reference("Script"), [definition("a/b/Script.kts", "Script", { identity: { language: "Kotlin", dialect: "kotlin-script" } })],
+        { knownFiles: ["src/Main.kt", "a/b/Script.kts"] },
+      )).toMatchObject({ status: "resolved", fqn: "a/b/Script.kts#Script", source: "import" });
+    }
+    const dartGrammars = await loadNativeGrammarSet([{ packageName: "tree-sitter-dart", version: "github:UserNobody14/tree-sitter-dart#be07cf7118d3ba06236a3f19541685a68209934" }]);
+    const dartOutcome = await new StructuralRuntime({ grammarSet: () => dartGrammars }).parse({
+      extension: ".dart", source: Buffer.from('import "base.dart"; void main() { Base(); }'),
+    });
+    expect(dartOutcome.status).toBe("ok");
+    if (dartOutcome.status === "ok") {
+      const dartFile = { file: "src/main.dart", dialect: "dart", resolverVersion: "1.0.0", imports: dartOutcome.structure.imports };
+      const dartDefinitions = [
+        definition("src/base.dart", "Base", { identity: { language: "Dart", dialect: "dart" } }),
+        definition("src/unrelated.dart", "Base", { identity: { language: "Dart", dialect: "dart" } }),
+      ];
+      expect(MANAGED_LANGUAGE_RESOLVER.resolve(dartFile, reference("Base"), dartDefinitions, { knownFiles: ["src/main.dart", "src/base.dart", "src/unrelated.dart"] }))
+        .toMatchObject({ status: "resolved", fqn: "src/base.dart#Base", source: "import" });
+    }
+    expect(MANAGED_LANGUAGE_RESOLVER.resolve(
+      { file: "src/Main.cs", dialect: "csharp", resolverVersion: "1.0.0", imports: [imported("A.B", [], { form: "csharp_using" })] },
+      reference("Base"), [definition("A/B.cs", "Base", { exported: false, identity: { language: "C#", dialect: "csharp" } })],
+      { knownFiles: ["src/Main.cs", "A/B.cs"] },
+    )).toEqual({ status: "unresolved", name: "Base" });
   });
 });
 

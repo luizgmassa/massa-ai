@@ -28,6 +28,8 @@ const DIALECT_PROBES: Readonly<Record<string, readonly string[]>> = Object.freez
   c: ["", ".c", ".h"], "header-default-c": ["", ".c", ".h"],
   cpp: ["", ".cpp", ".hpp", ".h"], header: ["", ".cpp", ".hpp", ".h"], "header-cpp": ["", ".cpp", ".hpp", ".h"],
   go: ["", ".go"], rust: ["", ".rs"], zig: ["", ".zig"],
+  java: ["", ".java"], kotlin: ["", ".kt", ".kts"], "kotlin-script": ["", ".kt", ".kts"],
+  scala: ["", ".scala"], csharp: ["", ".cs"], swift: ["", ".swift"], dart: ["", ".dart"],
 });
 
 function candidates(identities: readonly StructuralIdentity[]): readonly StructuralFqnCandidate[] {
@@ -131,7 +133,7 @@ function candidateKind(reference: NormalizedReference, definition: ResolvableDef
     return ["class", "interface", "trait", "enum", "type", "type_parameter"].includes(definition.identity.kind);
   }
   if (reference.kind === "call" || reference.kind === "data_flow" || reference.kind === "http_call") {
-    return ["function", "method", "constructor", "class", "variable", "constant", "export"].includes(definition.identity.kind);
+    return ["function", "method", "constructor", "class", "field", "variable", "constant", "export"].includes(definition.identity.kind);
   }
   return false;
 }
@@ -246,7 +248,7 @@ function importedMatches(
   const matches: ResolvableDefinition[] = [];
   let claimed = false;
   for (const imported of file.imports) {
-    if (!["esm_import", "commonjs_require", "dynamic_import", "python_import", "ruby_require", "php_use", "lua_require", "c_include", "cpp_include", "go_import", "rust_use", "zig_import"].includes(imported.form)) continue;
+    if (!["esm_import", "commonjs_require", "dynamic_import", "python_import", "ruby_require", "php_use", "lua_require", "c_include", "cpp_include", "go_import", "rust_use", "zig_import", "java_import", "java_static_import", "kotlin_import", "scala_import", "dart_import"].includes(imported.form)) continue;
     const typeEdge = reference.kind === "type_ref" || reference.kind === "extend" || reference.kind === "implement";
     for (const binding of imported.bindings) {
       let sought: string | undefined;
@@ -266,7 +268,7 @@ function importedMatches(
       claimed = true;
       if ((imported.typeOnly || binding.typeOnly) && !typeEdge) continue;
       const importedFile = resolveStructuralSpecifier(imported.specifier, file.file, build, file.dialect) ??
-        (["python_import", "ruby_require", "php_use", "lua_require", "c_include", "cpp_include", "go_import", "rust_use", "zig_import"].includes(imported.form)
+        (["python_import", "ruby_require", "php_use", "lua_require", "c_include", "cpp_include", "go_import", "rust_use", "zig_import", "java_import", "java_static_import", "kotlin_import", "scala_import", "dart_import"].includes(imported.form)
           ? probe(imported.specifier.replace(/^\.\//u, ""), new Set(build.knownFiles.map(normalizeStructuralFile)), file.dialect)
           : undefined);
       if (!importedFile) continue;

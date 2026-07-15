@@ -163,6 +163,12 @@ export function buildStructuralResolverDefinitions(
   }
   return Object.freeze(documents.flatMap((document) => document.structure.symbols.map((symbol) => {
     const key = `${document.file}\0${symbol.qualifiedName}\0${symbol.kind}`;
+    const visibleNested = document.dialect === "java"
+      ? symbol.signatureMaterial.modifiers.includes("public") && (
+        ["class", "interface", "enum"].includes(symbol.kind) ||
+        symbol.signatureMaterial.modifiers.includes("static")
+      )
+      : !symbol.signatureMaterial.modifiers.includes("private");
     return Object.freeze({
       identity: Object.freeze({
         file: document.file,
@@ -182,7 +188,7 @@ export function buildStructuralResolverDefinitions(
       exported: symbol.exported || (
         !symbol.name.startsWith("#") &&
         !symbol.name.startsWith("%23") &&
-        !symbol.signatureMaterial.modifiers.includes("private") &&
+        visibleNested &&
         exportedRoots.has(`${document.file}\0${symbol.qualifiedName.split(".")[0]}`)
       ),
       defaultExport: symbol.defaultExport,
