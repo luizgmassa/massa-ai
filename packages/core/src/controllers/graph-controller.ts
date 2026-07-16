@@ -27,6 +27,8 @@ import type {
   ImpactScope,
 } from "../services/symbol/impact-analysis.js";
 import type { DefinitionLookupResult } from "../services/symbol/definition-lookup.js";
+import { toSymbolIdentityResolution } from "../services/symbol/definition-lookup.js";
+import type { SymbolIdentityResolution } from "@massa-th0th/shared";
 
 export interface TracePathInput {
   projectId: string;
@@ -53,6 +55,7 @@ export interface TracePathOutput {
   chains: string[];
   nodes: TracePathResult["nodes"];
   edges: TracePathResult["edges"];
+  identity?: SymbolIdentityResolution;
   /** Surfaced when the seed did not resolve — agent-actionable hint. */
   notFoundHint?: string;
 }
@@ -161,6 +164,9 @@ export class GraphController {
         chains: result.chains,
         nodes: result.nodes,
         edges: result.edges,
+        ...(result.identityResolution
+          ? { identity: toSymbolIdentityResolution(result.identityResolution) }
+          : {}),
       },
     };
   }

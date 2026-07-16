@@ -4,6 +4,7 @@ import {
   STRUCTURAL_SYMBOL_KINDS,
   type StructuralSymbolKind,
 } from "./types.js";
+import type { StructuralFqnCandidate } from "@massa-th0th/shared";
 
 const KIND_PATTERN = STRUCTURAL_SYMBOL_KINDS.join("|");
 const MODERN_SUFFIX = new RegExp(`^(.*)~(${KIND_PATTERN})~([0-9a-f]{64})$`, "u");
@@ -45,15 +46,7 @@ export interface StructuralIdentity {
   signatureHash: string;
 }
 
-export interface StructuralFqnCandidate {
-  fqn: string;
-  file: string;
-  name: string;
-  displayName: string;
-  qualifiedName: string;
-  kind: StructuralSymbolKind;
-  signatureHash: string;
-}
+export type { StructuralFqnCandidate } from "@massa-th0th/shared";
 
 export type StructuralFqnResolution =
   | { found: true; ambiguous: false; identity: StructuralIdentity }

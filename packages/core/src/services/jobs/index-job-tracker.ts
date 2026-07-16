@@ -6,9 +6,11 @@
  */
 
 import { randomUUID } from "crypto";
-import { logger } from "@massa-th0th/shared";
+import {
+  logger,
+  type ActiveGraphDiagnostics,
+} from "@massa-th0th/shared";
 import type { JobStore } from "./index-job-store.js";
-import type { ParserDiagnosticsSummary } from "../etl/stage-context.js";
 
 export interface IndexJob {
   jobId: string;
@@ -25,9 +27,7 @@ export interface IndexJob {
     chunksIndexed: number;
     errors: number;
     duration: number;
-    activatedGraphGenerationId?: string;
-    parserDiagnostics?: ParserDiagnosticsSummary;
-  };
+  } & Partial<ActiveGraphDiagnostics<string>>;
   error?: string;
   createdAt: Date;
   startedAt?: Date;

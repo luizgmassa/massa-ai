@@ -5,9 +5,12 @@
  * Uses the Symbol Graph's PostgreSQL index for fast, exact results.
  */
 
-import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
+import {
+  IToolHandler,
+  STRUCTURAL_SYMBOL_KIND_SCHEMA,
+  ToolResponse,
+} from "@massa-th0th/shared";
 import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
-import { STRUCTURAL_SYMBOL_KINDS } from "../services/structural/types.js";
 
 interface SearchDefinitionsParams {
   projectId: string;
@@ -36,10 +39,7 @@ export class SearchDefinitionsTool implements IToolHandler {
       },
       kind: {
         type: "array",
-        items: {
-          type: "string",
-          enum: [...STRUCTURAL_SYMBOL_KINDS],
-        },
+        items: STRUCTURAL_SYMBOL_KIND_SCHEMA,
         description: "Filter by symbol kind",
       },
       file: {

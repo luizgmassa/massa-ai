@@ -7,7 +7,7 @@
 - workflow: spec-driven
 - persona: AI Engineer
 - feature: `multi-language-tree-sitter-breadth`
-- status: EXECUTE ACTIVE; TASK-001 through TASK-020 PASS; TASK-021 READY
+- status: EXECUTE ACTIVE; TASK-001 through TASK-021 PASS; TASK-022 READY
 - branch: `main`
 - baseline: `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`
 - push: not attempted
@@ -73,14 +73,15 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 - TASK-018 adds native Elixir/EXS/Erlang/Clojure/OCaml/Haskell declarations, documentation/spec evidence, honest namespace/named/open/qualified/hiding imports, applicable relations, calls/data flow, module-owned identities, and dialect-isolated resolution. BEAM import arity selects exact overload identities; EX/EXS remain compatible. Exact Bun 1.3.0 focused gates passed 101/101 with 575 assertions; type-check 6/6, core build 2/2, diff, and independent review passed after two remediation rounds.
 - TASK-019 adds Vue/Markdown embedded parsing plus Markdown heading and JSON/YAML qualified-key packs. Host resources release before sequential depth-two child parsing, native UTF-16 offsets are centrally adapted to exact UTF-8 bytes, Vue `lang` uses native attributes, stable ordinal scopes remap child spans, and fallback/hard-failure diagnostics retain exact totals. Exact Bun 1.3.0 passed 141/141 with 915 assertions; type-check 6/6, build 5/5, diff, and independent review passed after resolver, native-attribute, and acceptance-matrix remediation.
 - TASK-020 routes definition, reference, trace, architecture, and impact consumers through one active-generation identity lookup; exact modern identities resolve, legacy ambiguity remains explicit and stable, overload impact analysis does not fall back to bare names, and search exposes all 18 canonical additive kinds. Exact Bun 1.3.0 focused tests passed 8/8 with 19 assertions; owned PostgreSQL passed 21/21 with 81 assertions; type-check 6/6, build 5/5, diff, and independent review passed. A supplemental broad trace/architecture run retained four pre-existing shared-database fixture failures outside the task-owned gate; no validation asset was weakened.
+- TASK-021 exposes one shared parser-summary, active-generation, FQN-resolution, and canonical 18-kind transport contract through HTTP and the production MCP CallTool proxy. Project-map graph inputs are captured in one share-locked PostgreSQL transaction so concurrent activation cannot mix generations; extension counts remain distinct from parser language counts and raw diagnostics are never expanded. Exact Bun 1.3.0 focused transport/readiness/identity tests passed 19/19 with 92 assertions; owned PostgreSQL passed 21/21 with 93 assertions including the activation-lock/pending-poison sensor; type-check 6/6, build 5/5, diff, and independent re-review passed after both initial P1 findings were remediated.
 
 ## Blocker
 
-No blocker at the TASK-020 boundary. TASK-021 is dependency-satisfied and remains sequential under the one-atomic-task contract. Four pre-existing shared-database fixture failures remain in a supplemental broad trace/architecture run; TASK-020's frozen focused, owned PostgreSQL, type, build, diff, and independent-review gates pass.
+No blocker at the TASK-021 boundary. TASK-022 is dependency-satisfied and remains sequential under the one-atomic-task contract. Four pre-existing shared-database fixture failures remain in a supplemental broad trace/architecture run from TASK-020; TASK-021's frozen focused, owned PostgreSQL, type, build, diff, and independent-review gates pass.
 
 ## Next Step
 
-Execute the next READY task, TASK-021.
+Execute the next READY task, TASK-022.
 
 ## Previous Feature
 

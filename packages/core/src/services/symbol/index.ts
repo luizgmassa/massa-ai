@@ -3,6 +3,12 @@
  */
 
 export { symbolGraphService, SymbolGraphService } from "./symbol-graph.service.js";
+export {
+  DefinitionLookupService,
+  definitionLookupService,
+  toSymbolIdentityResolution,
+} from "./definition-lookup.js";
+export type { DefinitionLookupResult } from "./definition-lookup.js";
 export { computePageRank } from "./centrality.js";
 export { runLouvain } from "./communities.js";
 export type {

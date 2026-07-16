@@ -1,26 +1,9 @@
-/** Canonical structural symbol taxonomy. Additive changes require a version bump. */
-export const STRUCTURAL_SYMBOL_KINDS = [
-  "module",
-  "namespace",
-  "class",
-  "interface",
-  "trait",
-  "enum",
-  "function",
-  "method",
-  "constructor",
-  "property",
-  "field",
-  "variable",
-  "constant",
-  "type",
-  "type_parameter",
-  "export",
-  "heading",
-  "key",
-] as const;
-
-export type StructuralSymbolKind = (typeof STRUCTURAL_SYMBOL_KINDS)[number];
+/** Canonical transport taxonomy. Additive changes require a version bump. */
+export {
+  STRUCTURAL_SYMBOL_KINDS,
+  type StructuralSymbolKind,
+} from "@massa-th0th/shared";
+import type { StructuralSymbolKind } from "@massa-th0th/shared";
 
 /** Canonical structural edge taxonomy. Additive changes require a version bump. */
 export const STRUCTURAL_EDGE_KINDS = [

@@ -519,15 +519,87 @@ describe.skipIf(!requested)("owned PostgreSQL generation-scoped symbol repositor
 
   test("scopes centrality writes and active diagnostic/count snapshots", async () => {
     expect((await repository.updateCentralityGeneration(lease(), [{ filePath: "src/pending.ts", score: 0.99 }])).status).toBe("written");
-    await seedFile(pendingId, "src/pending.ts", "p", "recovered", 4, true);
+    await seedFile(pendingId, "src/pending.vue", "p", "recovered", 4, true);
+    await seedDefinition(pendingId, "src/pending.vue#poison-key", "src/pending.vue", "poison-key", "src/pending.vue#poison-key");
+    await db!.query(`UPDATE symbol_definitions SET kind='key' WHERE project_id=$1 AND generation_id=$2`, [projectId, pendingId]);
+    await db!.query(`INSERT INTO symbol_references(project_id,generation_id,from_file,from_line,symbol_name,target_fqn,ref_kind) VALUES($1,$2,'src/pending.vue',1,'poison-key','src/pending.vue#poison-key','http_call')`, [projectId, pendingId]);
+    await db!.query(`INSERT INTO symbol_imports(project_id,generation_id,from_file,specifier,imported_names,is_external,is_type_only) VALUES($1,$2,'src/pending.vue','./poison',ARRAY['poison-key'],false,false)`, [projectId, pendingId]);
     expect((await repository.getTopCentralFiles(projectId)).map((row) => row.file_path)).toEqual(["src/active.ts"]);
     expect(await repository.getActiveGraphSnapshot(projectId)).toMatchObject({ generationId: activeId, counts: { files: 1, definitions: 1, references: 1, imports: 1, centrality: 1 }, diagnostics: { recovered: 0, hardFailures: 0, staleFiles: 0, errors: 0 }, languages: { typescript: 1 } });
-    await db!.query(`UPDATE graph_generations SET status='superseded' WHERE id=$1`, [activeId]);
-    await db!.query(`UPDATE graph_generations SET status='active',completed_at=NOW(),activated_at=NOW() WHERE id=$1`, [pendingId]);
-    await db!.query(`UPDATE workspaces SET active_graph_generation_id=$1,pending_graph_generation_id=NULL,graph_lease_token=NULL,graph_lease_expires_at=NULL,graph_lease_heartbeat_at=NULL WHERE project_id=$2`, [pendingId, projectId]);
+
+    // Start activation after project_map captures the active generation. The
+    // repository transaction's workspace share lock must hold the pointer
+    // stable until every map read finishes. Pending poison data makes any
+    // mixed-generation read immediately visible and deterministic.
+    const activator = new Client({
+      connectionString: process.env.DATABASE_URL,
+      application_name: "task021-project-map-activator",
+    });
+    await activator.connect();
+    let activation: Promise<void> | undefined;
+    let observedBlockedActivation = false;
+    try {
+      const { symbolGraphService } = await import("../services/symbol/symbol-graph.service.js");
+      const duringActivation = await symbolGraphService.getProjectMap(projectId, {
+        afterGenerationCaptured: async (generationId) => {
+          expect(generationId).toBe(activeId);
+          activation = (async () => {
+            await activator.query("BEGIN");
+            await activator.query(`UPDATE graph_generations SET status='superseded' WHERE id=$1`, [activeId]);
+            await activator.query(`UPDATE graph_generations SET status='active',completed_at=NOW(),activated_at=NOW() WHERE id=$1`, [pendingId]);
+            await activator.query(`UPDATE workspaces SET active_graph_generation_id=$1,pending_graph_generation_id=NULL,graph_lease_token=NULL,graph_lease_expires_at=NULL,graph_lease_heartbeat_at=NULL WHERE project_id=$2`, [pendingId, projectId]);
+            await activator.query("COMMIT");
+          })();
+          for (let attempt = 0; attempt < 100; attempt++) {
+            const state = await db!.query(
+              `SELECT wait_event_type FROM pg_stat_activity WHERE application_name='task021-project-map-activator' AND state='active'`,
+            );
+            if (state.rows.some((row) => row.wait_event_type === "Lock")) {
+              observedBlockedActivation = true;
+              break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 2));
+          }
+        },
+      });
+      expect(observedBlockedActivation).toBe(true);
+      expect(duringActivation).toMatchObject({
+        activatedGraphGenerationId: activeId,
+        stats: { files: 1, symbols: 1 },
+        parserDiagnostics: {
+          diagnosticsCount: 0, recoveredFiles: 0, hardFailureFiles: 0,
+          staleFiles: 0, languages: { typescript: 1 },
+        },
+        filesByLanguage: { ts: 1 },
+        symbolsByKind: { function: 1 },
+        edgesByKind: { call: 1 },
+      });
+      expect(duringActivation?.topCentralFiles.map((row) => row.filePath)).toEqual(["src/active.ts"]);
+      expect(duringActivation?.symbolsByKind).not.toHaveProperty("key");
+      expect(duringActivation?.filesByLanguage).not.toHaveProperty("vue");
+      await activation;
+    } finally {
+      await activator.query("ROLLBACK").catch(() => undefined);
+      await activator.end();
+    }
+
     expect(await repository.getActiveGraphSnapshot(projectId)).toMatchObject({
       generationId: pendingId, diagnostics: { recovered: 1, hardFailures: 0, staleFiles: 1, errors: 4 }, languages: { typescript: 1 },
     });
+    const { symbolGraphService } = await import("../services/symbol/symbol-graph.service.js");
+    const map = await symbolGraphService.getProjectMap(projectId);
+    expect(map?.activatedGraphGenerationId).toBe(pendingId);
+    expect(map?.parserDiagnostics).toEqual({
+      diagnosticsCount: 4,
+      recoveredFiles: 1,
+      hardFailureFiles: 0,
+      staleFiles: 1,
+      languages: { typescript: 1 },
+    });
+    expect(map?.filesByLanguage).toEqual({ vue: 1 });
+    expect(map?.symbolsByKind).toEqual({ key: 1 });
+    expect(map?.edgesByKind).toEqual({ http_call: 1 });
+    expect(map?.topCentralFiles.map((row) => row.filePath)).toEqual(["src/pending.ts"]);
   });
 
   test("deletes only the owned pending file graph", async () => {

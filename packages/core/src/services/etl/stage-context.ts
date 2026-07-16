@@ -18,6 +18,10 @@ import type {
 } from "../structural/types.js";
 import type { GraphGenerationLease } from "../../data/graph-generation/graph-generation-contract.js";
 import type { HeaderLanguageEvidence } from "../structural/language-manifest.js";
+import type {
+  ActiveGraphDiagnostics,
+  ParserDiagnosticsSummary,
+} from "@massa-th0th/shared";
 
 // ─── Event types ─────────────────────────────────────────────────────────────
 
@@ -161,7 +165,7 @@ export interface ResolvedFile extends ParsedFile {
 
 // ─── Pipeline result ──────────────────────────────────────────────────────────
 
-export interface EtlResult {
+export interface EtlResult extends ActiveGraphDiagnostics<string> {
   filesDiscovered: number;
   filesIndexed: number;
   filesSkipped: number; // fingerprint cache hits
@@ -170,14 +174,6 @@ export interface EtlResult {
   errors: number;
   durationMs: number;
   stageTimings: Record<EtlStage, number>;
-  activatedGraphGenerationId: string;
-  parserDiagnostics: ParserDiagnosticsSummary;
 }
 
-export interface ParserDiagnosticsSummary {
-  diagnosticsCount: number;
-  recoveredFiles: number;
-  hardFailureFiles: number;
-  staleFiles: number;
-  languages: Record<string, number>;
-}
+export type { ParserDiagnosticsSummary } from "@massa-th0th/shared";

@@ -5,6 +5,8 @@
  * the hierarchical memory architecture described in docs/02-architecture.md
  */
 
+export * from "./structural-transport.js";
+
 /**
  * Memory Hierarchy Levels
  * 

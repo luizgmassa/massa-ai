@@ -5,6 +5,11 @@
  * e o mapeamento para endpoints da Tools API.
  */
 
+import {
+  STRUCTURAL_FQN_DESCRIPTION,
+  STRUCTURAL_SYMBOL_KIND_SCHEMA,
+} from "@massa-th0th/shared";
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -56,7 +61,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "index_status",
     description:
-      "Get the status of a background indexing job by its jobId. Use this after calling index to check progress.",
+      "Get durable background-index status. Completed structural jobs include activatedGraphGenerationId and parserDiagnostics with exact aggregate diagnosticsCount, recoveredFiles, hardFailureFiles, staleFiles, and language counts; raw per-file diagnostics are not expanded.",
     apiEndpoint: "/api/v1/project/index/status/:jobId",
     apiMethod: "GET",
     inputSchema: {
@@ -557,7 +562,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "project_map",
     description:
-      "Aggregate view of an indexed project: overall stats (files/chunks/symbols/status/lastIndexedAt), top central files by PageRank (the dependency backbone), symbols grouped by kind (function/class/interface/type/etc.), files grouped by extension (language distribution), and the most-recently indexed files. Use this as a one-shot 'what's in this project?' summary.",
+      "Aggregate view of one active graph generation: identity, exact parser-diagnostic summary, stats, PageRank backbone, symbol counts using the canonical 18-kind schema-v2 taxonomy, extension distribution, and recent files. Raw per-file diagnostics are not expanded. Use this as a one-shot project summary.",
     apiEndpoint: "/api/v1/workspace/:id/map",
     apiMethod: "GET",
     inputSchema: {
@@ -600,8 +605,15 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           description: "Substring search on symbol name (case-insensitive)",
         },
         kind: {
-          type: "string",
-          description: "Comma-separated symbol kinds to filter: function,class,variable,type,interface,export",
+          anyOf: [
+            STRUCTURAL_SYMBOL_KIND_SCHEMA,
+            {
+              type: "array",
+              items: STRUCTURAL_SYMBOL_KIND_SCHEMA,
+            },
+          ],
+          description:
+            "One canonical graph schema v2 symbol kind, or an array of kinds. Arrays are serialized as comma-separated query values.",
         },
         file: {
           type: "string",
@@ -625,7 +637,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "get_references",
     description:
-      "Find all references (usages) of a symbol across the project. Returns file paths, line numbers, reference kinds (call/import/type_ref/extend/implement), and code context snippets.",
+      `Find all references to a symbol across the active graph generation. ${STRUCTURAL_FQN_DESCRIPTION}`,
     apiEndpoint: "/api/v1/symbol/references",
     apiMethod: "GET",
     inputSchema: {
@@ -641,8 +653,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         fqn: {
           type: "string",
-          description:
-            "Fully-qualified name (e.g. 'services/search/rlm.ts#ContextualSearchRLM') to disambiguate when multiple definitions share the same name",
+          description: STRUCTURAL_FQN_DESCRIPTION,
         },
         limit: {
           type: "number",
@@ -657,7 +668,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "go_to_definition",
     description:
-      "Find the definition of a symbol (function, class, variable, type, etc.) in the project. Disambiguates by calling file context. Returns file location, line numbers, doc comment, and code snippet.",
+      `Find a definition in the active graph generation. ${STRUCTURAL_FQN_DESCRIPTION}`,
     apiEndpoint: "/api/v1/symbol/definition",
     apiMethod: "GET",
     inputSchema: {
@@ -669,7 +680,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         symbolName: {
           type: "string",
-          description: "Name of the symbol to find the definition for",
+          description: `Bare symbol name or structural FQN. ${STRUCTURAL_FQN_DESCRIPTION}`,
         },
         fromFile: {
           type: "string",
@@ -687,7 +698,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       "Trace paths through the code graph from a seed symbol, following typed edges (CALLS/DATA_FLOWS/HTTP_CALLS/EMITS/LISTENS). " +
       "Modes: calls (callers/callees), data_flow (value propagation), cross_service (HTTP/async hops), all. " +
       "Direction: outbound (what it reaches) | inbound (what reaches it) | both. " +
-      "Use INSTEAD OF grep for callers, dependencies, impact analysis, or data flow tracing.",
+      `Use INSTEAD OF grep for callers, dependencies, impact analysis, or data flow tracing. ${STRUCTURAL_FQN_DESCRIPTION}`,
     apiEndpoint: "/api/v1/symbol/trace",
     apiMethod: "GET",
     inputSchema: {
@@ -700,7 +711,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         symbol: { type: "string", description: "Alias for function_name." },
         qualifiedName: {
           type: "string",
-          description: "Fully-qualified name (e.g. 'services/search/rlm.ts#ContextualSearchRLM') — skips name resolution.",
+          description: STRUCTURAL_FQN_DESCRIPTION,
         },
         projectId: { type: "string", description: "The project ID to trace in" },
         direction: {
@@ -732,7 +743,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           description: "Explicit edge-type override (wins over mode): call|data_flow|http_call|emit|listen|import|type_ref|extend|implement.",
         },
       },
-      required: ["projectId", "function_name"],
+      required: ["projectId"],
+      anyOf: [
+        { required: ["function_name"] },
+        { required: ["symbol"] },
+        { required: ["qualifiedName"] },
+      ],
     },
   },
 

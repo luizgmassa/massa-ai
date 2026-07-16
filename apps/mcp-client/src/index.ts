@@ -15,7 +15,8 @@ import {
 import fs from "fs/promises";
 import { ApiClient } from "./api-client.js";
 import { collectFiles } from "./file-collector.js";
-import { TOOL_DEFINITIONS, getToolDefinition } from "./tool-definitions.js";
+import { TOOL_DEFINITIONS } from "./tool-definitions.js";
+import { proxyCallTool } from "./call-tool-proxy.js";
 import {
   configExists,
   initConfig,
@@ -149,73 +150,11 @@ class McpProxyServer {
         if (name === "index") {
           return await this.handleIndexTool((args ?? {}) as Record<string, unknown>);
         }
-
-        const toolDef = getToolDefinition(name);
-        if (!toolDef) {
-          throw new Error(`Unknown tool: ${name}`);
-        }
-
-        // Proxy to API
-        let response;
-        if (toolDef.apiMethod === "GET") {
-          // For GET requests: replace :pathParam placeholders, rest go as query params
-          let endpoint = toolDef.apiEndpoint;
-          const params = (args ?? {}) as Record<string, unknown>;
-          const queryParams: Record<string, unknown> = {};
-
-          for (const [key, value] of Object.entries(params)) {
-            if (endpoint.includes(`:${key}`)) {
-              // Path parameter
-              endpoint = endpoint.replace(`:${key}`, encodeURIComponent(String(value)));
-            } else {
-              // Query parameter
-              queryParams[key] = value;
-            }
-          }
-
-          response = await this.apiClient.get(endpoint, queryParams);
-        } else {
-          // POST request: replace :pathParam placeholders, rest go into the body.
-          // A clean body is required — Elysia 1.2.25 t.Object is strict on
-          // additional properties, so a leftover id (or filePath) key would 422.
-          let endpoint = toolDef.apiEndpoint;
-          const body: Record<string, unknown> = {};
-          const params = (args ?? {}) as Record<string, unknown>;
-
-          for (const [key, value] of Object.entries(params)) {
-            if (endpoint.includes(`:${key}`)) {
-              endpoint = endpoint.replace(`:${key}`, encodeURIComponent(String(value)));
-            } else {
-              body[key] = value;
-            }
-          }
-
-          response = await this.apiClient.post(endpoint, body);
-        }
-
-        // Format response for MCP
-        const responseData = response as any;
-
-        // If response has TOON format string in data, return directly
-        if (responseData?.success && typeof responseData?.data === "string") {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: responseData.data,
-              },
-            ],
-          };
-        }
-
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(response, null, 2),
-            },
-          ],
-        };
+        return await proxyCallTool(
+          this.apiClient,
+          name,
+          (args ?? {}) as Record<string, unknown>,
+        );
       } catch (error) {
         return {
           content: [

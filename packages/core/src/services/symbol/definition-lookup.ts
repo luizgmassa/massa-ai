@@ -5,6 +5,7 @@ import type {
   SymbolRepositoryPg,
 } from "../../data/symbol/symbol-repository-pg.js";
 import { parseStructuralFqn } from "../structural/fqn-codec.js";
+import type { SymbolIdentityResolution } from "@massa-th0th/shared";
 
 export type DefinitionLookupResult =
   | { readonly status: "resolved"; readonly definition: SymbolDefinition }
@@ -13,6 +14,26 @@ export type DefinitionLookupResult =
   | { readonly status: "bare"; readonly query: string; readonly definitions: readonly SymbolDefinition[] };
 
 type LookupRepository = Pick<SymbolRepositoryPg, "resolveDefinitionFqn" | "findDefinitionsByName">;
+
+/** Stable public projection shared by HTTP and MCP transport surfaces. */
+export function toSymbolIdentityResolution(
+  result: DefinitionLookupResult,
+): SymbolIdentityResolution {
+  switch (result.status) {
+    case "resolved":
+      return Object.freeze({ status: "resolved", fqn: result.definition.id });
+    case "ambiguous":
+      return Object.freeze({
+        status: "ambiguous",
+        legacyFqn: result.legacyFqn,
+        candidates: result.candidates,
+      });
+    case "missing":
+      return Object.freeze({ status: "missing", query: result.query });
+    case "bare":
+      return Object.freeze({ status: "bare", query: result.query });
+  }
+}
 
 /** One active-generation lookup contract shared by every graph consumer. */
 export class DefinitionLookupService {

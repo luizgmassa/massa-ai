@@ -236,7 +236,11 @@ export type { HeaderLanguageEvidence } from "./structural/language-manifest.js";
 export { symbolGraphService, SymbolGraphService } from "./symbol/symbol-graph.service.js";
 export { computePageRank } from "./symbol/centrality.js";
 export { TracePathService, tracePathService } from "./symbol/trace-path.js";
-export { DefinitionLookupService, definitionLookupService } from "./symbol/definition-lookup.js";
+export {
+  DefinitionLookupService,
+  definitionLookupService,
+  toSymbolIdentityResolution,
+} from "./symbol/definition-lookup.js";
 export type { DefinitionLookupResult } from "./symbol/definition-lookup.js";
 export { ImpactAnalysisService, impactAnalysisService, defaultDiffRunner } from "./symbol/impact-analysis.js";
 export type {

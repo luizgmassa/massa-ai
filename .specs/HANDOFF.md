@@ -47,20 +47,21 @@ Implement `plan-multi-language.md` under workflow session `spec-multi-language`.
 - TASK-018 adds versioned native Elixir/EXS/Erlang/Clojure/OCaml/Haskell packs and a dialect-scoped functional resolver. Native tests cover declarations/docs/spec metadata, AST-only imports and exposure modes, applicable protocol/behaviour/class/instance relations, calls/bare flow, Haskell equation dedupe/hiding, Erlang arity, parser-produced resolution, ambiguity/unresolved/isolation, and EX/EXS compatibility. Exact Bun 1.3.0 passed 101/101 with 575 assertions; type-check 6/6, core build 2/2, diff, and independent review passed after two remediation rounds.
 - TASK-019 adds Vue/Markdown embedded parsing plus Markdown heading and JSON/YAML qualified-key packs. Host resources release before sequential depth-two child parsing, native UTF-16 offsets are centrally adapted to exact UTF-8 bytes, Vue `lang` uses native attributes, stable ordinal scopes remap child spans, and fallback/hard-failure diagnostics retain exact totals. Exact Bun 1.3.0 passed 141/141 with 915 assertions; type-check 6/6, build 5/5, diff, and independent review passed after resolver, native-attribute, and acceptance-matrix remediation.
 - TASK-020 adds one active-generation definition identity lookup shared by graph definition/reference/trace consumers, returns stable legacy ambiguity without first-match traversal, preserves exact overload identities in impact analysis, and exposes all 18 canonical kinds. Exact Bun 1.3.0 focused tests passed 8/8 with 19 assertions; owned PostgreSQL passed 21/21 with 81 assertions; type-check 6/6, build 5/5, diff, and independent review passed. A supplemental broad trace/architecture run retained four pre-existing shared-database fixture failures outside the task-owned gate; no test was weakened.
+- TASK-021 exposes exact durable parser summaries, active generation identity, one stable FQN resolution schema, and all 18 canonical kinds through HTTP and the production MCP CallTool proxy without expanding raw diagnostics. Project-map centrality, aggregates, typed edges, diagnostics, counts, recent files, and architecture inputs now come from one share-locked active-generation PostgreSQL snapshot; a deterministic concurrent-activation/pending-poison sensor proves no mixed-generation response. Exact Bun 1.3.0 focused tests passed 19/19 with 92 assertions; owned PostgreSQL passed 21/21 with 93 assertions; type-check 6/6, build 5/5, diff, and independent re-review passed after remediating both initial P1 findings.
 
 ## Blocking Gate
 
-TASK-020 passed exact modern/legacy/ambiguous identity behavior, active-generation-only traversal and kind aggregation, overload-safe impact analysis, type/build/diff, and independent-review gates. No test was weakened. Four pre-existing shared-database fixture failures remain in a supplemental broad trace/architecture run and are not TASK-020 acceptance failures.
+TASK-021 passed exact HTTP/MCP resolved, missing, ambiguous, durable-status, project-map, operational-error, liveness/readiness, one-generation race, type, build, diff, and independent-review gates. No test was weakened. Four pre-existing shared-database fixture failures remain in a supplemental broad trace/architecture run from TASK-020 and are not TASK-021 acceptance failures.
 
 ## Exact Next Step
 
-Execute TASK-021 parser-diagnostic HTTP/MCP transport parity only.
+Execute TASK-022 deterministic polyglot E2E replacement only.
 
 ## Worktree and Safety
 
 - Branch: `main`; baseline `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`.
-- User commit `7245aaa` and its files are preserved; TASK-020 is committed on top without modifying that commit.
+- User commit `7245aaa` and its files are preserved; TASK-021 is committed on top without modifying that commit.
 - `plan-multi-language.md` was supplied untracked and is now an in-scope revised artifact.
 - No push attempted.
-- TASK-001 through TASK-020 are claimed with recorded gates, including scripting/systems/managed/functional/embedded/data support, durable bounded parser summaries, and versioned graph-consumer identities. No HTTP/MCP diagnostic exposure, container build, or final parser benchmark has been claimed.
+- TASK-001 through TASK-021 are claimed with recorded gates, including scripting/systems/managed/functional/embedded/data support, durable bounded parser summaries, versioned graph-consumer identities, and exact HTTP/MCP diagnostic/ambiguity transport. No TASK-022 E2E expansion, container build, or final parser benchmark has been claimed.
 - Preserve existing SQLite-removal artifacts and follow-up status.

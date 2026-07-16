@@ -136,6 +136,48 @@ export interface WorkspaceRow {
   updated_at: number;
 }
 
+/**
+ * All graph-backed inputs needed by project_map, captured from one active
+ * generation while the workspace row is share-locked in one transaction.
+ */
+export interface ProjectMapGraphSnapshot {
+  workspace: WorkspaceRow;
+  generationId: string | null;
+  counts: {
+    files: number;
+    definitions: number;
+    references: number;
+    imports: number;
+    centrality: number;
+  };
+  diagnostics: {
+    recovered: number;
+    hardFailures: number;
+    staleFiles: number;
+    errors: number;
+  };
+  languages: Record<string, number>;
+  topCentralFiles: CentralityEntry[];
+  symbolsByKind: Record<string, number>;
+  filesByLanguage: Record<string, number>;
+  recentFiles: Array<{ filePath: string; indexedAt: number | null }>;
+  edgesByKind: Record<string, number>;
+  architecture: {
+    files: string[];
+    importEdges: Array<{ from_file: string; to_file?: string }>;
+    definitions: SymbolDefinition[];
+    httpEdges: SymbolReference[];
+    centrality: Map<string, number>;
+  };
+}
+
+export interface ProjectMapSnapshotOptions {
+  centralityLimit?: number;
+  recentLimit?: number;
+  /** @internal Deterministic concurrency sensor used by DB-backed tests. */
+  afterGenerationCaptured?: (generationId: string | null) => void | Promise<void>;
+}
+
 export interface ActiveGenerationScope {
   projectId: string;
   generationId: string;
@@ -1031,6 +1073,179 @@ export class SymbolRepositoryPg {
     }));
 
     return { symbolsByKind, filesByLanguage, recentFiles };
+  }
+
+  /**
+   * Capture every graph-backed project-map input from one active generation.
+   * The workspace share lock prevents activation from changing the pointer
+   * until all reads finish; every query is additionally scoped by the captured
+   * generation id so pending rows can never leak into the response.
+   */
+  async getProjectMapSnapshot(
+    projectId: string,
+    opts: ProjectMapSnapshotOptions = {},
+  ): Promise<ProjectMapGraphSnapshot | null> {
+    const centralityLimit = opts.centralityLimit ?? 20;
+    const recentLimit = opts.recentLimit ?? 10;
+
+    return getPrismaClient().$transaction(async (tx) => {
+      const workspaceRows = await tx.$queryRaw<Array<WsRaw & { active_graph_generation_id: string | null }>>`
+        SELECT * FROM workspaces WHERE project_id = ${projectId} FOR SHARE
+      `;
+      const workspaceRow = workspaceRows[0];
+      if (!workspaceRow) return null;
+
+      const generationId = workspaceRow.active_graph_generation_id;
+      await opts.afterGenerationCaptured?.(generationId);
+
+      const empty: ProjectMapGraphSnapshot = {
+        workspace: mapWs(workspaceRow),
+        generationId: null,
+        counts: { files: 0, definitions: 0, references: 0, imports: 0, centrality: 0 },
+        diagnostics: { recovered: 0, hardFailures: 0, staleFiles: 0, errors: 0 },
+        languages: {},
+        topCentralFiles: [],
+        symbolsByKind: {},
+        filesByLanguage: {},
+        recentFiles: [],
+        edgesByKind: {},
+        architecture: {
+          files: [], importEdges: [], definitions: [], httpEdges: [], centrality: new Map(),
+        },
+      };
+      if (!generationId) return empty;
+
+      const fileRows = await tx.$queryRaw<Array<{
+        relative_path: string;
+        indexed_at: Date | null;
+        language: string | null;
+        parser_status: string;
+        parser_error_count: number;
+        is_stale: boolean;
+      }>>`
+        SELECT relative_path, indexed_at, language, parser_status,
+               parser_error_count, is_stale
+        FROM symbol_files
+        WHERE project_id = ${projectId} AND generation_id = ${generationId}
+      `;
+      const kindRows = await tx.$queryRaw<Array<{ kind: string; count: bigint }>>`
+        SELECT kind, COUNT(*)::bigint AS count
+        FROM symbol_definitions
+        WHERE project_id = ${projectId} AND generation_id = ${generationId}
+        GROUP BY kind
+      `;
+      const definitionRows = await tx.$queryRaw<DefRaw[]>`
+        SELECT * FROM symbol_definitions
+        WHERE project_id = ${projectId} AND generation_id = ${generationId}
+        ORDER BY file_path, line_start, id
+        LIMIT 1000
+      `;
+      const importRows = await tx.$queryRaw<Array<{ from_file: string; to_file: string | null }>>`
+        SELECT from_file, to_file FROM symbol_imports
+        WHERE project_id = ${projectId} AND generation_id = ${generationId}
+      `;
+      const edgeRows = await tx.$queryRaw<Array<{ ref_kind: string; count: bigint }>>`
+        SELECT ref_kind, COUNT(*)::bigint AS count
+        FROM symbol_references
+        WHERE project_id = ${projectId} AND generation_id = ${generationId}
+        GROUP BY ref_kind
+      `;
+      const httpRows = await tx.$queryRaw<RefRaw[]>`
+        SELECT * FROM symbol_references
+        WHERE project_id = ${projectId} AND generation_id = ${generationId}
+          AND ref_kind = 'http_call'
+        ORDER BY from_file, from_line
+        LIMIT 200
+      `;
+      const centralityRows = await tx.$queryRaw<Array<{
+        file_path: string;
+        score: number;
+        updated_at: Date;
+      }>>`
+        SELECT file_path, score, updated_at FROM symbol_centrality
+        WHERE project_id = ${projectId} AND generation_id = ${generationId}
+      `;
+
+      const symbolsByKind: Record<string, number> = {};
+      let definitionCount = 0;
+      for (const row of kindRows) {
+        const count = Number(row.count);
+        symbolsByKind[row.kind] = count;
+        definitionCount += count;
+      }
+
+      const edgesByKind: Record<string, number> = {};
+      let referenceCount = 0;
+      for (const row of edgeRows) {
+        const count = Number(row.count);
+        edgesByKind[row.ref_kind] = count;
+        referenceCount += count;
+      }
+
+      const languages: Record<string, number> = {};
+      const filesByLanguage: Record<string, number> = {};
+      let recovered = 0;
+      let hardFailures = 0;
+      let staleFiles = 0;
+      let errors = 0;
+      for (const row of fileRows) {
+        const language = row.language ?? "unknown";
+        languages[language] = (languages[language] ?? 0) + 1;
+        const extension = row.relative_path.match(/\.([^./\\]+)$/)?.[1]?.toLowerCase() ?? "other";
+        filesByLanguage[extension] = (filesByLanguage[extension] ?? 0) + 1;
+        if (row.parser_status === "recovered") recovered++;
+        if (row.parser_status === "failed" || row.parser_status === "unsupported") hardFailures++;
+        if (row.is_stale) staleFiles++;
+        errors += Number(row.parser_error_count);
+      }
+
+      const centrality = new Map<string, number>();
+      const centralEntries = centralityRows.map((row) => {
+        const score = Number(row.score);
+        centrality.set(row.file_path, score);
+        return {
+          project_id: projectId,
+          file_path: row.file_path,
+          score,
+          updated_at: row.updated_at.getTime(),
+        } satisfies CentralityEntry;
+      });
+      centralEntries.sort((left, right) => right.score - left.score || left.file_path.localeCompare(right.file_path));
+
+      const recentFiles = fileRows
+        .map((row) => ({ filePath: row.relative_path, indexedAt: row.indexed_at?.getTime() ?? null }))
+        .sort((left, right) => (right.indexedAt ?? 0) - (left.indexedAt ?? 0) || left.filePath.localeCompare(right.filePath))
+        .slice(0, recentLimit);
+
+      return {
+        workspace: mapWs(workspaceRow),
+        generationId,
+        counts: {
+          files: fileRows.length,
+          definitions: definitionCount,
+          references: referenceCount,
+          imports: importRows.length,
+          centrality: centralityRows.length,
+        },
+        diagnostics: { recovered, hardFailures, staleFiles, errors },
+        languages,
+        topCentralFiles: centralEntries.slice(0, centralityLimit),
+        symbolsByKind,
+        filesByLanguage,
+        recentFiles,
+        edgesByKind,
+        architecture: {
+          files: fileRows.map((row) => row.relative_path),
+          importEdges: importRows.map((row) => ({
+            from_file: row.from_file,
+            ...(row.to_file ? { to_file: row.to_file } : {}),
+          })),
+          definitions: definitionRows.map(mapDef),
+          httpEdges: httpRows.map(mapRef),
+          centrality,
+        },
+      };
+    });
   }
 
   async getCentrality(projectId: string): Promise<Map<string, number>> {

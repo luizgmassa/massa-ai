@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { DefinitionLookupService } from "../services/symbol/definition-lookup.js";
+import {
+  DefinitionLookupService,
+  toSymbolIdentityResolution,
+} from "../services/symbol/definition-lookup.js";
 import { STRUCTURAL_SYMBOL_KINDS } from "../services/structural/types.js";
 import { SearchDefinitionsTool } from "../tools/search_definitions.js";
 import type { SymbolDefinition } from "../data/symbol/symbol-repository-pg.js";
@@ -32,7 +35,15 @@ describe("shared definition identity lookup", () => {
     };
     const service = new DefinitionLookupService(() => repo as never);
     expect(await service.lookup("p", "src/a.ts#run")).toEqual({ status: "resolved", definition: exact });
-    expect(await service.lookup("p", "src/shared.ts#run")).toEqual({ status: "ambiguous", legacyFqn: "src/shared.ts#run", candidates });
+    const ambiguous = await service.lookup("p", "src/shared.ts#run");
+    expect(ambiguous).toEqual({ status: "ambiguous", legacyFqn: "src/shared.ts#run", candidates });
+    expect(toSymbolIdentityResolution(ambiguous)).toEqual({
+      status: "ambiguous",
+      legacyFqn: "src/shared.ts#run",
+      candidates,
+    });
+    expect(toSymbolIdentityResolution(await service.lookup("p", "src/a.ts#run")))
+      .toEqual({ status: "resolved", fqn: "src/a.ts#run" });
     expect(await service.lookup("p", "src/missing.ts#none")).toEqual({ status: "missing", query: "src/missing.ts#none" });
     expect((await service.lookup("p", "run"))).toMatchObject({ status: "bare", definitions: [exact, { file_path: "src/b.ts" }] });
     expect(await service.lookup("p", "none")).toEqual({ status: "missing", query: "none" });

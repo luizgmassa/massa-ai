@@ -15,6 +15,7 @@ import {
   IndexProjectTool,
   GraphController,
   symbolGraphService,
+  toSymbolIdentityResolution,
   workspaceManager,
 } from "@massa-th0th/core";
 import { Elysia, t } from "elysia";
@@ -265,10 +266,29 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
         if (!symbolName)
           return { success: false, error: "symbolName is required" };
 
+        const lookup = fqn
+          ? await symbolGraphService.lookupDefinition(projectId, fqn)
+          : undefined;
+        const identity = lookup ? toSymbolIdentityResolution(lookup) : undefined;
+        if (identity?.status === "ambiguous" || identity?.status === "missing") {
+          return {
+            success: true,
+            data: {
+              symbolName,
+              fqn,
+              identity,
+              references: [],
+              total: 0,
+              shown: 0,
+            },
+          };
+        }
+
         const refs = await symbolGraphService.getReferences(
           projectId,
           symbolName,
           fqn,
+          lookup,
         );
         const limited = refs.slice(0, boundedInt(limit, 50, 1, 1000));
 
@@ -278,6 +298,7 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
             references: limited,
             total: refs.length,
             shown: limited.length,
+            ...(identity ? { identity } : {}),
           },
         };
       } catch (error) {
@@ -306,17 +327,18 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
         if (!symbolName)
           return { success: false, error: "symbolName is required" };
 
-        const defs = await symbolGraphService.goToDefinition(
-          projectId,
-          symbolName,
-          fromFile,
-        );
+        const lookup = await symbolGraphService.lookupDefinition(projectId, symbolName);
+        const identity = toSymbolIdentityResolution(lookup);
+        const defs = identity.status === "ambiguous" || identity.status === "missing"
+          ? []
+          : await symbolGraphService.goToDefinition(projectId, symbolName, fromFile, lookup);
 
         return {
           success: true,
           data: {
             found: defs.length > 0,
             symbolName,
+            identity,
             definitions: defs,
           },
         };
@@ -390,10 +412,19 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
         });
 
         if (!result.found) {
+          const identity = result.identityResolution
+            ? toSymbolIdentityResolution(result.identityResolution)
+            : undefined;
+          if (identity?.status === "ambiguous") {
+            return {
+              success: true,
+              data: { found: false, identity },
+            };
+          }
           return {
             success: false,
             error: `Symbol '${result.symbol}' not found in project '${result.projectId}'.`,
-            data: { hint: result.hint },
+            data: { hint: result.hint, ...(identity ? { identity } : {}) },
           };
         }
 

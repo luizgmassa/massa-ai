@@ -12,7 +12,10 @@
 
 import path from "path";
 import fs from "fs/promises";
-import { logger } from "@massa-th0th/shared";
+import {
+  logger,
+  type ActiveGraphDiagnostics,
+} from "@massa-th0th/shared";
 import { definitionLookupService, type DefinitionLookupResult } from "./definition-lookup.js";
 import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import { workspaceManager } from "../workspace/workspace-manager.js";
@@ -22,6 +25,7 @@ import type {
   SymbolImport,
   CentralityEntry,
   RefKind,
+  ProjectMapGraphSnapshot,
 } from "../../data/symbol/symbol-repository-pg.js";
 import { computePageRank } from "./centrality.js";
 import { runLouvain, type WeightedEdge } from "./communities.js";
@@ -118,7 +122,7 @@ export interface ListDefinitionsOptions {
   limit?: number;
 }
 
-export interface ProjectMapResult {
+export interface ProjectMapResult extends ActiveGraphDiagnostics {
   projectId: string;
   stats: {
     files: number;
@@ -151,6 +155,8 @@ export interface ProjectMapResult {
 export interface GetProjectMapOptions {
   centralityLimit?: number;
   recentLimit?: number;
+  /** @internal Deterministic concurrency sensor used by DB-backed tests. */
+  afterGenerationCaptured?: (generationId: string | null) => void | Promise<void>;
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -196,9 +202,10 @@ export class SymbolGraphService {
     projectId: string,
     symbolName: string,
     fromFile?: string,
+    resolvedLookup?: DefinitionLookupResult,
   ): Promise<DefinitionResult[]> {
     const repo = getSymbolRepository();
-    const lookup = await this.identityLookup.lookup(projectId, symbolName);
+    const lookup = resolvedLookup ?? await this.identityLookup.lookup(projectId, symbolName);
     const defs = lookup.status === "resolved" ? [lookup.definition]
       : lookup.status === "bare" ? [...lookup.definitions] : [];
     const centrality = await repo.getCentrality(projectId);
@@ -253,11 +260,12 @@ export class SymbolGraphService {
     projectId: string,
     symbolName: string,
     fqn?: string,
+    resolvedLookup?: DefinitionLookupResult,
   ): Promise<ReferenceResult[]> {
     const repo = getSymbolRepository();
     let refs: SymbolReference[];
     if (fqn) {
-      const lookup = await this.identityLookup.lookup(projectId, fqn);
+      const lookup = resolvedLookup ?? await this.identityLookup.lookup(projectId, fqn);
       if (lookup.status === "resolved") {
         const targets = lookup.definition.id === fqn ? [fqn] : [lookup.definition.id, fqn];
         const matches = (await Promise.all(targets.map((target) => repo.findReferencesByFqn(projectId, target)))).flat();
@@ -405,25 +413,19 @@ export class SymbolGraphService {
     const recentLimit = opts.recentLimit ?? 10;
 
     const repo = getSymbolRepository();
-    const workspace = await repo.getWorkspace(projectId);
-    if (!workspace) return null;
-
-    const [topCentralFiles, aggregates, edgesByKind] = await Promise.all([
-      this.getTopCentralFiles(projectId, centralityLimit),
-      repo.getProjectMapAggregates(projectId, recentLimit),
-      // Typed-edge counts (D1) — cheap single GROUP BY; surface when non-empty.
-      // Wrapped in Promise.resolve so it works whether the repo returns a
-      // plain value (PostgreSQL sync) or a Promise (PG async).
-      Promise.resolve(repo.countEdgesByKind(projectId)).catch(
-        () => ({}) as Record<string, number>,
-      ),
-    ]);
+    const graphSnapshot = await repo.getProjectMapSnapshot(projectId, {
+      centralityLimit,
+      recentLimit,
+      afterGenerationCaptured: opts.afterGenerationCaptured,
+    });
+    if (!graphSnapshot) return null;
+    const workspace = graphSnapshot.workspace;
 
     // ── Architecture intelligence (D4) — best-effort, fully isolated. ──────────
     // Every step is wrapped so a failure in any analyzer leaves the existing
     // project_map fields byte-for-byte intact. New fields are additive (only
     // attached when non-empty).
-    const arch = await this.computeArchitectureMapSafe(projectId, repo).catch(
+    const arch = await this.computeArchitectureMapSafe(graphSnapshot.architecture).catch(
       (err) => {
         logger.warn("getProjectMap: architecture map failed; skipping", {
           projectId,
@@ -436,22 +438,36 @@ export class SymbolGraphService {
     return {
       projectId,
       stats: {
-        files: workspace.files_count,
+        files: graphSnapshot?.counts.files ?? workspace.files_count,
         chunks: workspace.chunks_count,
-        symbols: workspace.symbols_count,
+        symbols: graphSnapshot?.counts.definitions ?? workspace.symbols_count,
         status: workspace.status,
         lastIndexedAt: workspace.last_indexed_at
           ? new Date(workspace.last_indexed_at).toISOString()
           : null,
       },
-      topCentralFiles,
-      symbolsByKind: aggregates.symbolsByKind,
-      filesByLanguage: aggregates.filesByLanguage,
-      recentFiles: aggregates.recentFiles.map((r) => ({
+      topCentralFiles: graphSnapshot.topCentralFiles.map((row) => ({
+        filePath: row.file_path,
+        score: row.score,
+        updatedAt: row.updated_at,
+      })),
+      symbolsByKind: graphSnapshot.symbolsByKind,
+      activatedGraphGenerationId: graphSnapshot?.generationId ?? null,
+      parserDiagnostics: {
+        diagnosticsCount: graphSnapshot?.diagnostics.errors ?? 0,
+        recoveredFiles: graphSnapshot?.diagnostics.recovered ?? 0,
+        hardFailureFiles: graphSnapshot?.diagnostics.hardFailures ?? 0,
+        staleFiles: graphSnapshot?.diagnostics.staleFiles ?? 0,
+        languages: graphSnapshot?.languages ?? {},
+      },
+      filesByLanguage: graphSnapshot.filesByLanguage,
+      recentFiles: graphSnapshot.recentFiles.map((r) => ({
         filePath: r.filePath,
         indexedAt: r.indexedAt ? new Date(r.indexedAt).toISOString() : null,
       })),
-      edgesByKind: Object.keys(edgesByKind).length > 0 ? edgesByKind : undefined,
+      edgesByKind: Object.keys(graphSnapshot.edgesByKind).length > 0
+        ? graphSnapshot.edgesByKind
+        : undefined,
       // D4 additive fields — present only when computed and non-empty.
       packages: arch && arch.packages.length > 0 ? arch.packages : undefined,
       entryPoints: arch && arch.entryPoints.length > 0 ? arch.entryPoints : undefined,
@@ -472,28 +488,15 @@ export class SymbolGraphService {
    * project_map response intact.
    */
   private async computeArchitectureMapSafe(
-    projectId: string,
-    repo: ReturnType<typeof getSymbolRepository>,
+    snapshot: ProjectMapGraphSnapshot["architecture"],
   ): Promise<ArchitectureMap | null> {
-    // Gather the file-import graph + definitions + HTTP edges in parallel.
-    // Each is wrapped in Promise.resolve so the PostgreSQL (sync) and PG (async)
-    // repo contracts both work.
-    const [filesRaw, importEdgesRaw, defsRaw, httpEdgesRaw, centralityRaw] =
-      await Promise.all([
-        Promise.resolve(repo.allFiles(projectId)).catch(() => [] as string[]),
-        Promise.resolve(repo.allImportEdges(projectId)).catch(
-          () => [] as Array<{ from_file: string; to_file?: string }>,
-        ),
-        Promise.resolve(
-          repo.listDefinitions(projectId, { limit: 1000 }),
-        ).catch(() => [] as SymbolDefinition[]),
-        Promise.resolve(
-          repo.findEdges(projectId, { types: ["http_call"], limit: 200 }),
-        ).catch(() => [] as SymbolReference[]),
-        Promise.resolve(repo.getCentrality(projectId)).catch(
-          () => new Map<string, number>(),
-        ),
-      ]);
+    const {
+      files: filesRaw,
+      importEdges: importEdgesRaw,
+      definitions: defsRaw,
+      httpEdges: httpEdgesRaw,
+      centrality: centralityRaw,
+    } = snapshot;
 
     if (!filesRaw || filesRaw.length === 0) return null;
 

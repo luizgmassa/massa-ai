@@ -6,7 +6,7 @@ Implement with the active `massa-th0th` Spec Driven Execute flow, `coding-guidel
 
 **Design:** `.specs/features/multi-language-tree-sitter-breadth/design.md`  
 **Capability contract:** `.specs/features/multi-language-tree-sitter-breadth/capability-matrix.md`  
-**Status:** TASK-001 through TASK-020 PASS; TASK-021 READY
+**Status:** TASK-001 through TASK-021 PASS; TASK-022 READY
 
 ## Project Testing Guidelines Scan
 
@@ -331,7 +331,7 @@ Phase 7 Validate:
 
 ### T21 / TASK-021: Expose parser diagnostics through HTTP and MCP
 
-**Status:** READY.
+**Status:** PASS on 2026-07-16. Exact Bun 1.3.0 focused transport/readiness/identity tests passed 19/19 with 92 assertions; owned PostgreSQL passed 21/21 with 93 assertions, including a deterministic activation-lock and pending-poison project-map sensor; type-check 6/6, build 5/5, diff, and independent re-review passed after both initial P1 findings were remediated.
 
 **What:** Add parser readiness, durable index diagnostics, project-map summaries, generation identity, kinds, and one ambiguity schema to HTTP/MCP definitions.  
 **Where:** Tools API routes, MCP tool definitions, shared types, tests.  
@@ -341,6 +341,8 @@ Phase 7 Validate:
 **Commit:** `feat(api): expose parser diagnostics and ambiguity`
 
 ### T22 / TASK-022: Replace polyglot limitation tests with deterministic E2E
+
+**Status:** READY.
 
 **What:** Expand the polyglot fixture to all 33 extensions and replace best-effort/zero-symbol expectations with manifest-tier assertions, generation safety, and transport parity.  
 **Where:** E2E fixtures and `02.indexing`, `09.symbol-graph`, `15.nfr` tests.  
