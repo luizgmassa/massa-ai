@@ -742,3 +742,15 @@ These draft checksums are retained as failed-review evidence and are not an acti
 - Failure/resolver evidence: unknown-language semantic fallback, malformed recovered children, hard child failure-kind propagation, exact diagnostic totals/bounded details, Vue TS/JS extension probes, and foreign-dialect isolation. Vue `lang` is read from native attribute/name/value nodes.
 - Independent read-only review: initial NOT PASS identified Vue resolver semantics, missing acceptance floors, and regex attribute parsing. All were remediated; independent re-review PASS with no actionable finding.
 - Scope: embedded/data cohort only; no graph-consumer integration, Linux, Docker, container, or non-arm64 implementation.
+
+## TASK-020 Accepted Gate Evidence v24
+
+- Platform: macOS arm64 only; exact Bun `1.3.0`; dedicated owned PostgreSQL 17 at frozen admin URL `postgresql://test@127.0.0.1:5433/postgres`.
+- Exact focused command: `bunx bun@1.3.0 test definition-lookup.test.ts impact-analysis-diff.test.ts` — PASS, 8 tests, 19 assertions.
+- Exact owned PostgreSQL command: `RUN_GRAPH_GENERATION_SYMBOL_REPOSITORY=1 MASSA_TH0TH_DEDICATED=1 GRAPH_GENERATION_TEST_ADMIN_URL='postgresql://test@127.0.0.1:5433/postgres' bunx bun@1.3.0 test --max-concurrency 1 packages/core/src/__tests__/graph-generation-symbol-repository-pg.test.ts` — PASS, 21 tests, 81 assertions.
+- `bunx bun@1.3.0 run type-check` — PASS, 6/6 packages. `bunx bun@1.3.0 run build` — PASS, 5/5 packages. `git diff --check` — PASS.
+- Identity evidence: one active-generation lookup discriminates modern resolution, deterministic legacy ambiguity, malformed/missing inputs, and bare-name compatibility; definition/reference/trace consumers return zero traversal for ambiguous explicit identities rather than first-match or verbatim behavior. Impact analysis retains the exact modern FQN and never falls back to a bare overload name.
+- Generation/kind evidence: pending-generation definitions and references remain invisible; active bare-name lookup remains compatible; project-map aggregates expose exactly all 18 canonical structural kinds while excluding pending rows; search schema consumes the canonical kind list.
+- Independent read-only source review: PASS with no actionable finding after remediation.
+- Supplemental divergence: a broad trace/architecture run retained four pre-existing shared-database fixture failures. This was not the frozen TASK-020 gate; task-owned focused and owned-database regressions pass, and no test, fixture, schema, or validator was weakened.
+- Scope: graph-consumer identity integration only; no HTTP/MCP parser-diagnostic transport (TASK-021), Linux, Docker, container, or non-arm64 implementation.

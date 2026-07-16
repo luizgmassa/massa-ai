@@ -7,6 +7,7 @@
 
 import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
+import { STRUCTURAL_SYMBOL_KINDS } from "../services/structural/types.js";
 
 interface SearchDefinitionsParams {
   projectId: string;
@@ -37,7 +38,7 @@ export class SearchDefinitionsTool implements IToolHandler {
         type: "array",
         items: {
           type: "string",
-          enum: ["function", "class", "variable", "type", "interface", "export"],
+          enum: [...STRUCTURAL_SYMBOL_KINDS],
         },
         description: "Filter by symbol kind",
       },

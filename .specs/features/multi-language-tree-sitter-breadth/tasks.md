@@ -6,7 +6,7 @@ Implement with the active `massa-th0th` Spec Driven Execute flow, `coding-guidel
 
 **Design:** `.specs/features/multi-language-tree-sitter-breadth/design.md`  
 **Capability contract:** `.specs/features/multi-language-tree-sitter-breadth/capability-matrix.md`  
-**Status:** TASK-001 through TASK-019 PASS; TASK-020 READY
+**Status:** TASK-001 through TASK-020 PASS; TASK-021 READY
 
 ## Project Testing Guidelines Scan
 
@@ -320,6 +320,8 @@ Phase 7 Validate:
 
 ### T20 / TASK-020: Integrate FQN ambiguity and additive kinds across graph consumers
 
+**Status:** PASS on 2026-07-16. Exact Bun 1.3.0 focused tests passed 8/8 with 19 assertions; owned PostgreSQL passed 21/21 with 81 assertions; type-check 6/6, build 5/5, diff, and independent review passed. A supplemental broad trace/architecture run retained four pre-existing shared-database fixture failures outside this task gate; no test was weakened.
+
 **What:** Route definition/reference/trace/architecture/impact consumers through active generation and shared FQN resolver; expose all additive kinds and stable ambiguity type.  
 **Where:** core graph services/controllers/tools and tests.  
 **Depends on:** T13,T15,T16,T17,T18,T19. **Requirements:** MLTS-005-006,013,023.  
@@ -328,6 +330,8 @@ Phase 7 Validate:
 **Commit:** `feat(graph): expose versioned symbol identities`
 
 ### T21 / TASK-021: Expose parser diagnostics through HTTP and MCP
+
+**Status:** READY.
 
 **What:** Add parser readiness, durable index diagnostics, project-map summaries, generation identity, kinds, and one ambiguity schema to HTTP/MCP definitions.  
 **Where:** Tools API routes, MCP tool definitions, shared types, tests.  

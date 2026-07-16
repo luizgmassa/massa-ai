@@ -26,6 +26,7 @@ import type {
   ImpactAnalysisResult,
   ImpactScope,
 } from "../services/symbol/impact-analysis.js";
+import type { DefinitionLookupResult } from "../services/symbol/definition-lookup.js";
 
 export interface TracePathInput {
   projectId: string;
@@ -101,7 +102,7 @@ export class GraphController {
    */
   async tracePath(input: TracePathInput): Promise<
     | { found: true; result: TracePathOutput }
-    | { found: false; hint: string; symbol: string; projectId: string }
+    | { found: false; hint: string; symbol: string; projectId: string; identityResolution?: Exclude<DefinitionLookupResult, { status: "bare" }> }
   > {
     const projectId = input.projectId;
     const seed = input.function_name ?? input.symbol ?? input.qualifiedName;
@@ -139,6 +140,7 @@ export class GraphController {
         found: false,
         symbol: seed,
         projectId,
+        ...(result.identityResolution ? { identityResolution: result.identityResolution } : {}),
         hint:
           "Use search_definitions(search=...) to find the exact name, or pass a fully-qualified name (qualifiedName='rel/path.ts#Name').",
       };

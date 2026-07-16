@@ -272,9 +272,8 @@ export class ImpactAnalysisService {
       for (const sym of syms) {
         let refs: { from_file: string; from_line: number; symbol_name: string }[] = [];
         try {
-          // Try FQN first (exact), then name.
-          const byFqn = await repo.findReferencesByFqn(projectId, sym.fqn);
-          refs = byFqn.length > 0 ? byFqn : await repo.findReferencesByName(projectId, sym.name);
+          // Exact identity only: name fallback would merge overloads.
+          refs = await repo.findReferencesByFqn(projectId, sym.fqn);
         } catch {
           continue; // best-effort
         }

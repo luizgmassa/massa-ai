@@ -21,6 +21,7 @@ import { logger } from "@massa-th0th/shared";
 import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import { symbolGraphService } from "./symbol-graph.service.js";
 import type { EdgeType, EdgeResult } from "./symbol-graph.service.js";
+import { definitionLookupService, type DefinitionLookupResult } from "./definition-lookup.js";
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -85,6 +86,8 @@ export interface TracePathResult {
   /** Readable call chains (one per reached leaf), e.g. "a() -> b() -> c()". */
   chains: string[];
   truncated: boolean;
+  /** Exact FQN lookup result; ambiguity is explicit and always has zero traversal. */
+  identityResolution?: Exclude<DefinitionLookupResult, { status: "bare" }>;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -115,7 +118,7 @@ const TEST_FILE_RE = /(^|\/)(test|tests|spec|specs|__tests__)(\/|$)|(\.|_|-)(tes
 export class TracePathService {
   private static instance: TracePathService | null = null;
 
-  private constructor() {}
+  constructor(private readonly identityLookup = definitionLookupService) {}
 
   static getInstance(): TracePathService {
     if (!TracePathService.instance) {
@@ -138,24 +141,34 @@ export class TracePathService {
     projectId: string,
     opts: TracePathOptions,
   ): Promise<{ fqn: string; name: string; file?: string; line?: number }[]> {
-    const explicit = opts.qualifiedName ?? (opts.symbol?.includes("#") ? opts.symbol : undefined);
+    return (await this.resolveSeedResult(projectId, opts)).seeds;
+  }
+
+  private async resolveSeedResult(projectId: string, opts: TracePathOptions): Promise<{
+    seeds: { fqn: string; name: string; file?: string; line?: number }[];
+    identityResolution?: Exclude<DefinitionLookupResult, { status: "bare" }>;
+  }> {
+    const explicit = opts.qualifiedName ?? ((opts.symbol?.indexOf("#") ?? -1) > 0 ? opts.symbol : undefined);
     if (explicit) {
-      // name = the segment after '#'
-      const name = explicit.includes("#") ? explicit.split("#").pop()! : explicit;
-      return [{ fqn: explicit, name }];
+      const lookup = await this.identityLookup.lookup(projectId, explicit);
+      return { identityResolution: lookup as Exclude<DefinitionLookupResult, { status: "bare" }>, seeds: lookup.status === "resolved" ? [{
+        fqn: lookup.definition.id,
+        name: lookup.definition.name,
+        file: lookup.definition.file_path,
+        line: lookup.definition.line_start,
+      }] : [] };
     }
 
     const name = opts.symbol ?? opts.function_name;
-    if (!name) return [];
+    if (!name) return { seeds: [] };
 
-    const repo = getSymbolRepository();
-    let defs: { id: string; name: string; file_path: string; line_start: number }[] = [];
     try {
-      defs = await repo.findDefinitionsByName(projectId, name);
+      const lookup = await this.identityLookup.lookup(projectId, name);
+      const defs = lookup.status === "bare" ? lookup.definitions : [];
+      return { seeds: defs.map((d) => ({ fqn: d.id, name: d.name, file: d.file_path, line: d.line_start })) };
     } catch {
-      return [];
+      return { seeds: [] };
     }
-    return defs.map((d) => ({ fqn: d.id, name: d.name, file: d.file_path, line: d.line_start }));
   }
 
   /**
@@ -174,7 +187,8 @@ export class TracePathService {
       opts.edge_types && opts.edge_types.length > 0 ? opts.edge_types : MODE_EDGE_TYPES[mode];
 
     // Resolve seeds.
-    const seedDefs = await this.resolveSeeds(projectId, opts);
+    const seedResult = await this.resolveSeedResult(projectId, opts);
+    const seedDefs = seedResult.seeds;
     const seeds = seedDefs.map((s) => s.fqn);
 
     const empty: TracePathResult = {
@@ -188,6 +202,7 @@ export class TracePathService {
       edges: [],
       chains: [],
       truncated: false,
+      ...(seedResult.identityResolution ? { identityResolution: seedResult.identityResolution } : {}),
     };
 
     if (seeds.length === 0) return empty;
@@ -259,6 +274,7 @@ export class TracePathService {
       edges,
       chains,
       truncated,
+      ...(seedResult.identityResolution ? { identityResolution: seedResult.identityResolution } : {}),
     };
 
     logger.debug("TracePathService: trace complete", {

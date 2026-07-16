@@ -13,6 +13,7 @@
 import path from "path";
 import fs from "fs/promises";
 import { logger } from "@massa-th0th/shared";
+import { definitionLookupService, type DefinitionLookupResult } from "./definition-lookup.js";
 import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import { workspaceManager } from "../workspace/workspace-manager.js";
 import type {
@@ -166,7 +167,7 @@ export class SymbolGraphService {
    */
   private readonly PROJECT_ROOT_CACHE_MAX_ENTRIES = 512;
 
-  private constructor() {}
+  constructor(private readonly identityLookup = definitionLookupService) {}
 
   static getInstance(): SymbolGraphService {
     if (!SymbolGraphService.instance) {
@@ -197,10 +198,10 @@ export class SymbolGraphService {
     fromFile?: string,
   ): Promise<DefinitionResult[]> {
     const repo = getSymbolRepository();
-    const [centrality, defs] = await Promise.all([
-      repo.getCentrality(projectId),
-      repo.findDefinitionsByName(projectId, symbolName),
-    ]);
+    const lookup = await this.identityLookup.lookup(projectId, symbolName);
+    const defs = lookup.status === "resolved" ? [lookup.definition]
+      : lookup.status === "bare" ? [...lookup.definitions] : [];
+    const centrality = await repo.getCentrality(projectId);
 
     if (defs.length === 0) return [];
 
@@ -235,6 +236,11 @@ export class SymbolGraphService {
     return results;
   }
 
+  /** Stable service-level identity result for callers that need ambiguity details. */
+  async lookupDefinition(projectId: string, query: string): Promise<DefinitionLookupResult> {
+    return this.identityLookup.lookup(projectId, query);
+  }
+
   // ── get_references ──────────────────────────────────────────────────────────
 
   /**
@@ -249,9 +255,23 @@ export class SymbolGraphService {
     fqn?: string,
   ): Promise<ReferenceResult[]> {
     const repo = getSymbolRepository();
-    const refs: SymbolReference[] = fqn
-      ? await repo.findReferencesByFqn(projectId, fqn)
-      : await repo.findReferencesByName(projectId, symbolName);
+    let refs: SymbolReference[];
+    if (fqn) {
+      const lookup = await this.identityLookup.lookup(projectId, fqn);
+      if (lookup.status === "resolved") {
+        const targets = lookup.definition.id === fqn ? [fqn] : [lookup.definition.id, fqn];
+        const matches = (await Promise.all(targets.map((target) => repo.findReferencesByFqn(projectId, target)))).flat();
+        const seen = new Set<string>();
+        refs = matches.filter((reference) => {
+          const key = `${reference.from_file}\0${reference.from_line}\0${reference.ref_kind}\0${reference.target_fqn ?? ""}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      } else refs = [];
+    } else {
+      refs = await repo.findReferencesByName(projectId, symbolName);
+    }
 
     const results: ReferenceResult[] = refs.map((r) => ({
       fromFile: r.from_file,

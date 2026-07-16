@@ -485,6 +485,38 @@ describe.skipIf(!requested)("owned PostgreSQL generation-scoped symbol repositor
     if (!result.found && result.ambiguous) expect(result.candidates.map((candidate) => candidate.fqn)).toEqual([a, z]);
   });
 
+  test("routes graph consumers through active-only identities and exposes all canonical kinds", async () => {
+    const alias = "legacy/consumer.ts#run";
+    const a = `src/a.ts#A.run~function~${hashA}`;
+    const z = `src/z.ts#Z.run~function~${hashB}`;
+    await seedFile(activeId, "src/a.ts", "a"); await seedFile(activeId, "src/z.ts", "z"); await seedFile(pendingId, "src/p.ts", "p");
+    await seedDefinition(activeId, z, "src/z.ts", "Z.run", alias, hashB);
+    await seedDefinition(activeId, a, "src/a.ts", "A.run", alias, hashA);
+    await seedDefinition(pendingId, `src/p.ts#P.run~function~${hashA}`, "src/p.ts", "P.run", alias, hashA);
+    await db!.query(`INSERT INTO symbol_references(project_id,generation_id,from_file,from_line,symbol_name,target_fqn,ref_kind) VALUES($1,$2,'src/a.ts',3,'run',$3,'call'),($1,$4,'src/p.ts',3,'run',$5,'call')`, [projectId, activeId, a, pendingId, `src/p.ts#P.run~function~${hashA}`]);
+
+    const { DefinitionLookupService } = await import("../services/symbol/definition-lookup.js");
+    const lookup = await new DefinitionLookupService(() => repository as never).lookup(projectId, alias);
+    expect(lookup).toMatchObject({ status: "ambiguous", legacyFqn: alias });
+    if (lookup.status === "ambiguous") expect(lookup.candidates.map((candidate) => candidate.fqn)).toEqual([a, z]);
+    const { symbolGraphService } = await import("../services/symbol/symbol-graph.service.js");
+    const { tracePathService } = await import("../services/symbol/trace-path.js");
+    expect(await symbolGraphService.goToDefinition(projectId, alias)).toEqual([]);
+    expect(await symbolGraphService.getReferences(projectId, "run", alias)).toEqual([]);
+    expect(await tracePathService.resolveSeeds(projectId, { projectId, symbol: alias })).toEqual([]);
+    expect((await symbolGraphService.goToDefinition(projectId, "run")).map((item) => item.fqn).sort()).toEqual([a, z]);
+
+    const kinds = ["module","namespace","class","interface","trait","enum","function","method","constructor","property","field","variable","constant","type","type_parameter","export","heading","key"];
+    for (const [index, kind] of kinds.entries()) await db!.query(
+      `INSERT INTO symbol_definitions(id,project_id,generation_id,file_path,name,kind,line_start,line_end,exported,indexed_at,qualified_name,legacy_fqn) VALUES($1,$2,$3,'src/active.ts',$4,$5,1,1,true,NOW(),$4,$6)`,
+      [`src/active.ts#kind-${index}`, projectId, activeId, `kind-${index}`, kind, `src/active.ts#kind-${index}`],
+    );
+    await db!.query(`INSERT INTO symbol_definitions(id,project_id,generation_id,file_path,name,kind,line_start,line_end,exported,indexed_at,qualified_name,legacy_fqn) VALUES('src/p.ts#poison-key',$1,$2,'src/p.ts','poison-key','key',1,1,true,NOW(),'poison-key','src/p.ts#poison-key')`, [projectId, pendingId]);
+    const aggregates = await repository.getProjectMapAggregates(projectId);
+    expect(Object.keys(aggregates.symbolsByKind).sort()).toEqual([...kinds].sort());
+    expect(aggregates.symbolsByKind.key).toBe(1);
+  });
+
   test("scopes centrality writes and active diagnostic/count snapshots", async () => {
     expect((await repository.updateCentralityGeneration(lease(), [{ filePath: "src/pending.ts", score: 0.99 }])).status).toBe("written");
     await seedFile(pendingId, "src/pending.ts", "p", "recovered", 4, true);

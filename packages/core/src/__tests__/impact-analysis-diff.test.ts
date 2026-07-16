@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { defaultDiffRunner } from "../services/symbol/impact-analysis.js";
+import { defaultDiffRunner, ImpactAnalysisService } from "../services/symbol/impact-analysis.js";
 
 const tempDirs: string[] = [];
 
@@ -64,4 +64,28 @@ describe("defaultDiffRunner committed scope", () => {
 
     expect(defaultDiffRunner(dir, "committed", undefined, first)).toEqual(["two.ts"]);
   });
+});
+
+test("impact analysis never falls back from exact identity to a bare overload name", async () => {
+  let nameFallbacks = 0;
+  const changed = {
+    id: "src/changed.ts#run~function~" + "a".repeat(64), project_id: "p", generation_id: "active",
+    file_path: "src/changed.ts", name: "run", qualified_name: "run", kind: "function" as const,
+    line_start: 1, line_end: 1, exported: true, indexed_at: 1,
+  };
+  const repo = {
+    allFiles: async () => ["src/changed.ts"],
+    listDefinitions: async () => [changed],
+    allImportEdges: async () => [],
+    getCentrality: async () => new Map(),
+    findReferencesByFqn: async () => [],
+    findReferencesByName: async () => { nameFallbacks += 1; return []; },
+  };
+  const result = await ImpactAnalysisService.getInstance().analyze({
+    projectId: "p", projectPath: ".", scope: "unstaged", depth: 1,
+    diffRunner: () => ["src/changed.ts"], repoOverride: repo as never,
+  });
+  expect(result.changedFiles[0]?.symbols[0]?.fqn).toBe(changed.id);
+  expect(result.impacted).toEqual([]);
+  expect(nameFallbacks).toBe(0);
 });
