@@ -1,4 +1,22 @@
+import path from "path";
+import os from "os";
+
+// XDG-aware config dir, mirrored from config-loader.ts. Inlined here (rather
+// than imported) to avoid a circular dependency: config-loader imports this
+// module for the defaults, so this module cannot statically import it back.
+// The canonical implementation lives in config-loader.ts; keep the two in sync.
+const XDG_CONFIG_HOME =
+  process.env.XDG_CONFIG_HOME && process.env.XDG_CONFIG_HOME.trim()
+    ? process.env.XDG_CONFIG_HOME
+    : path.join(os.homedir(), ".config");
+
 export interface MassaTh0thConfig {
+  database?: {
+    // Optional DATABASE_URL home (secret). Seeded into process.env at runtime
+    // by env.ts when DATABASE_URL is unset, so config.json is the source of
+    // truth for the DB connection unless an explicit env override exists.
+    url: string;
+  };
   embedding: {
     provider: "ollama" | "mistral" | "openai" | "google" | "cohere";
     model: string;
@@ -162,6 +180,9 @@ export interface SynapseConfig {
 }
 
 export const defaultMassaTh0thConfig: MassaTh0thConfig = {
+  database: {
+    url: "",
+  },
   embedding: {
     provider: "ollama",
     model: "nomic-embed-text:latest",
@@ -179,7 +200,7 @@ export const defaultMassaTh0thConfig: MassaTh0thConfig = {
     l2MaxSizeMB: 500,
     defaultTTLSeconds: 3600,
   },
-  dataDir: "~/.massa-th0th-data",
+  dataDir: path.join(XDG_CONFIG_HOME, "massa-th0th", "data"),
   logging: {
     level: "info",
     enableMetrics: false,

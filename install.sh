@@ -316,13 +316,19 @@ write_env() {
   # auto-importance call a 404 instead of taking the rule-based silent-degrade
   # path (which only applies when the flag is false). Search rerank and query
   # understanding stay off — they're latency-sensitive and a separate opt-in.
-  local llm_model="qwen3.5:9b"
+  local llm_model="qwen2.5:7b-instruct"
+  local llm_code_model="qwen2.5-coder:7b"
   local llm_enabled=false
   if ollama_has_model "$llm_model" "$ollama_url"; then
     llm_enabled=true
     ok "LLM consolidation + auto-importance auto-enabled (${llm_model} detected at ${ollama_url})"
   else
     info "LLM features off — pull the model to enable: ollama pull ${llm_model}"
+  fi
+  if ! ollama_has_model "$llm_code_model" "$ollama_url"; then
+    info "Code-oriented LLM sites off — pull the model to enable: ollama pull ${llm_code_model}"
+  else
+    ok "Code-oriented LLM sites available (${llm_code_model} detected at ${ollama_url})"
   fi
 
   prompt_search_quality_flags "$llm_enabled"
@@ -359,11 +365,12 @@ LOG_LEVEL=info
 ENABLE_METRICS=true
 
 # ── Local-first LLM (Ollama); default OFF, silent degrade ──
-# Auto-set ON by install.sh only when qwen3.5:9b is pulled in Ollama.
+# Auto-set ON by install.sh only when qwen2.5:7b-instruct is pulled in Ollama.
 RLM_LLM_ENABLED=${llm_enabled}
 RLM_LLM_BASE_URL=http://localhost:11434/v1
 RLM_LLM_API_KEY=ollama
 RLM_LLM_MODEL=${llm_model}
+RLM_LLM_CODE_MODEL=${llm_code_model}
 RLM_LLM_TEMPERATURE=0.2
 RLM_LLM_MAX_OUTPUT_TOKENS=8000
 RLM_LLM_TIMEOUT_MS=90000
@@ -398,7 +405,7 @@ AUTO_IMPROVE_MIN_FILE_HITS=3
 AUTO_IMPROVE_MIN_FIX_HITS=2
 
 # ── Auto importance/salience (LLM) ────────────────────────────
-# Auto-set ON by install.sh only when qwen3.5:9b is pulled in Ollama.
+# Auto-set ON by install.sh only when qwen2.5:7b-instruct is pulled in Ollama.
 AUTO_IMPORTANCE_ENABLED=${llm_enabled}
 
 # ── Search quality knobs ──────────────────────────────────────
@@ -452,7 +459,7 @@ resolve_ports() {
 # ── Post-install optional setup scripts ──────────────────────
 # Prints (never auto-writes) the passive-capture hooks guide for Claude Code,
 # Codex, and Cursor. Printing avoids clobbering the user's existing hook config
-# (.claude/settings.json, ~/.codex/hooks.json, ~/.cursor/hooks.json). The 4 hook
+# (.claude/settings.json, ~/.codex/hooks.json, ~/.cursor/hooks.json). The 5 hook
 # scripts are platform-neutral shells that POST observations to the API; only the
 # config wrapper differs per platform.
 print_hooks_guide() {
@@ -463,7 +470,7 @@ print_hooks_guide() {
   echo ""
   echo -e "${BOLD}Passive-capture hooks (Claude Code · Codex · Cursor)${NC}"
   echo -e "${DIM}Fire-and-forget scripts POST observations to the API with a 2s timeout${NC}"
-  echo -e "${DIM}and always exit 0 — they never block the agent. The same 4 shell scripts${NC}"
+  echo -e "${DIM}and always exit 0 — they never block the agent. The same 5 shell scripts${NC}"
   echo -e "${DIM}serve all 3 platforms; only the config wrapper differs.${NC}"
   echo ""
 
@@ -471,7 +478,7 @@ print_hooks_guide() {
     # Docker mode may not have cloned the repo locally, so point at GitHub raw
     # URLs and the platform-neutral batch endpoint.
     echo -e "  ${BOLD}Hook scripts (raw, any platform):${NC}"
-    for s in session-start.sh user-prompt-submit.sh post-tool-use.sh stop.sh; do
+    for s in session-start.sh user-prompt-submit.sh post-tool-use.sh stop.sh pre-compact.sh; do
       echo -e "    ${GITHUB_RAW}/${BRANCH}/apps/claude-plugin/hooks/${s}"
     done
     echo ""
@@ -497,7 +504,8 @@ print_hooks_guide() {
   echo -e "      \"SessionStart\":     [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/session-start.sh\\\"\" }] }],"
   echo -e "      \"UserPromptSubmit\": [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/user-prompt-submit.sh\\\"\" }] }],"
   echo -e "      \"PostToolUse\":      [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/post-tool-use.sh\\\"\" }] }],"
-  echo -e "      \"Stop\":             [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/stop.sh\\\"\" }] }]"
+  echo -e "      \"Stop\":             [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/stop.sh\\\"\" }] }],"
+  echo -e "      \"PreCompact\":       [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/pre-compact.sh\\\"\" }] }]"
   echo -e '    }'
   echo -e '  }'
   echo ""
@@ -510,7 +518,8 @@ print_hooks_guide() {
   echo -e "      \"SessionStart\":     [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/session-start.sh\\\"\" }] }],"
   echo -e "      \"UserPromptSubmit\": [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/user-prompt-submit.sh\\\"\" }] }],"
   echo -e "      \"PostToolUse\":      [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/post-tool-use.sh\\\"\" }] }],"
-  echo -e "      \"Stop\":             [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/stop.sh\\\"\" }] }]"
+  echo -e "      \"Stop\":             [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/stop.sh\\\"\" }] }],"
+  echo -e "      \"PreCompact\":       [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"\\\"${hooks_dir}/pre-compact.sh\\\"\" }] }]"
   echo -e '    }'
   echo -e '  }'
   echo -e "  ${DIM}Then run /hooks in Codex to review and trust each hook — non-managed hooks${NC}"
@@ -528,8 +537,9 @@ print_hooks_guide() {
   echo -e "      \"stop\":               [{ \"command\": \"\\\"${hooks_dir}/stop.sh\\\"\" }]"
   echo -e '    }'
   echo -e '  }'
-  echo -e "  ${DIM}Cursor hooks are beta. There is no SessionStart event, and afterFileEdit${NC}"
-  echo -e "  ${DIM}fires on file edits only (not every tool call).${NC}"
+  echo -e "  ${DIM}Cursor hooks are beta. Cursor has NO SessionStart and NO PreCompact${NC}"
+  echo -e "  ${DIM}equivalent — only the 3 events above are mappable. afterFileEdit fires${NC}"
+  echo -e "  ${DIM}on file edits only (not every tool call).${NC}"
   echo ""
 
   echo -e "  ${BOLD}Env vars (set in your shell or .env; all platforms):${NC}"

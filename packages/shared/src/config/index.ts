@@ -13,7 +13,7 @@
 import "../env.js";
 
 import path from "path";
-import os from "os";
+import { loadConfigSafe, getConfigDir } from "./config-loader";
 
 /**
  * Default LLM model for NL/instruction-shaped sites. Pure-instruct (non-thinking)
@@ -293,13 +293,27 @@ export interface DecayParams {
 }
 
 /**
- * Get global data directory
- * Creates ~/.massa-th0th-data/ directory for all projects
+ * Resolve the global data directory.
+ *
+ * Precedence (final, per the config-unification contract):
+ *   1. `MASSA_TH0TH_DATA_DIR` env var (explicit override)
+ *   2. `dataDir` from config.json (the runtime middle layer)
+ *   3. `~/.config/massa-th0th/data` (literal default)
+ *
+ * The legacy `~/.massa-th0th-data/` location is migrated to (3) once at module
+ * load by env.ts -> migrateDataDirOnce(), so a stale config.json pointing at
+ * the old path is corrected by the move; if the old dir still exists (e.g.
+ * cross-volume rename failed), precedence (2) keeps us reading from wherever
+ * config.json says, but the default is the unified XDG location.
  */
-function getGlobalDataDir(): string {
-  const homeDir = os.homedir();
-  const dataDir = path.join(homeDir, ".massa-th0th-data");
-  return dataDir;
+export function getGlobalDataDir(): string {
+  const envOverride = process.env.MASSA_TH0TH_DATA_DIR;
+  if (envOverride && envOverride.trim()) return envOverride;
+
+  const fileConfig = loadConfigSafe();
+  if (fileConfig.dataDir) return fileConfig.dataDir;
+
+  return path.join(getConfigDir(), "data");
 }
 
 /**
@@ -346,7 +360,24 @@ export const DEFAULT_ALLOWED_EXTENSIONS: readonly string[] = [
 
 /**
  * Default Configuration
+ *
+ * Precedence for every tunable: explicit env var > config.json value > literal
+ * default. `fileConfig` (loaded once via loadConfigSafe) supplies the config.json
+ * middle layer; envX() already returns the env value when set, so the env
+ * override remains authoritative. config.json is the source of truth for
+ * secrets (DATABASE_URL via env.ts seeding, LLM/embedding keys) and fills
+ * everything else the env does not set.
  */
+const fileConfig = loadConfigSafe();
+
+// config.json cache block is in MB; ServerConfig expects bytes for l1/l2 maxSize.
+const fileCacheL1Bytes = fileConfig.cache?.l1MaxSizeMB
+  ? fileConfig.cache.l1MaxSizeMB * 1024 * 1024
+  : undefined;
+const fileCacheL2Bytes = fileConfig.cache?.l2MaxSizeMB
+  ? fileConfig.cache.l2MaxSizeMB * 1024 * 1024
+  : undefined;
+
 export const defaultConfig: ServerConfig = {
   name: "massa-th0th-server",
   version: "1.0.0",
@@ -355,12 +386,18 @@ export const defaultConfig: ServerConfig = {
 
   cache: {
     l1: {
-      maxSize: envNum("L1_CACHE_MAX_SIZE", 100 * 1024 * 1024),
-      defaultTTL: envNum("L1_CACHE_TTL", 300),
+      maxSize: envNum("L1_CACHE_MAX_SIZE", fileCacheL1Bytes ?? 100 * 1024 * 1024),
+      defaultTTL: envNum(
+        "L1_CACHE_TTL",
+        fileConfig.cache?.defaultTTLSeconds ?? 300,
+      ),
     },
     l2: {
-      maxSize: envNum("L2_CACHE_MAX_SIZE", 500 * 1024 * 1024),
-      defaultTTL: envNum("L2_CACHE_TTL", 3600),
+      maxSize: envNum("L2_CACHE_MAX_SIZE", fileCacheL2Bytes ?? 500 * 1024 * 1024),
+      defaultTTL: envNum(
+        "L2_CACHE_TTL",
+        fileConfig.cache?.defaultTTLSeconds ?? 3600,
+      ),
     },
     embedding: {
       maxAgeHours: 168, // 7 days
@@ -370,36 +407,69 @@ export const defaultConfig: ServerConfig = {
   search: {
     // Max files an auto-reindex (latency-sensitive) path will sync before
     // deferring. Overridable via AUTOREINDEX_MAX_FILES env var.
-    autoReindexMaxFiles: envNum("AUTOREINDEX_MAX_FILES", 200),
+    autoReindexMaxFiles: envNum(
+      "AUTOREINDEX_MAX_FILES",
+      fileConfig.search?.autoReindexMaxFiles ?? 200,
+    ),
     // Phase 2: query understanding (LLM rewrite + HyDE). Opt-in via
     // SEARCH_QUERY_UNDERSTANDING_ENABLED. hydeEnabled gates only the HyDE
     // extra-LLM-call (the rewrite still runs when enabled && hydeEnabled=false).
     // Cache is per-(query, projectId), TTL+size bounded.
     queryUnderstanding: {
-      enabled: envBool("SEARCH_QUERY_UNDERSTANDING_ENABLED", false),
-      hydeEnabled: envBool("SEARCH_QUERY_UNDERSTANDING_HYDE_ENABLED", true),
-      cacheTtlMs: envNum("SEARCH_QUERY_UNDERSTANDING_CACHE_TTL_MS", 300_000),
-      cacheMaxSize: envNum("SEARCH_QUERY_UNDERSTANDING_CACHE_MAX_SIZE", 256),
+      enabled: envBool(
+        "SEARCH_QUERY_UNDERSTANDING_ENABLED",
+        fileConfig.search?.queryUnderstanding?.enabled ?? false,
+      ),
+      hydeEnabled: envBool(
+        "SEARCH_QUERY_UNDERSTANDING_HYDE_ENABLED",
+        fileConfig.search?.queryUnderstanding?.hydeEnabled ?? true,
+      ),
+      cacheTtlMs: envNum(
+        "SEARCH_QUERY_UNDERSTANDING_CACHE_TTL_MS",
+        fileConfig.search?.queryUnderstanding?.cacheTtlMs ?? 300_000,
+      ),
+      cacheMaxSize: envNum(
+        "SEARCH_QUERY_UNDERSTANDING_CACHE_MAX_SIZE",
+        fileConfig.search?.queryUnderstanding?.cacheMaxSize ?? 256,
+      ),
     },
     // Phase 7a: LLM-judge rerank. Opt-in via SEARCH_RERANK_ENABLED.
     // rerankWindow = top-K re-scored by the LLM judge after centrality boost.
     rerank: {
-      enabled: envBool("SEARCH_RERANK_ENABLED", false),
-      rerankWindow: envNum("SEARCH_RERANK_WINDOW", 50),
+      enabled: envBool(
+        "SEARCH_RERANK_ENABLED",
+        fileConfig.search?.rerank?.enabled ?? false,
+      ),
+      rerankWindow: envNum(
+        "SEARCH_RERANK_WINDOW",
+        fileConfig.search?.rerank?.rerankWindow ?? 50,
+      ),
     },
   },
 
   // Shared local-first LLM block (cross-cutting §1). Ollama defaults; the
   // OpenAI-compatible provider is created from these in services/memory/llm-client.ts.
   llm: {
-    enabled: envBool("RLM_LLM_ENABLED", false),
-    baseUrl: envString("RLM_LLM_BASE_URL", "http://localhost:11434/v1"),
-    apiKey: envString("RLM_LLM_API_KEY", "ollama"),
-    model: envString("RLM_LLM_MODEL", DEFAULT_LLM_MODEL),
-    codeModel: envString("RLM_LLM_CODE_MODEL", DEFAULT_LLM_CODE_MODEL),
-    temperature: envNum("RLM_LLM_TEMPERATURE", 0.2),
-    maxOutputTokens: envNum("RLM_LLM_MAX_OUTPUT_TOKENS", 8000),
-    timeoutMs: envNum("RLM_LLM_TIMEOUT_MS", 90000),
+    enabled: envBool("RLM_LLM_ENABLED", fileConfig.llm?.enabled ?? false),
+    baseUrl: envString(
+      "RLM_LLM_BASE_URL",
+      fileConfig.llm?.baseUrl ?? "http://localhost:11434/v1",
+    ),
+    apiKey: envString("RLM_LLM_API_KEY", fileConfig.llm?.apiKey ?? "ollama"),
+    model: envString("RLM_LLM_MODEL", fileConfig.llm?.model ?? DEFAULT_LLM_MODEL),
+    codeModel: envString(
+      "RLM_LLM_CODE_MODEL",
+      fileConfig.llm?.codeModel ?? DEFAULT_LLM_CODE_MODEL,
+    ),
+    temperature: envNum(
+      "RLM_LLM_TEMPERATURE",
+      fileConfig.llm?.temperature ?? 0.2,
+    ),
+    maxOutputTokens: envNum(
+      "RLM_LLM_MAX_OUTPUT_TOKENS",
+      fileConfig.llm?.maxOutputTokens ?? 8000,
+    ),
+    timeoutMs: envNum("RLM_LLM_TIMEOUT_MS", fileConfig.llm?.timeoutMs ?? 90000),
     // qwen3 thinking models return their answer in the reasoning channel; the
     // content channel can come back empty when thinking consumes the token
     // budget. disableThink (a) asks Ollama to stop thinking (best-effort) and
@@ -407,61 +477,124 @@ export const defaultConfig: ServerConfig = {
     // NB: with the pure-instruct default model there is no reasoning channel,
     // so this fallback is dormant — kept as a safety net for any Ollama shape
     // shift or an env override back to a thinking model.
-    disableThink: envBool("RLM_LLM_DISABLE_THINK", true),
+    disableThink: envBool(
+      "RLM_LLM_DISABLE_THINK",
+      fileConfig.llm?.disableThink ?? true,
+    ),
   },
 
   memory: {
     // Defaults borrowed from ai-memory decay.rs. Tunable via the `memory.decay`
     // config override or by constructing a Config with overrides.
     decay: {
-      lambda: 0.02,
-      sigma: 0.6,
-      mu: 0.04,
-      coldThreshold: 0.2,
+      lambda: fileConfig.memory?.decay?.lambda ?? 0.02,
+      sigma: fileConfig.memory?.decay?.sigma ?? 0.6,
+      mu: fileConfig.memory?.decay?.mu ?? 0.04,
+      coldThreshold: fileConfig.memory?.decay?.coldThreshold ?? 0.2,
     },
     bootstrap: {
       // Phase 4: repo bootstrap. Scan + rule-based seed have no LLM dep.
-      enabled: envBool("BOOTSTRAP_ENABLED", true),
-      maxSeedMemories: envNum("BOOTSTRAP_MAX_SEED_MEMORIES", 8),
-      centralityLimit: envNum("BOOTSTRAP_CENTRALITY_LIMIT", 10),
-      gitLogLimit: envNum("BOOTSTRAP_GIT_LOG_LIMIT", 20),
-      refreshEnabled: envBool("BOOTSTRAP_REFRESH_ENABLED", true),
+      enabled: envBool(
+        "BOOTSTRAP_ENABLED",
+        fileConfig.memory?.bootstrap?.enabled ?? true,
+      ),
+      maxSeedMemories: envNum(
+        "BOOTSTRAP_MAX_SEED_MEMORIES",
+        fileConfig.memory?.bootstrap?.maxSeedMemories ?? 8,
+      ),
+      centralityLimit: envNum(
+        "BOOTSTRAP_CENTRALITY_LIMIT",
+        fileConfig.memory?.bootstrap?.centralityLimit ?? 10,
+      ),
+      gitLogLimit: envNum(
+        "BOOTSTRAP_GIT_LOG_LIMIT",
+        fileConfig.memory?.bootstrap?.gitLogLimit ?? 20,
+      ),
+      refreshEnabled: envBool(
+        "BOOTSTRAP_REFRESH_ENABLED",
+        fileConfig.memory?.bootstrap?.refreshEnabled ?? true,
+      ),
     },
     autoImprove: {
       // Phase 5: auto-improvement loop. Rule-based pattern detection has
       // no LLM dep; LLM enrichment inherits the top-level llm.enabled gate.
       // Default auto-approve + logging; reviewGate=true surfaces pending
       // proposals via list_proposals / approve_proposal.
-      enabled: envBool("AUTO_IMPROVE_ENABLED", true),
-      reviewGate: envBool("AUTO_IMPROVE_REVIEW_GATE", false),
-      minObservations: envNum("AUTO_IMPROVE_MIN_OBS", 8),
-      minIntervalMs: envNum("AUTO_IMPROVE_MIN_INTERVAL_MS", 5 * 60 * 1000),
-      maxWindow: envNum("AUTO_IMPROVE_MAX_WINDOW", 16),
-      minQueryHits: envNum("AUTO_IMPROVE_MIN_QUERY_HITS", 3),
-      minFileHits: envNum("AUTO_IMPROVE_MIN_FILE_HITS", 3),
-      minFixHits: envNum("AUTO_IMPROVE_MIN_FIX_HITS", 2),
+      enabled: envBool(
+        "AUTO_IMPROVE_ENABLED",
+        fileConfig.memory?.autoImprove?.enabled ?? true,
+      ),
+      reviewGate: envBool(
+        "AUTO_IMPROVE_REVIEW_GATE",
+        fileConfig.memory?.autoImprove?.reviewGate ?? false,
+      ),
+      minObservations: envNum(
+        "AUTO_IMPROVE_MIN_OBS",
+        fileConfig.memory?.autoImprove?.minObservations ?? 8,
+      ),
+      minIntervalMs: envNum(
+        "AUTO_IMPROVE_MIN_INTERVAL_MS",
+        fileConfig.memory?.autoImprove?.minIntervalMs ?? 5 * 60 * 1000,
+      ),
+      maxWindow: envNum(
+        "AUTO_IMPROVE_MAX_WINDOW",
+        fileConfig.memory?.autoImprove?.maxWindow ?? 16,
+      ),
+      minQueryHits: envNum(
+        "AUTO_IMPROVE_MIN_QUERY_HITS",
+        fileConfig.memory?.autoImprove?.minQueryHits ?? 3,
+      ),
+      minFileHits: envNum(
+        "AUTO_IMPROVE_MIN_FILE_HITS",
+        fileConfig.memory?.autoImprove?.minFileHits ?? 3,
+      ),
+      minFixHits: envNum(
+        "AUTO_IMPROVE_MIN_FIX_HITS",
+        fileConfig.memory?.autoImprove?.minFixHits ?? 2,
+      ),
     },
     // Phase 7b: auto salience scoring on remember (opt-in via
     // AUTO_IMPORTANCE_ENABLED). Scores only when the caller omits importance.
     autoImportance: {
-      enabled: envBool("AUTO_IMPORTANCE_ENABLED", false),
+      enabled: envBool(
+        "AUTO_IMPORTANCE_ENABLED",
+        fileConfig.memory?.autoImportance?.enabled ?? false,
+      ),
     },
   },
 
   hooks: {
     // Phase 3: passive lifecycle capture. Ingestion has no LLM dependency.
-    enabled: envBool("HOOKS_ENABLED", true),
-    maxPayloadBytes: envNum("HOOKS_MAX_PAYLOAD_BYTES", 65_536),
+    enabled: envBool("HOOKS_ENABLED", fileConfig.hooks?.enabled ?? true),
+    maxPayloadBytes: envNum(
+      "HOOKS_MAX_PAYLOAD_BYTES",
+      fileConfig.hooks?.maxPayloadBytes ?? 65_536,
+    ),
     queue: {
       // Saturation threshold — once exceeded, /api/v1/hook returns 429.
-      maxPending: envNum("HOOKS_QUEUE_MAX_PENDING", 256),
+      maxPending: envNum(
+        "HOOKS_QUEUE_MAX_PENDING",
+        fileConfig.hooks?.queue?.maxPending ?? 256,
+      ),
     },
     bridge: {
       // LLM-driven observation→memory summarization. No-ops when llm.enabled=false.
-      enabled: envBool("HOOKS_BRIDGE_ENABLED", true),
-      minObservations: envNum("HOOKS_BRIDGE_MIN_OBS", 8),
-      minIntervalMs: envNum("HOOKS_BRIDGE_MIN_INTERVAL_MS", 5 * 60 * 1000),
-      maxWindow: envNum("HOOKS_BRIDGE_MAX_WINDOW", 8),
+      enabled: envBool(
+        "HOOKS_BRIDGE_ENABLED",
+        fileConfig.hooks?.bridge?.enabled ?? true,
+      ),
+      minObservations: envNum(
+        "HOOKS_BRIDGE_MIN_OBS",
+        fileConfig.hooks?.bridge?.minObservations ?? 8,
+      ),
+      minIntervalMs: envNum(
+        "HOOKS_BRIDGE_MIN_INTERVAL_MS",
+        fileConfig.hooks?.bridge?.minIntervalMs ?? 5 * 60 * 1000,
+      ),
+      maxWindow: envNum(
+        "HOOKS_BRIDGE_MAX_WINDOW",
+        fileConfig.hooks?.bridge?.maxWindow ?? 8,
+      ),
     },
   },
 
@@ -471,12 +604,18 @@ export const defaultConfig: ServerConfig = {
   },
 
   compression: {
-    defaultStrategy: "code_structure",
-    minTokensForCompression: envNum("MIN_TOKENS_FOR_COMPRESSION", 100),
-    targetCompressionRatio: envNum("TARGET_COMPRESSION_RATIO", 0.7),
+    defaultStrategy: fileConfig.compression?.defaultStrategy ?? "code_structure",
+    minTokensForCompression: envNum(
+      "MIN_TOKENS_FOR_COMPRESSION",
+      fileConfig.compression?.minTokensForCompression ?? 100,
+    ),
+    targetCompressionRatio: envNum(
+      "TARGET_COMPRESSION_RATIO",
+      fileConfig.compression?.targetCompressionRatio ?? 0.7,
+    ),
     // Compression-specific prompt override (env RLM_LLM_PROMPT). The LLM
     // connection fields (model/baseUrl/etc.) live in the top-level `llm` block.
-    prompt: process.env.RLM_LLM_PROMPT || undefined,
+    prompt: process.env.RLM_LLM_PROMPT || fileConfig.compression?.prompt || undefined,
   },
 
   rateLimit: {
@@ -504,8 +643,11 @@ export const defaultConfig: ServerConfig = {
   },
 
   logging: {
-    level: (process.env.LOG_LEVEL as any) || "info",
-    enableMetrics: process.env.ENABLE_METRICS === "true",
+    level: (process.env.LOG_LEVEL as any) || fileConfig.logging?.level || "info",
+    enableMetrics:
+      process.env.ENABLE_METRICS === "true" ||
+      (process.env.ENABLE_METRICS === undefined &&
+        !!fileConfig.logging?.enableMetrics),
   },
 
   synapse: {
@@ -734,19 +876,19 @@ export class Config {
  */
 export const config = new Config();
 
-export {
-  MassaTh0thConfig,
-  defaultMassaTh0thConfig,
-} from "./massa-th0th-config";
+export type { MassaTh0thConfig } from "./massa-th0th-config";
+export { defaultMassaTh0thConfig } from "./massa-th0th-config";
 
 export {
   getConfigDir,
   getConfigPath,
   configExists,
   loadConfig,
+  loadConfigSafe,
   saveConfig,
   initConfig,
   getConfigForEnv,
+  migrateDataDirOnce,
 } from "./config-loader";
 
 // DEDICATED-stack DB guard — fails fast if a dedicated-flagged process would

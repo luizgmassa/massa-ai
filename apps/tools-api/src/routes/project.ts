@@ -17,8 +17,8 @@ import {
 } from "@massa-th0th/core";
 import { Elysia, t } from "elysia";
 import fs from "fs/promises";
-import os from "os";
 import path from "path";
+import { getGlobalDataDir } from "@massa-th0th/shared";
 
 let indexProjectTool: IndexProjectTool | null = null;
 let indexStatusTool: GetIndexStatusTool | null = null;
@@ -215,7 +215,7 @@ export const projectRoutes = new Elysia({ prefix: "/api/v1/project" })
         "default";
       const finalProjectId = rawBase.replace(/[^a-zA-Z0-9_.-]/g, "_").slice(0, 128);
 
-      const uploadRoot = process.env.MASSA_TH0TH_UPLOAD_DIR || path.join(os.homedir(), ".massa-th0th-data", "uploads");
+      const uploadRoot = process.env.MASSA_TH0TH_UPLOAD_DIR || path.join(getGlobalDataDir(), "uploads");
       const stagingDir = path.resolve(uploadRoot, finalProjectId);
 
       // Clear stale files from previous uploads so deleted/renamed files don't linger

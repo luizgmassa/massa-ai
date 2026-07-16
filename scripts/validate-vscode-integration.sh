@@ -50,7 +50,7 @@ if curl -s --max-time 2 "${OLLAMA_URL}/api/tags" > /dev/null 2>&1; then
     echo -e "  ${GREEN}✓${NC} Ollama: healthy (v${OLAMA_VERSION})"
     
     # Check embedding model
-    MODEL="${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text:latest}"
+    MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:8b}"
     MODEL_EXISTS=$(curl -s "${OLLAMA_URL}/api/tags" 2>/dev/null | python3 -c "
 import sys, json
 data = json.load(sys.stdin)

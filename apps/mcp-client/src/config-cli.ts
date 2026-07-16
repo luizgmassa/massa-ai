@@ -37,7 +37,7 @@ Commands:
 Examples:
   massa-th0th-config init
   massa-th0th-config init --mistral your-api-key
-  massa-th0th-config use ollama --model nomic-embed-text:latest
+  massa-th0th-config use ollama --model qwen3-embedding:8b
   massa-th0th-config use mistral --api-key your-key
   massa-th0th-config set embedding.dimensions 1024
 `);
@@ -153,7 +153,7 @@ switch (command) {
     if (provider === "ollama") {
       config.embedding = {
         provider: "ollama",
-        model: (options.model as string) || "nomic-embed-text:latest",
+        model: (options.model as string) || "qwen3-embedding:8b",
         baseURL: (options["base-url"] as string) || "http://localhost:11434",
         dimensions: 768,
       };

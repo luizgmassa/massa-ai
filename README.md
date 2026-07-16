@@ -419,7 +419,7 @@ falls back to its rule-based path.
 > a `modelRole` option in `packages/core/src/services/memory/llm-client.ts`.
 > Both default to **non-thinking instruct** models so structured-output calls
 > return fast (~5 s) and reliably, instead of burning a 90 s wall-clock timeout
-> on a thinking model (the prior `qwen3.5:9b` default routed answers into the
+> on a thinking model (the prior default routed answers into the
 > reasoning channel and silently degraded). Override either with the env vars
 > above.
 
@@ -432,28 +432,45 @@ falls back to its rule-based path.
 
 ## Passive Capture (Claude Code hooks)
 
-Passive capture streams Claude Code lifecycle events into massa-th0th as Observations,
+Passive capture streams agent lifecycle events into massa-th0th as Observations,
 so the agent's behaviour is recorded without any change to how you prompt.
 
 - **Fire-and-forget:** each hook `curl`s the endpoint with a **2s timeout** and
   always `exit 0`. The agent is never blocked, even if the API is down or
   `curl` is missing.
 - **No stdout:** scripts produce no output.
+- **Empty stdin is a no-op:** if a hook fires with no payload, the script exits
+  without posting (the API requires a non-empty payload object).
+
+### What each of the 5 hooks captures
+
+| Script | Lifecycle event | Observation `source` | What it records |
+|--------|-----------------|----------------------|-----------------|
+| `session-start.sh` | `SessionStart` | `session-start` | Session bootstrap (cwd, source, etc.) |
+| `user-prompt-submit.sh` | `UserPromptSubmit` | `user-prompt` | Each submitted prompt |
+| `post-tool-use.sh` | `PostToolUse` | `post-tool-use` | Every tool call + result |
+| `stop.sh` | `Stop` | `session-end` | Session termination |
+| `pre-compact.sh` | `PreCompact` | `pre-compact` | Pre-compaction snapshot — also triggers `POST /api/v1/hook/compact-snapshot` to build a bounded, reference-based table-of-contents of the session's observations (raw events stay in the store; zero loss) |
 
 ### Install
 
 1. `chmod +x` the scripts under `apps/claude-plugin/hooks/` (already executable
    in this repo).
-2. Add them to your project or user `.claude/settings.json` `hooks` block — use
-   **absolute paths** to the scripts:
+2. Add them to your project or user `.claude/settings.json` `hooks` block. The
+   canonical, ready-to-merge template is
+   [`apps/claude-plugin/settings.json.template`](apps/claude-plugin/settings.json.template)
+   — it wires all 5 events. Replace `${CLAUDE_PLUGIN_ROOT}` with the absolute
+   path to `apps/claude-plugin`, or use absolute paths to the scripts. The shape
+   is the nested matcher-group + `hooks[]` form Claude Code expects:
 
 ```jsonc
 {
   "hooks": {
-    "SessionStart":      [{ "command": "/abs/path/to/apps/claude-plugin/hooks/session-start.sh" }],
-    "UserPromptSubmit":  [{ "command": "/abs/path/to/apps/claude-plugin/hooks/user-prompt-submit.sh" }],
-    "PostToolUse":       [{ "command": "/abs/path/to/apps/claude-plugin/hooks/post-tool-use.sh" }],
-    "Stop":              [{ "command": "/abs/path/to/apps/claude-plugin/hooks/stop.sh" }]
+    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "\"/abs/path/to/apps/claude-plugin/hooks/session-start.sh\"" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "\"/abs/path/to/apps/claude-plugin/hooks/user-prompt-submit.sh\"" }] }],
+    "PostToolUse":      [{ "hooks": [{ "type": "command", "command": "\"/abs/path/to/apps/claude-plugin/hooks/post-tool-use.sh\"" }] }],
+    "Stop":             [{ "hooks": [{ "type": "command", "command": "\"/abs/path/to/apps/claude-plugin/hooks/stop.sh\"" }] }],
+    "PreCompact":       [{ "hooks": [{ "type": "command", "command": "\"/abs/path/to/apps/claude-plugin/hooks/pre-compact.sh\"" }] }]
   }
 }
 ```
@@ -463,6 +480,16 @@ so the agent's behaviour is recorded without any change to how you prompt.
    PostgreSQL and are consolidated into memories only when
    `RLM_LLM_ENABLED=true`; otherwise they're stored raw and the bridge silently
    skips.
+
+### Other CLIs (Codex, Cursor)
+
+Run `bash install.sh` and read the printed **Passive-capture hooks** guide — it
+emits per-CLI config blocks (Codex `~/.codex/hooks.json`, Cursor
+`~/.cursor/hooks.json`) with the same absolute script paths. Codex supports the
+same 5 events as Claude Code (nested form). **Cursor limitations:** Cursor's
+beta hooks schema only maps 3 events — `beforeSubmitPrompt`→`user-prompt-submit`,
+`afterFileEdit`→`post-tool-use`, `stop`→`stop`; there is **no SessionStart and no
+PreCompact equivalent** in Cursor.
 
 ### Env
 
@@ -700,7 +727,7 @@ npx @massa-th0th/mcp-client --help
 
 | Provider | Model | Cost | Quality |
 |----------|-------|------|---------|
-| **Ollama** (default) | qwen3-embedding:8b (also bge-m3, nomic-embed-text) | Free | Good-Excellent |
+| **Ollama** (default) | qwen3-embedding:8b (also bge-m3) | Free | Good-Excellent |
 | **Mistral** | mistral-embed, codestral-embed | $$ | Great |
 | **OpenAI** | text-embedding-3-small | $$ | Great |
 

@@ -71,7 +71,9 @@ if [ "$OLLAMA_HAS_CLI" = false ] && [ "$OLLAMA_API_REACHABLE" = false ]; then
         curl -fsSL https://ollama.com/install.sh | sh
         OLLAMA_HAS_CLI=true
     elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo -e "  ${YELLOW}⚠${NC} On macOS, install Ollama from: https://ollama.com/download"
+        echo -e "  ${YELLOW}⚠${NC} On macOS, install Ollama first:"
+        echo -e "      brew install ollama   (then: brew services start ollama)"
+        echo -e "      or download from https://ollama.com/download"
         echo -e "  ${YELLOW}⚠${NC} Then re-run this script."
         exit 1
     else
@@ -104,20 +106,52 @@ if [ "$OLLAMA_API_REACHABLE" = false ]; then
     fi
 fi
 
+# Detect whether a named Ollama model is already pulled, without silently
+# returning "no" (which would trigger a multi-GB re-pull). Preference order:
+#   1. `ollama list` CLI (no python3 dependency, works offline once pulled)
+#   2. /api/tags parsed with python3 (if python3 is present)
+#   3. /api/tags body scanned with grep (last-resort, no python3)
+# Each branch prints exactly "yes" or "no".
+ollama_model_exists() {
+    local model="$1" search="${1%%:*}" body
+    # 1. CLI
+    if [ "$OLLAMA_HAS_CLI" = true ]; then
+        if ollama list 2>/dev/null | grep -Eq "(^|[[:space:]])${search}(:|[[:space:]])"; then
+            echo "yes"; return 0
+        fi
+    fi
+    # Fetch the tags payload once for the fallbacks.
+    body="$(curl -s "${OLLAMA_URL}/api/tags" 2>/dev/null || true)"
+    if [ -z "$body" ]; then echo "no"; return 0; fi
+    # 2. python3 JSON parse
+    if command -v python3 >/dev/null 2>&1; then
+        printf '%s' "$body" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    print('no'); sys.exit(0)
+models = [m.get('name','') for m in data.get('models', [])]
+search = '${search}'
+print('yes' if any(search in m for m in models) else 'no')
+" 2>/dev/null && return 0
+    fi
+    # 3. grep fallback: match \"name\":\"qwen3-embedding...
+    if printf '%s' "$body" | grep -Eq "\"name\"[[:space:]]*:[[:space:]]*\"${search}"; then
+        echo "yes"
+    else
+        echo "no"
+    fi
+}
+
 # ---- Step 2: Pull embedding models ----
 echo ""
 echo -e "${BOLD}[2/5] Pulling embedding models...${NC}"
 
 EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:8b}"
 
-# Check if model is already available via API
-MODEL_EXISTS=$(curl -s "${OLLAMA_URL}/api/tags" 2>/dev/null | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-models = [m['name'] for m in data.get('models', [])]
-search = '${EMBEDDING_MODEL%%:*}'
-print('yes' if any(search in m for m in models) else 'no')
-" 2>/dev/null || echo "no")
+# Check if model is already available
+MODEL_EXISTS="$(ollama_model_exists "$EMBEDDING_MODEL")"
 
 if [ "$MODEL_EXISTS" = "yes" ]; then
     echo -e "  ${GREEN}✓${NC} Model ${EMBEDDING_MODEL} already available"
@@ -138,20 +172,14 @@ else
     echo -e "  ${GREEN}✓${NC} Model ${EMBEDDING_MODEL} pulled"
 fi
 
-# Pull the local-first LLM model (consolidation, rerank, query rewrite).
-LLM_MODEL="${RLM_LLM_MODEL:-qwen3.5:9b}"
-LLM_EXISTS=$(curl -s "${OLLAMA_URL}/api/tags" 2>/dev/null | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-models = [m['name'] for m in data.get('models', [])]
-search = '${LLM_MODEL%%:*}'
-print('yes' if any(search in m for m in models) else 'no')
-" 2>/dev/null || echo "no")
+# Pull the local-first LLM model (consolidation, salience, query rewrite, HyDE).
+LLM_MODEL="${RLM_LLM_MODEL:-qwen2.5:7b-instruct}"
+LLM_EXISTS="$(ollama_model_exists "$LLM_MODEL")"
 
 if [ "$LLM_EXISTS" = "yes" ]; then
     echo -e "  ${GREEN}✓${NC} Model ${LLM_MODEL} already available"
 else
-    echo -e "  Pulling ${LLM_MODEL} (completion model, ~4.7GB)..."
+    echo -e "  Pulling ${LLM_MODEL} (instruct model, ~4.7GB)..."
     if [ "$OLLAMA_HAS_CLI" = true ]; then
         ollama pull "$LLM_MODEL"
     else
@@ -165,6 +193,29 @@ else
         echo ""
     fi
     echo -e "  ${GREEN}✓${NC} Model ${LLM_MODEL} pulled"
+fi
+
+# Pull the code-oriented LLM model (bootstrap seed, reranker, code compression).
+CODE_MODEL="${RLM_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
+CODE_EXISTS="$(ollama_model_exists "$CODE_MODEL")"
+
+if [ "$CODE_EXISTS" = "yes" ]; then
+    echo -e "  ${GREEN}✓${NC} Model ${CODE_MODEL} already available"
+else
+    echo -e "  Pulling ${CODE_MODEL} (code-oriented LLM, ~4.7GB)..."
+    if [ "$OLLAMA_HAS_CLI" = true ]; then
+        ollama pull "$CODE_MODEL"
+    else
+        # Pull via API (works for remote/WSL scenarios)
+        curl -s "${OLLAMA_URL}/api/pull" -d "{\"name\": \"${CODE_MODEL}\"}" | while IFS= read -r line; do
+            STATUS=$(echo "$line" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || true)
+            if [ -n "$STATUS" ]; then
+                printf "\r  %s" "$STATUS"
+            fi
+        done
+        echo ""
+    fi
+    echo -e "  ${GREEN}✓${NC} Model ${CODE_MODEL} pulled"
 fi
 
 # ---- Step 3: Database selection ----
@@ -277,8 +328,19 @@ require_postgres_database_url "$DATABASE_URL"
 echo ""
 echo -e "${BOLD}[4/5] Creating directories and config...${NC}"
 
-# Data directory
-DATA_DIR="${HOME}/.massa-th0th-data"
+# Data directory — unified under the XDG config home so config + data live in
+# one place (~/.config/massa-th0th/). The legacy ~/.massa-th0th-data/ location
+# is migrated idempotently if present and the new path does not yet exist.
+DATA_DIR="${HOME}/.config/massa-th0th/data"
+LEGACY_DATA_DIR="${HOME}/.massa-th0th-data"
+if [ -d "$LEGACY_DATA_DIR" ] && [ ! -d "$DATA_DIR" ]; then
+    mkdir -p "${HOME}/.config/massa-th0th"
+    if mv "$LEGACY_DATA_DIR" "$DATA_DIR" 2>/dev/null; then
+        echo -e "  ${GREEN}✓${NC} Migrated data directory: ${LEGACY_DATA_DIR} -> ${DATA_DIR}"
+    else
+        echo -e "  ${YELLOW}⚠${NC} Could not move ${LEGACY_DATA_DIR} -> ${DATA_DIR} (cross-volume?). Move it manually."
+    fi
+fi
 mkdir -p "$DATA_DIR"
 echo -e "  ${GREEN}✓${NC} Data directory: ${DATA_DIR}"
 
@@ -320,61 +382,107 @@ backup_if_exists "$ENV_FILE"
 
     cat > "$ENV_FILE" << ENVEOF
 # MCP MASSA_TH0TH - Auto-generated by setup-local-first.sh
+#
+# NOTE: config.json (${CONFIG_FILE}) is now the RUNTIME source of truth for
+# all tunables (llm, embedding, cache, search, memory, hooks, compression,
+# logging) AND for DATABASE_URL. This .env is intentionally thin: it only
+# keeps DATABASE_URL for tooling that reads the environment directly, and as a
+# legacy override path (explicit env vars still override config.json).
 
-# Database Configuration
+# Database Configuration (also written to config.json -> database.url)
 DATABASE_URL=${DATABASE_URL}
-
-# Ollama Configuration (Local)
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_EMBEDDING_MODEL=qwen3-embedding:8b
-OLLAMA_EMBEDDING_DIMENSIONS=4096
-
-# Logging
-LOG_LEVEL=info
-ENABLE_METRICS=false
-
-# Cache Configuration
-L1_CACHE_MAX_SIZE=104857600  # 100MB
-L1_CACHE_TTL=300             # 5 minutes
-L2_CACHE_MAX_SIZE=524288000  # 500MB
-L2_CACHE_TTL=3600            # 1 hour
 ENVEOF
 
-    # Local-first LLM + chosen search-quality flags.
-    cat >> "$ENV_FILE" << ENVEOF
-
-# Local-first LLM (auto-pulled by setup-local-first.sh)
-RLM_LLM_ENABLED=true
-RLM_LLM_MODEL=${LLM_MODEL}
-AUTO_IMPORTANCE_ENABLED=true
-# Search quality (chosen interactively above)
-SEARCH_QUERY_UNDERSTANDING_ENABLED=${SEARCH_QU_ENABLED:-false}
-SEARCH_QUERY_UNDERSTANDING_HYDE_ENABLED=true
-SEARCH_RERANK_ENABLED=${SEARCH_RERANK_ENABLED:-false}
-ENVEOF
-
-    echo -e "  ${GREEN}✓${NC} Created .env file: ${ENV_FILE}"
+    echo -e "  ${GREEN}✓${NC} Created thin .env file: ${ENV_FILE} (config.json is the runtime source)"
 
 # Regenerate the config file, backing up any existing copy first.
 backup_if_exists "$CONFIG_FILE"
     cat > "$CONFIG_FILE" << EOF
 {
+  "database": {
+    "url": "${DATABASE_URL}"
+  },
   "embedding": {
     "provider": "ollama",
     "model": "${EMBEDDING_MODEL}",
     "baseURL": "${OLLAMA_URL}",
     "dimensions": 4096
   },
-  "compression": {
+  "llm": {
     "enabled": true,
-    "strategy": "code_structure",
-    "targetRatio": 0.7
+    "baseUrl": "http://localhost:11434/v1",
+    "apiKey": "ollama",
+    "model": "${LLM_MODEL}",
+    "codeModel": "${CODE_MODEL}",
+    "temperature": 0.2,
+    "maxOutputTokens": 8000,
+    "timeoutMs": 90000,
+    "disableThink": true
+  },
+  "compression": {
+    "defaultStrategy": "code_structure",
+    "minTokensForCompression": 100,
+    "targetCompressionRatio": 0.7
   },
   "cache": {
     "enabled": true,
     "l1MaxSizeMB": 100,
     "l2MaxSizeMB": 500,
     "defaultTTLSeconds": 3600
+  },
+  "search": {
+    "autoReindexMaxFiles": 200,
+    "queryUnderstanding": {
+      "enabled": ${SEARCH_QU_ENABLED:-false},
+      "hydeEnabled": true,
+      "cacheTtlMs": 300000,
+      "cacheMaxSize": 256
+    },
+    "rerank": {
+      "enabled": ${SEARCH_RERANK_ENABLED:-false},
+      "rerankWindow": 50
+    }
+  },
+  "memory": {
+    "decay": {
+      "lambda": 0.02,
+      "sigma": 0.6,
+      "mu": 0.04,
+      "coldThreshold": 0.2
+    },
+    "bootstrap": {
+      "enabled": true,
+      "maxSeedMemories": 8,
+      "centralityLimit": 10,
+      "gitLogLimit": 20,
+      "refreshEnabled": true
+    },
+    "autoImprove": {
+      "enabled": true,
+      "reviewGate": false,
+      "minObservations": 8,
+      "minIntervalMs": 300000,
+      "maxWindow": 16,
+      "minQueryHits": 3,
+      "minFileHits": 3,
+      "minFixHits": 2
+    },
+    "autoImportance": {
+      "enabled": true
+    }
+  },
+  "hooks": {
+    "enabled": true,
+    "maxPayloadBytes": 65536,
+    "queue": {
+      "maxPending": 256
+    },
+    "bridge": {
+      "enabled": true,
+      "minObservations": 8,
+      "minIntervalMs": 300000,
+      "maxWindow": 8
+    }
   },
   "dataDir": "${DATA_DIR}",
   "logging": {
@@ -383,7 +491,9 @@ backup_if_exists "$CONFIG_FILE"
   }
 }
 EOF
-    echo -e "  ${GREEN}✓${NC} Created config: ${CONFIG_FILE}"
+    # config.json now contains DATABASE_URL (a secret) — restrict to owner.
+    chmod 600 "$CONFIG_FILE"
+    echo -e "  ${GREEN}✓${NC} Created config: ${CONFIG_FILE} (chmod 600)"
 
 # Run Prisma migrations unconditionally. A connection, pgvector, or migration
 # failure stops setup before final configuration is reported as usable.
@@ -392,8 +502,18 @@ echo -e "  ${YELLOW}⚠${NC} Running database migrations..."
 command -v bun &> /dev/null || die "Bun is required to run PostgreSQL migrations."
 export DATABASE_URL
 cd "${PROJECT_ROOT}/packages/core"
-bunx prisma migrate deploy || die "PostgreSQL migrations failed. Setup stopped."
-echo -e "  ${GREEN}✓${NC} Database migrations completed"
+# Ensure pgvector exists before migrating (Prisma schema depends on it). The
+# native helper already does this, but the Docker path or a reused cluster may
+# not have it yet. CREATE EXTENSION is idempotent.
+if command -v psql &> /dev/null; then
+    psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector;" >/dev/null 2>&1 \
+        || echo -e "  ${YELLOW}⚠${NC} Could not pre-create pgvector extension (it may already be present, or the role lacks superuser)."
+fi
+bunx prisma migrate deploy \
+    || die "PostgreSQL migrations failed. Setup stopped.
+      Verify: (1) Postgres is running and DATABASE_URL is reachable,
+      (2) pgvector is installed in the target database (CREATE EXTENSION vector),
+      (3) packages/core/prisma/migrations exists. Then re-run this script."
 
 # ---- Step 5: Verify setup ----
 echo ""
@@ -421,15 +541,26 @@ else
     echo -e "  ${RED}✗${NC} Config: not found"
 fi
 
-# Verify reachability and pgvector after migrations.
+# Verify reachability and pgvector after migrations. Attempt to self-heal by
+# (re)creating the extension before declaring failure; distinguish a connection
+# problem from a missing-extension problem in the error message.
+verify_pgvector() {
+    local psql_cmd="$1"          # e.g. "psql \"${DATABASE_URL}\"" or "docker exec ... psql ..."
+    eval "$psql_cmd -v ON_ERROR_STOP=1 -c \"CREATE EXTENSION IF NOT EXISTS vector;\"" >/dev/null 2>&1
+    eval "$psql_cmd -tAc \"SELECT 1 FROM pg_extension WHERE extname = 'vector'\"" 2>/dev/null | grep -qx "1"
+}
 if command -v psql &> /dev/null; then
-    psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_extension WHERE extname = 'vector'" | grep -qx "1" \
-        || die "PostgreSQL is unreachable or pgvector is unavailable. Setup stopped."
+    if psql "${DATABASE_URL}" -tAc "SELECT 1" >/dev/null 2>&1; then
+        verify_pgvector "psql \"${DATABASE_URL}\"" \
+            || die "Connected to PostgreSQL, but pgvector is unavailable. Install it (brew install pgvector) and re-run, or run: psql \"${DATABASE_URL}\" -c \"CREATE EXTENSION vector;\""
+    else
+        die "Cannot connect to PostgreSQL at ${DATABASE_URL}. Ensure the server is running and the URL is correct. Setup stopped."
+    fi
 elif command -v docker &> /dev/null && docker ps --format '{{.Names}}' | grep -qx "massa-th0th-postgres"; then
-    docker exec massa-th0th-postgres psql -U massa_th0th -d massa_th0th -tAc "SELECT 1 FROM pg_extension WHERE extname = 'vector'" | grep -qx "1" \
-        || die "PostgreSQL pgvector verification failed. Setup stopped."
+    verify_pgvector "docker exec massa-th0th-postgres psql -U massa_th0th -d massa_th0th" \
+        || die "PostgreSQL container is up but pgvector verification failed. Run: docker exec massa-th0th-postgres psql -U massa_th0th -d massa_th0th -c \"CREATE EXTENSION vector;\""
 else
-    die "Cannot verify PostgreSQL reachability and pgvector. Setup stopped."
+    die "Cannot verify PostgreSQL reachability and pgvector: neither psql nor the massa-th0th-postgres container is available. Setup stopped."
 fi
 echo -e "  ${GREEN}✓${NC} PostgreSQL + pgvector: connected"
 
