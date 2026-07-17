@@ -818,3 +818,13 @@ Re-validated foundation under Bun `1.3.11`/Node `25.9.0`: cold reinstall (389 pa
 - Feasibility: residual build-phase cost is per-symbol rich extraction (signature strings, signatureMaterial, spans) that the regex baseline does not produce — spec-required (MLTS-005/006). Throughput 25% assessed likely infeasible for a full-AST indexer vs regex; RSS 50% may be reachable with further work (RSS is partly lazy-GC timing across the corpus, not a leak per the disposal sensor).
 - Independent measurement (subagent, two rounds incl. a fair-baseline re-measure) confirmed the numbers; no thresholds weakened, no data faked.
 - Unblock condition: MLTS-014 throughput (≤25%) and RSS (≤50%) thresholds met (further indexer optimization + RSS reduction). TASK-026 may proceed independently.
+
+## TASK-026 Accepted Gate Evidence (2026-07-17)
+
+- Deliverable: README "Structural indexing (polyglot native Tree-sitter)" section + `scripts/tests/polyglot-indexing-docs.test.ts`.
+- Documents: 33 extensions + capability tiers; macOS arm64-only target (Bun `1.3.11`/Node `25.9.0`/npm `11.14.1`, patched `tree-sitter@0.25.0` SHA `e79aec7b…`, no WASM/download); readiness vs liveness; graph schema v2 (generation/CAS/last-known-good); ≤10-detail diagnostics bounding; modern+legacy FQNs + ambiguity; Vue/Markdown embedded parsing; stable API examples; verification commands with measured evidence (33+33 parses, 27 modules, RSS <16 MiB, arm64 linkage) + the macOS arm64 CI gate.
+- Perf status documented honestly: 2.2× optimization committed (`490f302`); MLTS-014 throughput/RSS thresholds NOT met (TASK-025 blocked-on-perf); "do not assume regex parity".
+- Docs-parity/stale-reference test: 13/13 PASS — asserts required content, cross-checks "33" against `LANGUAGE_MANIFEST` length, forbids stale regex/zero-symbol phrases (none existed; a self-introduced phrase was caught + reworded).
+- type-check 6/6; build 5/5; `git diff --check` PASS; excluded-platform non-touch clean.
+- No stale regex/zero-symbol limitation claims remain.
+- Commit: `docs(parser): document polyglot structural indexing`.

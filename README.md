@@ -806,6 +806,142 @@ massa-th0th/
 
 ---
 
+## Structural indexing (polyglot native Tree-sitter)
+
+massa-th0th indexes code with **pinned native Tree-sitter grammars** across all
+33 canonical source extensions, producing a versioned symbol/edge graph ranked by
+dependency centrality. This supersedes the earlier best-effort typed-edge pass.
+The native runtime is correct and verified; no WASM or runtime/post-install
+download is used.
+
+**Native target:** macOS arm64 only. Application runtime is **Bun `1.3.11`**;
+**Node `25.9.0`** (npm `11.14.1`) is a build-only `node-gyp` helper, not the
+application runtime. `tree-sitter@0.25.0` carries a repository patch
+(SHA-256 `e79aec7b96eb8114e85ebcb90f0a8b12076bcd8aa08c09bb88929621e1c1446d`:
+C++20 `binding.gyp` + install-guard) for deterministic lifetime/disposal safety
+and clean consumer installs. There is no Linux, Docker, container, or non-arm64
+native target; those code paths are intentionally untouched.
+
+### Supported languages and capability tiers
+
+The frozen manifest (`packages/core/src/services/structural/language-manifest.ts`,
+mirroring `DEFAULT_ALLOWED_EXTENSIONS`) declares 33 extensions across TS/JS, web
+host (Vue/HTML), data (JSON/YAML/Markdown), systems (C/C++/Go/Rust/Zig),
+scripting (Python/Ruby/PHP/Lua), managed/mobile (Java/Kotlin/Scala/C#/Swift/Dart),
+and functional/BEAM (Elixir/Erlang/Clojure/OCaml/Haskell). Each language declares
+capability tiers — declarations/documentation, imports/modules, type relations,
+calls, data flow, HTTP, and events — and a pack emits only its declared tiers
+(no invented placeholders for unsupported capabilities). See
+`.specs/features/multi-language-tree-sitter-breadth/capability-matrix.md` for the
+per-extension tier matrix and exact grammar artifacts.
+
+### Readiness vs. liveness
+
+Parser **readiness** is separate from process **liveness**. `/health` reports the
+API alive regardless of parser state. On startup, `validateAllGrammars` loads all
+33 manifest entries in one cached flight; indexing is rejected (before any job is
+created) until readiness reaches `ready`. A missing or ABI-incompatible grammar
+leaves liveness up but keeps readiness `failed`, so a broken native install can
+never silently produce an empty/partial graph.
+
+### Graph schema v2 and rebuild visibility
+
+Symbol, reference, import, centrality, and diagnostic rows are scoped by
+**generation**. A pending generation is built beside the active one under a DB
+lease, with an immutable snapshot and expected-active CAS; a terminal job always
+names an activated generation. A required-file failure is a hard failure that
+blocks activation; an incremental hard failure retains the last-known-good active
+generation and surfaces stale diagnostics. Pending data is invisible to graph
+reads until activation, so an in-flight rebuild never corrupts the visible graph.
+
+### Diagnostics
+
+Exact recovered and hard/stale diagnostic **totals** are preserved separately
+from bounded detail: at most **10** detail spans per file are exposed, while the
+exact counts survive persistence. Durable per-job and per-project summaries come
+from the activated generation.
+
+### Versioned symbol identities (FQNs)
+
+Every symbol gets a **modern full-SHA-256 identity** plus a stable **legacy
+alias**, with explicit **ambiguity payloads** where multiple symbols share a
+legacy name (one codec owns all three):
+
+- Legacy alias: `path/to/file.ts#myFunction`
+- Modern identity: `path/to/file.ts#MyClass.myMethod~method~<sha256>`
+- Ambiguity: when the legacy alias is non-unique, resolution returns the ordered
+  candidate list instead of first-match.
+
+There are 18 canonical symbol kinds and 9 edge kinds. No graph consumer uses
+verbatim or first-match FQN behavior.
+
+### Embedded parsing
+
+Vue and Markdown host two-level embedded child parsing: a Vue SFC is parsed via
+its HTML host grammar with TS/JS child grammars for `<script>`/`<template>`
+blocks; Markdown headings/fences and JSON/YAML qualified keys are extracted with
+stable scope FQNs, host-byte remapping, and dedupe.
+
+### Examples
+
+The structural runtime exposes a stable, generation-scoped API. Approximate
+shapes (see `packages/core/src/services/structural/` for the full contract):
+
+```ts
+// Readiness must pass before indexing; status ∈ pending|validating|ready|failed
+interface ParserReadinessSnapshot {
+  status: "pending" | "validating" | "ready" | "failed";
+  requiredExtensions: number;   // 33
+  validatedExtensions: number;
+  errors: readonly { code: string; message: string }[];
+}
+
+// One bounded lease per parse; cursors deleted before trees even on failure
+class StructuralRuntime {
+  async parse(request: {
+    extension: string;           // e.g. ".ts"
+    source: Buffer;
+    headerEvidence?: HeaderLanguageEvidence;
+  }): Promise<StructuralParseOutcome>;
+}
+
+// Modern identity carries the legacy alias; ambiguous legacy names resolve to a list
+interface StructuralIdentity {
+  fqn: string;          // modern:  file#qualifiedName~kind~<sha256>
+  legacyFqn: string;    // legacy:  file#name
+  aliases: readonly string[];
+  kind: string;
+  signatureHash: string;
+}
+```
+
+### Verification (macOS arm64)
+
+The native toolchain is gated by deterministic verifiers, not hand-checked claims:
+
+| Command | Checks |
+|---------|--------|
+| `bun run verify:tree-sitter-native` | Source + dist + packed-package: 33+33 parses, 27 native modules, 10 lifetime sensors, RSS < 16 MiB median delta, Mach-O arm64 linkage, missing/ABI-incompatible negative sensors |
+| `bun run verify:tree-sitter-source-dist` | Source/dist grammar load + parse |
+| `bun run verify:tree-sitter-package` | Packed `npm` tarball bundles the nested patched runtime + generated arm64 addon |
+| `bun run type-check` / `bun run build` | Workspace type-check (6/6) and build (5/5) |
+| `bun run bench:parser -- --baseline 5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03` | Frozen parser benchmark vs. the regex baseline |
+| `.github/workflows/native-macos-arm64.yml` | macOS arm64 CI: Bun `1.3.11`, Node `25.9.0`/npm `11.14.1`, frozen install, build, `verify:tree-sitter-native`, provenance upload |
+
+### Performance status (honest)
+
+Native structural indexing is **correct and verified**, but the frozen parser
+benchmark (TASK-025) has not yet reached parity with the regex baseline. A 2.2×
+indexer optimization is committed (`490f302`), and the 16 MiB explicit-disposal
+native-retention stress passes — but the MLTS-014 throughput (≤25%) and RSS
+(≤50%) thresholds vs. the `5d43a96` regex baseline are **not yet met**. This is a
+known, tracked limitation (TASK-025 BLOCKED ON PERF): a full-AST structural
+indexer produces per-symbol rich extraction (signatures, spans, FQNs) that the
+regex baseline does not, so like-for-like throughput parity is assessed as
+unlikely. Do not assume native parity with the legacy regex pass.
+
+---
+
 ## License
 
 MIT

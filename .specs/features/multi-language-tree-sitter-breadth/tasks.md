@@ -386,6 +386,8 @@ Phase 7 Validate:
 
 ### T26 / TASK-026: Complete active documentation and compatibility guidance
 
+**Status:** PASS on 2026-07-17. README gained a "Structural indexing (polyglot native Tree-sitter)" section documenting the 33 extensions + capability tiers, macOS arm64-only target (Bun `1.3.11`/Node `25.9.0`/npm `11.14.1`, patched `tree-sitter@0.25.0` SHA `e79aec7b…`), readiness vs liveness, graph schema v2 (generation/CAS/last-known-good), ≤10-detail diagnostics bounding, modern+legacy FQNs + ambiguity, Vue/Markdown embedded parsing, stable API examples (`StructuralRuntime.parse`, `ParserReadinessSnapshot`, `StructuralIdentity`), and the verification commands with measured evidence + the macOS arm64 CI gate. Perf status documented honestly (2.2× optimization committed `490f302`; MLTS-014 throughput/RSS thresholds not yet met — TASK-025 blocked-on-perf; do not assume regex parity). A docs-parity/stale-reference test (`scripts/tests/polyglot-indexing-docs.test.ts`, 13/13) asserts required content, cross-checks "33" against `LANGUAGE_MANIFEST`, and forbids stale regex/zero-symbol phrases (none existed; a self-introduced phrase was caught + reworded). type-check 6/6; build 5/5; `git diff --check` PASS.
+
 **What:** Document supported tiers, macOS arm64 native target, readiness, graph schema v2/rebuild visibility, diagnostics, modern/legacy FQNs, examples, rollout, and exact verification evidence; remove stale regex limitation text.  
 **Where:** active README/docs/examples/spec state/handoff/gate manifest.  
 **Depends on:** T21,T22,T24,T25. **Requirements:** MLTS-023 and all acceptance evidence.  
