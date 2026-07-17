@@ -17,6 +17,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { describeNative } from "./_helpers/native-skip.js";
 import {
   runLouvain,
   COMMUNITY_NODE_CAP,
@@ -359,7 +360,7 @@ async function makeTempProject(files: Record<string, string>): Promise<string> {
   return dir;
 }
 
-describe("getProjectMap enriched fields (fixture pipeline)", () => {
+describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
   const repo = getSymbolRepository();
 
   beforeEach(() => {

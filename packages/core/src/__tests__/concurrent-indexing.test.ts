@@ -8,6 +8,7 @@
  */
 
 import { describe, test, expect, beforeEach, mock, afterEach } from "bun:test";
+import { describeNative } from "./_helpers/native-skip.js";
 
 // ── Restore any stale mocks from other test files (shared module registry) ───
 // When running alongside other test files in the same Bun process, files like
@@ -88,7 +89,7 @@ afterEach(() => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("ContextualSearchRLM — concurrent indexing mutex", () => {
+describeNative("ContextualSearchRLM — concurrent indexing mutex", () => {
   // ── Basic serial execution ───────────────────────────────────────────────
   describe("serial execution guarantee", () => {
     test("single caller runs immediately, cleans up the lock map", async () => {

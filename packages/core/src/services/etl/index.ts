@@ -2,7 +2,7 @@
  * ETL Module Exports
  */
 
-export { EtlPipeline, etlPipeline } from "./pipeline.js";
+export { EtlPipeline } from "./pipeline.js";
 export type { PipelineInput } from "./pipeline.js";
 export type {
   EtlStageContext,

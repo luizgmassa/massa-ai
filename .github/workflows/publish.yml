@@ -6,16 +6,33 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+  # Auto-publish `next` after a successful CI run on main (continuous delivery
+  # of prereleases). Release/tag events still publish `latest`; manual dispatch
+  # is unchanged. The build job below gates on the triggering run's conclusion.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
 
 env:
   NPM_TAG: ${{ github.event_name == 'release' && 'latest' || 'next' }}
 
 jobs:
   build:
+    # For workflow_run triggers, only proceed when the triggering CI run
+    # actually succeeded — a `completed` workflow_run can also be a failure,
+    # which must not publish.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # workflow_run fires against the default branch; pin to the exact
+          # commit CI validated instead of whatever main points at now.
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -133,6 +150,11 @@ jobs:
 
   publish-docker:
     needs: build
+    # Docker multi-arch builds are heavy; skip them on the per-push
+    # workflow_run (auto `next`) trigger and only build images on explicit
+    # release / tag / manual dispatch. npm package `next` prereleases still
+    # publish on every green main push via publish-packages/publish-apps.
+    if: github.event_name != 'workflow_run'
     runs-on: ubuntu-latest
     environment: DEPLOY
     permissions:

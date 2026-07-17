@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, mock, test } from "bun:test";
+import { describeNative } from "./_helpers/native-skip.js";
 
 const invalidations: string[] = [];
 let releaseInvalidation!: () => void;
@@ -19,11 +20,12 @@ let pipeline: any;
 let indexJobTracker: any;
 
 beforeAll(async () => {
-  ({ etlPipeline: pipeline } = await import("../services/etl/pipeline.js"));
+  const pipelineModule = await import("../services/etl/pipeline.js");
+  pipeline = pipelineModule.EtlPipeline.getInstance();
   ({ indexJobTracker } = await import("../services/jobs/index-job-tracker.js"));
 });
 
-describe("ETL search-cache consistency", () => {
+describeNative("ETL search-cache consistency", () => {
   test("invalidates project cache before exposing a completed job", async () => {
     const job = indexJobTracker.createJob("cache-project", "/tmp");
     indexJobTracker.updateStatus(job.jobId, "running");

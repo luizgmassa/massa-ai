@@ -16,7 +16,7 @@ import { ToolResponse } from "@massa-th0th/shared";
 import { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js";
 import { logger } from "@massa-th0th/shared";
 import { indexJobTracker } from "../services/jobs/index-job-tracker.js";
-import { etlPipeline } from "../services/etl/pipeline.js";
+import { EtlPipeline } from "../services/etl/pipeline.js";
 import { workspaceManager } from "../services/workspace/workspace-manager.js";
 import { realpath } from "node:fs/promises";
 import path from "path";
@@ -219,7 +219,7 @@ export class IndexProjectTool implements IToolHandler {
 
       // ETL Pipeline: discover → parse → resolve → load
       // EventBus integration handles progress updates and WorkspaceManager status
-      const etlResult = await etlPipeline.run({
+      const etlResult = await EtlPipeline.getInstance().run({
         projectId,
         projectPath,
         jobId,

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { describeNative } from "./_helpers/native-skip.js";
 import { EtlPipeline } from "../services/etl/pipeline.js";
 import { indexJobTracker } from "../services/jobs/index-job-tracker.js";
 
@@ -25,7 +26,7 @@ function result(errors = 0) {
   };
 }
 
-describe("EtlPipeline per-project run queue", () => {
+describeNative("EtlPipeline per-project run queue", () => {
   const pipeline = EtlPipeline.getInstance() as any;
   let originalRunInternal: (input: any) => Promise<any>;
   let originalDiscoverRun: (context: any, input: any) => Promise<any>;
