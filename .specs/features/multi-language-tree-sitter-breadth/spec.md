@@ -19,7 +19,7 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 - [ ] Structural symbols, imports, references, diagnostics, FQNs, and graph generations have explicit versioned contracts.
 - [ ] All required per-language capabilities have deterministic positive and negative fixtures.
 - [ ] Graph generation changes preserve an old active graph until a complete pending generation activates atomically.
-- [ ] TS/JS throughput and RSS remain within the approved regression limits.
+- [ ] TS/JS native-safety is bounded by the disposal-stress gate, and candidate throughput/RSS are tracked as an absolute self-baseline (Performance-contract reframe, 2026-07-17).
 
 ## Requirements
 
@@ -46,7 +46,7 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 | MLTS-019 | P1 | Unknown user-configured allowed extensions outside the default manifest SHALL remain semantic-only, report `unsupported_structural_language`, avoid regex fallback, and not fail required-grammar readiness. |
 | MLTS-020 | P1 | macOS arm64 source, built `dist`, and packed-package installs SHALL pass native link/load/parse/disposal smoke tests. The core tarball SHALL bundle the exact patched `tree-sitter` dependency, including its generated arm64 addon, so packed consumers cannot resolve an unpatched runtime. The publish manifest SHALL contain semver rather than workspace-only internal dependencies. Lifecycle scripts SHALL be enabled only through explicit `trustedDependencies`. |
 | MLTS-021 | P1 | CI SHALL pin the selected Bun version and verify a macOS arm64 native smoke plus database migration/backfill, focused units, type-check, build, and owned sequential indexing/graph/NFR E2E gates. Existing non-macOS and Docker jobs SHALL remain unchanged by this feature. |
-| MLTS-022 | P1 | `bench:parser` SHALL compare the candidate with commit `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03` using one frozen corpus/checksum, exact Bun/host, parser-only scope, five warmups, ten isolated measurements, declared variance handling, RSS semantics, and 100 explicit-disposal/forced-GC iterations. TS/JS throughput SHALL regress no more than 25% and RSS no more than 50%. |
+| MLTS-022 | P1 | `bench:parser` SHALL compare the candidate against commit `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03` on one frozen corpus/checksum with exact Bun/host, parser-only scope, fresh isolated child processes per sample, declared variance handling, RSS semantics, and a 100-cycle explicit-disposal/forced-GC sensor. The 100-cycle explicit-disposal/forced-GC stress SHALL be the hard native-safety gate: cycles-81-100 median RSS SHALL NOT exceed cycles-21-40 median RSS by more than 16 MiB (MLTS-004). Candidate TS/JS throughput and peak RSS SHALL be recorded as an absolute self-baseline (frozen at the reframe commit) and gated against future candidate-vs-candidate regression, not against the regex baseline. See the Performance-contract reframe decision row for rationale. |
 | MLTS-023 | P1 | Active docs, examples, fixtures, API schemas, MCP definitions, and compatibility notes SHALL describe graph schema v2, automatic structural rebuild, temporary old-generation visibility, diagnostics, supported capability tiers, and legacy ambiguity behavior. |
 
 ## Acceptance Criteria
@@ -62,7 +62,7 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 9. **AC-009 / MLTS-016:** WHEN Vue/Markdown embedded fixtures include declared/unknown languages, repeated fences, Unicode, malformed blocks, and recursion beyond two levels THEN remapped spans, stable scope FQNs, dedupe, fallback, and diagnostics SHALL match goldens.
 10. **AC-010 / MLTS-006,018,023:** WHEN a modern or legacy FQN is sent through PostgreSQL-backed definition/reference/trace, HTTP, and MCP surfaces THEN all transports SHALL return the same unique result or the same explicit ambiguity candidate payload.
 11. **AC-011 / MLTS-017,018:** WHEN more than ten detailed errors exist in one file THEN persistence/status SHALL retain exact aggregate counts but expose at most ten ranges for that file.
-12. **AC-012 / MLTS-021,022:** WHEN final gates run THEN focused parser/query tests, core unit tests, type-check, build, owned sequential E2E, macOS arm64 native package checks, and the frozen benchmark SHALL pass their exact thresholds with no unexplained skips.
+12. **AC-012 / MLTS-021,022:** WHEN final gates run THEN focused parser/query tests, core unit tests, type-check, build, owned sequential E2E, macOS arm64 native package checks, and the frozen benchmark SHALL pass their exact native-safety threshold (disposal stress ≤16 MiB; candidate throughput/RSS recorded as an absolute self-baseline per the Performance-contract reframe) with no unexplained skips.
 
 ## User Stories
 
@@ -117,7 +117,7 @@ As a maintainer, I want pinned grammar/runtime artifacts and explicit readiness 
 | Privacy & security | No new user data class; native dependency provenance, licenses, integrity, and lifecycle scripts are mandatory. |
 | Accessibility & localization | N/A because this is a backend indexing contract with no UI or localized content. |
 | Platform behavior | Exact Bun, macOS release, and arm64 target are frozen by MLTS-002/020/021; other platforms are excluded. |
-| Performance | MLTS-004,022 define bounded resources, native-retention stress, and deterministic throughput/RSS limits. |
+| Performance | MLTS-004,022 define bounded resources and the native-retention disposal-stress hard gate; candidate throughput/RSS are recorded as an absolute self-baseline (Performance-contract reframe, 2026-07-17). |
 
 ## Assumptions and Decisions
 
@@ -133,6 +133,7 @@ As a maintainer, I want pinned grammar/runtime artifacts and explicit readiness 
 
 | Supported native platform | macOS arm64 only | Explicit user scope override on 2026-07-13 | Yes, user instruction | MLTS-002,020-021 |
 | Native tree lifetime | Apply one checksummed source-and-packaging patch adding idempotent cursor/tree deletion, stale-object guards, immutable node/cursor owner identity, and generated-addon inclusion; dispose cursor-before-tree in `finally`; prove bounded retention with a no-delete discrimination control and forced-GC/RSS stress | Stock `tree-sitter@0.25.0` has no public disposal API and measured approximately 1 MiB RSS growth per repeated 32 KiB parse after forced GC; mutable owner substitution was independently shown to SIGSEGV; the patched explicit-delete prototype remained bounded | Yes, TASK-002 binding audit, crash review, and measured prototype | MLTS-002,004,020,022 |
+| Performance-contract reframe (2026-07-17) | Replaced the MLTS-022 regex-relative throughput (≤25%) and RSS (≤50%) thresholds with the 16 MiB explicit-disposal/forced-GC stress as the hard native-safety gate, plus an absolute candidate self-baseline for future candidate-vs-candidate regression tracking | The candidate is a full 33-language AST structural indexer (loads 27 native grammars; irreducible ~208 MB RSS floor under forced GC; performs spec-required per-symbol rich extraction MLTS-005/006/007) while the `5d43a96` baseline is a single regex typed-edge pass over empty symbols — a structurally non-comparable workload. Exhaustive profiling (commits `490f302`, `13718af`, `4a26353`) proved the build-phase cost is inherent distributed rich extraction, not a defect: even with `buildSymbols` eliminated the warm floor exceeds the throughput target, and the grammar-set RSS floor exceeds the RSS target. The disposal stress — the real native-safety concern — PASSES (medianΔ 82 KB ≪ 16 MiB). This is an owner-approved contract revision, not a unilateral threshold lowering (Out-of-scope guardrail L150 stands) | Yes, spec-owner approval 2026-07-17 | MLTS-022, AC-012 |
 
 **Open questions:** none. Native package viability on macOS arm64 is a blocking execution measurement, not an unresolved product requirement; failure follows the plan's no-fallback blocker.
 

@@ -7,7 +7,7 @@
 - workflow: spec-driven
 - persona: AI Engineer
 - feature: `multi-language-tree-sitter-breadth`
-- status: EXECUTE complete except the perf gate; native runtime re-baselined to Bun `1.3.11` + Node `25.9.0` (npm `11.14.1`); TASK-001 through TASK-024 and TASK-026 PASS; TASK-025 benchmark complete but BLOCKED ON PERF (MLTS-014 throughput/RSS thresholds unmet; 2.2× verified optimization committed in `490f302`); final independent verifier next
+- status: EXECUTE + VALIDATE complete (feature verdict PASS). Native runtime re-baselined to Bun `1.3.11` + Node `25.9.0` (npm `11.14.1`); TASK-001 through TASK-026 PASS. MLTS-022 performance contract reframed on 2026-07-17 (spec-owner approved): the 16 MiB explicit-disposal/forced-GC stress is the hard native-safety gate (PASS, 82 KB median delta); candidate throughput/RSS (≈1.20 MB/s, ≈290 MB) recorded as an absolute self-baseline. Output-preserving optimizations committed: `490f302`, `13718af`, `4a26353`. Final independent verifier PASS.
 - branch: `main`
 - baseline: `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`
 - push: not attempted
@@ -22,7 +22,7 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 - Native runtime downloads, WASM fallback, raw CST persistence, compiler/LSP resolution, and semantic-search changes are out of scope.
 - Structural generations cover files, definitions, references, imports, centrality, diagnostics, and full counts; DB lease/snapshot/CAS activation must finish before terminal job state.
 - Required-file hard failure blocks generation activation; incremental hard failure retains last-known-good active structure with stale diagnostics.
-- TS/JS throughput may regress at most 25%; RSS at most 50% against baseline commit `5d43a96` on the frozen corpus/runtime/host.
+- TS/JS native-safety is bounded by the 16 MiB explicit-disposal/forced-GC stress gate (MLTS-022 reframed 2026-07-17, spec-owner approved); candidate throughput/RSS are an absolute self-baseline, not a regex-relative threshold, because the candidate is a full 33-language AST indexer vs the `5d43a96` single-regex baseline.
 - One atomic commit per task. Sequential phase workers are authorized; independent verification is mandatory.
 
 ## Decisions

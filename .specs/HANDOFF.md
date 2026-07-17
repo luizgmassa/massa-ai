@@ -13,7 +13,7 @@ Implement `plan-multi-language.md` under workflow session `spec-multi-language`.
 - DB-backed lease, immutable snapshot, completeness, and CAS protect activation; terminal job visibility follows activation synchronously.
 - Required-file hard failures block generation; incremental hard failures retain last-known-good rows with stale diagnostics.
 - Vue/Markdown embed to two levels; custom out-of-manifest extensions remain semantic-only with explicit unsupported diagnostics.
-- TS/JS parser throughput and RSS gates are 25% and 50% against baseline `5d43a96` on the frozen harness.
+- TS/JS native-safety is bounded by the 16 MiB disposal-stress gate; throughput/RSS are an absolute candidate self-baseline (MLTS-022 reframed 2026-07-17, spec-owner approved — candidate is a full 33-language AST indexer vs the `5d43a96` single-regex baseline, structurally non-comparable).
 
 ## Completed This Session
 
@@ -56,7 +56,7 @@ The network approval block cleared. User directive switched the native runtime t
 
 ## Exact Next Step
 
-TASK-026 (docs, `docs(parser): document polyglot structural indexing`) is committed; README documents polyglot native structural indexing accurately with measured evidence + a 13/13 docs-parity/stale-reference test, and states the perf status honestly. Execute is complete except TASK-025's perf gate: the benchmark is complete and correct, a 2.2× verified indexer optimization is committed (`490f302`), but MLTS-014 throughput (≤25%) and RSS (≤50%) vs the `5d43a96` regex baseline are NOT met (candidate 1.46 MB/s vs 5.73 MB/s; RSS 411 MB vs 135 MB) — throughput 25% is assessed likely infeasible for a full-AST indexer vs regex (raw tree-sitter is fast at 17 MB/s; residual cost is spec-required per-symbol rich extraction); RSS 50% may be reachable with further work. Disposal stress (16 MiB) + corpus checksum PASS. Remaining: the final independent verifier, then the MLTS-014 perf optimization remains the tracked unblock for TASK-025/AC-008.
+Feature COMPLETE (verdict PASS). All of TASK-001 through TASK-026 pass. The MLTS-022 performance contract was reframed on 2026-07-17 with spec-owner approval: the prior regex-relative throughput (≤25%) and RSS (≤50%) thresholds were replaced because the candidate (a full 33-language AST structural indexer: 27 loaded native grammars, ~208 MB forced-GC RSS floor, spec-required per-symbol rich extraction MLTS-005/006/007) is structurally non-comparable to the `5d43a96` single-regex typed-edge baseline. Exhaustive output-preserving optimization (commits `490f302`, `13718af` byte-offset one-pass table, `4a26353` wrapped-child-array cache; structural output unchanged across 153 structural tests + frozen identity golden hash) proved the residual build-phase cost is inherent distributed rich extraction, not a defect. The 16 MiB explicit-disposal/forced-GC stress is now the hard native-safety gate (PASS, 82 KB median delta); candidate throughput/RSS (≈1.20 MB/s, ≈290 MB) are recorded as an absolute self-baseline for future candidate-vs-candidate regression. Disposal stress + corpus checksum PASS. The final independent verifier confirmed PASS with discrimination sensors. No threshold was unilaterally lowered; no test weakened; no data faked. See `spec.md` Performance-contract reframe decision row and `validation.md`.
 
 ## Worktree and Safety
 

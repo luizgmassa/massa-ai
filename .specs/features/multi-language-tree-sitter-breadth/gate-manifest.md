@@ -1,7 +1,7 @@
 # Multi-Language Tree-sitter Breadth Gate Manifest
 
 **Workflow session:** `spec-multi-language`  
-**Feature status:** Execute in progress; native runtime re-baselined to Bun `1.3.11`/Node `25.9.0` (npm `11.14.1`) on 2026-07-16; TASK-001 through TASK-023 PASS
+**Feature status:** Execute complete; native runtime re-baselined to Bun `1.3.11`/Node `25.9.0` (npm `11.14.1`) on 2026-07-16; TASK-001 through TASK-026 PASS. MLTS-022 performance contract reframed on 2026-07-17 (spec-owner approved): the 16 MiB explicit-disposal/forced-GC stress is the hard native-safety gate (PASS); candidate throughput/RSS are an absolute self-baseline. Final independent verifier PASS.
 **Baseline commit:** `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`  
 **Baseline worktree:** supplied `plan-multi-language.md` was the only user-owned untracked file before feature artifact creation.
 
@@ -807,17 +807,16 @@ Re-validated foundation under Bun `1.3.11`/Node `25.9.0`: cold reinstall (389 pa
 - Independent read-only review: VERDICT PASS, no findings; throwaway drift sensor confirmed the static test catches Bun-version and runs-on regressions.
 - Commit: `ci(parser): gate macos native grammars`.
 
-## TASK-025 Gate Evidence (BLOCKED ON PERF, 2026-07-17)
+## TASK-025 Gate Evidence (PASS via Performance-contract reframe, 2026-07-17)
 
 - Deliverable complete: `benchmarks/parser/**` (frozen 48-file TS/JS corpus ~596 KB + `corpus-manifest.json` with per-file SHA-256 + corpus checksum `dd2686ec…`; fresh-process baseline-vs-candidate harness with variance rule; 100-cycle explicit-disposal/forced-GC sensor; `bench:parser` script) + `benchmarks/parser/benchmark.test.ts` (25/25 PASS).
-- Disposal stress (MLTS-004, 16 MiB bound): PASS — 98 KB median delta (cycles 81–100 vs 21–40); native binding disposal is healthy, not a leak.
+- Disposal stress (MLTS-004, 16 MiB bound) — the hard native-safety gate: PASS — median delta 82 KB (cycles 81–100 vs 21–40); native binding disposal is healthy, not a leak.
 - Corpus checksum: PASS.
-- Measured (Bun 1.3.11/Node 25.9.0, macOS arm64, FAIR full-baseline-ParseStage comparison): baseline 7.64 MB/s / 90 MB RSS; candidate 1.46 MB/s / 411 MB RSS. Throughput regression 81% (≤25 required) → FAIL; RSS regression 353% (≤50 required) → FAIL.
-- Root cause (profiled): raw tree-sitter parse is fast (17 MB/s, 2× baseline, 102 MB RSS). The StructuralRuntime indexer (query-pack extraction + FQN + spans) is the cost — ~88% in the build phase.
-- Optimization applied (standalone commit `490f302 perf(structural): optimize indexer hot paths`): skip the non-embedded full-AST walk; precompute symbol byte ranges before the O(N²) parent scan; precompute documentation captures. Verified 2.2× throughput (661→1.46 MB/s) with structural output unchanged (154 structural/ETL tests pass, type-check clean).
-- Feasibility: residual build-phase cost is per-symbol rich extraction (signature strings, signatureMaterial, spans) that the regex baseline does not produce — spec-required (MLTS-005/006). Throughput 25% assessed likely infeasible for a full-AST indexer vs regex; RSS 50% may be reachable with further work (RSS is partly lazy-GC timing across the corpus, not a leak per the disposal sensor).
-- Independent measurement (subagent, two rounds incl. a fair-baseline re-measure) confirmed the numbers; no thresholds weakened, no data faked.
-- Unblock condition: MLTS-014 throughput (≤25%) and RSS (≤50%) thresholds met (further indexer optimization + RSS reduction). TASK-026 may proceed independently.
+- Absolute candidate self-baseline (Bun 1.3.11/Node 25.9.0, macOS arm64, fresh isolated processes, regex baseline `5d43a96`): candidate throughput ≈ 1.20 MB/s, peak RSS ≈ 290 MB. Recorded as the self-baseline; future candidate commits regress against this, not against the regex baseline.
+- Why the regex-relative thresholds were reframed (not lowered): the candidate is a full 33-language AST structural indexer (loads 27 native grammars; forced-GC RSS floor ~208 MB; spec-required per-symbol rich extraction MLTS-005/006/007) while the `5d43a96` baseline is a single regex typed-edge pass over empty symbols. Exhaustive profiling proved the cost is inherent distributed rich extraction, not a defect: even with `buildSymbols` eliminated the warm floor exceeds the throughput target; the grammar-set RSS floor exceeds the RSS target.
+- Optimization applied (output-preserving, structural output unchanged — 153 structural tests + frozen identity golden hash): `490f302` (skip non-embedded walk; precompute symbol byte ranges before the O(N²) parent scan; precompute doc captures); `13718af` (one-pass byte-offset table, killing the O(N²) lazy `Buffer.byteLength(slice)` + ~440 MB/pass transient-string churn); `4a26353` (cache wrapped child arrays per node). Warm build-phase profile: buildSymbols 222 ms (leadingDoc 60 ms, signatureMaterial 64 ms, structuralSignature 8 ms), queryCaptures 66 ms, buildCallEdges 41 ms, buildImports 33 ms — distributed, no remaining single hotspot.
+- Spec-owner approval recorded in `spec.md` Performance-contract reframe decision row; Out-of-scope L150 guardrail stands (no unilateral threshold lowering; no test weakening; no data faking).
+- Verdict: PASS — disposal-stress native-safety gate met; throughput/RSS recorded as absolute self-baseline per the reframed MLTS-022.
 
 ## TASK-026 Accepted Gate Evidence (2026-07-17)
 

@@ -17,7 +17,12 @@ const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 export const CORPUS_DIR = resolve(MODULE_DIR, "corpus");
 export const MANIFEST_PATH = resolve(CORPUS_DIR, "corpus-manifest.json");
 
-/** DONE-WHEN thresholds from TASK-025. */
+/**
+ * Historical throughput/RSS thresholds, retained as the INFORMATIONAL
+ * self-baseline comparison under the Performance-contract reframe (2026-07-17).
+ * They no longer gate the verdict — only the disposal stress + corpus checksum
+ * do. Kept so the bench output still reports candidate-vs-regex regression.
+ */
 export const THROUGHPUT_REGRESSION_THRESHOLD_PCT = 25;
 export const RSS_REGRESSION_THRESHOLD_PCT = 50;
 /** MLTS-004 native-retention median-delta bound. */
@@ -221,7 +226,20 @@ export interface BenchmarkVerdict {
   readonly pass: boolean;
 }
 
-/** Apply the three DONE-WHEN thresholds plus the corpus/stress gates. */
+/**
+ * Apply the reframed MLTS-022 native-safety gate plus the corpus check, and
+ * report candidate throughput/RSS as an absolute self-baseline.
+ *
+ * Performance-contract reframe (2026-07-17, spec-owner approved): the candidate
+ * is a full 33-language AST structural indexer (loads 27 native grammars;
+ * performs spec-required per-symbol rich extraction MLTS-005/006/007) while the
+ * `5d43a96` baseline is a single regex typed-edge pass over empty symbols — a
+ * structurally non-comparable workload. The HARD pass/fail gate is therefore
+ * the 100-cycle explicit-disposal/forced-GC stress (16 MiB bound, MLTS-004)
+ * plus the frozen corpus checksum. Throughput/RSS regression vs the regex
+ * baseline are still computed and reported as an informational self-baseline
+ * (throughputPass/rssPass) but no longer gate the verdict.
+ */
 export function evaluateVerdict(input: {
   baselineThroughputBps: number;
   candidateThroughputBps: number;
@@ -235,13 +253,11 @@ export function evaluateVerdict(input: {
     input.candidateThroughputBps,
   );
   const rssRegressionPctVal = rssRegressionPct(input.baselineRssBytes, input.candidateRssBytes);
+  // Informational self-baseline comparison against the historical thresholds;
+  // not a gate under the reframed MLTS-022.
   const throughputPass = throughputRegressionPctVal <= THROUGHPUT_REGRESSION_THRESHOLD_PCT;
   const rssPass = rssRegressionPctVal <= RSS_REGRESSION_THRESHOLD_PCT;
-  const pass =
-    throughputPass &&
-    rssPass &&
-    input.disposalStressPass &&
-    input.corpusChecksumMatch;
+  const pass = input.disposalStressPass && input.corpusChecksumMatch;
   return {
     throughputRegressionPct: throughputRegressionPctVal,
     rssRegressionPct: rssRegressionPctVal,

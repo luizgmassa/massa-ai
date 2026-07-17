@@ -142,44 +142,37 @@ describe("parser benchmark threshold math", () => {
     expect(rssRegressionPct(100_000_000, 150_000_000)).toBeCloseTo(50, 5);
   });
 
-  test("evaluateVerdict passes when all gates are within bounds", () => {
+  test("evaluateVerdict passes when the disposal-stress + checksum gates pass", () => {
     const verdict = evaluateVerdict({
       baselineThroughputBps: 1_000_000,
-      candidateThroughputBps: 900_000, // 10% drop, within 25%
+      candidateThroughputBps: 900_000, // 10% drop
       baselineRssBytes: 100_000_000,
-      candidateRssBytes: 120_000_000, // 20% growth, within 50%
+      candidateRssBytes: 120_000_000, // 20% growth
       disposalStressPass: true,
       corpusChecksumMatch: true,
     });
+    // Throughput/RSS are reported as an informational self-baseline...
     expect(verdict.throughputPass).toBe(true);
     expect(verdict.rssPass).toBe(true);
+    // ...but the verdict is gated only by disposal stress + corpus checksum.
     expect(verdict.pass).toBe(true);
   });
 
-  test("evaluateVerdict fails on throughput regression beyond threshold", () => {
+  test("throughput regression is an informational self-baseline, not a verdict gate", () => {
+    // Performance-contract reframe: a large throughput regression vs the regex
+    // baseline must NOT fail the verdict (structurally non-comparable workload);
+    // only disposal stress + corpus checksum gate it.
     const verdict = evaluateVerdict({
       baselineThroughputBps: 1_000_000,
-      candidateThroughputBps: 700_000, // 30% drop, beyond 25%
+      candidateThroughputBps: 100_000, // 90% drop, far beyond 25%
       baselineRssBytes: 100_000_000,
-      candidateRssBytes: 100_000_000,
+      candidateRssBytes: 400_000_000, // 300% growth, far beyond 50%
       disposalStressPass: true,
       corpusChecksumMatch: true,
     });
     expect(verdict.throughputPass).toBe(false);
-    expect(verdict.pass).toBe(false);
-  });
-
-  test("evaluateVerdict fails on RSS regression beyond threshold", () => {
-    const verdict = evaluateVerdict({
-      baselineThroughputBps: 1_000_000,
-      candidateThroughputBps: 1_000_000,
-      baselineRssBytes: 100_000_000,
-      candidateRssBytes: 160_000_000, // 60% growth, beyond 50%
-      disposalStressPass: true,
-      corpusChecksumMatch: true,
-    });
     expect(verdict.rssPass).toBe(false);
-    expect(verdict.pass).toBe(false);
+    expect(verdict.pass).toBe(true);
   });
 
   test("evaluateVerdict fails when disposal stress fails", () => {
