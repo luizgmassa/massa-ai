@@ -4,7 +4,7 @@
   "model": "qwen3-embedding:8b",
   "dimensions": 4096,
   "needleTargets": [
-    { "path": "packages/core/src/data/vector/postgres-vector-store.ts", "sha256": "bbc762d1b5aecab2120b64d62ae7968eae7c2bc908349f630fc2e4a1d41ef399" },
+    { "path": "packages/core/src/data/vector/postgres-vector-store.ts", "sha256": "4f54bbb4a079d91629693ffbf9f440cd70f1ca1aafca7440111fb358bd04e49e" },
     { "path": "packages/core/src/services/etl/stages/discover.ts", "sha256": "c342d7f6589d37fdbc70a9bbd3bc557928fb1bd1b0451f7f46bf5fe2ccb3ed20" },
     { "path": "packages/core/src/services/search/contextual-search-rlm.ts", "sha256": "23e563a00452b40c9ded2544047356be6e63daed32bbefae60a2ff4e7dab7306" },
     { "path": "packages/core/src/services/search/smart-chunker.ts", "sha256": "89ff025d601bfa7acc741d1aeaccfa6767367a90a1530800822743a9b95ba81a" },
@@ -33,8 +33,8 @@
     { "path": "packages/core/src/services/graph/graph-store-pg.ts", "sha256": "4ab6dd9425cd0f4819fa0bbfc0fb75c76f94673eca1c562263d2e0bf9ed1c029" }
   ],
   "supportFiles": [
-    { "path": "README.md", "sha256": "55dac9c45be6db12ad389b38546e959f3907c29f388e60505662087a065b518c" },
-    { "path": "package.json", "sha256": "fd44c995c3c4fb76e4d269d53628e0845b32f7b597ba6c3368bd8be3f601734c" },
+    { "path": "README.md", "sha256": "287bafa95c6c79a124fd7ae3931eb080e9a1525b93003817e072dff9570b6ba2" },
+    { "path": "package.json", "sha256": "4a216c7dd4bc32b5f02b6de7c70ba63182dff236f50b24ea44e1151026ec75f1" },
     { "path": "turbo.json", "sha256": "b8f5065deaabb015f606a82a27a3ecfd8a746d41f61dbe19d3437b914a15b8d9" },
     { "path": "tsconfig.json", "sha256": "e324f7293caff5e0dd855aa64aded767c448c665188a9b615e6c23a614baa03d" },
     { "path": "packages/core/package.json", "sha256": "c13ad6bcd949cc6131ebfc8ff7d0a19ca12c027f640a2b4f98989e8dfeb4ca4f" },

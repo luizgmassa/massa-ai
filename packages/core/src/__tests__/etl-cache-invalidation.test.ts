@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, mock, test } from "bun:test";
+import { describeNative } from "./_helpers/native-skip.js";
 
 const invalidations: string[] = [];
 let releaseInvalidation!: () => void;
@@ -23,7 +24,7 @@ beforeAll(async () => {
   ({ indexJobTracker } = await import("../services/jobs/index-job-tracker.js"));
 });
 
-describe("ETL search-cache consistency", () => {
+describeNative("ETL search-cache consistency", () => {
   test("invalidates project cache before exposing a completed job", async () => {
     const job = indexJobTracker.createJob("cache-project", "/tmp");
     indexJobTracker.updateStatus(job.jobId, "running");

@@ -11,6 +11,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { describeNative } from "./_helpers/native-skip.js";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
@@ -69,7 +70,7 @@ const FIXTURE: Record<string, string> = {
   `,
 };
 
-describe("trace_path", () => {
+describeNative("trace_path", () => {
   const repo = getSymbolRepository();
 
   beforeEach(() => {

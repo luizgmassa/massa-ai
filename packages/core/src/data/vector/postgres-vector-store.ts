@@ -62,6 +62,20 @@ export class PostgresVectorStore extends BaseVectorStore {
     return `vector_documents_${dimensions}d`;
   }
 
+  /**
+   * Clamp a raw pgvector cosine-similarity (`1 - (embedding <=> query)`) into
+   * the [0,1] relevance contract exposed by SearchResult.score. pgvector
+   * returns NULL — which parseFloats to NaN — for rows whose embedding is
+   * missing or zero-norm, and cosine similarity can dip below 0 for
+   * anti-correlated vectors. Both are normalized to 0 so every search result
+   * always carries a finite, in-range score.
+   */
+  private normalizeScore(raw: unknown): number {
+    const value = typeof raw === "number" ? raw : parseFloat(String(raw));
+    if (!Number.isFinite(value)) return 0;
+    return Math.min(1, Math.max(0, value));
+  }
+
   // ── Binary quantization ────────────────────────────────────────────────────
 
   /**
@@ -531,7 +545,7 @@ export class PostgresVectorStore extends BaseVectorStore {
     return rows.map((row: any) => ({
       id: row.id,
       content: row.content,
-      score: parseFloat(row.similarity),
+      score: this.normalizeScore(row.similarity),
       source: SearchSource.VECTOR,
       metadata: row.metadata,
     }));
@@ -588,7 +602,7 @@ export class PostgresVectorStore extends BaseVectorStore {
     return rows.map((row: any) => ({
       id: row.id,
       content: row.content,
-      score: parseFloat(row.similarity),
+      score: this.normalizeScore(row.similarity),
       source: SearchSource.VECTOR,
       metadata: row.metadata,
     }));
