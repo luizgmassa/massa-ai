@@ -130,13 +130,24 @@ function byteNodeAdapter(source: Buffer) {
     const key = native as object;
     const cached = nativeToWrapped.get(key);
     if (cached) return cached;
+    // The native tree is immutable for the lifetime of executeQueryPack (it is
+    // deleted only in the finally after the query returns), so a node's child
+    // collections are stable. Cache the wrapped arrays in the closure instead
+    // of re-allocating the array and re-wrapping every child on every access;
+    // descendants()/signatureMaterial read these repeatedly.
+    let namedChildrenCache: readonly StructuralSyntaxNode[] | undefined;
+    let childrenCache: readonly StructuralSyntaxNode[] | undefined;
     const wrapped: StructuralSyntaxNode = {
       get type() { return native.type; },
       get hasError() { return native.hasError; },
       get startIndex() { return byteOffset(native.startIndex ?? 0); },
       get endIndex() { return byteOffset(native.endIndex); },
-      get namedChildren() { return native.namedChildren?.map(wrap); },
-      get children() { return native.children?.map(wrap); },
+      get namedChildren() {
+        return namedChildrenCache ??= native.namedChildren?.map(wrap);
+      },
+      get children() {
+        return childrenCache ??= native.children?.map(wrap);
+      },
       get parent() { return native.parent ? wrap(native.parent) : native.parent; },
       childForFieldName(name) {
         const child = native.childForFieldName?.(name);
