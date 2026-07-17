@@ -150,11 +150,13 @@ jobs:
 
   publish-docker:
     needs: build
-    # Docker multi-arch builds are heavy; skip them on the per-push
-    # workflow_run (auto `next`) trigger and only build images on explicit
-    # release / tag / manual dispatch. npm package `next` prereleases still
-    # publish on every green main push via publish-packages/publish-apps.
+    # Docker multi-arch builds are heavy and OPTIONAL — npm package publishing
+    # is the Publish contract. Skip on the per-push workflow_run (auto `next`)
+    # trigger; on release/tag/dispatch, attempt the build but tolerate failure
+    # (continue-on-error) so a missing DockerHub credential or image-build
+    # issue never fails the Publish run.
     if: github.event_name != 'workflow_run'
+    continue-on-error: true
     runs-on: ubuntu-latest
     environment: DEPLOY
     permissions:
