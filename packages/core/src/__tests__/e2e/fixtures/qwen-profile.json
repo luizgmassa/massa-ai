@@ -19,7 +19,7 @@
     { "path": "packages/core/src/services/search/query-understanding.ts", "sha256": "552e560d766ff1e48fecbd08ae944bc2213d64f187bfc91b52d371649e653c92" },
     { "path": "packages/core/src/services/search/reranker.ts", "sha256": "d9ee860aa77745210802b818dba01aea9dfee4e606f2aac6bfdff9dbf47fc309" },
     { "path": "packages/core/src/services/search/search-cache-pg.ts", "sha256": "ac75bec67c943d277d1998305d6b2315150f0b838930988d1cd0a7815c2d54bb" },
-    { "path": "packages/core/src/services/etl/pipeline.ts", "sha256": "d4af7dcd1ececefdacc6a24a3b32d9ca4aa6daa73e9ede3b8e810b2e445d8826" },
+    { "path": "packages/core/src/services/etl/pipeline.ts", "sha256": "7894fe975fa6049cb4404732c8c5923d6a1c54af598f1bac6453f1d2e22bb34c" },
     { "path": "packages/core/src/services/etl/stages/parse.ts", "sha256": "b4dcc55a960aa8eb8d952378a220ede393e570f46227bad9e57b965e9a8510fd" },
     { "path": "packages/core/src/services/etl/stages/resolve.ts", "sha256": "3548efb18b160071c36a97e9de8ed28ce764f40142bb4ff1f42dea56aaaee072" },
     { "path": "packages/core/src/services/etl/stages/load.ts", "sha256": "e366c67fa1346b2f9b690c94d5abe1b97215797cf3d901051dcad2f9a394945b" },

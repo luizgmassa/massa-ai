@@ -20,7 +20,8 @@ let pipeline: any;
 let indexJobTracker: any;
 
 beforeAll(async () => {
-  ({ etlPipeline: pipeline } = await import("../services/etl/pipeline.js"));
+  const pipelineModule = await import("../services/etl/pipeline.js");
+  pipeline = pipelineModule.EtlPipeline.getInstance();
   ({ indexJobTracker } = await import("../services/jobs/index-job-tracker.js"));
 });
 

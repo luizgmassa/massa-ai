@@ -457,4 +457,9 @@ export class EtlPipeline {
   }
 }
 
-export const etlPipeline = EtlPipeline.getInstance();
+// NOTE: do NOT eagerly instantiate the singleton at module top level.
+// EtlPipeline's constructor builds ResolveStage, which calls
+// getSymbolRepository -> requirePostgresDatabaseUrl, forcing a DB connection
+// on every importer of this module. That broke DB-free tests (e.g.
+// structural-etl) that only import pure helpers like buildHeaderLanguageEvidence.
+// Callers obtain the instance lazily via EtlPipeline.getInstance().

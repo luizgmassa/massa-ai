@@ -101,7 +101,7 @@ export type {
 } from "./context/session-file-cache.js";
 
 // ETL Pipeline
-export { etlPipeline, EtlPipeline } from "./etl/pipeline.js";
+export { EtlPipeline } from "./etl/pipeline.js";
 export type { PipelineInput, EtlResult, EtlStage } from "./etl/index.js";
 
 // Structural parser readiness (liveness remains transport-owned and separate)
