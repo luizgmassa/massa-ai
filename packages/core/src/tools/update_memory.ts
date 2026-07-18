@@ -8,8 +8,8 @@
 
 import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
-import { encode as toTOON } from "@toon-format/toon";
 import { MemoryController } from "../controllers/memory-controller.js";
+import { serializeToolResponse } from "./serialize.js";
 
 interface UpdateMemoryParams {
   id: string;
@@ -18,6 +18,7 @@ interface UpdateMemoryParams {
   tags?: string[];
   mergeTags?: boolean;
   format?: "json" | "toon";
+  fields?: string[];
 }
 
 export class UpdateMemoryTool implements IToolHandler {
@@ -51,6 +52,12 @@ export class UpdateMemoryTool implements IToolHandler {
         description: "Output format (json or toon)",
         default: "toon",
       },
+      fields: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
+      },
     },
     required: ["id"],
   };
@@ -62,7 +69,7 @@ export class UpdateMemoryTool implements IToolHandler {
   }
 
   async handle(params: unknown): Promise<ToolResponse> {
-    const { id, content, importance, tags, mergeTags, format = "toon" } =
+    const { id, content, importance, tags, mergeTags, format = "toon", fields } =
       params as UpdateMemoryParams;
 
     try {
@@ -74,9 +81,7 @@ export class UpdateMemoryTool implements IToolHandler {
         mergeTags,
       });
 
-      return format === "toon"
-        ? { success: true, data: toTOON(result) }
-        : { success: true, data: result };
+      return serializeToolResponse(result, { format, fields });
     } catch (error) {
       logger.error("Failed to update memory", error as Error, { id });
       return {

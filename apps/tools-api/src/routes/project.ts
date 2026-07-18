@@ -11,14 +11,18 @@ import {
   IndexProjectTool,
   getMemoryRepository,
   getKeywordSearch,
+  getOperationLogRepository,
   getSearchCache,
   getVectorStore,
   workspaceManager,
+  type ActorContext,
+  UNKNOWN_ACTOR,
 } from "@massa-th0th/core";
 import { Elysia, t } from "elysia";
 import fs from "fs/promises";
 import path from "path";
 import { getGlobalDataDir } from "@massa-th0th/shared";
+import { deriveActor } from "../middleware/auth.js";
 
 let indexProjectTool: IndexProjectTool | null = null;
 let indexStatusTool: GetIndexStatusTool | null = null;
@@ -101,7 +105,7 @@ export const projectRoutes = new Elysia({ prefix: "/api/v1/project" })
   )
   .post(
     "/reset",
-    async ({ body }) => {
+    async ({ body, headers }) => {
       const {
         projectId,
         clearVectors = true,
@@ -113,6 +117,17 @@ export const projectRoutes = new Elysia({ prefix: "/api/v1/project" })
         clearSymbols?: boolean;
         clearMemories?: boolean;
       };
+
+      // Derive the audit actor from the request headers (API-key identity
+      // today; future identity sources plug into deriveActor without
+      // rewriting call sites). Elysia flattens headers to a plain
+      // lowercase-keyed object, so deriveActor can index directly. The
+      // reset outcome is recorded in operation_log AFTER the destructive
+      // work finishes — recordOperation is fail-safe so a broken audit
+      // table NEVER blocks the reset itself.
+      const actor: ActorContext = deriveActor(
+        headers as Record<string, string>,
+      ) ?? UNKNOWN_ACTOR;
 
       const result: Record<string, number | string> = {};
       const errors: string[] = [];
@@ -156,6 +171,33 @@ export const projectRoutes = new Elysia({ prefix: "/api/v1/project" })
           errors.push(`memories: ${(e as Error).message}`);
         }
       }
+
+      const outcome = errors.length > 0
+        ? (errors.length >= 3 ? ("failure" as const) : ("partial" as const))
+        : ("success" as const);
+
+      // M8 audit trail. Best-effort: recordOperation swallows errors so a
+      // broken operation_log NEVER blocks the reset. Scope captures what
+      // was requested + what was deleted (counts are cheap and already in
+      // hand). The await preserves ordering (audit row lands after the
+      // destructive op) without introducing failure surface.
+      await getOperationLogRepository().recordOperation({
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        projectId,
+        op: "project_reset",
+        scope: {
+          projectId,
+          requestedScopes: {
+            vectors: clearVectors,
+            symbols: clearSymbols,
+            memories: clearMemories,
+          },
+        },
+        result: outcome,
+        meta: { ...result },
+        error: errors.length > 0 ? errors.join("; ") : null,
+      });
 
       if (errors.length > 0) {
         return {

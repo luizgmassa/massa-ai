@@ -45,6 +45,15 @@ export interface TracePathOptions {
   include_tests?: boolean;
   /** Explicit edge-type override; wins over `mode`. */
   edge_types?: EdgeType[];
+  /**
+   * Wall-clock budget (ms) for the traversal. If the BFS exceeds this it aborts
+   * with `truncated=true` and whatever nodes/edges it has collected so far.
+   * Additive to MAX_DEPTH / MAX_NODES. Default 5s (generous vs typical sub-
+   * second walks). Injectable clock is for deterministic tests.
+   */
+  deadlineMs?: number;
+  /** Injectable clock (defaults to Date.now) for deterministic deadline tests. */
+  now?: () => number;
 }
 
 export interface TraceNode {
@@ -97,6 +106,13 @@ const MAX_DEPTH = 6;
 /** Safety ceiling on total visited nodes so a pathological fan-out graph
  * cannot exhaust memory/time. */
 const MAX_NODES = 2000;
+/**
+ * Default wall-clock budget for a single tracePath() call. Additive to
+ * MAX_DEPTH / MAX_NODES: a runaway traversal aborts with partial results
+ * instead of hanging the agent. 5s is generous vs typical sub-second walks,
+ * so unset behaviour is unchanged for normal queries.
+ */
+const DEFAULT_TRAVERSAL_DEADLINE_MS = 5_000;
 
 /** mode → edge types to follow. */
 const MODE_EDGE_TYPES: Record<TraceMode, EdgeType[]> = {
@@ -181,6 +197,11 @@ export class TracePathService {
     const includeTests = opts.include_tests ?? false;
     const requestedDepth = opts.depth ?? DEFAULT_DEPTH;
     const depth = Math.max(0, Math.min(MAX_DEPTH, requestedDepth));
+    // Wall-clock deadline: an additive guard so a runaway traversal aborts with
+    // partial results instead of hanging. The default is generous; normal
+    // queries never reach it. The clock is injectable for deterministic tests.
+    const now = opts.now ?? Date.now;
+    const deadlineAt = now() + (opts.deadlineMs ?? DEFAULT_TRAVERSAL_DEADLINE_MS);
 
     // Resolve edge types: explicit override > mode.
     const edgeTypes: EdgeType[] =
@@ -249,10 +270,10 @@ export class TracePathService {
     }
 
     if (doOutbound) {
-      await this.bfs(projectId, seeds, edgeTypes, "outbound", depth, includeTests, addNode, addEdge, () => (truncated = true));
+      await this.bfs(projectId, seeds, edgeTypes, "outbound", depth, includeTests, addNode, addEdge, () => (truncated = true), deadlineAt, now);
     }
     if (doInbound) {
-      await this.bfs(projectId, seeds, edgeTypes, "inbound", depth, includeTests, addNode, addEdge, () => (truncated = true));
+      await this.bfs(projectId, seeds, edgeTypes, "inbound", depth, includeTests, addNode, addEdge, () => (truncated = true), deadlineAt, now);
     }
 
     // Drop test-file nodes when the caller excluded tests (seeds are always kept).
@@ -312,6 +333,8 @@ export class TracePathService {
     addNode: (n: TraceNode) => boolean,
     addEdge: (e: TraceEdge) => void,
     markTruncated: () => void,
+    deadlineAt: number,
+    now: () => number,
   ): Promise<void> {
     const visited = new Set<string>();
     // queue entries: the FQN to expand + its depth.
@@ -329,6 +352,13 @@ export class TracePathService {
       const { fqn, depth } = queue.shift()!;
       if (depth >= maxDepth) {
         continue; // already marked visited at enqueue; no re-queue possible
+      }
+      // Wall-clock deadline: abort mid-traversal with partial results so a
+      // runaway walk never hangs the agent. O(1) per iteration. The already-
+      // collected nodes/edges are preserved by the caller.
+      if (now() >= deadlineAt) {
+        markTruncated();
+        return;
       }
 
       let edges: EdgeResult[] = [];

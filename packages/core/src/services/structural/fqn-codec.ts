@@ -4,6 +4,7 @@ import {
   STRUCTURAL_SYMBOL_KINDS,
   type StructuralSymbolKind,
 } from "./types.js";
+import { assertSchemaSupported } from "./schema-version.js";
 import type { StructuralFqnCandidate } from "@massa-th0th/shared";
 
 const KIND_PATTERN = STRUCTURAL_SYMBOL_KINDS.join("|");
@@ -133,6 +134,43 @@ export function canonicalizeStructuralSignature(input: StructuralSignatureInput)
     typeTokens,
     modifiers,
   });
+}
+
+/**
+ * Extract the embedded schema version from a canonical signature produced by
+ * `canonicalizeStructuralSignature`. Returns `""` for any payload that does not
+ * carry a parseable version field (legacy pre-version rows, malformed input, or
+ * the synthetic `"persisted:<id>"` placeholder used by the ETL resolve stage).
+ *
+ * Read-side corruption-surface guard: callers that re-hash or compare persisted
+ * canonical signatures must route the extracted version through
+ * `assertCanonicalSignatureSupported` so a row written by NEWER code fails loud
+ * instead of silently identity-drifting.
+ */
+export function decodeCanonicalSignatureVersion(canonicalSignature: string): string {
+  if (!canonicalSignature || typeof canonicalSignature !== "string") return "";
+  // The synthetic ETL placeholder ("persisted:<id>") and any non-JSON legacy
+  // payload have no embedded version — treat them as unknown / legacy.
+  if (!canonicalSignature.startsWith("{")) return "";
+  try {
+    const parsed = JSON.parse(canonicalSignature) as { version?: unknown };
+    return typeof parsed.version === "string" ? parsed.version : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Decode-and-assert for persisted canonical signatures. Throws
+ * `SchemaAheadError` ONLY when the embedded version is strictly newer than the
+ * running code's `STRUCTURAL_FQN_SCHEMA_VERSION`. Legacy / malformed / missing
+ * versions pass through unchanged (forward-compat with old rows).
+ */
+export function assertCanonicalSignatureSupported(canonicalSignature: string): void {
+  const embedded = decodeCanonicalSignatureVersion(canonicalSignature);
+  // Empty embedded version = legacy / unknown — never throw.
+  if (!embedded) return;
+  assertSchemaSupported("fqn", embedded, STRUCTURAL_FQN_SCHEMA_VERSION);
 }
 
 export const sha256SignatureDigest: SignatureDigest = (canonicalSignature) =>

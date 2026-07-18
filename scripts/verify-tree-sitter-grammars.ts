@@ -6,171 +6,31 @@ import { createRequire, type Require } from "node:module";
 import { dirname, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { flattenDiagnosticMessageText, parseConfigFileTextToJson } from "typescript";
+// Canonical native grammar identity pins live in the shared structural module
+// so the offline verifier and the runtime load-time integrity check share a
+// single source of truth. Re-exported here to preserve the historical public
+// surface of this script (and its test).
+export {
+  NATIVE_DEPENDENCIES,
+  NATIVE_LOCK_IDENTITIES,
+  TRUSTED_NATIVE_PACKAGES,
+  TREE_SITTER_PATCH,
+} from "../packages/core/src/services/structural/native-lock-identities.ts";
+import {
+  NATIVE_DEPENDENCIES,
+  NATIVE_LOCK_IDENTITIES,
+  TRUSTED_NATIVE_PACKAGES,
+  TREE_SITTER_PATCH,
+} from "../packages/core/src/services/structural/native-lock-identities.ts";
 
 export const EXPECTED_BUN_VERSION = "1.3.11";
 export const EXPECTED_NODE_BUILD_VERSION = "25.9.0";
 export const EXPECTED_NATIVE_MODULE_ABI = 137;
 export const EXPECTED_NATIVE_MODULE_COUNT = 27;
-export const TREE_SITTER_PATCH = Object.freeze({
-  package: "tree-sitter@0.25.0",
-  path: "patches/tree-sitter@0.25.0.patch",
-  sha256: "e79aec7b96eb8114e85ebcb90f0a8b12076bcd8aa08c09bb88929621e1c1446d",
-});
 const RSS_DISCRIMINATION_BYTES = 16 * 1024 * 1024;
 const RSS_SENSOR_CYCLES = 100;
 const VERIFIER_DATABASE_URL =
   "postgresql://tree_sitter_verifier:tree_sitter_verifier@127.0.0.1:1/tree_sitter_verifier";
-
-export const NATIVE_DEPENDENCIES = {
-  "@tree-sitter-grammars/tree-sitter-kotlin": "1.1.0",
-  "@tree-sitter-grammars/tree-sitter-lua": "0.4.1",
-  "@tree-sitter-grammars/tree-sitter-markdown": "0.3.2",
-  "@tree-sitter-grammars/tree-sitter-yaml": "0.7.1",
-  "@tree-sitter-grammars/tree-sitter-zig": "1.1.2",
-  "tree-sitter": "0.25.0",
-  "tree-sitter-c": "0.24.1",
-  "tree-sitter-c-sharp": "0.23.5",
-  "tree-sitter-clojure-orchard": "0.2.5",
-  "tree-sitter-cpp": "0.23.4",
-  "tree-sitter-dart":
-    "github:UserNobody14/tree-sitter-dart#be07cf7118d3dba06236a3f19541685a68209934",
-  "tree-sitter-elixir": "0.3.5",
-  "tree-sitter-erlang":
-    "github:WhatsApp/tree-sitter-erlang#836aa2b6c3af2c7cef3f84049b0ed6d44485a870",
-  "tree-sitter-go": "0.25.0",
-  "tree-sitter-haskell": "0.23.1",
-  "tree-sitter-html": "0.23.2",
-  "tree-sitter-java": "0.23.5",
-  "tree-sitter-javascript": "0.25.0",
-  "tree-sitter-json": "0.24.8",
-  "tree-sitter-ocaml": "0.24.2",
-  "tree-sitter-php": "0.24.2",
-  "tree-sitter-python": "0.25.0",
-  "tree-sitter-ruby": "0.23.1",
-  "tree-sitter-rust": "0.24.0",
-  "tree-sitter-scala": "0.24.0",
-  "tree-sitter-swift": "0.7.1",
-  "tree-sitter-typescript": "0.23.2",
-} as const;
-
-type NativeLockIdentity =
-  | { resolved: string; sri: `sha512-${string}` }
-  | { resolved: string; gitIdentity: string };
-
-export const NATIVE_LOCK_IDENTITIES: Record<keyof typeof NATIVE_DEPENDENCIES, NativeLockIdentity> = {
-  "@tree-sitter-grammars/tree-sitter-kotlin": {
-    resolved: "@tree-sitter-grammars/tree-sitter-kotlin@1.1.0",
-    sri: "sha512-vlVXaxEE8t2kpJgfZpa8XVvxcnKw9AYtRTgy7KWjsDmAsadk06RxAT80IXOgGQnmM9i/orQn1nD84gPNUHu6DQ==",
-  },
-  "@tree-sitter-grammars/tree-sitter-lua": {
-    resolved: "@tree-sitter-grammars/tree-sitter-lua@0.4.1",
-    sri: "sha512-EwagFaU6ZveVk18/Y8qUhZkkiBKnQ7dSCHbm//TUroLVKy3i1rOYGy/cNHtSkAb1eDvS1HhCLybH2S541Cya/g==",
-  },
-  "@tree-sitter-grammars/tree-sitter-markdown": {
-    resolved: "@tree-sitter-grammars/tree-sitter-markdown@0.3.2",
-    sri: "sha512-hQXCcDVvg2t4E8cn7zz6jjIBerzk9E9ZlHxJp5IrUOpY4s1YVpXJbMeWZks2/V7lmkPRnnkM8IrTbQ5ltwEOnA==",
-  },
-  "@tree-sitter-grammars/tree-sitter-yaml": {
-    resolved: "@tree-sitter-grammars/tree-sitter-yaml@0.7.1",
-    sri: "sha512-AynBwkIoQCTgjDR33bDUp9Mqq+YTco0is3n5hRApMqG9of/6A4eQsfC1/uSEeHSUyMQSYawcAWamsexnVpIP4Q==",
-  },
-  "@tree-sitter-grammars/tree-sitter-zig": {
-    resolved: "@tree-sitter-grammars/tree-sitter-zig@1.1.2",
-    sri: "sha512-J0L31HZ2isy3F5zb2g5QWQOv2r/pbruQNL9ADhuQv2pn5BQOzxt80WcEJaYXBeuJ8GHxVT42slpCna8k1c8LOw==",
-  },
-  "tree-sitter": {
-    resolved: "tree-sitter@0.25.0",
-    sri: "sha512-PGZZzFW63eElZJDe/b/R/LbsjDDYJa5UEjLZJB59RQsMX+fo0j54fqBPn1MGKav/QNa0JR0zBiVaikYDWCj5KQ==",
-  },
-  "tree-sitter-c": {
-    resolved: "tree-sitter-c@0.24.1",
-    sri: "sha512-lkYwWN3SRecpvaeqmFKkuPNR3ZbtnvHU+4XAEEkJdrp3JfSp2pBrhXOtvfsENUneye76g889Y0ddF2DM0gEDpA==",
-  },
-  "tree-sitter-c-sharp": {
-    resolved: "tree-sitter-c-sharp@0.23.5",
-    sri: "sha512-xJGOeXPMmld0nES5+080N/06yY6LQi+KWGWV4LfZaZe6srJPtUtfhIbRSN7EZN6IaauzW28v6W4QHFwmeUW6HQ==",
-  },
-  "tree-sitter-clojure-orchard": {
-    resolved: "tree-sitter-clojure-orchard@0.2.5",
-    sri: "sha512-X+JaSnqY9hNYDA/hsQ40My47qoG+J26y11VAZ4YUzH3u8ggs+b9sFRQuxE6pNnlgwqWtJUycxnB0cOomtOIvAw==",
-  },
-  "tree-sitter-cpp": {
-    resolved: "tree-sitter-cpp@0.23.4",
-    sri: "sha512-qR5qUDyhZ5jJ6V8/umiBxokRbe89bCGmcq/dk94wI4kN86qfdV8k0GHIUEKaqWgcu42wKal5E97LKpLeVW8sKw==",
-  },
-  "tree-sitter-dart": {
-    resolved: "tree-sitter-dart@github:UserNobody14/tree-sitter-dart#be07cf7",
-    gitIdentity: "UserNobody14-tree-sitter-dart-be07cf7",
-  },
-  "tree-sitter-elixir": {
-    resolved: "tree-sitter-elixir@0.3.5",
-    sri: "sha512-xozQMvYK0aSolcQZAx2d84Xe/YMWFuRPYFlLVxO01bM2GITh5jyiIp0TqPCQa8754UzRAI7A83hZmfiYub5TZQ==",
-  },
-  "tree-sitter-erlang": {
-    resolved: "tree-sitter-erlang@github:WhatsApp/tree-sitter-erlang#836aa2b",
-    gitIdentity: "WhatsApp-tree-sitter-erlang-836aa2b",
-  },
-  "tree-sitter-go": {
-    resolved: "tree-sitter-go@0.25.0",
-    sri: "sha512-APBc/Dq3xz/e35Xpkhb1blu5UgW+2E3RyGWawZSCNcbGwa7jhSQPS8KsUupuzBla8PCo8+lz9W/JDJjmfRa2tw==",
-  },
-  "tree-sitter-haskell": {
-    resolved: "tree-sitter-haskell@0.23.1",
-    sri: "sha512-qG4CYhejveu9DLMLEGBz/n9/TTeGSFLC6wniwOgG6m8/v7Dng8qR0ob0EVG7+XH+9WiOxohpGA23EhceWuxY4w==",
-  },
-  "tree-sitter-html": {
-    resolved: "tree-sitter-html@0.23.2",
-    sri: "sha512-TN+l+7cCeLx9db/1RhRSqMAZO/266Oh2BHb8J8hMSSFLuzYvFTYP/UnD3S0mny5awzw05KzFNgu2vnwzN9wVJg==",
-  },
-  "tree-sitter-java": {
-    resolved: "tree-sitter-java@0.23.5",
-    sri: "sha512-Yju7oQ0Xx7GcUT01mUglPP+bYfvqjNCGdxqigTnew9nLGoII42PNVP3bHrYeMxswiCRM0yubWmN5qk+zsg0zMA==",
-  },
-  "tree-sitter-javascript": {
-    resolved: "tree-sitter-javascript@0.25.0",
-    sri: "sha512-1fCbmzAskZkxcZzN41sFZ2br2iqTYP3tKls1b/HKGNPQUVOpsUxpmGxdN/wMqAk3jYZnYBR1dd/y/0avMeU7dw==",
-  },
-  "tree-sitter-json": {
-    resolved: "tree-sitter-json@0.24.8",
-    sri: "sha512-Tc9ZZYwHyWZ3Tt1VEw7Pa2scu1YO7/d2BCBbKTx5hXwig3UfdQjsOPkPyLpDJOn/m1UBEWYAtSdGAwCSyagBqQ==",
-  },
-  "tree-sitter-ocaml": {
-    resolved: "tree-sitter-ocaml@0.24.2",
-    sri: "sha512-H0RAeCepIyXyTPCQra6yMd7Bn5ZBYkIaddzdLNwVZpM9mCe2e8av+3O6Ojl7Z8YHrV/kYsfHvI2y+Hh7qzcYQQ==",
-  },
-  "tree-sitter-php": {
-    resolved: "tree-sitter-php@0.24.2",
-    sri: "sha512-zwgAePc/HozNaWOOfwRAA+3p8yhuehRw8Fb7vn5qd2XjiIc93uJPryDTMYTSjBRjVIUg/KY6pM3rRzs8dSwKfw==",
-  },
-  "tree-sitter-python": {
-    resolved: "tree-sitter-python@0.25.0",
-    sri: "sha512-eCmJx6zQa35GxaCtQD+wXHOhYqBxEL+bp71W/s3fcDMu06MrtzkVXR437dRrCrbrDbyLuUDJpAgycs7ncngLXw==",
-  },
-  "tree-sitter-ruby": {
-    resolved: "tree-sitter-ruby@0.23.1",
-    sri: "sha512-d9/RXgWjR6HanN7wTYhS5bpBQLz1VkH048Vm3CodPGyJVnamXMGb8oEhDypVCBq4QnHui9sTXuJBBP3WtCw5RA==",
-  },
-  "tree-sitter-rust": {
-    resolved: "tree-sitter-rust@0.24.0",
-    sri: "sha512-NWemUDf629Tfc90Y0Z55zuwPCAHkLxWnMf2RznYu4iBkkrQl2o/CHGB7Cr52TyN5F1DAx8FmUnDtCy9iUkXZEQ==",
-  },
-  "tree-sitter-scala": {
-    resolved: "tree-sitter-scala@0.24.0",
-    sri: "sha512-vkMuAUrBZ1zZz2XcGDQk18Kz73JkpgaeXzbNVobPke0G35sd9jH32aUxG6OLRKM7et0TbsfqkWf4DeJoGk4K1g==",
-  },
-  "tree-sitter-swift": {
-    resolved: "tree-sitter-swift@0.7.1",
-    sri: "sha512-pneKVTuGamaBsqqqfB9BvNQjktzh/0IVPR54jLB5Fq/JTDQwYHd0Wo6pVyZ5jAYpbztzq+rJ/rpL9ruxTmSoKw==",
-  },
-  "tree-sitter-typescript": {
-    resolved: "tree-sitter-typescript@0.23.2",
-    sri: "sha512-e04JUUKxTT53/x3Uq1zIL45DoYKVfHH4CZqwgZhPg5qYROl5nQjV+85ruFzFGZxu+QeFVbRTPDRnqL9UbU4VeA==",
-  },
-};
-
-export const TRUSTED_NATIVE_PACKAGES = Object.freeze(
-  Object.keys(NATIVE_DEPENDENCIES).sort(),
-);
 
 export interface MinimalParseCase {
   extension: string;

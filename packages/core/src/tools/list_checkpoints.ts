@@ -9,8 +9,8 @@
 
 import { IToolHandler, ToolResponse, CheckpointType } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
-import { encode as toTOON } from "@toon-format/toon";
 import { CheckpointManager } from "../services/checkpoint/checkpoint-manager.js";
+import { serializeToolResponse } from "./serialize.js";
 
 interface ListCheckpointsParams {
   taskId?: string;
@@ -19,6 +19,7 @@ interface ListCheckpointsParams {
   includeExpired?: boolean;
   limit?: number;
   format?: "json" | "toon";
+  fields?: string[];
 }
 
 export class ListCheckpointsTool implements IToolHandler {
@@ -59,6 +60,12 @@ export class ListCheckpointsTool implements IToolHandler {
         description: "Output format",
         default: "toon",
       },
+      fields: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
+      },
     },
     required: [],
   };
@@ -77,6 +84,7 @@ export class ListCheckpointsTool implements IToolHandler {
       includeExpired = false,
       limit = 10,
       format = "toon",
+      fields,
     } = params as ListCheckpointsParams;
 
     try {
@@ -120,9 +128,7 @@ export class ListCheckpointsTool implements IToolHandler {
         },
       };
 
-      return format === "toon"
-        ? { success: true, data: toTOON(responseData) }
-        : { success: true, data: responseData };
+      return serializeToolResponse(responseData, { format, fields });
     } catch (error) {
       logger.error("Failed to list checkpoints", error as Error);
       return {

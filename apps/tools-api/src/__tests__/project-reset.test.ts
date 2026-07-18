@@ -7,6 +7,8 @@ const calls = {
   cache: [] as string[],
   symbol: [] as string[],
   memory: [] as string[],
+  // M8 audit-log captures
+  audit: [] as Record<string, unknown>[],
 };
 
 mock.module("@massa-th0th/core", () => ({
@@ -39,6 +41,12 @@ mock.module("@massa-th0th/core", () => ({
       return 2;
     },
   }),
+  getOperationLogRepository: () => ({
+    recordOperation: async (input: Record<string, unknown>) => {
+      calls.audit.push(input);
+    },
+  }),
+  UNKNOWN_ACTOR: { actorType: "api_key", actorId: "unknown" },
 }));
 
 const { projectRoutes } = await import("../routes/project.js");
@@ -48,11 +56,11 @@ beforeEach(() => {
   for (const values of Object.values(calls)) values.length = 0;
 });
 
-async function reset(body: Record<string, unknown>) {
+async function reset(body: Record<string, unknown>, headers: Record<string, string> = {}) {
   const response = await app.handle(
     new Request("http://localhost/api/v1/project/reset", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...headers },
       body: JSON.stringify(body),
     }),
   );
@@ -94,5 +102,51 @@ describe("project reset lexical lifecycle", () => {
     expect(calls.cache).toEqual([]);
     expect(calls.symbol).toEqual(["partial-project"]);
     expect(calls.memory).toEqual(["partial-project"]);
+  });
+});
+
+// M8 — audit-log attribution for the destructive reset entry point.
+describe("project reset audit-log attribution", () => {
+  test("records a project_reset row with the full requested scope", async () => {
+    const response = await reset({
+      projectId: "audit-full",
+      clearVectors: true,
+      clearSymbols: true,
+      clearMemories: true,
+    });
+
+    expect(response.status).toBe(200);
+    expect(calls.audit).toHaveLength(1);
+    const [entry] = calls.audit;
+    expect(entry).toMatchObject({
+      op: "project_reset",
+      projectId: "audit-full",
+      result: "success",
+      actorType: "api_key",
+      actorId: "unknown",
+    });
+    expect(entry?.scope).toMatchObject({
+      projectId: "audit-full",
+      requestedScopes: { vectors: true, symbols: true, memories: true },
+    });
+    expect(entry?.meta).toMatchObject({
+      vectorsDeleted: 3,
+      keywordsDeleted: 4,
+      memoriesDeleted: 2,
+      symbolsCleared: 1,
+    });
+    expect(entry?.error).toBeNull();
+  });
+
+  test("captures the x-actor-id header as actorId", async () => {
+    await reset(
+      { projectId: "audit-actor", clearVectors: false, clearSymbols: false, clearMemories: false },
+      { "x-actor-id": "ops-bot-7" },
+    );
+    expect(calls.audit).toHaveLength(1);
+    expect(calls.audit[0]).toMatchObject({
+      actorType: "api_key",
+      actorId: "ops-bot-7",
+    });
   });
 });

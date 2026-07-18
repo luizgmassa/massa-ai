@@ -11,8 +11,8 @@
 
 import { IToolHandler, ToolResponse, estimateTokens } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
-import { encode as toTOON } from "@toon-format/toon";
 import { CodeCompressor } from "../services/compression/code-compressor.js";
+import { serializeToolResponse } from "./serialize.js";
 import { eventBus } from "../services/events/event-bus.js";
 import { SymbolGraphService } from "../services/symbol/symbol-graph.service.js";
 import { workspaceManager } from "../services/workspace/workspace-manager.js";
@@ -31,6 +31,7 @@ interface ReadFileParams {
   format?: "json" | "toon";
   includeSymbols?: boolean;
   includeImports?: boolean;
+  fields?: string[];
 }
 
 interface ReadRange {
@@ -103,6 +104,12 @@ export class ReadFileTool implements IToolHandler {
         description: "Output format",
         default: "json",
       },
+      fields: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
+      },
       includeSymbols: {
         type: "boolean",
         description: "Include symbol metadata from graph (default: true)",
@@ -153,6 +160,7 @@ export class ReadFileTool implements IToolHandler {
     const shouldCompress = p.compress !== false;
     const targetRatio = p.targetRatio || 0.3;
     const format = p.format || "json";
+    const { fields } = p;
     const includeSymbols = p.includeSymbols !== false;
     const includeImports = p.includeImports !== false;
 
@@ -276,9 +284,7 @@ export class ReadFileTool implements IToolHandler {
         );
       }
 
-      return format === "toon"
-        ? { success: true, data: toTOON(result) }
-        : { success: true, data: result };
+      return serializeToolResponse(result, { format, fields });
     } catch (error) {
       logger.error("Failed to read file", error as Error, {
         filePath: p.filePath,

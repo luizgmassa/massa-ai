@@ -8,6 +8,7 @@
 import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
 import { ContextController } from "../controllers/context-controller.js";
+import { serializeToolResponse } from "./serialize.js";
 
 interface GetOptimizedContextParams {
   query: string;
@@ -20,6 +21,8 @@ interface GetOptimizedContextParams {
   sessionId?: string;
   includeMemories?: boolean;
   memoryBudgetRatio?: number;
+  format?: "json" | "toon";
+  fields?: string[];
 }
 
 export class GetOptimizedContextTool implements IToolHandler {
@@ -77,6 +80,18 @@ export class GetOptimizedContextTool implements IToolHandler {
           "Fraction of maxTokens allocated for memories (0-1, default: 0.2 = 20%)",
         default: 0.2,
       },
+      format: {
+        type: "string",
+        enum: ["json", "toon"],
+        description: "Output format (json or toon). Default: json.",
+        default: "json",
+      },
+      fields: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
+      },
     },
     required: ["query", "projectId"],
   };
@@ -89,26 +104,26 @@ export class GetOptimizedContextTool implements IToolHandler {
 
   async handle(params: unknown): Promise<ToolResponse> {
     const p = params as GetOptimizedContextParams;
+    const { format = "json", fields } = p;
 
     try {
       const result = await this.controller.getOptimizedContext(p);
 
-      return {
-        success: true,
-        data: {
-          context: result.context,
-          sources: result.sources,
-          resultsCount: result.resultsCount,
-          memoriesCount: result.memoriesCount,
-          sessionCacheHits: result.sessionCacheHits,
-        },
-        metadata: {
-          tokensSaved: result.tokensSaved,
-          compressionRatio: result.compressionRatio,
-          tokensSavedBySessionCache: result.tokensSavedBySessionCache,
-          cacheHit: result.sessionCacheHits > 0,
-        } as any,
+      const data = {
+        context: result.context,
+        sources: result.sources,
+        resultsCount: result.resultsCount,
+        memoriesCount: result.memoriesCount,
+        sessionCacheHits: result.sessionCacheHits,
       };
+      const metadata = {
+        tokensSaved: result.tokensSaved,
+        compressionRatio: result.compressionRatio,
+        tokensSavedBySessionCache: result.tokensSavedBySessionCache,
+        cacheHit: result.sessionCacheHits > 0,
+      } as any;
+
+      return { ...serializeToolResponse(data, { format, fields }), metadata };
     } catch (error) {
       logger.error("Failed to get optimized context", error as Error, {
         query: p.query,

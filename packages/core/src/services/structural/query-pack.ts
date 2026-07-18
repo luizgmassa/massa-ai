@@ -309,6 +309,12 @@ function structuralSignature(source: Buffer, draft: SymbolDraft): string {
   if (owner !== draft.node) {
     valuePrefix = text(source, draft.node).slice(0, owner.startIndex - draft.node.startIndex);
   }
+  // Short-circuit empty bodies before the fingerprint work: when the sliceable
+  // region is empty there is nothing to sign, and the trailing trim/regex chain
+  // would return "" anyway. Skip the wasted computation (cbm b9797ec — don't
+  // compute a signature over nothing). Output is byte-identical to the fall-
+  // through for empty regions; the dedup key is untouched.
+  if (endByte <= owner.startIndex && valuePrefix === "") return "";
   const raw = `${valuePrefix}${source.subarray(owner.startIndex, endByte).toString("utf8")}`.trim();
   return raw.replace(/(?:=>|=|\{)\s*$/u, "").replace(/;\s*$/u, "").trim();
 }

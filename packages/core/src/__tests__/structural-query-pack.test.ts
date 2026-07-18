@@ -345,6 +345,25 @@ describeNative("declarative structural query packs", () => {
     expect(outcome.structure.symbols.find((symbol) => symbol.name === "Decorated")?.signatureMaterial.modifiers).toEqual([]);
   });
 
+  test("short-circuits empty-body signatures without altering non-empty ones (M13)", async () => {
+    // The empty-body guard returns "" when the sliceable region is empty,
+    // skipping wasted fingerprint work before the dedup gate. Non-empty bodies
+    // must still produce their full signature unchanged.
+    const outcome = await parseTypeScriptWithCapabilities(
+      'function real(value: string): { ok: boolean } { return { ok: true }; }\n',
+      {
+        declarations: "required", documentation: "required", imports: "required",
+        type_relations: "required", calls: "required", data_flow: "required",
+        specialized_edges: "required",
+      },
+    );
+    expect(outcome.status).toBe("ok");
+    if (outcome.status !== "ok") return;
+    // Non-empty body: signature is preserved verbatim (regression guard).
+    expect(outcome.structure.symbols.find((symbol) => symbol.name === "real")?.signature)
+      .toBe("function real(value: string): { ok: boolean }");
+  });
+
   test("extracts exact scripting-cohort capabilities without inventing Lua type edges", async () => {
     const cases = [
       [".py", { packageName: "tree-sitter-python", version: "0.25.0" },

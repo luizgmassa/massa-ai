@@ -8,12 +8,13 @@
 
 import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
-import { encode as toTOON } from "@toon-format/toon";
 import { MemoryController } from "../controllers/memory-controller.js";
+import { serializeToolResponse } from "./serialize.js";
 
 interface DeleteMemoryParams {
   id: string;
   format?: "json" | "toon";
+  fields?: string[];
 }
 
 export class DeleteMemoryTool implements IToolHandler {
@@ -30,6 +31,12 @@ export class DeleteMemoryTool implements IToolHandler {
         description: "Output format (json or toon)",
         default: "toon",
       },
+      fields: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
+      },
     },
     required: ["id"],
   };
@@ -41,14 +48,12 @@ export class DeleteMemoryTool implements IToolHandler {
   }
 
   async handle(params: unknown): Promise<ToolResponse> {
-    const { id, format = "toon" } = params as DeleteMemoryParams;
+    const { id, format = "toon", fields } = params as DeleteMemoryParams;
 
     try {
       const result = await this.controller.delete(id);
 
-      return format === "toon"
-        ? { success: true, data: toTOON(result) }
-        : { success: true, data: result };
+      return serializeToolResponse(result, { format, fields });
     } catch (error) {
       logger.error("Failed to delete memory", error as Error, { id });
       return {

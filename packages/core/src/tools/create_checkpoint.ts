@@ -7,8 +7,8 @@
 
 import { IToolHandler, ToolResponse, TaskState, TaskStatus, CheckpointType } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
-import { encode as toTOON } from "@toon-format/toon";
 import { CheckpointManager } from "../services/checkpoint/checkpoint-manager.js";
+import { serializeToolResponse } from "./serialize.js";
 
 interface CreateCheckpointParams {
   taskId: string;
@@ -41,6 +41,7 @@ interface CreateCheckpointParams {
   /** Pending validations */
   pendingValidations?: string[];
   format?: "json" | "toon";
+  fields?: string[];
 }
 
 export class CreateCheckpointTool implements IToolHandler {
@@ -135,6 +136,12 @@ export class CreateCheckpointTool implements IToolHandler {
         description: "Output format",
         default: "toon",
       },
+      fields: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
+      },
     },
     required: ["taskId", "description"],
   };
@@ -164,6 +171,7 @@ export class CreateCheckpointTool implements IToolHandler {
       nextAction,
       pendingValidations = [],
       format = "toon",
+      fields,
     } = params as CreateCheckpointParams;
 
     try {
@@ -219,9 +227,7 @@ export class CreateCheckpointTool implements IToolHandler {
         expiresAt: checkpoint.expiresAt,
       };
 
-      return format === "toon"
-        ? { success: true, data: toTOON(responseData) }
-        : { success: true, data: responseData };
+      return serializeToolResponse(responseData, { format, fields });
     } catch (error) {
       logger.error("Failed to create checkpoint", error as Error, { taskId });
       return {

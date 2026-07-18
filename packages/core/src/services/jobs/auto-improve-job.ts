@@ -41,7 +41,7 @@ import {
   type ObservationStore,
 } from "../../data/memory/observation-repository.js";
 import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
-import type { InsertMemoryInput, UpdateMemoryPatch } from "../../data/memory/memory-repository.js";
+import type { InsertMemoryInput, MemoryRow, UpdateMemoryPatch } from "../../data/memory/memory-repository.js";
 import { eventBus } from "../events/event-bus.js";
 import { llm as defaultLlmSurface } from "../memory/llm-client.js";
 import type { LlmSurface } from "../memory/consolidator.js";
@@ -82,10 +82,18 @@ export interface ApproveRejectResult {
 /**
  * Injectable memory-apply seam. The default implementation resolves
  * getMemoryRepository() lazily inside each method (test-isolation).
+ *
+ * `getById` is the read seam used by applyProposal to enforce the pinned-memory
+ * invariant (M40): the auto-improve apply path must NEVER rewrite a pinned
+ * memory and must FAIL CLOSED on unreadable/missing targets. Mirrors the
+ * exemption already honored by memory-consolidation-job.
  */
 export interface MemoryApplySeam {
   insert(input: InsertMemoryInput): void | Promise<void>;
   update(id: string, patch: UpdateMemoryPatch): boolean;
+  getById(
+    id: string,
+  ): MemoryRow | null | Promise<MemoryRow | null>;
 }
 
 export interface AutoImproveJobOptions {
@@ -150,6 +158,102 @@ export const ProposalEnrichmentSchema = z.object({
   items: z.array(ProposalEnrichmentItemSchema),
 });
 export type ProposalEnrichment = z.infer<typeof ProposalEnrichmentSchema>;
+
+// ── Apply-rejection + payload validation (M40 fail-closed) ──────────────────
+
+/**
+ * Apply-phase rejection with a structured reason. approve() surfaces
+ * `reason` verbatim so callers distinguish the pinned-memory invariant
+ * (`pinned`), an unreadable/missing target (`unreadable_target`), and a
+ * malformed proposal payload (`malformed-payload`) from generic apply-failed.
+ */
+export type ApplyRejectionReason =
+  | "pinned"
+  | "unreadable_target"
+  | "malformed-payload";
+
+export class ApplyRejection extends Error {
+  readonly reason: ApplyRejectionReason;
+  constructor(reason: ApplyRejectionReason, message?: string) {
+    super(message ?? reason);
+    this.name = "ApplyRejection";
+    this.reason = reason;
+  }
+}
+
+/** Set of valid MemoryType string values, for present-but-invalid checks. */
+const VALID_MEMORY_TYPES = new Set<string>(Object.values(MemoryType));
+
+/**
+ * Fail-closed validation for `memory.create` payloads. Genuinely-optional
+ * fields (no key present) may keep their defaults; a PRESENT-but-invalid
+ * required field is rejected instead of silently coerced. Never throws a bare
+ * Error — throws ApplyRejection("malformed-payload") so approve() surfaces it.
+ */
+function validateCreatePayload(p: Record<string, unknown>): void {
+  if ("type" in p && p.type !== undefined && p.type !== null) {
+    if (typeof p.type !== "string" || !VALID_MEMORY_TYPES.has(p.type)) {
+      throw new ApplyRejection(
+        "malformed-payload",
+        `invalid memory type: ${JSON.stringify(p.type)}`,
+      );
+    }
+  }
+  if ("importance" in p && p.importance !== undefined && p.importance !== null) {
+    if (
+      typeof p.importance !== "number" ||
+      !Number.isFinite(p.importance) ||
+      p.importance < 0 ||
+      p.importance > 1
+    ) {
+      throw new ApplyRejection(
+        "malformed-payload",
+        `invalid importance: ${JSON.stringify(p.importance)}`,
+      );
+    }
+  }
+  if ("tags" in p && p.tags !== undefined && p.tags !== null) {
+    if (!Array.isArray(p.tags) || !p.tags.every((t) => typeof t === "string")) {
+      throw new ApplyRejection("malformed-payload", "invalid tags");
+    }
+  }
+}
+
+/**
+ * Build an UpdateMemoryPatch from a `memory.update` payload, validating each
+ * present field fail-closed. A present-but-invalid field → ApplyRejection.
+ * Optional-absent fields are skipped (behavior-preserving).
+ */
+function buildUpdatePatch(p: Record<string, unknown>): UpdateMemoryPatch {
+  const patch: UpdateMemoryPatch = {};
+  if ("content" in p && p.content !== undefined && p.content !== null) {
+    if (typeof p.content !== "string") {
+      throw new ApplyRejection("malformed-payload", "invalid content");
+    }
+    patch.content = p.content;
+  }
+  if ("importance" in p && p.importance !== undefined && p.importance !== null) {
+    if (
+      typeof p.importance !== "number" ||
+      !Number.isFinite(p.importance) ||
+      p.importance < 0 ||
+      p.importance > 1
+    ) {
+      throw new ApplyRejection(
+        "malformed-payload",
+        `invalid importance: ${JSON.stringify(p.importance)}`,
+      );
+    }
+    patch.importance = p.importance;
+  }
+  if ("tags" in p && p.tags !== undefined && p.tags !== null) {
+    if (!Array.isArray(p.tags) || !p.tags.every((t) => typeof t === "string")) {
+      throw new ApplyRejection("malformed-payload", "invalid tags");
+    }
+    patch.tags = p.tags as string[];
+  }
+  return patch;
+}
 
 // ── Pattern detection (pure) ────────────────────────────────────────────────
 
@@ -445,6 +549,7 @@ export class AutoImproveJob {
       ({
         insert: (i: InsertMemoryInput) => getMemoryRepository().insert(i),
         update: (id: string, p: UpdateMemoryPatch) => getMemoryRepository().update(id, p),
+        getById: (id: string) => getMemoryRepository().getById(id),
       } as unknown as MemoryApplySeam);
 
     const cfg = readAutoImproveConfig();
@@ -642,12 +747,18 @@ export class AutoImproveJob {
     try {
       appliedMemoryId = await this.applyProposal(row);
     } catch (e) {
+      // Surface ApplyRejection reasons verbatim so callers can distinguish the
+      // pinned invariant (pinned), an unreadable target (unreadable_target),
+      // and a malformed payload (malformed-payload) from a generic apply-failed.
+      const reason =
+        e instanceof ApplyRejection ? e.reason : "apply-failed";
       logger.warn("proposal:apply-failed", {
         id,
         projectId: row.projectId,
+        reason,
         error: (e as Error).message,
       });
-      return { ok: false, reason: "apply-failed" };
+      return { ok: false, reason };
     }
 
     // Flip status → approved.
@@ -718,11 +829,19 @@ export class AutoImproveJob {
   /**
    * Apply a proposal's edit to the memory store. Returns the affected memory
    * id (fresh for create, existing for update/tag). Throws on failure
-   * (caller catches → apply-failed).
+   * (caller catches → apply-failed, or the specific ApplyRejection.reason).
+   *
+   * Pinned-memory invariant (M40): the `memory.update` / `memory.tag` branches
+   * read the target row BEFORE mutating. If the target is unreadable/missing
+   * the apply FAILS CLOSED (`unreadable_target`, no mutation); if the target is
+   * pinned it is rejected with `pinned` and NO mutation, mirroring the
+   * exemption consolidation already honors. The common unpinned+well-formed
+   * case is behavior-preserving.
    *
    * The payload is a loose union; we dispatch on `kind` and treat the payload
-   * as a plain record within each branch (defensive reads, never throws to
-   * the caller — the outer approve() catches).
+   * as a plain record within each branch. Malformed-but-present required fields
+   * are rejected (fail-closed) rather than silently coerced, so a bad proposal
+   * surfaces loudly instead of papering over the bad value with a default.
    */
   private async applyProposal(record: ProposalRecord): Promise<string | null> {
     const memId =
@@ -731,6 +850,9 @@ export class AutoImproveJob {
     const p = record.payload as Record<string, unknown>;
 
     if (record.kind === "memory.create") {
+      // Fail-closed payload validation: a present-but-invalid `type` or
+      // `importance` is rejected rather than silently defaulted away.
+      validateCreatePayload(p);
       await Promise.resolve(
         this.memoryRepo.insert({
           id: memId,
@@ -754,24 +876,67 @@ export class AutoImproveJob {
 
     if (record.kind === "memory.update") {
       if (!record.targetMemoryId) return null;
-      const patch: UpdateMemoryPatch = {};
-      if (typeof p.content === "string") patch.content = p.content;
-      if (typeof p.importance === "number") patch.importance = p.importance;
-      if (Array.isArray(p.tags)) patch.tags = p.tags as string[];
-      this.memoryRepo.update(record.targetMemoryId, patch);
-      return record.targetMemoryId;
+      // Pinned-memory invariant: read the target before any mutation.
+      const target = await this.readTargetForApply(record.targetMemoryId);
+      // Fail-closed payload validation on the patch shape.
+      const patch = buildUpdatePatch(p);
+      this.memoryRepo.update(target.id, patch);
+      return target.id;
     }
 
     if (record.kind === "memory.tag") {
       if (!record.targetMemoryId) return null;
+      // Pinned-memory invariant: read the target before any mutation.
+      const target = await this.readTargetForApply(record.targetMemoryId);
       // Tag merge: append unique tags. Read-then-write is acceptable for the
       // low-contention proposal path (mirrors bootstrap/handoff best-effort).
-      const tags = Array.isArray(p.tags) ? (p.tags as string[]) : [];
-      this.memoryRepo.update(record.targetMemoryId, { tags });
-      return record.targetMemoryId;
+      if (!Array.isArray(p.tags)) {
+        // A malformed tag proposal has no usable tag set → reject closed.
+        throw new ApplyRejection("malformed-payload");
+      }
+      const tags = (p.tags as string[]).filter(
+        (t) => typeof t === "string" && t.length > 0,
+      );
+      this.memoryRepo.update(target.id, { tags });
+      return target.id;
     }
 
     return null;
+  }
+
+  /**
+   * Read the target memory row for an apply, enforcing the pinned invariant.
+   * Returns the row when it exists and is NOT pinned. Throws ApplyRejection
+   * with reason `unreadable_target` (missing/unreadable) or `pinned` (immu)
+   * so approve() surfaces the specific reason instead of generic apply-failed.
+   *
+   * The pinned truthy check mirrors decay.ts (`pinned === 1 || pinned === true`).
+   */
+  private async readTargetForApply(targetMemoryId: string): Promise<MemoryRow> {
+    let row: MemoryRow | null;
+    try {
+      row = await Promise.resolve(this.memoryRepo.getById(targetMemoryId));
+    } catch (e) {
+      throw new ApplyRejection(
+        "unreadable_target",
+        `getById threw: ${(e as Error).message}`,
+      );
+    }
+    if (!row) {
+      throw new ApplyRejection("unreadable_target", "target memory not found");
+    }
+    // Match decay.ts's exact truthy check for pinned (0/1 from the row, or
+    // bool). Cast through unknown so TS keeps both arms of the comparison
+    // without narrowing away the boolean case; the runtime check is identical
+    // to decay.ts (`pinned === 1 || pinned === true`).
+    const pinned = row.pinned as unknown as number | boolean;
+    if (pinned === 1 || pinned === true) {
+      throw new ApplyRejection(
+        "pinned",
+        `target ${targetMemoryId} is pinned; auto-improve cannot rewrite it`,
+      );
+    }
+    return row;
   }
 
   // ── listPending (surfacing) ──────────────────────────────────────────────

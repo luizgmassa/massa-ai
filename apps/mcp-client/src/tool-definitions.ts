@@ -138,6 +138,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: "string",
           description: "Synapse session ID from synapse_session. Activates cognitive modulation: task alignment, agent affinity, working-memory boost.",
         },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
+        },
       },
       required: ["query", "projectId"],
     },
@@ -180,6 +186,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           enum: ["json", "toon"],
           description: "Output format (json or toon)",
           default: "toon",
+        },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
         },
       },
       required: ["content", "type"],
@@ -235,6 +247,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           description: "Output format (json or toon)",
           default: "toon",
         },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
+        },
       },
       required: ["query"],
     },
@@ -275,6 +293,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           description: "Output format (json or toon)",
           default: "toon",
         },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
+        },
       },
       required: ["id"],
     },
@@ -294,6 +318,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           enum: ["json", "toon"],
           description: "Output format (json or toon)",
           default: "toon",
+        },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
         },
       },
       required: ["id"],
@@ -326,6 +356,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           enum: ["json", "toon"],
           description: "Output format (json or toon)",
           default: "toon",
+        },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
         },
       },
       required: [],
@@ -402,6 +438,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           description: "Output format (json or toon)",
           default: "toon",
         },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
+        },
       },
       required: ["taskId", "description"],
     },
@@ -428,6 +470,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           enum: ["json", "toon"],
           description: "Output format (json or toon)",
           default: "toon",
+        },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
         },
       },
       required: [],
@@ -498,6 +546,18 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: "number",
           description: "Maximum search results to include",
           default: 5,
+        },
+        format: {
+          type: "string",
+          enum: ["json", "toon"],
+          description: "Output format (json or toon). Default: json.",
+          default: "json",
+        },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
         },
       },
       required: ["query", "projectId"],
@@ -742,6 +802,24 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           items: { type: "string" },
           description: "Explicit edge-type override (wins over mode): call|data_flow|http_call|emit|listen|import|type_ref|extend|implement.",
         },
+        deadline_ms: {
+          type: "number",
+          default: 5000,
+          description:
+            "Wall-clock budget (ms) bounding the graph traversal. If exceeded the walk aborts with truncated=true and partial nodes/edges. Default 5000.",
+        },
+        format: {
+          type: "string",
+          enum: ["json", "toon"],
+          description: "Output format (json or toon). Default: json.",
+          default: "json",
+        },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
+        },
       },
       required: ["projectId"],
       anyOf: [
@@ -792,6 +870,24 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: "array",
           items: { type: "string" },
           description: "Optional filter — only analyze these changed relative paths.",
+        },
+        deadline_ms: {
+          type: "number",
+          default: 5000,
+          description:
+            "Wall-clock budget (ms) bounding the reverse-import-graph traversal. If exceeded the walk aborts with truncated=true and partial impacted symbols. Default 5000.",
+        },
+        format: {
+          type: "string",
+          enum: ["json", "toon"],
+          description: "Output format (json or toon). Default: json.",
+          default: "json",
+        },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported, e.g. ['impacted.symbol']). Absent/empty → full data.",
         },
       },
       required: ["projectId", "projectPath"],
@@ -850,6 +946,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         compress: { type: "boolean", description: "Auto-compress content > 100 lines (default: true)", default: true },
         targetRatio: { type: "number", description: "Compression target ratio (0.3 = 70% reduction)", default: 0.3 },
         format: { type: "string", enum: ["json", "toon"], description: "Output format", default: "json" },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
+        },
         includeSymbols: { type: "boolean", description: "Include symbol definitions/references (default: true)", default: true },
         includeImports: { type: "boolean", description: "Extract file imports (default: true)", default: true },
       },

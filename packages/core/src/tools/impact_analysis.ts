@@ -21,6 +21,7 @@
 import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { impactAnalysisService } from "../services/symbol/impact-analysis.js";
 import type { ImpactScope } from "../services/symbol/impact-analysis.js";
+import { serializeToolResponse } from "./serialize.js";
 
 interface ImpactAnalysisParams {
   projectId: string;
@@ -31,6 +32,10 @@ interface ImpactAnalysisParams {
   since?: string;
   depth?: number;
   paths?: string[];
+  /** Wall-clock budget (ms) bounding the reverse-BFS. Default 5000. */
+  deadline_ms?: number;
+  format?: "json" | "toon";
+  fields?: string[];
 }
 
 export class ImpactAnalysisTool implements IToolHandler {
@@ -73,12 +78,31 @@ export class ImpactAnalysisTool implements IToolHandler {
         items: { type: "string" },
         description: "Optional filter — only analyze these changed relative paths.",
       },
+      deadline_ms: {
+        type: "number",
+        default: 5000,
+        description:
+          "Wall-clock budget (ms) bounding the reverse-import-graph traversal. If exceeded the walk aborts with truncated=true and partial impacted symbols. Default 5000.",
+      },
+      format: {
+        type: "string",
+        enum: ["json", "toon"],
+        description: "Output format (json or toon). Default: json.",
+        default: "json",
+      },
+      fields: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Projection — keep only these keys (dotted paths supported, e.g. ['impacted.symbol']). Absent/empty → full data.",
+      },
     },
     required: ["projectId", "projectPath"],
   };
 
   async handle(params: unknown): Promise<ToolResponse> {
     const p = params as ImpactAnalysisParams;
+    const { format = "json", fields } = p;
     if (!p.projectId) {
       return { success: false, error: "projectId is required" };
     }
@@ -100,12 +124,12 @@ export class ImpactAnalysisTool implements IToolHandler {
         since: p.since,
         depth: p.depth,
         paths: p.paths,
+        deadlineMs: p.deadline_ms,
       });
 
       if (result.changedFiles.length === 0) {
-        return {
-          success: true,
-          data: {
+        return serializeToolResponse(
+          {
             projectId: result.projectId,
             scope: result.scope,
             changedFiles: [],
@@ -115,12 +139,12 @@ export class ImpactAnalysisTool implements IToolHandler {
             hint:
               "No indexed source files in the diff. Check scope/base_branch, or index the project first (index_project).",
           },
-        };
+          { format, fields },
+        );
       }
 
-      return {
-        success: true,
-        data: {
+      return serializeToolResponse(
+        {
           projectId: result.projectId,
           scope: result.scope,
           baseBranch: result.baseBranch,
@@ -142,7 +166,8 @@ export class ImpactAnalysisTool implements IToolHandler {
             via: s.via,
           })),
         },
-      };
+        { format, fields },
+      );
     } catch (error) {
       return {
         success: false,

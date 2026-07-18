@@ -7,8 +7,8 @@
 
 import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
-import { encode as toTOON } from "@toon-format/toon";
 import { SearchController } from "../controllers/search-controller.js";
+import { serializeToolResponse } from "./serialize.js";
 
 interface SearchProjectParams {
   query: string;
@@ -23,6 +23,7 @@ interface SearchProjectParams {
   explainScores?: boolean;
   format?: "json" | "toon";
   sessionId?: string;
+  fields?: string[];
 }
 
 export class SearchProjectTool implements IToolHandler {
@@ -91,6 +92,12 @@ export class SearchProjectTool implements IToolHandler {
         description: "Output format (json or toon)",
         default: "toon",
       },
+      fields: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
+      },
       sessionId: {
         type: "string",
         description: "Session ID for search hook scoping (enables session memory persistence)",
@@ -108,13 +115,12 @@ export class SearchProjectTool implements IToolHandler {
   async handle(params: unknown): Promise<ToolResponse> {
     const p = params as SearchProjectParams;
     const format = p.format || "toon";
+    const { fields } = p;
 
     try {
       const result = await this.controller.searchProject(p);
 
-      return format === "toon"
-        ? { success: true, data: toTOON(result) }
-        : { success: true, data: result };
+      return serializeToolResponse(result, { format, fields });
     } catch (error) {
       logger.error("Failed to search project", error as Error, {
         query: p.query,

@@ -7,8 +7,8 @@
 
 import { IToolHandler, ToolResponse, MemoryType } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
-import { encode as toTOON } from "@toon-format/toon";
 import { MemoryController } from "../controllers/memory-controller.js";
+import { serializeToolResponse } from "./serialize.js";
 
 interface StoreMemoryParams {
   content: string;
@@ -21,6 +21,7 @@ interface StoreMemoryParams {
   tags?: string[];
   linkTo?: string[];
   format?: "json" | "toon";
+  fields?: string[];
 }
 
 export class StoreMemoryTool implements IToolHandler {
@@ -63,6 +64,12 @@ export class StoreMemoryTool implements IToolHandler {
         description: "Output format (json or toon)",
         default: "toon",
       },
+      fields: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
+      },
     },
     required: ["content", "type"],
   };
@@ -85,6 +92,7 @@ export class StoreMemoryTool implements IToolHandler {
       tags,
       linkTo,
       format = "toon",
+      fields,
     } = params as StoreMemoryParams;
 
     try {
@@ -100,9 +108,7 @@ export class StoreMemoryTool implements IToolHandler {
         linkTo,
       });
 
-      return format === "toon"
-        ? { success: true, data: toTOON(result) }
-        : { success: true, data: result };
+      return serializeToolResponse(result, { format, fields });
     } catch (error) {
       logger.error("Failed to store memory", error as Error, { type });
       return {
