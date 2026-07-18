@@ -51,6 +51,20 @@ import type {
   CreateCheckpointOptions,
   CheckpointStats,
 } from "./checkpoint-store.js";
+import { assertSchemaSupported } from "../structural/schema-version.js";
+
+/**
+ * Schema-ahead guard for checkpoint state. The `task_checkpoints.state_schema_version`
+ * column is written on every save; the read path (rowToCheckpoint) now refuses
+ * rows written by NEWER code so an unreadable checkpoint never loads silently.
+ *
+ * Kept as a numeric-typed semver-shaped constant: the column is an integer today
+ * (always `1`), but the guard accepts the same `major.minor.patch` compare the
+ * structural guard uses, so a future bump to e.g. `2` or a migrated `"2.0.0"`
+ * string both fail loud against this running binary. Older / equal / null
+ * versions pass through unchanged.
+ */
+const SUPPORTED_CHECKPOINT_STATE_SCHEMA_VERSION = "1.0.0";
 
 // ── Raw row shape returned by $queryRaw ─────────────────────────────────────
 
@@ -168,6 +182,26 @@ export class PgCheckpointStore implements ICheckpointStore {
 
   private rowToCheckpoint(row: CheckpointRow): TaskCheckpoint {
     const state = decompressState(row.state);
+    // Schema-ahead guard: a state_schema_version strictly newer than the code's
+    // supported version means the row was written by newer code and the state
+    // payload may not deserialize/interpret correctly. Fail loud instead of
+    // silently loading a drifted checkpoint. Older / equal / null / legacy
+    // integer stamps (the current `1`) pass through — only strictly-newer throws.
+    const storedSchemaVersion = toNum(row.state_schema_version);
+    if (storedSchemaVersion != null) {
+      const storedVersionString = String(storedSchemaVersion);
+      // Normalize a bare integer like "1" to "1.0.0" so the semver guard can
+      // compare it; non-numeric / malformed strings fall through to the helper
+      // (which treats non-semver as unknown and does NOT throw).
+      const normalized = /^\d+$/u.test(storedVersionString)
+        ? `${storedVersionString}.0.0`
+        : storedVersionString;
+      assertSchemaSupported(
+        "checkpoint",
+        normalized,
+        SUPPORTED_CHECKPOINT_STATE_SCHEMA_VERSION,
+      );
+    }
     return {
       id: row.id,
       taskId: row.task_id,
