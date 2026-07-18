@@ -802,6 +802,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           items: { type: "string" },
           description: "Explicit edge-type override (wins over mode): call|data_flow|http_call|emit|listen|import|type_ref|extend|implement.",
         },
+        deadline_ms: {
+          type: "number",
+          default: 5000,
+          description:
+            "Wall-clock budget (ms) bounding the graph traversal. If exceeded the walk aborts with truncated=true and partial nodes/edges. Default 5000.",
+        },
         format: {
           type: "string",
           enum: ["json", "toon"],
@@ -864,6 +870,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: "array",
           items: { type: "string" },
           description: "Optional filter — only analyze these changed relative paths.",
+        },
+        deadline_ms: {
+          type: "number",
+          default: 5000,
+          description:
+            "Wall-clock budget (ms) bounding the reverse-import-graph traversal. If exceeded the walk aborts with truncated=true and partial impacted symbols. Default 5000.",
         },
         format: {
           type: "string",

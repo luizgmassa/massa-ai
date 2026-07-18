@@ -60,6 +60,15 @@ export interface ImpactAnalysisOptions {
    * pipeline with "clearProject is not a function" on the real repo).
    */
   repoOverride?: ReturnType<typeof getSymbolRepository>;
+  /**
+   * Wall-clock budget (ms) for the reverse-BFS. If exceeded, the traversal
+   * aborts with `truncated=true` and the impacted set collected so far.
+   * Additive to MAX_DEPTH / MAX_IMPACTED / MAX_DEF_QUERIES. Default 5s.
+   * Injectable clock is for deterministic tests.
+   */
+  deadlineMs?: number;
+  /** Injectable clock (defaults to Date.now) for deterministic deadline tests. */
+  now?: () => number;
 }
 
 export interface ChangedFile {
@@ -113,6 +122,13 @@ const MAX_IMPACTED = 100;
  * a small depth. The cache dedupes repeats; this caps the unique-file work.
  */
 const MAX_DEF_QUERIES = 500;
+/**
+ * Default wall-clock budget for a single analyze() reverse-BFS. Additive to
+ * the caps above: a runaway traversal aborts with partial impacted results
+ * instead of hanging. 5s is generous vs typical sub-second walks, so unset
+ * behaviour is unchanged for normal queries.
+ */
+const DEFAULT_TRAVERSAL_DEADLINE_MS = 5_000;
 /** Centrality weight in the risk formula (centrality ∈ [0,1]). */
 const W_CENTRALITY = 0.6;
 /** Proximity weight — closer hops weigh higher (proximity = 1/(depth+1)). */
@@ -142,6 +158,11 @@ export class ImpactAnalysisService {
     const scope = opts.scope;
     const depth = Math.max(0, Math.min(MAX_DEPTH, opts.depth ?? DEFAULT_DEPTH));
     const repo = opts.repoOverride ?? getSymbolRepository();
+    // Wall-clock deadline: an additive guard so a runaway reverse-BFS aborts
+    // with partial impacted results instead of hanging. The default is
+    // generous; normal queries never reach it. Clock is injectable for tests.
+    const now = opts.now ?? Date.now;
+    const deadlineAt = now() + (opts.deadlineMs ?? DEFAULT_TRAVERSAL_DEADLINE_MS);
 
     // ── 1. Changed files (scoped git diff) ──────────────────────────────────
     const runDiff = opts.diffRunner ?? defaultDiffRunner;
@@ -237,6 +258,12 @@ export class ImpactAnalysisService {
       while (queue.length > 0) {
         const { file, hop } = queue.shift()!;
         if (hop >= depth) continue;
+        // Wall-clock deadline: abort mid-traversal with partial impacted
+        // results so a runaway reverse-BFS never hangs. O(1) per iteration.
+        if (now() >= deadlineAt) {
+          truncated = true;
+          break;
+        }
         const importers = importerOf.get(file) ?? [];
         for (const imp of importers) {
           if (visited.has(imp)) continue;

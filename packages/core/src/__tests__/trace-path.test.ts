@@ -472,4 +472,72 @@ describeNative("trace_path", () => {
       await fs.rm(dir, { recursive: true, force: true });
     }
   }, 30000);
+
+  // ── Wall-clock deadline (M7) ───────────────────────────────────────────────
+  // A runaway traversal must abort with truncated=true and partial results
+  // instead of hanging. We force the deadline deterministically with an
+  // injectable clock — no reliance on wall-clock timing, no sleeps.
+
+  test("deadline aborts traversal with truncated=true and partial nodes", async () => {
+    const dir = await makeTempProject(FIXTURE);
+    try {
+      await indexFixture(dir, "d2-deadline-1");
+
+      // Clock: start in the past so the first iteration is free (seed already
+      // added), then jump past the deadline so the SECOND dequeue fires the
+      // guard. This proves the check is per-iteration and additive to the
+      // existing MAX_DEPTH/MAX_NODES bounds (those are NOT what fires here).
+      let ticks = 0;
+      const start = 10_000;
+      const now = () => {
+        // First call captures deadlineAt = start + 1; subsequent dequeues
+        // return start + 1000 (past the deadline).
+        const v = ticks === 0 ? start : start + 1000;
+        ticks++;
+        return v;
+      };
+
+      const res = await tracePathService.tracePath({
+        projectId: TEST_PROJECT,
+        symbol: "alpha",
+        direction: "outbound",
+        mode: "calls",
+        depth: 3,
+        deadlineMs: 1,
+        now,
+      });
+
+      // The seed (alpha) is added before the BFS loop, so it's always present;
+      // the deadline fires on the first real dequeue → partial result.
+      expect(res.truncated).toBe(true);
+      expect(res.nodes.length).toBeGreaterThanOrEqual(1);
+      // gamma lives at depth 2 and must NOT have been reached once the deadline
+      // fires on the first dequeue.
+      expect(res.nodes.map((n) => n.name)).not.toContain("gamma");
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  test("default deadline (unset) does not truncate a normal walk", async () => {
+    const dir = await makeTempProject(FIXTURE);
+    try {
+      await indexFixture(dir, "d2-deadline-default-1");
+
+      // No deadlineMs / no clock → default 5s applies, which is generous vs
+      // this sub-millisecond walk. Behavior is unchanged from pre-M7.
+      const res = await tracePathService.tracePath({
+        projectId: TEST_PROJECT,
+        symbol: "alpha",
+        direction: "outbound",
+        mode: "calls",
+        depth: 3,
+      });
+
+      expect(res.truncated).toBe(false);
+      expect(res.nodes.map((n) => n.name)).toContain("gamma");
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  }, 30000);
 });

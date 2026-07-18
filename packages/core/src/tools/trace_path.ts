@@ -33,6 +33,8 @@ interface TracePathParams {
   depth?: number;
   include_tests?: boolean;
   edge_types?: EdgeType[];
+  /** Wall-clock budget (ms) bounding the traversal. Default 5000. */
+  deadline_ms?: number;
   format?: "json" | "toon";
   fields?: string[];
 }
@@ -86,6 +88,12 @@ export class TracePathTool implements IToolHandler {
         items: { type: "string" },
         description: "Explicit edge-type override (wins over mode): call|data_flow|http_call|emit|listen|import|type_ref|extend|implement.",
       },
+      deadline_ms: {
+        type: "number",
+        default: 5000,
+        description:
+          "Wall-clock budget (ms) bounding the graph traversal. If exceeded the walk aborts with truncated=true and partial nodes/edges. Default 5000.",
+      },
       format: {
         type: "string",
         enum: ["json", "toon"],
@@ -124,6 +132,7 @@ export class TracePathTool implements IToolHandler {
         depth: p.depth,
         include_tests: p.include_tests,
         edge_types: p.edge_types,
+        deadlineMs: p.deadline_ms,
       });
 
       if (result.seeds.length === 0) {

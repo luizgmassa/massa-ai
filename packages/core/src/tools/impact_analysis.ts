@@ -32,6 +32,8 @@ interface ImpactAnalysisParams {
   since?: string;
   depth?: number;
   paths?: string[];
+  /** Wall-clock budget (ms) bounding the reverse-BFS. Default 5000. */
+  deadline_ms?: number;
   format?: "json" | "toon";
   fields?: string[];
 }
@@ -76,6 +78,12 @@ export class ImpactAnalysisTool implements IToolHandler {
         items: { type: "string" },
         description: "Optional filter — only analyze these changed relative paths.",
       },
+      deadline_ms: {
+        type: "number",
+        default: 5000,
+        description:
+          "Wall-clock budget (ms) bounding the reverse-import-graph traversal. If exceeded the walk aborts with truncated=true and partial impacted symbols. Default 5000.",
+      },
       format: {
         type: "string",
         enum: ["json", "toon"],
@@ -116,6 +124,7 @@ export class ImpactAnalysisTool implements IToolHandler {
         since: p.since,
         depth: p.depth,
         paths: p.paths,
+        deadlineMs: p.deadline_ms,
       });
 
       if (result.changedFiles.length === 0) {
