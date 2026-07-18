@@ -102,3 +102,11 @@ Commit the native runtime re-baseline, then commit TASK-023 (`build(parser): ver
 - Added 14 feature-named folders for supplied Claude Code plans, each with `spec.md`, `design.md`, `tasks.md`, and `validation.md`.
 - Source plans remain machine-local under `/Users/luizmassa/.claude/plans`; each feature design captures commit-backed execution facts and explicit gaps.
 - Historical source range: inclusive `c1d37b8120025a69e2de0e5fd054ca8177e205de^..81d33606fb6826e1759a073006b165419d0e3ba4` contains 133 reachable commits. Historical claims are not current-session runtime verification.
+
+## Wave 2 (Improvement Plan v2)
+
+- Source plan: `~/Downloads/massa-th0th-improvement-plan.md`. Wave 1 merged via PR #3 (`9fb32f3`).
+- workflowSessionId: `spec-driven-wave2`; branch: `wave-2` (off `main`).
+- Verify-first fan-out (10 read-only subagents) done 2026-07-18; per-item matrix persisted to th0th memory (`wave-2-verify-matrix`). User chose execution order: **M36 first**, then plan order (M7 → M8+M9 → M10 → M11 → M12 → M40 → M13 → M14).
+- **M36 (TOON compact output) — DONE + validated PASS** (2026-07-18). Shared `serializeToolResponse` + `fields` projection; `format` added to 3 tools (get_optimized_context, trace_path, impact_analysis), `fields` to all 12, two-layer MCP parity. Commits `33fea92`, `23035ac`, `05d518b`, `1d30061` on `wave-2`. Independent verifier PASS, discrimination sensor 4/4. Artifacts: `.specs/features/toon-compact-output/`. Follow-ups (non-blocking): MCP `search` def lacks `format` (pre-existing, M32 scope); pre-existing PG-fixture failures in `trace-path.test.ts` (test-isolation task).
+- Next: M7 (query deadline) → M9 → M40 → M13 (Small batch), then M10/M11, then M8/M12 (Medium — checkpoint before migration/home-writes), then M14 (Large refactor, own feature).
