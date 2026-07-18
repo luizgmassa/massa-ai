@@ -31,6 +31,18 @@ export type {
 export { getVectorStore, resetVectorStore } from "./data/vector/index.js";
 export * from "./data/graph-generation/index.js";
 
+// M8 — audit-log attribution for destructive operations (who/when/what/scope/result)
+export { OperationLogRepositoryPg } from "./data/audit/operation-log-pg.js";
+export { getOperationLogRepository } from "./data/audit/operation-log-factory.js";
+export type {
+  ActorContext,
+  OperationResult,
+  RecordOperationInput,
+  OperationLogRow,
+  OperationLogRepository,
+} from "./data/audit/operation-log-contract.js";
+export { UNKNOWN_ACTOR } from "./data/audit/operation-log-contract.js";
+
 // Phase 3 — passive lifecycle capture (hook ingestion)
 export {
   MemoryObservationStore,
