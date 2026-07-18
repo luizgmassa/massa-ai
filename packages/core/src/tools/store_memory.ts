@@ -7,8 +7,8 @@
 
 import { IToolHandler, ToolResponse, MemoryType } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
-import { encode as toTOON } from "@toon-format/toon";
 import { MemoryController } from "../controllers/memory-controller.js";
+import { serializeToolResponse } from "./serialize.js";
 
 interface StoreMemoryParams {
   content: string;
@@ -100,9 +100,7 @@ export class StoreMemoryTool implements IToolHandler {
         linkTo,
       });
 
-      return format === "toon"
-        ? { success: true, data: toTOON(result) }
-        : { success: true, data: result };
+      return serializeToolResponse(result, { format });
     } catch (error) {
       logger.error("Failed to store memory", error as Error, { type });
       return {

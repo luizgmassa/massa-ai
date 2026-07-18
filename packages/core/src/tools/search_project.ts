@@ -7,8 +7,8 @@
 
 import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
-import { encode as toTOON } from "@toon-format/toon";
 import { SearchController } from "../controllers/search-controller.js";
+import { serializeToolResponse } from "./serialize.js";
 
 interface SearchProjectParams {
   query: string;
@@ -112,9 +112,7 @@ export class SearchProjectTool implements IToolHandler {
     try {
       const result = await this.controller.searchProject(p);
 
-      return format === "toon"
-        ? { success: true, data: toTOON(result) }
-        : { success: true, data: result };
+      return serializeToolResponse(result, { format });
     } catch (error) {
       logger.error("Failed to search project", error as Error, {
         query: p.query,

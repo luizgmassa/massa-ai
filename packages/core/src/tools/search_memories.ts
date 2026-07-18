@@ -7,8 +7,8 @@
 
 import { IToolHandler, ToolResponse, MemoryType } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
-import { encode as toTOON } from "@toon-format/toon";
 import { MemoryController } from "../controllers/memory-controller.js";
+import { serializeToolResponse } from "./serialize.js";
 
 interface SearchMemoriesParams {
   query: string;
@@ -132,9 +132,7 @@ export class SearchMemoriesTool implements IToolHandler {
         total: result.total,
       };
 
-      return format === "toon"
-        ? { success: true, data: toTOON(responseData) }
-        : { success: true, data: responseData };
+      return serializeToolResponse(responseData, { format });
     } catch (error) {
       logger.error("Failed to search memories", error as Error, { query });
       return {

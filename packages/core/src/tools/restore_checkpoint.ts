@@ -10,8 +10,8 @@
 
 import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
-import { encode as toTOON } from "@toon-format/toon";
 import { CheckpointManager } from "../services/checkpoint/checkpoint-manager.js";
+import { serializeToolResponse } from "./serialize.js";
 
 interface RestoreCheckpointParams {
   /** Checkpoint ID to restore */
@@ -117,9 +117,7 @@ export class RestoreCheckpointTool implements IToolHandler {
         createdAt: result.checkpoint.createdAt,
       };
 
-      return format === "toon"
-        ? { success: true, data: toTOON(responseData) }
-        : { success: true, data: responseData };
+      return serializeToolResponse(responseData, { format });
     } catch (error) {
       logger.error("Failed to restore checkpoint", error as Error, {
         checkpointId,

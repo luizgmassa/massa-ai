@@ -8,8 +8,8 @@
 
 import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
-import { encode as toTOON } from "@toon-format/toon";
 import { MemoryController } from "../controllers/memory-controller.js";
+import { serializeToolResponse } from "./serialize.js";
 
 interface DeleteMemoryParams {
   id: string;
@@ -46,9 +46,7 @@ export class DeleteMemoryTool implements IToolHandler {
     try {
       const result = await this.controller.delete(id);
 
-      return format === "toon"
-        ? { success: true, data: toTOON(result) }
-        : { success: true, data: result };
+      return serializeToolResponse(result, { format });
     } catch (error) {
       logger.error("Failed to delete memory", error as Error, { id });
       return {
