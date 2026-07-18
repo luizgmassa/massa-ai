@@ -62,6 +62,11 @@ import {
   ensureInitializedImpl,
   type IndexProjectOptions,
 } from "./rlm-indexing.js";
+import {
+  applySynapseStateImpl,
+  correctQueryImpl,
+  buildGraphStreamImpl,
+} from "./rlm-synapse.js";
 
 const globAsync = glob;
 
@@ -654,39 +659,7 @@ export class ContextualSearchRLM {
     projectId: string,
     sessionId?: string,
   ): Promise<SearchResult[]> {
-    if (!sessionId) return baseResults;
-
-    const registry = this.injectedDeps?.sessionRegistry ?? getSessionRegistry();
-    let session: AgentSession | null;
-    try {
-      session = await registry.getAsync(sessionId);
-    } catch (error) {
-      logger.warn("Synapse session lookup failed — using stateless search", {
-        sessionId,
-        projectId,
-        error: (error as Error).message,
-      });
-      return baseResults;
-    }
-
-    if (!session || (session.workspaceId && session.workspaceId !== projectId)) {
-      return baseResults;
-    }
-
-    const synapseManager = this.injectedDeps?.synapseManager ?? getSynapseManager();
-    const allowBufferInjection = session.workspaceId === projectId;
-    const processed = synapseManager.process(baseResults, query, {
-      session,
-      projectId,
-      allowBufferInjection,
-    });
-    const baseIds = new Set(baseResults.map((result) => result.id));
-
-    return processed.results.filter((result) => {
-      if (baseIds.has(result.id)) return true;
-      const metadata = result.metadata as Record<string, unknown> | undefined;
-      return allowBufferInjection && metadata?.projectId === projectId;
-    });
+    return applySynapseStateImpl(this, baseResults, query, projectId, sessionId);
   }
 
   /**
@@ -697,25 +670,7 @@ export class ContextualSearchRLM {
    * can't be reliably corrected).
    */
   private async correctQuery(query: string): Promise<string | null> {
-    if (typeof this.keywordSearch.fuzzyCorrect !== "function") return null;
-    const terms = extractQueryTerms(query).filter((w) => w.length >= 3);
-    // Vocabulary-nearest correction is reliable for identifier typo probes
-    // ("useEffct") but unsafe for natural-language sentences: ordinary
-    // Portuguese words were rewritten to unrelated English code tokens and
-    // added as an entire extra RRF stream.
-    if (terms.length !== 1) return null;
-    const corrected: string[] = [];
-    let changed = false;
-    for (const term of terms) {
-      const fix = await this.keywordSearch.fuzzyCorrect!(term);
-      if (fix && fix !== term) {
-        corrected.push(fix);
-        changed = true;
-      } else {
-        corrected.push(term);
-      }
-    }
-    return changed ? corrected.join(" ") : null;
+    return correctQueryImpl(this, query);
   }
 
   /**
@@ -743,111 +698,7 @@ export class ContextualSearchRLM {
     maxResults: number,
     projectId?: string,
   ): Promise<SearchResult[]> {
-    try {
-      // Seed candidates = top-N ids + derived filePath/symbol anchors from the
-      // first (vector) stream's chunk metadata.
-      const vectorStream = resultSets[0] ?? [];
-      const topHits = vectorStream.slice(0, Math.min(maxResults, 20));
-      const rawIds = topHits
-        .map((r) => r.id)
-        .filter((id): id is string => typeof id === "string" && id.length > 0);
-
-      // Derive anchor terms (filePath / symbol) from code-chunk metadata.
-      // These are used to find MEMORY ids whose content references the same
-      // code, bridging the chunk-id → memory-id gap.
-      const anchors = new Set<string>();
-      for (const r of topHits) {
-        const meta = (r.metadata ?? {}) as Record<string, unknown>;
-        const fp = meta.filePath;
-        if (typeof fp === "string" && fp.length > 0) {
-          // Use the basename + the full path; basename is the most common
-          // reference form in memories ("updated store.ts ...").
-          anchors.add(fp);
-          const base = fp.split("/").pop();
-          if (base && base.length >= 3) anchors.add(base);
-        }
-        for (const key of ["parentSymbol", "symbolName", "label"] as const) {
-          const v = meta[key];
-          if (typeof v === "string" && v.length >= 3) anchors.add(v);
-        }
-      }
-
-      const seedIds = new Set<string>(rawIds);
-      // Bridge: resolve anchors to memory ids via fullTextSearch. Bounded to
-      // the top few anchors to keep latency in check.
-      if (anchors.size > 0) {
-        const repo = getMemoryRepository();
-        const anchorTerms = [...anchors].slice(0, 6);
-        for (const term of anchorTerms) {
-          try {
-            // fullTextSearch(query, filters) — pass a SearchFilters object as
-            // the second arg so both the number and object overloads resolve.
-            const rows = await Promise.resolve(
-              repo.fullTextSearch(term, 5, {
-                projectId,
-                minImportance: 0,
-              }),
-            );
-            for (const row of rows) {
-              if (typeof row.id === "string") seedIds.add(row.id);
-            }
-          } catch {
-            // Defensive: a single anchor lookup never aborts bridging.
-          }
-        }
-      }
-
-      if (seedIds.size === 0) return [];
-      const graph = getGraphStore();
-      // PostgreSQL bfsNeighbors is sync; Pg is async. Normalize via Promise.resolve
-      // so both backends work without an isPostgres short-circuit.
-      const ns = await Promise.resolve(
-        typeof (graph as { bfsNeighbors?: unknown }).bfsNeighbors === "function"
-          ? (graph as { bfsNeighbors: (ids: string[], d: number) => string[] | Promise<string[]> }).bfsNeighbors([...seedIds], 2)
-          : [],
-      );
-      if (!Array.isArray(ns) || ns.length === 0) return [];
-      // Filter out ids already in the result set (avoid double-counting RRF).
-      const present = new Set<string>();
-      for (const set of resultSets)
-        for (const r of set) present.add(r.id);
-      const fresh = ns.filter((id) => !present.has(id));
-      if (fresh.length === 0) return [];
-
-      const repo = getMemoryRepository();
-      const out: SearchResult[] = [];
-      for (const id of fresh) {
-        try {
-          // Backend-polymorphic: PostgreSQL getById is sync, Pg is async. Normalize.
-          const row = await Promise.resolve(repo.getById(id));
-          if (!row || row.deleted_at !== null) continue;
-          out.push({
-            id: row.id,
-            content: row.content,
-            // Fixed sub-hit score: below a typical direct vector hit, above
-            // the minScore 0.3 floor, so RRF surfaces neighbors mid-list.
-            score: 0.45,
-            source: "memory" as SearchResult["source"],
-            metadata: {
-              projectId: row.project_id ?? undefined,
-              context: {
-                memoryType: row.type,
-                graphNeighbor: true,
-                importance: row.importance,
-              },
-            },
-          });
-        } catch {
-          // Defensive: a single missing memory never aborts the stream.
-        }
-      }
-      return out;
-    } catch (e) {
-      logger.debug("graph stream omitted", {
-        err: (e as Error).message,
-      });
-      return [];
-    }
+    return buildGraphStreamImpl(this, resultSets, maxResults, projectId);
   }
 
   /**
