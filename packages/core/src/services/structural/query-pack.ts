@@ -18,14 +18,16 @@ import type {
 } from "./structural-runtime.js";
 import {
   normalizeQueryCaptures,
+  functionalCaptures,
+  collectEmbeddedChildren,
+} from "./query-pack-captures.js";
+import {
   buildImports,
   buildCallEdges,
   buildSyntaxEdges,
   dedupeEdges,
-  functionalCaptures,
-  collectEmbeddedChildren,
   unresolved,
-} from "./query-pack-captures.js";
+} from "./query-pack-edges.js";
 
 export type { StructuralQueryPack, QueryCapabilityContract } from "./query-pack-registry.js";
 export { structuralQueryPackForDialect } from "./query-pack-registry.js";
