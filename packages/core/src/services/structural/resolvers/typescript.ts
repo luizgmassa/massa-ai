@@ -247,8 +247,10 @@ function exportedMatches(
 // (e.g. a function-scoped `const lib = require("./b")` shadowing a module-scope
 // `const lib = require("./a")`). Only the nearest preceding require should claim
 // a reference; otherwise inner-scope member access resolves to the wrong module.
-// Lexical-scope tracking would be exact, but resolver definitions carry no span,
-// so this positional approximation handles the common inner-shadow pattern.
+// Only require-style forms are shadowers — ESM/typed redeclarations are illegal
+// in JS/TS, so an esm_import with the same local name can't shadow. Lexical-scope
+// tracking would be exact, but resolver definitions carry no span, so this
+// positional approximation handles the common inner-shadow pattern.
 const REQUIRE_IMPORT_FORMS = new Set(["commonjs_require", "dynamic_import", "ruby_require", "lua_require"]);
 
 function importedMatches(
