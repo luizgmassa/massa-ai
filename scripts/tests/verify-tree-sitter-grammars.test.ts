@@ -67,10 +67,14 @@ describe("native Tree-sitter package contract", () => {
     expect(NATIVE_LOCK_IDENTITIES["tree-sitter"]).toEqual({
       resolved: "tree-sitter@0.25.0",
       sri: "sha512-PGZZzFW63eElZJDe/b/R/LbsjDDYJa5UEjLZJB59RQsMX+fo0j54fqBPn1MGKav/QNa0JR0zBiVaikYDWCj5KQ==",
+      sourceIntegrity:
+        "sha512-dUm5bDgJETEMVMtAUPyBm8gz30K2RT8GJV9cu/2iF6snKW8mtS2oCLEiBKq9xqtHl/iiOOgfzu1BGWZ39Us4bw==",
     });
     expect(NATIVE_LOCK_IDENTITIES["tree-sitter-dart"]).toEqual({
       resolved: "tree-sitter-dart@github:UserNobody14/tree-sitter-dart#be07cf7",
       gitIdentity: "UserNobody14-tree-sitter-dart-be07cf7",
+      sourceIntegrity:
+        "sha512-8kUB+x7poKS1aS+yMAbQL8+vWq+IereTjcAA77fKHNq/lsAOdoOeXsX2JyWHQfk9tZCJVFN5Dt/hbD8BihAiZw==",
     });
 
     const corruptedSri = lockSource.replace(

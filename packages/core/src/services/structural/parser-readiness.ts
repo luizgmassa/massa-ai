@@ -4,6 +4,7 @@ import {
   loadNativeGrammarSet,
   type LoadedNativeGrammarSet,
 } from "./grammar-loaders.js";
+import { verifyNativeGrammarIntegrity } from "./grammar-integrity.js";
 import type { GrammarArtifact } from "./types.js";
 
 export type ParserReadinessStatus =
@@ -126,6 +127,15 @@ async function runValidation(
   });
 
   try {
+    // Load-time grammar integrity check: recompute each pinned package's
+    // ABI-independent source hash and fail loud before the first parse if a
+    // pin has drifted. Runs once per process, only on the production loader
+    // path (test stubs that swap the loader are exempt). Default is ON; set
+    // MASSA_TH0TH_SKIP_GRAMMAR_INTEGRITY=1 to skip for local dev.
+    if (loader === loadNativeGrammarSet) {
+      verifyNativeGrammarIntegrity();
+    }
+
     const loaded = await loader(uniqueArtifacts());
     let validatedExtensions = 0;
     for (const entry of LANGUAGE_MANIFEST) {
