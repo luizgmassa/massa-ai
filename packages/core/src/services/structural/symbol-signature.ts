@@ -4,8 +4,8 @@ import type {
   NormalizedStructuralSymbol,
   StructuralSymbolKind,
 } from "./types.js";
-import { SYMBOL_KINDS } from "./query-pack.js";
-import type { StructuralQueryPack } from "./query-pack.js";
+import { SYMBOL_KINDS } from "./query-pack-registry.js";
+import type { StructuralQueryPack } from "./query-pack-registry.js";
 import {
   text,
   frozenSpan,
