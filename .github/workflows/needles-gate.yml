@@ -46,7 +46,12 @@ concurrency:
 jobs:
   needles:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Headroom for a COLD-cache run: the first run after cache eviction/model
+    # change must pull qwen3-embedding:8b (~5GB, ~9min) before embedding, and
+    # the actions/cache post-step only saves once the gate step finishes — a
+    # timeout mid-run skips it, leaving the cache cold forever. 20min lets the
+    # cold run complete + save. WARM runs (the common case) finish in ~3min.
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
