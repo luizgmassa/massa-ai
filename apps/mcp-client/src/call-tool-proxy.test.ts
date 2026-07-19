@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { proxyCallTool } from "./call-tool-proxy.js";
+import { ApiHttpError } from "./api-client.js";
+import {
+  proxyCallTool,
+  proxyToolRequest,
+  type ToolProxyApiClient,
+} from "./call-tool-proxy.js";
 
 const projectId = "transport-project";
 const legacyFqn = "src/service.ts#run";
@@ -50,6 +55,8 @@ describe("MCP CallTool structural transport", () => {
             return httpResponse;
           },
           post: async () => { throw new Error("structural tools must use GET"); },
+          patch: async () => { throw new Error("structural tools must use GET"); },
+          delete: async () => { throw new Error("structural tools must use GET"); },
         }, tool.name, tool.args);
 
         expect(calls).toHaveLength(1);
@@ -88,6 +95,8 @@ describe("MCP CallTool structural transport", () => {
         return httpResponse;
       },
       post: async () => { throw new Error("index_status must use GET"); },
+      patch: async () => { throw new Error("index_status must use GET"); },
+      delete: async () => { throw new Error("index_status must use GET"); },
     }, "index_status", { jobId: "job-21" });
 
     expect(calls).toEqual([{ endpoint: "/api/v1/project/index/status/job-21", params: {} }]);
@@ -99,11 +108,69 @@ describe("MCP CallTool structural transport", () => {
       const result = await proxyCallTool({
         get: async () => { throw new Error("upstream unavailable"); },
         post: async () => { throw new Error("unexpected POST"); },
+        patch: async () => { throw new Error("unexpected PATCH"); },
+        delete: async () => { throw new Error("unexpected DELETE"); },
       }, tool.name, tool.args);
+      expect(result.isError).toBe(true);
       expect(JSON.parse(result.content[0]!.text)).toEqual({
         success: false,
         error: "upstream unavailable",
       });
     }
+  });
+});
+
+describe("MCP CallTool HTTP method dispatch", () => {
+  test("substitutes path fields, removes them from payloads, and dispatches all four verbs", async () => {
+    const calls: Array<{ method: string; endpoint: string; body?: unknown }> = [];
+    const apiClient: ToolProxyApiClient = {
+      get: async (endpoint, body) => {
+        calls.push({ method: "GET", endpoint, body });
+        return { success: true };
+      },
+      post: async (endpoint, body) => {
+        calls.push({ method: "POST", endpoint, body });
+        return { success: true };
+      },
+      patch: async (endpoint, body) => {
+        calls.push({ method: "PATCH", endpoint, body });
+        return { success: true };
+      },
+      delete: async (endpoint, body) => {
+        calls.push({ method: "DELETE", endpoint, body });
+        return { success: true };
+      },
+    };
+
+    for (const method of ["GET", "POST", "PATCH", "DELETE"] as const) {
+      await proxyToolRequest(apiClient, method, "/sessions/:id", {
+        id: "session/with space",
+        taskContext: `${method}-context`,
+      });
+    }
+
+    expect(calls).toEqual([
+      { method: "GET", endpoint: "/sessions/session%2Fwith%20space", body: { taskContext: "GET-context" } },
+      { method: "POST", endpoint: "/sessions/session%2Fwith%20space", body: { taskContext: "POST-context" } },
+      { method: "PATCH", endpoint: "/sessions/session%2Fwith%20space", body: { taskContext: "PATCH-context" } },
+      { method: "DELETE", endpoint: "/sessions/session%2Fwith%20space", body: { taskContext: "DELETE-context" } },
+    ]);
+  });
+
+  test("preserves parsed REST envelopes as MCP tool errors", async () => {
+    const envelope = {
+      success: false,
+      error: { code: "SESSION_EXPIRED", message: "Session expired" },
+    };
+    const result = await proxyCallTool({
+      get: async () => { throw new ApiHttpError(410, envelope); },
+      post: async () => { throw new Error("unexpected POST"); },
+      patch: async () => { throw new Error("unexpected PATCH"); },
+      delete: async () => { throw new Error("unexpected DELETE"); },
+    }, "index_status", { jobId: "expired" });
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0]!.text)).toEqual(envelope);
+    expect(result.content[0]!.text).not.toContain("API error");
   });
 });

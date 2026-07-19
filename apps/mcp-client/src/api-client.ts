@@ -14,6 +14,16 @@ export interface ApiClientConfig {
   maxRetries?: number;
 }
 
+export class ApiHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly body: Record<string, unknown>,
+  ) {
+    super(`Tools API request failed with status ${status}`);
+    this.name = "ApiHttpError";
+  }
+}
+
 export class ApiClient {
   private baseUrl: string;
   private apiKey: string;
@@ -44,6 +54,16 @@ export class ApiClient {
     return this.request("POST", endpoint, body, timeoutMs);
   }
 
+  /** PATCH request to Tools API */
+  async patch(endpoint: string, body: unknown): Promise<unknown> {
+    return this.request("PATCH", endpoint, body);
+  }
+
+  /** DELETE request to Tools API */
+  async delete(endpoint: string, body?: unknown): Promise<unknown> {
+    return this.request("DELETE", endpoint, body);
+  }
+
   /** GET request to Tools API with optional query parameters */
   async get(endpoint: string, queryParams?: Record<string, unknown>): Promise<unknown> {
     let url = endpoint;
@@ -60,7 +80,7 @@ export class ApiClient {
 
   /** Generic HTTP request to Tools API */
   private async request(
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "PATCH" | "DELETE",
     endpoint: string,
     body?: unknown,
     timeoutMs = this.timeoutMs,
@@ -90,8 +110,20 @@ export class ApiClient {
         clearTimeout(timeout);
 
         if (!response.ok) {
-          const errorBody = await response.text();
-          throw new Error(`API error ${response.status}: ${errorBody}`);
+          const errorText = await response.text();
+          let errorBody: Record<string, unknown> = {
+            success: false,
+            error: "Upstream API request failed",
+          };
+          try {
+            const parsedBody: unknown = JSON.parse(errorText);
+            if (parsedBody !== null && typeof parsedBody === "object" && !Array.isArray(parsedBody)) {
+              errorBody = parsedBody as Record<string, unknown>;
+            }
+          } catch {
+            // Keep the generic envelope; raw non-JSON upstream bodies may contain secrets.
+          }
+          throw new ApiHttpError(response.status, errorBody);
         }
 
         return await response.json();
@@ -99,7 +131,11 @@ export class ApiClient {
         lastError = error as Error;
 
         // Don't retry on client errors (4xx)
-        if (lastError.message.includes("API error 4")) {
+        if (
+          lastError instanceof ApiHttpError &&
+          lastError.status >= 400 &&
+          lastError.status < 500
+        ) {
           throw lastError;
         }
 
