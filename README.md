@@ -267,6 +267,9 @@ restore_checkpoint { checkpointId: "<cp-id>" }
 47 tools total. Grouped below; each row lists **Req:** required and
 **Opt:** optional params.
 
+The current roster fits in one MCP `tools/list` page. Future registries over
+100 tools require clients to follow `nextCursor` until it is absent.
+
 ### Indexing & Search
 
 | Tool | Description |

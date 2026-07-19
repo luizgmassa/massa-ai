@@ -17,6 +17,7 @@ import { ApiClient } from "./api-client.js";
 import { collectFiles } from "./file-collector.js";
 import { TOOL_DEFINITIONS } from "./tool-definitions.js";
 import { proxyCallTool } from "./call-tool-proxy.js";
+import { pageToolDefinitions } from "./tool-discovery.js";
 import {
   configExists,
   initConfig,
@@ -131,15 +132,9 @@ class McpProxyServer {
   }
 
   private setupHandlers(): void {
-    // List tools - return all tool definitions
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-      return {
-        tools: TOOL_DEFINITIONS.map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema,
-        })),
-      };
+    // List tools in stable protocol pages. Current roster remains one page.
+    this.server.setRequestHandler(ListToolsRequestSchema, async (request) => {
+      return pageToolDefinitions(TOOL_DEFINITIONS, request.params?.cursor);
     });
 
     // Handle tool calls - proxy to Tools API
