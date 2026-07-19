@@ -157,17 +157,17 @@ export class SearchCachePg {
         lastAccessed: new Date(row.last_accessed).getTime(),
       };
 
-      this.stats.l2Hits++;
-      this.stats.totalHits++;
-      this.l1Cache.set(key, entry);
-      this.evictL1IfNeeded();
-
       await pool.query(
         `UPDATE search_cache 
          SET access_count = access_count + 1, last_accessed = NOW()
          WHERE key = $1`,
         [key]
       );
+
+      this.stats.l2Hits++;
+      this.stats.totalHits++;
+      this.l1Cache.set(key, entry);
+      this.evictL1IfNeeded();
 
       return entry.results;
     }
@@ -197,9 +197,6 @@ export class SearchCachePg {
       lastAccessed: now,
     };
 
-    this.l1Cache.set(key, entry);
-    this.evictL1IfNeeded();
-
     const pool = await this.getPool();
     await pool.query(
       `INSERT INTO search_cache (key, query, project_id, results, options)
@@ -211,7 +208,9 @@ export class SearchCachePg {
       [key, query, projectId, JSON.stringify(results), JSON.stringify(options)]
     );
 
-    this.evictL2IfNeeded();
+    await this.evictL2IfNeeded();
+    this.l1Cache.set(key, entry);
+    this.evictL1IfNeeded();
   }
 
   async invalidateProject(projectId: string): Promise<number> {

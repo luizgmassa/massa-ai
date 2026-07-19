@@ -198,13 +198,17 @@ export async function searchImpl(
     }
 
     if (understood) {
-      eventBus.publish("search:query-rewritten", {
-        query,
-        projectId,
-        expansions: understood.expansions,
-        keywords: understood.keywords,
-        hydeUsed: understood.hydeVector !== null,
-      });
+      try {
+        eventBus.publish("search:query-rewritten", {
+          query,
+          projectId,
+          expansions: understood.expansions,
+          keywords: understood.keywords,
+          hydeUsed: understood.hydeVector !== null,
+        });
+      } catch {
+        degrade("SEARCH_AUDIT_UNAVAILABLE", "search_query_rewritten_event");
+      }
       const rewrittenFTS = buildRewrittenFTSQuery(query, understood.keywords);
       const vectorPromise = rlm.vectorStore
         .search(query, retrievalLimit, projectId)
@@ -357,12 +361,16 @@ export async function searchImpl(
     ];
 
     if (usedQueryUnderstanding) {
-      eventBus.publish("search:reranked", {
-        query,
-        projectId,
-        streamCount: resultSets.length,
-        resultCount: fusedResults.length,
-      });
+      try {
+        eventBus.publish("search:reranked", {
+          query,
+          projectId,
+          streamCount: resultSets.length,
+          resultCount: fusedResults.length,
+        });
+      } catch {
+        degrade("SEARCH_AUDIT_UNAVAILABLE", "search_reranked_event");
+      }
     }
 
     // Apply file pattern filters if provided

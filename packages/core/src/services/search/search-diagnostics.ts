@@ -9,6 +9,7 @@ export type SearchDegradationCode =
   | "PROXIMITY_RERANK_UNAVAILABLE"
   | "GRAPH_AUGMENTATION_UNAVAILABLE"
   | "SYNAPSE_UNAVAILABLE"
+  | "SEARCH_AUDIT_UNAVAILABLE"
   | "SEARCH_ANALYTICS_UNAVAILABLE";
 
 export interface SearchDegradation {
@@ -52,6 +53,7 @@ const DEGRADATION_MESSAGES: Record<SearchDegradationCode, string> = {
   PROXIMITY_RERANK_UNAVAILABLE: "Proximity reranking was unavailable; fused order preserved",
   GRAPH_AUGMENTATION_UNAVAILABLE: "Graph augmentation was unavailable",
   SYNAPSE_UNAVAILABLE: "Synapse enrichment was unavailable; stateless results used",
+  SEARCH_AUDIT_UNAVAILABLE: "Search event auditing was unavailable",
   SEARCH_ANALYTICS_UNAVAILABLE: "Search analytics were unavailable",
 };
 
@@ -65,7 +67,7 @@ export class SearchServiceError extends Error {
   ) {
     super(
       code === "STORE_CORRUPTION"
-        ? "Stored search data is invalid"
+        ? "Stored data is invalid"
         : "A required search backend is unavailable",
       options?.cause === undefined ? undefined : { cause: options.cause },
     );
