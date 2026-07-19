@@ -264,7 +264,7 @@ restore_checkpoint { checkpointId: "<cp-id>" }
 
 ## Available Tools
 
-42 tools total. Grouped below; each row lists **Req:** required and
+47 tools total. Grouped below; each row lists **Req:** required and
 **Opt:** optional params.
 
 ### Indexing & Search
@@ -324,9 +324,14 @@ Synapse is an optional post-retrieval modulation layer that improves result qual
 
 | Tool | Description |
 |------|-------------|
-| `synapse_session` | Create/resume a cognitive session scoped to a task |
+| `synapse_session` | Create a cognitive session scoped to a task |
+| `synapse_get` | Inspect session state |
+| `synapse_update` | Replace session task context |
+| `synapse_end` | End a session |
 | `synapse_prime` | Seed working-memory buffer with recalled memories |
 | `synapse_access` | Record file access to boost that file in future searches |
+| `synapse_prefetch` | Plan prefetch and optionally prime matching entries |
+| `synapse_list` | List the active session count |
 
 ### Passive Capture
 
@@ -775,7 +780,7 @@ npx @massa-th0th/mcp-client --config-set embedding.dimensions 4096
 ```
 massa-th0th/
 ├── apps/
-│   ├── mcp-client/           # MCP Server (stdio) — 42 tools
+│   ├── mcp-client/           # MCP Server (stdio) — 47 tools
 │   ├── tools-api/            # REST API (port 3333) + Web UI at /ui
 │   ├── web-ui/               # Read-only memory/search/handoff/checkpoint browser
 │   ├── claude-plugin/        # Passive-capture hook scripts + install guide

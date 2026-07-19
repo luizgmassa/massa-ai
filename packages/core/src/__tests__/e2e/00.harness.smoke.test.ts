@@ -1,7 +1,7 @@
 /**
  * T1 smoke — proves the E2E harness end-to-end:
  *   1. HTTP transport reaches the live API.
- *   2. MCP subprocess boots, advertises all 42 tools.
+ *   2. MCP subprocess boots, advertises all 47 tools.
  *   3. Matrix machinery holds for a read-only tool (list_projects).
  *
  * Skipped unless RUN_E2E=1, the API is up, the MCP dist is built, and the
@@ -17,7 +17,7 @@ import {
 } from "./_helpers";
 import { startMcp, mcpCall, type McpHandle } from "./_mcp";
 
-// The 42 tools declared in apps/mcp-client/src/tool-definitions.ts (in
+// The 47 tools declared in apps/mcp-client/src/tool-definitions.ts (in
 // declaration order). SF3: this list must mirror tool-definitions.ts exactly —
 // the assertion below is strict (===), so a missing tool fails loudly instead
 // of being hidden by the old leaky >= check. When a tool is added upstream,
@@ -27,7 +27,8 @@ const EXPECTED_TOOLS = [
   "memory_update", "memory_delete", "list_checkpoints", "create_checkpoint", "restore_checkpoint",
   "compress", "optimized_context", "analytics", "list_projects", "project_map",
   "search_definitions", "get_references", "go_to_definition", "trace_path", "impact_analysis",
-  "reset_project", "read_file", "synapse_session", "synapse_prime", "synapse_access",
+  "reset_project", "read_file", "synapse_session", "synapse_get", "synapse_update",
+  "synapse_end", "synapse_prime", "synapse_access", "synapse_prefetch", "synapse_list",
   "symbol_snippet", "memory_list", "reindex", "hook_ingest", "compact_snapshot",
   "bootstrap", "handoff_begin", "handoff_accept", "handoff_cancel", "handoff_list_pending",
   "list_proposals", "approve_proposal", "reject_proposal", "execute", "execute_file",
@@ -59,7 +60,7 @@ describe.skipIf(!READY)("T1 harness smoke", () => {
     expect(res.service).toBe("massa-th0th-tools-api");
   }, 10_000);
 
-  test("MCP advertises all 42 tools", async () => {
+  test("MCP advertises all 47 tools", async () => {
     expect(mcp).not.toBeNull();
     const names = mcp!.toolNames;
     // SF3: strict equality — the MCP tool roster must match
