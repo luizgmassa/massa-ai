@@ -4,10 +4,10 @@
 
 ### TASK-M19-1 — Transactional `.env` publisher
 
-- Files: `scripts/lib/installer-env-transaction.sh`, `scripts/setup-local-first.sh`, `scripts/tests/test-installer-env-race-safety.sh`
+- Files: `scripts/lib/installer-env-transaction.sh`, `install.sh`, `scripts/setup-local-first.sh`, `scripts/tests/test-installer-env-race-safety.sh`
 - Implement: candidate-before-lock, typed snapshot/revalidation, owner-proven lock/reclaim, atomic verified backup and publish, owner-scoped cleanup.
-- Done when: AC1–AC6 pass in focused shell harness; existing setup-wizard test remains green.
-- Gate: `bash scripts/tests/test-installer-env-race-safety.sh && bash scripts/tests/test-setup-wizard-db-selection.sh && bash -n scripts/setup-local-first.sh`
+- Done when: AC1–AC6 and AC8 pass in focused shell harness; both installers parse.
+- Gate: `bash scripts/tests/test-installer-env-race-safety.sh && bash -n install.sh && bash -n scripts/setup-local-first.sh`
 - Commit: `fix(installer): make env publication race safe`
 
 ### TASK-M19-2 — Independent cross-platform validation
@@ -28,8 +28,9 @@
 | AC5 | old/new/backup digest assertions |
 | AC6 | TERM cleanup and foreign-lock preservation |
 | AC7 | OS-labelled focused gate |
+| AC8 | candidate mutation and deterministic SIGKILL/retry barriers |
 
 ## Gate Commands
 
 - Quick/Full: `bash scripts/tests/test-installer-env-race-safety.sh`
-- Build: `bash scripts/tests/test-installer-env-race-safety.sh && bash scripts/tests/test-setup-wizard-db-selection.sh && bash -n scripts/setup-local-first.sh`
+- Build: `bash scripts/tests/test-installer-env-race-safety.sh && bash -n install.sh && bash -n scripts/setup-local-first.sh`
