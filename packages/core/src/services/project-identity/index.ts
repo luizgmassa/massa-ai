@@ -26,3 +26,23 @@ export {
 } from "./hash.js";
 export { ProjectIdentityError } from "./errors.js";
 export type { ProjectIdentityErrorCode } from "./errors.js";
+export {
+  discoverProjectIdentityStorage,
+  fingerprintProjectIdentityRows,
+  inspectIdentityPayload,
+  quoteDiscoveredIdentifier,
+} from "./discovery.js";
+export type {
+  DiscoveredDirectStore,
+  DiscoveredPayloadStore,
+  ProjectIdentityInventory,
+  ProjectIdentityQueryClient,
+  ProjectIdentityQueryResult,
+} from "./discovery.js";
+export { ProjectIdentityPreviewPlanner } from "./planner.js";
+export {
+  PROJECT_IDENTITY_REGISTRY_VERSION,
+  directStorePolicy,
+  isKnownRegistryTable,
+  payloadStorePolicies,
+} from "./registry.js";

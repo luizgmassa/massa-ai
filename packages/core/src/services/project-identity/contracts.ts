@@ -92,6 +92,8 @@ export interface ProjectIdentityPlanMaterial {
   stores: readonly ProjectIdentityStoreCount[];
   conflicts: readonly ProjectIdentityConflict[];
   unknownStores: readonly string[];
+  /** Digest of relevant source and target row material; detects changes without exposing it. */
+  storageFingerprint?: string;
 }
 
 export interface ProjectIdentityPreview extends ProjectIdentityPlanMaterial {
