@@ -66,5 +66,11 @@ describe("MCP tool discovery pagination", () => {
     const changed = registry(101);
     changed[0] = { ...changed[0]!, description: "Changed" };
     expectInvalid(cursor, changed);
+    const schemaChanged = registry(101);
+    schemaChanged[0] = {
+      ...schemaChanged[0]!,
+      inputSchema: { type: "object", properties: { changed: { type: "boolean" } } },
+    };
+    expectInvalid(cursor, schemaChanged);
   });
 });

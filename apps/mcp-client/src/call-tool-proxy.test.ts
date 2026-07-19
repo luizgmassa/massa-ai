@@ -173,4 +173,24 @@ describe("MCP CallTool HTTP method dispatch", () => {
     expect(JSON.parse(result.content[0]!.text)).toEqual(envelope);
     expect(result.content[0]!.text).not.toContain("API error");
   });
+
+  test("preserves PATCH and DELETE authentication failures with isError", async () => {
+    const envelope = { success: false, error: { code: "UNAUTHORIZED", message: "Invalid API key" } };
+    const methods: string[] = [];
+    const apiClient: ToolProxyApiClient = {
+      get: async () => { throw new Error("unexpected GET"); },
+      post: async () => { throw new Error("unexpected POST"); },
+      patch: async () => { methods.push("PATCH"); throw new ApiHttpError(401, envelope); },
+      delete: async () => { methods.push("DELETE"); throw new ApiHttpError(401, envelope); },
+    };
+    for (const [name, args] of [
+      ["synapse_update", { id: "session", taskContext: "updated" }],
+      ["synapse_end", { id: "session" }],
+    ] as const) {
+      const result = await proxyCallTool(apiClient, name, args);
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0]!.text)).toEqual(envelope);
+    }
+    expect(methods).toEqual(["PATCH", "DELETE"]);
+  });
 });
