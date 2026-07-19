@@ -8,37 +8,19 @@ name: Needles Gate
 # chunker-default changes, embedding-model swaps, or content shifts that would
 # otherwise only surface as a slow quality decay in real usage.
 #
-# The harness needs an embedding provider (Ollama + qwen3-embedding:8b). To
-# keep CI cheap and avoid hard-failing runners that can't reach a model, the
-# job is:
-#   - path-filtered (only runs when search/chunker/fixture files change, or on
-#     manual dispatch), AND
-#   - defensive: if Ollama or the model can't be brought up, the job exits 0
-#     with a clear "skipped — no embedding provider" message rather than
-#     failing the pipeline.
+# MANUAL-ONLY (workflow_dispatch) or local. qwen3-embedding:8b is ~60s/embed on
+# a 2-core free runner (~90min for the fixture), so the gate is impractical for
+# per-PR CI and would burn the free-tier quota. PR gating relies on the CI build
+# + structural-native jobs. Run on demand from the Actions tab, or locally with
+# `bun run bench:needles:gate`.
 #
-# Local equivalent:
-#   bun run bench:needles:gate
+# The job is defensive: if Ollama or the model can't be brought up, it exits 0
+# with a "skipped — no embedding provider" notice rather than erroring.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "packages/core/src/services/search/smart-chunker.ts"
-      - "packages/core/src/services/search/**"
-      - "benchmarks/needles/**"
-      - ".github/workflows/needles-gate.yml"
-  pull_request:
-    branches: [main]
-    paths:
-      - "packages/core/src/services/search/smart-chunker.ts"
-      - "packages/core/src/services/search/**"
-      - "benchmarks/needles/**"
-      - ".github/workflows/needles-gate.yml"
   workflow_dispatch: {}
 
-# Let an in-flight gate finish instead of being cancelled by a superseding
-# push to the same ref (the historical cause of every "cancelled" run).
+# Let an in-flight dispatched gate finish rather than racing a re-dispatch.
 concurrency:
   group: needles-${{ github.ref }}
   cancel-in-progress: false
