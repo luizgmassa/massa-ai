@@ -12,6 +12,15 @@ import { buildRewrittenFTSQuery } from "./query-understanding.js";
 import { applyProximityRerank } from "./lexical-search.js";
 import { eventBus } from "../events/event-bus.js";
 import type { ContextualSearchRLM } from "./contextual-search-rlm.js";
+import {
+  recordSearchDegradation,
+  recordSearchFailure,
+  searchBackendUnavailable,
+  SearchServiceError,
+  storeCorruption,
+  type SearchDegradation,
+  type SearchDegradationCode,
+} from "./search-diagnostics.js";
 
 // ── search ───────────────────────────────────────────────────────────────────
 
@@ -23,6 +32,8 @@ export type SearchOptions = {
   excludeFilters?: string[];
   /** Phase 2: Synapse session id forwarded for future Synapse-biased fusion. */
   sessionId?: string;
+  /** Receives bounded, sanitized evidence for optional search failures. */
+  onDegradations?: (degradations: readonly SearchDegradation[]) => void;
 };
 
 export async function searchImpl(
@@ -31,12 +42,30 @@ export async function searchImpl(
   projectId: string,
   options: SearchOptions = {},
 ): Promise<SearchResult[]> {
-  await rlm.ensureInitialized();
+  try {
+    await rlm.ensureInitialized();
+  } catch (error) {
+    const failure = searchBackendUnavailable("search_initialization", error);
+    recordSearchFailure(failure, projectId);
+    throw failure;
+  }
   const maxResults = options.maxResults ?? 10;
   const minScore = options.minScore ?? 0.3;
   const explainScores = options.explainScores || false;
   const includeFilters = options.includeFilters;
   const excludeFilters = options.excludeFilters;
+  const degradations: SearchDegradation[] = [];
+  const degrade = (
+    code: SearchDegradationCode,
+    component: string,
+  ): void => {
+    if (degradations.length >= 10) return;
+    if (degradations.some((entry) => entry.code === code && entry.component === component)) {
+      return;
+    }
+    degradations.push(recordSearchDegradation(code, component, projectId));
+    options.onDegradations?.([...degradations]);
+  };
   const hasFileFilters =
     (includeFilters?.length ?? 0) > 0 || (excludeFilters?.length ?? 0) > 0;
   const retrievalLimit = hasFileFilters
@@ -88,11 +117,14 @@ export async function searchImpl(
     excludeFilters,
     retrievalWindow: "bounded-v1",
   };
-  const cachedResults = await rlm.searchCache.get(
-    query,
-    projectId,
-    cacheOptions,
-  );
+  let cachedResults: SearchResult[] | null;
+  try {
+    cachedResults = await rlm.searchCache.get(query, projectId, cacheOptions);
+  } catch (error) {
+    const failure = searchBackendUnavailable("search_cache_read", error);
+    recordSearchFailure(failure, projectId);
+    throw failure;
+  }
 
   if (cachedResults) {
     const endTime = performance.now();
@@ -108,15 +140,19 @@ export async function searchImpl(
     });
 
     // Track cache hit
-    rlm.analytics.trackSearch({
-      timestamp: Date.now(),
-      projectId,
-      query,
-      resultCount: cachedResults.length,
-      duration,
-      cacheHit: true,
-      score: rlm.calculateAvgScore(cachedResults),
-    });
+    try {
+      rlm.analytics.trackSearch({
+        timestamp: Date.now(),
+        projectId,
+        query,
+        resultCount: cachedResults.length,
+        duration,
+        cacheHit: true,
+        score: rlm.calculateAvgScore(cachedResults),
+      });
+    } catch {
+      degrade("SEARCH_ANALYTICS_UNAVAILABLE", "search_analytics");
+    }
 
     logger.info("Cache hit - returning cached results", {
       projectId,
@@ -125,80 +161,77 @@ export async function searchImpl(
       durationMs: `${duration}ms`,
       preciseMs: `${(endTime - startTime).toFixed(3)}ms`,
     });
-    return rlm.applySynapseState(
-      cachedResults,
-      query,
-      projectId,
-      options.sessionId,
-    );
+    try {
+      return await rlm.applySynapseState(
+        cachedResults,
+        query,
+        projectId,
+        options.sessionId,
+        degrade,
+      );
+    } catch {
+      degrade("SYNAPSE_UNAVAILABLE", "synapse");
+      return cachedResults;
+    }
   }
 
   try {
     const disableKeyword = process.env.SEARCH_DISABLE_KEYWORD === "true";
 
-    // ── Phase 2: query understanding (default-off, silent degrade) ──
-    // On any LLM throw/timeout/disabled, `understand()` returns null and we
-    // fall through silently to the original 2-stream path. This branch is
-    // also guarded by an outer try/catch so a defensive throw never escapes.
+    // ── Phase 2: query understanding (default-off, explicit degradation) ──
     let resultSets: SearchResult[][] = [];
     let usedQueryUnderstanding = false;
+    let understood: Awaited<ReturnType<typeof rlm.queryUnderstanding.understand>> = null;
     try {
       const qu = config.get("search").queryUnderstanding;
       if (qu?.enabled && query.trim()) {
-        const understood = await rlm.queryUnderstanding.understand(
+        understood = await rlm.queryUnderstanding.understand(
           query,
           projectId,
         );
-        if (understood) {
-          eventBus.publish("search:query-rewritten", {
-            query,
-            projectId,
-            expansions: understood.expansions,
-            keywords: understood.keywords,
-            hydeUsed: understood.hydeVector !== null,
-          });
-          const rewrittenFTS = buildRewrittenFTSQuery(
-            query,
-            understood.keywords,
-          );
-          const [v, k, h] = await Promise.all([
-            rlm.vectorStore.search(query, retrievalLimit, projectId),
-            disableKeyword
-              ? Promise.resolve([] as SearchResult[])
-              : rlm.keywordSearch
-                  .searchWithFilter(rewrittenFTS, { projectId }, retrievalLimit)
-                  .catch((err) => {
-                    logger.warn(
-                      "Keyword search (rewritten) failed — falling back to vector-only",
-                      { err: (err as Error).message },
-                    );
-                    return [] as SearchResult[];
-                  }),
-            understood.hydeVector
-              ? rlm.vectorStore.searchByEmbedding(
-                  understood.hydeVector,
-                  retrievalLimit,
-                  projectId,
-                )
-              : Promise.resolve([]),
-          ]);
-          resultSets = understood.hydeVector ? [v, k, h] : [v, k];
-          usedQueryUnderstanding = true;
-
-          logger.debug("Query understanding fan-out", {
-            vectorCount: v.length,
-            keywordCount: k.length,
-            hydeCount: h.length,
-            hydeUsed: understood.hydeVector !== null,
-          });
+        if (!understood) {
+          degrade("QUERY_UNDERSTANDING_UNAVAILABLE", "query_understanding");
         }
       }
-    } catch (e) {
-      logger.warn("query understanding failed — falling back to original path", {
-        err: (e as Error).message,
+    } catch {
+      degrade("QUERY_UNDERSTANDING_UNAVAILABLE", "query_understanding");
+    }
+
+    if (understood) {
+      eventBus.publish("search:query-rewritten", {
+        query,
+        projectId,
+        expansions: understood.expansions,
+        keywords: understood.keywords,
+        hydeUsed: understood.hydeVector !== null,
       });
-      resultSets = [];
-      usedQueryUnderstanding = false;
+      const rewrittenFTS = buildRewrittenFTSQuery(query, understood.keywords);
+      const vectorPromise = rlm.vectorStore
+        .search(query, retrievalLimit, projectId)
+        .catch((error) => { throw searchBackendUnavailable("vector_search", error); });
+      const keywordPromise = disableKeyword
+        ? Promise.resolve([] as SearchResult[])
+        : rlm.keywordSearch
+            .searchWithFilter(rewrittenFTS, { projectId }, retrievalLimit)
+            .catch((error) => { throw searchBackendUnavailable("keyword_search", error); });
+      const hydePromise = understood.hydeVector
+        ? rlm.vectorStore
+            .searchByEmbedding(understood.hydeVector, retrievalLimit, projectId)
+            .catch(() => {
+              degrade("QUERY_UNDERSTANDING_UNAVAILABLE", "hyde_search");
+              return [] as SearchResult[];
+            })
+        : Promise.resolve([] as SearchResult[]);
+      const [v, k, h] = await Promise.all([vectorPromise, keywordPromise, hydePromise]);
+      resultSets = understood.hydeVector && h.length > 0 ? [v, k, h] : [v, k];
+      usedQueryUnderstanding = true;
+
+      logger.debug("Query understanding fan-out", {
+        vectorCount: v.length,
+        keywordCount: k.length,
+        hydeCount: h.length,
+        hydeUsed: understood.hydeVector !== null,
+      });
     }
 
     if (!usedQueryUnderstanding) {
@@ -209,27 +242,21 @@ export async function searchImpl(
       const fetchN = retrievalLimit;
       const [vectorResults, keywordResults, trigramResults] =
         await Promise.all([
-          rlm.vectorStore.search(query, fetchN, projectId),
+          rlm.vectorStore
+            .search(query, fetchN, projectId)
+            .catch((error) => { throw searchBackendUnavailable("vector_search", error); }),
           disableKeyword
             ? Promise.resolve([] as SearchResult[])
             : rlm.keywordSearch
                 .searchWithFilter(query, { projectId }, fetchN)
-                .catch((err) => {
-                  logger.warn(
-                    "Keyword search failed — falling back to vector-only",
-                    { err: (err as Error).message },
-                  );
-                  return [] as SearchResult[];
-                }),
+                .catch((error) => { throw searchBackendUnavailable("keyword_search", error); }),
           // Trigram stream (best-effort; [] when tokenizer unavailable).
           disableKeyword || !rlm.keywordSearch.searchTrigram
             ? Promise.resolve([] as SearchResult[])
             : rlm.keywordSearch
                 .searchTrigram!(query, { projectId }, fetchN)
-                .catch((err) => {
-                  logger.debug("Trigram search failed (non-fatal)", {
-                    err: (err as Error).message,
-                  });
+                .catch(() => {
+                  degrade("TRIGRAM_UNAVAILABLE", "trigram_search");
                   return [] as SearchResult[];
                 }),
         ]);
@@ -249,17 +276,28 @@ export async function searchImpl(
       // "useEffect" that porter/trigram miss. Best-effort; skipped when no
       // correction applies or fuzzyCorrect is unavailable.
       if (!disableKeyword && typeof rlm.keywordSearch.fuzzyCorrect === "function") {
-        const corrected = await rlm.correctQuery(query);
+        let corrected: string | null = null;
+        try {
+          corrected = await rlm.correctQuery(query);
+        } catch {
+          degrade("FUZZY_SEARCH_UNAVAILABLE", "fuzzy_correction");
+        }
         if (corrected && corrected !== query.toLowerCase().trim()) {
           try {
             const [fuzzyKeyword, fuzzyTrigram] = await Promise.all([
               rlm.keywordSearch
                 .searchWithFilter(corrected, { projectId }, fetchN)
-                .catch(() => [] as SearchResult[]),
+                .catch(() => {
+                  degrade("FUZZY_SEARCH_UNAVAILABLE", "fuzzy_keyword_search");
+                  return [] as SearchResult[];
+                }),
               rlm.keywordSearch.searchTrigram
                 ? rlm.keywordSearch
                     .searchTrigram!(corrected, { projectId }, fetchN)
-                    .catch(() => [] as SearchResult[])
+                    .catch(() => {
+                      degrade("FUZZY_SEARCH_UNAVAILABLE", "fuzzy_trigram_search");
+                      return [] as SearchResult[];
+                    })
                 : Promise.resolve([] as SearchResult[]),
             ]);
             if (fuzzyKeyword.length > 0) resultSets.push(fuzzyKeyword);
@@ -269,10 +307,8 @@ export async function searchImpl(
               fuzzyKeywordCount: fuzzyKeyword.length,
               fuzzyTrigramCount: fuzzyTrigram.length,
             });
-          } catch (err) {
-            logger.debug("Fuzzy correction stream failed (non-fatal)", {
-              err: (err as Error).message,
-            });
+          } catch {
+            degrade("FUZZY_SEARCH_UNAVAILABLE", "fuzzy_search");
           }
         }
       }
@@ -284,7 +320,17 @@ export async function searchImpl(
     // RRF surfaces them mid-list. Silent-omit when empty/unavailable (the
     // resultSets length — and thus the search:reranked streamCount — reflects
     // the actual stream count). No graph-stream throw escapes this optional path.
-    const graphStream = await rlm.buildGraphStream(resultSets, maxResults, projectId);
+    let graphStream: SearchResult[] = [];
+    try {
+      graphStream = await rlm.buildGraphStream(
+        resultSets,
+        maxResults,
+        projectId,
+        degrade,
+      );
+    } catch {
+      degrade("GRAPH_AUGMENTATION_UNAVAILABLE", "graph_augmentation");
+    }
     if (graphStream.length > 0) {
       resultSets = [...resultSets, graphStream];
     }
@@ -299,7 +345,12 @@ export async function searchImpl(
     // stays low; equally-boosted results keep their RRF order.
     const rerankPool = Math.max(maxResults * 3, 20);
     const rerankInput = fusedResults.slice(0, rerankPool);
-    const rerankedTop = applyProximityRerank(rerankInput, query);
+    let rerankedTop = rerankInput;
+    try {
+      rerankedTop = applyProximityRerank(rerankInput, query);
+    } catch {
+      degrade("PROXIMITY_RERANK_UNAVAILABLE", "proximity_rerank");
+    }
     const fusedReranked = [
       ...rerankedTop,
       ...fusedResults.slice(rerankPool),
@@ -371,23 +422,36 @@ export async function searchImpl(
       : aboveThreshold.slice(0, maxResults);
 
     // Add context to results
-    const withContext = await rlm.addContextToResults(filtered, projectId);
+    let withContext: SearchResult[];
+    try {
+      withContext = await rlm.addContextToResults(filtered, projectId);
+    } catch (error) {
+      throw storeCorruption("search_result_hydration", error);
+    }
 
     // Cache the results
-    await rlm.searchCache.set(query, projectId, withContext, cacheOptions);
+    try {
+      await rlm.searchCache.set(query, projectId, withContext, cacheOptions);
+    } catch (error) {
+      throw searchBackendUnavailable("search_cache_write", error);
+    }
 
     const duration = Math.round(performance.now() - startTime); // Use performance.now() for consistency
 
     // Track cache miss
-    rlm.analytics.trackSearch({
-      timestamp: Date.now(),
-      projectId,
-      query,
-      resultCount: withContext.length,
-      duration,
-      cacheHit: false,
-      score: rlm.calculateAvgScore(withContext),
-    });
+    try {
+      rlm.analytics.trackSearch({
+        timestamp: Date.now(),
+        projectId,
+        query,
+        resultCount: withContext.length,
+        duration,
+        cacheHit: false,
+        score: rlm.calculateAvgScore(withContext),
+      });
+    } catch {
+      degrade("SEARCH_ANALYTICS_UNAVAILABLE", "search_analytics");
+    }
 
     logger.info("Contextual search completed", {
       projectId,
@@ -396,13 +460,22 @@ export async function searchImpl(
       duration,
     });
 
-    return rlm.applySynapseState(
-      withContext,
-      query,
-      projectId,
-      options.sessionId,
-    );
+    try {
+      return await rlm.applySynapseState(
+        withContext,
+        query,
+        projectId,
+        options.sessionId,
+        degrade,
+      );
+    } catch {
+      degrade("SYNAPSE_UNAVAILABLE", "synapse");
+      return withContext;
+    }
   } catch (error) {
+    if (error instanceof SearchServiceError) {
+      recordSearchFailure(error, projectId);
+    }
     logger.error("Contextual search failed", error as Error, {
       query,
       projectId,

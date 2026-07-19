@@ -76,6 +76,10 @@ import {
   calculateAvgScoreImpl,
   filterByPatternsImpl,
 } from "./rlm-search.js";
+import type {
+  SearchDegradation,
+  SearchDegradationReporter,
+} from "./search-diagnostics.js";
 import {
   clearProjectIndexImpl,
   getProjectStatsImpl,
@@ -285,6 +289,7 @@ export class ContextualSearchRLM {
       excludeFilters?: string[];
       /** Phase 2: Synapse session id forwarded for future Synapse-biased fusion. */
       sessionId?: string;
+      onDegradations?: (degradations: readonly SearchDegradation[]) => void;
     } = {},
   ): Promise<SearchResult[]> {
     return searchImpl(this, query, projectId, options);
@@ -300,8 +305,16 @@ export class ContextualSearchRLM {
     query: string,
     projectId: string,
     sessionId?: string,
+    reportDegradation?: SearchDegradationReporter,
   ): Promise<SearchResult[]> {
-    return applySynapseStateImpl(this, baseResults, query, projectId, sessionId);
+    return applySynapseStateImpl(
+      this,
+      baseResults,
+      query,
+      projectId,
+      sessionId,
+      reportDegradation,
+    );
   }
 
   /**
@@ -341,8 +354,15 @@ export class ContextualSearchRLM {
     resultSets: SearchResult[][],
     maxResults: number,
     projectId?: string,
+    reportDegradation?: SearchDegradationReporter,
   ): Promise<SearchResult[]> {
-    return buildGraphStreamImpl(this, resultSets, maxResults, projectId);
+    return buildGraphStreamImpl(
+      this,
+      resultSets,
+      maxResults,
+      projectId,
+      reportDegradation,
+    );
   }
 
   /**

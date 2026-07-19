@@ -13,6 +13,7 @@ import { getSynapseManager } from "../synapse/index.js";
 import { extractQueryTerms } from "./lexical-search.js";
 import type { AgentSession } from "../synapse/types.js";
 import type { ContextualSearchRLM } from "./contextual-search-rlm.js";
+import type { SearchDegradationReporter } from "./search-diagnostics.js";
 
 /**
  * Apply session state after the session-independent base result is cached.
@@ -24,6 +25,7 @@ export async function applySynapseStateImpl(
   query: string,
   projectId: string,
   sessionId?: string,
+  reportDegradation?: SearchDegradationReporter,
 ): Promise<SearchResult[]> {
   if (!sessionId) return baseResults;
 
@@ -32,6 +34,7 @@ export async function applySynapseStateImpl(
   try {
     session = await registry.getAsync(sessionId);
   } catch (error) {
+    reportDegradation?.("SYNAPSE_UNAVAILABLE", "synapse_session_lookup");
     logger.warn("Synapse session lookup failed — using stateless search", {
       sessionId,
       projectId,
@@ -46,11 +49,22 @@ export async function applySynapseStateImpl(
 
   const synapseManager = rlm.injectedDeps?.synapseManager ?? getSynapseManager();
   const allowBufferInjection = session.workspaceId === projectId;
-  const processed = synapseManager.process(baseResults, query, {
-    session,
-    projectId,
-    allowBufferInjection,
-  });
+  let processed;
+  try {
+    processed = synapseManager.process(baseResults, query, {
+      session,
+      projectId,
+      allowBufferInjection,
+    });
+  } catch (error) {
+    reportDegradation?.("SYNAPSE_UNAVAILABLE", "synapse_processing");
+    logger.warn("Synapse processing failed — using stateless search", {
+      sessionId,
+      projectId,
+      error: (error as Error).message,
+    });
+    return baseResults;
+  }
   const baseIds = new Set(baseResults.map((result) => result.id));
 
   return processed.results.filter((result) => {
@@ -117,6 +131,7 @@ export async function buildGraphStreamImpl(
   resultSets: SearchResult[][],
   maxResults: number,
   projectId?: string,
+  reportDegradation?: SearchDegradationReporter,
 ): Promise<SearchResult[]> {
   try {
     // Seed candidates = top-N ids + derived filePath/symbol anchors from the
@@ -167,6 +182,7 @@ export async function buildGraphStreamImpl(
             if (typeof row.id === "string") seedIds.add(row.id);
           }
         } catch {
+          reportDegradation?.("GRAPH_AUGMENTATION_UNAVAILABLE", "graph_anchor_lookup");
           // Defensive: a single anchor lookup never aborts bridging.
         }
       }
@@ -218,6 +234,7 @@ export async function buildGraphStreamImpl(
     }
     return out;
   } catch (e) {
+    reportDegradation?.("GRAPH_AUGMENTATION_UNAVAILABLE", "graph_augmentation");
     logger.debug("graph stream omitted", {
       err: (e as Error).message,
     });
