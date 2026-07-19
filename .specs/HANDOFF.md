@@ -1,5 +1,16 @@
 # AI Engineering Handoff
 
+## Current: Wave 3 / M19 Installer Race Safety
+
+- projectId: `massa-th0th`; workflowSessionId: `spec-wave-3`
+- branch: `wave-3`; isolated worktree: `massa-th0th-wt-wave-3`
+- active feature: `installer-race-safety`
+- exact next step: implement TASK-M19-1, run focused gate, then dispatch independent verifier.
+- sequence after M19: M20+M54, M50, M16+M17, M45+M47, M21.
+- mandatory unavailable gates block the relevant feature. Do not weaken validation assets.
+
+---
+
 ## Current: Multi-Language Tree-sitter Breadth
 
 Implement `plan-multi-language.md` under workflow session `spec-multi-language`. Canonical feature artifacts live in `.specs/features/multi-language-tree-sitter-breadth/`.

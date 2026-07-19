@@ -1,5 +1,22 @@
 # massa-th0th Spec State
 
+## Wave 3 — Active
+
+- projectId: `massa-th0th`
+- workflowSessionId: `spec-wave-3`
+- workflow: spec-driven
+- feature: `installer-race-safety` (M19)
+- status: Specify, Design, and Tasks approved from supplied Wave 3 plan; Execute pending
+- branch/worktree: `wave-3` / `massa-th0th-wt-wave-3`
+- sequence: M19 → M20+M54 → M50 → M16+M17 → M45+M47 → M21
+- invariant: `sqlite-removal` stays `in_progress`; `multi-language-tree-sitter-breadth` reconciled to `complete` from its recorded PASS evidence.
+
+### Wave 3 Next Step
+
+Implement and independently verify M19 installer race safety. Mandatory unavailable platform gates block completion rather than being waived.
+
+---
+
 ## Current
 
 - projectId: `massa-th0th`

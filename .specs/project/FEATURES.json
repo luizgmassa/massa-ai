@@ -234,15 +234,51 @@
     {
       "slug": "multi-language-tree-sitter-breadth",
       "title": "Native Tree-sitter structural indexing across 33 extensions",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
         "design": true,
         "tasks": true,
-        "execute": false
+        "execute": true
       }
+    },
+    {
+      "slug": "installer-race-safety",
+      "title": "M19 — installer race safety",
+      "status": "in_progress", "priority": "P0",
+      "phases": { "specify": true, "design": true, "tasks": true, "execute": false }
+    },
+    {
+      "slug": "synapse-mcp-parity-discovery-pagination",
+      "title": "M20 + M54 — Synapse MCP parity and discovery pagination",
+      "status": "pending", "priority": "P1",
+      "phases": { "specify": false, "design": false, "tasks": false, "execute": false }
+    },
+    {
+      "slug": "tiered-fail-loud-search",
+      "title": "M50 — corruption surfacing and tiered fail-loud search",
+      "status": "pending", "priority": "P0",
+      "phases": { "specify": false, "design": false, "tasks": false, "execute": false }
+    },
+    {
+      "slug": "transactional-project-identity",
+      "title": "M16 + M17 — project rename, merge, and cache invalidation",
+      "status": "pending", "priority": "P0",
+      "phases": { "specify": false, "design": false, "tasks": false, "execute": false }
+    },
+    {
+      "slug": "hook-attribution-repair",
+      "title": "M45 + M47 — sticky hook attribution and repair",
+      "status": "pending", "priority": "P1",
+      "phases": { "specify": false, "design": false, "tasks": false, "execute": false }
+    },
+    {
+      "slug": "linux-native-structural-runtime",
+      "title": "M21 — native Linux glibc x64 support",
+      "status": "pending", "priority": "P0",
+      "phases": { "specify": false, "design": false, "tasks": false, "execute": false }
     }
   ],
-  "active_feature": "multi-language-tree-sitter-breadth"
+  "active_feature": "installer-race-safety"
 }
