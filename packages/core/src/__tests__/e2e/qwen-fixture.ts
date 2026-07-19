@@ -122,8 +122,8 @@ export async function validateQwenFixtureManifest(
   ) {
     throw new Error("qwen fixture profile must be version 1 / ollama / qwen3-embedding:8b / 4096");
   }
-  if (manifest.needleTargets.length !== 5) {
-    throw new Error("qwen fixture must contain exactly five unique needle target files");
+  if (manifest.needleTargets.length !== 6) {
+    throw new Error("qwen fixture must contain exactly six unique needle target files");
   }
   if (manifest.distractors.length !== 20) {
     throw new Error("qwen fixture must contain exactly twenty tracked source distractors");
