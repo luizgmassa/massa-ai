@@ -156,6 +156,7 @@ model Workspace {
   imports      SymbolImport[]
   centralities SymbolCentrality[]
   graphGenerations GraphGeneration[] @relation("GenerationWorkspace")
+  identityAliases ProjectIdentityAlias[] @relation("ProjectIdentityAliasTarget")
   activeGraphGeneration GraphGeneration? @relation("WorkspaceActiveGraphGeneration", fields: [projectId, activeGraphGenerationId], references: [projectId, id], onDelete: SetNull)
   pendingGraphGeneration GraphGeneration? @relation("WorkspacePendingGraphGeneration", fields: [projectId, pendingGraphGenerationId], references: [projectId, id], onDelete: SetNull)
 
@@ -660,4 +661,36 @@ model Checkpoint {
   @@index([createdAt])
   @@index([checkpointType])
   @@map("task_checkpoints")
+}
+
+// Durable retired-ID compatibility and strict identity-operation audit.
+model ProjectIdentityAlias {
+  retiredProjectId String   @id @map("retired_project_id")
+  targetProjectId  String   @map("target_project_id")
+  canonicalRoot    String   @map("canonical_root")
+  operationId      String   @map("operation_id")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  target            Workspace @relation("ProjectIdentityAliasTarget", fields: [targetProjectId], references: [projectId], onDelete: Restrict, onUpdate: Cascade)
+  operation         ProjectIdentityOperation @relation(fields: [operationId], references: [operationId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([targetProjectId])
+  @@map("project_identity_aliases")
+}
+
+model ProjectIdentityOperation {
+  operationId        String   @id @map("operation_id")
+  mode               String
+  sourceProjectId    String   @map("source_project_id")
+  targetProjectId    String   @map("target_project_id")
+  sourceCanonicalRoot String  @map("source_canonical_root")
+  targetCanonicalRoot String  @map("target_canonical_root")
+  requestHash        String   @map("request_hash")
+  planHash           String   @map("plan_hash")
+  result             Json
+  committedAt        DateTime @default(now()) @map("committed_at") @db.Timestamptz(6)
+  aliases            ProjectIdentityAlias[]
+
+  @@index([sourceProjectId])
+  @@index([targetProjectId])
+  @@map("project_identity_operations")
 }

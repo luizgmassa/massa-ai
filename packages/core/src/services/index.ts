@@ -24,6 +24,9 @@ export type {
   SearchFailureCode,
 } from "./search/search-diagnostics.js";
 
+// Transactional project identity (M16 + M17)
+export * from "./project-identity/index.js";
+
 // Cache
 export { L1MemoryCache } from "./cache/l1-memory-cache.js";
 export { EmbeddingCachePg } from "./cache/embedding-cache-pg.js";
