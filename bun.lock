@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "massa-th0th",
@@ -14,7 +15,7 @@
     },
     "apps/mcp-client": {
       "name": "@massa-th0th/mcp-client",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "bin": {
         "massa-th0th": "dist/index.js",
         "massa-th0th-config": "dist/config-cli.js",
@@ -31,7 +32,7 @@
     },
     "apps/opencode-plugin": {
       "name": "@massa-th0th/opencode-plugin",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "bin": {
         "massa-th0th-config": "dist/config-cli.js",
       },
@@ -48,7 +49,7 @@
     },
     "apps/tools-api": {
       "name": "@massa-th0th/tools-api",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "bin": {
         "massa-th0th-api": "dist/index.js",
       },
@@ -67,18 +68,18 @@
     },
     "apps/web-ui": {
       "name": "@massa-th0th/web-ui",
-      "version": "1.0.0",
+      "version": "1.1.0",
     },
     "packages/core": {
       "name": "@massa-th0th/core",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "dependencies": {
         "@ai-sdk/cohere": "^3.0.17",
         "@ai-sdk/google": "^3.0.19",
         "@ai-sdk/mistral": "^3.0.17",
         "@ai-sdk/openai": "^3.0.24",
         "@huggingface/transformers": "^3.0.0",
-        "@massa-th0th/shared": "workspace:*",
+        "@massa-th0th/shared": "1.0.0",
         "@prisma/adapter-pg": "^7.5.0",
         "@prisma/client": "^7.5.0",
         "@prisma/client-runtime-utils": "^7.3.0",
@@ -132,7 +133,7 @@
     },
     "packages/shared": {
       "name": "@massa-th0th/shared",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "dependencies": {
         "dotenv": "^17.2.4",
       },
@@ -885,11 +886,11 @@
 
     "tree-sitter-cpp": ["tree-sitter-cpp@0.23.4", "", { "dependencies": { "node-addon-api": "^8.2.1", "node-gyp-build": "^4.8.2", "tree-sitter-c": "^0.23.1" }, "peerDependencies": { "tree-sitter": "^0.21.1" }, "optionalPeers": ["tree-sitter"] }, "sha512-qR5qUDyhZ5jJ6V8/umiBxokRbe89bCGmcq/dk94wI4kN86qfdV8k0GHIUEKaqWgcu42wKal5E97LKpLeVW8sKw=="],
 
-    "tree-sitter-dart": ["tree-sitter-dart@github:UserNobody14/tree-sitter-dart#be07cf7", { "dependencies": { "node-addon-api": "^8.9.0", "node-gyp-build": "^4.8.4" }, "peerDependencies": { "tree-sitter": "^0.25.0" } }, "UserNobody14-tree-sitter-dart-be07cf7"],
+    "tree-sitter-dart": ["tree-sitter-dart@github:UserNobody14/tree-sitter-dart#be07cf7", { "dependencies": { "node-addon-api": "^8.9.0", "node-gyp-build": "^4.8.4" }, "peerDependencies": { "tree-sitter": "^0.25.0" } }, "UserNobody14-tree-sitter-dart-be07cf7", "sha512-QgrosNMEHXVKuGERB1cp9IhdhjFZCdGXFps3eWxNteFSgG0vJ4EmmAonW6WS3lZeqGYDvgTx9qb0ZcbaXXbCCg=="],
 
     "tree-sitter-elixir": ["tree-sitter-elixir@0.3.5", "", { "dependencies": { "node-addon-api": "^7.1.0", "node-gyp-build": "^4.8.0" }, "peerDependencies": { "tree-sitter": "^0.21.0" } }, "sha512-xozQMvYK0aSolcQZAx2d84Xe/YMWFuRPYFlLVxO01bM2GITh5jyiIp0TqPCQa8754UzRAI7A83hZmfiYub5TZQ=="],
 
-    "tree-sitter-erlang": ["tree-sitter-erlang@github:WhatsApp/tree-sitter-erlang#836aa2b", { "dependencies": { "node-addon-api": "^7.1.0", "node-gyp-build": "^4.8.0", "prettier": "^2.2.1", "tree-sitter-cli": "^0.23.0" }, "peerDependencies": { "tree-sitter": "^0.22.4" } }, "WhatsApp-tree-sitter-erlang-836aa2b"],
+    "tree-sitter-erlang": ["tree-sitter-erlang@github:WhatsApp/tree-sitter-erlang#836aa2b", { "dependencies": { "node-addon-api": "^7.1.0", "node-gyp-build": "^4.8.0", "prettier": "^2.2.1", "tree-sitter-cli": "^0.23.0" }, "peerDependencies": { "tree-sitter": "^0.22.4" } }, "WhatsApp-tree-sitter-erlang-836aa2b", "sha512-UiRpasRSoyfd9XrY5vG9y2yxg5wW1uPjAyNq7VvG7iASSCRbnGiRmt3QHt2EYjOAo835Nzdn4He2ywwes9acmQ=="],
 
     "tree-sitter-go": ["tree-sitter-go@0.25.0", "", { "dependencies": { "node-addon-api": "^8.3.1", "node-gyp-build": "^4.8.4" }, "peerDependencies": { "tree-sitter": "^0.25.0" }, "optionalPeers": ["tree-sitter"] }, "sha512-APBc/Dq3xz/e35Xpkhb1blu5UgW+2E3RyGWawZSCNcbGwa7jhSQPS8KsUupuzBla8PCo8+lz9W/JDJjmfRa2tw=="],
 
@@ -966,6 +967,8 @@
     "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 
     "zod-to-json-schema": ["zod-to-json-schema@3.25.2", "", { "peerDependencies": { "zod": "^3.25.28 || ^4" } }, "sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA=="],
+
+    "@massa-th0th/core/@massa-th0th/shared": ["@massa-th0th/shared@1.0.0", "", { "dependencies": { "dotenv": "^17.2.4" } }, "sha512-JxwrAtmJauMT/PoC/yZR2lUpX1iycrEwq6Cmlv+D1PgjuZXYPVTVNC1GJRfaEyRYpeDV6MFXWU9QhIitHKl6BQ=="],
 
     "@massa-th0th/opencode-plugin/@types/node": ["@types/node@22.20.0", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-QWlFW2wf3nTjC13/DqRnBpR4ZO36VJH/JVBkA/vcnmbTBNQIlnObqyqZE1tUR7+Ni23Lda8R1BxMfbXRpCUx5g=="],
 
