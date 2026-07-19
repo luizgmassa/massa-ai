@@ -17,8 +17,8 @@ const ROOT = resolve(import.meta.dir, "../..");
 describe("macOS arm64 packed Tree-sitter artifact contract", () => {
   test("freezes publish-safe manifests and exact build tools", () => {
     expect(verifyPackageArtifactStaticContract()).toEqual({
-      sharedVersion: "1.0.0",
-      coreVersion: "1.0.0",
+      sharedVersion: "1.1.0",
+      coreVersion: "1.1.0",
       trustedDependencies: 27,
     });
     expect(EXPECTED_NPM_VERSION).toBe("11.14.1");
