@@ -10,9 +10,8 @@
  *  - State machine: open → accepted | expired (both terminal).
  *  - accept/cancel only valid on an `open` row; everything else is a
  *    clear `{ok:false, reason}` failure (never a silent no-op).
- *  - Silent degradation: optional LLM summary-polish is default-off and
- *    best-effort; store/memory insert failures become `{ok:false}`
- *    results. NEVER throws to the caller.
+ *  - Optional LLM summary-polish and memory dual-write are best-effort.
+ *    Canonical handoff-store failures propagate as sanitized typed errors.
  *  - Backend-polymorphic via the HandoffStore factory (no
  *    `isPostgresEnabled()` short-circuit).
  *
@@ -149,11 +148,7 @@ export class HandoffService {
       acceptedAt: null,
     };
 
-    try {
-      this.store.insert(record);
-    } catch {
-      return { ok: false, reason: "store-failed" };
-    }
+    await this.store.insert(record);
 
     // R5 dual-write: best-effort searchable memory.
     let memoryId: string | null = null;
@@ -199,12 +194,7 @@ export class HandoffService {
       return { ok: false, reason: "missing-id" };
     }
 
-    let row: HandoffRecord | null;
-    try {
-      row = this.store.getById(params.id);
-    } catch {
-      return { ok: false, reason: "store-failed" };
-    }
+    const row = await this.store.getById(params.id);
     if (!row) return { ok: false, reason: "not-found" };
 
     if (params.projectId && row.projectId !== params.projectId) {
@@ -215,12 +205,7 @@ export class HandoffService {
     }
 
     const acceptedAt = target === "accepted" ? Date.now() : undefined;
-    let updated: HandoffRecord | null;
-    try {
-      updated = this.store.setStatus(params.id, target, acceptedAt);
-    } catch {
-      return { ok: false, reason: "store-failed" };
-    }
+    const updated = await this.store.setStatus(params.id, target, acceptedAt);
     if (!updated) return { ok: false, reason: "store-failed" };
     if (updated.status !== target) return { ok: false, reason: "not-open" };
 
@@ -240,12 +225,8 @@ export class HandoffService {
 
   // ── listPending (R3 surfacing) ────────────────────────────────────────────
 
-  listPending(projectId: string, targetAgent?: string | null): HandoffRecord[] {
-    try {
-      return this.store.listPending(projectId, targetAgent ?? undefined);
-    } catch {
-      return [];
-    }
+  async listPending(projectId: string, targetAgent?: string | null): Promise<HandoffRecord[]> {
+    return this.store.listPending(projectId, targetAgent ?? undefined);
   }
 }
 

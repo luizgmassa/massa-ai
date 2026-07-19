@@ -98,8 +98,8 @@ describe.skipIf(!DEDICATED_DB)("handoff/proposal PostgreSQL parity", () => {
         nextSteps: ["n1"],
         files: ["a.ts", "b.ts"],
       });
-      store.insert(record);
-      expect(store.getById(record.id)).toEqual(record);
+      await store.insert(record);
+      expect(await store.getById(record.id)).toEqual(record);
       await store.__drain();
 
       const rows = await prisma.$queryRaw<any[]>`
@@ -108,8 +108,8 @@ describe.skipIf(!DEDICATED_DB)("handoff/proposal PostgreSQL parity", () => {
       expect(rows[0].source_session_id).toBeNull();
       expect(rows[0].target_agent).toBeNull();
       expect(JSON.parse(rows[0].open_questions_json)).toEqual(["q1", "q2"]);
-      expect(store.getById("missing")).toBeNull();
-      expect(store.journalMode()).toBe("postgres");
+      expect(await store.getById("missing")).toBeNull();
+      expect(await store.journalMode()).toBe("postgres");
     });
 
     test("listPending mirrors project/target/null filters and oldest-first ordering", async () => {
@@ -117,22 +117,22 @@ describe.skipIf(!DEDICATED_DB)("handoff/proposal PostgreSQL parity", () => {
       await store.__hydrate();
       const pid = projectId();
       const now = Date.now();
-      store.insert(handoff({ id: "pg-h-1", projectId: pid, targetAgent: "a1", createdAt: now }));
-      store.insert(handoff({ id: "pg-h-2", projectId: pid, targetAgent: "a2", createdAt: now + 10 }));
-      store.insert(handoff({ id: "pg-h-3", projectId: pid, targetAgent: null, createdAt: now + 5 }));
-      store.insert(handoff({ id: "pg-h-4", projectId: projectId(), targetAgent: "a1" }));
-      expect(store.listPending(pid).map((row) => row.id)).toEqual([
+      await store.insert(handoff({ id: "pg-h-1", projectId: pid, targetAgent: "a1", createdAt: now }));
+      await store.insert(handoff({ id: "pg-h-2", projectId: pid, targetAgent: "a2", createdAt: now + 10 }));
+      await store.insert(handoff({ id: "pg-h-3", projectId: pid, targetAgent: null, createdAt: now + 5 }));
+      await store.insert(handoff({ id: "pg-h-4", projectId: projectId(), targetAgent: "a1" }));
+      expect((await store.listPending(pid)).map((row) => row.id)).toEqual([
         "pg-h-1",
         "pg-h-3",
         "pg-h-2",
       ]);
-      expect(store.listPending(pid, "a1").map((row) => row.id)).toEqual([
+      expect((await store.listPending(pid, "a1")).map((row) => row.id)).toEqual([
         "pg-h-1",
         "pg-h-3",
       ]);
-      expect(store.listPending(pid, "none").map((row) => row.id)).toEqual(["pg-h-3"]);
-      store.setStatus("pg-h-1", "accepted", 1234);
-      expect(store.listPending(pid).map((row) => row.id)).toEqual(["pg-h-3", "pg-h-2"]);
+      expect((await store.listPending(pid, "none")).map((row) => row.id)).toEqual(["pg-h-3"]);
+      await store.setStatus("pg-h-1", "accepted", 1234);
+      expect((await store.listPending(pid)).map((row) => row.id)).toEqual(["pg-h-3", "pg-h-2"]);
       await store.__drain();
     });
 
@@ -141,45 +141,46 @@ describe.skipIf(!DEDICATED_DB)("handoff/proposal PostgreSQL parity", () => {
       await store.__hydrate();
       const accepted = handoff({ id: "pg-h-accepted" });
       const expired = handoff({ id: "pg-h-expired" });
-      store.insert(accepted);
-      store.insert(expired);
-      expect(store.setStatus(accepted.id, "accepted", 1234)).toMatchObject({
+      await store.insert(accepted);
+      await store.insert(expired);
+      expect(await store.setStatus(accepted.id, "accepted", 1234)).toMatchObject({
         status: "accepted",
         acceptedAt: 1234,
       });
-      expect(store.setStatus(accepted.id, "expired")!.status).toBe("accepted");
-      expect(store.setStatus(expired.id, "expired")).toMatchObject({
+      expect((await store.setStatus(accepted.id, "expired"))!.status).toBe("accepted");
+      expect(await store.setStatus(expired.id, "expired")).toMatchObject({
         status: "expired",
         acceptedAt: null,
       });
-      expect(store.setStatus("missing", "accepted")).toBeNull();
+      expect(await store.setStatus("missing", "accepted")).toBeNull();
       await store.__drain();
-      expect(store.getById(accepted.id)).toMatchObject({ status: "accepted", acceptedAt: 1234 });
+      expect(await store.getById(accepted.id)).toMatchObject({ status: "accepted", acceptedAt: 1234 });
     });
 
     test("fresh store hydrates persisted rows after restart", async () => {
       const record = handoff();
       const first = new PgHandoffStore();
       await first.__hydrate();
-      first.insert(record);
+      await first.insert(record);
       await first.__drain();
       const restarted = new PgHandoffStore();
       await restarted.__hydrate();
-      expect(restarted.getById(record.id)).toEqual(record);
+      expect(await restarted.getById(record.id)).toEqual(record);
     });
 
     test("concurrent terminal transitions have one durable winner", async () => {
       const seed = new PgHandoffStore();
       await seed.__hydrate();
       const record = handoff();
-      seed.insert(record);
+      await seed.insert(record);
       await seed.__drain();
       const acceptor = new PgHandoffStore();
       const expirer = new PgHandoffStore();
       await Promise.all([acceptor.__hydrate(), expirer.__hydrate()]);
-      acceptor.setStatus(record.id, "accepted", 1000);
-      expirer.setStatus(record.id, "expired");
-      await Promise.all([acceptor.__drain(), expirer.__drain()]);
+      await Promise.all([
+        acceptor.setStatus(record.id, "accepted", 1000),
+        expirer.setStatus(record.id, "expired"),
+      ]);
       const rows = await prisma.$queryRaw<any[]>`
         SELECT status, accepted_at FROM handoffs WHERE id = ${record.id}`;
       expect(["accepted", "expired"]).toContain(rows[0].status);
@@ -288,7 +289,7 @@ describe.skipIf(!DEDICATED_DB)("handoff/proposal PostgreSQL parity", () => {
     ]);
     const h = handoff();
     const p = proposal();
-    handoffStore.insert(h);
+    await handoffStore.insert(h);
     proposalStore.insert(p);
     await Promise.all([
       (handoffStore as PgHandoffStore).__drain(),

@@ -175,7 +175,7 @@ export const handoffRoutes = new Elysia({ prefix: "/api/v1/handoff" })
         return { status: 400, error: "projectId required" };
       }
       try {
-        const pending = service().listPending(b.projectId, b.targetAgent);
+        const pending = await service().listPending(b.projectId, b.targetAgent);
         set.status = 200;
         return {
           success: true,
