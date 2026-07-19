@@ -267,7 +267,7 @@ async function main(): Promise<void> {
   log(`corpus: ${entries.length} files, ${manifest.totalBytes} bytes`);
 
   // Resolve the runner command. The benchmark runs under the same Bun that
-  // the repo pins (1.3.11); prefer the explicit workspace bun.
+  // the repo pins (1.3.14); prefer the explicit workspace bun.
   const bunCommand = "bun";
 
   // 2. Measure candidate (fresh process per sample).

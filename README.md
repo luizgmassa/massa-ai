@@ -811,7 +811,7 @@ dependency centrality. This supersedes the earlier best-effort typed-edge pass.
 The native runtime is correct and verified; no WASM or runtime/post-install
 download is used.
 
-**Native target:** macOS arm64 only. Application runtime is **Bun `1.3.11`**;
+**Native target:** macOS arm64 only. Application runtime is **Bun `1.3.14`**;
 **Node `25.9.0`** (npm `11.14.1`) is a build-only `node-gyp` helper, not the
 application runtime. `tree-sitter@0.25.0` carries a repository patch
 (SHA-256 `e79aec7b96eb8114e85ebcb90f0a8b12076bcd8aa08c09bb88929621e1c1446d`:
@@ -923,7 +923,7 @@ The native toolchain is gated by deterministic verifiers, not hand-checked claim
 | `bun run verify:tree-sitter-package` | Packed `npm` tarball bundles the nested patched runtime + generated arm64 addon |
 | `bun run type-check` / `bun run build` | Workspace type-check (6/6) and build (5/5) |
 | `bun run bench:parser -- --baseline 5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03` | Frozen parser benchmark vs. the regex baseline |
-| `.github/workflows/native-macos-arm64.yml` | macOS arm64 CI: Bun `1.3.11`, Node `25.9.0`/npm `11.14.1`, frozen install, build, `verify:tree-sitter-native`, provenance upload |
+| `.github/workflows/native-macos-arm64.yml` | macOS arm64 CI: Bun `1.3.14`, Node `25.9.0`/npm `11.14.1`, frozen install, build, `verify:tree-sitter-native`, provenance upload |
 
 ### Performance status (honest)
 

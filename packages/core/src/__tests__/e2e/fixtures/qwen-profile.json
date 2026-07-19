@@ -114,11 +114,11 @@
   "supportFiles": [
     {
       "path": "README.md",
-      "sha256": "c8351b321a1d2981b7731ebf739d894f5d9da0e4eb53f10f133349351bf43afd"
+      "sha256": "33b524453a73873b94255959b10e5c25a6b575dc1a627efff8d94c63ff58065c"
     },
     {
       "path": "package.json",
-      "sha256": "4803ecb3a290fd7bb672f7c791e6139e761056a668b4a07934d8aae5cb6b302f"
+      "sha256": "e78af83065d27b5304f8de6bd10317e6f5b39a5157174839c8a1c484da04223c"
     },
     {
       "path": "turbo.json",
@@ -130,7 +130,7 @@
     },
     {
       "path": "packages/core/package.json",
-      "sha256": "40ca0ec2d7fecdf9e5bcd6341e28eb8cbeee933b6e937619b7b23d6123079dcd"
+      "sha256": "5993f233699c7697d48ad76418e1a437ba8fc66d4acaadd1f15e95b4d5cae369"
     },
     {
       "path": "packages/shared/package.json",

@@ -95,29 +95,42 @@ function findRank(needle: Needle, hits: Hit[], tol: number): { rank: number | nu
   return { rank: null, hit: null };
 }
 
-// ── Embedding (Ollama /api/embeddings, sequential to respect the mutex) ────
+// ── Embedding (Ollama /api/embeddings, bounded-parallel pool) ─────────────
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? "http://localhost:11434";
 const DEFAULT_MODEL = process.env.NEEDLE_MODEL ?? "qwen3-embedding:8b";
 
 async function embed(text: string, model: string): Promise<number[]> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 120_000);
-  try {
-    const res = await fetch(`${OLLAMA_HOST}/api/embeddings`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model, prompt: text.slice(0, 8000) }),
-      signal: ctrl.signal,
-    });
-    if (!res.ok) {
-      throw new Error(`Ollama embeddings HTTP ${res.status}: ${await res.text()}`);
+  // Ollama on a constrained CI runner can serialize/queue concurrent embedding
+  // requests, so a single request can exceed a tight per-call timeout. Use a
+  // generous timeout and retry transient failures (abort under contention, a
+  // dropped connection) so one slow request never sinks the whole run.
+  const maxAttempts = 3;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 300_000);
+    try {
+      const res = await fetch(`${OLLAMA_HOST}/api/embeddings`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ model, prompt: text.slice(0, 8000) }),
+        signal: ctrl.signal,
+      });
+      if (!res.ok) {
+        throw new Error(`Ollama embeddings HTTP ${res.status}: ${await res.text()}`);
+      }
+      const json = (await res.json()) as { embedding?: number[]; error?: string };
+      if (!json.embedding) throw new Error(`Ollama error: ${json.error ?? "no embedding"}`);
+      return json.embedding;
+    } catch (err) {
+      lastError = err;
+      if (attempt === maxAttempts) break;
+      await new Promise((r) => setTimeout(r, 1000 * attempt));
+    } finally {
+      clearTimeout(timer);
     }
-    const json = (await res.json()) as { embedding?: number[]; error?: string };
-    if (!json.embedding) throw new Error(`Ollama error: ${json.error ?? "no embedding"}`);
-    return json.embedding;
-  } finally {
-    clearTimeout(timer);
   }
+  throw lastError;
 }
 
 function cosine(a: number[], b: number[]): number {
@@ -131,6 +144,40 @@ function cosine(a: number[], b: number[]): number {
   }
   if (na === 0 || nb === 0) return 0;
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+// Bounded-concurrency map that preserves input order (results[i] ↔ items[i]).
+// This standalone harness hits localhost Ollama over plain HTTP — there is no
+// live-stack embedding mutex here, so embedding can safely fan out. Determinism
+// is preserved by index alignment plus sequential scoring downstream.
+// Default 1 (sequential): the embed phase is Ollama-bound, and on a constrained
+// CI runner an 8B model serializes concurrent requests — fanning out mostly adds
+// per-call timeout risk (a queued request aborts). Raise NEEDLE_EMBED_CONCURRENCY
+// only on hosts where Ollama truly parallelizes (num_parallel > 1, enough RAM/CPU).
+const EMBED_CONCURRENCY = Math.max(1, Number(process.env.NEEDLE_EMBED_CONCURRENCY ?? "1") || 1);
+
+async function mapPool<T, R>(
+  items: T[],
+  worker: (item: T, index: number) => Promise<R>,
+  concurrency: number,
+  onProgress?: (done: number, total: number) => void,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  const total = items.length;
+  let next = 0;
+  let done = 0;
+  const size = Math.max(1, Math.min(concurrency, total));
+  async function run(): Promise<void> {
+    while (true) {
+      const i = next++;
+      if (i >= total) return;
+      results[i] = await worker(items[i], i);
+      done++;
+      onProgress?.(done, total);
+    }
+  }
+  await Promise.all(Array.from({ length: size }, () => run()));
+  return results;
 }
 
 // ── CLI args ───────────────────────────────────────────────────────────────
@@ -216,12 +263,15 @@ async function main() {
   }
 
   // Embed all chunk contents ONCE (cache by content; queries are separate).
-  console.log(`\nEmbedding ${allChunks.length} chunks (sequential)...`);
-  const chunkVecs: number[][] = [];
-  for (let i = 0; i < allChunks.length; i++) {
-    chunkVecs.push(await embed(allChunks[i].content, model));
-    if ((i + 1) % 10 === 0) process.stdout.write(`\r  ${i + 1}/${allChunks.length}`);
-  }
+  console.log(`\nEmbedding ${allChunks.length} chunks (concurrency ${EMBED_CONCURRENCY})...`);
+  const chunkVecs = await mapPool(
+    allChunks,
+    (c) => embed(c.content, model),
+    EMBED_CONCURRENCY,
+    (d, t) => {
+      if (d % 10 === 0 || d === t) process.stdout.write(`\r  ${d}/${t}`);
+    },
+  );
   process.stdout.write("\r                       \r");
 
   // Per-needle retrieval.
@@ -235,10 +285,15 @@ async function main() {
   const rawResults: RawResult[] = [];
   const emptyNeedles: string[] = [];
 
-  console.log(`\nRetrieving ${dataset.needles.length} needles (sequential embed per query)...`);
-  for (const needle of dataset.needles) {
+  // Pre-embed all query vectors in parallel; retrieval + scoring stays sequential
+  // so per-needle output ordering (and the printed table) stays deterministic.
+  console.log(`\nEmbedding ${dataset.needles.length} queries (concurrency ${EMBED_CONCURRENCY})...`);
+  const queryVecs = await mapPool(dataset.needles, (n) => embed(n.query, model), EMBED_CONCURRENCY);
+  console.log(`\nRetrieving ${dataset.needles.length} needles (rank + score)...`);
+  for (let ni = 0; ni < dataset.needles.length; ni++) {
+    const needle = dataset.needles[ni];
     const qStart = Date.now();
-    const qVec = await embed(needle.query, model);
+    const qVec = queryVecs[ni];
     const scored = allChunks
       .map((c, i) => ({ c, sim: cosine(qVec, chunkVecs[i]) }))
       .sort((a, b) => b.sim - a.sim);
