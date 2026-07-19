@@ -225,7 +225,7 @@ describe("structural language manifest", () => {
     expect(STRUCTURAL_FINGERPRINT_INPUTS.runtime).toEqual({
       packageName: "tree-sitter",
       version: "0.25.0",
-      bunVersion: "1.3.11",
+      bunVersion: "1.3.14",
       nativeModuleAbi: 137,
       patchSha256:
         "e79aec7b96eb8114e85ebcb90f0a8b12076bcd8aa08c09bb88929621e1c1446d",

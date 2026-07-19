@@ -100,24 +100,37 @@ const OLLAMA_HOST = process.env.OLLAMA_HOST ?? "http://localhost:11434";
 const DEFAULT_MODEL = process.env.NEEDLE_MODEL ?? "qwen3-embedding:8b";
 
 async function embed(text: string, model: string): Promise<number[]> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 120_000);
-  try {
-    const res = await fetch(`${OLLAMA_HOST}/api/embeddings`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model, prompt: text.slice(0, 8000) }),
-      signal: ctrl.signal,
-    });
-    if (!res.ok) {
-      throw new Error(`Ollama embeddings HTTP ${res.status}: ${await res.text()}`);
+  // Ollama on a constrained CI runner can serialize/queue concurrent embedding
+  // requests, so a single request can exceed a tight per-call timeout. Use a
+  // generous timeout and retry transient failures (abort under contention, a
+  // dropped connection) so one slow request never sinks the whole run.
+  const maxAttempts = 3;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 300_000);
+    try {
+      const res = await fetch(`${OLLAMA_HOST}/api/embeddings`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ model, prompt: text.slice(0, 8000) }),
+        signal: ctrl.signal,
+      });
+      if (!res.ok) {
+        throw new Error(`Ollama embeddings HTTP ${res.status}: ${await res.text()}`);
+      }
+      const json = (await res.json()) as { embedding?: number[]; error?: string };
+      if (!json.embedding) throw new Error(`Ollama error: ${json.error ?? "no embedding"}`);
+      return json.embedding;
+    } catch (err) {
+      lastError = err;
+      if (attempt === maxAttempts) break;
+      await new Promise((r) => setTimeout(r, 1000 * attempt));
+    } finally {
+      clearTimeout(timer);
     }
-    const json = (await res.json()) as { embedding?: number[]; error?: string };
-    if (!json.embedding) throw new Error(`Ollama error: ${json.error ?? "no embedding"}`);
-    return json.embedding;
-  } finally {
-    clearTimeout(timer);
   }
+  throw lastError;
 }
 
 function cosine(a: number[], b: number[]): number {
@@ -137,7 +150,11 @@ function cosine(a: number[], b: number[]): number {
 // This standalone harness hits localhost Ollama over plain HTTP — there is no
 // live-stack embedding mutex here, so embedding can safely fan out. Determinism
 // is preserved by index alignment plus sequential scoring downstream.
-const EMBED_CONCURRENCY = Math.max(1, Number(process.env.NEEDLE_EMBED_CONCURRENCY ?? "4") || 1);
+// Default 1 (sequential): the embed phase is Ollama-bound, and on a constrained
+// CI runner an 8B model serializes concurrent requests — fanning out mostly adds
+// per-call timeout risk (a queued request aborts). Raise NEEDLE_EMBED_CONCURRENCY
+// only on hosts where Ollama truly parallelizes (num_parallel > 1, enough RAM/CPU).
+const EMBED_CONCURRENCY = Math.max(1, Number(process.env.NEEDLE_EMBED_CONCURRENCY ?? "1") || 1);
 
 async function mapPool<T, R>(
   items: T[],

@@ -93,7 +93,7 @@ describe("polyglot indexing docs parity", () => {
     });
 
     test("documents runtime/build-helper pins", () => {
-      expect(readme).toContain("1.3.11"); // Bun application runtime
+      expect(readme).toContain("1.3.14"); // Bun application runtime
       expect(readme).toContain("25.9.0"); // Node build-only helper
       expect(readme).toContain("11.14.1"); // npm
     });
