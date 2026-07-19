@@ -36,7 +36,7 @@ afterEach(async () => {
 });
 
 describe("commit-locked qwen E2E fixture", () => {
-  test("manifest contains five unique needle targets and twenty tracked distractors", async () => {
+  test("manifest contains six unique needle targets and twenty tracked distractors", async () => {
     const manifest = await loadQwenFixtureManifest();
     const files = await validateQwenFixtureManifest(REPOSITORY_ROOT, manifest);
     const dataset = JSON.parse(await readFile(

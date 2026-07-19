@@ -4,78 +4,293 @@
   "model": "qwen3-embedding:8b",
   "dimensions": 4096,
   "needleTargets": [
-    { "path": "packages/core/src/data/vector/postgres-vector-store.ts", "sha256": "4f54bbb4a079d91629693ffbf9f440cd70f1ca1aafca7440111fb358bd04e49e" },
-    { "path": "packages/core/src/services/etl/stages/discover.ts", "sha256": "c342d7f6589d37fdbc70a9bbd3bc557928fb1bd1b0451f7f46bf5fe2ccb3ed20" },
-    { "path": "packages/core/src/services/search/contextual-search-rlm.ts", "sha256": "a08d3f18a5464d6693a5eb5f69158f64752d95cfbe0a1b0bdf1c6293151ca2ff" },
-    { "path": "packages/core/src/services/search/smart-chunker.ts", "sha256": "89ff025d601bfa7acc741d1aeaccfa6767367a90a1530800822743a9b95ba81a" },
-    { "path": "packages/core/src/services/symbol/centrality.ts", "sha256": "c639810dc6ac0c352df66c800127b0f4ba3c7c9246351fde2b9ac09bbfdfa6c7" }
+    {
+      "path": "packages/core/src/data/vector/postgres-vector-store.ts",
+      "sha256": "4f54bbb4a079d91629693ffbf9f440cd70f1ca1aafca7440111fb358bd04e49e"
+    },
+    {
+      "path": "packages/core/src/services/etl/stages/discover.ts",
+      "sha256": "c342d7f6589d37fdbc70a9bbd3bc557928fb1bd1b0451f7f46bf5fe2ccb3ed20"
+    },
+    {
+      "path": "packages/core/src/services/search/smart-chunker.ts",
+      "sha256": "89ff025d601bfa7acc741d1aeaccfa6767367a90a1530800822743a9b95ba81a"
+    },
+    {
+      "path": "packages/core/src/services/symbol/centrality.ts",
+      "sha256": "c639810dc6ac0c352df66c800127b0f4ba3c7c9246351fde2b9ac09bbfdfa6c7"
+    },
+    {
+      "path": "packages/core/src/services/search/rlm-fusion.ts",
+      "sha256": "803fc91ab47084b91845afcfd3dc7afa205e303a6aead4d4dc322f265ee61e47"
+    },
+    {
+      "path": "packages/core/src/services/search/rlm-search.ts",
+      "sha256": "0da02c52a12376def0728e4258a01aca923d4debf1fd2605470b5250f559fa0a"
+    }
   ],
   "distractors": [
-    { "path": "packages/core/src/controllers/search-controller.ts", "sha256": "1c5beaada2105c17ddc7a0372550d994cc6e2bda8ab283f269f94da2d937cdb1" },
-    { "path": "packages/core/src/services/query/prisma-client.ts", "sha256": "71084d1647bb24e17680fee32b63ee946bef1634c8c36926fc4f5b80160d9a7e" },
-    { "path": "packages/core/src/services/embeddings/embedding-service.ts", "sha256": "1bc69f4c59937246aa99c1d685c73fc876433a45aea49a110a924b5678104550" },
-    { "path": "packages/core/src/services/search/index-manager.ts", "sha256": "c88082dc9a9e11d1237408c849120199d6a1618b26797dbd3dddbae080bcdcf5" },
-    { "path": "packages/core/src/services/search/lexical-search.ts", "sha256": "7cefe2912ed9468ad4346b82aea2cd5b7353b5a5e90691a4dc58a3444e92c9f7" },
-    { "path": "packages/core/src/services/search/query-understanding.ts", "sha256": "552e560d766ff1e48fecbd08ae944bc2213d64f187bfc91b52d371649e653c92" },
-    { "path": "packages/core/src/services/search/reranker.ts", "sha256": "d9ee860aa77745210802b818dba01aea9dfee4e606f2aac6bfdff9dbf47fc309" },
-    { "path": "packages/core/src/services/search/search-cache-pg.ts", "sha256": "ac75bec67c943d277d1998305d6b2315150f0b838930988d1cd0a7815c2d54bb" },
-    { "path": "packages/core/src/services/etl/pipeline.ts", "sha256": "7894fe975fa6049cb4404732c8c5923d6a1c54af598f1bac6453f1d2e22bb34c" },
-    { "path": "packages/core/src/services/etl/stages/parse.ts", "sha256": "b4dcc55a960aa8eb8d952378a220ede393e570f46227bad9e57b965e9a8510fd" },
-    { "path": "packages/core/src/services/etl/stages/resolve.ts", "sha256": "3548efb18b160071c36a97e9de8ed28ce764f40142bb4ff1f42dea56aaaee072" },
-    { "path": "packages/core/src/services/etl/stages/load.ts", "sha256": "e366c67fa1346b2f9b690c94d5abe1b97215797cf3d901051dcad2f9a394945b" },
-    { "path": "packages/core/src/services/symbol/symbol-graph.service.ts", "sha256": "252bb53ed6a58fb801b50f84c34b1844d0e6f16ee6530612c55ac9172c2d6b2a" },
-    { "path": "packages/core/src/index.ts", "sha256": "39c6ede98326bdf57f4b01f2a23f855b58d15d770e153582cd0fa00d5f63311e" },
-    { "path": "packages/shared/src/index.ts", "sha256": "f3c3eaa09980e0f1c8373ae19ca31e5f0cb10f80f2fffa74d5960a43903c6c1b" },
-    { "path": "apps/tools-api/src/index.ts", "sha256": "9d63d3cfb5c37abd9df06fc9d886da50c4349a7dcf5e4246c39e55606c01ca22" },
-    { "path": "packages/core/src/tools/search_project.ts", "sha256": "83f67d05dd30253e202fdb0e58826fbaea77941a6a02b249b7a5b095db36efe4" },
-    { "path": "packages/core/src/tools/trace_path.ts", "sha256": "abb20d19be70f92eeb2ea2950a5270df071627d6cfdb102fc180a6a43aa53de9" },
-    { "path": "packages/core/src/tools/impact_analysis.ts", "sha256": "817935325f9f7d045b6f01dd4385bfd9b3dcc4789c0826bd0193027af1fda9b6" },
-    { "path": "packages/core/src/services/graph/graph-store-pg.ts", "sha256": "4ab6dd9425cd0f4819fa0bbfc0fb75c76f94673eca1c562263d2e0bf9ed1c029" }
+    {
+      "path": "packages/core/src/controllers/search-controller.ts",
+      "sha256": "1c5beaada2105c17ddc7a0372550d994cc6e2bda8ab283f269f94da2d937cdb1"
+    },
+    {
+      "path": "packages/core/src/services/query/prisma-client.ts",
+      "sha256": "71084d1647bb24e17680fee32b63ee946bef1634c8c36926fc4f5b80160d9a7e"
+    },
+    {
+      "path": "packages/core/src/services/embeddings/embedding-service.ts",
+      "sha256": "1bc69f4c59937246aa99c1d685c73fc876433a45aea49a110a924b5678104550"
+    },
+    {
+      "path": "packages/core/src/services/search/index-manager.ts",
+      "sha256": "c88082dc9a9e11d1237408c849120199d6a1618b26797dbd3dddbae080bcdcf5"
+    },
+    {
+      "path": "packages/core/src/services/search/lexical-search.ts",
+      "sha256": "7cefe2912ed9468ad4346b82aea2cd5b7353b5a5e90691a4dc58a3444e92c9f7"
+    },
+    {
+      "path": "packages/core/src/services/search/query-understanding.ts",
+      "sha256": "552e560d766ff1e48fecbd08ae944bc2213d64f187bfc91b52d371649e653c92"
+    },
+    {
+      "path": "packages/core/src/services/search/reranker.ts",
+      "sha256": "d9ee860aa77745210802b818dba01aea9dfee4e606f2aac6bfdff9dbf47fc309"
+    },
+    {
+      "path": "packages/core/src/services/search/search-cache-pg.ts",
+      "sha256": "ac75bec67c943d277d1998305d6b2315150f0b838930988d1cd0a7815c2d54bb"
+    },
+    {
+      "path": "packages/core/src/services/etl/pipeline.ts",
+      "sha256": "7894fe975fa6049cb4404732c8c5923d6a1c54af598f1bac6453f1d2e22bb34c"
+    },
+    {
+      "path": "packages/core/src/services/etl/stages/parse.ts",
+      "sha256": "b4dcc55a960aa8eb8d952378a220ede393e570f46227bad9e57b965e9a8510fd"
+    },
+    {
+      "path": "packages/core/src/services/etl/stages/resolve.ts",
+      "sha256": "3548efb18b160071c36a97e9de8ed28ce764f40142bb4ff1f42dea56aaaee072"
+    },
+    {
+      "path": "packages/core/src/services/etl/stages/load.ts",
+      "sha256": "e366c67fa1346b2f9b690c94d5abe1b97215797cf3d901051dcad2f9a394945b"
+    },
+    {
+      "path": "packages/core/src/services/symbol/symbol-graph.service.ts",
+      "sha256": "252bb53ed6a58fb801b50f84c34b1844d0e6f16ee6530612c55ac9172c2d6b2a"
+    },
+    {
+      "path": "packages/core/src/index.ts",
+      "sha256": "39c6ede98326bdf57f4b01f2a23f855b58d15d770e153582cd0fa00d5f63311e"
+    },
+    {
+      "path": "packages/shared/src/index.ts",
+      "sha256": "f3c3eaa09980e0f1c8373ae19ca31e5f0cb10f80f2fffa74d5960a43903c6c1b"
+    },
+    {
+      "path": "apps/tools-api/src/index.ts",
+      "sha256": "9d63d3cfb5c37abd9df06fc9d886da50c4349a7dcf5e4246c39e55606c01ca22"
+    },
+    {
+      "path": "packages/core/src/tools/search_project.ts",
+      "sha256": "83f67d05dd30253e202fdb0e58826fbaea77941a6a02b249b7a5b095db36efe4"
+    },
+    {
+      "path": "packages/core/src/tools/trace_path.ts",
+      "sha256": "abb20d19be70f92eeb2ea2950a5270df071627d6cfdb102fc180a6a43aa53de9"
+    },
+    {
+      "path": "packages/core/src/tools/impact_analysis.ts",
+      "sha256": "817935325f9f7d045b6f01dd4385bfd9b3dcc4789c0826bd0193027af1fda9b6"
+    },
+    {
+      "path": "packages/core/src/services/graph/graph-store-pg.ts",
+      "sha256": "4ab6dd9425cd0f4819fa0bbfc0fb75c76f94673eca1c562263d2e0bf9ed1c029"
+    }
   ],
   "supportFiles": [
-    { "path": "README.md", "sha256": "c8351b321a1d2981b7731ebf739d894f5d9da0e4eb53f10f133349351bf43afd" },
-    { "path": "package.json", "sha256": "4a216c7dd4bc32b5f02b6de7c70ba63182dff236f50b24ea44e1151026ec75f1" },
-    { "path": "turbo.json", "sha256": "b8f5065deaabb015f606a82a27a3ecfd8a746d41f61dbe19d3437b914a15b8d9" },
-    { "path": "tsconfig.json", "sha256": "e324f7293caff5e0dd855aa64aded767c448c665188a9b615e6c23a614baa03d" },
-    { "path": "packages/core/package.json", "sha256": "c13ad6bcd949cc6131ebfc8ff7d0a19ca12c027f640a2b4f98989e8dfeb4ca4f" },
-    { "path": "packages/shared/package.json", "sha256": "3fefd076aac05256f033c4b78c60708fcb89033bec360f8f1eaf087b6c123b62" },
-    { "path": "apps/tools-api/package.json", "sha256": "b3cb65430a27194bcebe864182a9e16da61d26e1a13280acb8a5d3830b3c7726" },
-    { "path": "apps/mcp-client/package.json", "sha256": "cce586f02746c3e588e35424eb945b5df5577f57979b574ac9e8353c329075f2" },
-    { "path": "benchmarks/needles/fixtures/massa-th0th.json", "sha256": "11607ff7e3eeecce29c40c5e8aef5ebbffa00d626604a3647818d5d40bcaea63" },
-    { "path": "packages/core/src/__tests__/e2e/11.lifecycle.test.ts", "sha256": "527166aef9a7fad6e8714c12f75a1aff54940bf13d2ab06e313180da78619f8f" },
-    { "path": "packages/core/src/__tests__/e2e/20.new-features.test.ts", "sha256": "aef1d199543a3350eae5e3be80c0ccd49f06f7033fdb4901f78dc2d2828de6c6" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/README.md", "sha256": "362e2ef5d36176a667a689b32b29c44891c90c4093f48f31982f401ff70ddb79" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/decorator-heavy.ts", "sha256": "e0780ff49a65c71f7d0926ea3926ccb8a633e08c0fb37ad8b8a7605c3f2739b4" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/indent-method.py", "sha256": "e682da5dd8d26a8c2daad804a2d490b2cd6a7c41b8ed1eff1bbcf250cd588617" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/poly.dart", "sha256": "edb5c0781ad8018894cd2d0beece4baf9164f9292abc4c515571297d493a1e9c" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/poly.go", "sha256": "887ef323b19d9f563cbd1e045127f4532e0bb3d9ac982ab3f3152acf61ff5cc6" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/poly.kt", "sha256": "8c3c60846cdbe90ea9a49c1674f53cc4204085a4f2c07322f0863614029877e9" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/poly.rs", "sha256": "137f08185bf57995967c4a10fdd28aaed22f5e7f89e94115822facaeab788de7" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.c", "sha256": "45ca36c99d6f8abefbd7e278c1d4dd785f1494d824c833e8ec9fe6226e1efabf" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.clj", "sha256": "e2ec167989f3ce9698faedc07e55f4e83cd71ba1fb4ade3bf5f7bf79cf963dae" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.cpp", "sha256": "0cc61527e1fa8638ef69c40178db7f4743a69b7f70627318547ffbffe04860a7" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.cs", "sha256": "78daa023372ff31ab13c3bafc6226e41ab769b85e1fceb46851f528e032b0cb1" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.erl", "sha256": "e6a3658fed6d932cf55b8918c330322181ff7181f70bea5c222de683145c85c4" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.ex", "sha256": "5cbe580746a4699b4b035f326d4f719391a8a1528e844a4ae16038d76f12676a" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.exs", "sha256": "ebeb34494e1274eed3ef6c3fc8b3ac046afb49381d44e6dd16638da400b8e329" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.h", "sha256": "ea83fe38cbe03ca2b634d7a75cc57170e0de96a8be98fff31f4fbf71033dbb84" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.hpp", "sha256": "e8e957fd783a0c5e90c812fe301cdb998694f14177afd2f7c4e48605d981e361" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.hs", "sha256": "c45bee35e2c6ab19588e0a209be65c9acbaf839f2bf8b7d582d4f4b9fdbfbae6" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.java", "sha256": "ac623a4bfec756e040a2548f83e0b7a1b6f0a161eeec5c645f3f5d733d74b637" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.js", "sha256": "03ab8c188dea1f82e17389c919da9e55a84be683dac353af586814d2c3047551" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.jsx", "sha256": "d68aeeb3bb3d454528de8c636f0bbc4ec9e101784baf5ef1b6970c4149bf6e4a" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.kts", "sha256": "4cb743058f726670259efc2cdc0addcf65cc660c6b1596c58daeebe507a9441a" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.lua", "sha256": "606fe478fd2ed693edcfb0b2e0fb0d7b1c581200a6db4b00d469de1fbd55ab8c" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.ml", "sha256": "1d8fb62240d256f549761a26e57b6588d78caa84661684ab4a879d5881d8fea9" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.php", "sha256": "d7479b854dd3702d87ff064db75b68c8fac6b4f94b919f3accf958066dbd169c" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.rb", "sha256": "18c5fa1e4711da1d75c6e364d6b3fe2cbe1cf3af87b2ff28560b8a6e1d8fdb24" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.scala", "sha256": "d105f176c45350438849884c7259a69eeb9a12985e0e0c26ef4f93b21f032719" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.swift", "sha256": "e798a4de0411488de26002932ee050f38180bbc823fa9217be6170ef2da66dcd" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.tsx", "sha256": "6ea251764f3b7844ac04f3df5a70cff6220e49db8cce687780a684dcbb6f1fc5" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.vue", "sha256": "5bc096060b5633a78a0a0c8207b01b1fc7383aa009e81bc90ff4f5997cc2d592" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.yaml", "sha256": "9b8c1a056acd1e3ee22ec19abb888b8191702371f7123d72ebb13c71d980f262" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.yml", "sha256": "b99f70494f192eb38c6112d87dc1cc507b87c94336539a94147a8be640030dfd" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.zig", "sha256": "368fe70352d3c4e7822b27e560b2fcfe2c5beced7785b7da4c3f24473716b332" },
-    { "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/tsconfig.json", "sha256": "730dc52e00635c2e80cf6598bf66b182035f3628c1aeeefe0213467353389703" }
+    {
+      "path": "README.md",
+      "sha256": "c8351b321a1d2981b7731ebf739d894f5d9da0e4eb53f10f133349351bf43afd"
+    },
+    {
+      "path": "package.json",
+      "sha256": "4803ecb3a290fd7bb672f7c791e6139e761056a668b4a07934d8aae5cb6b302f"
+    },
+    {
+      "path": "turbo.json",
+      "sha256": "b8f5065deaabb015f606a82a27a3ecfd8a746d41f61dbe19d3437b914a15b8d9"
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "e324f7293caff5e0dd855aa64aded767c448c665188a9b615e6c23a614baa03d"
+    },
+    {
+      "path": "packages/core/package.json",
+      "sha256": "40ca0ec2d7fecdf9e5bcd6341e28eb8cbeee933b6e937619b7b23d6123079dcd"
+    },
+    {
+      "path": "packages/shared/package.json",
+      "sha256": "7553b28e59157c5984199980bcee6f7f31ec0bd6e691348dbf4688c9e016186c"
+    },
+    {
+      "path": "apps/tools-api/package.json",
+      "sha256": "dac69e9181e0b88694333125b383d9561f53b6e6abe7cf8a221c9a8e45fc746b"
+    },
+    {
+      "path": "apps/mcp-client/package.json",
+      "sha256": "ff563f75dfb44add410ad0c7d92700655b08d78ec090f985aaebd007a0ec5088"
+    },
+    {
+      "path": "benchmarks/needles/fixtures/massa-th0th.json",
+      "sha256": "07ea4dfb8a2919975e49ee6229eafe50065727abc33086b6cfacd7432e2350db"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/11.lifecycle.test.ts",
+      "sha256": "527166aef9a7fad6e8714c12f75a1aff54940bf13d2ab06e313180da78619f8f"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/20.new-features.test.ts",
+      "sha256": "aef1d199543a3350eae5e3be80c0ccd49f06f7033fdb4901f78dc2d2828de6c6"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/README.md",
+      "sha256": "362e2ef5d36176a667a689b32b29c44891c90c4093f48f31982f401ff70ddb79"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/decorator-heavy.ts",
+      "sha256": "e0780ff49a65c71f7d0926ea3926ccb8a633e08c0fb37ad8b8a7605c3f2739b4"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/indent-method.py",
+      "sha256": "e682da5dd8d26a8c2daad804a2d490b2cd6a7c41b8ed1eff1bbcf250cd588617"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/poly.dart",
+      "sha256": "edb5c0781ad8018894cd2d0beece4baf9164f9292abc4c515571297d493a1e9c"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/poly.go",
+      "sha256": "887ef323b19d9f563cbd1e045127f4532e0bb3d9ac982ab3f3152acf61ff5cc6"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/poly.kt",
+      "sha256": "8c3c60846cdbe90ea9a49c1674f53cc4204085a4f2c07322f0863614029877e9"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/poly.rs",
+      "sha256": "137f08185bf57995967c4a10fdd28aaed22f5e7f89e94115822facaeab788de7"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.c",
+      "sha256": "45ca36c99d6f8abefbd7e278c1d4dd785f1494d824c833e8ec9fe6226e1efabf"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.clj",
+      "sha256": "e2ec167989f3ce9698faedc07e55f4e83cd71ba1fb4ade3bf5f7bf79cf963dae"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.cpp",
+      "sha256": "0cc61527e1fa8638ef69c40178db7f4743a69b7f70627318547ffbffe04860a7"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.cs",
+      "sha256": "78daa023372ff31ab13c3bafc6226e41ab769b85e1fceb46851f528e032b0cb1"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.erl",
+      "sha256": "e6a3658fed6d932cf55b8918c330322181ff7181f70bea5c222de683145c85c4"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.ex",
+      "sha256": "5cbe580746a4699b4b035f326d4f719391a8a1528e844a4ae16038d76f12676a"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.exs",
+      "sha256": "ebeb34494e1274eed3ef6c3fc8b3ac046afb49381d44e6dd16638da400b8e329"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.h",
+      "sha256": "ea83fe38cbe03ca2b634d7a75cc57170e0de96a8be98fff31f4fbf71033dbb84"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.hpp",
+      "sha256": "e8e957fd783a0c5e90c812fe301cdb998694f14177afd2f7c4e48605d981e361"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.hs",
+      "sha256": "c45bee35e2c6ab19588e0a209be65c9acbaf839f2bf8b7d582d4f4b9fdbfbae6"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.java",
+      "sha256": "ac623a4bfec756e040a2548f83e0b7a1b6f0a161eeec5c645f3f5d733d74b637"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.js",
+      "sha256": "03ab8c188dea1f82e17389c919da9e55a84be683dac353af586814d2c3047551"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.jsx",
+      "sha256": "d68aeeb3bb3d454528de8c636f0bbc4ec9e101784baf5ef1b6970c4149bf6e4a"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.kts",
+      "sha256": "4cb743058f726670259efc2cdc0addcf65cc660c6b1596c58daeebe507a9441a"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.lua",
+      "sha256": "606fe478fd2ed693edcfb0b2e0fb0d7b1c581200a6db4b00d469de1fbd55ab8c"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.ml",
+      "sha256": "1d8fb62240d256f549761a26e57b6588d78caa84661684ab4a879d5881d8fea9"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.php",
+      "sha256": "d7479b854dd3702d87ff064db75b68c8fac6b4f94b919f3accf958066dbd169c"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.rb",
+      "sha256": "18c5fa1e4711da1d75c6e364d6b3fe2cbe1cf3af87b2ff28560b8a6e1d8fdb24"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.scala",
+      "sha256": "d105f176c45350438849884c7259a69eeb9a12985e0e0c26ef4f93b21f032719"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.swift",
+      "sha256": "e798a4de0411488de26002932ee050f38180bbc823fa9217be6170ef2da66dcd"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.tsx",
+      "sha256": "6ea251764f3b7844ac04f3df5a70cff6220e49db8cce687780a684dcbb6f1fc5"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.vue",
+      "sha256": "5bc096060b5633a78a0a0c8207b01b1fc7383aa009e81bc90ff4f5997cc2d592"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.yaml",
+      "sha256": "9b8c1a056acd1e3ee22ec19abb888b8191702371f7123d72ebb13c71d980f262"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.yml",
+      "sha256": "b99f70494f192eb38c6112d87dc1cc507b87c94336539a94147a8be640030dfd"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/sentinel.zig",
+      "sha256": "368fe70352d3c4e7822b27e560b2fcfe2c5beced7785b7da4c3f24473716b332"
+    },
+    {
+      "path": "packages/core/src/__tests__/e2e/fixtures/polyglot/tsconfig.json",
+      "sha256": "730dc52e00635c2e80cf6598bf66b182035f3628c1aeeefe0213467353389703"
+    },
+    {
+      "path": "packages/core/src/services/search/contextual-search-rlm.ts",
+      "sha256": "e7e48760bd21ba4a33f399a9a33b95940d5a0748b55fbd3c746b6ca35b4ca458"
+    }
   ]
 }
