@@ -191,6 +191,29 @@ describe.skipIf(!DEDICATED_DB)("handoff/proposal PostgreSQL parity", () => {
         SELECT status FROM handoffs WHERE id = ${record.id}`;
       expect(durable[0].status).toBe(rows[0].status);
     });
+
+    test("real PostgreSQL corruption surfaces and failed writes preserve the mirror", async () => {
+      const store = new PgHandoffStore();
+      await store.__hydrate();
+      const record = handoff();
+      await store.insert(record);
+
+      await expect(
+        store.insert({ ...record, summary: "must not replace durable state" }),
+      ).rejects.toMatchObject({
+        code: "SEARCH_BACKEND_UNAVAILABLE",
+        component: "handoff_store",
+      });
+      expect(await store.getById(record.id)).toEqual(record);
+
+      await prisma.$executeRaw`
+        UPDATE handoffs SET open_questions_json = '[1]' WHERE id = ${record.id}`;
+      const restarted = new PgHandoffStore();
+      await expect(restarted.getById(record.id)).rejects.toMatchObject({
+        code: "STORE_CORRUPTION",
+        component: "handoff.open_questions_json",
+      });
+    });
   });
 
   describe("PgProposalStore", () => {
@@ -274,6 +297,29 @@ describe.skipIf(!DEDICATED_DB)("handoff/proposal PostgreSQL parity", () => {
         SELECT status, decided_at FROM proposals WHERE id = ${record.id}`;
       expect(["approved", "rejected"]).toContain(rows[0].status);
       expect(rows[0].decided_at).not.toBeNull();
+    });
+
+    test("real PostgreSQL corruption surfaces and failed writes preserve the mirror", async () => {
+      const store = new PgProposalStore();
+      await store.__hydrate();
+      const record = proposal();
+      await store.insert(record);
+
+      await expect(
+        store.insert({ ...record, payload: { content: "must not replace durable state" } }),
+      ).rejects.toMatchObject({
+        code: "SEARCH_BACKEND_UNAVAILABLE",
+        component: "proposal_store",
+      });
+      expect(await store.getById(record.id)).toEqual(record);
+
+      await prisma.$executeRaw`
+        UPDATE proposals SET payload_json = '[]' WHERE id = ${record.id}`;
+      const restarted = new PgProposalStore();
+      await expect(restarted.getById(record.id)).rejects.toMatchObject({
+        code: "STORE_CORRUPTION",
+        component: "proposal.payload_json",
+      });
     });
   });
 
