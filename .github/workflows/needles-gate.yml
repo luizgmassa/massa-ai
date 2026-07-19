@@ -46,11 +46,13 @@ concurrency:
 jobs:
   needles:
     runs-on: ubuntu-latest
-    # Headroom for a COLD-cache run: the first run after cache eviction/model
-    # change must pull qwen3-embedding:8b (~5GB, ~9min) before embedding, and
-    # the actions/cache post-step only saves once the gate step finishes — a
-    # timeout mid-run skips it, leaving the cache cold forever. 20min lets the
-    # cold run complete + save. WARM runs (the common case) finish in ~3min.
+    # NON-BLOCKING by design. qwen3-embedding:8b is ~60s/embed on a 2-core free
+    # runner (~90min for the fixture), so this gate cannot reliably complete on
+    # free runners. It remains for manual dispatch (workflow_dispatch) or a
+    # beefier runner, and never blocks PR merge — PR gating depends on the CI
+    # build + structural-native jobs. continue-on-error makes a timeout/failure
+    # informational (reported as a warning, not a required-check failure).
+    continue-on-error: true
     timeout-minutes: 20
 
     steps:
