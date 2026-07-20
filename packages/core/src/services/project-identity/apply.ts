@@ -16,6 +16,11 @@ import {
 import { ProjectIdentityError } from "./errors.js";
 import { hashProjectIdentityRequest } from "./hash.js";
 import type { PayloadStorePolicy } from "./registry.js";
+import {
+  EMPTY_INVALIDATION_REPORT,
+  ProjectIdentityInvalidatorRegistry,
+  type ProjectIdentityInvalidationReport,
+} from "./invalidator-registry.js";
 
 /**
  * Runner owns acquisition and release of a transaction-backed client.
@@ -61,6 +66,27 @@ class PgPoolTransactionRunner implements ProjectIdentityTransactionRunner {
     }
   }
 }
+
+/**
+ * Best-effort publisher for the `project-identity:changed` event. Production
+ * wires this to the shared EventBus singleton; tests substitute a recorder.
+ * Publish failures MUST be swallowed by the caller (spec req 8) — the publisher
+ * itself does not throw.
+ */
+export interface ProjectIdentityChangedPublisher {
+  publish(payload: ProjectIdentityChangedPayload): void;
+}
+
+export interface ProjectIdentityChangedPayload {
+  mode: "rename" | "merge";
+  sourceProjectId: string;
+  targetProjectId: string;
+  operationId: string;
+  committedAt: string;
+}
+
+/** No-op default publisher so the constructor stays single-arg in tests. */
+const NOOP_PUBLISHER: ProjectIdentityChangedPublisher = { publish() { /* noop */ } };
 
 interface OperationRow {
   operation_id: string;
@@ -210,18 +236,85 @@ function sortedBy<T, K extends string>(items: readonly T[], key: (item: T) => K)
 export class ProjectIdentityApplyService {
   constructor(
     private readonly runner: ProjectIdentityTransactionRunner,
+    private readonly invalidators: ProjectIdentityInvalidatorRegistry = new ProjectIdentityInvalidatorRegistry(),
+    private readonly publisher: ProjectIdentityChangedPublisher = NOOP_PUBLISHER,
     private readonly schema = "public",
   ) {}
 
   async apply(input: ProjectIdentityApplyInput): Promise<ProjectIdentityApplyResult> {
     const request = parseProjectIdentityApplyRequest(input);
+    let outcome: { result: ProjectIdentityApplyResult; replayed: boolean };
     try {
-      return await this.runner.withTransaction(async (client) =>
+      outcome = await this.runner.withTransaction(async (client) =>
         this.applyInTransaction(client, request),
       );
     } catch (error) {
       if (error instanceof ProjectIdentityError) throw error;
       throw new ProjectIdentityError("PROJECT_IDENTITY_BACKEND_UNAVAILABLE", { cause: error });
+    }
+    const committed = outcome.result;
+
+    // Idempotent replay (spec req 7): the stored result is returned VERBATIM.
+    // No fresh invalidation, no duplicate event, no decoration — the operation
+    // already ran its post-commit steps when it first committed.
+    if (outcome.replayed) {
+      return committed;
+    }
+
+    // POST-COMMIT ONLY (spec req 8). The transaction has COMMITTED; nothing
+    // below may turn this success into a failure. Invalidation + event publish
+    // are captured as sanitized diagnostics / swallowed entirely.
+    const invalidation = await this.runPostCommitInvalidation(
+      request.sourceProjectId,
+      request.targetProjectId,
+    );
+    this.publishChangedEvent(committed, request);
+
+    return invalidation === EMPTY_INVALIDATION_REPORT
+      ? committed
+      : { ...committed, invalidation };
+  }
+
+  /**
+   * Run every registered in-memory cache invalidator for source + target.
+   * NEVER throws — a rejection here is captured as a sanitized report and the
+   * committed result is returned with `invalidation.failures` populated.
+   */
+  private async runPostCommitInvalidation(
+    source: string,
+    target: string,
+  ): Promise<ProjectIdentityInvalidationReport> {
+    try {
+      return await this.invalidators.invalidateBoth(source, target);
+    } catch {
+      // invalidateBoth already isolates per-invalidator failures; this catch
+      // guards against a defect in the registry itself. Surface a sanitized
+      // diagnostic instead of hiding the defect behind an absent field.
+      return {
+        invalidated: [],
+        failures: [{ invalidatorId: "<invalidator-registry>", code: "UNKNOWN" }],
+      };
+    }
+  }
+
+  /**
+   * Best-effort `project-identity:changed` notification. Any throw is swallowed
+   * — listeners cannot roll back a committed operation (spec req 8).
+   */
+  private publishChangedEvent(
+    committed: ProjectIdentityApplyResult,
+    request: { mode: "rename" | "merge"; operationId: string; sourceProjectId: string; targetProjectId: string },
+  ): void {
+    try {
+      this.publisher.publish({
+        mode: request.mode,
+        sourceProjectId: request.sourceProjectId,
+        targetProjectId: request.targetProjectId,
+        operationId: request.operationId,
+        committedAt: committed.committedAt,
+      });
+    } catch {
+      /* best-effort — never surfaces in the result */
     }
   }
 
@@ -234,7 +327,7 @@ export class ProjectIdentityApplyService {
       operationId: string;
       expectedPlanHash: string;
     },
-  ): Promise<ProjectIdentityApplyResult> {
+  ): Promise<{ result: ProjectIdentityApplyResult; replayed: boolean }> {
     // 1. Idempotency FIRST: fast path. If operationId already committed, return
     //    the stored result without mutation when the request material matches.
     //    This pre-lock read is a fast path only — an authoritative re-check
@@ -247,7 +340,7 @@ export class ProjectIdentityApplyService {
       operationId: request.operationId,
     });
     const preExisting = await this.storedResultFor(client, request.operationId, requestHash);
-    if (preExisting) return preExisting;
+    if (preExisting) return { result: preExisting, replayed: true };
 
     // 2. Acquire ordered exclusive identity locks (lexical ordering handled by SQL).
     await client.query(
@@ -261,7 +354,7 @@ export class ProjectIdentityApplyService {
     //     returns the stored result instead of recomputing (and failing on)
     //     an already-retired source.
     const postExisting = await this.storedResultFor(client, request.operationId, requestHash);
-    if (postExisting) return postExisting;
+    if (postExisting) return { result: postExisting, replayed: true };
 
     // 3. Authoritative in-tx plan.
     const plan = await computeIdentityPlan(
@@ -389,7 +482,9 @@ export class ProjectIdentityApplyService {
       throw new ProjectIdentityError("PROJECT_IDENTITY_OPERATION_REUSED");
     }
     // 6. PRE-COMMIT BOUNDARY — withTransaction COMMITs next; any throw above rolls back.
-    return committed.result ?? result;
+    // This is the FRESH commit path (the operation row was written by this
+    // transaction): post-commit invalidation/event must run.
+    return { result: committed.result ?? result, replayed: false };
   }
 
   /**
@@ -667,14 +762,24 @@ export class ProjectIdentityApplyService {
 /**
  * Build a ProjectIdentityApplyService backed by a function that yields a
  * pg-style transaction client. Production passes the shared pool's connect.
+ *
+ * The invalidator registry and event publisher default to no-op so existing
+ * callers (and T1–T3 tests) stay byte-identical; production wires real ones.
  */
 export function createProjectIdentityApplyService(
   acquireClient: () => Promise<ProjectIdentityTransactionClient>,
   releaseClient: (client: ProjectIdentityTransactionClient) => Promise<void>,
-  schema = "public",
+  options: {
+    invalidators?: ProjectIdentityInvalidatorRegistry;
+    publisher?: ProjectIdentityChangedPublisher;
+    schema?: string;
+  } = {},
 ): ProjectIdentityApplyService {
+  const { invalidators, publisher, schema = "public" } = options;
   return new ProjectIdentityApplyService(
     new PgPoolTransactionRunner(acquireClient, releaseClient),
+    invalidators,
+    publisher,
     schema,
   );
 }

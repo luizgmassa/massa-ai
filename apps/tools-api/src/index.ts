@@ -42,6 +42,7 @@ import { webUiRoutes } from "./routes/web-ui.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
 import { getHealthChecker, searchSessionHook, coRetrievalHook } from "@massa-th0th/core";
+import { installProjectIdentityGuardsFromPool } from "@massa-th0th/core";
 import {
   getParserReadiness,
   indexJobTracker,
@@ -147,6 +148,27 @@ await listenAfterParserValidation({
     );
   },
 });
+
+// Install project-identity guard triggers on every mutable direct store +
+// existing runtime vector_documents* table. Bounded one-time pass before hook
+// registration; per-table failures are warn-logged with sanitized codes and
+// never abort startup (spec req 8). Tables created LATER at runtime
+// (keyword_documents, search_cache, search_analytics, search_events, new
+// vector_documents_<dim>d) install their own guard at their create sites.
+await installProjectIdentityGuardsFromPool()
+  .then((report) => {
+    if (report.failures.length > 0) {
+      console.warn("[project-identity] guard install finished with sanitized per-table failures", {
+        failures: report.failures,
+      });
+    }
+  })
+  .catch((error) => {
+    console.warn(
+      "[project-identity] guard install failed at startup; continuing (sanitized).",
+      error instanceof Error ? { name: error.name } : error,
+    );
+  });
 
 searchSessionHook.register();
 coRetrievalHook.register(); // active only when MASSA_TH0TH_CO_RETRIEVAL_HOOK=true

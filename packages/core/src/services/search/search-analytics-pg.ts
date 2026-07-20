@@ -6,6 +6,7 @@
 
 import { logger } from "@massa-th0th/shared";
 import { getPgPool } from "../../data/db-connection.js";
+import { installGuardOnTable } from "../project-identity/identity-guard-installer.js";
 import type { Pool } from "pg";
 
 export interface SearchEvent {
@@ -81,7 +82,16 @@ export class SearchAnalyticsPg {
       CREATE INDEX IF NOT EXISTS idx_events_project ON search_events(project_id);
       CREATE INDEX IF NOT EXISTS idx_events_timestamp ON search_events(timestamp DESC);
     `);
-    
+
+    // Project-identity guards on both runtime-created tables (best-effort,
+    // sanitized codes only).
+    for (const table of ["search_analytics", "search_events"] as const) {
+      const guardCode = await installGuardOnTable(pool, "public", table, "project_id");
+      if (guardCode) {
+        logger.warn("[project-identity] guard install failed (sanitized)", { table, code: guardCode });
+      }
+    }
+
     logger.info('PostgreSQL search analytics initialized');
   }
 

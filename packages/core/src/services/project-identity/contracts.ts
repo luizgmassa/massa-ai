@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { ProjectIdentityError } from "./errors.js";
+import type { ProjectIdentityInvalidationReport } from "./invalidator-registry.js";
 
 export const PROJECT_IDENTITY_PLAN_VERSION = 1 as const;
 export const PROJECT_IDENTITY_MAX_PROJECT_ID_LENGTH = 255;
@@ -112,6 +113,14 @@ export interface ProjectIdentityApplyResult {
   planHash: string;
   stores: readonly ProjectIdentityStoreCount[];
   committedAt: string;
+  /**
+   * Sanitized post-commit invalidation report. OPTIONAL so existing snapshot
+   * tests (which do not exercise the invalidator) stay byte-identical; the
+   * planner hash is computed over ProjectIdentityPlanMaterial, not the result,
+   * so plan hashes are unaffected by this field. When present, failures here
+   * MUST NEVER change the committed success status (spec req 8).
+   */
+  invalidation?: ProjectIdentityInvalidationReport;
 }
 
 export interface ProjectIdentityService {

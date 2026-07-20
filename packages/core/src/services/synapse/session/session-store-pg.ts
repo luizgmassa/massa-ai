@@ -29,6 +29,7 @@
 
 import { logger } from "@massa-th0th/shared";
 import { getPrismaClient } from "../../query/prisma-client.js";
+import { getProjectIdentityAliasResolver } from "../../project-identity/alias-resolver.js";
 import type { PrismaClient } from "../../../generated/prisma/index.js";
 import type { AgentSession } from "../types.js";
 import {
@@ -217,6 +218,11 @@ export class PgSynapseSessionStore implements SessionStore {
     // Fire-and-forget persist (best-effort, matching PgScheduledJobStore).
     this.chainWrite(session.sessionId, async () => {
       const prisma = this.getClient();
+      // Resolve canonical workspace id at the persist seam (spec req 3). The
+      // sync mirror keeps the caller's id; the durable row uses the target.
+      const canonicalWorkspaceId = session.workspaceId
+        ? await getProjectIdentityAliasResolver().resolve(session.workspaceId)
+        : session.workspaceId;
       const now = Date.now();
       const taskTokens = session.taskTokens
         ? JSON.stringify(Array.from(session.taskTokens))
@@ -239,7 +245,7 @@ export class PgSynapseSessionStore implements SessionStore {
         ) VALUES (
           ${session.sessionId},
           ${session.agentId},
-          ${session.workspaceId ?? null},
+          ${canonicalWorkspaceId ?? null},
           ${session.taskContext ?? null},
           ${taskTokens},
           ${taskEmbedding},

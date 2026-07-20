@@ -16,6 +16,7 @@
 
 import { logger } from "@massa-th0th/shared";
 import { getPrismaClient } from "../query/prisma-client.js";
+import { getProjectIdentityAliasResolver } from "../project-identity/alias-resolver.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type { ScheduledJob, ScheduleSpec, JobKind } from "./scheduler-types.js";
 import type { ScheduledJobStore } from "./scheduler-store.js";
@@ -158,7 +159,10 @@ export class PgScheduledJobStore implements ScheduledJobStore {
     this.localDeletes.delete(job.id);
 
     // Capture values at save() time. The scheduler mutates job objects later,
-    // while PostgreSQL persists synchronously at the call boundary.
+    // while PostgreSQL persists synchronously at the call boundary. Payload is
+    // captured RAW: its embedded projectId is alias-resolved inside the async
+    // persist (spec req 3 — payload-only store, no identity column, so the DB
+    // trigger cannot resolve it).
     const persisted = {
       id: job.id,
       name: job.name,
@@ -169,13 +173,21 @@ export class PgScheduledJobStore implements ScheduledJobStore {
       nextRunAt: job.nextRunAt,
       lastRunAt: job.lastRunAt,
       enabled: job.enabled,
-      payload: job.payload ? JSON.stringify(job.payload) : null,
+      payload: job.payload ? structuredClone(job.payload) : null,
     };
 
     // Fire-and-forget remains the public contract, but same-ID writes are
     // chained so a slower old write cannot overwrite a newer save.
     this.enqueueMutation(job.id, async () => {
       const prisma = this.getClient();
+      let payloadJson: string | null = null;
+      if (persisted.payload) {
+        if (typeof persisted.payload.projectId === "string" && persisted.payload.projectId) {
+          persisted.payload.projectId = await getProjectIdentityAliasResolver()
+            .resolve(persisted.payload.projectId);
+        }
+        payloadJson = JSON.stringify(persisted.payload);
+      }
       await prisma.$executeRaw`
           INSERT INTO scheduled_jobs (
             id, name, job_kind, schedule_type, interval_ms, cron,
@@ -190,7 +202,7 @@ export class PgScheduledJobStore implements ScheduledJobStore {
             ${persisted.nextRunAt}::bigint,
             ${persisted.lastRunAt}::bigint,
             ${persisted.enabled ? 1 : 0}::int,
-            ${persisted.payload}
+            ${payloadJson}
           )
           ON CONFLICT (id) DO UPDATE SET
             name = EXCLUDED.name,

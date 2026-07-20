@@ -47,10 +47,50 @@ export {
   ProjectIdentityApplyService,
   createProjectIdentityApplyService,
 } from "./apply.js";
-export type { ProjectIdentityTransactionRunner } from "./apply.js";
+export type {
+  ProjectIdentityChangedPayload,
+  ProjectIdentityChangedPublisher,
+  ProjectIdentityTransactionRunner,
+} from "./apply.js";
 export {
   PROJECT_IDENTITY_REGISTRY_VERSION,
+  STATIC_DIRECT_STORES,
   directStorePolicy,
   isKnownRegistryTable,
   payloadStorePolicies,
 } from "./registry.js";
+export type { DirectStorePolicy, IdentityColumn, PayloadStorePolicy } from "./registry.js";
+export {
+  installGuardOnTable,
+  installProjectIdentityGuards,
+  installProjectIdentityGuardsFromPool,
+} from "./identity-guard-installer.js";
+export type {
+  IdentityGuardInstallerClient,
+  ProjectIdentityGuardInstallReport,
+} from "./identity-guard-installer.js";
+export {
+  EMPTY_INVALIDATION_REPORT,
+  ProjectIdentityInvalidatorRegistry,
+} from "./invalidator-registry.js";
+export type {
+  ProjectIdentityInvalidationReport,
+  ProjectIdentityInvalidator,
+} from "./invalidator-registry.js";
+export {
+  createEventBusProjectIdentityChangedPublisher,
+  createProductionProjectIdentityInvalidatorRegistry,
+} from "./production-wiring.js";
+export type {
+  ProductionInvalidatorTargetResolver,
+  ProductionInvalidatorTargets,
+} from "./production-wiring.js";
+export {
+  ProjectIdentityAliasResolver,
+  getProjectIdentityAliasResolver,
+  setProjectIdentityAliasResolverForTests,
+} from "./alias-resolver.js";
+export type {
+  AliasResolverQuerier,
+  ProjectIdentityAliasResolverOptions,
+} from "./alias-resolver.js";

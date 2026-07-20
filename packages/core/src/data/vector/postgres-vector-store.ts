@@ -23,6 +23,7 @@ import {
   SearchSource,
 } from '@massa-th0th/shared';
 import { logger } from '@massa-th0th/shared';
+import { installGuardOnTable } from '../../services/project-identity/identity-guard-installer.js';
 import type { Pool, PoolConfig } from 'pg';
 
 export interface PostgresConfig {
@@ -218,6 +219,17 @@ export class PostgresVectorStore extends BaseVectorStore {
     await client.query(`
       CREATE INDEX idx_${this.tableName}_project_id ON ${this.tableName}(project_id)
     `);
+
+    // Project-identity guard on this runtime-created dimension table
+    // (design: runtime tables install guards during initialization). The
+    // installer is idempotent (DROP IF EXISTS + CREATE) and never throws.
+    const guardCode = await installGuardOnTable(client, "public", this.tableName, "project_id");
+    if (guardCode) {
+      logger.warn('[project-identity] guard install failed (sanitized)', {
+        table: this.tableName,
+        code: guardCode,
+      });
+    }
   }
 
   // ── Index creation ─────────────────────────────────────────────────────────

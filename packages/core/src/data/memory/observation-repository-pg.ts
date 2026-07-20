@@ -29,6 +29,7 @@
 
 import { logger } from "@massa-th0th/shared";
 import { getPrismaClient } from "../../services/query/prisma-client.js";
+import { getProjectIdentityAliasResolver } from "../../services/project-identity/alias-resolver.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type {
   Observation,
@@ -174,12 +175,16 @@ export class PgObservationStore implements ObservationStore {
     void (async () => {
       try {
         const prisma = this.getClient();
+        // Resolve canonical project id at the persist seam (spec req 3). The
+        // sync mirror keeps the caller's id by design; the durable row lands
+        // on the live target and is what hydration reloads.
+        const canonicalProjectId = await getProjectIdentityAliasResolver().resolve(obs.projectId);
         await prisma.$executeRaw`
           INSERT INTO observations (
             id, project_id, session_id, source, category, payload_json, importance, created_at
           ) VALUES (
             ${obs.id},
-            ${obs.projectId},
+            ${canonicalProjectId},
             ${obs.sessionId},
             ${obs.source},
             ${obs.category ?? null},

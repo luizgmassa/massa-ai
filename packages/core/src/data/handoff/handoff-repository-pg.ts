@@ -2,6 +2,7 @@
 
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import { getPrismaClient } from "../../services/query/prisma-client.js";
+import { getProjectIdentityAliasResolver } from "../../services/project-identity/alias-resolver.js";
 import {
   searchBackendUnavailable,
   storeCorruption,
@@ -110,6 +111,9 @@ export class PgHandoffStore implements HandoffStore {
   async insert(record: HandoffRecord): Promise<void> {
     await this.ensureHydrated();
     const captured = structuredClone(record);
+    // Resolve canonical project id at the write seam (spec req 3): a caller
+    // holding a retired id lands the row on the live target.
+    captured.projectId = await getProjectIdentityAliasResolver().resolve(captured.projectId);
     try {
       await this.getClient().$executeRaw`
         INSERT INTO handoffs (

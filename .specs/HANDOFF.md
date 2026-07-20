@@ -4,12 +4,14 @@
 
 - projectId: `massa-th0th`; workflowSessionId: `spec-wave-3`
 - branch: `wave-3`; isolated worktree: `massa-th0th-wt-wave-3`
-- active feature: `transactional-project-identity`
+- active feature: `transactional-project-identity` (tasks.md T1–T7)
+- feature HEAD: `15cf45b` (T3). Prior: `3dc85b5` (T1), `be0e9c5` (T2). Base: main `c92e481`.
 - M19 complete: macOS 22/22, Ubuntu Codespace 22/22, three discrimination mutations killed. Ubuntu/glibc-x64 was an explicit user-approved substitution for Debian 12.
 - M20+M54 complete: 15 focused tests, live Synapse 21-pass gate, two killed mutations, strict 47-tool roster, cursor page size 100.
 - M50 complete: local focused 45/45, workspace type/build pass, Ubuntu PostgreSQL/API/MCP gates pass, independent re-verification PASS after two review fixes.
-- exact next step: finish the read-only inventory, then implement the frozen alias/operation schema and Core contracts.
-- remaining sequence: M16+M17, M45+M47, M21.
+- M16+M17 progress: T1 contracts+migration (`3dc85b5`), T2 discovery+planner (`be0e9c5`), T3 transactional apply (`15cf45b`) committed and independently verified. T4 complete: guard installation (startup over 22 mutable direct stores + `operation_log` INSERT resolution + runtime `vector_documents*`; per-create-site installs for keyword/search_cache/search_analytics/search_events/new-dim vector tables), invalidator registry + production composition (query-understanding/file-filter/index-manager/symbol-graph/alias-resolver), best-effort `project-identity:changed` event, post-commit invalidation with verbatim replay, and user-approved application adapter resolution (`ProjectIdentityAliasResolver`, 250 ms bounded fail-open) wired at 11 write seams (ETL run/runInternal, indexFile, index-manager, observation, job-store, checkpoint, synapse-session, scheduler payload, handoff, proposal, memory insert+deleteByProject). Two independent review rounds: round 1 FAIL→all 4 P1 + 8 P2 remediated (lazy-table guards, snapshot-hole adjudicated READ-COMMITTED-safe, replay verbatim, publish-after-commit discrimination, frozen table list, sync-throw allSettled isolation); round 2 PASS→6 P2 remediated (runTails canonical keying, structuredClone payload, probe isolation, 3 discrimination tests). Gates: 76 focused identity tests + seam/write tests green (61 in identity+store batch), type-check 6/6, build 5/5. Pre-existing PG-fixture failures (scheduler persist, 4 etl-queue, etl-cache-invalidation, structural-etl, auto-improve flaky) reproduce on clean HEAD — not task-owned.
+- exact next step: commit T4 as `fix(identity): guard writers and invalidate caches`, then **T5** — REST rename/merge + MCP tools with dry-run default and shared envelopes. Commit `feat(identity): expose rename and merge transports`.
+- remaining sequence: T4 (writer guard+invalidation) → T5 (REST+MCP transports) → T6 (PostgreSQL two-process acceptance) → T7 (validation.md + full regression). Then M45+M47, M21.
 - mandatory unavailable gates block the relevant feature. Do not weaken validation assets.
 
 ---

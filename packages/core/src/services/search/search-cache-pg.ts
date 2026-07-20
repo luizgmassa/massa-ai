@@ -8,6 +8,7 @@ import { SearchResult } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
 import crypto from "crypto";
 import { getPgPool } from "../../data/db-connection.js";
+import { installGuardOnTable } from "../project-identity/identity-guard-installer.js";
 import type { Pool } from "pg";
 
 interface CacheEntry {
@@ -76,6 +77,16 @@ export class SearchCachePg {
       CREATE INDEX IF NOT EXISTS idx_search_cache_project ON search_cache(project_id);
       CREATE INDEX IF NOT EXISTS idx_search_cache_expires ON search_cache(expires_at);
     `);
+
+    // Project-identity guard on this runtime-created table (design req:
+    // guards install during initialization, not only at startup). Best-effort.
+    const guardCode = await installGuardOnTable(pool, "public", "search_cache", "project_id");
+    if (guardCode) {
+      logger.warn("[project-identity] guard install failed (sanitized)", {
+        table: "search_cache",
+        code: guardCode,
+      });
+    }
   }
 
   private generateKey(

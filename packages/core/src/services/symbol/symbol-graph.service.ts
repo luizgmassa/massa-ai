@@ -692,6 +692,15 @@ export class SymbolGraphService {
       this.projectRootCache.delete(oldest);
     }
   }
+
+  /**
+   * Drop the cached project root for this projectId (post-commit invalidator
+   * hook for project rename/merge). A renamed project must re-resolve its root
+   * on next access; leaving a stale entry would resolve the old path.
+   */
+  clearProjectRoot(projectId: string): void {
+    this.projectRootCache.delete(projectId);
+  }
 }
 
 export const symbolGraphService = SymbolGraphService.getInstance();

@@ -13,6 +13,7 @@ import { glob } from "glob";
 import { logger, config, DEFAULT_ALLOWED_EXTENSIONS } from "@massa-th0th/shared";
 import type { IVectorStore } from "@massa-th0th/shared";
 import { loadProjectIgnore } from "./ignore-patterns.js";
+import { getProjectIdentityAliasResolver } from "../project-identity/alias-resolver.js";
 
 const globAsync = glob;
 
@@ -188,6 +189,8 @@ export class IndexManager {
     indexedFiles: string[],
   ): Promise<void> {
     try {
+      // Resolve canonical project id at the write-entry seam (spec req 3).
+      projectId = await getProjectIdentityAliasResolver().resolve(projectId);
       const fileMetadata: Record<string, FileMetadata> = {};
       let totalSize = 0;
 

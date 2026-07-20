@@ -14,7 +14,14 @@ export interface PayloadStorePolicy {
   readonly encoding: "json" | "json-text" | "text-array";
 }
 
-const STATIC_DIRECT_STORES: Readonly<Record<string, DirectStorePolicy>> = {
+/**
+ * Catalog of every direct (non-payload) project/workspace identity column.
+ * Mutable rows are rewritten by apply; immutable rows (operation_log,
+ * project_identity_operations) are inventoried but never rewritten.
+ * Exported so the T4 guard installer can iterate the same catalog and install
+ * a BEFORE INSERT/UPDATE/DELETE trigger on every mutable direct store.
+ */
+export const STATIC_DIRECT_STORES: Readonly<Record<string, DirectStorePolicy>> = {
   memories: { storeId: "memories", identityColumn: "project_id", mutable: true },
   projects: { storeId: "projects", identityColumn: "project_id", mutable: true },
   documents: { storeId: "documents", identityColumn: "project_id", mutable: true },

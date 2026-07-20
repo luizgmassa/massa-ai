@@ -7,6 +7,7 @@
 import { SearchResult, SearchSource } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
 import { getPgPool } from "../db-connection.js";
+import { installGuardOnTable } from "../../services/project-identity/identity-guard-installer.js";
 import type { Pool } from "pg";
 import {
   sanitizeTrigramQuery,
@@ -92,6 +93,17 @@ export class KeywordSearchPg {
         word TEXT PRIMARY KEY
       );
     `);
+
+    // Project-identity guard (M16+M17 design: runtime-created tables install
+    // guards during initialization). Best-effort: sanitized code on failure,
+    // table init never aborts on a guard problem.
+    const guardCode = await installGuardOnTable(pool, "public", "keyword_documents", "project_id");
+    if (guardCode) {
+      logger.warn("[project-identity] guard install failed (sanitized)", {
+        table: "keyword_documents",
+        code: guardCode,
+      });
+    }
 
     // pg_trgm extension for trigram similarity. Requires the extension to be
     // available; on managed PG (RDS, etc.) this is usually pre-installed. On

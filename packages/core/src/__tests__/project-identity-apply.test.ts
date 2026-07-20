@@ -3,9 +3,12 @@ import { describe, expect, test } from "bun:test";
 import {
   ProjectIdentityApplyService,
   ProjectIdentityError,
+  ProjectIdentityInvalidatorRegistry,
   canonicalProjectIdentityJson,
   hashProjectIdentityPlan,
   hashProjectIdentityRequest,
+  type ProjectIdentityChangedPayload,
+  type ProjectIdentityChangedPublisher,
   type ProjectIdentityTransactionClient,
 } from "../services/project-identity/index.js";
 import { computeIdentityPlan } from "../services/project-identity/planner.js";
@@ -850,5 +853,244 @@ describe("project identity apply — error sanitization", () => {
       expect(message).not.toContain(source);
       expect(message).not.toContain(target);
     }
+  });
+});
+
+describe("project identity apply — post-commit invalidation and event (T4)", () => {
+  function serviceWithPostCommit(
+    client: FakeTransactionClient,
+    invalidators: ProjectIdentityInvalidatorRegistry,
+    publisher: ProjectIdentityChangedPublisher,
+  ): ProjectIdentityApplyService {
+    return new ProjectIdentityApplyService(
+      {
+        withTransaction: async <T,>(body: (c: FakeTransactionClient) => Promise<T>): Promise<T> => {
+          await client.beginTransaction();
+          try {
+            const result = await body(client);
+            await client.commitTransaction();
+            return result;
+          } catch (error) {
+            try { await client.rollbackTransaction(); } catch { /* best-effort */ }
+            throw error;
+          }
+        },
+      },
+      invalidators,
+      publisher,
+    );
+  }
+
+  test("committed apply invalidates both IDs, attaches the report, and publishes the event", async () => {
+    const { client, source, target } = withSourceAndTarget(baselineClient(), "rename");
+    const invalidated: string[] = [];
+    const published: ProjectIdentityChangedPayload[] = [];
+    const registry = new ProjectIdentityInvalidatorRegistry();
+    registry.register({ id: "rec", invalidateProject: (p) => { invalidated.push(p); } });
+    const service = serviceWithPostCommit(client, registry, { publish: (p) => published.push(p) });
+    const planHash = await previewHash(client, "rename", source, target);
+
+    const result = await service.apply({
+      mode: "rename", sourceProjectId: source, targetProjectId: target,
+      dryRun: false, operationId: "op-post-1", expectedPlanHash: planHash,
+    });
+
+    expect(invalidated.sort()).toEqual([source, target].sort());
+    expect(result.invalidation?.invalidated).toHaveLength(2);
+    expect(result.invalidation?.invalidated).toContainEqual({ invalidatorId: "rec", projectId: source });
+    expect(result.invalidation?.invalidated).toContainEqual({ invalidatorId: "rec", projectId: target });
+    expect(result.invalidation?.failures).toEqual([]);
+    expect(published).toHaveLength(1);
+    expect(published[0]).toEqual({
+      mode: "rename",
+      sourceProjectId: source,
+      targetProjectId: target,
+      operationId: "op-post-1",
+      committedAt: result.committedAt,
+    });
+  });
+
+  test("invalidator failure is sanitized in the report and never flips the committed result", async () => {
+    const { client, source, target } = withSourceAndTarget(baselineClient(), "rename");
+    const registry = new ProjectIdentityInvalidatorRegistry();
+    registry.register({
+      id: "broken",
+      invalidateProject: () => { throw Object.assign(new Error("secret cache path"), { code: "E_CACHE" }); },
+    });
+    const service = serviceWithPostCommit(client, registry, { publish: () => { /* noop */ } });
+    const planHash = await previewHash(client, "rename", source, target);
+
+    const result = await service.apply({
+      mode: "rename", sourceProjectId: source, targetProjectId: target,
+      dryRun: false, operationId: "op-post-2", expectedPlanHash: planHash,
+    });
+
+    // The transaction COMMITTED despite the post-commit invalidator failure.
+    expect(result.operationId).toBe("op-post-2");
+    expect(client.tables.project_identity_aliases!.length).toBe(1);
+    expect(client.tables.project_identity_operations!.length).toBe(1);
+    expect(result.invalidation?.failures).toHaveLength(2);
+    expect(result.invalidation?.failures[0]).toEqual({ invalidatorId: "broken", code: "E_CACHE" });
+    expect(JSON.stringify(result)).not.toContain("secret");
+  });
+
+  test("a throwing publisher is swallowed and the empty registry leaves the result shape unchanged", async () => {
+    const { client, source, target } = withSourceAndTarget(baselineClient(), "rename");
+    const service = serviceWithPostCommit(client, new ProjectIdentityInvalidatorRegistry(), {
+      publish: () => { throw new Error("listener boom"); },
+    });
+    const planHash = await previewHash(client, "rename", source, target);
+
+    const result = await service.apply({
+      mode: "rename", sourceProjectId: source, targetProjectId: target,
+      dryRun: false, operationId: "op-post-3", expectedPlanHash: planHash,
+    });
+
+    expect(result.operationId).toBe("op-post-3");
+    expect(client.tables.project_identity_aliases!.length).toBe(1);
+    // Empty registry → EMPTY report → field absent (T1–T3 result shape holds).
+    expect("invalidation" in result).toBe(false);
+  });
+
+  test("default single-arg wiring keeps the committed result free of the invalidation field", async () => {
+    const { client, source, target } = withSourceAndTarget(baselineClient(), "rename");
+    const service = serviceFor(client);
+    const planHash = await previewHash(client, "rename", source, target);
+
+    const result = await service.apply({
+      mode: "rename", sourceProjectId: source, targetProjectId: target,
+      dryRun: false, operationId: "op-post-4", expectedPlanHash: planHash,
+    });
+
+    expect(result.operationId).toBe("op-post-4");
+    expect("invalidation" in result).toBe(false);
+  });
+});
+
+describe("project identity apply — T4 review remediations", () => {
+  test("the changed event is published strictly AFTER the transaction commits", async () => {
+    const { client, source, target } = withSourceAndTarget(baselineClient(), "rename");
+    const order: string[] = [];
+    const baseCommit = client.commitTransaction.bind(client);
+    client.commitTransaction = async () => { order.push("commit"); await baseCommit(); };
+    const registry = new ProjectIdentityInvalidatorRegistry();
+    registry.register({ id: "rec", invalidateProject: () => { order.push("invalidate"); } });
+    const service = new ProjectIdentityApplyService(
+      {
+        withTransaction: async <T,>(body: (c: FakeTransactionClient) => Promise<T>): Promise<T> => {
+          await client.beginTransaction();
+          try {
+            const result = await body(client);
+            await client.commitTransaction();
+            return result;
+          } catch (error) {
+            try { await client.rollbackTransaction(); } catch { /* best-effort */ }
+            throw error;
+          }
+        },
+      },
+      registry,
+      { publish: () => { order.push("publish"); } },
+    );
+    const planHash = await previewHash(client, "rename", source, target);
+
+    await service.apply({
+      mode: "rename", sourceProjectId: source, targetProjectId: target,
+      dryRun: false, operationId: "op-order", expectedPlanHash: planHash,
+    });
+
+    // A publish-BEFORE-commit mutant fails this ordering assertion. The
+    // invalidator runs once per ID (source + target).
+    expect(order).toEqual(["commit", "invalidate", "invalidate", "publish"]);
+  });
+
+  test("idempotent replay returns the stored result verbatim: no fresh invalidation, no duplicate event", async () => {
+    const { client, source, target } = withSourceAndTarget(baselineClient(), "rename");
+    let invalidations = 0;
+    let publishes = 0;
+    const registry = new ProjectIdentityInvalidatorRegistry();
+    registry.register({ id: "rec", invalidateProject: () => { invalidations++; } });
+    const service = new ProjectIdentityApplyService(
+      {
+        withTransaction: async <T,>(body: (c: FakeTransactionClient) => Promise<T>): Promise<T> => {
+          await client.beginTransaction();
+          try {
+            const result = await body(client);
+            await client.commitTransaction();
+            return result;
+          } catch (error) {
+            try { await client.rollbackTransaction(); } catch { /* best-effort */ }
+            throw error;
+          }
+        },
+      },
+      registry,
+      { publish: () => { publishes++; } },
+    );
+    const planHash = await previewHash(client, "rename", source, target);
+    const request = {
+      mode: "rename" as const, sourceProjectId: source, targetProjectId: target,
+      dryRun: false as const, operationId: "op-replay", expectedPlanHash: planHash,
+    };
+
+    const first = await service.apply(request);
+    expect(invalidations).toBe(2); // source + target
+    expect(publishes).toBe(1);
+    expect(first.invalidation?.invalidated).toHaveLength(2);
+
+    const second = await service.apply(request);
+
+    // Replay: stored result verbatim — the first result carried a fresh
+    // invalidation report; the stored row does not gain a new one, and no
+    // post-commit step re-runs.
+    expect(invalidations).toBe(2);
+    expect(publishes).toBe(1);
+    expect(second.operationId).toBe("op-replay");
+    expect(second.planHash).toBe(first.planHash);
+    expect("invalidation" in second).toBe(false);
+    expect(client.mutations).toBeGreaterThan(0);
+    const mutationsBefore = client.mutations;
+    await service.apply(request);
+    expect(client.mutations).toBe(mutationsBefore);
+  });
+});
+
+describe("project identity apply — registry defect diagnostic", () => {
+  test("a defective invalidator registry surfaces one sanitized failure and still returns the committed result", async () => {
+    const { client, source, target } = withSourceAndTarget(baselineClient(), "rename");
+    const sabotaged = new ProjectIdentityInvalidatorRegistry();
+    (sabotaged as unknown as { invalidateBoth: () => Promise<never> }).invalidateBoth =
+      async () => { throw new Error("registry internals broken /secret"); };
+    const service = new ProjectIdentityApplyService(
+      {
+        withTransaction: async <T,>(body: (c: FakeTransactionClient) => Promise<T>): Promise<T> => {
+          await client.beginTransaction();
+          try {
+            const result = await body(client);
+            await client.commitTransaction();
+            return result;
+          } catch (error) {
+            try { await client.rollbackTransaction(); } catch { /* best-effort */ }
+            throw error;
+          }
+        },
+      },
+      sabotaged,
+      { publish: () => { /* noop */ } },
+    );
+    const planHash = await previewHash(client, "rename", source, target);
+
+    const result = await service.apply({
+      mode: "rename", sourceProjectId: source, targetProjectId: target,
+      dryRun: false, operationId: "op-defect", expectedPlanHash: planHash,
+    });
+
+    expect(result.operationId).toBe("op-defect");
+    expect(client.tables.project_identity_aliases!.length).toBe(1);
+    expect(result.invalidation?.invalidated).toEqual([]);
+    expect(result.invalidation?.failures).toEqual([
+      { invalidatorId: "<invalidator-registry>", code: "UNKNOWN" },
+    ]);
+    expect(JSON.stringify(result)).not.toContain("/secret");
   });
 });
