@@ -8,9 +8,10 @@ import { Elysia } from "elysia";
 import { SearchServiceError } from "@massa-th0th/core";
 
 export const errorHandler = new Elysia({ name: "error-handler" }).onError(
-  ({ error, set }) => {
+  ({ code, error, set }) => {
     console.error("[massa-th0th-api] Request failed", {
       name: error instanceof Error ? error.name : "UnknownError",
+      code,
     });
 
     if (error instanceof SearchServiceError) {
@@ -21,6 +22,20 @@ export const errorHandler = new Elysia({ name: "error-handler" }).onError(
           code: error.code,
           message: error.message,
           component: error.component,
+        },
+      };
+    }
+
+    // Elysia body/query/param validation + parse failures (framework code,
+    // 422-ish). Return a typed, sanitized envelope — never INTERNAL_ERROR for
+    // a client mistake, never TypeBox internals (spec req 9 pattern).
+    if (code === "VALIDATION" || code === "PARSE") {
+      set.status = 400;
+      return {
+        success: false,
+        error: {
+          code: "INVALID_REQUEST",
+          message: "The request failed validation",
         },
       };
     }

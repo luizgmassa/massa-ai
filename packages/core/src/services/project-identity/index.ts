@@ -86,6 +86,12 @@ export type {
   ProductionInvalidatorTargets,
 } from "./production-wiring.js";
 export {
+  createProjectIdentityService,
+} from "./service.js";
+export type {
+  CreateProjectIdentityServiceOptions,
+} from "./service.js";
+export {
   ProjectIdentityAliasResolver,
   getProjectIdentityAliasResolver,
   setProjectIdentityAliasResolverForTests,

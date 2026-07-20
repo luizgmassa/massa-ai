@@ -1468,6 +1468,82 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    name: "rename_project",
+    description:
+      "Rename a project identity transactionally. Default dryRun=true previews " +
+      "canonical roots, per-store counts, conflicts, and a planHash. To apply, " +
+      "call again with dryRun=false, a caller-chosen operationId (idempotency " +
+      "key), and the preview's planHash as expectedPlanHash. The retired source " +
+      "ID remains a working alias.",
+    apiEndpoint: "/api/v1/project/rename",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sourceProjectId: {
+          type: "string",
+          description: "Current project ID to rename from",
+        },
+        targetProjectId: {
+          type: "string",
+          description: "New project ID (must be unused and never retired)",
+        },
+        dryRun: {
+          type: "boolean",
+          description:
+            "Preview only (default true). Set false with operationId + expectedPlanHash to apply.",
+        },
+        operationId: {
+          type: "string",
+          description: "Idempotency key, required when dryRun=false",
+        },
+        expectedPlanHash: {
+          type: "string",
+          description: "planHash from the dryRun preview, required when dryRun=false",
+        },
+      },
+      required: ["sourceProjectId", "targetProjectId"],
+    },
+  },
+  {
+    name: "merge_projects",
+    description:
+      "Merge one project identity into another transactionally (same canonical " +
+      "root required). Default dryRun=true previews counts, conflicts, and a " +
+      "planHash. To apply, call again with dryRun=false, a caller-chosen " +
+      "operationId, and the preview's planHash as expectedPlanHash. The retired " +
+      "source ID remains a working alias.",
+    apiEndpoint: "/api/v1/project/merge",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sourceProjectId: {
+          type: "string",
+          description: "Project ID to merge from (retired afterwards)",
+        },
+        targetProjectId: {
+          type: "string",
+          description: "Live project ID to merge into",
+        },
+        dryRun: {
+          type: "boolean",
+          description:
+            "Preview only (default true). Set false with operationId + expectedPlanHash to apply.",
+        },
+        operationId: {
+          type: "string",
+          description: "Idempotency key, required when dryRun=false",
+        },
+        expectedPlanHash: {
+          type: "string",
+          description: "planHash from the dryRun preview, required when dryRun=false",
+        },
+      },
+      required: ["sourceProjectId", "targetProjectId"],
+    },
+  },
 ];
 
 /**
