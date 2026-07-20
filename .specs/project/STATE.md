@@ -5,15 +5,15 @@
 - projectId: `massa-th0th`
 - workflowSessionId: `spec-wave-3`
 - workflow: spec-driven
-- feature: `transactional-project-identity` (M16+M17)
-- status: M19, M20+M54, M50, M16+M17 complete (T1–T7 `3dc85b5`→`b68910d` `docs(specs): validate transactional project identity`; independent verifier PASS, surviving mutant M4 closed by new planner fixture); M45+M47 next
+- feature: `hook-attribution-repair` (M45+M47)
+- status: M19, M20+M54, M50, M16+M17 complete (`3dc85b5`→`b68910d` + bookkeeping `356b8bd`; independent verifier PASS); M45+M47 specified (`21bb272`: spec/design/tasks, HAR-01..10, pre-mortem plan-critic revisions C1–C5 incorporated) — Execute next (T1–T8); M21 pending (Linux gate env pre-decided: Ubuntu Codespace, M19 precedent)
 - branch/worktree: `wave-3` / `massa-th0th-wt-wave-3`
 - sequence: M19 → M20+M54 → M50 → M16+M17 → M45+M47 → M21
 - invariant: `sqlite-removal` stays `in_progress`; `multi-language-tree-sitter-breadth` reconciled to `complete` from its recorded PASS evidence.
 
 ### Wave 3 Next Step
 
-T7 committed (`b68910d`): validation.md PASS, full regression with T6 gate 9/9 inside the suite, baseline failure classification, verifier PASS. Next: M45+M47 (`hook-attribution-repair`, P1) verify-first per ~/Downloads/massa-th0th-improvement-plan.md as its own spec-driven feature; then M21 (`linux-native-structural-runtime`, P0).
+Execute `hook-attribution-repair` T1 (additive observation attribution columns) per `.specs/features/hook-attribution-repair/tasks.md`. Gates under pinned Bun 1.3.11; owned acceptance DB `massa_th0th_hook_attribution` via `HOOK_ATTRIBUTION_ACCEPTANCE_DATABASE_URL` (turbo passThroughEnv forwarded in T4). Then M21 (`linux-native-structural-runtime`, P0).
 
 ---
 

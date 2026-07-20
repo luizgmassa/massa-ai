@@ -1,6 +1,19 @@
 # AI Engineering Handoff
 
-## Current: Wave 3 / M16+M17 Transactional Project Identity
+## Current: Wave 3 / M45+M47 Hook Attribution Repair
+
+- projectId: `massa-th0th`; workflowSessionId: `spec-wave-3`
+- branch: `wave-3`; isolated worktree: `massa-th0th-wt-wave-3`
+- active feature: `hook-attribution-repair` (tasks.md T1–T8)
+- feature spec HEAD: `21bb272` (`docs(specs): specify hook attribution repair`). Prior feature complete: `b68910d` + bookkeeping `356b8bd`. Base: main `c92e481`.
+- Specify COMPLETE (2026-07-20): verify-first fan-out (3 read-only subagents) confirmed M45 precondition + all four bug modes REAL; user decisions locked (server+emitters, fail-open+provenance, agentId+mirror in scope); spec/design/tasks with HAR-01..10 committed. Full The Fool pre-mortem plan-critic found C1–C5; all incorporated: (C1/C2) resolver+migration dedupe roots by path, self-match preference, NULL-safe NOT EXISTS, `_pre_repair_project_id` preservation, shared-DB grooming runbook authored (execution needs user approval; `e2e-th0th-shared` preserved per standing ops decision); (C3) `_pin.sh` runs AFTER stdin capture (single-read constraint); (C4) compact-snapshot gains optional `cwd` + resolver routing + route-level test; (C5) OpenCode populates agentId, Claude honestly NULL.
+- exact next step: Execute T1 (additive observation attribution columns) per `.specs/features/hook-attribution-repair/tasks.md`. Gates under pinned Bun 1.3.11 (`/var/folders/2s/y7r9gt5d15s48_z4nxkhyldr0000gn/T/opencode/bun-1.3.11/node_modules/.bin`, recreate via `npm i bun@1.3.11` if temp-cleaned). Owned acceptance DB `massa_th0th_hook_attribution`; gate var `HOOK_ATTRIBUTION_ACCEPTANCE_DATABASE_URL` (turbo passThroughEnv added in T4 — without it the suite silently skips).
+- remaining sequence: M45+M47 → M21 (`linux-native-structural-runtime`, P0; Linux gate env pre-decided by user 2026-07-20: Ubuntu Codespace, M19 precedent; native runtime contract frozen per AD-004/005/006).
+- mandatory unavailable gates block the relevant feature. Do not weaken validation assets.
+
+---
+
+## Previous: Wave 3 / M16+M17 Transactional Project Identity
 
 - projectId: `massa-th0th`; workflowSessionId: `spec-wave-3`
 - branch: `wave-3`; isolated worktree: `massa-th0th-wt-wave-3`

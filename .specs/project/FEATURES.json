@@ -270,8 +270,8 @@
     {
       "slug": "hook-attribution-repair",
       "title": "M45 + M47 — sticky hook attribution and repair",
-      "status": "pending", "priority": "P1",
-      "phases": { "specify": false, "design": false, "tasks": false, "execute": false }
+      "status": "in_progress", "priority": "P1",
+      "phases": { "specify": true, "design": true, "tasks": true, "execute": false }
     },
     {
       "slug": "linux-native-structural-runtime",
@@ -280,5 +280,5 @@
       "phases": { "specify": false, "design": false, "tasks": false, "execute": false }
     }
   ],
-  "active_feature": "transactional-project-identity"
+  "active_feature": "hook-attribution-repair"
 }
