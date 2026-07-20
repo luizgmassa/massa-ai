@@ -373,6 +373,8 @@ model Observation {
   payloadJson String   @map("payload_json")
   importance  Float
   createdAt   DateTime @default(now()) @map("created_at")
+  agentId     String?  @map("agent_id")
+  attributionSource String? @map("attribution_source")
 
   @@index([projectId, createdAt(sort: Desc)])
   @@index([sessionId])
