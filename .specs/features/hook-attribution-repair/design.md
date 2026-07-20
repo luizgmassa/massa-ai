@@ -73,14 +73,14 @@ Conform to AD-004/005/006 (exact Bun 1.3.11 gate runtime, pinned native stack �
   - `resolve(input: AttributionInput): Promise<AttributionResult>` — order: explicit → sticky → containment → verbatim.
   - `WorkspaceRootProvider` (interface): `listRoots(): Promise<Array<{projectId, projectPath}>>` — PG impl cached 30s TTL + 250ms timeout, fail-open to empty (→ containment simply never matches).
 - **Logic**:
-  - Roots are **deduplicated by `project_path`** before matching: identical paths collapse to one candidate root carrying its set of live ids.
-  - explicit: caller id is a live workspace id OR alias-resolves to one (reuse `getProjectIdentityAliasResolver`) → `source:'explicit'`.
-  - sticky: pin map hit for `sessionId` → `source:'sticky'`.
-  - containment: `canonicalize(cwd)` (realpathSync, fallback `path.resolve`; fs failure → fall through) matched against non-broad deduped roots; longest path match wins; if the matched path is shared by multiple live ids: caller id ∈ sharing set → self-match `source:'explicit'`; otherwise ambiguous → verbatim. Zero matches → verbatim.
+  - Roots are **deduplicated by `project_path`** before matching: identical paths collapse to one candidate root carrying its live id set; a matched shared path is ambiguous unless the caller self-matches — which is decided at the explicit tier (raw + canonical live check), not inside containment.
+  - explicit: caller id is a live workspace id OR alias-resolves to one (reuse `getProjectIdentityAliasResolver`) → `source:'explicit'`. Self-match across a path-sharing id set lands here automatically.
+  - sticky: pin map hit for `sessionId` → `source:'sticky'`; the hit re-pins so expiry refreshes for long-lived sessions.
+  - containment: `canonicalize(cwd)` (realpathSync, fallback `path.resolve`; fs failure → fall through) matched against non-broad deduped roots (trailing separators normalized, empty paths excluded); longest path match wins; single-id match → `source:'containment'`; shared-path match → ambiguous → verbatim. Zero matches → verbatim.
   - broad-root: root `=== path.parse(root).root` or `=== os.homedir()` excluded from matching.
   - verbatim: `source:'verbatim'`, caller id unchanged.
   - On success with source ∈ {explicit, sticky, containment} and `sessionId` present → (re)pin session.
-  - Any internal error → catch → `{projectId: caller, source:'verbatim'}` + sanitized warn (no SQL, no paths beyond projectId).
+  - Any internal error → catch → `{projectId: caller, source:'verbatim'}` + sanitized warn (error name only; no SQL, no paths, no caller ids).
 - **Reuses**: alias-resolver pattern; `realpathSafe` semantics; `canonicalizeProjectRoot` semantics.
 
 ### SessionPinStore (`packages/core/src/services/hooks/session-pin-store.ts`)
