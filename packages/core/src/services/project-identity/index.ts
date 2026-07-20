@@ -26,6 +26,10 @@ export {
   hashProjectIdentityPlan,
   hashProjectIdentityRequest,
 } from "./hash.js";
+export {
+  parsePgArrayLiteral,
+  toPgArrayLiteral,
+} from "./pg-array-codec.js";
 export { ProjectIdentityError } from "./errors.js";
 export type { ProjectIdentityErrorCode } from "./errors.js";
 export {

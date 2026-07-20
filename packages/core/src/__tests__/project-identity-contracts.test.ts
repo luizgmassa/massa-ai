@@ -103,9 +103,32 @@ describe("project identity canonical hashing", () => {
   test("rejects values JSON would silently coerce", () => {
     expect(() => canonicalProjectIdentityJson({ bad: undefined })).toThrow(TypeError);
     expect(() => canonicalProjectIdentityJson({ bad: Number.NaN })).toThrow(TypeError);
-    expect(() => canonicalProjectIdentityJson(new Date())).toThrow(TypeError);
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
     expect(() => canonicalProjectIdentityJson(cyclic)).toThrow(TypeError);
+    // NOTE (T6 correction): Date/bytea/bigint are NOT rejected — real
+    // PostgreSQL row material carries timestamp/bytea columns, and the plan
+    // fingerprint must canonicalize them (tagged forms, see below). The prior
+    // Date-throws assertion was written against plain-JSON fakes and was
+    // falsified by the owned-PG acceptance gate.
+  });
+});
+
+describe("canonical JSON — PostgreSQL driver values (T6 finding)", () => {
+  test("Date, bytea, and bigint canonicalize to tagged unambiguous forms", () => {
+    const date = new Date("2026-07-20T12:00:00.000Z");
+    const bytes = Buffer.from("hello", "utf8");
+    expect(canonicalProjectIdentityJson({ d: date })).toBe('{"d":"date:2026-07-20T12:00:00.000Z"}');
+    expect(canonicalProjectIdentityJson({ b: bytes })).toBe(`{"b":"bytes:${bytes.toString("base64")}"}`);
+    expect(canonicalProjectIdentityJson({ n: BigInt(42) })).toBe('{"n":"bigint:42"}');
+    // Tagged forms never collide with plain text holding the same characters.
+    expect(canonicalProjectIdentityJson({ n: "42" })).not.toBe(canonicalProjectIdentityJson({ n: BigInt(42) }));
+    expect(canonicalProjectIdentityJson({ d: "2026-07-20T12:00:00.000Z" })).not.toBe(
+      canonicalProjectIdentityJson({ d: date }),
+    );
+    // Uint8Array (non-Buffer) takes the same bytea path.
+    expect(canonicalProjectIdentityJson({ b: new Uint8Array([104, 105]) })).toBe(
+      canonicalProjectIdentityJson({ b: Buffer.from("hi", "utf8") }),
+    );
   });
 });

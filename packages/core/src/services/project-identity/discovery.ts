@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { canonicalProjectIdentityJson } from "./hash.js";
+import { parsePgArrayLiteral } from "./pg-array-codec.js";
 import {
   PROJECT_IDENTITY_REGISTRY_VERSION,
   directStorePolicy,
@@ -45,7 +46,11 @@ export interface DiscoveredDirectStore {
   materialColumns: readonly string[];
 }
 
-export interface DiscoveredPayloadStore extends PayloadStorePolicy {}
+export interface DiscoveredPayloadStore extends PayloadStorePolicy {
+  /** True when the table carries its own project_id column, so payload scans
+   *  can be scoped to the source/target rows instead of the whole table. */
+  readonly hasProjectIdentityColumn: boolean;
+}
 
 export interface ProjectIdentityInventory {
   registryVersion: typeof PROJECT_IDENTITY_REGISTRY_VERSION;
@@ -133,7 +138,9 @@ export async function discoverProjectIdentityStorage(
       });
     }
     for (const policy of payloadStorePolicies(tableName)) {
-      if (columns.has(policy.column)) payloadStores.push(policy);
+      if (columns.has(policy.column)) {
+        payloadStores.push({ ...policy, hasProjectIdentityColumn: columns.has("project_id") });
+      }
     }
     if (/project|workspace/.test(tableName) && !isKnownRegistryTable(tableName)) {
       unknown.add(tableName);
@@ -171,13 +178,16 @@ export function inspectIdentityPayload(
 ): { count: number; malformed: boolean; canonical: string } {
   try {
     if (encoding === "text-array") {
-      if (!Array.isArray(raw) || raw.some((item) => typeof item !== "string")) {
+      // TEXT columns arrive as PG array literals (`{a,b}`); native text[]
+      // columns arrive as JS arrays. Both are valid (see pg-array-codec).
+      const parsed = parsePgArrayLiteral(raw);
+      if (parsed === undefined) {
         return { count: 0, malformed: raw != null, canonical: "" };
       }
-      const count = raw.filter((item) =>
+      const count = parsed.filter((item) =>
         item === `handoff:${projectId}` || item === `project:${projectId}` || item === projectId
       ).length;
-      return { count, malformed: false, canonical: canonicalProjectIdentityJson(raw) };
+      return { count, malformed: false, canonical: canonicalProjectIdentityJson(parsed) };
     }
     const value = encoding === "json-text" && typeof raw === "string" ? JSON.parse(raw) : raw;
     if (value == null) return { count: 0, malformed: false, canonical: "null" };

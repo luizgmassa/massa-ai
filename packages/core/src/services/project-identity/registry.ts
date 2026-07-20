@@ -54,7 +54,10 @@ export const STATIC_DIRECT_STORES: Readonly<Record<string, DirectStorePolicy>> =
 };
 
 const PAYLOAD_STORES: readonly PayloadStorePolicy[] = [
-  { storeId: "memories", column: "metadata", encoding: "json" },
+  // memories.metadata is TEXT holding a JSON document (same Prisma/no-OID
+  // mapping class as tags) — the "json-text" encoding parses + re-serializes
+  // so the UPDATE round-trips the text representation (T6 finding).
+  { storeId: "memories", column: "metadata", encoding: "json-text" },
   { storeId: "memories", column: "tags", encoding: "text-array" },
   { storeId: "scheduled_jobs", column: "payload", encoding: "json-text" },
   { storeId: "keyword_documents", column: "metadata", encoding: "json" },

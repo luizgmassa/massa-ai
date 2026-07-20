@@ -102,18 +102,20 @@ export async function computeIdentityPlan(
   request: { mode: ProjectIdentityMode; sourceProjectId: string; targetProjectId: string },
   schema = "public",
 ): Promise<ProjectIdentityPlan> {
-  const [workspaceResult, aliasResult, inventory] = await Promise.all([
-    client.query<WorkspaceRow>(
-      `SELECT project_id, project_path FROM workspaces WHERE project_id = $1 OR project_id = $2`,
-      [request.sourceProjectId, request.targetProjectId],
-    ),
-    client.query<AliasRow>(
-      `SELECT retired_project_id, target_project_id FROM project_identity_aliases
-        WHERE retired_project_id = $1 OR retired_project_id = $2`,
-      [request.sourceProjectId, request.targetProjectId],
-    ),
-    discoverProjectIdentityStorage(client, schema),
-  ]);
+  // Sequential queries on the single pooled client: concurrent query
+  // pipelining is deprecated in pg 8 and REMOVED in pg 9 — under Bun it can
+  // desync the wire protocol and wedge the connection (T6 finding: the next
+  // pool.query on the reused client never resolved).
+  const workspaceResult = await client.query<WorkspaceRow>(
+    `SELECT project_id, project_path FROM workspaces WHERE project_id = $1 OR project_id = $2`,
+    [request.sourceProjectId, request.targetProjectId],
+  );
+  const aliasResult = await client.query<AliasRow>(
+    `SELECT retired_project_id, target_project_id FROM project_identity_aliases
+      WHERE retired_project_id = $1 OR retired_project_id = $2`,
+    [request.sourceProjectId, request.targetProjectId],
+  );
+  const inventory = await discoverProjectIdentityStorage(client, schema);
   const workspaces = new Map(workspaceResult.rows.map((row) => [row.project_id, row]));
   const aliases = new Set(aliasResult.rows.map((row) => row.retired_project_id));
   const source = workspaces.get(request.sourceProjectId);
@@ -133,11 +135,19 @@ export async function computeIdentityPlan(
   const counts = new Map<string, ProjectIdentityStoreCount>();
   const conflicts = new Map<string, ProjectIdentityConflict>();
   const fingerprintRows: unknown[] = [];
+  // Fingerprint inputs MUST be order-independent: PostgreSQL makes no row-order
+  // guarantee without ORDER BY, so an unsorted fingerprint can flip a valid
+  // preview/apply pair into PROJECT_IDENTITY_PLAN_CHANGED on identical storage
+  // (T6 finding). Rows and payload fingerprints are sorted canonically below.
   for (const store of inventory.directStores) {
     const rows = await loadDirectRows(
       client, store, request.sourceProjectId, request.targetProjectId,
     );
-    fingerprintRows.push({ store: store.storeId, rows });
+    fingerprintRows.push({
+      store: store.storeId,
+      rows: [...rows].sort((a, b) =>
+        compareText(canonicalProjectIdentityJson(a), canonicalProjectIdentityJson(b))),
+    });
     const sourceRows = rows.filter((row) => row[store.identityColumn] === request.sourceProjectId);
     counts.set(store.storeId, { storeId: store.storeId, directCount: sourceRows.length, adaptedCount: 0 });
     if (request.mode === "merge") {
@@ -163,8 +173,18 @@ export async function computeIdentityPlan(
   for (const adapter of inventory.payloadStores) {
     const table = quoteDiscoveredIdentifier(adapter.storeId);
     const column = quoteDiscoveredIdentifier(adapter.column);
+    // Scope the scan to the source/target rows when the table carries its own
+    // project_id: a GLOBAL scan would let an unrelated project's payload write
+    // between preview and apply flip the fingerprint and spuriously fail apply
+    // with PROJECT_IDENTITY_PLAN_CHANGED (T6 review). scheduled_jobs has no
+    // project_id column and keeps the full scan by design.
+    const scoped = adapter.hasProjectIdentityColumn;
     const result = await client.query<PayloadRow>(
-      `SELECT ${column} AS payload_value FROM ${table} WHERE ${column} IS NOT NULL`,
+      scoped
+        ? `SELECT ${column} AS payload_value FROM ${table}
+           WHERE ${column} IS NOT NULL AND ("project_id" = $1 OR "project_id" = $2)`
+        : `SELECT ${column} AS payload_value FROM ${table} WHERE ${column} IS NOT NULL`,
+      scoped ? [request.sourceProjectId, request.targetProjectId] : [],
     );
     let adaptedCount = 0;
     let malformedCount = 0;
@@ -175,7 +195,10 @@ export async function computeIdentityPlan(
       if (inspected.malformed) malformedCount++;
       else payloadFingerprints.push(inspected.canonical);
     }
-    fingerprintRows.push({ store: `${adapter.storeId}.${adapter.column}`, payloads: payloadFingerprints });
+    fingerprintRows.push({
+      store: `${adapter.storeId}.${adapter.column}`,
+      payloads: [...payloadFingerprints].sort(compareText),
+    });
     const count = counts.get(adapter.storeId) ?? {
       storeId: adapter.storeId, directCount: 0, adaptedCount: 0,
     };

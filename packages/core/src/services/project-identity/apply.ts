@@ -15,6 +15,7 @@ import {
 } from "./discovery.js";
 import { ProjectIdentityError } from "./errors.js";
 import { hashProjectIdentityRequest } from "./hash.js";
+import { parsePgArrayLiteral, toPgArrayLiteral } from "./pg-array-codec.js";
 import type { PayloadStorePolicy } from "./registry.js";
 import {
   EMPTY_INVALIDATION_REPORT,
@@ -130,15 +131,20 @@ function rewriteIdentityInValue(
   encoding: PayloadStorePolicy["encoding"],
 ): { value: unknown; rewritten: boolean } {
   if (encoding === "text-array") {
-    if (!Array.isArray(value)) return { value, rewritten: false };
+    // TEXT columns arrive as PG array literals (`{a,b}`); native text[]
+    // columns arrive as JS arrays. Parse both, rewrite, then serialize back
+    // to the SAME wire representation so the UPDATE round-trips (T6 finding).
+    const parsed = parsePgArrayLiteral(value);
+    if (parsed === undefined) return { value, rewritten: false };
     let rewritten = false;
-    const next = value.map((item) => {
+    const next = parsed.map((item) => {
       if (item === `handoff:${source}`) { rewritten = true; return `handoff:${target}`; }
       if (item === `project:${source}`) { rewritten = true; return `project:${target}`; }
       if (item === source) { rewritten = true; return target; }
       return item;
     });
-    return { value: next, rewritten };
+    if (!rewritten) return { value, rewritten: false };
+    return { value: typeof value === "string" ? toPgArrayLiteral(next) : next, rewritten: true };
   }
   const decoded = encoding === "json-text" && typeof value === "string"
     ? safeJsonParse(value)
@@ -402,11 +408,27 @@ export class ProjectIdentityApplyService {
     }
 
     // 4b. Direct mutable stores: rename → UPDATE id_col; merge → dedupe then UPDATE.
-    //     In merge mode the source workspaces row is skipped here (its project_id
-    //     PK would collide with the existing target row); it is retired in (4c)
-    //     after its graph_generations dependents have moved.
-    for (const store of mutableDirectStores) {
-      if (request.mode === "merge" && store.storeId === "workspaces") continue;
+    //     Identity ROOT stores (projects, workspaces) rewrite FIRST: dependent
+    //     stores hold NON-deferred FKs to them (documents.project_id →
+    //     projects.project_id, symbol_*.project_id → workspaces.project_id), so
+    //     an alphabetical rewrite violates the FK before the root moves (T6
+    //     finding). The graph_generations ↔ workspaces cycle stays safe via the
+    //     deferred composite FK.
+    //     In merge mode the source projects/workspaces rows are skipped here
+    //     (their unique identity values would collide with the live target
+    //     rows); they are retired in (4c) after dependents have moved.
+    //     graph_generations is also skipped in merge mode: moving source rows
+    //     naively would put TWO status='active' rows under target and trip the
+    //     non-deferrable graph_generations_one_active_per_project index (T6
+    //     finding) — (4c) supersedes before moving instead.
+    const isIdentityRoot = (storeId: string): boolean =>
+      storeId === "projects" || storeId === "workspaces";
+    const orderedStores = [...mutableDirectStores].sort((a, b) =>
+      Number(isIdentityRoot(b.storeId)) - Number(isIdentityRoot(a.storeId)) ||
+      compareText(a.storeId, b.storeId));
+    for (const store of orderedStores) {
+      if (request.mode === "merge" &&
+          (isIdentityRoot(store.storeId) || store.storeId === "graph_generations")) continue;
       await this.rewriteDirectStore(client, store, request);
     }
 
@@ -538,17 +560,20 @@ export class ProjectIdentityApplyService {
     // narrower check would miss is already a CONFLICT before we reach here.
     const keyColumns = store.primaryKey.filter((col) => col !== store.identityColumn);
     if (keyColumns.length > 0) {
-      const keyProjection = keyColumns.map((col) => quoteDiscoveredIdentifier(col)).join(", ");
+      // Every element must carry its table alias: `(t_source.a, "b")` leaves
+      // `"b"` unqualified inside the self-join → 42702 ambiguous column (T6
+      // finding on search_cache.hit_count).
+      const qualify = (alias: string, columns: readonly string[]): string =>
+        columns.map((col) => `${alias}.${quoteDiscoveredIdentifier(col)}`).join(", ");
       // Material equality on the safe (non-bytea/vector) columns.
       const materialColumns = store.materialColumns.length > 0 ? store.materialColumns : keyColumns;
-      const materialProjection = materialColumns.map((col) => quoteDiscoveredIdentifier(col)).join(", ");
       await client.query(
         `DELETE FROM ${table} t_source
           USING ${table} t_target
           WHERE t_source.${column} = $1
             AND t_target.${column} = $2
-            AND (t_source.${keyProjection}) IS NOT DISTINCT FROM (t_target.${keyProjection})
-            AND (t_source.${materialProjection}) IS NOT DISTINCT FROM (t_target.${materialProjection})`,
+            AND (${qualify("t_source", keyColumns)}) IS NOT DISTINCT FROM (${qualify("t_target", keyColumns)})
+            AND (${qualify("t_source", materialColumns)}) IS NOT DISTINCT FROM (${qualify("t_target", materialColumns)})`,
         [request.sourceProjectId, request.targetProjectId],
       );
     }
@@ -562,18 +587,28 @@ export class ProjectIdentityApplyService {
   private async rewritePayloadStore(
     client: ProjectIdentityTransactionClient,
     policy: PayloadStorePolicy,
-    request: { sourceProjectId: string; targetProjectId: string },
+    request: { mode: "rename" | "merge"; sourceProjectId: string; targetProjectId: string },
   ): Promise<void> {
     const table = quoteDiscoveredIdentifier(policy.storeId);
     const column = quoteDiscoveredIdentifier(policy.column);
 
     // Project-filter when the table has a project_id column; otherwise scan
-    // (scheduled_jobs has no project_id — acceptable per spec).
+    // (scheduled_jobs has no project_id — acceptable per spec). Merge mode
+    // scans BOTH ids: a target row whose payload references the source id is
+    // counted by the planner and must be rewritten too, otherwise a mutable
+    // source reference survives apply (T6 review, spec AC zero-source-refs).
     const hasProjectColumn = await this.tableHasColumn(client, policy.storeId, "project_id");
+    const bothIds = hasProjectColumn && request.mode === "merge";
     const filter = hasProjectColumn
-      ? `WHERE "project_id" = $1`
+      ? bothIds
+        ? `WHERE "project_id" = $1 OR "project_id" = $2`
+        : `WHERE "project_id" = $1`
       : `WHERE ${column} IS NOT NULL`;
-    const filterValues = hasProjectColumn ? [request.sourceProjectId] : [];
+    const filterValues = hasProjectColumn
+      ? bothIds
+        ? [request.sourceProjectId, request.targetProjectId]
+        : [request.sourceProjectId]
+      : [];
 
     // Fetch rows + a row identifier for targeted UPDATE. Prefer an `id` PK.
     const hasId = await this.tableHasColumn(client, policy.storeId, "id");
@@ -633,8 +668,8 @@ export class ProjectIdentityApplyService {
     request: { sourceProjectId: string; targetProjectId: string },
     mutableDirectStores: readonly DiscoveredDirectStore[],
   ): Promise<void> {
-    // Before the generation project_id rewrite: NULL out workspace active/pending
-    // pointers for BOTH ids so the deferred composite FK survives the rewrite.
+    // Before any generation work: NULL out workspace active/pending pointers
+    // for BOTH ids so the deferred composite FK survives the rewrite.
     await client.query(
       `UPDATE workspaces
           SET active_graph_generation_id = NULL,
@@ -643,15 +678,60 @@ export class ProjectIdentityApplyService {
       [request.sourceProjectId, request.targetProjectId],
     );
 
-    // graph_generations rows moved from source to target in step (4a); assert
-    // none remain under source before retiring the source workspace row.
-    // Stray-row assertion: every mutable direct store other than `workspaces`
-    // (retired below) must have ZERO rows still pointing at source. This covers
-    // graph_generations and any symbol_* / runtime-created direct store; rows
-    // that failed to move would otherwise be silently cascade-deleted when the
-    // source workspace row is removed.
+    // Winner selection BEFORE the move, across BOTH projects (spec: newest
+    // activated generation wins). The non-deferrable partial unique index
+    // graph_generations_one_active_per_project forbids two active rows under
+    // one project, so the loser actives are superseded BEFORE any row moves
+    // (T6 finding: a naive move-then-supersede tripped 23505).
+    const generations = await client.query<GraphGenerationRow>(
+      `SELECT id, project_id, status, activated_at
+         FROM graph_generations
+        WHERE project_id = $1 OR project_id = $2
+        ORDER BY (activated_at IS NULL) ASC, activated_at DESC, id DESC`,
+      [request.sourceProjectId, request.targetProjectId],
+    );
+    const winner = generations.rows.find((row) => row.status === "active")
+      ?? generations.rows.find((row) => row.status === "completed");
+    // pending rows are untouched by the supersede/activate updates below, so the
+    // in-memory generations list is authoritative for them. Preserve an
+    // in-flight pending pointer (NULLed above for FK survival), preferring the
+    // target's own pending generation and falling back to the source's so a
+    // merge never silently drops in-flight graph work (T6 review).
+    const pendingWinner = generations.rows.find((row) =>
+      row.status === "pending" && row.project_id === request.targetProjectId)
+      ?? generations.rows.find((row) => row.status === "pending")
+      ?? null;
+    if (winner) {
+      await client.query(
+        `UPDATE graph_generations
+            SET status = 'superseded', superseded_at = COALESCE(superseded_at, now())
+          WHERE (project_id = $1 OR project_id = $2) AND status = 'active' AND id <> $3`,
+        [request.sourceProjectId, request.targetProjectId, winner.id],
+      );
+    }
+
+    // Move the source generations. At most one active row exists under target
+    // afterwards: the winner (re-activated below when it came from source).
+    await client.query(
+      `UPDATE graph_generations SET project_id = $1 WHERE project_id = $2`,
+      [request.targetProjectId, request.sourceProjectId],
+    );
+    if (winner) {
+      await client.query(
+        `UPDATE graph_generations SET status = 'active', activated_at = COALESCE(activated_at, now())
+          WHERE project_id = $1 AND id = $2`,
+        [request.targetProjectId, winner.id],
+      );
+    }
+
+    // Stray-row assertion: every mutable direct store other than the retired
+    // roots (`workspaces`, `projects`) must have ZERO rows still pointing at
+    // source. This covers graph_generations, documents, and any symbol_* /
+    // runtime-created direct store; rows that failed to move would otherwise
+    // be silently cascade-deleted when the source root rows are removed.
+    const RETIRED_ROOTS = new Set(["workspaces", "projects"]);
     for (const store of mutableDirectStores) {
-      if (store.storeId === "workspaces") continue;
+      if (RETIRED_ROOTS.has(store.storeId)) continue;
       const table = quoteDiscoveredIdentifier(store.storeId);
       const column = quoteDiscoveredIdentifier(store.identityColumn);
       const stray = await client.query<{ count: number | string }>(
@@ -663,42 +743,32 @@ export class ProjectIdentityApplyService {
       }
     }
 
-    // Retire the source workspace row: its identity is now an alias. The alias
-    // row (4d) and immutable operation_log are the only allowed source refs.
+    // Flatten inbound alias chains (spec req 2): aliases that pointed at the
+    // retiring source are re-pointed at the merge target. This MUST happen
+    // before the source workspaces row is deleted —
+    // project_identity_aliases_target_fkey is ON DELETE RESTRICT, so merging a
+    // previously-renamed id otherwise aborts with 23503 (T6 review finding,
+    // proven against the owned DB: rename A→B then merge B→C failed).
+    await client.query(
+      `UPDATE project_identity_aliases
+          SET target_project_id = $1
+        WHERE target_project_id = $2`,
+      [request.targetProjectId, request.sourceProjectId],
+    );
+
+    // Retire the source identity-root rows: both identities are now aliases.
+    // documents.project_id → projects.project_id is RESTRICT on delete, so the
+    // projects delete is only safe AFTER dependents moved (asserted above).
+    // The alias row (4d) and immutable operation_log are the only allowed
+    // source refs.
+    await client.query(
+      `DELETE FROM projects WHERE project_id = $1`,
+      [request.sourceProjectId],
+    );
     await client.query(
       `DELETE FROM workspaces WHERE project_id = $1`,
       [request.sourceProjectId],
     );
-
-    // graph_generations.project_id was rewritten in step (4a). Select the
-    // newest activated generation now consolidated under target.
-    const generations = await client.query<GraphGenerationRow>(
-      `SELECT id, project_id, status, activated_at
-         FROM graph_generations
-        WHERE project_id = $1
-        ORDER BY (activated_at IS NULL) ASC, activated_at DESC, id DESC`,
-      [request.targetProjectId],
-    );
-    const winner = generations.rows.find((row) => row.status === "active")
-      ?? generations.rows.find((row) => row.status === "completed");
-    // pending rows are untouched by the supersede/activate updates below, so the
-    // in-memory generations list is authoritative for them. Preserve the target
-    // workspace's in-flight pending pointer (NULLed above for FK survival).
-    const pendingWinner = generations.rows.find((row) => row.status === "pending") ?? null;
-    // Supersede every other active generation under target.
-    if (winner) {
-      await client.query(
-        `UPDATE graph_generations
-            SET status = 'superseded', superseded_at = COALESCE(superseded_at, now())
-          WHERE project_id = $1 AND status = 'active' AND id <> $2`,
-        [request.targetProjectId, winner.id],
-      );
-      await client.query(
-        `UPDATE graph_generations SET status = 'active', activated_at = COALESCE(activated_at, now())
-          WHERE project_id = $1 AND id = $2`,
-        [request.targetProjectId, winner.id],
-      );
-    }
 
     // Recompute workspace aggregate counts from the chosen generation.
     const aggregateTarget = winner?.id ?? null;

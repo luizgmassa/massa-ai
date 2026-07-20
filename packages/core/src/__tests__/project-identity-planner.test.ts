@@ -63,7 +63,15 @@ class FakeClient implements ProjectIdentityQueryClient {
       return { rows: rows.filter((row) => values.includes(row[identityColumn])) as T[] };
     }
     const column = text.match(/SELECT "([a-z0-9_]+)" AS payload_value/)?.[1];
-    return { rows: rows.filter((row) => row[column!] != null).map((row) => ({ payload_value: row[column!] })) as T[] };
+    // Planner scopes payload scans to the source/target rows when the table
+    // carries project_id; unscoped tables (scheduled_jobs) scan all rows.
+    const scoped = /"project_id"\s*=\s*\$1/i.test(text);
+    return {
+      rows: rows
+        .filter((row) => row[column!] != null)
+        .filter((row) => !scoped || values.includes(row.project_id))
+        .map((row) => ({ payload_value: row[column!] })) as T[],
+    };
   }
 }
 

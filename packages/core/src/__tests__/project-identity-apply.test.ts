@@ -138,7 +138,9 @@ class FakeTransactionClient implements ProjectIdentityTransactionClient {
     }
     if (/^SELECT[\s\S]*FROM\s+graph_generations/i.test(text)) {
       const rows = this.active().graph_generations ?? [];
-      const forProject = rows.filter((row) => row.project_id === values[0]);
+      // Merge repair selects across BOTH projects: WHERE project_id = $1 OR project_id = $2.
+      const ids = /OR\s+project_id\s*=\s*\$2/i.test(text) ? [values[0], values[1]] : [values[0]];
+      const forProject = rows.filter((row) => ids.includes(row.project_id));
       return { rows: forProject as unknown as T[] };
     }
     if (/FROM\s+graph_generations\s+WHERE\s+project_id/i.test(text)) {
@@ -168,9 +170,12 @@ class FakeTransactionClient implements ProjectIdentityTransactionClient {
       const table = text.match(/FROM "([a-z0-9_]+)"/)?.[1] ?? "";
       const column = text.match(/SELECT "([a-z0-9_]+)" AS payload_value/)?.[1] ?? "";
       const rows = this.active()[table] ?? [];
-      const filtered = text.includes("project_id")
-        ? rows.filter((row) => row.project_id === values[0])
-        : rows;
+      // Planner scopes payload scans to ($1 OR $2); apply's rewrite filters $1.
+      const filtered = !text.includes("project_id")
+        ? rows
+        : /OR\s+"project_id"\s*=\s*\$2/i.test(text)
+          ? rows.filter((row) => [values[0], values[1]].includes(row.project_id))
+          : rows.filter((row) => row.project_id === values[0]);
       return { rows: filtered
         .filter((row) => row[column] != null)
         .map((row) => ({ id: row.id, [column]: row[column] })) as unknown as T[] };
@@ -218,7 +223,9 @@ class FakeTransactionClient implements ProjectIdentityTransactionClient {
       const sourceId = values[0];
       const targetId = values[1];
       const groups = [...text.matchAll(/\(t_source\.([^)]+)\)/g)].map((match) =>
-        match[1]!.split(",").map((col) => col.replace(/"/g, "").trim())
+        match[1]!.split(",").map((col) =>
+          // Each element carries its own table alias (t_source."a", t_source."b").
+          col.replace(/^\s*(t_source|t_target)\s*\./, "").replace(/"/g, "").trim())
           .filter((col) => col && col !== "project_id" && col !== "workspace_id"));
       const keyCols = groups[0] ?? [];
       const materialCols = groups[1] ?? keyCols;
@@ -239,6 +246,14 @@ class FakeTransactionClient implements ProjectIdentityTransactionClient {
     if (/^DELETE FROM/i.test(text) && /WHERE\s+"?project_id"?\s*=\s*\$1/i.test(text)) {
       const doomed = values[0];
       store[table] = target.filter((row) => row.project_id !== doomed);
+      return { rows: [] };
+    }
+    // Alias flatten (merge): re-point inbound aliases from source to target.
+    if (/^UPDATE\s+"?project_identity_aliases"?\s+SET\s+target_project_id/i.test(text)) {
+      const rows = store.project_identity_aliases ?? [];
+      for (const row of rows) {
+        if (row.target_project_id === values[1]) row.target_project_id = values[0];
+      }
       return { rows: [] };
     }
     if (/^UPDATE\s+"?([a-z0-9_]+)"?\s+SET\s+"?(project_id|workspace_id)"?/i.test(text)) {
@@ -296,18 +311,26 @@ class FakeTransactionClient implements ProjectIdentityTransactionClient {
       return { rows: [] };
     }
     if (/^UPDATE\s+graph_generations\s+SET\s+status/i.test(text)) {
+      const isSupersede = /status\s*=\s*'superseded'/i.test(text);
+      if (isSupersede) {
+        // New merge shape: WHERE (project_id = $1 OR project_id = $2)
+        //   AND status = 'active' AND id <> $3
+        const bothProjects = /OR\s+project_id\s*=\s*\$2/i.test(text);
+        const projectIds = bothProjects ? [values[0], values[1]] : [values[0]];
+        const excludedId = bothProjects ? values[2] : values[1];
+        for (const row of target) {
+          if (!projectIds.includes(row.project_id)) continue;
+          if (excludedId && row.id === excludedId) continue;
+          if (row.status === "active") row.status = "superseded";
+        }
+        return { rows: [] };
+      }
       const projectId = values[0];
       const targetId = values[1];
-      const isSupersede = /status\s*=\s*'superseded'/i.test(text);
       const isInclusive = /AND id\s*=\s*\$2/i.test(text);
       for (const row of target) {
         if (row.project_id !== projectId) continue;
-        if (isSupersede) {
-          if (targetId && row.id === targetId) continue;
-          if (row.status === "active") row.status = "superseded";
-        } else if (isInclusive) {
-          if (row.id === targetId) row.status = "active";
-        }
+        if (isInclusive && row.id === targetId) row.status = "active";
       }
       return { rows: [] };
     }
@@ -648,11 +671,14 @@ describe("project identity apply — merge success", () => {
       { id: "g-source-active", project_id: source, status: "active", activated_at: "2026-07-19T10:00:00Z" },
       { id: "g-target-active", project_id: target, status: "active", activated_at: "2026-07-18T10:00:00Z" },
     ];
-    // memories: one byte-equivalent duplicate (same id+material), one source-only.
+    // memories: one byte-equivalent duplicate (same id+material), one source-only,
+    // and one TARGET row whose payload references the source id (must also be
+    // rewritten in merge — spec AC zero mutable source references).
     client.tables.memories = [
       { id: "dup", project_id: source, metadata: {}, tags: [] },
       { id: "dup", project_id: target, metadata: {}, tags: [] },
       { id: "uniq", project_id: source, metadata: { projectId: "source" }, tags: [] },
+      { id: "t-ref", project_id: target, metadata: { projectId: "source" }, tags: [] },
     ];
     client.tables.documents = [{ id: "d1", project_id: source }];
     client.tables.scheduled_jobs = [{ id: "j1", payload: JSON.stringify({ projectId: "source" }) }];
@@ -680,7 +706,15 @@ describe("project identity apply — merge success", () => {
     expect(dupRows[0]!.project_id).toBe(target);
     const uniqRow = memories.find((row) => row.id === "uniq");
     expect(uniqRow?.project_id).toBe(target);
-    expect(uniqRow?.metadata).toEqual({ projectId: target });
+    // memories.metadata is a TEXT column holding a JSON document (verified
+    // against the owned T6 PostgreSQL schema, information_schema data_type
+    // "text"), so the json-text rewrite preserves the STRING representation.
+    expect(uniqRow?.metadata).toBe(JSON.stringify({ projectId: target }));
+    // Target-row payload referencing the source id was rewritten too (merge
+    // scans both ids); without it a mutable source reference would survive.
+    const targetRef = memories.find((row) => row.id === "t-ref");
+    expect(targetRef?.project_id).toBe(target);
+    expect(targetRef?.metadata).toBe(JSON.stringify({ projectId: target }));
     // Source workspace retired; target kept.
     expect(client.tables.workspaces!.filter((row) => row.project_id === source).length).toBe(0);
     expect(client.tables.workspaces!.filter((row) => row.project_id === target).length).toBe(1);
@@ -745,6 +779,43 @@ describe("project identity apply — merge success", () => {
     // The pending generation row itself is untouched (still pending).
     const pendingGen = client.tables.graph_generations!.find((row) => row.id === "g-target-pending");
     expect(pendingGen?.status).toBe("pending");
+  });
+
+  test("flattens inbound alias chains before retiring the source (rename A→B, merge B→C)", async () => {
+    const client = baselineClient();
+    const chainA = "chain-a";
+    const chainB = "chain-b";
+    const chainC = "chain-c";
+    const path = "/repos/app";
+    // B is live (result of an earlier rename A→B); C is the live merge target.
+    client.tables.workspaces = [
+      { project_id: chainB, project_path: path, active_graph_generation_id: null, pending_graph_generation_id: null },
+      { project_id: chainC, project_path: path, active_graph_generation_id: null, pending_graph_generation_id: null },
+    ];
+    client.tables.graph_generations = [];
+    client.tables.memories = [{ id: "m1", project_id: chainB, metadata: {}, tags: [] }];
+    client.tables.documents = [];
+    client.tables.scheduled_jobs = [];
+    client.tables.operation_log = [];
+    // A is already retired and points at B — the merge MUST re-point it at C.
+    client.tables.project_identity_aliases = [
+      { retired_project_id: chainA, target_project_id: chainB, canonical_root: path, operation_id: "op-earlier" },
+    ];
+    client.tables.project_identity_operations = [];
+    client.tables.symbol_files = [];
+
+    const planHash = await previewHash(client, "merge", chainB, chainC);
+    const service = serviceFor(client);
+    await service.apply({
+      mode: "merge", sourceProjectId: chainB, targetProjectId: chainC,
+      dryRun: false, operationId: "op-merge-chain", expectedPlanHash: planHash,
+    });
+
+    expect(client.tables.project_identity_aliases).toEqual([
+      { retired_project_id: chainA, target_project_id: chainC, canonical_root: path, operation_id: "op-earlier" },
+      expect.objectContaining({ retired_project_id: chainB, target_project_id: chainC }),
+    ]);
+    expect(client.tables.workspaces!.filter((row) => row.project_id === chainB).length).toBe(0);
   });
 });
 

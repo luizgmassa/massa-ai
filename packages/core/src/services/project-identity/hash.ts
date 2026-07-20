@@ -37,6 +37,19 @@ function canonicalize(value: unknown, seen: Set<object>): CanonicalJson {
     if (!Number.isFinite(value)) throw new TypeError("Canonical JSON requires finite numbers");
     return Object.is(value, -0) ? 0 : value;
   }
+  if (typeof value === "bigint") {
+    // pg int8 (with bigint parsers) — tagged so it can never collide with a
+    // text column holding the same digits.
+    return `bigint:${value.toString()}`;
+  }
+  if (value instanceof Date) {
+    // pg timestamp/timestamptz driver values. Tagged canonical instant.
+    return `date:${value.toISOString()}`;
+  }
+  if (Buffer.isBuffer(value) || value instanceof Uint8Array) {
+    // pg bytea driver values. Tagged base64.
+    return `bytes:${Buffer.from(value).toString("base64")}`;
+  }
   if (Array.isArray(value)) {
     if (seen.has(value)) throw new TypeError("Canonical JSON cannot contain cycles");
     seen.add(value);
