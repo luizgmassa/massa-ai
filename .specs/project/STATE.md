@@ -6,14 +6,14 @@
 - workflowSessionId: `spec-wave-3`
 - workflow: spec-driven
 - feature: `hook-attribution-repair` (M45+M47)
-- status: M19, M20+M54, M50, M16+M17 complete (`3dc85b5`→`b68910d` + bookkeeping `356b8bd`; independent verifier PASS); M45+M47 specified (`21bb272`: spec/design/tasks, HAR-01..10, pre-mortem plan-critic revisions C1–C5 incorporated) — Execute next (T1–T8); M21 pending (Linux gate env pre-decided: Ubuntu Codespace, M19 precedent)
+- status: M19, M20+M54, M50, M16+M17 complete; M45+M47 specified (`21bb272`+`89217f4`) + Execute T1–T3 done (`b015508` cols, `0b78e32` resolver, `34fa019` all-seam wiring) — T4–T8 remain; M21 pending (Linux gate env pre-decided: Ubuntu Codespace, M19 precedent)
 - branch/worktree: `wave-3` / `massa-th0th-wt-wave-3`
 - sequence: M19 → M20+M54 → M50 → M16+M17 → M45+M47 → M21
 - invariant: `sqlite-removal` stays `in_progress`; `multi-language-tree-sitter-breadth` reconciled to `complete` from its recorded PASS evidence.
 
 ### Wave 3 Next Step
 
-Execute `hook-attribution-repair` T1 (additive observation attribution columns) per `.specs/features/hook-attribution-repair/tasks.md`. Gates under pinned Bun 1.3.11; owned acceptance DB `massa_th0th_hook_attribution` via `HOOK_ATTRIBUTION_ACCEPTANCE_DATABASE_URL` (turbo passThroughEnv forwarded in T4). Then M21 (`linux-native-structural-runtime`, P0).
+Continue `hook-attribution-repair` T4 (PG observation persistence + canonical mirror + acceptance suite + turbo `passThroughEnv` for `HOOK_ATTRIBUTION_ACCEPTANCE_DATABASE_URL`) per `.specs/features/hook-attribution-repair/tasks.md`. Then T5–T8. Gates under pinned Bun 1.3.11; owned acceptance DB `massa_th0th_hook_attribution`. Then M21 (`linux-native-structural-runtime`, P0).
 
 ---
 
