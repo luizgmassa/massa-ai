@@ -613,8 +613,16 @@ export class SymbolGraphService {
   }
 
   /**
-   * Read lines [lineStart, lineEnd] from a relative project path.
-   * Used to enrich definition results with code previews.
+   * Read a bounded snippet from a project file. Used to enrich definition
+   * results with code previews.
+   *
+   * N9 EXCLUSION: this internal enrichment path is NOT subject to the
+   * MASSA_TH0TH_READ_FILE_MAX_LINES cap. The cap applies to user-facing
+   * read_file + symbol_snippet HTTP endpoint; readSnippet is called by
+   * `go_to_definition` enrichment that returns small bounded context
+   * windows (3-line context, top-3 definitions). Applying the cap here
+   * would silently clip internal enrichment with no propagation path to
+   * the MCP response. See Wave 4 N9 AC 15.
    */
   private async readSnippet(
     relativePath: string,
@@ -634,7 +642,12 @@ export class SymbolGraphService {
     }
   }
 
-  /** Read N lines of context around a given line number from a relative path. */
+  /**
+   * Read N lines of context around a given line number from a relative path.
+   *
+   * N9 EXCLUSION: same as readSnippet — internal enrichment path, NOT capped
+   * by MASSA_TH0TH_READ_FILE_MAX_LINES. See Wave 4 N9 AC 15.
+   */
   private async readContext(
     relativePath: string,
     lineNumber: number,

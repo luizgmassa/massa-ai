@@ -19,6 +19,22 @@ import { workspaceManager } from "../services/workspace/workspace-manager.js";
 import fs from "fs/promises";
 import path from "path";
 
+/**
+ * N9: per-read line ceiling on user-facing read_file output. Default 500;
+ * override via `MASSA_TH0TH_READ_FILE_MAX_LINES`. Invalid/negative/zero
+ * values fall back to 500 (treat invalid as unset). When the requested
+ * range exceeds the cap, `selectedContent` is sliced and `source_clipped:
+ * true` is emitted in the same response. The true total line count is
+ * always surfaced as `lineRange.actual.total` so `omitted = total - shown`
+ * is derivable. Internal enrichment paths (SymbolGraphService.readSnippet
+ * /readContext used by go_to_definition) are NOT capped — see
+ * symbol-graph.service.ts for the exclusion comment.
+ */
+const MASSA_TH0TH_READ_FILE_MAX_LINES = (() => {
+  const v = Number(process.env.MASSA_TH0TH_READ_FILE_MAX_LINES);
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : 500;
+})();
+
 interface ReadFileParams {
   filePath: string;
   projectId?: string;
@@ -197,8 +213,24 @@ export class ReadFileTool implements IToolHandler {
       const lines = content.split("\n");
       const totalLines = lines.length;
       const adjustedRange = this.adjustRange(range, totalLines);
-      const selectedContent = this.extractLines(lines, adjustedRange);
-      const selectedLineCount = selectedContent.split("\n").length;
+      let selectedContent = this.extractLines(lines, adjustedRange);
+      let selectedLineCount = selectedContent.split("\n").length;
+
+      // N9: cap user-facing read_file output at MASSA_TH0TH_READ_FILE_MAX_LINES
+      // (default 500). When the adjusted range exceeds the cap, slice the
+      // content and emit `source_clipped: true` in the same response so the
+      // caller knows lines were omitted. `lineRange.actual.total` keeps the
+      // true total line count so `omitted = total - shown` is derivable.
+      let source_clipped = false;
+      if (selectedLineCount > MASSA_TH0TH_READ_FILE_MAX_LINES) {
+        const cappedLines = lines.slice(
+          adjustedRange.start - 1,
+          adjustedRange.start - 1 + MASSA_TH0TH_READ_FILE_MAX_LINES,
+        );
+        selectedContent = cappedLines.join("\n");
+        selectedLineCount = selectedContent.split("\n").length;
+        source_clipped = true;
+      }
 
       // Determine if compression is needed
       const shouldAutoCompress = 
@@ -216,11 +248,14 @@ export class ReadFileTool implements IToolHandler {
           },
           actual: {
             start: adjustedRange.start,
-            end: adjustedRange.end,
+            end: source_clipped
+              ? adjustedRange.start + selectedLineCount - 1
+              : adjustedRange.end,
             total: totalLines,
           },
           selected: selectedLineCount,
         },
+        source_clipped,
         metadata: {
           totalLines,
           language: metadata.language,

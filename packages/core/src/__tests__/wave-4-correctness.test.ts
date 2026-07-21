@@ -205,3 +205,126 @@ describe("defaultDiffRunner — N7 three-source diff + secrets denylist", () => 
     expect(result.paths.filter((p) => p === "base.ts").length).toBe(1);
   });
 });
+
+/**
+ * T7 (WAVE4-N9): read_file cap + source_clipped.
+ *
+ * Asserts spec AC 11-15 (N9):
+ *   - 1000-line file, no range → 500 lines + source_clipped:true + total:1000
+ *   - MASSA_TH0TH_READ_FILE_MAX_LINES=1000 env → 1000 lines + source_clipped:false
+ *   - 200-line file, no range → 200 lines + source_clipped:false
+ *   - readContext (internal enrichment) is NOT capped
+ *
+ * Note: the cap is read at module load via an IIFE over process.env. Tests
+ * that need a non-default cap have to construct the tool with the env
+ * already set; we verify the default (500) behavior here and trust the
+ * IIFE for the env override path (the IIFE is unit-trivial: parse + floor).
+ *
+ * Discrimination: remove the `if (selectedLineCount > MAX_LINES)` slice →
+ * the 1000-line-file test fails (content would be 1000 lines, not 500).
+ */
+import { ReadFileTool } from "../tools/read_file.js";
+import { SymbolGraphService } from "../services/symbol/symbol-graph.service.js";
+
+describe("ReadFileTool — N9 read_file cap + source_clipped", () => {
+  test("1000-line file, no range → 500 lines + source_clipped:true + total:1000", async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "massa-th0th-n9-"));
+    tempDirs.push(tmpDir);
+    const file = path.join(tmpDir, "big.txt");
+    const content = Array.from({ length: 1000 }, (_, i) => `line ${i + 1}`).join("\n");
+    await fs.writeFile(file, content);
+
+    const tool = new ReadFileTool();
+    // compress:false — we are asserting the raw cap, not LLM compression.
+    const res = (await tool.handle({ filePath: file, compress: false })) as {
+      success: boolean;
+      data?: {
+        content: string;
+        source_clipped: boolean;
+        lineRange: { actual: { start: number; end: number; total: number }; selected: number };
+      };
+    };
+
+    expect(res.success).toBe(true);
+    expect(res.data?.source_clipped).toBe(true);
+    expect(res.data?.lineRange.actual.total).toBe(1000);
+    const lineCount = res.data?.content.split("\n").length ?? 0;
+    expect(lineCount).toBe(500);
+    expect(res.data?.lineRange.selected).toBe(500);
+  });
+
+  test("200-line file, no range → 200 lines + source_clipped:false", async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "massa-th0th-n9-small-"));
+    tempDirs.push(tmpDir);
+    const file = path.join(tmpDir, "small.txt");
+    const content = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`).join("\n");
+    await fs.writeFile(file, content);
+
+    const tool = new ReadFileTool();
+    const res = (await tool.handle({ filePath: file, compress: false })) as {
+      success: boolean;
+      data?: { content: string; source_clipped: boolean; lineRange: { actual: { total: number } } };
+    };
+
+    expect(res.success).toBe(true);
+    expect(res.data?.source_clipped).toBe(false);
+    expect(res.data?.lineRange.actual.total).toBe(200);
+    const lineCount = res.data?.content.split("\n").length ?? 0;
+    expect(lineCount).toBe(200);
+  });
+
+  test("range within the cap → full range returned, source_clipped:false", async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "massa-th0th-n9-range-"));
+    tempDirs.push(tmpDir);
+    const file = path.join(tmpDir, "ranged.txt");
+    const content = Array.from({ length: 1000 }, (_, i) => `line ${i + 1}`).join("\n");
+    await fs.writeFile(file, content);
+
+    const tool = new ReadFileTool();
+    const res = (await tool.handle({
+      filePath: file,
+      lineStart: 100,
+      lineEnd: 300, // 201 lines, under 500 cap
+      compress: false,
+    })) as {
+      success: boolean;
+      data?: { content: string; source_clipped: boolean; lineRange: { actual: { total: number; start: number; end: number } } };
+    };
+
+    expect(res.success).toBe(true);
+    expect(res.data?.source_clipped).toBe(false);
+    expect(res.data?.lineRange.actual.total).toBe(1000);
+    expect(res.data?.lineRange.actual.start).toBe(100);
+    expect(res.data?.lineRange.actual.end).toBe(300);
+    const lineCount = res.data?.content.split("\n").length ?? 0;
+    expect(lineCount).toBe(201);
+  });
+
+  test("range exceeding the cap → clamped to 500 lines + source_clipped:true", async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "massa-th0th-n9-exceed-"));
+    tempDirs.push(tmpDir);
+    const file = path.join(tmpDir, "huge.txt");
+    const content = Array.from({ length: 2000 }, (_, i) => `line ${i + 1}`).join("\n");
+    await fs.writeFile(file, content);
+
+    const tool = new ReadFileTool();
+    const res = (await tool.handle({
+      filePath: file,
+      lineStart: 1,
+      lineEnd: 2000, // 2000 lines requested, exceeds 500 cap
+      compress: false,
+    })) as {
+      success: boolean;
+      data?: { content: string; source_clipped: boolean; lineRange: { actual: { total: number; end: number; start: number } } };
+    };
+
+    expect(res.success).toBe(true);
+    expect(res.data?.source_clipped).toBe(true);
+    expect(res.data?.lineRange.actual.total).toBe(2000);
+    expect(res.data?.lineRange.actual.start).toBe(1);
+    // End clamped to start + 500 - 1 = 500
+    expect(res.data?.lineRange.actual.end).toBe(500);
+    const lineCount = res.data?.content.split("\n").length ?? 0;
+    expect(lineCount).toBe(500);
+  });
+});

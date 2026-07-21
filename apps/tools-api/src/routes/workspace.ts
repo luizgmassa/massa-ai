@@ -640,9 +640,31 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
         }
 
         const start = boundedInt(lineStart, 1, 1, 1_000_000);
-        const end = lineEnd
-          ? boundedInt(lineEnd, start + 20, start, start + 10_000)
-          : start + 20;
+        // N9: cap symbol_snippet output at MASSA_TH0TH_READ_FILE_MAX_LINES
+        // (default 500) — same env override as read_file. The prior hard-coded
+        // ceiling was start+10_000. When the requested range exceeds the cap,
+        // we clamp end and emit source_clipped: true. The full file line count
+        // is NOT fetched here (it would require a second pass for a hot route);
+        // omitted is derivable by the caller as `lines.length - (endLine-startLine+1)`.
+        const MAX_SNIPPET_LINES = (() => {
+          const v = Number(process.env.MASSA_TH0TH_READ_FILE_MAX_LINES);
+          return Number.isFinite(v) && v > 0 ? Math.floor(v) : 500;
+        })();
+        const cappedEndMax = start + MAX_SNIPPET_LINES - 1;
+        let end: number;
+        let source_clipped = false;
+        if (lineEnd) {
+          const requestedEnd = boundedInt(lineEnd, start + 20, start, start + 10_000);
+          if (requestedEnd - start + 1 > MAX_SNIPPET_LINES) {
+            end = cappedEndMax;
+            source_clipped = true;
+          } else {
+            end = requestedEnd;
+          }
+        } else {
+          // Default 20-line window — well under the cap.
+          end = start + 20;
+        }
         const absolutePath = path.join(workspace.project_path, file);
         const content = await fs.readFile(absolutePath, "utf-8");
         const lines = content.split(/\r?\n/);
@@ -660,6 +682,7 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
             projectId,
             startLine: start,
             endLine: start + slice.length - 1,
+            source_clipped,
             lines: formatted,
           },
         };
