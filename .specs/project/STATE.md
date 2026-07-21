@@ -6,14 +6,14 @@
 - workflowSessionId: `spec-wave-3`
 - workflow: spec-driven
 - feature: `hook-attribution-repair` (M45+M47)
-- status: M19, M20+M54, M50, M16+M17 complete; M45+M47 specified (`21bb272`+`89217f4`) + Execute T1–T3 done (`b015508` cols, `0b78e32` resolver, `34fa019` all-seam wiring) — T4–T8 remain; M21 pending (Linux gate env pre-decided: Ubuntu Codespace, M19 precedent)
+- status: M19, M20+M54, M50, M16+M17 complete; M45+M47 Execute T1–T4 done (`b015508` cols, `0b78e32` resolver, `34fa019` all-seam wiring, `fc8b81b` PG persist + mirror + acceptance suite) — T5–T8 remain; M21 pending (Linux gate env pre-decided: Ubuntu Codespace, M19 precedent)
 - branch/worktree: `wave-3` / `massa-th0th-wt-wave-3`
 - sequence: M19 → M20+M54 → M50 → M16+M17 → M45+M47 → M21
 - invariant: `sqlite-removal` stays `in_progress`; `multi-language-tree-sitter-breadth` reconciled to `complete` from its recorded PASS evidence.
 
 ### Wave 3 Next Step
 
-Continue `hook-attribution-repair` T4 (PG observation persistence + canonical mirror + acceptance suite + turbo `passThroughEnv` for `HOOK_ATTRIBUTION_ACCEPTANCE_DATABASE_URL`) per `.specs/features/hook-attribution-repair/tasks.md`. Then T5–T8. Gates under pinned Bun 1.3.11; owned acceptance DB `massa_th0th_hook_attribution`. Then M21 (`linux-native-structural-runtime`, P0).
+Continue `hook-attribution-repair` T5 (Claude `_pin.sh` session pinning, stdin-safe per plan-critic C3) per `.specs/features/hook-attribution-repair/tasks.md`. Then T6–T8. Gates under pinned Bun 1.3.11; owned acceptance DB `massa_th0th_hook_attribution` via `HOOK_ATTRIBUTION_ACCEPTANCE_DATABASE_URL`. Then M21 (`linux-native-structural-runtime`, P0).
 
 ---
 
