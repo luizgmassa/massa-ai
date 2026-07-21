@@ -32,7 +32,7 @@
   "distractors": [
     {
       "path": "packages/core/src/controllers/search-controller.ts",
-      "sha256": "d3c0095d3ccab895007ba7e7e6d8e82d55f27e6d2250367b2b8973f5d31901fe"
+      "sha256": "fb3020fd64d06d84d5d560039671bcb657f8d28fe015231f704401ad5cf0f954"
     },
     {
       "path": "packages/core/src/services/query/prisma-client.ts",
@@ -80,7 +80,7 @@
     },
     {
       "path": "packages/core/src/services/symbol/symbol-graph.service.ts",
-      "sha256": "4183c8fccd9cca4c00ab673e66097e41d55fe996982d7b198262365ef67450c8"
+      "sha256": "9ac827d32dc9384093be1dfbac35e367fd6a317cc859a61c183cf6c31602391e"
     },
     {
       "path": "packages/core/src/index.ts",
@@ -100,11 +100,11 @@
     },
     {
       "path": "packages/core/src/tools/trace_path.ts",
-      "sha256": "abb20d19be70f92eeb2ea2950a5270df071627d6cfdb102fc180a6a43aa53de9"
+      "sha256": "589a7df91eef0ef694d19c0ad2e0b11d934c6a0c105cab90c1e9388b13ba69a6"
     },
     {
       "path": "packages/core/src/tools/impact_analysis.ts",
-      "sha256": "817935325f9f7d045b6f01dd4385bfd9b3dcc4789c0826bd0193027af1fda9b6"
+      "sha256": "bf679c216c4fe8fd1ce808161d10ab205269bb9788219c1469db79497b470502"
     },
     {
       "path": "packages/core/src/services/graph/graph-store-pg.ts",
