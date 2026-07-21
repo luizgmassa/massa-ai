@@ -2,12 +2,9 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { MassaTh0thConfig, defaultMassaTh0thConfig } from "./massa-th0th-config";
+import { configDir } from "./xdg";
 
-const XDG_CONFIG_HOME =
-  process.env.XDG_CONFIG_HOME && process.env.XDG_CONFIG_HOME.trim()
-    ? process.env.XDG_CONFIG_HOME
-    : path.join(os.homedir(), ".config");
-const CONFIG_DIR = path.join(XDG_CONFIG_HOME, "massa-th0th");
+const CONFIG_DIR = configDir("massa-th0th");
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
 
 export function getConfigDir(): string {
