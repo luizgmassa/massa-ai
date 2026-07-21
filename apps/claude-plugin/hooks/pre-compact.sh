@@ -10,7 +10,6 @@
 # Silent-degrade: never blocks the agent (exit 0, no stdout).
 
 _massa_th0th_base="${MASSA_TH0TH_API_BASE:-http://localhost:3333}"
-_massa_th0th_project="${MASSA_TH0TH_PROJECT_ID:-$(basename "$PWD")}"
 
 # Read the Claude Code hook payload from stdin (JSON) — may be empty.
 _massa_th0th_stdin=""
@@ -29,6 +28,17 @@ if command -v jq >/dev/null 2>&1; then
 else
   _massa_th0th_session=$(printf '%s' "$_massa_th0th_stdin" | sed -n 's/.*"session_id"[: ]*"*\([^",}]*\).*/\1/p' 2>/dev/null)
 fi
+# Resolve the project id through the per-session pin (M45/HAR-04) — AFTER the
+# stdin capture above (single-read constraint; the pin helper never reads
+# stdin). A missing helper falls back to today's env/basename behavior.
+_massa_th0th_pin_lib="$(dirname "$0")/_pin.sh"
+if [ -f "$_massa_th0th_pin_lib" ]; then
+  . "$_massa_th0th_pin_lib"
+  _massa_th0th_project=$(massa_th0th_pin_project_id "$_massa_th0th_session" "$PWD")
+else
+  _massa_th0th_project="${MASSA_TH0TH_PROJECT_ID:-$(basename "$PWD")}"
+fi
+
 [ -z "$_massa_th0th_session" ] && _massa_th0th_session="unknown"
 
 # 1. Emit the pre-compact lifecycle observation (backward-compatible with the
