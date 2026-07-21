@@ -521,7 +521,7 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
         }),
         scope: t.Optional(
           t.Union(
-            [t.Literal("unstaged"), t.Literal("staged"), t.Literal("committed")],
+            [t.Literal("unstaged"), t.Literal("staged"), t.Literal("committed"), t.Literal("all")],
             { description: "unstaged (default) | staged | committed" },
           ),
         ),

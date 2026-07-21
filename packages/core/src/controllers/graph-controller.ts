@@ -83,6 +83,7 @@ export interface ImpactAnalysisOutput {
   impactedCount: number;
   truncated: boolean;
   impacted: ImpactAnalysisResult["impacted"];
+  untrackedFiltered: number;
   note?: string;
 }
 
@@ -214,6 +215,7 @@ export class GraphController {
       impactedCount: result.impacted.length,
       truncated: result.truncated,
       impacted: result.impacted,
+      untrackedFiltered: result.untrackedFiltered,
       note: result.note,
     };
   }
