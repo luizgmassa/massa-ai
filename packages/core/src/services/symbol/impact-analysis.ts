@@ -135,6 +135,13 @@ export interface ImpactAnalysisResult {
   impacted_total: number;
   impacted_shown: number;
   impacted_omitted: number;
+  /**
+   * Wave 5 FR-03 / N41: quotient rollup of impacted files by 2-segment path
+   * prefix. Cap DEFAULT_MODULE_CAP prefixes; overflow folds into `(other)`.
+   * Same emitter as impacted_total/shown/omitted so the counts are consistent.
+   * Undefined when there are no impacted files (backward-compat).
+   */
+  impacted_modules?: { prefix: string; count: number }[];
   /** Diagnostic when git produced no output (e.g. clean tree). */
   note?: string;
 }
@@ -145,6 +152,12 @@ const DEFAULT_DEPTH = 2;
 const MAX_DEPTH = 4;
 /** Cap on impacted-symbol results returned. */
 const MAX_IMPACTED = 100;
+/**
+ * Wave 5 FR-03 / N41: cap on the number of 2-segment path prefixes surfaced in
+ * `impacted_modules`. Prefixes past this cap fold into an `(other)` overflow
+ * entry so the rollup stays bounded and readable. Default 20.
+ */
+const DEFAULT_MODULE_CAP = 20;
 /**
  * Cap on the number of listDefinitionsByFile queries a single analyze() call
  * may issue (across the whole reverse-import BFS). Without it, a dense hub
@@ -380,6 +393,12 @@ export class ImpactAnalysisService {
     const impactedShown = out.length;
     const impactedOmitted = Math.max(0, impactedTotal - impactedShown);
 
+    // Wave 5 FR-03 / N41: impacted_modules quotient rollup over the FULL
+    // pre-clamp impacted set (not just the shown slice) so the rollup reflects
+    // total blast radius, not a truncated view. Group by 2-segment path prefix,
+    // cap at DEFAULT_MODULE_CAP, fold overflow into `(other)`.
+    const impactedModules = computeImpactedModules(ranked, DEFAULT_MODULE_CAP);
+
     logger.info("ImpactAnalysisService: analyze complete", {
       projectId,
       scope,
@@ -402,6 +421,7 @@ export class ImpactAnalysisService {
       impacted_total: impactedTotal,
       impacted_shown: impactedShown,
       impacted_omitted: impactedOmitted,
+      impacted_modules: impactedModules,
     };
   }
 
@@ -478,6 +498,66 @@ export class ImpactAnalysisService {
       return new Map();
     }
   }
+}
+
+// ─── Wave 5 FR-03 / N41: impacted_modules quotient rollup ────────────────────
+
+/**
+ * Group impacted files by their 2-segment path prefix (`path/to/file.ts` →
+ * `path/to`). Cap at `moduleCap` prefixes (highest count first); fold the
+ * overflow into an `(other)` entry. Files with no `/` use the full path as
+ * their prefix. The rollup runs over the FULL pre-clamp impacted set so it
+ * reflects the total blast radius, not the truncated view.
+ *
+ * Pure (no I/O); exported for B2/B3 consumption + unit testing.
+ */
+export function computeImpactedModules(
+  impacted: ImpactedSymbol[],
+  moduleCap: number = DEFAULT_MODULE_CAP,
+): { prefix: string; count: number }[] {
+  if (impacted.length === 0) return [];
+  const counts = new Map<string, number>();
+  for (const s of impacted) {
+    const prefix = twoSegmentPrefix(s.file);
+    counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
+  }
+  // Sort by count desc, then prefix asc for determinism.
+  const sorted = Array.from(counts.entries()).sort(
+    (a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
+  );
+  if (sorted.length <= moduleCap) {
+    return sorted.map(([prefix, count]) => ({ prefix, count }));
+  }
+  const head = sorted.slice(0, moduleCap - 1);
+  const tail = sorted.slice(moduleCap - 1);
+  const otherCount = tail.reduce((sum, [, c]) => sum + c, 0);
+  return [
+    ...head.map(([prefix, count]) => ({ prefix, count })),
+    { prefix: "(other)", count: otherCount },
+  ];
+}
+
+/**
+ * Extract the 2-segment path prefix for the quotient rollup: drop the filename
+ * (last segment), then keep up to 2 leading directory segments.
+ *
+ *   `path/to/file.ts`   → `path/to`   (2 dirs, file dropped)
+ *   `a/b/c/d.ts`        → `a/b`       (capped at 2 dirs, file dropped)
+ *   `src/a.ts`          → `src`       (1 dir, file dropped)
+ *   `root.ts`           → `root.ts`   (no dir → use full path as its own prefix)
+ *
+ * This groups sibling files (`src/a.ts` + `src/b.ts` → `src`) while bounding
+ * deep paths to 2 segments so the rollup stays readable.
+ */
+function twoSegmentPrefix(filePath: string): string {
+  if (!filePath) return filePath;
+  const slash = filePath.lastIndexOf("/");
+  if (slash < 0) return filePath; // no dir → file is its own prefix
+  const dir = filePath.slice(0, slash);
+  // Cap at 2 leading segments: `a/b/c` → `a/b`.
+  const parts = dir.split("/");
+  if (parts.length <= 2) return dir;
+  return parts.slice(0, 2).join("/");
 }
 
 // ─── Default git diff runner (production) ─────────────────────────────────────

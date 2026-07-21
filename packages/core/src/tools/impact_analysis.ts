@@ -174,6 +174,7 @@ export class ImpactAnalysisTool implements IToolHandler {
             impacted_total: result.impacted_total,
             impacted_shown: result.impacted_shown,
             impacted_omitted: result.impacted_omitted,
+            impacted_modules: result.impacted_modules,
             // N1 (WAVE4-N1): the active graph generation id at query time.
             activatedGraphGenerationId,
             note: result.note,
@@ -199,6 +200,7 @@ export class ImpactAnalysisTool implements IToolHandler {
           impacted_total: result.impacted_total,
           impacted_shown: result.impacted_shown,
           impacted_omitted: result.impacted_omitted,
+          impacted_modules: result.impacted_modules,
           // N1 (WAVE4-N1): the active graph generation id at query time.
           activatedGraphGenerationId,
           impacted: result.impacted.map((s) => ({
