@@ -14,6 +14,7 @@
  */
 import { describe, test, expect } from "bun:test";
 import { ToolError, validateEnum } from "../tools/enum-validation.js";
+import { validateGitRef } from "../services/symbol/git-ref-validation.js";
 
 describe("ToolError", () => {
   test("defaults statusCode to 400", () => {
@@ -106,5 +107,75 @@ describe("validateEnum", () => {
     expect(() =>
       validateEnum<"only">("mode", "other", ["only"] as const),
     ).toThrow(ToolError);
+  });
+});
+
+/**
+ * T2 (WAVE4-N8): validateGitRef shell-arg guard.
+ *
+ * Asserts spec AC 10: `base_branch`/`since` starting with `--` or containing
+ * shell metacharacters / failing the accepted pattern throw ToolError BEFORE
+ * any `execFileSync("git", [...])` call.
+ *
+ * Discrimination: drop the `value.startsWith("--")` guard → the
+ * `--upload-pack=...` test fails. Drop the pattern test → the `main;rm -rf /`
+ * and `$(whoami)` tests fail. Empty string MUST NOT throw (caller falls back
+ * to `main`).
+ */
+describe("validateGitRef", () => {
+  test("valid refs pass: main, feature/foo-bar, v1.0.0, abc123", () => {
+    const valid = ["main", "feature/foo-bar", "v1.0.0", "abc123", "origin/main", "2026-07-01"];
+    for (const v of valid) {
+      expect(() => validateGitRef("base_branch", v)).not.toThrow();
+    }
+  });
+
+  test("empty string passes (caller falls back to default main)", () => {
+    expect(() => validateGitRef("base_branch", "")).not.toThrow();
+  });
+
+  test("rejects `--upload-pack=evil` (git arg-injection)", () => {
+    expect(() => validateGitRef("base_branch", "--upload-pack=evil")).toThrow(
+      ToolError,
+    );
+    try {
+      validateGitRef("base_branch", "--upload-pack=evil");
+      throw new Error("expected throw");
+    } catch (e) {
+      expect(e).toBeInstanceOf(ToolError);
+      expect((e as ToolError).statusCode).toBe(400);
+      expect((e as Error).message).toContain("Invalid base_branch value:");
+      expect((e as Error).message).toContain("Valid pattern:");
+    }
+  });
+
+  test("rejects `main;rm -rf /` (shell metacharacter `;`)", () => {
+    expect(() => validateGitRef("base_branch", "main;rm -rf /")).toThrow(
+      ToolError,
+    );
+  });
+
+  test("rejects `$(whoami)` (command substitution)", () => {
+    expect(() => validateGitRef("since", "$(whoami)")).toThrow(ToolError);
+  });
+
+  test("rejects `--exec=...` (git option-as-arg)", () => {
+    expect(() => validateGitRef("base_branch", "--exec=/tmp/evil")).toThrow(
+      ToolError,
+    );
+  });
+
+  test("rejects empty-with-newline `\\n` (newline injection)", () => {
+    expect(() => validateGitRef("base_branch", "\n")).toThrow(ToolError);
+  });
+
+  test("rejects a ref containing a space (not in the accepted pattern)", () => {
+    expect(() => validateGitRef("base_branch", "main with space")).toThrow(
+      ToolError,
+    );
+  });
+
+  test("rejects backtick command substitution", () => {
+    expect(() => validateGitRef("base_branch", "`whoami`")).toThrow(ToolError);
   });
 });
