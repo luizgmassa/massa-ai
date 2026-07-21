@@ -24,6 +24,7 @@
 import { logger } from "@massa-th0th/shared";
 import { parsePositiveIntEnv } from "@massa-th0th/shared/config";
 import { getPrismaClient } from "../../services/query/prisma-client.js";
+import { getProjectIdentityAliasResolver } from "../../services/project-identity/alias-resolver.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type { IndexJob } from "./index-job-tracker.js";
 import type { JobStore } from "./index-job-store-contract.js";
@@ -294,6 +295,8 @@ export class PgJobStore implements JobStore {
 
   private async persist(job: IndexJob): Promise<void> {
     const prisma = this.getClient();
+    // Resolve canonical project id at the write seam (spec req 3).
+    const canonicalProjectId = await getProjectIdentityAliasResolver().resolve(job.projectId);
     const filesIndexed = job.result?.filesIndexed ?? null;
     const chunksIndexed = job.result?.chunksIndexed ?? null;
     const errors = job.result?.errors ?? null;
@@ -313,7 +316,7 @@ export class PgJobStore implements JobStore {
         created_at, started_at, completed_at, heartbeat_at
       ) VALUES (
         ${job.jobId},
-        ${job.projectId},
+        ${canonicalProjectId},
         ${job.projectPath},
         ${job.status},
         ${job.progress.current},

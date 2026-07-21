@@ -71,3 +71,25 @@ describe("SymbolGraphService — projectRootCache LRU cap + promotion", () => {
     svc.projectRootCache.clear();
   });
 });
+
+describe("SymbolGraphService.clearProjectRoot (T4 identity hook)", () => {
+  test("drops only the named project's cached root", () => {
+    const svc = SymbolGraphService.getInstance() as unknown as {
+      projectRootCache: Map<string, string>;
+      clearProjectRoot(projectId: string): void;
+    };
+    svc.projectRootCache.clear();
+    svc.projectRootCache.set("proj-a", "/roots/a");
+    svc.projectRootCache.set("proj-b", "/roots/b");
+
+    svc.clearProjectRoot("proj-a");
+
+    expect(svc.projectRootCache.has("proj-a")).toBe(false);
+    expect(svc.projectRootCache.get("proj-b")).toBe("/roots/b");
+
+    // Unknown id is a no-op.
+    svc.clearProjectRoot("proj-absent");
+    expect(svc.projectRootCache.size).toBe(1);
+    svc.projectRootCache.clear();
+  });
+});

@@ -198,6 +198,19 @@ class QueryUnderstandingCache {
     this.store.clear();
   }
 
+  /**
+   * Drop only entries scoped to this projectId. Keys are `${projectId}::${query}`
+   * (see QueryUnderstandingService.run); match the projectId prefix so a
+   * project rename/merge cannot serve stale rewrite/HyDE state. Keeps unrelated
+   * project entries live.
+   */
+  invalidateProject(projectId: string): void {
+    const prefix = `${projectId}::`;
+    for (const key of this.store.keys()) {
+      if (key.startsWith(prefix)) this.store.delete(key);
+    }
+  }
+
   /** @internal — for tests. */
   get size(): number {
     return this.store.size;
@@ -287,6 +300,14 @@ export class QueryUnderstandingService {
   /** @internal — clear cache between tests. */
   clearCache(): void {
     this.cache.clear();
+  }
+
+  /**
+   * Drop only rewrite/HyDE entries for this projectId (post-commit invalidator
+   * hook for project rename/merge). See QueryUnderstandingCache.invalidateProject.
+   */
+  invalidateProject(projectId: string): void {
+    this.cache.invalidateProject(projectId);
   }
 }
 

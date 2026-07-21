@@ -42,6 +42,7 @@ import {
   logger,
 } from "@massa-th0th/shared";
 import { getPrismaClient } from "../query/prisma-client.js";
+import { getProjectIdentityAliasResolver } from "../project-identity/alias-resolver.js";
 import { Prisma } from "../../generated/prisma/index.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type {
@@ -260,6 +261,11 @@ export class PgCheckpointStore implements ICheckpointStore {
     // Fire-and-forget persist (best-effort).
     this.chainWrite(id, async () => {
       const prisma = this.getClient();
+      // Resolve canonical project id at the persist seam (spec req 3). The
+      // sync mirror keeps the caller's id; the durable row uses the target.
+      const canonicalProjectId = projectId
+        ? await getProjectIdentityAliasResolver().resolve(projectId)
+        : projectId;
       const compressed = compressState(state);
       await prisma.$executeRaw`
         INSERT INTO task_checkpoints (
@@ -273,7 +279,7 @@ export class PgCheckpointStore implements ICheckpointStore {
           ${state.taskId},
           ${state.description ?? null},
           ${agentId ?? null},
-          ${projectId ?? null},
+          ${canonicalProjectId ?? null},
           ${compressed},
           1,
           ${JSON.stringify(memoryIds)},

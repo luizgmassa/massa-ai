@@ -8,6 +8,7 @@ import { SearchResult } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
 import crypto from "crypto";
 import { getPgPool } from "../../data/db-connection.js";
+import { installGuardOnTable } from "../project-identity/identity-guard-installer.js";
 import type { Pool } from "pg";
 
 interface CacheEntry {
@@ -76,6 +77,16 @@ export class SearchCachePg {
       CREATE INDEX IF NOT EXISTS idx_search_cache_project ON search_cache(project_id);
       CREATE INDEX IF NOT EXISTS idx_search_cache_expires ON search_cache(expires_at);
     `);
+
+    // Project-identity guard on this runtime-created table (design req:
+    // guards install during initialization, not only at startup). Best-effort.
+    const guardCode = await installGuardOnTable(pool, "public", "search_cache", "project_id");
+    if (guardCode) {
+      logger.warn("[project-identity] guard install failed (sanitized)", {
+        table: "search_cache",
+        code: guardCode,
+      });
+    }
   }
 
   private generateKey(
@@ -157,17 +168,17 @@ export class SearchCachePg {
         lastAccessed: new Date(row.last_accessed).getTime(),
       };
 
-      this.stats.l2Hits++;
-      this.stats.totalHits++;
-      this.l1Cache.set(key, entry);
-      this.evictL1IfNeeded();
-
       await pool.query(
         `UPDATE search_cache 
          SET access_count = access_count + 1, last_accessed = NOW()
          WHERE key = $1`,
         [key]
       );
+
+      this.stats.l2Hits++;
+      this.stats.totalHits++;
+      this.l1Cache.set(key, entry);
+      this.evictL1IfNeeded();
 
       return entry.results;
     }
@@ -197,9 +208,6 @@ export class SearchCachePg {
       lastAccessed: now,
     };
 
-    this.l1Cache.set(key, entry);
-    this.evictL1IfNeeded();
-
     const pool = await this.getPool();
     await pool.query(
       `INSERT INTO search_cache (key, query, project_id, results, options)
@@ -211,7 +219,9 @@ export class SearchCachePg {
       [key, query, projectId, JSON.stringify(results), JSON.stringify(options)]
     );
 
-    this.evictL2IfNeeded();
+    await this.evictL2IfNeeded();
+    this.l1Cache.set(key, entry);
+    this.evictL1IfNeeded();
   }
 
   async invalidateProject(projectId: string): Promise<number> {

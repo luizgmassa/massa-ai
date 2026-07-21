@@ -6,11 +6,12 @@
  * POST /api/v1/handoff/cancel - Cancel an open handoff (open→expired)
  * POST /api/v1/handoff/list   - List pending (open) handoffs
  *
- * Returns 423 when handoffs is disabled via config, 400 on missing required
- * fields. The service never throws; all failures surface as {ok:false, reason}.
+ * Returns 423 when handoffs is disabled via config and 400 on missing required
+ * fields. Canonical store failures flow to the global sanitized error envelope;
+ * domain rejections surface as {ok:false, reason}.
  */
 
-import { getHandoffService } from "@massa-th0th/core";
+import { getHandoffService, SearchServiceError } from "@massa-th0th/core";
 import { config, logger } from "@massa-th0th/shared";
 import { Elysia, t } from "elysia";
 
@@ -26,6 +27,11 @@ function handoffsDisabled(): boolean {
   } catch {
     return false;
   }
+}
+
+/** Preserve canonical storage failures for the global HTTP/MCP envelope. */
+export function rethrowCanonicalHandoffError(error: unknown): void {
+  if (error instanceof SearchServiceError) throw error;
 }
 
 const EVENT_DETAIL = {
@@ -66,6 +72,7 @@ export const handoffRoutes = new Elysia({ prefix: "/api/v1/handoff" })
         set.status = result.ok ? 200 : 400;
         return { success: result.ok, data: result };
       } catch (e) {
+        rethrowCanonicalHandoffError(e);
         const err = e as Error;
         logger.error("handoff begin failed", err);
         set.status = 500;
@@ -86,7 +93,7 @@ export const handoffRoutes = new Elysia({ prefix: "/api/v1/handoff" })
         ...EVENT_DETAIL,
         summary: "Begin a cross-session handoff",
         description:
-          "Creates an open handoff row and a dual-write searchable memory. Optional LLM summary-polish (default-off). Never throws.",
+          "Creates an open handoff row and a dual-write searchable memory. Optional LLM summary-polish is best-effort; canonical store failures use the typed error envelope.",
       },
     },
   )
@@ -107,6 +114,7 @@ export const handoffRoutes = new Elysia({ prefix: "/api/v1/handoff" })
         set.status = result.ok ? 200 : 400;
         return { success: result.ok, data: result };
       } catch (e) {
+        rethrowCanonicalHandoffError(e);
         const err = e as Error;
         logger.error("handoff accept failed", err);
         set.status = 500;
@@ -143,6 +151,7 @@ export const handoffRoutes = new Elysia({ prefix: "/api/v1/handoff" })
         set.status = result.ok ? 200 : 400;
         return { success: result.ok, data: result };
       } catch (e) {
+        rethrowCanonicalHandoffError(e);
         const err = e as Error;
         logger.error("handoff cancel failed", err);
         set.status = 500;
@@ -175,13 +184,14 @@ export const handoffRoutes = new Elysia({ prefix: "/api/v1/handoff" })
         return { status: 400, error: "projectId required" };
       }
       try {
-        const pending = service().listPending(b.projectId, b.targetAgent);
+        const pending = await service().listPending(b.projectId, b.targetAgent);
         set.status = 200;
         return {
           success: true,
           data: { pending, count: pending.length },
         };
       } catch (e) {
+        rethrowCanonicalHandoffError(e);
         const err = e as Error;
         logger.error("handoff list failed", err);
         set.status = 500;

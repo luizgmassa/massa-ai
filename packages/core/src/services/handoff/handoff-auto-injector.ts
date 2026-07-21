@@ -38,27 +38,29 @@ export class HandoffAutoInjector {
     if (this.unsubscribe) return this.unsubscribe;
     this.unsubscribe = eventBus.subscribe("observation:ingested", (payload) => {
       if (!payload || payload.source !== "session-start") return;
-      try {
-        const projectId = payload.projectId;
-        if (!projectId) return;
-        // targetAgent is not in the observation payload directly; derive
-        // best-effort from agentId if present. listPending with no
-        // targetAgent returns all open handoffs for the project.
-        const targetAgent =
-          (payload as { agentId?: string }).agentId ?? undefined;
-        const pending = this.service.listPending(projectId, targetAgent);
-        if (pending.length > 0) {
-          logger.info("HandoffAutoInjector: pending handoffs found", {
-            projectId,
-            count: pending.length,
-            ids: pending.map((h) => h.id),
+      void (async () => {
+        try {
+          const projectId = payload.projectId;
+          if (!projectId) return;
+          // targetAgent is not in the observation payload directly; derive
+          // best-effort from agentId if present. listPending with no
+          // targetAgent returns all open handoffs for the project.
+          const targetAgent =
+            (payload as { agentId?: string }).agentId ?? undefined;
+          const pending = await this.service.listPending(projectId, targetAgent);
+          if (pending.length > 0) {
+            logger.info("HandoffAutoInjector: pending handoffs found", {
+              projectId,
+              count: pending.length,
+              ids: pending.map((h) => h.id),
+            });
+          }
+        } catch (e) {
+          logger.debug("HandoffAutoInjector: error handling session-start", {
+            error: (e as Error).message,
           });
         }
-      } catch (e) {
-        logger.debug("HandoffAutoInjector: error handling session-start", {
-          error: (e as Error).message,
-        });
-      }
+      })();
     });
     return this.unsubscribe;
   }

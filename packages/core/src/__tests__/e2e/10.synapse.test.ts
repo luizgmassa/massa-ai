@@ -434,6 +434,64 @@ describe.skipIf(!READY)("T7 — Schema drift (E28) + best-effort edges", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe.skipIf(!READY)("T7 — Matrix equivalence (HTTP vs MCP)", () => {
+  test("matrix: MCP exposes get/update/prefetch/list/end lifecycle parity", async () => {
+    if (!mcp) {
+      console.log("[T7:matrix:lifecycle] SKIP: MCP subprocess not available");
+      return;
+    }
+    for (const name of [
+      "synapse_session", "synapse_get", "synapse_update", "synapse_prefetch",
+      "synapse_list", "synapse_end",
+    ]) requireTool(mcp.toolNames, name);
+
+    const created = await mcpCall(mcp.client, "synapse_session", {
+      agentId: "t7-mcp-lifecycle",
+      taskContext: "initial",
+      enableBuffer: true,
+    });
+    expect(created?.success).toBe(true);
+    const sid = created?.data?.sessionId;
+    expect(typeof sid).toBe("string");
+
+    const got = await mcpCall(mcp.client, "synapse_get", { id: sid });
+    expect(got?.data?.taskContext).toBe("initial");
+
+    const updated = await mcpCall(mcp.client, "synapse_update", {
+      id: sid,
+      taskContext: "updated through MCP",
+    });
+    expect(updated?.success).toBe(true);
+    expect(updated?.data?.taskContext).toBe("updated through MCP");
+
+    const prefetched = await mcpCall(mcp.client, "synapse_prefetch", {
+      id: sid,
+      filePath: "src/index.ts",
+      symbols: [{ name: "McpProxyServer" }],
+      entries: [{ id: "mcp-prefetch-1", content: "prefetched through MCP" }],
+    });
+    expect(prefetched?.success).toBe(true);
+    expect(prefetched?.data?.primed).toBe(1);
+
+    const listed = await mcpCall(mcp.client, "synapse_list", {});
+    expect(listed?.success).toBe(true);
+    expect(listed?.data?.activeCount).toBeGreaterThanOrEqual(1);
+
+    const ended = await mcpCall(mcp.client, "synapse_end", { id: sid });
+    expect(ended).toEqual({ success: true });
+    const missing = await mcpCall(mcp.client, "synapse_get", { id: sid });
+    expect(missing).toEqual({ success: false, error: "Session not found or expired" });
+
+    const expiring = await mcpCall(mcp.client, "synapse_session", {
+      agentId: "t7-mcp-expiry",
+      ttlMs: 5,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const expired = await mcpCall(mcp.client, "synapse_get", {
+      id: expiring?.data?.sessionId,
+    });
+    expect(expired).toEqual({ success: false, error: "Session not found or expired" });
+  });
+
   // synapse_session is bucket C (no format param) and works on both transports.
   test("matrix: synapse_session — HTTP ≡ MCP (bucket C, tolerate sessionId/expiresAt)", async () => {
     if (!mcp) {

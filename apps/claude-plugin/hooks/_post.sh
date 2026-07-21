@@ -11,7 +11,8 @@
 # Env:
 #   MASSA_TH0TH_API_BASE  — API base URL (default http://localhost:3333)
 #   MASSA_TH0TH_API_KEY   — optional API key (x-api-key header)
-#   MASSA_TH0TH_PROJECT_ID — optional explicit projectId (else cwd basename)
+#   MASSA_TH0TH_PROJECT_ID — optional explicit projectId (else git toplevel
+#                             basename, else cwd basename; pinned per session)
 
 _massa_th0th_base="${MASSA_TH0TH_API_BASE:-http://localhost:3333}"
 _massa_th0th_url="$_massa_th0th_base/api/v1/hook"
@@ -41,7 +42,17 @@ fi
 _massa_th0th_stdin=$(printf '%s' "$_massa_th0th_raw" | tr -d '[:space:]')
 [ -z "$_massa_th0th_stdin" ] && exit 0
 
-_massa_th0th_project="${MASSA_TH0TH_PROJECT_ID:-$(basename "$PWD")}"
+# Resolve the project id through the per-session pin (M45/HAR-04). This runs
+# AFTER the stdin capture above — the pin helper never touches stdin, and the
+# POST body must stay intact (single-read constraint). A missing helper falls
+# back to today's env/basename behavior so silent-degrade is preserved.
+_massa_th0th_pin_lib="$(dirname "$0")/_pin.sh"
+if [ -f "$_massa_th0th_pin_lib" ]; then
+  . "$_massa_th0th_pin_lib"
+  _massa_th0th_project=$(massa_th0th_pin_project_id "$_massa_th0th_session" "$PWD")
+else
+  _massa_th0th_project="${MASSA_TH0TH_PROJECT_ID:-$(basename "$PWD")}"
+fi
 
 # Conditionally include the top-level sessionId field. Omit it entirely when
 # absent so the server stores NULL (preserves prior behavior for payloads

@@ -12,6 +12,7 @@
 import { logger, MemoryType } from "@massa-th0th/shared";
 import { Prisma } from "../../generated/prisma/index.js";
 import { getPrismaClient } from "../../services/query/prisma-client.js";
+import { getProjectIdentityAliasResolver } from "../../services/project-identity/alias-resolver.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type { InsertMemoryInput, MemoryRow, SearchFilters, UpdateMemoryPatch } from "./memory-repository-contract.js";
 
@@ -150,6 +151,11 @@ export class MemoryRepositoryPg {
    */
   async insert(input: InsertMemoryInput): Promise<void> {
     const now = new Date();
+    // Resolve canonical project id at the write seam (spec req 3): a caller
+    // holding a retired id lands the row on the live target.
+    const canonicalProjectId = input.projectId
+      ? await getProjectIdentityAliasResolver().resolve(input.projectId)
+      : input.projectId;
     const embeddingBuf = input.embedding && input.embedding.length > 0
       ? Buffer.from(new Float32Array(input.embedding).buffer)
       : null;
@@ -169,7 +175,7 @@ export class MemoryRepositoryPg {
         ${input.level},
         ${input.userId ?? null},
         ${input.sessionId ?? null},
-        ${input.projectId ?? null},
+        ${canonicalProjectId ?? null},
         ${input.agentId ?? null},
         ${input.importance},
         ${tagsArray},
@@ -390,8 +396,10 @@ export class MemoryRepositoryPg {
    * Delete all memories for a project. Returns the count deleted.
    */
   async deleteByProject(projectId: string): Promise<number> {
+    // Resolve so a caller holding a retired id still hits the moved rows.
+    const canonicalProjectId = await getProjectIdentityAliasResolver().resolve(projectId);
     const result = await this.prisma.$executeRaw`
-      DELETE FROM memories WHERE project_id = ${projectId}
+      DELETE FROM memories WHERE project_id = ${canonicalProjectId}
     `;
     return result;
   }

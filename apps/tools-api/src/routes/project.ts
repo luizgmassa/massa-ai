@@ -9,6 +9,8 @@
 import {
   GetIndexStatusTool,
   IndexProjectTool,
+  ProjectIdentityError,
+  createProjectIdentityService,
   getMemoryRepository,
   getKeywordSearch,
   getOperationLogRepository,
@@ -16,6 +18,7 @@ import {
   getVectorStore,
   workspaceManager,
   type ActorContext,
+  type ProjectIdentityService,
   UNKNOWN_ACTOR,
 } from "@massa-th0th/core";
 import { Elysia, t } from "elysia";
@@ -26,6 +29,7 @@ import { deriveActor } from "../middleware/auth.js";
 
 let indexProjectTool: IndexProjectTool | null = null;
 let indexStatusTool: GetIndexStatusTool | null = null;
+let projectIdentityService: ProjectIdentityService | null = null;
 
 function getIndexProjectTool(): IndexProjectTool {
   if (!indexProjectTool) {
@@ -40,6 +44,80 @@ function getIndexStatusTool(): GetIndexStatusTool {
   }
   return indexStatusTool;
 }
+
+function getProjectIdentityService(): ProjectIdentityService {
+  if (!projectIdentityService) {
+    projectIdentityService = createProjectIdentityService();
+  }
+  return projectIdentityService;
+}
+
+interface IdentityRequestBody {
+  sourceProjectId: string;
+  targetProjectId: string;
+  dryRun?: boolean;
+  operationId?: string;
+  expectedPlanHash?: string;
+}
+
+/**
+ * Shared rename/merge handler (spec public contract). dryRun DEFAULTS TO
+ * TRUE: a preview never mutates and returns the planHash the apply call must
+ * echo back as expectedPlanHash together with a caller-chosen operationId.
+ * Errors are the sanitized ProjectIdentityError codes (spec req 9).
+ */
+async function handleProjectIdentity(
+  mode: "rename" | "merge",
+  body: IdentityRequestBody,
+  set: { status?: number | string },
+) {
+  const service = getProjectIdentityService();
+  const dryRun = body.dryRun !== false;
+  try {
+    if (dryRun) {
+      const preview = await service.preview({
+        mode,
+        sourceProjectId: body.sourceProjectId,
+        targetProjectId: body.targetProjectId,
+        dryRun: true,
+      });
+      return { success: true, data: preview };
+    }
+    const result = await service.apply({
+      mode,
+      sourceProjectId: body.sourceProjectId,
+      targetProjectId: body.targetProjectId,
+      dryRun: false,
+      operationId: body.operationId as string,
+      expectedPlanHash: body.expectedPlanHash as string,
+    });
+    return { success: true, data: result };
+  } catch (error) {
+    if (error instanceof ProjectIdentityError) {
+      set.status = error.statusCode;
+      return {
+        success: false,
+        error: { code: error.code, message: error.message },
+      };
+    }
+    throw error;
+  }
+}
+
+const identityBodySchema = t.Object({
+  sourceProjectId: t.String({ description: "Current project ID to rename/merge from" }),
+  targetProjectId: t.String({ description: "Target project ID" }),
+  dryRun: t.Optional(t.Boolean({
+    default: true,
+    description: "Preview only (default true). Apply requires dryRun=false + operationId + expectedPlanHash.",
+  })),
+  operationId: t.Optional(t.String({
+    description: "Idempotency key required when dryRun=false",
+  })),
+  expectedPlanHash: t.Optional(t.String({
+    description: "planHash from the dryRun preview, required when dryRun=false",
+  })),
+});
 
 export const projectRoutes = new Elysia({ prefix: "/api/v1/project" })
   .get(
@@ -330,6 +408,32 @@ export const projectRoutes = new Elysia({ prefix: "/api/v1/project" })
         summary: "Get indexing job status",
         description:
           "Get the status and progress of an async indexing job started with POST /index",
+      },
+    },
+  )
+  .post(
+    "/rename",
+    async ({ body, set }) => handleProjectIdentity("rename", body, set),
+    {
+      body: identityBodySchema,
+      detail: {
+        tags: ["project"],
+        summary: "Rename a project identity (transactional)",
+        description:
+          "Preview (dryRun default true) returns canonical roots, per-store counts, conflicts, and planHash. Apply (dryRun=false) requires operationId + expectedPlanHash and executes the rename in one transaction.",
+      },
+    },
+  )
+  .post(
+    "/merge",
+    async ({ body, set }) => handleProjectIdentity("merge", body, set),
+    {
+      body: identityBodySchema,
+      detail: {
+        tags: ["project"],
+        summary: "Merge two project identities (transactional)",
+        description:
+          "Merge source into target under the same canonical root. Preview (dryRun default true) returns counts/conflicts/planHash; apply (dryRun=false) requires operationId + expectedPlanHash.",
       },
     },
   );

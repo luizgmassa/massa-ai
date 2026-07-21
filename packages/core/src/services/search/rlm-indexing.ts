@@ -22,6 +22,7 @@ import { getVectorStore } from "../../data/vector/vector-store-factory.js";
 import { getSearchCache } from "./cache-factory.js";
 import { getSearchAnalytics } from "./analytics-factory.js";
 import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
+import { getProjectIdentityAliasResolver } from "../project-identity/alias-resolver.js";
 import type { ContextualSearchRLM } from "./contextual-search-rlm.js";
 
 const globAsync = glob;
@@ -431,6 +432,8 @@ export async function indexFileImpl(
   projectRoot: string,
   centralityMap?: Map<string, number>,
 ): Promise<{ chunks: number }> {
+  // Resolve canonical project id at the write-entry seam (spec req 3).
+  projectId = await getProjectIdentityAliasResolver().resolve(projectId);
   const content = await fs.readFile(filePath, "utf-8");
   const relativePath = path.relative(projectRoot, filePath);
 

@@ -135,6 +135,19 @@ export interface EventMap {
     salience: number;
     source: "llm" | "default";
   };
+  /**
+   * Emitted best-effort AFTER a project identity rename/merge commits. This is
+   * notification only — listeners must treat it as "something changed, refresh
+   * if you care". Publish failures are swallowed by the apply service and never
+   * flip a committed operation to failure (spec req 8).
+   */
+  "project-identity:changed": {
+    mode: "rename" | "merge";
+    sourceProjectId: string;
+    targetProjectId: string;
+    operationId: string;
+    committedAt: string;
+  };
 }
 
 export type EventName = keyof EventMap;

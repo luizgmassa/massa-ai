@@ -51,6 +51,7 @@ export {
   newObservationId,
   LIFECYCLE_EVENTS,
   OBSERVATION_CATEGORIES,
+  ATTRIBUTION_SOURCES,
 } from "./data/memory/observation-repository.js";
 export { PgObservationStore } from "./data/memory/observation-repository-pg.js";
 export type { ObservationStore } from "./data/memory/observation-repository.js";
@@ -59,6 +60,7 @@ export type {
   ObservationRow,
   LifecycleEventKind,
   ObservationCategory,
+  AttributionSource,
 } from "./data/memory/observation-repository.js";
 export {
   HookService,

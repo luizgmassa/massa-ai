@@ -25,6 +25,7 @@ import { indexJobTracker } from "../jobs/index-job-tracker.js";
 import { getSearchCache } from "../search/cache-factory.js";
 import { getVectorStore } from "../../data/vector/vector-store-factory.js";
 import { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
+import { getProjectIdentityAliasResolver } from "../project-identity/alias-resolver.js";
 import type { EtlStageContext, EtlEvent, EtlResult, EtlStage } from "./stage-context.js";
 import { assertParserReadyForIndexing } from "../structural/parser-readiness.js";
 import { StructuralEtlParseError } from "./stages/parse.js";
@@ -137,33 +138,43 @@ export class EtlPipeline {
   async run(input: PipelineInput): Promise<EtlResult> {
     // Reject before queue or destructive force-reindex mutations are created.
     await assertParserReadyForIndexing();
-    const previous = EtlPipeline.runTails.get(input.projectId);
+    // Resolve the canonical id BEFORE same-project serialization: a caller
+    // holding a retired id and one holding the live id must share one queue
+    // (spec req 3). runInternal resolves again (cache hit) for defense.
+    const projectId = await getProjectIdentityAliasResolver().resolve(input.projectId);
+    const canonicalInput: PipelineInput =
+      projectId === input.projectId ? input : { ...input, projectId };
+    const previous = EtlPipeline.runTails.get(projectId);
     let release!: () => void;
     const tail = new Promise<void>((resolve) => {
       release = resolve;
     });
-    EtlPipeline.runTails.set(input.projectId, tail);
+    EtlPipeline.runTails.set(projectId, tail);
 
     if (previous) {
       logger.info("EtlPipeline: waiting for prior project run", {
-        projectId: input.projectId,
+        projectId,
         jobId: input.jobId,
       });
       await previous;
     }
 
     try {
-      return await this.runInternal(input);
+      return await this.runInternal(canonicalInput);
     } finally {
-      if (EtlPipeline.runTails.get(input.projectId) === tail) {
-        EtlPipeline.runTails.delete(input.projectId);
+      if (EtlPipeline.runTails.get(projectId) === tail) {
+        EtlPipeline.runTails.delete(projectId);
       }
       release();
     }
   }
 
   private async runInternal(input: PipelineInput, generationRetry = 0): Promise<EtlResult> {
-    const { projectId, projectPath, jobId, forceReindex = false, filesToProcess, include_tests = false } = input;
+    // Resolve canonical project id at the write-entry seam (spec req 3): every
+    // downstream graph/vector/keyword write and force-reindex delete uses the
+    // live target even when the caller holds a retired id.
+    const projectId = await getProjectIdentityAliasResolver().resolve(input.projectId);
+    const { projectPath, jobId, forceReindex = false, filesToProcess, include_tests = false } = input;
     const t0 = performance.now();
     const stageTimings: Record<EtlStage, number> = {
       discover: 0,

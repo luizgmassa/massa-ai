@@ -1,12 +1,17 @@
-/** PostgreSQL implementation of the synchronous HandoffStore contract. */
+/** PostgreSQL implementation of the durable asynchronous HandoffStore contract. */
 
-import { logger } from "@massa-th0th/shared";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import { getPrismaClient } from "../../services/query/prisma-client.js";
-import type {
-  HandoffRecord,
-  HandoffStatus,
-  HandoffStore,
+import { getProjectIdentityAliasResolver } from "../../services/project-identity/alias-resolver.js";
+import {
+  searchBackendUnavailable,
+  storeCorruption,
+} from "../../services/search/search-diagnostics.js";
+import {
+  HANDOFF_STATUSES,
+  type HandoffRecord,
+  type HandoffStatus,
+  type HandoffStore,
 } from "./handoff-contract.js";
 
 interface PgHandoffRow {
@@ -23,28 +28,43 @@ interface PgHandoffRow {
   accepted_at: Date | null;
 }
 
-function jsonArray(raw: string): string[] {
+function jsonArray(raw: string, field: string): string[] {
+  let value: unknown;
   try {
-    const value = JSON.parse(raw || "[]");
-    return Array.isArray(value) ? value.map(String) : [];
-  } catch {
-    return [];
+    value = JSON.parse(raw);
+  } catch (error) {
+    throw storeCorruption(`handoff.${field}`, error);
   }
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw storeCorruption(`handoff.${field}`, new TypeError("expected string array"));
+  }
+  return value;
+}
+
+function timestamp(value: unknown, field: string, nullable = false): number | null {
+  if (nullable && value === null) return null;
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    throw storeCorruption(`handoff.${field}`, new TypeError("expected valid date"));
+  }
+  return value.getTime();
 }
 
 function toRecord(row: PgHandoffRow): HandoffRecord {
+  if (!(HANDOFF_STATUSES as readonly string[]).includes(row.status)) {
+    throw storeCorruption("handoff.status", new TypeError("invalid status"));
+  }
   return {
     id: row.id,
     projectId: row.project_id,
     sourceSessionId: row.source_session_id,
     targetAgent: row.target_agent,
     summary: row.summary,
-    openQuestions: jsonArray(row.open_questions_json),
-    nextSteps: jsonArray(row.next_steps_json),
-    files: jsonArray(row.files_json),
+    openQuestions: jsonArray(row.open_questions_json, "open_questions_json"),
+    nextSteps: jsonArray(row.next_steps_json, "next_steps_json"),
+    files: jsonArray(row.files_json, "files_json"),
     status: row.status as HandoffStatus,
-    createdAt: row.created_at.getTime(),
-    acceptedAt: row.accepted_at?.getTime() ?? null,
+    createdAt: timestamp(row.created_at, "created_at")!,
+    acceptedAt: timestamp(row.accepted_at, "accepted_at", true),
   };
 }
 
@@ -53,8 +73,10 @@ export class PgHandoffStore implements HandoffStore {
   private mirror = new Map<string, HandoffRecord>();
   private hydrated = false;
   private hydrating: Promise<void> | null = null;
-  private pendingById = new Map<string, Promise<void>>();
-  private pending = new Set<Promise<void>>();
+
+  constructor(client?: PrismaClient) {
+    if (client) this.prisma = client;
+  }
 
   private getClient(): PrismaClient {
     if (!this.prisma) this.prisma = getPrismaClient();
@@ -66,20 +88,19 @@ export class PgHandoffStore implements HandoffStore {
     if (this.hydrating) return this.hydrating;
     this.hydrating = (async () => {
       try {
-        const rows = await this.getClient().$queryRaw<PgHandoffRow[]>`
-          SELECT id, project_id, source_session_id, target_agent, summary,
-                 open_questions_json, next_steps_json, files_json, status,
-                 created_at, accepted_at
-          FROM handoffs`;
+        let rows: PgHandoffRow[];
+        try {
+          rows = await this.getClient().$queryRaw<PgHandoffRow[]>`
+            SELECT id, project_id, source_session_id, target_agent, summary,
+                   open_questions_json, next_steps_json, files_json, status,
+                   created_at, accepted_at
+            FROM handoffs`;
+        } catch (error) {
+          throw searchBackendUnavailable("handoff_store", error);
+        }
         const next = new Map(rows.map((row) => [row.id, toRecord(row)]));
-        // Calls made before hydration completed are authoritative locally.
-        for (const [id, record] of this.mirror) next.set(id, record);
         this.mirror = next;
         this.hydrated = true;
-      } catch (error) {
-        logger.warn("PgHandoffStore hydrate failed (best-effort)", {
-          error: (error as Error).message,
-        });
       } finally {
         this.hydrating = null;
       }
@@ -87,32 +108,13 @@ export class PgHandoffStore implements HandoffStore {
     return this.hydrating;
   }
 
-  private enqueue(id: string, operation: () => Promise<void>): void {
-    const previous = this.pendingById.get(id);
-    const run = async () => {
-      await this.ensureHydrated();
-      try {
-        await operation();
-      } catch (error) {
-        logger.warn("PgHandoffStore persistence failed (best-effort)", {
-          id,
-          error: (error as Error).message,
-        });
-      }
-    };
-    const task = previous ? previous.then(run, run) : run();
-    this.pendingById.set(id, task);
-    this.pending.add(task);
-    void task.finally(() => {
-      this.pending.delete(task);
-      if (this.pendingById.get(id) === task) this.pendingById.delete(id);
-    });
-  }
-
-  insert(record: HandoffRecord): void {
+  async insert(record: HandoffRecord): Promise<void> {
+    await this.ensureHydrated();
     const captured = structuredClone(record);
-    this.mirror.set(record.id, captured);
-    this.enqueue(record.id, async () => {
+    // Resolve canonical project id at the write seam (spec req 3): a caller
+    // holding a retired id lands the row on the live target.
+    captured.projectId = await getProjectIdentityAliasResolver().resolve(captured.projectId);
+    try {
       await this.getClient().$executeRaw`
         INSERT INTO handoffs (
           id, project_id, source_session_id, target_agent, summary,
@@ -127,17 +129,20 @@ export class PgHandoffStore implements HandoffStore {
           ${new Date(captured.createdAt)},
           ${captured.acceptedAt === null ? null : new Date(captured.acceptedAt)}
         )`;
-    });
+    } catch (error) {
+      throw searchBackendUnavailable("handoff_store", error);
+    }
+    this.mirror.set(record.id, captured);
   }
 
-  getById(id: string): HandoffRecord | null {
-    void this.ensureHydrated();
+  async getById(id: string): Promise<HandoffRecord | null> {
+    await this.ensureHydrated();
     const record = this.mirror.get(id);
     return record ? structuredClone(record) : null;
   }
 
-  listPending(projectId: string, targetAgent?: string | null): HandoffRecord[] {
-    void this.ensureHydrated();
+  async listPending(projectId: string, targetAgent?: string | null): Promise<HandoffRecord[]> {
+    await this.ensureHydrated();
     return [...this.mirror.values()]
       .filter(
         (record) =>
@@ -151,49 +156,44 @@ export class PgHandoffStore implements HandoffStore {
       .map((record) => structuredClone(record));
   }
 
-  setStatus(
+  async setStatus(
     id: string,
     status: "accepted" | "expired",
     acceptedAt?: number,
-  ): HandoffRecord | null {
+  ): Promise<HandoffRecord | null> {
+    await this.ensureHydrated();
     const current = this.mirror.get(id);
-    if (!current) {
-      void this.ensureHydrated();
-      return null;
-    }
+    if (!current) return null;
     if (current.status !== "open") return structuredClone(current);
 
-    const next: HandoffRecord = {
-      ...current,
-      status,
-      acceptedAt: status === "accepted" ? (acceptedAt ?? Date.now()) : null,
-    };
-    this.mirror.set(id, next);
-    this.enqueue(id, async () => {
-      const acceptedDate = next.acceptedAt === null ? null : new Date(next.acceptedAt);
-      const rows = await this.getClient().$queryRaw<PgHandoffRow[]>`
+    const nextAcceptedAt = status === "accepted" ? (acceptedAt ?? Date.now()) : null;
+    const acceptedDate = nextAcceptedAt === null ? null : new Date(nextAcceptedAt);
+    let rows: PgHandoffRow[];
+    try {
+      rows = await this.getClient().$queryRaw<PgHandoffRow[]>`
         UPDATE handoffs
         SET status = ${status}, accepted_at = ${acceptedDate}
         WHERE id = ${id} AND status = 'open'
         RETURNING id, project_id, source_session_id, target_agent, summary,
                   open_questions_json, next_steps_json, files_json, status,
                   created_at, accepted_at`;
-      if (rows[0]) {
-        this.mirror.set(id, toRecord(rows[0]));
-        return;
-      }
-      // Another process won the conditional transition; converge the mirror.
-      const persisted = await this.getClient().$queryRaw<PgHandoffRow[]>`
+      if (!rows[0]) {
+        rows = await this.getClient().$queryRaw<PgHandoffRow[]>`
         SELECT id, project_id, source_session_id, target_agent, summary,
                open_questions_json, next_steps_json, files_json, status,
                created_at, accepted_at FROM handoffs WHERE id = ${id}`;
-      if (persisted[0]) this.mirror.set(id, toRecord(persisted[0]));
-    });
-    return structuredClone(next);
+      }
+    } catch (error) {
+      throw searchBackendUnavailable("handoff_store", error);
+    }
+    if (!rows[0]) return null;
+    const persisted = toRecord(rows[0]);
+    this.mirror.set(id, persisted);
+    return structuredClone(persisted);
   }
 
-  journalMode(): string {
-    void this.ensureHydrated();
+  async journalMode(): Promise<string> {
+    await this.ensureHydrated();
     return "postgres";
   }
 
@@ -202,15 +202,8 @@ export class PgHandoffStore implements HandoffStore {
     await this.ensureHydrated();
   }
 
-  /** Internal verification hook; waits until hydration and writes settle. */
+  /** Compatibility verification hook; all public writes are already durable. */
   async __drain(): Promise<void> {
-    do {
-      const tasks = [
-        ...(this.hydrating ? [this.hydrating] : []),
-        ...this.pending,
-      ];
-      if (tasks.length === 0) break;
-      await Promise.all(tasks);
-    } while (this.hydrating || this.pending.size > 0);
+    await this.ensureHydrated();
   }
 }

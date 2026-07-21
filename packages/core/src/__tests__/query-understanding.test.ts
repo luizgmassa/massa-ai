@@ -449,3 +449,45 @@ describe("P2-FANOUT-01 + P2-QUALITY-01: rewrite-on retrieval >= rewrite-off base
     expect(rewHit).toBe(1);
   });
 });
+
+// ─── T4: project-identity post-commit invalidation hook ─────────────────────
+
+describe("QueryUnderstandingService.invalidateProject (T4 identity hook)", () => {
+  test("drops only entries for the renamed project; other projects stay cached", async () => {
+    let objectCalls = 0;
+    const surface: QueryLlmSurface = {
+      object: async () => {
+        objectCalls++;
+        return { ok: true, value: GOOD_REWRITE };
+      },
+      complete: async () => ({ ok: true, value: "hyde paragraph" }),
+      isEnabled: () => true,
+    };
+    const embed: EmbedFn = async () => [1, 2, 3];
+    const svc = new QueryUnderstandingService({
+      llmSurface: surface,
+      embedFn: embed,
+      cacheTtlMs: 60_000,
+      cacheMaxSize: 16,
+    });
+
+    await svc.understand("login", "proj-old");
+    await svc.understand("logout", "proj-old");
+    await svc.understand("login", "proj-keep");
+    expect(objectCalls).toBe(3);
+
+    svc.invalidateProject("proj-old");
+
+    // Both proj-old entries were evicted → recompute on next access.
+    await svc.understand("login", "proj-old");
+    expect(objectCalls).toBe(4);
+    // proj-keep survived — no extra LLM call.
+    await svc.understand("login", "proj-keep");
+    expect(objectCalls).toBe(4);
+
+    // A no-match invalidate is a no-op.
+    svc.invalidateProject("proj-absent");
+    await svc.understand("login", "proj-keep");
+    expect(objectCalls).toBe(4);
+  });
+});

@@ -2,22 +2,34 @@
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
     },
     "dev": {
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "cache": false,
       "persistent": true
     },
     "type-check": {
-      "dependsOn": ["^build"]
+      "dependsOn": [
+        "^build"
+      ]
     },
     "test": {
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "cache": false,
       "passThroughEnv": [
         "DATABASE_URL",
+        "IDENTITY_ACCEPTANCE_DATABASE_URL",
+        "HOOK_ATTRIBUTION_ACCEPTANCE_DATABASE_URL",
         "MASSA_TH0TH_API_URL",
         "MASSA_TH0TH_API_KEY",
         "MASSA_TH0TH_DEDICATED",

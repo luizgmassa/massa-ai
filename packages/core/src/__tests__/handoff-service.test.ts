@@ -195,12 +195,10 @@ describe("HandoffService — begin", () => {
     expect(row.files).toEqual(["f1"]);
   });
 
-  it("begin: store insert throws -> {ok:false, store-failed}", async () => {
-    const throwingStore: HandoffStore = {
-      ...makeFakeStore(),
-      insert(): void {
-        throw new Error("boom");
-      },
+  it("begin: canonical store insert failure propagates", async () => {
+    const throwingStore = makeFakeStore();
+    throwingStore.insert = async () => {
+      throw new Error("boom");
     };
     const svcThrow = new HandoffService({
       store: throwingStore,
@@ -208,9 +206,7 @@ describe("HandoffService — begin", () => {
       llm: disabledSurface(),
       idFactory: deterministicIdFactory(),
     });
-    const res = await svcThrow.begin({ projectId: "p", summary: "s" });
-    expect(res.ok).toBe(false);
-    expect(res.reason).toBe("store-failed");
+    await expect(svcThrow.begin({ projectId: "p", summary: "s" })).rejects.toThrow("boom");
   });
 
   it("begin: memory insert throws -> still ok, memoryId null", async () => {
@@ -395,39 +391,36 @@ describe("HandoffService — listPending (auto-inject surfacing)", () => {
     await svc.begin({ projectId: "p2", targetAgent: "a1", summary: "4" });
 
     // all p1
-    const all = svc.listPending("p1");
+    const all = await svc.listPending("p1");
     expect(all.length).toBe(3);
     expect(all.map((h) => h.summary)).toEqual(["1", "2", "3"]);
 
     // target a1 only (broadcast nulls included)
-    const a1 = svc.listPending("p1", "a1");
+    const a1 = await svc.listPending("p1", "a1");
     expect(a1.length).toBe(2);
     expect(a1.map((h) => h.summary)).toEqual(["1", "2"]);
 
     // accept one -> excluded
     await svc.accept({ id: all[0].id });
-    const afterAccept = svc.listPending("p1");
+    const afterAccept = await svc.listPending("p1");
     expect(afterAccept.length).toBe(2);
     expect(afterAccept.find((h) => h.summary === "1")).toBeUndefined();
 
     // p2 untouched
-    expect(svc.listPending("p2").length).toBe(1);
+    expect((await svc.listPending("p2")).length).toBe(1);
   });
 
-  it("listPending: store throws -> returns [] (never throws)", () => {
-    const throwingStore: HandoffStore = {
-      ...makeFakeStore(),
-      listPending(): HandoffRecord[] {
-        throw new Error("boom");
-      },
+  it("listPending: canonical store failure propagates", async () => {
+    const throwingStore = makeFakeStore();
+    throwingStore.listPending = async () => {
+      throw new Error("boom");
     };
     const svc = new HandoffService({
       store: throwingStore,
       memoryRepo: makeFakeMemoryRepo(),
       llm: disabledSurface(),
     });
-    expect(() => svc.listPending("p")).not.toThrow();
-    expect(svc.listPending("p")).toEqual([]);
+    await expect(svc.listPending("p")).rejects.toThrow("boom");
   });
 });
 
@@ -487,7 +480,7 @@ describe("HandoffAutoInjector — session-start surfacing", () => {
         importance: 0.5,
       });
       // listPending still works as the recall path
-      const pending = svc.listPending("p-inj");
+      const pending = await svc.listPending("p-inj");
       expect(pending.length).toBe(1);
       expect(pending[0].id).toBe("h_inject");
     } finally {
@@ -515,7 +508,7 @@ describe("HandoffAutoInjector — session-start surfacing", () => {
         source: "post-tool-use",
         importance: 0.3,
       });
-      expect(svc.listPending("p-ign").length).toBe(1);
+      expect((await svc.listPending("p-ign")).length).toBe(1);
     } finally {
       injector.stop();
     }

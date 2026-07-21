@@ -264,8 +264,11 @@ restore_checkpoint { checkpointId: "<cp-id>" }
 
 ## Available Tools
 
-42 tools total. Grouped below; each row lists **Req:** required and
+47 tools total. Grouped below; each row lists **Req:** required and
 **Opt:** optional params.
+
+The current roster fits in one MCP `tools/list` page. Future registries over
+100 tools require clients to follow `nextCursor` until it is absent.
 
 ### Indexing & Search
 
@@ -324,9 +327,14 @@ Synapse is an optional post-retrieval modulation layer that improves result qual
 
 | Tool | Description |
 |------|-------------|
-| `synapse_session` | Create/resume a cognitive session scoped to a task |
+| `synapse_session` | Create a cognitive session scoped to a task |
+| `synapse_get` | Inspect session state |
+| `synapse_update` | Replace session task context |
+| `synapse_end` | End a session |
 | `synapse_prime` | Seed working-memory buffer with recalled memories |
 | `synapse_access` | Record file access to boost that file in future searches |
+| `synapse_prefetch` | Plan prefetch and optionally prime matching entries |
+| `synapse_list` | List the active session count |
 
 ### Passive Capture
 
@@ -775,7 +783,7 @@ npx @massa-th0th/mcp-client --config-set embedding.dimensions 4096
 ```
 massa-th0th/
 ├── apps/
-│   ├── mcp-client/           # MCP Server (stdio) — 42 tools
+│   ├── mcp-client/           # MCP Server (stdio) — 47 tools
 │   ├── tools-api/            # REST API (port 3333) + Web UI at /ui
 │   ├── web-ui/               # Read-only memory/search/handoff/checkpoint browser
 │   ├── claude-plugin/        # Passive-capture hook scripts + install guide
@@ -811,13 +819,16 @@ dependency centrality. This supersedes the earlier best-effort typed-edge pass.
 The native runtime is correct and verified; no WASM or runtime/post-install
 download is used.
 
-**Native target:** macOS arm64 only. Application runtime is **Bun `1.3.14`**;
+**Native target:** macOS arm64 and Linux glibc x64. Application runtime is **Bun `1.3.14`**;
 **Node `25.9.0`** (npm `11.14.1`) is a build-only `node-gyp` helper, not the
 application runtime. `tree-sitter@0.25.0` carries a repository patch
 (SHA-256 `e79aec7b96eb8114e85ebcb90f0a8b12076bcd8aa08c09bb88929621e1c1446d`:
 C++20 `binding.gyp` + install-guard) for deterministic lifetime/disposal safety
-and clean consumer installs. There is no Linux, Docker, container, or non-arm64
-native target; those code paths are intentionally untouched.
+and clean consumer installs. On macOS arm64 the addon is a Mach-O arm64 bundle
+linked to system `libc++`/`libSystem`; on Linux glibc x64 it is an ELF x86-64
+shared object linked to system glibc/libstdc++ (verified via `readelf -d`
+NEEDED entries). There is no musl, Alpine, Windows, or other non-darwin-arm64 /
+non-linux-x64 native target; those code paths are intentionally untouched.
 
 ### Supported languages and capability tiers
 
@@ -912,18 +923,19 @@ interface StructuralIdentity {
 }
 ```
 
-### Verification (macOS arm64)
+### Verification (macOS arm64 + Linux glibc x64)
 
 The native toolchain is gated by deterministic verifiers, not hand-checked claims:
 
 | Command | Checks |
 |---------|--------|
-| `bun run verify:tree-sitter-native` | Source + dist + packed-package: 33+33 parses, 27 native modules, 10 lifetime sensors, RSS < 16 MiB median delta, Mach-O arm64 linkage, missing/ABI-incompatible negative sensors |
+| `bun run verify:tree-sitter-native` | Source + dist + packed-package: 33+33 parses, 27 native modules, 10 lifetime sensors, RSS < 16 MiB median delta, Mach-O arm64 (macOS) / ELF x86-64 (Linux) linkage, missing/ABI-incompatible negative sensors |
 | `bun run verify:tree-sitter-source-dist` | Source/dist grammar load + parse |
-| `bun run verify:tree-sitter-package` | Packed `npm` tarball bundles the nested patched runtime + generated arm64 addon |
+| `bun run verify:tree-sitter-package` | Packed `npm` tarball bundles the nested patched runtime + generated addon (arm64 on macOS, x86-64 on Linux) |
 | `bun run type-check` / `bun run build` | Workspace type-check (6/6) and build (5/5) |
 | `bun run bench:parser -- --baseline 5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03` | Frozen parser benchmark vs. the regex baseline |
-| `.github/workflows/native-macos-arm64.yml` | macOS arm64 CI: Bun `1.3.14`, Node `25.9.0`/npm `11.14.1`, frozen install, build, `verify:tree-sitter-native`, provenance upload |
+| `.github/workflows/ci.yml` (structural-native) | macOS arm64 CI: Bun `1.3.14`, Node `22` LTS build helper, frozen install, build, native-structural unit tests |
+| `.github/workflows/ci.yml` (structural-native-linux) | Linux glibc x64 CI: Bun `1.3.14`, Node `25.9.0` build helper, frozen install, build, `verify:tree-sitter-native`, native-structural unit tests, provenance upload |
 
 ### Performance status (honest)
 

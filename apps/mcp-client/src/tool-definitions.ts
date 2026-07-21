@@ -15,7 +15,7 @@ export interface ToolDefinition {
   description: string;
   inputSchema: Record<string, unknown>;
   apiEndpoint: string;
-  apiMethod: "GET" | "POST";
+  apiMethod: "GET" | "POST" | "PATCH" | "DELETE";
 }
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
@@ -960,19 +960,60 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: "synapse_session",
-    description: "Create/resume a Synapse cognitive session. Returns sessionId to pass as sessionId on every search. Activates task alignment, agent affinity, working-memory buffer. Name by intent: 'debug-auth', 'feature-payment'.",
+    description: "Create a Synapse cognitive session. Returns sessionId to pass as sessionId on every search. Activates task alignment, agent affinity, and optional working memory.",
     apiEndpoint: "/api/v1/synapse/session",
     apiMethod: "POST",
     inputSchema: {
       type: "object",
       properties: {
-        sessionId: { type: "string", description: "Reuse existing session ID (omit to auto-generate)" },
-        agentId: { type: "string", description: "Stable agent identifier", default: "claude-code" },
+        sessionId: { type: "string", description: "Override the generated session ID" },
+        agentId: { type: "string", description: "Stable identifier of the calling agent" },
         workspaceId: { type: "string", description: "Project ID this session is scoped to" },
         taskContext: { type: "string", description: "One-sentence description of the current task" },
         ttlMs: { type: "number", description: "Session TTL in ms (default: 1h)", default: 3600000 },
+        enableBuffer: { type: "boolean", description: "Enable working-memory buffer", default: true },
+        bufferMaxSize: { type: "number", description: "Maximum working-memory entries" },
+        bufferTtlMs: { type: "number", description: "Working-memory entry TTL in ms" },
+        accessHistoryMaxEntries: { type: "number", description: "Maximum access-history entries" },
       },
-      required: [],
+      required: ["agentId"],
+    },
+  },
+  {
+    name: "synapse_get",
+    description: "Inspect a Synapse session, including expiry, access history, and buffer state.",
+    apiEndpoint: "/api/v1/synapse/session/:id",
+    apiMethod: "GET",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string", description: "Session ID" } },
+      required: ["id"],
+    },
+  },
+  {
+    name: "synapse_update",
+    description: "Replace a Synapse session task context and refresh its activity window.",
+    apiEndpoint: "/api/v1/synapse/session/:id",
+    apiMethod: "PATCH",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Session ID" },
+        taskContext: { type: "string", description: "Replacement task context" },
+        taskEmbedding: { type: "array", items: { type: "number" }, description: "Precomputed task-context embedding" },
+      },
+      required: ["id", "taskContext"],
+    },
+  },
+  {
+    name: "synapse_end",
+    description: "End and remove a Synapse session.",
+    apiEndpoint: "/api/v1/synapse/session/:id",
+    apiMethod: "DELETE",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string", description: "Session ID" } },
+      required: ["id"],
     },
   },
   {
@@ -1002,6 +1043,41 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["id", "memoryId"],
     },
+  },
+  {
+    name: "synapse_prefetch",
+    description: "Build a prefetch query for an opened file and optionally prime matching entries into the session buffer.",
+    apiEndpoint: "/api/v1/synapse/session/:id/prefetch",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Session ID" },
+        filePath: { type: "string", description: "Path of the file just opened" },
+        symbols: { type: "array", items: { type: "object", properties: { name: { type: "string" } }, required: ["name"] } },
+        chains: { type: "array", items: { type: "string" } },
+        maxResults: { type: "number" },
+        minImportance: { type: "number" },
+        entries: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" }, content: { type: "string" }, score: { type: "number" }, metadata: { type: "object" },
+            },
+            required: ["id", "content"],
+          },
+        },
+      },
+      required: ["id", "filePath"],
+    },
+  },
+  {
+    name: "synapse_list",
+    description: "List the number of active Synapse sessions after evicting expired sessions.",
+    apiEndpoint: "/api/v1/synapse/sessions",
+    apiMethod: "GET",
+    inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "symbol_snippet",
@@ -1390,6 +1466,82 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "Override cache freshness window in ms (0 bypasses cache like force).",
         },
       },
+    },
+  },
+  {
+    name: "rename_project",
+    description:
+      "Rename a project identity transactionally. Default dryRun=true previews " +
+      "canonical roots, per-store counts, conflicts, and a planHash. To apply, " +
+      "call again with dryRun=false, a caller-chosen operationId (idempotency " +
+      "key), and the preview's planHash as expectedPlanHash. The retired source " +
+      "ID remains a working alias.",
+    apiEndpoint: "/api/v1/project/rename",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sourceProjectId: {
+          type: "string",
+          description: "Current project ID to rename from",
+        },
+        targetProjectId: {
+          type: "string",
+          description: "New project ID (must be unused and never retired)",
+        },
+        dryRun: {
+          type: "boolean",
+          description:
+            "Preview only (default true). Set false with operationId + expectedPlanHash to apply.",
+        },
+        operationId: {
+          type: "string",
+          description: "Idempotency key, required when dryRun=false",
+        },
+        expectedPlanHash: {
+          type: "string",
+          description: "planHash from the dryRun preview, required when dryRun=false",
+        },
+      },
+      required: ["sourceProjectId", "targetProjectId"],
+    },
+  },
+  {
+    name: "merge_projects",
+    description:
+      "Merge one project identity into another transactionally (same canonical " +
+      "root required). Default dryRun=true previews counts, conflicts, and a " +
+      "planHash. To apply, call again with dryRun=false, a caller-chosen " +
+      "operationId, and the preview's planHash as expectedPlanHash. The retired " +
+      "source ID remains a working alias.",
+    apiEndpoint: "/api/v1/project/merge",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sourceProjectId: {
+          type: "string",
+          description: "Project ID to merge from (retired afterwards)",
+        },
+        targetProjectId: {
+          type: "string",
+          description: "Live project ID to merge into",
+        },
+        dryRun: {
+          type: "boolean",
+          description:
+            "Preview only (default true). Set false with operationId + expectedPlanHash to apply.",
+        },
+        operationId: {
+          type: "string",
+          description: "Idempotency key, required when dryRun=false",
+        },
+        expectedPlanHash: {
+          type: "string",
+          description: "planHash from the dryRun preview, required when dryRun=false",
+        },
+      },
+      required: ["sourceProjectId", "targetProjectId"],
     },
   },
 ];

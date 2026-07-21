@@ -343,8 +343,12 @@ export async function withMaskedBunVersion<T>(
 }
 
 export function assertRuntimeTarget(): void {
-  invariant(process.platform === "darwin", `native verifier requires Darwin, got ${process.platform}`);
-  invariant(process.arch === "arm64", `native verifier requires arm64, got ${process.arch}`);
+  const isDarwinArm64 = process.platform === "darwin" && process.arch === "arm64";
+  const isLinuxX64 = process.platform === "linux" && process.arch === "x64";
+  invariant(
+    isDarwinArm64 || isLinuxX64,
+    `native verifier requires macOS arm64 or Linux glibc x64, got ${process.platform} ${process.arch}`,
+  );
   invariant(
     process.versions.bun === EXPECTED_BUN_VERSION,
     `native verifier requires Bun ${EXPECTED_BUN_VERSION}, got ${process.versions.bun ?? "none"}`,
@@ -683,6 +687,38 @@ function currentNativeModules(requireFromConsumer: Require): string[] {
     .sort();
 }
 
+/** Allowed ELF soname patterns for Linux glibc x64 native modules. */
+const ALLOWED_LINUX_SONAME_PATTERNS: readonly RegExp[] = [
+  /^linux-vdso\.so\.1$/,
+  /^libstdc\+\+\.so\.6(\..*)?$/,
+  /^libgcc_s\.so\.1$/,
+  /^libc\.so\.6$/,
+  /^libpthread\.so\.0$/,
+  /^libdl\.so\.2$/,
+  /^libm\.so\.6$/,
+  /^ld-linux-x86-64\.so\.2$/,
+];
+
+/** Allowed Mach-O dynamic libraries for macOS arm64 native modules. */
+const ALLOWED_MACOS_LIBRARIES = new Set([
+  "/usr/lib/libc++.1.dylib",
+  "/usr/lib/libSystem.B.dylib",
+]);
+
+/** Parse `readelf -d` output and return the NEEDED soname entries. */
+export function parseElfNeeded(readelfOutput: string): string[] {
+  const needed: string[] = [];
+  for (const line of readelfOutput.split("\n")) {
+    const match = line.match(/^\s*0x[0-9a-f]+\s+\(NEEDED\)\s+Shared library:\s+\[([^\]]+)\]/i);
+    if (match) needed.push(match[1]);
+  }
+  return needed;
+}
+
+function isAllowedLinuxSoname(soname: string): boolean {
+  return ALLOWED_LINUX_SONAME_PATTERNS.some((pattern) => pattern.test(soname));
+}
+
 export function verifyNativeLinkage(
   requireFromConsumer: Require,
   baselineNativeModules: ReadonlySet<string> = new Set(),
@@ -695,24 +731,40 @@ export function verifyNativeLinkage(
     `expected ${EXPECTED_NATIVE_MODULE_COUNT} loaded native modules, got ${nativeModules.length}`,
   );
 
-  const allowedLibraries = new Set([
-    "/usr/lib/libc++.1.dylib",
-    "/usr/lib/libSystem.B.dylib",
-  ]);
+  const isLinux = process.platform === "linux";
   for (const nativeModule of nativeModules) {
     const fileOutput = runCommand("file", [nativeModule]);
-    invariant(
-      fileOutput.includes("Mach-O 64-bit bundle arm64"),
-      `${nativeModule} is not a Mach-O 64-bit arm64 bundle: ${fileOutput.trim()}`,
-    );
-    const linkedLibraries = runCommand("otool", ["-L", nativeModule])
-      .split("\n")
-      .slice(1)
-      .map((line) => line.trim().split(/\s+\(/, 1)[0])
-      .filter(Boolean);
-    invariant(linkedLibraries.length > 0, `${nativeModule} has no recorded dynamic linkage`);
-    for (const library of linkedLibraries) {
-      invariant(allowedLibraries.has(library), `${nativeModule} links non-system library ${library}`);
+    if (isLinux) {
+      invariant(
+        fileOutput.includes("ELF 64-bit LSB shared object") && fileOutput.includes("x86-64"),
+        `${nativeModule} is not an ELF 64-bit LSB x86-64 shared object: ${fileOutput.trim()}`,
+      );
+      const readelfOutput = runCommand("readelf", ["-d", nativeModule]);
+      const needed = parseElfNeeded(readelfOutput);
+      invariant(needed.length > 0, `${nativeModule} has no recorded NEEDED dynamic entries`);
+      for (const soname of needed) {
+        invariant(
+          isAllowedLinuxSoname(soname),
+          `${nativeModule} links non-system library ${soname}`,
+        );
+      }
+    } else {
+      invariant(
+        fileOutput.includes("Mach-O 64-bit bundle arm64"),
+        `${nativeModule} is not a Mach-O 64-bit arm64 bundle: ${fileOutput.trim()}`,
+      );
+      const linkedLibraries = runCommand("otool", ["-L", nativeModule])
+        .split("\n")
+        .slice(1)
+        .map((line) => line.trim().split(/\s+\(/, 1)[0])
+        .filter(Boolean);
+      invariant(linkedLibraries.length > 0, `${nativeModule} has no recorded dynamic linkage`);
+      for (const library of linkedLibraries) {
+        invariant(
+          ALLOWED_MACOS_LIBRARIES.has(library),
+          `${nativeModule} links non-system library ${library}`,
+        );
+      }
     }
   }
   return nativeModules;

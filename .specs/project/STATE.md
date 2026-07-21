@@ -1,5 +1,24 @@
 # massa-th0th Spec State
 
+## Wave 3 — Active
+
+- projectId: `massa-th0th`
+- workflowSessionId: `spec-wave3-followup` (native-runtime-rebaseline follow-up); prior `spec-m21` (M21) COMPLETE.
+- workflow: spec-driven
+- feature: `native-runtime-rebaseline` (Wave 3 follow-up, P1) — T1–T6 COMPLETE + validated PASS. T1 merge `b6aa4a4`; T2 test rewrite `428d462`; spec artifacts `846ff29`; T3 classification `e866ea5` + `17eedfd`; T4 npm reconcile (no code change — Codespace npm 11.12.1 → 11.14.1 install); T5 cross-platform verify (Codespace Bun 1.3.14 install, ABI 137, both platforms `verify:tree-sitter-native` exit 0, 152/152 native-structural); T6 AD amendment + validation.md (this commit). Status: `complete`.
+- prior: `linux-native-structural-runtime` (M21, P0) — COMPLETE + validated PASS.
+- status: M19, M20+M54, M50, M16+M17, M45+M47, M21 complete. **native-runtime-rebaseline COMPLETE** (T1–T6: `b6aa4a4`/`428d462`/`846ff29`/`e866ea5`/`17eedfd` + T4/T5/T6). Phase A (T1–T2) PASS on macOS arm64; Phase B (T3) six-suite classification — 2 FIX (`e866ea5` auto-improve LLM-surface isolation defect, `17eedfd` qwen fixture re-lock after identity-guard drift) + 4 DOCUMENTED-ACCEPT (etl-cache-invalidation, etl-pipeline-queue, scheduler-store-pg, trace-path — shared-DB fixture gaps: `graph_generation_workspace_missing:*`, `scheduled-*` pollution); Phase C (T4–T5) npm reconciled 11.14.1 both platforms, Bun 1.3.14 installed on Codespace (ABI 137), `verify:tree-sitter-native` PASS on macOS arm64 + Ubuntu Codespace (33+33 parses, 27+27 modules, 10 sensors, RSS -188 KB Codespace / +589 KB macOS < 16 MiB, packed package PASS, 152/152 native-structural both platforms). Phase D (T6) AD-004/005/006 amendment + validation.md.
+- branch/worktree: `wave-3` / `massa-th0th-wt-wave-3`
+- sequence: M19 → M20+M54 → M50 → M16+M17 → M45+M47 ✅ → M21 ✅ → native-runtime-rebaseline ✅
+- invariant: `sqlite-removal` stays `in_progress`; `multi-language-tree-sitter-breadth` reconciled to `complete` from its recorded PASS evidence.
+- cleanup: temp branch `wave-3-codespace-sync` on origin (used to sync Codespace for T5) — delete after feature closure.
+
+### Wave 3 Next Step
+
+native-runtime-rebaseline complete. Wave 3 follow-up exhausted. Clean up: delete temp remote branch `wave-3-codespace-sync`. No push of `wave-3` (contract). Independent verifier (author ≠ verifier) to run full gate matrix + discrimination sensors and confirm PASS per spec-driven validate.md.
+
+---
+
 ## Current
 
 - projectId: `massa-th0th`
@@ -35,6 +54,9 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 | AD-004 | active after TASK-004 PASS; re-baselined 2026-07-16 | Exact Bun `1.3.11` loads upstream native packages through one serialized compatibility loader that snapshots, removes, and restores the full `process.versions.bun` descriptor before parsing. Exact Node `25.9.0` is the build-only `node-gyp` helper (npm `11.14.1`). | TASK-001 native evidence; TASK-004 fault, readiness, startup, and direct-guard gates |
 | AD-005 | active after TASK-002 PASS; re-baselined 2026-07-16 | The runtime identity combines upstream `tree-sitter@0.25.0` SRI with patch SHA-256 `e79aec7b96eb8114e85ebcb90f0a8b12076bcd8aa08c09bb88929621e1c1446d`, adding idempotent cursor/tree deletion, stale-object guards, immutable JS owner identity, same-tree cursor reset enforcement, generated-addon packaging, a C++20 `binding.gyp` (Node 25 headers), and an install-guard that no-ops when the prebuilt addon is present. Core bundles the patched dependency for packed consumers. | TASK-002 no-delete control, hardened prototype, independent crash reviews, fresh normal packed consumer, final independent PASS; re-baseline cold install + source/dist native verifier under Bun 1.3.11/Node 25.9.0 |
 | AD-006 | active after TASK-005 PASS | Production uses one process-global FIFO parser pool: default capacity 4/hard max 32 and default acquisition timeout 5,000 ms/hard max 60,000 ms. Runtime owns cursor-before-tree cleanup and never returns empty success without a query executor. | TASK-005 overlap, timeout, retarget recovery, hard-outcome, native lifetime, RSS, and independent review gates |
+| AD-004 (amendment 2026-07-21, native-runtime-rebaseline) | active; Bun pin moved 1.3.11 → 1.3.14 via merge of main (`e12c4e4`) into `wave-3` | Wave-3 absorbed main's Bun `1.3.14` bump + lock-contract `record.includes` fix via merge commit `b6aa4a4`. Node `25.9.0` unchanged; npm `11.14.1` unchanged (Codespace npm 11.12.1 → 11.14.1 install reconciled). ABI `137` unchanged (confirmed on both platforms). Native load still uses the masked-Bun Node-path (`withMaskedBunVersion` → `node-gyp-build` → `build/Release`). | `verify:tree-sitter-native` PASS on macOS arm64 + Ubuntu Codespace under Bun 1.3.14; `verify-tree-sitter-grammars.test.ts` 9/9; native-structural 152/152 both platforms |
+| AD-005 (amendment 2026-07-21, native-runtime-rebaseline) | active; patch SHA `e79aec7b...` unchanged; only the Bun pin moves | Patch SHA `e79aec7b96eb8114e85ebcb90f0a8b12076bcd8aa08c09bb88929621e1c1446d` unchanged under Bun 1.3.14. Immutable owners, same-tree reset, install-guard, C++20 `binding.gyp`, 33-language manifest, versioned FQN codec, lazy grammar pool, embedded Vue/Markdown all unchanged (FROZEN contract). | 33+33 parses, 27+27 modules, 10 sensors, RSS -188 KB (Codespace) / +589 KB (macOS) < 16 MiB on both platforms under 1.3.14 |
+| AD-006 (amendment 2026-07-21, native-runtime-rebaseline) | active; parser pool contract unchanged; only the Bun pin moves | Parser pool (capacity 4/max 32, timeout 5s/max 60s), cursor-before-tree cleanup, non-empty-success guarantee all unchanged under Bun 1.3.14. | 10 behavior sensors PASS on both platforms; RSS stress gate PASS (100 cycles, median delta well within 16 MiB) under 1.3.14 |
 
 ## Progress
 
