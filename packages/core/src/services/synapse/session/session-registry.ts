@@ -133,12 +133,12 @@ export class SessionRegistry {
           this.sessions.set(sessionId, loaded);
           session = loaded;
         }
-      } catch { /* store swallows + warns */ }
+      } catch (error) { logger.warn("[SessionRegistry] store load failed:", { error: (error as Error).message }); }
     }
     if (!session) return null;
     if (session.expiresAt <= now) {
       this.sessions.delete(sessionId);
-      try { this.store?.delete(sessionId); } catch { /* best-effort */ }
+      try { this.store?.delete(sessionId); } catch (error) { logger.warn("[SessionRegistry] store delete (expired) failed:", { error: (error as Error).message }); }
       return null;
     }
     const refreshed = now + (session.ttlMs ?? this.defaultTtlMs);
@@ -163,7 +163,7 @@ export class SessionRegistry {
     session.taskTokens = tokenize(taskContext);
     if (taskEmbedding) session.taskEmbedding = taskEmbedding;
     session.expiresAt = now + (session.ttlMs ?? this.defaultTtlMs);
-    try { this.store?.save(session); } catch { /* best-effort */ }
+    try { this.store?.save(session); } catch (error) { logger.warn("[SessionRegistry] store save (updateTaskContext) failed:", { error: (error as Error).message }); }
     return session;
   }
 
@@ -194,12 +194,12 @@ export class SessionRegistry {
       history.delete(oldest);
     }
     // Phase 1: write-through the access touch (best-effort, LRU recency).
-    try { this.store?.recordAccess(sessionId, memoryId, nextCount); } catch { /* best-effort */ }
+    try { this.store?.recordAccess(sessionId, memoryId, nextCount); } catch (error) { logger.warn("[SessionRegistry] store recordAccess failed:", { error: (error as Error).message }); }
   }
 
   delete(sessionId: string): boolean {
     const removed = this.sessions.delete(sessionId);
-    try { this.store?.delete(sessionId); } catch { /* best-effort */ }
+    try { this.store?.delete(sessionId); } catch (error) { logger.warn("[SessionRegistry] store delete failed:", { error: (error as Error).message }); }
     return removed;
   }
 
@@ -237,7 +237,8 @@ export function getSessionRegistry(): SessionRegistry {
         getSessionStore: () => SessionStore;
       };
       store = getSessionStore();
-    } catch {
+    } catch (error) {
+      logger.warn("[SessionRegistry] store init failed, falling back to MemorySessionStore:", { error: (error as Error).message });
       const { MemorySessionStore } = require("./session-store.js") as {
         MemorySessionStore: new () => SessionStore;
       };
