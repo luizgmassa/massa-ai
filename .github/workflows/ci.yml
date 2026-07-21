@@ -224,7 +224,7 @@ jobs:
         run: bun run build
 
       - name: Run native verifier (source/dist + packed package)
-        run: bun run verify:tree-sitter-native
+        run: bun run verify:tree-sitter-native | tee native-linux-x64-verification.log
 
       - name: Run native-structural unit tests
         working-directory: packages/core
