@@ -905,9 +905,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         scope: {
           type: "string",
-          enum: ["unstaged", "staged", "committed"],
+          enum: ["unstaged", "staged", "committed", "all"],
           default: "unstaged",
-          description: "unstaged = working-tree changes; staged = index; committed = diff vs base_branch (or since).",
+          description: "unstaged = working-tree changes (+ untracked new files); staged = index (+ untracked); committed = diff vs base_branch (or since); all = committed + unstaged + untracked, deduped.",
         },
         base_branch: {
           type: "string",
