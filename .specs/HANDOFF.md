@@ -1,6 +1,6 @@
 # AI Engineering Handoff
 
-## Wave 4 Breaking Changes
+## Wave 4 Breaking Changes (feature COMPLETE — validated PASS)
 
 Wave 4 (`wave-4-correctness-hygiene`) introduces three breaking changes that callers and integrators must absorb:
 

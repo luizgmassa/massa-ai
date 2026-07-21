@@ -1,14 +1,15 @@
 # massa-th0th Spec State
 
-## Wave 4 — Active
+## Wave 4 — Complete
 
 - projectId: `massa-th0th`
 - workflowSessionId: `spec-wave-4-correctness-hygiene`
 - workflow: spec-driven
-- feature: `wave-4-correctness-hygiene` (Wave 4, P1) — in progress
-- status: in progress (T1–T20 executing; T1–T14 complete, T15–T20 in progress)
+- feature: `wave-4-correctness-hygiene` (Wave 4, P1) — COMPLETE + validated PASS
+- status: complete (T1–T20 all done; independent verifier PASS: 13/13 ACs, 4/4 discrimination mutations killed, gates green, no gaps)
 - branch: `main`
 - baseline: `f3d8020`
+- residual risk: pre-existing `qwen-e2e-fixture` failure (documented, owned by `sqlite-removal-followup` SQLRFU-002 — not Wave 4 task-owned)
 
 ---
 
