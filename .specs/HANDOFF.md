@@ -1,5 +1,15 @@
 # AI Engineering Handoff
 
+## Wave 4 Breaking Changes
+
+Wave 4 (`wave-4-correctness-hygiene`) introduces three breaking changes that callers and integrators must absorb:
+
+- **N7 — `scope=unstaged` default now includes untracked new files.** `defaultDiffRunner` merges `git ls-files --others --exclude-standard` into the unstaged (default), staged, and all scopes; `scope=committed` preserves the old single-source behavior. Secret-like untracked paths (`*.env*`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, `secrets.*`, `*.keystore`, `id_rsa*`, `*.asc`) are excluded and counted in `untrackedFiltered`. Callers that assumed `scope=unstaged` excluded untracked files will see new paths in impact analysis results.
+- **N6 — invalid enum params now throw `ToolError` with valid-values list.** All tool handlers with enum/finite-set params (`scope`, `direction`, `mode`, `status`, `kind`, `checkpointType`, `strategy`, `language`, `format`, `responseMode`, `type`) reject invalid values with a teaching error instead of silently falling back to a default. Callers sending invalid enum values will receive `{ success: false, error: "Invalid <param> value: <v>. Valid values: <list>." }` instead of a silent-default response.
+- **N9 — `read_file` default cap 500 lines.** User-facing `read_file` and `symbol_snippet` HTTP endpoint cap output at `MASSA_TH0TH_READ_FILE_MAX_LINES` (default 500, env override). When the range exceeds the cap, `source_clipped: true` and the true total line count are returned. Internal `SymbolGraphService.readSnippet`/`readContext` are NOT capped. Callers reading large files without an explicit range will receive clipped output with a `source_clipped` flag instead of the full file.
+
+---
+
 ## Current: Wave 3 Follow-up — Native Runtime Re-baseline
 
 - projectId: `massa-th0th`; workflowSessionId: `spec-wave3-followup`
