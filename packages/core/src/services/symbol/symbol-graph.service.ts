@@ -526,9 +526,13 @@ export class SymbolGraphService {
   }
 
   /**
-   * Compute the architecture map (D4): packages, entry points, routes,
-   * hotspots, layers, and communities. Best-effort — returns null when there
-   * isn't enough graph data to produce a meaningful map.
+   * Compute the architecture map (D4 + Wave 5 `cycles` aspect): packages, entry
+   * points, routes, hotspots, layers, and communities. Best-effort — returns
+   * null when there isn't enough graph data to produce a meaningful map.
+   *
+   * Wave 5 FR-02: when `opts.aspects` includes `"cycles"`, runs iterative Tarjan
+   * SCC over the CALL-edge graph and attaches `cycles` + `cycles_truncated`.
+   * Unknown aspect values throw a teaching error (Wave 4 N6 parity).
    *
    * Isolation: each repo call is awaited separately and any thrown error
    * propagates to the caller, which catches and logs it, leaving the existing
@@ -536,6 +540,7 @@ export class SymbolGraphService {
    */
   private async computeArchitectureMapSafe(
     snapshot: ProjectMapGraphSnapshot["architecture"],
+    opts: { aspects?: string[] } = {},
   ): Promise<ArchitectureMap | null> {
     const {
       files: filesRaw,
@@ -630,6 +635,36 @@ export class SymbolGraphService {
       centrality: centralityRaw,
       symbolCounts,
       communities: commResult.communities,
+    }, { aspects: opts.aspects });
+  }
+
+  // ── get_architecture (Wave 5 FR-01 / FR-02) ──────────────────────────────────
+
+  /**
+   * Compute the architecture map for a project, with opt-in aspects.
+   *
+   * Wave 5 FR-01 / FR-02: powers the `get_architecture` MCP tool + REST route.
+   * Unlike {@link getProjectMap} (which always computes the baseline aspects
+   * best-effort and never throws on analyzer failure), this method:
+   *   - Surfaces analyzer errors to the caller (the tool layer maps them to
+   *     teaching errors / 4xx).
+   *   - Honors `aspects` opt-in (only `"cycles"` today; unknown → throws
+   *     {@link ToolError}, Wave 4 N6 parity).
+   *   - Returns `null` only when the project has no indexed files.
+   *
+   * @throws {ToolError} when `aspects` contains an unknown value.
+   */
+  async getArchitecture(
+    projectId: string,
+    opts: { aspects?: string[]; centralityLimit?: number } = {},
+  ): Promise<ArchitectureMap | null> {
+    const repo = getSymbolRepository();
+    const graphSnapshot = await repo.getProjectMapSnapshot(projectId, {
+      centralityLimit: opts.centralityLimit ?? 20,
+    });
+    if (!graphSnapshot) return null;
+    return this.computeArchitectureMapSafe(graphSnapshot.architecture, {
+      aspects: opts.aspects,
     });
   }
 

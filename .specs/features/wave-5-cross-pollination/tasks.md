@@ -106,6 +106,8 @@ rtk bun run typecheck && rtk bun run build && rtk bun test
 - Property test: 100 random small graphs, compare against brute-force SCC finder.
 - Specific fixtures: self-loop, two cycles sharing one node, K5 (fully connected 5-node), disconnected cycles, DAG (empty result).
 
+**RSS guard clarification (AC-2):** Build the 500k-edge input graph in the baseline measurement (input allocation is not Tarjan overhead). Then assert `detectCycles` adds < 16 MiB RSS delta vs that baseline. Intent per AD-W5-001 is that the iterative impl doesn't balloon via recursion; input-size-linear allocation is expected.
+
 **ACs touched:** AC-2, AC-25.
 
 **Deps:** none (pure module).

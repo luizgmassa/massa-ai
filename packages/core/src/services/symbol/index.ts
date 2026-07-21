@@ -30,17 +30,22 @@ export type {
   ArchitectureMap,
   ArchitectureInput,
   ArchitectureOptions,
+  ArchitectureAspect,
   PackageInfo,
   EntryPoint,
   RouteInfo,
   HotspotInfo,
   LayerInfo,
   CommunityInfo,
+  CycleInfo,
   InternalImport,
   SymbolDefLite,
   HttpEdgeLite,
   CallEdge,
 } from "./architecture.js";
+export { VALID_ARCHITECTURE_ASPECTS } from "./architecture.js";
+export { detectCycles, DEFAULT_CYCLE_EDGE_BUDGET } from "./cycle-detection.js";
+export type { SCC, DetectCyclesResult } from "./cycle-detection.js";
 export { TracePathService, tracePathService } from "./trace-path.js";
 export type {
   TracePathOptions,

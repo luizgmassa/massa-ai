@@ -234,7 +234,9 @@ verbatim — no re-implementation. Interface drift blocks the batch (failing tes
   `cycles_truncated=false` when under budget.
 - **AC-2 (FR-02)**: Forcing a synthetic 500k-edge CALL graph sets `cycles_truncated=true`
   and returns ≤ budget edges. Iterative implementation does not overflow the JS stack
-  (verified by RSS guard < 16 MiB over the same stress fixture used in Wave 3 MLTS-022).
+  (verified by RSS delta guard: build the input graph in baseline, then assert
+  `detectCycles` adds < 16 MiB RSS overhead vs baseline — measures Tarjan state only,
+  not input allocation, per AD-W5-001 intent).
 - **AC-3 (FR-03)**: `impact_analysis` on a fixture with impacted files across ≥5 distinct
   2-segment prefixes emits `impacted_modules[]` with `(other)` overflow when prefix count
   > cap. `impacted_total` matches the unique pre-clamp count exactly.
