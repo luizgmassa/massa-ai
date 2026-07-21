@@ -343,8 +343,12 @@ export async function withMaskedBunVersion<T>(
 }
 
 export function assertRuntimeTarget(): void {
-  invariant(process.platform === "darwin", `native verifier requires Darwin, got ${process.platform}`);
-  invariant(process.arch === "arm64", `native verifier requires arm64, got ${process.arch}`);
+  const isDarwinArm64 = process.platform === "darwin" && process.arch === "arm64";
+  const isLinuxX64 = process.platform === "linux" && process.arch === "x64";
+  invariant(
+    isDarwinArm64 || isLinuxX64,
+    `native verifier requires macOS arm64 or Linux glibc x64, got ${process.platform} ${process.arch}`,
+  );
   invariant(
     process.versions.bun === EXPECTED_BUN_VERSION,
     `native verifier requires Bun ${EXPECTED_BUN_VERSION}, got ${process.versions.bun ?? "none"}`,

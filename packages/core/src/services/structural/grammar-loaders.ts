@@ -204,9 +204,11 @@ export function grammarArtifactKey(artifact: GrammarArtifact): string {
 }
 
 function assertRuntimeTarget(): void {
-  if (process.platform !== "darwin" || process.arch !== "arm64") {
+  const isDarwinArm64 = process.platform === "darwin" && process.arch === "arm64";
+  const isLinuxX64 = process.platform === "linux" && process.arch === "x64";
+  if (!isDarwinArm64 && !isLinuxX64) {
     throw new Error(
-      `Structural native parsing requires macOS arm64, got ${process.platform} ${process.arch}`,
+      `Structural native parsing requires macOS arm64 or Linux glibc x64, got ${process.platform} ${process.arch}`,
     );
   }
   if (process.versions.bun !== STRUCTURAL_BUN_VERSION) {
