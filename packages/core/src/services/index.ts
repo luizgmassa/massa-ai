@@ -288,6 +288,28 @@ export type {
   ImpactedSymbol,
 } from "./symbol/impact-analysis.js";
 
+// Wave 5 — Architecture map + cycles aspect (FR-01, FR-02, FR-04)
+export { computeArchitectureMap, VALID_ARCHITECTURE_ASPECTS } from "./symbol/architecture.js";
+export { detectCycles, DEFAULT_CYCLE_EDGE_BUDGET } from "./symbol/cycle-detection.js";
+export type {
+  ArchitectureMap,
+  ArchitectureInput,
+  ArchitectureOptions,
+  ArchitectureAspect,
+  PackageInfo,
+  EntryPoint,
+  RouteInfo,
+  HotspotInfo,
+  LayerInfo,
+  CommunityInfo,
+  CycleInfo,
+  InternalImport,
+  SymbolDefLite,
+  HttpEdgeLite,
+  CallEdge,
+} from "./symbol/architecture.js";
+export type { SCC, DetectCyclesResult } from "./symbol/cycle-detection.js";
+
 // Events
 export { eventBus, EventBus } from "./events/event-bus.js";
 export type { EventMap, EventName } from "./events/event-bus.js";

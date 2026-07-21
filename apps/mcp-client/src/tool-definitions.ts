@@ -648,6 +648,48 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 
   {
+    name: "get_architecture",
+    description:
+      "Get the architecture map for a project: packages, entry points, routes, hotspots, communities, layers, and opt-in cycles (Tarjan SCC over CALL edges). " +
+      "Pass aspects:[\"cycles\"] to surface strongly connected components (file-level call cycles). Unknown aspect values return a teaching error listing valid values.",
+    apiEndpoint: "/api/v1/project/:id/architecture",
+    apiMethod: "GET",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The project ID (as registered via index_project).",
+        },
+        aspects: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Opt-in aspects. Only \"cycles\" today: runs iterative Tarjan SCC over CALL edges and returns { cycles, cycles_truncated }. Unknown values return a 400 teaching error listing valid values.",
+        },
+        centralityLimit: {
+          type: "number",
+          description: "Max number of top central files to include. Default 20.",
+          default: 20,
+        },
+        format: {
+          type: "string",
+          enum: ["json", "toon"],
+          description: "Output format (json or toon). Default: json.",
+          default: "json",
+        },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported). Absent/empty → full data.",
+        },
+      },
+      required: ["id"],
+    },
+  },
+
+  {
     name: "search_definitions",
     description:
       "Search for symbol definitions (functions, classes, variables, types, interfaces) in an indexed project. Returns name, kind, file location, line numbers, and doc comments.",
