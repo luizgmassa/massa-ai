@@ -7,10 +7,12 @@
 
 import {
   IToolHandler,
+  STRUCTURAL_SYMBOL_KINDS,
   STRUCTURAL_SYMBOL_KIND_SCHEMA,
   ToolResponse,
 } from "@massa-th0th/shared";
 import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
+import { validateEnum } from "./enum-validation.js";
 
 interface SearchDefinitionsParams {
   projectId: string;
@@ -70,10 +72,23 @@ export class SearchDefinitionsTool implements IToolHandler {
       maxResults = 20,
     } = params as SearchDefinitionsParams;
 
+    // Validate each kind entry against the 18 canonical structural kinds.
+    // Empty/missing kind is allowed (no filter); an invalid kind string
+    // teaching-errors immediately with the full valid-values list.
+    const validatedKind = kind
+      ? kind.map((k) =>
+          validateEnum<typeof STRUCTURAL_SYMBOL_KINDS[number]>(
+            "kind",
+            k,
+            STRUCTURAL_SYMBOL_KINDS,
+          ),
+        )
+      : undefined;
+
     try {
       const definitions = await symbolGraphService.listDefinitions(projectId, {
         search: query,
-        kind,
+        kind: validatedKind,
         file,
         exportedOnly,
         limit: maxResults,

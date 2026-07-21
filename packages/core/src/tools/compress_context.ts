@@ -10,6 +10,7 @@ import { ToolResponse } from "@massa-th0th/shared";
 import { CodeCompressor } from "../services/compression/code-compressor.js";
 import { logger } from "@massa-th0th/shared";
 import { estimateTokens } from "@massa-th0th/shared";
+import { validateEnum } from "./enum-validation.js";
 
 interface CompressContextParams {
   content: string;
@@ -67,10 +68,21 @@ export class CompressContextTool implements IToolHandler {
   async handle(params: unknown): Promise<ToolResponse> {
     const {
       content,
-      strategy = "code_structure",
       language,
       targetRatio = 0.7,
     } = params as CompressContextParams;
+    const strategy = validateEnum<
+      "code_structure" | "conversation_summary" | "semantic_dedup" | "hierarchical"
+    >(
+      "strategy",
+      (params as CompressContextParams).strategy ?? "code_structure",
+      [
+        "code_structure",
+        "conversation_summary",
+        "semantic_dedup",
+        "hierarchical",
+      ] as const,
+    );
 
     try {
       const originalTokens = estimateTokens(content, (language as 'code' | 'text') || "code");

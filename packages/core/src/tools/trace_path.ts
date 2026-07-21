@@ -21,6 +21,7 @@ import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { tracePathService } from "../services/symbol/trace-path.js";
 import type { EdgeType } from "../services/symbol/symbol-graph.service.js";
 import { serializeToolResponse } from "./serialize.js";
+import { validateEnum } from "./enum-validation.js";
 
 interface TracePathParams {
   projectId: string;
@@ -120,6 +121,16 @@ export class TracePathTool implements IToolHandler {
     if (!p.projectId) {
       return { success: false, error: "projectId is required" };
     }
+    const direction = validateEnum<"outbound" | "inbound" | "both">(
+      "direction",
+      p.direction ?? "outbound",
+      ["outbound", "inbound", "both"] as const,
+    );
+    const mode = validateEnum<"calls" | "data_flow" | "cross_service" | "all">(
+      "mode",
+      p.mode ?? "calls",
+      ["calls", "data_flow", "cross_service", "all"] as const,
+    );
 
     try {
       const result = await tracePathService.tracePath({
@@ -127,8 +138,8 @@ export class TracePathTool implements IToolHandler {
         function_name: p.function_name,
         qualifiedName: p.qualifiedName,
         projectId: p.projectId,
-        direction: p.direction,
-        mode: p.mode,
+        direction,
+        mode,
         depth: p.depth,
         include_tests: p.include_tests,
         edge_types: p.edge_types,

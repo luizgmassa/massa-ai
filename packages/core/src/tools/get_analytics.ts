@@ -8,6 +8,7 @@ import { IToolHandler } from "@massa-th0th/shared";
 import { ToolResponse } from "@massa-th0th/shared";
 import { getSearchAnalytics } from "../services/search/analytics-factory.js";
 import { logger } from "@massa-th0th/shared";
+import { validateEnum } from "./enum-validation.js";
 
 interface GetAnalyticsParams {
   type: "summary" | "project" | "query" | "cache" | "recent";
@@ -50,7 +51,12 @@ export class GetAnalyticsTool implements IToolHandler {
   constructor() {}
 
   async handle(params: unknown): Promise<ToolResponse> {
-    const { type, projectId, query, limit = 10 } = params as GetAnalyticsParams;
+    const { projectId, query, limit = 10 } = params as GetAnalyticsParams;
+    const type = validateEnum<"summary" | "project" | "query" | "cache" | "recent">(
+      "type",
+      (params as GetAnalyticsParams).type,
+      ["summary", "project", "query", "cache", "recent"] as const,
+    );
 
     try {
       const analytics = getSearchAnalytics();
@@ -105,12 +111,6 @@ export class GetAnalyticsTool implements IToolHandler {
           data = await analytics.getRecentSearches(recentLimit, projectId);
           break;
         }
-
-        default:
-          return {
-            success: false,
-            error: `Invalid analytics type: ${type}`,
-          };
       }
 
       logger.info("Analytics retrieved", {

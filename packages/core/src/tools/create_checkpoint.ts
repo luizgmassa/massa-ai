@@ -9,6 +9,7 @@ import { IToolHandler, ToolResponse, TaskState, TaskStatus, CheckpointType } fro
 import { logger } from "@massa-th0th/shared";
 import { CheckpointManager } from "../services/checkpoint/checkpoint-manager.js";
 import { serializeToolResponse } from "./serialize.js";
+import { validateEnum } from "./enum-validation.js";
 
 interface CreateCheckpointParams {
   taskId: string;
@@ -156,12 +157,10 @@ export class CreateCheckpointTool implements IToolHandler {
     const {
       taskId,
       description,
-      status = TaskStatus.IN_PROGRESS,
       currentStep = "",
       progressPercent = 0,
       totalSteps = 0,
       completedSteps = 0,
-      checkpointType = "manual",
       agentId,
       projectId,
       memoryIds = [],
@@ -173,6 +172,23 @@ export class CreateCheckpointTool implements IToolHandler {
       format = "toon",
       fields,
     } = params as CreateCheckpointParams;
+
+    const status = validateEnum<TaskStatus>(
+      "status",
+      (params as CreateCheckpointParams).status ?? TaskStatus.IN_PROGRESS,
+      [
+        TaskStatus.PENDING,
+        TaskStatus.IN_PROGRESS,
+        TaskStatus.COMPLETED,
+        TaskStatus.FAILED,
+        TaskStatus.PAUSED,
+      ] as readonly TaskStatus[],
+    );
+    const checkpointType = validateEnum<"manual" | "milestone">(
+      "checkpointType",
+      (params as CreateCheckpointParams).checkpointType ?? "manual",
+      ["manual", "milestone"] as const,
+    );
 
     try {
       const state: TaskState = {

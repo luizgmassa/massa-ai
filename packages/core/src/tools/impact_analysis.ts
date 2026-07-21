@@ -22,6 +22,7 @@ import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { impactAnalysisService } from "../services/symbol/impact-analysis.js";
 import type { ImpactScope } from "../services/symbol/impact-analysis.js";
 import { serializeToolResponse } from "./serialize.js";
+import { validateEnum } from "./enum-validation.js";
 
 interface ImpactAnalysisParams {
   projectId: string;
@@ -113,7 +114,11 @@ export class ImpactAnalysisTool implements IToolHandler {
           "projectPath is required (absolute path to the working tree where `git` runs).",
       };
     }
-    const scope: ImpactScope = p.scope ?? "unstaged";
+    const scope: ImpactScope = validateEnum<ImpactScope>(
+      "scope",
+      p.scope ?? "unstaged",
+      ["unstaged", "staged", "committed"] as const,
+    );
 
     try {
       const result = await impactAnalysisService.analyze({

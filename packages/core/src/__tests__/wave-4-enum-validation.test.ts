@@ -179,3 +179,179 @@ describe("validateGitRef", () => {
     expect(() => validateGitRef("base_branch", "`whoami`")).toThrow(ToolError);
   });
 });
+
+/**
+ * T5 (WAVE4-N6): validateEnum wired into all tool handlers.
+ *
+ * Asserts spec AC 6: each tool handler teaching-errors on an invalid enum
+ * param with the valid-values list in the error message. Handlers wrap their
+ * bodies in try/catch and return `{success:false, error:<msg>}`, so the
+ * teaching text arrives via `error` (NOT as a re-thrown ToolError).
+ *
+ * Discrimination: remove the validateEnum call in any tool → its invalid-enum
+ * test fails (silent fallback returns success:false with a generic error that
+ * does NOT list valid values, or returns success:true with wrong data).
+ */
+import { ImpactAnalysisTool } from "../tools/impact_analysis.js";
+import { TracePathTool } from "../tools/trace_path.js";
+import { GetAnalyticsTool } from "../tools/get_analytics.js";
+import { ListProjectsTool } from "../tools/list_projects.js";
+import { SearchDefinitionsTool } from "../tools/search_definitions.js";
+import { CreateCheckpointTool } from "../tools/create_checkpoint.js";
+import { CompressContextTool } from "../tools/compress_context.js";
+import { ExecutorController } from "../controllers/executor-controller.js";
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+/**
+ * Run a tool handler call and extract the teaching-error message text, whether
+ * the handler throws `ToolError` (validation at top of `handle`, before any
+ * try/catch) or returns `{success:false, error:<msg>}` (validation inside a
+ * try/catch). Both shapes satisfy spec AC 6 — the contract is that the
+ * valid-values list reaches the caller, not the throw-vs-return mechanism.
+ */
+async function teachingError(call: () => Promise<unknown>): Promise<string> {
+  let maybeReturn: unknown;
+  try {
+    maybeReturn = await call();
+  } catch (e) {
+    if (e instanceof ToolError) return e.message;
+    throw e;
+  }
+  const r = maybeReturn as { success: boolean; error?: string };
+  if (r && r.success === false && typeof r.error === "string") return r.error;
+  throw new Error(
+    `expected ToolError throw OR {success:false,error}; got: ${JSON.stringify(maybeReturn).slice(0, 200)}`,
+  );
+}
+
+describe("T5: tool handlers wired to validateEnum (N6)", () => {
+  test("impact_analysis rejects invalid scope with valid-values list", async () => {
+    const tool = new ImpactAnalysisTool();
+    const err = await teachingError(() =>
+      tool.handle({
+        projectId: "p",
+        projectPath: "/tmp",
+        scope: "bogus",
+      } as any),
+    );
+    expect(err).toContain("Invalid scope value: bogus.");
+    expect(err).toContain("unstaged, staged, committed");
+  });
+
+  test("trace_path rejects invalid direction with valid-values list", async () => {
+    const tool = new TracePathTool();
+    const err = await teachingError(() =>
+      tool.handle({
+        projectId: "p",
+        function_name: "x",
+        direction: "sideways",
+      } as any),
+    );
+    expect(err).toContain("Invalid direction value: sideways.");
+    expect(err).toContain("outbound, inbound, both");
+  });
+
+  test("trace_path rejects invalid mode with valid-values list", async () => {
+    const tool = new TracePathTool();
+    const err = await teachingError(() =>
+      tool.handle({
+        projectId: "p",
+        function_name: "x",
+        mode: "nope",
+      } as any),
+    );
+    expect(err).toContain("Invalid mode value: nope.");
+    expect(err).toContain("calls, data_flow, cross_service, all");
+  });
+
+  test("get_analytics rejects invalid type with valid-values list", async () => {
+    const tool = new GetAnalyticsTool();
+    const err = await teachingError(() =>
+      tool.handle({ type: "bogus" } as any),
+    );
+    expect(err).toContain("Invalid type value: bogus.");
+    expect(err).toContain("summary, project, query, cache, recent");
+  });
+
+  test("list_projects rejects invalid status with valid-values list", async () => {
+    const tool = new ListProjectsTool();
+    const err = await teachingError(() =>
+      tool.handle({ status: "archived" } as any),
+    );
+    expect(err).toContain("Invalid status value: archived.");
+    expect(err).toContain("pending, indexing, indexed, error, all");
+  });
+
+  test("search_definitions rejects invalid kind with valid-values list", async () => {
+    const tool = new SearchDefinitionsTool();
+    const err = await teachingError(() =>
+      tool.handle({ projectId: "p", kind: ["function", "bogus_kind"] } as any),
+    );
+    expect(err).toContain("Invalid kind value: bogus_kind.");
+    // Valid-values list must include the 18 canonical kinds (sample-check a few).
+    expect(err).toContain("function");
+    expect(err).toContain("class");
+    expect(err).toContain("module");
+  });
+
+  test("create_checkpoint rejects invalid status with valid-values list", async () => {
+    const tool = new CreateCheckpointTool();
+    const err = await teachingError(() =>
+      tool.handle({ taskId: "t", description: "d", status: "archived" } as any),
+    );
+    expect(err).toContain("Invalid status value: archived.");
+    expect(err).toContain("pending, in_progress, completed, failed, paused");
+  });
+
+  test("create_checkpoint rejects invalid checkpointType with valid-values list", async () => {
+    const tool = new CreateCheckpointTool();
+    const err = await teachingError(() =>
+      tool.handle({
+        taskId: "t",
+        description: "d",
+        checkpointType: "final",
+      } as any),
+    );
+    expect(err).toContain("Invalid checkpointType value: final.");
+    expect(err).toContain("manual, milestone");
+  });
+
+  test("compress_context rejects invalid strategy with valid-values list", async () => {
+    const tool = new CompressContextTool();
+    const err = await teachingError(() =>
+      tool.handle({ content: "x", strategy: "bogus" } as any),
+    );
+    expect(err).toContain("Invalid strategy value: bogus.");
+    expect(err).toContain(
+      "code_structure, conversation_summary, semantic_dedup, hierarchical",
+    );
+  });
+
+  test("ExecutorController.execute rejects invalid language with valid-values list", async () => {
+    const ctrl = ExecutorController.getInstance();
+    const err = await teachingError(() =>
+      ctrl.execute({
+        language: "klingon" as any,
+        code: "1+1",
+      } as any),
+    );
+    expect(err).toContain("Invalid language value: klingon.");
+    expect(err).toContain(
+      "javascript, typescript, python, shell, ruby, go, rust, php, perl, r",
+    );
+  });
+
+  test("ExecutorController.executeFile rejects invalid language with valid-values list", async () => {
+    const ctrl = ExecutorController.getInstance();
+    const err = await teachingError(() =>
+      ctrl.executeFile({
+        language: "klingon" as any,
+        path: "/tmp/x.py",
+      } as any),
+    );
+    expect(err).toContain("Invalid language value: klingon.");
+    expect(err).toContain(
+      "javascript, typescript, python, shell, ruby, go, rust, php, perl, r",
+    );
+  });
+});

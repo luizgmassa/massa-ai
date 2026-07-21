@@ -8,6 +8,7 @@
 import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { workspaceManager } from "../services/workspace/workspace-manager.js";
 import type { WorkspaceStatus } from "../services/workspace/workspace-manager.js";
+import { validateEnum } from "./enum-validation.js";
 
 interface ListProjectsParams {
   status?: WorkspaceStatus | "all";
@@ -31,7 +32,11 @@ export class ListProjectsTool implements IToolHandler {
   };
 
   async handle(params: unknown): Promise<ToolResponse> {
-    const { status = "all" } = (params ?? {}) as ListProjectsParams;
+    const status = validateEnum<WorkspaceStatus | "all">(
+      "status",
+      ((params ?? {}) as ListProjectsParams).status ?? "all",
+      ["pending", "indexing", "indexed", "error", "all"] as const,
+    );
 
     try {
       const workspaces = await workspaceManager.listWorkspaces(status);
