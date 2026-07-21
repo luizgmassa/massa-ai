@@ -23,7 +23,7 @@ import {
   TREE_SITTER_PATCH,
 } from "../packages/core/src/services/structural/native-lock-identities.ts";
 
-export const EXPECTED_BUN_VERSION = "1.3.11";
+export const EXPECTED_BUN_VERSION = "1.3.14";
 export const EXPECTED_NODE_BUILD_VERSION = "25.9.0";
 export const EXPECTED_NATIVE_MODULE_ABI = 137;
 export const EXPECTED_NATIVE_MODULE_COUNT = 27;
@@ -401,16 +401,21 @@ export function verifyLockContractText(source: string, fileName = "bun.lock"): {
       record[0] === expected.resolved,
       `bun.lock ${packageName} resolved identity drifted: ${String(record[0])}`,
     );
-    const integrity = record.at(-1);
     if ("sri" in expected) {
+      const integrity = record.at(-1);
       invariant(
         integrity === expected.sri,
         `bun.lock ${packageName} SRI drifted: ${String(integrity)}`,
       );
     } else {
+      // Git-dep records are [resolved, metadata, gitIdentity] under Bun 1.3.11
+      // and [resolved, metadata, gitIdentity, sourceIntegrity] under Bun 1.3.14
+      // (which appends a per-archive sha512). The gitIdentity token is the commit
+      // pin we freeze; assert it by membership so the check survives the appended
+      // element without losing the commit-drift guarantee.
       invariant(
-        integrity === expected.gitIdentity,
-        `bun.lock ${packageName} Git identity drifted: ${String(integrity)}`,
+        record.includes(expected.gitIdentity),
+        `bun.lock ${packageName} Git identity drifted: ${JSON.stringify(record)}`,
       );
     }
     lockedIdentities += 1;
@@ -471,7 +476,7 @@ export function verifyStaticContract(): {
     "core must bundle the patched tree-sitter runtime",
   );
   invariant(
-    corePackage.dependencies?.["@massa-th0th/shared"] === "1.0.0",
+    corePackage.dependencies?.["@massa-th0th/shared"] === "1.1.0",
     "core must publish a semver dependency on @massa-th0th/shared",
   );
   const patchPath = resolve(ROOT, TREE_SITTER_PATCH.path);
