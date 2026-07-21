@@ -468,3 +468,260 @@ describe("ImpactAnalysisService — N4 impacted_total/shown/omitted", () => {
 // This file's scope is impact_analysis + read_file + diff runner; the trace
 // path field-presence is covered by the type system (TracePathResult) and
 // the existing trace-path tests pass unchanged.
+
+/**
+ * T9 (WAVE4-N4): *_total/*_shown/*_omitted on search_definitions +
+ * search_code + get_references.
+ *
+ * Asserts spec AC 3, 4, 5 (N4):
+ *   - search_definitions with 600 matches, limit 20 →
+ *     definitions_total=600, definitions_shown=20, definitions_omitted=580
+ *   - search_code with 50 reachable results, maxResults 10 →
+ *     results_total=50, results_shown=10, results_omitted=40
+ *   - get_references with 100 refs, maxResults 50 →
+ *     total=100, shown=50, omitted=50
+ *
+ * Discrimination (for the verifier's sensor):
+ *   - search_definitions: drop the `countDefinitions` call → total equals the
+ *     page length (20), not 600 → the 600-match test fails.
+ *   - search_code: drop the `results_total = rerankedResults.length` line →
+ *     results_total is undefined → the 50-result test fails.
+ *   - get_references: drop the `omitted` field → the 100-ref test fails.
+ *
+ * The search_definitions + get_references tests mock the symbolGraphService
+ * singleton via Bun's mock.module so the tool handler exercises the real N4
+ * arithmetic without a DB. The search_code test injects a stub
+ * ContextualSearchRLM into a fresh SearchController (same pattern as
+ * search-admission-preflight.test.ts).
+ */
+import { mock } from "bun:test";
+import { SearchDefinitionsTool } from "../tools/search_definitions.js";
+import { GetReferencesTool } from "../tools/get_references.js";
+import type { DefinitionResult, ReferenceResult } from "../services/symbol/symbol-graph.service.js";
+
+// ── Stubbed symbolGraphService for the SearchDefinitionsTool + GetReferencesTool ──
+// The tool imports the singleton from symbol-graph.service.js. We mock the
+// module so the singleton's listDefinitions / getReferences return our
+// fixture-shaped results. Mock is set up once at module scope; each test
+// overrides the specific methods it needs on the singleton.
+
+let stubListDefinitions: (
+  projectId: string,
+  opts: { search?: string; kind?: string[]; file?: string; exportedOnly?: boolean; limit?: number },
+) => Promise<{ definitions: DefinitionResult[]; total: number }>;
+let stubGetReferences: (
+  projectId: string,
+  symbolName: string,
+  fqn?: string,
+) => Promise<ReferenceResult[]>;
+
+mock.module("../services/symbol/symbol-graph.service.js", () => {
+  // Re-export the real types + class so downstream imports still type-check.
+  const actual = require("../services/symbol/symbol-graph.service.js");
+  return {
+    ...actual,
+    symbolGraphService: {
+      listDefinitions: (projectId: string, opts: Parameters<typeof stubListDefinitions>[1]) =>
+        stubListDefinitions(projectId, opts),
+      getReferences: (projectId: string, symbolName: string, fqn?: string) =>
+        stubGetReferences(projectId, symbolName, fqn),
+    },
+  };
+});
+
+function makeDef(fqn: string, name: string, file: string): DefinitionResult {
+  return {
+    fqn,
+    name,
+    kind: "function",
+    file,
+    lineStart: 1,
+    lineEnd: 1,
+    exported: true,
+    centralityScore: 0.5,
+  };
+}
+
+function makeRef(file: string, line: number): ReferenceResult {
+  return {
+    fromFile: file,
+    fromLine: line,
+    refKind: "call",
+    symbolName: "run",
+    targetFqn: "src/changed.ts#run",
+  };
+}
+
+describe("SearchDefinitionsTool — N4 definitions_total/shown/omitted", () => {
+  test("600 matches, limit 20 → definitions_total=600, definitions_shown=20, definitions_omitted=580", async () => {
+    // Stub: total=600, but only 20 are returned (the SQL LIMIT path).
+    stubListDefinitions = async (_p, opts) => {
+      const limit = opts.limit ?? 20;
+      const page = Array.from({ length: Math.min(limit, 600) }, (_, i) =>
+        makeDef(`src/f${i}.ts#fn${i}`, `fn${i}`, `src/f${i}.ts`),
+      );
+      return { definitions: page, total: 600 };
+    };
+
+    const tool = new SearchDefinitionsTool();
+    const res = (await tool.handle({ projectId: "p", maxResults: 20 })) as {
+      success: boolean;
+      data?: {
+        definitions: unknown[];
+        definitions_total: number;
+        definitions_shown: number;
+        definitions_omitted: number;
+        total: number;
+      };
+    };
+
+    expect(res.success).toBe(true);
+    expect(res.data?.definitions.length).toBe(20);
+    expect(res.data?.definitions_total).toBe(600);
+    expect(res.data?.definitions_shown).toBe(20);
+    expect(res.data?.definitions_omitted).toBe(580);
+    // Legacy `total` equals the page length (back-compat).
+    expect(res.data?.total).toBe(20);
+  });
+
+  test("under-LIMIT matches → definitions_omitted=0", async () => {
+    stubListDefinitions = async () => ({
+      definitions: [makeDef("src/a.ts#a", "a", "src/a.ts")],
+      total: 1,
+    });
+
+    const tool = new SearchDefinitionsTool();
+    const res = (await tool.handle({ projectId: "p", maxResults: 20 })) as {
+      success: boolean;
+      data?: { definitions_total: number; definitions_shown: number; definitions_omitted: number };
+    };
+
+    expect(res.data?.definitions_total).toBe(1);
+    expect(res.data?.definitions_shown).toBe(1);
+    expect(res.data?.definitions_omitted).toBe(0);
+  });
+
+  test("zero matches → definitions_total=0, definitions_shown=0, definitions_omitted=0", async () => {
+    stubListDefinitions = async () => ({ definitions: [], total: 0 });
+
+    const tool = new SearchDefinitionsTool();
+    const res = (await tool.handle({ projectId: "p", maxResults: 20 })) as {
+      success: boolean;
+      data?: { definitions_total: number; definitions_shown: number; definitions_omitted: number };
+    };
+
+    expect(res.data?.definitions_total).toBe(0);
+    expect(res.data?.definitions_shown).toBe(0);
+    expect(res.data?.definitions_omitted).toBe(0);
+  });
+});
+
+describe("GetReferencesTool — N4 total/shown/omitted", () => {
+  test("100 refs, maxResults 50 → total=100, shown=50, omitted=50", async () => {
+    const refs = Array.from({ length: 100 }, (_, i) => makeRef(`src/c${i}.ts`, i + 1));
+    stubGetReferences = async () => refs;
+
+    const tool = new GetReferencesTool();
+    const res = (await tool.handle({ projectId: "p", symbolName: "run", maxResults: 50 })) as {
+      success: boolean;
+      data?: { total: number; shown: number; omitted: number; references: unknown[] };
+    };
+
+    expect(res.success).toBe(true);
+    expect(res.data?.total).toBe(100);
+    expect(res.data?.shown).toBe(50);
+    expect(res.data?.omitted).toBe(50);
+    expect(res.data?.references.length).toBe(50);
+  });
+
+  test("under-limit refs → omitted=0", async () => {
+    stubGetReferences = async () => [makeRef("src/c0.ts", 1)];
+
+    const tool = new GetReferencesTool();
+    const res = (await tool.handle({ projectId: "p", symbolName: "run", maxResults: 50 })) as {
+      success: boolean;
+      data?: { total: number; shown: number; omitted: number };
+    };
+
+    expect(res.data?.total).toBe(1);
+    expect(res.data?.shown).toBe(1);
+    expect(res.data?.omitted).toBe(0);
+  });
+
+  test("zero refs → total=0, shown=0, omitted=0", async () => {
+    stubGetReferences = async () => [];
+
+    const tool = new GetReferencesTool();
+    const res = (await tool.handle({ projectId: "p", symbolName: "run", maxResults: 50 })) as {
+      success: boolean;
+      data?: { total: number; shown: number; omitted: number };
+    };
+
+    expect(res.data?.total).toBe(0);
+    expect(res.data?.shown).toBe(0);
+    expect(res.data?.omitted).toBe(0);
+  });
+});
+
+/**
+ * search_code / SearchController N4 — results_total/shown/omitted.
+ *
+ * Uses the same freshController + stubbed ContextualSearchRLM pattern as
+ * search-admission-preflight.test.ts. The controller's reachable set is the
+ * post-filter, post-rerank list BEFORE the final `.slice(0, maxResults)`.
+ */
+import { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js";
+import { SearchController } from "../controllers/search-controller.js";
+
+function makeSearchResult(id: string): { id: string; score: number; content: string; metadata: Record<string, unknown> } {
+  return { id, score: 0.5, content: "x", metadata: { filePath: `src/${id}.ts`, lineStart: 1, lineEnd: 1, language: "ts" } };
+}
+
+function freshControllerWithResults(results: ReturnType<typeof makeSearchResult>[]): SearchController {
+  const search = {
+    checkSearchAdmission: async () => ({ admitted: true as const }),
+    search: async () => results,
+    ensureFreshIndex: async () => ({ wasStale: false, reindexed: false, reason: "fresh" }),
+  } as unknown as ContextualSearchRLM;
+  const controller = Object.create(SearchController.prototype) as SearchController;
+  (controller as any).contextualSearch = search;
+  // Rerank is config-gated off in tests; applyBoost + filterByPatterns run on
+  // the prototype and need no extra wiring for a no-include/no-boost call.
+  return controller;
+}
+
+describe("SearchController — N4 results_total/shown/omitted", () => {
+  test("50 reachable results, maxResults 10 → results_total=50, results_shown=10, results_omitted=40", async () => {
+    const reachable = Array.from({ length: 50 }, (_, i) => makeSearchResult(`r${i}`));
+    const controller = freshControllerWithResults(reachable);
+
+    const result = await controller.searchProject({ query: "q", projectId: "p", maxResults: 10 });
+
+    expect(result.results_total).toBe(50);
+    expect(result.results_shown).toBe(10);
+    expect(result.results_omitted).toBe(40);
+    expect(result.results.length).toBe(10);
+  });
+
+  test("under-maxResults reachable → results_omitted=0", async () => {
+    const reachable = Array.from({ length: 5 }, (_, i) => makeSearchResult(`r${i}`));
+    const controller = freshControllerWithResults(reachable);
+
+    const result = await controller.searchProject({ query: "q", projectId: "p", maxResults: 10 });
+
+    expect(result.results_total).toBe(5);
+    expect(result.results_shown).toBe(5);
+    expect(result.results_omitted).toBe(0);
+  });
+
+  test("zero reachable → results_total=0, results_shown=0, results_omitted=0", async () => {
+    const controller = freshControllerWithResults([]);
+
+    const result = await controller.searchProject({ query: "q", projectId: "p", maxResults: 10 });
+
+    expect(result.results_total).toBe(0);
+    expect(result.results_shown).toBe(0);
+    expect(result.results_omitted).toBe(0);
+    expect(result.results).toEqual([]);
+  });
+});

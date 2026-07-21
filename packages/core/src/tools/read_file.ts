@@ -524,7 +524,7 @@ export class ReadFileTool implements IToolHandler {
       try {
         // Symbol DB stores relative paths — use original relative path for queries
         const queryPath = options.relativePath || filePath;
-        const definitions = await this.symbolGraph.listDefinitions(
+        const { definitions } = await this.symbolGraph.listDefinitions(
           options.projectId,
           {
             file: queryPath,

@@ -50,6 +50,18 @@ export interface ProjectSearchResult {
   };
   results: FormattedResult[];
   /**
+   * N4 (WAVE4-N4): pre-clamp reachable count, post-clamp shown, omitted.
+   * `results_total` is the count of results that survived admission + search +
+   * glob filtering (the reachable set) BEFORE the final `.slice(0, maxResults)`
+   * clamps the displayed page. `results_shown` is the displayed page length.
+   * `results_omitted = results_total - results_shown`.
+   * Spec AC 3 — emitted at the top level (not centralized in serializeToolResponse
+   * per the M36 contract; per-tool is the existing convention).
+   */
+  results_total: number;
+  results_shown: number;
+  results_omitted: number;
+  /**
    * Admission preflight warning (Tier 2). Present only when the project is
    * indexed but `isIndexStale` flagged it (files_changed / path_mismatch /
    * age_threshold). Search still ran; callers MAY surface this to the user.
@@ -211,6 +223,12 @@ export class SearchController {
       });
     }
 
+    // N4 (WAVE4-N4): the reachable set is the post-filter, post-rerank list
+    // BEFORE the final `.slice(0, maxResults)` clamps the displayed page. This
+    // is the "pre-clamp reachable count" per spec AC 3. `results_shown` is the
+    // page length after the slice. `results_omitted = results_total - results_shown`.
+    const results_total = rerankedResults.length;
+
     const formattedResults = rerankedResults.slice(0, maxResults).map((r) => {
       const meta = (r.metadata ?? {}) as Record<string, unknown>;
       const base: FormattedResult = {
@@ -291,6 +309,10 @@ export class SearchController {
         filteredResults: filteredResults.length,
       },
       results: formattedResults,
+      // N4 (WAVE4-N4): top-level totals for the clamped results list.
+      results_total,
+      results_shown: formattedResults.length,
+      results_omitted: Math.max(0, results_total - formattedResults.length),
       ...(degradations.length > 0 ? { degradations: [...degradations] } : {}),
       ...(staleWarning
         ? {

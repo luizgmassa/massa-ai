@@ -224,17 +224,28 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
         if (!projectId)
           return { success: false, error: "projectId is required" };
 
-        const defs = await symbolGraphService.listDefinitions(projectId, {
+        const limitBounded = boundedInt(limit, 20, 1, 500);
+        const { definitions: defs, total } = await symbolGraphService.listDefinitions(projectId, {
           search,
           kind: kind ? kind.split(",") : undefined,
           file,
           exportedOnly: exportedOnly === "true",
-          limit: boundedInt(limit, 20, 1, 500),
+          limit: limitBounded,
         });
+        const shown = defs.length;
+        const omitted = Math.max(0, total - shown);
 
         return {
           success: true,
-          data: { definitions: defs, total: defs.length },
+          data: {
+            definitions: defs,
+            // N4 (WAVE4-N4): pre-LIMIT total, post-LIMIT shown, omitted.
+            definitions_total: total,
+            definitions_shown: shown,
+            definitions_omitted: omitted,
+            // Legacy `total` kept for back-compat (equals the page length, as before).
+            total: shown,
+          },
         };
       } catch (error) {
         return { success: false, error: (error as Error).message };
@@ -280,6 +291,8 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
               references: [],
               total: 0,
               shown: 0,
+              // N4 (WAVE4-N4): omitted = total - shown. Zero on the missing/ambiguous path.
+              omitted: 0,
             },
           };
         }
@@ -290,14 +303,19 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
           fqn,
           lookup,
         );
-        const limited = refs.slice(0, boundedInt(limit, 50, 1, 1000));
+        const limitBounded = boundedInt(limit, 50, 1, 1000);
+        const limited = refs.slice(0, limitBounded);
+        const total = refs.length;
+        const shown = limited.length;
 
         return {
           success: true,
           data: {
             references: limited,
-            total: refs.length,
-            shown: limited.length,
+            total,
+            shown,
+            // N4 (WAVE4-N4): omitted = total - shown.
+            omitted: total - shown,
             ...(identity ? { identity } : {}),
           },
         };

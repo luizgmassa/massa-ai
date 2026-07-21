@@ -883,6 +883,44 @@ export class SymbolRepositoryPg {
     return rows.map(mapDef);
   }
 
+  /**
+   * Pre-LIMIT total count for {@link searchDefinitions} (N4 correctness bundle).
+   *
+   * Returns the true number of matching definitions BEFORE the SQL `LIMIT`
+   * clamps the result page, so the tool layer can emit `definitions_total`
+   * alongside `definitions_shown` and `definitions_omitted` (spec AC 4, WAVE4-N4).
+   *
+   * Spec note: AC 4 allows `COUNT(*) OVER()` OR a separate `SELECT COUNT(*)`
+   * (2 round trips). The separate-count path is chosen here for query-plan
+   * clarity — the window function regresses latency on large workspaces per
+   * the pre-mortem finding. The >100k sentinel cap is handled by the caller
+   * (see T10) via a cheap ceiling check, NOT here, so this method stays exact.
+   *
+   * Uses the exact same WHERE clauses as {@link searchDefinitions} so the
+   * count and the displayed list share one code path (N4 invariant: the total
+   * MUST be computed on the same code path as the displayed list).
+   */
+  async countDefinitions(
+    projectId: string,
+    query?: string,
+    kinds?: SymbolKind[],
+    exportedOnly?: boolean,
+    filePath?: string,
+  ): Promise<number> {
+    const p = getPrismaClient();
+    const kindList = kinds && kinds.length > 0 ? kinds : null;
+    const rows = await p.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::bigint AS count FROM symbol_definitions
+      WHERE project_id = ${projectId}
+        AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
+        AND (${query ?? null}::text IS NULL OR name ILIKE ${"%" + (query ?? "") + "%"})
+        AND (${kindList}::text[] IS NULL OR kind = ANY(${kindList}::text[]))
+        AND (${exportedOnly ?? false} = false OR exported = true)
+        AND (${filePath ?? null}::text IS NULL OR file_path = ${filePath ?? ""})
+    `;
+    return rows.length > 0 ? Number(rows[0].count) : 0;
+  }
+
   async getDefinition(
     projectId: string,
     fqn: string,

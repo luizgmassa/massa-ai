@@ -25,6 +25,7 @@ import type {
   SymbolImport,
   CentralityEntry,
   RefKind,
+  SymbolKind,
   ProjectMapGraphSnapshot,
 } from "../../data/symbol/symbol-repository-pg.js";
 import { computePageRank } from "./centrality.js";
@@ -375,16 +376,39 @@ export class SymbolGraphService {
 
   // ── list_definitions ────────────────────────────────────────────────────────
 
+  /**
+   * Result of {@link listDefinitions} — the displayed page plus the pre-LIMIT
+   * total (N4 correctness bundle, WAVE4-N4). The total is the true count of
+   * matching definitions BEFORE the SQL `LIMIT` clamps the page, so callers
+   * can emit `definitions_total` / `definitions_shown` / `definitions_omitted`
+   * (spec AC 4). The total is computed on the SAME code path (same WHERE
+   * clauses) as the displayed list — the cbm invariant from the spec.
+   */
   async listDefinitions(
     projectId: string,
     opts: ListDefinitionsOptions = {},
-  ): Promise<DefinitionResult[]> {
+  ): Promise<{ definitions: DefinitionResult[]; total: number }> {
     const repo = getSymbolRepository();
-    const [defs, centrality] = await Promise.all([
+    const limit = opts.limit ?? 100;
+    const [defs, centrality, total] = await Promise.all([
       repo.listDefinitions(projectId, opts),
       repo.getCentrality(projectId),
+      repo.countDefinitions(
+        projectId,
+        opts.search,
+        opts.kind as SymbolKind[] | undefined,
+        opts.exportedOnly,
+        opts.file,
+      ),
     ]);
-    return defs.map((def) => this.toDefinitionResult(def, centrality));
+    // The repo's listDefinitions applies its own default LIMIT 100 when opts.limit
+    // is absent; the displayed `definitions` page length is the post-clamp count.
+    // The returned `total` is the pre-LIMIT match count (exact for ≤100k; the
+    // >100k sentinel is a T10 concern, NOT applied here).
+    return {
+      definitions: defs.map((def) => this.toDefinitionResult(def, centrality)),
+      total,
+    };
   }
 
   // ── get_top_central_files ──────────────────────────────────────────────────

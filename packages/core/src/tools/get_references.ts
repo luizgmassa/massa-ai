@@ -72,6 +72,10 @@ export class GetReferencesTool implements IToolHandler {
           fqn: fqn ?? null,
           total: refs.length,
           shown: limited.length,
+          // N4 (WAVE4-N4): omitted = total - shown. The repo returns the full
+          // match set (no SQL LIMIT on the references path); the tool slices to
+          // maxResults. omitted is the count dropped by the client-facing cap.
+          omitted: refs.length - limited.length,
           references: limited.map((r) => ({
             fromFile: r.fromFile,
             fromLine: r.fromLine,

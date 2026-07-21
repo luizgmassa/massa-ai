@@ -252,9 +252,10 @@ async function main(): Promise<void> {
   const listLatencies: number[] = [];
 
   // Warm run (sem cache de símbolo)
-  const { result: allDefs } = await measure(() =>
+  const { result: allDefsResult } = await measure(() =>
     symbolGraphService.listDefinitions(opts.projectId, { limit: 1000 })
   );
+  const allDefs = allDefsResult.definitions;
 
   // 5 medições para latência estável
   for (let i = 0; i < 5; i++) {
