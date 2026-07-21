@@ -12,6 +12,7 @@ import {
   type WorkingMemoryBufferConfig,
 } from "../buffer/working-memory-buffer.js";
 import type { SessionStore } from "./session-store.js";
+import { logger } from "@massa-th0th/shared";
 
 const TOKEN_RE = /[a-z0-9_]{2,}/g;
 
@@ -73,7 +74,7 @@ export class SessionRegistry {
     };
     this.sessions.set(session.sessionId, session);
     // Phase 1: write-through (best-effort).
-    try { this.store?.save(session); } catch { /* store swallows + warns */ }
+    try { this.store?.save(session); } catch (error) { logger.warn("[SessionRegistry] store save failed:", { error: (error as Error).message }); }
     return session;
   }
 
@@ -89,8 +90,8 @@ export class SessionRegistry {
   async ensureReady(): Promise<void> {
     try {
       await this.store?.ensureReady();
-    } catch {
-      /* store swallows + warns */
+    } catch (error) {
+      logger.warn("[SessionRegistry] store ensureReady failed:", { error: (error as Error).message });
     }
   }
 
