@@ -48,6 +48,8 @@ interface PgObservationRow {
   payload_json: string;
   importance: number;
   created_at: number | bigint;
+  agent_id: string | null;
+  attribution_source: string | null;
 }
 
 function toNum(v: number | bigint | null | undefined): number | null {
@@ -65,6 +67,8 @@ function pgRowToObservation(r: PgObservationRow): Observation {
     payload_json: r.payload_json,
     importance: r.importance,
     created_at: toNum(r.created_at) ?? 0,
+    agent_id: r.agent_id,
+    attribution_source: r.attribution_source,
   };
   // Reuse the shared row mapper for parity with the PostgreSQL store.
   // (rowToObservation is not exported, so inline the identical mapping.)
@@ -77,6 +81,8 @@ function pgRowToObservation(r: PgObservationRow): Observation {
     payloadJson: row.payload_json,
     importance: row.importance,
     createdAt: row.created_at,
+    agentId: row.agent_id ?? undefined,
+    attributionSource: (row.attribution_source as Observation["attributionSource"] | null) ?? undefined,
   };
 }
 
@@ -125,7 +131,7 @@ export class PgObservationStore implements ObservationStore {
       try {
         const prisma = this.getClient();
         const rows = await prisma.$queryRaw<PgObservationRow[]>`
-          SELECT id, project_id, session_id, source, category, payload_json, importance, created_at
+          SELECT id, project_id, session_id, source, category, payload_json, importance, created_at, agent_id, attribution_source
           FROM observations
         `;
         const next: Map<string, Observation> = new Map();
@@ -176,12 +182,17 @@ export class PgObservationStore implements ObservationStore {
       try {
         const prisma = this.getClient();
         // Resolve canonical project id at the persist seam (spec req 3). The
-        // sync mirror keeps the caller's id by design; the durable row lands
-        // on the live target and is what hydration reloads.
+        // sync mirror initially keeps the caller's id; once the canonical id
+        // resolves we overwrite the mirror entry so sync reads (listRecent /
+        // countByProject / listBySession) key on the SAME canonical id as the
+        // durable row — closing the post-rename read/write split (HAR-07).
         const canonicalProjectId = await getProjectIdentityAliasResolver().resolve(obs.projectId);
+        if (canonicalProjectId !== obs.projectId) {
+          this.mirror.set(obs.id, { ...obs, projectId: canonicalProjectId });
+        }
         await prisma.$executeRaw`
           INSERT INTO observations (
-            id, project_id, session_id, source, category, payload_json, importance, created_at
+            id, project_id, session_id, source, category, payload_json, importance, created_at, agent_id, attribution_source
           ) VALUES (
             ${obs.id},
             ${canonicalProjectId},
@@ -190,16 +201,20 @@ export class PgObservationStore implements ObservationStore {
             ${obs.category ?? null},
             ${obs.payloadJson},
             ${obs.importance},
-            ${obs.createdAt}::bigint
+            ${obs.createdAt}::bigint,
+            ${obs.agentId ?? null},
+            ${obs.attributionSource ?? null}
           )
           ON CONFLICT (id) DO UPDATE SET
-            project_id   = EXCLUDED.project_id,
-            session_id   = EXCLUDED.session_id,
-            source       = EXCLUDED.source,
-            category     = EXCLUDED.category,
-            payload_json = EXCLUDED.payload_json,
-            importance   = EXCLUDED.importance,
-            created_at   = EXCLUDED.created_at
+            project_id       = EXCLUDED.project_id,
+            session_id       = EXCLUDED.session_id,
+            source           = EXCLUDED.source,
+            category         = EXCLUDED.category,
+            payload_json     = EXCLUDED.payload_json,
+            importance       = EXCLUDED.importance,
+            created_at       = EXCLUDED.created_at,
+            agent_id         = EXCLUDED.agent_id,
+            attribution_source = EXCLUDED.attribution_source
         `;
       } catch (e) {
         logger.warn("PgObservationStore.insert failed (best-effort)", {
