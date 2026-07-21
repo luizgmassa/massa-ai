@@ -1,6 +1,26 @@
 # AI Engineering Handoff
 
-## Current: Wave 3 / M21 Linux Native Structural Runtime
+## Current: Wave 3 Follow-up — Native Runtime Re-baseline
+
+- projectId: `massa-th0th`; workflowSessionId: `spec-wave3-followup`
+- branch: `wave-3`; isolated worktree: `massa-th0th-wt-wave-3`
+- feature COMPLETE: `native-runtime-rebaseline` (Wave 3 follow-up, P1) — T1–T6 COMPLETE + validated PASS.
+- T1 `b6aa4a4`: merged `origin/main` (`e12c4e4`) into `wave-3` to absorb the Bun `1.3.14` bump + lock-contract `record.includes(expected.gitIdentity)` fix (main shipped both via PR #6; wave-3 was behind). Resolved README.md conflict (combined wave-3's "macOS arm64 and Linux glibc x64" with main's "Bun 1.3.14"). Fixed `structural-native-linux` CI job which still pinned Bun 1.3.11. Gate matrix green under machine default Bun 1.3.14 (no shim): `verify-tree-sitter-grammars.test.ts` 9/9, type-check 6/6, build 5/5, native-structural 152/152, `verify:tree-sitter-source-dist` PASS (33+33 parses, 27+27 modules, 10 sensors, RSS 425984 bytes < 16 MiB). Pre-existing lock-contract failure RESOLVED.
+- T2 `428d462`: rewrote `native-macos-arm64-workflow.test.ts` to assert the actual `ci.yml:150` `structural-native` job (inline merge replaced the deleted `native-macos-arm64.yml`). Fixed `native-linux-x64-workflow.test.ts:22` stale test-name string "Bun 1.3.11" → "Bun 1.3.14". Removed stale M21-specific non-touch sub-test (M21 complete + merge brought legitimate changes to `needles-gate.yml`/`publish.yml`). macOS test 3/3 PASS, Linux test 5/5 PASS.
+- Spec artifacts `846ff29`: `.specs/features/native-runtime-rebaseline/{spec,design,tasks}.md`.
+- T3 six-suite classification (2 FIX + 4 DOCUMENTED-ACCEPT):
+  - `e866ea5`: auto-improve-job FLAKY-TIMEOUT fix — P5-DETECT-01 + P5-AUTOAPPROVE-01 omitted `llm: disabledSurface()` → fell back to real Ollama client → 5000ms timeout. Test-isolation defect per file header lines 4-8. 26/26 solo 3× stable post-fix.
+  - `17eedfd`: qwen-e2e-fixture frozen fixture drift fix — 14 manifest entries re-hashed after `c9e361b` (identity-guard) legitimately changed `postgres-vector-store.ts` + 13 other files post-lock. Documented sqlite-removal follow-up (STATE.md line 97). 8/8 solo 3× stable post-fix.
+  - DOCUMENTED-ACCEPT (shared-DB fixture gaps, NOT fixed per contract): etl-cache-invalidation (`graph_generation_workspace_missing:cache-project`), etl-pipeline-queue (workspace_missing + `assertParserReadyForIndexing` ordering gap), scheduler-store-pg (4 real `scheduled-*` rows pollute shared DB), trace-path (`graph_generation_workspace_missing:p4d2-trace-path`). Root cause: no `.env` in worktree → `DATABASE_URL` falls back to config.json shared DB → tests assume isolated workspaces/clean scheduled_jobs. Prior memory cross-checked: scheduler resume bug FIXED in `75b7394` (present); trace-path callerFqn has client-side workaround (present); neither is the cause.
+- T4 npm reconcile: Codespace npm 11.12.1 → 11.14.1 install (matches contract literal). Both platforms now 11.14.1. No code changes needed.
+- T5 cross-platform verify: Codespace had NO Bun (`bun: command not found`) — installed Bun 1.3.14 via `curl -fsSL https://bun.sh/install | bash -s bun-v1.3.14`. ABI 137 confirmed on Codespace (`bun -e 'console.log(process.versions.modules)'` → 137). Synced Codespace to wave-3 HEAD `17eedfd` via temp sync branch `wave-3-codespace-sync` (wave-3 NOT pushed per contract). `verify:tree-sitter-native` exit 0 on macOS arm64 + Ubuntu Codespace (33+33 parses, 27+27 modules, 10 sensors, RSS -188 KB Codespace / +589 KB macOS < 16 MiB, packed package PASS, ELF x86-64 system-only linkage on Codespace). Native-structural 152/152 both platforms.
+- T6 AD amendment + validation.md: AD-004/005/006 amendment rows appended to STATE.md Decisions table (Bun 1.3.11 → 1.3.14 via merge; Node 25.9.0 unchanged; ABI 137 unchanged; patch SHA `e79aec7b...` unchanged; cross-platform evidence). `validation.md` written with per-AC verdict table (NVR-001..030), six-suite classification ledger, discrimination sensor results (4/4 killed), diff range, residual risk. Independent verifier PASS.
+- Native runtime contract FROZEN: patch SHA `e79aec7b...`, 16 MiB disposal-stress gate, immutable owners, same-tree reset, install-guard, C++20 `binding.gyp`, 33-language manifest, versioned FQN codec, lazy grammar pool, embedded Vue/Markdown all unchanged. Only the Bun version pin moved (1.3.11 → 1.3.14 via merge); npm reconciled. No structural contract touched.
+- exact next step: feature COMPLETE. Cleanup: delete temp remote branch `wave-3-codespace-sync`. No push of `wave-3` (contract). Independent verifier (author ≠ verifier) confirmed PASS.
+
+---
+
+## Previous: Wave 3 / M21 Linux Native Structural Runtime
 
 - projectId: `massa-th0th`; workflowSessionId: `spec-m21`
 - branch: `wave-3`; isolated worktree: `massa-th0th-wt-wave-3`

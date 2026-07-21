@@ -278,7 +278,13 @@
       "title": "M21 — native Linux glibc x64 support",
       "status": "complete", "priority": "P0",
       "phases": { "specify": true, "design": false, "tasks": true, "execute": true }
+    },
+    {
+      "slug": "native-runtime-rebaseline",
+      "title": "Wave 3 follow-up — native runtime re-baseline to Bun 1.3.14 + six-suite classification + cross-platform re-verification",
+      "status": "complete", "priority": "P1",
+      "phases": { "specify": true, "design": true, "tasks": true, "execute": true }
     }
   ],
-  "active_feature": "linux-native-structural-runtime"
+  "active_feature": "native-runtime-rebaseline"
 }
