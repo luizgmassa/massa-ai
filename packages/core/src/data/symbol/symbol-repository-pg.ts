@@ -1854,6 +1854,66 @@ export class SymbolRepositoryPg {
     return rows.map(mapImp);
   }
 
+  /**
+   * Wave 5 FR-05 / N3 — Multi-source reverse-import BFS via a single recursive
+   * CTE (additive, behind `MASSA_TH0TH_IMPACT_BFS_CTE=true`).
+   *
+   * Anchor = changed files at hop 0. Recursive step walks the REVERSE import
+   * graph (`si.to_file = current → si.from_file` is an importer) up to `depth`
+   * hops. `MIN(hop)` collapses cycles / multi-path arrivals so each file appears
+   * once at its shortest distance. Result capped at `maxImpacted`.
+   *
+   * NULL guard (AD-W5-018 / FR-24): the anchor drops `NULL` seeds
+   * (`WHERE file_id IS NOT NULL`) so a NULL in the changed-seed does not
+   * silently re-walk the whole graph; the recursive step also skips
+   * `si.from_file IS NULL`. Parity vs the TS path is scoped to "same FQN set;
+   * depths may differ ≤1 hop on cyclic graphs" (AD-W5-018).
+   *
+   * Returns `{ file, hop }[]` (FQN resolution happens in the service). Pure
+   * single-CTE: no per-FQN follow-up queries.
+   */
+  async runBfsCteImpact(
+    projectId: string,
+    changedFiles: string[],
+    opts: { depth: number; maxImpacted: number },
+  ): Promise<{ file: string; hop: number }[]> {
+    const p = getPrismaClient();
+    const depth = Math.max(0, Math.min(4, opts.depth));
+    const maxImpacted = Math.max(1, Math.min(1000, opts.maxImpacted));
+    if (changedFiles.length === 0) return [];
+
+    // Prisma $queryRaw with an array param: pass as a JS array → PG text[].
+    // The active generation is resolved inline so the CTE joins on the same
+    // generation_id the rest of the snapshot uses.
+    const rows = await p.$queryRaw<{ file: string; hop: number }[]>`
+      WITH RECURSIVE bfs AS (
+        SELECT file_id, 0 AS hop, ARRAY[file_id] AS visited
+        FROM unnest(${changedFiles}::text[]) AS seed(file_id)
+        WHERE file_id IS NOT NULL
+        UNION ALL
+        SELECT si.from_file, b.hop + 1, b.visited || si.from_file
+        FROM bfs b
+        JOIN symbol_imports si
+          ON si.to_file = b.file_id
+         AND si.project_id = ${projectId}
+         AND si.generation_id = (
+           SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId}
+         )
+        WHERE b.hop < ${depth}
+          AND si.from_file IS NOT NULL
+          AND si.from_file <> b.file_id
+          AND NOT si.from_file = ANY(b.visited)
+      )
+      SELECT file_id AS file, MIN(hop) AS hop
+      FROM bfs
+      WHERE file_id IS NOT NULL
+      GROUP BY file_id
+      ORDER BY hop ASC, file_id ASC
+      LIMIT ${maxImpacted}
+    `;
+    return rows.map((r) => ({ file: r.file, hop: Number(r.hop) }));
+  }
+
   /** Imports originating from a specific file (alias for getImportsFrom). */
   async findDependencies(
     projectId: string,
