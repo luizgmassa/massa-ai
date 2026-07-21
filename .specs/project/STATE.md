@@ -3,17 +3,17 @@
 ## Wave 3 — Active
 
 - projectId: `massa-th0th`
-- workflowSessionId: `spec-wave-3`
+- workflowSessionId: `spec-m21`
 - workflow: spec-driven
-- feature: `linux-native-structural-runtime` (M21, P0) — starting; Linux gate env pre-decided: Ubuntu Codespace (M19 precedent, user-approved 2026-07-20)
-- status: M19, M20+M54, M50, M16+M17, **M45+M47 complete** (`hook-attribution-repair` T1–T8 done + validated PASS: `b015508`/`0b78e32`/`34fa019`/`fc8b81b`/`de78480`/`4e8f1a9`/`397f4f9`/`da858ab`). M21 pending.
+- feature: `linux-native-structural-runtime` (M21, P0) — Phase A (T1–T4) COMPLETE + PASS on macOS arm64; Phase B (T5–T6) BLOCKED (Ubuntu Codespace unavailable this session); T7 validation PASS with Blocked evidence; T8 bookkeeping. Status: `blocked` pending a Codespace session to run the Linux native verifier.
+- status: M19, M20+M54, M50, M16+M17, M45+M47 complete. **M21 PARTIAL PASS — blocked** (T1–T4 `40f085a`/`35f8f74`/`2167901`/`be9c8e8`, T7 validation `e4b59a5`). M21 commits: T1 `40f085a` (assertRuntimeTarget linux/x64), T2 `35f8f74` (ELF readelf -d linkage), T3 `2167901` (isNativeTarget + E2E/graph-gen guards), T4 `be9c8e8` (Linux CI + docs), T7 `e4b59a5` (validation). T5/T6 Blocked — Codespace unavailable; AC-004/005/006 + Linux runtime of AC-002/009 require Ubuntu Codespace per frozen contract.
 - branch/worktree: `wave-3` / `massa-th0th-wt-wave-3`
-- sequence: M19 → M20+M54 → M50 → M16+M17 → M45+M47 ✅ → M21
+- sequence: M19 → M20+M54 → M50 → M16+M17 → M45+M47 ✅ → M21 (blocked)
 - invariant: `sqlite-removal` stays `in_progress`; `multi-language-tree-sitter-breadth` reconciled to `complete` from its recorded PASS evidence.
 
 ### Wave 3 Next Step
 
-Begin `linux-native-structural-runtime` (M21, P0). Native runtime contract frozen (AD-004/005/006): exact Bun 1.3.11 + Node 25.9.0, patched tree-sitter SHA `e79aec7b…`, 16 MiB disposal-stress hard gate. Linux gate env pre-decided: Ubuntu Codespace (M19 precedent — Ubuntu/glibc-x64 was an explicit user-approved substitution for Debian 12, 2026-07-20). Mandatory unavailable gates block the feature; never weaken validation assets. Start with spec-driven Specify (spec/design/tasks under `.specs/features/linux-native-structural-runtime/`), verify-first fan-out optional (M19 precedent + multi-language TASK-001..026 PASS evidence already in hand).
+Unblock M21 T5/T6 by running `bun run verify:tree-sitter-source-dist` and `bun run verify:tree-sitter-package` in an Ubuntu Codespace under Bun 1.3.11 + Node 25.9.0 (or Node 22 LTS fallback if C++20 headers reject per pre-mortem #1). If a pinned grammar fails to build on Linux, mark M21 Blocked with that package as the blocker — no version change (frozen contract, pre-mortem #2). On PASS, flip FEATURES.json status to `complete` and update HANDOFF.md.
 
 ---
 

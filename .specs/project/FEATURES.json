@@ -276,8 +276,8 @@
     {
       "slug": "linux-native-structural-runtime",
       "title": "M21 — native Linux glibc x64 support",
-      "status": "in_progress", "priority": "P0",
-      "phases": { "specify": false, "design": false, "tasks": false, "execute": false }
+      "status": "blocked", "priority": "P0",
+      "phases": { "specify": true, "design": false, "tasks": true, "execute": true }
     }
   ],
   "active_feature": "linux-native-structural-runtime"
