@@ -8,6 +8,12 @@ import {
   buildPromptPayload,
   buildSessionPayload,
 } from "./observation-emitter"
+import {
+  SessionProjectPin,
+  computePluginProjectId,
+  gitToplevelSafe,
+  agentIdOf,
+} from "./session-project-pin"
 
 // ---------------------------------------------------------------------------
 // Config
@@ -115,8 +121,22 @@ export const MassaTh0thPlugin: Plugin = async ({ project, directory, worktree, c
   
   const config = loadConfig()
   
-  const projectId = project?.id || directory?.split("/").pop() || "default"
   const projectPath = worktree || directory
+
+  // Per-session project id memo (M45/HAR-04): the first event of a session
+  // computes the id (project?.id > git toplevel basename > directory basename
+  // > "default"); later events of that session reuse it even from subdirectory
+  // contexts. `projectId` (no session) keeps the same computed value for the
+  // request/response tools below.
+  const projectPins = new SessionProjectPin({
+    computeProjectId: () =>
+      computePluginProjectId({
+        projectId: project?.id,
+        directory,
+        gitToplevel: gitToplevelSafe,
+      }),
+  })
+  const projectId = projectPins.for(undefined)
 
   // Per-plugin-instance state
   const editedFiles = new Set<string>()
@@ -551,8 +571,9 @@ export const MassaTh0thPlugin: Plugin = async ({ project, directory, worktree, c
       // OpenCode tool names raw; TOOL_NAME_NORMALIZE maps them. Non-blocking.
       observations.emit({
         event: "post-tool-use",
-        projectId,
+        projectId: projectPins.for(input.sessionID),
         sessionId: input.sessionID,
+        agentId: agentIdOf(input),
         payload: buildToolPayload({
           tool: input.tool,
           args: input.args,
@@ -571,7 +592,7 @@ export const MassaTh0thPlugin: Plugin = async ({ project, directory, worktree, c
       fireAndForget("/api/v1/memory/store", {
         content: `Git: ${cmd.slice(0, 200)}\nResult: ${result}`,
         type: "code",
-        projectId,
+        projectId: projectPins.for(input.sessionID),
         sessionId: input.sessionID,
         tags: ["git"],
         importance: 0.6,
@@ -619,7 +640,7 @@ export const MassaTh0thPlugin: Plugin = async ({ project, directory, worktree, c
           "/api/v1/hook/compact-snapshot",
           {
             sessionId: input.sessionID,
-            projectId,
+            projectId: projectPins.for(input.sessionID),
             persist: true,
           },
           5_000,
@@ -633,8 +654,8 @@ export const MassaTh0thPlugin: Plugin = async ({ project, directory, worktree, c
 
     // Inject massa-th0th env vars into shell
     // Hooks interface: shell.env(input: { cwd, sessionID?, callID? }, output: { env })
-    "shell.env": async (_input, output) => {
-      output.env.MASSA_TH0TH_PROJECT_ID = projectId
+    "shell.env": async (input, output) => {
+      output.env.MASSA_TH0TH_PROJECT_ID = projectPins.for(input.sessionID)
       output.env.MASSA_TH0TH_PROJECT_PATH = projectPath
       output.env.MASSA_TH0TH_API_URL = MASSA_TH0TH_API_URL
     },
@@ -667,8 +688,9 @@ export const MassaTh0thPlugin: Plugin = async ({ project, directory, worktree, c
         if (text) {
           observations.emit({
             event: "user-prompt",
-            projectId,
+            projectId: projectPins.for(p.sessionID),
             sessionId: p.sessionID,
+            agentId: agentIdOf(p),
             payload: buildPromptPayload({ prompt: text, cwd: projectPath }),
           })
         }
@@ -681,8 +703,9 @@ export const MassaTh0thPlugin: Plugin = async ({ project, directory, worktree, c
           if (status === "completed" || status === "error") {
             observations.emit({
               event: "post-tool-use",
-              projectId,
+              projectId: projectPins.for(part.sessionID),
               sessionId: part.sessionID,
+              agentId: agentIdOf(part),
               payload: buildToolPayload({
                 tool: part.tool,
                 args: part.state.input,
@@ -700,8 +723,9 @@ export const MassaTh0thPlugin: Plugin = async ({ project, directory, worktree, c
         const p = event.properties as { sessionID?: string }
         observations.emit({
           event: "session-end",
-          projectId,
+          projectId: projectPins.for(p.sessionID),
           sessionId: p.sessionID,
+          agentId: agentIdOf(p),
           payload: buildSessionPayload({ cwd: projectPath }),
         })
         // On session.idle, also best-effort flush buffered observations so a
