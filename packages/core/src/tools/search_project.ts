@@ -22,7 +22,7 @@ interface SearchProjectParams {
   include?: string[];
   exclude?: string[];
   explainScores?: boolean;
-  format?: "json" | "toon";
+  format?: "json" | "toon" | "tree";
   sessionId?: string;
   fields?: string[];
 }
@@ -89,8 +89,9 @@ export class SearchProjectTool implements IToolHandler {
       },
       format: {
         type: "string",
-        enum: ["json", "toon"],
-        description: "Output format (json or toon)",
+        enum: ["json", "toon", "tree"],
+        description:
+          "Output format. 'toon' (default) encodes the raw object. 'json' emits the raw object. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper (groups results by file). Default: toon.",
         default: "toon",
       },
       fields: {
@@ -121,7 +122,11 @@ export class SearchProjectTool implements IToolHandler {
     try {
       const result = await this.controller.searchProject(p);
 
-      return serializeToolResponse(result, { format, fields });
+      // Wave 5 FR-07: tree format groups results by file via the shared
+      // groupRowsByPrefix helper. json/toon unchanged when tree not selected.
+      const groupOpts =
+        format === "tree" ? { format, fields, groupBy: { file: "filePath" } } : { format, fields };
+      return serializeToolResponse(result, groupOpts);
     } catch (error) {
       logger.error("Failed to search project", error as Error, {
         query: p.query,

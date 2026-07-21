@@ -138,6 +138,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: "string",
           description: "Synapse session ID from synapse_session. Activates cognitive modulation: task alignment, agent affinity, working-memory boost.",
         },
+        format: {
+          type: "string",
+          enum: ["json", "toon", "tree"],
+          description:
+            "Output format. 'json' (default) emits the raw object. 'toon' encodes it. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper. Default: json.",
+          default: "json",
+        },
         fields: {
           type: "array",
           items: { type: "string" },
@@ -674,8 +681,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         format: {
           type: "string",
-          enum: ["json", "toon"],
-          description: "Output format (json or toon). Default: json.",
+          enum: ["json", "toon", "tree"],
+          description: "Output format (json, toon, or tree). Default: json.",
           default: "json",
         },
         fields: {
@@ -772,6 +779,19 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           description:
             "Optional precondition: the client's last-known `activatedGraphGenerationId`. If it mismatches the current active generation, the tool returns a 412 teaching error.",
         },
+        format: {
+          type: "string",
+          enum: ["json", "toon", "tree"],
+          description:
+            "Output format. 'json' (default) emits the raw object. 'toon' encodes it. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper (groups references by file). Default: json.",
+          default: "json",
+        },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported). Absent/empty → full data.",
+        },
       },
       required: ["projectId", "symbolName"],
     },
@@ -862,8 +882,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         format: {
           type: "string",
-          enum: ["json", "toon"],
-          description: "Output format (json or toon). Default: json.",
+          enum: ["json", "toon", "tree"],
+          description:
+            "Output format. 'json' (default) emits the raw object. 'toon' encodes it. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper (groups nodes by file). Default: json.",
           default: "json",
         },
         fields: {
@@ -936,8 +957,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         format: {
           type: "string",
-          enum: ["json", "toon"],
-          description: "Output format (json or toon). Default: json.",
+          enum: ["json", "toon", "tree"],
+          description:
+            "Output format. 'json' (default) emits the raw object. 'toon' encodes it. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper (groups impacted symbols by file prefix). Default: json.",
           default: "json",
         },
         fields: {

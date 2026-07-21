@@ -36,7 +36,7 @@ interface ImpactAnalysisParams {
   paths?: string[];
   /** Wall-clock budget (ms) bounding the reverse-BFS. Default 5000. */
   deadline_ms?: number;
-  format?: "json" | "toon";
+  format?: "json" | "toon" | "tree";
   fields?: string[];
   /**
    * N1 (WAVE4-N1): optional precondition — the client's last-known
@@ -215,7 +215,11 @@ export class ImpactAnalysisTool implements IToolHandler {
             via: s.via,
           })),
         },
-        { format, fields },
+        // Wave 5 FR-07: tree format groups impacted symbols by file prefix
+        // via the shared groupRowsByPrefix helper. json/toon unchanged.
+        format === "tree"
+          ? { format, fields, groupBy: { file: "file" } }
+          : { format, fields },
       );
     } catch (error) {
       return {

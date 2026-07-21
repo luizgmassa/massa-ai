@@ -26,7 +26,7 @@ interface GetArchitectureParams {
   aspects?: string[];
   /** Max number of top central files to include. Default 20. */
   centralityLimit?: number;
-  format?: "json" | "toon";
+  format?: "json" | "toon" | "tree";
   fields?: string[];
 }
 
@@ -61,8 +61,9 @@ export class GetArchitectureTool implements IToolHandler {
       },
       format: {
         type: "string",
-        enum: ["json", "toon"],
-        description: "Output format (json or toon). Default: json.",
+        enum: ["json", "toon", "tree"],
+        description:
+          "Output format. 'json' (default) emits the raw object. 'toon' encodes it. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper (groups hotspots by file). Default: json.",
         default: "json",
       },
       fields: {
@@ -107,7 +108,11 @@ export class GetArchitectureTool implements IToolHandler {
           error: `Project '${p.projectId}' not found or has no indexed files.`,
         };
       }
-      return serializeToolResponse(map, { format, fields });
+      // Wave 5 FR-07: tree format groups hotspots by file via the shared
+      // groupRowsByPrefix helper. json/toon unchanged when tree not selected.
+      const groupOpts =
+        format === "tree" ? { format, fields, groupBy: { file: "file" } } : { format, fields };
+      return serializeToolResponse(map, groupOpts);
     } catch (error) {
       // ToolError (teaching error from the service or the validator) →
       // surface the message verbatim so the MCP transport maps it to 400.
