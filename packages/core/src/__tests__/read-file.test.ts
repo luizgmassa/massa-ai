@@ -189,15 +189,19 @@ describe("ReadFileTool — cache key includes option flags", () => {
     // (extractMetadata → listDefinitions). Cast to the service type so the
     // constructor accepts it.
     const stubSymbolGraph = {
-      listDefinitions: async (_projectId: string, _opts: any) => [
-        {
-          name: "foo",
-          kind: "function",
-          filePath: tmpFile,
-          lineStart: 2,
-          lineEnd: 2,
-        },
-      ],
+      listDefinitions: async (_projectId: string, _opts: any) => ({
+        definitions: [
+          {
+            name: "foo",
+            kind: "function",
+            filePath: tmpFile,
+            lineStart: 2,
+            lineEnd: 2,
+          },
+        ],
+        total: 1,
+        total_exact: true,
+      }),
       getReferences: async (_projectId: string, _name: string, _fqn?: string) => [],
     } as unknown as SymbolGraphService;
 
