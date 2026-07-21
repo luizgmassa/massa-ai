@@ -28,7 +28,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { logger } from "@massa-th0th/shared";
+import { logger, config } from "@massa-th0th/shared";
 import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import type { SymbolDefinition } from "../../data/symbol/symbol-repository-pg.js";
 import { validateGitRef } from "./git-ref-validation.js";
@@ -179,6 +179,20 @@ const W_PROXIMITY = 0.4;
 
 const TEST_FILE_RE = /(^|\/)(test|tests|spec|specs|__tests__)(\/|$)|(\.|_|-)(test|spec)\.(t|j)sx?$/i;
 
+// ─── Wave 5 FR-05 / N3: BFS CTE behind-flag helper ─────────────────────────────
+// When MASSA_TH0TH_IMPACT_BFS_CTE=true (config.impact.bfsCteEnabled), impact
+// analysis skips the TS reverse-import BFS (buildReverseImportGraph + the
+// queue loop in step 5a) and uses the single recursive CTE `runBfsCteImpact`
+// instead. Parity gated by impact-bfs-parity.test.ts: same FQN set; depths may
+// differ by ≤1 hop on cyclic graphs (AD-W5-018). Default false — additive.
+function readBfsCteFlag(): boolean {
+  try {
+    return Boolean(config.get("impact")?.bfsCteEnabled);
+  } catch {
+    return false;
+  }
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export class ImpactAnalysisService {
@@ -272,7 +286,22 @@ export class ImpactAnalysisService {
 
     // ── 3. Build the reverse import graph (file-level dependents) ───────────
     // importerOf: file → set of files that import it (the reverse of symbol_imports).
-    const importerOf = await this.buildReverseImportGraph(repo, projectId);
+    // Wave 5 FR-05: when MASSA_TH0TH_IMPACT_BFS_CTE=true, skip building the
+    // TS reverse graph and use runBfsCteImpact (single recursive CTE) instead.
+    // The CTE returns { file, hop }[] directly, so step 5a uses that list
+    // instead of walking importerOf. Parity gated by impact-bfs-parity.test.ts.
+    const bfsCteEnabled = readBfsCteFlag();
+    const importerOf = bfsCteEnabled
+      ? new Map<string, string[]>()
+      : await this.buildReverseImportGraph(repo, projectId);
+    // CTE path: one call for all changed files (multi-source BFS). NULL guard
+    // is inside runBfsCteImpact (WHERE file_id IS NOT NULL per AD-W5-018).
+    const cteImpact = bfsCteEnabled
+      ? await repo.runBfsCteImpact(projectId, changedPaths, {
+          depth,
+          maxImpacted: MAX_IMPACTED,
+        })
+      : [];
 
     // ── 4. Centrality lookup ────────────────────────────────────────────────
     const centrality = await this.getCentralityMap(repo, projectId);
@@ -305,46 +334,86 @@ export class ImpactAnalysisService {
     };
 
     // (a) File-level: BFS over reverse import graph from each changed file.
-    for (const changedFile of changedPaths) {
-      const visited = new Set<string>([changedFile]);
-      const queue: Array<{ file: string; hop: number }> = [
-        { file: changedFile, hop: 0 },
-      ];
-      while (queue.length > 0) {
-        const { file, hop } = queue.shift()!;
-        if (hop >= depth) continue;
-        // Wall-clock deadline: abort mid-traversal with partial impacted
-        // results so a runaway reverse-BFS never hangs. O(1) per iteration.
+    if (bfsCteEnabled) {
+      // CTE path (Wave 5 FR-05): runBfsCteImpact already returned { file, hop }[]
+      // for all changed files in one recursive CTE. Emit impacted symbols for
+      // each file at its minimum hop, attributing the changed file that seeded
+      // the walk. Min-hop attribution: the CTE groups by file_id with MIN(hop);
+      // we attribute to the first changed file in changedPaths for stable output
+      // (the parity test asserts FQN-set equivalence with the TS path, not
+      // per-file attribution, per AD-W5-018).
+      for (const { file, hop } of cteImpact) {
         if (now() >= deadlineAt) {
           truncated = true;
           break;
         }
-        const importers = importerOf.get(file) ?? [];
-        for (const imp of importers) {
-          if (visited.has(imp)) continue;
-          visited.add(imp);
-          // Symbols in the importer file are impacted (they may consume the change).
-          // Use the per-analyze cache so a hub file imported by many changed
-          // files is queried once, not once-per-frontier.
-          const consumerDefs = await cachedDefs(imp);
-          for (const d of consumerDefs) {
-            if (TEST_FILE_RE.test(imp) && d.exported === false) continue;
-            const c = (centrality.get(imp) ?? 0) / maxCentrality; // normalize 0–1
-            const proximity = 1 / (hop + 1);
-            const risk = W_CENTRALITY * c + W_PROXIMITY * proximity;
-            addImpact({
-              fqn: d.id,
-              name: d.name,
-              file: imp,
-              line: d.line_start,
-              depth: hop + 1,
-              centrality: Number(c.toFixed(4)),
-              risk: Number(risk.toFixed(4)),
-              reason: `imports changed file '${changedFile}'`,
-              via: { changedFile, edge: "import" },
-            });
+        // Skip the seed files themselves at hop 0 (they are the changed files,
+        // not impacted consumers). The CTE includes them with hop=0; mirror
+        // the TS path which seeds visited={} with changedFile and never
+        // re-emits it as impacted.
+        if (hop === 0) continue;
+        const consumerDefs = await cachedDefs(file);
+        for (const d of consumerDefs) {
+          if (TEST_FILE_RE.test(file) && d.exported === false) continue;
+          const c = (centrality.get(file) ?? 0) / maxCentrality;
+          const proximity = 1 / (hop + 1);
+          const risk = W_CENTRALITY * c + W_PROXIMITY * proximity;
+          addImpact({
+            fqn: d.id,
+            name: d.name,
+            file,
+            line: d.line_start,
+            depth: hop,
+            centrality: Number(c.toFixed(4)),
+            risk: Number(risk.toFixed(4)),
+            reason: `impacted via CTE BFS at hop ${hop}`,
+            via: { changedFile: changedPaths[0] ?? file, edge: "import" },
+          });
+        }
+      }
+    } else {
+      // TS reverse-import BFS path (default).
+      for (const changedFile of changedPaths) {
+        const visited = new Set<string>([changedFile]);
+        const queue: Array<{ file: string; hop: number }> = [
+          { file: changedFile, hop: 0 },
+        ];
+        while (queue.length > 0) {
+          const { file, hop } = queue.shift()!;
+          if (hop >= depth) continue;
+          // Wall-clock deadline: abort mid-traversal with partial impacted
+          // results so a runaway reverse-BFS never hangs. O(1) per iteration.
+          if (now() >= deadlineAt) {
+            truncated = true;
+            break;
           }
-          queue.push({ file: imp, hop: hop + 1 });
+          const importers = importerOf.get(file) ?? [];
+          for (const imp of importers) {
+            if (visited.has(imp)) continue;
+            visited.add(imp);
+            // Symbols in the importer file are impacted (they may consume the change).
+            // Use the per-analyze cache so a hub file imported by many changed
+            // files is queried once, not once-per-frontier.
+            const consumerDefs = await cachedDefs(imp);
+            for (const d of consumerDefs) {
+              if (TEST_FILE_RE.test(imp) && d.exported === false) continue;
+              const c = (centrality.get(imp) ?? 0) / maxCentrality; // normalize 0–1
+              const proximity = 1 / (hop + 1);
+              const risk = W_CENTRALITY * c + W_PROXIMITY * proximity;
+              addImpact({
+                fqn: d.id,
+                name: d.name,
+                file: imp,
+                line: d.line_start,
+                depth: hop + 1,
+                centrality: Number(c.toFixed(4)),
+                risk: Number(risk.toFixed(4)),
+                reason: `imports changed file '${changedFile}'`,
+                via: { changedFile, edge: "import" },
+              });
+            }
+            queue.push({ file: imp, hop: hop + 1 });
+          }
         }
       }
     }

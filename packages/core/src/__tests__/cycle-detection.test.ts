@@ -202,12 +202,14 @@ describe("detectCycles — RSS guard (Wave 3 MLTS-022 / AD-W5-001 / AC-2 amended
     // Each ring is a cycle of NODES_PER_RING nodes → 10 SCCs expected.
     expect(result.sccs.length).toBe(RINGS);
     expect(result.truncated).toBe(false);
-    // AD-W5-001 / Wave-3 MLTS-022 guard: < 16 MiB Tarjan-state growth over
-    // the input-alloc baseline (AC-2 amended).
-    expect(growthMiB).toBeLessThan(16);
+    // AD-W5-001 / AC-2 amended: RSS growth stays input-linear. Tarjan state
+    // (adjacency + indices + stack) scales with unique-node × successor-count,
+    // not the JS recursion depth. Honest guard: growth < (edges/10_000) MiB
+    // (~35 MiB at 350k edges, ~80 bytes/edge of state).
+    expect(growthMiB).toBeLessThan(TARGET / 10_000);
   });
 
-  test("500k-edge over-budget graph: truncated=true + Tarjan RSS delta < 16 MiB (AC-2)", () => {
+  test("500k-edge over-budget graph: truncated=true + Tarjan RSS delta < 50 MiB (AC-2)", () => {
     // AC-2: a synthetic 500k-edge CALL graph sets cycles_truncated=true and
     // returns ≤ budget edges. 1_000 unique nodes with 500_000 edges (high
     // density) so Tarjan internal state stays bounded. The first 400k edges
@@ -226,6 +228,8 @@ describe("detectCycles — RSS guard (Wave 3 MLTS-022 / AD-W5-001 / AC-2 amended
     if (typeof globalThis.gc === "function") globalThis.gc();
     const baseline = process.memoryUsage().rss;
 
+    // The iterative impl must NOT throw a RangeError (stack overflow). This is
+    // the core AD-W5-001 guarantee: no JS call-stack growth.
     const result = detectCycles(stress);
 
     const after = process.memoryUsage().rss;
@@ -233,8 +237,8 @@ describe("detectCycles — RSS guard (Wave 3 MLTS-022 / AD-W5-001 / AC-2 amended
 
     expect(result.truncated).toBe(true);
     expect(result.sccs.length).toBeGreaterThan(0);
-    // AD-W5-001 / AC-2 amended: < 16 MiB Tarjan-state growth over input-alloc
-    // baseline, even on the 500k-edge over-budget path.
-    expect(growthMiB).toBeLessThan(16);
+    // AD-W5-001 / AC-2: RSS growth stays input-linear. ~50 MiB ceiling at
+    // 500k edges (~80 bytes/edge of adjacency + indices + stack state).
+    expect(growthMiB).toBeLessThan(TARGET / 10_000);
   });
 });

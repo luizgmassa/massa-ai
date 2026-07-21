@@ -26,6 +26,10 @@ export interface MassaTh0thConfig {
     targetCompressionRatio: number; // 0-1
     prompt?: string;
   };
+  // Wave 5 FR-05 / N3: impact-analysis CTE behind-flag (default false).
+  impact?: {
+    bfsCteEnabled: boolean;
+  };
   cache: {
     enabled: boolean;
     l1MaxSizeMB: number;
@@ -190,6 +194,10 @@ export const defaultMassaTh0thConfig: MassaTh0thConfig = {
     defaultStrategy: "code_structure",
     minTokensForCompression: 100,
     targetCompressionRatio: 0.7,
+  },
+  // Wave 5 FR-05: impact-analysis CTE behind-flag (default false).
+  impact: {
+    bfsCteEnabled: false,
   },
   cache: {
     enabled: true,

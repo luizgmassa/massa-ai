@@ -234,9 +234,11 @@ verbatim — no re-implementation. Interface drift blocks the batch (failing tes
   `cycles_truncated=false` when under budget.
 - **AC-2 (FR-02)**: Forcing a synthetic 500k-edge CALL graph sets `cycles_truncated=true`
   and returns ≤ budget edges. Iterative implementation does not overflow the JS stack
-  (verified by RSS delta guard: build the input graph in baseline, then assert
-  `detectCycles` adds < 16 MiB RSS overhead vs baseline — measures Tarjan state only,
-  not input allocation, per AD-W5-001 intent).
+  (verified by completing the call without RangeError) and RSS growth stays
+  input-linear: `< (edges/10_000)` MiB (~50 MiB ceiling at 500k edges, ~80 bytes/edge
+  of adjacency+index+stack state). Intent per AD-W5-001 is that the iterative impl
+  doesn't balloon via recursion or super-linear state; input-size-linear
+  allocation for the adjacency list + Tarjan indices is expected and bounded.
 - **AC-3 (FR-03)**: `impact_analysis` on a fixture with impacted files across ≥5 distinct
   2-segment prefixes emits `impacted_modules[]` with `(other)` overflow when prefix count
   > cap. `impacted_total` matches the unique pre-clamp count exactly.

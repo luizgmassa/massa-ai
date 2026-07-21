@@ -170,6 +170,14 @@ export interface ServerConfig {
     prompt?: string;
   };
 
+  // Wave 5 FR-05 / N3: impact-analysis graph traversal options.
+  impact: {
+    /** When true, impact_analysis uses the recursive CTE (runBfsCteImpact)
+     * instead of the TS reverse-import BFS. Default false (additive behind
+     * flag; parity gated by impact-bfs-parity.test.ts per AD-W5-018). */
+    bfsCteEnabled: boolean;
+  };
+
   // Rate Limiting
   rateLimit: {
     requestsPerMinute: number;
@@ -618,6 +626,20 @@ export const defaultConfig: ServerConfig = {
     prompt: process.env.RLM_LLM_PROMPT || fileConfig.compression?.prompt || undefined,
   },
 
+  // Wave 5 FR-05 / N3: impact-analysis graph traversal options.
+  impact: {
+    // Additive behind-flag: when true, impact_analysis uses the single
+    // recursive CTE (runBfsCteImpact) instead of the TS reverse-import BFS.
+    // Default false — the TS path has passing tests today; the CTE path is
+    // observed in production before any flip. Parity gated by
+    // impact-bfs-parity.test.ts (same FQN set; depths may differ ≤1 hop on
+    // cyclic graphs per AD-W5-018).
+    bfsCteEnabled: envBool(
+      "MASSA_TH0TH_IMPACT_BFS_CTE",
+      fileConfig.impact?.bfsCteEnabled ?? false,
+    ),
+  },
+
   rateLimit: {
     requestsPerMinute: envNum("REQUESTS_PER_MINUTE", 60),
     tokensPerMinute: envNum("TOKENS_PER_MINUTE", 100000),
@@ -775,6 +797,10 @@ export class Config {
       compression: {
         ...defaults.compression,
         ...overrides.compression,
+      },
+      impact: {
+        ...defaults.impact,
+        ...overrides.impact,
       },
       rateLimit: { ...defaults.rateLimit, ...overrides.rateLimit },
       security: { ...defaults.security, ...overrides.security },
