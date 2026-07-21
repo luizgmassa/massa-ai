@@ -22,6 +22,8 @@ import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { impactAnalysisService } from "../services/symbol/impact-analysis.js";
 import type { ImpactScope } from "../services/symbol/impact-analysis.js";
 import { serializeToolResponse } from "./serialize.js";
+import { validateEnum, ToolError } from "./enum-validation.js";
+import { getActiveGeneration, assertGenerationNotStale } from "../services/symbol/active-generation.js";
 
 interface ImpactAnalysisParams {
   projectId: string;
@@ -36,6 +38,13 @@ interface ImpactAnalysisParams {
   deadline_ms?: number;
   format?: "json" | "toon";
   fields?: string[];
+  /**
+   * N1 (WAVE4-N1): optional precondition — the client's last-known
+   * `activatedGraphGenerationId`. If it mismatches the current active
+   * generation, the tool throws a 412 teaching error. Opt-in: omitted →
+   * no precondition.
+   */
+  ifNoneMatch?: string;
 }
 
 export class ImpactAnalysisTool implements IToolHandler {
@@ -55,9 +64,10 @@ export class ImpactAnalysisTool implements IToolHandler {
       },
       scope: {
         type: "string",
-        enum: ["unstaged", "staged", "committed"],
+        enum: ["unstaged", "staged", "committed", "all"],
         default: "unstaged",
-        description: "unstaged = working-tree changes; staged = index; committed = diff vs base_branch (or since).",
+        description:
+          "unstaged = working-tree changes (+ untracked new files); staged = index (+ untracked); committed = diff vs base_branch (or since); all = committed + unstaged + untracked, deduped.",
       },
       base_branch: {
         type: "string",
@@ -96,6 +106,11 @@ export class ImpactAnalysisTool implements IToolHandler {
         description:
           "Projection — keep only these keys (dotted paths supported, e.g. ['impacted.symbol']). Absent/empty → full data.",
       },
+      ifNoneMatch: {
+        type: "string",
+        description:
+          "Optional precondition: the client's last-known `activatedGraphGenerationId`. If it mismatches the current active generation, the tool returns a 412 teaching error.",
+      },
     },
     required: ["projectId", "projectPath"],
   };
@@ -113,7 +128,27 @@ export class ImpactAnalysisTool implements IToolHandler {
           "projectPath is required (absolute path to the working tree where `git` runs).",
       };
     }
-    const scope: ImpactScope = p.scope ?? "unstaged";
+    const scope: ImpactScope = validateEnum<ImpactScope>(
+      "scope",
+      p.scope ?? "unstaged",
+      ["unstaged", "staged", "committed", "all"] as const,
+    );
+
+    // N1 (WAVE4-N1): surface the active graph generation id + opt-in stale
+    // precondition. The lookup is cheap (single row from workspaces); the
+    // precondition is opt-in (omitted ifNoneMatch → no throw). The 412
+    // teaching error is thrown BEFORE the expensive git diff + reverse BFS.
+    // Catch the ToolError here so the MCP transport sees a structured
+    // {success:false, error, statusCode} response (not an uncaught throw).
+    const activatedGraphGenerationId = await getActiveGeneration(p.projectId);
+    try {
+      assertGenerationNotStale(p.ifNoneMatch, activatedGraphGenerationId);
+    } catch (e) {
+      if (e instanceof ToolError) {
+        return { success: false, error: e.message };
+      }
+      throw e;
+    }
 
     try {
       const result = await impactAnalysisService.analyze({
@@ -135,6 +170,12 @@ export class ImpactAnalysisTool implements IToolHandler {
             changedFiles: [],
             impacted: [],
             truncated: false,
+            untrackedFiltered: result.untrackedFiltered,
+            impacted_total: result.impacted_total,
+            impacted_shown: result.impacted_shown,
+            impacted_omitted: result.impacted_omitted,
+            // N1 (WAVE4-N1): the active graph generation id at query time.
+            activatedGraphGenerationId,
             note: result.note,
             hint:
               "No indexed source files in the diff. Check scope/base_branch, or index the project first (index_project).",
@@ -154,6 +195,12 @@ export class ImpactAnalysisTool implements IToolHandler {
           changedFiles: result.changedFiles,
           impactedCount: result.impacted.length,
           truncated: result.truncated,
+          untrackedFiltered: result.untrackedFiltered,
+          impacted_total: result.impacted_total,
+          impacted_shown: result.impacted_shown,
+          impacted_omitted: result.impacted_omitted,
+          // N1 (WAVE4-N1): the active graph generation id at query time.
+          activatedGraphGenerationId,
           impacted: result.impacted.map((s) => ({
             symbol: s.name,
             fqn: s.fqn,

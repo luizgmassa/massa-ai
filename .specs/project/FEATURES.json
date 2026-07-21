@@ -222,11 +222,23 @@
     {
       "slug": "sqlite-removal",
       "title": "PostgreSQL-only storage; SQLite runtime removal",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
         "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "sqlite-removal-followup",
+      "title": "SQLite removal non-gating follow-ups (legacy Prisma probe rerun, qwen fixture manifest rebuild, final aggregate capture)",
+      "status": "in_progress",
+      "priority": "P2",
+      "phases": {
+        "specify": true,
+        "design": false,
         "tasks": true,
         "execute": true
       }
@@ -284,7 +296,13 @@
       "title": "Wave 3 follow-up — native runtime re-baseline to Bun 1.3.14 + six-suite classification + cross-platform re-verification",
       "status": "complete", "priority": "P1",
       "phases": { "specify": true, "design": true, "tasks": true, "execute": true }
+    },
+    {
+      "slug": "wave-4-correctness-hygiene",
+      "title": "Wave 4 — Correctness, hygiene, and spec reconciliation (N1 generation staleness, N4 clamped-list totals, N6 enum teaching errors, N7 untracked merge + secrets denylist, N8 git-ref guard, N9 read_file cap, N10 SQL bounds, N25 spec reconciliation, M29 sqlite-removal close, N33 dead code sweep, N34 CI grammar gate, N36 xdg extraction, M35 scheduler seam)",
+      "status": "complete", "priority": "P1",
+      "phases": { "specify": true, "design": true, "tasks": true, "execute": true }
     }
   ],
-  "active_feature": "native-runtime-rebaseline"
+  "active_feature": "wave-4-correctness-hygiene"
 }

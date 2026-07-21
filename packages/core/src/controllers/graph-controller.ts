@@ -50,6 +50,9 @@ export interface TracePathOutput {
   edgeTypes: EdgeType[];
   seeds: string[];
   truncated: boolean;
+  nodes_total: number;
+  nodes_shown: number;
+  nodes_omitted: number;
   nodeCount: number;
   edgeCount: number;
   chains: string[];
@@ -83,6 +86,10 @@ export interface ImpactAnalysisOutput {
   impactedCount: number;
   truncated: boolean;
   impacted: ImpactAnalysisResult["impacted"];
+  untrackedFiltered: number;
+  impacted_total: number;
+  impacted_shown: number;
+  impacted_omitted: number;
   note?: string;
 }
 
@@ -159,6 +166,9 @@ export class GraphController {
         edgeTypes: result.edgeTypes,
         seeds: result.seeds,
         truncated: result.truncated,
+        nodes_total: result.nodes_total,
+        nodes_shown: result.nodes_shown,
+        nodes_omitted: result.nodes_omitted,
         nodeCount: result.nodes.length,
         edgeCount: result.edges.length,
         chains: result.chains,
@@ -214,6 +224,10 @@ export class GraphController {
       impactedCount: result.impacted.length,
       truncated: result.truncated,
       impacted: result.impacted,
+      untrackedFiltered: result.untrackedFiltered,
+      impacted_total: result.impacted_total,
+      impacted_shown: result.impacted_shown,
+      impacted_omitted: result.impacted_omitted,
       note: result.note,
     };
   }

@@ -149,15 +149,6 @@ export class HybridSearch implements IHybridSearch {
   }
 
   /**
-   * @deprecated Use normalizeRRFScores (batch) instead
-   */
-  private normalizeRRFScore(rrfScore: number): number {
-    // Kept for backwards compatibility; single-value path.
-    const theoreticalMax = 2 / (RRF_K + 1);
-    return Math.min(1, rrfScore / theoreticalMax);
-  }
-
-  /**
    * Calculate average score
    */
   private calculateAvgScore(results: SearchResult[]): number {

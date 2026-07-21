@@ -25,6 +25,7 @@ import type {
   SymbolImport,
   CentralityEntry,
   RefKind,
+  SymbolKind,
   ProjectMapGraphSnapshot,
 } from "../../data/symbol/symbol-repository-pg.js";
 import { computePageRank } from "./centrality.js";
@@ -375,16 +376,61 @@ export class SymbolGraphService {
 
   // ── list_definitions ────────────────────────────────────────────────────────
 
+  /**
+   * Result of {@link listDefinitions} — the displayed page plus the pre-LIMIT
+   * total (N4 correctness bundle, WAVE4-N4). The total is the true count of
+   * matching definitions BEFORE the SQL `LIMIT` clamps the page, so callers
+   * can emit `definitions_total` / `definitions_shown` / `definitions_omitted`
+   * (spec AC 4). The total is computed on the SAME code path (same WHERE
+   * clauses) as the displayed list — the cbm invariant from the spec.
+   *
+   * `total_exact` is `true` when `total` is the exact pre-LIMIT count, and
+   * `false` when the match set exceeded the 100k sentinel cap (T10, N4 perf).
+   * In the sentinel case `total` is the cap value (100000) — a floor of the
+   * true count — so callers can emit `definitions_total_exact: false` per
+   * spec AC 4 without scanning the full match set on every query.
+   */
   async listDefinitions(
     projectId: string,
     opts: ListDefinitionsOptions = {},
-  ): Promise<DefinitionResult[]> {
+  ): Promise<{
+    definitions: DefinitionResult[];
+    total: number;
+    total_exact: boolean;
+  }> {
     const repo = getSymbolRepository();
-    const [defs, centrality] = await Promise.all([
+    const limit = opts.limit ?? 100;
+    const [defs, centrality, total] = await Promise.all([
       repo.listDefinitions(projectId, opts),
       repo.getCentrality(projectId),
+      repo.countDefinitions(
+        projectId,
+        opts.search,
+        opts.kind as SymbolKind[] | undefined,
+        opts.exportedOnly,
+        opts.file,
+      ),
     ]);
-    return defs.map((def) => this.toDefinitionResult(def, centrality));
+    // T10 (N4 perf): when the match set exceeds the 100k sentinel cap, emit
+    // total=cap (a floor) + total_exact:false so callers can surface
+    // `definitions_total_exact: false` per spec AC 4. The cap avoids
+    // re-fetching the full match set on every query; `COUNT(*)` is itself
+    // cheap, but the sentinel signals to clients that the value is a floor,
+    // not an exact count. The cap is applied AFTER the count so the exact
+    // path stays exact for ≤100k workspaces (the common case).
+    const SENTINEL_CAP = 100_000;
+    if (total > SENTINEL_CAP) {
+      return {
+        definitions: defs.map((def) => this.toDefinitionResult(def, centrality)),
+        total: SENTINEL_CAP,
+        total_exact: false,
+      };
+    }
+    return {
+      definitions: defs.map((def) => this.toDefinitionResult(def, centrality)),
+      total,
+      total_exact: true,
+    };
   }
 
   // ── get_top_central_files ──────────────────────────────────────────────────
@@ -613,8 +659,16 @@ export class SymbolGraphService {
   }
 
   /**
-   * Read lines [lineStart, lineEnd] from a relative project path.
-   * Used to enrich definition results with code previews.
+   * Read a bounded snippet from a project file. Used to enrich definition
+   * results with code previews.
+   *
+   * N9 EXCLUSION: this internal enrichment path is NOT subject to the
+   * MASSA_TH0TH_READ_FILE_MAX_LINES cap. The cap applies to user-facing
+   * read_file + symbol_snippet HTTP endpoint; readSnippet is called by
+   * `go_to_definition` enrichment that returns small bounded context
+   * windows (3-line context, top-3 definitions). Applying the cap here
+   * would silently clip internal enrichment with no propagation path to
+   * the MCP response. See Wave 4 N9 AC 15.
    */
   private async readSnippet(
     relativePath: string,
@@ -634,7 +688,12 @@ export class SymbolGraphService {
     }
   }
 
-  /** Read N lines of context around a given line number from a relative path. */
+  /**
+   * Read N lines of context around a given line number from a relative path.
+   *
+   * N9 EXCLUSION: same as readSnippet — internal enrichment path, NOT capped
+   * by MASSA_TH0TH_READ_FILE_MAX_LINES. See Wave 4 N9 AC 15.
+   */
   private async readContext(
     relativePath: string,
     lineNumber: number,

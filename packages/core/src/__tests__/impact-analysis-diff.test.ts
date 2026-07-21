@@ -41,11 +41,14 @@ describe("defaultDiffRunner committed scope", () => {
       GIT_COMMITTER_DATE: "2026-02-01T12:00:00Z",
     });
 
-    expect(defaultDiffRunner(dir, "committed", undefined, "2026-01-15")).toEqual(["after.ts"]);
-    expect(defaultDiffRunner(dir, "committed", undefined, "2025-01-01")).toEqual([
-      "after.ts",
-      "before.ts",
-    ]);
+    expect(defaultDiffRunner(dir, "committed", undefined, "2026-01-15")).toEqual({
+      paths: ["after.ts"],
+      untrackedFiltered: 0,
+    });
+    expect(defaultDiffRunner(dir, "committed", undefined, "2025-01-01")).toEqual({
+      paths: ["after.ts", "before.ts"],
+      untrackedFiltered: 0,
+    });
   });
 
   test("continues to accept a commit ref", async () => {
@@ -62,7 +65,10 @@ describe("defaultDiffRunner committed scope", () => {
     git(dir, ["add", "two.ts"]);
     git(dir, ["commit", "-qm", "two"]);
 
-    expect(defaultDiffRunner(dir, "committed", undefined, first)).toEqual(["two.ts"]);
+    expect(defaultDiffRunner(dir, "committed", undefined, first)).toEqual({
+      paths: ["two.ts"],
+      untrackedFiltered: 0,
+    });
   });
 });
 
@@ -83,7 +89,7 @@ test("impact analysis never falls back from exact identity to a bare overload na
   };
   const result = await ImpactAnalysisService.getInstance().analyze({
     projectId: "p", projectPath: ".", scope: "unstaged", depth: 1,
-    diffRunner: () => ["src/changed.ts"], repoOverride: repo as never,
+    diffRunner: () => ({ paths: ["src/changed.ts"], untrackedFiltered: 0 }), repoOverride: repo as never,
   });
   expect(result.changedFiles[0]?.symbols[0]?.fqn).toBe(changed.id);
   expect(result.impacted).toEqual([]);
@@ -143,7 +149,7 @@ test("impact analysis deadline aborts reverse-BFS with truncated=true", async ()
   const result = await ImpactAnalysisService.getInstance().analyze({
     projectId: "p", projectPath: ".", scope: "unstaged", depth: 4,
     deadlineMs: 1, now,
-    diffRunner: () => ["src/changed.ts"], repoOverride: repo as never,
+    diffRunner: () => ({ paths: ["src/changed.ts"], untrackedFiltered: 0 }), repoOverride: repo as never,
   });
 
   expect(result.truncated).toBe(true);
@@ -181,7 +187,7 @@ test("impact analysis default deadline (unset) does not truncate a normal walk",
   // the normal 1-hop walk completes and is NOT truncated.
   const result = await ImpactAnalysisService.getInstance().analyze({
     projectId: "p", projectPath: ".", scope: "unstaged", depth: 2,
-    diffRunner: () => ["src/changed.ts"], repoOverride: repo as never,
+    diffRunner: () => ({ paths: ["src/changed.ts"], untrackedFiltered: 0 }), repoOverride: repo as never,
   });
 
   expect(result.truncated).toBe(false);

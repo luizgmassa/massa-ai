@@ -11,6 +11,7 @@
 
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
 import { resolve, dirname } from "path";
+import { logger } from "@massa-th0th/shared";
 
 /**
  * Pricing per provider (per 1M tokens)
@@ -440,7 +441,7 @@ export class MetricsCollector {
         JSON.stringify(this.currentMetrics, null, 2),
       );
     } catch (error) {
-      console.error("[Metrics] Failed to save:", error);
+      logger.error("[Metrics] Failed to save:", error as Error);
     }
   }
 

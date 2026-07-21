@@ -7,10 +7,13 @@
 
 import {
   IToolHandler,
+  STRUCTURAL_SYMBOL_KINDS,
   STRUCTURAL_SYMBOL_KIND_SCHEMA,
   ToolResponse,
 } from "@massa-th0th/shared";
 import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
+import { validateEnum, ToolError } from "./enum-validation.js";
+import { getActiveGeneration, assertGenerationNotStale } from "../services/symbol/active-generation.js";
 
 interface SearchDefinitionsParams {
   projectId: string;
@@ -19,6 +22,13 @@ interface SearchDefinitionsParams {
   file?: string;
   exportedOnly?: boolean;
   maxResults?: number;
+  /**
+   * N1 (WAVE4-N1): optional precondition — the client's last-known
+   * `activatedGraphGenerationId`. If it mismatches the current active
+   * generation, the tool throws a 412 teaching error. Opt-in: omitted →
+   * no precondition.
+   */
+  ifNoneMatch?: string;
 }
 
 export class SearchDefinitionsTool implements IToolHandler {
@@ -56,6 +66,11 @@ export class SearchDefinitionsTool implements IToolHandler {
         description: "Maximum number of results to return (default: 20)",
         default: 20,
       },
+      ifNoneMatch: {
+        type: "string",
+        description:
+          "Optional precondition: the client's last-known `activatedGraphGenerationId`. If it mismatches the current active generation, the tool returns a 412 teaching error.",
+      },
     },
     required: ["projectId"],
   };
@@ -68,16 +83,45 @@ export class SearchDefinitionsTool implements IToolHandler {
       file,
       exportedOnly = false,
       maxResults = 20,
+      ifNoneMatch,
     } = params as SearchDefinitionsParams;
 
+    // Validate each kind entry against the 18 canonical structural kinds.
+    // Empty/missing kind is allowed (no filter); an invalid kind string
+    // teaching-errors immediately with the full valid-values list.
+    const validatedKind = kind
+      ? kind.map((k) =>
+          validateEnum<typeof STRUCTURAL_SYMBOL_KINDS[number]>(
+            "kind",
+            k,
+            STRUCTURAL_SYMBOL_KINDS,
+          ),
+        )
+      : undefined;
+
+    // N1 (WAVE4-N1): surface the active graph generation id + opt-in stale
+    // precondition. search_definitions reads the symbol graph, so it
+    // participates; search_code is excluded (vector + keyword only).
+    const activatedGraphGenerationId = await getActiveGeneration(projectId);
     try {
-      const definitions = await symbolGraphService.listDefinitions(projectId, {
+      assertGenerationNotStale(ifNoneMatch, activatedGraphGenerationId);
+    } catch (e) {
+      if (e instanceof ToolError) {
+        return { success: false, error: e.message };
+      }
+      throw e;
+    }
+
+    try {
+      const { definitions, total, total_exact } = await symbolGraphService.listDefinitions(projectId, {
         search: query,
-        kind,
+        kind: validatedKind,
         file,
         exportedOnly,
         limit: maxResults,
       });
+      const shown = definitions.length;
+      const omitted = Math.max(0, total - shown);
 
       return {
         success: true,
@@ -93,9 +137,22 @@ export class SearchDefinitionsTool implements IToolHandler {
             docComment: d.docComment,
             centralityScore: d.centralityScore,
           })),
-          total: definitions.length,
+          // N4 (WAVE4-N4): pre-LIMIT total, post-LIMIT shown, omitted = total - shown.
+          // `total` is the exact count of matching definitions BEFORE the SQL LIMIT
+          // (computed via SELECT COUNT(*) on the same WHERE clauses) for ≤100k
+          // workspaces. For >100k match sets, T10 emits the sentinel cap (100000)
+          // with `definitions_total_exact: false` — `total` is a floor, not exact.
+          definitions_total: total,
+          definitions_shown: shown,
+          definitions_omitted: omitted,
+          definitions_total_exact: total_exact,
+          // Legacy `total` kept for back-compat with callers that read the old shape.
+          // Equals `definitions_shown` (the page length) — matches the prior contract.
+          total: shown,
           projectId,
           query: query ?? null,
+          // N1 (WAVE4-N1): the active graph generation id at query time.
+          activatedGraphGenerationId,
         },
       };
     } catch (error) {

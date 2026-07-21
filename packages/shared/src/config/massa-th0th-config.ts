@@ -1,14 +1,5 @@
 import path from "path";
-import os from "os";
-
-// XDG-aware config dir, mirrored from config-loader.ts. Inlined here (rather
-// than imported) to avoid a circular dependency: config-loader imports this
-// module for the defaults, so this module cannot statically import it back.
-// The canonical implementation lives in config-loader.ts; keep the two in sync.
-const XDG_CONFIG_HOME =
-  process.env.XDG_CONFIG_HOME && process.env.XDG_CONFIG_HOME.trim()
-    ? process.env.XDG_CONFIG_HOME
-    : path.join(os.homedir(), ".config");
+import { configDir } from "./xdg";
 
 export interface MassaTh0thConfig {
   database?: {
@@ -206,7 +197,7 @@ export const defaultMassaTh0thConfig: MassaTh0thConfig = {
     l2MaxSizeMB: 500,
     defaultTTLSeconds: 3600,
   },
-  dataDir: path.join(XDG_CONFIG_HOME, "massa-th0th", "data"),
+  dataDir: path.join(configDir("massa-th0th"), "data"),
   logging: {
     level: "info",
     enableMetrics: false,

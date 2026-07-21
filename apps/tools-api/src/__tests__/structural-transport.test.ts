@@ -157,6 +157,13 @@ describe("Tools API structural transport", () => {
         chains: [],
         nodes: [],
         edges: [],
+        // N4 (WAVE4-N4, T8): TracePathOutput requires the total/shown/omitted
+        // fields on every response. The mock returns a non-truncated result
+        // (nodeCount=1, well under MAX_NODES=2000), so all three are equal to
+        // the displayed count and omitted is 0.
+        nodes_total: 1,
+        nodes_shown: 1,
+        nodes_omitted: 0,
         identity: { status: "resolved", fqn: modernFqn },
       },
     });

@@ -27,6 +27,21 @@ import {
 import type { ExecuteParams } from "../tools/execute.js";
 import type { ExecuteFileParams } from "../tools/execute_file.js";
 import type { BatchExecuteParams } from "../tools/batch_execute.js";
+import { validateEnum } from "../tools/enum-validation.js";
+
+/** The 10 languages supported by the Polyglot executor (N6). */
+const EXECUTOR_LANGUAGES = [
+  "javascript",
+  "typescript",
+  "python",
+  "shell",
+  "ruby",
+  "go",
+  "rust",
+  "php",
+  "perl",
+  "r",
+] as const;
 
 /**
  * Hard cap on the number of commands a single batch_execute call may run.
@@ -83,8 +98,13 @@ export class ExecutorController {
   /** execute (ctx_execute). */
   async execute(params: ExecuteParams): Promise<ToolResponse> {
     try {
+      const language = validateEnum<Language>(
+        "language",
+        params.language,
+        EXECUTOR_LANGUAGES,
+      );
       const result = await this.executor.execute({
-        language: params.language as Language,
+        language,
         code: params.code,
         timeout: params.timeout,
         background: params.background,
@@ -118,9 +138,14 @@ export class ExecutorController {
   /** execute_file (ctx_execute_file). */
   async executeFile(params: ExecuteFileParams): Promise<ToolResponse> {
     try {
+      const language = validateEnum<Language>(
+        "language",
+        params.language,
+        EXECUTOR_LANGUAGES,
+      );
       const result = await this.executor.executeFile({
         path: params.path,
-        language: params.language as Language,
+        language,
         code: params.code,
         timeout: params.timeout,
       });

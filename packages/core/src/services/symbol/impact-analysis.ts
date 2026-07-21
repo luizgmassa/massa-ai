@@ -31,10 +31,22 @@ import { execFileSync } from "node:child_process";
 import { logger } from "@massa-th0th/shared";
 import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import type { SymbolDefinition } from "../../data/symbol/symbol-repository-pg.js";
+import { validateGitRef } from "./git-ref-validation.js";
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
-export type ImpactScope = "unstaged" | "staged" | "committed";
+export type ImpactScope = "unstaged" | "staged" | "committed" | "all";
+
+/**
+ * Result shape of the diff runner (N7). `paths` is the deduped set of changed
+ * files (tracked + untracked, minus secret-like untracked files). `untrackedFiltered`
+ * counts how many untracked paths were excluded by the secrets denylist so
+ * the response can surface it (`untracked_filtered`).
+ */
+export interface DiffRunnerResult {
+  paths: string[];
+  untrackedFiltered: number;
+}
 
 export interface ImpactAnalysisOptions {
   projectId: string;
@@ -51,7 +63,12 @@ export interface ImpactAnalysisOptions {
   /** Optional filter — only consider these changed paths (relative). */
   paths?: string[];
   /** Injectable diff runner (tests pass a stub; production runs real git). */
-  diffRunner?: (projectPath: string, scope: ImpactScope, baseBranch?: string, since?: string) => string[];
+  diffRunner?: (
+    projectPath: string,
+    scope: ImpactScope,
+    baseBranch?: string,
+    since?: string,
+  ) => DiffRunnerResult;
   /**
    * Injectable symbol repository (tests pass an instrumented stub; production
    * resolves the singleton via {@link getSymbolRepository}). Using this seam
@@ -105,6 +122,19 @@ export interface ImpactAnalysisResult {
   changedFiles: ChangedFile[];
   impacted: ImpactedSymbol[];
   truncated: boolean;
+  /** Number of untracked new files excluded from the diff because they
+   * matched the secrets denylist (e.g. `.env*`, `*.key`, `*.pem`). Surfaced
+   * so agents can see that a secret was deliberately filtered (N7 AC 9a). */
+  untrackedFiltered: number;
+  /**
+   * N4: pre-clamp total of unique impacted FQNs (the count we would have
+   * returned if MAX_IMPACTED did not apply). `impacted_shown = impacted.length`
+   * and `impacted_omitted = impacted_total - impacted_shown` are derivable
+   * on the same code path as the displayed list.
+   */
+  impacted_total: number;
+  impacted_shown: number;
+  impacted_omitted: number;
   /** Diagnostic when git produced no output (e.g. clean tree). */
   note?: string;
 }
@@ -166,7 +196,9 @@ export class ImpactAnalysisService {
 
     // ── 1. Changed files (scoped git diff) ──────────────────────────────────
     const runDiff = opts.diffRunner ?? defaultDiffRunner;
-    let changedPaths = runDiff(opts.projectPath, scope, opts.baseBranch, opts.since);
+    const diffResult = runDiff(opts.projectPath, scope, opts.baseBranch, opts.since);
+    let changedPaths = diffResult.paths;
+    const untrackedFiltered = diffResult.untrackedFiltered;
 
     // Optional path filter (relative).
     if (opts.paths && opts.paths.length > 0) {
@@ -187,6 +219,10 @@ export class ImpactAnalysisService {
         changedFiles: [],
         impacted: [],
         truncated: false,
+        untrackedFiltered,
+        impacted_total: 0,
+        impacted_shown: 0,
+        impacted_omitted: 0,
         note: "No indexed source files in the diff (clean tree, or only non-source changes).",
       };
     }
@@ -232,6 +268,10 @@ export class ImpactAnalysisService {
     // ── 5. Reverse-traverse: find impacted consumers ────────────────────────
     const impacted = new Map<string, ImpactedSymbol>();
     let truncated = false;
+    // N4: pre-clamp total of unique impacted FQNs. Increment on every NEW
+    // FQN encountered (regardless of whether MAX_IMPACTED let us store it)
+    // so impacted_omitted = impacted_total - impacted_shown is derivable.
+    let impactedTotal = 0;
 
     const addImpact = (sym: ImpactedSymbol) => {
       // Keep the strongest (lowest depth / highest risk) entry per impacted FQN.
@@ -242,6 +282,8 @@ export class ImpactAnalysisService {
         }
         return;
       }
+      // New FQN — count it toward the pre-clamp total even if we don't store it.
+      impactedTotal++;
       if (impacted.size >= MAX_IMPACTED) {
         truncated = true;
         return;
@@ -335,12 +377,15 @@ export class ImpactAnalysisService {
     const ranked = Array.from(impacted.values()).sort((a, b) => b.risk - a.risk);
     const out = ranked.slice(0, MAX_IMPACTED);
     truncated = truncated || ranked.length > MAX_IMPACTED;
+    const impactedShown = out.length;
+    const impactedOmitted = Math.max(0, impactedTotal - impactedShown);
 
     logger.info("ImpactAnalysisService: analyze complete", {
       projectId,
       scope,
       changedFiles: changedPaths.length,
       impacted: out.length,
+      impactedTotal,
       truncated,
     });
 
@@ -353,6 +398,10 @@ export class ImpactAnalysisService {
       changedFiles,
       impacted: out,
       truncated,
+      untrackedFiltered,
+      impacted_total: impactedTotal,
+      impacted_shown: impactedShown,
+      impacted_omitted: impactedOmitted,
     };
   }
 
@@ -434,12 +483,47 @@ export class ImpactAnalysisService {
 // ─── Default git diff runner (production) ─────────────────────────────────────
 
 /**
+ * Secret-like path patterns excluded from untracked-file inclusion (N7 AC 9a).
+ * Pre-mortem finding: untracked secrets not in `.gitignore` must not be
+ * disclosed to agent consumers. The denylist is conservative and does NOT
+ * rely on `.gitignore` (the user may forget).
+ */
+const SECRET_PATH_PATTERNS = [
+  /\.env/i,        // .env, .env.local, .env.production, foo.env
+  /\.key$/i,        // private keys (any extension/name boundary)
+  /\.pem$/i,        // PEM certs/keys
+  /\.p12$/i,        // PKCS#12 bundles
+  /\.pfx$/i,        // PFX bundles
+  /^secrets?\./i,   // secrets.json, secret.yaml
+  /\.keystore$/i,   // Java keystores
+  /^id_rsa/i,      // SSH private keys (id_rsa, id_rsa.pub is .pub — not matched)
+  /\.asc$/i,        // armored keys / PGP
+];
+
+function isSecretLike(p: string): boolean {
+  return SECRET_PATH_PATTERNS.some((re) => re.test(p));
+}
+
+/**
  * Run a SCOPED `git diff --name-only` in `projectPath`. Returns relative paths.
  * Scope:
- *   - unstaged:  `git diff --name-only`
- *   - staged:    `git diff --name-only --cached`
- *   - committed: `git diff --name-only <base>...HEAD` (since wins if provided:
- *                 `git diff --name-only <since>...HEAD`)
+ *   - unstaged:  `git diff --name-only` (+ untracked new files)
+ *   - staged:    `git diff --name-only --cached` (+ untracked new files)
+ *   - committed: `git diff --name-only <base>...HEAD` (single-source; no untracked)
+ *   - all:       committed + unstaged + untracked new files, deduped
+ *
+ * `scope=unstaged` (default) and `scope=staged` BREAKINGLY now include
+ * untracked new files (`git ls-files --others --exclude-standard`), matching
+ * the cbm invariant: untracked new files are invisible to `git diff` but are
+ * semantically part of the working-tree change. `scope=committed` stays
+ * single-source (committed-only) for callers that want the old behavior.
+ *
+ * Secret-like untracked paths (`.env*`, `*.key`, `*.pem`, `secrets.*`, etc.)
+ * are excluded and counted in `untrackedFiltered` (N7 AC 9a). Dedup is via
+ * `Set<string>`.
+ *
+ * `baseBranch`/`since` are validated against git arg-injection (N8) before any
+ * `execFileSync` call.
  *
  * Never invoked on the whole repo by the tool — the scope is always bounded.
  * Throws on git failure so the tool can surface a clean error.
@@ -449,11 +533,16 @@ export function defaultDiffRunner(
   scope: ImpactScope,
   baseBranch?: string,
   since?: string,
-): string[] {
+): DiffRunnerResult {
+  // N8: validate git refs before any execFileSync. Empty strings are allowed
+  // (the caller falls back to "main"); invalid patterns throw ToolError.
+  validateGitRef("base_branch", baseBranch ?? "");
+  validateGitRef("since", since ?? "");
+
   const args: string[] = ["-C", projectPath, "diff", "--name-only", "--diff-filter=d"];
   if (scope === "staged") {
     args.push("--cached");
-  } else if (scope === "committed") {
+  } else if (scope === "committed" || scope === "all") {
     let ref = baseBranch ?? "main";
     let diffRange: string | undefined;
     if (since) {
@@ -502,10 +591,41 @@ export function defaultDiffRunner(
     stdio: ["ignore", "pipe", "pipe"],
     maxBuffer: 4 * 1024 * 1024,
   });
-  return out
+  const tracked = out
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
+
+  // N7: merge untracked new files for unstaged/staged/all (NOT committed).
+  // committed is single-source; it diffs against a ref and intentionally
+  // excludes working-tree-only files.
+  const includeUntracked = scope === "unstaged" || scope === "staged" || scope === "all";
+  let untrackedFiltered = 0;
+  const merged = new Set<string>(tracked);
+  if (includeUntracked) {
+    const untracked = execFileSync(
+      "git",
+      ["-C", projectPath, "ls-files", "--others", "--exclude-standard"],
+      {
+        cwd: projectPath,
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+        maxBuffer: 4 * 1024 * 1024,
+      },
+    )
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    for (const p of untracked) {
+      if (isSecretLike(p)) {
+        untrackedFiltered++;
+        continue;
+      }
+      merged.add(p);
+    }
+  }
+
+  return { paths: Array.from(merged), untrackedFiltered };
 }
 
 export const impactAnalysisService = ImpactAnalysisService.getInstance();

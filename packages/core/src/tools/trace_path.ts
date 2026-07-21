@@ -21,6 +21,8 @@ import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { tracePathService } from "../services/symbol/trace-path.js";
 import type { EdgeType } from "../services/symbol/symbol-graph.service.js";
 import { serializeToolResponse } from "./serialize.js";
+import { validateEnum, ToolError } from "./enum-validation.js";
+import { getActiveGeneration, assertGenerationNotStale } from "../services/symbol/active-generation.js";
 
 interface TracePathParams {
   projectId: string;
@@ -37,6 +39,13 @@ interface TracePathParams {
   deadline_ms?: number;
   format?: "json" | "toon";
   fields?: string[];
+  /**
+   * N1 (WAVE4-N1): optional precondition — the client's last-known
+   * `activatedGraphGenerationId`. If it mismatches the current active
+   * generation, the tool throws a 412 teaching error. Opt-in: omitted →
+   * no precondition.
+   */
+  ifNoneMatch?: string;
 }
 
 export class TracePathTool implements IToolHandler {
@@ -106,6 +115,11 @@ export class TracePathTool implements IToolHandler {
         description:
           "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
       },
+      ifNoneMatch: {
+        type: "string",
+        description:
+          "Optional precondition: the client's last-known `activatedGraphGenerationId`. If it mismatches the current active generation, the tool returns a 412 teaching error.",
+      },
     },
     required: ["projectId", "function_name"],
   };
@@ -120,6 +134,28 @@ export class TracePathTool implements IToolHandler {
     if (!p.projectId) {
       return { success: false, error: "projectId is required" };
     }
+    const direction = validateEnum<"outbound" | "inbound" | "both">(
+      "direction",
+      p.direction ?? "outbound",
+      ["outbound", "inbound", "both"] as const,
+    );
+    const mode = validateEnum<"calls" | "data_flow" | "cross_service" | "all">(
+      "mode",
+      p.mode ?? "calls",
+      ["calls", "data_flow", "cross_service", "all"] as const,
+    );
+
+    // N1 (WAVE4-N1): surface the active graph generation id + opt-in stale
+    // precondition. The lookup is cheap; the precondition is opt-in.
+    const activatedGraphGenerationId = await getActiveGeneration(p.projectId);
+    try {
+      assertGenerationNotStale(p.ifNoneMatch, activatedGraphGenerationId);
+    } catch (e) {
+      if (e instanceof ToolError) {
+        return { success: false, error: e.message };
+      }
+      throw e;
+    }
 
     try {
       const result = await tracePathService.tracePath({
@@ -127,8 +163,8 @@ export class TracePathTool implements IToolHandler {
         function_name: p.function_name,
         qualifiedName: p.qualifiedName,
         projectId: p.projectId,
-        direction: p.direction,
-        mode: p.mode,
+        direction,
+        mode,
         depth: p.depth,
         include_tests: p.include_tests,
         edge_types: p.edge_types,
@@ -143,6 +179,8 @@ export class TracePathTool implements IToolHandler {
             hint:
               "Use search_definitions(search=...) to find the exact name, then pass it to trace_path. " +
               "Or pass a fully-qualified name (qualifiedName='rel/path.ts#Name') to skip name resolution.",
+            // N1 (WAVE4-N1): still surface the generation id on the not-found path.
+            activatedGraphGenerationId,
           },
         };
       }
@@ -156,6 +194,9 @@ export class TracePathTool implements IToolHandler {
           edgeTypes: result.edgeTypes,
           seeds: result.seeds,
           truncated: result.truncated,
+          nodes_total: result.nodes_total,
+          nodes_shown: result.nodes_shown,
+          nodes_omitted: result.nodes_omitted,
           nodeCount: result.nodes.length,
           edgeCount: result.edges.length,
           nodes: result.nodes,
@@ -168,6 +209,8 @@ export class TracePathTool implements IToolHandler {
             meta: e.meta,
           })),
           chains: result.chains,
+          // N1 (WAVE4-N1): the active graph generation id at query time.
+          activatedGraphGenerationId,
         },
         { format, fields },
       );
