@@ -18,6 +18,7 @@ import os from "os";
 import { EtlPipeline } from "../services/etl/pipeline.js";
 import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
 import { tracePathService } from "../services/symbol/trace-path.js";
+import { workspaceManager } from "../services/workspace/workspace-manager.js";
 import { TracePathTool } from "../tools/trace_path.js";
 import { getSymbolRepository } from "../data/symbol/symbol-repository-factory.js";
 
@@ -90,6 +91,7 @@ describeNative("trace_path", () => {
 
   async function indexFixture(dir: string, jobId: string): Promise<Record<string, number>> {
     const pipeline = EtlPipeline.getInstance();
+    await workspaceManager.markIndexing(TEST_PROJECT, dir);
     await pipeline.run({
       projectId: TEST_PROJECT,
       projectPath: dir,
