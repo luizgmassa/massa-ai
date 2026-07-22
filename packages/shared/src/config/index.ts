@@ -188,6 +188,23 @@ export interface ServerConfig {
     maxIgnorePatterns?: number;
   };
 
+  // Wave 5 FR-12 / N9-ext: read_file path containment. Absolute paths must
+  // resolve under the project root (projectPath arg), cwd, or an explicit
+  // colon-separated allowlist. Outside → teaching error listing valid roots
+  // (no host path enumeration). Project root + cwd are ALWAYS allowed.
+  readFile: {
+    /** Colon-separated absolute paths; empty string → no extra roots. */
+    extraRoots: string[];
+  };
+
+  // Wave 5 FR-18 / N16: server-side revalidation of client filter hints.
+  // search-controller.filterByPatterns caps include+exclude patterns,
+  // validates glob syntax, and emits filter_downgrades on contradiction.
+  filterValidation: {
+    /** Max include.length + exclude.length. Default 32. */
+    maxFilterPatterns: number;
+  };
+
   // Rate Limiting
   rateLimit: {
     requestsPerMinute: number;
@@ -727,6 +744,24 @@ export const defaultConfig: ServerConfig = {
   capturePolicy: fileConfig.capturePolicy
     ? validateCapturePolicyConfig(fileConfig.capturePolicy)
     : undefined,
+
+  // Wave 5 FR-12 / AD-W5-006: read_file path containment allowlist. Env
+  // MASSA_TH0TH_READ_FILE_ROOTS is colon-separated (POSIX-style). Project
+  // root (projectPath arg) and cwd are ALWAYS allowed; this list adds extra
+  // roots. Empty/unset → no extra roots. Teaching errors list valid roots
+  // only (no host path enumeration).
+  readFile: {
+    extraRoots: envString("MASSA_TH0TH_READ_FILE_ROOTS", "")
+      .split(":")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
+  },
+
+  // Wave 5 FR-18 / AD-W5-012: server-side filter revalidation. Cap
+  // include+exclude patterns (default 32, env MAX_FILTER_PATTERNS).
+  filterValidation: {
+    maxFilterPatterns: envNum("MAX_FILTER_PATTERNS", 32),
+  },
 
   rateLimit: {
     requestsPerMinute: envNum("REQUESTS_PER_MINUTE", 60),

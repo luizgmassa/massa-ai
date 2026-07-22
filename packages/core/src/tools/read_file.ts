@@ -9,7 +9,7 @@
  * - Language detection
  */
 
-import { IToolHandler, ToolResponse, estimateTokens } from "@massa-th0th/shared";
+import { IToolHandler, ToolResponse, estimateTokens, sanitizeFilePath } from "@massa-th0th/shared";
 import { logger } from "@massa-th0th/shared";
 import { CodeCompressor } from "../services/compression/code-compressor.js";
 import { serializeToolResponse } from "./serialize.js";
@@ -195,6 +195,22 @@ export class ReadFileTool implements IToolHandler {
       }
       const filePath = resolved;
 
+      // ── Wave 5 FR-12 / AD-W5-006: filesystem-side path containment. Absolute
+      // paths must resolve under one of: the project root (projectPath arg /
+      // workspace lookup), cwd, or an explicit allowlist env
+      // MASSA_TH0TH_READ_FILE_ROOTS (colon-separated). Outside → teaching
+      // error listing valid roots only (no host path enumeration). Project
+      // root + cwd are ALWAYS allowed. sanitizeFilePath strips ../ traversal
+      // tokens before the containment check so a crafted relative path can't
+      // escape. Does not regress the 500-line cap (N9) — applied later.
+      const containment = await this.checkPathContainment(filePath, p.projectId);
+      if (!containment.allowed) {
+        return {
+          success: false,
+          error: containment.error,
+        };
+      }
+
       // Keep original relative path for symbol DB queries (DB stores relative paths)
       const relativePath = p.filePath;
 
@@ -356,12 +372,79 @@ export class ReadFileTool implements IToolHandler {
     if (projectId) {
       const root = await this.getProjectRoot(projectId);
       if (root) {
-        return path.resolve(root, filePath);
+        // Wave 5 FR-12: strip ../ traversal tokens from relative paths before
+        // resolving under the project root. sanitizeFilePath removes ../ and
+        // ..\ segments so a crafted relative path can't escape the root.
+        const cleaned = sanitizeFilePath(filePath);
+        return path.resolve(root, cleaned);
       }
       return null;
     }
     // Relative path with no projectId — do not guess against cwd.
     return null;
+  }
+
+  /**
+   * Wave 5 FR-12 / AD-W5-006: filesystem-side path containment.
+   *
+   * An absolute path is allowed iff it resolves under one of:
+   *   1. the project root (workspace lookup for projectId, when provided)
+   *   2. process.cwd()
+   *   3. an entry in MASSA_TH0TH_READ_FILE_ROOTS (colon-separated env)
+   *
+   * Project root + cwd are ALWAYS allowed. Outside → teaching error listing
+   * valid roots only (no host path enumeration). The check uses path.relative
+   * to detect traversal out of a root (a result starting with ".." or an
+   * absolute path on another drive means outside).
+   *
+   * The env allowlist is read at CALL TIME (not config-load time) so test
+   * suites and runtime operators can set it without restarting the process.
+   * config.readFile.extraRoots mirrors the same env for introspection.
+   *
+   * Returns { allowed: true } on success, or { allowed: false, error } with a
+   * Wave-4-N6-style teaching error listing the valid roots.
+   */
+  private async checkPathContainment(
+    absoluteFilePath: string,
+    projectId?: string,
+  ): Promise<{ allowed: true } | { allowed: false; error: string }> {
+    // Collect valid roots. Project root is included only when actually
+    // resolvable (workspace lookup succeeds); cwd is always available.
+    const roots: string[] = [];
+    if (projectId) {
+      const root = await this.getProjectRoot(projectId);
+      if (root) roots.push(path.resolve(root));
+    }
+    roots.push(path.resolve(process.cwd()));
+    // Read the env allowlist at call time so tests/operators can set it
+    // without restarting the process. Colon-separated (POSIX-style).
+    const envRoots = (process.env.MASSA_TH0TH_READ_FILE_ROOTS ?? "")
+      .split(":")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    for (const extra of envRoots) {
+      roots.push(path.resolve(extra));
+    }
+
+    const target = path.resolve(absoluteFilePath);
+    for (const root of roots) {
+      const rel = path.relative(root, target);
+      // Inside iff rel does not start with ".." and is not absolute (cross-drive).
+      if (rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel)) {
+        return { allowed: true };
+      }
+      // Exact root match (rel === "") is also inside.
+      if (rel === "") return { allowed: true };
+    }
+    // Outside all roots → teaching error listing valid roots only.
+    const validRootsList = roots.map((r) => `  - ${r}`).join("\n");
+    return {
+      allowed: false,
+      error:
+        `read_file path containment: "${target}" is outside the allowed roots.\n` +
+        `Valid roots (project root + cwd + MASSA_TH0TH_READ_FILE_ROOTS):\n${validRootsList}\n` +
+        `Provide a filePath that resolves under one of these roots.`,
+    };
   }
 
   private async getProjectRoot(projectId: string): Promise<string | null> {

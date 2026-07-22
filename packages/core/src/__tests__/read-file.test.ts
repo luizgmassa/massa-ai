@@ -9,7 +9,7 @@
  *   3. absolute filePath                 → used verbatim (base-independent).
  */
 
-import { describe, test, expect, mock, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, mock, beforeEach, afterEach, afterAll } from "bun:test";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -32,8 +32,20 @@ type IndexingStartedPayload = {
   totalFiles?: number;
 };
 const indexingStartedListeners = new Set<(payload: IndexingStartedPayload) => void>();
+
+// Wave 5 FR-12: read_file path containment rejects absolute paths outside
+// project root + cwd + MASSA_TH0TH_READ_FILE_ROOTS. These Wave-4 tests
+// create temp files under os.tmpdir() (outside cwd), so allow tmpdir as an
+// extra root. The tool reads this env at CALL TIME, so setting it here
+// covers all tests in this file. Restored in afterAll.
+const PREV_READ_FILE_ROOTS = process.env.MASSA_TH0TH_READ_FILE_ROOTS;
 beforeEach(() => {
   fs.mkdirSync(FAKE_WORKSPACE_ROOT, { recursive: true });
+  process.env.MASSA_TH0TH_READ_FILE_ROOTS = os.tmpdir();
+});
+afterAll(() => {
+  if (PREV_READ_FILE_ROOTS === undefined) delete process.env.MASSA_TH0TH_READ_FILE_ROOTS;
+  else process.env.MASSA_TH0TH_READ_FILE_ROOTS = PREV_READ_FILE_ROOTS;
 });
 mock.module("../services/events/event-bus.js", () => ({
   eventBus: {
