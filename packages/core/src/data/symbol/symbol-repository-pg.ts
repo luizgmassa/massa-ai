@@ -5,7 +5,6 @@
  * Prisma 7.7.0 + Bun ORM bug (isObjectEnumValue is not a function).
  */
 
-import { createHash } from "node:crypto";
 import { logger } from "@massa-th0th/shared";
 import { getPrismaClient } from "../../services/query/prisma-client.js";
 import {
@@ -48,264 +47,37 @@ import type {
   DefinitionFqnResolution,
 } from "./symbol-repo-types.js";
 
-type TransactionClient = Parameters<
-  Parameters<ReturnType<typeof getPrismaClient>["$transaction"]>[0]
->[0];
+// ─── SQL identity helpers (from symbol-repo-identity.ts — N31 T07) ──────────
+export type { TransactionClient } from "./symbol-repo-identity.js";
+export {
+  definitionIdentityColumns,
+  generationDefinitionIdentityColumns,
+  referenceSourceSpan,
+} from "./symbol-repo-identity.js";
+import type { TransactionClient } from "./symbol-repo-identity.js";
+import {
+  definitionIdentityColumns,
+  generationDefinitionIdentityColumns,
+  referenceSourceSpan,
+} from "./symbol-repo-identity.js";
 
-function definitionIdentityColumns(def: SymbolDefinition): {
-  qualifiedName: string;
-  canonicalSignature: string | null;
-  signatureHash: string | null;
-  legacyFqn: string;
-  sourceSpan: Record<string, unknown> | null;
-} {
-  const legacyFqn = def.legacy_fqn ?? `${def.file_path}#${def.name}`;
-  let parsedModern: Extract<ReturnType<typeof parseStructuralFqn>, { format: "qualified" }> | null = null;
-  try {
-    const parsed = parseStructuralFqn(def.id);
-    if (
-      parsed.format === "qualified" &&
-      parsed.file === def.file_path &&
-      parsed.kind === def.kind &&
-      parsed.qualifiedName.split(".").at(-1) === def.name
-    ) {
-      parsedModern = parsed;
-    }
-  } catch {
-    // Pre-codec legacy rows retain their compatibility fields without
-    // fabricating qualified identity material.
-  }
-  return {
-    qualifiedName: def.qualified_name ?? parsedModern?.qualifiedName ?? def.name,
-    canonicalSignature: def.canonical_signature ?? null,
-    signatureHash: def.signature_hash ?? parsedModern?.signatureHash ?? null,
-    legacyFqn,
-    sourceSpan: def.source_span ?? null,
-  };
-}
-
-function generationDefinitionIdentityColumns(def: SymbolDefinition): ReturnType<typeof definitionIdentityColumns> {
-  const identity = definitionIdentityColumns(def);
-  const parsed = parseStructuralFqn(def.id);
-  if (parsed.file !== def.file_path) throw new TypeError(`definition_fqn_file_mismatch:${def.id}`);
-  const expectedLegacyFqn = `${def.file_path}#${def.name}`;
-  if (identity.legacyFqn !== expectedLegacyFqn) {
-    throw new TypeError(`definition_legacy_fqn_mismatch:${def.id}`);
-  }
-  if (parsed.format === "simple") {
-    if (parsed.name !== def.name) throw new TypeError(`definition_fqn_name_mismatch:${def.id}`);
-    if (def.qualified_name !== undefined && def.qualified_name !== def.name) {
-      throw new TypeError(`definition_fqn_qualified_name_mismatch:${def.id}`);
-    }
-    if ((def.canonical_signature === undefined) !== (def.signature_hash === undefined)) {
-      throw new TypeError(`definition_simple_signature_pair_mismatch:${def.id}`);
-    }
-    if (def.canonical_signature !== undefined && def.signature_hash !== undefined) {
-      const digest = createHash("sha256").update(def.canonical_signature, "utf8").digest("hex");
-      if (digest !== def.signature_hash) throw new TypeError(`definition_fqn_signature_mismatch:${def.id}`);
-    }
-    return { ...identity, qualifiedName: def.name };
-  }
-  if (parsed.kind !== def.kind) throw new TypeError(`definition_fqn_kind_mismatch:${def.id}`);
-  if (parsed.qualifiedName.split(".").at(-1) !== def.name) {
-    throw new TypeError(`definition_fqn_name_mismatch:${def.id}`);
-  }
-  if (def.qualified_name !== undefined && def.qualified_name !== parsed.qualifiedName) {
-    throw new TypeError(`definition_fqn_qualified_name_mismatch:${def.id}`);
-  }
-  if (def.signature_hash !== undefined && def.signature_hash !== parsed.signatureHash) {
-    throw new TypeError(`definition_fqn_signature_hash_mismatch:${def.id}`);
-  }
-  if (def.canonical_signature !== undefined) {
-    const digest = createHash("sha256").update(def.canonical_signature, "utf8").digest("hex");
-    if (digest !== parsed.signatureHash) throw new TypeError(`definition_fqn_signature_mismatch:${def.id}`);
-  }
-  return {
-    ...identity,
-    qualifiedName: parsed.qualifiedName,
-    signatureHash: parsed.signatureHash,
-  };
-}
-
-function referenceSourceSpan(ref: SymbolReference): Record<string, unknown> | null {
-  const candidate = ref.source_span ?? ref.meta?.sourceSpan;
-  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
-  const span = candidate as Record<string, unknown>;
-  const start = span.start as Record<string, unknown> | undefined;
-  const end = span.end as Record<string, unknown> | undefined;
-  const integers = [span.startByte, span.endByte, start?.row, start?.column, end?.row, end?.column];
-  if (!integers.every((value) => Number.isInteger(value) && (value as number) >= 0)) return null;
-  if ((span.endByte as number) < (span.startByte as number)) return null;
-  return span;
-}
-
-// ─── Raw row types returned by $queryRaw ─────────────────────────────────────
-
-interface WsRaw {
-  project_id: string;
-  project_path: string;
-  display_name: string | null;
-  status: string;
-  last_indexed_at: Date | null;
-  last_error: string | null;
-  files_count: number;
-  chunks_count: number;
-  symbols_count: number;
-  created_at: Date;
-  updated_at: Date;
-}
-
-function mapWs(ws: WsRaw): WorkspaceRow {
-  return {
-    project_id: ws.project_id,
-    project_path: ws.project_path,
-    display_name: ws.display_name ?? undefined,
-    status: ws.status as WorkspaceStatus,
-    last_indexed_at: ws.last_indexed_at?.getTime(),
-    last_error: ws.last_error ?? undefined,
-    files_count: Number(ws.files_count),
-    chunks_count: Number(ws.chunks_count),
-    symbols_count: Number(ws.symbols_count),
-    created_at: ws.created_at.getTime(),
-    updated_at: ws.updated_at.getTime(),
-  };
-}
-
-interface FileRaw {
-  project_id: string;
-  generation_id: string;
-  relative_path: string;
-  content_hash: string;
-  mtime: bigint;
-  size: number;
-  indexed_at: Date;
-  symbol_count: number;
-  chunk_count: number;
-  language: string | null;
-  dialect: string | null;
-  grammar_version: string | null;
-  query_pack_version: string | null;
-  resolver_version: string | null;
-  parser_status: SymbolFileRow["parser_status"];
-  parser_error_count: number;
-  diagnostics: Record<string, unknown>[];
-  is_stale: boolean;
-  last_known_good_generation_id: string | null;
-  last_successful_at: Date | null;
-}
-
-function mapFile(f: FileRaw): SymbolFileRow {
-  return {
-    project_id: f.project_id,
-    relative_path: f.relative_path,
-    content_hash: f.content_hash,
-    mtime: Number(f.mtime),
-    size: Number(f.size),
-    indexed_at: f.indexed_at.getTime(),
-    symbol_count: Number(f.symbol_count),
-    chunk_count: Number(f.chunk_count),
-    generation_id: f.generation_id,
-    language: f.language ?? undefined,
-    dialect: f.dialect ?? undefined,
-    grammar_version: f.grammar_version ?? undefined,
-    query_pack_version: f.query_pack_version ?? undefined,
-    resolver_version: f.resolver_version ?? undefined,
-    parser_status: f.parser_status,
-    parser_error_count: Number(f.parser_error_count),
-    diagnostics: Array.isArray(f.diagnostics) ? f.diagnostics : [],
-    is_stale: Boolean(f.is_stale),
-    last_known_good_generation_id: f.last_known_good_generation_id ?? undefined,
-    last_successful_at: f.last_successful_at?.getTime(),
-  };
-}
-
-interface DefRaw {
-  id: string;
-  project_id: string;
-  file_path: string;
-  name: string;
-  kind: string;
-  line_start: number;
-  line_end: number;
-  exported: boolean;
-  doc_comment: string | null;
-  indexed_at: Date;
-  qualified_name: string;
-  canonical_signature: string | null;
-  signature_hash: string | null;
-  legacy_fqn: string;
-  source_span: Record<string, unknown> | null;
-}
-
-function mapDef(d: DefRaw): SymbolDefinition {
-  return {
-    id: d.id,
-    project_id: d.project_id,
-    file_path: d.file_path,
-    name: d.name,
-    kind: d.kind as SymbolKind,
-    line_start: Number(d.line_start),
-    line_end: Number(d.line_end),
-    exported: Boolean(d.exported),
-    doc_comment: d.doc_comment ?? undefined,
-    indexed_at: d.indexed_at.getTime(),
-    qualified_name: d.qualified_name,
-    canonical_signature: d.canonical_signature ?? undefined,
-    signature_hash: d.signature_hash ?? undefined,
-    legacy_fqn: d.legacy_fqn,
-    source_span: d.source_span ?? undefined,
-  };
-}
-
-interface RefRaw {
-  id: number;
-  project_id: string;
-  from_file: string;
-  from_line: number;
-  symbol_name: string;
-  target_fqn: string | null;
-  ref_kind: string;
-  meta: Record<string, unknown> | null;
-  source_span: Record<string, unknown> | null;
-}
-
-function mapRef(r: RefRaw): SymbolReference {
-  return {
-    id: Number(r.id),
-    project_id: r.project_id,
-    from_file: r.from_file,
-    from_line: Number(r.from_line),
-    symbol_name: r.symbol_name,
-    target_fqn: r.target_fqn ?? undefined,
-    ref_kind: r.ref_kind as RefKind,
-    meta: r.meta ?? null,
-    source_span: r.source_span ?? undefined,
-  };
-}
-
-interface ImpRaw {
-  id: number;
-  project_id: string;
-  from_file: string;
-  to_file: string | null;
-  specifier: string;
-  imported_names: string[];
-  is_external: boolean;
-  is_type_only: boolean;
-}
-
-function mapImp(i: ImpRaw): SymbolImport {
-  return {
-    id: Number(i.id),
-    project_id: i.project_id,
-    from_file: i.from_file,
-    to_file: i.to_file ?? undefined,
-    specifier: i.specifier,
-    imported_names: Array.isArray(i.imported_names) ? i.imported_names : [],
-    is_external: Boolean(i.is_external),
-    is_type_only: Boolean(i.is_type_only),
-  };
-}
+// ─── Raw row mappers (from symbol-repo-mappers.ts — N31 T07) ─────────────────
+export type {
+  WsRaw,
+  FileRaw,
+  DefRaw,
+  RefRaw,
+  ImpRaw,
+} from "./symbol-repo-mappers.js";
+export {
+  mapWs,
+  mapFile,
+  mapDef,
+  mapRef,
+  mapImp,
+} from "./symbol-repo-mappers.js";
+import type { WsRaw, FileRaw, DefRaw, RefRaw, ImpRaw } from "./symbol-repo-mappers.js";
+import { mapWs, mapFile, mapDef, mapRef, mapImp } from "./symbol-repo-mappers.js";
 
 interface GenerationWriteLockRow {
   id: string;
