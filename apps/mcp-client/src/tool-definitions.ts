@@ -3,12 +3,17 @@
  *
  * Define as ferramentas expostas ao MCP host (OpenCode/Claude)
  * e o mapeamento para endpoints da Tools API.
+ *
+ * Wave 6 N31: search/memory tool defs extracted to tool-defs/ modules.
+ * Remaining tools (project, synapse, hooks/exec) stay inline pending T12.
  */
 
 import {
   STRUCTURAL_FQN_DESCRIPTION,
   STRUCTURAL_SYMBOL_KIND_SCHEMA,
 } from "@massa-th0th/shared";
+import { SEARCH_TOOL_DEFINITIONS } from "./tool-defs/tool-defs-search.js";
+import { MEMORY_TOOL_DEFINITIONS } from "./tool-defs/tool-defs-memory.js";
 
 export interface ToolDefinition {
   name: string;
@@ -18,7 +23,18 @@ export interface ToolDefinition {
   apiMethod: "GET" | "POST" | "PATCH" | "DELETE";
 }
 
-export const TOOL_DEFINITIONS: ToolDefinition[] = [
+// ── Lookup maps for interleaving extracted tools in canonical order ───────
+
+const SEARCH_BY_NAME = new Map(
+  SEARCH_TOOL_DEFINITIONS.map((t) => [t.name, t] as const),
+);
+const MEMORY_BY_NAME = new Map(
+  MEMORY_TOOL_DEFINITIONS.map((t) => [t.name, t] as const),
+);
+
+// ── Remaining inline tool definitions (T12 will extract these) ─────────────
+
+const REMAINING_TOOLS: ToolDefinition[] = [
   {
     name: "index",
     description:
@@ -73,535 +89,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["jobId"],
-    },
-  },
-  {
-    name: "search",
-    description:
-      "Search for code in an indexed project using semantic and keyword search",
-    apiEndpoint: "/api/v1/search/project",
-    apiMethod: "POST",
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "Search query (natural language or keywords)",
-        },
-        projectId: { type: "string", description: "Project ID to search in" },
-        projectPath: {
-          type: "string",
-          description: "Project path (required for autoReindex)",
-        },
-        maxResults: {
-          type: "number",
-          description: "Maximum number of results to return",
-          default: 10,
-        },
-        minScore: {
-          type: "number",
-          description: "Minimum relevance score (0-1)",
-          default: 0.3,
-        },
-        responseMode: {
-          type: "string",
-          enum: ["summary", "full", "enriched"],
-          description:
-            "Response format: 'summary' (preview only, saves 70% tokens), 'full' (includes content), or 'enriched' (full + fileImports + parentSymbol in one call)",
-          default: "summary",
-        },
-        autoReindex: {
-          type: "boolean",
-          description:
-            "Automatically reindex if project index is stale (can increase latency)",
-          default: false,
-        },
-        include: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Glob patterns to include (e.g., ['src/components/**/*.tsx', 'src/utils/**'])",
-        },
-        exclude: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Glob patterns to exclude (e.g., ['**/*.test.*', '**/*.spec.*'])",
-        },
-        explainScores: {
-          type: "boolean",
-          description:
-            "Include detailed score breakdown (vector, keyword, RRF components)",
-          default: false,
-        },
-        sessionId: {
-          type: "string",
-          description: "Synapse session ID from synapse_session. Activates cognitive modulation: task alignment, agent affinity, working-memory boost.",
-        },
-        format: {
-          type: "string",
-          enum: ["json", "toon", "tree"],
-          description:
-            "Output format. 'json' (default) emits the raw object. 'toon' encodes it. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper. Default: json.",
-          default: "json",
-        },
-        fields: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
-        },
-      },
-      required: ["query", "projectId"],
-    },
-  },
-  {
-    name: "remember",
-    description:
-      "Store memory in the PostgreSQL-backed hierarchical memory system",
-    apiEndpoint: "/api/v1/memory/store",
-    apiMethod: "POST",
-    inputSchema: {
-      type: "object",
-      properties: {
-        content: { type: "string", description: "Content to store" },
-        type: {
-          type: "string",
-          enum: ["critical", "conversation", "code", "decision", "pattern"],
-          description: "Type of memory",
-        },
-        userId: { type: "string", description: "User ID" },
-        projectId: { type: "string", description: "Project ID" },
-        sessionId: { type: "string", description: "Session ID" },
-        agentId: {
-          type: "string",
-          description:
-            "Agent ID (e.g., orchestrator, implementer, architect, optimizer)",
-        },
-        tags: {
-          type: "array",
-          items: { type: "string" },
-          description: "Tags for categorization",
-        },
-        importance: {
-          type: "number",
-          description: "Importance score (0-1)",
-          default: 0.5,
-        },
-        format: {
-          type: "string",
-          enum: ["json", "toon"],
-          description: "Output format (json or toon)",
-          default: "toon",
-        },
-        fields: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
-        },
-      },
-      required: ["content", "type"],
-    },
-  },
-  {
-    name: "recall",
-    description:
-      "Search stored memories across sessions using semantic search (recovers context from previous conversations)",
-    apiEndpoint: "/api/v1/memory/search",
-    apiMethod: "POST",
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "Search query (what to remember)",
-        },
-        userId: { type: "string", description: "Filter by user ID" },
-        projectId: { type: "string", description: "Filter by project ID" },
-        sessionId: { type: "string", description: "Filter by session ID" },
-        agentId: {
-          type: "string",
-          description:
-            "Filter by agent ID (orchestrator, implementer, architect, optimizer)",
-        },
-        types: {
-          type: "array",
-          items: {
-            type: "string",
-            enum: ["critical", "conversation", "code", "decision", "pattern"],
-          },
-          description: "Filter by memory types",
-        },
-        limit: {
-          type: "number",
-          description: "Maximum results to return",
-          default: 10,
-        },
-        minImportance: {
-          type: "number",
-          description: "Minimum importance (0-1)",
-          default: 0.3,
-        },
-        includePersistent: {
-          type: "boolean",
-          description: "Include persistent memories from other sessions",
-          default: true,
-        },
-        format: {
-          type: "string",
-          enum: ["json", "toon"],
-          description: "Output format (json or toon)",
-          default: "toon",
-        },
-        fields: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
-        },
-      },
-      required: ["query"],
-    },
-  },
-  {
-    name: "memory_update",
-    description:
-      "Update an existing memory by id (content, importance, or tags). Content changes are re-embedded.",
-    apiEndpoint: "/api/v1/memory/update",
-    apiMethod: "POST",
-    inputSchema: {
-      type: "object",
-      properties: {
-        id: { type: "string", description: "ID of the memory to update" },
-        content: {
-          type: "string",
-          description: "New content (re-embedded when set)",
-        },
-        importance: {
-          type: "number",
-          description: "New importance score (0-1)",
-          minimum: 0,
-          maximum: 1,
-        },
-        tags: {
-          type: "array",
-          items: { type: "string" },
-          description: "Tags (replace existing unless mergeTags is true)",
-        },
-        mergeTags: {
-          type: "boolean",
-          description: "Union tags with existing instead of replacing",
-          default: false,
-        },
-        format: {
-          type: "string",
-          enum: ["json", "toon"],
-          description: "Output format (json or toon)",
-          default: "toon",
-        },
-        fields: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
-        },
-      },
-      required: ["id"],
-    },
-  },
-  {
-    name: "memory_delete",
-    description:
-      "Delete a memory by id (hard delete). Also removes its graph edges.",
-    apiEndpoint: "/api/v1/memory/delete",
-    apiMethod: "POST",
-    inputSchema: {
-      type: "object",
-      properties: {
-        id: { type: "string", description: "ID of the memory to delete" },
-        format: {
-          type: "string",
-          enum: ["json", "toon"],
-          description: "Output format (json or toon)",
-          default: "toon",
-        },
-        fields: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
-        },
-      },
-      required: ["id"],
-    },
-  },
-  {
-    name: "list_checkpoints",
-    description:
-      "List saved task checkpoints (versioned TASK state). Filter by task ID, project, or type. These are task-progress snapshots, not session-continuity snapshots (see compact_snapshot).",
-    apiEndpoint: "/api/v1/checkpoints/list",
-    apiMethod: "POST",
-    inputSchema: {
-      type: "object",
-      properties: {
-        taskId: { type: "string", description: "Filter by task ID" },
-        projectId: { type: "string", description: "Filter by project ID" },
-        checkpointType: {
-          type: "string",
-          enum: ["auto", "manual", "milestone"],
-          description: "Filter by checkpoint type",
-        },
-        includeExpired: {
-          type: "boolean",
-          description: "Include expired checkpoints",
-          default: false,
-        },
-        limit: { type: "number", description: "Max results to return", default: 10 },
-        format: {
-          type: "string",
-          enum: ["json", "toon"],
-          description: "Output format (json or toon)",
-          default: "toon",
-        },
-        fields: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
-        },
-      },
-      required: [],
-    },
-  },
-  {
-    name: "create_checkpoint",
-    description:
-      "Create a checkpoint to save current task progress — versioned TASK state (progress, decisions, files) for resumption or rollback. Distinct from compact_snapshot (SESSION continuity across /compact).",
-    apiEndpoint: "/api/v1/checkpoints/create",
-    apiMethod: "POST",
-    inputSchema: {
-      type: "object",
-      properties: {
-        taskId: { type: "string", description: "Unique identifier for the task" },
-        description: {
-          type: "string",
-          description: "Human-readable description of the task",
-        },
-        status: {
-          type: "string",
-          enum: ["pending", "in_progress", "completed", "failed", "paused"],
-          description: "Current task status",
-          default: "in_progress",
-        },
-        currentStep: { type: "string", description: "Current step name" },
-        progressPercent: {
-          type: "number",
-          description: "Overall progress percentage (0-100)",
-          default: 0,
-        },
-        totalSteps: { type: "number", description: "Total steps", default: 0 },
-        completedSteps: { type: "number", description: "Completed steps", default: 0 },
-        checkpointType: {
-          type: "string",
-          enum: ["manual", "milestone"],
-          description: "Checkpoint type (milestone has longer TTL)",
-          default: "manual",
-        },
-        agentId: { type: "string", description: "Agent creating the checkpoint" },
-        projectId: { type: "string", description: "Project ID" },
-        memoryIds: {
-          type: "array",
-          items: { type: "string" },
-          description: "Memory IDs related to this task",
-        },
-        fileChanges: {
-          type: "array",
-          items: { type: "string" },
-          description: "File paths modified during this task",
-        },
-        decisions: {
-          type: "array",
-          items: { type: "string" },
-          description: "Memory IDs of decisions made",
-        },
-        learnings: {
-          type: "array",
-          items: { type: "string" },
-          description: "Key learnings or insights",
-        },
-        nextAction: {
-          type: "string",
-          description: "Next action to take when restoring",
-        },
-        pendingValidations: {
-          type: "array",
-          items: { type: "string" },
-          description: "Validations still pending",
-        },
-        format: {
-          type: "string",
-          enum: ["json", "toon"],
-          description: "Output format (json or toon)",
-          default: "toon",
-        },
-        fields: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
-        },
-      },
-      required: ["taskId", "description"],
-    },
-  },
-  {
-    name: "restore_checkpoint",
-    description:
-      "Restore a saved task checkpoint — returns TASK state (progress, decisions, agent state) plus memory/file integrity checks. Distinct from compact_snapshot (SESSION continuity, not task state).",
-    apiEndpoint: "/api/v1/checkpoints/restore",
-    apiMethod: "POST",
-    inputSchema: {
-      type: "object",
-      properties: {
-        checkpointId: {
-          type: "string",
-          description: "Checkpoint ID to restore (omit to use taskId)",
-        },
-        taskId: {
-          type: "string",
-          description: "Restore the latest checkpoint for this task",
-        },
-        format: {
-          type: "string",
-          enum: ["json", "toon"],
-          description: "Output format (json or toon)",
-          default: "toon",
-        },
-        fields: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
-        },
-      },
-      required: [],
-    },
-  },
-  {
-    name: "compress",
-    description:
-      "Compress context using semantic compression (keeps structure, removes details)",
-    apiEndpoint: "/api/v1/context/compress",
-    apiMethod: "POST",
-    inputSchema: {
-      type: "object",
-      properties: {
-        content: { type: "string", description: "Content to compress" },
-        strategy: {
-          type: "string",
-          enum: [
-            "code_structure",
-            "conversation_summary",
-            "semantic_dedup",
-            "hierarchical",
-          ],
-          description: "Compression strategy",
-          default: "code_structure",
-        },
-        targetRatio: {
-          type: "number",
-          description:
-            "Target compression ratio (0-1, e.g., 0.7 = 70% reduction)",
-          default: 0.7,
-        },
-        language: {
-          type: "string",
-          description: "Programming language (for code compression)",
-        },
-      },
-      required: ["content"],
-    },
-  },
-  {
-    name: "optimized_context",
-    description:
-      "Retrieve and compress context with maximum token efficiency (search + compress)",
-    apiEndpoint: "/api/v1/context/optimized",
-    apiMethod: "POST",
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "Search query to find relevant context",
-        },
-        projectId: {
-          type: "string",
-          description: "Project ID for code context",
-        },
-        projectPath: {
-          type: "string",
-          description: "Project path (for auto-reindex)",
-        },
-        maxTokens: {
-          type: "number",
-          description: "Maximum tokens in returned context",
-          default: 4000,
-        },
-        maxResults: {
-          type: "number",
-          description: "Maximum search results to include",
-          default: 5,
-        },
-        format: {
-          type: "string",
-          enum: ["json", "toon"],
-          description: "Output format (json or toon). Default: json.",
-          default: "json",
-        },
-        fields: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
-        },
-      },
-      required: ["query", "projectId"],
-    },
-  },
-  {
-    name: "analytics",
-    description:
-      "Get search analytics and performance metrics (usage patterns, cache performance, etc)",
-    apiEndpoint: "/api/v1/analytics",
-    apiMethod: "POST",
-    inputSchema: {
-      type: "object",
-      properties: {
-        type: {
-          type: "string",
-          enum: ["summary", "project", "query", "cache", "recent"],
-          description:
-            "Type of analytics: 'summary' (overall), 'project' (specific project), 'query' (specific query), 'cache' (cache performance), 'recent' (recent searches)",
-        },
-        projectId: {
-          type: "string",
-          description:
-            "Project ID. Required for type='project'. Optional for type='cache' (omit for global cache stats across all projects; provide to scope to one project). Optional for type='query'/'recent'.",
-        },
-        query: {
-          type: "string",
-          description: "Search query (required for type='query')",
-        },
-        limit: {
-          type: "number",
-          description:
-            "Limit for results (default: 10 for most, 50 for recent)",
-          default: 10,
-        },
-      },
-        required: ["type"],
     },
   },
 
@@ -693,288 +180,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["id"],
-    },
-  },
-
-  {
-    name: "search_definitions",
-    description:
-      "Search for symbol definitions (functions, classes, variables, types, interfaces) in an indexed project. Returns name, kind, file location, line numbers, and doc comments.",
-    apiEndpoint: "/api/v1/symbol/definitions",
-    apiMethod: "GET",
-    inputSchema: {
-      type: "object",
-      properties: {
-        projectId: {
-          type: "string",
-          description: "The project ID to search in",
-        },
-        search: {
-          type: "string",
-          description: "Substring search on symbol name (case-insensitive)",
-        },
-        kind: {
-          anyOf: [
-            STRUCTURAL_SYMBOL_KIND_SCHEMA,
-            {
-              type: "array",
-              items: STRUCTURAL_SYMBOL_KIND_SCHEMA,
-            },
-          ],
-          description:
-            "One canonical graph schema v2 symbol kind, or an array of kinds. Arrays are serialized as comma-separated query values.",
-        },
-        file: {
-          type: "string",
-          description: "Filter by file path (relative to project root)",
-        },
-        exportedOnly: {
-          type: "boolean",
-          description: "Return only exported symbols",
-          default: false,
-        },
-        limit: {
-          type: "number",
-          description: "Maximum number of results (default: 20)",
-          default: 20,
-        },
-        ifNoneMatch: {
-          type: "string",
-          description:
-            "Optional precondition: the client's last-known `activatedGraphGenerationId`. If it mismatches the current active generation, the tool returns a 412 teaching error.",
-        },
-      },
-      required: ["projectId"],
-    },
-  },
-
-  {
-    name: "get_references",
-    description:
-      `Find all references to a symbol across the active graph generation. ${STRUCTURAL_FQN_DESCRIPTION}`,
-    apiEndpoint: "/api/v1/symbol/references",
-    apiMethod: "GET",
-    inputSchema: {
-      type: "object",
-      properties: {
-        projectId: {
-          type: "string",
-          description: "The project ID to search in",
-        },
-        symbolName: {
-          type: "string",
-          description: "Name of the symbol to find references for",
-        },
-        fqn: {
-          type: "string",
-          description: STRUCTURAL_FQN_DESCRIPTION,
-        },
-        limit: {
-          type: "number",
-          description: "Maximum references to return (default: 50)",
-          default: 50,
-        },
-        ifNoneMatch: {
-          type: "string",
-          description:
-            "Optional precondition: the client's last-known `activatedGraphGenerationId`. If it mismatches the current active generation, the tool returns a 412 teaching error.",
-        },
-        format: {
-          type: "string",
-          enum: ["json", "toon", "tree"],
-          description:
-            "Output format. 'json' (default) emits the raw object. 'toon' encodes it. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper (groups references by file). Default: json.",
-          default: "json",
-        },
-        fields: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Projection — keep only these keys (dotted paths supported). Absent/empty → full data.",
-        },
-      },
-      required: ["projectId", "symbolName"],
-    },
-  },
-
-  {
-    name: "go_to_definition",
-    description:
-      `Find a definition in the active graph generation. ${STRUCTURAL_FQN_DESCRIPTION}`,
-    apiEndpoint: "/api/v1/symbol/definition",
-    apiMethod: "GET",
-    inputSchema: {
-      type: "object",
-      properties: {
-        projectId: {
-          type: "string",
-          description: "The project ID to search in",
-        },
-        symbolName: {
-          type: "string",
-          description: `Bare symbol name or structural FQN. ${STRUCTURAL_FQN_DESCRIPTION}`,
-        },
-        fromFile: {
-          type: "string",
-          description:
-            "Relative path of the file where the symbol is used. Helps prioritize the correct definition when multiple exist.",
-        },
-      },
-      required: ["projectId", "symbolName"],
-    },
-  },
-
-  {
-    name: "trace_path",
-    description:
-      "Trace paths through the code graph from a seed symbol, following typed edges (CALLS/DATA_FLOWS/HTTP_CALLS/EMITS/LISTENS). " +
-      "Modes: calls (callers/callees), data_flow (value propagation), cross_service (HTTP/async hops), all. " +
-      "Direction: outbound (what it reaches) | inbound (what reaches it) | both. " +
-      `Use INSTEAD OF grep for callers, dependencies, impact analysis, or data flow tracing. ${STRUCTURAL_FQN_DESCRIPTION}`,
-    apiEndpoint: "/api/v1/symbol/trace",
-    apiMethod: "GET",
-    inputSchema: {
-      type: "object",
-      properties: {
-        function_name: {
-          type: "string",
-          description: "Seed symbol name (bare name resolved against definitions). Aliases: symbol, qualifiedName.",
-        },
-        symbol: { type: "string", description: "Alias for function_name." },
-        qualifiedName: {
-          type: "string",
-          description: STRUCTURAL_FQN_DESCRIPTION,
-        },
-        projectId: { type: "string", description: "The project ID to trace in" },
-        direction: {
-          type: "string",
-          enum: ["outbound", "inbound", "both"],
-          default: "outbound",
-          description: "outbound = what the seed calls/flows to; inbound = what calls/flows into it; both = run each.",
-        },
-        mode: {
-          type: "string",
-          enum: ["calls", "data_flow", "cross_service", "all"],
-          default: "calls",
-          description:
-            "calls: follow CALL edges. data_flow: CALL + DATA_FLOW. cross_service: HTTP_CALL + EMITS + LISTENS + DATA_FLOW. all: every typed edge.",
-        },
-        depth: {
-          type: "number",
-          description: "Max BFS depth (default 3, hard cap 6 to bound cost).",
-          default: 3,
-        },
-        include_tests: {
-          type: "boolean",
-          default: false,
-          description: "Whether to traverse into test files (default false).",
-        },
-        edge_types: {
-          type: "array",
-          items: { type: "string" },
-          description: "Explicit edge-type override (wins over mode): call|data_flow|http_call|emit|listen|import|type_ref|extend|implement.",
-        },
-        deadline_ms: {
-          type: "number",
-          default: 5000,
-          description:
-            "Wall-clock budget (ms) bounding the graph traversal. If exceeded the walk aborts with truncated=true and partial nodes/edges. Default 5000.",
-        },
-        format: {
-          type: "string",
-          enum: ["json", "toon", "tree"],
-          description:
-            "Output format. 'json' (default) emits the raw object. 'toon' encodes it. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper (groups nodes by file). Default: json.",
-          default: "json",
-        },
-        fields: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Projection — keep only these keys (dotted paths supported, e.g. ['nodes.symbol']). Absent/empty → full data.",
-        },
-        ifNoneMatch: {
-          type: "string",
-          description:
-            "Optional precondition: the client's last-known `activatedGraphGenerationId`. If it mismatches the current active generation, the tool returns a 412 teaching error.",
-        },
-      },
-      required: ["projectId"],
-      anyOf: [
-        { required: ["function_name"] },
-        { required: ["symbol"] },
-        { required: ["qualifiedName"] },
-      ],
-    },
-  },
-
-  {
-    name: "impact_analysis",
-    description:
-      "Analyze a git diff and report impacted symbols (callers/dependents of changed code) ranked by centrality-weighted risk. " +
-      "Scope: unstaged | staged | committed (vs base_branch/since). " +
-      "Answers 'what else breaks if I change X?' without grepping the whole repo.",
-    apiEndpoint: "/api/v1/symbol/impact",
-    apiMethod: "POST",
-    inputSchema: {
-      type: "object",
-      properties: {
-        projectId: { type: "string", description: "The project ID to analyze" },
-        projectPath: {
-          type: "string",
-          description: "Absolute path to the project working tree (where `git` runs). Required for the diff.",
-        },
-        scope: {
-          type: "string",
-          enum: ["unstaged", "staged", "committed", "all"],
-          default: "unstaged",
-          description: "unstaged = working-tree changes (+ untracked new files); staged = index (+ untracked); committed = diff vs base_branch (or since); all = committed + unstaged + untracked, deduped.",
-        },
-        base_branch: {
-          type: "string",
-          default: "main",
-          description: "For committed scope: diff against this branch (default main).",
-        },
-        since: {
-          type: "string",
-          description: "For committed scope: commits since this ref/date (e.g. '2026-07-01' or a SHA). Wins over base_branch.",
-        },
-        depth: {
-          type: "number",
-          description: "How far to propagate impact through the reverse import graph (default 2, hard cap 4).",
-          default: 2,
-        },
-        paths: {
-          type: "array",
-          items: { type: "string" },
-          description: "Optional filter — only analyze these changed relative paths.",
-        },
-        deadline_ms: {
-          type: "number",
-          default: 5000,
-          description:
-            "Wall-clock budget (ms) bounding the reverse-import-graph traversal. If exceeded the walk aborts with truncated=true and partial impacted symbols. Default 5000.",
-        },
-        format: {
-          type: "string",
-          enum: ["json", "toon", "tree"],
-          description:
-            "Output format. 'json' (default) emits the raw object. 'toon' encodes it. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper (groups impacted symbols by file prefix). Default: json.",
-          default: "json",
-        },
-        fields: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Projection — keep only these keys (dotted paths supported, e.g. ['impacted.symbol']). Absent/empty → full data.",
-        },
-        ifNoneMatch: {
-          type: "string",
-          description:
-            "Optional precondition: the client's last-known `activatedGraphGenerationId`. If it mismatches the current active generation, the tool returns a 412 teaching error.",
-        },
-      },
-      required: ["projectId", "projectPath"],
     },
   },
 
@@ -1211,39 +416,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         id: { type: "string", description: "Session ID from synapse_task_begin" },
       },
       required: ["id"],
-    },
-  },
-  {
-    name: "symbol_snippet",
-    description: "Get raw code snippet by file + line range from an indexed project.",
-    apiEndpoint: "/api/v1/symbol/snippet",
-    apiMethod: "GET",
-    inputSchema: {
-      type: "object",
-      properties: {
-        projectId: { type: "string" },
-        file: { type: "string", description: "Relative file path" },
-        lineStart: { type: "number" },
-        lineEnd: { type: "number" },
-      },
-      required: ["projectId", "file"],
-    },
-  },
-  {
-    name: "memory_list",
-    description: "Browse stored memories by type/importance without a semantic query (audit mode). Use recall for semantic search.",
-    apiEndpoint: "/api/v1/memory/list",
-    apiMethod: "POST",
-    inputSchema: {
-      type: "object",
-      properties: {
-        projectId: { type: "string" },
-        type: { type: "string", description: "critical | decision | pattern | code | conversation" },
-        minImportance: { type: "number", default: 0 },
-        limit: { type: "number", default: 50 },
-        offset: { type: "number", default: 0 },
-      },
-      required: [],
     },
   },
   {
@@ -1679,6 +851,76 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
 ];
+
+// ── Canonical order (pinned by T02 characterization test) ───────────────────
+// Interleave remaining tools with extracted search/memory tools in the exact
+// order the characterization test pins.
+
+const CANONICAL_ORDER = [
+  "index",
+  "index_status",
+  "search",
+  "remember",
+  "recall",
+  "memory_update",
+  "memory_delete",
+  "list_checkpoints",
+  "create_checkpoint",
+  "restore_checkpoint",
+  "compress",
+  "optimized_context",
+  "analytics",
+  "list_projects",
+  "project_map",
+  "get_architecture",
+  "search_definitions",
+  "get_references",
+  "go_to_definition",
+  "trace_path",
+  "impact_analysis",
+  "reset_project",
+  "read_file",
+  "synapse_session",
+  "synapse_get",
+  "synapse_update",
+  "synapse_end",
+  "synapse_prime",
+  "synapse_access",
+  "synapse_prefetch",
+  "synapse_list",
+  "synapse_task_begin",
+  "synapse_task_end",
+  "symbol_snippet",
+  "memory_list",
+  "reindex",
+  "hook_ingest",
+  "compact_snapshot",
+  "bootstrap",
+  "handoff_begin",
+  "handoff_accept",
+  "handoff_cancel",
+  "handoff_list_pending",
+  "list_proposals",
+  "approve_proposal",
+  "reject_proposal",
+  "execute",
+  "execute_file",
+  "batch_execute",
+  "fetch_and_index",
+  "rename_project",
+  "merge_projects",
+] as const;
+
+const REMAINING_BY_NAME = new Map(
+  REMAINING_TOOLS.map((t) => [t.name, t] as const),
+);
+
+export const TOOL_DEFINITIONS: ToolDefinition[] = CANONICAL_ORDER.map(
+  (name) =>
+    SEARCH_BY_NAME.get(name) ??
+    MEMORY_BY_NAME.get(name) ??
+    REMAINING_BY_NAME.get(name)!,
+);
 
 /**
  * Get tool definition by name
