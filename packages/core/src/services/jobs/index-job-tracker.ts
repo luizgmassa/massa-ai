@@ -11,6 +11,7 @@ import {
   type ActiveGraphDiagnostics,
 } from "@massa-th0th/shared";
 import type { JobStore } from "./index-job-store.js";
+import { eventBus } from "../events/event-bus.js";
 
 export interface IndexJob {
   jobId: string;
@@ -136,6 +137,10 @@ export class IndexJobTracker {
       job.completedAt = new Date();
     }
     try { this.store?.save(job); } catch { /* best-effort */ }
+    // No publish here: the ETL pipeline already emits `indexing:started` on
+    // the main indexing path (pipeline.ts:286/390). The tracker publishes only
+    // from `setResult` for early-exit/reaper transitions the pipeline does not
+    // own (FR-16, state-CHANGE only).
   }
 
   /**
@@ -210,7 +215,12 @@ export class IndexJobTracker {
       // Promote into the hot cache so setResult mutates the same object the
       // next getJob() will return, then flip to failed with a clear cause.
       this.jobs.set(job.jobId, job);
+      const reapedPrevStatus = job.status; // "running"
       this.setResult(job.jobId, undefined, "heartbeat stale (possible crash/OOM)");
+      // The reaper is a state CHANGE the ETL pipeline does not own (the job
+      // hung while the server kept running; the pipeline never emitted a
+      // terminal event). Publish it directly (FR-16).
+      this.publishStateChange(this.jobs.get(job.jobId) ?? job, reapedPrevStatus);
       reaped++;
     }
     return reaped;
@@ -227,6 +237,7 @@ export class IndexJobTracker {
     const job = this.jobs.get(jobId);
     if (!job) return;
 
+    const prevStatus = job.status;
     if (error) {
       job.status = "failed";
       job.error = error;
@@ -246,6 +257,17 @@ export class IndexJobTracker {
         `indexJobTracker: job store write failed for ${jobId} on setResult`,
         { jobId, error: (err as Error)?.message ?? String(err) },
       );
+    }
+    // Publish on state CHANGE only, and ONLY for early-exit transitions the
+    // ETL pipeline does NOT own (FR-16). The pipeline path is
+    // pending→running→completed|failed and already emits `indexing:started`
+    // + `indexing:completed`/`indexing:failed` itself (pipeline.ts:286/390/
+    // 509/576). Early-exit callers (lease-busy, managed-run begin failure) go
+    // pending→terminal directly via `setResult` WITHOUT `updateStatus(running)`
+    // — those are the transitions the tracker owns and publishes. The reaper
+    // path (running→failed) publishes via its own call (see `reapStaleJobs`).
+    if (prevStatus === "pending") {
+      this.publishStateChange(job, prevStatus);
     }
   }
 
@@ -318,6 +340,57 @@ export class IndexJobTracker {
    */
   clear(): void {
     this.jobs.clear();
+  }
+
+  /**
+   * Publish a state-CHANGE transition to the global eventBus (FR-16).
+   *
+   * Called ONLY from {@link setResult} (early-exit: pending→terminal) and
+   * {@link reapStaleJobs} (reaper: running→failed) — the two state-change
+   * paths the ETL pipeline does NOT own. The main indexing path
+   * (pending→running→completed|failed) is owned by the pipeline, which
+   * already emits `indexing:started` + `indexing:completed`/`indexing:failed`
+   * (pipeline.ts:286/390/509/576); the tracker never double-publishes it.
+   *
+   * Never called from {@link updateProgress} — progress ticks are
+   * high-frequency and the pipeline already publishes `indexing:progress`.
+   * The hard constraint is "state CHANGE only, not every progress tick".
+   *
+   * Event mapping (tracker-owned transitions only):
+   *   pending → completed  → `indexing:completed` (early-exit success path
+   *                          is theoretical; today early exits are failures)
+   *   pending → failed     → `indexing:failed` (lease-busy, managed-run fail)
+   *   running → failed     → `indexing:failed` (reaper: hung job)
+   *
+   * The `indexing:completed` payload carries the job result fields the
+   * tracker actually has; `symbolsIndexed` is 0 (only the pipeline knows
+   * symbol counts) and `activatedGraphGenerationId` is "" when absent.
+   */
+  private publishStateChange(job: IndexJob, prevStatus: IndexJob["status"]): void {
+    const next = job.status;
+    try {
+      if (next === "completed" && prevStatus !== "completed") {
+        const r = job.result;
+        eventBus.publish("indexing:completed", {
+          jobId: job.jobId,
+          projectId: job.projectId,
+          filesIndexed: r?.filesIndexed ?? 0,
+          chunksIndexed: r?.chunksIndexed ?? 0,
+          symbolsIndexed: 0,
+          durationMs: r?.duration ?? 0,
+          activatedGraphGenerationId: r?.activatedGraphGenerationId ?? "",
+        });
+      } else if (next === "failed" && prevStatus !== "failed") {
+        eventBus.publish("indexing:failed", {
+          jobId: job.jobId,
+          projectId: job.projectId,
+          error: job.error ?? "unknown",
+          durationMs: 0,
+        });
+      }
+    } catch {
+      // best-effort: never let an eventBus publish flip a committed job state.
+    }
   }
 }
 
