@@ -45,6 +45,16 @@ export const MEMORY_LEVELS = [
 
 const THEME_STORAGE_KEY = "massa-th0th-ui-theme";
 
+/** Check if write mode is enabled (MASSA_TH0TH_WEB_WRITE_MODE=true). Default off. */
+export function isWriteModeEnabled() {
+  if (typeof globalThis !== "undefined" && globalThis.MASSA_TH0TH_WEB_WRITE_MODE === true) return true;
+  try {
+    return localStorage.getItem("massa-th0th-write-mode") === "true";
+  } catch (_) {
+    return false;
+  }
+}
+
 // ── HTML escaping ──────────────────────────────────────────────────────────
 
 export function escapeHtml(s) {
@@ -249,6 +259,7 @@ export function renderMemoryBrowser(data, state) {
   const limit = (payload && payload.limit) || 50;
   const offset = (payload && payload.offset) || 0;
   const f = state.filters || {};
+  const writeMode = isWriteModeEnabled();
 
   const typeOpts = MEMORY_TYPES.map(
     (t) =>
@@ -289,11 +300,19 @@ export function renderMemoryBrowser(data, state) {
   if (memories.length === 0) {
     body = '<p class="empty">No memories match these filters.</p>';
   } else {
+    const actionCol = writeMode ? "<th>actions</th>" : "";
     body =
-      '<table class="grid"><thead><tr><th>type</th><th>level</th><th>imp.</th><th>content</th></tr></thead><tbody>' +
+      '<table class="grid"><thead><tr><th>type</th><th>level</th><th>imp.</th><th>content</th>' + actionCol + '</tr></thead><tbody>' +
       memories
         .map((m) => {
           const content = truncate(m.content || "", 200);
+          const id = escapeHtml(m.id || "");
+          const actions = writeMode
+            ? '<td class="actions-cell">' +
+              '<button type="button" class="btn-edit" data-action="memory-edit" data-id="' + id + '">edit</button> ' +
+              '<button type="button" class="btn-delete" data-action="memory-delete" data-id="' + id + '">delete</button>' +
+              "</td>"
+            : "";
           return (
             "<tr>" +
             "<td>" +
@@ -308,6 +327,7 @@ export function renderMemoryBrowser(data, state) {
             '<td class="content-cell">' +
             markdownToHtml(content) +
             "</td>" +
+            actions +
             "</tr>"
           );
         })
@@ -417,6 +437,54 @@ export function renderHandoffs(data, state) {
     })
     .join("");
   return '<section class="view"><h2>Handoffs</h2>' + rows + "</section>";
+}
+
+export function renderProposals(data, state) {
+  state = state || {};
+  const project = state.project || "";
+  if (!project) {
+    return (
+      '<section class="view"><h2>Proposals</h2>' +
+      '<p class="muted">Select a project to list pending auto-improvement proposals.</p></section>'
+    );
+  }
+  if (!data || data.success === false) {
+    return '<section class="view"><h2>Proposals</h2>' + errorBlock(data) + "</section>";
+  }
+  const payload = data.data || data;
+  const proposals = (payload && payload.proposals) || [];
+  if (proposals.length === 0) {
+    return '<section class="view"><h2>Proposals</h2><p class="empty">No pending proposals.</p></section>';
+  }
+  const writeMode = isWriteModeEnabled();
+  const rows = proposals
+    .map((p) => {
+      const id = escapeHtml(p.id || "");
+      const actions = writeMode
+        ? '<div class="actions-cell">' +
+          '<button type="button" class="btn-approve" data-action="proposal-approve" data-id="' + id + '">approve</button> ' +
+          '<button type="button" class="btn-reject" data-action="proposal-reject" data-id="' + id + '">reject</button>' +
+          "</div>"
+        : "";
+      return (
+        '<div class="card">' +
+        "<div><strong>" +
+        escapeHtml(p.type || "proposal") +
+        "</strong> <span class=\"muted\">" +
+        escapeHtml(p.status || "") +
+        "</span></div>" +
+        '<div class="card-body">' +
+        markdownToHtml(p.description || p.summary || "(no description)") +
+        "</div>" +
+        "<div class=\"muted\">" +
+        escapeHtml(p.id || "") +
+        "</div>" +
+        actions +
+        "</div>"
+      );
+    })
+    .join("");
+  return '<section class="view"><h2>Proposals</h2>' + rows + "</section>";
 }
 
 export function renderCheckpoints(data) {
@@ -569,7 +637,7 @@ function startApp(opts) {
   }
   function viewFromHash(h) {
     const name = (h || "").replace(/^#\/?/, "");
-    return ["projects", "memory", "search", "handoffs", "checkpoints", "dashboard"].includes(name)
+    return ["projects", "memory", "search", "handoffs", "proposals", "checkpoints", "dashboard"].includes(name)
       ? name
       : "projects";
   }
@@ -624,6 +692,15 @@ function startApp(opts) {
           });
         }
         root.innerHTML = renderHandoffs(data, { project: state.project });
+      } else if (state.view === "proposals") {
+        let data = null;
+        if (state.project) {
+          data = await api.request("/api/v1/proposal/list", {
+            method: "POST",
+            body: { projectId: state.project },
+          });
+        }
+        root.innerHTML = renderProposals(data, { project: state.project });
       } else if (state.view === "checkpoints") {
         const body = { limit: 50 };
         if (state.project) body.projectId = state.project;
@@ -658,6 +735,38 @@ function startApp(opts) {
       state.memoryOffset += 50;
       render();
     });
+    // write mode: memory edit/delete
+    root.querySelectorAll('[data-action="memory-edit"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        if (!id) return;
+        handleMemoryEdit(id);
+      });
+    });
+    root.querySelectorAll('[data-action="memory-delete"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        if (!id) return;
+        if (confirm("Delete this memory? This cannot be undone.")) {
+          handleMemoryDelete(id);
+        }
+      });
+    });
+    // write mode: proposal approve/reject
+    root.querySelectorAll('[data-action="proposal-approve"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        if (!id) return;
+        handleProposalAction(id, "approve");
+      });
+    });
+    root.querySelectorAll('[data-action="proposal-reject"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        if (!id) return;
+        handleProposalAction(id, "reject");
+      });
+    });
     // search
     const q = root.querySelector('[data-bind="query"]');
     if (q) {
@@ -668,6 +777,43 @@ function startApp(opts) {
     root.querySelector('[data-action="search-run"]')?.addEventListener("click", () => {
       render();
     });
+  }
+
+  async function handleMemoryEdit(id) {
+    const newContent = prompt("Edit memory content:", "");
+    if (newContent === null) return;
+    try {
+      await api.request("/api/v1/memory/" + encodeURIComponent(id), {
+        method: "PUT",
+        body: { content: newContent },
+      });
+      render();
+    } catch (e) {
+      alert("Edit failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleMemoryDelete(id) {
+    try {
+      await api.request("/api/v1/memory/" + encodeURIComponent(id), {
+        method: "DELETE",
+      });
+      render();
+    } catch (e) {
+      alert("Delete failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleProposalAction(id, action) {
+    try {
+      await api.request("/api/v1/proposal/" + action, {
+        method: "POST",
+        body: { id },
+      });
+      render();
+    } catch (e) {
+      alert(action + " failed: " + String(e.message || e));
+    }
   }
 
   // global controls
@@ -703,10 +849,12 @@ const MASSA_TH0TH_UI = {
   renderMemoryBrowser,
   renderSearch,
   renderHandoffs,
+  renderProposals,
   renderCheckpoints,
   renderDashboard,
   initTheme,
   toggleTheme,
+  isWriteModeEnabled,
   createApiClient,
   startApp,
   FORBIDDEN_MUTATING_PATHS,

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 
-const { markdownToHtml, escapeHtml } = await import("../static/app.js");
+const { markdownToHtml, escapeHtml, isWriteModeEnabled, renderMemoryBrowser, renderProposals } = await import("../static/app.js");
 
 describe("markdown rendering (marked + DOMPurify)", () => {
   describe("minimal fallback renderer", () => {
@@ -65,22 +65,22 @@ describe("markdown rendering (marked + DOMPurify)", () => {
   });
 
   describe("marked + DOMPurify path (when libraries available)", () => {
-    const originalMarked = globalThis.marked;
-    const originalDOMPurify = globalThis.DOMPurify;
+    const originalMarked = (globalThis as any).marked;
+    const originalDOMPurify = (globalThis as any).DOMPurify;
 
     afterEach(() => {
-      if (originalMarked) globalThis.marked = originalMarked;
-      else delete globalThis.marked;
-      if (originalDOMPurify) globalThis.DOMPurify = originalDOMPurify;
-      else delete globalThis.DOMPurify;
+      if (originalMarked) (globalThis as any).marked = originalMarked;
+      else delete (globalThis as any).marked;
+      if (originalDOMPurify) (globalThis as any).DOMPurify = originalDOMPurify;
+      else delete (globalThis as any).DOMPurify;
     });
 
     it("uses marked + DOMPurify when available, sanitizing XSS", () => {
-      globalThis.marked = {
-        parse: (text) => text.replace(/`([^`]+)`/g, "<code>$1</code>"),
+      (globalThis as any).marked = {
+        parse: (text: string) => text.replace(/`([^`]+)`/g, "<code>$1</code>"),
       };
-      globalThis.DOMPurify = {
-        sanitize: (html) => html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ""),
+      (globalThis as any).DOMPurify = {
+        sanitize: (html: string) => html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ""),
       };
 
       const html = markdownToHtml("Use `code` here");
@@ -88,11 +88,11 @@ describe("markdown rendering (marked + DOMPurify)", () => {
     });
 
     it("DOMPurify strips script tags (F4 XSS mitigation)", () => {
-      globalThis.marked = {
-        parse: (text) => text,
+      (globalThis as any).marked = {
+        parse: (text: string) => text,
       };
-      globalThis.DOMPurify = {
-        sanitize: (html) => html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ""),
+      (globalThis as any).DOMPurify = {
+        sanitize: (html: string) => html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ""),
       };
 
       const html = markdownToHtml("<script>alert('xss')</script>");
@@ -102,14 +102,14 @@ describe("markdown rendering (marked + DOMPurify)", () => {
 
     it("renders markdown tables via marked", () => {
       const tableMd = "| Col1 | Col2 |\n|------|------|\n| a | b |";
-      globalThis.marked = {
-        parse: (text) => {
+      (globalThis as any).marked = {
+        parse: (text: string) => {
           if (text.includes("|")) return "<table><tr><td>a</td><td>b</td></tr></table>";
           return text;
         },
       };
-      globalThis.DOMPurify = {
-        sanitize: (html) => html,
+      (globalThis as any).DOMPurify = {
+        sanitize: (html: string) => html,
       };
 
       const html = markdownToHtml(tableMd);
@@ -118,17 +118,74 @@ describe("markdown rendering (marked + DOMPurify)", () => {
     });
 
     it("falls back to minimal renderer when marked throws", () => {
-      globalThis.marked = {
+      (globalThis as any).marked = {
         parse: () => {
           throw new Error("parse error");
         },
       };
-      globalThis.DOMPurify = {
-        sanitize: (html) => html,
+      (globalThis as any).DOMPurify = {
+        sanitize: (html: string) => html,
       };
 
       const html = markdownToHtml("# Title");
       expect(html).toContain("<h1>");
     });
+  });
+});
+
+describe("write mode gating", () => {
+  const originalWriteMode = (globalThis as any).MASSA_TH0TH_WEB_WRITE_MODE;
+
+  afterEach(() => {
+    if (originalWriteMode !== undefined) {
+      (globalThis as any).MASSA_TH0TH_WEB_WRITE_MODE = originalWriteMode;
+    } else {
+      delete (globalThis as any).MASSA_TH0TH_WEB_WRITE_MODE;
+    }
+  });
+
+  it("isWriteModeEnabled returns false by default", () => {
+    delete (globalThis as any).MASSA_TH0TH_WEB_WRITE_MODE;
+    expect(isWriteModeEnabled()).toBe(false);
+  });
+
+  it("isWriteModeEnabled returns true when MASSA_TH0TH_WEB_WRITE_MODE=true", () => {
+    (globalThis as any).MASSA_TH0TH_WEB_WRITE_MODE = true;
+    expect(isWriteModeEnabled()).toBe(true);
+  });
+
+  it("renderMemoryBrowser hides edit/delete buttons when write mode off", () => {
+    delete (globalThis as any).MASSA_TH0TH_WEB_WRITE_MODE;
+    const data = { data: { memories: [{ id: "mem-1", type: "code", level: 1, importance: 0.8, content: "test" }], total: 1, limit: 50, offset: 0 } };
+    const html = renderMemoryBrowser(data, { filters: {} });
+    expect(html).not.toContain('data-action="memory-edit"');
+    expect(html).not.toContain('data-action="memory-delete"');
+    expect(html).not.toContain("actions");
+  });
+
+  it("renderMemoryBrowser shows edit/delete buttons when write mode on", () => {
+    (globalThis as any).MASSA_TH0TH_WEB_WRITE_MODE = true;
+    const data = { data: { memories: [{ id: "mem-1", type: "code", level: 1, importance: 0.8, content: "test" }], total: 1, limit: 50, offset: 0 } };
+    const html = renderMemoryBrowser(data, { filters: {} });
+    expect(html).toContain('data-action="memory-edit"');
+    expect(html).toContain('data-action="memory-delete"');
+    expect(html).toContain('data-id="mem-1"');
+  });
+
+  it("renderProposals shows approve/reject buttons when write mode on", () => {
+    (globalThis as any).MASSA_TH0TH_WEB_WRITE_MODE = true;
+    const data = { data: { proposals: [{ id: "prop-1", type: "edit", status: "pending", description: "test proposal" }] } };
+    const html = renderProposals(data, { project: "test-project" });
+    expect(html).toContain('data-action="proposal-approve"');
+    expect(html).toContain('data-action="proposal-reject"');
+    expect(html).toContain('data-id="prop-1"');
+  });
+
+  it("renderProposals hides approve/reject buttons when write mode off", () => {
+    delete (globalThis as any).MASSA_TH0TH_WEB_WRITE_MODE;
+    const data = { data: { proposals: [{ id: "prop-1", type: "edit", status: "pending", description: "test proposal" }] } };
+    const html = renderProposals(data, { project: "test-project" });
+    expect(html).not.toContain('data-action="proposal-approve"');
+    expect(html).not.toContain('data-action="proposal-reject"');
   });
 });
