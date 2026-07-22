@@ -206,6 +206,14 @@ jobReaperTimer.unref?.(); // never keep the event loop alive solely for the reap
 const scheduler = getScheduler();
 try {
   registerDefaultJobs(scheduler);
+  // Wave 5 FR-13: catch-up missed jobs at boot. Fires ONE tick per missed job
+  // (next_run_at < now() AND enabled=true), non-overlapping per kind. Not a
+  // full backfill. Called after registerDefaultJobs (jobs are persisted) and
+  // before start() (the tick loop takes over from here).
+  const catchUp = scheduler.catchUpMissedJobs();
+  if (catchUp.caughtUp > 0) {
+    console.log(`[scheduler] catch-up: ${catchUp.caughtUp} missed job(s) fired`);
+  }
   scheduler.start();
 } catch (err) {
   console.error(`[scheduler] init error:`, err instanceof Error ? err.message : err);
