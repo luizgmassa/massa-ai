@@ -40,6 +40,7 @@ import { executorRoutes } from "./routes/executor.js";
 import { webRoutes } from "./routes/web.js";
 import { webUiRoutes } from "./routes/web-ui.js";
 import { architectureRoutes } from "./routes/architecture.js";
+import { dashboardRoutes } from "./routes/dashboard.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
 import { getHealthChecker, searchSessionHook, coRetrievalHook } from "@massa-th0th/core";
@@ -136,6 +137,7 @@ const app = new Elysia({ adapter: node() })
   .use(webRoutes)
   .use(webUiRoutes)
   .use(architectureRoutes)
+  .use(dashboardRoutes)
   .get("/health", () => buildHealthResponse(getParserReadiness()));
 
 await listenAfterParserValidation({
