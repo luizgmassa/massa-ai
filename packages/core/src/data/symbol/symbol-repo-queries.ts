@@ -374,6 +374,10 @@ export async function batchInsertImports(imports: SymbolImport[]): Promise<void>
 
 export async function clearProject(projectId: string): Promise<void> {
   const p = getPrismaClient();
+  // Clean up graph_generations before deleting the workspace row to avoid
+  // orphaned generation rows that cause graph_generation_workspace_missing
+  // errors on subsequent re-index runs (Wave 3 shared-DB fixture gap fix).
+  await p.$executeRaw`DELETE FROM graph_generations WHERE project_id = ${projectId}`;
   await p.$executeRaw`DELETE FROM workspaces WHERE project_id = ${projectId}`;
 }
 

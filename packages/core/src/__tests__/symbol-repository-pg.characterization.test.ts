@@ -91,7 +91,7 @@ function dequeueRows(): unknown[] {
   return typeof r === "function" ? (r as () => unknown[])() : r;
 }
 
-mock.module("/Users/luizmassa/Personal Projects/massa-th0th/packages/core/src/services/query/prisma-client.ts", () => {
+mock.module("../services/query/prisma-client.ts", () => {
   return { getPrismaClient: () => STUB };
 });
 
