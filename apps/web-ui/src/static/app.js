@@ -839,6 +839,31 @@ function startApp(opts) {
   }
 
   refreshProjectsForSelect().finally(render);
+
+  // SSE: subscribe to /api/v1/events for real-time updates (Wave 7 T10)
+  if (typeof EventSource !== "undefined") {
+    try {
+      const sseBase = opts.base || "";
+      const es = new EventSource(sseBase + "/api/v1/events");
+      es.onmessage = (ev) => {
+        try {
+          const data = JSON.parse(ev.data);
+          // Refresh current view on index_status or observation events
+          if (data && (data.type === "index_status" || data.type === "observation" || data.event === "index_status" || data.event === "observation")) {
+            render();
+          }
+        } catch (_) {
+          // ignore parse errors
+        }
+      };
+      es.onerror = () => {
+        // SSE reconnection is handled by the browser automatically;
+        // no action needed on error
+      };
+    } catch (_) {
+      // EventSource unavailable or connection failed — non-fatal
+    }
+  }
 }
 
 // Export pure helpers + bootstrap on globalThis for both browser and Node import.
