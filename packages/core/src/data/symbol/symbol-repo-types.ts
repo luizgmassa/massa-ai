@@ -208,3 +208,33 @@ export type DefinitionFqnResolution =
       legacyFqn: string;
       candidates: readonly StructuralFqnCandidate[];
     };
+
+export type WorkspaceUpsertInput = Omit<WorkspaceRow, "created_at" | "updated_at"> & { created_at?: number };
+export type WorkspaceStatusUpdateOptions = {
+  lastError?: string | null; lastIndexedAt?: number;
+  filesCount?: number; chunksCount?: number; symbolsCount?: number;
+};
+export type ProjectMapAggregatesResult = {
+  symbolsByKind: Record<string, number>;
+  filesByLanguage: Record<string, number>;
+  recentFiles: Array<{ filePath: string; indexedAt: number | null }>;
+};
+export type ActiveGraphSnapshot = {
+  generationId: string;
+  counts: { files: number; definitions: number; references: number; imports: number; centrality: number };
+  diagnostics: { recovered: number; hardFailures: number; staleFiles: number; errors: number };
+  languages: Record<string, number>;
+};
+export type MarkFileStaleInput = {
+  lastKnownGoodGenerationId: string;
+  diagnostics: readonly Record<string, unknown>[];
+  parserErrorCount: number;
+};
+export type FindEdgesOptions = {
+  types?: RefKind[]; fromSymbol?: string; toSymbol?: string; fromFile?: string;
+  direction?: "outgoing" | "incoming" | "both"; limit?: number;
+};
+export type ListDefinitionsOptions = {
+  search?: string; kind?: string[]; file?: string; exportedOnly?: boolean; limit?: number;
+};
+export type ListAllDefinitionsOptions = { kind?: string[]; exportedOnly?: boolean };
