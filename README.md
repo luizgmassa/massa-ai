@@ -689,8 +689,8 @@ rows default **OFF** and degrade silently when disabled.
 | `search.autoReindexMaxFiles` | `AUTOREINDEX_MAX_FILES` | `200` | — |
 | — | `WEB_UI_ENABLED` | `true` | on |
 
-> **Note:** `compression.llm` is a deprecated alias of top-level `llm` (same env
-> vars).
+> **Note:** `compression.llm` was removed in commit `da4c60f`. LLM connection
+> fields now live exclusively in the top-level `llm` config block.
 
 ### Operational knobs
 
