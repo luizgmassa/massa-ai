@@ -9,7 +9,7 @@
 import { MemoryLevel, MemoryType } from "@massa-th0th/shared";
 import type { Observation } from "../../data/memory/observation-repository.js";
 import type { PatternCandidate, PatternThresholds } from "./auto-improve-job.js";
-import { DEFAULT_THRESHOLDS } from "./auto-improve-job.js";
+import { DEFAULT_THRESHOLDS } from "./auto-improve-config.js";
 
 export function detectPatterns(
   observations: Observation[],
