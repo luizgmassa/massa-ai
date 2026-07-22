@@ -450,7 +450,7 @@
     {
       "slug": "wave-6-architecture-features",
       "title": "Wave 6 — Architecture and medium features (N31 god-files, N32 embedded MCP, N30 hook binary, N20 parallel tests, N21 test-seam, N28 dashboard, N29 scheduler preset, N17 harness protocol, N18 deterministic script, N19 auth, N42 path recovery, M25 name resolution, M26 JSON extraction, M62 tree-sitter GLR)",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,

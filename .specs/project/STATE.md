@@ -1,5 +1,25 @@
 # massa-th0th Spec State
 
+## Wave 6 — Active
+
+- projectId: `massa-th0th`
+- workflowSessionId: `spec-wave-6`
+- workflow: spec-driven (Large/Complex)
+- feature: `wave-6-architecture-features` (Wave 6, P1) — COMPLETE + validated PASS
+- branch: `wave-6` (off `main` post-`389461b`)
+- baseline: `389461b`
+- scope: 14 requirements (W6-01..W6-14), 47 acceptance criteria, 38 atomic tasks across 8 phases
+- plan-critic: full The Fool pre-mortem; 5 findings (2 CRITICAL + 1 HIGH + 2 MEDIUM) incorporated before Execute
+- B1 (P1-2, T01-T10): characterization tests + SymbolRepositoryPg decomposition — COMPLETE (commits `9b40561`..`d684873`)
+- B2 (P3, T11-T17): ToolDefs + AutoImprove + SmartChunker decomposition — COMPLETE (commits `d85f709`..`cef5f9d`)
+- B3 (P4-5, T18-T26): embedded MCP + hook binary + parallel runner + test-seam — COMPLETE (commits `da99ad2`..`8de8c51`)
+- B4 (P6-7, T27-T37): dashboard + scheduler + process + carryovers — COMPLETE (commits `99ed294`..`05c636e`)
+- B5 (P8, T38): independent verifier — PASS (iteration 2, 7/7 gaps closed, 5/5 mutants killed)
+- Fix commits (iteration 1): `174c930`..`72fc2cf` (7 gaps fixed)
+- Residual: 3 low-priority spec-precision gaps (N18, N10, N13 — non-blocking, not in scope)
+
+---
+
 ## Wave 5 — Active
 
 - projectId: `massa-th0th`
