@@ -69,7 +69,7 @@ massa-th0th accumulated structural debt across three axes: god-file modules exce
 **Acceptance Criteria**:
 
 1. WHEN `symbol-repository-pg.ts` is split THEN each resulting module SHALL be ≤600 LOC and the barrel `data/symbol/index.ts` SHALL re-export the same `SymbolRepositoryPg` class with identical method signatures
-2. WHEN `tool-definitions.ts` is split THEN `TOOL_DEFINITIONS` array SHALL be byte-identical (same 57 entries, same order, same schemas) and `getToolDefinition` SHALL return the same result for any tool name
+2. WHEN `tool-definitions.ts` is split THEN `TOOL_DEFINITIONS` array SHALL be byte-identical (same 52 entries, same order, same schemas) and `getToolDefinition` SHALL return the same result for any tool name
 3. WHEN `auto-improve-job.ts` is split THEN `AutoImproveJob` class public API SHALL be unchanged and `detectPatterns`/`enrichWithLlm` SHALL produce identical outputs for identical inputs
 4. WHEN `smart-chunker.ts` is split THEN `smartChunk` SHALL produce byte-identical `Chunk[]` output for identical inputs across all format dispatchers (markdown/json/yaml/code/fixed)
 5. WHEN characterization tests run THEN they SHALL pass before AND after every split commit (tests written first, never deleted or weakened)

@@ -126,7 +126,7 @@ T38 (independent verifier)
 
 ### T2: ToolDefinitions characterization test
 
-**What**: Pin exact TOOL_DEFINITIONS roster (57 tools, order, names, schema presence) before split.
+**What**: Pin exact TOOL_DEFINITIONS roster (52 tools, order, names, schema presence) before split.
 **Where**: `apps/mcp-client/src/__tests__/tool-definitions.characterization.test.ts`
 **Depends on**: None
 **Reuses**: None
@@ -135,7 +135,7 @@ T38 (independent verifier)
 **Tools**: MCP: NONE. Skill: NONE.
 
 **Done when**:
-- [ ] Tests assert: array length = 57, all tool names present in expected order, each has `name`/`description`/`inputSchema`/`apiMethod`/`apiEndpoint`
+- [ ] Tests assert: array length = 52, all tool names present in expected order, each has `name`/`description`/`inputSchema`/`apiMethod`/`apiEndpoint`
 - [ ] `getToolDefinition` returns correct def for each name, null for unknown
 - [ ] Quick gate passes: `cd apps/mcp-client && bun test src/__tests__/tool-definitions.characterization.test.ts`
 - [ ] Test count: ≥5 tests pass
@@ -328,7 +328,7 @@ T38 (independent verifier)
 **Done when**:
 - [ ] Tool definitions moved to domain modules
 - [ ] tool-definitions.ts imports and concatenates them
-- [ ] Characterization test (T2) green (57 tools, same order)
+- [ ] Characterization test (T2) green (52 tools, same order)
 - [ ] Type gate passes
 - [ ] Each module ≤ 600 LOC
 
@@ -348,7 +348,7 @@ T38 (independent verifier)
 **Tools**: MCP: NONE. Skill: NONE.
 
 **Done when**:
-- [ ] All 57 tool definitions in domain modules
+- [ ] All 52 tool definitions in domain modules
 - [ ] tool-definitions.ts is ≤50 LOC (import + concatenate + getToolDefinition)
 - [ ] Characterization test green
 - [ ] Build gate passes

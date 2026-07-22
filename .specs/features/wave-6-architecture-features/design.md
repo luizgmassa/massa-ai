@@ -136,7 +136,7 @@ graph TD
   - `tool-defs-project.ts` — index, index_status, list_projects, project_map, get_architecture, reset_project, reindex, rename_project, merge_projects, bootstrap
   - `tool-defs-hooks-exec.ts` — hook_ingest, compact_snapshot, handoff_*, list_proposals, approve_proposal, reject_proposal, execute, execute_file, batch_execute, fetch_and_index
 - **Facade**: `tool-definitions.ts` (~40 LOC) — imports all, concatenates into `TOOL_DEFINITIONS`, re-exports `getToolDefinition`
-- **Characterization test**: `tool-definitions.characterization.test.ts` — pins exact roster (57 tools, order, schemas)
+- **Characterization test**: `tool-definitions.characterization.test.ts` — pins exact roster (52 tools, order, schemas)
 
 ### N31: AutoImproveJob Decomposition
 
