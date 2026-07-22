@@ -7,7 +7,7 @@
  *      escaped JSON, return nested structures, clear error on failure.
  */
 
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, mock, beforeEach } from "bun:test";
 import {
   projectFields,
   unescapeJsonField,
@@ -94,15 +94,109 @@ describe("T35 M26: escaped JSON extraction", () => {
 
 // ── M25: project name-tail resolution ───────────────────────────────────────
 //
-// WorkspaceManager.resolveByNameTail is a DB-dependent method. We test the
-// resolution logic by importing the class and verifying the method signature
-// exists. Full DB integration tests would require a live PostgreSQL instance.
+// resolveByNameTail reads getSymbolRepository().listWorkspaces() and matches
+// by the last path segment of project_path OR the project_id. We mock the
+// symbol-repository-factory so listWorkspaces returns a controllable row set,
+// and stub event-bus + symbol-graph.service so the WorkspaceManager singleton
+// constructs without touching a live DB or global event subscribers.
 
-describe("T35 M25: project name-tail resolution (contract)", () => {
-  test("WorkspaceManager has resolveByNameTail method", async () => {
-    const mod = await import("../services/workspace/workspace-manager.js");
-    expect(typeof mod.WorkspaceManager).toBe("function");
-    // The method is on the prototype
-    expect(typeof mod.WorkspaceManager.prototype.resolveByNameTail).toBe("function");
+import type { WorkspaceRow } from "../data/symbol/symbol-repository-pg.js";
+
+let mockWorkspaces: WorkspaceRow[] = [];
+let listCallCount = 0;
+
+mock.module("../data/symbol/symbol-repository-factory.js", () => ({
+  getSymbolRepository: () => ({
+    listWorkspaces: async () => {
+      listCallCount++;
+      return mockWorkspaces;
+    },
+  }),
+}));
+
+mock.module("../services/events/event-bus.js", () => ({
+  eventBus: {
+    subscribe: () => () => {},
+    publish: () => {},
+  },
+}));
+
+mock.module("../services/symbol/symbol-graph.service.js", () => ({
+  symbolGraphService: {
+    recomputeCentrality: async () => {},
+  },
+}));
+
+const { WorkspaceManager } = await import("../services/workspace/workspace-manager.js");
+
+function makeRow(projectId: string, projectPath: string): WorkspaceRow {
+  return {
+    project_id: projectId,
+    project_path: projectPath,
+    display_name: projectPath.split("/").pop() ?? projectPath,
+    status: "indexed",
+    files_count: 0,
+    chunks_count: 0,
+    symbols_count: 0,
+    created_at: Date.now(),
+    updated_at: Date.now(),
+  } as WorkspaceRow;
+}
+
+describe("T35 M25: project name-tail resolution (behavior)", () => {
+  beforeEach(() => {
+    mockWorkspaces = [];
+    listCallCount = 0;
+  });
+
+  test("unique name tail → returns the matching WorkspaceRow", async () => {
+    mockWorkspaces = [
+      makeRow("foo/bar/my-project", "/home/user/foo/bar/my-project"),
+      makeRow("baz/qux/other-project", "/srv/baz/qux/other-project"),
+    ];
+    const wm = WorkspaceManager.getInstance();
+    const result = await wm.resolveByNameTail("my-project");
+    expect(result).not.toBeNull();
+    expect(result!.project_id).toBe("foo/bar/my-project");
+    expect(result!.project_path).toBe("/home/user/foo/bar/my-project");
+  });
+
+  test("ambiguous (multiple matches) → throws error listing candidates", async () => {
+    mockWorkspaces = [
+      makeRow("foo/bar/my-project", "/home/user/foo/bar/my-project"),
+      makeRow("baz/qux/my-project", "/srv/baz/qux/my-project"),
+    ];
+    const wm = WorkspaceManager.getInstance();
+    await expect(wm.resolveByNameTail("my-project")).rejects.toThrow(/Ambiguous/);
+    await expect(wm.resolveByNameTail("my-project")).rejects.toThrow(
+      /foo\/bar\/my-project.*baz\/qux\/my-project/,
+    );
+  });
+
+  test("no match → returns null (not-found)", async () => {
+    mockWorkspaces = [
+      makeRow("foo/bar/something-else", "/home/user/foo/bar/something-else"),
+    ];
+    const wm = WorkspaceManager.getInstance();
+    const result = await wm.resolveByNameTail("my-project");
+    expect(result).toBeNull();
+  });
+
+  test("empty name tail → returns null (not-found) without querying", async () => {
+    const wm = WorkspaceManager.getInstance();
+    const result = await wm.resolveByNameTail("");
+    expect(result).toBeNull();
+    expect(listCallCount).toBe(0);
+  });
+
+  test("match by projectId (not path tail) → returns the row", async () => {
+    mockWorkspaces = [
+      makeRow("org/unique-id-123", "/some/path/unique-app"),
+    ];
+    const wm = WorkspaceManager.getInstance();
+    // The project_id itself is a valid name-tail input (matches by id).
+    const result = await wm.resolveByNameTail("org/unique-id-123");
+    expect(result).not.toBeNull();
+    expect(result!.project_id).toBe("org/unique-id-123");
   });
 });
