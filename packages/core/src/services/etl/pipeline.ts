@@ -36,10 +36,33 @@ import {
   GraphGenerationCoordinator,
 } from "./graph-generation-coordinator.js";
 import type { GraphGenerationLease } from "../../data/graph-generation/graph-generation-contract.js";
+import { ManagedRunRepositoryPg } from "../../data/managed-runs/managed-run-repository-pg.js";
+import type {
+  BeginManagedRunOutcome,
+  ManagedRunLease,
+  ManagedRunRepository,
+} from "../../data/managed-runs/managed-run-contract.js";
 import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
 import type { DiscoveredFile } from "./stage-context.js";
 import type { HeaderLanguageEvidence } from "../structural/language-manifest.js";
+
+/**
+ * Error raised by {@link EtlPipeline.runInternal} when a `managed_runs` lease
+ * for `(projectId, "indexing")` is already held by another live process
+ * (FR-09 / AC-7). IndexProjectTool maps this to a 409 response body carrying
+ * the active runId so the caller can poll get_index_status.
+ */
+export class EtlPipelineBusyError extends Error {
+  readonly activeRunId: string;
+  readonly leaseExpiresAt: number;
+  constructor(activeRunId: string, leaseExpiresAt: number) {
+    super(`indexing_busy:${activeRunId}`);
+    this.name = "EtlPipelineBusyError";
+    this.activeRunId = activeRunId;
+    this.leaseExpiresAt = leaseExpiresAt;
+  }
+}
 
 export interface PipelineInput {
   projectId: string;
@@ -55,6 +78,15 @@ export interface PipelineInput {
    * {@link loadProjectIgnore} stays unchanged for query-time callers).
    */
   include_tests?: boolean;
+  /**
+   * Wave 5 FR-09: managed_runs lease acquired by the caller (IndexProjectTool
+   * or auto-reindex). When provided, {@link EtlPipeline.runInternal} spawns a
+   * 30s heartbeat, aborts ETL on lease_lost, completes the lease on success,
+   * and aborts the lease on failure. The pipeline does NOT acquire the lease
+   * — the caller owns 202/409 semantics so the MCP handler can return busy
+   * synchronously without running the full ETL in the foreground.
+   */
+  managedRunLease?: ManagedRunLease;
 }
 
 /** Derive deterministic `.h` language evidence from the immutable discovery snapshot. */
@@ -174,7 +206,7 @@ export class EtlPipeline {
     // downstream graph/vector/keyword write and force-reindex delete uses the
     // live target even when the caller holds a retired id.
     const projectId = await getProjectIdentityAliasResolver().resolve(input.projectId);
-    const { projectPath, jobId, forceReindex = false, filesToProcess, include_tests = false } = input;
+    const { projectPath, jobId, forceReindex = false, filesToProcess, include_tests = false, managedRunLease } = input;
     const t0 = performance.now();
     const stageTimings: Record<EtlStage, number> = {
       discover: 0,
@@ -244,6 +276,41 @@ export class EtlPipeline {
     const graphAbortController = new AbortController();
     const heartbeatTimerController = new AbortController();
     let stopGraphHeartbeat = false;
+
+    // ── Wave 5 managed_runs lease heartbeat (FR-09). The caller (tool or
+    // auto-reindex path) acquired the lease and passed it in; the pipeline
+    // renews it every 30s and aborts ETL if the lease is lost (another
+    // process took over, or reaper reaped us). The graph generation lease
+    // has its own heartbeat above; this runs in parallel so both leases
+    // stay warm. The AbortController is shared: lease_lost aborts graph
+    // work too (the run is no longer ours).
+    let managedRunHeartbeat: Promise<void> | undefined;
+    let managedRunLeaseLost: Error | undefined;
+    let stopManagedRunHeartbeat = false;
+    const managedRunTimerController = new AbortController();
+    const managedRunRepository = managedRunLease ? ManagedRunRepositoryPg.getInstance() : undefined;
+    if (managedRunLease && managedRunRepository) {
+      managedRunHeartbeat = (async () => {
+        while (!stopManagedRunHeartbeat) {
+          try { await delay(30_000, undefined, { signal: managedRunTimerController.signal }); }
+          catch { return; }
+          if (stopManagedRunHeartbeat || !managedRunLease) return;
+          try {
+            const outcome = await managedRunRepository.heartbeat(managedRunLease);
+            if (outcome.status === "lease_lost") {
+              managedRunLeaseLost = new Error("managed_run_lease_lost");
+              graphAbortController.abort(managedRunLeaseLost);
+              return;
+            }
+          } catch (heartbeatError) {
+            managedRunLeaseLost = heartbeatError as Error;
+            graphAbortController.abort(managedRunLeaseLost);
+            return;
+          }
+        }
+      })();
+    }
+
     try {
       // ── Stage 1: Discover ─────────────────────────────────────────────────
       const st1 = performance.now();
@@ -341,18 +408,21 @@ export class EtlPipeline {
         }
       }
       if (graphHeartbeatFailure) throw graphHeartbeatFailure;
+      if (managedRunLeaseLost) throw managedRunLeaseLost;
       stageTimings.parse = Math.round(performance.now() - st2);
 
       // ── Stage 3: Resolve ──────────────────────────────────────────────────
       const st3 = performance.now();
       const resolved = await abortable(this.resolve.run(ctx, parsed), graphAbortController.signal);
       if (graphHeartbeatFailure) throw graphHeartbeatFailure;
+      if (managedRunLeaseLost) throw managedRunLeaseLost;
       stageTimings.resolve = Math.round(performance.now() - st3);
 
       // ── Stage 4: Load ─────────────────────────────────────────────────────
       const st4 = performance.now();
       const loadResult = await abortable(this.load.run(ctx, resolved), graphAbortController.signal);
       if (graphHeartbeatFailure) throw graphHeartbeatFailure;
+      if (managedRunLeaseLost) throw managedRunLeaseLost;
       stageTimings.load = Math.round(performance.now() - st4);
 
       if (loadResult.errors > 0) {
@@ -366,9 +436,13 @@ export class EtlPipeline {
         throw new Error("graph_generation_stale_snapshot");
       }
       if (graphHeartbeatFailure) throw graphHeartbeatFailure;
+      if (managedRunLeaseLost) throw managedRunLeaseLost;
       stopGraphHeartbeat = true;
       heartbeatTimerController.abort();
       await graphHeartbeat;
+      stopManagedRunHeartbeat = true;
+      managedRunTimerController.abort();
+      if (managedRunHeartbeat) await managedRunHeartbeat;
       const activatedGraph = await this.graphGenerations.activate(graphGenerationLease);
       const activeGraphSummary = await getSymbolRepository().getActiveGraphSnapshot(projectId);
       if (!activeGraphSummary || activeGraphSummary.generationId !== activatedGraph.generationId) {
@@ -432,6 +506,22 @@ export class EtlPipeline {
       stopGraphHeartbeat = true;
       heartbeatTimerController.abort();
       await graphHeartbeat;
+      stopManagedRunHeartbeat = true;
+      managedRunTimerController.abort();
+      if (managedRunHeartbeat) await managedRunHeartbeat;
+
+      // ── Wave 5 FR-09: release the managed_runs lease on success. We do
+      // NOT persist a final file_cursor here (T14 will add file_cursor
+      // persistence during the load stage); for T13 the lease just
+      // transitions to `completed` so the partial UNIQUE frees for the
+      // next indexer.
+      if (managedRunLease && managedRunRepository) {
+        try {
+          await managedRunRepository.complete(managedRunLease);
+        } catch (completeError) {
+          logger.error("EtlPipeline: managed_runs complete failed", completeError as Error, { projectId, jobId });
+        }
+      }
 
       logger.info("EtlPipeline: run completed", { projectId, jobId, ...result });
       return result;
@@ -450,6 +540,24 @@ export class EtlPipeline {
       heartbeatTimerController.abort();
       graphAbortController.abort();
       await graphHeartbeat;
+      stopManagedRunHeartbeat = true;
+      managedRunTimerController.abort();
+      if (managedRunHeartbeat) await managedRunHeartbeat;
+
+      // ── Wave 5 FR-09: release the managed_runs lease on failure. abort()
+      // flips the row to `aborted` so the partial UNIQUE frees; if the
+      // lease was already lost (reaper reaped us, or another process took
+      // over), abort() returns `lease_lost` and we just log it.
+      if (managedRunLease && managedRunRepository) {
+        try {
+          const outcome = await managedRunRepository.abort(managedRunLease);
+          if (outcome.status === "lease_lost") {
+            logger.warn("EtlPipeline: managed_runs abort saw lease_lost", { projectId, jobId });
+          }
+        } catch (abortError) {
+          logger.error("EtlPipeline: managed_runs abort failed", abortError as Error, { projectId, jobId });
+        }
+      }
 
       eventBus.publish("indexing:failed", { jobId, projectId, error, durationMs });
 
