@@ -11,13 +11,7 @@
  * The DB layer is mocked via mock.module on "@massa-th0th/core/services" so
  * getPrismaClient returns a controllable prisma stub. No live DB needed.
  */
-
 import { describe, test, expect, mock, beforeEach } from "bun:test";
-
-interface FakeWorkspace {
-  findUnique: (args: { where: { projectId: string } }) => Promise<{ projectPath: string } | null>;
-  update: (args: { where: { projectId: string }; data: { projectPath: string } }) => Promise<unknown>;
-}
 
 let fakeExisting: { projectPath: string } | null = null;
 let lastUpdateArgs: { where: { projectId: string }; data: { projectPath: string } } | null = null;
@@ -26,7 +20,7 @@ let updateCalls = 0;
 
 const fakePrisma = {
   workspace: {
-    findUnique: async (args: { where: { projectId: string } }) => {
+    findUnique: async (_args: { where: { projectId: string } }) => {
       findUniqueCalls++;
       return fakeExisting;
     },
@@ -35,8 +29,8 @@ const fakePrisma = {
       lastUpdateArgs = args;
       return {};
     },
-  } as unknown as FakeWorkspace["workspace"],
-} as unknown as { workspace: FakeWorkspace["workspace"] };
+  },
+};
 
 mock.module("@massa-th0th/core/services", () => ({
   getPrismaClient: () => fakePrisma,
