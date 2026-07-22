@@ -18,6 +18,7 @@ import { collectFiles } from "./file-collector.js";
 import { TOOL_DEFINITIONS } from "./tool-definitions.js";
 import { proxyCallTool } from "./call-tool-proxy.js";
 import { pageToolDefinitions } from "./tool-discovery.js";
+import { applyMoonshotFlavor, resolveFlavor } from "./moonshot-flavor.js";
 import {
   configExists,
   initConfig,
@@ -133,8 +134,14 @@ class McpProxyServer {
 
   private setupHandlers(): void {
     // List tools in stable protocol pages. Current roster remains one page.
+    // Wave 5 FR-17: `?flavor=moonshot` strips root-level JSON Schema
+    // combinators from each tool's inputSchema (transport-only, no storage
+    // rewrite). The flavor may arrive via `_meta.flavor` or a `flavor`
+    // param on the request.
     this.server.setRequestHandler(ListToolsRequestSchema, async (request) => {
-      return pageToolDefinitions(TOOL_DEFINITIONS, request.params?.cursor);
+      const result = pageToolDefinitions(TOOL_DEFINITIONS, request.params?.cursor);
+      const flavor = resolveFlavor(request);
+      return applyMoonshotFlavor(result, flavor);
     });
 
     // Handle tool calls - proxy to Tools API
