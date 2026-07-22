@@ -84,7 +84,7 @@ These are commit/diff facts, not a claim that every manual or runtime verificati
 ## Preserved acceptance facts
 
 - Graph extraction scope remains TS/JS first; `TODO.md` still records broad multi-language tree-sitter work as deferred.
-- `TODO.md` still records the D5 Cypher subset as deferred until D1–D4 use justifies it.
+- `TODO.md` still records the D5 Cypher subset as deferred until D1–D4 use justifies it. **CLOSED 2026-07-22 by ADR 0001** (`docs/adr/0001-remove-d5-cypher-subset.md`) — structural graph traversal (`trace_path`, `impact_analysis`, `get_architecture`) covers the use cases; deferral formally removed.
 - The current E2E coverage ledger contains deterministic needle relevance floors and dedicated Phase-4 graph plus web/execution/new-feature suites.
 - `TODO.md` states the execution controls are best-effort containment and advises container/VM isolation before exposure to untrusted clients; this preserves the source plan’s need to bound the new execution surface.
 - The source plan’s native-rewrite/license constraint is an intent requirement. Commit metadata/diffs establish TypeScript implementation changes in this repository, but do not independently prove provenance of every algorithm.
@@ -93,7 +93,7 @@ These are commit/diff facts, not a claim that every manual or runtime verificati
 
 - The source plan marked B4 think-in-code routing optional and lower priority. No commit in this range has a `think-in-code` routing-hook subject; this record cannot establish that B4 landed.
 - The plan’s phase verification asks for measured needle improvement over the named baseline and several live end-to-end/manual checks. This record inspected commit/diff and existing-spec evidence only; it did not rerun those checks or report fresh benchmark values.
-- The plan deferred D5 and multi-language parsing. Current `TODO.md` retains both as deferred, so neither is an execution omission.
+- The plan deferred D5 and multi-language parsing. Current `TODO.md` retains multi-language parsing as deferred; **D5 Cypher subset deferral CLOSED by ADR 0001** (2026-07-22). Neither is an execution omission.
 - The source plan requested an OS-level sandbox only indirectly through execution safety requirements; current `TODO.md` explicitly says no OS-level sandbox exists. Treat present controls as containment, not an untrusted-code security boundary.
 
 ## Existing spec crossrefs
