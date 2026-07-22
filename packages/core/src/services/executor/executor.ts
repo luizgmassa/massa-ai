@@ -36,6 +36,7 @@ import {
   type Language,
   type DetectDeps,
 } from "./runtime.js";
+import { getSandboxMode, wrapSpawn, type SandboxMode } from "./sandbox.js";
 
 const isWin = process.platform === "win32";
 
@@ -446,7 +447,13 @@ export class PolyglotExecutor {
     background: boolean,
   ): Promise<ExecResult> {
     return new Promise((res) => {
-      const proc = spawn(cmd[0], cmd.slice(1), {
+      // OS-level sandbox (W7-08): wrap the command with platform-specific
+      // isolation. auto = use if available, fall back to best-effort (F1).
+      // The seatbelt profile uses realpathSync for project root (F2).
+      const sandboxMode = getSandboxMode();
+      const sandboxedCmd = wrapSpawn(cmd, cwd, sandboxTmpDir, sandboxMode);
+
+      const proc = spawn(sandboxedCmd[0], sandboxedCmd.slice(1), {
         cwd,
         stdio: ["ignore", "pipe", "pipe"],
         env: buildSafeEnv(sandboxTmpDir),
