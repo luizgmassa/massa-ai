@@ -57,16 +57,46 @@ export function escapeHtml(s) {
     .replace(/'/g, "&#39;");
 }
 
-// ── Minimal markdown renderer ──────────────────────────────────────────────
+// ── Markdown renderer (marked + DOMPurify with XSS prevention) ──────────────
 
 /**
- * Render a small, safe subset of markdown to HTML. Escapes all raw text first
- * so injected HTML/tags cannot execute. Supported: ATX headings, bold, italic,
- * inline code, fenced code blocks, unordered/ordered lists, links, paragraphs.
- * Returns "" for falsy input.
+ * Render markdown to safe HTML using marked + DOMPurify.
+ * Falls back to the built-in minimal renderer when the CDN libraries are not
+ * loaded (e.g., in test environments without a DOM).
+ *
+ * SECURITY: never use raw innerHTML with unsanitized markdown output.
+ * DOMPurify.sanitize() strips XSS vectors (scripts, event handlers, etc.).
+ * F4 mitigation: stored markdown cannot inject scripts.
  */
 export function markdownToHtml(md) {
   if (!md) return "";
+  const text = String(md);
+
+  // Use marked + DOMPurify when available (browser with CDN scripts loaded)
+  if (typeof globalThis !== "undefined") {
+    const markedLib = globalThis.marked;
+    const purifyLib = globalThis.DOMPurify;
+    if (markedLib && purifyLib) {
+      try {
+        const rawHtml = markedLib.parse(text);
+        return purifyLib.sanitize(rawHtml);
+      } catch (_) {
+        // fall through to minimal renderer on parse error
+      }
+    }
+  }
+
+  // Fallback: minimal built-in renderer (no table support, but safe)
+  return _minimalMarkdownToHtml(text);
+}
+
+/**
+ * Minimal built-in markdown renderer — escapes all raw text first so injected
+ * HTML/tags cannot execute. Used as fallback when marked/DOMPurify are not
+ * available (tests, non-browser). Supported: headings, bold, italic, inline
+ * code, fenced code blocks, lists, links, paragraphs.
+ */
+function _minimalMarkdownToHtml(md) {
   const lines = String(md).replace(/\r\n?/g, "\n").split("\n");
   const out = [];
   let i = 0;
@@ -91,16 +121,13 @@ export function markdownToHtml(md) {
     }
   };
 
-  // inline formatting applied AFTER escaping
   function inline(text) {
     let t = escapeHtml(text);
-    // inline code first to protect its content from further substitution
     const codeStash = [];
     t = t.replace(/`([^`]+)`/g, (_m, c) => {
       codeStash.push(c);
       return "@@MASSA_TH0THCODE" + (codeStash.length - 1) + "@@";
     });
-    // links [text](url) — url must be http(s)/mailto; escape text already done
     t = t.replace(
       /\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g,
       (_m, label, url) =>
@@ -108,7 +135,6 @@ export function markdownToHtml(md) {
     );
     t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
     t = t.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-    // restore inline code
     t = t.replace(/@@MASSA_TH0THCODE(\d+)@@/g, (_m, idx) => "<code>" + codeStash[Number(idx)] + "</code>");
     return t;
   }
@@ -116,7 +142,6 @@ export function markdownToHtml(md) {
   while (i < lines.length) {
     const line = lines[i];
 
-    // fenced code block
     const fence = line.match(/^```(\w*)\s*$/);
     if (fence) {
       flushPara();
@@ -128,13 +153,12 @@ export function markdownToHtml(md) {
         codeLines.push(lines[i]);
         i++;
       }
-      i++; // skip closing fence (or eof)
+      i++;
       const cls = lang ? ' class="language-' + escapeHtml(lang) + '"' : "";
       out.push("<pre><code" + cls + ">" + escapeHtml(codeLines.join("\n")) + "</code></pre>");
       continue;
     }
 
-    // heading
     const h = line.match(/^(#{1,6})\s+(.*)$/);
     if (h) {
       flushPara();
@@ -145,7 +169,6 @@ export function markdownToHtml(md) {
       continue;
     }
 
-    // unordered list item
     if (/^\s*[-*]\s+/.test(line)) {
       flushPara();
       if (inOl) {
@@ -161,7 +184,6 @@ export function markdownToHtml(md) {
       continue;
     }
 
-    // ordered list item
     if (/^\s*\d+\.\s+/.test(line)) {
       flushPara();
       if (inUl) {
@@ -177,7 +199,6 @@ export function markdownToHtml(md) {
       continue;
     }
 
-    // blank line → paragraph break
     if (line.trim() === "") {
       flushPara();
       flushLists();
@@ -185,7 +206,6 @@ export function markdownToHtml(md) {
       continue;
     }
 
-    // default: accumulate paragraph line
     flushLists();
     para.push(line);
     i++;
