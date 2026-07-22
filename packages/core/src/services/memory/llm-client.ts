@@ -18,7 +18,7 @@
 import { generateText, generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { config, logger, DEFAULT_LLM_MODEL } from "@massa-th0th/shared";
-import type { z } from "zod";
+import { z } from "zod";
 
 /**
  * Which model role a call targets. `"instruct"` (default) selects the
@@ -47,6 +47,68 @@ export interface LlmResult<T = string> {
   /** Present when ok === false. */
   error?: string;
 }
+
+// ── json_schema constrained decoding (W7-07) ─────────────────────────────
+
+/**
+ * Cached Ollama json_schema support flag. `null` = not yet checked.
+ * Ollama >= 0.5.0 supports `format: { type: "json_schema", json_schema: {...} }`
+ * for constrained decoding. Older versions only support `json_object`.
+ */
+let _jsonSchemaSupported: boolean | null = null;
+
+/**
+ * Check whether the configured Ollama instance supports `json_schema` format
+ * (requires Ollama >= 0.5.0). Caches the result for the process lifetime.
+ * On any error (Ollama down, unparseable version), returns `false` (safe
+ * fallback to the current json_object path).
+ * @internal
+ */
+export async function _checkJsonSchemaSupport(): Promise<boolean> {
+  if (_jsonSchemaSupported !== null) return _jsonSchemaSupported;
+  try {
+    const llm = getLlmConfig();
+    // Ollama's version endpoint is at /api/version (no /v1 prefix).
+    const versionUrl = llm.baseUrl.replace(/\/v1\/?$/, "") + "/api/version";
+    const res = await fetch(versionUrl, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) {
+      _jsonSchemaSupported = false;
+      logger.warn("json_schema: Ollama version check failed", { status: res.status });
+      return false;
+    }
+    const body = (await res.json()) as { version?: string };
+    const version = body.version ?? "";
+    const match = version.match(/^(\d+)\.(\d+)\.(\d+)/);
+    if (!match) {
+      _jsonSchemaSupported = false;
+      logger.warn("json_schema: could not parse Ollama version", { version });
+      return false;
+    }
+    const major = parseInt(match[1], 10);
+    const minor = parseInt(match[2], 10);
+    const supported = major > 0 || (major === 0 && minor >= 5);
+    _jsonSchemaSupported = supported;
+    logger.info("json_schema: Ollama version detected", { version, supported });
+    return supported;
+  } catch (e) {
+    _jsonSchemaSupported = false;
+    logger.warn("json_schema: version check error — falling back to json_object", {
+      error: (e as Error).message,
+    });
+    return false;
+  }
+}
+
+/**
+ * Test seam: force the json_schema support flag without hitting Ollama.
+ * Pass `null` to clear the cache.
+ * @internal
+ */
+export function _setJsonSchemaSupportedForTesting(flag: boolean | null): void {
+  _jsonSchemaSupported = flag;
+}
+
+// ── end json_schema section ──────────────────────────────────────────────
 
 /** Whether the LLM is enabled at the current config. Cheap, side-effect-free. */
 export function isLlmEnabled(): boolean {
@@ -314,19 +376,67 @@ export async function llmObject<T>(
   const timeoutMs = opts.timeoutMs ?? llm.timeoutMs;
   let result: any = null;
   try {
+    // json_schema constrained decoding (W7-07): when Ollama >= 0.5.0,
+    // generateObject passes the Zod schema as json_schema to Ollama for
+    // constrained decoding (the SDK maps responseFormat.type="json" + schema
+    // to json_schema). When Ollama < 0.5.0 (or version check fails), fall
+    // back to json_object (no schema) and validate manually afterward.
+    const useJsonSchema = llm.disableThink && (await _checkJsonSchemaSupport());
+
+    if (useJsonSchema) {
+      // json_schema path: SDK sends format=json_schema with the compiled schema.
+      // schemaName provides additional LLM guidance. No providerOptions needed.
+      result = await generateObject({
+        model: buildProvider(llm),
+        prompt,
+        system: opts.system,
+        schema,
+        schemaName: "response",
+        temperature: llm.temperature,
+        maxOutputTokens: llm.maxOutputTokens,
+        abortSignal: timeoutSignal(timeoutMs),
+      });
+      logger.info("json_schema: constrained decoding used", {});
+      return { ok: true, value: result.object };
+    }
+
+    // Fallback path (Ollama < 0.5.0 or disableThink off): use no-schema output
+    // so the SDK sends json_object (no json_schema) to avoid version errors,
+    // then validate the returned object against the Zod schema manually.
     result = await generateObject({
       model: buildProvider(llm),
       prompt,
       system: opts.system,
-      schema,
+      output: "no-schema",
       temperature: llm.temperature,
       maxOutputTokens: llm.maxOutputTokens,
       abortSignal: timeoutSignal(timeoutMs),
-      ...(llm.disableThink
-        ? { providerOptions: { openai: { responseFormat: { type: "json_object" } } } }
-        : {}),
     });
-    return { ok: true, value: result.object };
+    const validated = schema.safeParse(result.object);
+    if (validated.success) {
+      logger.info("json_schema: fallback to json_object — validated", {});
+      return { ok: true, value: validated.data };
+    }
+    // Manual validation failed — try reasoning-channel recovery before degrading.
+    if (llm.disableThink) {
+      const reasoning = _reasoningToText(result);
+      if (reasoning.length > 0) {
+        const parsed = _extractJsonObject(reasoning);
+        if (parsed !== undefined) {
+          const recovered = schema.safeParse(parsed);
+          if (recovered.success) {
+            logger.warn("llmObject: recovered object from reasoning channel (fallback path)", {
+              reasoningLen: reasoning.length,
+            });
+            return { ok: true, value: recovered.data };
+          }
+        }
+      }
+    }
+    logger.warn("llmObject: fallback validation failed", {
+      zodError: validated.error.issues.map((i) => i.message).join("; "),
+    });
+    return { ok: false, error: "schema validation failed (fallback path)" };
   } catch (e) {
     // generateObject throws AI_NoObjectGeneratedError on schema mismatch / empty
     // parse — the thrown error carries the raw response (with reasoning). The

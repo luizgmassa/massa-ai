@@ -53,6 +53,7 @@ import {
   llmObject,
   isLlmEnabled,
   _setLlmEnabledForTesting,
+  _setJsonSchemaSupportedForTesting,
   _reasoningToText,
   _extractJsonObject,
 } from "../services/memory/llm-client.js";
@@ -68,6 +69,7 @@ const sampleSchema = z.object({
 
 beforeEach(() => {
   _setLlmEnabledForTesting(false);
+  _setJsonSchemaSupportedForTesting(null);
   generateShouldThrow = null;
   generateObjectShouldThrow = null;
   generateReturn = null;
@@ -96,7 +98,7 @@ describe("llm-client — default-off gate (P1-LLMCLIENT-03)", () => {
 });
 
 describe("llm-client — silent degradation (P1-LLMCLIENT-04)", () => {
-  beforeEach(() => { _setLlmEnabledForTesting(true); });
+  beforeEach(() => { _setLlmEnabledForTesting(true); _setJsonSchemaSupportedForTesting(false); });
 
   test("llmComplete swallows a throw and returns {ok:false} (no throw to caller)", async () => {
     generateShouldThrow = "connection refused";
@@ -120,7 +122,7 @@ describe("llm-client — silent degradation (P1-LLMCLIENT-04)", () => {
 });
 
 describe("llm-client — success path (P1-LLMCLIENT-02)", () => {
-  beforeEach(() => { _setLlmEnabledForTesting(true); });
+  beforeEach(() => { _setLlmEnabledForTesting(true); _setJsonSchemaSupportedForTesting(false); });
 
   test("llmComplete returns {ok:true, value} when the provider succeeds", async () => {
     const res = await llmComplete("hello");
@@ -142,13 +144,20 @@ describe("llm-client — success path (P1-LLMCLIENT-02)", () => {
 });
 
 describe("llm-client — thinking-model mitigations", () => {
-  beforeEach(() => { _setLlmEnabledForTesting(true); });
+  beforeEach(() => { _setLlmEnabledForTesting(true); _setJsonSchemaSupportedForTesting(false); });
 
-  test("llmObject forwards response_format json_object via providerOptions when disableThink is on", async () => {
+  test("llmObject uses no-schema fallback (json_object) when json_schema unsupported", async () => {
+    _setJsonSchemaSupportedForTesting(false);
     await llmObject("hello", sampleSchema);
-    expect(lastCall.providerOptions).toEqual({
-      openai: { responseFormat: { type: "json_object" } },
-    });
+    expect(lastCall.output).toBe("no-schema");
+    expect(lastCall.providerOptions).toBeUndefined();
+  });
+
+  test("llmObject uses schemaName when json_schema supported (constrained decoding)", async () => {
+    _setJsonSchemaSupportedForTesting(true);
+    await llmObject("hello", sampleSchema);
+    expect(lastCall.schemaName).toBe("response");
+    expect(lastCall.output).toBeUndefined(); // default "object" output
   });
 
   test("llmComplete recovers from reasoning channel when content is empty", async () => {
@@ -250,7 +259,7 @@ const LLM_CFG_AVAILABLE = (() => {
 })();
 
 describe("llm-client — per-task model routing (T4)", () => {
-  beforeEach(() => { _setLlmEnabledForTesting(true); });
+  beforeEach(() => { _setLlmEnabledForTesting(true); _setJsonSchemaSupportedForTesting(false); });
 
   test("instruct role (default) selects config.llm.model", async () => {
     await llmComplete("hello"); // default role = instruct
