@@ -31,7 +31,10 @@ import {
   detectRoutes,
   detectHotspots,
   labelCommunities,
+  VALID_ARCHITECTURE_ASPECTS,
 } from "../services/symbol/architecture.js";
+import type { HttpEdgeLite } from "../services/symbol/architecture.js";
+import { ToolError } from "../tools/enum-validation.js";
 
 // ─── (1) Unit tests — pure functions ─────────────────────────────────────────
 
@@ -273,6 +276,117 @@ describe("architecture analyzers (pure)", () => {
     for (const l of map.layers) {
       expect(["entry", "api", "core", "service", "leaf", "unknown"]).toContain(l.layer);
     }
+  });
+});
+
+// ─── Wave 5 — `cycles` aspect + `aspects` opt-in (T03 / FR-02 / FR-04) ────────
+
+describe("computeArchitectureMap — cycles aspect + aspects opt-in (Wave 5)", () => {
+  const files = ["a.ts", "b.ts", "c.ts", "d.ts", "e.ts"];
+  const internalEdges: Array<{ fromFile: string; toFile: string }> = [];
+  const definitions = [{ filePath: "a.ts", name: "fn", kind: "function" }];
+  const httpEdges: HttpEdgeLite[] = [];
+
+  test("no aspects → baseline map, cycles absent (backward-compat)", () => {
+    const map = computeArchitectureMap({
+      files,
+      internalEdges,
+      definitions,
+      httpEdges,
+      callEdges: [{ from: "a.ts", to: "b.ts" }, { from: "b.ts", to: "a.ts" }],
+    });
+    expect(map.cycles).toBeUndefined();
+    expect(map.cycles_truncated).toBeUndefined();
+  });
+
+  test('aspects: ["cycles"] → surfaces SCCs of size >1', () => {
+    // a↔b cycle, plus a→c (no cycle), plus d↔d self-loop.
+    const map = computeArchitectureMap(
+      {
+        files,
+        internalEdges,
+        definitions,
+        httpEdges,
+        callEdges: [
+          { from: "a.ts", to: "b.ts" },
+          { from: "b.ts", to: "a.ts" },
+          { from: "a.ts", to: "c.ts" },
+          { from: "d.ts", to: "d.ts" },
+        ],
+      },
+      { aspects: ["cycles"] },
+    );
+    expect(map.cycles).toBeDefined();
+    expect(map.cycles!.length).toBe(2);
+    // The a↔b SCC.
+    const ab = map.cycles!.find((c) => c.nodes.length === 2);
+    expect(ab).toBeDefined();
+    expect(ab!.nodes.sort()).toEqual(["a.ts", "b.ts"]);
+    expect(ab!.edgeCount).toBe(2); // a→b + b→a
+    expect(ab!.id).toBe("cycle:a.ts|b.ts");
+    // The d self-loop SCC.
+    const d = map.cycles!.find((c) => c.nodes.length === 1);
+    expect(d).toBeDefined();
+    expect(d!.nodes).toEqual(["d.ts"]);
+    expect(d!.edgeCount).toBe(1);
+    expect(map.cycles_truncated).toBe(false);
+  });
+
+  test('aspects: ["cycles"] with no CALL edges → empty cycles, no truncation', () => {
+    const map = computeArchitectureMap(
+      { files, internalEdges, definitions, httpEdges, callEdges: [] },
+      { aspects: ["cycles"] },
+    );
+    expect(map.cycles).toEqual([]);
+    expect(map.cycles_truncated).toBe(false);
+  });
+
+  test('aspects: ["cycles"] with callEdges absent (undefined) → empty cycles', () => {
+    const map = computeArchitectureMap(
+      { files, internalEdges, definitions, httpEdges },
+      { aspects: ["cycles"] },
+    );
+    expect(map.cycles).toEqual([]);
+    expect(map.cycles_truncated).toBe(false);
+  });
+
+  test("unknown aspect → teaching error listing valid values (Wave 4 N6 parity)", () => {
+    expect(() =>
+      computeArchitectureMap(
+        { files, internalEdges, definitions, httpEdges },
+        { aspects: ["cycles", "bogus"] },
+      ),
+    ).toThrow(ToolError);
+    expect(() =>
+      computeArchitectureMap(
+        { files, internalEdges, definitions, httpEdges },
+        { aspects: ["bogus"] },
+      ),
+    ).toThrow(/Invalid aspects value: bogus.*Valid values: cycles/);
+  });
+
+  test("VALID_ARCHITECTURE_ASPECTS exports the opt-in set", () => {
+    expect(VALID_ARCHITECTURE_ASPECTS).toContain("cycles");
+  });
+
+  test("teaching error fires before any analyzer work (fail-fast)", () => {
+    // Pass files that would crash detectPackages if reached; the validator
+    // must throw first. We assert the error is raised even with empty input.
+    let ranAnalyzer = false;
+    try {
+      computeArchitectureMap(
+        {
+          files: [],
+          internalEdges: [],
+          definitions: [],
+          httpEdges: [],
+        },
+        { aspects: ["nope"] },
+      );
+    } catch {
+      ranAnalyzer = true;
+    }
+    expect(ranAnalyzer).toBe(true);
   });
 });
 

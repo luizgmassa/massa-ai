@@ -180,13 +180,12 @@ export class Scheduler {
       // against now — a future persisted nextRunAt is kept as-is.
       const now = Date.now();
       full.nextRunAt = existing.nextRunAt;
-      if (full.enabled && existing.nextRunAt <= now) {
-        // Persisted nextRunAt is past due + enabled: reschedule from now
-        // (avoids a noisy missed-run skip log on boot).
-        full.nextRunAt = this.computeNextRun(full.schedule, now);
-      }
+      // Wave 5 FR-13: do NOT reschedule past-due jobs here — catchUpMissedJobs()
+      // fires one tick per missed job at boot. Preserving the past-due nextRunAt
+      // lets catch-up identify which jobs were missed.
       // If disabled, keep the existing nextRunAt as-is (it'll be recomputed
       // when the job is re-enabled via setEnabled).
+      void now; // now referenced in catchUpMissedJobs
     }
 
     this.store.save(full);
@@ -287,6 +286,48 @@ export class Scheduler {
   }
 
   /**
+   * Wave 5 FR-13: catch-up missed jobs at boot. Fires ONE tick per missed job
+   * (jobs with next_run_at < now() AND enabled=true), non-overlapping per kind
+   * (the `running` set prevents concurrent execution of the same jobKind). Not
+   * a full backfill — exactly one tick per missed job. Called by the boot
+   * wiring after registerDefaultJobs() and before start().
+   *
+   * Each fired job's nextRunAt is advanced to the next scheduled run (via
+   * fireJob). Jobs that are already due-but-not-missed (overdue < tick) are
+   * left for the normal tick to pick up.
+   */
+  catchUpMissedJobs(now: number = Date.now()): { caughtUp: number; skipped: number } {
+    if (!this.enabled) return { caughtUp: 0, skipped: 0 };
+    const jobs = this.store.listEnabled();
+    let caughtUp = 0;
+    let skipped = 0;
+    for (const job of jobs) {
+      // Non-overlapping per kind: skip if this jobKind is already running.
+      if (this.running.has(job.jobKind)) {
+        skipped++;
+        continue;
+      }
+      // Missed = nextRunAt is in the past (overdue by more than one tick).
+      // The normal tick handles jobs due within the current tick window.
+      const overdueMs = now - job.nextRunAt;
+      if (overdueMs <= this.tickIntervalMs) {
+        // Not missed — the normal tick will fire it.
+        continue;
+      }
+      // Fire one catch-up tick for this missed job.
+      logger.info("Scheduler: catch-up tick for missed job", {
+        id: job.id,
+        name: job.name,
+        jobKind: job.jobKind,
+        overdueMs,
+      });
+      this.fireJob(job, now);
+      caughtUp++;
+    }
+    return { caughtUp, skipped };
+  }
+
+  /**
    * Stop the scheduler. Clears the interval. Does NOT delete job definitions.
    */
   stop(): void {
@@ -384,20 +425,39 @@ export class Scheduler {
     });
 
     void (async () => {
+      let succeeded = false;
+      let errMsg: string | null = null;
       try {
         await Promise.resolve(handler(job));
+        succeeded = true;
         logger.info("Scheduler: job completed", {
           id: job.id,
           jobKind: job.jobKind,
           durationMs: Date.now() - firedAt,
         });
       } catch (e) {
+        errMsg = (e as Error).message;
         logger.warn("Scheduler: job handler threw (caught)", {
           id: job.id,
           jobKind: job.jobKind,
-          error: (e as Error).message,
+          error: errMsg,
         });
       } finally {
+        // Wave 5 FR-13: success/failure split. last_success_at updates ONLY
+        // on success; consecutive_failures resets to 0 on success and
+        // increments on failure. last_error captures the truncated message.
+        if (succeeded) {
+          job.lastSuccessAt = firedAt;
+          job.consecutiveFailures = 0;
+          job.lastError = null;
+        } else {
+          job.lastFailureAt = firedAt;
+          job.consecutiveFailures = (job.consecutiveFailures ?? 0) + 1;
+          // Truncate last_error to 2000 chars (avoid unbounded TEXT growth).
+          job.lastError = errMsg
+            ? (errMsg.length > 2000 ? errMsg.substring(0, 1997) + "..." : errMsg)
+            : "unknown error";
+        }
         // Update lastRunAt + nextRunAt and persist.
         job.lastRunAt = firedAt;
         job.nextRunAt = this.computeNextRun(job.schedule, firedAt);

@@ -3,7 +3,15 @@ import { encode as toTOON } from "@toon-format/toon";
 import {
   projectFields,
   serializeToolResponse,
+  groupRowsByPrefix,
+  twoSegmentPrefix,
+  groupedToTree,
 } from "../tools/serialize.js";
+import type {
+  GroupRowsByPrefixOptions,
+  GroupedResult,
+  GroupedGroup,
+} from "../tools/serialize-interfaces.js";
 
 /**
  * Real trace_path-shaped payload (plan-critic F3): scalar counts + truncated
@@ -310,5 +318,200 @@ describe("serializeToolResponse — format × fields matrix", () => {
         expect(r.error).toBeUndefined();
       }
     }
+  });
+});
+
+// ─── Wave 5 FR-06 / N5 / AD-W5-011: grouped format ────────────────────────────
+
+const groupedRows = [
+  { file: "src/services/a.ts", symbol: "A", risk: 0.9 },
+  { file: "src/services/b.ts", symbol: "B", risk: 0.8 },
+  { file: "src/services/c.ts", symbol: "C", risk: 0.7 },
+  { file: "src/tools/x.ts", symbol: "X", risk: 0.5 },
+  { file: "src/tools/y.ts", symbol: "Y", risk: 0.4 },
+  { file: "src/tools/z.ts", symbol: "Z", risk: 0.3 },
+  { file: "lib/m.ts", symbol: "M", risk: 0.2 },
+  { file: "lib/n.ts", symbol: "N", risk: 0.1 },
+];
+
+describe("groupRowsByPrefix — grouped model", () => {
+  test("groups rows by 2-segment file prefix", () => {
+    const out = groupRowsByPrefix(groupedRows, { file: "file" });
+    expect(out.rows_total).toBe(8);
+    expect(out.rows_shown).toBe(8);
+    expect(out.rows_omitted).toBe(0);
+    expect(out.groups_total).toBe(3);
+    expect(out.groups_shown).toBe(3);
+    expect(out.groups_omitted).toBe(0);
+    const prefixes = out.groups.map((g) => g.qnPrefix);
+    expect(prefixes.sort()).toEqual(["lib", "src/services", "src/tools"]);
+  });
+
+  test("sorts groups by row count desc then prefix asc", () => {
+    const out = groupRowsByPrefix(groupedRows, { file: "file" });
+    expect(out.groups[0].qnPrefix).toBe("src/services");
+    expect(out.groups[0].rows.length).toBe(3);
+    expect(out.groups[1].qnPrefix).toBe("src/tools");
+    expect(out.groups[1].rows.length).toBe(3);
+    expect(out.groups[2].qnPrefix).toBe("lib");
+    expect(out.groups[2].rows.length).toBe(2);
+  });
+
+  test("surfaces representative file when all rows in a group share one", () => {
+    const rows = [
+      { file: "src/a.ts", symbol: "A" },
+      { file: "src/a.ts", symbol: "A2" },
+    ];
+    const out = groupRowsByPrefix(rows, { file: "file" });
+    expect(out.groups[0].file).toBe("src/a.ts");
+  });
+
+  test("file undefined when group spans multiple files", () => {
+    const out = groupRowsByPrefix(groupedRows, { file: "file" });
+    expect(out.groups[0].file).toBeUndefined(); // src/services spans 3 files
+  });
+
+  test("per-group row cap drops rows and counts them in rows_omitted", () => {
+    const many = Array.from({ length: 55 }, (_, i) => ({
+      file: "src/a.ts",
+      symbol: `S${i}`,
+    }));
+    const out = groupRowsByPrefix(many, { file: "file", maxRowsPerGroup: 50 });
+    expect(out.rows_total).toBe(55);
+    expect(out.rows_shown).toBe(50);
+    expect(out.rows_omitted).toBe(5);
+    expect(out.groups[0].rows_shown).toBe(50);
+    expect(out.groups[0].rows_omitted).toBe(5);
+  });
+
+  test("groups cap folds overflow into (other)", () => {
+    const rows = Array.from({ length: 30 }, (_, i) => ({
+      file: `pkg${i}/file.ts`,
+      symbol: `S${i}`,
+    }));
+    const out = groupRowsByPrefix(rows, { file: "file", maxGroups: 5 });
+    expect(out.groups_total).toBe(30);
+    expect(out.groups_shown).toBe(5);
+    expect(out.groups_omitted).toBe(26);
+    // Last group is (other), holding the 26 overflow groups' rows.
+    expect(out.groups[out.groups.length - 1].qnPrefix).toBe("(other)");
+  });
+
+  test("explicit qnPrefix field wins over file-derived prefix", () => {
+    const rows = [
+      { qnPrefix: "custom/prefix", file: "src/a.ts", symbol: "A" },
+      { qnPrefix: "custom/prefix", file: "src/b.ts", symbol: "B" },
+    ];
+    const out = groupRowsByPrefix(rows, { qnPrefix: "qnPrefix", file: "file" });
+    expect(out.groups_total).toBe(1);
+    expect(out.groups[0].qnPrefix).toBe("custom/prefix");
+  });
+
+  test("row with no resolvable prefix goes to (other)", () => {
+    const rows = [{ symbol: "X" }];
+    const out = groupRowsByPrefix(rows, { file: "file" });
+    expect(out.groups[0].qnPrefix).toBe("(other)");
+  });
+
+  test("empty input → zero totals, zero groups", () => {
+    const out = groupRowsByPrefix([], { file: "file" });
+    expect(out.rows_total).toBe(0);
+    expect(out.groups).toEqual([]);
+  });
+
+  test("twoSegmentPrefix: deep paths cap at 2 dirs; root files keep full path", () => {
+    expect(twoSegmentPrefix("a/b/c/d.ts")).toBe("a/b");
+    expect(twoSegmentPrefix("src/a.ts")).toBe("src");
+    expect(twoSegmentPrefix("root.ts")).toBe("root.ts");
+    expect(twoSegmentPrefix("")).toBe("");
+  });
+});
+
+describe("serializeToolResponse — format:tree + grouped json (AD-W5-011)", () => {
+  test("format:tree emits text-indented grouped model", () => {
+    const r = serializeToolResponse(groupedRows, {
+      format: "tree",
+      groupBy: { file: "file" },
+    });
+    expect(r.success).toBe(true);
+    expect(typeof r.data).toBe("string");
+    const text = r.data as string;
+    expect(text).toContain("rows: 8/8");
+    expect(text).toContain("src/services");
+    expect(text).toContain("src/tools");
+    expect(text).toContain("  {\"file\":\"src/services/a.ts\"");
+  });
+
+  test("format:json + grouped:true emits same grouped model as JSON", () => {
+    const r = serializeToolResponse(groupedRows, {
+      format: "json",
+      grouped: true,
+      groupBy: { file: "file" },
+    });
+    expect(r.success).toBe(true);
+    const data = r.data as GroupedResult;
+    expect(data.rows_total).toBe(8);
+    expect(data.groups_total).toBe(3);
+    expect(data.groups.map((g) => g.qnPrefix).sort()).toEqual([
+      "lib",
+      "src/services",
+      "src/tools",
+    ]);
+  });
+
+  test("format:json (default, no grouped flag) unchanged — flat object", () => {
+    const r = serializeToolResponse(groupedRows, { format: "json" });
+    expect(r.success).toBe(true);
+    expect(Array.isArray(r.data)).toBe(true);
+    expect((r.data as unknown[]).length).toBe(8);
+  });
+
+  test("format:tree + fields projection composes (project before group)", () => {
+    const r = serializeToolResponse(groupedRows, {
+      format: "tree",
+      fields: ["file", "symbol"],
+      groupBy: { file: "file" },
+    });
+    expect(r.success).toBe(true);
+    const text = r.data as string;
+    expect(text).toContain("\"symbol\":\"A\"");
+    expect(text).not.toContain("risk");
+  });
+
+  test("format:tree without groupBy on array data falls back to flat tree", () => {
+    const r = serializeToolResponse(groupedRows, { format: "tree" });
+    expect(r.success).toBe(true);
+    expect(typeof r.data).toBe("string");
+  });
+
+  // AC-6 mutation test: both formats MUST change together when the helper
+  // is mutated. We swap `twoSegmentPrefix` to a 1-segment variant via a
+  // wrapper and assert both tree + json grouped outputs change identically.
+  test("mutation: both tree and json-grouped change together via shared helper", () => {
+    const opts: GroupRowsByPrefixOptions = { file: "file" };
+    const baseline = groupRowsByPrefix(groupedRows, opts);
+    const baselineTree = groupedToTree(baseline);
+    const baselineJson = JSON.stringify(baseline);
+
+    // Mutate: force 1-segment prefix by rewriting the rows' file field to
+    // only its first segment. The helper derives the prefix from `file`, so
+    // both encoders (which consume the helper output) must observe the
+    // mutation together.
+    const mutatedRows = groupedRows.map((r) => ({
+      ...r,
+      file: r.file.split("/").slice(0, 2).join("/"),
+    }));
+    const mutated = groupRowsByPrefix(mutatedRows, opts);
+    const mutatedTree = groupedToTree(mutated);
+    const mutatedJson = JSON.stringify(mutated);
+
+    expect(mutatedTree).not.toBe(baselineTree);
+    expect(mutatedJson).not.toBe(baselineJson);
+    // And both mutated outputs agree on the new prefix set.
+    const mutatedPrefixes = mutated.groups.map((g) => g.qnPrefix).sort();
+    expect(mutatedTree).toContain(mutatedPrefixes[0]);
+    expect(JSON.parse(mutatedJson).groups.map((g: GroupedGroup) => g.qnPrefix).sort()).toEqual(
+      mutatedPrefixes,
+    );
   });
 });

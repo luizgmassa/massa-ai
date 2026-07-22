@@ -24,7 +24,9 @@ describe("Project identity MCP tool definitions (T5)", () => {
       expect(def?.inputSchema.required).not.toContain("operationId");
       expect(def?.inputSchema.required).not.toContain("expectedPlanHash");
     }
-    expect(TOOL_DEFINITIONS.length).toBe(49);
+    // 49 pre-Wave-5 tools + get_architecture (W5-T04)
+    // + synapse_task_begin (W5-T21) + synapse_task_end (W5-T22) = 52.
+    expect(TOOL_DEFINITIONS.length).toBe(52);
   });
 
   test("proxyCallTool routes rename_project/merge_projects to their REST endpoints with the body intact", async () => {

@@ -583,6 +583,16 @@ model ScheduledJob {
   enabled      Int     @default(1)
   payload      String? // JSON
 
+  // Wave 5 FR-13 / M-W5-02: success/failure split + crash-safe catch-up.
+  // last_success_at — ms-epoch of the last SUCCESSFUL run (NULL until first success).
+  // last_failure_at — ms-epoch of the last FAILED run (NULL until first failure).
+  // consecutive_failures — failure streak counter (0 on success, ++ on failure).
+  // last_error — truncated error message from the last failure (NULL on success).
+  lastSuccessAt        BigInt? @map("last_success_at")
+  lastFailureAt        BigInt? @map("last_failure_at")
+  consecutiveFailures  Int     @default(0) @map("consecutive_failures")
+  lastError            String? @map("last_error")
+
   @@index([enabled])
   @@index([nextRunAt])
   @@map("scheduled_jobs")
@@ -695,4 +705,41 @@ model ProjectIdentityOperation {
   @@index([sourceProjectId])
   @@index([targetProjectId])
   @@map("project_identity_operations")
+}
+
+// ========================================
+// Managed Runs (Wave 5 FR-08 / FR-09 / FR-10 / FR-20 / AD-W5-004 / AD-W5-013 / AD-W5-014)
+// Single table unifying indexing lease (CAS, 90s expiry + 30s heartbeat) and
+// idempotent event_id dedup + FileCursor resume. Decoupled from
+// graph_generations (AD-W5-004): an indexing run is a process-writer concept
+// with a different lifecycle than an immutable generation snapshot.
+//
+// Reaper (AD-W5-013): every begin() first UPDATEs expired active rows to
+// 'aborted'. The managed_runs_status_active partial index supports that query.
+//
+// getActive pin (AD-W5-014): WHERE status='active' AND lease_expires_at >
+// clock_timestamp() ORDER BY lease_expires_at DESC LIMIT 1. The
+// managed_runs_one_active_per_project_kind partial UNIQUE index enforces "one
+// live active row per (project_id, run_kind)".
+//
+// event_id uniqueness (FR-10): UNIQUE(project_id, event_id) prevents duplicate
+// application across crashes/restarts (idempotent incremental import).
+// ========================================
+model ManagedRun {
+  id             BigInt   @id @default(autoincrement()) @map("id")
+  projectId      String   @map("project_id")
+  runKind        String   @map("run_kind")
+  eventId        String   @map("event_id")
+  contentHash    String?  @map("content_hash")
+  fileCursor     Json?    @map("file_cursor")
+  status         String   @default("active") @map("status")
+  leaseToken     String?  @map("lease_token")
+  leaseExpiresAt DateTime? @map("lease_expires_at") @db.Timestamptz(6)
+  heartbeatAt    DateTime? @map("heartbeat_at") @db.Timestamptz(6)
+  createdAt      BigInt   @map("created_at")
+  completedAt    BigInt?  @map("completed_at")
+
+  @@unique([projectId, eventId], map: "managed_runs_event_unique")
+  @@index([leaseExpiresAt], map: "managed_runs_lease_expiry")
+  @@map("managed_runs")
 }

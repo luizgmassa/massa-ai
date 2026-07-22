@@ -20,7 +20,7 @@
  *   - make `committed` include untracked → `scope=committed` test fails
  *     (both untracked files would appear).
  */
-import { afterEach, describe, test, expect } from "bun:test";
+import { afterEach, afterAll, describe, test, expect } from "bun:test";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -28,6 +28,18 @@ import path from "node:path";
 import { defaultDiffRunner } from "../services/symbol/impact-analysis.js";
 
 const tempDirs: string[] = [];
+
+// Wave 5 FR-12: read_file path containment rejects absolute paths outside
+// project root + cwd + MASSA_TH0TH_READ_FILE_ROOTS. The N9 read_file tests
+// create temp files under os.tmpdir() (outside cwd), so allow tmpdir as an
+// extra root. The tool reads this env at CALL TIME, so setting it here
+// covers all read_file tests in this file. Restored in afterAll.
+const PREV_READ_FILE_ROOTS = process.env.MASSA_TH0TH_READ_FILE_ROOTS;
+process.env.MASSA_TH0TH_READ_FILE_ROOTS = os.tmpdir();
+afterAll(() => {
+  if (PREV_READ_FILE_ROOTS === undefined) delete process.env.MASSA_TH0TH_READ_FILE_ROOTS;
+  else process.env.MASSA_TH0TH_READ_FILE_ROOTS = PREV_READ_FILE_ROOTS;
+});
 
 afterEach(async () => {
   await Promise.all(

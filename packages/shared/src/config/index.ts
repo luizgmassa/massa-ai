@@ -170,6 +170,41 @@ export interface ServerConfig {
     prompt?: string;
   };
 
+  // Wave 5 FR-05 / N3: impact-analysis graph traversal options.
+  impact: {
+    /** When true, impact_analysis uses the recursive CTE (runBfsCteImpact)
+     * instead of the TS reverse-import BFS. Default false (additive behind
+     * flag; parity gated by impact-bfs-parity.test.ts per AD-W5-018). */
+    bfsCteEnabled: boolean;
+  };
+
+  // Wave 5 FR-11 / N13: capture policy (bounded pure module). Optional —
+  // when absent, the core pure module's DEFAULT_POLICY is used. Loaded +
+  // validated at config load (denyUnknownFields, maxIgnorePatterns,
+  // maxMatchWork).
+  capturePolicy?: {
+    rules: Array<{ pattern: string; disposition: "Keep" | "Drop" | "MetadataOnly" }>;
+    maxMatchWork?: number;
+    maxIgnorePatterns?: number;
+  };
+
+  // Wave 5 FR-12 / N9-ext: read_file path containment. Absolute paths must
+  // resolve under the project root (projectPath arg), cwd, or an explicit
+  // colon-separated allowlist. Outside → teaching error listing valid roots
+  // (no host path enumeration). Project root + cwd are ALWAYS allowed.
+  readFile: {
+    /** Colon-separated absolute paths; empty string → no extra roots. */
+    extraRoots: string[];
+  };
+
+  // Wave 5 FR-18 / N16: server-side revalidation of client filter hints.
+  // search-controller.filterByPatterns caps include+exclude patterns,
+  // validates glob syntax, and emits filter_downgrades on contradiction.
+  filterValidation: {
+    /** Max include.length + exclude.length. Default 32. */
+    maxFilterPatterns: number;
+  };
+
   // Rate Limiting
   rateLimit: {
     requestsPerMinute: number;
@@ -273,6 +308,73 @@ function envBool(key: string, fallback: boolean): boolean {
 function envString(key: string, fallback: string): string {
   const s = process.env[key];
   return s === undefined || s === "" ? fallback : s;
+}
+
+// ── Wave 5 FR-11 / AD-W5-005: capture-policy config validation ──────────────
+
+/** Maximum files to scan before refusing (FR-11 `MAX_MATCH_WORK`). */
+export const MAX_MATCH_WORK = 100_000;
+/** Maximum number of Drop patterns allowed (FR-11 `MAX_IGNORE_PATTERNS`). */
+export const MAX_IGNORE_PATTERNS = 1_024;
+
+/**
+ * Validate a `capturePolicy` config block at load time. Throws TypeError on:
+ *  - unknown fields (denyUnknownFields=true — the schema is closed)
+ *  - `maxIgnorePatterns` exceeded by the number of `Drop` rules
+ *  - `maxMatchWork` missing or negative
+ *  - any rule with an invalid disposition
+ *
+ * This mirrors `validatePolicy` in the core pure module but is duplicated here
+ * so the shared config loader does not depend on `@massa-th0th/core`. The
+ * pure module's `validatePolicy` remains the authoritative validator for
+ * direct callers; this is the config-load-time gate.
+ */
+function validateCapturePolicyConfig(
+  raw: unknown,
+): {
+  rules: Array<{ pattern: string; disposition: "Keep" | "Drop" | "MetadataOnly" }>;
+  maxMatchWork?: number;
+  maxIgnorePatterns?: number;
+} {
+  if (!raw || typeof raw !== "object") throw new TypeError("capturePolicy must be an object");
+  const p = raw as Record<string, unknown>;
+  const allowedKeys = new Set(["rules", "maxMatchWork", "maxIgnorePatterns"]);
+  for (const key of Object.keys(p)) {
+    if (!allowedKeys.has(key)) {
+      throw new TypeError(`capturePolicy: unknown field "${key}" (denyUnknownFields=true)`);
+    }
+  }
+  if (!Array.isArray(p.rules)) throw new TypeError("capturePolicy.rules must be an array");
+  const validDispositions = new Set(["Keep", "Drop", "MetadataOnly"]);
+  let dropCount = 0;
+  for (const rule of p.rules as Array<Record<string, unknown>>) {
+    if (!rule || typeof rule !== "object") throw new TypeError("capturePolicy.rules[] must be objects");
+    if (typeof rule.pattern !== "string" || !rule.pattern) {
+      throw new TypeError("capturePolicy.rules[].pattern must be a non-empty string");
+    }
+    if (typeof rule.disposition !== "string" || !validDispositions.has(rule.disposition)) {
+      throw new TypeError(
+        `capturePolicy.rules[].disposition must be Keep|Drop|MetadataOnly (got ${String(rule.disposition)})`,
+      );
+    }
+    if (rule.disposition === "Drop") dropCount++;
+  }
+  const maxIgnore = typeof p.maxIgnorePatterns === "number" ? p.maxIgnorePatterns : MAX_IGNORE_PATTERNS;
+  if (dropCount > maxIgnore) {
+    throw new TypeError(
+      `capturePolicy: ${dropCount} Drop rules exceed maxIgnorePatterns=${maxIgnore}`,
+    );
+  }
+  if (p.maxMatchWork !== undefined) {
+    if (typeof p.maxMatchWork !== "number" || p.maxMatchWork < 0) {
+      throw new TypeError("capturePolicy.maxMatchWork must be a non-negative number");
+    }
+  }
+  return {
+    rules: p.rules as Array<{ pattern: string; disposition: "Keep" | "Drop" | "MetadataOnly" }>,
+    ...(p.maxMatchWork !== undefined && { maxMatchWork: p.maxMatchWork as number }),
+    ...(p.maxIgnorePatterns !== undefined && { maxIgnorePatterns: p.maxIgnorePatterns as number }),
+  };
 }
 
 /**
@@ -618,6 +720,49 @@ export const defaultConfig: ServerConfig = {
     prompt: process.env.RLM_LLM_PROMPT || fileConfig.compression?.prompt || undefined,
   },
 
+  // Wave 5 FR-05 / N3: impact-analysis graph traversal options.
+  impact: {
+    // Additive behind-flag: when true, impact_analysis uses the single
+    // recursive CTE (runBfsCteImpact) instead of the TS reverse-import BFS.
+    // Default false — the TS path has passing tests today; the CTE path is
+    // observed in production before any flip. Parity gated by
+    // impact-bfs-parity.test.ts (same FQN set; depths may differ ≤1 hop on
+    // cyclic graphs per AD-W5-018).
+    bfsCteEnabled: envBool(
+      "MASSA_TH0TH_IMPACT_BFS_CTE",
+      fileConfig.impact?.bfsCteEnabled ?? false,
+    ),
+  },
+
+  // Wave 5 FR-11 / FR-21 / AD-W5-005 / AD-W5-015: capture policy. The pure
+  // module (packages/core/src/services/search/capture-policy.ts) owns
+  // applyPolicy + DEFAULT_POLICY; the wrapper (ignore-patterns.ts) merges
+  // .gitignore with DEFAULT_IGNORES via the Ignore library BEFORE delegating
+  // to applyPolicy. Here we surface the config block + validate bounds +
+  // denyUnknownFields at load time. When the block is absent, the pure
+  // module's DEFAULT_POLICY is used (no validation needed).
+  capturePolicy: fileConfig.capturePolicy
+    ? validateCapturePolicyConfig(fileConfig.capturePolicy)
+    : undefined,
+
+  // Wave 5 FR-12 / AD-W5-006: read_file path containment allowlist. Env
+  // MASSA_TH0TH_READ_FILE_ROOTS is colon-separated (POSIX-style). Project
+  // root (projectPath arg) and cwd are ALWAYS allowed; this list adds extra
+  // roots. Empty/unset → no extra roots. Teaching errors list valid roots
+  // only (no host path enumeration).
+  readFile: {
+    extraRoots: envString("MASSA_TH0TH_READ_FILE_ROOTS", "")
+      .split(":")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
+  },
+
+  // Wave 5 FR-18 / AD-W5-012: server-side filter revalidation. Cap
+  // include+exclude patterns (default 32, env MAX_FILTER_PATTERNS).
+  filterValidation: {
+    maxFilterPatterns: envNum("MAX_FILTER_PATTERNS", 32),
+  },
+
   rateLimit: {
     requestsPerMinute: envNum("REQUESTS_PER_MINUTE", 60),
     tokensPerMinute: envNum("TOKENS_PER_MINUTE", 100000),
@@ -775,6 +920,10 @@ export class Config {
       compression: {
         ...defaults.compression,
         ...overrides.compression,
+      },
+      impact: {
+        ...defaults.impact,
+        ...overrides.impact,
       },
       rateLimit: { ...defaults.rateLimit, ...overrides.rateLimit },
       security: { ...defaults.security, ...overrides.security },

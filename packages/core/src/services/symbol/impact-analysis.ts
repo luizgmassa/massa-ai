@@ -28,7 +28,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { logger } from "@massa-th0th/shared";
+import { logger, config } from "@massa-th0th/shared";
 import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import type { SymbolDefinition } from "../../data/symbol/symbol-repository-pg.js";
 import { validateGitRef } from "./git-ref-validation.js";
@@ -135,6 +135,13 @@ export interface ImpactAnalysisResult {
   impacted_total: number;
   impacted_shown: number;
   impacted_omitted: number;
+  /**
+   * Wave 5 FR-03 / N41: quotient rollup of impacted files by 2-segment path
+   * prefix. Cap DEFAULT_MODULE_CAP prefixes; overflow folds into `(other)`.
+   * Same emitter as impacted_total/shown/omitted so the counts are consistent.
+   * Undefined when there are no impacted files (backward-compat).
+   */
+  impacted_modules?: { prefix: string; count: number }[];
   /** Diagnostic when git produced no output (e.g. clean tree). */
   note?: string;
 }
@@ -145,6 +152,12 @@ const DEFAULT_DEPTH = 2;
 const MAX_DEPTH = 4;
 /** Cap on impacted-symbol results returned. */
 const MAX_IMPACTED = 100;
+/**
+ * Wave 5 FR-03 / N41: cap on the number of 2-segment path prefixes surfaced in
+ * `impacted_modules`. Prefixes past this cap fold into an `(other)` overflow
+ * entry so the rollup stays bounded and readable. Default 20.
+ */
+const DEFAULT_MODULE_CAP = 20;
 /**
  * Cap on the number of listDefinitionsByFile queries a single analyze() call
  * may issue (across the whole reverse-import BFS). Without it, a dense hub
@@ -165,6 +178,20 @@ const W_CENTRALITY = 0.6;
 const W_PROXIMITY = 0.4;
 
 const TEST_FILE_RE = /(^|\/)(test|tests|spec|specs|__tests__)(\/|$)|(\.|_|-)(test|spec)\.(t|j)sx?$/i;
+
+// ─── Wave 5 FR-05 / N3: BFS CTE behind-flag helper ─────────────────────────────
+// When MASSA_TH0TH_IMPACT_BFS_CTE=true (config.impact.bfsCteEnabled), impact
+// analysis skips the TS reverse-import BFS (buildReverseImportGraph + the
+// queue loop in step 5a) and uses the single recursive CTE `runBfsCteImpact`
+// instead. Parity gated by impact-bfs-parity.test.ts: same FQN set; depths may
+// differ by ≤1 hop on cyclic graphs (AD-W5-018). Default false — additive.
+function readBfsCteFlag(): boolean {
+  try {
+    return Boolean(config.get("impact")?.bfsCteEnabled);
+  } catch {
+    return false;
+  }
+}
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
@@ -259,7 +286,22 @@ export class ImpactAnalysisService {
 
     // ── 3. Build the reverse import graph (file-level dependents) ───────────
     // importerOf: file → set of files that import it (the reverse of symbol_imports).
-    const importerOf = await this.buildReverseImportGraph(repo, projectId);
+    // Wave 5 FR-05: when MASSA_TH0TH_IMPACT_BFS_CTE=true, skip building the
+    // TS reverse graph and use runBfsCteImpact (single recursive CTE) instead.
+    // The CTE returns { file, hop }[] directly, so step 5a uses that list
+    // instead of walking importerOf. Parity gated by impact-bfs-parity.test.ts.
+    const bfsCteEnabled = readBfsCteFlag();
+    const importerOf = bfsCteEnabled
+      ? new Map<string, string[]>()
+      : await this.buildReverseImportGraph(repo, projectId);
+    // CTE path: one call for all changed files (multi-source BFS). NULL guard
+    // is inside runBfsCteImpact (WHERE file_id IS NOT NULL per AD-W5-018).
+    const cteImpact = bfsCteEnabled
+      ? await repo.runBfsCteImpact(projectId, changedPaths, {
+          depth,
+          maxImpacted: MAX_IMPACTED,
+        })
+      : [];
 
     // ── 4. Centrality lookup ────────────────────────────────────────────────
     const centrality = await this.getCentralityMap(repo, projectId);
@@ -292,46 +334,86 @@ export class ImpactAnalysisService {
     };
 
     // (a) File-level: BFS over reverse import graph from each changed file.
-    for (const changedFile of changedPaths) {
-      const visited = new Set<string>([changedFile]);
-      const queue: Array<{ file: string; hop: number }> = [
-        { file: changedFile, hop: 0 },
-      ];
-      while (queue.length > 0) {
-        const { file, hop } = queue.shift()!;
-        if (hop >= depth) continue;
-        // Wall-clock deadline: abort mid-traversal with partial impacted
-        // results so a runaway reverse-BFS never hangs. O(1) per iteration.
+    if (bfsCteEnabled) {
+      // CTE path (Wave 5 FR-05): runBfsCteImpact already returned { file, hop }[]
+      // for all changed files in one recursive CTE. Emit impacted symbols for
+      // each file at its minimum hop, attributing the changed file that seeded
+      // the walk. Min-hop attribution: the CTE groups by file_id with MIN(hop);
+      // we attribute to the first changed file in changedPaths for stable output
+      // (the parity test asserts FQN-set equivalence with the TS path, not
+      // per-file attribution, per AD-W5-018).
+      for (const { file, hop } of cteImpact) {
         if (now() >= deadlineAt) {
           truncated = true;
           break;
         }
-        const importers = importerOf.get(file) ?? [];
-        for (const imp of importers) {
-          if (visited.has(imp)) continue;
-          visited.add(imp);
-          // Symbols in the importer file are impacted (they may consume the change).
-          // Use the per-analyze cache so a hub file imported by many changed
-          // files is queried once, not once-per-frontier.
-          const consumerDefs = await cachedDefs(imp);
-          for (const d of consumerDefs) {
-            if (TEST_FILE_RE.test(imp) && d.exported === false) continue;
-            const c = (centrality.get(imp) ?? 0) / maxCentrality; // normalize 0–1
-            const proximity = 1 / (hop + 1);
-            const risk = W_CENTRALITY * c + W_PROXIMITY * proximity;
-            addImpact({
-              fqn: d.id,
-              name: d.name,
-              file: imp,
-              line: d.line_start,
-              depth: hop + 1,
-              centrality: Number(c.toFixed(4)),
-              risk: Number(risk.toFixed(4)),
-              reason: `imports changed file '${changedFile}'`,
-              via: { changedFile, edge: "import" },
-            });
+        // Skip the seed files themselves at hop 0 (they are the changed files,
+        // not impacted consumers). The CTE includes them with hop=0; mirror
+        // the TS path which seeds visited={} with changedFile and never
+        // re-emits it as impacted.
+        if (hop === 0) continue;
+        const consumerDefs = await cachedDefs(file);
+        for (const d of consumerDefs) {
+          if (TEST_FILE_RE.test(file) && d.exported === false) continue;
+          const c = (centrality.get(file) ?? 0) / maxCentrality;
+          const proximity = 1 / (hop + 1);
+          const risk = W_CENTRALITY * c + W_PROXIMITY * proximity;
+          addImpact({
+            fqn: d.id,
+            name: d.name,
+            file,
+            line: d.line_start,
+            depth: hop,
+            centrality: Number(c.toFixed(4)),
+            risk: Number(risk.toFixed(4)),
+            reason: `impacted via CTE BFS at hop ${hop}`,
+            via: { changedFile: changedPaths[0] ?? file, edge: "import" },
+          });
+        }
+      }
+    } else {
+      // TS reverse-import BFS path (default).
+      for (const changedFile of changedPaths) {
+        const visited = new Set<string>([changedFile]);
+        const queue: Array<{ file: string; hop: number }> = [
+          { file: changedFile, hop: 0 },
+        ];
+        while (queue.length > 0) {
+          const { file, hop } = queue.shift()!;
+          if (hop >= depth) continue;
+          // Wall-clock deadline: abort mid-traversal with partial impacted
+          // results so a runaway reverse-BFS never hangs. O(1) per iteration.
+          if (now() >= deadlineAt) {
+            truncated = true;
+            break;
           }
-          queue.push({ file: imp, hop: hop + 1 });
+          const importers = importerOf.get(file) ?? [];
+          for (const imp of importers) {
+            if (visited.has(imp)) continue;
+            visited.add(imp);
+            // Symbols in the importer file are impacted (they may consume the change).
+            // Use the per-analyze cache so a hub file imported by many changed
+            // files is queried once, not once-per-frontier.
+            const consumerDefs = await cachedDefs(imp);
+            for (const d of consumerDefs) {
+              if (TEST_FILE_RE.test(imp) && d.exported === false) continue;
+              const c = (centrality.get(imp) ?? 0) / maxCentrality; // normalize 0–1
+              const proximity = 1 / (hop + 1);
+              const risk = W_CENTRALITY * c + W_PROXIMITY * proximity;
+              addImpact({
+                fqn: d.id,
+                name: d.name,
+                file: imp,
+                line: d.line_start,
+                depth: hop + 1,
+                centrality: Number(c.toFixed(4)),
+                risk: Number(risk.toFixed(4)),
+                reason: `imports changed file '${changedFile}'`,
+                via: { changedFile, edge: "import" },
+              });
+            }
+            queue.push({ file: imp, hop: hop + 1 });
+          }
         }
       }
     }
@@ -380,6 +462,12 @@ export class ImpactAnalysisService {
     const impactedShown = out.length;
     const impactedOmitted = Math.max(0, impactedTotal - impactedShown);
 
+    // Wave 5 FR-03 / N41: impacted_modules quotient rollup over the FULL
+    // pre-clamp impacted set (not just the shown slice) so the rollup reflects
+    // total blast radius, not a truncated view. Group by 2-segment path prefix,
+    // cap at DEFAULT_MODULE_CAP, fold overflow into `(other)`.
+    const impactedModules = computeImpactedModules(ranked, DEFAULT_MODULE_CAP);
+
     logger.info("ImpactAnalysisService: analyze complete", {
       projectId,
       scope,
@@ -402,6 +490,7 @@ export class ImpactAnalysisService {
       impacted_total: impactedTotal,
       impacted_shown: impactedShown,
       impacted_omitted: impactedOmitted,
+      impacted_modules: impactedModules,
     };
   }
 
@@ -478,6 +567,66 @@ export class ImpactAnalysisService {
       return new Map();
     }
   }
+}
+
+// ─── Wave 5 FR-03 / N41: impacted_modules quotient rollup ────────────────────
+
+/**
+ * Group impacted files by their 2-segment path prefix (`path/to/file.ts` →
+ * `path/to`). Cap at `moduleCap` prefixes (highest count first); fold the
+ * overflow into an `(other)` entry. Files with no `/` use the full path as
+ * their prefix. The rollup runs over the FULL pre-clamp impacted set so it
+ * reflects the total blast radius, not the truncated view.
+ *
+ * Pure (no I/O); exported for B2/B3 consumption + unit testing.
+ */
+export function computeImpactedModules(
+  impacted: ImpactedSymbol[],
+  moduleCap: number = DEFAULT_MODULE_CAP,
+): { prefix: string; count: number }[] {
+  if (impacted.length === 0) return [];
+  const counts = new Map<string, number>();
+  for (const s of impacted) {
+    const prefix = twoSegmentPrefix(s.file);
+    counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
+  }
+  // Sort by count desc, then prefix asc for determinism.
+  const sorted = Array.from(counts.entries()).sort(
+    (a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
+  );
+  if (sorted.length <= moduleCap) {
+    return sorted.map(([prefix, count]) => ({ prefix, count }));
+  }
+  const head = sorted.slice(0, moduleCap - 1);
+  const tail = sorted.slice(moduleCap - 1);
+  const otherCount = tail.reduce((sum, [, c]) => sum + c, 0);
+  return [
+    ...head.map(([prefix, count]) => ({ prefix, count })),
+    { prefix: "(other)", count: otherCount },
+  ];
+}
+
+/**
+ * Extract the 2-segment path prefix for the quotient rollup: drop the filename
+ * (last segment), then keep up to 2 leading directory segments.
+ *
+ *   `path/to/file.ts`   → `path/to`   (2 dirs, file dropped)
+ *   `a/b/c/d.ts`        → `a/b`       (capped at 2 dirs, file dropped)
+ *   `src/a.ts`          → `src`       (1 dir, file dropped)
+ *   `root.ts`           → `root.ts`   (no dir → use full path as its own prefix)
+ *
+ * This groups sibling files (`src/a.ts` + `src/b.ts` → `src`) while bounding
+ * deep paths to 2 segments so the rollup stays readable.
+ */
+function twoSegmentPrefix(filePath: string): string {
+  if (!filePath) return filePath;
+  const slash = filePath.lastIndexOf("/");
+  if (slash < 0) return filePath; // no dir → file is its own prefix
+  const dir = filePath.slice(0, slash);
+  // Cap at 2 leading segments: `a/b/c` → `a/b`.
+  const parts = dir.split("/");
+  if (parts.length <= 2) return dir;
+  return parts.slice(0, 2).join("/");
 }
 
 // ─── Default git diff runner (production) ─────────────────────────────────────

@@ -30,6 +30,9 @@ export { GoToDefinitionTool } from "./go_to_definition.js";
 export { TracePathTool } from "./trace_path.js";
 export { ImpactAnalysisTool } from "./impact_analysis.js";
 
+// Symbol Graph architecture (Wave 5 FR-01 / FR-02)
+export { GetArchitectureTool } from "./get_architecture.js";
+
 // File tools
 export { ReadFileTool } from "./read_file.js";
 

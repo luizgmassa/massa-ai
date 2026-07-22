@@ -43,6 +43,17 @@ export interface ScheduledJob {
   enabled: boolean;
   /** Optional payload passed to the handler (e.g. projectId). JSON-serializable. */
   payload?: Record<string, unknown>;
+  /**
+   * Wave 5 FR-13: success/failure split. last_success_at is the ms-epoch of
+   * the last SUCCESSFUL run (null until the first success). last_failure_at
+   * is the ms-epoch of the last FAILED run (null until the first failure).
+   */
+  lastSuccessAt?: number | null;
+  lastFailureAt?: number | null;
+  /** Failure streak counter (0 on success, ++ on failure). */
+  consecutiveFailures?: number;
+  /** Truncated error message from the last failure (null on success). */
+  lastError?: string | null;
 }
 
 /** A handler invoked when a scheduled job fires. Must never throw. */

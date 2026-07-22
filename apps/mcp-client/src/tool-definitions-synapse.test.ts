@@ -14,8 +14,10 @@ const expected = [
 
 describe("Synapse MCP tool definitions", () => {
   test("exposes the complete REST lifecycle with exact methods and paths", () => {
-    // 47 pre-identity tools + rename_project + merge_projects (M16+M17, T5).
-    expect(TOOL_DEFINITIONS).toHaveLength(49);
+    // 47 pre-identity tools + rename_project + merge_projects (M16+M17, T5)
+    // + get_architecture (W5-T04) + synapse_task_begin (W5-T21)
+    // + synapse_task_end (W5-T22) = 52.
+    expect(TOOL_DEFINITIONS).toHaveLength(52);
     for (const [name, method, endpoint, required] of expected) {
       const definition = getToolDefinition(name);
       expect(definition?.apiMethod).toBe(method);

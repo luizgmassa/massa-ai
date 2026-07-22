@@ -261,6 +261,8 @@ export {
 } from "./symbol/definition-lookup.js";
 export type { DefinitionLookupResult } from "./symbol/definition-lookup.js";
 export { ImpactAnalysisService, impactAnalysisService, defaultDiffRunner } from "./symbol/impact-analysis.js";
+// Wave 5 FR-03: impacted_modules quotient rollup helper (pure, for B2/B3).
+export { computeImpactedModules } from "./symbol/impact-analysis.js";
 // N1 (WAVE4-N1): active-graph-generation lookup + opt-in stale precondition.
 export { getActiveGeneration, assertGenerationNotStale } from "./symbol/active-generation.js";
 export type {
@@ -287,6 +289,28 @@ export type {
   ChangedFile,
   ImpactedSymbol,
 } from "./symbol/impact-analysis.js";
+
+// Wave 5 — Architecture map + cycles aspect (FR-01, FR-02, FR-04)
+export { computeArchitectureMap, VALID_ARCHITECTURE_ASPECTS } from "./symbol/architecture.js";
+export { detectCycles, DEFAULT_CYCLE_EDGE_BUDGET } from "./symbol/cycle-detection.js";
+export type {
+  ArchitectureMap,
+  ArchitectureInput,
+  ArchitectureOptions,
+  ArchitectureAspect,
+  PackageInfo,
+  EntryPoint,
+  RouteInfo,
+  HotspotInfo,
+  LayerInfo,
+  CommunityInfo,
+  CycleInfo,
+  InternalImport,
+  SymbolDefLite,
+  HttpEdgeLite,
+  CallEdge,
+} from "./symbol/architecture.js";
+export type { SCC, DetectCyclesResult } from "./symbol/cycle-detection.js";
 
 // Events
 export { eventBus, EventBus } from "./events/event-bus.js";
@@ -417,6 +441,7 @@ export {
   DEFAULT_COMPRESS_CONFIG,
   DEFAULT_EMBEDDING_EVOLUTION_CONFIG,
   DEFAULT_PREFETCH_CONFIG,
+  TaskEnvelopeService,
 } from "./synapse/index.js";
 export type {
   AgentSession,

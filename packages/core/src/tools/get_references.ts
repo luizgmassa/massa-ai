@@ -8,6 +8,7 @@
 import { IToolHandler, ToolResponse } from "@massa-th0th/shared";
 import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
 import { ToolError } from "./enum-validation.js";
+import { serializeToolResponse } from "./serialize.js";
 import { getActiveGeneration, assertGenerationNotStale } from "../services/symbol/active-generation.js";
 
 interface GetReferencesParams {
@@ -22,6 +23,8 @@ interface GetReferencesParams {
    * no precondition.
    */
   ifNoneMatch?: string;
+  format?: "json" | "toon" | "tree";
+  fields?: string[];
 }
 
 export class GetReferencesTool implements IToolHandler {
@@ -55,6 +58,19 @@ export class GetReferencesTool implements IToolHandler {
         description:
           "Optional precondition: the client's last-known `activatedGraphGenerationId`. If it mismatches the current active generation, the tool returns a 412 teaching error.",
       },
+      format: {
+        type: "string",
+        enum: ["json", "toon", "tree"],
+        description:
+          "Output format. 'json' (default) emits the raw object. 'toon' encodes it. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper (groups references by file). Default: json.",
+        default: "json",
+      },
+      fields: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Projection — keep only these keys (dotted paths supported). Absent/empty → full data.",
+      },
     },
     required: ["projectId", "symbolName"],
   };
@@ -66,6 +82,8 @@ export class GetReferencesTool implements IToolHandler {
       fqn,
       maxResults = 50,
       ifNoneMatch,
+      format = "json",
+      fields,
     } = params as GetReferencesParams;
 
     // N1 (WAVE4-N1): surface the active graph generation id + opt-in stale
@@ -92,34 +110,38 @@ export class GetReferencesTool implements IToolHandler {
         byFile.set(ref.fromFile, arr);
       }
 
-      return {
-        success: true,
-        data: {
-          symbolName,
-          fqn: fqn ?? null,
-          total: refs.length,
-          shown: limited.length,
-          // N4 (WAVE4-N4): omitted = total - shown. The repo returns the full
-          // match set (no SQL LIMIT on the references path); the tool slices to
-          // maxResults. omitted is the count dropped by the client-facing cap.
-          omitted: refs.length - limited.length,
-          references: limited.map((r) => ({
-            fromFile: r.fromFile,
-            fromLine: r.fromLine,
-            refKind: r.refKind,
-            context: r.context,
-          })),
-          byFile: Object.fromEntries(
-            Array.from(byFile.entries()).map(([file, fileRefs]) => [
-              file,
-              fileRefs.map((r) => ({ line: r.fromLine, kind: r.refKind })),
-            ]),
-          ),
-          projectId,
-          // N1 (WAVE4-N1): the active graph generation id at query time.
-          activatedGraphGenerationId,
-        },
+      const data = {
+        symbolName,
+        fqn: fqn ?? null,
+        total: refs.length,
+        shown: limited.length,
+        // N4 (WAVE4-N4): omitted = total - shown. The repo returns the full
+        // match set (no SQL LIMIT on the references path); the tool slices to
+        // maxResults. omitted is the count dropped by the client-facing cap.
+        omitted: refs.length - limited.length,
+        references: limited.map((r) => ({
+          fromFile: r.fromFile,
+          fromLine: r.fromLine,
+          refKind: r.refKind,
+          context: r.context,
+        })),
+        byFile: Object.fromEntries(
+          Array.from(byFile.entries()).map(([file, fileRefs]) => [
+            file,
+            fileRefs.map((r) => ({ line: r.fromLine, kind: r.refKind })),
+          ]),
+        ),
+        projectId,
+        // N1 (WAVE4-N1): the active graph generation id at query time.
+        activatedGraphGenerationId,
       };
+      // Wave 5 FR-07: tree format groups references by file via the shared
+      // groupRowsByPrefix helper. json/toon unchanged when tree not selected.
+      const groupOpts =
+        format === "tree"
+          ? { format, fields, groupBy: { file: "fromFile" } }
+          : { format, fields };
+      return serializeToolResponse(data, groupOpts);
     } catch (error) {
       return {
         success: false,

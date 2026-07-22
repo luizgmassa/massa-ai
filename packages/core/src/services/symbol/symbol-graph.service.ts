@@ -33,6 +33,7 @@ import { runLouvain, type WeightedEdge } from "./communities.js";
 import {
   computeArchitectureMap,
   type ArchitectureMap,
+  type CallEdge,
   type HttpEdgeLite,
   type InternalImport,
   type SymbolDefLite,
@@ -525,9 +526,13 @@ export class SymbolGraphService {
   }
 
   /**
-   * Compute the architecture map (D4): packages, entry points, routes,
-   * hotspots, layers, and communities. Best-effort — returns null when there
-   * isn't enough graph data to produce a meaningful map.
+   * Compute the architecture map (D4 + Wave 5 `cycles` aspect): packages, entry
+   * points, routes, hotspots, layers, and communities. Best-effort — returns
+   * null when there isn't enough graph data to produce a meaningful map.
+   *
+   * Wave 5 FR-02: when `opts.aspects` includes `"cycles"`, runs iterative Tarjan
+   * SCC over the CALL-edge graph and attaches `cycles` + `cycles_truncated`.
+   * Unknown aspect values throw a teaching error (Wave 4 N6 parity).
    *
    * Isolation: each repo call is awaited separately and any thrown error
    * propagates to the caller, which catches and logs it, leaving the existing
@@ -535,12 +540,14 @@ export class SymbolGraphService {
    */
   private async computeArchitectureMapSafe(
     snapshot: ProjectMapGraphSnapshot["architecture"],
+    opts: { aspects?: string[] } = {},
   ): Promise<ArchitectureMap | null> {
     const {
       files: filesRaw,
       importEdges: importEdgesRaw,
       definitions: defsRaw,
       httpEdges: httpEdgesRaw,
+      callEdges: callEdgesRaw,
       centrality: centralityRaw,
     } = snapshot;
 
@@ -592,6 +599,29 @@ export class SymbolGraphService {
       route: (r.meta?.route as string | undefined) ?? undefined,
     }));
 
+    // Wave 5 FR-02 / N2: CALL edges → file-level directed edges for the
+    // `cycles` aspect (iterative Tarjan SCC). `from` = caller's file (raw
+    // `from_file`); `to` = callee's file, extracted from the callee's
+    // structural FQN (`relative/path.ts#Name` → `relative/path.ts`). Rows
+    // lacking a `target_fqn` or whose target does not resolve to an indexed
+    // file are dropped: a CALL edge without a resolvable callee cannot be
+    // part of a file-level cycle. The SCC detector itself runs only when the
+    // caller opts in via `aspects: ["cycles"]` (T03); this transformation is
+    // always-on so the snapshotter cost stays predictable.
+    const knownFiles = fileIndex;
+    const callEdges: CallEdge[] = [];
+    for (const r of callEdgesRaw) {
+      if (!r.target_fqn) continue;
+      const hashIdx = r.target_fqn.indexOf("#");
+      // Strip the `#Name` segment; a FQN without `#` is treated as-is.
+      const calleeFile = hashIdx >= 0 ? r.target_fqn.slice(0, hashIdx) : r.target_fqn;
+      if (!calleeFile || calleeFile === r.from_file) continue;
+      // Drop edges whose callee file is not in the indexed set: external
+      // callees (or stale FQNs) cannot close a file-level cycle.
+      if (!knownFiles.has(calleeFile)) continue;
+      callEdges.push({ from: r.from_file, to: calleeFile });
+    }
+
     // Run community detection over the file-import graph.
     const commResult = runLouvain(files.length, weightedEdges);
 
@@ -601,9 +631,40 @@ export class SymbolGraphService {
       internalEdges,
       definitions,
       httpEdges,
+      callEdges,
       centrality: centralityRaw,
       symbolCounts,
       communities: commResult.communities,
+    }, { aspects: opts.aspects });
+  }
+
+  // ── get_architecture (Wave 5 FR-01 / FR-02) ──────────────────────────────────
+
+  /**
+   * Compute the architecture map for a project, with opt-in aspects.
+   *
+   * Wave 5 FR-01 / FR-02: powers the `get_architecture` MCP tool + REST route.
+   * Unlike {@link getProjectMap} (which always computes the baseline aspects
+   * best-effort and never throws on analyzer failure), this method:
+   *   - Surfaces analyzer errors to the caller (the tool layer maps them to
+   *     teaching errors / 4xx).
+   *   - Honors `aspects` opt-in (only `"cycles"` today; unknown → throws
+   *     {@link ToolError}, Wave 4 N6 parity).
+   *   - Returns `null` only when the project has no indexed files.
+   *
+   * @throws {ToolError} when `aspects` contains an unknown value.
+   */
+  async getArchitecture(
+    projectId: string,
+    opts: { aspects?: string[]; centralityLimit?: number } = {},
+  ): Promise<ArchitectureMap | null> {
+    const repo = getSymbolRepository();
+    const graphSnapshot = await repo.getProjectMapSnapshot(projectId, {
+      centralityLimit: opts.centralityLimit ?? 20,
+    });
+    if (!graphSnapshot) return null;
+    return this.computeArchitectureMapSafe(graphSnapshot.architecture, {
+      aspects: opts.aspects,
     });
   }
 

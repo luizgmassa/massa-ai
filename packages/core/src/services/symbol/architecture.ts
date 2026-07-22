@@ -13,6 +13,8 @@
  */
 
 import type { Community } from "./communities.js";
+import { detectCycles, DEFAULT_CYCLE_EDGE_BUDGET } from "./cycle-detection.js";
+import { ToolError } from "../../tools/enum-validation.js";
 
 // ─── Public result types ─────────────────────────────────────────────────────
 
@@ -89,6 +91,28 @@ export interface ArchitectureMap {
   hotspots: HotspotInfo[];
   communities: CommunityInfo[];
   layers: LayerInfo[];
+  /**
+   * Opt-in `cycles` aspect (Wave 5 FR-02 / N2). Present only when the caller
+   * passed `aspects: ["cycles"]` to {@link computeArchitectureMap}. Each entry
+   * is a file-level strongly connected component of size >1 (or a singleton
+   * self-loop) over the CALL-edge graph.
+   */
+  cycles?: CycleInfo[];
+  /** `true` when the CALL-edge input exceeded the budget and was truncated. */
+  cycles_truncated?: boolean;
+}
+
+/**
+ * One cycle (strongly connected component) surfaced by the `cycles` aspect.
+ *
+ * `id` is a stable synthetic id derived from the sorted node list so snapshot
+ * fingerprinting and diffing are reproducible. `edgeCount` is the number of
+ * intra-SCC CALL edges (the cost of breaking the cycle).
+ */
+export interface CycleInfo {
+  id: string;
+  nodes: string[];
+  edgeCount: number;
 }
 
 // ─── Internal edge view ──────────────────────────────────────────────────────
@@ -97,6 +121,20 @@ export interface ArchitectureMap {
 export interface InternalImport {
   fromFile: string;
   toFile: string;
+}
+
+/**
+ * Directed CALL edge between two files (Wave 5 — FR-02 / N2).
+ *
+ * `from` = caller's file (relative path); `to` = callee's file (relative path,
+ * stripped from the callee's structural FQN `path/to/file.ts#Name`). The Tarjan
+ * SCC detector ({@link detectCycles}) runs over CALL edges to surface cyclic
+ * call graphs. Endpoint identity is FILE-level (not symbol-level) so the SCC
+ * partitions reflect file-grained dependency cycles.
+ */
+export interface CallEdge {
+  from: string;
+  to: string;
 }
 
 export interface SymbolDefLite {
@@ -549,23 +587,63 @@ export interface ArchitectureInput {
   internalEdges: InternalImport[];
   definitions: SymbolDefLite[];
   httpEdges: HttpEdgeLite[];
+  /**
+   * Directed CALL edges (Wave 5 FR-02 / N2). Populated from
+   * `symbol_references WHERE ref_kind='call'` rows by the snapshot reader;
+   * the `cycles` aspect (T03) runs iterative Tarjan SCC over these. Optional
+   * for backward-compat: pre-Wave-5 callers omit it and `cycles` stays absent
+   * from the resulting {@link ArchitectureMap}.
+   */
+  callEdges?: CallEdge[];
   centrality?: Map<string, number>;
   symbolCounts?: Map<string, number>;
   communities?: Community[];
 }
 
+/**
+ * Valid aspect names for {@link ArchitectureOptions.aspects} (Wave 5 FR-02 /
+ * FR-04 / AD-W5-020). Used both to validate caller input (teaching error on
+ * unknown value, Wave 4 N6 parity) and to document the contract.
+ */
+export const VALID_ARCHITECTURE_ASPECTS = ["cycles"] as const;
+export type ArchitectureAspect = (typeof VALID_ARCHITECTURE_ASPECTS)[number];
+
 export interface ArchitectureOptions {
   /** Whether to compute communities (skip to save cost when undesired). */
   withCommunities?: boolean;
+  /**
+   * Opt-in aspects (Wave 5 FR-02 / FR-04). When present, only listed aspects
+   * beyond the always-on baseline (packages/entryPoints/routes/hotspots/
+   * communities/layers) are computed. Today the only opt-in aspect is
+   * `"cycles"` (iterative Tarjan SCC over CALL edges).
+   *
+   * Unknown values throw a teaching error listing {@link VALID_ARCHITECTURE_ASPECTS}
+   * (Wave 4 N6 parity). `undefined` / empty → no opt-in aspects (backward-
+   * compat with pre-Wave-5 callers).
+   */
+  aspects?: string[];
 }
 
 /**
  * Compute the full architecture map. Pure: no DB, no I/O.
+ *
+ * @throws {ToolError} when `opts.aspects` contains an unknown value (Wave 4
+ *   N6 teaching-error parity; message lists {@link VALID_ARCHITECTURE_ASPECTS}).
  */
 export function computeArchitectureMap(
   input: ArchitectureInput,
-  _opts: ArchitectureOptions = {},
+  opts: ArchitectureOptions = {},
 ): ArchitectureMap {
+  // Validate opt-in aspects first (teaching error before any work).
+  const aspects = opts.aspects ?? [];
+  for (const a of aspects) {
+    if (!VALID_ARCHITECTURE_ASPECTS.includes(a as ArchitectureAspect)) {
+      throw new ToolError(
+        `Invalid aspects value: ${String(a)}. Valid values: ${VALID_ARCHITECTURE_ASPECTS.join(", ")}.`,
+      );
+    }
+  }
+
   const gv = buildGraphView(input.files, input.internalEdges);
 
   const packages = detectPackages(input.files, gv);
@@ -582,5 +660,44 @@ export function computeArchitectureMap(
   }
   const layers = classifyLayers(communityInfos, gv, routes);
 
-  return { packages, entryPoints, routes, hotspots, communities: communityInfos, layers };
+  const map: ArchitectureMap = {
+    packages,
+    entryPoints,
+    routes,
+    hotspots,
+    communities: communityInfos,
+    layers,
+  };
+
+  // Wave 5 FR-02 / N2: opt-in `cycles` aspect via iterative Tarjan SCC over
+  // CALL edges (AD-W5-001). Only computed when the caller asks for it.
+  if (aspects.includes("cycles")) {
+    const callEdges = input.callEdges ?? [];
+    const { sccs, truncated } = detectCycles(callEdges, DEFAULT_CYCLE_EDGE_BUDGET);
+    if (sccs.length > 0 || truncated) {
+      map.cycles = sccs.map((scc) => decorateCycle(scc.nodes, callEdges));
+      map.cycles_truncated = truncated;
+    } else {
+      // Empty-but-explicit: surface truncation flag even when no SCCs found.
+      map.cycles = [];
+      map.cycles_truncated = truncated;
+    }
+  }
+
+  return map;
+}
+
+/**
+ * Decorate one SCC with a stable synthetic id and the intra-SCC CALL-edge
+ * count. Pure: deterministic so snapshot fingerprints are reproducible.
+ */
+function decorateCycle(nodes: string[], callEdges: CallEdge[]): CycleInfo {
+  const sorted = nodes.slice().sort();
+  const id = "cycle:" + sorted.join("|");
+  const nodeSet = new Set(sorted);
+  let edgeCount = 0;
+  for (const e of callEdges) {
+    if (nodeSet.has(e.from) && nodeSet.has(e.to)) edgeCount++;
+  }
+  return { id, nodes: sorted, edgeCount };
 }

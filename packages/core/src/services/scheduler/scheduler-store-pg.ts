@@ -32,6 +32,11 @@ interface ScheduledJobRow {
   last_run_at: number | bigint;
   enabled: number | bigint;
   payload: string | null;
+  // Wave 5 FR-13 / M-W5-02: success/failure split columns.
+  last_success_at: number | bigint | null;
+  last_failure_at: number | bigint | null;
+  consecutive_failures: number | bigint;
+  last_error: string | null;
 }
 
 function toNum(v: number | bigint | null | undefined): number | null {
@@ -66,6 +71,11 @@ function rowToJob(r: ScheduledJobRow): ScheduledJob {
     lastRunAt: Number(r.last_run_at),
     enabled: Number(r.enabled) !== 0,
     payload,
+    // Wave 5 FR-13: success/failure split columns.
+    lastSuccessAt: toNum(r.last_success_at),
+    lastFailureAt: toNum(r.last_failure_at),
+    consecutiveFailures: Number(r.consecutive_failures),
+    lastError: r.last_error,
   };
 }
 
@@ -174,6 +184,11 @@ export class PgScheduledJobStore implements ScheduledJobStore {
       lastRunAt: job.lastRunAt,
       enabled: job.enabled,
       payload: job.payload ? structuredClone(job.payload) : null,
+      // Wave 5 FR-13: success/failure split columns.
+      lastSuccessAt: job.lastSuccessAt ?? null,
+      lastFailureAt: job.lastFailureAt ?? null,
+      consecutiveFailures: job.consecutiveFailures ?? 0,
+      lastError: job.lastError ?? null,
     };
 
     // Fire-and-forget remains the public contract, but same-ID writes are
@@ -191,7 +206,8 @@ export class PgScheduledJobStore implements ScheduledJobStore {
       await prisma.$executeRaw`
           INSERT INTO scheduled_jobs (
             id, name, job_kind, schedule_type, interval_ms, cron,
-            next_run_at, last_run_at, enabled, payload
+            next_run_at, last_run_at, enabled, payload,
+            last_success_at, last_failure_at, consecutive_failures, last_error
           ) VALUES (
             ${persisted.id},
             ${persisted.name},
@@ -202,7 +218,11 @@ export class PgScheduledJobStore implements ScheduledJobStore {
             ${persisted.nextRunAt}::bigint,
             ${persisted.lastRunAt}::bigint,
             ${persisted.enabled ? 1 : 0}::int,
-            ${payloadJson}
+            ${payloadJson},
+            ${persisted.lastSuccessAt}::bigint,
+            ${persisted.lastFailureAt}::bigint,
+            ${persisted.consecutiveFailures}::int,
+            ${persisted.lastError}
           )
           ON CONFLICT (id) DO UPDATE SET
             name = EXCLUDED.name,
@@ -213,7 +233,11 @@ export class PgScheduledJobStore implements ScheduledJobStore {
             next_run_at = EXCLUDED.next_run_at,
             last_run_at = EXCLUDED.last_run_at,
             enabled = EXCLUDED.enabled,
-            payload = EXCLUDED.payload
+            payload = EXCLUDED.payload,
+            last_success_at = EXCLUDED.last_success_at,
+            last_failure_at = EXCLUDED.last_failure_at,
+            consecutive_failures = EXCLUDED.consecutive_failures,
+            last_error = EXCLUDED.last_error
       `;
     }, "save");
     void this.ensureHydrated();

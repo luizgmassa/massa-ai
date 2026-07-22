@@ -13,6 +13,7 @@ import { VectorDocument } from "@massa-th0th/shared";
 import fs from "fs/promises";
 import path from "path";
 import { glob } from "glob";
+import { randomUUID } from "node:crypto";
 import { smartChunk } from "./smart-chunker.js";
 import { loadProjectIgnore } from "./ignore-patterns.js";
 import { IndexManager } from "./index-manager.js";
@@ -23,6 +24,8 @@ import { getSearchCache } from "./cache-factory.js";
 import { getSearchAnalytics } from "./analytics-factory.js";
 import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import { getProjectIdentityAliasResolver } from "../project-identity/alias-resolver.js";
+import { ManagedRunRepositoryPg } from "../../data/managed-runs/managed-run-repository-pg.js";
+import type { ManagedRunLease } from "../../data/managed-runs/managed-run-contract.js";
 import type { ContextualSearchRLM } from "./contextual-search-rlm.js";
 
 const globAsync = glob;
@@ -322,16 +325,54 @@ export async function ensureFreshIndexImpl(
 
   if (needsFullReindex) {
     logger.info("Performing full reindex", { projectId });
-    await rlm.indexProject(projectPath, projectId);
 
-    // Invalidate cache after reindex
-    await rlm.searchCache.invalidateProject(projectId);
+    // ── Wave 5 FR-09: auto-reindex also goes through the managed_runs lease.
+    // If a foreground indexer already holds the lease for this project, the
+    // auto-reindex path defers (wasStale/reindexed=false/deferred=true) so
+    // the foreground run completes unobstructed; the next stale check after
+    // the foreground completes will observe a fresh index.
+    const managedRunRepo = ManagedRunRepositoryPg.getInstance();
+    const eventId = `reindex:${projectId}:${randomUUID()}`;
+    const beginOutcome = await managedRunRepo.begin({
+      projectId,
+      runKind: "indexing",
+      eventId,
+    });
+    if (beginOutcome.status === "busy") {
+      logger.warn("Auto-reindex deferred: indexing lease busy", {
+        projectId,
+        activeRunId: beginOutcome.activeRunId,
+      });
+      return {
+        wasStale: true,
+        reindexed: false,
+        deferred: true,
+        reason: "indexing_lease_busy",
+        filesPending: filesToReindex.length,
+      };
+    }
+    let lease: ManagedRunLease = beginOutcome.lease;
+    try {
+      await rlm.indexProject(projectPath, projectId);
 
-    return {
-      wasStale: true,
-      reindexed: true,
-      reason: "full_reindex",
-    };
+      // Invalidate cache after reindex
+      await rlm.searchCache.invalidateProject(projectId);
+
+      return {
+        wasStale: true,
+        reindexed: true,
+        reason: "full_reindex",
+      };
+    } catch (err) {
+      try { await managedRunRepo.abort(lease); lease = undefined as unknown as ManagedRunLease; }
+      catch (abortErr) { logger.error("Auto-reindex lease abort failed", abortErr as Error, { projectId }); }
+      throw err;
+    } finally {
+      if (lease) {
+        try { await managedRunRepo.complete(lease); }
+        catch (completeErr) { logger.error("Auto-reindex lease complete failed", completeErr as Error, { projectId }); }
+      }
+    }
   }
 
   // Incremental reindex

@@ -167,6 +167,14 @@ export interface ProjectMapGraphSnapshot {
     importEdges: Array<{ from_file: string; to_file?: string }>;
     definitions: SymbolDefinition[];
     httpEdges: SymbolReference[];
+    /**
+     * CALL-kind references (Wave 5 FR-02 / N2). Populated from
+     * `symbol_references WHERE ref_kind='call'` rows; consumed by the
+     * `cycles` aspect in {@link computeArchitectureMap} via Tarjan SCC.
+     * Bounded by `callEdgeBudget` (default 400_000) — over the budget, rows
+     * are simply truncated (the cycles result sets `cycles_truncated=true`).
+     */
+    callEdges: SymbolReference[];
     centrality: Map<string, number>;
   };
 }
@@ -174,6 +182,15 @@ export interface ProjectMapGraphSnapshot {
 export interface ProjectMapSnapshotOptions {
   centralityLimit?: number;
   recentLimit?: number;
+  /**
+   * Wave 5 (FR-02 / N2): hard cap on CALL-kind reference rows read for the
+   * architecture snapshot's `callEdges` slot. Default 400_000 — over the
+   * budget, rows are truncated and the `cycles` aspect surfaces
+   * `cycles_truncated=true`. The cap matches the iterative Tarjan edge budget
+   * (AD-W5-017) so the SCC detector never receives more edges than it can
+   * process within the RSS guard.
+   */
+  callEdgeBudget?: number;
   /** @internal Deterministic concurrency sensor used by DB-backed tests. */
   afterGenerationCaptured?: (generationId: string | null) => void | Promise<void>;
 }
@@ -1125,6 +1142,11 @@ export class SymbolRepositoryPg {
   ): Promise<ProjectMapGraphSnapshot | null> {
     const centralityLimit = opts.centralityLimit ?? 20;
     const recentLimit = opts.recentLimit ?? 10;
+    // Wave 5 FR-02 / N2: CALL-edge budget. Matches the iterative Tarjan edge
+    // budget (AD-W5-017) so the SCC detector never receives more edges than
+    // it can process within the RSS guard. Over the budget, rows are
+    // truncated and the `cycles` aspect surfaces `cycles_truncated=true`.
+    const callEdgeBudget = opts.callEdgeBudget ?? 400_000;
 
     return getPrismaClient().$transaction(async (tx) => {
       const workspaceRows = await tx.$queryRaw<Array<WsRaw & { active_graph_generation_id: string | null }>>`
@@ -1148,7 +1170,7 @@ export class SymbolRepositoryPg {
         recentFiles: [],
         edgesByKind: {},
         architecture: {
-          files: [], importEdges: [], definitions: [], httpEdges: [], centrality: new Map(),
+          files: [], importEdges: [], definitions: [], httpEdges: [], callEdges: [], centrality: new Map(),
         },
       };
       if (!generationId) return empty;
@@ -1194,6 +1216,18 @@ export class SymbolRepositoryPg {
           AND ref_kind = 'http_call'
         ORDER BY from_file, from_line
         LIMIT 200
+      `;
+      // Wave 5 FR-02 / N2: CALL-kind edges drive the `cycles` aspect (Tarjan
+      // SCC). Bounded by `callEdgeBudget` (default 400_000); over the budget,
+      // the rows are truncated and `cycles_truncated=true` is surfaced. The
+      // budget matches the iterative Tarjan edge ceiling (AD-W5-017) so the
+      // SCC detector never overflows the JS stack under the RSS guard.
+      const callRows = await tx.$queryRaw<RefRaw[]>`
+        SELECT * FROM symbol_references
+        WHERE project_id = ${projectId} AND generation_id = ${generationId}
+          AND ref_kind = 'call'
+        ORDER BY from_file, from_line
+        LIMIT ${callEdgeBudget}
       `;
       const centralityRows = await tx.$queryRaw<Array<{
         file_path: string;
@@ -1280,6 +1314,7 @@ export class SymbolRepositoryPg {
           })),
           definitions: definitionRows.map(mapDef),
           httpEdges: httpRows.map(mapRef),
+          callEdges: callRows.map(mapRef),
           centrality,
         },
       };
@@ -1817,6 +1852,66 @@ export class SymbolRepositoryPg {
         AND generation_id = (SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId})
     `;
     return rows.map(mapImp);
+  }
+
+  /**
+   * Wave 5 FR-05 / N3 — Multi-source reverse-import BFS via a single recursive
+   * CTE (additive, behind `MASSA_TH0TH_IMPACT_BFS_CTE=true`).
+   *
+   * Anchor = changed files at hop 0. Recursive step walks the REVERSE import
+   * graph (`si.to_file = current → si.from_file` is an importer) up to `depth`
+   * hops. `MIN(hop)` collapses cycles / multi-path arrivals so each file appears
+   * once at its shortest distance. Result capped at `maxImpacted`.
+   *
+   * NULL guard (AD-W5-018 / FR-24): the anchor drops `NULL` seeds
+   * (`WHERE file_id IS NOT NULL`) so a NULL in the changed-seed does not
+   * silently re-walk the whole graph; the recursive step also skips
+   * `si.from_file IS NULL`. Parity vs the TS path is scoped to "same FQN set;
+   * depths may differ ≤1 hop on cyclic graphs" (AD-W5-018).
+   *
+   * Returns `{ file, hop }[]` (FQN resolution happens in the service). Pure
+   * single-CTE: no per-FQN follow-up queries.
+   */
+  async runBfsCteImpact(
+    projectId: string,
+    changedFiles: string[],
+    opts: { depth: number; maxImpacted: number },
+  ): Promise<{ file: string; hop: number }[]> {
+    const p = getPrismaClient();
+    const depth = Math.max(0, Math.min(4, opts.depth));
+    const maxImpacted = Math.max(1, Math.min(1000, opts.maxImpacted));
+    if (changedFiles.length === 0) return [];
+
+    // Prisma $queryRaw with an array param: pass as a JS array → PG text[].
+    // The active generation is resolved inline so the CTE joins on the same
+    // generation_id the rest of the snapshot uses.
+    const rows = await p.$queryRaw<{ file: string; hop: number }[]>`
+      WITH RECURSIVE bfs AS (
+        SELECT file_id, 0 AS hop, ARRAY[file_id] AS visited
+        FROM unnest(${changedFiles}::text[]) AS seed(file_id)
+        WHERE file_id IS NOT NULL
+        UNION ALL
+        SELECT si.from_file, b.hop + 1, b.visited || si.from_file
+        FROM bfs b
+        JOIN symbol_imports si
+          ON si.to_file = b.file_id
+         AND si.project_id = ${projectId}
+         AND si.generation_id = (
+           SELECT active_graph_generation_id FROM workspaces WHERE project_id = ${projectId}
+         )
+        WHERE b.hop < ${depth}
+          AND si.from_file IS NOT NULL
+          AND si.from_file <> b.file_id
+          AND NOT si.from_file = ANY(b.visited)
+      )
+      SELECT file_id AS file, MIN(hop) AS hop
+      FROM bfs
+      WHERE file_id IS NOT NULL
+      GROUP BY file_id
+      ORDER BY hop ASC, file_id ASC
+      LIMIT ${maxImpacted}
+    `;
+    return rows.map((r) => ({ file: r.file, hop: Number(r.hop) }));
   }
 
   /** Imports originating from a specific file (alias for getImportsFrom). */

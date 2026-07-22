@@ -47,6 +47,10 @@ function job(
     lastRunAt: 1_000,
     enabled: true,
     payload: { projectId: "scheduler-parity" },
+    lastSuccessAt: null,
+    lastFailureAt: null,
+    consecutiveFailures: 0,
+    lastError: null,
     ...overrides,
   };
 }

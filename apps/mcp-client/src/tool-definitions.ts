@@ -138,6 +138,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: "string",
           description: "Synapse session ID from synapse_session. Activates cognitive modulation: task alignment, agent affinity, working-memory boost.",
         },
+        format: {
+          type: "string",
+          enum: ["json", "toon", "tree"],
+          description:
+            "Output format. 'json' (default) emits the raw object. 'toon' encodes it. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper. Default: json.",
+          default: "json",
+        },
         fields: {
           type: "array",
           items: { type: "string" },
@@ -648,6 +655,48 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 
   {
+    name: "get_architecture",
+    description:
+      "Get the architecture map for a project: packages, entry points, routes, hotspots, communities, layers, and opt-in cycles (Tarjan SCC over CALL edges). " +
+      "Pass aspects:[\"cycles\"] to surface strongly connected components (file-level call cycles). Unknown aspect values return a teaching error listing valid values.",
+    apiEndpoint: "/api/v1/project/:id/architecture",
+    apiMethod: "GET",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The project ID (as registered via index_project).",
+        },
+        aspects: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Opt-in aspects. Only \"cycles\" today: runs iterative Tarjan SCC over CALL edges and returns { cycles, cycles_truncated }. Unknown values return a 400 teaching error listing valid values.",
+        },
+        centralityLimit: {
+          type: "number",
+          description: "Max number of top central files to include. Default 20.",
+          default: 20,
+        },
+        format: {
+          type: "string",
+          enum: ["json", "toon", "tree"],
+          description: "Output format (json, toon, or tree). Default: json.",
+          default: "json",
+        },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported). Absent/empty → full data.",
+        },
+      },
+      required: ["id"],
+    },
+  },
+
+  {
     name: "search_definitions",
     description:
       "Search for symbol definitions (functions, classes, variables, types, interfaces) in an indexed project. Returns name, kind, file location, line numbers, and doc comments.",
@@ -729,6 +778,19 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: "string",
           description:
             "Optional precondition: the client's last-known `activatedGraphGenerationId`. If it mismatches the current active generation, the tool returns a 412 teaching error.",
+        },
+        format: {
+          type: "string",
+          enum: ["json", "toon", "tree"],
+          description:
+            "Output format. 'json' (default) emits the raw object. 'toon' encodes it. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper (groups references by file). Default: json.",
+          default: "json",
+        },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Projection — keep only these keys (dotted paths supported). Absent/empty → full data.",
         },
       },
       required: ["projectId", "symbolName"],
@@ -820,8 +882,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         format: {
           type: "string",
-          enum: ["json", "toon"],
-          description: "Output format (json or toon). Default: json.",
+          enum: ["json", "toon", "tree"],
+          description:
+            "Output format. 'json' (default) emits the raw object. 'toon' encodes it. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper (groups nodes by file). Default: json.",
           default: "json",
         },
         fields: {
@@ -863,9 +926,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         scope: {
           type: "string",
-          enum: ["unstaged", "staged", "committed"],
+          enum: ["unstaged", "staged", "committed", "all"],
           default: "unstaged",
-          description: "unstaged = working-tree changes; staged = index; committed = diff vs base_branch (or since).",
+          description: "unstaged = working-tree changes (+ untracked new files); staged = index (+ untracked); committed = diff vs base_branch (or since); all = committed + unstaged + untracked, deduped.",
         },
         base_branch: {
           type: "string",
@@ -894,8 +957,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         format: {
           type: "string",
-          enum: ["json", "toon"],
-          description: "Output format (json or toon). Default: json.",
+          enum: ["json", "toon", "tree"],
+          description:
+            "Output format. 'json' (default) emits the raw object. 'toon' encodes it. 'tree' (Wave 5 FR-06) emits a text-indented grouped model via the shared groupRowsByPrefix helper (groups impacted symbols by file prefix). Default: json.",
           default: "json",
         },
         fields: {
@@ -1098,6 +1162,56 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     apiEndpoint: "/api/v1/synapse/sessions",
     apiMethod: "GET",
     inputSchema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "synapse_task_begin",
+    description:
+      "Begin a task envelope: create session → prime (if entries) → first search → prefetch first hit → record access. " +
+      "Returns { sessionId, search, primed, partial, errors }. Session is always returned; partial=true + errors[] when a sub-step fails; search may be null when search failed. " +
+      "Use synapse_task_end to clean up.",
+    apiEndpoint: "/api/v1/synapse/task/begin",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        agentId: { type: "string", description: "Stable identifier of the calling agent" },
+        taskContext: { type: "string", description: "One-sentence description of the current task" },
+        workspaceId: { type: "string", description: "Project ID this session is scoped to" },
+        query: { type: "string", description: "First search query" },
+        projectId: { type: "string", description: "Project ID for the search" },
+        entries: {
+          type: "array",
+          description: "Optional entries to prime the buffer with (from recall)",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              content: { type: "string" },
+              score: { type: "number" },
+              metadata: { type: "object" },
+            },
+            required: ["id", "content"],
+          },
+        },
+        limit: { type: "number", description: "Max results for the first search (default 10)" },
+      },
+      required: ["agentId", "query", "projectId"],
+    },
+  },
+  {
+    name: "synapse_task_end",
+    description:
+      "End a Synapse task: compute summary (accessCount, topFiles) and DELETE the session. " +
+      "Returns { sessionId, durationMs, accessCount, topFiles }. A follow-up GET on the session returns 404.",
+    apiEndpoint: "/api/v1/synapse/task/:id/end",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Session ID from synapse_task_begin" },
+      },
+      required: ["id"],
+    },
   },
   {
     name: "symbol_snippet",

@@ -37,7 +37,7 @@ interface TracePathParams {
   edge_types?: EdgeType[];
   /** Wall-clock budget (ms) bounding the traversal. Default 5000. */
   deadline_ms?: number;
-  format?: "json" | "toon";
+  format?: "json" | "toon" | "tree";
   fields?: string[];
   /**
    * N1 (WAVE4-N1): optional precondition — the client's last-known
@@ -212,7 +212,11 @@ export class TracePathTool implements IToolHandler {
           // N1 (WAVE4-N1): the active graph generation id at query time.
           activatedGraphGenerationId,
         },
-        { format, fields },
+        // Wave 5 FR-07: tree format groups nodes by file via the shared
+        // groupRowsByPrefix helper. json/toon unchanged when tree not selected.
+        format === "tree"
+          ? { format, fields, groupBy: { file: "file" } }
+          : { format, fields },
       );
     } catch (error) {
       return {
