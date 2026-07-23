@@ -1,6 +1,36 @@
 # massa-th0th Spec State
 
-## Current — Codex + Cursor Plugin Parity
+## Current — Subagent Skills Plugin Parity
+
+- projectId: `massa-th0th`
+- workflowSessionId: `spec-subagent-skills-plugins-parity`
+- workflow: spec-driven (Large/Complex)
+- feature: `subagent-skills-plugin-parity` — IN PROGRESS (Specify + Design + Tasks COMPLETE; Execute pending)
+- scope: 44 requirements (CLA-01..10, CDX-01..10, CRS-01..08, OPC-01..10, DOC-01..07), 5 user stories, 4 host targets
+- Spec: `.specs/features/subagent-skills-plugin-parity/spec.md` (checksum `e563bb80...`, v4 docs-parity amendment)
+- Design: `.specs/features/subagent-skills-plugin-parity/design.md` (checksum `a7fa79c8...`, v1; Approach A chosen: one generator + four installer extensions)
+- Tasks: `.specs/features/subagent-skills-plugin-parity/tasks.md` (checksum `59c28dab...`, v1; 12 tasks across 3 phases; pre-approval checks pass)
+- Tasks plan: Phase 1 (T1-T4 generator foundation) → Phase 2 (T5-T8 installer extensions) → Phase 3 (T9-T12 docs + final gate). Single source of truth = `scripts/generate-subagent-artifacts.ts`; drift gate via `--check` + parity test.
+- Design key decisions:
+  - `scripts/generate-subagent-artifacts.ts` = single source of truth; reads `skills/*/SKILL.md`, emits per-host agent files into `apps/*/agents/`; outputs checked in; `--check` mode + parity test = drift gate (F1 mitigation).
+  - Codex agents → `~/.codex/agents/*.toml` (OUTSIDE plugin dir; `# massa-th0th-owned` top comment). OpenCode agents → `~/.config/opencode/agents/*.md` (OUTSIDE npm package; `metadata: { massa-th0th-owned: true }`; shipped via `files` array update — R2).
+  - Claude/Cursor agents → plugin's `agents/` dir (Claude uninstall excludes `massa-th0th-navigator.md` by name — R1).
+  - OpenCode: new `massa-th0th-config agents install/uninstall` subcommand (extends `config-cli.ts`).
+  - 10 risks R1-R10 documented with mitigations; no project-level AD (additive, no DB/binary).
+- Docs parity (user follow-up): `README.md` = summary layer (12 names, pinned model+effort per host in compact form, link to FEATURES.md); `FEATURES.md` = depth layer (new "Subagent Skills (12 Specialists)" section: per-host names, file locations/formats, four model-pinning tables verbatim, effort pins, permission mappings, ownership markers, generator+parity contract). DOC-02/03/06/07 assert the split; DOC-06 asserts FEATURES.md ↔ spec table byte-parity (test).
+- Model pinning (user follow-up): `model` PINNED per agent per host, NOT advisory. Claude aliases (haiku/sonnet/opus); Codex IDs (gpt-5.4-mini / gpt-5.6-terra / gpt-5.6-sol); Cursor + OpenCode use charter `metadata.model_hint` verbatim (DeepSeek V4 Pro / GLM-5.2 / MiniMax M3). Three model-pinning tables added to spec; AC CLA-10/CDX-10/CRS-08/OPC-10 assert exact pinning.
+- Effort pinning (user follow-up): Claude `effort: high`; Codex `model_reasoning_effort = "high"`; Cursor `reasoningEffort: max` (field-name unverified — subagent docs 404; pass-through, harmless if ignored); OpenCode `reasoningEffort: max` (pass-through, provider-dependent honoring for DeepSeek/GLM/MiniMax). ACs CLA-10/CDX-10/CRS-08/OPC-10 updated.
+- Plan Challenge: lite-escalation inline (subagent spawning unavailable — `cavecrew-reviewer` model not found). 8 findings F1-F8; F1 (drift), F2 (name collision), F4 (OpenCode bash ambiguity), F5 (out-of-plugin-dir ownership marker), F6 (Claude tools format) incorporated as assumptions + ACs. Escalate-to-full: false.
+- Decisions (feature-local, no project-level AD):
+  - Ship as host-native subagent definitions (Claude `agents/*.md`, Cursor `agents/*.md`, OpenCode `agents/<name>.md` mode: subagent, Codex `agents/<name>.toml`).
+  - Full native frontmatter adaptation (tools/sandbox_mode/permission per host; model hint as advisory body comment, omitted from frontmatter).
+  - No new lifecycle hooks (invocation-based specialists; existing 6 lifecycle hooks unchanged; shared binary untouched).
+  - Codex/OpenCode agents live OUTSIDE the plugin dir (shared agent dirs) → in-file ownership marker (`# massa-th0th-owned` comment / `metadata: { massa-th0th-owned: true }`).
+  - Single source of truth: `scripts/generate-subagent-artifacts.ts` emits shipped files from `skills/*/SKILL.md`; parity test asserts byte-identity (drift fails CI).
+  - Existing `massa-th0th-navigator.md` (Claude/Cursor) preserved; 12 specialists additive.
+- Next step: Design phase (`references/spec-driven/design.md`) — architecture, components, per-host frontmatter mapping table, generator design, verification design.
+
+## Previous — Codex + Cursor Plugin Parity
 
 - projectId: `massa-th0th`
 - workflowSessionId: `spec-codex-cursor-plugin-parity`
