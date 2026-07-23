@@ -33,6 +33,7 @@ Use this workflow when the user reports broken behavior, failures, regressions, 
    - Compare expected vs actual behavior
    - Check recent changes first
    - Minimize search space to relevant modules
+   - For call/data-flow path tracing, call `trace_path` with `function_name` (or `qualifiedName`), `project`, `direction` (outbound/inbound/both), `mode` (calls/data_flow/cross_service/all), and `depth` to trace typed-edge BFS paths. `trace_path` only counts as evidence when the index is fresh for the current repository path and commit/worktree state; fall back to `search`/`get_references` and record reduced retrieval confidence when the index is stale or unavailable.
 10. Size the fix before editing:
    - Use the exact Quick, Standard, and Spec-driven thresholds in `references/verification-ladder.md`.
    - Refactor route applies only when the fix becomes behavior-preserving cleanup after the root cause is proven.
