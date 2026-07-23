@@ -56,8 +56,19 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - Accept the exact scope packet and requirement source from `implementation-audit`.
    - Do not broaden beyond resolved files, surrounding code, public contracts, tests, config, docs, and requirements needed to verify a claim.
    - Return compact findings to the parent implementation audit; do not write broad project memories unless explicitly assigned.
-10. Investigation pass:
-   - Build a requirement checklist from the source: must-have behavior, non-goals, acceptance criteria, compatibility constraints, inputs, outputs, and user-visible promises.
+10. Investigation pass. Dispatch `audit-specialist` per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
+
+> **Dispatch: audit-specialist** — see `skills/agents/audit-specialist/SKILL.md`
+> - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, or independent verification of high-impact finding
+> - scope: the requirements audit target — files, contracts, specs, acceptance criteria
+> - permissions: read-only
+> - inputs: shared scope packet; `lens: requirements`; requirement source, recalled requirements decisions, accepted exceptions
+> - sensors: build requirement checklist from source; trace implementation vs spec; coverage gap, ambiguity, contradiction, implicit-need detection
+> - output: findings with requirement gap, location, evidence, severity, confidence, simplest fix direction, verification suggestion
+> - firewall: raw diffs/logs/search output summarized, not returned raw
+> - memory: suggest-only; main agent persists reusable requirements patterns
+
+    - Build a requirement checklist from the source: must-have behavior, non-goals, acceptance criteria, compatibility constraints, inputs, outputs, and user-visible promises.
    - Compare implementation and tests against each checklist item.
    - Prioritize missing requirements, contradicted requirements, out-of-scope behavior, changed public contracts, compatibility breaks, incomplete edge cases, and docs or tests that misrepresent delivered behavior.
    - For each candidate finding, record the concrete claim, source evidence, affected requirement, impacted flow, provisional severity, and what would disprove it.

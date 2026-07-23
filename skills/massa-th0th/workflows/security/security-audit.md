@@ -54,8 +54,19 @@ This workflow is findings-only. Do not edit code unless the user separately asks
 9. For implementation parent scope:
    - Accept the exact scope packet from `implementation-audit`; do not broaden beyond resolved files, surrounding code, called auth/validation helpers, config, schemas, and tests needed to verify a security claim.
    - Return compact findings to the parent implementation audit; do not write broad project memories unless explicitly assigned.
-10. Investigation pass:
-   - Trace untrusted input -> validation -> authorization -> transformation -> persistence or side effect.
+10. Investigation pass. Dispatch `audit-specialist` per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
+
+> **Dispatch: audit-specialist** — see `skills/agents/audit-specialist/SKILL.md`
+> - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, or independent verification of high-impact finding
+> - scope: the security audit target — files, trust boundaries, auth paths, validators
+> - permissions: read-only
+> - inputs: shared scope packet; `lens: security`; recalled security decisions, auth boundaries, validation rules, accepted exceptions
+> - sensors: trace untrusted input -> validation -> authorization -> transformation -> persistence; authn/authz, object ownership, tenant isolation, input validation, secret handling, injection risks
+> - output: findings with security boundary, asset, trigger/exploit path, severity, confidence, evidence, simplest fix direction, verification suggestion
+> - firewall: raw diffs/logs/search output summarized, not returned raw
+> - memory: suggest-only; main agent persists reusable security patterns
+
+    - Trace untrusted input -> validation -> authorization -> transformation -> persistence or side effect.
    - Check authn/authz, object ownership, tenant isolation, input validation, output encoding, secret handling, cryptography use, SSRF/path traversal/injection risks, logging privacy, dependency/config exposure, and security-sensitive tests.
    - For mobile scopes, check secure storage/keychain/keystore use, permission states, deep links and auth guards, push token handling, biometrics, local DB/cache and offline queues, logs/crash reports/screenshots, native bridge payload trust, and backend-mobile contract skew from `references/mobile-context.md`.
    - For each candidate finding, record the concrete claim, source evidence, impacted asset or boundary, likely trigger, provisional severity, and what would disprove it.

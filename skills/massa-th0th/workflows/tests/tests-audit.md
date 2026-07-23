@@ -54,8 +54,19 @@ This workflow is findings-only. Do not edit code unless the user separately asks
 9. For implementation parent scope:
    - Accept the exact scope packet from `implementation-audit`; do not broaden beyond resolved files, nearby tests, fixtures, config, and callers needed to verify regression protection.
    - Return compact findings to the parent implementation audit; do not write broad project memories unless explicitly assigned.
-10. Investigation pass:
-   - Map changed or targeted behavior to existing tests, fixtures, mocks, and deterministic harnesses.
+10. Investigation pass. Dispatch `audit-specialist` per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
+
+> **Dispatch: audit-specialist** — see `skills/agents/audit-specialist/SKILL.md`
+> - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, or independent verification of high-impact finding
+> - scope: the tests audit target — test files, fixtures, harnesses, coverage
+> - permissions: read-only
+> - inputs: shared scope packet; `lens: performance` (test coverage is under the performance lens); recalled testing conventions, flaky tests, known regressions
+> - sensors: map behavior to tests; check missing tests for new branches, error paths, async logic, migrations; fixture health, assertion quality, flakiness root-cause
+> - output: findings with missing/weak coverage type, location, evidence, regression risk, severity, simplest test direction, deterministic sensor, verification suggestion
+> - firewall: raw diffs/logs/search output summarized, not returned raw
+> - memory: suggest-only; main agent persists reusable testing patterns
+
+    - Map changed or targeted behavior to existing tests, fixtures, mocks, and deterministic harnesses.
    - Check missing tests for new branches, error paths, auth/validation/persistence changes, async or race-prone logic, migrations, public contracts, and recalled bug patterns.
    - For mobile scopes, check KMP shared and platform-specific `actual` tests, Android/iOS harnesses, native bridge payload coverage, permissions, lifecycle, offline sync, deep links, push/background flows, UI snapshots/screenshots, device-matrix assumptions, and platform parity claims from `references/mobile-context.md`.
    - Check weak assertions, tests that only assert implementation details, fixture drift, nondeterminism, hidden network/time/filesystem dependencies, skipped tests, and weakened snapshots.

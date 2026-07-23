@@ -53,8 +53,19 @@ This workflow is findings-only. Do not edit code unless the user separately asks
 9. For implementation parent scope:
    - Accept the exact scope packet from `implementation-audit`; do not broaden beyond resolved files, surrounding code, callers, callees, tests, config, migrations, schemas, and public contracts needed to verify a correctness claim.
    - Return compact Correctness findings to the parent implementation audit; do not write broad project memories unless explicitly assigned.
-10. Investigation pass:
-   - Trace input -> transformation -> output for each suspicious path.
+10. Investigation pass. Dispatch `audit-specialist` per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
+
+> **Dispatch: audit-specialist** — see `skills/agents/audit-specialist/SKILL.md`
+> - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, or independent verification of high-impact finding
+> - scope: the bugs audit target — files, diffs, suspicious paths
+> - permissions: read-only
+> - inputs: shared scope packet; `lens: bugs`; recalled regressions, known bug patterns, accepted exceptions
+> - sensors: trace input -> transformation -> output; check diffs, callers/callees, tests, config, migrations; prioritize correctness bugs, crashes, data loss, security regressions, broken contracts, async/race issues
+> - output: findings with bug category, location, evidence, trigger, severity, confidence, simplest fix direction, verification suggestion
+> - firewall: raw diffs/logs/search output summarized, not returned raw
+> - memory: suggest-only; main agent persists reusable bug patterns
+
+    - Trace input -> transformation -> output for each suspicious path.
    - Check diffs, surrounding code, callers and callees, tests, config, migrations, schemas, and recalled project patterns.
    - Prioritize correctness bugs, crashes, data loss, security regressions, broken contracts, async or race issues, validation or authorization gaps, persistence and migration bugs, environment/config issues, and behavior that contradicts tests or public API contracts.
    - For each candidate finding, record the concrete claim, bug class, source evidence, impacted flow, trigger or repro path, root-cause hypothesis, regression risk, provisional severity, and what would disprove it.

@@ -59,17 +59,19 @@ Use these role names in prompts and memory tags when useful.
 
 Before adding a new reusable role, load `references/subagent-design.md` and write a bounded role charter. For one-off tasks, use an existing role plus the prompt contract below instead of inventing a new role.
 
-| Role | Use For | Read/Write |
-|---|---|---|
-| `investigator` | Trace code paths, find entry points, summarize current behavior | read-only |
-| `implementer` | Execute one atomic task with a disjoint write set | write |
-| `verifier` | Independently run sensors and inspect whether claims hold | read-only |
-| `domain-mapper` | Identify subdomains, bounded contexts, language conflicts, cohesion | read-only |
-| `coupling-auditor` | Analyze strength, distance, volatility, and risky dependencies | read-only |
-| `deepening-architect` | Find shallow modules and deepening opportunities | read-only |
-| `plan-critic` | Stress-test a constructed plan using The Fool mode and return bounded critique | read-only |
-| `furps-analyst` | Analyze one FURPS+ dimension of a PRD/ADR against the checklist and return structured findings | read-only |
-| `handoff-writer` | Build a compact continuation package | read-only unless asked to save |
+| Role | Use For | Read/Write | Charter |
+|---|---|---|---|
+| `investigator` | Trace code paths, find entry points, summarize current behavior | read-only | `skills/agents/investigator/SKILL.md` |
+| `implementer` → `builder` | Execute one atomic task with a disjoint write set | write | `skills/agents/builder/SKILL.md` |
+| `verifier` → `verification-agent` | Independently run sensors and inspect whether claims hold | read-only | `skills/agents/verification-agent/SKILL.md` |
+| `domain-mapper` → `architecture-specialist` | Identify subdomains, bounded contexts, language conflicts, cohesion | read-only | `skills/agents/architecture-specialist/SKILL.md` (lens: `domain`) |
+| `coupling-auditor` → `architecture-specialist` | Analyze strength, distance, volatility, and risky dependencies | read-only | `skills/agents/architecture-specialist/SKILL.md` (lens: `coupling`) |
+| `deepening-architect` → `architecture-specialist` | Find shallow modules and deepening opportunities | read-only | `skills/agents/architecture-specialist/SKILL.md` (lens: `deepening`) |
+| `plan-critic` | Stress-test a constructed plan using The Fool mode and return bounded critique | read-only | role-based (no charter) |
+| `furps-analyst` | Analyze one FURPS+ dimension of a PRD/ADR against the checklist and return structured findings | read-only | role-based (no charter) |
+| `handoff-writer` | Build a compact continuation package | read-only unless asked to save | role-based (no charter) |
+
+**Role mapping:** `investigator`→`investigator` (identical); `implementer`→`builder` (renamed); `verifier`→`verification-agent` (renamed, centralizes Verification Ladder); `domain-mapper`+`coupling-auditor`+`deepening-architect`→`architecture-specialist` (three roles folded into one specialist; the `lens` input field selects the sub-mode). Workflows dispatch the new agent names via named dispatch blocks; the old role names above are kept for traceability only.
 
 ## Capability Packet
 

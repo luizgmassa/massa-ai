@@ -22,7 +22,7 @@ Holds for every task, even if reference files are not opened:
 1. Tests derive from the spec's acceptance criteria and assert spec-defined outcomes — they never mirror the implementation.
 2. The gate must pass (tests pass) before a task is done — the test runner decides, not self-assessment.
 3. One atomic commit per task. Never batch tasks; never weaken, skip, or delete tests to make them pass.
-4. After the last task, a fresh Verifier always runs automatically (author ≠ verifier) — spec-anchored outcome check plus discrimination sensor. Never optional, never prompted.
+4. After the last task, a fresh verification-agent always runs automatically (author ≠ verifier) — spec-anchored outcome check plus discrimination sensor. Never optional, never prompted.
 
 ## Auto-Sizing
 
@@ -93,7 +93,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
    - Use per-task commits when the environment and user permissions allow commits; otherwise record the skipped reason.
    - Keep validation assets protected.
    - Update logical feature artifacts in `.specs/features/<slug>/` and `.specs/project/STATE.md` after meaningful progress.
-    - Finish Execute by running `references/spec-driven/validate.md`. Dispatch `verification-agent` (author ≠ verifier) per `references/agent-orchestration.md`; the verifier always runs automatically and writes `.specs/features/<slug>/validation.md`. Without subagents, run the standalone fresh-eyes fallback in `validate.md`.
+    - Finish Execute by running `references/spec-driven/validate.md`. Dispatch `verification-agent` (author ≠ verifier) per `references/agent-orchestration.md`; the verification-agent always runs automatically and writes `.specs/features/<slug>/validation.md`. Without subagents, run the standalone fresh-eyes fallback in `validate.md`.
 
 > **Dispatch: verification-agent** — see `skills/agents/verification-agent/SKILL.md`
 > - trigger: spec-driven Execute final gate; author ≠ verifier independence required
@@ -105,7 +105,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
 > - firewall: raw diffs/logs/test output summarized; mutations run in scratch state only
 > - memory: suggest-only; main agent persists validation outcomes
 
-    - The verifier re-derives coverage independently using evidence-or-zero and does not inherit the author's mental model.
+    - The verification-agent re-derives coverage independently using evidence-or-zero and does not inherit the author's mental model.
    - The fix → re-verify loop is capped at 3 iterations before escalating to `Blocked`.
    - Distill lesson signals through `references/lessons.md` when validation produces grounded reusable failures.
 7. Update `.specs/project/STATE.md`, `.specs/HANDOFF.md`, and `references/spec-driven/memory.md` records for decisions, blockers, handoff, and completion evidence.
@@ -132,7 +132,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
 - Requirement cannot close: keep Specify open and ask the user, or record an explicit accepted assumption before execution.
 - Design or Tasks was skipped incorrectly: stop, create the missing artifact, and resume from the updated contract.
 - Validation command unavailable: record the missing command/tool in `validation.md` and mark `Blocked`.
-- Discrimination sensor cannot be made safely reversible: mark `Blocked` unless the verifier can prove equivalent discrimination with an existing deterministic mutation fixture.
+- Discrimination sensor cannot be made safely reversible: mark `Blocked` unless the verification-agent can prove equivalent discrimination with an existing deterministic mutation fixture.
 - Validation conflict: stop for user resolution when a validation asset conflicts with an approved specification.
 - Fix loop exceeds 3 iterations: stop with `Blocked`, preserve evidence, and ask for direction.
 
