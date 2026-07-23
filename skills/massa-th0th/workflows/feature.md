@@ -28,7 +28,7 @@ Use this workflow when the user wants to add a new capability, screen, command, 
    - For Standard work or Quick work over 3 files/200 LOC, load `references/pr-task-fix.md`, run its ADR/TDD input gate, decompose work into Small-first independently buildable PR groups, and keep Medium groups only when splitting would break build, tests, UI, or review coherence.
 6. Follow the shared retrieval order from `references/codebase-investigation.md`
    to find related code; pass only `synapseSessionId` to
-   `search.sessionId`.
+   `search.sessionId`. When the investigation involves multi-search, call `synapse_task_begin` with `id` (the `synapseSessionId`) and `taskContext` before the first search to open a task envelope; call `synapse_prefetch` with `id` and `filePath` after opening a file for deep investigation to warm the buffer; call `synapse_task_end` with `id` when the investigation completes. `synapse_task_begin`/`synapse_task_end` require an existing `synapse_session` id.
 7. Follow existing patterns discovered from recall
 8. Establish the verification recipe before Standard edits and before Quick edits that touch validation assets, including file-integrity checks for tests, specs, benchmarks, fixtures, and snapshots used as validation assets
    - Include a focused naming review when the feature introduces or renames identifiers. New names should use domain or precise role vocabulary, and public/persisted names should not change without explicit compatibility handling.

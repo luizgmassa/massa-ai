@@ -69,7 +69,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
 2. Restore context before planning:
    - `recall` for exact-session continuity, durable decisions, rejected approaches, patterns, blockers, and handoffs.
    - Load `references/spec-driven/artifact-store.md` before reading or writing feature registry, state, handoff, phase artifacts, validation reports, or lessons.
-   - Load `references/synapse-policy.md` when two or more related searches are expected.
+   - Load `references/synapse-policy.md` when two or more related searches are expected. When the investigation involves multi-search, call `synapse_task_begin` with `id` (the `synapseSessionId`) and `taskContext` before the first search to open a task envelope; call `synapse_prefetch` with `id` and `filePath` after opening a file for deep investigation to warm the buffer; call `synapse_task_end` with `id` when the investigation phase completes. `synapse_task_begin`/`synapse_task_end` require an existing `synapse_session` id.
    - Load `references/context-firewall.md` before broad source inspection, generated reports, external research, or verbose tool output.
    - Keep the loaded context budget under the `references/spec-driven/context-limits.md` target; summarize or narrow before loading bulky artifacts.
    - Use `references/spec-driven/code-analysis.md` when source inspection needs structural search or tool fallback.
