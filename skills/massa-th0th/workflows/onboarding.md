@@ -15,6 +15,7 @@ Use this workflow for a first session, missing project context, or repo setup wh
 8. Load `references/synapse-policy.md` when architecture mapping will require
    repeated searches, then follow the shared retrieval order from
    `references/codebase-investigation.md`.
-9. Persist the architectural overview via `remember` as a scored
-   `decision` memory with `memory:semantic`.
-10. Complete the Evidence Gate from `references/evidence-gate.md`.
+9. Call `bootstrap` with `projectId` and `projectPath` to generate seed memories automatically from git log, README, docs, manifests, and centrality. `bootstrap` is idempotent (re-run is a no-op unless `force: true`); with LLM off it degrades to rule-based minimal seeds. Treat bootstrap seed memories as leads to confirm against current source, not as authoritative. If `bootstrap` is unavailable, proceed with manual `remember` calls.
+10. Persist the architectural overview via `remember` as a scored
+    `decision` memory with `memory:semantic`.
+11. Complete the Evidence Gate from `references/evidence-gate.md`.
