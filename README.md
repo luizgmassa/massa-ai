@@ -155,10 +155,10 @@ backup + `_massaTh0thOwned` marker — user hooks are always preserved.
 
 | Tool | Install command | Events | Bundles | Trust step? |
 |------|----------------|--------|---------|-------------|
-| **Claude Code** | `bash apps/claude-plugin/install.sh --user` | 5 | 6 slash commands + navigator subagent + hooks into `settings.json` | No |
-| **Codex** | `bash apps/codex-plugin/install.sh --user` | 6 | 6 skills + hooks into `hooks.json` + `.mcp.json` | Yes — run `/hooks` in Codex |
-| **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + `mcp.json` + navigator agent | No |
-| **OpenCode** | `npm install @massa-th0th/opencode-plugin` | 6 (in-process) | 14 in-process tools + lifecycle handlers (npm package, no installer script) | No |
+| **Claude Code** | `bash apps/claude-plugin/install.sh --user` | 5 | 6 slash commands + navigator subagent + 12 subagent specialists + hooks into `settings.json` | No |
+| **Codex** | `bash apps/codex-plugin/install.sh --user` | 6 | 6 skills + 12 subagent specialists (TOML to `~/.codex/agents/`) + hooks into `hooks.json` + `.mcp.json` | Yes — run `/hooks` in Codex |
+| **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + `mcp.json` + navigator agent + 12 subagent specialists | No |
+| **OpenCode** | `npm install @massa-th0th/opencode-plugin` then `massa-th0th-config agents install --user` | 6 (in-process) | 14 in-process tools + lifecycle handlers + 12 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
 
 All installers support `--user` (default, e.g. `~/.claude`), `--project` (e.g.
 `./.claude`), and `--uninstall` (removes only massa-th0th-owned entries).
@@ -175,6 +175,19 @@ Cursor symlink to it. OpenCode uses in-process handlers (no external hooks file)
 **MCP deconfliction:** if you install a plugin, the MCP server is already
 registered via the plugin's `.mcp.json`/`mcp.json`. Skip the
 `install-agents.ts` MCP step for that tool to avoid double-registration.
+
+**12 subagent specialists:** all four plugins ship the 12 massa-th0th
+sub-agent specialists (investigator, planner, builder, reviewer,
+context-curator, verification-agent, requirements-analyst,
+architecture-specialist, test-engineer, documentation-agent,
+audit-specialist, mobile-specialist) as host-native subagent definitions.
+Model + effort are pinned per host: Claude `effort: high` + aliases
+(haiku/sonnet/opus); Codex `model_reasoning_effort = "high"` + IDs
+(gpt-5.4-mini/gpt-5.6-terra/gpt-5.6-sol); Cursor/OpenCode
+`reasoningEffort: max` + charter model hints (DeepSeek V4 Pro / GLM-5.2 /
+MiniMax M3). See [FEATURES.md → Subagent Skills (12 Specialists)](./FEATURES.md#subagent-skills-12-specialists)
+for the full per-agent model/effort/permission tables, file locations, and
+the generator + parity-test contract.
 
 **Cursor advanced (extension authors):** register the plugin directory
 programmatically via
