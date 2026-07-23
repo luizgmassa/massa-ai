@@ -20,6 +20,7 @@ Use this workflow when the user reports broken behavior, failures, regressions, 
    to load relevant code. `optimized_context` has no session field; put
    `workflowSessionId` in query text/tags and pass only `synapseSessionId` to
    `search.sessionId`.
+   - For large files (>200 lines) or derived-value computation, call `execute_file` with `path`, `language`, and `code` to run analysis code over the file instead of loading the entire file into context. Respect the local-dev-only trust model (no untrusted-client exposure).
 6. Build or request a trustworthy feedback loop before editing:
    - Use the reproduction ladder in `references/debug-diagnosis-loop.md`: unit/CLI repro, integration/API repro, app/browser/device repro, then structured HITL.
    - IF no loop can run, record a skipped-reason enum from the debug reference and collect the strongest root-cause proof available
