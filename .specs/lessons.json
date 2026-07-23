@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 5,
+  "next_id": 6,
   "lessons": [
     {
       "id": "L-001",
@@ -79,6 +79,25 @@
       ],
       "created": "2026-07-22T21:39:38Z",
       "last_seen": "2026-07-22T21:39:38Z",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-005",
+      "key": "surviving_mutant::when a unit test bypasses a version gate threshold via a testing seam setjsonschemasupportedfortesting the threshold logic checkjsonschemasupport minor 5 is uncovered add direct tests of the version parser with mocked version strings 0 5 0 0 4 9 1 0 0 garbage so threshold regressions are caught",
+      "text": "When a unit test bypasses a version-gate threshold via a testing seam (_setJsonSchemaSupportedForTesting), the threshold logic (_checkJsonSchemaSupport minor >= 5) is uncovered. Add direct tests of the version parser with mocked version strings (0.5.0, 0.4.9, 1.0.0, garbage) so threshold regressions are caught.",
+      "signal": "surviving_mutant",
+      "scope": "packages/core",
+      "status": "candidate",
+      "features": [
+        "wave-7-hygiene-ui-process"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "packages/core/src/__tests__/llm-client-json-schema.test.ts:62-69 (packages/core)"
+      ],
+      "created": "2026-07-22T23:54:13Z",
+      "last_seen": "2026-07-22T23:54:13Z",
       "confidence": 0.62
     }
   ]

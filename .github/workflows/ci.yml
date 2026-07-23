@@ -70,13 +70,24 @@ jobs:
               - 'packages/core/src/services/structural/**'
               - 'packages/core/prisma/migrations/**'
               - 'scripts/verify-tree-sitter*.ts'
+            changelog:
+              - 'CHANGELOG.md'
 
       - name: Grammar integrity verifier
         if: steps.filter.outputs.grammar == 'true'
         run: bun run verify:tree-sitter-native
 
+      - name: CHANGELOG merge gate
+        if: github.event_name == 'pull_request' && steps.filter.outputs.changelog == 'false' && !contains(github.event.pull_request.labels.*.name, 'no-changelog') && github.event.pull_request.user.type != 'Bot'
+        run: |
+          echo "❌ CHANGELOG.md not modified. Add an entry under [Unreleased] or apply the 'no-changelog' label."
+          echo "Bot-authored PRs (Dependabot, etc.) are exempt."
+          exit 1
+
       - name: Test
         run: bun run test
+        env:
+          MASSA_TH0TH_EXECUTOR_SANDBOX: none
 
   mcp:
     runs-on: ubuntu-latest

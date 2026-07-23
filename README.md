@@ -431,10 +431,11 @@ falls back to its rule-based path.
 > reasoning channel and silently degraded). Override either with the env vars
 > above.
 
-> **Embeddings note:** `qwen3-embedding:8b` (4096d) gives stronger recall than
-> `bge-m3` but is slower — bulk indexing a large corpus takes minutes. The old
-> bge-m3 batch-8 crash cap no longer applies; switch to `bge-m3` (1024d) for
-> speed if its recall quality is sufficient for your use case.
+> **Embeddings note:** The config default embedding model is `nomic-embed-text:latest`
+> (see `massa-th0th-config.ts`). `qwen3-embedding:8b` (4096d) gives stronger recall
+> than `nomic-embed-text` or `bge-m3` but is slower — bulk indexing a large corpus
+> takes minutes. Override via `OLLAMA_EMBEDDING_MODEL` or config `embedding.model`.
+> Switch to `bge-m3` (1024d) for speed if its recall quality is sufficient.
 
 ---
 
@@ -689,8 +690,8 @@ rows default **OFF** and degrade silently when disabled.
 | `search.autoReindexMaxFiles` | `AUTOREINDEX_MAX_FILES` | `200` | — |
 | — | `WEB_UI_ENABLED` | `true` | on |
 
-> **Note:** `compression.llm` is a deprecated alias of top-level `llm` (same env
-> vars).
+> **Note:** `compression.llm` was removed in commit `da4c60f`. LLM connection
+> fields now live exclusively in the top-level `llm` config block.
 
 ### Operational knobs
 

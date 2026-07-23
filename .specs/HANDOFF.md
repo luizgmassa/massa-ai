@@ -1,164 +1,52 @@
-# AI Engineering Handoff
+# Wave 7 — Handoff
 
-## Wave 6 — Architecture & Medium Features (COMPLETE + validated PASS)
+**Active Feature**: Wave 7 — Hygiene, UI, Process, Decisions
+**Branch**: `wave-7`
+**Spec**: `.specs/features/wave-7-hygiene-ui-process/spec.md`
+**Design**: `.specs/features/wave-7-hygiene-ui-process/design.md`
+**Tasks**: `.specs/features/wave-7-hygiene-ui-process/tasks.md`
 
-- 2026-07-22: Wave 6 complete. 27 commits on `wave-6` (T01-T37 + 6 fix commits). Independent verifier PASS (iteration 2, 7/7 gaps closed, 5/5 mutants killed, 47/47 ACs matched). 3 low-priority spec-precision gaps remain (N18, N10, N13 — non-blocking).
-- **N31 god-file decomposition**: 4 god-files split behind byte-identical facades (symbol-repository-pg 2119→116 LOC facade + 6 modules; tool-definitions 1688→28 LOC facade + 5 modules; auto-improve-job 969→119 LOC facade + 4 modules; smart-chunker 945→81 LOC facade + 5 modules). Characterization tests pin behavior before+after every split. No module >600 LOC.
-- **N32 embedded MCP**: `EmbeddedApiClient` implements `ToolProxyApiClient` + `uploadAndIndex` + `healthCheck`; `MASSA_TH0TH_EMBEDDED=true` routes direct to core services (no HTTP); `handleIndexTool` refactored with path-safety parity.
-- **N30 hook binary**: Single `massa-th0th-hook` Bun binary replacing 7 shell scripts; `pre-compact` does dual-POST (observation 3s + snapshot 5s); pin resolution ported from `_pin.sh` to TS.
-- **N20 parallel runner**: `SUITE_TABLE` macro + `--list-suites` + child processes + ZERO-LOSS UNION GUARD.
-- **N21 test-seam**: Frozen JSON fixtures fed to consumer parsers (observation-extractor, WorkingMemoryBuffer); drift detection via fixture mutation.
-- **N28 dashboard**: `/dashboard` route + 2 new API routes (scheduler/status, hooks/queue-status); reads scheduler, hook queue, Synapse sessions, system metrics.
-- **N29 scheduler preset**: `MASSA_TH0TH_SCHEDULER_SAFE_DEFAULTS=true` enables consolidation+decay; auto-improve opt-in; `applySafeDefaults` wired inside `registerDefaultJobs` before `envBool` loop.
-- **N17/N18/N19/N42/M25/M26/M62**: CONTRIBUTING.md 7-step protocol; `_DETERMINISTIC_ONLY=1` script; admin-preservation four-rung ladder; `--recover` path recovery; M25 name-tail resolution; M26 escaped JSON extraction; M62 GLR probe (no defect found).
-- Pre-mortem findings incorporated: F1 (N32 index path safety), F3 (N30 pre-compact dual-POST), F4 (N31 line drift + identity module), F2 (N31 SmartChunker extract-functions not delegate-class), F5 (N29 preset wiring inside registerDefaultJobs).
+## Progress
 
----
+### Phase 1: P1 Hygiene (COMPLETE)
+- T1: AGENTS.md at repo root (32b5ce4)
+- T2: .tool-versions + mise.toml version pins (79af13b)
+- T3: LLM/embedding defaults aligned in health-checker (6fca91d)
+- T4: CHANGELOG.md + CI merge gate (d6858dd)
+- T5: D5 Cypher deferral removed via ADR (be618ef)
+- T6: Stale compression.llm doc references removed (ac96d6a)
+- T7: Abandoned features documented in docs/removed-features.md (815488f)
 
-## Wave 5 — N45 Hook Attribution Confirmation (FR-19 / AC-16)
+### Phase 2: P2 Features (COMPLETE)
+- T8: Web UI markdown rendering — marked + DOMPurify (f0b92cd)
+- T9: Web UI write mode — memory edit/delete + proposal approve/reject (236ce5a)
+- T10: Web UI SSE real-time updates (caf96b5)
+- T11: json_schema constrained decoding for Ollama (9c0434f)
+- T12: OS-level sandbox wrapper — macOS seatbelt + Linux Docker (2a2aee9)
 
-- 2026-07-22: N45 hook attribution verified complete at `92b7fb4`; registry entry stays `complete`. No code change.
+### Phase 3: P3 Cleanup (COMPLETE)
+- T13: Spec archive — .specs/HANDOFF.md + PHASE-INTEGRATION.md archived (cbb7591)
+- T14: Wave-2 branch push + STATE.md reconciliation (a775534)
+- T15: Hook deadline breadcrumb-on-fire (3a6a9a6)
 
-## Wave 4 Breaking Changes (feature COMPLETE — validated PASS)
+### Verification (COMPLETE)
+- Independent Verifier: PASS — 13/13 ACs verified, 3/3 mutations killed
+- Fix commits: health-checker test fixup (055b897), 3 gap fixes (b01b0f0), mutant kill (d618ecc)
+- Validation report: `.specs/features/wave-7-hygiene-ui-process/validation.md`
 
-Wave 4 (`wave-4-correctness-hygiene`) introduces three breaking changes that callers and integrators must absorb:
+## Pre-Mortem Mitigations Honored
+- F1 (T12): sandbox default `auto`, not `on` — uses if available, falls back to best-effort
+- F2 (T12): seatbelt profile uses `realpathSync` for project root, not lexical paths
+- F3 (T11): logs when json_schema is used vs fallback; version-gates Ollama support
+- F4 (T8): marked + DOMPurify XSS prevention — DONE
+- F5 (T4): CHANGELOG gate skips bot-authored PRs — DONE
 
-- **N7 — `scope=unstaged` default now includes untracked new files.** `defaultDiffRunner` merges `git ls-files --others --exclude-standard` into the unstaged (default), staged, and all scopes; `scope=committed` preserves the old single-source behavior. Secret-like untracked paths (`*.env*`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, `secrets.*`, `*.keystore`, `id_rsa*`, `*.asc`) are excluded and counted in `untrackedFiltered`. Callers that assumed `scope=unstaged` excluded untracked files will see new paths in impact analysis results.
-- **N6 — invalid enum params now throw `ToolError` with valid-values list.** All tool handlers with enum/finite-set params (`scope`, `direction`, `mode`, `status`, `kind`, `checkpointType`, `strategy`, `language`, `format`, `responseMode`, `type`) reject invalid values with a teaching error instead of silently falling back to a default. Callers sending invalid enum values will receive `{ success: false, error: "Invalid <param> value: <v>. Valid values: <list>." }` instead of a silent-default response.
-- **N9 — `read_file` default cap 500 lines.** User-facing `read_file` and `symbol_snippet` HTTP endpoint cap output at `MASSA_TH0TH_READ_FILE_MAX_LINES` (default 500, env override). When the range exceeds the cap, `source_clipped: true` and the true total line count are returned. Internal `SymbolGraphService.readSnippet`/`readContext` are NOT capped. Callers reading large files without an explicit range will receive clipped output with a `source_clipped` flag instead of the full file.
+## Archived Files
+- `.specs/archive/HANDOFF.md` — old stacked history (27 KB)
+- `.specs/archive/PHASE-INTEGRATION.md` — old 50 KB integration doc
 
----
-
-## Current: Wave 3 Follow-up — Native Runtime Re-baseline
-
-- projectId: `massa-th0th`; workflowSessionId: `spec-wave3-followup`
-- branch: `wave-3`; isolated worktree: `massa-th0th-wt-wave-3`
-- feature COMPLETE: `native-runtime-rebaseline` (Wave 3 follow-up, P1) — T1–T6 COMPLETE + validated PASS.
-- T1 `b6aa4a4`: merged `origin/main` (`e12c4e4`) into `wave-3` to absorb the Bun `1.3.14` bump + lock-contract `record.includes(expected.gitIdentity)` fix (main shipped both via PR #6; wave-3 was behind). Resolved README.md conflict (combined wave-3's "macOS arm64 and Linux glibc x64" with main's "Bun 1.3.14"). Fixed `structural-native-linux` CI job which still pinned Bun 1.3.11. Gate matrix green under machine default Bun 1.3.14 (no shim): `verify-tree-sitter-grammars.test.ts` 9/9, type-check 6/6, build 5/5, native-structural 152/152, `verify:tree-sitter-source-dist` PASS (33+33 parses, 27+27 modules, 10 sensors, RSS 425984 bytes < 16 MiB). Pre-existing lock-contract failure RESOLVED.
-- T2 `428d462`: rewrote `native-macos-arm64-workflow.test.ts` to assert the actual `ci.yml:150` `structural-native` job (inline merge replaced the deleted `native-macos-arm64.yml`). Fixed `native-linux-x64-workflow.test.ts:22` stale test-name string "Bun 1.3.11" → "Bun 1.3.14". Removed stale M21-specific non-touch sub-test (M21 complete + merge brought legitimate changes to `needles-gate.yml`/`publish.yml`). macOS test 3/3 PASS, Linux test 5/5 PASS.
-- Spec artifacts `846ff29`: `.specs/features/native-runtime-rebaseline/{spec,design,tasks}.md`.
-- T3 six-suite classification (2 FIX + 4 DOCUMENTED-ACCEPT):
-  - `e866ea5`: auto-improve-job FLAKY-TIMEOUT fix — P5-DETECT-01 + P5-AUTOAPPROVE-01 omitted `llm: disabledSurface()` → fell back to real Ollama client → 5000ms timeout. Test-isolation defect per file header lines 4-8. 26/26 solo 3× stable post-fix.
-  - `17eedfd`: qwen-e2e-fixture frozen fixture drift fix — 14 manifest entries re-hashed after `c9e361b` (identity-guard) legitimately changed `postgres-vector-store.ts` + 13 other files post-lock. Documented sqlite-removal follow-up (STATE.md line 97). 8/8 solo 3× stable post-fix.
-  - DOCUMENTED-ACCEPT (shared-DB fixture gaps, NOT fixed per contract): etl-cache-invalidation (`graph_generation_workspace_missing:cache-project`), etl-pipeline-queue (workspace_missing + `assertParserReadyForIndexing` ordering gap), scheduler-store-pg (4 real `scheduled-*` rows pollute shared DB), trace-path (`graph_generation_workspace_missing:p4d2-trace-path`). Root cause: no `.env` in worktree → `DATABASE_URL` falls back to config.json shared DB → tests assume isolated workspaces/clean scheduled_jobs. Prior memory cross-checked: scheduler resume bug FIXED in `75b7394` (present); trace-path callerFqn has client-side workaround (present); neither is the cause.
-- T4 npm reconcile: Codespace npm 11.12.1 → 11.14.1 install (matches contract literal). Both platforms now 11.14.1. No code changes needed.
-- T5 cross-platform verify: Codespace had NO Bun (`bun: command not found`) — installed Bun 1.3.14 via `curl -fsSL https://bun.sh/install | bash -s bun-v1.3.14`. ABI 137 confirmed on Codespace (`bun -e 'console.log(process.versions.modules)'` → 137). Synced Codespace to wave-3 HEAD `17eedfd` via temp sync branch `wave-3-codespace-sync` (wave-3 NOT pushed per contract). `verify:tree-sitter-native` exit 0 on macOS arm64 + Ubuntu Codespace (33+33 parses, 27+27 modules, 10 sensors, RSS -188 KB Codespace / +589 KB macOS < 16 MiB, packed package PASS, ELF x86-64 system-only linkage on Codespace). Native-structural 152/152 both platforms.
-- T6 AD amendment + validation.md: AD-004/005/006 amendment rows appended to STATE.md Decisions table (Bun 1.3.11 → 1.3.14 via merge; Node 25.9.0 unchanged; ABI 137 unchanged; patch SHA `e79aec7b...` unchanged; cross-platform evidence). `validation.md` written with per-AC verdict table (NVR-001..030), six-suite classification ledger, discrimination sensor results (4/4 killed), diff range, residual risk. Independent verifier PASS.
-- Native runtime contract FROZEN: patch SHA `e79aec7b...`, 16 MiB disposal-stress gate, immutable owners, same-tree reset, install-guard, C++20 `binding.gyp`, 33-language manifest, versioned FQN codec, lazy grammar pool, embedded Vue/Markdown all unchanged. Only the Bun version pin moved (1.3.11 → 1.3.14 via merge); npm reconciled. No structural contract touched.
-- exact next step: feature COMPLETE. Cleanup: delete temp remote branch `wave-3-codespace-sync`. No push of `wave-3` (contract). Independent verifier (author ≠ verifier) confirmed PASS.
-
----
-
-## Previous: Wave 3 / M21 Linux Native Structural Runtime
-
-- projectId: `massa-th0th`; workflowSessionId: `spec-m21`
-- branch: `wave-3`; isolated worktree: `massa-th0th-wt-wave-3`
-- feature COMPLETE: `linux-native-structural-runtime` (M21, P0) — validated PASS
-- M21 Phase A (T1–T4) PASS on macOS arm64 (Bun 1.3.11). Commits: T1 `40f085a` (assertRuntimeTarget accepts linux/x64), T2 `35f8f74` (ELF readelf -d linkage branch in verifyNativeLinkage), T3 `2167901` (isNativeTarget + describeNative + E2E 02/09/15 + graph-gen PG guards widen to linux/x64), T4 `be9c8e8` (structural-native-linux CI job in ci.yml + README dual-platform docs + native-linux-x64-workflow.test.ts 6/6 + polyglot-indexing-docs.test.ts 13/13). T7 validation `e4b59a5` + T8 bookkeeping `2724cff`.
-- M21 Phase B (T5/T6) PASS on Ubuntu Codespace (`wave3-debian-gate-wv567j4g9j35x76`, Ubuntu 24.04.4 LTS x86_64, Bun 1.3.11, Node 25.9.0, npm 11.12.1). tree-sitter addon built from source under Node 25.9.0 + C++20 `binding.gyp` on Ubuntu gcc (pre-mortem #1 did NOT materialize, unlike macos-14 Apple clang). All 27 grammars built/loaded (3 from-source: clojure-orchard, dart, erlang; 24 via prebuilds + patched runtime — pre-mortem #2 did NOT materialize). Native verification direct: `verifyColdConsumerProcesses` source/dist 33+33 parses/27+27 modules/27+27 resolvable, `verifyPatchBehaviorProcess` 10/10 sensors, `verifyRssDiscriminationProcesses` patchedMedianDelta -266240 B (< 16 MiB) vs controlGrowth 114 MiB, `runDiscriminationSensors` {missing:true, incompatible:true}. ELF linkage: all 28 addons (5 from-source + 23 prebuilds) ELF 64-bit LSB x86-64 with system-only NEEDED (libstdc++.so.6, libgcc_s.so.1, libc.so.6). Packed-package: core tarball bundles nested patched runtime addon + install-guard.js; cold consumer install resolved nested runtime at `@massa-th0th/core/node_modules/tree-sitter/`; ELF x86-64 system-only. Native-structural unit tests 152/152 pass (993 assertions). Type-check 6/6, build 5/5 on Linux.
-- Pre-existing `bun.lock tree-sitter-dart Git identity drift` blocks the full `verify:tree-sitter-native` and `verify:tree-sitter-package` scripts (lock format has SRI as last element; verifier expects gitIdentity). PRE-EXISTING on macOS too (2/9 verifier test failure before M21). Native functions called directly all PASS. Fixing it is out of M21 scope ("never chase pre-existing failures"); flagged as a separate follow-up task.
-- Pre-mortem gate (The Fool, pre-mortem mode, standalone — subagent `haiku/.` model not found): 5 failure narratives; 3 revisions applied before Execute. Findings #1 (Node 25 C++20 headers) and #2 (grammar Linux build) did NOT materialize on Ubuntu; #3 (readelf -d over ldd) PASS; #4 (Codespace unavailable) RESOLVED via `gh codespace ssh`; #5 (pre-existing test chase) sensor killed.
-- Discrimination sensors (5, all killed): platform predicate, ELF non-system soname, ELF foreign-arch, macOS Mach-O regression guard, pre-existing test non-touch.
-- Pre-existing failures NOT task-owned (unchanged): native-macos-arm64-workflow.test.ts 3/3 fail (missing .github/workflows/native-macos-arm64.yml, merged into ci.yml:137-175), verify-tree-sitter-grammars.test.ts 2/9 fail (bun.lock tree-sitter-dart Git identity drift), full-suite 6 groups (auto-improve-job, etl-cache-invalidation, etl-pipeline-queue, qwen-e2e-fixture, scheduler-store-pg, trace-path).
-- Codespace sync: temp remote branch `wave-3-codespace-sync` pushed (Codespace was at old HEAD `3dc85b5`); fetch+checkout in Codespace to `2724cff`. Delete `wave-3-codespace-sync` after M21 closure.
-- Bun 1.3.11 shim at `/var/folders/2s/y7r9gt5d15s48_z4nxkhyldr0000gn/T/opencode/bun-1.3.11/node_modules/.bin` — prepend PATH for all macOS gates. Codespace has bun 1.3.11 under Node v24.14.0's global modules at `/usr/local/share/nvm/versions/node/v24.14.0/bin/bun`; Node 25.9.0 via `nvm use 25.9.0` + `node-gyp`/`node-gyp-build` installed globally.
-- exact next step: M21 complete. Wave 3 sequence exhausted. Cleanup: delete temp remote branch `wave-3-codespace-sync`. No push of `wave-3`. Optional follow-up: fix the pre-existing `bun.lock tree-sitter-dart Git identity drift` so `verify:tree-sitter-native` passes end-to-end.
-- remaining sequence: none (M21 was the last). No push.
-
----
-
-## Previous: Wave 3 / M45+M47 Hook Attribution Repair
-
-- projectId: `massa-th0th`; workflowSessionId: `spec-wave-3`
-- branch: `wave-3`; isolated worktree: `massa-th0th-wt-wave-3`
-- feature COMPLETE: `hook-attribution-repair` (T1–T8). HEAD `da858ab` (validation).
-- One app-layer `AttributionResolver` (explicit→sticky→containment→verbatim, fail-open, sanitized warns) runs pre-enqueue at every hook ingestion path; emitters pin per session (Claude `_pin.sh`, OpenCode `SessionProjectPin`); persistence gains additive `agent_id`+`attribution_source` with a canonical-keyed mirror; idempotent repair migration re-derives history via path-deduped containment (broad `/` excluded, unambiguous-only) and unambiguous session linkage, preserving `_pre_repair_project_id`. Plan-critic pre-mortem C1–C5 all incorporated. M16+M17 alias resolution unchanged at the repo seam.
-- Residual (contract-legal): rows with no cwd / ambiguous shared-path / multi-id sessions stay `verbatim` (counted via `DO $$` NOTICE). Shared-DB grooming runbook is docs-only (needs user approval; `e2e-th0th-shared` preserved per ops decision).
-- Canonical evidence: `.specs/features/hook-attribution-repair/validation.md`.
-
----
-
-## Previous: Wave 3 / M16+M17 Transactional Project Identity
-
-- projectId: `massa-th0th`; workflowSessionId: `spec-wave-3`
-- branch: `wave-3`; isolated worktree: `massa-th0th-wt-wave-3`
-- active feature: `transactional-project-identity` (tasks.md T1–T7)
-- feature HEAD: `b68910d` (T7, feature COMPLETE). Prior: `3dc85b5` (T1), `be0e9c5` (T2), `15cf45b` (T3), `c9e361b` (T4), `5f6865f` (T5), `d5ecb6f` (T6), `81f0e99` (bookkeeping). Base: main `c92e481`.
-- M19 complete: macOS 22/22, Ubuntu Codespace 22/22, three discrimination mutations killed. Ubuntu/glibc-x64 was an explicit user-approved substitution for Debian 12.
-- M20+M54 complete: 15 focused tests, live Synapse 21-pass gate, two killed mutations, strict 47-tool roster, cursor page size 100.
-- M50 complete: local focused 45/45, workspace type/build pass, Ubuntu PostgreSQL/API/MCP gates pass, independent re-verification PASS after two review fixes.
-- M16+M17 progress: T1 contracts+migration (`3dc85b5`), T2 discovery+planner (`be0e9c5`), T3 transactional apply (`15cf45b`), T4 writer guard+invalidation+adapter resolution (`c9e361b`), T5 REST+MCP transports (`5f6865f`) — all committed and independently verified. T4 included user-approved application-layer alias resolution at 11 write seams + two review rounds (4 P1 + 14 P2 total remediated). T5 added `createProjectIdentityService`, REST rename/merge (dryRun default true), MCP rename_project/merge_projects (roster 47→49); review fixed P1 preview-acquire→503 mapping + release-on-throw + Elysia validation envelope (`INVALID_REQUEST` via framework `code`).
-- **T6 COMPLETE (independently verified, 2 review rounds)**: owned PG acceptance 9/9 ×3 consecutive against owned DB `massa_th0th_identity_t6` (127.0.0.1:5432, role `luizmassa`, pgvector, 19 migrations). Env gate `IDENTITY_ACCEPTANCE_DATABASE_URL`. Suite `packages/core/src/__tests__/project-identity-pg-acceptance.test.ts` (9 tests). Production bugs found+fixed by the gate + reviews: (1) `hash.ts` tagged canonical forms for Date/bytea/bigint; (2) `pg-array-codec.ts` for TEXT tags holding `{a,b}` literals; (3) `memories.metadata` registry encoding json→json-text (TEXT column) — the hidden root of the preview-passes/apply-CONFLICT failure (planHash covers conflicts, so both plans had them; the test never inspected preview.conflicts); (4) roots-first direct-store rewrite (non-deferred FKs documents→projects RESTRICT, symbol_*→workspaces); (5) merge winner-first supersede→move→reactivate vs non-deferrable `graph_generations_one_active_per_project` partial unique index (23505); (6) alias-qualified merge dedupe projections (42702 `hit_count`); (7) canonically sorted fingerprint inputs (order-dependent planHash → spurious PLAN_CHANGED); (8) sequential planner queries (Bun pg pipelining desync wedged pooled clients — 5s hook timeouts, 08P01); (9) merge flattens inbound alias chains before retiring source roots (`project_identity_aliases_target_fkey` ON DELETE RESTRICT — rename A→B then merge B→C failed 23503; spec req 2) + chained acceptance test; (10) payload fingerprint/rewrite scoped to source∪target rows when the table has project_id (liveness + zero-source-ref AC; scheduled_jobs keeps global scan by design). Test-harness fixes: serviceFor wrapper transparent passthrough + restore-on-release (callback-drop wedged pool), lock signal after settle, writer release-after-settle, unknown-storage preview-resolves/apply-rejects, operation_log seed `success` (CHECK). Deferred P3s (documented, non-blocking): pg-array-codec unquoted NULL→"" normalization (pinned); hash.ts `date:` tag TZ-dependence for TIMESTAMP-without-tz (same-host invariant) + plain-string tag collision needing crafted data; registry dead `project_identity_operations` catalog entry; vector_documents/symbol_* unseeded in acceptance snapshot (covered by unit fakes). Gates: acceptance 9/9 ×3, identity unit 69/69, MCP 4/4, HTTP 5/5, type-check 6/6, build 5/5.
-- exact next step: M45+M47 (FEATURES.json slug `hook-attribution-repair`, P1) — own spec-driven feature: verify-first fan-out against ~/Downloads/massa-th0th-improvement-plan.md, spec/design/tasks under `.specs/features/hook-attribution-repair/`, plan-challenge gate per policy, one atomic commit per task, independent verification mandatory. Then M21 (`linux-native-structural-runtime`, P0; M19 precedent: Ubuntu/glibc-x64 was an explicit user-approved substitution for Debian 12).
-- remaining sequence: M45+M47 → M21.
-- **T7 COMPLETE (`b68910d`, independent verifier PASS)**: `validation.md` written (task evidence, req/AC maps, T6 bug ledger, deferred P3s, failure classification). Full workspace regression under pinned Bun 1.3.11 (isolated binary; machine default drifted to 1.3.14 which fails the exact-version native parser gate — AD-004/005): 1432 pass with T6 acceptance 9/9 green INSIDE the suite; identity unit 70/70; migration 3/3; type-check 6/6; build --force 5/5. Pre-existing failures reproduced at clean baseline `1e21f9a` (HEAD~7) and classified NOT task-owned: scheduler-store-pg persist (1=1), etl-pipeline-queue (HEAD 4 vs baseline 3, same shared-DB `graph_generation_workspace_missing` family; 4th passes solo at HEAD), etl-cache-invalidation (1=1), auto-improve-job 2 flaky timeouts (baseline also fails +2 more), qwen-e2e-fixture (2=2), trace-path shared-db fixture race (HEAD 2–4 subset vs baseline 8). T7 test-infra fixes: project-reset whole-module mock completed for T5 identity imports (latent T5 gap, full-suite-only); turbo.json passThroughEnv += IDENTITY_ACCEPTANCE_DATABASE_URL (acceptance silently skipped under turbo before); new planner fixture killed verifier-surviving mutant M4 (global payload-scan regression). Verifier: 5 mutation probes (alias flatten, roots-first, planHash sort, payload scoping, merge rewrite scoping), all killed after M4 fixture; remaining gaps none.
-- mandatory unavailable gates block the relevant feature. Do not weaken validation assets.
-
----
-
-## Current: Multi-Language Tree-sitter Breadth
-
-Implement `plan-multi-language.md` under workflow session `spec-multi-language`. Canonical feature artifacts live in `.specs/features/multi-language-tree-sitter-breadth/`.
-
-## Approved Contract
-
-- 33 exact default extensions, pinned native grammar artifacts, conditional capability tiers, repository-owned query/resolver packs.
-- `smartChunk`, embeddings, ranking, and semantic search remain unchanged.
-- Versioned full SHA-256 FQN codec and UTF-8 byte-accurate `SourceSpan`.
-- Graph generations include files, definitions, references, imports, centrality, diagnostics, and active counts.
-- DB-backed lease, immutable snapshot, completeness, and CAS protect activation; terminal job visibility follows activation synchronously.
-- Required-file hard failures block generation; incremental hard failures retain last-known-good rows with stale diagnostics.
-- Vue/Markdown embed to two levels; custom out-of-manifest extensions remain semantic-only with explicit unsupported diagnostics.
-- TS/JS native-safety is bounded by the 16 MiB disposal-stress gate; throughput/RSS are an absolute candidate self-baseline (MLTS-022 reframed 2026-07-17, spec-owner approved — candidate is a full 33-language AST indexer vs the `5d43a96` single-regex baseline, structurally non-comparable).
-
-## Completed This Session
-
-- Loaded required coding stack and AI Engineer persona.
-- Recalled memory; exact-session recall was empty. Synapse failed on a current shared-dist export mismatch, so retrieval used stateless search and current source.
-- Ran two source investigators and a full pre-mortem Plan Critic. Revised the plan through two rounds; final critic found no critical/high contradiction.
-- Created/activated feature spec, context, design, capability matrix, tasks, gate manifest, project state, and this handoff.
-- User explicitly permitted sub-agents. Tasks select one sequential worker per Execute phase plus an independent verifier.
-- Phase 0 worker ran TASK-001 target discovery and measured macOS 26.5.2 arm64 with Bun 1.3.11. The user subsequently narrowed native implementation scope to macOS arm64 only.
-- TASK-001 then passed with exact Bun 1.3.0 after exact Bun 1.2.0 failed. Frozen reinstall, 33/33 parses twice, Mach-O arm64 linkage, missing/incompatible sensors, and provenance evidence are recorded in the feature manifests.
-- TASK-002 pinned the exact runtime/build-helper/native dependency/trust set and lockfile. Cold real consumers, queue fault recovery, and exact resolved identities are fixed. Reference-only cleanup was empirically falsified by about 1 MiB RSS retention per repeated parse, so a checksummed binding patch now provides idempotent cursor/tree deletion, post-delete guards, and generated-addon packaging; core bundles the patch for packed consumers.
-- Independent reviews found mutable node/cursor owners and cross-tree cursor reset/resetTo could bypass liveness, SIGSEGV, or return garbage. Patch v3 SHA-256 `b0f73d0031e70f3585fca701076e1c6a05c30968b62f2d939de32af6df39a06a` binds immutable owners, marshals same-tree reset nodes, rejects cross-tree transfers in JS/native code, and marks owners readonly.
-- Authoritative patch v3 gates pass: empty-cache install, 9 focused tests/54 assertions, source/dist 33+33 parses and 27+27 modules, ten behavior guards, RSS below the 16 MiB bound with a roughly 125 MiB no-delete control, type-check 6/6, and build 5/5.
-- Fresh npm-packed shared/core installed into a normal consumer; built core resolved the nested patched runtime and passed immutable-owner, same-tree reset, cross-tree rejection, stale throw, and Mach-O arm64/system-only linkage checks.
-- Exact Node 22.22.2/npm 10.9.7 packed shared/core. A normal non-workspace Bun 1.3.0 consumer imported built core, resolved the nested patched runtime, parsed/double-deleted, and loaded a system-only Mach-O arm64 addon. Bun's own 1.3.0 pack path was rejected because it omitted the bundle payload.
-- TASK-003 added normalized structural contracts plus the ordered exhaustive 33-extension manifest and deterministic fingerprint inputs. Exact Bun 1.3.0 focused tests passed 6/6 with 451 assertions; forced uncached type-check/build passed. Independent review's sole `parameterIndex`/`paramIndex` finding was fixed and accepted.
-- TASK-004 added lazy literal native grammar loading, exact serialized Bun-marker restoration, cached 33/33 parser readiness, additive live health status, startup validation-before-listen, and pre-side-effect indexing guards. Focused 10/10, queue regressions 13/13, native verifier, uncached type/build, built-dist readiness, and independent review passed.
-- TASK-005 added one process-global FIFO parser pool (capacity 4/max 32; timeout 5s/max 60s), typed runtime outcomes, bounded diagnostics with total counts, and cursor-before-tree lifetime ownership. Focused 21/21, native/RSS, uncached type/build, and independent review passed after fixing cap multiplication, poisoned retarget slots, and raw grammar-cache exposure.
-- TASK-006 added byte-accurate immutable UTF-8 source indexing, embedded span remapping, legacy line compatibility, canonical full-SHA structural FQNs, legacy aliases, collision failure, and deterministic ambiguity payloads. Focused 25/25, forced type/build, and independent review passed after closing malformed-modern-suffix masquerading and reserved-name round trips.
-- TASK-007 added runtime-owned bounded native Query compilation/execution and declarative TS/JS/TSX/JSX packs with frozen declaration/import/relation/call/flow/HTTP/event output. Exact query tests 17/17 and independent query/runtime/identity review 57/57 passed after three remediation rounds covering typed identity/import material, exports, private names, capability independence, and AST-safe modifiers.
-- TASK-008 added the exact-version resolver registry, generation-scoped FQN session, and TS/JS resolver across same-file lexical scope, imports/re-exports, namespaces, default owners, globals, ambiguity, unresolved targets, and legacy aliases. Exact focused review passed 76/76 with 265 assertions after direct probes closed import basename leakage, dynamic namespaces, barrel forwarding, private leakage, and default-owner members.
-- TASK-009 routed TS/JS/TSX/JSX ETL structural extraction through the native runtime and shared resolver session while freezing unchanged `smartChunk` output. Its executable pre-T9 baseline and approved-difference ledger passed 105/105 focused tests with 508 assertions; native source/dist, type/build, diff, and independent review gates passed before the regex typed-edge path was removed.
-- TASK-010 added graph-generation schema/ownership plus one locked transactional legacy backfill. Its active-scoped repository bridge, same-project pointers, modern FQN/span preservation, exact counts, bounded diagnostics, and safe cleanup passed an owned PostgreSQL 17 gate (3/3, 62 assertions), a clean 15-migration deploy, migrated ETL regression, type/build, and independent review.
-- TASK-011 added a typed PostgreSQL lifecycle repository with cross-process workspace row locking, live lease heartbeat/ownership, fingerprint/snapshot separation, expected-active CAS, count recomputation, expiry takeover, atomic activation/abort, and last-known-good-safe cleanup. The owned macOS arm64 PostgreSQL suite passed 11/11 with 67 assertions; forced type/build and review gates passed. T13 remains the explicit owner of discovered-file snapshot membership and post-snapshot delta reconciliation.
-- TASK-012 added lease-bound pending generation writes, atomic per-file replacement/deletion/stale fallback, inbound-edge cleanup, captured active batch scopes, exact centrality replacement, full active aggregates, and exact-first modern/legacy ambiguity resolution. The owned macOS arm64 PostgreSQL suite passed 12/12 with 38 assertions after deterministic activation-race and identity validation remediation.
-- TASK-013 integrated pending generations into the real ETL lifecycle with immutable discovery snapshots, recovered/hard/incremental handling, deletion, interruption settlement, cross-process stale-active refresh, synchronous activation, and awaited durable terminal generation identity. Exact Bun 1.3.0 focused/owned PostgreSQL passed 38/38 with 147 assertions; type 6/6, build 5/5, diff, and independent review passed. Semantic vector/keyword lifecycle was explicitly preserved per the canonical task boundary.
-- TASK-014 carries exact parser diagnostic totals separately from bounded ten-detail evidence, including original hard-failure spans through stale LKG activation. Active-generation-only status/language summaries persist with activated identity in nullable durable job columns; legacy NULL jobs hydrate unchanged. Exact Bun 1.3.0 focused/owned PostgreSQL and ETL passed 50/50 with 249 assertions; type 6/6, build 5/5, diff, and independent review passed.
-- TASK-015 adds versioned native Python/Ruby/PHP/Lua packs and a dialect-scoped scripting resolver. Grammar-derived tests cover symbols/docs, distinct honest imports and aliases, Python/PHP types, inheritance, calls/data flow/HTTP/events, unresolved/ambiguity, cross-language negatives, and Lua's no-type contract. Focused exact Bun 1.3.0 passed 67/67 with 333 assertions; build/type, diff, and independent review passed after four P1 fixes.
-- TASK-016 adds versioned native C/C++/Go/Rust/Zig packs and a dialect-scoped systems resolver. AST-derived native tests cover symbols/docs, honest includes/imports, types/inheritance/traits, calls/data flow/HTTP/events, Rust alias/group/glob/self resolution, unresolved/ambiguity/isolation, and four cases per concrete extension. `.h` defaults to C and selects C++ only from unambiguous AST importer or directory-aware build evidence, including cached importers; angle includes stay unresolved. Exact Bun 1.3.0 passed 95/95 with 1,010 assertions; core build, diff, and independent review passed after four remediation rounds.
-- TASK-017 adds versioned native Java/Kotlin/KTS/Scala/C#/Swift/Dart packs and a dialect-scoped managed resolver. Native tests cover declarations/docs, exact imports, nested owners, overloads, constructors, properties/fields, inheritance, calls/data flow/HTTP/events, unresolved/ambiguity/isolation, and stable overload FQNs. Real Java providers prove public nested/static imports resolve while private members do not; Java and C# per-declarator fields retain declaration modifiers. Exact Bun 1.3.0 passed 91/91 with 480 assertions; type-check 6/6, build 5/5, diff, and independent review passed after five remediation rounds.
-- TASK-018 adds versioned native Elixir/EXS/Erlang/Clojure/OCaml/Haskell packs and a dialect-scoped functional resolver. Native tests cover declarations/docs/spec metadata, AST-only imports and exposure modes, applicable protocol/behaviour/class/instance relations, calls/bare flow, Haskell equation dedupe/hiding, Erlang arity, parser-produced resolution, ambiguity/unresolved/isolation, and EX/EXS compatibility. Exact Bun 1.3.0 passed 101/101 with 575 assertions; type-check 6/6, core build 2/2, diff, and independent review passed after two remediation rounds.
-- TASK-019 adds Vue/Markdown embedded parsing plus Markdown heading and JSON/YAML qualified-key packs. Host resources release before sequential depth-two child parsing, native UTF-16 offsets are centrally adapted to exact UTF-8 bytes, Vue `lang` uses native attributes, stable ordinal scopes remap child spans, and fallback/hard-failure diagnostics retain exact totals. Exact Bun 1.3.0 passed 141/141 with 915 assertions; type-check 6/6, build 5/5, diff, and independent review passed after resolver, native-attribute, and acceptance-matrix remediation.
-- TASK-020 adds one active-generation definition identity lookup shared by graph definition/reference/trace consumers, returns stable legacy ambiguity without first-match traversal, preserves exact overload identities in impact analysis, and exposes all 18 canonical kinds. Exact Bun 1.3.0 focused tests passed 8/8 with 19 assertions; owned PostgreSQL passed 21/21 with 81 assertions; type-check 6/6, build 5/5, diff, and independent review passed. A supplemental broad trace/architecture run retained four pre-existing shared-database fixture failures outside the task-owned gate; no test was weakened.
-- TASK-021 exposes exact durable parser summaries, active generation identity, one stable FQN resolution schema, and all 18 canonical kinds through HTTP and the production MCP CallTool proxy without expanding raw diagnostics. Project-map centrality, aggregates, typed edges, diagnostics, counts, recent files, and architecture inputs now come from one share-locked active-generation PostgreSQL snapshot; a deterministic concurrent-activation/pending-poison sensor proves no mixed-generation response. Exact Bun 1.3.0 focused tests passed 19/19 with 92 assertions; owned PostgreSQL passed 21/21 with 93 assertions; type-check 6/6, build 5/5, diff, and independent re-review passed after remediating both initial P1 findings.
-- TASK-022 restores the baseline-deleted indexing suite as a deterministic PostgreSQL-native all-33 E2E contract. ParseStage's 29-of-33 integration escape—25/29 Flow tiers plus all four Structure tiers—was fixed by deriving structural routing from the manifest. The fixture proves exactly 33 extensions/sentinels, 29 Flow-tier edges, four Structure-tier zero-edge declarations, overload identities and legacy ambiguity, HTTP/MCP parity, unresolved null targets, atomic generations, exact stale-snapshot failure preservation, deletion, and concurrency. Owned sequential E2E passed 41 tests/664 assertions with one explained auth-on skip; focused indexing passed 7/7 and 249 assertions; static routing passed 20/278 with seven expected E2E-off skips; type 6/6, build 5/5, qwen 69-entry/44-support hash validation, diff, and final independent re-review passed.
-
-## Native Runtime Re-baseline + TASK-023 PASS (2026-07-16)
-
-The network approval block cleared. User directive switched the native runtime to Bun `1.3.11` and Node `25.9.0` (npm `11.14.1`); Node 25.2.2 was requested but is not a real release, so the closest real, locally-installed Node 25.x (25.9.0) was used and confirmed. The TASK-023 empty-cache packed-consumer install now runs and exposed two real defects, both fixed in the `tree-sitter` patch (SHA `b0f73d00…` → `e79aec7b96eb8114e85ebcb90f0a8b12076bcd8aa08c09bb88929621e1c1446d`): (1) Node 25 headers require C++20, so `binding.gyp` moved from C++17 to C++20; (2) the bundled `tree-sitter` `install` script fell back to a missing `node-gyp` in consumers, so an install-guard now no-ops when the prebuilt addon is present (falling back to the upstream `node-gyp-build` only for fresh source builds). The package verifier materializes the hoisted patched runtime into `packages/core/node_modules` before `npm pack` so the core tarball bundles the exact nested patched runtime. Gates under the new versions: cold install; source/dist native 33+33 parses, 27+27 modules, 10 sensors, RSS within bound; package gate 33 parses, 27 modules/paths, 10 sensors; focused verifier tests 14/14; type-check 6/6; build 5/5.
-
-## Exact Next Step
-
-Feature COMPLETE (verdict PASS). All of TASK-001 through TASK-026 pass. The MLTS-022 performance contract was reframed on 2026-07-17 with spec-owner approval: the prior regex-relative throughput (≤25%) and RSS (≤50%) thresholds were replaced because the candidate (a full 33-language AST structural indexer: 27 loaded native grammars, ~208 MB forced-GC RSS floor, spec-required per-symbol rich extraction MLTS-005/006/007) is structurally non-comparable to the `5d43a96` single-regex typed-edge baseline. Exhaustive output-preserving optimization (commits `490f302`, `13718af` byte-offset one-pass table, `4a26353` wrapped-child-array cache; structural output unchanged across 153 structural tests + frozen identity golden hash) proved the residual build-phase cost is inherent distributed rich extraction, not a defect. The 16 MiB explicit-disposal/forced-GC stress is now the hard native-safety gate (PASS, 82 KB median delta); candidate throughput/RSS (≈1.20 MB/s, ≈290 MB) are recorded as an absolute self-baseline for future candidate-vs-candidate regression. Disposal stress + corpus checksum PASS. The final independent verifier confirmed PASS with discrimination sensors. No threshold was unilaterally lowered; no test weakened; no data faked. See `spec.md` Performance-contract reframe decision row and `validation.md`.
-
-## Worktree and Safety
-
-- Branch: `main`; baseline `5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03`.
-- User commit `7245aaa` and its files are preserved; TASK-021 is committed on top without modifying that commit.
-- `plan-multi-language.md` was supplied untracked and is now an in-scope revised artifact.
-- No push attempted.
-- TASK-001 through TASK-023 are claimed with recorded gates. The native runtime re-baseline (Bun `1.3.11`/Node `25.9.0`) plus the TASK-023 package verifier are committed on top. No Linux, Docker, container, or non-arm64 implementation has been started; TASK-024/025/026 remain.
-- Preserve existing SQLite-removal artifacts and follow-up status.
+## Gate Status
+- Type-check: 6/6 passing
+- Build: 5/5 passing
+- Focused tests: 108 pass / 3 skip / 0 fail (8 test files)
+- Validation: PASS — all 13 requirements verified, all gates green

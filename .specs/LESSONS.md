@@ -38,6 +38,12 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: scripts/__tests__/run-tests-parallel.test.ts:113 (test-design)
 - last seen: 2026-07-22T21:39:38Z
 
+### L-005 - When a unit test bypasses a version-gate threshold via a testing seam (_setJsonSchemaSupportedForTesting), the threshold logic (_checkJsonSchemaSupport minor >= 5) is uncovered. Add direct tests of the version parser with mocked version strings (0.5.0, 0.4.9, 1.0.0, garbage) so threshold regressions are caught.
+- signal: `surviving_mutant` | recurrence: 1 feature(s) | scope: `packages/core` | harmful: 0 | confidence: 0.62
+- features: wave-7-hygiene-ui-process
+- evidence: packages/core/src/__tests__/llm-client-json-schema.test.ts:62-69 (packages/core)
+- last seen: 2026-07-22T23:54:13Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.
