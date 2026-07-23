@@ -44,7 +44,7 @@ Step 5: Flag as uncertain → "I'm not certain about X — here's my reasoning, 
    - constraints, target environment, and current session
    - whether the task is pure explanation, onboarding, flow mapping, or decision support
 4. Recall first:
-   - `th0th_recall` for prior decisions, patterns, handoffs, gotchas, and previous exploration of the entity.
+   - `recall` for prior decisions, patterns, handoffs, gotchas, and previous exploration of the entity.
    - Filter stale, superseded, or contradicted memories before using them as current truth.
    - Treat memory as a lead until confirmed against current source when accuracy matters.
 5. Build a proportional investigation plan before deep reads (BRIEFING → PLAN → EXECUTE → DEBRIEF):
@@ -86,7 +86,7 @@ Step 5: Flag as uncertain → "I'm not certain about X — here's my reasoning, 
    - Persist only durable discoveries that would cost future effort to rediscover: repeated project patterns, architectural constraints, fragile flows, gotchas, accepted exceptions, rejected approaches, or reusable verification recipes.
    - **Note-worthiness trigger:** when understanding touches 3+ files or a non-trivial flow, persist a note to the th0th memory layer. Below that threshold, decide per-finding.
    - Three-way note decision: **create** (new durable finding), **update** (existing non-stale note for the same entity), or **skip** (trivial, one-off, already captured). The Debrief records what was verified against source, not just what was read.
-   - Use `th0th_remember` with required tags and the correct memory tier.
+   - Use `remember` with required tags and the correct memory tier.
    - Keep `th0th` as the canonical memory layer for massa-th0th workflows. Do not introduce `.notebook/`, generated state files, or copied-code notes as default persistence.
    - Skip memory for trivial observations, one-off facts, raw logs, copied source, screenshots, customer data, tokens, device IDs, and facts already captured in current non-stale memories.
 10. Complete the Evidence Gate from `references/evidence-gate.md`.

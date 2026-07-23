@@ -13,7 +13,7 @@ Use `workflows/restart-save.md` instead when the primary goal is preserving cano
    - `skills/ai-context-handoff/SKILL.md` when available, as an output lens only
    - Do not let `ai-context-handoff` replace this workflow's memory recall, state inspection, persistence, conditional reset instruction, or Evidence Gate.
 3. Recall state:
-   - `th0th_recall` -> current session, prior handoffs, decisions, blockers, rejected approaches, and verification recipes.
+   - `recall` -> current session, prior handoffs, decisions, blockers, rejected approaches, and verification recipes.
    - Filter stale or superseded memories before treating them as current truth.
 4. Inspect concrete state when available:
    - changed files, current branch, relevant specs/tasks, failing commands, and active workflow artifacts loaded from .specs/ files when canonical restart state is needed.

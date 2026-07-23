@@ -6,8 +6,8 @@ Use `workflows/restart-save.md` instead when the primary goal is preserving cano
 
 1. Continue with the same `workflowSessionId` and `projectId`; never generate a new durable workflow session for compaction
 2. Load `references/handoff-package.md` for the shared continuation-package shape
-3. If code context exceeds 200 lines, 20 KB, or 50 search hits in the active reasoning window, use `th0th_compress` with strategy `code_structure`
-4. If conversation history exceeds 60% context usage or contains stale/raw tool output that no longer drives decisions, use `th0th_compress` with strategy `conversation_summary`
+3. If code context exceeds 200 lines, 20 KB, or 50 search hits in the active reasoning window, use `compress` with strategy `code_structure`
+4. If conversation history exceeds 60% context usage or contains stale/raw tool output that no longer drives decisions, use `compress` with strategy `conversation_summary`
 5. Write a Session Guide before handoff, compaction, or stopping:
    - Last request
    - Current state
@@ -19,7 +19,7 @@ Use `workflows/restart-save.md` instead when the primary goal is preserving cano
    - Exact `workflowSessionId` and `projectId`
    - Instruction to open and optionally prime a fresh Synapse session after resume when repeated searches are expected
 6. If handing off to another agent or new chat, expand the Session Guide into the full package from `references/handoff-package.md`
-7. Persist the Session Guide or handoff package via `th0th_remember` as `type=critical` for incomplete work or `type=conversation` for routine compaction, with `memory:working` and `handoff` tags
+7. Persist the Session Guide or handoff package via `remember` as `type=critical` for incomplete work or `type=conversation` for routine compaction, with `memory:working` and `handoff` tags
 8. Complete the Evidence Gate from `references/evidence-gate.md`
 
 ## Example

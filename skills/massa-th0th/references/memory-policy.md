@@ -69,7 +69,7 @@ Add focused domain tags only when they improve future retrieval, such as `auth`,
 Persist only after recall and scoring. Add `stale-replaces:<memoryId>` only when replacing a recalled memory.
 
 ```js
-th0th_remember({
+remember({
   projectId: "useful-agent-skills",
   sessionId: "spec-memory-routing",
   type: "decision",
@@ -97,7 +97,7 @@ Prefer memories in this order:
 
 Treat memories tagged `stale`, or old memories whose IDs are referenced by newer `stale-replaces:*` tags, as historical context rather than current truth.
 
-Use `th0th_recall(projectId=...)` for project-scoped decisions. The v2.0.2 MCP
-declaration exposes `projectId` on `th0th_memory_list`, but the verified REST
+Use `recall(projectId=...)` for project-scoped decisions. The v2.0.2 MCP
+declaration exposes `projectId` on `memory_list`, but the verified REST
 body does not; treat memory-list output as unscoped unless a runtime probe proves
 the installed adapter applies the filter.

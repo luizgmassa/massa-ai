@@ -3,7 +3,7 @@
 Use this workflow for behavior-preserving structural cleanup, simplification, decoupling, testability improvements, and code organization changes where the intended external behavior stays the same. Do not use it for broken behavior; route that to `workflows/debug.md`. Do not use it for broad boundary redesign, migration, or unclear architecture direction; route that to `workflows/architecture/architecture-audit.md` or `workflows/spec-driven.md`.
 
 1. Resolve/reuse `workflowSessionId`: `refactor-[entity]`
-2. `th0th_recall` → load architectural decisions and coupling patterns for the area
+2. `recall` → load architectural decisions and coupling patterns for the area
 3. Load shared references as needed:
    - `references/codebase-investigation.md` before changing unfamiliar code
    - `references/architecture-lenses.md` when the refactor is driven by coupling, seams, adapters, depth, leverage, or locality
@@ -38,6 +38,6 @@ Use this workflow for behavior-preserving structural cleanup, simplification, de
      `python3 skills/massa-th0th/scripts/lessons.py --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
 11. Use `references/agent-orchestration.md` only for isolated implementation slices or independent verification
 12. At completion, persist (run the scoring rubric from `references/decision-engine.md`):
-   - Refactored architectural decisions via `th0th_remember` as scored `decision` memories
-   - Identified and decoupled anti-patterns via `th0th_remember` as scored `pattern` memories
+   - Refactored architectural decisions via `remember` as scored `decision` memories
+   - Identified and decoupled anti-patterns via `remember` as scored `pattern` memories
 13. Complete the Evidence Gate from `references/evidence-gate.md`

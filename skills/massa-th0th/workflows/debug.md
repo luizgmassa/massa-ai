@@ -10,16 +10,16 @@ Use this workflow when the user reports broken behavior, failures, regressions, 
    - `references/verification-ladder.md` before Quick/Standard/Spec-driven sizing or applying fixes
    - `references/context-firewall.md` before inspecting logs, traces, snapshots, or generated output that meet its threshold table (a single source/log/doc block >200 lines, >20 KB, or >50 search hits)
    - `references/lessons.md` when `.specs/lessons.json` exists, to load confirmed project lessons before diagnosis
-3. `th0th_recall` → load prior debugging attempts for this entity
+3. `recall` → load prior debugging attempts for this entity
 4. IF prior attempts exist:
    - Review what was already tried
    - Focus on untested hypotheses
    - Treat memories tagged `stale` or superseded by `stale-replaces:*` as historical only
    - Do not repeat ruled-out hypotheses unless new evidence invalidates the prior result
 5. Follow the shared retrieval order from `references/codebase-investigation.md`
-   to load relevant code. `th0th_optimized_context` has no session field; put
+   to load relevant code. `optimized_context` has no session field; put
    `workflowSessionId` in query text/tags and pass only `synapseSessionId` to
-   `th0th_search.sessionId`.
+   `search.sessionId`.
 6. Build or request a trustworthy feedback loop before editing:
    - Use the reproduction ladder in `references/debug-diagnosis-loop.md`: unit/CLI repro, integration/API repro, app/browser/device repro, then structured HITL.
    - IF no loop can run, record a skipped-reason enum from the debug reference and collect the strongest root-cause proof available
@@ -47,10 +47,10 @@ Use this workflow when the user reports broken behavior, failures, regressions, 
      Rerun the original feedback loop, run the verification recipe, and remove temporary instrumentation unless intentionally retained as observability
 15. Use `references/agent-orchestration.md` only for independent verification or isolated investigation branches
 16. IF fix found:
-   - Persist the root cause via `th0th_remember` as a scored `decision` memory with `memory:semantic`
-   - Persist the fix pattern via `th0th_remember` as a scored `pattern` memory with `memory:procedural`
+   - Persist the root cause via `remember` as a scored `decision` memory with `memory:semantic`
+   - Persist the fix pattern via `remember` as a scored `pattern` memory with `memory:procedural`
 17. IF NOT resolved:
-   - Persist what was ruled out via `th0th_remember` as a scored `conversation` memory with `memory:episodic`
+   - Persist what was ruled out via `remember` as a scored `conversation` memory with `memory:episodic`
    - Persist repeated failed tool loops as procedural cognition lessons only when they are reusable
    - Document remaining hypotheses for future sessions
 18. Complete the Evidence Gate from `references/evidence-gate.md`
@@ -75,4 +75,4 @@ User asks: "The login route returns 500 after deploy."
 4. Build a hypothesis board: missing env, middleware ordering, expired session lookup, or database connection regression; probe one at a time.
 5. Trace request → auth middleware → session lookup → response, then fix the divergence point closest to the root cause.
 6. Define the verification recipe: rerun the original route check, add or update regression coverage at the failing seam, and confirm validation assets were not weakened.
-7. If root cause is a missing `DATABASE_URL`, persist via `th0th_remember`: a semantic decision memory for the root cause and a procedural pattern memory for the deploy-env verification command.
+7. If root cause is a missing `DATABASE_URL`, persist via `remember`: a semantic decision memory for the root cause and a procedural pattern memory for the deploy-env verification command.

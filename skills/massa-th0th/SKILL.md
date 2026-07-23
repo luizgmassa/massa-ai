@@ -28,14 +28,14 @@ Before reading any massa-th0th file:
 
 - Every coding/planning task uses one stable `projectId` and
   `workflowSessionId`.
-- Start with `th0th_recall` for relevant prior decisions/patterns.
+- Start with `recall` for relevant prior decisions/patterns.
 - Default startup/context recall is budgeted: use `limit <= 3`,
   `minImportance >= 0.7`, and `types=["critical","decision","pattern"]`
   unless the selected workflow explicitly needs a broader memory query.
-- Never use `th0th_recall` as an artifact loader. Exact project, restart,
+- Never use `recall` as an artifact loader. Exact project, restart,
   handoff, feature, and validation state must come from .specs/ files.
 - For multi-search tasks, use a separate ephemeral `synapseSessionId` according
-  to `references/synapse-policy.md`; pass it only to `th0th_search.sessionId`.
+  to `references/synapse-policy.md`; pass it only to `search.sessionId`.
   Never pass `workflowSessionId` in that field.
 - Prefer the shared v2 retrieval order; fall back gracefully if th0th or
   Synapse is unavailable.
@@ -78,7 +78,7 @@ Examples:
 
 Resolve `projectId`:
 
-1. Call `th0th_recall` with query `"projectId for this workspace"`,
+1. Call `recall` with query `"projectId for this workspace"`,
    `limit <= 3`, `minImportance >= 0.7`, and
    `types=["critical","decision","pattern"]`.
 2. If found, reuse exactly.
@@ -193,22 +193,22 @@ reason. Reuse The Fool context when it is already loaded.
 
 Use this default retrieval sequence when it matches the task:
 
-1. `th0th_list_projects` or equivalent freshness evidence before relying on indexed project state.
-2. `th0th_project_map` for one-shot architecture orientation when the index is fresh for the current repository path and worktree state.
-3. `th0th_search(responseMode="summary", maxResults=10)` for broad discovery.
-4. `th0th_search(responseMode="enriched", maxResults=3)` for targeted deep reads; use `maxResults=5` only when the user named 4-5 concrete files, symbols, or findings.
-5. Symbol navigation and `th0th_read_file` for exact definitions, usages, and
+1. `list_projects` or equivalent freshness evidence before relying on indexed project state.
+2. `project_map` for one-shot architecture orientation when the index is fresh for the current repository path and worktree state.
+3. `search(responseMode="summary", maxResults=10)` for broad discovery.
+4. `search(responseMode="enriched", maxResults=3)` for targeted deep reads; use `maxResults=5` only when the user named 4-5 concrete files, symbols, or findings.
+5. Symbol navigation and `read_file` for exact definitions, usages, and
    line ranges.
-6. `th0th_optimized_context` for compact synthesized context when available.
+6. `optimized_context` for compact synthesized context when available.
 7. Focused shell/file fallback when th0th is unavailable, stale, incomplete, or misses
    obvious local truth.
 
-`th0th_project_map`, `th0th_search`, and `th0th_optimized_context` are leads
+`project_map`, `search`, and `optimized_context` are leads
 until their results are confirmed against current source files read in this session or returned with current freshness evidence. Current repository source
 and approved `.specs/` artifacts remain authoritative.
 
 Load `references/synapse-policy.md` when the planned investigation includes
-two or more related `th0th_search` calls. MCP is primary; authenticated REST may
+two or more related `search` calls. MCP is primary; authenticated REST may
 fill missing or broken Synapse lifecycle operations once after a documented MCP
 schema or adapter failure. Keep REST-only fields out of MCP calls.
 
@@ -268,7 +268,7 @@ Load only when a selected workflow asks for them:
 
 | Failure | Behavior |
 |---|---|
-| `th0th_recall` empty | Continue as cold start; do not invent memory. |
+| `recall` empty | Continue as cold start; do not invent memory. |
 | th0th unavailable | Fall back to focused shell/file reads; keep session concept. |
 | Synapse unavailable | Continue with stateless th0th search. |
 | Synapse prime/access mismatch | Use verified REST fallback or skip that optional step. |

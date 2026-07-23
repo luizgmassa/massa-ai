@@ -18,7 +18,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - `references/context-firewall.md` before inspecting large diffs, dependency graphs, generated reports, or broad search output
    - `references/synapse-policy.md` when repeated th0th searches are expected
    - `references/agent-orchestration.md` only for large scopes, explicit parallel/subagent requests, PR subagent invocation, isolated audit slices, or independent verification of high-impact findings
-3. `th0th_recall` -> load ADRs, architecture decisions, known boundaries, coupling patterns, accepted exceptions, project constraints, and prior rejected refactors for the target area.
+3. `recall` -> load ADRs, architecture decisions, known boundaries, coupling patterns, accepted exceptions, project constraints, and prior rejected refactors for the target area.
    - Apply the Memory Freshness Gate from `references/audit-scope.md`; recalled exceptions are leads, not proof.
 4. Establish the investigation scope before proceeding:
    - Modified files scope: use when the user says modified files, changed files, current changes, uncommitted changes, staged changes, or unstaged changes.
@@ -63,7 +63,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
      - Domain lens: subdomains, bounded contexts, ubiquitous language, cohesion score, colliding concepts, cross-domain ownership, and integration pattern fit.
      - Coupling lens: dependency graph, knowledge direction, integration strength, distance, volatility, balance table result, and contract health.
      - Deepening lens: module/interface/seam/adapter vocabulary, shallow modules, deletion test, dependency category, locality, leverage, and interface-as-test-surface evidence.
-   - Use `th0th_search_definitions` and `th0th_get_references` to verify exported surfaces and dependency direction where needed.
+   - Use `search_definitions` and `get_references` to verify exported surfaces and dependency direction where needed.
    - Capture positive architecture patterns when they materially disprove a concern, such as versioned contracts, anti-corruption layers, cohesive local coupling, or a deep interface that concentrates tests.
    - For each candidate finding, record the concrete claim, source evidence, lens-specific evidence, impacted boundary or module, provisional severity, tradeoff, simplest sufficient direction, and what would disprove it.
 11. False-positive pass:
@@ -82,7 +82,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
 > - scope: exact files/modules/boundaries in the audit target
 > - permissions: read-only
 > - inputs: shared scope packet; lens sub-mode (`domain` for bounded-context mapping, `coupling` for dependency-graph/strength/distance/volatility, `deepening` for module-depth opportunities); recalled ADRs and rejected refactors
-> - sensors: `th0th_search_definitions` / `th0th_get_references` for exported surfaces and dependency direction; source inspection against current files
+> - sensors: `search_definitions` / `get_references` for exported surfaces and dependency direction; source inspection against current files
 > - output: findings with lens-specific evidence, provisional severity, tradeoff, and what would disprove it
 > - firewall: raw dependency graphs, generated reports, and broad search output summarized, not returned raw
 > - memory: suggest-only; main agent persists accepted constraints/rejected refactors

@@ -19,37 +19,37 @@ shape or package version.
 
 | Tool | Primary use | Important contract note |
 |---|---|---|
-| `th0th_index` | Start background project indexing | Requires `projectPath`; may return `jobId`. |
-| `th0th_index_status` | Poll indexing progress | Poll after a real delay, never in a tight loop. |
-| `th0th_list_projects` | Resolve exact project IDs and index status | Use before indexing or project-map calls. |
-| `th0th_project_map` | Architecture/stats/PageRank overview | Uses `id`, not `projectId`. |
-| `th0th_search` | Semantic + keyword code search | Supports `summary`, `full`, `enriched`, and optional Synapse `sessionId`. |
-| `th0th_optimized_context` | Search plus compression | Has no `sessionId`; do not invent one. |
-| `th0th_search_definitions` | Find symbol definitions | Search field is `search`; installed v2.0.2 may ignore search/kind filters. |
-| `th0th_get_references` | Find symbol usages | Use `fqn` when names are ambiguous. |
-| `th0th_go_to_definition` | Resolve a symbol from caller context | Optional `fromFile` improves disambiguation. |
-| `th0th_symbol_snippet` | Read exact code lines | Requires `projectId` and relative `file`. |
-| `th0th_read_file` | Targeted file/range read with symbols/imports | Relative paths may resolve against the server checkout; see below. |
-| `th0th_recall` | Semantic memory retrieval | Use `projectId` for project-scoped decisions. |
-| `th0th_memory_list` | Chronological memory audit | Treat as unscoped until runtime proves project filtering. |
-| `th0th_remember` | Persist durable knowledge | Supported types: critical, conversation, code, decision, pattern. |
-| `th0th_compress` | Compress large context | Use structured strategies; do not persist output automatically. |
-| `th0th_analytics` | Inspect search/cache usage | Requires analytics `type`. |
-| `th0th_reindex` | Force workspace reindex | Compatibility-sensitive; see below. |
-| `th0th_reset_project` | Delete vectors/symbols/memories | Destructive; explicit user intent required. |
-| `th0th_synapse_session` | Create an ephemeral cognitive session | Supply explicit agent/workspace/context/TTL. |
-| `th0th_synapse_prime` | Prime Synapse buffer | Adapter is compatibility-sensitive in verified v2.0.2 runtime. |
-| `th0th_synapse_access` | Record a consumed hit | Verified adapter may fail path binding; REST fallback works. |
+| `index` | Start background project indexing | Requires `projectPath`; may return `jobId`. |
+| `index_status` | Poll indexing progress | Poll after a real delay, never in a tight loop. |
+| `list_projects` | Resolve exact project IDs and index status | Use before indexing or project-map calls. |
+| `project_map` | Architecture/stats/PageRank overview | Uses `id`, not `projectId`. |
+| `search` | Semantic + keyword code search | Supports `summary`, `full`, `enriched`, and optional Synapse `sessionId`. |
+| `optimized_context` | Search plus compression | Has no `sessionId`; do not invent one. |
+| `search_definitions` | Find symbol definitions | Search field is `search`; installed v2.0.2 may ignore search/kind filters. |
+| `get_references` | Find symbol usages | Use `fqn` when names are ambiguous. |
+| `go_to_definition` | Resolve a symbol from caller context | Optional `fromFile` improves disambiguation. |
+| `symbol_snippet` | Read exact code lines | Requires `projectId` and relative `file`. |
+| `read_file` | Targeted file/range read with symbols/imports | Relative paths may resolve against the server checkout; see below. |
+| `recall` | Semantic memory retrieval | Use `projectId` for project-scoped decisions. |
+| `memory_list` | Chronological memory audit | Treat as unscoped until runtime proves project filtering. |
+| `remember` | Persist durable knowledge | Supported types: critical, conversation, code, decision, pattern. |
+| `compress` | Compress large context | Use structured strategies; do not persist output automatically. |
+| `analytics` | Inspect search/cache usage | Requires analytics `type`. |
+| `reindex` | Force workspace reindex | Compatibility-sensitive; see below. |
+| `reset_project` | Delete vectors/symbols/memories | Destructive; explicit user intent required. |
+| `synapse_session` | Create an ephemeral cognitive session | Supply explicit agent/workspace/context/TTL. |
+| `synapse_prime` | Prime Synapse buffer | Adapter is compatibility-sensitive in verified v2.0.2 runtime. |
+| `synapse_access` | Record a consumed hit | Verified adapter may fail path binding; REST fallback works. |
 
 ## Retrieval Order
 
-1. `th0th_list_projects` or equivalent index metadata to verify project ID,
+1. `list_projects` or equivalent index metadata to verify project ID,
    path, status, and `lastIndexedAt` before treating indexed context as current.
-2. `th0th_project_map` for architecture orientation when the index is fresh for the current repository path and worktree state.
-3. `th0th_search(responseMode="summary", maxResults=10)` for broad discovery.
-4. `th0th_search(responseMode="enriched", maxResults=3)` for targeted deep reads with `fileImports`, `parentSymbol`, and chunk navigation metadata; raise to `maxResults=5` only when 4-5 exact files, symbols, or report finding IDs are already named.
-5. Symbol tools and `th0th_read_file` for exact source evidence.
-6. `th0th_optimized_context` for compact synthesized context when available.
+2. `project_map` for architecture orientation when the index is fresh for the current repository path and worktree state.
+3. `search(responseMode="summary", maxResults=10)` for broad discovery.
+4. `search(responseMode="enriched", maxResults=3)` for targeted deep reads with `fileImports`, `parentSymbol`, and chunk navigation metadata; raise to `maxResults=5` only when 4-5 exact files, symbols, or report finding IDs are already named.
+5. Symbol tools and `read_file` for exact source evidence.
+6. `optimized_context` for compact synthesized context when available.
 7. Focused `rg`/file reads when th0th is unavailable, stale, incomplete, or misses obvious
    local truth.
 
@@ -64,7 +64,7 @@ focused source reads as proof and record the reduced retrieval confidence.
 ## Common MCP Calls
 
 ```js
-th0th_search({
+search({
   query: "authentication middleware",
   projectId: "<projectId>",
   maxResults: 10,
@@ -77,7 +77,7 @@ th0th_search({
 Omit `sessionId` for one-shot or stateless search.
 
 ```js
-th0th_optimized_context({
+optimized_context({
   query: "session:<workflowSessionId> payment ownership",
   projectId: "<projectId>",
   maxTokens: 4000,
@@ -86,7 +86,7 @@ th0th_optimized_context({
 ```
 
 ```js
-th0th_remember({
+remember({
   content: "<durable fact or decision>",
   type: "decision",
   importance: 0.8,
@@ -119,7 +119,7 @@ th0th_remember({
 | Synapse access | MCP permits `memoryId` or `filePath` | REST requires `memoryId` | Verified MCP path binding failed; use REST fallback with `memoryId`. |
 | Reindex | MCP declares `{id, forceReindex}` | REST requires path `id` plus body `projectPath` | Probe only on disposable workspace; otherwise use full index fallback. |
 | File read path | MCP permits relative or absolute `filePath` | REST reads server filesystem | If relative resolution fails, combine registered workspace path with the indexed relative path. |
-| Definition filters | MCP exposes `search`, `kind`, `file`, `exportedOnly` | REST documents query filters | If filters are ignored, client-filter results or use `th0th_go_to_definition`. |
+| Definition filters | MCP exposes `search`, `kind`, `file`, `exportedOnly` | REST documents query filters | If filters are ignored, client-filter results or use `go_to_definition`. |
 
 ## REST-Only Operations
 
@@ -140,17 +140,17 @@ required operation is absent or its adapter is proven broken.
 
 ## Reindex And Reset
 
-- Prefer `th0th_search(autoReindex=true)` for small stale-index refreshes.
-- Use `th0th_reindex` only after verifying its installed adapter contract on a
+- Prefer `search(autoReindex=true)` for small stale-index refreshes.
+- Use `reindex` only after verifying its installed adapter contract on a
   disposable workspace.
-- Fallback for a known path: `th0th_index({ projectPath, projectId,
+- Fallback for a known path: `index({ projectPath, projectId,
   forceReindex: true })` and poll its job.
-- Never call `th0th_reset_project` as routine reindex preparation. It can delete
+- Never call `reset_project` as routine reindex preparation. It can delete
   memories by default and requires explicit destructive intent.
 
 ## Polling Discipline
 
-Never call `th0th_index_status` in a tight turn-by-turn loop. Poll after a real
+Never call `index_status` in a tight turn-by-turn loop. Poll after a real
 delay. Preferred shell pattern:
 
 ```bash

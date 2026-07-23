@@ -43,7 +43,7 @@ Use this workflow when the user asks to save the old chat, preserve canonical re
    - update `.specs/HANDOFF.md` as the concise restart summary artifact.
    - Re-read every mutated file after writing to verify content.
    - If content and status already match, record no-op evidence instead of rewriting.
-9. Persist durable memory only for reusable decisions, rejected approaches, repeated lessons, or verification recipes. `th0th_remember` must not be the only place restart state exists.
+9. Persist durable memory only for reusable decisions, rejected approaches, repeated lessons, or verification recipes. `remember` must not be the only place restart state exists.
 10. Optionally export `.specs-exports/` as an untracked debug projection (`cp -r .specs/ .specs-exports/`). State that the export is not canonical, not runtime fallback, and not completion evidence.
 11. Complete the Evidence Gate and report saved logical paths, no-op writes, memory outcome, optional export path, residual risk, and the exact instruction for the next clean chat.
 
