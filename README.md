@@ -594,7 +594,6 @@ The canonical annotated reference for every environment variable is
 **See [FEATURES.md](./FEATURES.md#configuration) for the complete environment
 variable table, search quality tuning, operational knobs, embedding providers,
 and config CLI commands.**
-```
 
 ---
 
@@ -622,7 +621,6 @@ and config CLI commands.**
 
 ## Architecture
 
-```
 massa-th0th/
 ├── apps/
 │   ├── mcp-client/           # MCP Server (stdio) — 52 tools
@@ -636,7 +634,6 @@ massa-th0th/
 │   ├── core/                 # Business logic, search, embeddings, compression
 │   └── shared/               # Shared types, config loader, utilities
 └── scripts/
-```
 
 | Component | Description |
 |-----------|-------------|
@@ -681,10 +678,11 @@ embedded parsing, verification commands, and performance details.
 
 massa-th0th builds on ideas and inspiration from these open-source projects:
 
-- **[th0th](https://github.com/luizgmassa/th0th)** — the semantic code-search and memory platform this project is built on
-- **[ai-memory](https://github.com/luizgmassa/ai-memory)** — persistent agent memory concepts
-- **[codebase-context-mcp](https://github.com/luizgmassa/codebase-context-mcp)** — MCP-based codebase context indexing
-- **[context-memory](https://github.com/luizgmassa/context-memory)** — cross-session context and memory persistence
+- **[th0th](https://github.com/S1LV4/th0th)** — the semantic code-search and memory platform this project is built on
+- **[ai-memory](https://github.com/akitaonrails/ai-memory)** — persistent agent memory concepts
+- **[codebase-context-mcp](https://github.com/DeusData/codebase-memory-mcp)** — MCP-based codebase context indexing
+- **[context-memory](https://github.com/mksglu/context-memory)** — cross-session context and memory persistence
+- **[code-context-engine](https://github.com/elara-labs/code-context-engine)** — index codebase, agents search instead of reading files
 
 ## License
 
