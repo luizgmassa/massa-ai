@@ -193,4 +193,54 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
     expect(res.stdout).toContain("install-agents.ts");
     expect(res.stdout.toLowerCase()).toContain("mcp");
   });
+
+  // ── T6: 12 subagent specialists bundled into plugin agents/ (CRS-01,04,07 + DOC-01) ─
+  const SPECIALIST_NAMES = [
+    "investigator",
+    "planner",
+    "builder",
+    "reviewer",
+    "context-curator",
+    "verification-agent",
+    "requirements-analyst",
+    "architecture-specialist",
+    "test-engineer",
+    "documentation-agent",
+    "audit-specialist",
+    "mobile-specialist",
+  ];
+
+  test("CRS-01/CRS-04/DOC-01: install copies 12 specialists + navigator (13 .md) into plugin agents/ + prints summary", async () => {
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const agentsDir = path.join(tmp, ".cursor/plugins/massa-th0th/agents");
+    // Navigator preserved (CRS-04)
+    expect(await pathExists(path.join(agentsDir, "massa-th0th-navigator.md"))).toBe(true);
+    // 12 specialists (CRS-01)
+    for (const name of SPECIALIST_NAMES) {
+      expect(
+        await pathExists(path.join(agentsDir, `massa-th0th-${name}.md`)),
+      ).toBe(true);
+    }
+    // Total 13 .md files in agents/
+    const files = (await fs.readdir(agentsDir)).filter((f) => f.endsWith(".md"));
+    expect(files.length).toBe(13);
+
+    // Install output mentions 12 subagent specialists (DOC-01)
+    expect(res.stdout).toContain("12 subagent specialists");
+  });
+
+  test("CRS-05: uninstall removes whole plugin dir (all 13 agents gone)", async () => {
+    runInstall(["--user"], { HOME: tmp });
+    const agentsDir = path.join(tmp, ".cursor/plugins/massa-th0th/agents");
+    expect(await pathExists(agentsDir)).toBe(true);
+
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    // Whole plugin dir removed (CRS-05: unchanged behavior)
+    expect(
+      await pathExists(path.join(tmp, ".cursor/plugins/massa-th0th")),
+    ).toBe(false);
+  });
 });

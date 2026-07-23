@@ -294,6 +294,135 @@ All four plugins can be installed from the root `install.sh` post-install menu (
 
 ---
 
+## Subagent Skills (12 Specialists)
+
+**What:** massa-th0th defines 12 reusable sub-agent specialists in `skills/*/SKILL.md` (charter files). These ship as host-native subagent definitions across all four plugins so the massa-th0th workflow router's delegation model works inside Claude Code, Codex, Cursor, and OpenCode. The 12 specialists are additive to the existing `massa-th0th-navigator` (Claude/Cursor), which is a distinct index-first agent.
+
+**The 12 specialists:** investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist.
+
+**Single source of truth:** `scripts/generate-subagent-artifacts.ts` reads `skills/*/SKILL.md` and emits per-host agent files into `apps/{claude,codex,cursor,opencode}-plugin/agents/`. Outputs are checked into git. A parity test (`scripts/__tests__/subagent-parity.test.ts`) re-runs the generator in `--check` mode and asserts byte-identity — drift fails CI.
+
+### File locations + formats (per host)
+
+| Host | Location | Format | Ownership marker |
+| --- | --- | --- | --- |
+| Claude Code | `apps/claude-plugin/agents/massa-th0th-*.md` → installed to `~/.claude/agents/` | `.md` (YAML frontmatter: `name`, `description`, `tools`, `model`, `effort`) | Name prefix `massa-th0th-` (uninstall excludes `massa-th0th-navigator.md` by name — R1) |
+| Codex | `apps/codex-plugin/agents/massa-th0th-*.toml` → installed to `~/.codex/agents/` (OUTSIDE plugin dir) | `.toml` (`name`, `description`, `model`, `model_reasoning_effort`, `sandbox_mode`, `developer_instructions`) | `# massa-th0th-owned` top comment |
+| Cursor | `apps/cursor-plugin/agents/massa-th0th-*.md` → bundled in plugin `agents/` dir | `.md` (same shape as Claude) | Name prefix `massa-th0th-` (removed with plugin dir) |
+| OpenCode | `apps/opencode-plugin/agents/massa-th0th-*.md` → installed to `~/.config/opencode/agents/` (OUTSIDE npm package) | `.md` (`description`, `mode: subagent`, `model`, `reasoningEffort`, `permission`, `metadata`) | `metadata: { massa-th0th-owned: true }` frontmatter |
+
+> Codex and OpenCode agents live OUTSIDE the plugin dir / npm package because their host discovery loads agents from a shared config-root directory, not from the plugin bundle. The in-file ownership marker enables scoped uninstall that preserves user agents (R3).
+
+### Model pinning (PINNED per agent per host, NOT advisory)
+
+The `model` frontmatter field is PINNED per agent per host. The generator emits these exact values; a parity test asserts them.
+
+#### Claude Code (model aliases + `effort: high`)
+
+Every Claude Code agent sets `effort: high` in addition to its pinned `model`.
+
+| Agent | Model | Why |
+| --- | --- | --- |
+| investigator | haiku | Fast repository exploration, symbol lookup, dependency tracing, file discovery. |
+| context-curator | haiku | Reading many files, summarizing, filtering, building Context Packets. |
+| documentation-agent | haiku | README, KDoc, changelogs, ADR formatting don't need frontier reasoning. |
+| requirements-analyst | sonnet | Needs to detect ambiguity and infer missing requirements. |
+| planner | opus | One of the highest-leverage places to spend tokens. |
+| builder | sonnet | "Everyday coding" workload Sonnet is intended for. |
+| reviewer | sonnet | Strong balance of code understanding and cost. |
+| verification-agent | sonnet | Systematic reasoning without Opus-level cost. |
+| test-engineer | sonnet | Excellent for generating tests and edge cases. |
+| audit-specialist | sonnet | Most audits don't justify Opus unless architectural. |
+| mobile-specialist | sonnet | Android/iOS implementation is primarily coding work. |
+| architecture-specialist | opus | Large-scale design, trade-offs, migrations, RFC guidance. |
+
+#### Codex (model IDs + `model_reasoning_effort = "high"`)
+
+Every Codex agent TOML sets `model_reasoning_effort = "high"` in addition to its pinned `model`.
+
+| Agent | Model | Why |
+| --- | --- | --- |
+| investigator | gpt-5.4-mini | Fast repository exploration, symbol lookup, dependency tracing, file discovery. |
+| context-curator | gpt-5.4-mini | Reading many files, summarizing, filtering, building Context Packets. |
+| documentation-agent | gpt-5.4-mini | README, KDoc, changelogs, ADR formatting don't need frontier reasoning. |
+| requirements-analyst | gpt-5.6-terra | Needs to detect ambiguity and infer missing requirements. |
+| planner | gpt-5.6-sol | One of the highest-leverage places to spend tokens. |
+| builder | gpt-5.6-terra | "Everyday coding" workload GPT-5.6 Terra is intended for. |
+| reviewer | gpt-5.6-terra | Strong balance of code understanding and cost. |
+| verification-agent | gpt-5.6-terra | Systematic reasoning without Opus-level cost. |
+| test-engineer | gpt-5.6-terra | Excellent for generating tests and edge cases. |
+| audit-specialist | gpt-5.6-terra | Most audits don't justify Opus unless architectural. |
+| mobile-specialist | gpt-5.6-terra | Android/iOS implementation is primarily coding work. |
+| architecture-specialist | gpt-5.6-sol | Large-scale design, trade-offs, migrations, RFC guidance. |
+
+#### Cursor (charter `metadata.model_hint` verbatim + `reasoningEffort: max`)
+
+Every Cursor agent sets `reasoningEffort: max` in frontmatter (pass-through; field-name unverified — Cursor subagent docs returned 404; harmless if ignored). Cursor resolves the model by name; if unavailable, the host falls back.
+
+| Agent | Model (verbatim from charter) | Charter hint |
+| --- | --- | --- |
+| investigator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
+| context-curator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
+| documentation-agent | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
+| requirements-analyst | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
+| planner | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| builder | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| reviewer | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| verification-agent | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| test-engineer | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| audit-specialist | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| mobile-specialist | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| architecture-specialist | MiniMax M3 | `metadata.model_hint: MiniMax M3` |
+
+#### OpenCode (charter `metadata.model_hint` verbatim + `reasoningEffort: max`)
+
+Every OpenCode agent sets `reasoningEffort: max` in frontmatter (pass-through to the provider; honoring is provider-dependent for DeepSeek/GLM/MiniMax). OpenCode `model` accepts `provider/model-id`; if the pinned model is unavailable, OpenCode gracefully falls back to the invoking primary agent's model.
+
+| Agent | Model (verbatim from charter) | Charter hint |
+| --- | --- | --- |
+| investigator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
+| context-curator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
+| documentation-agent | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
+| requirements-analyst | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
+| planner | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| builder | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| reviewer | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| verification-agent | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| test-engineer | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| audit-specialist | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| mobile-specialist | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| architecture-specialist | MiniMax M3 | `metadata.model_hint: MiniMax M3` |
+
+### Effort pinning (per host)
+
+| Host | Effort field | Value |
+| --- | --- | --- |
+| Claude Code | `effort` | `high` |
+| Codex | `model_reasoning_effort` | `"high"` |
+| Cursor | `reasoningEffort` | `max` (pass-through) |
+| OpenCode | `reasoningEffort` | `max` (pass-through; provider-honoring is host behavior) |
+
+### Permission mapping (read-only vs write)
+
+Write-permitted agents: `builder`, `test-engineer`, `documentation-agent`. All others are read-only.
+
+| Host | Read-only | Write |
+| --- | --- | --- |
+| Claude Code | `tools: ["Read","Grep","Glob","Bash"]` (no Write/Edit) | `tools: ["Read","Grep","Glob","Bash","Write","Edit"]` |
+| Codex | `sandbox_mode = "read-only"` | `sandbox_mode = "workspace-write"` |
+| Cursor | Same `tools` as Claude | Same `tools` as Claude |
+| OpenCode | `permission: { edit: deny, bash: deny }` (strict) or `{ edit: deny, bash: { "*": "ask" } }` (planner — inspection-capable) | `permission: { edit: allow, bash: allow }` |
+
+### Generator + parity contract
+
+- **Generator:** `scripts/generate-subagent-artifacts.ts` reads `skills/*/SKILL.md` (12 charters), emits 48 files (12 × 4 hosts) into `apps/*/agents/`. Run via `bun run scripts/generate-subagent-artifacts.ts`. Outputs checked into git.
+- **Drift gate:** `bun run scripts/generate-subagent-artifacts.ts --check` emits to a temp dir and diffs against checked-in files. Exit non-zero on drift.
+- **Parity test:** `scripts/__tests__/subagent-parity.test.ts` runs the drift gate + asserts model/effort/permission pinning, name-collision-free, exact 12 per host, Codex TOML round-trip + owned marker, and FEATURES.md ↔ spec table byte-parity (DOC-06).
+
+**Spec:** `.specs/features/subagent-skills-plugin-parity/`
+
+---
+
 ## Bootstrap
 
 **What:** Scans a project root (recent git log, README, docs/, package manifests, top central files via PageRank centrality) and turns those signals into seed memories (types `pattern`/`code`/`decision`). Idempotent — re-running is a no-op unless `force: true`. Detected via a stored seed-memory marker tag `bootstrap:<projectId>`.

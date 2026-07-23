@@ -470,7 +470,19 @@
         "tasks": true,
         "execute": true
       }
+    },
+    {
+      "slug": "subagent-skills-plugin-parity",
+      "title": "Subagent Skills Plugin Parity — Ship the 12 sub-agent specialists as host-native subagent definitions across Claude Code, Codex, Cursor, and OpenCode plugins",
+      "status": "in_progress",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": "pending",
+        "tasks": "pending",
+        "execute": "pending"
+      }
     }
   ],
-  "active_feature": "codex-cursor-plugin-parity"
+  "active_feature": "subagent-skills-plugin-parity"
 }
