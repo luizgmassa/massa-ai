@@ -132,11 +132,6 @@ describe("json_schema version parser (discrimination)", () => {
   // version parser (not the _setJsonSchemaSupportedForTesting bypass).
   // This kills the mutant where `minor >= 5` is changed to `minor >= 99`.
 
-  afterEach(() => {
-    globalThis.fetch = globalThis.fetch; // restore handled by individual tests
-    _setJsonSchemaSupportedForTesting(false); // prevent outer beforeEach from triggering real fetch
-  });
-
   test("Ollama 0.5.0 → json_schema supported (boundary: exactly 0.5)", async () => {
     const origFetch = globalThis.fetch;
     (globalThis as any).fetch = async () =>
