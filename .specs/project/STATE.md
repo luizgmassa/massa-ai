@@ -5,8 +5,11 @@
 - projectId: `massa-th0th`
 - workflowSessionId: `spec-subagent-skills-plugins-parity`
 - workflow: spec-driven (Large/Complex)
-- feature: `subagent-skills-plugin-parity` — IN PROGRESS (Specify + Design + Tasks COMPLETE; Execute pending)
+- feature: `subagent-skills-plugin-parity` — COMPLETE + validated PASS
 - scope: 44 requirements (CLA-01..10, CDX-01..10, CRS-01..08, OPC-01..10, DOC-01..07), 5 user stories, 4 host targets
+- Validation: PASS — 42/44 ACs verified with file:line evidence, 3/3 discrimination mutations killed, 60 tests pass (818 assertions), type-check 6/6, build 5/5, drift gate exit 0. 2 non-blocking spec-precision gaps flagged (CRS-02/03 transitive, DOC-06 substring parity).
+- Report: `.specs/features/subagent-skills-plugin-parity/validation.md`
+- Commits: 14 commits on `spec-sub-agent-system` (bc57daa..851f29b)
 - Spec: `.specs/features/subagent-skills-plugin-parity/spec.md` (checksum `e563bb80...`, v4 docs-parity amendment)
 - Design: `.specs/features/subagent-skills-plugin-parity/design.md` (checksum `a7fa79c8...`, v1; Approach A chosen: one generator + four installer extensions)
 - Tasks: `.specs/features/subagent-skills-plugin-parity/tasks.md` (checksum `59c28dab...`, v1; 12 tasks across 3 phases; pre-approval checks pass)
