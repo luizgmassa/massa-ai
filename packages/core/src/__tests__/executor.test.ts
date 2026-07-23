@@ -12,7 +12,18 @@
  * All execution tests use tiny inline scripts (no indexing, no DB) per the
  * project memory gotchas. Defaults to the `node`/`sh` runtime that's always
  * present on the dev host; skips gracefully when a runtime is absent.
+ *
+ * The OS-level sandbox (W7-08, T12) is disabled here so execution tests run
+ * the raw command directly. On CI (`ubuntu-latest`) Docker is preinstalled, so
+ * `getSandboxMode()` in `auto` mode would otherwise resolve to `docker` and
+ * `wrapSpawn` would wrap every command in `docker run ...`, breaking the tests
+ * (no runtime image pulled, read-only mount issues). Setting
+ * `MASSA_TH0TH_EXECUTOR_SANDBOX=none` forces best-effort (no sandbox) so the
+ * executor spawns the resolved runtime directly. `getSandboxMode()` reads
+ * this env at spawn time inside `#spawn`, so setting it at module top level
+ * (before any test runs) is sufficient.
  */
+process.env.MASSA_TH0TH_EXECUTOR_SANDBOX = "none";
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import {
