@@ -9,9 +9,15 @@ import {
   initConfig,
   defaultMassaTh0thConfig,
 } from "@massa-th0th/shared/config";
+import { promises as fs } from "fs";
+import path from "path";
+import os from "os";
+import { fileURLToPath } from "url";
 
 const args = process.argv.slice(2);
 const command = args[0];
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function help() {
   console.log(`
@@ -34,12 +40,17 @@ Commands:
     --model <name>    Model name
     --base-url <url>  Base URL (for ollama)
 
+  agents            Manage the 12 subagent specialist definitions
+    agents install [--user|--project]   Write 12 agent .md files
+    agents uninstall [--user|--project] Remove only massa-th0th-owned agents
+
 Examples:
   massa-th0th-config init
   massa-th0th-config init --mistral your-api-key
   massa-th0th-config use ollama --model nomic-embed-text:latest
   massa-th0th-config use mistral --api-key your-key
   massa-th0th-config set embedding.dimensions 1024
+  massa-th0th-config agents install --user
 `);
 }
 
@@ -184,6 +195,67 @@ switch (command) {
     saveConfig(config);
     console.log(`✓ Switched to ${provider} embeddings`);
     console.log(`  Model: ${config.embedding.model}`);
+    break;
+  }
+
+  case "agents": {
+    const subcommand = args[1];
+    if (subcommand !== "install" && subcommand !== "uninstall") {
+      console.error("Usage: massa-th0th-config agents <install|uninstall> [--user|--project]");
+      process.exit(1);
+    }
+    const scope = typeof options.project === "boolean" ? "project" : "user";
+    // OpenCode discovers agents from ~/.config/opencode/agents/ (user) or
+    // .opencode/agents/ (project). These live OUTSIDE the npm package.
+    const agentsDir =
+      scope === "project"
+        ? path.join(process.cwd(), ".opencode/agents")
+        : path.join(
+            (process.env.XDG_CONFIG_HOME && process.env.XDG_CONFIG_HOME.trim()) ||
+              path.join(os.homedir(), ".config"),
+            "opencode",
+            "agents",
+          );
+    // Source agent files ship in the package's agents/ dir (sibling of dist/).
+    // Resolve relative to this file so it works both from source (bun run) and
+    // from the built bundle (dist/config-cli.js).
+    const sourceAgentsDir = path.resolve(__dirname, "..", "agents");
+
+    if (subcommand === "install") {
+      await fs.mkdir(agentsDir, { recursive: true });
+      let count = 0;
+      const entries = await fs.readdir(sourceAgentsDir);
+      for (const entry of entries) {
+        if (!entry.startsWith("massa-th0th-") || !entry.endsWith(".md")) continue;
+        const src = path.join(sourceAgentsDir, entry);
+        const dest = path.join(agentsDir, entry);
+        await fs.copyFile(src, dest);
+        count++;
+      }
+      console.log(
+        `+ ${count} subagent specialists: investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist`,
+      );
+      console.log(`  written to: ${agentsDir}`);
+    } else {
+      // uninstall: remove only files with metadata: { massa-th0th-owned: true }
+      let removed = 0;
+      try {
+        const entries = await fs.readdir(agentsDir);
+        for (const entry of entries) {
+          if (!entry.startsWith("massa-th0th-") || !entry.endsWith(".md")) continue;
+          const filePath = path.join(agentsDir, entry);
+          const content = await fs.readFile(filePath, "utf8");
+          if (content.includes("massa-th0th-owned: true")) {
+            await fs.unlink(filePath);
+            removed++;
+          }
+        }
+      } catch (e: unknown) {
+        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+      }
+      console.log(`- removed ${removed} massa-th0th-owned agent files from ${agentsDir}`);
+      console.log("  User agents preserved.");
+    }
     break;
   }
 
