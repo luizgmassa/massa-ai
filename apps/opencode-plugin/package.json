@@ -8,7 +8,8 @@
     "massa-th0th-config": "dist/config-cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "agents/*.md"
   ],
   "scripts": {
     "dev": "bun run --watch src/index.ts",
