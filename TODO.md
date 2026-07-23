@@ -4,7 +4,7 @@ Current architecture state and verified follow-up work. Detailed maintenance evi
 `.specs/features/repository-maintenance-2026-07-12/`; E2E coverage decisions live in
 `packages/core/src/__tests__/e2e/COVERAGE.md`.
 
-Last updated: 2026-07-13.
+Last updated: 2026-07-23.
 
 ## Architecture fixes and decisions already landed
 
@@ -71,10 +71,16 @@ remains from that iteration.
 - **D5 Cypher subset** — CLOSED 2026-07-22 by ADR 0001 (see `docs/adr/0001-remove-d5-cypher-subset.md`).
   Structural graph traversal (trace_path, impact_analysis, architecture) covers use cases; D1–D4
   equivalent (native tree-sitter) complete. No longer deferred.
-- **Multi-language tree-sitter breadth** — indexing remains TS/JS-centric; broad parser support
-  is a separate feature.
-- **Native `format: json_schema` constrained decoding** — optional hardening for Ollama-backed
-  structured LLM calls.
+- **Multi-language tree-sitter breadth** — COMPLETE (validated PASS). Native Tree-sitter structural
+  indexing across all 33 canonical extensions is shipped. The frozen parser benchmark (TASK-025) has
+  not yet reached throughput/RSS parity with the regex baseline (MLTS-014), but the 16 MiB
+  disposal-stress native-safety gate passes and the contract was reframed (spec-owner approved
+  2026-07-17). See `.specs/features/multi-language-tree-sitter-breadth/`.
+- **Native `format: json_schema` constrained decoding** — shipped in Wave 7 (W7-07). Version-gated
+  for Ollama >= 0.5.0, graceful fallback to `json_object`.
+- **Codex + Cursor plugin parity** — COMPLETE (commit `8dcef49`). All four tools (Claude Code,
+  Codex, Cursor, OpenCode) now have native plugin bundles with auto-write hooks. See
+  `.specs/features/codex-cursor-plugin-parity/`.
 
 ## Verification references
 
