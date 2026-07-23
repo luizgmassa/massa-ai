@@ -18,6 +18,22 @@ Check `.specs/project/STATE.md` for the current active feature and `.specs/proje
 
 - `massa-th0th-memory/` — memory system usage patterns
 - `synapse-usage/` — Synapse cognitive session lifecycle
+- `AGENTS.md` (under `skills/`) — sub-agent registry: 12 reusable specialist agents
+
+#### Sub-Agent Skills (invocable by any workflow)
+
+- `investigator/` — read-only codebase investigation (locate, trace, impact)
+- `planner/` — read-only implementation planning (steps, deps, risks, order)
+- `builder/` — write-permitted implementation (disjoint write set)
+- `reviewer/` — read-only diff review (bugs, regressions, smells, edge cases)
+- `context-curator/` — read-only Context Packet preparation (firewall, Synapse)
+- `verification-agent/` — read-only Verification Ladder centralization (validate, report)
+- `requirements-analyst/` — read-only requirements analysis (ambiguity, gaps, implicit)
+- `architecture-specialist/` — read-only architecture guidance (boundaries, trade-offs)
+- `test-engineer/` — testing strategy (unit, integration, edge, acceptance coverage)
+- `documentation-agent/` — engineering documentation (README, ADR, RFC, changelog)
+- `audit-specialist/` — configurable 6-lens audit (bugs, architecture, security, requirements, code-quality, performance)
+- `mobile-specialist/` — conditional mobile expertise (Android, iOS, KMP; refuses non-mobile)
 
 ### Spec Artifacts
 
