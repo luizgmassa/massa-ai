@@ -16,6 +16,7 @@ Every feature in massa-th0th, what it does, why it exists, and how to use it.
 - [Persistent Memory](#persistent-memory)
 - [Passive Capture (Hooks)](#passive-capture-hooks)
 - [Plugins (4-Tool Parity)](#plugins-4-tool-parity)
+- [Workflow Tools (52-Tool Adoption)](#workflow-tools-52-tool-adoption)
 - [Bootstrap](#bootstrap)
 - [Cross-session Handoffs](#cross-session-handoffs)
 - [Auto-improvement (Proposals)](#auto-improvement-proposals)
@@ -420,6 +421,44 @@ Write-permitted agents: `builder`, `test-engineer`, `documentation-agent`. All o
 - **Parity test:** `scripts/__tests__/subagent-parity.test.ts` runs the drift gate + asserts model/effort/permission pinning, name-collision-free, exact 12 per host, Codex TOML round-trip + owned marker, and FEATURES.md ↔ spec table byte-parity (DOC-06).
 
 **Spec:** `.specs/features/subagent-skills-plugin-parity/`
+
+---
+
+## Workflow Tools (52-Tool Adoption)
+
+**What:** The massa-th0th workflow skill (`skills/massa-th0th/`) references the full 52-tool surface from `apps/mcp-client/src/tool-definitions.ts` CANONICAL_ORDER. Every tool name uses the canonical un-prefixed form (e.g. `recall`, not `th0th_recall`), matching what the MCP server and OpenCode plugin actually expose. The tool-contract reference (`references/th0th-tools.md`) contains a complete MCP Capability Matrix for all 52 tools grouped by category, and each workflow adopts the tools that materially benefit its flow.
+
+**Why:** The workflows previously referenced only ~11 of 52+ shipped tools and used stale `th0th_*`-prefixed names that diverged from the actual MCP tool declarations. Powerful shipped features — checkpoints, cross-session handoffs, bootstrap, compact_snapshot, trace_path, impact_analysis, code execution, the full Synapse lifecycle, read_file, symbol_snippet, memory_update/delete, analytics, fetch_and_index — were unguided by the workflow router. Agents following massa-th0th workflows missed deterministic, first-class tool support for long-running task save/resume, cross-session continuity, code-path tracing, impact analysis, and code execution for analysis.
+
+**How to use:** Workflows reference tools inline in their ordered steps. No separate invocation is needed — when you follow a massa-th0th workflow, the tool calls are part of the flow. Key adoption map:
+
+| Tool(s) | Workflow | Where in the flow |
+| --- | --- | --- |
+| `bootstrap` | `onboarding` | After indexing, before manual `remember` |
+| `create_checkpoint` / `list_checkpoints` / `restore_checkpoint` | `spec-driven`, `long-session`, `restart-save` | Task boundaries; resume after interruption; milestone before restart |
+| `handoff_begin` / `handoff_accept` / `handoff_list_pending` / `handoff_cancel` | `agent-handoff`, `restart-load` | Persist + resume cross-session handoffs |
+| `compact_snapshot` | `long-session` | Before compaction fires (zero-loss /compact recovery) |
+| `trace_path` | `debug` | Root-cause call/data-flow path tracing |
+| `impact_analysis` | `architecture-audit`, `refactor` | Git-diff centrality-ranked blast radius |
+| `get_architecture` | `architecture-audit` | Architecture-specific deep map (packages, routes, hotspots, communities, cycles) |
+| `execute_file` / `execute` / `batch_execute` | `debug`, `general` | Run analysis code over files instead of loading into context |
+| `synapse_task_begin` / `synapse_task_end` / `synapse_prefetch` | `spec-driven`, `feature`, `debug` | Task envelopes + buffer warming for multi-search investigations |
+| `read_file` / `symbol_snippet` | `general` (and all workflows that read files) | File reads with symbol metadata; raw code snippets by line range |
+| `memory_update` / `memory_delete` | `general`, `debug`, `long-session` | Correct stale memories; remove obsolete ones |
+| `analytics` | `general`, `long-session` | Usage/cache insights |
+| `fetch_and_index` | `exploration` | Pull web docs/API refs into searchable index |
+
+**Graph-tool freshness gate:** `trace_path`, `impact_analysis`, and `get_architecture` only count as evidence when the index is fresh for the current repository path and commit/worktree state. When the index is stale, incomplete, or missing, workflows fall back to `search`/`get_references` and record reduced retrieval confidence.
+
+**`get_architecture` vs `project_map`:** `project_map` is the general overview (PageRank backbone, symbol counts, extension distribution, recent files). `get_architecture` is the architecture-specific deep map (packages, entry points, routes, hotspots, Louvain communities, layers, and opt-in Tarjan SCC call cycles via `aspects:["cycles"]`).
+
+**`compact_snapshot` session-id:** `compact_snapshot` takes the lifecycle `sessionId` (from hooks/sessions), NOT the `workflowSessionId`. The two-session-id rule from `references/synapse-policy.md` applies.
+
+**Graceful degradation:** Every new tool reference keeps the existing "if unavailable, continue with fallback" pattern. `create_checkpoint` unavailable → `.specs/` state. `handoff_begin` unavailable (`HANDOFFS_ENABLED=false`) → `remember` + `.specs/`. `bootstrap` unavailable → manual `remember`. `compact_snapshot` unavailable → `compress` + `remember`. Code execution unavailable → load file into context. Graph tools on stale index → `search`/`get_references`.
+
+**Canonical naming:** All tool references in `skills/massa-th0th/` (workflows, references, SKILL.md) use un-prefixed canonical names matching `tool-definitions.ts` CANONICAL_ORDER. No `th0th_*`-prefixed tool names remain.
+
+**Spec:** `.specs/features/workflow-tools-adaptation/`
 
 ---
 

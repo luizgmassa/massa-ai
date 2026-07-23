@@ -319,6 +319,18 @@ The current roster fits in one MCP `tools/list` page (pagination via
 **See [FEATURES.md](./FEATURES.md#mcp-server-52-tools) for the complete tool
 roster** with required/optional params for every tool.
 
+### Workflow integration
+
+The massa-th0th workflow skill (`skills/massa-th0th/`) references all 52 tools
+by their canonical un-prefixed names. Each workflow adopts the tools that
+materially benefit its flow — e.g. `spec-driven` and `long-session` use
+checkpoints for task save/resume; `debug` uses `trace_path` for call-path
+tracing and `execute_file` for large-file analysis; `architecture-audit` uses
+`impact_analysis` and `get_architecture`; `agent-handoff` uses the handoff
+tools; `onboarding` uses `bootstrap`. See
+[FEATURES.md → Workflow Tools (52-Tool Adoption)](./FEATURES.md#workflow-tools-52-tool-adoption)
+for the full tool-to-workflow adoption map.
+
 ---
 
 ## Local-first LLM (Ollama)
