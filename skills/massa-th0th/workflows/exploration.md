@@ -68,6 +68,7 @@ Step 5: Flag as uncertain → "I'm not certain about X — here's my reasoning, 
     - Follow the shared retrieval order: project map, summary search, targeted
       enriched search, symbol/file tools, optimized context, then focused shell
       fallback.
+   - When external documentation, API references, or web content is needed to answer the question, call `fetch_and_index` with `url` (or `requests`[]) to fetch, convert HTML→markdown or extract JSON key-paths, and index the result into the searchable store so it can be retrieved later via `search`. SSRF-guarded, TTL-cached.
    - Follow imports, calls, ownership boundaries, and data paths from entry point outward.
    - For behavior questions, trace input -> transformation -> output.
    - Read signatures and high-value logic first; avoid whole-project sweeps and large raw file reads.

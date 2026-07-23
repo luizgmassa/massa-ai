@@ -11,14 +11,17 @@ Use this workflow for coding, planning-before-coding, review, or implementation 
    Retrieve only the context required for the goal:
    - begin with focused local inspection or the shared summary-search sequence
    - deepen into enriched search, symbols, or exact files only when needed
+   - prefer `read_file` over native Read when symbol metadata + imports are useful (priority 14 per `massa-th0th-memory` meta-skill); use `symbol_snippet` for raw code snippets by file + line range
    - prefer current repository truth over stale or conflicting memories
 6. Execute the requested work using existing repository conventions. Tie verification depth to the Verification Ladder tier table in `references/verification-ladder.md`: Quick (<=3 files and <=200 changed LOC) runs static + file-integrity checks; Standard (<=10 files or <=500 changed LOC) adds a named verification recipe and behavioral checks; Spec-driven (>10 files, >500 changed LOC) escalates to `workflows/spec-driven.md`. Do not invent new thresholds; load specialized references only when the task needs their exact contracts.
    - For analysis that benefits from running code (derived values, data inspection, bulk transforms), call `execute` with `language` and `code` or `batch_execute` with `commands`[] instead of loading raw data into context. Respect the local-dev-only trust model (no untrusted-client exposure).
 7. Use `compress` only when accumulated source or conversation context is reducing execution quality; preserve decisions, constraints, current state, and next steps rather than raw history.
 8. Before completion, if verification found a reusable signal, record it via `references/lessons.md`. Score potential memories using `references/decision-engine.md` when that guidance is not already loaded:
    `python3 skills/massa-th0th/scripts/lessons.py --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
-   - remember verified decisions, reusable discoveries, recurring blockers, accepted constraints, and completed outcomes that will save future work
-   - skip transient details, raw logs, copied source, unverified hypotheses, and facts already captured in current non-stale memory
+    - remember verified decisions, reusable discoveries, recurring blockers, accepted constraints, and completed outcomes that will save future work
+    - if a recalled memory is stale or needs correction, call `memory_update` with `id` and the new `content` (re-embeds automatically); if a memory is obsolete, call `memory_delete` with `id` (hard-delete, severs graph edges)
+    - for usage insights (search/cache patterns, recent activity), call `analytics` with `type` and `projectId`
+    - skip transient details, raw logs, copied source, unverified hypotheses, and facts already captured in current non-stale memory
 9. Complete the Evidence Gate from `references/evidence-gate.md` and report verification, changed artifacts, memory outcome, and residual risk.
 
 ## Failure Handling

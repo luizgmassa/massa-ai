@@ -22,6 +22,8 @@ Use `workflows/restart-save.md` instead when the primary goal is preserving cano
 6. If handing off to another agent or new chat, expand the Session Guide into the full package from `references/handoff-package.md`
 7. Before compaction or stopping, call `create_checkpoint` with `checkpointType: "manual"`, `taskId` (or `workflowSessionId` as `taskId`), `description` summarizing the Session Guide, `currentStep`, `nextAction`, and `fileChanges` so the progress state is checkpoint-backed and resumable. If `create_checkpoint` is unavailable, continue with `.specs/` artifact state as the fallback.
 8. Persist the Session Guide or handoff package via `remember` as `type=critical` for incomplete work or `type=conversation` for routine compaction, with `memory:working` and `handoff` tags
+   - If a memory from this session is now obsolete (e.g. a superseded hypothesis or a resolved blocker), call `memory_delete` with its `id` to hard-delete it and sever graph edges
+   - For usage insights before compaction, call `analytics` with `type` and `projectId` to capture search/cache patterns for the session guide
 9. Complete the Evidence Gate from `references/evidence-gate.md`
 
 ## Example

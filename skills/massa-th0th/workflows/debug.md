@@ -52,6 +52,7 @@ Use this workflow when the user reports broken behavior, failures, regressions, 
 16. IF fix found:
    - Persist the root cause via `remember` as a scored `decision` memory with `memory:semantic`
    - Persist the fix pattern via `remember` as a scored `pattern` memory with `memory:procedural`
+   - If a prior debugging memory for this entity is now stale or contradicted by the fix, call `memory_update` with its `id` and the corrected `content` (re-embeds automatically)
 17. IF NOT resolved:
    - Persist what was ruled out via `remember` as a scored `conversation` memory with `memory:episodic`
    - Persist repeated failed tool loops as procedural cognition lessons only when they are reusable
