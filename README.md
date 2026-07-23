@@ -196,6 +196,63 @@ programmatically via
 See [§Passive Capture (Hooks)](#passive-capture-hooks) for the full event
 tables and [FEATURES.md](./FEATURES.md#plugins-4-tool-parity) for details.
 
+---
+
+## Skills & Install System
+
+The repo ships a set of repo-local skills plus a unified installer that symlinks them into each tool's config directory. The per-plugin installers (above) handle hooks + MCP + subagent specialists; this installer handles skills and the bootstrap contract.
+
+### Included skills
+
+| Skill | Location | Purpose |
+|-------|----------|---------|
+| `massa-th0th` | `skills/massa-th0th/` | Workflow router (spec-driven, debug, feature, refactor, audits, ADR/RFC/TDD, etc.) |
+| `massa-th0th-memory` | `skills/massa-th0th-memory/` | Rules for using massa-th0th semantic search, compression, memory, and symbol graph tools |
+| `synapse-usage` | `skills/synapse-usage/` | Synapse cognitive modulation layer for focused multi-step retrieval |
+| `persona-router` | `skills/persona-router/` | Automatic persona selection from catalog (`skills/massa-th0th/personas/`) |
+
+### Unified skills installer
+
+Symlinks all `skills/*/SKILL.md` into each detected tool's config dir and writes the bootstrap contract block into the tool's `AGENTS.md`. Symlink-based — updates to the repo are immediately reflected without re-running.
+
+```bash
+# Install skills for all detected tools
+bun scripts/install-skills.ts --apply --platform all --yes
+
+# Install for one platform
+bun scripts/install-skills.ts --apply --platform claude --yes
+
+# Preview changes (write nothing)
+bun scripts/install-skills.ts --dry-run --platform all
+
+# Check for drift (exit 1 if symlinks missing or pointing wrong)
+bun scripts/install-skills.ts --check --platform all
+
+# Uninstall (remove only massa-th0th-owned symlinks + bootstrap block)
+bun scripts/install-skills.ts --uninstall --platform all --yes
+```
+
+**State:** `~/.config/massa-th0th/install-state.json` (v2 format; v1 auto-migrates).
+
+**Safety:** aborts on non-symlink conflict (won't overwrite user files); `--dry-run` writes nothing; requires `--yes` for real `$HOME`.
+
+See [FEATURES.md → Skills & Install System](./FEATURES.md#skills--install-system) for the full reference.
+
+### Workflow guides
+
+Migrated documentation for massa-th0th workflows lives in `docs/`:
+
+| Guide | File |
+|-------|------|
+| Spec-Driven | `docs/massa-th0th-spec-driven.md` |
+| TDD | `docs/massa-th0th-tdd.md` |
+| RFC | `docs/massa-th0th-rfc.md` |
+| Commit | `docs/massa-th0th-commit.md` |
+| Ticket | `docs/massa-th0th-ticket.md` |
+| Maestro | `docs/massa-th0th-maestro.md` |
+| Mobile Figma | `docs/massa-th0th-mobile-figma.md` |
+| Context Slices | `docs/context-slices.md` |
+
 ```json
 {
   "mcpServers": {

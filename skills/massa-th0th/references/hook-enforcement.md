@@ -33,8 +33,8 @@ nudge, exit 0).
 
 | Flag | Values | Effect |
 |---|---|---|
-| `UAS_HOOK_PROFILE` | `minimal` \| `standard` \| `strict` | `minimal`: only blocking safety hooks (gateguard, config_protection). `standard` (default): blocking + nudges + observation + stop gate as nudge. `strict`: stop gate blocks once per session to force acknowledgment. |
-| `UAS_DISABLED_HOOKS` | comma-separated hook names | Skip named hooks entirely. |
+| `MASSA_TH0TH_HOOK_PROFILE` | `minimal` \| `standard` \| `strict` | `minimal`: only blocking safety hooks (gateguard, config_protection). `standard` (default): blocking + nudges + observation + stop gate as nudge. `strict`: stop gate blocks once per session to force acknowledgment. |
+| `MASSA_TH0TH_DISABLED_HOOKS` | comma-separated hook names | Skip named hooks entirely. |
 
 Every hook exits 0 on bad stdin or non-critical error. Blocking hooks are
 <200 ms and make no network calls. Observation hooks are non-blocking.
