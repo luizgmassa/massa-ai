@@ -8,7 +8,8 @@ Use `workflows/restart-save.md` instead when the primary goal is preserving cano
 2. Load `references/handoff-package.md` for the shared continuation-package shape
 3. If code context exceeds 200 lines, 20 KB, or 50 search hits in the active reasoning window, use `compress` with strategy `code_structure`
 4. If conversation history exceeds 60% context usage or contains stale/raw tool output that no longer drives decisions, use `compress` with strategy `conversation_summary`
-5. Write a Session Guide before handoff, compaction, or stopping:
+5. Before compaction fires, call `compact_snapshot` with `sessionId` (the lifecycle session id from hooks/sessions — NOT the `workflowSessionId`; see the two-session-id rule in `references/synapse-policy.md`) and `projectId` to build a bounded (<2KB) reference-based table-of-contents of the session's observations. This enables zero-loss recovery across `/compact`: raw events stay in the observation store; the snapshot is a navigable index. Record the snapshot as a reference pointer in the Session Guide. If `compact_snapshot` is unavailable, continue with `compress` + `remember` and record the skipped snapshot.
+6. Write a Session Guide before handoff, compaction, or stopping:
    - Last request
    - Current state
    - Pending tasks
