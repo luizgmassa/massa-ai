@@ -553,17 +553,25 @@ print_hooks_guide() {
   # ── Cursor (flat, camelCase; beta) ──
   echo -e "  ${BOLD}Cursor — save as ~/.cursor/hooks.json (or project .cursor/hooks.json):${NC}"
   echo ""
+  echo -e "  ${DIM}Cursor now supports 7 events (sessionStart, sessionEnd, beforeSubmitPrompt,${NC}"
+  echo -e "  ${DIM}preToolUse, postToolUse, preCompact, stop). The canonical path is the plugin${NC}"
+  echo -e "  ${DIM}installer, which auto-wires all 7:${NC}"
+  echo -e "    ${CYAN}bash ${install_dir}/apps/cursor-plugin/install.sh --user${NC}  (or --project)"
+  echo ""
+  echo -e "  ${DIM}Manual hooks.json shape (commands point at the shared binary; the plugin${NC}"
+  echo -e "  ${DIM}installer generates this for you with absolute paths):${NC}"
   echo -e '  {'
   echo -e '    "version": 1,'
   echo -e '    "hooks": {'
-  echo -e "      \"beforeSubmitPrompt\": [{ \"command\": \"\\\"${hooks_dir}/user-prompt-submit.sh\\\"\" }],"
-  echo -e "      \"afterFileEdit\":      [{ \"command\": \"\\\"${hooks_dir}/post-tool-use.sh\\\"\" }],"
-  echo -e "      \"stop\":               [{ \"command\": \"\\\"${hooks_dir}/stop.sh\\\"\" }]"
+  echo -e "      \"sessionStart\":         [{ \"command\": \"\\\"${hooks_dir}/massa-th0th-hook session-start\\\"\" }],"
+  echo -e "      \"sessionEnd\":           [{ \"command\": \"\\\"${hooks_dir}/massa-th0th-hook stop\\\"\" }],"
+  echo -e "      \"beforeSubmitPrompt\":   [{ \"command\": \"\\\"${hooks_dir}/massa-th0th-hook user-prompt-submit\\\"\" }],"
+  echo -e "      \"preToolUse\":           [{ \"command\": \"\\\"${hooks_dir}/massa-th0th-hook pre-tool-use\\\"\" }],"
+  echo -e "      \"postToolUse\":          [{ \"command\": \"\\\"${hooks_dir}/massa-th0th-hook post-tool-use\\\"\" }],"
+  echo -e "      \"preCompact\":           [{ \"command\": \"\\\"${hooks_dir}/massa-th0th-hook pre-compact\\\"\" }],"
+  echo -e "      \"stop\":                 [{ \"command\": \"\\\"${hooks_dir}/massa-th0th-hook stop\\\"\" }]"
   echo -e '    }'
   echo -e '  }'
-  echo -e "  ${DIM}Cursor hooks are beta. Cursor has NO SessionStart and NO PreCompact${NC}"
-  echo -e "  ${DIM}equivalent — only the 3 events above are mappable. afterFileEdit fires${NC}"
-  echo -e "  ${DIM}on file edits only (not every tool call).${NC}"
   echo ""
 
   echo -e "  ${BOLD}Env vars (set in your shell or .env; all platforms):${NC}"
