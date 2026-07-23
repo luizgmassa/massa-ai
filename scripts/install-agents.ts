@@ -305,6 +305,9 @@ class ClaudeCodeWriter extends JsonMcpWriter {
       console.log(
         "💡 If you installed the massa-th0th Claude plugin (apps/claude-plugin/install.sh), hooks are already wired — skip this install-agents step for Claude Code.",
       );
+      console.log(
+        "💡 For the 12 subagent specialists, run: apps/claude-plugin/install.sh --user (installs massa-th0th-*.md agents to ~/.claude/agents/).",
+      );
     }
     return res;
   }
@@ -331,6 +334,9 @@ class CursorWriter extends JsonMcpWriter {
       console.log(
         "💡 If you installed the massa-th0th Cursor plugin (apps/cursor-plugin/install.sh), MCP is already registered — skip this install-agents step for Cursor.",
       );
+      console.log(
+        "💡 For the 12 subagent specialists, run: apps/cursor-plugin/install.sh --user (bundles massa-th0th-*.md agents into the plugin's agents/ dir).",
+      );
     }
     return res;
   }
@@ -347,6 +353,9 @@ class OpenCodeWriter extends JsonMcpWriter {
     if (res.written) {
       console.log(
         "💡 If you installed the massa-th0th OpenCode plugin (@massa-th0th/opencode-plugin), hooks are already wired — skip this install-agents step for OpenCode.",
+      );
+      console.log(
+        "💡 For the 12 subagent specialists, run: massa-th0th-config agents install --user (writes massa-th0th-*.md to ~/.config/opencode/agents/).",
       );
     }
     return res;
@@ -472,6 +481,9 @@ class CodexWriter implements AgentWriter {
     await fs.writeFile(plan.configPath, stringifyToml(doc), "utf8");
     console.log(
       "💡 If you installed the massa-th0th Codex plugin (apps/codex-plugin/install.sh), MCP is already registered — skip this install-agents step for Codex.",
+    );
+    console.log(
+      "💡 For the 12 subagent specialists, run: apps/codex-plugin/install.sh --user (writes massa-th0th-*.toml agents to ~/.codex/agents/).",
     );
     return { agent: this.agent, configPath: plan.configPath, backupPath, written: true, changes: plan.changes, dryRun: false };
   }
