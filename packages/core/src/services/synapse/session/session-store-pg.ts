@@ -65,11 +65,6 @@ interface AccessRow {
   last_accessed_at: number | bigint;
 }
 
-function toNum(v: number | bigint | null | undefined): number | null {
-  if (v == null) return null;
-  return typeof v === "bigint" ? Number(v) : v;
-}
-
 export class PgSynapseSessionStore implements SessionStore {
   private prisma!: PrismaClient;
   /** In-memory mirror: the sync read path. Hydrated from PG on first use. */
