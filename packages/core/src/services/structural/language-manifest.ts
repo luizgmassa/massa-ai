@@ -19,7 +19,7 @@ export const TREE_SITTER_RUNTIME_VERSION = "0.25.0";
 export const TREE_SITTER_NATIVE_MODULE_ABI = 137;
 export const STRUCTURAL_BUN_VERSION = "1.3.14";
 export const TREE_SITTER_PATCH_SHA256 =
-  "e79aec7b96eb8114e85ebcb90f0a8b12076bcd8aa08c09bb88929621e1c1446d";
+  "cd957e559b88dfe54219b77ab25f4dfd1d5a24c64afe0db6f2d4e6868f49b6e8";
 
 const STRUCTURE_CAPABILITIES = Object.freeze({
   declarations: "required",

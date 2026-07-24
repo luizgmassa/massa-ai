@@ -52,7 +52,7 @@ describe("native Tree-sitter package contract", () => {
     expect(TREE_SITTER_PATCH).toEqual({
       package: "tree-sitter@0.25.0",
       path: "patches/tree-sitter@0.25.0.patch",
-      sha256: "e79aec7b96eb8114e85ebcb90f0a8b12076bcd8aa08c09bb88929621e1c1446d",
+      sha256: "cd957e559b88dfe54219b77ab25f4dfd1d5a24c64afe0db6f2d4e6868f49b6e8",
     });
   });
 
