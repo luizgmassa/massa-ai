@@ -182,17 +182,28 @@ export interface Availability {
 /**
  * Resolve the backend attested by the E2E environment.
  *
- * A dedicated E2E stack must declare its isolated PostgreSQL URL. No local
- * database-file inference is permitted.
+ * Attestation succeeds ("postgres") when EITHER:
+ *   1. The dedicated/acceptance stack declares its isolated PostgreSQL URL
+ *      (MASSA_AI_DEDICATED=1 with a postgresql:// DATABASE_URL), OR
+ *   2. The live API self-reports a postgres backend via /api/v1/system/info
+ *      (the developer stack runs the same code against a developer-owned
+ *      PostgreSQL instance). Trusting the API's own backend type is safe
+ *      because destructive tests are guarded separately by
+ *      {@link assertSafeE2eEnvironment} / {@link isOwnedDedicatedE2eEnvironment},
+ *      not by this attestation — so widening it cannot enable destructive
+ *      suites against a shared developer database.
+ *
+ * No local database-file inference is permitted.
  */
 export function resolveBackendAttestation(
   dedicated: boolean,
   explicitType: string | undefined,
-  _databaseSizes: unknown,
+  apiBackend: unknown,
 ): Backend {
-  return dedicated && /^postgres(?:ql)?:\/\//.test(explicitType ?? "")
-    ? "postgres"
-    : "unknown";
+  if (dedicated && /^postgres(?:ql)?:\/\//.test(explicitType ?? "")) {
+    return "postgres";
+  }
+  return apiBackend === "postgres" ? "postgres" : "unknown";
 }
 
 // ── Prefix guard ────────────────────────────────────────────────────────────
@@ -260,7 +271,7 @@ export async function probeAvailability(): Promise<Availability> {
       BACKEND = resolveBackendAttestation(
         process.env.MASSA_AI_DEDICATED === "1",
         process.env.DATABASE_URL,
-        info?.databases?.sizes,
+        info?.databases?.backend,
       );
     } catch {
       /* leave unknown */

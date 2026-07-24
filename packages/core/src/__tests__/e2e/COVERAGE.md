@@ -2,7 +2,7 @@
 
 Current E2E contract for `packages/core/src/__tests__/e2e/`.
 
-Last updated: 2026-07-13. Acceptance backend: PostgreSQL 17 + pgvector 0.8.4.
+Last updated: 2026-07-24. Acceptance backend: PostgreSQL 17 + pgvector 0.8.4.
 
 ## Coverage decisions
 
@@ -33,13 +33,13 @@ Last updated: 2026-07-13. Acceptance backend: PostgreSQL 17 + pgvector 0.8.4.
 
 | File | Coverage responsibility |
 | --- | --- |
-| `00.harness.smoke.test.ts` | API/MCP availability and basic transport contract |
+| `00.harness.smoke.test.ts` | API/MCP availability, basic transport contract, and 52-tool roster parity |
 | `02.indexing.test.ts` | index, status, reindex/reset, lifecycle, terminal job consistency |
 | `05.memory.test.ts` | remember/recall/update/delete/list and HTTP/MCP parity |
 | `06.checkpoints.test.ts` | checkpoint create/list/restore |
 | `08.search.test.ts` | hybrid search, response tiers, compression, file/symbol tools |
 | `09.symbol-graph.test.ts` | definitions, references, project map, navigation |
-| `10.synapse.test.ts` | session create/prime/access/persistence and transport parity |
+| `10.synapse.test.ts` | session create/prime/access/persistence, task envelope lifecycle, and transport parity |
 | `11.lifecycle.test.ts` | hooks, bootstrap, handoffs, and proposals |
 | `12.observability.test.ts` | health, metrics, analytics, SSE, Swagger, and UI endpoints |
 | `13.cli.test.ts` | CLI flags and isolated configuration operations |
@@ -49,10 +49,11 @@ Last updated: 2026-07-13. Acceptance backend: PostgreSQL 17 + pgvector 0.8.4.
 | `17.cleanup-verify.test.ts` | final prefixed-data leak check |
 | `18.graph-phase4.test.ts` | typed edges, trace paths, impact analysis, architecture maps |
 | `19.web-exec.test.ts` | web controller and execution-tool behavior |
-| `20.new-features.test.ts` | observations, compact snapshots, proposals, Synapse PG persistence |
+| `20.new-features.test.ts` | observations, compact snapshots, proposals, Synapse PG persistence, dashboard route surface confirmation |
 | `21.qwen-fixture.test.ts` | negative discrimination for the commit-locked qwen fixture |
 | `22.path-identity.test.ts` | same-process wrong-root rebuild plus direct PostgreSQL manifest/path sentinels |
 | `23.owned-destructive.test.ts` | owned N1/N3/E25/F88 outage, restart, configuration, and recovery orchestration |
+| `24.dashboard-architecture.test.ts` | dashboard routes (scheduler/hooks), get_architecture MCP+HTTP, rename/merge dryRun preview |
 | `backend-attestation.test.ts` | dedicated/non-dedicated backend-detection unit contract |
 
 The MCP surface is defined by `apps/mcp-client/src/tool-definitions.ts`; coverage should follow
@@ -77,6 +78,27 @@ the responsible suite row and add HTTP/MCP equivalence where both transports exi
   workspace identity before every later reuse in the same Bun process.
 - `read_file.ts`: the process-lifetime read-file tool refreshes an affected cached project root
   when the existing canonical `indexing:started` lifecycle event announces a rebuild.
+
+## Tests updated in the E2E coverage expansion pass (2026-07-24)
+
+- `00.harness.smoke.test.ts`: EXPECTED_TOOLS updated from 47 to 52, matching
+  `CANONICAL_ORDER` in `tool-definitions.ts`. Five new tools added:
+  `get_architecture`, `synapse_task_begin`, `synapse_task_end`,
+  `rename_project`, `merge_projects`.
+- `20.new-features.test.ts`: SG1 gap probe replaced with real assertions of
+  `/api/v1/scheduler/status` and `/api/v1/hooks/queue-status` (routes shipped
+  in Wave 6 N28). The old probe wrongly asserted no surface existed. The
+  inverted gap probe (no scheduler MCP tool) remains valid.
+- `10.synapse.test.ts`: TE1-TE5 added for `synapse_task_begin` /
+  `synapse_task_end` task envelope lifecycle (begin shape, HTTP parity, end
+  summary, missing-session error, partial-failure on unindexed projectId).
+- `24.dashboard-architecture.test.ts`: new file covering dashboard routes
+  (DB1-DB5: scheduler/status, hooks/queue-status, graceful degradation,
+  no-scheduler-MCP-tool), `get_architecture` MCP+HTTP (AR1-AR5: shape, parity,
+  cycles aspect, unknown-aspect teaching error, _aspects list), and
+  `rename_project`/`merge_projects` dryRun preview (RN1-RN5: plan envelope,
+  HTTP parity, merge per-store counts, nonexistent-source error,
+  missing-operationId error).
 
 ## Latest real verification data
 
@@ -134,7 +156,8 @@ RUN_E2E=1 bun test --max-concurrency 1 \
   src/__tests__/e2e/19.web-exec.test.ts \
   src/__tests__/e2e/20.new-features.test.ts \
   src/__tests__/e2e/21.qwen-fixture.test.ts \
-  src/__tests__/e2e/22.path-identity.test.ts
+  src/__tests__/e2e/22.path-identity.test.ts \
+  src/__tests__/e2e/24.dashboard-architecture.test.ts
 RUN_E2E=1 bun test --max-concurrency 1 src/__tests__/e2e/17.cleanup-verify.test.ts
 RUN_E2E=1 RUN_E2E_DESTRUCTIVE=1 bun test src/__tests__/e2e/16.destructive.test.ts
 RUN_E2E=1 RUN_OWNED_DESTRUCTIVE=1 bun test --max-concurrency 1 src/__tests__/e2e/23.owned-destructive.test.ts

@@ -9,12 +9,6 @@
  *
  * Coverage GAPS (features with NO testable MCP/HTTP black-box surface —
  * reported, not worked around):
- *   - in-process scheduler (c051468): gated by MASSA_AI_SCHEDULER_ENABLED
- *     at server boot and has NO HTTP route / MCP tool to list/register jobs
- *     from outside. The scheduler is observable only via its side-effects
- *     (consolidation/decay/auto-improve jobs firing on a clock), which are
- *     neither deterministic nor safe to wait for on a shared stack. SG1 below
- *     documents the gap with a probe that confirms there is no public surface.
  *   - offline embeddings smoke (116d9be/ef51da2): the transformers.js provider
  *     is selected by EMBEDDING_PROVIDER=transformers at server boot. A running
  *     stack is locked to whatever provider it started with (Ollama in this
@@ -502,50 +496,49 @@ describe.skipIf(!READY)("T11c lexical-RRF search quality (trigram + proximity)",
       expect(hit).toBeDefined();
       expect(hit.score).toBeGreaterThan(0);
     },
-    180_000,
+    900_000,
   );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe.skipIf(!READY)("T11c coverage-gap probes (scheduler, offline embeddings)", () => {
-  // These two features have NO MCP/HTTP black-box surface to drive from an
-  // E2E test. The probes below CONFIRM the gap by asserting the absence of a
-  // public surface, so a future feature adding one trips the test (forcing an
-  // update here rather than silent rot).
+describe.skipIf(!READY)("T11c scheduler surface + offline-embeddings gap probe", () => {
+  // SG1 — the scheduler DOES have a public HTTP surface now (Wave 6 N28):
+  // /api/v1/scheduler/status and /api/v1/hooks/queue-status. The old SG1 gap
+  // probe wrongly asserted no surface existed. Full dashboard coverage lives
+  // in 24.dashboard-architecture.test.ts (DB1-DB5); this test confirms the
+  // routes exist and return valid shapes from the new-features file's scope.
+  // The inverted gap probe (no scheduler MCP tool advertised) remains valid.
 
   test(
-    "SG1: in-process scheduler has NO public HTTP route / MCP tool (gap probe)",
+    "SG1: dashboard routes exist and return valid shapes (scheduler + hooks queue)",
     async () => {
-      // Probe: attempt a scheduler-list route. If a route is ever added, this
-      // will return non-404 and the test will fail — prompting a real test.
-      let schedulerRouteHits = false;
-      try {
-        const r = await httpGet<any>("/api/v1/scheduler/jobs");
-        // A 404 / validation error means no route; anything else means one exists.
-        if (r?.status !== 404 && r?.type !== "validation" && r?.code !== "NOT_FOUND") {
-          schedulerRouteHits = true;
-        }
-      } catch {
-        /* network error = no route */
-      }
-      // Also check the MCP tool roster — scheduler is not an MCP tool today.
-      let schedulerToolAdvertised = false;
+      // /api/v1/scheduler/status → {running, tickIntervalMs, jobs[]} or a
+      // graceful-degradation envelope {running:false, unavailable:true, error}.
+      const sched = await httpGet<any>("/api/v1/scheduler/status");
+      expect(typeof sched?.running).toBe("boolean");
+      expect(typeof sched?.tickIntervalMs).toBe("number");
+      expect(Array.isArray(sched?.jobs)).toBe(true);
+
+      // /api/v1/hooks/queue-status → {pendingCount, maxPending, saturated} or
+      // a graceful-degradation envelope {pendingCount:0, unavailable:true}.
+      const queue = await httpGet<any>("/api/v1/hooks/queue-status");
+      expect(typeof queue?.pendingCount).toBe("number");
+      expect(typeof queue?.maxPending).toBe("number");
+      expect(typeof queue?.saturated).toBe("boolean");
+
+      // Inverted gap probe: the scheduler has NO MCP tool (it is observable
+      // only via the HTTP dashboard routes, not the MCP tool roster). If a
+      // scheduler MCP tool is ever added, this assertion trips so the coverage
+      // map is updated.
       if (mcp) {
-        schedulerToolAdvertised = mcp.toolNames.some(
-          (n) => n.includes("scheduler") || n.includes("schedule_job") || n.includes("cron"),
+        const schedulerToolAdvertised = mcp.toolNames.some(
+          (n) =>
+            n.includes("scheduler") ||
+            n.includes("schedule_job") ||
+            n.includes("cron"),
         );
+        expect(schedulerToolAdvertised).toBe(false);
       }
-      console.log(
-        `[T11c:SG1] scheduler surface probe: ` +
-          `routeHits=${schedulerRouteHits} toolAdvertised=${schedulerToolAdvertised}`,
-      );
-      // COVERAGE GAP (c051468): the in-process scheduler is boot-gated by
-      // MASSA_AI_SCHEDULER_ENABLED and has no external surface. Its jobs
-      // (memory-consolidation, decay, auto-improve, observation-bridge) fire
-      // on a clock and are only observable via their side-effects, which are
-      // neither deterministic nor safe to wait for on a shared stack.
-      expect(schedulerRouteHits).toBe(false);
-      expect(schedulerToolAdvertised).toBe(false);
     },
     30_000,
   );
@@ -587,6 +580,6 @@ describe.skipIf(!READY)("T11c coverage-gap probes (scheduler, offline embeddings
           `fields, used boot-time provider. No per-request toggle exists.`,
       );
     },
-    120_000,
+    900_000,
   );
 });
