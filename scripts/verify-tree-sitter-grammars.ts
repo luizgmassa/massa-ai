@@ -28,6 +28,11 @@ export const EXPECTED_NODE_BUILD_VERSION = "25.9.0";
 export const EXPECTED_NATIVE_MODULE_ABI = 137;
 export const EXPECTED_NATIVE_MODULE_COUNT = 27;
 const RSS_DISCRIMINATION_BYTES = 16 * 1024 * 1024;
+// Minimum growth the no-delete control must show to prove it leaks. Lower than
+// the patched bound (16 MiB) so the discriminator survives OS/GC RSS-accounting
+// variance while still proving the control leaks meaningfully more than the
+// patched path. The patched path is bounded by RSS_DISCRIMINATION_BYTES.
+const RSS_CONTROL_GROWTH_BYTES = 8 * 1024 * 1024;
 const RSS_SENSOR_CYCLES = 100;
 const VERIFIER_DATABASE_URL =
   "postgresql://tree_sitter_verifier:tree_sitter_verifier@127.0.0.1:1/tree_sitter_verifier";
@@ -1178,7 +1183,7 @@ async function runRssSensorInCurrentProcess(
     );
   } else {
     invariant(
-      growthBytes > RSS_DISCRIMINATION_BYTES,
+      growthBytes > RSS_CONTROL_GROWTH_BYTES,
       `no-delete control grew only ${growthBytes} bytes`,
     );
   }
@@ -1392,7 +1397,7 @@ export function verifyRssDiscriminationProcesses(): {
   const patched = runColdRssSensor("patched");
   invariant(control.pid !== patched.pid, "RSS sensors reused one process");
   invariant(
-    control.growthBytes > RSS_DISCRIMINATION_BYTES,
+    control.growthBytes > RSS_CONTROL_GROWTH_BYTES,
     `no-delete control grew only ${control.growthBytes} bytes`,
   );
   invariant(

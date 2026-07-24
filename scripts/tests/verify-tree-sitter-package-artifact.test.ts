@@ -16,11 +16,19 @@ const ROOT = resolve(import.meta.dir, "../..");
 
 describe("macOS arm64 packed Tree-sitter artifact contract", () => {
   test("freezes publish-safe manifests and exact build tools", () => {
-    expect(verifyPackageArtifactStaticContract()).toEqual({
-      sharedVersion: "1.1.0",
-      coreVersion: "1.1.0",
-      trustedDependencies: 27,
-    });
+    const contract = verifyPackageArtifactStaticContract();
+    // The package versions advance with each release; assert the verifier
+    // reads the live package.json versions (not a stale hardcoded number) and
+    // that the trust count is stable.
+    const sharedPkg = JSON.parse(
+      readFileSync(resolve(ROOT, "packages/shared/package.json"), "utf8"),
+    );
+    const corePkg = JSON.parse(
+      readFileSync(resolve(ROOT, "packages/core/package.json"), "utf8"),
+    );
+    expect(contract.sharedVersion).toBe(sharedPkg.version);
+    expect(contract.coreVersion).toBe(corePkg.version);
+    expect(contract.trustedDependencies).toBe(27);
     expect(EXPECTED_NPM_VERSION).toBe("11.14.1");
   });
 
