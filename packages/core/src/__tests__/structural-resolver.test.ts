@@ -3,6 +3,7 @@ import { describeNative } from "./_helpers/native-skip.js";
 import {
   StructuralResolverRegistry,
   StructuralResolverSession,
+  StructuralFqnRegistry,
   SCRIPTING_LANGUAGE_RESOLVER,
   SYSTEMS_LANGUAGE_RESOLVER,
   MANAGED_LANGUAGE_RESOLVER,
@@ -254,6 +255,60 @@ describeNative("systems structural resolver", () => {
     expect(SYSTEMS_LANGUAGE_RESOLVER.resolve(current, reference("run"), definitions, build)).toMatchObject({ status: "resolved", source: "global" });
     expect(SYSTEMS_LANGUAGE_RESOLVER.resolve(current, reference("shared"), definitions, build)).toMatchObject({ status: "ambiguous" });
     expect(SYSTEMS_LANGUAGE_RESOLVER.resolve(current, reference("missing"), definitions, build)).toEqual({ status: "unresolved", name: "missing" });
+  });
+
+  test("Rust self and super use-path specifiers resolve to relative paths", () => {
+    // Covers systems.ts lines 30-31: self/ and super/ specifier rewriting.
+    // `self/helper` → `./helper` (same directory), `super/helper` → `../helper` (parent directory).
+    const selfSlashFile = Object.freeze({
+      file: "src/main.rs", dialect: "rust", resolverVersion: "1.0.0",
+      imports: Object.freeze([imported("self/helper", [{ imported: "helper", local: "helper" }], { form: "rust_use" })]),
+    });
+    const superSlashFile = Object.freeze({
+      file: "src/sub/main.rs", dialect: "rust", resolverVersion: "1.0.0",
+      imports: Object.freeze([imported("super/helper", [{ imported: "helper", local: "helper" }], { form: "rust_use" })]),
+    });
+    const selfBareFile = Object.freeze({
+      file: "src/main.rs", dialect: "rust", resolverVersion: "1.0.0",
+      imports: Object.freeze([imported("self", [{ imported: "helper", local: "helper" }], { form: "rust_use" })]),
+    });
+    const superBareFile = Object.freeze({
+      file: "src/sub/main.rs", dialect: "rust", resolverVersion: "1.0.0",
+      imports: Object.freeze([imported("super", [{ imported: "helper", local: "helper" }], { form: "rust_use" })]),
+    });
+    const definitions = [
+      definition("src/helper.rs", "helper", { identity: { language: "Rust", dialect: "rust" } }),
+    ];
+    const build = { knownFiles: ["src/main.rs", "src/sub/main.rs", "src/helper.rs"] };
+    // self/helper → ./helper → src/helper.rs
+    expect(SYSTEMS_LANGUAGE_RESOLVER.resolve(selfSlashFile, reference("helper"), definitions, build)).toMatchObject({ status: "resolved", fqn: "src/helper.rs#helper", source: "import" });
+    // super/helper → ../helper → src/helper.rs (from src/sub/main.rs)
+    expect(SYSTEMS_LANGUAGE_RESOLVER.resolve(superSlashFile, reference("helper"), definitions, build)).toMatchObject({ status: "resolved", fqn: "src/helper.rs#helper", source: "import" });
+    // self → ./ → current directory (not a file) → unresolved (covers the bare branch)
+    expect(SYSTEMS_LANGUAGE_RESOLVER.resolve(selfBareFile, reference("helper"), definitions, build)).toMatchObject({ status: "unresolved" });
+    // super → ../ → parent directory (not a file) → unresolved (covers the bare branch)
+    expect(SYSTEMS_LANGUAGE_RESOLVER.resolve(superBareFile, reference("helper"), definitions, build)).toMatchObject({ status: "unresolved" });
+  });
+
+  test("Rust crate use-path specifier resolves to src root when file is under src/", () => {
+    // Covers systems.ts lines 27-29: crate/ specifier rewriting.
+    // `crate/helper` from src/main.rs → ./helper → src/helper.rs (crate root = src)
+    const crateSlashFile = Object.freeze({
+      file: "src/main.rs", dialect: "rust", resolverVersion: "1.0.0",
+      imports: Object.freeze([imported("crate/helper", [{ imported: "helper", local: "helper" }], { form: "rust_use" })]),
+    });
+    const crateBareFile = Object.freeze({
+      file: "src/main.rs", dialect: "rust", resolverVersion: "1.0.0",
+      imports: Object.freeze([imported("crate", [{ imported: "helper", local: "helper" }], { form: "rust_use" })]),
+    });
+    const definitions = [
+      definition("src/helper.rs", "helper", { identity: { language: "Rust", dialect: "rust" } }),
+    ];
+    const build = { knownFiles: ["src/main.rs", "src/helper.rs"] };
+    // crate/helper → ./helper → src/helper.rs
+    expect(SYSTEMS_LANGUAGE_RESOLVER.resolve(crateSlashFile, reference("helper"), definitions, build)).toMatchObject({ status: "resolved", fqn: "src/helper.rs#helper", source: "import" });
+    // crate → ./ → src/ (directory, not a file) → unresolved (covers the bare branch)
+    expect(SYSTEMS_LANGUAGE_RESOLVER.resolve(crateBareFile, reference("helper"), definitions, build)).toMatchObject({ status: "unresolved" });
   });
 });
 
@@ -938,5 +993,234 @@ describeNative("TS/JS structural resolver", () => {
       },
     }]);
     expect(definitions.find((item) => item.identity.name === "%23secret")?.exported).toBe(false);
+  });
+
+  test("resolveFqn resolves a unique legacy alias from seed identities", () => {
+    // Covers resolver.ts lines 275-276: resolveFqn finds a single seed identity
+    // whose legacyFqn matches the query (after exact + local registry miss).
+    const registry = new StructuralFqnRegistry();
+    const seedIdentity = registry.register(identity("src/lib.ts", "run", {
+      scope: "nested", overload: "unique", kind: "method", arity: 0, qualifiedName: "Service.run",
+    }));
+    // legacyFqn = src/lib.ts#run; fqn = src/lib.ts#Service.run~method~<hash>
+    expect(seedIdentity.legacyFqn).toBe("src/lib.ts#run");
+    expect(seedIdentity.fqn).not.toBe(seedIdentity.legacyFqn);
+
+    const seedDef: StructuralResolverDefinition = {
+      identity: identity("src/lib.ts", "run", { scope: "nested", overload: "unique", kind: "method", arity: 0, qualifiedName: "Service.run" }),
+      resolvedIdentity: seedIdentity,
+      exported: true,
+    };
+    const session = new StructuralResolverSession(
+      [], { knownFiles: ["src/lib.ts"] },
+      new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER]),
+      [seedDef],
+    );
+    // resolveFqn with the legacy FQN → not exact match, not in local registry,
+    // but matches a single seed identity's legacyFqn → resolved
+    const result = session.resolveFqn("src/lib.ts#run");
+    expect(result.found).toBe(true);
+    expect(result.ambiguous).toBe(false);
+    if (result.found) expect(result.identity.fqn).toBe(seedIdentity.fqn);
+  });
+
+  test("resolveFqn reports ambiguous legacy alias from multiple seed identities", () => {
+    // Covers resolver.ts lines 277-295: multiple seed identities share the same
+    // legacyFqn → ambiguous with sorted candidates.
+    const registry = new StructuralFqnRegistry();
+    const seed1 = registry.register(identity("src/lib.ts", "run", {
+      scope: "nested", overload: "overloaded", kind: "method", arity: 0, typeTokens: [], qualifiedName: "Service.run",
+    }));
+    const seed2 = registry.register(identity("src/lib.ts", "run", {
+      scope: "nested", overload: "overloaded", kind: "method", arity: 1, typeTokens: ["string"], qualifiedName: "Service.run",
+    }));
+    // Both have legacyFqn = src/lib.ts#run but different FQNs (different arity)
+    expect(seed1.legacyFqn).toBe("src/lib.ts#run");
+    expect(seed2.legacyFqn).toBe("src/lib.ts#run");
+    expect(seed1.fqn).not.toBe(seed2.fqn);
+
+    const seedDefs: StructuralResolverDefinition[] = [
+      { identity: identity("src/lib.ts", "run", { scope: "nested", overload: "overloaded", kind: "method", arity: 0, typeTokens: [], qualifiedName: "Service.run" }), resolvedIdentity: seed1, exported: true },
+      { identity: identity("src/lib.ts", "run", { scope: "nested", overload: "overloaded", kind: "method", arity: 1, typeTokens: ["string"], qualifiedName: "Service.run" }), resolvedIdentity: seed2, exported: true },
+    ];
+    const session = new StructuralResolverSession(
+      [], { knownFiles: ["src/lib.ts"] },
+      new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER]),
+      seedDefs,
+    );
+    const result = session.resolveFqn("src/lib.ts#run");
+    expect(result.found).toBe(false);
+    expect(result.ambiguous).toBe(true);
+    if (!result.found && result.ambiguous) {
+      expect(result.legacyFqn).toBe("src/lib.ts#run");
+      expect(result.candidates.length).toBe(2);
+    }
+  });
+
+  test("resolveFqn returns not-found for an unknown FQN", () => {
+    const session = new StructuralResolverSession(
+      [], { knownFiles: [] },
+      new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER]),
+    );
+    const result = session.resolveFqn("src/unknown.ts#missing");
+    expect(result.found).toBe(false);
+    expect(result.ambiguous).toBe(false);
+  });
+
+  test("resolveFqn finds exact seed identity by modern FQN", () => {
+    // Covers resolver.ts line 271-272: exact match in seedIdentities.
+    const registry = new StructuralFqnRegistry();
+    const seedIdentity = registry.register(identity("src/lib.ts", "run", {
+      scope: "top_level", overload: "unique", kind: "function", arity: 0,
+    }));
+    const seedDef: StructuralResolverDefinition = {
+      identity: identity("src/lib.ts", "run", { scope: "top_level", overload: "unique", kind: "function", arity: 0 }),
+      resolvedIdentity: seedIdentity,
+      exported: true,
+    };
+    const session = new StructuralResolverSession(
+      [], { knownFiles: ["src/lib.ts"] },
+      new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER]),
+      [seedDef],
+    );
+    // Exact FQN match in seedIdentities
+    const result = session.resolveFqn(seedIdentity.fqn);
+    expect(result.found).toBe(true);
+    expect(result.ambiguous).toBe(false);
+  });
+
+  test("resolveFqn finds identity via local FQN registry when not a seed", () => {
+    // Covers resolver.ts line 273-274: local registry resolve finds it.
+    const doc = Object.freeze({
+      file: "src/main.ts", language: "TypeScript", dialect: "typescript", resolverVersion: "1.0.0",
+      structure: Object.freeze({
+        symbols: Object.freeze([symbol("run")]),
+        imports: Object.freeze([]), edges: Object.freeze([]),
+      }),
+    });
+    const session = new StructuralResolverSession(
+      [doc], { knownFiles: ["src/main.ts"] },
+      new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER]),
+    );
+    // The local definition is registered in fqnRegistry → resolveFqn finds it
+    const result = session.resolveFqn("src/main.ts#run");
+    expect(result.found).toBe(true);
+  });
+
+  test("resolve throws when document is missing for file", () => {
+    const session = new StructuralResolverSession(
+      [], { knownFiles: [] },
+      new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER]),
+    );
+    expect(() => session.resolve("src/missing.ts", reference("run"))).toThrow("structural_resolver_document_missing");
+  });
+
+  test("resolve infers lexical scope from containing symbol when not provided", () => {
+    // Covers resolver.ts lines 304-315: lexicalScope inference from document symbols.
+    const SPAN_LOCAL = Object.freeze({
+      startByte: 10, endByte: 20,
+      start: Object.freeze({ row: 0, column: 10 }),
+      end: Object.freeze({ row: 0, column: 20 }),
+    });
+    const OUTER_SPAN = Object.freeze({
+      startByte: 0, endByte: 50,
+      start: Object.freeze({ row: 0, column: 0 }),
+      end: Object.freeze({ row: 0, column: 50 }),
+    });
+    const doc = Object.freeze({
+      file: "src/main.ts", language: "TypeScript", dialect: "typescript", resolverVersion: "1.0.0",
+      structure: Object.freeze({
+        symbols: Object.freeze([
+          { ...symbol("Outer", "Outer", { kind: "class" }), span: OUTER_SPAN },
+          { ...symbol("inner", "Outer.inner", { kind: "method" }), span: SPAN_LOCAL },
+        ]),
+        imports: Object.freeze([]), edges: Object.freeze([]),
+      }),
+    });
+    const session = new StructuralResolverSession(
+      [doc], { knownFiles: ["src/main.ts"] },
+      new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER]),
+    );
+    // Reference inside Outer.inner (byte 15) without lexicalScope → should
+    // infer the containing symbol and resolve accordingly.
+    const ref = Object.freeze({
+      kind: "call" as const,
+      span: Object.freeze({ startByte: 15, endByte: 16, start: Object.freeze({ row: 0, column: 15 }), end: Object.freeze({ row: 0, column: 16 }) }),
+      target: Object.freeze({ status: "unresolved" as const, name: "inner" }),
+    });
+    const result = session.resolve("src/main.ts", ref);
+    // Should resolve to the local same-file definition Outer.inner
+    expect(result.status).toBe("resolved");
+  });
+
+  test("seed construction throws on identity collision with local definition", () => {
+    // Covers resolver.ts lines 237-241: seed identity collides with a local
+    // definition but has a different canonical signature / exported flag.
+    const registry = new StructuralFqnRegistry();
+    const seedIdentity = registry.register(identity("src/lib.ts", "run", {
+      scope: "top_level", overload: "unique", kind: "function", arity: 0,
+    }));
+    const doc = Object.freeze({
+      file: "src/lib.ts", language: "TypeScript", dialect: "typescript", resolverVersion: "1.0.0",
+      structure: Object.freeze({
+        symbols: Object.freeze([symbol("run", "run", { signatureMaterial: { arity: 1, typeTokens: ["string"], modifiers: [] } })]),
+        imports: Object.freeze([]), edges: Object.freeze([]),
+      }),
+    });
+    // The local definition will have a different canonical signature (arity 1 vs 0)
+    // → fqn_identity_collision when the seed is checked against it.
+    const seedDef: StructuralResolverDefinition = {
+      identity: identity("src/lib.ts", "run", { scope: "top_level", overload: "unique", kind: "function", arity: 0 }),
+      resolvedIdentity: seedIdentity,
+      exported: true,
+    };
+    expect(() => new StructuralResolverSession(
+      [doc], { knownFiles: ["src/lib.ts"] },
+      new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER]),
+      [seedDef],
+    )).toThrow("fqn_identity_collision");
+  });
+
+  test("seed construction throws when seed definition lacks resolvedIdentity", () => {
+    // Covers resolver.ts line 236: seed requires a materialized identity.
+    const seedDef: StructuralResolverDefinition = {
+      identity: identity("src/lib.ts", "run"),
+      resolvedIdentity: undefined,
+      exported: true,
+    };
+    expect(() => new StructuralResolverSession(
+      [], { knownFiles: ["src/lib.ts"] },
+      new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER]),
+      [seedDef],
+    )).toThrow(TypeError);
+  });
+
+  test("seed construction deduplicates matching seed with identical identity", () => {
+    // Covers resolver.ts lines 242-244: seed identity matches a local definition
+    // with same canonical signature → silently deduplicated (no collision).
+    const registry = new StructuralFqnRegistry();
+    const seedIdentity = registry.register(identity("src/lib.ts", "run", {
+      scope: "top_level", overload: "unique", kind: "function", arity: 0,
+    }));
+    const doc = Object.freeze({
+      file: "src/lib.ts", language: "TypeScript", dialect: "typescript", resolverVersion: "1.0.0",
+      structure: Object.freeze({
+        symbols: Object.freeze([symbol("run", "run", { signatureMaterial: { arity: 0, typeTokens: [], modifiers: [] } })]),
+        imports: Object.freeze([]), edges: Object.freeze([]),
+      }),
+    });
+    const seedDef: StructuralResolverDefinition = {
+      identity: identity("src/lib.ts", "run", { scope: "top_level", overload: "unique", kind: "function", arity: 0 }),
+      resolvedIdentity: seedIdentity,
+      exported: true,
+      defaultExport: false,
+    };
+    // Should NOT throw — the seed matches the local definition exactly
+    const session = new StructuralResolverSession(
+      [doc], { knownFiles: ["src/lib.ts"] },
+      new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER]),
+      [seedDef],
+    );
+    expect(session.identitiesFor("src/lib.ts").length).toBe(1);
   });
 });
