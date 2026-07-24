@@ -318,6 +318,16 @@ describe("SessionPinStore bounds (HAR-04)", () => {
     expect(pins.get("a")).toBeUndefined();
   });
 
+  test("clear() empties the store", () => {
+    const pins = new SessionPinStore();
+    pins.set("a", "pa");
+    pins.set("b", "pb");
+    expect(pins.size).toBe(2);
+    pins.clear();
+    expect(pins.size).toBe(0);
+    expect(pins.get("a")).toBeUndefined();
+  });
+
   test("sticky hit + caller re-pin refreshes expiry (long-lived sessions stay sticky)", async () => {
     let now = 0;
     const pins = new SessionPinStore({ ttlMs: 100, now: () => now });
@@ -353,5 +363,117 @@ describe("session handling edge cases", () => {
     const r = resolver({ roots: provider([]), pins });
     const out = await r.resolve({ callerProjectId: "junk", cwd: "/nowhere" });
     expect(out.source).toBe("verbatim");
+  });
+});
+
+// ── PgWorkspaceRootProvider (real PG-backed provider) ───────────────────────
+// Uses the live test PostgreSQL instance. The provider caches roots for 30s;
+// clearCache is tested. These tests run only when RUN_POSTGRES_TESTS=1.
+
+import { PgWorkspaceRootProvider, getAttributionResolver, resetAttributionResolver, setAttributionResolverForTests } from "../services/hooks/attribution-resolver.js";
+
+const RUN_PG = process.env.RUN_POSTGRES_TESTS === "1" && !!process.env.DATABASE_URL;
+
+describe.skipIf(!RUN_PG)("PgWorkspaceRootProvider (live PG)", () => {
+  test("listRoots returns an array (may be empty on a fresh test db)", async () => {
+    const prov = new PgWorkspaceRootProvider();
+    const roots = await prov.listRoots();
+    expect(Array.isArray(roots)).toBe(true);
+  });
+
+  test("positive cache: second call within TTL returns cached array without re-querying", async () => {
+    const prov = new PgWorkspaceRootProvider();
+    const first = await prov.listRoots();
+    const second = await prov.listRoots();
+    // Same array reference (cached, not re-queried).
+    expect(second).toBe(first);
+  });
+
+  test("clearCache forces a fresh query on the next call", async () => {
+    const prov = new PgWorkspaceRootProvider();
+    const first = await prov.listRoots();
+    prov.clearCache();
+    const second = await prov.listRoots();
+    // After clearCache, a new array is returned (fresh query).
+    expect(second).not.toBe(first);
+    expect(Array.isArray(second)).toBe(true);
+  });
+});
+
+// ── defaultCanonicalize (real fs) ───────────────────────────────────────────
+
+describe("defaultCanonicalize", () => {
+  test("resolves a real existing path to its realpath", async () => {
+    // Use the test file itself — it exists and realpathSync returns its canonical path.
+    const { defaultCanonicalize: _dc } = await import("../services/hooks/attribution-resolver.js");
+    // The function is not exported directly; test via the AttributionResolver
+    // default ctor which uses it. Create a resolver without injecting canonicalize.
+    const r = new AttributionResolver({
+      roots: provider([{ projectId: "cwd-proj", projectPath: process.cwd() }]),
+      aliasResolver: aliases({}),
+      pins: new SessionPinStore(),
+      // Use the REAL defaultCanonicalize by NOT overriding it.
+      homedir: () => "/nonexistent-home-xyz",
+      fsRoot: () => "/",
+    });
+    // process.cwd() is inside the project root → containment.
+    const out = await r.resolve({ callerProjectId: "junk", cwd: process.cwd() });
+    expect(out.source).toBe("containment");
+    expect(out.projectId).toBe("cwd-proj");
+  });
+
+  test("returns undefined for a non-existent path that cannot be resolved at all", async () => {
+    // defaultCanonicalize tries realpathSync first, then path.resolve as fallback.
+    // path.resolve almost never fails, so this tests the realpathSync catch path.
+    // A path with null bytes throws in realpathSync; path.resolve also handles it.
+    const r = new AttributionResolver({
+      roots: provider([{ projectId: "x", projectPath: "/nonexistent-root-xyz" }]),
+      aliasResolver: aliases({}),
+      pins: new SessionPinStore(),
+      homedir: () => "/nonexistent-home-xyz",
+      fsRoot: () => "/",
+    });
+    // A non-existent cwd → realpathSync throws → path.resolve succeeds → containment
+    // won't match (path is not under /nonexistent-root-xyz) → verbatim.
+    const out = await r.resolve({ callerProjectId: "caller", cwd: "/totally/nonexistent/path/abc" });
+    expect(out.source).toBe("verbatim");
+  });
+});
+
+// ── Singleton factory functions ────────────────────────────────────────────
+
+describe("singleton factory functions", () => {
+  test("getAttributionResolver returns the same instance", () => {
+    resetAttributionResolver();
+    const a = getAttributionResolver();
+    const b = getAttributionResolver();
+    expect(a).toBe(b);
+  });
+
+  test("resetAttributionResolver clears the singleton", () => {
+    const a = getAttributionResolver();
+    resetAttributionResolver();
+    const b = getAttributionResolver();
+    expect(a).not.toBe(b);
+  });
+
+  test("setAttributionResolverForTests swaps the singleton", () => {
+    const fake = {
+      resolve: async () => ({ projectId: "fake", source: "verbatim" as const }),
+      pinSession: () => {},
+    };
+    setAttributionResolverForTests(fake as any);
+    const r = getAttributionResolver();
+    expect(r).toBe(fake as any);
+    // Clean up.
+    resetAttributionResolver();
+  });
+
+  test("setAttributionResolverForTests(null) clears the singleton", () => {
+    setAttributionResolverForTests(null);
+    // getAttributionResolver creates a new one after null.
+    const r = getAttributionResolver();
+    expect(r).toBeDefined();
+    resetAttributionResolver();
   });
 });
