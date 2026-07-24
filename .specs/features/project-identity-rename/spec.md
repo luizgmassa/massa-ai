@@ -4,8 +4,8 @@ Slug: `project-identity-rename`. Source: `rename-the-entire-project-quiet-torval
 
 ## Requirements
 
-- Package scope is `@massa-th0th`; configuration type is `MassaTh0thConfig`; project variables use `MASSA_TH0TH_*`.
-- Runtime server identity is `massa-th0th` and MCP tools remain unprefixed.
+- Package scope is `@massa-ai` (renamed from `@massa-th0th` in the subsequent `repo-rename-massa-ai` feature); configuration type is `MassaAiConfig`; project variables use `MASSA_AI_*`.
+- Runtime server identity is `massa-ai` and MCP tools remain unprefixed.
 - New functionality preserves scoped package resolution and current storage/config conventions.
 - Retained subsystem names such as `RLM_LLM_*` are intentional compatibility boundaries.
 
