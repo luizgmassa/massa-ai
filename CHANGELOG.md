@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **E2E coverage expansion**: live E2E suite widened to the 52-tool roster and post-baseline feature surfaces. `00.harness.smoke.test.ts` `EXPECTED_TOOLS` 47→52 (matches `CANONICAL_ORDER` in `tool-definitions.ts`); `10.synapse.test.ts` adds TE1-TE5 for the `synapse_task_begin`/`synapse_task_end` task-envelope lifecycle; `20.new-features.test.ts` SG1 gap probe replaced with real assertions of `/api/v1/scheduler/status` + `/api/v1/hooks/queue-status`; new `24.dashboard-architecture.test.ts` covers DB1-5 (dashboard routes + graceful degradation), AR1-5 (`get_architecture` MCP+HTTP parity, cycles aspect, teaching error, `_aspects` list), and RN1-5 (`rename_project`/`merge_projects` dryRun preview only). `_helpers.ts` `resolveBackendAttestation` widened to trust the API's self-reported `databases.backend` (destructive suites remain guarded by `assertSafeE2eEnvironment`). `COVERAGE.md` suite map updated. 53 pass / 0 fail / 1 deliberate skip against the live dev stack; type-check 6/6. Spec: `.specs/features/e2e-feature-coverage-expansion/`.
 
+### Fixed
+
+- **`packages/core` `@massa-ai/shared` dependency**: was `workspace:*`, which fails the `verifyStaticContract` gate (requires the declared version to `===` the root version exactly). Set to `1.2.1` (matches root + the local workspace package version, so it still resolves locally with no `bun install` 404 and no lockfile change).
+
 ## [1.2.1] - 2026-07-24
 
 ### Changed
