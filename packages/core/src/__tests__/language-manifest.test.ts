@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_ALLOWED_EXTENSIONS } from "@massa-th0th/shared/config";
+import { DEFAULT_ALLOWED_EXTENSIONS } from "@massa-ai/shared/config";
 import {
   getLanguageManifestEntry,
   inspectLanguageManifest,
@@ -228,7 +228,7 @@ describe("structural language manifest", () => {
       bunVersion: "1.3.14",
       nativeModuleAbi: 137,
       patchSha256:
-        "e79aec7b96eb8114e85ebcb90f0a8b12076bcd8aa08c09bb88929621e1c1446d",
+        "cd957e559b88dfe54219b77ab25f4dfd1d5a24c64afe0db6f2d4e6868f49b6e8",
     });
     expect(STRUCTURAL_FINGERPRINT_INPUTS.schemas).toEqual({
       taxonomy: "1.0.0",

@@ -14,15 +14,15 @@
       },
     },
     "apps/mcp-client": {
-      "name": "@massa-th0th/mcp-client",
+      "name": "@massa-ai/mcp-client",
       "version": "1.1.0",
       "bin": {
-        "massa-th0th": "dist/index.js",
-        "massa-th0th-config": "dist/config-cli.js",
+        "massa-ai": "dist/index.js",
+        "massa-ai-config": "dist/config-cli.js",
       },
       "dependencies": {
-        "@massa-th0th/core": "workspace:*",
-        "@massa-th0th/shared": "workspace:*",
+        "@massa-ai/core": "workspace:*",
+        "@massa-ai/shared": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.0.0",
       },
       "devDependencies": {
@@ -32,14 +32,14 @@
       },
     },
     "apps/opencode-plugin": {
-      "name": "@massa-th0th/opencode-plugin",
+      "name": "@massa-ai/opencode-plugin",
       "version": "1.1.0",
       "bin": {
-        "massa-th0th-config": "dist/config-cli.js",
+        "massa-ai-config": "dist/config-cli.js",
       },
       "dependencies": {
-        "@massa-th0th/core": "workspace:*",
-        "@massa-th0th/shared": "workspace:*",
+        "@massa-ai/core": "workspace:*",
+        "@massa-ai/shared": "workspace:*",
         "@opencode-ai/plugin": "^1.2.15",
         "@opencode-ai/sdk": "^1.2.15",
       },
@@ -49,17 +49,17 @@
       },
     },
     "apps/tools-api": {
-      "name": "@massa-th0th/tools-api",
+      "name": "@massa-ai/tools-api",
       "version": "1.1.0",
       "bin": {
-        "massa-th0th-api": "dist/index.js",
+        "massa-ai-api": "dist/index.js",
       },
       "dependencies": {
         "@elysiajs/cors": "^1.2.0",
         "@elysiajs/node": "^1.2.0",
         "@elysiajs/swagger": "^1.2.0",
-        "@massa-th0th/core": "workspace:*",
-        "@massa-th0th/shared": "workspace:*",
+        "@massa-ai/core": "workspace:*",
+        "@massa-ai/shared": "workspace:*",
         "elysia": "^1.2.25",
       },
       "devDependencies": {
@@ -68,11 +68,11 @@
       },
     },
     "apps/web-ui": {
-      "name": "@massa-th0th/web-ui",
+      "name": "@massa-ai/web-ui",
       "version": "1.1.0",
     },
     "packages/core": {
-      "name": "@massa-th0th/core",
+      "name": "@massa-ai/core",
       "version": "1.1.0",
       "dependencies": {
         "@ai-sdk/cohere": "^3.0.17",
@@ -80,7 +80,7 @@
         "@ai-sdk/mistral": "^3.0.17",
         "@ai-sdk/openai": "^3.0.24",
         "@huggingface/transformers": "^3.0.0",
-        "@massa-th0th/shared": "1.1.0",
+        "@massa-ai/shared": "1.1.0",
         "@prisma/adapter-pg": "^7.5.0",
         "@prisma/client": "^7.5.0",
         "@prisma/client-runtime-utils": "^7.3.0",
@@ -133,7 +133,7 @@
       },
     },
     "packages/shared": {
-      "name": "@massa-th0th/shared",
+      "name": "@massa-ai/shared",
       "version": "1.1.0",
       "dependencies": {
         "dotenv": "^17.2.4",
@@ -269,17 +269,17 @@
 
     "@kurkle/color": ["@kurkle/color@0.3.4", "", {}, "sha512-M5UknZPHRu3DEDWoipU6sE8PdkZ6Z/S+v4dD+Ke8IaNlpdSQah50lz1KtcFBa2vsdOnwbbnxJwVM4wty6udA5w=="],
 
-    "@massa-th0th/core": ["@massa-th0th/core@workspace:packages/core"],
+    "@massa-ai/core": ["@massa-ai/core@workspace:packages/core"],
 
-    "@massa-th0th/mcp-client": ["@massa-th0th/mcp-client@workspace:apps/mcp-client"],
+    "@massa-ai/mcp-client": ["@massa-ai/mcp-client@workspace:apps/mcp-client"],
 
-    "@massa-th0th/opencode-plugin": ["@massa-th0th/opencode-plugin@workspace:apps/opencode-plugin"],
+    "@massa-ai/opencode-plugin": ["@massa-ai/opencode-plugin@workspace:apps/opencode-plugin"],
 
-    "@massa-th0th/shared": ["@massa-th0th/shared@workspace:packages/shared"],
+    "@massa-ai/shared": ["@massa-ai/shared@workspace:packages/shared"],
 
-    "@massa-th0th/tools-api": ["@massa-th0th/tools-api@workspace:apps/tools-api"],
+    "@massa-ai/tools-api": ["@massa-ai/tools-api@workspace:apps/tools-api"],
 
-    "@massa-th0th/web-ui": ["@massa-th0th/web-ui@workspace:apps/web-ui"],
+    "@massa-ai/web-ui": ["@massa-ai/web-ui@workspace:apps/web-ui"],
 
     "@mixmark-io/domino": ["@mixmark-io/domino@2.2.0", "", {}, "sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw=="],
 
@@ -969,7 +969,7 @@
 
     "zod-to-json-schema": ["zod-to-json-schema@3.25.2", "", { "peerDependencies": { "zod": "^3.25.28 || ^4" } }, "sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA=="],
 
-    "@massa-th0th/opencode-plugin/@types/node": ["@types/node@22.20.0", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-QWlFW2wf3nTjC13/DqRnBpR4ZO36VJH/JVBkA/vcnmbTBNQIlnObqyqZE1tUR7+Ni23Lda8R1BxMfbXRpCUx5g=="],
+    "@massa-ai/opencode-plugin/@types/node": ["@types/node@22.20.0", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-QWlFW2wf3nTjC13/DqRnBpR4ZO36VJH/JVBkA/vcnmbTBNQIlnObqyqZE1tUR7+Ni23Lda8R1BxMfbXRpCUx5g=="],
 
     "@opencode-ai/plugin/@ai-sdk/provider": ["@ai-sdk/provider@3.0.8", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-oGMAgGoQdBXbZqNG0Ze56CHjDZ1IDYOwGYxYjO5KLSlz5HiNQ9udIXsPZ61VWaHGZ5XW/jyjmr6t2xz2jGVwbQ=="],
 
@@ -1031,7 +1031,7 @@
 
     "wrap-ansi-cjs/strip-ansi": ["strip-ansi@6.0.1", "", { "dependencies": { "ansi-regex": "^5.0.1" } }, "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A=="],
 
-    "@massa-th0th/opencode-plugin/@types/node/undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
+    "@massa-ai/opencode-plugin/@types/node/undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
 
     "@prisma/config/effect/fast-check": ["fast-check@3.23.2", "", { "dependencies": { "pure-rand": "^6.1.0" } }, "sha512-h5+1OzzfCC3Ef7VbtKdcv7zsstUQwUDlYpUTvjeUsJAssPgLn7QzbboPtL5ro04Mq0rPOsMzl7q5hIbRs2wD1A=="],
 

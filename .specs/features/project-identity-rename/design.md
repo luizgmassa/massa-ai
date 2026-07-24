@@ -12,7 +12,7 @@ Plan claimed a breaking identity and runtime-contract rename: published package 
 
 Execution evidence predates this record’s commit range. Rename commit `09713f4` records a repository-wide `th0th` → `massa-th0th` migration and seven manifests at `1.0.0`; follow-up `346f718` corrected package/workflow/environment/skill references. The assigned range subsequently maintains the renamed package/configuration surface and adds new unprefixed MCP tools.
 
-Current source confirms `name: "massa-th0th"`, `MassaTh0thConfig`, `MASSA_TH0TH_*` project variables, scoped packages such as `@massa-th0th/core`, and `.massa-th0th-data`. It also confirms the runtime tool convention is unprefixed (`index`, `fetch_and_index`, `execute`), rather than the source plan’s proposed `massa_th0th_*` tool names.
+Current source confirms `name: "massa-ai"` (renamed from `massa-th0th` by the subsequent `repo-rename-massa-ai` feature), `MassaAiConfig`, `MASSA_AI_*` project variables, scoped packages such as `@massa-ai/core`, and `.massa-ai-data`. It also confirms the runtime tool convention is unprefixed (`index`, `fetch_and_index`, `execute`), rather than the source plan’s proposed `massa_th0th_*` tool names.
 
 ## Commit evidence
 
@@ -33,10 +33,10 @@ Current source confirms `name: "massa-th0th"`, `MassaTh0thConfig`, `MASSA_TH0TH_
 
 ## Spec/acceptance facts now worth preserving
 
-- Package scope is `@massa-th0th`; configuration type is `MassaTh0thConfig`.
-- Project-owned environment variables use `MASSA_TH0TH_*`; `RLM_LLM_*` remains a subsystem configuration namespace.
-- Runtime MCP server identity is `massa-th0th`; current MCP tool names are unprefixed.
-- Post-rename additions must preserve scoped package resolution: build repair explicitly protects `@massa-th0th/shared` emission, and executor coverage asserts `@massa-th0th/core`.
+- Package scope is `@massa-ai` (subsequently renamed from `@massa-th0th`); configuration type is `MassaAiConfig`.
+- Project-owned environment variables use `MASSA_AI_*` (subsequently renamed from `MASSA_TH0TH_*`); `RLM_LLM_*` remains a subsystem configuration namespace.
+- Runtime MCP server identity is `massa-ai` (subsequently renamed from `massa-th0th`); current MCP tool names are unprefixed.
+- Post-rename additions must preserve scoped package resolution: build repair explicitly protects `@massa-ai/shared` emission, and executor coverage asserts `@massa-ai/core`.
 
 ## Deviations or unresolved gaps
 
