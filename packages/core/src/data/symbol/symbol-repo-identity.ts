@@ -71,7 +71,14 @@ export function generationDefinitionIdentityColumns(def: SymbolDefinition): Retu
     return { ...identity, qualifiedName: def.name };
   }
   if (parsed.kind !== def.kind) throw new TypeError(`definition_fqn_kind_mismatch:${def.id}`);
-  if (parsed.qualifiedName.split(".").at(-1) !== def.name) {
+  // The qualified name joins scope segments with ".", but symbol names
+  // themselves may contain "." (e.g. markdown headings like "1. Check Completed
+  // Tasks"). Splitting on "." therefore cannot reliably recover the terminal
+  // name. def.name is authoritative, so accept it when it is the qualified
+  // name's suffix (exact for a lone name, or preceded by the scope separator).
+  const terminalMatchesName =
+    parsed.qualifiedName === def.name || parsed.qualifiedName.endsWith(`.${def.name}`);
+  if (!terminalMatchesName) {
     throw new TypeError(`definition_fqn_name_mismatch:${def.id}`);
   }
   if (def.qualified_name !== undefined && def.qualified_name !== parsed.qualifiedName) {

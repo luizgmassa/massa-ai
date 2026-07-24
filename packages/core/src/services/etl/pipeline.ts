@@ -23,6 +23,7 @@ import { eventBus } from "../events/event-bus.js";
 import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import { indexJobTracker } from "../jobs/index-job-tracker.js";
 import { getSearchCache } from "../search/cache-factory.js";
+import { IndexManager } from "../search/index-manager.js";
 import { getVectorStore } from "../../data/vector/vector-store-factory.js";
 import { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
 import { getProjectIdentityAliasResolver } from "../project-identity/alias-resolver.js";
@@ -490,6 +491,27 @@ export class EtlPipeline {
       // status poller can safely query the newly materialized data as soon as
       // it observes `completed`.
       await getSearchCache().invalidateProject(projectId);
+
+      // Persist the search-admission marker. The ETL pipeline replaced the
+      // legacy contextualSearch.indexProject() monolith, which wrote this
+      // _metadata:<projectId> marker; without it, checkSearchAdmission
+      // hard-fails ("Project is not indexed") even though vectors, symbols,
+      // and keywords are fully loaded. Best-effort and non-fatal: a missing
+      // marker degrades search admission, never the index itself.
+      try {
+        const admissionMarker = new IndexManager(await getVectorStore());
+        await admissionMarker.updateIndexMetadata(
+          projectId,
+          projectPath,
+          discovered.map((file) => file.relativePath),
+        );
+      } catch (markerError) {
+        logger.warn("EtlPipeline: search-admission marker write failed", {
+          projectId,
+          jobId,
+          error: (markerError as Error).message.slice(0, 160),
+        });
+      }
 
       // Belt-and-suspenders terminal signal: mark the job completed the moment
       // the pipeline resolves, independent of the caller's warmup path (which

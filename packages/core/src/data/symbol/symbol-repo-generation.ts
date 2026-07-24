@@ -244,11 +244,29 @@ export async function writeFileGeneration(
         last_successful_at = EXCLUDED.last_successful_at
     `;
 
-    for (const definition of definitions) {
+    // Two symbols in one file can collapse to the same FQN (e.g. an export
+    // marker and its declaration, or duplicate declarations with identical
+    // signatures). The symbol_definitions primary key is
+    // (project_id, generation_id, id), so inserting a duplicate id aborts the
+    // whole file write and blocks graph activation. Collapse to the first
+    // occurrence per id — they share an identity by construction.
+    const seenDefinitionIds = new Set<string>();
+    const uniqueDefinitions = definitions.filter((definition) => {
+      if (seenDefinitionIds.has(definition.id)) return false;
+      seenDefinitionIds.add(definition.id);
+      return true;
+    });
+    for (const definition of uniqueDefinitions) {
       const identity = generationDefinitionIdentityColumns(definition);
       await tx.$executeRaw`
         INSERT INTO symbol_definitions (id, project_id, generation_id, file_path, name, kind, line_start, line_end, exported, doc_comment, indexed_at, qualified_name, canonical_signature, signature_hash, legacy_fqn, source_span)
         VALUES (${definition.id}, ${lease.projectId}, ${lease.generationId}, ${file.relative_path}, ${definition.name}, ${definition.kind}, ${definition.line_start}, ${definition.line_end}, ${definition.exported}, ${definition.doc_comment ?? null}, ${new Date(definition.indexed_at)}, ${identity.qualifiedName}, ${identity.canonicalSignature}, ${identity.signatureHash}, ${identity.legacyFqn}, ${identity.sourceSpan}::jsonb)
+        ON CONFLICT (project_id, generation_id, id) DO UPDATE SET
+          name = EXCLUDED.name, kind = EXCLUDED.kind, line_start = EXCLUDED.line_start,
+          line_end = EXCLUDED.line_end, exported = EXCLUDED.exported, doc_comment = EXCLUDED.doc_comment,
+          indexed_at = EXCLUDED.indexed_at, qualified_name = EXCLUDED.qualified_name,
+          canonical_signature = EXCLUDED.canonical_signature, signature_hash = EXCLUDED.signature_hash,
+          legacy_fqn = EXCLUDED.legacy_fqn, source_span = EXCLUDED.source_span
       `;
     }
     for (const reference of references) {
