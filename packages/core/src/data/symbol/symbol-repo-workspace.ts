@@ -76,7 +76,7 @@ export async function upsertWorkspace(
       AND generation.id = 'legacy-' || md5(current_workspace.project_id)
       AND generation.project_id = current_workspace.project_id
     `;
-  });
+  }, { timeout: 60_000, maxWait: 10_000 });
 }
 
 export async function updateWorkspaceStatus(
@@ -165,5 +165,5 @@ export async function updateWorkspaceStatus(
       FROM active_counts c
       WHERE w.project_id = c.project_id AND EXISTS (SELECT 1 FROM updated_generation)
     `;
-  });
+  }, { timeout: 60_000, maxWait: 10_000 });
 }

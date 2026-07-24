@@ -165,6 +165,14 @@ export class ResolveStage {
           timestamp: Date.now(),
         });
       }
+      // Resolve is CPU-bound and synchronous per file; a multi-hundred-file
+      // batch blocks the event loop longer than the managed-run/graph lease
+      // TTL AND the Prisma pool/transaction timeouts, so concurrent DB work
+      // (lease heartbeats, workspace marks) stalls — exhausting the connection
+      // pool and expiring transactions. Yielding after every file keeps each
+      // synchronous burst to a single file's cost so pending DB callbacks
+      // drain and release their connections well inside every timeout.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
     }
 
     const durationMs = Math.round(performance.now() - t0);

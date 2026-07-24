@@ -170,6 +170,14 @@ export function buildStructuralResolverDefinitions(
         symbol.signatureMaterial.modifiers.includes("static")
       )
       : !symbol.signatureMaterial.modifiers.includes("private");
+    // Export-clause markers (kind "export") are emitted as their own symbols
+    // (e.g. `export { foo }`), so they must own an identity to satisfy the
+    // resolve stage's 1:1 symbol↔identity projection. But a marker re-exporting
+    // a top-level declaration would otherwise share its simple FQN (file#name)
+    // and abort the index via fqn_identity_collision. Forcing markers to the
+    // "overloaded" identity shape gives them a distinct qualified FQN
+    // (file#name~export~<hash>) so they never collide with the declaration.
+    const isExportMarker = symbol.kind === "export";
     return Object.freeze({
       identity: Object.freeze({
         file: document.file,
@@ -184,7 +192,7 @@ export function buildStructuralResolverDefinitions(
         typeTokens: symbol.signatureMaterial.typeTokens,
         modifiers: symbol.signatureMaterial.modifiers,
         scope: symbol.qualifiedName === symbol.name ? "top_level" : "nested",
-        overload: (groups.get(key) ?? 0) > 1 ? "overloaded" : "unique",
+        overload: (groups.get(key) ?? 0) > 1 || isExportMarker ? "overloaded" : "unique",
       } satisfies StructuralIdentityInput),
       exported: symbol.exported || (
         !symbol.name.startsWith("#") &&

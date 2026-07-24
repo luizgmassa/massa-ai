@@ -30,11 +30,16 @@ import {
   API,
   API_KEY,
   E2E_ENABLED,
+  PREFIX,
+  RUN_STAMP,
   probeAvailability,
   httpGet,
   httpPost,
   normalize,
   assertMatrix,
+  ensureSharedIndex,
+  SHARED_PID,
+  assertE2ePrefix,
 } from "./_helpers";
 import { startMcp, mcpCall, requireTool, type McpHandle } from "./_mcp";
 
@@ -162,11 +167,13 @@ describe.skipIf(!READY)("T7 — Synapse session lifecycle (HTTP)", () => {
       agentId: "t7-agent",
       sessionId: id,
     });
-    // The route does not catch the duplicate error → Elysia surfaces HTTP 500.
+    // The route does not catch registry.create's duplicate-id throw, so Elysia's
+    // global error handler surfaces HTTP 500. The thrown "Session already exists"
+    // message is intentionally NOT leaked — the body is the generic INTERNAL_ERROR
+    // envelope {success:false, error:{code:"INTERNAL_ERROR", ...}}.
     expect(second.status).toBe(500);
-    // Body is a plain string, not JSON — surfaced via _raw.
-    const bodyText = String(second.json?._raw ?? second.json ?? "");
-    expect(bodyText).toContain("Session already exists");
+    expect(second.json?.success).toBe(false);
+    expect(second.json?.error?.code).toBe("INTERNAL_ERROR");
   });
 
   // F75 — stored fields are readable via GET.
@@ -583,6 +590,221 @@ describe.skipIf(!READY)("T7 — Matrix equivalence (HTTP vs MCP)", () => {
     // Falsifying check: primed must be a real number, NOT a 422 validation error.
     expect(typeof mcpRes?.data?.primed).toBe("number");
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task envelope lifecycle (TE1-TE5) — Wave 5 FR-14 / FR-15.
+//
+// synapse_task_begin collapses 5 moves (create → prime → search → prefetch →
+// access) into one call. synapse_task_end computes a summary + DELETE session.
+//
+// Source:
+//   - HTTP: apps/tools-api/src/routes/synapse.ts (POST /task/begin, /task/:id/end)
+//   - Core: packages/core/src/services/synapse/task-envelope.ts
+//   - MCP:  tool-defs-synapse.ts (synapse_task_begin, synapse_task_end)
+//
+// TE1-TE3 need a successful search (OLLAMA_UP + shared index). TE4 (end on
+// missing session) and TE5 (partial failure) run under API_UP alone.
+// ─────────────────────────────────────────────────────────────────────────────
+describe.skipIf(!READY)("T7 — synapse_task_begin / synapse_task_end (TE1-TE5)", () => {
+  // TE1-TE3 need OLLAMA_UP for a successful search inside the envelope.
+  let OLLAMA_READY = false;
+  let taskPid: string;
+
+  beforeAll(async () => {
+    const a = await probeAvailability();
+    OLLAMA_READY = a.OLLAMA_UP;
+    if (OLLAMA_READY) {
+      taskPid = await ensureSharedIndex();
+    }
+  }, 900_000);
+
+  test(
+    "TE1: MCP synapse_task_begin returns sessionId + search + partial flag",
+    async () => {
+      if (!OLLAMA_READY || !mcp) {
+        console.log("[T7:TE1:SKIP] Ollama not up or MCP not started");
+        expect(true).toBe(true);
+        return;
+      }
+      requireTool(mcp.toolNames, "synapse_task_begin");
+      const r = await mcpCall(mcp.client, "synapse_task_begin", {
+        agentId: "t7-task-begin",
+        query: "ContextualSearchRLM mutex queue",
+        projectId: taskPid,
+        taskContext: "TE1 task envelope begin",
+      });
+      expect(r?.success).toBe(true);
+      const data = r?.data ?? {};
+      expect(typeof data.sessionId).toBe("string");
+      expect(data.sessionId.startsWith("syn_")).toBe(true);
+      // search is present when the search sub-step succeeded.
+      expect(data.search).not.toBeNull();
+      expect(typeof data.primed).toBe("number");
+      expect(typeof data.partial).toBe("boolean");
+      expect(Array.isArray(data.errors)).toBe(true);
+      // On a healthy stack, the search succeeds → partial:false.
+      if (!data.partial) {
+        expect(data.errors).toEqual([]);
+      }
+
+      // Clean up: end the session.
+      try {
+        await mcpCall(mcp.client, "synapse_task_end", { id: data.sessionId });
+      } catch {
+        /* best-effort */
+      }
+    },
+    120_000,
+  );
+
+  test(
+    "TE2: HTTP POST /synapse/task/begin matches MCP shape (parity)",
+    async () => {
+      if (!OLLAMA_READY || !mcp) {
+        console.log("[T7:TE2:SKIP] Ollama not up or MCP not started");
+        expect(true).toBe(true);
+        return;
+      }
+      const args = {
+        agentId: "t7-task-parity",
+        query: "computePageRank centrality graph",
+        projectId: taskPid,
+      };
+      const httpRes = await httpJson("POST", "/api/v1/synapse/task/begin", args);
+      expect(httpRes.status).toBe(200);
+      expect(httpRes.json?.success).toBe(true);
+      const mcpRes = await mcpCall(mcp.client, "synapse_task_begin", args);
+      expect(mcpRes?.success).toBe(true);
+      // Both return the same envelope shape: sessionId, search, primed,
+      // partial, errors. Compare the stable keys after dropping the volatile
+      // sessionId (random) and search results (timing-dependent ordering).
+      const httpKeys = Object.keys(httpRes.json?.data ?? {}).sort();
+      const mcpKeys = Object.keys(mcpRes?.data ?? {}).sort();
+      expect(httpKeys).toEqual(mcpKeys);
+      expect(typeof httpRes.json?.data?.sessionId).toBe("string");
+      expect(typeof mcpRes?.data?.sessionId).toBe("string");
+      expect(typeof httpRes.json?.data?.partial).toBe("boolean");
+      expect(typeof mcpRes?.data?.partial).toBe("boolean");
+
+      // Clean up both sessions.
+      try {
+        await httpJson("POST", `/api/v1/synapse/task/${httpRes.json?.data?.sessionId}/end`);
+        await mcpCall(mcp.client, "synapse_task_end", { id: mcpRes?.data?.sessionId });
+      } catch {
+        /* best-effort */
+      }
+    },
+    120_000,
+  );
+
+  test(
+    "TE3: MCP synapse_task_end returns summary {sessionId, durationMs, accessCount, topFiles}",
+    async () => {
+      if (!OLLAMA_READY || !mcp) {
+        console.log("[T7:TE3:SKIP] Ollama not up or MCP not started");
+        expect(true).toBe(true);
+        return;
+      }
+      requireTool(mcp.toolNames, "synapse_task_end");
+      // Begin a task first.
+      const begun = await mcpCall(mcp.client, "synapse_task_begin", {
+        agentId: "t7-task-end",
+        query: "postgres vector store addDocuments",
+        projectId: taskPid,
+      });
+      expect(begun?.success).toBe(true);
+      const sid = begun?.data?.sessionId;
+      expect(typeof sid).toBe("string");
+
+      // End the task.
+      const ended = await mcpCall(mcp.client, "synapse_task_end", { id: sid });
+      expect(ended?.success).toBe(true);
+      const summary = ended?.data ?? {};
+      expect(summary.sessionId).toBe(sid);
+      expect(typeof summary.durationMs).toBe("number");
+      expect(summary.durationMs).toBeGreaterThanOrEqual(0);
+      expect(typeof summary.accessCount).toBe("number");
+      expect(Array.isArray(summary.topFiles)).toBe(true);
+    },
+    120_000,
+  );
+
+  test(
+    "TE4: synapse_task_end on a missing/ended session → {success:false}",
+    async () => {
+      const bogusId = `syn_definitely_missing_te4_${Date.now().toString(36)}`;
+      // HTTP path.
+      const httpRes = await httpJson(
+        "POST",
+        `/api/v1/synapse/task/${bogusId}/end`,
+      );
+      expect(httpRes.status).toBe(200);
+      expect(httpRes.json?.success).toBe(false);
+      expect(typeof httpRes.json?.error).toBe("string");
+
+      // MCP path (if available).
+      if (mcp) {
+        const mcpRes = await mcpCall(mcp.client, "synapse_task_end", {
+          id: bogusId,
+        });
+        expect(mcpRes?.success).toBe(false);
+      }
+    },
+    30_000,
+  );
+
+  test(
+    "TE5: synapse_task_begin with an unindexed projectId → sessionId still present",
+    async () => {
+      // An unindexed projectId causes the search sub-step to fail (no
+      // embeddings/workspace) or return empty results. Either way, the
+      // session is ALWAYS returned (the core partial-failure contract).
+      const unindexedPid = `${PREFIX}task-fail-${RUN_STAMP}`;
+      assertE2ePrefix(unindexedPid);
+      const args = {
+        agentId: "t7-task-partial",
+        query: "nonexistent project search",
+        projectId: unindexedPid,
+      };
+      // Prefer MCP; fall back to HTTP if MCP is unavailable.
+      let res: any = null;
+      if (mcp) {
+        try {
+          res = await mcpCall(mcp.client, "synapse_task_begin", args);
+        } catch {
+          res = null;
+        }
+      }
+      if (!res) {
+        const httpRes = await httpJson("POST", "/api/v1/synapse/task/begin", args);
+        res = httpRes.json;
+      }
+
+      expect(res?.success).toBe(true);
+      const data = res?.data ?? {};
+      expect(typeof data.sessionId).toBe("string");
+      expect(data.sessionId.startsWith("syn_")).toBe(true);
+      expect(typeof data.partial).toBe("boolean");
+      expect(Array.isArray(data.errors)).toBe(true);
+      // When the search sub-step fails, partial is true and errors includes
+      // "search". When the search succeeds (empty results), partial is false.
+      if (data.partial) {
+        expect(data.errors.length).toBeGreaterThan(0);
+        expect(data.errors).toContain("search");
+      }
+
+      // Clean up: end the session (best-effort).
+      if (data?.sessionId) {
+        try {
+          await httpJson("POST", `/api/v1/synapse/task/${data.sessionId}/end`);
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+    30_000,
+  );
 });
 
 // Always-on sanity: if E2E is disabled, surface a clear reason.

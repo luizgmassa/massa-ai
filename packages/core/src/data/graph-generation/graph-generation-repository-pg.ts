@@ -259,7 +259,7 @@ export class GraphGenerationRepositoryPg implements GraphGenerationRepository {
           AND graph_lease_token = ${lease.leaseToken}
       `;
       return { status: "renewed", leaseExpiresAt: renewed[0].lease_expires_at.getTime() };
-    });
+    }, { timeout: 60_000, maxWait: 10_000 });
   }
 
   async complete(lease: GraphGenerationLease): Promise<CompleteGraphGenerationOutcome> {

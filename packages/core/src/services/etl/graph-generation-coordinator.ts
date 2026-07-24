@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { getGraphGenerationRepository } from "../../data/graph-generation/graph-generation-repository-factory.js";
+import { withDeadlockRetry } from "../../data/with-deadlock-retry.js";
 import type {
   ActivateGraphGenerationOutcome,
   GraphGenerationLease,
@@ -46,7 +47,13 @@ export class GraphGenerationCoordinator {
   }
 
   async heartbeat(lease: GraphGenerationLease): Promise<void> {
-    const outcome = await this.repository.heartbeat(lease, GRAPH_GENERATION_LEASE_TTL_MS);
+    // The lease renewal UPDATE contends with concurrent per-file Load writes
+    // for the generation row; a transient deadlock (40P01) here would otherwise
+    // abort the whole index run. Retry — the renewal is idempotent.
+    const outcome = await withDeadlockRetry(
+      () => this.repository.heartbeat(lease, GRAPH_GENERATION_LEASE_TTL_MS),
+      { operation: "graph_generation.heartbeat", maxAttempts: 3 },
+    );
     if (outcome.status !== "renewed") throw new Error("graph_generation_lease_lost");
   }
 

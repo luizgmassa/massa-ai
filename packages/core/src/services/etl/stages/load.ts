@@ -11,6 +11,7 @@
  */
 
 import { logger } from "@massa-ai/shared";
+import { withDeadlockRetry } from "../../../data/with-deadlock-retry.js";
 import { getVectorStore } from "../../../data/vector/vector-store-factory.js";
 import { getKeywordSearch } from "../../../data/keyword/keyword-search-factory.js";
 import { getSymbolRepository } from "../../../data/symbol/symbol-repository-factory.js";
@@ -173,8 +174,16 @@ export class LoadStage {
 
           try {
             const [chunkCount, symCount] = await Promise.all([
-              mode === "structural" ? Promise.resolve(0) : this.loadToSearchStores(ctx, file),
-              mode === "semantic" ? Promise.resolve(file.symbols.length) : this.loadToSymbolDb(ctx, file),
+              mode === "structural"
+                ? Promise.resolve(0)
+                : withDeadlockRetry(() => this.loadToSearchStores(ctx, file), {
+                    operation: "etl.loadToSearchStores",
+                  }),
+              mode === "semantic"
+                ? Promise.resolve(file.symbols.length)
+                : withDeadlockRetry(() => this.loadToSymbolDb(ctx, file), {
+                    operation: "etl.loadToSymbolDb",
+                  }),
             ]);
 
             if (!ctx.graphGenerationLease && mode !== "structural") {
