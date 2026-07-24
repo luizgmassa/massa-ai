@@ -10,9 +10,11 @@ import {
   pickConsolidationWindow,
   cosineSimilarity,
   ConsolidatedBatchSchema,
+  rowsToCandidates,
   type ConsolidateCandidate,
   type LlmSurface,
 } from "../services/memory/consolidator.js";
+import type { MemoryRow } from "../data/memory/memory-repository.js";
 
 function cand(
   id: string,
@@ -174,5 +176,131 @@ describe("consolidateWindow — LLM integration", () => {
   test("single-memory window (no cluster) → null regardless of LLM", async () => {
     const batch = await consolidateWindow([cand("a", VEC_A)], makeLlm({ enabled: true }));
     expect(batch).toBeNull();
+  });
+});
+
+// ─── vecFrom / rowsToCandidates coverage (lines 86-98, 226-232) ─────────────
+
+describe("vecFrom embedding conversion (via pickConsolidationWindow)", () => {
+  test("converts a Buffer embedding to a number[]", () => {
+    const buf = Buffer.from(new Float32Array([1, 0, 0, 0]).buffer);
+    const ws = pickConsolidationWindow([
+      cand("a", buf),
+      cand("b", buf),
+    ]);
+    expect(ws).not.toBeNull();
+    expect(ws!.map((c) => c.id).sort()).toEqual(["a", "b"]);
+  });
+
+  test("converts a Uint8Array embedding to a number[]", () => {
+    const buf = Buffer.from(new Float32Array([1, 0, 0, 0]).buffer);
+    const uint8 = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+    const ws = pickConsolidationWindow([
+      cand("a", uint8 as any),
+      cand("b", uint8 as any),
+    ]);
+    expect(ws).not.toBeNull();
+    expect(ws!.length).toBe(2);
+  });
+
+  test("converts a Float32Array embedding to a number[]", () => {
+    const f32 = new Float32Array([1, 0, 0, 0]);
+    const ws = pickConsolidationWindow([
+      cand("a", f32 as any),
+      cand("b", f32 as any),
+    ]);
+    expect(ws).not.toBeNull();
+    expect(ws!.length).toBe(2);
+  });
+
+  test("returns null for empty Buffer (byteLen=0)", () => {
+    const buf = Buffer.alloc(0);
+    const ws = pickConsolidationWindow([
+      cand("a", buf),
+      cand("b", buf),
+    ]);
+    expect(ws).toBeNull();
+  });
+
+  test("returns null for Buffer with < 4 bytes (floatLen=0)", () => {
+    const buf = Buffer.from([1, 2, 3]); // 3 bytes < 4
+    const ws = pickConsolidationWindow([
+      cand("a", buf),
+      cand("b", buf),
+    ]);
+    expect(ws).toBeNull();
+  });
+
+  test("returns null for empty array embedding", () => {
+    const ws = pickConsolidationWindow([
+      cand("a", [] as any),
+      cand("b", [] as any),
+    ]);
+    expect(ws).toBeNull();
+  });
+
+  test("returns null for unknown embedding type", () => {
+    const ws = pickConsolidationWindow([
+      cand("a", { foo: 1 } as any),
+      cand("b", { foo: 1 } as any),
+    ]);
+    expect(ws).toBeNull();
+  });
+});
+
+describe("rowsToCandidates", () => {
+  test("converts MemoryRow[] to ConsolidateCandidate[]", () => {
+    const rows: MemoryRow[] = [
+      {
+        id: "r1",
+        content: "content",
+        type: "decision",
+        level: 1,
+        user_id: null,
+        session_id: null,
+        project_id: "proj-1",
+        agent_id: null,
+        importance: 0.8,
+        tags: "[]",
+        embedding: Buffer.from(new Float32Array([1, 0, 0, 0]).buffer),
+        metadata: null,
+        created_at: 1000,
+        updated_at: 2000,
+        access_count: 5,
+        last_accessed: 3000,
+        pinned: 0,
+        deleted_at: null,
+      },
+      {
+        id: "r2",
+        content: "content2",
+        type: "pattern",
+        level: 2,
+        user_id: "u1",
+        session_id: "s1",
+        project_id: "proj-2",
+        agent_id: "architect",
+        importance: 0.5,
+        tags: '["t"]',
+        embedding: null,
+        metadata: null,
+        created_at: 5000,
+        updated_at: 6000,
+        access_count: 0,
+        last_accessed: null,
+        pinned: 1,
+        deleted_at: null,
+      },
+    ];
+    const candidates = rowsToCandidates(rows);
+    expect(candidates.length).toBe(2);
+    expect(candidates[0].id).toBe("r1");
+    expect(candidates[0].projectId).toBe("proj-1");
+    expect(candidates[0].importance).toBe(0.8);
+    expect(candidates[0].embedding).toBe(rows[0].embedding);
+    expect(candidates[0].createdAt).toBe(1000);
+    expect(candidates[1].id).toBe("r2");
+    expect(candidates[1].projectId).toBe("proj-2");
+    expect(candidates[1].embedding).toBeNull();
   });
 });
