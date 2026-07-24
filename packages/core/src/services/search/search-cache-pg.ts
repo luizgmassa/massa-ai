@@ -395,10 +395,10 @@ export class SearchCachePg {
     if (this.l1Cache.size <= this.L1_MAX_SIZE) return;
 
     let oldestKey: string | null = null;
-    let oldestTime = Date.now();
+    let oldestTime = Infinity;
 
     for (const [key, entry] of this.l1Cache.entries()) {
-      if (entry.lastAccessed < oldestTime) {
+      if (entry.lastAccessed <= oldestTime) {
         oldestTime = entry.lastAccessed;
         oldestKey = key;
       }

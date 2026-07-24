@@ -12,6 +12,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { minimatch } from "minimatch";
 import {
   validateFilters,
   DEFAULT_MAX_FILTER_PATTERNS,
@@ -66,6 +67,30 @@ describe("filter-validation (FR-18 / AC-15)", () => {
 
   test("glob: empty exclude pattern rejected", () => {
     expect(() => validateFilters([], ["**/*.ts", ""])).toThrow(/empty pattern is not a valid glob/);
+  });
+
+  test("glob: makeRe throws → teaching error with message", () => {
+    // Patch minimatch.makeRe to throw, then restore.
+    const origMakeRe = minimatch.makeRe;
+    minimatch.makeRe = (() => { throw new TypeError("invalid pattern"); }) as any;
+    try {
+      expect(() => validateFilters(["valid-pattern/**"], [])).toThrow(ToolError);
+      expect(() => validateFilters(["valid-pattern/**"], [])).toThrow(/invalid glob/);
+    } finally {
+      minimatch.makeRe = origMakeRe;
+    }
+  });
+
+  test("glob: makeRe returns false → teaching error (no usable regex)", () => {
+    // Patch minimatch.makeRe to return false (degenerate pattern).
+    const origMakeRe = minimatch.makeRe;
+    minimatch.makeRe = (() => false) as any;
+    try {
+      expect(() => validateFilters(["some-pattern"], [])).toThrow(ToolError);
+      expect(() => validateFilters(["some-pattern"], [])).toThrow(/could not compile/);
+    } finally {
+      minimatch.makeRe = origMakeRe;
+    }
   });
 
   test("glob: error message names the array (include vs exclude)", () => {
