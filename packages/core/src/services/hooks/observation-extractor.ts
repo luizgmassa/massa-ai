@@ -113,16 +113,14 @@ const classifyToolCall: Classifier = (_source, payload) => {
         (toolInput && typeof toolInput === "object" ? (toolInput as Record<string, unknown>).command : undefined);
       const cmd = lower(cmdRaw);
       if (cmd.startsWith("git ") || cmd.includes(" git ")) {
-        if (cmd.includes("commit") || cmd.includes("merge") || cmd.includes("rebase")) {
-          return "git-changes";
-        }
         return "git-changes";
       }
       return "tool-calls";
     }
     case "TodoWrite":
-    case "Task":
       return "tasks";
+    case "Task": // subagent spawn
+      return "subagents-spawned";
     case "WebFetch":
       return "web-fetch";
     case "WebSearch":
@@ -139,8 +137,6 @@ const classifyToolCall: Classifier = (_source, payload) => {
       return "memories-stored";
     case "compact_snapshot":
       return "compaction-snapshots";
-    case "Task": // subagent spawn
-      return "subagents-spawned";
     default:
       // MCP tool calls (namespaced like "mcp__server__tool")
       if (toolName.startsWith("mcp__")) return "mcp-calls";

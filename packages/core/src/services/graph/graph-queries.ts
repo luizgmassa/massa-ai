@@ -418,10 +418,10 @@ export class GraphQueries {
     }
 
     const rows = await getPrismaClient().$queryRaw<Array<any>>`
-      SELECT id, content, type, level, importance, array_to_json(tags)::text AS tags,
+      SELECT id, content, type, level, importance, tags,
              created_at, updated_at, access_count, user_id, session_id, project_id, agent_id,
              NULL::bytea AS embedding, NULL::text AS metadata, NULL::timestamp AS last_accessed,
-             pinned::integer AS pinned, deleted_at
+             CASE WHEN pinned THEN 1 ELSE 0 END AS pinned, deleted_at
       FROM memories WHERE id = ANY(${memoryIds}::text[])`;
 
     // Convert to map for O(1) lookup

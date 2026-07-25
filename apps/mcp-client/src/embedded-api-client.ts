@@ -34,9 +34,6 @@ import {
   GetOptimizedContextTool,
   GetAnalyticsTool,
   ListProjectsTool,
-  SearchDefinitionsTool,
-  GetReferencesTool,
-  GoToDefinitionTool,
   TracePathTool,
   ImpactAnalysisTool,
   GetArchitectureTool,
@@ -80,7 +77,7 @@ function indexStatusTool(): GetIndexStatusTool {
   return _indexStatusTool;
 }
 
-let _searchProjectTool: SearchProjectTool | null = null;
+  let _searchProjectTool: SearchProjectTool | null = null;
 function searchProjectTool(): SearchProjectTool {
   if (!_searchProjectTool) _searchProjectTool = new SearchProjectTool();
   return _searchProjectTool;
@@ -156,24 +153,6 @@ let _listProjectsTool: ListProjectsTool | null = null;
 function listProjectsTool(): ListProjectsTool {
   if (!_listProjectsTool) _listProjectsTool = new ListProjectsTool();
   return _listProjectsTool;
-}
-
-let _searchDefsTool: SearchDefinitionsTool | null = null;
-function searchDefsTool(): SearchDefinitionsTool {
-  if (!_searchDefsTool) _searchDefsTool = new SearchDefinitionsTool();
-  return _searchDefsTool;
-}
-
-let _getRefsTool: GetReferencesTool | null = null;
-function getRefsTool(): GetReferencesTool {
-  if (!_getRefsTool) _getRefsTool = new GetReferencesTool();
-  return _getRefsTool;
-}
-
-let _goToDefTool: GoToDefinitionTool | null = null;
-function goToDefTool(): GoToDefinitionTool {
-  if (!_goToDefTool) _goToDefTool = new GoToDefinitionTool();
-  return _goToDefTool;
 }
 
 let _tracePathTool: TracePathTool | null = null;

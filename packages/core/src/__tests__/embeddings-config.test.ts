@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { getRateLimits, getMaxChars } from "../services/embeddings/config.js";
+import {
+  embeddingProviders,
+  getProvidersByPriority,
+  getRateLimits,
+  getMaxChars,
+  hasApiKey,
+} from "../services/embeddings/config.js";
 
 /**
  * Focused unit coverage for the falsy-`0` env-parsing migration (COVERAGE #4).
@@ -101,5 +107,40 @@ describe("embeddings config: falsy-0 env parsing (COVERAGE #4)", () => {
     process.env.EMBEDDING_RPM = "not-a-number";
     const rl = getRateLimits("GOOGLE");
     expect(rl).toBeUndefined();
+  });
+});
+
+describe("embeddings config: provider priority + API-key resolution", () => {
+  test("getProvidersByPriority returns every configured provider sorted ascending by priority", () => {
+    const sorted = getProvidersByPriority();
+    // Result is stable and contains the full configured set.
+    expect(sorted.length).toBe(Object.keys(embeddingProviders).length);
+    // Strictly non-decreasing by priority.
+    for (let index = 1; index < sorted.length; index += 1) {
+      expect(sorted[index]![1].priority).toBeGreaterThanOrEqual(sorted[index - 1]![1].priority);
+    }
+    // Identity: re-sorting the same entries reproduces the order.
+    const repro = getProvidersByPriority().map(([id]) => id);
+    expect(repro).toEqual(getProvidersByPriority().map(([id]) => id));
+  });
+
+  test("hasApiKey resolves local providers as always-available and requires credentials elsewhere", () => {
+    // Unknown provider short-circuits to false.
+    expect(hasApiKey("does-not-exist")).toBe(false);
+
+    // Local providers need no API key (req 1: ollama + transformers are local).
+    expect(hasApiKey("ollama")).toBe(true);
+    expect(hasApiKey("transformers")).toBe(true);
+    expect(hasApiKey("local")).toBe(true);
+
+    // Each provider-specific branch is exercised regardless of whether a key
+    // is present at module-load time (the branch line runs either way).
+    for (const providerName of ["mistralText", "mistralCode", "vercel", "litellm", "custom", "google"]) {
+      expect(typeof hasApiKey(providerName as never)).toBe("boolean");
+    }
+
+    // A provider that needs an API key but has none (the module-load default
+    // for mistral) resolves to false via the `!!config.apiKey` fallback.
+    expect(hasApiKey("mistralText")).toBe(!!embeddingProviders.mistralText?.apiKey);
   });
 });

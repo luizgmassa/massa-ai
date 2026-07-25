@@ -515,3 +515,243 @@ describe("serializeToolResponse — format:tree + grouped json (AD-W5-011)", () 
     );
   });
 });
+
+// ─── Coverage gap fills: projectPath array-leaf, mergeProjection
+// otherwise-branch, stringifyRow/treeFlat circular-ref catch blocks ───────
+
+describe("projectFields — array leaf wrapping + mergeProjection edge cases", () => {
+  test("dotted path where the leaf is an array wraps each element under the key", () => {
+    // nodes.tags is an array of strings → projectPath hits the
+    // `Array.isArray(child) ? child.map(e => ({[head]: e}))` branch (line 191-193).
+    // The outer nodes array is mapped element-wise, so nodes[i] becomes the
+    // array of wrapped tag elements.
+    const data = {
+      nodes: [
+        { tags: ["a", "b", "c"], other: 1 },
+        { tags: ["x"], other: 2 },
+      ],
+    };
+    const out = projectFields(data, ["nodes.tags"]) as Record<string, unknown>;
+    const nodes = out.nodes as unknown[];
+    expect(nodes).toHaveLength(2);
+    // nodes[0] is the wrapped tags array for the first element
+    const firstTags = nodes[0] as Array<Record<string, unknown>>;
+    expect(firstTags).toEqual([{ tags: "a" }, { tags: "b" }, { tags: "c" }]);
+    const secondTags = nodes[1] as Array<Record<string, unknown>>;
+    expect(secondTags).toEqual([{ tags: "x" }]);
+  });
+
+  test("mergeProjection otherwise-branch: later wins when types mismatch (non-array, non-object)", () => {
+    // Two dotted fields share head "x"; first resolves to a scalar, second
+    // to a different scalar → mergeProjection(a=number, b=number) hits the
+    // final `return b` (otherwise) branch because scalars are not arrays
+    // or objects.
+    const data = { a: { x: 1, y: 2 } };
+    // Project a.x (scalar 1) then a.y (scalar 2) — different heads, no merge.
+    // To force the merge otherwise-branch we need the SAME head with two
+    // scalar resolutions. Construct: obj.metadata where metadata is a scalar
+    // in one path and a scalar in another via nested arrays.
+    // Simpler: project "a.x" twice is idempotent. Instead, use a structure
+    // where mergeProjection receives (scalar, scalar) for the same head via
+    // two distinct dotted paths that converge.
+    // E.g. data = { pkg: { v: 1 } } and fields ["pkg.v", "pkg.v"] → second
+    // mergeProjection(undefined, {v:1}) → returns {v:1} (a===undefined path).
+    // To hit `return b` (a !== undefined, not array/object), we need a
+    // prior projection that's a scalar and a new scalar for the same head.
+    // This happens with: data = { n: [ {x: 1, x: 2} ] } is impossible (dup key).
+    //
+    // The reliable way: project a head that resolves to a scalar in one
+    // field and a scalar in another. Since projectPath wraps leaves under
+    // their key, both produce objects {key: scalar} → mergeProjection gets
+    // two objects → shallow merge, not the otherwise branch.
+    //
+    // The otherwise branch (return b) fires when `a` is defined and NOT
+    // an array/object — e.g. a boolean or number. That can only happen if
+    // a prior field projected the head as a bare scalar, which projectPath
+    // never does (it always wraps). So we exercise it via mergeProjection
+    // indirectly: project "nodeCount" (shallow, scalar) then "nodeCount.deep"
+    // (missing midpoint → undefined). The merge gets (3, undefined) → a is
+    // defined (3) b undefined → `a === undefined` false, neither array nor
+    // object → `return b` (undefined). Key absent.
+    const out = projectFields(data, ["a.x", "a.x.nope"]) as Record<string, unknown>;
+    // a.x resolves to {x:1}; a.x.nope: x is scalar 1 → projectPath returns
+    // undefined (primitive midpoint) → mergeProjection({x:1}, undefined)
+    // → a !== undefined, both objects? a is object, b undefined → not the
+    // object branch (b null check fails) → otherwise return b (undefined).
+    // So out.a stays {x:1}.
+    expect(out.a).toEqual({ x: 1 });
+  });
+
+  test("mergeProjection merges two objects sharing a head", () => {
+    // impacted.symbol + impacted.risk both produce {symbol}/{risk} per element;
+    // mergeProjection merges them into {symbol, risk} per element.
+    const data = {
+      impacted: [
+        { symbol: "a", risk: 0.9, extra: 1 },
+        { symbol: "b", risk: 0.4, extra: 2 },
+      ],
+    };
+    const out = projectFields(data, ["impacted.symbol", "impacted.risk"]) as Record<
+      string,
+      unknown
+    >;
+    const impacted = out.impacted as Array<Record<string, unknown>>;
+    expect(impacted[0]).toEqual({ symbol: "a", risk: 0.9 });
+    expect(impacted[1]).toEqual({ symbol: "b", risk: 0.4 });
+  });
+
+  test("mergeProjection arrays of different lengths pads with undefined", () => {
+    // Two dotted fields targeting the same array head but with different
+    // element-level resolutions. mergeProjection(max length) iterates and
+    // calls mergeProjection(a[i], b[i]) where one side may be undefined.
+    const data = {
+      items: [
+        { a: 1, b: 2 },
+        { a: 3 },     // no b
+        { b: 6 },     // no a
+      ],
+    };
+    const out = projectFields(data, ["items.a", "items.b"]) as Record<string, unknown>;
+    const items = out.items as Array<Record<string, unknown>>;
+    expect(items).toHaveLength(3);
+    // element 0: both present → merged
+    expect(items[0]).toEqual({ a: 1, b: 2 });
+    // element 1: a present, b undefined → mergeProjection({a:3}, undefined)
+    //   → a !== undefined, b null → otherwise branch returns b (undefined)
+    expect(items[1]).toBeUndefined();
+    // element 2: a undefined, b present → mergeProjection(undefined, {b:6})
+    //   → a === undefined → returns b
+    expect(items[2]).toEqual({ b: 6 });
+  });
+});
+
+describe("serializeToolResponse — tree fallback + circular ref safety", () => {
+  test("treeFlat on a circular object falls back to String() (no throw)", () => {
+    // A circular structure makes JSON.stringify throw; treeFlat's catch
+    // must return String(projected) instead.
+    const circ: any = { name: "root" };
+    circ.self = circ;
+    const r = serializeToolResponse(circ, { format: "tree" });
+    expect(r.success).toBe(true);
+    expect(typeof r.data).toBe("string");
+    // String(object) is "[object Object]" — the catch path output.
+    expect(r.data).toBe(String(circ));
+  });
+
+  test("treeFlat on array of circular rows falls back to String() per row", () => {
+    const a: any = { id: 1 };
+    a.self = a;
+    const b: any = { id: 2 };
+    b.self = b;
+    const r = serializeToolResponse([a, b], { format: "tree" });
+    expect(r.success).toBe(true);
+    expect(typeof r.data).toBe("string");
+    // Each row renders via stringifyRow's catch → String(row).
+    expect(r.data).toContain(String(a));
+    expect(r.data).toContain(String(b));
+  });
+
+  test("groupedToTree with a circular row in a group renders via String()", () => {
+    const circ: any = { file: "a.ts", symbol: "X" };
+    circ.self = circ;
+    const r = serializeToolResponse([circ], {
+      format: "tree",
+      groupBy: { file: "file" },
+    });
+    expect(r.success).toBe(true);
+    expect(typeof r.data).toBe("string");
+    // The circular row hit stringifyRow's catch → String(circ) present.
+    expect(r.data).toContain(String(circ));
+  });
+
+  test("treeFlat on a non-circular array uses JSON.stringify per row", () => {
+    const r = serializeToolResponse([{ a: 1 }, { b: 2 }], { format: "tree" });
+    expect(r.success).toBe(true);
+    expect(r.data).toContain('{"a":1}');
+    expect(r.data).toContain('{"b":2}');
+  });
+
+  test("treeFlat on a non-circular object uses JSON.stringify", () => {
+    const r = serializeToolResponse({ x: 1, y: "hi" }, { format: "tree" });
+    expect(r.success).toBe(true);
+    expect(r.data).toBe(JSON.stringify({ x: 1, y: "hi" }));
+  });
+});
+
+describe("projectFields — unescapeJsonField (M26 escaped JSON values)", () => {
+  test("null/undefined values returned as-is", () => {
+    const out = projectFields({ a: null, b: undefined }, ["a", "b"]) as Record<string, unknown>;
+    expect(out.a).toBeNull();
+    expect(out.b).toBeUndefined();
+  });
+
+  test("non-string scalar values returned as-is", () => {
+    const out = projectFields({ a: 42, b: true, c: { x: 1 } }, ["a", "b", "c"]) as Record<string, unknown>;
+    expect(out.a).toBe(42);
+    expect(out.b).toBe(true);
+    expect(out.c).toEqual({ x: 1 });
+  });
+
+  test("empty/whitespace string returned as-is", () => {
+    const out = projectFields({ a: "   ", b: "" }, ["a", "b"]) as Record<string, unknown>;
+    expect(out.a).toBe("   ");
+    expect(out.b).toBe("");
+  });
+
+  test("escaped JSON object string is parsed into nested structure", () => {
+    // A string value that looks like escaped JSON: `{\"key\":\"value\"}`
+    const escaped = '{"key":"value"}';
+    const out = projectFields({ meta: escaped }, ["meta"]) as Record<string, unknown>;
+    expect(out.meta).toEqual({ key: "value" });
+  });
+
+  test("escaped JSON array string is parsed into nested structure", () => {
+    const escaped = '[1,2,3]';
+    const out = projectFields({ meta: escaped }, ["meta"]) as Record<string, unknown>;
+    expect(out.meta).toEqual([1, 2, 3]);
+  });
+
+  test("string with escaped quotes (\\\") is unescaped then parsed", () => {
+    // Value stored with escaped quotes: `{\"k\":\"v\"}` (literal backslash-quote)
+    const escaped = '{\\"k\\":\\"v\\"}';
+    const out = projectFields({ meta: escaped }, ["meta"]) as Record<string, unknown>;
+    expect(out.meta).toEqual({ k: "v" });
+  });
+
+  test("invalid JSON-like string (starts with { ends with }) returns unescaped string", () => {
+    const notJson = "{not valid json}";
+    const out = projectFields({ meta: notJson }, ["meta"]) as Record<string, unknown>;
+    expect(out.meta).toBe(notJson);
+  });
+
+  test("invalid JSON-like array string returns unescaped string", () => {
+    const notJson = "[not valid]";
+    const out = projectFields({ meta: notJson }, ["meta"]) as Record<string, unknown>;
+    expect(out.meta).toBe(notJson);
+  });
+
+  test("string with escaped quotes but not JSON-like returns unescaped string", () => {
+    // Contains \" but doesn't start with { or [ → unescaped returned
+    const escaped = 'say \\"hi\\" there';
+    const out = projectFields({ msg: escaped }, ["msg"]) as Record<string, unknown>;
+    expect(out.msg).toBe('say "hi" there');
+  });
+
+  test("plain string (no escapes, not JSON-like) returned as-is", () => {
+    const out = projectFields({ msg: "hello world" }, ["msg"]) as Record<string, unknown>;
+    expect(out.msg).toBe("hello world");
+  });
+
+  test("escaped JSON in a shallow field is parsed (M26 unescape only applies to shallow fields)", () => {
+    // unescapeJsonField is called on the shallow-leaf path (projectFields line 112),
+    // NOT on the dotted-path leaf (projectPath). So a shallow field with an
+    // escaped JSON value is parsed; a dotted-path leaf is left as-is.
+    const data = { config: '{"a":1}', nodes: [{ config: '{"b":2}' }] };
+    const out = projectFields(data, ["config", "nodes.config"]) as Record<string, unknown>;
+    // shallow field → parsed
+    expect(out.config).toEqual({ a: 1 });
+    // dotted-path leaf → NOT parsed (wrapped as-is)
+    const nodes = out.nodes as Array<Record<string, unknown>>;
+    expect(nodes[0]).toEqual({ config: '{"b":2}' });
+  });
+});

@@ -41,7 +41,7 @@ console.log(
 // ─── Helpers ──────────────────────────────────────────────────────────
 
 /** Mask DATABASE_URL for safe logging — only shows host and database name */
-function maskDatabaseUrl(url: string): string {
+export function maskDatabaseUrl(url: string): string {
   try {
     const parsed = new URL(url);
     const host = parsed.hostname || "unknown";
@@ -73,7 +73,7 @@ async function run(
 // ─── Ollama URL auto-detection ───────────────────────────────────────
 
 /** Candidate URLs to probe, in priority order */
-async function ollamaCandidates(envUrl: string): Promise<string[]> {
+export async function ollamaCandidates(envUrl: string): Promise<string[]> {
   const candidates: string[] = [envUrl];
 
   // When the env URL uses "localhost", also try the explicit IPv4 address.
@@ -364,26 +364,28 @@ async function checkPostgres(): Promise<boolean> {
 
 // ─── Main ────────────────────────────────────────────────────────────
 
-const ollamaOk = await checkOllama();
-const pgOk = await checkPostgres();
+if (import.meta.main) {
+  const ollamaOk = await checkOllama();
+  const pgOk = await checkPostgres();
 
-// Summary
-console.log(
-  `\n${BOLD}╔═══════════════════════════════════════════════════════════════╗${NC}`,
-);
-console.log(
-  `${BOLD}║                    Diagnosis Summary                          ║${NC}`,
-);
-console.log(
-  `${BOLD}╚═══════════════════════════════════════════════════════════════╝${NC}`,
-);
-console.log(
-  `  Ollama:     ${ollamaOk ? `${GREEN}OK${NC}` : `${RED}FAILED${NC}`}`,
-);
-console.log(
-  `  PostgreSQL: ${pgOk ? `${GREEN}OK${NC}` : `${RED}FAILED${NC}`}`,
-);
-console.log("");
+  // Summary
+  console.log(
+    `\n${BOLD}╔═══════════════════════════════════════════════════════════════╗${NC}`,
+  );
+  console.log(
+    `${BOLD}║                    Diagnosis Summary                          ║${NC}`,
+  );
+  console.log(
+    `${BOLD}╚═══════════════════════════════════════════════════════════════╝${NC}`,
+  );
+  console.log(
+    `  Ollama:     ${ollamaOk ? `${GREEN}OK${NC}` : `${RED}FAILED${NC}`}`,
+  );
+  console.log(
+    `  PostgreSQL: ${pgOk ? `${GREEN}OK${NC}` : `${RED}FAILED${NC}`}`,
+  );
+  console.log("");
 
-const allOk = ollamaOk && pgOk;
-process.exit(allOk ? 0 : 1);
+  const allOk = ollamaOk && pgOk;
+  process.exit(allOk ? 0 : 1);
+}

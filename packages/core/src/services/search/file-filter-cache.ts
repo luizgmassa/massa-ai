@@ -160,9 +160,10 @@ export class FileFilterCache {
    */
   invalidateProject(projectId: string): number {
     let removed = 0;
+    const prefix = `project:${projectId}`;
 
     for (const [key, _entry] of this.cache.entries()) {
-      if (key.startsWith(`project:${projectId}|`)) {
+      if (key === prefix || key.startsWith(`${prefix}|`)) {
         this.cache.delete(key);
         removed++;
       }

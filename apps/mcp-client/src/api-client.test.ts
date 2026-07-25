@@ -10,12 +10,12 @@ afterEach(() => {
 describe("ApiClient HTTP transport", () => {
   test("sends GET, POST, PATCH, and DELETE with API-key authentication and JSON bodies", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
-    globalThis.fetch = (async (input, init) => {
+    globalThis.fetch = (async (input: string, init: RequestInit) => {
       requests.push({ url: String(input), init });
       return new Response(JSON.stringify({ success: true }), {
         headers: { "Content-Type": "application/json" },
       });
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     const client = new ApiClient({
       baseUrl: "https://tools.example",
@@ -89,5 +89,74 @@ describe("ApiClient HTTP transport", () => {
       success: false,
       error: "Upstream API request failed",
     });
+  });
+
+  test("uploadAndIndex POSTs to /api/v1/project/upload-and-index with the full payload", async () => {
+    const captured: Array<{ url: string; init?: RequestInit }> = [];
+    globalThis.fetch = (async (input: string, init: RequestInit) => {
+      captured.push({ url: String(input), init });
+      return new Response(JSON.stringify({ success: true, jobId: "job-1" }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+
+    const client = new ApiClient({ baseUrl: "https://tools.example", maxRetries: 0 });
+    const params = {
+      projectPath: "/proj",
+      projectId: "p1",
+      forceReindex: true,
+      warmCache: false,
+      warmupQueries: ["a"],
+      files: [{ relativePath: "a.ts", content: "x" }],
+    };
+    const result = await client.uploadAndIndex(params);
+
+    expect(captured[0]!.url).toBe("https://tools.example/api/v1/project/upload-and-index");
+    expect(captured[0]!.init?.method).toBe("POST");
+    expect(JSON.parse(captured[0]!.init!.body as string)).toEqual(params);
+    expect(result).toEqual({ success: true, jobId: "job-1" });
+  });
+
+  test("healthCheck returns true when /health responds ok", async () => {
+    const urls: string[] = [];
+    globalThis.fetch = (async (input: string) => {
+      urls.push(String(input));
+      return new Response("ok", { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const client = new ApiClient({ baseUrl: "https://tools.example", maxRetries: 0 });
+    const ok = await client.healthCheck();
+    expect(ok).toBe(true);
+    expect(urls).toEqual(["https://tools.example/health"]);
+  });
+
+  test("healthCheck returns false when fetch throws (network failure)", async () => {
+    globalThis.fetch = (async () => {
+      throw new Error("ECONNREFUSED");
+    }) as unknown as typeof fetch;
+
+    const client = new ApiClient({ baseUrl: "https://tools.example", maxRetries: 0 });
+    const ok = await client.healthCheck();
+    expect(ok).toBe(false);
+  });
+
+  test("healthCheck returns false on non-ok status", async () => {
+    globalThis.fetch = (async () => new Response("down", { status: 503 })) as unknown as typeof fetch;
+
+    const client = new ApiClient({ baseUrl: "https://tools.example", maxRetries: 0 });
+    const ok = await client.healthCheck();
+    expect(ok).toBe(false);
+  });
+
+  test("post throws ApiHttpError on non-2xx after exhausting retries", async () => {
+    globalThis.fetch = (async () => new Response(JSON.stringify({ success: false, error: "nope" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    })) as unknown as typeof fetch;
+
+    const client = new ApiClient({ baseUrl: "https://tools.example", maxRetries: 1 });
+    const error = await client.post("/fail", { a: 1 }).catch((c) => c);
+    expect(error).toBeInstanceOf(ApiHttpError);
+    expect((error as ApiHttpError).status).toBe(500);
   });
 });

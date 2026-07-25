@@ -133,3 +133,31 @@ describe("async proposal stores", () => {
     expect(await store.getById("proposal-1")).toBeNull();
   });
 });
+
+describe("MemoryProposalStore branch coverage", () => {
+  test("listPending filters + orders; setStatus on pending/non-pending/missing", async () => {
+    const store = new MemoryProposalStore();
+    await store.insert(proposal({ id: "p-a", createdAt: 2_000 }));
+    await store.insert(proposal({ id: "p-b", createdAt: 1_000, projectId: "other" }));
+    await store.insert(proposal({ id: "p-c", createdAt: 3_000 }));
+
+    // Only project-1 pending rows, ordered by createdAt.
+    expect((await store.listPending("project-1")).map((r) => r.id)).toEqual(["p-a", "p-c"]);
+    expect((await store.listPending("other")).map((r) => r.id)).toEqual(["p-b"]);
+
+    // setStatus on a non-pending row returns a clone with status unchanged.
+    const decided = await store.setStatus("p-a", "approved", 9_000);
+    expect(decided).toMatchObject({ id: "p-a", status: "approved", decidedAt: 9_000 });
+    const reDecide = await store.setStatus("p-a", "rejected");
+    expect(reDecide).toMatchObject({ id: "p-a", status: "approved", decidedAt: 9_000 });
+
+    // setStatus on pending stamps decidedAt when omitted.
+    const before = Date.now();
+    const stamped = await store.setStatus("p-c", "rejected");
+    expect(stamped!.decidedAt).toBeGreaterThanOrEqual(before);
+
+    // Missing row → null; getById miss → null.
+    expect(await store.setStatus("missing", "approved")).toBeNull();
+    expect(await store.getById("missing")).toBeNull();
+  });
+});

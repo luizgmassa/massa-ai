@@ -133,7 +133,12 @@ export class MemoryRepositoryPg {
       importance: m.importance,
       tags: JSON.stringify(tagsArr),
       embedding: m.embedding,
-      metadata: m.metadata ? JSON.stringify(m.metadata) : null,
+      metadata:
+        m.metadata == null
+          ? null
+          : typeof m.metadata === "string"
+            ? m.metadata
+            : JSON.stringify(m.metadata),
       created_at: m.created_at instanceof Date ? m.created_at.getTime() : Number(m.created_at),
       updated_at: m.updated_at instanceof Date ? m.updated_at.getTime() : Number(m.updated_at),
       access_count: m.access_count,
@@ -416,7 +421,7 @@ export class MemoryRepositoryPg {
              pinned, deleted_at
       FROM memories
       WHERE deleted_at IS NULL
-      ORDER BY created_at DESC
+      ORDER BY created_at DESC, id DESC
       LIMIT ${limit} OFFSET ${offset}
     `;
     return rows.map(r => this.toMemoryRow(r));
@@ -438,7 +443,7 @@ export class MemoryRepositoryPg {
   ): Promise<Array<{ id: string }>> {
     const since = new Date(opts.sinceMs);
     const conditions: Prisma.Sql[] = [
-      Prisma.sql`${tag} = ANY(tags)`,
+      Prisma.sql`${tag} = ANY(tags::text[])`,
       Prisma.sql`created_at >= ${since}`,
     ];
 

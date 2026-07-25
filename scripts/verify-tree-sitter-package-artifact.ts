@@ -199,15 +199,15 @@ function packPackage(
   return tarball;
 }
 
-function tarEntries(tarball: string): string[] {
+export function tarEntries(tarball: string): string[] {
   return command("tar", ["-tzf", tarball]).trim().split("\n").filter(Boolean);
 }
 
-function tarManifest(tarball: string): PublishManifest {
+export function tarManifest(tarball: string): PublishManifest {
   return JSON.parse(command("tar", ["-xOzf", tarball, "package/package.json"])) as PublishManifest;
 }
 
-function parsePackedResult(stdout: string): PackedConsumerVerificationResult {
+export function parsePackedResult(stdout: string): PackedConsumerVerificationResult {
   const line = stdout.split("\n").findLast((value) =>
     value.startsWith(PACKED_CONSUMER_RESULT_PREFIX)
   );

@@ -20,6 +20,8 @@ import {
   parseCron,
   nextCronRun,
   Scheduler,
+  getScheduler,
+  resetScheduler,
 } from "../services/scheduler/index.js";
 import type {
   ScheduledJob,
@@ -816,5 +818,303 @@ describe("disabled master switch", () => {
     expect(fired).toBe(false);
     expect(result.fired).toBe(0);
     expect(result.evaluated).toBe(0); // no jobs evaluated when disabled
+  });
+});
+
+// ── readEnabled / env-based construction ─────────────────────────────────────
+
+describe("readEnabled (env-based construction)", () => {
+  test("enabled defaults to false when env not set", () => {
+    delete process.env.MASSA_AI_SCHEDULER_ENABLED;
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store });
+    expect(scheduler.status().running).toBe(false);
+    scheduler.start();
+    expect(scheduler.isRunning()).toBe(false);
+    scheduler.stop();
+  });
+
+  test("enabled=true when MASSA_AI_SCHEDULER_ENABLED=true", () => {
+    process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, tickIntervalMs: 60000 });
+    scheduler.start();
+    expect(scheduler.isRunning()).toBe(true);
+    scheduler.stop();
+    delete process.env.MASSA_AI_SCHEDULER_ENABLED;
+  });
+
+  test("enabled=true when MASSA_AI_SCHEDULER_ENABLED=1", () => {
+    process.env.MASSA_AI_SCHEDULER_ENABLED = "1";
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, tickIntervalMs: 60000 });
+    scheduler.start();
+    expect(scheduler.isRunning()).toBe(true);
+    scheduler.stop();
+    delete process.env.MASSA_AI_SCHEDULER_ENABLED;
+  });
+});
+
+// ── unregisterHandler ──────────────────────────────────────────────────────────
+
+describe("unregisterHandler", () => {
+  test("unregisterHandler removes a handler", async () => {
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, enabled: true });
+    let fired = false;
+    scheduler.registerHandler("unreg-kind" as JobKind, async () => { fired = true; });
+    expect(scheduler.registeredKinds()).toContain("unreg-kind");
+    scheduler.unregisterHandler("unreg-kind" as JobKind);
+    expect(scheduler.registeredKinds()).not.toContain("unreg-kind");
+  });
+});
+
+// ── registerJob (upsert) ──────────────────────────────────────────────────────
+
+describe("registerJob", () => {
+  test("registerJob creates a new job with computed nextRunAt", () => {
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, enabled: true });
+    const job = scheduler.registerJob({
+      id: "rj-1",
+      name: "Register Job Test",
+      jobKind: "rj-kind" as JobKind,
+      schedule: { type: "interval", intervalMs: 60_000 },
+      nextRunAt: 0,
+      enabled: true,
+    });
+    expect(job.nextRunAt).toBeGreaterThan(Date.now() - 5000);
+    expect(store.get("rj-1")).not.toBeNull();
+  });
+
+  test("registerJob preserves lastRunAt from existing job", () => {
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, enabled: true });
+    // Seed an existing job with lastRunAt.
+    const existing = makeJob({
+      id: "rj-2",
+      lastRunAt: 12345,
+      nextRunAt: Date.now() + 60_000,
+    });
+    store.save(existing);
+    // Re-register with lastRunAt omitted → should preserve 12345.
+    const job = scheduler.registerJob({
+      id: "rj-2",
+      name: "Test Job",
+      jobKind: "test-kind" as JobKind,
+      schedule: { type: "interval", intervalMs: 60_000 },
+      nextRunAt: 0,
+      enabled: true,
+    });
+    expect(job.lastRunAt).toBe(12345);
+  });
+
+  test("registerJob recomputes nextRunAt when schedule changes", () => {
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, enabled: true });
+    // Seed an existing job.
+    store.save(makeJob({
+      id: "rj-3",
+      schedule: { type: "interval", intervalMs: 60_000 },
+      nextRunAt: Date.now() + 60_000,
+    }));
+    const before = store.get("rj-3")!.nextRunAt;
+    // Re-register with a different interval.
+    const job = scheduler.registerJob({
+      id: "rj-3",
+      name: "Test Job",
+      jobKind: "test-kind" as JobKind,
+      schedule: { type: "interval", intervalMs: 120_000 },
+      nextRunAt: 0,
+      enabled: true,
+    });
+    // nextRunAt should have been recomputed (different from before).
+    expect(job.nextRunAt).not.toBe(before);
+    expect(job.schedule.intervalMs).toBe(120_000);
+  });
+
+  test("registerJob preserves nextRunAt when schedule unchanged and nextRunAt != 0", () => {
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, enabled: true });
+    const futureNext = Date.now() + 300_000;
+    store.save(makeJob({
+      id: "rj-4",
+      schedule: { type: "interval", intervalMs: 60_000 },
+      nextRunAt: futureNext,
+    }));
+    const job = scheduler.registerJob({
+      id: "rj-4",
+      name: "Test Job",
+      jobKind: "test-kind" as JobKind,
+      schedule: { type: "interval", intervalMs: 60_000 },
+      nextRunAt: futureNext,
+      enabled: true,
+    });
+    // Schedule unchanged + nextRunAt != 0 → preserved.
+    expect(job.nextRunAt).toBe(futureNext);
+  });
+});
+
+// ── removeJob ──────────────────────────────────────────────────────────────────
+
+describe("removeJob", () => {
+  test("removeJob deletes a job from the store", () => {
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, enabled: true });
+    store.save(makeJob({ id: "rm-1" }));
+    expect(store.get("rm-1")).not.toBeNull();
+    scheduler.removeJob("rm-1");
+    expect(store.get("rm-1")).toBeNull();
+  });
+});
+
+// ── start() with real timer ──────────────────────────────────────────────────
+
+describe("start() with real timer", () => {
+  test("start creates a timer that ticks", async () => {
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({
+      store,
+      tickIntervalMs: 50,
+      maxConcurrent: 2,
+      enabled: true,
+    });
+    let fired = false;
+    scheduler.registerHandler("tick-kind" as JobKind, async () => { fired = true; });
+    store.save(makeJob({
+      id: "tick-1",
+      jobKind: "tick-kind" as JobKind,
+      nextRunAt: Date.now() - 1,
+      schedule: { type: "interval", intervalMs: 60_000 },
+    }));
+    scheduler.start();
+    // Wait for at least one tick.
+    await new Promise((r) => setTimeout(r, 120));
+    expect(fired).toBe(true);
+    scheduler.stop();
+  });
+});
+
+// ── catchUpMissedJobs ──────────────────────────────────────────────────────────
+
+describe("catchUpMissedJobs", () => {
+  test("catchUpMissedJobs fires one tick per missed job", async () => {
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({
+      store,
+      tickIntervalMs: 60_000,
+      maxConcurrent: 5,
+      enabled: true,
+    });
+    let fired = 0;
+    scheduler.registerHandler("catchup-kind" as JobKind, async () => { fired++; });
+    // Two jobs that are way overdue (5 minutes past + tick = 60s → missed).
+    const now = Date.now();
+    store.save(makeJob({
+      id: "catchup-1",
+      jobKind: "catchup-kind" as JobKind,
+      nextRunAt: now - 5 * 60_000,
+      schedule: { type: "interval", intervalMs: 60_000 },
+    }));
+    store.save(makeJob({
+      id: "catchup-2",
+      jobKind: "catchup-kind" as JobKind,
+      nextRunAt: now - 3 * 60_000,
+      schedule: { type: "interval", intervalMs: 60_000 },
+    }));
+    const result = scheduler.catchUpMissedJobs(now);
+    // Both are missed (> tickIntervalMs overdue). But same jobKind →
+    // concurrency guard: the first fires, the second is skipped (running).
+    expect(result.caughtUp + result.skipped).toBe(2);
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  test("catchUpMissedJobs is a no-op when disabled", () => {
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({
+      store,
+      tickIntervalMs: 60_000,
+      enabled: false,
+    });
+    store.save(makeJob({
+      id: "catchup-disabled",
+      nextRunAt: Date.now() - 5 * 60_000,
+    }));
+    const result = scheduler.catchUpMissedJobs();
+    expect(result.caughtUp).toBe(0);
+    expect(result.skipped).toBe(0);
+  });
+
+  test("catchUpMissedJobs skips jobs not yet missed (within tick window)", () => {
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({
+      store,
+      tickIntervalMs: 60_000,
+      maxConcurrent: 5,
+      enabled: true,
+    });
+    scheduler.registerHandler("not-missed" as JobKind, async () => {});
+    // Job overdue by only 10s (< 60s tick) → not missed.
+    store.save(makeJob({
+      id: "not-missed-1",
+      jobKind: "not-missed" as JobKind,
+      nextRunAt: Date.now() - 10_000,
+      schedule: { type: "interval", intervalMs: 60_000 },
+    }));
+    const result = scheduler.catchUpMissedJobs();
+    expect(result.caughtUp).toBe(0);
+  });
+});
+
+// ── isJobRunning ──────────────────────────────────────────────────────────────
+
+describe("isJobRunning", () => {
+  test("isJobRunning returns false when no handler is running", () => {
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, enabled: true });
+    expect(scheduler.isJobRunning("test-kind" as JobKind)).toBe(false);
+  });
+
+  test("isJobRunning returns true while a handler is executing", async () => {
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, enabled: true, maxConcurrent: 5 });
+    const runningCheck = new Promise<void>((resolve) => {
+      scheduler.registerHandler("running-kind" as JobKind, async () => {
+        // While this handler runs, isJobRunning should return true.
+        expect(scheduler.isJobRunning("running-kind" as JobKind)).toBe(true);
+        resolve();
+        await new Promise((r) => setTimeout(r, 30));
+      });
+    });
+    store.save(makeJob({
+      id: "running-1",
+      jobKind: "running-kind" as JobKind,
+      nextRunAt: Date.now() - 1,
+      schedule: { type: "interval", intervalMs: 60_000 },
+    }));
+    await scheduler.tick();
+    await runningCheck;
+    await new Promise((r) => setTimeout(r, 50));
+    expect(scheduler.isJobRunning("running-kind" as JobKind)).toBe(false);
+  });
+});
+
+// ── Singleton ──────────────────────────────────────────────────────────────────
+
+describe("singleton", () => {
+  test("getScheduler returns a shared instance", () => {
+    delete process.env.MASSA_AI_SCHEDULER_ENABLED;
+    const a = getScheduler();
+    const b = getScheduler();
+    expect(a).toBe(b);
+    resetScheduler();
+  });
+
+  test("resetScheduler clears the cached instance and stops it", () => {
+    const a = getScheduler();
+    resetScheduler();
+    const b = getScheduler();
+    expect(a).not.toBe(b);
+    resetScheduler();
   });
 });

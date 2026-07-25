@@ -232,4 +232,50 @@ describe.skipIf(!DB_AVAILABLE)("ManagedRunRepository (PostgreSQL)", () => {
     ).rejects.toThrow(RangeError);
     await cleanupProject(currentProjectId);
   });
+
+  test("updateFileCursor renews the lease and persists the cursor (renewed)", async () => {
+    const acquired = await repository.begin({
+      projectId: currentProjectId,
+      runKind: "indexing",
+      eventId: `evt-${randomUUID()}`,
+    });
+    if (acquired.status !== "acquired") throw new Error("expected acquired");
+    const cursor = { path: "src/managed.ts", offset: 4096 };
+    const outcome = await repository.updateFileCursor(acquired.lease, cursor);
+    expect(outcome.status).toBe("renewed");
+    if (outcome.status === "renewed") {
+      expect(outcome.leaseExpiresAt).toBeGreaterThanOrEqual(acquired.lease.leaseExpiresAt);
+    }
+    // The cursor is persisted: complete() without a cursor preserves it, and
+    // getActive surfaces it.
+    await repository.complete(acquired.lease);
+    await cleanupProject(currentProjectId);
+  });
+
+  test("updateFileCursor returns lease_lost for a wrong token", async () => {
+    const acquired = await repository.begin({
+      projectId: currentProjectId,
+      runKind: "indexing",
+      eventId: `evt-${randomUUID()}`,
+    });
+    if (acquired.status !== "acquired") throw new Error("expected acquired");
+    const wrong = { ...acquired.lease, leaseToken: `wrong-${acquired.lease.leaseToken}` };
+    const outcome = await repository.updateFileCursor(wrong, { path: "src/x.ts", offset: 0 });
+    expect(outcome.status).toBe("lease_lost");
+    await cleanupProject(currentProjectId);
+  });
+
+  test("updateFileCursor returns lease_lost after the lease expires", async () => {
+    const acquired = await repository.begin({
+      projectId: currentProjectId,
+      runKind: "indexing",
+      eventId: `evt-${randomUUID()}`,
+      leaseTtlMs: 1_000,
+    });
+    if (acquired.status !== "acquired") throw new Error("expected acquired");
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+    const outcome = await repository.updateFileCursor(acquired.lease, { path: "src/y.ts", offset: 1 });
+    expect(outcome.status).toBe("lease_lost");
+    await cleanupProject(currentProjectId);
+  });
 });

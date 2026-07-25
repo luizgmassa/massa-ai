@@ -33,7 +33,7 @@ import path from "path";
 
 // ── Event type mapping ──────────────────────────────────────────────────────
 
-const EVENT_MAP: Record<string, string> = {
+export const EVENT_MAP: Record<string, string> = {
   "session-start": "session-start",
   "user-prompt-submit": "user-prompt",
   "pre-tool-use": "pre-tool-use",
@@ -44,22 +44,22 @@ const EVENT_MAP: Record<string, string> = {
 
 // ── Pin resolution (ported from _pin.sh) ─────────────────────────────────────
 
-function sanitizeSessionId(sessionId: string): string {
+export function sanitizeSessionId(sessionId: string): string {
   return sessionId.replace(/[^A-Za-z0-9._-]/g, "_");
 }
 
-function getPinDir(): string {
+export function getPinDir(): string {
   return `${process.env.TMPDIR || "/tmp"}/massa-ai-hooks`;
 }
 
-function getPinFile(sessionId: string): string | null {
+export function getPinFile(sessionId: string): string | null {
   if (!sessionId) return null;
   const safe = sanitizeSessionId(sessionId);
   if (safe === "." || safe === "..") return null;
   return path.join(getPinDir(), safe);
 }
 
-function resolveProjectId(sessionId: string, cwd: string): string {
+export function resolveProjectId(sessionId: string, cwd: string): string {
   // 1. Existing pin wins
   if (sessionId) {
     const pinFile = getPinFile(sessionId);
@@ -113,7 +113,7 @@ function resolveProjectId(sessionId: string, cwd: string): string {
 
 // ── Stdin reading ───────────────────────────────────────────────────────────
 
-function readStdin(): string {
+export function readStdin(): string {
   // Terminal stdin (no pipe) → exit 0, no POST (same as shell [ -t 0 ] check)
   try {
     const stats = fstatSync(0);
@@ -134,7 +134,7 @@ function readStdin(): string {
 
 // ── POST helper ─────────────────────────────────────────────────────────────
 
-function postObservation(
+export function postObservation(
   url: string,
   body: Record<string, unknown>,
   timeoutMs: number,
@@ -206,18 +206,18 @@ function postObservation(
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
-async function main(): Promise<void> {
+export async function main(stdinInput?: string): Promise<void> {
   const subcommand = process.argv[2];
   if (!subcommand || !EVENT_MAP[subcommand]) {
     // Unknown or missing subcommand → exit 0 (silent-degrade)
-    process.exit(0);
+    return;
   }
 
-  const rawStdin = readStdin();
+  const rawStdin = stdinInput ?? readStdin();
   // Whitespace-stripped check: empty payload → no POST (server rejects empty payload)
   const stdinStripped = rawStdin.trim();
   if (!stdinStripped) {
-    process.exit(0);
+    return;
   }
 
   // Parse JSON (Bun-native, no jq). Malformed JSON → exit 0, no POST.
@@ -225,12 +225,12 @@ async function main(): Promise<void> {
   try {
     const parsed = JSON.parse(stdinStripped);
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-      process.exit(0);
+      return;
     }
     payload = parsed as Record<string, unknown>;
   } catch {
     // Malformed JSON → exit 0, no POST (same as shell jq failure)
-    process.exit(0);
+    return;
   }
 
   const event = EVENT_MAP[subcommand]!;
@@ -291,7 +291,8 @@ async function main(): Promise<void> {
   }
 
   // Always exit 0 (silent-degrade: never blocks the agent)
-  process.exit(0);
 }
 
-main().catch(() => process.exit(0));
+if (import.meta.main) {
+  main().catch(() => process.exit(0));
+}

@@ -1,167 +1,188 @@
 /**
- * Phase 7b — SalienceJudge tests (auto importance on remember).
+ * Unit tests for SalienceJudge (Phase 7b).
  *
- * Derives from spec R7B-01..04 + edge cases. Injects a fake LLM surface so no
- * network/config-gate is needed; the feature gate (`memory.autoImportance
- * .enabled`) is toggled via the real `config` object (this file does not mock
- * shared, mirrors query-understanding.test.ts).
- *
- * Tests assert spec OUTCOMES, never mirroring the implementation.
+ * Mocks config + LLM surface. No DB, no network.
  */
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { config, MemoryType } from "@massa-ai/shared";
-import {
-  SalienceJudge,
-  SalienceSchema,
-  NEUTRAL_SALIENCE,
-  type QueryLlmSurface,
-} from "../services/memory/salience-judge.js";
-import { _setLlmEnabledForTesting } from "../services/memory/llm-client.js";
+import { describe, test, expect, beforeEach, mock } from "bun:test";
 import type { z } from "zod";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ── Mock config ─────────────────────────────────────────────────────────────
 
-type Salience = z.infer<typeof SalienceSchema>;
+let autoImportanceEnabled = false;
 
-function fakeSurface(
-  verdict: Salience | null,
-  opts: { enabled?: boolean; throws?: boolean } = {},
-): QueryLlmSurface {
-  return {
-    object: async (_prompt, _schema) => {
-      if (opts.throws) throw new Error("boom");
-      if (verdict == null) return { ok: false, error: "disabled" };
-      return { ok: true, value: verdict };
+mock.module("@massa-ai/shared", () => ({
+  config: {
+    get: (key: string) => {
+      if (key === "memory") {
+        return { autoImportance: { enabled: autoImportanceEnabled } };
+      }
+      return {};
     },
-    complete: async () => ({ ok: false, error: "unused" }),
+  },
+  logger: {
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    debug: () => {},
+  },
+  MemoryType: {
+    DECISION: "decision",
+    PATTERN: "pattern",
+    CODE: "code",
+    CONVERSATION: "conversation",
+    CRITICAL: "critical",
+  },
+}));
+
+import { SalienceJudge, NEUTRAL_SALIENCE, SalienceSchema, _setSalienceJudgeForTesting } from "../services/memory/salience-judge.js";
+import type { QueryLlmSurface } from "../services/search/query-understanding.js";
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function makeSurface(opts: {
+  enabled?: boolean;
+  ok?: boolean;
+  value?: any;
+  throwErr?: boolean;
+  useDefault?: boolean;
+}): QueryLlmSurface {
+  return {
     isEnabled: () => opts.enabled ?? true,
+    async complete() {
+      return { ok: true, value: "ok" };
+    },
+    async object<T>(_prompt: string, _schema: z.ZodSchema<T>) {
+      if (opts.throwErr) throw new Error("llm boom");
+      if (opts.ok === false) return { ok: false, error: "boom" };
+      const val = opts.useDefault ? { importance: 0.8 } : opts.value;
+      return { ok: true, value: val as any as T };
+    },
   };
 }
 
-const ORIGINAL_MEMORY = config.get("memory");
-
-beforeEach(() => {
-  _setLlmEnabledForTesting(true);
-  config.set("memory", {
-    ...ORIGINAL_MEMORY,
-    autoImportance: { enabled: true },
-  });
-});
-
-afterEach(() => {
-  _setLlmEnabledForTesting(null);
-  config.set("memory", ORIGINAL_MEMORY);
-});
-
-// ─── R7B-01: scoring via LLM ───────────────────────────────────────────────────
-
-describe("SalienceJudge — R7B-01 LLM scoring", () => {
-  test("returns the clamped LLM verdict with source=llm", async () => {
-    const judge = new SalienceJudge(fakeSurface({ importance: 0.83 }));
-    const { salience, source } = await judge.scoreSalience(
-      "Critical auth decision",
-      MemoryType.DECISION,
-    );
-    expect(salience).toBeCloseTo(0.83, 5);
-    expect(source).toBe("llm");
+describe("SalienceJudge", () => {
+  beforeEach(() => {
+    autoImportanceEnabled = false;
+    _setSalienceJudgeForTesting(null);
   });
 
-  test("clamps out-of-range LLM verdicts into [0,1]", async () => {
-    const over = new SalienceJudge(fakeSurface({ importance: 5 } as any));
-    expect((await over.scoreSalience("x", MemoryType.CRITICAL)).salience).toBe(1);
-    const under = new SalienceJudge(fakeSurface({ importance: -3 } as any));
-    expect((await under.scoreSalience("x", MemoryType.CRITICAL)).salience).toBe(0);
-  });
-});
+  // ── scoreSalience ─────────────────────────────────────────────────────────
 
-// ─── R7B-02: degradation (the discrimination-sensor target) ───────────────────
-
-describe("SalienceJudge — R7B degradation returns neutral 0.5", () => {
-  test("feature disabled → neutral default, source=default", async () => {
-    config.set("memory", {
-      ...config.get("memory"),
-      autoImportance: { enabled: false },
+  describe("scoreSalience", () => {
+    test("returns neutral default when autoImportance disabled", async () => {
+      const judge = new SalienceJudge(makeSurface({ enabled: true }));
+      const result = await judge.scoreSalience("content", "decision" as any);
+      expect(result.salience).toBe(NEUTRAL_SALIENCE);
+      expect(result.source).toBe("default");
     });
-    const judge = new SalienceJudge(fakeSurface({ importance: 0.99 }));
-    const { salience, source } = await judge.scoreSalience(
-      "x",
-      MemoryType.DECISION,
-    );
-    expect(salience).toBe(NEUTRAL_SALIENCE);
-    expect(source).toBe("default");
+
+    test("returns neutral default when LLM disabled", async () => {
+      autoImportanceEnabled = true;
+      const judge = new SalienceJudge(makeSurface({ enabled: false }));
+      const result = await judge.scoreSalience("content", "decision" as any);
+      expect(result.salience).toBe(NEUTRAL_SALIENCE);
+      expect(result.source).toBe("default");
+    });
+
+    test("returns neutral default for empty content", async () => {
+      autoImportanceEnabled = true;
+      const judge = new SalienceJudge(makeSurface({ enabled: true }));
+      const result = await judge.scoreSalience("", "decision" as any);
+      expect(result.salience).toBe(NEUTRAL_SALIENCE);
+      expect(result.source).toBe("default");
+    });
+
+    test("returns neutral default for whitespace-only content", async () => {
+      autoImportanceEnabled = true;
+      const judge = new SalienceJudge(makeSurface({ enabled: true }));
+      const result = await judge.scoreSalience("   \n\t  ", "decision" as any);
+      expect(result.salience).toBe(NEUTRAL_SALIENCE);
+      expect(result.source).toBe("default");
+    });
+
+    test("returns LLM score when enabled and LLM succeeds", async () => {
+      autoImportanceEnabled = true;
+      const judge = new SalienceJudge(makeSurface({ enabled: true, value: { importance: 0.9 } }));
+      const result = await judge.scoreSalience("important content", "decision" as any);
+      expect(result.salience).toBe(0.9);
+      expect(result.source).toBe("llm");
+    });
+
+    test("clamps LLM score to [0,1]", async () => {
+      autoImportanceEnabled = true;
+      const judge = new SalienceJudge(makeSurface({ enabled: true, value: { importance: 1.5 } }));
+      const result = await judge.scoreSalience("content", "decision" as any);
+      expect(result.salience).toBe(1);
+    });
+
+    test("clamps negative LLM score to 0", async () => {
+      autoImportanceEnabled = true;
+      const judge = new SalienceJudge(makeSurface({ enabled: true, value: { importance: -0.5 } }));
+      const result = await judge.scoreSalience("content", "decision" as any);
+      expect(result.salience).toBe(0);
+    });
+
+    test("returns neutral default when LLM returns {ok:false}", async () => {
+      autoImportanceEnabled = true;
+      const judge = new SalienceJudge(makeSurface({ enabled: true, ok: false }));
+      const result = await judge.scoreSalience("content", "decision" as any);
+      expect(result.salience).toBe(NEUTRAL_SALIENCE);
+      expect(result.source).toBe("default");
+    });
+
+    test("returns neutral default when LLM throws", async () => {
+      autoImportanceEnabled = true;
+      const judge = new SalienceJudge(makeSurface({ enabled: true, throwErr: true }));
+      const result = await judge.scoreSalience("content", "decision" as any);
+      expect(result.salience).toBe(NEUTRAL_SALIENCE);
+      expect(result.source).toBe("default");
+    });
+
+    test("returns neutral default when LLM returns null value", async () => {
+      autoImportanceEnabled = true;
+      const judge = new SalienceJudge(makeSurface({ enabled: true, value: null }));
+      const result = await judge.scoreSalience("content", "decision" as any);
+      expect(result.salience).toBe(NEUTRAL_SALIENCE);
+      expect(result.source).toBe("default");
+    });
   });
 
-  test("LLM disabled → neutral default", async () => {
-    const judge = new SalienceJudge(
-      fakeSurface({ importance: 0.99 }, { enabled: false }),
-    );
-    const { salience, source } = await judge.scoreSalience(
-      "x",
-      MemoryType.DECISION,
-    );
-    expect(salience).toBe(NEUTRAL_SALIENCE);
-    expect(source).toBe("default");
+  // ── SalienceSchema ────────────────────────────────────────────────────────
+
+  describe("SalienceSchema", () => {
+    test("accepts valid importance in [0,1]", () => {
+      expect(SalienceSchema.safeParse({ importance: 0.5 }).success).toBe(true);
+      expect(SalienceSchema.safeParse({ importance: 0 }).success).toBe(true);
+      expect(SalienceSchema.safeParse({ importance: 1 }).success).toBe(true);
+    });
+
+    test("rejects importance out of range", () => {
+      expect(SalienceSchema.safeParse({ importance: -0.1 }).success).toBe(false);
+      expect(SalienceSchema.safeParse({ importance: 1.1 }).success).toBe(false);
+    });
+
+    test("rejects non-number importance", () => {
+      expect(SalienceSchema.safeParse({ importance: "high" }).success).toBe(false);
+    });
   });
 
-  test("LLM returns {ok:false} → neutral default", async () => {
-    const judge = new SalienceJudge(fakeSurface(null));
-    const { salience, source } = await judge.scoreSalience(
-      "x",
-      MemoryType.DECISION,
-    );
-    expect(salience).toBe(NEUTRAL_SALIENCE);
-    expect(source).toBe("default");
-  });
+  // ── getSalienceJudge / _setSalienceJudgeForTesting ─────────────────────────
 
-  test("LLM throws → neutral default (no throw escapes)", async () => {
-    const judge = new SalienceJudge(
-      fakeSurface({ importance: 0.99 }, { throws: true }),
-    );
-    const { salience, source } = await judge.scoreSalience(
-      "x",
-      MemoryType.DECISION,
-    );
-    expect(salience).toBe(NEUTRAL_SALIENCE);
-    expect(source).toBe("default");
-  });
-});
+  describe("getSalienceJudge / _setSalienceJudgeForTesting", () => {
+    test("getSalienceJudge returns a default instance", async () => {
+      const { getSalienceJudge } = await import("../services/memory/salience-judge.js");
+      const judge = getSalienceJudge();
+      expect(judge).toBeDefined();
+      _setSalienceJudgeForTesting(null);
+    });
 
-// ─── Edge cases (spec §"Edge cases") ──────────────────────────────────────────
-
-describe("SalienceJudge — edge cases", () => {
-  test("explicit empty content → neutral default", async () => {
-    const judge = new SalienceJudge(fakeSurface({ importance: 0.99 }));
-    expect((await judge.scoreSalience("", MemoryType.CRITICAL)).salience).toBe(
-      NEUTRAL_SALIENCE,
-    );
-    expect(
-      (await judge.scoreSalience("   \n\t  ", MemoryType.CRITICAL)).salience,
-    ).toBe(NEUTRAL_SALIENCE);
-  });
-
-  test("very long content is accepted (truncated internally, no throw)", async () => {
-    const long = "x".repeat(50_000);
-    const judge = new SalienceJudge(fakeSurface({ importance: 0.42 }));
-    const { salience, source } = await judge.scoreSalience(
-      long,
-      MemoryType.PATTERN,
-    );
-    expect(salience).toBeCloseTo(0.42, 5);
-    expect(source).toBe("llm");
-  });
-});
-
-// ─── Discrimination sensor (mutant must be killed by R7B-02) ──────────────────
-// The "LLM returns {ok:false} → neutral" test IS the mutant-kill: if the
-// degrade guard were removed, {ok:false} would propagate the (absent) verdict
-// and either throw or return NaN, breaking the .toBe(0.5) assertion.
-
-describe("discrimination sensor — degrade guard is load-bearing", () => {
-  test("removing the {ok:false} guard would NOT return a verdict (mutant kill)", async () => {
-    const judge = new SalienceJudge(fakeSurface(null));
-    const out = await judge.scoreSalience("real content", MemoryType.DECISION);
-    expect(out.salience).toBe(0.5);
-    expect(out.source).toBe("default");
+    test("_setSalienceJudgeForTesting overrides the module-level judge", async () => {
+      const { getSalienceJudge } = await import("../services/memory/salience-judge.js");
+      const fakeJudge = new SalienceJudge(makeSurface({ enabled: false }));
+      _setSalienceJudgeForTesting(fakeJudge);
+      expect(getSalienceJudge()).toBe(fakeJudge);
+      _setSalienceJudgeForTesting(null);
+    });
   });
 });

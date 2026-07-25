@@ -126,7 +126,7 @@ export class CompressContextTool implements IToolHandler {
     } catch (error) {
       logger.error("Failed to compress context", error as Error, {
         strategy,
-        contentLength: content.length,
+        contentLength: typeof content === "string" ? content.length : 0,
       });
 
       return {

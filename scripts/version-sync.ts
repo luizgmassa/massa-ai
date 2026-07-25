@@ -8,29 +8,62 @@
 import { readdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
-const root = join(import.meta.dir, "..");
-const rootPkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-const version: string = rootPkg.version;
-
-const targets = [
-  ...readdirSync(join(root, "packages")).map((d) =>
-    join(root, "packages", d, "package.json")
-  ),
-  ...readdirSync(join(root, "apps")).map((d) =>
-    join(root, "apps", d, "package.json")
-  ),
-];
-
-for (const pkgPath of targets) {
-  try {
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-    if (pkg.version === undefined) continue;
-    pkg.version = version;
-    writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
-    console.log(`  ✓ ${pkgPath.replace(root + "/", "")} → ${version}`);
-  } catch {
-    // skip missing paths
-  }
+export interface SyncedPackage {
+  path: string;
+  version: string | null;
+  skipped: boolean;
 }
 
-console.log(`\nAll packages synced to ${version}`);
+/**
+ * Sync every package/app version under `rootDir` to the root package.json
+ * version. Returns one entry per discovered package.json so callers (tests)
+ * can assert which files changed without parsing console output.
+ */
+export function syncVersions(rootDir: string): SyncedPackage[] {
+  const root = rootDir;
+  const rootPkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  const version: string = rootPkg.version;
+
+  const packageDirs = join(root, "packages");
+  const appsDirs = join(root, "apps");
+  const targets: string[] = [];
+  try {
+    targets.push(
+      ...readdirSync(packageDirs).map((d) => join(packageDirs, d, "package.json")),
+    );
+  } catch {
+    // no packages dir
+  }
+  try {
+    targets.push(
+      ...readdirSync(appsDirs).map((d) => join(appsDirs, d, "package.json")),
+    );
+  } catch {
+    // no apps dir
+  }
+
+  const synced: SyncedPackage[] = [];
+  for (const pkgPath of targets) {
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+      if (pkg.version === undefined) {
+        synced.push({ path: pkgPath, version: null, skipped: true });
+        continue;
+      }
+      pkg.version = version;
+      writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+      console.log(`  ✓ ${pkgPath.replace(root + "/", "")} → ${version}`);
+      synced.push({ path: pkgPath, version, skipped: false });
+    } catch {
+      // skip missing/unreadable paths
+      synced.push({ path: pkgPath, version: null, skipped: true });
+    }
+  }
+
+  console.log(`\nAll packages synced to ${version}`);
+  return synced;
+}
+
+if (import.meta.main) {
+  syncVersions(join(import.meta.dir, ".."));
+}

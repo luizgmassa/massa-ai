@@ -12,12 +12,16 @@
 import { Elysia } from "elysia";
 import { eventBus } from "@massa-ai/core";
 
-const HEARTBEAT_MS = 15_000;
-const MAX_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+const HEARTBEAT_MS_DEFAULT = 15_000;
+const MAX_DURATION_MS_DEFAULT = 10 * 60 * 1000; // 10 minutes
 
 export const eventsRoutes = new Elysia({ prefix: "/api/v1" }).get(
   "/events",
   async ({ query, set }) => {
+    // Read per-request so an env override (e.g. MASSA_AI_SSE_HEARTBEAT_MS) is
+    // honored even when this module was first imported under the default.
+    const HEARTBEAT_MS = Number(process.env.MASSA_AI_SSE_HEARTBEAT_MS) || HEARTBEAT_MS_DEFAULT;
+    const MAX_DURATION_MS = Number(process.env.MASSA_AI_SSE_MAX_DURATION_MS) || MAX_DURATION_MS_DEFAULT;
     const projectIdFilter = query.projectId as string | undefined;
     // Wave 5 FR-16: ?jobId= filter on events whose payload carries that jobId.
     const jobIdFilter = query.jobId as string | undefined;
@@ -30,6 +34,12 @@ export const eventsRoutes = new Elysia({ prefix: "/api/v1" }).get(
 
     const encoder = new TextEncoder();
     let closed = false;
+    // Hoisted to the handler scope so the ReadableStream `cancel` hook (a
+    // sibling of `start`, not nested in it) can tear them down. `start`
+    // populates them; `cancel` clears them.
+    let unsubscribers: (() => void)[] = [];
+    let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+    let closeTimer: ReturnType<typeof setTimeout> | undefined;
 
     const stream = new ReadableStream({
       start(controller) {
@@ -52,7 +62,7 @@ export const eventsRoutes = new Elysia({ prefix: "/api/v1" }).get(
           "workspace:updated",
         ] as const;
 
-        const unsubscribers = events.map((event) =>
+        unsubscribers = events.map((event) =>
           eventBus.subscribe(event, (payload: Record<string, unknown>) => {
             // Filter by projectId if specified (FR-16: AND composition).
             if (projectIdFilter && payload.projectId !== projectIdFilter) return;
@@ -64,7 +74,7 @@ export const eventsRoutes = new Elysia({ prefix: "/api/v1" }).get(
         );
 
         // Heartbeat to keep connection alive
-        const heartbeatTimer = setInterval(() => {
+        heartbeatTimer = setInterval(() => {
           if (closed) {
             clearInterval(heartbeatTimer);
             return;
@@ -78,7 +88,7 @@ export const eventsRoutes = new Elysia({ prefix: "/api/v1" }).get(
         }, HEARTBEAT_MS);
 
         // Auto-close after MAX_DURATION_MS
-        const closeTimer = setTimeout(() => {
+        closeTimer = setTimeout(() => {
           closed = true;
           unsubscribers.forEach((u) => u());
           clearInterval(heartbeatTimer);
@@ -98,14 +108,16 @@ export const eventsRoutes = new Elysia({ prefix: "/api/v1" }).get(
           },
           timestamp: new Date().toISOString(),
         });
-
-        // Cleanup on stream cancel (client disconnected)
-        return () => {
-          closed = true;
-          unsubscribers.forEach((u) => u());
-          clearInterval(heartbeatTimer);
-          clearTimeout(closeTimer);
-        };
+      },
+      // Cleanup on stream cancel (client disconnected). The `cancel` hook is
+      // the only reliable teardown seam: ReadableStream ignores a function
+      // returned from `start` (it only awaits a returned promise), so a
+      // start-return cleanup would silently leak subscribers + timers.
+      cancel() {
+        closed = true;
+        unsubscribers.forEach((u) => u());
+        if (heartbeatTimer) clearInterval(heartbeatTimer);
+        if (closeTimer) clearTimeout(closeTimer);
       },
     });
 

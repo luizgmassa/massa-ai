@@ -10,9 +10,6 @@ import {
   defaultMassaAiConfig,
 } from "@massa-ai/shared/config";
 
-const args = process.argv.slice(2);
-const command = args[0];
-
 function help() {
   console.log(`
 massa-ai-config - Configuration manager for massa-ai
@@ -48,7 +45,7 @@ Examples:
 `);
 }
 
-function parseOptions(args: string[]): Record<string, string | boolean> {
+export function parseOptions(args: string[]): Record<string, string | boolean> {
   const options: Record<string, string | boolean> = {};
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith("--")) {
@@ -64,14 +61,18 @@ function parseOptions(args: string[]): Record<string, string | boolean> {
   return options;
 }
 
-if (!command || command === "--help" || command === "-h") {
-  help();
-  process.exit(0);
-}
+export async function runCli(argv: string[]): Promise<number> {
+  const args = argv;
+  const command = args[0];
 
-const options = parseOptions(args.slice(1));
+  if (!command || command === "--help" || command === "-h") {
+    help();
+    return 0;
+  }
 
-switch (command) {
+  const options = parseOptions(args.slice(1));
+
+  switch (command) {
   case "init": {
     initConfig();
     
@@ -113,7 +114,7 @@ switch (command) {
       console.log("No config file found. Run `massa-ai-config init` to create one.");
       console.log("\nUsing defaults:");
       console.log(JSON.stringify(defaultMassaAiConfig, null, 2));
-      process.exit(0);
+      return 0;
     }
     
     const config = loadConfig();
@@ -127,7 +128,7 @@ switch (command) {
     
     if (!key || !value) {
       console.error("Usage: massa-ai-config set <key> <value>");
-      process.exit(1);
+      return 1;
     }
     
     const config = loadConfig();
@@ -150,7 +151,7 @@ switch (command) {
     
     if (!provider || !["ollama", "mistral", "openai"].includes(provider)) {
       console.error("Provider must be: ollama, mistral, or openai");
-      process.exit(1);
+      return 1;
     }
     
     const config = loadConfig();
@@ -165,7 +166,7 @@ switch (command) {
     } else if (provider === "mistral") {
       if (!options["api-key"]) {
         console.error("Error: --api-key required for Mistral");
-        process.exit(1);
+        return 1;
       }
       config.embedding = {
         provider: "mistral",
@@ -176,7 +177,7 @@ switch (command) {
     } else if (provider === "openai") {
       if (!options["api-key"]) {
         console.error("Error: --api-key required for OpenAI");
-        process.exit(1);
+        return 1;
       }
       config.embedding = {
         provider: "openai",
@@ -198,11 +199,11 @@ switch (command) {
 
     if (!projectId) {
       console.error("Error: projectId required. Usage: massa-ai-config recover <projectId> --path <newPath>");
-      process.exit(1);
+      return 1;
     }
     if (!newPath || typeof newPath !== "string") {
       console.error("Error: --path required. Usage: massa-ai-config recover <projectId> --path <newPath>");
-      process.exit(1);
+      return 1;
     }
 
     try {
@@ -210,14 +211,14 @@ switch (command) {
       const result = await recoverProjectPath(projectId, newPath);
       if (!result.found) {
         console.error(`Error: project "${projectId}" not found. Cannot recover — the project must be indexed first.`);
-        process.exit(1);
+        return 1;
       }
       console.log(`✓ Recovered project "${projectId}" — path updated to ${newPath}`);
       console.log(`  Previous path: ${result.oldPath ?? "(none)"}`);
     } catch (e) {
       const err = e as Error;
       console.error(`Error: recovery failed — ${err.message}`);
-      process.exit(1);
+      return 1;
     }
     break;
   }
@@ -225,5 +226,11 @@ switch (command) {
   default:
     console.error(`Unknown command: ${command}`);
     help();
-    process.exit(1);
+    return 1;
+  }
+  return 0;
+}
+
+if (import.meta.main) {
+  runCli(process.argv.slice(2)).then((code) => process.exit(code));
 }

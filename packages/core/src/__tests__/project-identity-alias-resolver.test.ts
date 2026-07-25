@@ -6,12 +6,15 @@
  * post-commit invalidation, and FAIL-OPEN behavior on lookup failure.
  */
 
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 
 import {
   ProjectIdentityAliasResolver,
+  getProjectIdentityAliasResolver,
+  setProjectIdentityAliasResolverForTests,
   type AliasResolverQuerier,
 } from "../services/project-identity/index.js";
+import { resetProjectIdentityAliasResolver } from "../services/project-identity/alias-resolver.js";
 
 class FakeQuerier implements AliasResolverQuerier {
   calls: string[] = [];
@@ -150,5 +153,46 @@ describe("project identity alias resolver — timeout cache discrimination", () 
     // mutant would instead serve "canonical" without a second query.
     await expect(resolver.resolve("proj")).resolves.toBe("proj");
     expect(calls).toBe(2);
+  });
+});
+
+describe("project identity alias resolver — process singleton + cache hatch", () => {
+  // The singleton getters mutate a module-level resolver; always reset so the
+  // shared-process test group sees no leakage.
+  afterEach(() => resetProjectIdentityAliasResolver());
+
+  test("getProjectIdentityAliasResolver memoizes one process-wide instance", () => {
+    const a = getProjectIdentityAliasResolver();
+    const b = getProjectIdentityAliasResolver();
+    expect(a).toBe(b);
+  });
+
+  test("resetProjectIdentityAliasResolver drops the memoized instance", () => {
+    const first = getProjectIdentityAliasResolver();
+    resetProjectIdentityAliasResolver();
+    const second = getProjectIdentityAliasResolver();
+    expect(second).not.toBe(first);
+  });
+
+  test("setProjectIdentityAliasResolverForTests swaps (and clears) the singleton", () => {
+    const stub = new ProjectIdentityAliasResolver({ querier: new FakeQuerier() });
+    setProjectIdentityAliasResolverForTests(stub);
+    expect(getProjectIdentityAliasResolver()).toBe(stub);
+    setProjectIdentityAliasResolverForTests(null);
+    expect(getProjectIdentityAliasResolver()).not.toBe(stub);
+  });
+
+  test("invalidateProject + clearCache manage the in-memory cache", async () => {
+    const querier = new FakeQuerier();
+    querier.mapping.set("retired", "live");
+    const resolver = new ProjectIdentityAliasResolver({ querier });
+    await resolver.resolve("retired"); // populates cache
+    expect(resolver.cacheSize).toBe(1);
+    resolver.invalidateProject("retired");
+    expect(resolver.cacheSize).toBe(0);
+    await resolver.resolve("retired");
+    expect(resolver.cacheSize).toBe(1);
+    resolver.clearCache();
+    expect(resolver.cacheSize).toBe(0);
   });
 });

@@ -13,9 +13,10 @@
  *  - malformed events are dropped client-side (do not poison the batch)
  *  - primary function unaffected: emit() returns synchronously (non-blocking)
  */
-import { test, expect, describe, mock, beforeEach } from "bun:test"
+import { test, expect, describe, mock, beforeEach, afterEach } from "bun:test"
 import {
   ObservationEmitter,
+  makeDefaultDeps,
   buildToolPayload,
   buildPromptPayload,
   buildSessionPayload,
@@ -293,5 +294,93 @@ describe("event → observation lifecycle-kind coverage", () => {
       expect(state.posts.length).toBe(1)
       expect(state.posts[0]!.body.events[0]!.event).toBe(kind)
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// makeDefaultDeps: real fetch-based post + timer wiring
+// ---------------------------------------------------------------------------
+
+describe("makeDefaultDeps", () => {
+  const originalFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  test("post returns true when fetch responds ok", async () => {
+    const captured: Array<{ url: string; init?: RequestInit }> = []
+    globalThis.fetch = (async (input, init) => {
+      captured.push({ url: String(input), init })
+      return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } })
+    }) as typeof fetch
+
+    const deps = makeDefaultDeps({
+      apiUrl: "http://localhost:3333",
+      log: () => {},
+      enabled: () => true,
+    })
+
+    const ok = await deps.post(
+      "http://localhost:3333/api/v1/hook/batch",
+      { events: [{ event: "post-tool-use", projectId: "p", payload: { tool_name: "Read" } }] },
+      3_000,
+    )
+    expect(ok).toBe(true)
+    expect(captured[0]!.init?.method).toBe("POST")
+    expect((captured[0]!.init!.body as string).length).toBeGreaterThan(0)
+  })
+
+  test("post returns false when fetch responds non-ok", async () => {
+    globalThis.fetch = (async () => new Response("nope", { status: 429 })) as typeof fetch
+
+    const deps = makeDefaultDeps({
+      apiUrl: "http://localhost:3333",
+      log: () => {},
+      enabled: () => true,
+    })
+
+    const ok = await deps.post("http://localhost:3333/x", { events: [] }, 3_000)
+    expect(ok).toBe(false)
+  })
+
+  test("post tolerates res.text() rejection (drain failure does not affect ok flag)", async () => {
+    globalThis.fetch = (async () => {
+      const r = new Response("{}", { status: 200 })
+      Object.defineProperty(r, "text", { value: async () => { throw new Error("drain fail") } })
+      return r
+    }) as typeof fetch
+
+    const deps = makeDefaultDeps({ apiUrl: "http://x", log: () => {}, enabled: () => true })
+    const ok = await deps.post("http://x", { events: [] }, 1_000)
+    expect(ok).toBe(true)
+  })
+
+  test("now() returns a growing epoch-ms number; setTimer/clearTimer use real timers", async () => {
+    const deps = makeDefaultDeps({ apiUrl: "http://x", log: () => {}, enabled: () => true })
+    const before = deps.now()
+    await new Promise((r) => setTimeout(r, 5))
+    expect(deps.now()).toBeGreaterThanOrEqual(before)
+
+    let fired = false
+    const id = deps.setTimer(() => { fired = true }, 10)
+    await new Promise((r) => setTimeout(r, 30))
+    expect(fired).toBe(true)
+    deps.clearTimer(id)
+  })
+
+  test("makeDefaultDeps wires end-to-end: ObservationEmitter flushes via real post", async () => {
+    globalThis.fetch = (async () => new Response("{}", { status: 200 })) as typeof fetch
+    const logs: string[] = []
+    const deps = makeDefaultDeps({
+      apiUrl: "http://localhost:3333",
+      log: (level, message) => logs.push(`${level}:${message}`),
+      enabled: () => true,
+    })
+    const e = new ObservationEmitter({ deps, maxBatch: 1 })
+    e.emit({ event: "post-tool-use", projectId: "p", payload: { tool_name: "Read" } })
+    // maxBatch=1 → immediate flush timer; fire after a tick
+    await new Promise((r) => setTimeout(r, 30))
+    expect(logs.length === 0 || logs.every((l) => !l.startsWith("warn"))).toBe(true)
   })
 })

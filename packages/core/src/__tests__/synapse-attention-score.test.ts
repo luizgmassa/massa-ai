@@ -118,4 +118,115 @@ describe("applyAttentionScore", () => {
     expect(b.recency).toBeGreaterThan(0.9); // fresh -> close to 1
     expect(b.final).toBeGreaterThan(0);
   });
+
+  // ── extractCreatedAt branch coverage (lines 67-71) ──────────────────────
+
+  test("createdAt as Date object is parsed to ms", () => {
+    const d = new Date(NOW - DAY);
+    const out = applyAttentionScore(
+      [r("d", "x", 0.5, { createdAt: d })],
+      cfg,
+      null,
+      NOW,
+    );
+    expect(out.breakdowns[0].recency).toBeGreaterThan(0.9);
+  });
+
+  test("createdAt as ISO string is parsed to ms", () => {
+    const iso = new Date(NOW - DAY).toISOString();
+    const out = applyAttentionScore(
+      [r("iso", "x", 0.5, { createdAt: iso })],
+      cfg,
+      null,
+      NOW,
+    );
+    expect(out.breakdowns[0].recency).toBeGreaterThan(0.9);
+  });
+
+  test("createdAt as invalid string yields recency 0 (treated as null)", () => {
+    const out = applyAttentionScore(
+      [r("bad", "x", 0.5, { createdAt: "not-a-date" })],
+      cfg,
+      null,
+      NOW,
+    );
+    expect(out.breakdowns[0].recency).toBe(0);
+  });
+
+  test("createdAt as non-number/string/Date yields recency 0", () => {
+    const out = applyAttentionScore(
+      [r("obj", "x", 0.5, { createdAt: { weird: true } })],
+      cfg,
+      null,
+      NOW,
+    );
+    expect(out.breakdowns[0].recency).toBe(0);
+  });
+
+  test("createdAt null yields recency 0", () => {
+    const out = applyAttentionScore(
+      [r("n", "x", 0.5, { createdAt: null })],
+      cfg,
+      null,
+      NOW,
+    );
+    expect(out.breakdowns[0].recency).toBe(0);
+  });
+
+  test("rerankWindow <= 0 falls back to 10", () => {
+    const results: SearchResult[] = [];
+    for (let i = 0; i < 12; i++) {
+      results.push(r(`r${i}`, `content ${i}`, 1 - i * 0.05));
+    }
+    const out = applyAttentionScore(
+      results,
+      { ...cfg, rerankWindow: 0 },
+      null,
+      NOW,
+    );
+    // window defaults to 10, so indices 10..11 are untouched tail
+    expect(out.results.slice(10).map((r) => r.id)).toEqual(["r10", "r11"]);
+  });
+
+  test("accessCount negative/non-finite is treated as 0", () => {
+    const out = applyAttentionScore(
+      [r("neg", "x", 0.5, { accessCount: -5 }), r("nan", "y", 0.5, { accessCount: NaN })],
+      { ...cfg, rerankWindow: 10 },
+      null,
+      NOW,
+    );
+    // Both have accessCount treated as 0 -> accessHeat 0; semantic equal -> tie
+    expect(out.results).toHaveLength(2);
+  });
+
+  test("NaN final score clamps to 0", () => {
+    // A NaN semantic score would propagate; clamp01 handles it.
+    const out = applyAttentionScore(
+      [r("nan", "x", NaN)],
+      cfg,
+      null,
+      NOW,
+    );
+    expect(out.breakdowns[0].semantic).toBe(0);
+    expect(out.breakdowns[0].final).toBe(0);
+  });
+
+  test("all-zero active weights uses scale=1 (degenerate)", () => {
+    const zeroWeights = {
+      semantic: 0,
+      recency: 0,
+      accessHeat: 0,
+      taskAlign: 0,
+      agentAffinity: 0,
+      confidence: 0,
+    };
+    const out = applyAttentionScore(
+      [r("z", "x", 0.5, { createdAt: NOW, accessCount: 5 })],
+      { ...cfg, weights: zeroWeights },
+      null,
+      NOW,
+    );
+    // totalActive = 0 -> scale = 1; final = 0
+    expect(out.breakdowns[0].final).toBe(0);
+  });
 });

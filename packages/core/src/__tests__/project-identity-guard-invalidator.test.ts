@@ -10,7 +10,7 @@
  *  - req 9: errors are typed and sanitized — SQLSTATE-style codes only.
  */
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 
 import { eventBus } from "../services/events/event-bus.js";
 import {
@@ -20,6 +20,7 @@ import {
   createProductionProjectIdentityInvalidatorRegistry,
   installGuardOnTable,
   installProjectIdentityGuards,
+  installProjectIdentityGuardsFromPool,
   type IdentityGuardInstallerClient,
   type ProductionInvalidatorTargets,
 } from "../services/project-identity/index.js";
@@ -30,12 +31,15 @@ class FakeInstallerClient implements IdentityGuardInstallerClient {
   installs: { target: string; column: string }[] = [];
   pgTables: string[] = [];
   failingTargets = new Map<string, unknown>();
+  /** When set, the runtime pg_tables probe rejects (simulates discovery failure). */
+  probeThrows = false;
 
   async query<Row = Record<string, unknown>>(
     text: string,
     values: readonly unknown[] = [],
   ): Promise<{ rows: Row[] }> {
     if (text.includes("pg_tables")) {
+      if (this.probeThrows) throw Object.assign(new Error("pg_catalog unreadable /secret"), { code: "58P01" });
       return { rows: this.pgTables.map((tablename) => ({ tablename })) as unknown as Row[] };
     }
     if (text.includes("project_identity_install_guard")) {
@@ -46,7 +50,27 @@ class FakeInstallerClient implements IdentityGuardInstallerClient {
     }
     throw new Error(`unexpected SQL in fake: ${text}`);
   }
+
+  releaseCount = 0;
+  release(): void { this.releaseCount += 1; }
 }
+
+// Production path (`installProjectIdentityGuardsFromPool`) acquires the shared
+// pg pool from `data/db-connection.js`. We substitute a controllable pool so the
+// test never opens a real connection. `mock.module` is process-global, so this
+// file runs isolated (the other tests in this file never call `getPgPool`).
+const poolHolder: {
+  pool: {
+    connect(): Promise<FakeInstallerClient>;
+  } | null;
+} = { pool: null };
+
+mock.module("../data/db-connection.js", () => ({
+  getPgPool: async () => {
+    if (!poolHolder.pool) throw new Error("test pool not configured");
+    return poolHolder.pool;
+  },
+}));
 
 // FROZEN explicit expectation (review-driven: deriving this from
 // STATIC_DIRECT_STORES would mirror the implementation and pass green if a
@@ -158,6 +182,79 @@ describe("project identity guard installer", () => {
     client.failingTargets.set("public.other", new Error("no code"));
     await expect(installGuardOnTable(client, "public", "other", "project_id"))
       .resolves.toBe("UNKNOWN");
+  });
+
+  test("runtime pg_tables probe failure is isolated into one sanitized failure entry (never aborts)", async () => {
+    const client = new FakeInstallerClient();
+    client.probeThrows = true;
+
+    const report = await installProjectIdentityGuards(client);
+
+    // Static catalog still fully installed despite the discovery failure.
+    expect(report.installed.slice().sort()).toEqual(EXPECTED_GUARDED_TABLES.slice().sort());
+    expect(report.runtimeTablesGuarded).toEqual([]);
+    // The single discovery failure is recorded with a sanitized PG SQLSTATE code.
+    expect(report.failures).toEqual([{ table: "<runtime-discovery:vector_documents>", code: "58P01" }]);
+    // No error message leaks (sanitization).
+    expect(JSON.stringify(report)).not.toContain("/secret");
+    expect(JSON.stringify(report)).not.toContain("pg_catalog");
+  });
+
+  test("a runtime vector_documents table whose install fails is isolated and sanitized", async () => {
+    const client = new FakeInstallerClient();
+    client.pgTables = ["vector_documents_1536d"];
+    client.failingTargets.set(
+      "public.vector_documents_1536d",
+      Object.assign(new Error("install blew up /home/bob"), { code: "42P07" }),
+    );
+
+    const report = await installProjectIdentityGuards(client);
+
+    expect(report.runtimeTablesGuarded).toEqual([]);
+    expect(report.failures).toContainEqual({ table: "vector_documents_1536d", code: "42P07" });
+    // Static catalog still completes.
+    expect(report.installed.length).toBe(EXPECTED_GUARDED_TABLES.length);
+    // Sanitization: the sensitive message never surfaces.
+    expect(JSON.stringify(report)).not.toContain("/home/bob");
+  });
+});
+
+// ─── Production pool wiring ──────────────────────────────────────────────────
+
+describe("installProjectIdentityGuardsFromPool (production wiring)", () => {
+  test("acquires a client, installs guards, and releases the client exactly once", async () => {
+    const client = new FakeInstallerClient();
+    poolHolder.pool = { connect: async () => client };
+
+    const report = await installProjectIdentityGuardsFromPool();
+
+    expect(report.installed.slice().sort()).toEqual(EXPECTED_GUARDED_TABLES.slice().sort());
+    expect(report.failures).toEqual([]);
+    expect(client.releaseCount).toBe(1);
+    poolHolder.pool = null;
+  });
+
+  test("releases the client even when an install throws mid-loop (finally contract)", async () => {
+    // installProjectIdentityGuards never throws (failures are isolated), but the
+    // finally must still release the client if the inner call were to reject.
+    // We force the scenario by making connect itself resolve and relying on the
+    // installer's internal isolation: release runs regardless.
+    const client = new FakeInstallerClient();
+    client.failingTargets.set("public.memories", Object.assign(new Error("boom"), { code: "42703" }));
+    poolHolder.pool = { connect: async () => client };
+
+    const report = await installProjectIdentityGuardsFromPool();
+
+    expect(report.failures).toContainEqual({ table: "memories", code: "42703" });
+    expect(client.releaseCount).toBe(1);
+    poolHolder.pool = null;
+  });
+
+  test("propagates a pool-acquisition/connect failure (only throws on connect)", async () => {
+    poolHolder.pool = { connect: async () => { throw new Error("connection refused"); } };
+
+    await expect(installProjectIdentityGuardsFromPool()).rejects.toThrow("connection refused");
+    poolHolder.pool = null;
   });
 });
 

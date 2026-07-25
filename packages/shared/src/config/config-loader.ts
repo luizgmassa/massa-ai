@@ -110,6 +110,15 @@ export function migrateDataDirOnce(): void {
   }
 }
 
+/**
+ * Test-only seam: clear the module-level one-shot guard so migrateDataDirOnce()
+ * can be exercised repeatedly under fs spies. Production code never calls this;
+ * the one-shot semantics are fully preserved for real startups.
+ */
+export function __resetMigrationForTests(): void {
+  migrationAttempted = false;
+}
+
 export function saveConfig(config: MassaAiConfig): void {
   if (!fs.existsSync(CONFIG_DIR)) {
     fs.mkdirSync(CONFIG_DIR, { recursive: true });

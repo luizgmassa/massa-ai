@@ -120,3 +120,34 @@ describe("async handoff stores", () => {
     expect(await store.getById("handoff-1")).toBeNull();
   });
 });
+
+describe("MemoryHandoffStore branch coverage", () => {
+  test("listPending filters by targetAgent (null/exact/null-row) and orders by createdAt; getById/setStatus miss returns null", async () => {
+    const store = new MemoryHandoffStore();
+    await store.insert(handoff({ id: "h-a", targetAgent: "alpha", createdAt: 3_000 }));
+    await store.insert(handoff({ id: "h-b", targetAgent: null, createdAt: 1_000 }));
+    await store.insert(handoff({ id: "h-c", targetAgent: "beta", createdAt: 2_000 }));
+    await store.insert(handoff({ id: "h-d", targetAgent: "alpha", projectId: "other", createdAt: 9_000 }));
+
+    // No targetAgent filter: every open row for project-1, ordered by createdAt.
+    expect((await store.listPending("project-1")).map((r) => r.id)).toEqual(["h-b", "h-c", "h-a"]);
+    // Exact targetAgent match includes the alpha row; the null-agent row (h-b) is also included.
+    expect((await store.listPending("project-1", "alpha")).map((r) => r.id)).toEqual(["h-b", "h-a"]);
+    // Unknown targetAgent still returns the null-agent row (fail-open).
+    expect((await store.listPending("project-1", "gamma")).map((r) => r.id)).toEqual(["h-b"]);
+
+    // setStatus: missing row → null.
+    expect(await store.setStatus("missing", "accepted")).toBeNull();
+    // accepted with explicit acceptedAt; expired clears acceptedAt.
+    const accepted = await store.setStatus("h-a", "accepted", 5_000);
+    expect(accepted).toMatchObject({ id: "h-a", status: "accepted", acceptedAt: 5_000 });
+    const expired = await store.setStatus("h-b", "expired");
+    expect(expired).toMatchObject({ id: "h-b", status: "expired", acceptedAt: null });
+    // accepted with no acceptedAt stamps Date.now().
+    const before = Date.now();
+    const stamped = await store.setStatus("h-c", "accepted");
+    expect(stamped!.acceptedAt).toBeGreaterThanOrEqual(before);
+    // Accepted/expired rows drop out of listPending.
+    expect((await store.listPending("project-1")).map((r) => r.id)).toEqual([]);
+  });
+});

@@ -281,14 +281,17 @@ export function restoreWorkingMemoryBuffer(
     if (!e || !e.result || typeof e.id !== "string") continue;
     // Skip entries already past TTL at restore time — they would be evicted on
     // the first get() anyway, so don't bother rehydrating dead weight.
-    if (now - (e.lastAccessedAt ?? 0) >= snapshot.config.ttlMs) continue;
+    // Use the same fallback (now) as the stored value so a missing
+    // lastAccessedAt is treated as fresh, not as epoch-0 (always expired).
+    const lastAccessedAt = e.lastAccessedAt ?? now;
+    if (now - lastAccessedAt >= snapshot.config.ttlMs) continue;
     const result = e.result;
     (buf as any).entries.set(e.id, {
       result,
       queryTokens: new Set<string>(),
       contentTokens: tokenize(result.content || ""),
       addedAt: e.addedAt ?? now,
-      lastAccessedAt: e.lastAccessedAt ?? now,
+      lastAccessedAt,
       baselineScore: e.baselineScore ?? result.score,
     });
   }
@@ -299,7 +302,8 @@ export function restoreWorkingMemoryBuffer(
  * Snapshot a live WorkingMemoryBuffer for persistence. Best-effort: scalars
  * only (token Sets are regenerable from result content on restore). Shared by
  * the PostgreSQL and PG session stores so the snapshot shape stays consistent.
- * Returns `null` when the session has no buffer or it has no entries.
+ * Returns `null` when the session has no buffer (or the buffer has no
+ * `entries` Map); an empty-but-valid buffer returns `{ entries: [], config }`.
  */
 export function snapshotWorkingMemoryBuffer(
   session: { buffer?: WorkingMemoryBuffer },
