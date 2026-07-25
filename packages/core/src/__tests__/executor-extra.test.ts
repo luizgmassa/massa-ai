@@ -113,7 +113,10 @@ describe.skipIf(!HAS_RUST)("PolyglotExecutor Rust compile+run", () => {
     });
     expect(result.stdout.trim()).toBe("rust-ok");
     expect(result.exitCode).toBe(0);
-  });
+    // bunfig.toml sets a global 5s per-test timeout. A cold rustc compile takes
+    // ~6s on CI, and the executor is handed a 30s budget above, so the test
+    // budget has to clear both.
+  }, 60_000);
 
   test("compile failure returns stderr with 'Compilation failed'", async () => {
     const exec = new PolyglotExecutor({ projectRoot: "/tmp" });
@@ -124,7 +127,7 @@ describe.skipIf(!HAS_RUST)("PolyglotExecutor Rust compile+run", () => {
     });
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("Compilation failed");
-  });
+  }, 60_000);
 });
 
 // Rust path with injected fake runtimes (covers compile-failure + finally
