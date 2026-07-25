@@ -10,15 +10,27 @@
  * Integration tests with real embedding providers are separate.
  */
 
-import { describe, test, expect, mock } from "bun:test";
+import { describe, test, expect, mock, beforeEach } from "bun:test";
 
 // Mock the embedding provider so tests don't require a running Ollama instance.
-// The "provider promise is shared" test only verifies that concurrent calls
-// return the same Promise object — it never awaits the resolved value.
+// Provider factory is controlled per-test via `currentProviderFactory`.
+const fakeProvider = {
+  dimensions: 384,
+  async embedQuery(content: string): Promise<number[]> {
+    return [content.length];
+  },
+  async embedBatch(contents: string[]): Promise<number[][]> {
+    return contents.map((c) => [c.length]);
+  },
+};
+const failingProvider = {
+  dimensions: 128,
+  async embedQuery(): Promise<number[]> { throw new Error("embed failed"); },
+  async embedBatch(): Promise<number[][]> { throw new Error("batch failed"); },
+};
+let currentProviderFactory: () => Promise<unknown> = () => Promise.resolve(fakeProvider);
 mock.module("../services/embeddings/index.js", () => ({
-  createEmbeddingProvider: mock(
-    () => new Promise(() => { /* intentionally never resolves */ }),
-  ),
+  createEmbeddingProvider: mock(() => currentProviderFactory()),
 }));
 
 import { SearchResult, VectorDocument, VectorStoreStats, ProjectInfo, IVectorCollection } from "@massa-ai/shared";
@@ -45,6 +57,17 @@ class TestableVectorStore extends BaseVectorStore {
 
   public testSimilarityToDistance(similarity: number) {
     return this.similarityToDistance(similarity);
+  }
+
+  // Expose embedding-related protected methods for coverage
+  public async testGetEmbeddingDimensions() {
+    return this.getEmbeddingDimensions();
+  }
+  public async testEmbedContent(content: string) {
+    return this.embedContent(content);
+  }
+  public async testEmbedBatch(contents: string[]) {
+    return this.embedBatch(contents);
   }
 
   // Stub implementations for abstract methods
@@ -270,6 +293,42 @@ describe("BaseVectorStore", () => {
       expect(await store.listProjects()).toEqual([]);
       expect(await store.healthCheck()).toBe(true);
       await store.close();
+    });
+  });
+
+  // ── Embedding helpers (success + error paths) ──────────────
+  describe("embedding helpers", () => {
+    beforeEach(() => {
+      currentProviderFactory = () => Promise.resolve(fakeProvider);
+    });
+
+    test("getEmbeddingDimensions returns provider.dimensions", async () => {
+      const store = new TestableVectorStore();
+      expect(await store.testGetEmbeddingDimensions()).toBe(384);
+    });
+
+    test("embedContent returns the provider's embedding", async () => {
+      const store = new TestableVectorStore();
+      const vec = await store.testEmbedContent("hello world");
+      expect(vec).toEqual([11]);
+    });
+
+    test("embedContent rethrows on provider failure", async () => {
+      currentProviderFactory = () => Promise.resolve(failingProvider);
+      const store = new TestableVectorStore();
+      expect(store.testEmbedContent("boom")).rejects.toThrow("embed failed");
+    });
+
+    test("embedBatch returns the provider's batch embeddings", async () => {
+      const store = new TestableVectorStore();
+      const vecs = await store.testEmbedBatch(["ab", "cde"]);
+      expect(vecs).toEqual([[2], [3]]);
+    });
+
+    test("embedBatch rethrows on provider failure", async () => {
+      currentProviderFactory = () => Promise.resolve(failingProvider);
+      const store = new TestableVectorStore();
+      expect(store.testEmbedBatch(["x"])).rejects.toThrow("batch failed");
     });
   });
 });

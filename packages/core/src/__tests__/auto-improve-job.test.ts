@@ -515,6 +515,71 @@ describe("AutoImproveJob — approve / reject state machine", () => {
   });
 });
 
+// ── maybeRun throttling ─────────────────────────────────────────────────────
+
+describe("AutoImproveJob — maybeRun throttling", () => {
+  beforeEach(() => {
+    idCounter = 0;
+  });
+
+  it("does not run when below minObservations and never run before", () => {
+    const { job } = makeJob({ observations: [], reviewGate: true });
+    // Override to a high threshold so a single call stays below.
+    (job as any).minObservations = 100;
+    (job as any).minIntervalMs = 60_000;
+    job.maybeRun("proj-throttle");
+    expect(job.runCalls).toBe(0);
+  });
+
+  it("runs once newSinceRun reaches minObservations", async () => {
+    const { job } = makeJob({ observations: hotFileObservations(), reviewGate: true });
+    (job as any).minObservations = 1;
+    (job as any).minIntervalMs = 60_000;
+    job.maybeRun("proj-throttle");
+    // maybeRun fires runOnce fire-and-forget; await it via runCalls polling.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(job.runCalls).toBe(1);
+  });
+
+  it("runs via interval-elapsed even when below minObservations", async () => {
+    const { job } = makeJob({ observations: hotFileObservations(), reviewGate: true });
+    (job as any).minObservations = 2;
+    (job as any).minIntervalMs = 1; // elapsed almost immediately
+    // First call: below threshold, never ran → skip.
+    job.maybeRun("proj-throttle");
+    expect(job.runCalls).toBe(0);
+    // Second call: reaches threshold → runs, sets lastRunAt.
+    job.maybeRun("proj-throttle");
+    await new Promise((r) => setTimeout(r, 30));
+    expect(job.runCalls).toBe(1);
+    // Wait for interval to elapse.
+    await new Promise((r) => setTimeout(r, 10));
+    // Third call: below threshold again, but interval elapsed → runs.
+    job.maybeRun("proj-throttle");
+    await new Promise((r) => setTimeout(r, 30));
+    expect(job.runCalls).toBe(2);
+  });
+
+  it("swallows runOnce rejection silently (best-effort)", async () => {
+    const { job, store } = makeJob({ observations: hotFileObservations(), reviewGate: true });
+    (job as any).minObservations = 1;
+    (job as any).minIntervalMs = 60_000;
+    // Force runOnce to reject by breaking the proposal store.
+    const failure = new SearchServiceError("SEARCH_BACKEND_UNAVAILABLE", "proposal_store");
+    store.setStatus = async () => { throw failure; };
+    // First call triggers auto-approval path (reviewGate defaults off in makeJob
+    // only when not passed; here reviewGate=true so no approve). Use reviewGate=false
+    // to hit the approve path that rethrows.
+    const auto = makeJob({ observations: hotFileObservations() });
+    (auto.job as any).minObservations = 1;
+    (auto.job as any).minIntervalMs = 60_000;
+    auto.store.setStatus = async () => { throw failure; };
+    // maybeRun must NOT throw even though runOnce rejects.
+    expect(() => auto.job.maybeRun("proj-swallow")).not.toThrow();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+});
+
 // ── Tool / route wiring assertion ───────────────────────────────────────────
 
 describe("P5-TOOL-01: MCP tools + route registered", () => {

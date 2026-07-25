@@ -52,9 +52,13 @@ describe.skipIf(!DB_AVAILABLE)("PostgresVectorStore — extended coverage", () =
 
   afterEach(async () => {
     for (const store of stores) {
-      for (const projectId of projects) await store.deleteByProject(projectId);
-      for (const id of ids) await store.delete(id);
-      await store.close();
+      for (const projectId of projects) {
+        try { await store.deleteByProject(projectId); } catch { /* table may be dropped */ }
+      }
+      for (const id of ids) {
+        try { await store.delete(id); } catch { /* table may be dropped */ }
+      }
+      try { await store.close(); } catch { /* already closed */ }
     }
     stores.length = 0;
     projects.clear();
@@ -244,5 +248,189 @@ describe.skipIf(!DB_AVAILABLE)("PostgresVectorStore — extended coverage", () =
     // Clean up
     await pool.query("DROP TABLE IF EXISTS vector_documents_2048d CASCADE");
     await store.close();
+  });
+
+  test("searchTwoPhase (BQ >2000 dims) returns results via binary quantization", async () => {
+    class HighDimStore extends PostgresVectorStore {
+      protected override async getEmbeddingDimensions(): Promise<number> { return 2048; }
+      protected override async embedContent(content: string): Promise<number[]> {
+        const v = Array<number>(2048).fill(0);
+        // Deterministic axis keyed off first char so different contents differ.
+        v[content.charCodeAt(0) % 2048] = 1;
+        return v;
+      }
+      protected override async embedBatch(contents: string[]): Promise<number[][]> {
+        return Promise.all(contents.map((c) => this.embedContent(c)));
+      }
+    }
+    const store = new HighDimStore({ connectionString: DATABASE_URL, poolSize: 2 });
+    stores.push(store as any);
+    const projectId = project();
+    const id = `pg-ext-bq-${randomUUID()}`;
+    ids.add(id);
+    await store.addDocument(id, "alpha document", { projectId });
+    const results = await store.search("alpha document", 5, projectId);
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].id).toBe(id);
+    // Cleanup the runtime-created high-dim table
+    await store.deleteByProject(projectId);
+    const pool = await store.ensureInitialized();
+    await pool.query("DROP TABLE IF EXISTS vector_documents_2048d CASCADE");
+  });
+
+  test("searchTwoPhase with projectId filter returns only scoped results", async () => {
+    class HighDimStore extends PostgresVectorStore {
+      protected override async getEmbeddingDimensions(): Promise<number> { return 2048; }
+      protected override async embedContent(content: string): Promise<number[]> {
+        const v = Array<number>(2048).fill(0);
+        v[content.charCodeAt(0) % 2048] = 1;
+        return v;
+      }
+      protected override async embedBatch(contents: string[]): Promise<number[][]> {
+        return Promise.all(contents.map((c) => this.embedContent(c)));
+      }
+    }
+    const store = new HighDimStore({ connectionString: DATABASE_URL, poolSize: 2 });
+    stores.push(store as any);
+    const p1 = project();
+    const p2 = project();
+    const id1 = `pg-ext-bq-p1-${randomUUID()}`;
+    const id2 = `pg-ext-bq-p2-${randomUUID()}`;
+    ids.add(id1);
+    ids.add(id2);
+    await store.addDocument(id1, "bravo document", { projectId: p1 });
+    await store.addDocument(id2, "bravo document", { projectId: p2 });
+    const scoped = await store.searchByEmbedding(
+      await (store as any).embedContent("bravo document"),
+      10,
+      p1,
+    );
+    expect(scoped.every((r) => r.id !== id2)).toBe(true);
+    await store.deleteByProject(p1);
+    await store.deleteByProject(p2);
+    const pool = await store.ensureInitialized();
+    await pool.query("DROP TABLE IF EXISTS vector_documents_2048d CASCADE");
+  });
+
+  test("addDocuments falls back per-document when sub-batch insert fails (dim mismatch)", async () => {
+    // embedBatch returns WRONG-dimension vectors → insertSubBatch throws
+    // (ROLLBACK) → per-document fallback uses embedContent (correct dim).
+    class MismatchStore extends PostgresVectorStore {
+      protected override async getEmbeddingDimensions(): Promise<number> { return 1024; }
+      protected override async embedContent(content: string): Promise<number[]> {
+        const v = Array<number>(1024).fill(0);
+        v[0] = content.length;
+        return v;
+      }
+      protected override async embedBatch(): Promise<number[][]> {
+        // Wrong dimension → insertSubBatch dimension-mismatch error → ROLLBACK.
+        return [Array<number>(512).fill(0)];
+      }
+    }
+    const store = new MismatchStore({ connectionString: DATABASE_URL, poolSize: 2 });
+    stores.push(store as any);
+    const projectId = project();
+    const id = `pg-ext-mismatch-${randomUUID()}`;
+    ids.add(id);
+    // Sub-batch fails, per-document fallback inserts via embedContent.
+    await store.addDocuments([
+      { id, content: "mismatch fallback content", metadata: { projectId } },
+    ]);
+    // The per-document fallback should have landed the row.
+    const stats = await store.getStats(projectId);
+    expect(stats.totalDocuments).toBeGreaterThanOrEqual(1);
+  });
+
+  test("addDocuments skips documents that fail both batch and single embed", async () => {
+    // Both embedBatch AND embedContent fail → totalFailed increments, row skipped.
+    class AllFailStore extends PostgresVectorStore {
+      protected override async getEmbeddingDimensions(): Promise<number> { return 1024; }
+      protected override async embedContent(): Promise<number[]> { throw new Error("nope"); }
+      protected override async embedBatch(): Promise<number[][]> { throw new Error("batch nope"); }
+    }
+    const store = new AllFailStore({ connectionString: DATABASE_URL, poolSize: 2 });
+    stores.push(store as any);
+    const projectId = project();
+    // Neither path succeeds; addDocuments resolves without throwing.
+    await store.addDocuments([
+      { id: `pg-ext-allfail-${randomUUID()}`, content: "fails", metadata: { projectId } },
+    ]);
+    const stats = await store.getStats(projectId);
+    expect(stats.totalDocuments).toBe(0);
+  });
+
+  test("addDocument throws on embedding dimension mismatch", async () => {
+    class WrongDimStore extends PostgresVectorStore {
+      protected override async getEmbeddingDimensions(): Promise<number> { return 1024; }
+      protected override async embedContent(): Promise<number[]> { return Array<number>(512).fill(0); }
+      protected override async embedBatch(contents: string[]): Promise<number[][]> {
+        return Promise.all(contents.map(() => Array<number>(512).fill(0)));
+      }
+    }
+    const store = new WrongDimStore({ connectionString: DATABASE_URL, poolSize: 2 });
+    stores.push(store as any);
+    const projectId = project();
+    expect(
+      store.addDocument(`pg-ext-wrongdim-${randomUUID()}`, "x", { projectId }),
+    ).rejects.toThrow(/Embedding dimension mismatch/);
+  });
+
+  test("searchByEmbedding throws on dimension mismatch", async () => {
+    const store = makeStore();
+    await expect(store.searchByEmbedding(Array<number>(10).fill(0), 5)).rejects.toThrow(
+      /Embedding dimension mismatch/,
+    );
+  });
+
+  test("searchDirect without projectId scans the whole table", async () => {
+    const store = makeStore();
+    const projectId = project();
+    const id = `pg-ext-noprojectid-${randomUUID()}`;
+    ids.add(id);
+    await store.addDocument(id, "no project filter content", { projectId });
+    // search() with no projectId → searchDirect unscoped branch.
+    const results = await store.search("no project filter content", 10);
+    expect(results.length).toBeGreaterThan(0);
+  });
+
+  test("searchTwoPhase returns [] when no candidates match", async () => {
+    class HighDimStore extends PostgresVectorStore {
+      protected override async getEmbeddingDimensions(): Promise<number> { return 2048; }
+      protected override async embedContent(content: string): Promise<number[]> {
+        const v = Array<number>(2048).fill(0);
+        v[content.charCodeAt(0) % 2048] = 1;
+        return v;
+      }
+      protected override async embedBatch(contents: string[]): Promise<number[][]> {
+        return Promise.all(contents.map((c) => this.embedContent(c)));
+      }
+    }
+    const store = new HighDimStore({ connectionString: DATABASE_URL, poolSize: 2 });
+    stores.push(store as any);
+    const projectId = project();
+    // No documents inserted → phase-1 candidate set is empty → returns [].
+    const results = await store.searchByEmbedding(
+      await (store as any).embedContent("nothing here"),
+      5,
+      projectId,
+    );
+    expect(results).toEqual([]);
+    const pool = await store.ensureInitialized();
+    await pool.query("DROP TABLE IF EXISTS vector_documents_2048d CASCADE");
+  });
+
+  test("getStats without projectId scans the whole table", async () => {
+    const store = makeStore();
+    const stats = await store.getStats();
+    expect(stats.totalDocuments).toBeGreaterThanOrEqual(0);
+  });
+
+  test("ivfflat indexType is accepted at construction", () => {
+    const store = new PostgresVectorStore({
+      connectionString: DATABASE_URL,
+      indexType: "ivfflat",
+      indexParams: { lists: 50 },
+    });
+    expect(store).toBeDefined();
   });
 });
