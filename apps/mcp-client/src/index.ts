@@ -31,40 +31,45 @@ import {
 // Check for config-related flags before starting MCP server
 const args = process.argv.slice(2);
 
-if (args.includes("--config-show")) {
-  try {
-    const config = loadConfig();
-    console.log(JSON.stringify(config, null, 2));
-    process.exit(0);
-  } catch (error) {
-    console.error("Error loading config:", error instanceof Error ? error.message : String(error));
-    process.exit(1);
+/**
+ * Handle CLI flags. Returns an exit code when a flag was handled (caller
+ * should process.exit), or undefined when no flag matched (continue startup).
+ */
+export function processCliArgs(cliArgs: string[]): number | undefined {
+  if (cliArgs.includes("--config-show")) {
+    try {
+      const config = loadConfig();
+      console.log(JSON.stringify(config, null, 2));
+      return 0;
+    } catch (error) {
+      console.error("Error loading config:", error instanceof Error ? error.message : String(error));
+      return 1;
+    }
   }
-}
 
-if (args.includes("--config-path")) {
-  console.log(getConfigPath());
-  process.exit(0);
-}
-
-if (args.includes("--config-dir")) {
-  console.log(getConfigDir());
-  process.exit(0);
-}
-
-if (args.includes("--config-init")) {
-  try {
-    initConfig();
-    console.log(`Configuration initialized at: ${getConfigPath()}`);
-    process.exit(0);
-  } catch (error) {
-    console.error("Error initializing config:", error instanceof Error ? error.message : String(error));
-    process.exit(1);
+  if (cliArgs.includes("--config-path")) {
+    console.log(getConfigPath());
+    return 0;
   }
-}
 
-if (args.includes("--help") || args.includes("-h")) {
-  console.log(`
+  if (cliArgs.includes("--config-dir")) {
+    console.log(getConfigDir());
+    return 0;
+  }
+
+  if (cliArgs.includes("--config-init")) {
+    try {
+      initConfig();
+      console.log(`Configuration initialized at: ${getConfigPath()}`);
+      return 0;
+    } catch (error) {
+      console.error("Error initializing config:", error instanceof Error ? error.message : String(error));
+      return 1;
+    }
+  }
+
+  if (cliArgs.includes("--help") || cliArgs.includes("-h")) {
+    console.log(`
 massa-ai MCP Client
 
 Usage:
@@ -84,10 +89,37 @@ Examples:
   npx @massa-ai/mcp-client --config-show
   npx @massa-ai/mcp-client --config-path
 `);
-  process.exit(0);
+    return 0;
+  }
+
+  // Reject unknown CLI flags (usage error, exit code 2).
+  const KNOWN_FLAGS = ["--config-show", "--config-path", "--config-dir", "--config-init", "--help", "-h"];
+  const unknown = cliArgs.filter((a) => a.startsWith("-") && !KNOWN_FLAGS.includes(a));
+  if (unknown.length) {
+    console.error(`Unknown flag: ${unknown[0]}\nRun 'massa-ai --help' for usage.`);
+    return 2;
+  }
+
+  return undefined;
 }
 
-function textContent(text: string) {
+if (import.meta.main) {
+  const code = processCliArgs(args);
+  if (code !== undefined) process.exit(code);
+
+  // Auto-configure on first run
+  if (!configExists()) {
+    initConfig();
+    console.log(`
+[massa-ai] Initialized with default configuration
+[massa-ai] Config: ${getConfigPath()}
+[massa-ai] Provider: Ollama (local, free)
+[massa-ai] To change: npx @massa-ai/mcp-client massa-ai-config use mistral --api-key YOUR_KEY
+`);
+  }
+}
+
+export function textContent(text: string) {
   return { content: [{ type: "text" as const, text }] };
 }
 
@@ -109,30 +141,11 @@ type ApiClientLike = ToolProxyApiClient & {
   healthCheck(): Promise<boolean>;
 };
 
-function isEmbeddedMode(): boolean {
+export function isEmbeddedMode(): boolean {
   return process.env.MASSA_AI_EMBEDDED === "true";
 }
 
-// Reject unknown CLI flags (usage error, exit code 2).
-const KNOWN_FLAGS = ["--config-show", "--config-path", "--config-dir", "--config-init", "--help", "-h"];
-const unknown = args.filter((a) => a.startsWith("-") && !KNOWN_FLAGS.includes(a));
-if (unknown.length) {
-  console.error(`Unknown flag: ${unknown[0]}\nRun 'massa-ai --help' for usage.`);
-  process.exit(2);
-}
-
-// Auto-configure on first run
-if (!configExists()) {
-  initConfig();
-  console.log(`
-[massa-ai] Initialized with default configuration
-[massa-ai] Config: ${getConfigPath()}
-[massa-ai] Provider: Ollama (local, free)
-[massa-ai] To change: npx @massa-ai/mcp-client massa-ai-config use mistral --api-key YOUR_KEY
-`);
-}
-
-class McpProxyServer {
+export class McpProxyServer {
   private server: Server;
   private transport: StdioServerTransport;
   private apiClient: ApiClientLike;
@@ -168,39 +181,43 @@ class McpProxyServer {
     // combinators from each tool's inputSchema (transport-only, no storage
     // rewrite). The flavor may arrive via `_meta.flavor` or a `flavor`
     // param on the request.
-    this.server.setRequestHandler(ListToolsRequestSchema, async (request) => {
-      const result = pageToolDefinitions(TOOL_DEFINITIONS, request.params?.cursor);
-      const flavor = resolveFlavor(request);
-      return applyMoonshotFlavor(result, flavor);
-    });
+    this.server.setRequestHandler(ListToolsRequestSchema, (async (request: any) => this.handleListTools(request)) as any);
 
     // Handle tool calls - proxy to Tools API
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name, arguments: args } = request.params;
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => this.handleCallTool(request));
+  }
 
-      try {
-        if (name === "index") {
-          return await this.handleIndexTool((args ?? {}) as Record<string, unknown>);
-        }
-        return await proxyCallTool(
-          this.apiClient,
-          name,
-          (args ?? {}) as Record<string, unknown>,
-        );
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({
-                success: false,
-                error: error instanceof Error ? error.message : String(error),
-              }),
-            },
-          ],
-        };
+  async handleListTools(request: { params?: { cursor?: string; flavor?: string }; _meta?: { flavor?: string } }): Promise<unknown> {
+    const result = pageToolDefinitions(TOOL_DEFINITIONS, request.params?.cursor);
+    const flavor = resolveFlavor(request);
+    return applyMoonshotFlavor(result, flavor);
+  }
+
+  async handleCallTool(request: { params: { name: string; arguments?: unknown } }): Promise<{ content: Array<{ type: "text"; text: string }> }> {
+    const { name, arguments: args } = request.params;
+
+    try {
+      if (name === "index") {
+        return await this.handleIndexTool((args ?? {}) as Record<string, unknown>);
       }
-    });
+      return await proxyCallTool(
+        this.apiClient,
+        name,
+        (args ?? {}) as Record<string, unknown>,
+      );
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              success: false,
+              error: error instanceof Error ? error.message : String(error),
+            }),
+          },
+        ],
+      };
+    }
   }
 
   private async handleIndexTool(
@@ -261,19 +278,21 @@ class McpProxyServer {
 }
 
 // Main
-const client = new McpProxyServer();
+if (import.meta.main) {
+  const client = new McpProxyServer();
 
-client.start().catch((error) => {
-  console.error("Failed to start MCP client:", error);
-  process.exit(1);
-});
+  client.start().catch((error) => {
+    console.error("Failed to start MCP client:", error);
+    process.exit(1);
+  });
 
-process.on("SIGINT", async () => {
-  await client.close();
-  process.exit(0);
-});
+  process.on("SIGINT", async () => {
+    await client.close();
+    process.exit(0);
+  });
 
-process.on("SIGTERM", async () => {
-  await client.close();
-  process.exit(0);
-});
+  process.on("SIGTERM", async () => {
+    await client.close();
+    process.exit(0);
+  });
+}

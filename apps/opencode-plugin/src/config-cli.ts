@@ -14,9 +14,6 @@ import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
 
-const args = process.argv.slice(2);
-const command = args[0];
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function help() {
@@ -54,7 +51,7 @@ Examples:
 `);
 }
 
-function parseOptions(args: string[]): Record<string, string | boolean> {
+export function parseOptions(args: string[]): Record<string, string | boolean> {
   const options: Record<string, string | boolean> = {};
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith("--")) {
@@ -70,14 +67,18 @@ function parseOptions(args: string[]): Record<string, string | boolean> {
   return options;
 }
 
-if (!command || command === "--help" || command === "-h") {
-  help();
-  process.exit(0);
-}
+export async function runCli(argv: string[]): Promise<number> {
+  const args = argv;
+  const command = args[0];
 
-const options = parseOptions(args.slice(1));
+  if (!command || command === "--help" || command === "-h") {
+    help();
+    return 0;
+  }
 
-switch (command) {
+  const options = parseOptions(args.slice(1));
+
+  switch (command) {
   case "init": {
     initConfig();
     
@@ -119,7 +120,7 @@ switch (command) {
       console.log("No config file found. Run `massa-ai-config init` to create one.");
       console.log("\nUsing defaults:");
       console.log(JSON.stringify(defaultMassaAiConfig, null, 2));
-      process.exit(0);
+      return 0;
     }
     
     const config = loadConfig();
@@ -133,7 +134,7 @@ switch (command) {
     
     if (!key || !value) {
       console.error("Usage: massa-ai-config set <key> <value>");
-      process.exit(1);
+      return 1;
     }
     
     const config = loadConfig();
@@ -156,7 +157,7 @@ switch (command) {
     
     if (!provider || !["ollama", "mistral", "openai"].includes(provider)) {
       console.error("Provider must be: ollama, mistral, or openai");
-      process.exit(1);
+      return 1;
     }
     
     const config = loadConfig();
@@ -171,7 +172,7 @@ switch (command) {
     } else if (provider === "mistral") {
       if (!options["api-key"]) {
         console.error("Error: --api-key required for Mistral");
-        process.exit(1);
+        return 1;
       }
       config.embedding = {
         provider: "mistral",
@@ -182,7 +183,7 @@ switch (command) {
     } else if (provider === "openai") {
       if (!options["api-key"]) {
         console.error("Error: --api-key required for OpenAI");
-        process.exit(1);
+        return 1;
       }
       config.embedding = {
         provider: "openai",
@@ -202,7 +203,7 @@ switch (command) {
     const subcommand = args[1];
     if (subcommand !== "install" && subcommand !== "uninstall") {
       console.error("Usage: massa-ai-config agents <install|uninstall> [--user|--project]");
-      process.exit(1);
+      return 1;
     }
     const scope = typeof options.project === "boolean" ? "project" : "user";
     // OpenCode discovers agents from ~/.config/opencode/agents/ (user) or
@@ -262,5 +263,11 @@ switch (command) {
   default:
     console.error(`Unknown command: ${command}`);
     help();
-    process.exit(1);
+    return 1;
+  }
+  return 0;
+}
+
+if (import.meta.main) {
+  runCli(process.argv.slice(2)).then((code) => process.exit(code));
 }
