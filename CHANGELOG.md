@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Unit-test coverage >90% across monorepo (coverage-90pct)**: raised per-file line coverage to >90% across all packages. `packages/core` 76→124 unit test groups (0 fail); `packages/shared` 27→176 pass; `apps/tools-api` 5→23 groups; `apps/mcp-client` fixed module-state collision via isolation runner (2 fail→0); `apps/opencode-plugin` 35→101; `apps/web-ui` 19→95; claude/codex/cursor plugins 27→59/16/15; `scripts/__tests__` 319→506; `scripts/tests` 10 fail→0 (docs-drift, RSS, manifest fixes). 233/242 core source files ≥90% line (9 documented exclusions: tree-sitter native internals, ONNX, barrel re-export, e2e-gated health, env-boilerplate). Batches A–L partitioned across parallel subagents with disjoint write sets (R10). Spec: `.specs/features/coverage-90pct/`.
+
+### Fixed
+
+- **`graph-queries.ts` pinned column cast**: `pinned::integer` replaced with `CASE WHEN pinned THEN 1 ELSE 0 END` for compatibility with non-integer `pinned` columns.
+- **`memory-repository-pg.ts` metadata double-encode + pagination determinism**: metadata was double-encoded on write; pagination ordering was non-deterministic. Both fixed with asserting tests.
+- **`events.ts` SSE leak**: server-sent events stream leak fixed in tools-api routes.
+- **`config-loader.ts` migrateDataDirOnce isolation**: data-dir migration isolation fix in shared config.
+- **mcp-client module-state collision**: `buildPrefetchPlan` not found when tests run in one process — fixed by adding an isolation runner (`scripts/run-tests-isolated.ts`).
+
 - **E2E coverage expansion**: live E2E suite widened to the 52-tool roster and post-baseline feature surfaces. `00.harness.smoke.test.ts` `EXPECTED_TOOLS` 47→52 (matches `CANONICAL_ORDER` in `tool-definitions.ts`); `10.synapse.test.ts` adds TE1-TE5 for the `synapse_task_begin`/`synapse_task_end` task-envelope lifecycle; `20.new-features.test.ts` SG1 gap probe replaced with real assertions of `/api/v1/scheduler/status` + `/api/v1/hooks/queue-status`; new `24.dashboard-architecture.test.ts` covers DB1-5 (dashboard routes + graceful degradation), AR1-5 (`get_architecture` MCP+HTTP parity, cycles aspect, teaching error, `_aspects` list), and RN1-5 (`rename_project`/`merge_projects` dryRun preview only). `_helpers.ts` `resolveBackendAttestation` widened to trust the API's self-reported `databases.backend` (destructive suites remain guarded by `assertSafeE2eEnvironment`). `COVERAGE.md` suite map updated. 53 pass / 0 fail / 1 deliberate skip against the live dev stack; type-check 6/6. Spec: `.specs/features/e2e-feature-coverage-expansion/`.
 
 ### Fixed
