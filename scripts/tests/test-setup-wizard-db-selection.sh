@@ -16,6 +16,15 @@ assert_contains() {
     if grep -Eq "$pattern" "$SETUP_SCRIPT"; then ok "$label"; else fail "$label"; fi
 }
 
+# grep is line-based, so a shell command split over a `\` continuation never matches a
+# single-line pattern. Match those against a copy with continuations folded back in.
+SETUP_SCRIPT_JOINED="$(perl -0pe 's/[ \t]*\\\n[ \t]*/ /g' "$SETUP_SCRIPT")"
+
+assert_joined_contains() {
+    local label="$1" pattern="$2"
+    if printf '%s' "$SETUP_SCRIPT_JOINED" | grep -Eq "$pattern"; then ok "$label"; else fail "$label"; fi
+}
+
 assert_absent() {
     local label="$1" pattern="$2"
     if grep -Eq "$pattern" "$SETUP_SCRIPT"; then fail "$label"; else ok "$label"; fi
@@ -31,7 +40,7 @@ assert_contains "native backend override exists" 'native\) DB_CHOICE=1'
 assert_contains "Docker backend override exists" 'docker\) DB_CHOICE=2'
 assert_contains "invalid interactive choice fails closed" 'Invalid database selection'
 assert_contains "database URL is validated" 'require_postgres_database_url "\$DATABASE_URL"'
-assert_contains "migrations fail closed" 'bunx prisma migrate deploy \|\| die'
+assert_joined_contains "migrations fail closed" 'bunx prisma migrate deploy \|\| die'
 assert_contains "pgvector is verified after migrations" "pg_extension WHERE extname = 'vector'"
 assert_absent "no optional PostgreSQL switch remains" 'USE_POSTGRES'
 assert_absent "no fallback message remains" 'Falling back'
