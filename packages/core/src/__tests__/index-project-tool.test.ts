@@ -6,6 +6,7 @@
 
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import path from "node:path";
+import { realpathSync } from "node:fs";
 import {
   canonicalizeProjectRoot,
   assertProjectRootReuse,
@@ -116,7 +117,10 @@ afterEach(() => {
 describe("canonicalizeProjectRoot", () => {
   test("resolves and canonicalizes a path", async () => {
     const result = await canonicalizeProjectRoot("/tmp");
-    expect(result).toBe("/private/tmp");
+    // realpath("/tmp") is platform-dependent: macOS resolves the /tmp symlink
+    // to /private/tmp, while Linux keeps /tmp. Compare against the live
+    // canonical form rather than a hardcoded macOS-only string.
+    expect(result).toBe(realpathSync("/tmp"));
   });
 
   test("uses custom canonicalize function", async () => {

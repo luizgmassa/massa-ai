@@ -105,7 +105,10 @@ describe.skipIf(!HAS_RUST)("PolyglotExecutor Rust compile+run", () => {
     const exec = new PolyglotExecutor({ projectRoot: "/tmp" });
     const result = await exec.execute({
       language: "rust",
-      code: `println!("rust-ok");`,
+      // The `execute` path writes the code verbatim to script.rs; it does not
+      // wrap in `fn main()` (unlike `execute_file`). Provide a complete Rust
+      // program so rustc produces a runnable binary.
+      code: `fn main() { println!("rust-ok"); }`,
       timeout: 30_000,
     });
     expect(result.stdout.trim()).toBe("rust-ok");
