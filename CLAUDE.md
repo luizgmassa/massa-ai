@@ -117,7 +117,10 @@ Claude/Codex/Cursor/OpenCode plugin artifacts. Run it after touching
 `packages/core/src/__tests__` — it is a core gate, not a repo-wide one.
 
 `bunfig.toml` sets a global **5 s per-test timeout** and `coverage = true`. A test doing
-real indexing or embedding needs an explicit longer timeout or it fails as flake. Two
+real indexing, embedding, or a cold native compile needs an explicit longer budget, passed
+as the third arg to `test()` — the established idiom here is `}, 60_000);` or `}, 30_000);`
+(see `architecture-map.test.ts`, `vector-store-factory.test.ts`). Raise the per-test value,
+never the global one; the 5 s default is what keeps real hangs visible. Two
 tests currently flake this way in the full parallel aggregate while passing standalone —
 `mcp-client` `embedded-api-client-endpoints.test.ts` ("routes without 404") and core's
 Dart `structural` case, both dying at exactly 5001 ms when Postgres and Ollama are
