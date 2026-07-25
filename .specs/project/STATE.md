@@ -1,6 +1,27 @@
 # massa-ai Spec State
 
-## Current — Repository Rename Part 2
+## Current — Coverage >90% Unit Tests
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-coverage-90pct`
+- workflow: spec-driven (Large/Complex)
+- feature: `coverage-90pct` — COMPLETE + validated PASS
+- scope: 10 requirements (R1-R10), raise unit-test coverage across monorepo to >90% line per-file, 0 fail / 0 skip, fix bugs found
+- Validation: PASS — 10/10 ACs verified, independent verifier confirmed all suites 0 fail, type-check 6/6, build 5/5, R10 disjoint, coverage >=90% for all in-scope source (9 documented exclusions)
+- Report: `.specs/features/coverage-90pct/validation.md`
+- Spec: `.specs/features/coverage-90pct/spec.md`
+- Design: `.specs/features/coverage-90pct/design.md` (Batches A-L, disjoint write sets)
+- Tasks: `.specs/features/coverage-90pct/tasks.md` (T1-T16)
+- Commits (this session): `fb1a02c` (recover cancelled subagent work), `e3c11db` (Completion-1: search+context), `b19518e` (Completion-2: PG stores+symbol+apply)
+- Prior commits: `a36a2a1`..`e28cb86` (Batches A-L, T1-T14)
+- Key outcomes:
+  - Core unit: 124 groups, 0 fail (up from 76 baseline)
+  - All packages: 0 fail, 0 skip
+  - 9 documented exclusions (tree-sitter native internals, ONNX, barrel re-export, e2e-gated health, env-boilerplate prisma-client)
+  - R8 bugs fixed: graph-queries pinned cast, metadata double-encode, pagination determinism, SSE leak, migrateDataDirOnce isolation
+- Next step: none — feature complete.
+
+## Previous — Repository Rename Part 2
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-repo-rename-massa-ai-part2`

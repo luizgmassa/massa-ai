@@ -524,15 +524,17 @@
     {
       "slug": "coverage-90pct",
       "title": "Coverage >90% unit tests across monorepo",
-      "status": "in-progress",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
         "design": true,
         "tasks": true,
         "execute": true
-      }
+      },
+      "spec": ".specs/features/coverage-90pct/spec.md",
+      "validation": ".specs/features/coverage-90pct/validation.md"
     }
   ],
-  "active_feature": "coverage-90pct"
+  "active_feature": null
 }
