@@ -50,7 +50,7 @@ async function findTestFiles(directory: string): Promise<string[]> {
 
 // ── Classifier (ported from run-tests-isolated.ts L100-127) ──────────────────
 
-function classifyIsolation(file: string, source: string): IsolationReason {
+export function classifyIsolation(file: string, source: string): IsolationReason {
   if (/^\s*mock\s*\.\s*module\s*\(/m.test(source)) return "module mock";
 
   const relativePath = path.relative(testsRoot, file);
@@ -80,16 +80,17 @@ function classifyIsolation(file: string, source: string): IsolationReason {
 }
 
 /** Deadline-sensitive suites: those using fake timers or temporal inhibition. */
-function isDeadlineSensitive(source: string): boolean {
+export function isDeadlineSensitive(source: string): boolean {
   return /\b(?:useFakeTimers|setSystemTime|temporalInhibition|eventBus)\b/.test(source);
 }
 
 // ── SUITE_TABLE macro array ─────────────────────────────────────────────────
 
-async function buildSuiteTable(): Promise<SuiteDef[]> {
-  const discoveredFiles = (await findTestFiles(testsRoot))
+export async function buildSuiteTable(testsRootOverride?: string): Promise<SuiteDef[]> {
+  const root = testsRootOverride ?? testsRoot;
+  const discoveredFiles = (await findTestFiles(root))
     .filter((file) => {
-      const relativePath = path.relative(testsRoot, file);
+      const relativePath = path.relative(root, file);
       // Exclude integration/ directory (has its own test:integration gate)
       return !relativePath.startsWith(`integration${path.sep}`);
     })
@@ -134,52 +135,9 @@ async function buildSuiteTable(): Promise<SuiteDef[]> {
   return suites;
 }
 
-// ── --list-suites flag ──────────────────────────────────────────────────────
+// ── Shared result types + helpers (testable in-process) ─────────────────────
 
-const args = process.argv.slice(2);
-const listSuites = args.includes("--list-suites");
-const filterArg = args.find((a) => a.startsWith("--filter="));
-const filterRegex = filterArg ? new RegExp(filterArg.slice("--filter=".length)) : undefined;
-const unknownArgs = args.filter(
-  (a) => a !== "--list-suites" && !a.startsWith("--filter=") && !a.startsWith("--serial-tail="),
-);
-
-if (unknownArgs.length > 0) {
-  console.error(`Unknown argument(s): ${unknownArgs.join(", ")}`);
-  process.exit(2);
-}
-
-const SUITE_TABLE = await buildSuiteTable();
-
-if (listSuites) {
-  console.log(`\nSUITE_TABLE (${SUITE_TABLE.length} suites):\n`);
-  for (const suite of SUITE_TABLE) {
-    const deadlineTag = suite.deadlineSensitive ? " [DEADLINE-SENSITIVE]" : "";
-    console.log(`  ${suite.id}${deadlineTag}`);
-    console.log(`    description: ${suite.description}`);
-    console.log(`    isolationReason: ${suite.isolationReason}`);
-    console.log(`    testFiles: ${suite.testFiles.length}`);
-    console.log("");
-  }
-  process.exit(0);
-}
-
-// ── Execution + UNION GUARD (T24) ────────────────────────────────────────────
-
-// Filter suites if --filter is provided
-const filteredSuites = filterRegex
-  ? SUITE_TABLE.filter((s) => filterRegex.test(s.id) || s.testFiles.some((f) => filterRegex.test(f)))
-  : SUITE_TABLE;
-
-// Split into parallel (non-deadline-sensitive) and serial tail (deadline-sensitive)
-const parallelSuites = filteredSuites.filter((s) => !s.deadlineSensitive);
-const serialSuites = filteredSuites.filter((s) => s.deadlineSensitive);
-
-console.log(
-  `[parallel-runner] ${filteredSuites.length} suites: ${parallelSuites.length} parallel, ${serialSuites.length} serial tail`,
-);
-
-interface SuiteResult {
+export interface SuiteResult {
   suiteId: string;
   exitCode: number | null;
   signal: NodeJS.Signals | null;
@@ -187,10 +145,10 @@ interface SuiteResult {
   passed: boolean;
 }
 
-function runSuite(suite: SuiteDef): Promise<SuiteResult> {
+export function runSuite(suite: SuiteDef, cwdOverride?: string): Promise<SuiteResult> {
   return new Promise((resolve) => {
     const child: ChildProcess = spawn(process.execPath, ["test", ...suite.testFiles], {
-      cwd: packageRoot,
+      cwd: cwdOverride ?? packageRoot,
       env: process.env,
       stdio: "inherit",
     });
@@ -217,61 +175,171 @@ function runSuite(suite: SuiteDef): Promise<SuiteResult> {
   });
 }
 
-// Run parallel suites concurrently
-const parallelResults: SuiteResult[] = await Promise.all(
-  parallelSuites.map((suite) => {
-    console.log(`[parallel-runner] START ${suite.id}`);
-    return runSuite(suite);
-  }),
-);
-
-// Run serial tail suites sequentially
-const serialResults: SuiteResult[] = [];
-for (const suite of serialSuites) {
-  console.log(`[parallel-runner] START (serial) ${suite.id}`);
-  const result = await runSuite(suite);
-  serialResults.push(result);
+/** Filter the suite table by id or test file path regex. */
+export function filterSuites(
+  suites: SuiteDef[],
+  filterRegex: RegExp | undefined,
+): SuiteDef[] {
+  if (!filterRegex) return suites;
+  return suites.filter(
+    (s) => filterRegex.test(s.id) || s.testFiles.some((f) => filterRegex.test(f)),
+  );
 }
 
-const allResults = [...parallelResults, ...serialResults];
-
-// ── UNION GUARD: result-set must equal list ──────────────────────────────────
-
-const expectedIds = new Set(filteredSuites.map((s) => s.id));
-const resultIds = new Set(allResults.map((r) => r.suiteId));
-
-// Missing suites = listed but not in results = silently dropped
-const missing = [...expectedIds].filter((id) => !resultIds.has(id));
-if (missing.length > 0) {
-  console.error(`\n[parallel-runner] UNION GUARD FAIL: ${missing.length} suite(s) missing from results:`);
-  for (const id of missing) console.error(`  - ${id}`);
-  process.exit(1);
+export interface UnionGuardResult {
+  ok: boolean;
+  missing: string[];
+  extra: string[];
 }
 
-// Extra suites = in results but not in list = phantom execution
-const extra = [...resultIds].filter((id) => !expectedIds.has(id));
-if (extra.length > 0) {
-  console.error(`\n[parallel-runner] UNION GUARD FAIL: ${extra.length} phantom suite(s) in results:`);
-  for (const id of extra) console.error(`  - ${id}`);
-  process.exit(1);
+/**
+ * UNION GUARD (T24): the executed result-set must equal the filtered list.
+ * Missing = listed but never reported (silently dropped). Extra = phantom
+ * result with no matching listed suite. Either case is a hard failure.
+ */
+export function unionGuardCheck(
+  filteredSuites: SuiteDef[],
+  allResults: SuiteResult[],
+): UnionGuardResult {
+  const expectedIds = new Set(filteredSuites.map((s) => s.id));
+  const resultIds = new Set(allResults.map((r) => r.suiteId));
+  const missing = [...expectedIds].filter((id) => !resultIds.has(id));
+  const extra = [...resultIds].filter((id) => !expectedIds.has(id));
+  return { ok: missing.length === 0 && extra.length === 0, missing, extra };
 }
 
-// ── Summary ─────────────────────────────────────────────────────────────────
-
-const passed = allResults.filter((r) => r.passed).length;
-const failed = allResults.filter((r) => !r.passed).length;
-const crashed = allResults.filter((r) => r.crashed).length;
-
-console.log(`\n[parallel-runner] SUMMARY: ${passed} passed, ${failed} failed, ${crashed} crashed`);
-
-for (const result of allResults) {
-  const status = result.passed ? "PASS" : result.crashed ? "CRASH" : "FAIL";
-  console.log(`  ${status}: ${result.suiteId}`);
+export interface Summary {
+  passed: number;
+  failed: number;
+  crashed: number;
 }
 
-// Crashed suite = failed (not dropped) — UNION GUARD ensures it's counted
-if (crashed > 0) {
-  console.error(`\n[parallel-runner] ${crashed} suite(s) crashed — counted as failed (ZERO-LOSS guard)`);
+export function summarizeResults(allResults: SuiteResult[]): Summary {
+  return {
+    passed: allResults.filter((r) => r.passed).length,
+    failed: allResults.filter((r) => !r.passed).length,
+    crashed: allResults.filter((r) => r.crashed).length,
+  };
 }
 
-process.exit(failed > 0 || crashed > 0 ? 1 : 0);
+export function statusOf(result: SuiteResult): string {
+  return result.passed ? "PASS" : result.crashed ? "CRASH" : "FAIL";
+}
+
+export interface ParsedArgs {
+  listSuites: boolean;
+  filterRegex: RegExp | undefined;
+  unknownArgs: string[];
+}
+
+export function parseArgs(argv: string[]): ParsedArgs {
+  const listSuites = argv.includes("--list-suites");
+  const filterArg = argv.find((a) => a.startsWith("--filter="));
+  const filterRegex = filterArg ? new RegExp(filterArg.slice("--filter=".length)) : undefined;
+  const unknownArgs = argv.filter(
+    (a) => a !== "--list-suites" && !a.startsWith("--filter=") && !a.startsWith("--serial-tail="),
+  );
+  return { listSuites, filterRegex, unknownArgs };
+}
+
+export function listSuitesTable(suites: SuiteDef[]): string {
+  const lines: string[] = [`\nSUITE_TABLE (${suites.length} suites):\n`];
+  for (const suite of suites) {
+    const deadlineTag = suite.deadlineSensitive ? " [DEADLINE-SENSITIVE]" : "";
+    lines.push(`  ${suite.id}${deadlineTag}`);
+    lines.push(`    description: ${suite.description}`);
+    lines.push(`    isolationReason: ${suite.isolationReason}`);
+    lines.push(`    testFiles: ${suite.testFiles.length}`);
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+// ── CLI entry ───────────────────────────────────────────────────────────────
+
+/**
+ * Orchestrates listing / execution for the given argv WITHOUT calling
+ * process.exit, returning the exit code instead so it is unit-testable
+ * in-process. The import.meta.main wrapper performs the actual exit.
+ */
+export async function runCli(argv: string[]): Promise<number> {
+  const parsed = parseArgs(argv);
+
+  if (parsed.unknownArgs.length > 0) {
+    console.error(`Unknown argument(s): ${parsed.unknownArgs.join(", ")}`);
+    return 2;
+  }
+
+  const SUITE_TABLE = await buildSuiteTable();
+
+  if (parsed.listSuites) {
+    console.log(listSuitesTable(SUITE_TABLE));
+    return 0;
+  }
+
+  // ── Execution + UNION GUARD (T24) ────────────────────────────────────────────
+
+  const filteredSuites = filterSuites(SUITE_TABLE, parsed.filterRegex);
+
+  // Split into parallel (non-deadline-sensitive) and serial tail (deadline-sensitive)
+  const parallelSuites = filteredSuites.filter((s) => !s.deadlineSensitive);
+  const serialSuites = filteredSuites.filter((s) => s.deadlineSensitive);
+
+  console.log(
+    `[parallel-runner] ${filteredSuites.length} suites: ${parallelSuites.length} parallel, ${serialSuites.length} serial tail`,
+  );
+
+  // Run parallel suites concurrently
+  const parallelResults: SuiteResult[] = await Promise.all(
+    parallelSuites.map((suite) => {
+      console.log(`[parallel-runner] START ${suite.id}`);
+      return runSuite(suite);
+    }),
+  );
+
+  // Run serial tail suites sequentially
+  const serialResults: SuiteResult[] = [];
+  for (const suite of serialSuites) {
+    console.log(`[parallel-runner] START (serial) ${suite.id}`);
+    const result = await runSuite(suite);
+    serialResults.push(result);
+  }
+
+  const allResults = [...parallelResults, ...serialResults];
+
+  // ── UNION GUARD: result-set must equal list ──────────────────────────────────
+
+  const guard = unionGuardCheck(filteredSuites, allResults);
+  if (guard.missing.length > 0) {
+    console.error(`\n[parallel-runner] UNION GUARD FAIL: ${guard.missing.length} suite(s) missing from results:`);
+    for (const id of guard.missing) console.error(`  - ${id}`);
+    return 1;
+  }
+  if (guard.extra.length > 0) {
+    console.error(`\n[parallel-runner] UNION GUARD FAIL: ${guard.extra.length} phantom suite(s) in results:`);
+    for (const id of guard.extra) console.error(`  - ${id}`);
+    return 1;
+  }
+
+  // ── Summary ─────────────────────────────────────────────────────────────────
+
+  const { passed, failed, crashed } = summarizeResults(allResults);
+
+  console.log(`\n[parallel-runner] SUMMARY: ${passed} passed, ${failed} failed, ${crashed} crashed`);
+
+  for (const result of allResults) {
+    console.log(`  ${statusOf(result)}: ${result.suiteId}`);
+  }
+
+  // Crashed suite = failed (not dropped) — UNION GUARD ensures it's counted
+  if (crashed > 0) {
+    console.error(`\n[parallel-runner] ${crashed} suite(s) crashed — counted as failed (ZERO-LOSS guard)`);
+  }
+
+  return failed > 0 || crashed > 0 ? 1 : 0;
+}
+
+if (import.meta.main) {
+  const code = await runCli(process.argv.slice(2));
+  if (code !== 0) process.exit(code);
+}

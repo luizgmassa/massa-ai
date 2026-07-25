@@ -123,10 +123,10 @@ const HOST_BUILTINS: Record<Host, ReadonlySet<string>> = {
 };
 
 // ── Types ───────────────────────────────────────────────────────────────────
-type Host = "claude" | "codex" | "cursor" | "opencode";
-type Permission = "read-only" | "write";
+export type Host = "claude" | "codex" | "cursor" | "opencode";
+export type Permission = "read-only" | "write";
 
-interface Charter {
+export interface Charter {
   name: SpecialistName;
   description: string;
   modelHint: string;
@@ -135,7 +135,7 @@ interface Charter {
 }
 
 // ── YAML frontmatter parser (minimal, charter-shaped) ───────────────────────
-function parseFrontmatter(raw: string): {
+export function parseFrontmatter(raw: string): {
   frontmatter: Record<string, unknown>;
   body: string;
 } {
@@ -151,7 +151,7 @@ function parseFrontmatter(raw: string): {
   return { frontmatter, body };
 }
 
-function parseSimpleYaml(text: string): Record<string, unknown> {
+export function parseSimpleYaml(text: string): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   const lines = text.split(/\r?\n/);
   let i = 0;
@@ -190,7 +190,7 @@ function parseSimpleYaml(text: string): Record<string, unknown> {
   return result;
 }
 
-function unquoteScalar(s: string): string {
+export function unquoteScalar(s: string): string {
   if (
     (s.startsWith('"') && s.endsWith('"')) ||
     (s.startsWith("'") && s.endsWith("'"))
@@ -201,7 +201,7 @@ function unquoteScalar(s: string): string {
 }
 
 // ── Charter loader ──────────────────────────────────────────────────────────
-async function loadCharter(name: SpecialistName): Promise<Charter> {
+export async function loadCharter(name: SpecialistName): Promise<Charter> {
   const file = path.join(SKILLS_DIR, "agents", name, "SKILL.md");
   const raw = await fs.readFile(file, "utf8");
   const { frontmatter, body } = parseFrontmatter(raw);
@@ -220,7 +220,7 @@ async function loadCharter(name: SpecialistName): Promise<Charter> {
   return { name, description, modelHint, permission, body };
 }
 
-async function loadAllCharters(): Promise<Charter[]> {
+export async function loadAllCharters(): Promise<Charter[]> {
   const charters: Charter[] = [];
   for (const name of SPECIALIST_NAMES) {
     charters.push(await loadCharter(name));
@@ -230,7 +230,7 @@ async function loadAllCharters(): Promise<Charter[]> {
 
 // ── Per-host emitters ───────────────────────────────────────────────────────
 
-function emitClaude(c: Charter): string {
+export function emitClaude(c: Charter): string {
   const agentName = `massa-ai-${c.name}`;
   const isWrite = WRITE_AGENTS.has(c.name);
   const tools = isWrite ? WRITE_TOOLS : READ_ONLY_TOOLS;
@@ -250,7 +250,7 @@ function emitClaude(c: Charter): string {
   return fm + c.body + "\n";
 }
 
-function emitCursor(c: Charter): string {
+export function emitCursor(c: Charter): string {
   const agentName = `massa-ai-${c.name}`;
   const isWrite = WRITE_AGENTS.has(c.name);
   const tools = isWrite ? WRITE_TOOLS : READ_ONLY_TOOLS;
@@ -269,11 +269,11 @@ function emitCursor(c: Charter): string {
   return fm + c.body + "\n";
 }
 
-function escapeTomlTripleQuote(s: string): string {
+export function escapeTomlTripleQuote(s: string): string {
   return s.replace(/"""/g, '\\"\\"\\"');
 }
 
-function emitCodex(c: Charter): string {
+export function emitCodex(c: Charter): string {
   const agentName = `massa-ai-${c.name}`;
   const isWrite = WRITE_AGENTS.has(c.name);
   const sandboxMode = isWrite ? "workspace-write" : "read-only";
@@ -293,12 +293,12 @@ function emitCodex(c: Charter): string {
   return lines.join("\n");
 }
 
-function tomlQuoted(s: string): string {
+export function tomlQuoted(s: string): string {
   // Basic TOML string escaping.
   return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
-function emitOpenCode(c: Charter): string {
+export function emitOpenCode(c: Charter): string {
   const agentName = `massa-ai-${c.name}`;
   const isWrite = WRITE_AGENTS.has(c.name);
   // OPC-07: permission per-agent bash mapping
@@ -327,7 +327,7 @@ function emitOpenCode(c: Charter): string {
 }
 
 // ── Emit-all + check ────────────────────────────────────────────────────────
-async function emitAll(targetDirs: Record<Host, string>): Promise<void> {
+export async function emitAll(targetDirs: Record<Host, string>): Promise<void> {
   const charters = await loadAllCharters();
   for (const [host, dir] of Object.entries(targetDirs) as [Host, string][]) {
     await fs.mkdir(dir, { recursive: true });
@@ -348,7 +348,7 @@ async function emitAll(targetDirs: Record<Host, string>): Promise<void> {
   }
 }
 
-async function diffHost(
+export async function diffHost(
   generatedDir: string,
   checkedInDir: string,
   host: Host
@@ -381,7 +381,7 @@ async function diffHost(
   return diffs;
 }
 
-async function runCheck(): Promise<number> {
+export async function runCheck(): Promise<number> {
   // Emit to a temp dir, diff against checked-in dirs.
   const tmp = await fs.mkdtemp(path.join(tmpdir(), "massa-ai-gen-"));
   try {
@@ -419,8 +419,8 @@ async function runCheck(): Promise<number> {
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
-async function main(): Promise<number> {
-  const args = process.argv.slice(2);
+export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
+  const args = argv;
   const check = args.includes("--check");
   if (check) {
     return runCheck();
@@ -431,7 +431,9 @@ async function main(): Promise<number> {
   return 0;
 }
 
-const code = await main();
-if (code !== 0) {
-  process.exit(code);
+if (import.meta.main) {
+  const code = await main();
+  if (code !== 0) {
+    process.exit(code);
+  }
 }

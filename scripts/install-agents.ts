@@ -128,7 +128,7 @@ function defaultEntry(apiBaseUrl: string): McpEntry {
   };
 }
 
-function deepGet(obj: Json, pathParts: string[]): unknown {
+export function deepGet(obj: Json, pathParts: string[]): unknown {
   let cur: unknown = obj;
   for (const p of pathParts) {
     if (cur && typeof cur === "object" && !Array.isArray(cur)) {
@@ -678,7 +678,7 @@ export async function runInstall(opts: InstallerOptions): Promise<RunResult> {
 }
 
 // ── CLI ────────────────────────────────────────────────────────────────────
-function printPlan(plan: Plan): void {
+export function printPlan(plan: Plan): void {
   if (plan.changes.length === 0) {
     console.log(`  [${plan.agent}] ${plan.configPath} — up to date (no change)`);
     return;
@@ -692,7 +692,7 @@ function printPlan(plan: Plan): void {
   }
 }
 
-function parseArgs(argv: string[]): InstallerOptions {
+export function parseArgs(argv: string[]): InstallerOptions {
   const opts: InstallerOptions = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -738,7 +738,7 @@ Wired agents write to:
   opencode        ~/.config/opencode/opencode.json
 `;
 
-async function main(argv: string[]): Promise<number> {
+export async function main(argv: string[]): Promise<number> {
   const opts = parseArgs(argv);
   try {
     const { results, plans } = await runInstall(opts);

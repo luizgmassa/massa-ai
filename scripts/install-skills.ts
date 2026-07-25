@@ -669,7 +669,7 @@ export async function checkPlatform(
 
 // ── CLI ────────────────────────────────────────────────────────────────────
 
-function parseArgs(argv: string[]): CliOptions {
+export function parseArgs(argv: string[]): CliOptions {
   const opts: CliOptions = {
     action: "apply",
     platforms: [...PLATFORMS],
@@ -739,8 +739,8 @@ Platforms install to:
   opencode  ~/.config/opencode/skills/<name>  + ~/.config/opencode/AGENTS.md
 `;
 
-async function main(): Promise<number> {
-  const opts = parseArgs(process.argv.slice(2));
+export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
+  const opts = parseArgs(argv);
   const repoRoot = resolveRepoRoot(opts.repoRoot);
   const home = path.resolve(opts.target);
   const codexHome = resolveCodexHome(home);

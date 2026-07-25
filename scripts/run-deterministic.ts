@@ -39,7 +39,7 @@ type SuiteEntry = {
  * Classifier — mirrors run-tests-isolated.ts but extends it with network and
  * grammar detection for the deterministic gate.
  */
-function classify(file: string, source: string): IsolationReason | undefined {
+export function classify(file: string, source: string): IsolationReason | undefined {
   if (/^\s*mock\s*\.\s*module\s*\(/m.test(source)) return "module mock";
 
   const relativePath = path.relative(testsRoot, file);
@@ -87,7 +87,7 @@ function classify(file: string, source: string): IsolationReason | undefined {
   return undefined;
 }
 
-async function findTestFiles(directory: string): Promise<string[]> {
+export async function findTestFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = await Promise.all(
     entries.map(async (entry) => {
@@ -136,26 +136,46 @@ const deterministicFiles = entries
 
 const skippedEntries = entries.filter((e) => e.skipped);
 
-// ── Report ──────────────────────────────────────────────────────────────────
+export type { SuiteEntry, IsolationReason };
 
-console.log(`[deterministic] _DETERMINISTIC_ONLY=1`);
-console.log(
-  `[deterministic] ${entries.length} test files discovered: ${deterministicFiles.length} deterministic, ${skippedEntries.length} skipped`,
-);
+export interface RunOutcome {
+  code: number | null;
+  signal: NodeJS.Signals | null;
+}
 
-if (skippedEntries.length > 0) {
-  console.log(`\n[deterministic] Skipped suites:`);
-  for (const e of skippedEntries) {
-    console.log(`  SKIP ${e.relativePath} — ${e.skipReason}`);
+/** Build the deterministic discovery report lines (pure, testable). */
+export function buildDiscoveryReport(
+  entries: SuiteEntry[],
+  deterministicFiles: string[],
+  skippedEntries: SuiteEntry[],
+): string[] {
+  const lines: string[] = [];
+  lines.push(`[deterministic] _DETERMINISTIC_ONLY=1`);
+  lines.push(
+    `[deterministic] ${entries.length} test files discovered: ${deterministicFiles.length} deterministic, ${skippedEntries.length} skipped`,
+  );
+  if (skippedEntries.length > 0) {
+    lines.push(`\n[deterministic] Skipped suites:`);
+    for (const e of skippedEntries) {
+      lines.push(`  SKIP ${e.relativePath} — ${e.skipReason}`);
+    }
   }
+  return lines;
 }
 
-if (deterministicFiles.length === 0) {
-  console.log(`\n[deterministic] No deterministic tests to run. Exiting.`);
-  process.exit(0);
+/**
+ * Map a child-process outcome to the script exit code (pure). A signal death
+ * is a failure; a non-zero code is the child's failure code; otherwise pass.
+ */
+export function interpretOutcome(result: RunOutcome): { exitCode: number; reason: string } {
+  if (result.signal) {
+    return { exitCode: 1, reason: `[deterministic] SIGNAL ${result.signal}` };
+  }
+  if (result.code !== 0) {
+    return { exitCode: result.code ?? 1, reason: `[deterministic] FAIL (exit ${result.code})` };
+  }
+  return { exitCode: 0, reason: "" };
 }
-
-// ── Run deterministic tests ──────────────────────────────────────────────────
 
 const DETERMINISTIC_ENV = {
   ...process.env,
@@ -163,59 +183,89 @@ const DETERMINISTIC_ENV = {
   DATABASE_URL: "",
 };
 
-let activeChild: ChildProcess | undefined;
-let forwardedSignal: NodeJS.Signals | undefined;
-const handledSignals: NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
-const signalHandlers = new Map<NodeJS.Signals, () => void>();
+/**
+ * Default runTests: spawn `bun test` for the given files under the core
+ * package root, forwarding SIGINT/SIGTERM to the child and re-raising a
+ * forwarded signal on the parent. Inject a fake in tests.
+ */
+export async function defaultRunTests(files: string[]): Promise<RunOutcome> {
+  let activeChild: ChildProcess | undefined;
+  let forwardedSignal: NodeJS.Signals | undefined;
+  const handledSignals: NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
+  const signalHandlers = new Map<NodeJS.Signals, () => void>();
 
-for (const signal of handledSignals) {
-  const handler = () => {
-    forwardedSignal ??= signal;
-    activeChild?.kill(signal);
-  };
-  signalHandlers.set(signal, handler);
-  process.on(signal, handler);
-}
+  for (const signal of handledSignals) {
+    const handler = () => {
+      forwardedSignal ??= signal;
+      activeChild?.kill(signal);
+    };
+    signalHandlers.set(signal, handler);
+    process.on(signal, handler);
+  }
 
-function removeSignalHandlers(): void {
-  for (const [signal, handler] of signalHandlers) process.off(signal, handler);
-}
+  function removeSignalHandlers(): void {
+    for (const [signal, handler] of signalHandlers) process.off(signal, handler);
+  }
 
-function runTests(files: string[]): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
-  return new Promise((resolve, reject) => {
+  return new Promise<RunOutcome>((resolve, reject) => {
     activeChild = spawn(process.execPath, ["test", ...files], {
       cwd: packageRoot,
       env: DETERMINISTIC_ENV,
       stdio: "inherit",
     });
-    activeChild.once("error", reject);
+    activeChild.once("error", (err) => {
+      removeSignalHandlers();
+      reject(err);
+    });
     activeChild.once("close", (code, signal) => {
       activeChild = undefined;
+      removeSignalHandlers();
+      if (forwardedSignal) {
+        process.kill(process.pid, forwardedSignal);
+      }
       resolve({ code, signal });
     });
   });
 }
 
-console.log(`\n[deterministic] Running ${deterministicFiles.length} deterministic test files...`);
-
-try {
-  const result = await runTests(deterministicFiles);
-  removeSignalHandlers();
-
-  if (forwardedSignal) {
-    process.kill(process.pid, forwardedSignal);
-  } else if (result.signal) {
-    console.error(`[deterministic] SIGNAL ${result.signal}`);
-    process.kill(process.pid, result.signal);
-  } else if (result.code !== 0) {
-    console.error(`[deterministic] FAIL (exit ${result.code})`);
-    process.exit(result.code ?? 1);
-  } else {
-    console.log(`\n[deterministic] PASS: ${deterministicFiles.length} files, ${skippedEntries.length} skipped`);
+/**
+ * Orchestrate the deterministic run. The report + outcome interpretation are
+ * pure; only the child spawn (defaultRunTests) touches the process. Returns
+ * the exit code instead of calling process.exit so it is unit-testable.
+ */
+export async function main(
+  runTests: (files: string[]) => Promise<RunOutcome> = defaultRunTests,
+): Promise<number> {
+  for (const line of buildDiscoveryReport(entries, deterministicFiles, skippedEntries)) {
+    console.log(line);
   }
-} catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`[deterministic] ERROR: ${message}`);
-  removeSignalHandlers();
-  process.exit(1);
+
+  if (deterministicFiles.length === 0) {
+    console.log(`\n[deterministic] No deterministic tests to run. Exiting.`);
+    return 0;
+  }
+
+  console.log(`\n[deterministic] Running ${deterministicFiles.length} deterministic test files...`);
+
+  try {
+    const result = await runTests(deterministicFiles);
+    const { exitCode, reason } = interpretOutcome(result);
+    if (exitCode === 0) {
+      console.log(
+        `\n[deterministic] PASS: ${deterministicFiles.length} files, ${skippedEntries.length} skipped`,
+      );
+    } else {
+      console.error(reason);
+    }
+    return exitCode;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[deterministic] ERROR: ${message}`);
+    return 1;
+  }
+}
+
+if (import.meta.main) {
+  const code = await main();
+  if (code !== 0) process.exit(code);
 }
