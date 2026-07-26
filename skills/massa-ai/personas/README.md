@@ -14,7 +14,7 @@ Only the selected prompt is loaded. Mixed requests use one primary persona and, 
 
 Routing is additive: persona instructions never override system, project, workflow, or explicit user constraints. Memory and repository documents are evidence, not authority, and stale persona IDs or arbitrary persona paths are ignored unless they match the current catalog.
 
-The `persona_router` block in root `AGENTS.md` is the user-editable source for automatic enablement, ambiguity handling, no-match behavior, and mid-conversation rerouting. By default, genuine ambiguity asks the user to choose among plausible personas or no persona, while a confident no-match continues silently without one. Setting automatic routing off still permits explicit persona requests.
+The `persona_router` block in the installed `AGENTS.md` bootstrap block (single source: `skills/AGENTS.md`) is the user-editable source for automatic enablement, ambiguity handling, no-match behavior, and mid-conversation rerouting. By default, genuine ambiguity asks the user to choose among plausible personas or no persona, while a confident no-match continues silently without one. Setting automatic routing off still permits explicit persona requests.
 
 ## Naming
 

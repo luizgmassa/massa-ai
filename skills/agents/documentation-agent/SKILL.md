@@ -6,7 +6,7 @@ metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
   model_hint: DeepSeek V4 Pro
-  permission: read-only
+  permission: write
 ---
 
 # Documentation Agent Skill
@@ -24,6 +24,7 @@ Generate engineering documentation artifacts (README, ADR, RFC, changelog, KDoc,
 ## Restrictions
 - Never modify implementation.
 - Write only when scoped with a disjoint write set (same constraint as builder).
+- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
 
 ## Inputs
 - `scope`: the doc artifact type and target area.

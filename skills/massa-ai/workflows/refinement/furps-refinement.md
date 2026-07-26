@@ -11,7 +11,7 @@ This workflow is findings-only. Do not edit the PRD/ADR unless the user separate
    - `references/furps/intake.md` before intake and sub-agent dispatch
    - `references/furps/checklist.md` for the per-dimension check items
    - `references/furps/report-contract.md` before writing the report
-   - `references/furps/analyst-role.md` before dispatching `furps-analyst`
+   - `references/furps/analyst-role.md` and `skills/agents/furps-analyst/SKILL.md` before dispatching `massa-ai-furps-analyst`
    - `references/agent-orchestration.md` and `references/context-firewall.md` before dispatch
    - `references/audit-report-io.md` before writing the final report
    - `references/synapse-policy.md` when repeated massa-ai searches are expected
@@ -23,12 +23,12 @@ This workflow is findings-only. Do not edit the PRD/ADR unless the user separate
    - If the source is missing or ambiguous, ask once before proceeding.
 4. The Fool pre-validation (sub-agents, one per mode):
    - Load `workflows/the-fool.md`. Treat the PRD/ADR as the challenged thesis (direct challenge; inherit `projectId`/`workflowSessionId`).
-   - Dispatch a read-only `plan-critic` sub-agent in `evidence_audit` mode with the document packet, DoR, and recalled facts.
-   - Then dispatch a `plan-critic` sub-agent in `pre_mortem` mode, passing the `evidence_audit` summary as input.
+   - Dispatch a read-only `massa-ai-plan-critic` sub-agent in `evidence_audit` mode with the document packet, DoR, and recalled facts.
+   - Then dispatch a `massa-ai-plan-critic` sub-agent in `pre_mortem` mode, passing the `evidence_audit` summary as input.
    - Collect the compact validation: source-confidence gaps, unsourceable claims, and execution-phase failure assumptions.
    - Gate: if `evidence_audit` surfaces critical gaps that block meaningful FURPS analysis, ask the user whether to proceed-with-caveats or pause for document completion. Otherwise attach the Fool summary to the FURPS packets.
 5. FURPS+ dimension analysis (sub-agents, one per dimension, parallel):
-   - Dispatch six `furps-analyst` sub-agents: F, U, R, P, S, X (X = FURPS+ Extensions).
+   - Dispatch six `massa-ai-furps-analyst` sub-agents: F, U, R, P, S, X (X = FURPS+ Extensions).
    - Each receives its `checklist.md` section, the bounded document packet, the DoR, and the Fool summary.
    - Each returns per check-item status (`covered|partial|missing|unclear`), `FR-<letter>-<N>` findings, and contributions to Open Questions / Suggestions / Insights / Risks / DoR-gaps.
    - Run in parallel; batch if a concurrency cap applies. Each gets its own ephemeral Synapse session only if it performs >=2 searches.
@@ -62,7 +62,7 @@ User asks: "Refine this PRD against FURPS before we start building."
 1. `workflowSessionId=furps-refinement-<entity>`.
 2. Ingest the PRD file; resolve DoR from a linked Confluence page via Atlassian MCP.
 3. Run The Fool (`evidence_audit` then `pre_mortem`); proceed (no critical blocker).
-4. Fan out six `furps-analyst` sub-agents (F, U, R, P, S, X) in parallel.
+4. Fan out six `massa-ai-furps-analyst` sub-agents (F, U, R, P, S, X) in parallel.
 5. Synthesize; write `audits/refinement/<date> furps-refinement.md`; summarize in chat.
 
 User asks: "Run a FURPS+ analysis on ADR-007."

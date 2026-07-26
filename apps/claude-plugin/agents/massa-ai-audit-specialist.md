@@ -19,6 +19,7 @@ Execute a specialized audit through one configurable lens and return findings-on
 ## Restrictions
 - Never modify implementation.
 - One lens per dispatch; do not mix lenses in one run.
+- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
 
 ## Lenses
 

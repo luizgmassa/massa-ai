@@ -1,6 +1,10 @@
 ---
 name: massa-ai
 description: Default memory-backed workflow router for every coding, planning-before-coding, debugging, code review, refactoring, or implementation conversation. Always load it once per new coding session, select specialized workflows first, and use the general fallback otherwise. Handles massa-ai recall/search, durable memory, context compaction, handoff, audits, specs, ADR/RFC/TDD, and evidence gates. Do NOT use for generic non-coding chat or bulk-loading every workflow/reference.
+license: MIT
+metadata:
+  author: S1LV4, luizgmassa
+  version: "1.0.0"
 ---
 
 # massa-ai Router
@@ -11,7 +15,10 @@ workflow/reference details only when the selected request requires them.
 This file is the canonical runtime contract for project/session handling,
 workflow routing, retrieval, persistence, graceful degradation, and completion.
 Startup activation, user-editable policies, and global ignore paths are owned by
-[`AGENTS.md`](../../AGENTS.md).
+the installed `AGENTS.md` bootstrap block (the `<!-- massa-ai:bootstrap -->`
+section of `<host>/AGENTS.md`, for example `~/.claude/AGENTS.md`). Its single
+source is `skills/AGENTS.md` in the product repo; `scripts/install-skills.sh`
+copies that block out. Edit the policies there, never in a host copy.
 
 ## Dedupe Guard
 
@@ -166,13 +173,13 @@ selected workflow asks for it.
 
 ## Plan Challenge Gate
 
-Read and apply the canonical Plan Challenge Policy from
-[`AGENTS.md`](../../AGENTS.md). Prompt-level user instructions override
-that policy for the current turn.
+Read and apply the canonical Plan Challenge Policy from the installed
+`AGENTS.md` bootstrap block (single source: `skills/AGENTS.md`). Prompt-level
+user instructions override that policy for the current turn.
 
 For a low-risk plan that receives the lite gate, attempt a read-only
-`plan-critic` subagent with a bounded checklist packet instead of running the
-checklist in the main agent. The packet includes the proposed plan, scope,
+`massa-ai-plan-critic` subagent with a bounded checklist packet instead of
+running the checklist in the main agent. The packet includes the proposed plan, scope,
 constraints, compact recalled facts/evidence, known risks, verification recipe,
 parent identifiers, and this output requirement:
 
@@ -189,17 +196,19 @@ Fool stays for `spec-driven`, `design`, `adr`, `rfc`, `tdd`, explicit challenge
 requests, high-risk domains, or plans touching more than 5 files/classes/modules.
 When the policy selects the full gate, or lite escalates, load
 `workflows/the-fool.md`, select the mode in the main agent, load only the
-selected The Fool references, and attempt a read-only `plan-critic` subagent
-with selected mode context and a bounded critique packet. Subagents inherit
+selected The Fool references, and attempt a read-only `massa-ai-plan-critic`
+subagent with selected mode context and a bounded critique packet. Subagents inherit
 `projectId`, parent `workflowSessionId`, workflow name, entity, and compact
 evidence; they do not receive full conversation context.
 
 If the policy file is unavailable, use the conservative fallback: run the full
 gate for high-risk domains, broad multi-module plans, explicit challenge
 requests, and planning workflows that commit to a feature, refactor, ADR, RFC,
-or TDD. If subagent spawning is unavailable or platform policy forbids it, run
-a strict standalone fresh-eyes local critique and report the skipped delegation
-reason. Reuse The Fool context when it is already loaded.
+or TDD. If the `massa-ai-plan-critic` agent is unavailable for any reason —
+spawning forbidden, plugin not installed, unknown `subagent_type` — run a strict
+standalone fresh-eyes local critique against the same output contract and report
+the skipped delegation reason. Do not retry under a different agent name. Reuse
+The Fool context when it is already loaded.
 
 ## Retrieval And Synapse
 

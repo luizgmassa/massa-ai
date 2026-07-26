@@ -26,6 +26,9 @@ Step 4: Web search → official docs, reputable sources, community patterns
 Step 5: Flag as uncertain → "I'm not certain about X — here's my reasoning, but verify"
 ```
 
+- If a chain step's tool is unavailable (Context7 MCP not registered, no web
+  access), record it as a skipped sensor with its reason and continue to the next
+  step. An unavailable step is skipped, never silently treated as answered.
 - Never skip to Step 5 if Steps 1-4 are available.
 - Step 5 is always flagged uncertain — never presented as fact.
 - Never assume or fabricate. If no answer is found, say "I don't know" or "I couldn't find documentation for this". "I don't know" beats invention.
@@ -55,7 +58,7 @@ Step 5: Flag as uncertain → "I'm not certain about X — here's my reasoning, 
    - ask only if the objective or scope cannot be inferred from local context
 6. Recon with progressive disclosure. Dispatch `investigator` per `references/agent-orchestration.md` when the investigation justifies an isolated read-only subagent:
 
-> **Dispatch: investigator** — see `skills/agents/investigator/SKILL.md`
+> **Dispatch: `massa-ai-investigator`** (role: `investigator`) — charter `skills/agents/investigator/SKILL.md`
 > - trigger: isolated read-only investigation justified; large scope, repeated searches, or context-firewall threshold exceeded
 > - scope: the exploration target — symbols, files, routes, commands, docs, or runtime artifacts to inspect
 > - permissions: read-only
@@ -98,7 +101,7 @@ Step 5: Flag as uncertain → "I'm not certain about X — here's my reasoning, 
 - Dumping raw logs, browser snapshots, generated reports, long diffs, or whole files into context.
 - Treating stale or superseded memories as current source truth.
 - Implementing fixes or refactors inside Exploration.
-- Creating a new persistence system or duplicating CodeNavi-style local notebooks inside massa-ai workflows.
+- Creating a new persistence system or duplicating local notebook files inside massa-ai workflows.
 - Asking the user where code lives before searching current sources.
 
 ## Output Contract

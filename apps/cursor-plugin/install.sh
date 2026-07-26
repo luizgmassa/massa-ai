@@ -215,21 +215,18 @@ if [[ -f "$PLUGIN_DIR/mcp.json" ]]; then
   echo -e "  - removed stale mcp.json (MCP is now registered in ~/.cursor/mcp.json)"
 fi
 
-# Copy agents — navigator + 12 subagent specialists (auto-discovered by Cursor
-# from the plugin's agents/ dir). The existing navigator is preserved; the 12
-# specialists are additive (CRS-04).
-cp "$SCRIPT_DIR/agents/massa-ai-navigator.md" "$PLUGIN_DIR/agents/massa-ai-navigator.md"
-vecho "  + agents/massa-ai-navigator.md"
+# Copy agents — every generated subagent specialist (auto-discovered by Cursor
+# from the plugin's agents/ dir). All of them, navigator included, are generated
+# from skills/agents/*/SKILL.md and owned by the massa-ai- name prefix (CRS-04).
 specialist_count=0
 for src in "$SCRIPT_DIR/agents/"massa-ai-*.md; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
-  [[ "$name" == *navigator* ]] && continue
   cp "$src" "$PLUGIN_DIR/agents/$name"
   vecho "  + $name"
   specialist_count=$((specialist_count + 1))
 done
-vecho "  + ${specialist_count} subagent specialists: investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist"
+vecho "  + ${specialist_count} subagent specialists (generated from skills/agents/*/SKILL.md)"
 
 # Create the binary symlink → repo's claude-plugin binary (resolved at install
 # time via SCRIPT_DIR → REPO_ROOT). This keeps a single source of truth.

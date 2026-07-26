@@ -79,7 +79,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - When you reject a refactor candidate, record its load-bearing reason in ruled-out candidates; if it is likely to be re-proposed, offer an ADR via `workflows/adr.md` so the rejection is not re-litigated next audit.
 12. Use agent orchestration only when it improves signal. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: architecture-specialist** — see `skills/agents/architecture-specialist/SKILL.md`
+> **Dispatch: `massa-ai-architecture-specialist`** (role: `architecture-specialist`) — charter `skills/agents/architecture-specialist/SKILL.md`
 > - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, isolated audit slice, or independent verification of high-impact finding
 > - scope: exact files/modules/boundaries in the audit target
 > - permissions: read-only
@@ -89,7 +89,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
 > - firewall: raw dependency graphs, generated reports, and broad search output summarized, not returned raw
 > - memory: suggest-only; main agent persists accepted constraints/rejected refactors
 
-> **Dispatch: verification-agent** — see `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: independent verification of a high-impact architecture finding
 > - scope: the specific finding's claimed evidence and affected boundary/module
 > - permissions: read-only

@@ -30,7 +30,7 @@ Do not use this parent workflow when the user wants only one audit lens; route d
    - When a broad audit lacks requirements, ask for a source when interactive and not forbidden; otherwise mark Requirements `not evaluated: missing source`. Never report a requirements all-clear without a source.
 7. Establish child contracts and dispatch `audit-specialist` per lens through `references/agent-orchestration.md`:
 
-> **Dispatch: audit-specialist** — see `skills/agents/audit-specialist/SKILL.md`
+> **Dispatch: `massa-ai-audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
 > - trigger: broad/full audit requiring multiple lenses, or explicit multi-lens request
 > - scope: one lens per dispatch against the shared implementation scope packet (Correctness/Architecture/Code Quality/Security/Requirements/Tests)
 > - permissions: read-only

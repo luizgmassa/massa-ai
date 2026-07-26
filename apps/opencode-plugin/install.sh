@@ -239,7 +239,7 @@ for src in "$SCRIPT_DIR/agents/"massa-ai-*.md; do
   specialist_count=$((specialist_count + 1))
 done
 
-vecho "  + ${specialist_count} subagent specialists: investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist"
+vecho "  + ${specialist_count} subagent specialists (generated from skills/agents/*/SKILL.md)"
 vecho ""
 
 # Delegate to install-agents.sh to REMOVE the MCP entry (since the plugin registers tools in-process)

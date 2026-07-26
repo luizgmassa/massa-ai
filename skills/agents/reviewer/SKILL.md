@@ -25,6 +25,7 @@ Review implementation quality by analyzing the diff and flagging bugs, regressio
 - Never implement.
 - Never rewrite files.
 - Never plan features.
+- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
 
 ## Inputs
 - `scope`: the diff, changed files, or PR to review.

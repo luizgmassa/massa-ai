@@ -277,7 +277,9 @@ Thumbs.db
 
 # Sub-Agent Registry
 
-Single registry for the 12 reusable sub-agent skills in this repo. Workflows remain the orchestrators; these agents are single-purpose specialists any workflow can invoke via the opencode task tool.
+Single registry for the 16 reusable sub-agent skills in this repo. Workflows remain the orchestrators; these agents are single-purpose specialists any workflow can invoke via the host's task/subagent tool.
+
+**Dispatch names are prefixed.** A charter at `skills/agents/<role>/SKILL.md` is registered by every host as `massa-ai-<role>`. Dispatch `massa-ai-investigator`, not `investigator`; the bare name is the registry key only. See `massa-ai/references/agent-orchestration.md` -> Name Resolution for the convention and for the fallback when a named agent is unavailable.
 
 ## Orchestration Model
 
@@ -285,12 +287,14 @@ Single registry for the 12 reusable sub-agent skills in this repo. Workflows rem
 Workflow (orchestrator)
   │  owns: routing, memory recall/persistence, user synthesis, Evidence Gate
   │
-  ├─ dispatch investigator        (read-only: locate, trace, understand)
-  ├─ dispatch context-curator     (read-only: build Context Packet)
-  ├─ dispatch planner             (read-only: produce plan)
-  ├─ dispatch builder             (write: implement approved task, disjoint write set)
-  ├─ dispatch reviewer            (read-only: review diff)
-  ├─ dispatch verification-agent  (read-only: run Verification Ladder)
+  ├─ dispatch massa-ai-investigator        (read-only: locate, trace, understand)
+  ├─ dispatch massa-ai-navigator           (read-only: index-first navigation)
+  ├─ dispatch massa-ai-context-curator     (read-only: build Context Packet)
+  ├─ dispatch massa-ai-planner             (read-only: produce plan)
+  ├─ dispatch massa-ai-plan-critic         (read-only: challenge the plan)
+  ├─ dispatch massa-ai-builder             (write: implement approved task, disjoint write set)
+  ├─ dispatch massa-ai-reviewer            (read-only: review diff)
+  ├─ dispatch massa-ai-verification-agent  (read-only: run Verification Ladder)
   └─ Evidence Gate + persist memory
 ```
 
@@ -328,6 +332,8 @@ Agents summarize verbose output. They never return raw logs, diffs, snapshots, o
 
 ## Agent Table
 
+Dispatch each agent as `massa-ai-<Name>`.
+
 | Name | Purpose | Permission | Model hint | Trigger | Charter |
 |---|---|---|---|---|---|
 | investigator | Read and understand the codebase | read-only | DeepSeek V4 Pro | Locate implementations, trace flow, estimate impact | `skills/agents/investigator/SKILL.md` |
@@ -342,10 +348,14 @@ Agents summarize verbose output. They never return raw logs, diffs, snapshots, o
 | documentation-agent | Generate engineering documentation | read-only (doc-write when scoped) | DeepSeek V4 Pro | README, ADR, RFC, changelog, KDoc | `skills/agents/documentation-agent/SKILL.md` |
 | audit-specialist | Execute specialized audits through configurable lenses | read-only | GLM-5.2 | One of: bugs, architecture, security, requirements, code-quality, performance | `skills/agents/audit-specialist/SKILL.md` |
 | mobile-specialist | Provide mobile-specific expertise (conditional) | read-only | GLM-5.2 | Mobile-related project detected (Android/iOS/KMP) | `skills/agents/mobile-specialist/SKILL.md` |
+| plan-critic | Challenge a constructed plan (lite or full Plan Challenge gate) | read-only | MiniMax M3 | A concrete plan exists; standing policy exception to the dispatch triggers | `skills/agents/plan-critic/SKILL.md` |
+| furps-analyst | Analyze one FURPS+ dimension of a PRD/ADR | read-only | GLM-5.2 | `furps-refinement` fans out per-dimension analysis | `skills/agents/furps-analyst/SKILL.md` |
+| handoff-writer | Build a compact continuation package | read-only | DeepSeek V4 Pro | Long-session compaction, agent handoff, restart-save | `skills/agents/handoff-writer/SKILL.md` |
+| navigator | Navigate an indexed codebase index-first | read-only | DeepSeek V4 Pro | "where is X", "who calls Y" against a fresh massa-ai index | `skills/agents/navigator/SKILL.md` |
 
 ## Mapping — New Agents ↔ Existing Roles
 
-The symlinked massa-ai skill defines 9 roles in `references/agent-orchestration.md`. This registry maps the 12 new agent skills to those roles:
+The symlinked massa-ai skill defines the roles in `references/agent-orchestration.md`. This registry maps the agent skills to those roles:
 
 | New agent skill | Existing role | Relationship |
 |---|---|---|
@@ -361,15 +371,20 @@ The symlinked massa-ai skill defines 9 roles in `references/agent-orchestration.
 | documentation-agent | — | New capability. |
 | audit-specialist | — | New capability (configurable 6-lens). |
 | mobile-specialist | — | New capability (conditional). |
+| plan-critic | `plan-critic` | Identical capability; the former charter-less role now has a charter. |
+| furps-analyst | `furps-analyst` | Identical capability; charter sourced from `references/furps/analyst-role.md`. |
+| handoff-writer | `handoff-writer` | Identical capability; charter sourced from `references/handoff-package.md`. Read-only: the main agent persists the package. |
+| navigator | — | Pre-existing Claude/Cursor index-first agent, now charter-governed and shipped to all four hosts. |
 
-Three existing roles remain in `references/agent-orchestration.md` unchanged: `plan-critic`, `furps-analyst`, `handoff-writer`.
+## How to Add an Agent
 
-## How to Add a 13th Agent
-
-1. Create `skills/<name>/SKILL.md` from the charter template (see any existing agent skill).
+1. Create `skills/agents/<name>/SKILL.md` from the charter template (see any existing agent skill), including `metadata.model_hint` and `metadata.permission`.
 2. Add one row to the Agent Table above.
 3. Add one row to the Mapping table if it maps to an existing role.
-4. No other file changes.
+4. Add `<name>` to `SPECIALIST_NAMES` plus the two model-pinning tables in `scripts/generate-subagent-artifacts.ts`, then run it to regenerate the host artifacts.
+5. Add `<name>` to the roster in `scripts/__tests__/subagent-parity.test.ts` and run `bun run test:scripts`.
+
+Steps 4-5 are enforced: the parity test fails on generator drift and `scripts/__tests__/skills-harness-integrity.test.ts` fails if a workflow dispatches an agent with no shipped artifact.
 
 ## Future Integration
 
@@ -380,10 +395,10 @@ This pass adds the agents only. A follow-up feature will update massa-ai workflo
 All agents integrate these concepts (documented per-agent in each charter):
 
 - **Massa-ai Memory**: agents suggest durable memories only when useful; the main agent persists.
-- **Synapse**: repeated-search agents (investigator, context-curator) receive their own ephemeral Synapse session.
+- **Synapse**: repeated-search agents (investigator, navigator, context-curator, furps-analyst) receive their own ephemeral Synapse session.
 - **Context Firewall**: agents summarize verbose output and never return raw dumps.
 - **Verification Ladder**: agents declare the deterministic sensors they run.
 - **References**: agents point to the relevant massa-ai reference files by name.
 - **Lessons**: agents surface reusable failures for lesson distillation.
 
-<!-- validator anchors: 12 agents | mapping table | capability packet | output contract -->
+<!-- validator anchors: 16 agents | mapping table | capability packet | output contract -->

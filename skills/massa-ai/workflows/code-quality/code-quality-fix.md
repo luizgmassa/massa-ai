@@ -49,7 +49,7 @@ Do not use this workflow for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, 
    - Prefer small reversible edits; verify after each finding or coherent group.
 10. Use agent orchestration only when it improves signal. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: builder** — see `skills/agents/builder/SKILL.md`
+> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated code-quality finding or disjoint file group
 > - permissions: write (disjoint write set)
@@ -59,7 +59,7 @@ Do not use this workflow for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, 
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable code-quality patterns
 
-> **Dispatch: verification-agent** — see `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: independent verification of a high-risk code-quality fix
 > - scope: the fixed finding's behavior preservation, imports, tests, and report claim closure
 > - permissions: read-only

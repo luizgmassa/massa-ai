@@ -198,7 +198,7 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
     ).toBe(false);
   });
 
-  // ── T6: 12 subagent specialists bundled into plugin agents/ (CRS-01,04,07 + DOC-01) ─
+  // ── T6: 16 subagent specialists bundled into plugin agents/ (CRS-01,04,07 + DOC-01) ─
   const SPECIALIST_NAMES = [
     "investigator",
     "planner",
@@ -212,30 +212,32 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
     "documentation-agent",
     "audit-specialist",
     "mobile-specialist",
+    "plan-critic",
+    "furps-analyst",
+    "handoff-writer",
+    "navigator",
   ];
 
-  test("CRS-01/CRS-04/DOC-01: install copies 12 specialists + navigator (13 .md) into plugin agents/ + prints summary", async () => {
+  test("CRS-01/CRS-04/DOC-01: install copies all 16 specialists into plugin agents/ + prints summary", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
     const agentsDir = path.join(tmp, ".cursor/plugins/massa-ai/agents");
-    // Navigator preserved (CRS-04)
-    expect(await pathExists(path.join(agentsDir, "massa-ai-navigator.md"))).toBe(true);
-    // 12 specialists (CRS-01)
+    // 16 specialists, navigator included (CRS-01/CRS-04)
     for (const name of SPECIALIST_NAMES) {
       expect(
         await pathExists(path.join(agentsDir, `massa-ai-${name}.md`)),
       ).toBe(true);
     }
-    // Total 13 .md files in agents/
+    // Total 16 .md files in agents/
     const files = (await fs.readdir(agentsDir)).filter((f) => f.endsWith(".md"));
-    expect(files.length).toBe(13);
+    expect(files.length).toBe(16);
 
-    // Install output mentions 12 subagent specialists (DOC-01)
-    expect(res.stdout).toContain("12 subagent specialists");
+    // Install output mentions the 16 subagent specialists (DOC-01)
+    expect(res.stdout).toContain("16 subagent specialists");
   });
 
-  test("CRS-05: uninstall removes whole plugin dir (all 13 agents gone)", async () => {
+  test("CRS-05: uninstall removes whole plugin dir (all 16 agents gone)", async () => {
     runInstall(["--user"], { HOME: tmp });
     const agentsDir = path.join(tmp, ".cursor/plugins/massa-ai/agents");
     expect(await pathExists(agentsDir)).toBe(true);

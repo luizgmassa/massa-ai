@@ -56,7 +56,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - Return compact findings to the parent implementation audit; do not write broad project memories unless explicitly assigned.
 10. Investigation pass. Dispatch `audit-specialist` per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
 
-> **Dispatch: audit-specialist** — see `skills/agents/audit-specialist/SKILL.md`
+> **Dispatch: `massa-ai-audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
 > - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, or independent verification of high-impact finding
 > - scope: the tests audit target — test files, fixtures, harnesses, coverage
 > - permissions: read-only

@@ -8,7 +8,9 @@ Conversation feedback is a user-facing progress layer, not a log system. Keep ea
 
 ## Policy Source
 
-Read the canonical Conversation Feedback Policy from root `AGENTS.md`. If that
+Read the canonical Conversation Feedback Policy from the installed `AGENTS.md`
+bootstrap block (`<!-- massa-ai:bootstrap -->`), whose single source is
+`skills/AGENTS.md` in the product repo. If that
 file is unavailable, emit concise transition updates automatically, keep each
 update to 1-2 lines, and suppress chain-of-thought, raw logs, secrets, and
 repeated micro-events.
