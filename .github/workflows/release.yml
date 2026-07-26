@@ -4,11 +4,15 @@ name: Release
 #
 # Chain: merge PR -> CI -> this workflow -> publish.yml (reusable).
 #
-# It deliberately does NOT rely on `push: tags` or `release: published` firing. A tag or
-# release created with GITHUB_TOKEN raises no event — GitHub's documented recursion guard
-# — so the chain is sequenced with `workflow_call` instead of events. That same guard is
-# what stops the version-bump commit from starting another CI run, and therefore another
-# release (ARV-R12).
+# It deliberately does NOT rely on `push: tags` or `release: published` firing. The
+# GitHub Release below is created with GITHUB_TOKEN, and a tag or release created with
+# GITHUB_TOKEN raises no event — GitHub's documented recursion guard — so `publish.yml` is
+# sequenced with `workflow_call` instead of an event.
+#
+# Loop safety (ARV-R12) does NOT come from that guard any more. The bump commit is pushed
+# with a deploy key (see the checkout step), which does raise events. `[skip ci]` in the
+# commit subject is what prevents the recursion, backed by the fact that a second run
+# would find an empty [Unreleased] and derive no bump.
 on:
   workflow_run:
     workflows: [CI]
@@ -43,6 +47,21 @@ jobs:
           # push is guaranteed to be rejected whenever main has moved.
           ref: main
           fetch-depth: 0
+          # Push as the `release-bot` deploy key, NOT GITHUB_TOKEN. The branch ruleset
+          # on main requires a PR and 5 status checks, so GITHUB_TOKEN's push is rejected
+          # with `GH013: Repository rule violations found`. The ruleset's bypass list is
+          # the only way through, and on a user-owned repo GitHub Actions cannot be a
+          # bypass actor ("must be part of the ruleset source or owner organization") —
+          # a write-enabled deploy key can. It is repo-scoped and git-only: no API
+          # access, no other repository, no expiry.
+          #
+          # Consequence: a deploy-key push DOES raise events, unlike GITHUB_TOKEN. The
+          # `[skip ci]` in the commit subject below is therefore load-bearing, not
+          # defensive — without it the bump commit starts CI, and a green CI on main is
+          # exactly what triggers this workflow. (A second run would still terminate:
+          # the promoted [Unreleased] is empty, so it derives no bump. `[skip ci]` is
+          # the first line of defence, that emptiness the second.)
+          ssh-key: ${{ secrets.RELEASE_SSH_KEY }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
