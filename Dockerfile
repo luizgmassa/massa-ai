@@ -34,9 +34,12 @@ COPY patches ./patches
 # Install dependencies (ignore Prisma postinstall that checks Node version)
 RUN bun install --ignore-scripts
 
-# Copy source code (web-ui is served by tools-api; plugins install separately)
+# Copy source code (plugins install separately).
+# apps/web-ui ships no build step — tools-api reads its static/ dir verbatim at
+# request time, so the sources must be present in the image or /ui returns 500.
 COPY packages ./packages
 COPY apps/tools-api ./apps/tools-api
+COPY apps/web-ui ./apps/web-ui
 COPY apps/mcp-client ./apps/mcp-client
 COPY apps/opencode-plugin ./apps/opencode-plugin
 
@@ -56,6 +59,7 @@ WORKDIR /app
 COPY --from=base /app/node_modules ./node_modules
 COPY --from=base /app/packages ./packages
 COPY --from=base /app/apps/tools-api ./apps/tools-api
+COPY --from=base /app/apps/web-ui ./apps/web-ui
 COPY --from=base /app/package.json ./package.json
 COPY --from=base /app/bunfig.toml ./bunfig.toml
 
