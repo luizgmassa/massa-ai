@@ -75,6 +75,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   second run finds an emptied `[Unreleased]` and derives no bump. The workflow comments
   that credited the old guard were corrected rather than left to mislead.
 
+- **A path-filtered required status check deadlocked every PR that did not touch
+  `skills/`.** `skills.yml` was filtered to `paths: ['skills/**']`, but its `validate` job
+  is a required check in the `main` branch ruleset. A required check that never *runs* never
+  *reports*, so the PR sits indefinitely on "Expected — waiting for status to be reported"
+  rather than failing — it cannot be merged and there is nothing to re-run. The `paths:`
+  filter is removed from the `pull_request` trigger (kept on `push`, where nothing requires
+  it); the job is checkout plus frontmatter greps, ~8s, so running it on every PR is free.
+
+  The trap is that this looks fine until the first PR that misses the filter. Audited the
+  other four required checks — `build`, `mcp`, and both `Structural native tests` jobs are
+  in `ci.yml`, which has no `paths:` filter and no job-level `if:`, so they always report.
+
 - **skills.yml shellcheck issues.** Fixed 7 unquoted variables (SC2086) and 1 redirect
   style issue (SC2129). Behavior is identical; the script now passes `actionlint`.
 - **The MCP server wrote 68 bytes to stdout on first run, breaking the stdio JSON-RPC handshake.** `initConfig()` in `packages/shared/src/config/config-loader.ts` announced `Created default config at <path>` on **stdout** via `console.log`. That branch fires only when `~/.config/massa-ai/config.json` does not exist yet — so it never fired on a machine that had already run massa-ai once, and always fired on a genuinely fresh install. Per this repo's own contract, a stdio MCP server's stdout carries nothing but protocol; one stray byte produces `connection closed: initialize response`. Now `console.error`. It deliberately does not use the shared logger: the logger reads config, so importing it here would be circular.
