@@ -16,6 +16,12 @@
  *      matched the tree.
  *   6. Charter <-> artifact permission — charters said `read-only` while the
  *      shipped artifact granted Write/Edit.
+ *   7. Persona <-> sub-agent boundary — the persona layer and the 15 charters
+ *      shared no stated contract: no Capability Packet copy mentioned persona,
+ *      no charter forbade self-routing or self-reading one, and persona-router's
+ *      Stop Conditions read as an absolute ban on subagents rather than a bound
+ *      on persona routing. See
+ *      .specs/features/persona-agent-boundary/spec.md.
  *
  * `bun run test:scripts` runs this file; CI runs that script.
  */
@@ -387,5 +393,139 @@ describe("charter permission matches the shipped artifact", () => {
         "Never spawn subagents",
       );
     }
+  });
+});
+
+// ── 7. Persona <-> sub-agent boundary (PAB) ────────────────────────────────
+//
+// Personas (skills/persona-router/ + skills/massa-ai/personas/) and the 15
+// charters are different layers with no shared contract before this feature.
+// Requirement IDs below are from
+// .specs/features/persona-agent-boundary/spec.md.
+
+describe("persona / sub-agent boundary", () => {
+  /** The three files that define the Capability Packet, by design (see design.md A1). */
+  const PACKET_FILES = [
+    "AGENTS.md",
+    path.join("massa-ai", "references", "agent-orchestration.md"),
+    path.join("massa-ai", "references", "subagent-design.md"),
+  ];
+
+  /**
+   * The persona field's semantics, byte-identical across all three packet
+   * copies. Uniform text is what makes a substring gate meaningful — a
+   * per-file paraphrase cannot be distinguished from a weakened one.
+   */
+  const PACKET_PERSONA_CLAUSE =
+    "advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions";
+
+  const PERSONA_ROUTER = path.join(SKILLS_DIR, "persona-router", "SKILL.md");
+
+  /**
+   * The span of a charter between its `## Restrictions` heading and the next
+   * `##` heading. PAB-02/AC2 and PAB-06 require the lines to live *there*, so a
+   * whole-file search would not actually enforce the acceptance criterion.
+   */
+  function restrictionsSection(charter: string, name: string): string {
+    const start = charter.indexOf("## Restrictions");
+    expect(start, `charter ${name} has no ## Restrictions section`).toBeGreaterThanOrEqual(0);
+    const rest = charter.slice(start + "## Restrictions".length);
+    const nextHeading = rest.search(/^## /m);
+    return nextHeading === -1 ? rest : rest.slice(0, nextHeading);
+  }
+
+  // PAB-01
+  test("all three Capability Packet copies declare the optional persona field", async () => {
+    const missing: string[] = [];
+    for (const rel of PACKET_FILES) {
+      const content = await read(path.join(SKILLS_DIR, rel));
+      if (!content.includes("`persona`:") || !content.includes(PACKET_PERSONA_CLAUSE)) {
+        missing.push(rel);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  // PAB-01/AC3 — a fourth packet definition would fork the contract silently.
+  test("the canonical persona clause appears in exactly those three files", async () => {
+    const files = await skillMarkdownFiles();
+    const found: string[] = [];
+    for (const file of files) {
+      const content = await read(file);
+      if (content.includes(PACKET_PERSONA_CLAUSE)) {
+        found.push(path.relative(SKILLS_DIR, file));
+      }
+    }
+    expect(found.sort()).toEqual([...PACKET_FILES].sort());
+  });
+
+  // PAB-02
+  test("every charter's Restrictions section carries the persona precedence line", async () => {
+    const names = await charterNames();
+    const missing: string[] = [];
+    for (const name of names) {
+      const charter = await read(path.join(SKILLS_DIR, "agents", name, "SKILL.md"));
+      const section = restrictionsSection(charter, name);
+      if (!section.includes("shapes emphasis only; these Restrictions win on any conflict")) {
+        missing.push(name);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  // PAB-06/AC1, AC3, AC4
+  test("every charter's Restrictions section forbids self-routing and self-reading a persona", async () => {
+    const names = await charterNames();
+    const missing: string[] = [];
+    for (const name of names) {
+      const charter = await read(path.join(SKILLS_DIR, "agents", name, "SKILL.md"));
+      const section = restrictionsSection(charter, name);
+      const bansRouter = section.includes(
+        "never load the `massa-ai` or `persona-router` routers",
+      );
+      const bansPromptRead = section.includes("never open a `personas/` prompt file");
+      if (!bansRouter || !bansPromptRead) missing.push(name);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  // PAB-06/AC5 — presence alone would pass if the old sentence were re-added.
+  test("no charter retains the superseded massa-ai-only restriction", async () => {
+    const names = await charterNames();
+    const offenders: string[] = [];
+    for (const name of names) {
+      const charter = await read(path.join(SKILLS_DIR, "agents", name, "SKILL.md"));
+      if (charter.includes("never load the `massa-ai` router")) offenders.push(name);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  // PAB-04
+  test("persona-router scopes its subagent prohibition to persona routing", async () => {
+    const content = await read(PERSONA_ROUTER);
+    expect(content).toContain("Persona routing itself stays inline");
+    expect(content).toContain(
+      "workflow-mandated agent dispatch is unaffected by an active persona route",
+    );
+  });
+
+  // PAB-04 — the absence side; the design's own stated reason for it.
+  test("persona-router no longer contains the unscoped prohibition", async () => {
+    const content = await read(PERSONA_ROUTER);
+    expect(content).not.toContain("launch subagents, create subprocess orchestration");
+  });
+
+  // PAB-03 + PAB-07
+  test("persona-router states persona grants no authority and reaches subagents as an id only", async () => {
+    const content = await read(PERSONA_ROUTER);
+    expect(content).toContain("grants no tool access, no write scope, and no permission");
+    expect(content).toContain("the persona is never authority");
+    expect(content).toContain("carries the persona **id only**, never the persona prompt");
+  });
+
+  // PAB-05
+  test("persona-router states a persona route is not a specialist consultation", async () => {
+    const content = await read(PERSONA_ROUTER);
+    expect(content).toContain("A persona route is not a specialist consultation");
   });
 });
