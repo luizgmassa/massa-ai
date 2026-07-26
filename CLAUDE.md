@@ -231,19 +231,50 @@ plus the plugin bundles). They follow the plugin-installer pattern — bash orch
 with an inline `node`/`bun` heredoc for every JSON/TOML edit; there is no `jq` in this
 repo, and `exit 3` means neither runtime was on PATH.
 
-**`scripts/install-agents.sh` is the only writer of host MCP config.** The three plugin
+**`scripts/install-agents.sh` is the only writer of host MCP config.** The plugin
 installers call it rather than shipping their own MCP file; a manifest `mcp` pointer or a
 plugin-local `.mcp.json`/`mcp.json` would reintroduce a second registration path.
 `scripts/tests/test-mcp-single-writer.sh` guards that. OpenCode is the one host where the
-MCP write is *skipped* — only when `opencode.json` lists `@massa-ai/opencode-plugin`,
-which registers 14 tools in-process.
+MCP write is *skipped* — when `opencode.json` lists the plugin in any accepted form (npm
+name `@massa-ai/opencode-plugin`, local path `./plugins/massa-ai/index.js`, or bare dir
+`massa-ai`), because the plugin registers 14 tools in-process. The harness order is skills
+→ MCP → plugins, so at MCP time that entry may not exist yet; the OpenCode installer
+therefore calls `install-agents.sh --agent opencode --uninstall` after registering itself,
+which keeps the single-writer invariant intact.
 
-Note the three plugin dirs are **not** workspace packages (no `package.json`) — each ships
-its own `install.sh`, alongside the 42 KB root `install.sh`. Their `__tests__/` run under
-no CI job; run them by hand with `bun test apps/<host>-plugin/__tests__`.
+The registered MCP command depends on `--mcp-source` (`local` | `npx` | `auto`, default
+`auto`; also read from `MASSA_AI_MCP_SOURCE`, flag wins). `setup-local-first.sh` passes
+`local` (→ `bun run <repo>/apps/mcp-client/src/index.ts`); the root `install.sh` passes
+`npx`. `auto` picks `local` when `apps/mcp-client/src/index.ts` exists. Two traps live
+here: the package's bin is `massa-ai`, not `mcp-client`, so `-p` is mandatory or npx dies
+with "could not determine executable to run" — and `bunx` accepts `-p` but has **no** `-y`.
+The npx path also drags in `@massa-ai/core` and compiles native tree-sitter grammars on
+first run, which outlasts any MCP host's handshake timeout, so `local` is the right default
+for a checkout.
 
-The parity guard is `scripts/__tests__/subagent-parity.test.ts`, which no CI job runs (see
-"Running tests"). Regenerate and run it by hand after touching the generator.
+**Stdout belongs to the protocol.** `packages/shared/src/utils/logger.ts` routes every
+level to stderr on purpose. A stdio MCP server whose stdout carries anything but JSON-RPC
+fails with `connection closed: initialize response`; a single `logger.info()` reaching
+stdout is enough. `apps/mcp-client/src/__tests__/mcp-stdout-clean.test.ts` is the guard.
+
+Claude Code reads MCP *definitions* from `~/.claude.json`, **not** from
+`~/.claude/settings.json` — that file holds only approval controls
+(`allowedMcpServers`, `enabledMcpjsonServers`, `disabledMcpServers`) plus `hooks`. Entry
+shape is per-host: Claude/Cursor need a **string** `command` plus an `args` array (Claude
+also `type: "stdio"`); OpenCode uses array `command` + `type: "local"` + `environment`.
+Do not generalise one host's shape to the others — that bug is what made Claude MCP
+registration a no-op before this release.
+
+Note the four plugin dirs are **not** workspace packages in the installer sense (only
+`apps/opencode-plugin/` has a `package.json`, because it also publishes to npm) — each
+ships its own `install.sh`, alongside the 42 KB root `install.sh`. The OpenCode one needs
+`bun run build` first: it symlinks `dist/index.js` and refuses to run without it. Because
+three of the four dirs are invisible to turbo, their `__tests__/` are reached by the root
+`bun run test:plugins` script (wired into the CI `build` job), not by `bun run test`.
+
+The parity guard is `scripts/__tests__/subagent-parity.test.ts`, reached by
+`bun run test:scripts` (which CI runs). Regenerate and re-run it after touching the
+generator.
 
 Installers, hooks, generated config, and symlinks are public compatibility surfaces —
 treat a change to them as breaking until proven otherwise.

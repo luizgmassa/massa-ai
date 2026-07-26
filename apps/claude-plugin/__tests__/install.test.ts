@@ -240,7 +240,7 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
   ];
 
   test("CLA-01/DOC-01: user-scope install copies 12 subagent specialists + prints summary line", async () => {
-    const res = runInstall(["--user"], { HOME: tmp });
+    const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
     // 12 specialist agent files at ~/.claude/agents/massa-ai-<name>.md

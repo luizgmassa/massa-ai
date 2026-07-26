@@ -95,6 +95,12 @@ jobs:
       - name: Test scripts (root-level suites)
         run: bun run test:scripts
 
+      # apps/{claude,codex,cursor}-plugin are not workspace packages (no
+      # package.json), so turbo's `test` never reaches them. They install into a
+      # temp $HOME, so they are safe to run here.
+      - name: Test plugin installers
+        run: bun run test:plugins
+
   mcp:
     runs-on: ubuntu-latest
     needs: build

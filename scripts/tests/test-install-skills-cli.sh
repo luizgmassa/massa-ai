@@ -28,7 +28,7 @@ echo "Scenario 1: --help exits 0 and documents the flags"
 HELP="$(bash "$INSTALLER" --help 2>&1)"
 assert_eq "--help exits 0" "$(rc_of bash "$INSTALLER" --help)" "0"
 assert_eq "-h exits 0" "$(rc_of bash "$INSTALLER" -h)" "0"
-for FLAG in --apply --uninstall --dry-run --check --platform --target --repo-root --yes --json; do
+for FLAG in --apply --uninstall --dry-run --check --quiet --verbose --platform --target --repo-root --yes --json; do
   assert_contains "help documents $FLAG" "$HELP" "$FLAG"
 done
 

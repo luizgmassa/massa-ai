@@ -53,8 +53,8 @@ describe("Logger", () => {
       loggerInstance.info("i");
       loggerInstance.warn("w");
       loggerInstance.error("e");
-      expect(logSpy).toHaveBeenCalledTimes(2); // debug + info -> stdout
-      expect(errSpy).toHaveBeenCalledTimes(2); // warn + error -> stderr
+      expect(logSpy).toHaveBeenCalledTimes(0); // all go to stderr
+      expect(errSpy).toHaveBeenCalledTimes(4); // all 4 to stderr
     });
 
     test("INFO level suppresses debug, logs info/warn/error", () => {
@@ -63,8 +63,8 @@ describe("Logger", () => {
       loggerInstance.info("i");
       loggerInstance.warn("w");
       loggerInstance.error("e");
-      expect(logSpy).toHaveBeenCalledTimes(1); // info
-      expect(errSpy).toHaveBeenCalledTimes(2); // warn + error
+      expect(logSpy).toHaveBeenCalledTimes(0);
+      expect(errSpy).toHaveBeenCalledTimes(3); // info, warn, error
     });
 
     test("WARN level suppresses debug/info, logs warn/error", () => {
@@ -91,13 +91,15 @@ describe("Logger", () => {
       configState = { level: "nonexistent", enableMetrics: false };
       loggerInstance.debug("d");
       loggerInstance.info("i");
-      expect(logSpy).toHaveBeenCalledTimes(1); // info only
+      expect(logSpy).toHaveBeenCalledTimes(0); // all to stderr
+      expect(errSpy).toHaveBeenCalledTimes(1); // info only
     });
 
     test("level string is case-insensitive", () => {
       configState = { level: "DEBUG", enableMetrics: false };
       loggerInstance.debug("d");
-      expect(logSpy).toHaveBeenCalledTimes(1);
+      expect(logSpy).toHaveBeenCalledTimes(0);
+      expect(errSpy).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -105,37 +107,38 @@ describe("Logger", () => {
     test("info message includes timestamp, level, message", () => {
       configState = { level: "info", enableMetrics: false };
       loggerInstance.info("hello");
-      const out = logSpy.mock.calls[0][0] as string;
+      const out = errSpy.mock.calls[0][0] as string;
       expect(out).toMatch(/^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z\] \[INFO\] hello$/);
     });
 
     test("meta is JSON-appended when provided", () => {
       configState = { level: "info", enableMetrics: false };
       loggerInstance.info("msg", { a: 1 });
-      const out = logSpy.mock.calls[0][0] as string;
+      const out = errSpy.mock.calls[0][0] as string;
       expect(out).toContain('msg {"a":1}');
     });
 
     test("no metaStr when meta omitted", () => {
       configState = { level: "info", enableMetrics: false };
       loggerInstance.info("plain");
-      const out = logSpy.mock.calls[0][0] as string;
+      const out = errSpy.mock.calls[0][0] as string;
       expect(out).not.toContain("{");
     });
   });
 
   describe("write stream routing", () => {
-    test("debug -> console.log (stdout)", () => {
+    test("debug -> console.error (stderr)", () => {
       configState = { level: "debug", enableMetrics: false };
       loggerInstance.debug("d");
-      expect(logSpy).toHaveBeenCalledTimes(1);
-      expect(errSpy).toHaveBeenCalledTimes(0);
+      expect(logSpy).toHaveBeenCalledTimes(0);
+      expect(errSpy).toHaveBeenCalledTimes(1);
     });
 
-    test("info -> console.log (stdout)", () => {
+    test("info -> console.error (stderr)", () => {
       configState = { level: "info", enableMetrics: false };
       loggerInstance.info("i");
-      expect(logSpy).toHaveBeenCalledTimes(1);
+      expect(logSpy).toHaveBeenCalledTimes(0);
+      expect(errSpy).toHaveBeenCalledTimes(1);
     });
 
     test("warn -> console.error (stderr)", () => {
@@ -149,6 +152,7 @@ describe("Logger", () => {
       configState = { level: "error", enableMetrics: false };
       loggerInstance.error("e");
       expect(errSpy).toHaveBeenCalledTimes(1);
+      expect(logSpy).toHaveBeenCalledTimes(0);
     });
   });
 
@@ -188,14 +192,14 @@ describe("Logger", () => {
     test("no-op when enableMetrics=false", () => {
       configState = { level: "info", enableMetrics: false };
       loggerInstance.metric("m", 1, "ms");
-      expect(logSpy).toHaveBeenCalledTimes(0);
+      expect(errSpy).toHaveBeenCalledTimes(0);
     });
 
     test("emits info-level METRIC line when enableMetrics=true", () => {
       configState = { level: "info", enableMetrics: true };
       loggerInstance.metric("my_metric", 42, "%");
-      expect(logSpy).toHaveBeenCalledTimes(1);
-      const out = logSpy.mock.calls[0][0] as string;
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      const out = errSpy.mock.calls[0][0] as string;
       expect(out).toContain("METRIC: my_metric");
       expect(out).toContain('"value":42');
       expect(out).toContain('"unit":"%"');
@@ -208,7 +212,7 @@ describe("Logger", () => {
       loggerInstance.info("should log at info fallback");
       loggerInstance.debug("should be suppressed");
       loggerInstance.metric("m", 1, "x"); // should be no-op (metrics off fallback)
-      expect(logSpy).toHaveBeenCalledTimes(1);
+      expect(errSpy).toHaveBeenCalledTimes(1); // info only
     });
   });
 
@@ -221,17 +225,17 @@ describe("Logger", () => {
       child.warn("w", { extra: 3 });
       child.error("e", undefined, { extra: 4 });
 
-      const debugOut = logSpy.mock.calls[0][0] as string;
+      const debugOut = errSpy.mock.calls[0][0] as string;
       expect(debugOut).toContain('"reqId":"abc"');
       expect(debugOut).toContain('"extra":1');
 
-      const infoOut = logSpy.mock.calls[1][0] as string;
+      const infoOut = errSpy.mock.calls[1][0] as string;
       expect(infoOut).toContain('"reqId":"abc"');
 
-      const warnOut = errSpy.mock.calls[0][0] as string;
+      const warnOut = errSpy.mock.calls[2][0] as string;
       expect(warnOut).toContain('"reqId":"abc"');
 
-      const errOut = errSpy.mock.calls[1][0] as string;
+      const errOut = errSpy.mock.calls[3][0] as string;
       expect(errOut).toContain('"reqId":"abc"');
       expect(errOut).toContain('"extra":4');
     });

@@ -20,14 +20,17 @@
 #   --agent <name>         claude-code, claude-desktop, codex, cursor, opencode
 #   --target <dir>         Override $HOME root (required for tests)
 #   --api-base <url>       MCP API base url written into env (default http://localhost:3333)
+#   --mcp-source <type>    Command source: local, npx, auto (default auto)
+#   --verbose              Print per-file detail; --dry-run enables this implicitly
+#   --quiet                Suppress per-file detail (default)
 #   --yes, -y              Consent to writing real $HOME
 #   -h, --help             Show this help
 #
 # Wired agents write to:
-#   claude-code     ~/.claude/settings.json                     (mcpServers)
-#   claude-desktop  ~/Library/Application Support/Claude/claude_desktop_config.json  (macOS)
+#   claude-code     ~/.claude.json                                 (mcpServers, stdio)
+#   claude-desktop  ~/Library/Application Support/Claude/claude_desktop_config.json  (mcpServers, stdio, macOS)
 #   codex           ~/.codex/config.toml                        ([mcp_servers.massa-ai])
-#   cursor          ~/.cursor/mcp.json                           (mcpServers)
+#   cursor          ~/.cursor/mcp.json                           (mcpServers, stdio)
 #   opencode        ~/.config/opencode/opencode.json             (mcp / environment / bunx)
 #
 # Safety:
@@ -58,9 +61,11 @@ ALL_AGENTS="claude-code claude-desktop codex cursor opencode"
 AGENTS="$ALL_AGENTS"
 TARGET_HOME="${HOME:-}"
 API_BASE="http://localhost:3333"
+MCP_SOURCE="${MASSA_AI_MCP_SOURCE:-auto}"
 DRY_RUN=0
 UNINSTALL=0
 ASSUME_YES=0
+VERBOSE=0
 
 usage() { sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; }
 
@@ -69,6 +74,8 @@ while [ $# -gt 0 ]; do
     --dry-run) DRY_RUN=1 ;;
     --uninstall) UNINSTALL=1 ;;
     --yes|-y) ASSUME_YES=1 ;;
+    --verbose) VERBOSE=1 ;;
+    --quiet) VERBOSE=0 ;;
     --agent)
       shift
       case "${1:-}" in
@@ -81,6 +88,16 @@ while [ $# -gt 0 ]; do
       ;;
     --target) shift; TARGET_HOME="${1:-}" ;;
     --api-base) shift; API_BASE="${1:-}" ;;
+    --mcp-source)
+      shift
+      case "${1:-}" in
+        local|npx|auto) MCP_SOURCE="$1" ;;
+        *)
+          echo "Unknown --mcp-source value: ${1:-}. Valid: local, npx, auto" >&2
+          exit 2
+          ;;
+      esac
+      ;;
     -h|--help) usage; exit 0 ;;
     *)
       echo "Unknown flag: $1" >&2
@@ -94,9 +111,32 @@ done
 
 TARGET_HOME="$(installer_resolve_path "${TARGET_HOME:-$HOME}")"
 
+# Resolve MCP source: auto → local (if src exists) or npx
+REPO_ROOT_FOR_AGENT="${REPO_ROOT_FOR_AGENT:-}"
+if [ -z "$REPO_ROOT_FOR_AGENT" ]; then
+  REPO_ROOT_FOR_AGENT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
+if [ "$MCP_SOURCE" = "auto" ]; then
+  if [ -f "$REPO_ROOT_FOR_AGENT/apps/mcp-client/src/index.ts" ]; then
+    MCP_SOURCE="local"
+  else
+    MCP_SOURCE="npx"
+  fi
+fi
+
+# --dry-run implicitly enables verbose because the plan output *is* the result
+if [ "$DRY_RUN" = "1" ]; then
+  VERBOSE=1
+fi
+
 if [ "$DRY_RUN" != "1" ]; then
   installer_consent_gate "$TARGET_HOME" "$ASSUME_YES" 13 "install-agents"
 fi
+
+# Source banner.sh after consent gate
+# shellcheck source=scripts/banner.sh
+source "$SCRIPT_DIR/banner.sh"
+export MASSA_AI_VERBOSE="$VERBOSE"
 
 RUNNER="$(installer_require_runner "agent config files")"
 
@@ -110,7 +150,7 @@ UNAME_S="$(uname -s)"
 
 agent_config_path() {
   case "$1" in
-    claude-code) echo "$TARGET_HOME/.claude/settings.json" ;;
+    claude-code) echo "$TARGET_HOME/.claude.json" ;;
     claude-desktop)
       # macOS only — Claude Desktop ships no Linux config location.
       [ "$UNAME_S" = "Darwin" ] || return 1
@@ -128,15 +168,29 @@ agent_servers_key() { [ "$1" = "opencode" ] && echo "mcp" || echo "mcpServers"; 
 agent_env_key()     { [ "$1" = "opencode" ] && echo "environment" || echo "env"; }
 agent_launcher()    { [ "$1" = "opencode" ] && echo "bunx" || echo "npx"; }
 
+# Entry style determines the JSON shape written:
+# - opencode-local: { type: "local", command: [...], environment, enabled, _massaAiOwned }
+# - stdio-typed: { type: "stdio", command: string, args: [...], env, _massaAiOwned }  (claude-code)
+# - stdio-untyped: { command: string, args: [...], env, _massaAiOwned }  (claude-desktop, cursor)
+agent_entry_style() {
+  case "$1" in
+    opencode) echo "opencode-local" ;;
+    claude-code) echo "stdio-typed" ;;
+    claude-desktop|cursor) echo "stdio-untyped" ;;
+    *) echo "" ;;
+  esac
+}
+
 # ── JSON writer (claude-code, claude-desktop, cursor, opencode) ─────────────
 json_op() {
-  local mode="$1" agent="$2" cfg="$3"
-  "$RUNNER" - "$mode" "$agent" "$cfg" \
+  local mode="$1" agent="$2" cfg="$3" mcp_source="$4"
+  "$RUNNER" - "$mode" "$agent" "$cfg" "$mcp_source" \
     "$(agent_servers_key "$agent")" "$(agent_env_key "$agent")" "$(agent_launcher "$agent")" \
-    "$API_BASE" "$(installer_timestamp)" "$RESULT_FILE" <<'NODE'
+    "$(agent_entry_style "$agent")" "$API_BASE" "$(installer_timestamp)" "$RESULT_FILE" "$REPO_ROOT_FOR_AGENT" "$VERBOSE" <<'NODE'
 const fs = require("fs");
 const path = require("path");
-const [, , mode, agent, file, serversKey, envKey, launcher, apiBase, ts, resultFile] = process.argv;
+const [, , mode, agent, file, mcpSource, serversKey, envKey, launcher, entryStyle, apiBase, ts, resultFile, repoRoot, verbosity] = process.argv;
+const VERBOSE = verbosity === "1";
 
 const OWNED_KEY = "massa-ai";
 const MARKER = "_massaAiOwned";
@@ -167,18 +221,43 @@ function deepMerge(dst, src) {
 
 function ownedEntry() {
   const e = {};
-  const command = [launcher, "@massa-ai/mcp-client"];
-  if (envKey === "environment") {
-    // OpenCode entry shape: type first, then command/environment/enabled.
+  const isLocal = mcpSource === "local";
+  const localPath = isLocal ? path.join(repoRoot, "apps/mcp-client/src/index.ts") : null;
+
+  if (entryStyle === "opencode-local") {
     e.type = "local";
-    e.command = command;
+    if (isLocal) {
+      e.command = ["bun", "run", localPath];
+    } else {
+      // bunx has no -y (it never prompts; it installs into a shared cache).
+      // Its documented flags are --bun, -p/--package, --no-install, --verbose,
+      // --silent. -p is required here because the bin name (massa-ai) differs
+      // from the package name.
+      e.command = ["bunx", "-p", "@massa-ai/mcp-client", "massa-ai"];
+    }
     e.environment = { MASSA_AI_API_URL: apiBase };
     e.enabled = true;
-  } else {
-    e.command = command;
-    e.type = "local";
+  } else if (entryStyle === "stdio-typed") {
+    // claude-code: type first, then command (string), args, env
+    e.type = "stdio";
+    if (isLocal) {
+      e.command = "bun";
+      e.args = ["run", localPath];
+    } else {
+      e.command = "npx";
+      e.args = ["-y", "-p", "@massa-ai/mcp-client", "massa-ai"];
+    }
     e.env = { MASSA_AI_API_URL: apiBase };
-    e.enabled = true;
+  } else if (entryStyle === "stdio-untyped") {
+    // claude-desktop, cursor: command (string), args, env; no type
+    if (isLocal) {
+      e.command = "bun";
+      e.args = ["run", localPath];
+    } else {
+      e.command = "npx";
+      e.args = ["-y", "-p", "@massa-ai/mcp-client", "massa-ai"];
+    }
+    e.env = { MASSA_AI_API_URL: apiBase };
   }
   e[MARKER] = true;
   return e;
@@ -227,7 +306,7 @@ if (mode === "uninstall") {
   const bak = backup();
   fs.writeFileSync(file, JSON.stringify(merged, null, 2) + "\n");
   console.log(`  [${agent}] ${file} (remove)`);
-  console.log(`      REMOVE  /${serversKey}/massa-ai`);
+  if (VERBOSE) console.log(`      REMOVE  /${serversKey}/massa-ai`);
   finish(true, bak, 1);
   process.exit(0);
 }
@@ -242,9 +321,11 @@ if (!kind) {
 }
 
 console.log(`  [${agent}] ${file} (${existed ? "merge" : "create"})`);
-console.log(`      ${kind.toUpperCase()}  /${serversKey}/massa-ai`);
-console.log(`        + ${JSON.stringify(after)}`);
-if (existing !== undefined) console.log(`        - ${JSON.stringify(existing)}`);
+if (VERBOSE) {
+  console.log(`      ${kind.toUpperCase()}  /${serversKey}/massa-ai`);
+  console.log(`        + ${JSON.stringify(after)}`);
+  if (existing !== undefined) console.log(`        - ${JSON.stringify(existing)}`);
+}
 
 if (mode === "plan") {
   finish(false, null, 1);
@@ -255,10 +336,70 @@ const merged = deepMerge(cfg, { [serversKey]: { [OWNED_KEY]: after } });
 const bak = backup();
 fs.writeFileSync(file, JSON.stringify(merged, null, 2) + "\n");
 
-if (agent === "claude-code" && hasPluginHooks(merged)) {
-  console.log("      massa-ai plugin hooks detected in settings.json — MCP entry merged alongside; plugin hooks preserved.");
+// For claude-code, check for plugin hooks in settings.json (which is separate from .claude.json)
+if (agent === "claude-code") {
+  try {
+    const settingsPath = file.replace(/.claude\.json$/, ".claude/settings.json");
+    const settingsRaw = fs.readFileSync(settingsPath, "utf8");
+    if (settingsRaw.trim()) {
+      const settingsCfg = JSON.parse(settingsRaw);
+      if (hasPluginHooks(settingsCfg)) {
+        console.log("      massa-ai plugin hooks detected in settings.json — MCP entry in .claude.json alongside; plugin hooks preserved.");
+      }
+    }
+  } catch (e) {
+    // settings.json doesn't exist or isn't readable — skip the check
+  }
 }
 finish(true, bak, 1);
+NODE
+}
+
+# ── Legacy claude-code migration ───────────────────────────────────────────
+# Removes _massaAiOwned entries from ~/.claude/settings.json if they exist,
+# backing up first. This handles pre-migration installations that wrote to the
+# wrong path.
+migrate_claude_settings() {
+  local settings_file="$TARGET_HOME/.claude/settings.json"
+  [ -f "$settings_file" ] || return 0
+
+  "$RUNNER" - "$settings_file" "$(installer_timestamp)" "$RESULT_FILE" "$VERBOSE" <<'NODE'
+const fs = require("fs");
+const [, , file, ts, resultFile, verbosity] = process.argv;
+const VERBOSE = verbosity === "1";
+
+(function() {
+  try {
+    const raw = fs.readFileSync(file, "utf8");
+    if (!raw.trim()) return;
+    const cfg = JSON.parse(raw);
+    if (!cfg.mcpServers || typeof cfg.mcpServers !== "object") return;
+
+    const servers = cfg.mcpServers;
+    if (!servers["massa-ai"]) return;
+    if (servers["massa-ai"]._massaAiOwned !== true) return;
+
+    // Found an owned entry in the wrong location — remove it
+    if (VERBOSE) {
+      console.log(`  [claude-code] ${file} (legacy migrate)`);
+      console.log(`      REMOVE  /mcpServers/massa-ai (from pre-migration settings.json)`);
+    }
+
+    const bak = `${file}.massa-ai.bak-${ts}`;
+    fs.copyFileSync(file, bak);
+
+    const nextServers = { ...servers };
+    delete nextServers["massa-ai"];
+    const merged = { ...cfg };
+    if (Object.keys(nextServers).length) merged.mcpServers = nextServers;
+    else delete merged.mcpServers;
+
+    fs.writeFileSync(file, JSON.stringify(merged, null, 2) + "\n");
+    fs.appendFileSync(resultFile, `1\t${bak}\t1\n`);
+  } catch (e) {
+    // Not valid JSON or not a file — skip silently
+  }
+})();
 NODE
 }
 
@@ -268,11 +409,12 @@ NODE
 # lines, and user tables byte-for-byte, rewriting only the table we own. A
 # general TOML library would reformat the file and drop comments.
 toml_op() {
-  local mode="$1" cfg="$2"
-  "$RUNNER" - "$mode" "$cfg" "$API_BASE" "$(installer_timestamp)" "$RESULT_FILE" <<'NODE'
+  local mode="$1" cfg="$2" mcp_source="$3"
+  "$RUNNER" - "$mode" "$cfg" "$mcp_source" "$API_BASE" "$(installer_timestamp)" "$RESULT_FILE" "$REPO_ROOT_FOR_AGENT" "$VERBOSE" <<'NODE'
 const fs = require("fs");
 const path = require("path");
-const [, , mode, file, apiBase, ts, resultFile] = process.argv;
+const [, , mode, file, mcpSource, apiBase, ts, resultFile, repoRoot, verbosity] = process.argv;
+const VERBOSE = verbosity === "1";
 
 const OWNED_KEY = "massa-ai";
 const MARKER = "_massaAiOwned";
@@ -311,12 +453,19 @@ function findTable(doc) {
 }
 
 function ownedBody() {
-  return [
-    'command = "npx"',
-    'args = ["@massa-ai/mcp-client"]',
-    `env = { MASSA_AI_API_URL = ${JSON.stringify(apiBase)} }`,
-    `${MARKER} = true`,
-  ];
+  const isLocal = mcpSource === "local";
+  const localPath = isLocal ? path.join(repoRoot, "apps/mcp-client/src/index.ts") : null;
+  const body = [];
+  if (isLocal) {
+    body.push('command = "bun"');
+    body.push(`args = ["run", "${localPath}"]`);
+  } else {
+    body.push('command = "npx"');
+    body.push('args = ["-y", "-p", "@massa-ai/mcp-client", "massa-ai"]');
+  }
+  body.push(`env = { MASSA_AI_API_URL = ${JSON.stringify(apiBase)} }`);
+  body.push(`${MARKER} = true`);
+  return body;
 }
 
 function finish(written, backupPath, changes) {
@@ -351,7 +500,7 @@ if (mode === "uninstall") {
   const bak = backup();
   fs.writeFileSync(file, stringifyToml(doc));
   console.log(`  [codex] ${file} (remove)`);
-  console.log("      REMOVE  /mcp_servers/massa-ai");
+  if (VERBOSE) console.log("      REMOVE  /mcp_servers/massa-ai");
   finish(true, bak, 1);
   process.exit(0);
 }
@@ -372,8 +521,10 @@ if (!kind) {
 }
 
 console.log(`  [codex] ${file} (${raw === null ? "create" : "merge"})`);
-console.log(`      ${kind.toUpperCase()}  /mcp_servers/massa-ai`);
-console.log(`        + ${JSON.stringify(after)}`);
+if (VERBOSE) {
+  console.log(`      ${kind.toUpperCase()}  /mcp_servers/massa-ai`);
+  console.log(`        + ${JSON.stringify(after)}`);
+}
 
 if (mode === "plan") {
   finish(false, null, 1);
@@ -401,7 +552,13 @@ try {
   const raw = fs.readFileSync(process.argv[2], "utf8");
   const cfg = raw.trim() ? JSON.parse(raw) : {};
   const plugins = Array.isArray(cfg.plugin) ? cfg.plugin : [];
-  process.exit(plugins.some((p) => typeof p === "string" && p.includes("@massa-ai/opencode-plugin")) ? 0 : 1);
+  // Match npm package or local symlink path or bare directory name
+  process.exit(plugins.some((p) => {
+    if (typeof p !== "string") return false;
+    return p.includes("@massa-ai/opencode-plugin") ||
+           p.includes("plugins/massa-ai/index.js") ||
+           p === "massa-ai";
+  }) ? 0 : 1);
 } catch {
   process.exit(1);
 }
@@ -410,8 +567,10 @@ NODE
 
 # ── Advisory: where the 12 subagent specialists come from ──────────────────
 # Suppressed when a plugin installer is the caller (it just ran that command).
+# Gated behind verbose.
 specialist_hint() {
   [ "${MASSA_AI_SUPPRESS_SPECIALIST_HINT:-0}" = "1" ] && return 0
+  [ "$VERBOSE" != "1" ] && return 0
   case "$1" in
     claude-code) echo "  💡 12 subagent specialists: apps/claude-plugin/install.sh --user" ;;
     codex) echo "  💡 12 subagent specialists: apps/codex-plugin/install.sh --user" ;;
@@ -434,6 +593,11 @@ MODE="apply"
 [ "$DRY_RUN" = "1" ] && MODE="plan"
 [ "$UNINSTALL" = "1" ] && MODE="uninstall"
 
+# Handle legacy migration for claude-code before the main loop
+if [ "$MODE" = "apply" ] && [ "$UNINSTALL" != "1" ]; then
+  migrate_claude_settings
+fi
+
 HINTS=""
 for agent in $AGENTS; do
   cfg="$(agent_config_path "$agent")" || continue
@@ -445,9 +609,9 @@ for agent in $AGENTS; do
   fi
 
   if [ "$agent" = "codex" ]; then
-    toml_op "$MODE" "$cfg"
+    toml_op "$MODE" "$cfg" "$MCP_SOURCE"
   else
-    json_op "$MODE" "$agent" "$cfg"
+    json_op "$MODE" "$agent" "$cfg" "$MCP_SOURCE"
   fi
 
   hint="$(specialist_hint "$agent")"

@@ -69,9 +69,9 @@ describe("root install.sh menu — four-plugin parity (T17)", () => {
 });
 
 describe("root install.sh menu — harness option (install-harness-migration)", () => {
-  test("menu offers the 'k' skills + MCP option", async () => {
+  test("menu offers the 'k' skills + MCP + plugins option", async () => {
     const src = await fs.readFile(ROOT_INSTALL, "utf8");
-    expect(src).toContain("k)${NC} Install skills + MCP registration");
+    expect(src).toContain("k)${NC} Install skills + MCP + plugin bundles");
   });
 
   test("case statement routes k|K to install_harness_menu", async () => {
@@ -79,10 +79,10 @@ describe("root install.sh menu — harness option (install-harness-migration)", 
     expect(src).toMatch(/k\|K\)\s*\n\s*install_harness_menu/);
   });
 
-  test("install_harness_menu invokes scripts/install-harness.sh", async () => {
+  test("install_harness_menu invokes scripts/install-harness.sh with --all", async () => {
     const src = await fs.readFile(ROOT_INSTALL, "utf8");
     expect(src).toContain("scripts/install-harness.sh");
-    expect(src).toMatch(/bash "\$harness" --skills --agents/);
+    expect(src).toMatch(/bash "\$harness" --all --platform all/);
   });
 
   test("docker-mode back-fetch includes the harness scripts", async () => {

@@ -108,14 +108,11 @@ if (import.meta.main) {
   if (code !== undefined) process.exit(code);
 
   // Auto-configure on first run
+  // Silence output: MCP protocol is pure JSON-RPC on stdout; any preamble breaks handshakes.
   if (!configExists()) {
     initConfig();
-    console.log(`
-[massa-ai] Initialized with default configuration
-[massa-ai] Config: ${getConfigPath()}
-[massa-ai] Provider: Ollama (local, free)
-[massa-ai] To change: npx @massa-ai/mcp-client massa-ai-config use mistral --api-key YOUR_KEY
-`);
+    // For debugging, users can monitor stderr or check the config directly;
+    // the stdout must remain pristine for MCP protocol traffic.
   }
 }
 
@@ -260,14 +257,9 @@ export class McpProxyServer {
 
   async start(): Promise<void> {
     // Check API health before starting
+    // Silence output: MCP protocol is pure JSON-RPC on stdout; any preamble breaks handshakes.
     const healthy = await this.apiClient.healthCheck();
-    if (!healthy) {
-      console.log(
-        `[massa-ai-mcp] Warning: Tools API is not reachable (mode: ${this.mode}). Requests will fail until API is available.`,
-      );
-    } else {
-      console.log(`[massa-ai-mcp] Connected (mode: ${this.mode})`);
-    }
+    // Health check failures are logged via stderr by the client; no need to duplicate.
 
     await this.server.connect(this.transport);
   }

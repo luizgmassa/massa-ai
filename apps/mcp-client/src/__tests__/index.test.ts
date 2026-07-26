@@ -151,18 +151,7 @@ describe("McpProxyServer.handleIndexTool", () => {
 });
 
 describe("McpProxyServer.start", () => {
-  test("start logs warning when API unhealthy", async () => {
-    process.env.MASSA_AI_EMBEDDED = "true";
-    const server = new McpProxyServer();
-    (server as any).apiClient.healthCheck = async () => false;
-    (server as any).server.connect = async () => {};
-    const { out } = await captureConsole(() => server.start());
-    delete process.env.MASSA_AI_EMBEDDED;
-    try { await server.close(); } catch { /* ok */ }
-    expect(out).toContain("not reachable");
-  });
-
-  test("start logs connected when API healthy", async () => {
+  test("start connects to MCP transport without printing to stdout", async () => {
     process.env.MASSA_AI_EMBEDDED = "true";
     const server = new McpProxyServer();
     (server as any).apiClient.healthCheck = async () => true;
@@ -170,7 +159,23 @@ describe("McpProxyServer.start", () => {
     const { out } = await captureConsole(() => server.start());
     delete process.env.MASSA_AI_EMBEDDED;
     try { await server.close(); } catch { /* ok */ }
-    expect(out).toContain("Connected");
+    // Stdout must remain clean for MCP protocol; logs go to stderr
+    expect(out).toBe("");
+  });
+
+  test("start performs health check regardless of API state", async () => {
+    process.env.MASSA_AI_EMBEDDED = "true";
+    const server = new McpProxyServer();
+    let healthChecked = false;
+    (server as any).apiClient.healthCheck = async () => {
+      healthChecked = true;
+      return false;
+    };
+    (server as any).server.connect = async () => {};
+    await captureConsole(() => server.start());
+    delete process.env.MASSA_AI_EMBEDDED;
+    try { await server.close(); } catch { /* ok */ }
+    expect(healthChecked).toBe(true);
   });
 });
 

@@ -29,12 +29,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SCOPE="user"
 UNINSTALL=0
+DRY_RUN=0
 
 for arg in "$@"; do
   case "$arg" in
     --user) SCOPE="user" ;;
     --project) SCOPE="project" ;;
     --uninstall) UNINSTALL=1 ;;
+    --quiet) MASSA_AI_VERBOSE=0 ;;
+    --verbose) MASSA_AI_VERBOSE=1 ;;
+    --dry-run) DRY_RUN=1; MASSA_AI_VERBOSE=1 ;;
     -h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
@@ -189,20 +193,23 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
 fi
 
 # ── Install ──────────────────────────────────────────────────────────────────
-echo "Installing massa-ai Claude Code plugin to: $TARGET"
+vecho "Installing massa-ai Claude Code plugin to: $TARGET"
 mkdir -p "$TARGET/commands" "$TARGET/agents"
 
+# Count for summary
+command_count=0
 # Slash commands — prefix with 'massa-ai-' to avoid collisions with user commands
 for src in "$SCRIPT_DIR/commands/"*.md; do
   name="$(basename "$src" .md)"
   dest="$TARGET/commands/massa-ai-${name}.md"
   cp "$src" "$dest"
-  echo "  + /massa-ai-${name}"
+  vecho "  + /massa-ai-${name}"
+  command_count=$((command_count + 1))
 done
 
 # Subagent — keep original name
 cp "$SCRIPT_DIR/agents/massa-ai-navigator.md" "$TARGET/agents/massa-ai-navigator.md"
-echo "  + agent: massa-ai-navigator"
+vecho "  + agent: massa-ai-navigator"
 
 # 12 subagent specialists (generated from skills/*/SKILL.md). Exclude navigator
 # from the loop (it is copied above and preserved on uninstall per CLA-05/R1).
@@ -212,38 +219,53 @@ for src in "$SCRIPT_DIR/agents/"massa-ai-*.md; do
   name="$(basename "$src")"
   [[ "$name" == *navigator* ]] && continue
   cp "$src" "$TARGET/agents/$name"
+  vecho "  + $name"
   specialist_count=$((specialist_count + 1))
 done
-echo "  + ${specialist_count} subagent specialists: investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist"
+vecho "  + ${specialist_count} subagent specialists: investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist"
 
 # Merge hooks into settings.json (array-append, backup, idempotent)
-echo ""
-echo "Merging hooks into $SETTINGS_JSON..."
+vecho ""
+vecho "Merging hooks into $SETTINGS_JSON..."
 if [[ ! -f "$HOOK_BIN" ]]; then
   echo "  ⚠ Warning: hook binary not found at $HOOK_BIN" >&2
   echo "    Hooks will not fire until the binary is available." >&2
 fi
 merge_settings_hooks "$SETTINGS_JSON" "install"
-echo "  + 5 massa-ai hook events wired (array-append, user hooks preserved)"
+vecho "  + 5 massa-ai hook events wired (array-append, user hooks preserved)"
 
 # ── MCP registration (delegated) ─────────────────────────────────────────────
 # scripts/install-agents.sh is the single writer of host MCP config. It merges
 # the massa-ai entry into ~/.claude/settings.json alongside the hooks block
 # written above, at USER scope — a --project plugin install still registers MCP
 # for the whole user.
-echo ""
-echo "Registering MCP server (user scope) via scripts/install-agents.sh..."
+vecho ""
+vecho "Registering MCP server (user scope) via scripts/install-agents.sh..."
 if [[ -f "$REPO_ROOT/scripts/install-agents.sh" ]]; then
-  MASSA_AI_SUPPRESS_SPECIALIST_HINT=1 bash "$REPO_ROOT/scripts/install-agents.sh" --agent claude-code --yes \
-    || echo "  ⚠ MCP wiring failed — run: bash scripts/install-agents.sh --agent claude-code --yes" >&2
+  # On success the delegated output is detail (usually "up to date"), so it is
+  # gated. On failure it is never gated: a silently-failed MCP registration is
+  # exactly the bug this change set exists to fix.
+  if agents_out="$(MASSA_AI_SUPPRESS_SPECIALIST_HINT=1 bash "$REPO_ROOT/scripts/install-agents.sh" --agent claude-code --yes 2>&1)"; then
+    vecho "$agents_out"
+  else
+    echo "$agents_out" >&2
+    echo "  ⚠ MCP wiring failed — run: bash scripts/install-agents.sh --agent claude-code --yes" >&2
+  fi
 else
   echo "  ⚠ scripts/install-agents.sh not found — register MCP with: bash scripts/install-agents.sh --agent claude-code --yes" >&2
 fi
 
-echo ""
-echo "Done. Restart Claude Code to pick up the new commands and hooks."
-echo ""
-echo "Next steps:"
-echo "  1. Try: /massa-ai-status"
-echo "  2. Try: /massa-ai-map (on an indexed project)"
-echo "💡 Hooks are wired by this plugin; MCP is registered in ~/.claude/settings.json by scripts/install-agents.sh (single writer)."
+# Summary line in quiet mode
+if [ "${MASSA_AI_VERBOSE:-0}" != "1" ]; then
+  ok "claude plugin installed (${command_count} commands, ${specialist_count} specialists, 5 hooks)"
+else
+  vecho ""
+  vecho "Done. Restart Claude Code to pick up the new commands and hooks."
+  vecho ""
+fi
+vecho "Next steps:"
+vecho "  1. Try: /massa-ai-status"
+vecho "  2. Try: /massa-ai-map (on an indexed project)"
+# ~/.claude.json, not ~/.claude/settings.json — Claude Code reads MCP
+# definitions from the former; settings.json only holds approval controls.
+vecho "💡 Hooks are wired by this plugin; MCP is registered in ~/.claude.json by scripts/install-agents.sh (single writer)."

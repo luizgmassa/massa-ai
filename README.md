@@ -82,13 +82,26 @@ Linux/WSL: install `postgresql` + `postgresql-*-pgvector` from your distro, crea
 
 ### OpenCode (recommended)
 
-The OpenCode plugin is an npm package (`@massa-ai/opencode-plugin`). Its
-hooks are in-process (no `hooks.json` to merge): the plugin registers
-lifecycle handlers (`session.created`, `tool.execute.after`,
-`experimental.session.compacting`, `shell.env`, `event`, `dispose`) directly,
-so observations are captured the moment the plugin loads.
+The OpenCode plugin's hooks are in-process (no `hooks.json` to merge): the plugin
+registers lifecycle handlers (`session.created`, `tool.execute.after`,
+`experimental.session.compacting`, `shell.env`, `event`, `dispose`) directly, so
+observations are captured the moment the plugin loads.
 
-**Install the package:**
+**Install from source (recommended — same as the other three hosts):**
+
+```bash
+bun run build                             # produces apps/opencode-plugin/dist/index.js
+bash apps/opencode-plugin/install.sh --user
+```
+
+That symlinks `~/.config/opencode/plugins/massa-ai/index.js` at the repo's
+`dist/index.js` (so `bun run build` keeps it current), adds
+`"./plugins/massa-ai/index.js"` to the `plugin` array of `opencode.json`, and
+symlinks the 12 specialist agents into `~/.config/opencode/agents/`. Because the
+plugin registers its tools in-process, the installer then drops the redundant
+OpenCode `mcp` entry via `scripts/install-agents.sh --agent opencode --uninstall`.
+
+**Install as an npm package (alternative):**
 
 ```bash
 npm install @massa-ai/opencode-plugin
@@ -158,12 +171,14 @@ backup + `_massaAiOwned` marker — user hooks are always preserved.
 | **Claude Code** | `bash apps/claude-plugin/install.sh --user` | 5 | 6 slash commands + navigator subagent + 12 subagent specialists + hooks into `settings.json` | No |
 | **Codex** | `bash apps/codex-plugin/install.sh --user` | 6 | 6 skills + 12 subagent specialists (TOML to `~/.codex/agents/`) + hooks into `hooks.json` + MCP into `~/.codex/config.toml` | Yes — run `/hooks` in Codex |
 | **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + MCP into `~/.cursor/mcp.json` + navigator agent + 12 subagent specialists | No |
-| **OpenCode** | `npm install @massa-ai/opencode-plugin` then `massa-ai-config agents install --user` | 6 (in-process) | 14 in-process tools + lifecycle handlers + 12 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
+| **OpenCode** | `bash apps/opencode-plugin/install.sh --user` | 6 (in-process) | 14 in-process tools + lifecycle handlers + 12 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
 
-All installers support `--user` (default, e.g. `~/.claude`), `--project` (e.g.
-`./.claude`), and `--uninstall` (removes only massa-ai-owned entries).
-OpenCode is an npm package — add `"plugin": ["@massa-ai/opencode-plugin"]`
-to `~/.config/opencode/opencode.json`.
+All four installers support `--user` (default, e.g. `~/.claude`), `--project`
+(e.g. `./.claude`), `--uninstall` (removes only massa-ai-owned entries), and
+`--quiet` / `--verbose`. The OpenCode installer additionally needs
+`apps/opencode-plugin/dist/index.js` to exist — run `bun run build` first; it
+exits non-zero with that hint otherwise. `npm install @massa-ai/opencode-plugin`
+plus `"plugin": ["@massa-ai/opencode-plugin"]` remains a supported alternative.
 
 Or pick the `p` option from the root `bash install.sh` post-install menu, which
 offers all four plugin choices plus an "All four" shortcut. The `k` option in
@@ -179,9 +194,14 @@ MCP config; the plugin installers call it for you (`--agent claude-code` /
 and running the installer directly cannot double-register. MCP is always
 registered at **user** scope, even for a `--project` plugin install.
 
-OpenCode is the one exception: `@massa-ai/opencode-plugin` registers 14 tools
-in-process, so `install-agents.sh` skips the OpenCode MCP entry when that plugin
-is listed in `opencode.json` — and still writes it for users without the plugin.
+OpenCode is the one exception: the plugin registers 14 tools in-process, so
+`install-agents.sh` skips the OpenCode MCP entry when `opencode.json` lists the
+plugin in any of its three accepted forms — the npm package name
+(`@massa-ai/opencode-plugin`), the local path (`./plugins/massa-ai/index.js`), or
+the bare dir name (`massa-ai`) — and still writes it for users without the
+plugin. Since the harness runs MCP *before* plugins, the OpenCode plugin
+installer removes that entry itself once it has registered, by delegating back to
+`install-agents.sh`.
 
 **12 subagent specialists:** all four plugins ship the 12 massa-ai
 sub-agent specialists (investigator, planner, builder, reviewer,
@@ -258,7 +278,7 @@ bash scripts/install-agents.sh --uninstall --yes     # remove only owned entries
 
 | Agent | Config file | Shape |
 |-------|-------------|-------|
-| `claude-code` | `~/.claude/settings.json` | `mcpServers`, `env`, `npx` |
+| `claude-code` | `~/.claude.json` | `mcpServers`, `type: "stdio"`, string `command` + `args`, `env`, `npx` |
 | `claude-desktop` | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) | `mcpServers`, `env`, `npx` |
 | `codex` | `~/.codex/config.toml` | `[mcp_servers.massa-ai]` (comments and user tables preserved) |
 | `cursor` | `~/.cursor/mcp.json` | `mcpServers`, `env`, `npx` |
@@ -267,6 +287,31 @@ bash scripts/install-agents.sh --uninstall --yes     # remove only owned entries
 Uninstall removes only entries carrying `_massaAiOwned: true` — a `massa-ai`
 entry you wrote by hand is left alone.
 
+**Which command gets registered — `--mcp-source`.** The MCP entry can point at
+either a local checkout or the published npm package:
+
+| `--mcp-source` | Command written | Chosen by |
+|---|---|---|
+| `local` | `bun run <repo>/apps/mcp-client/src/index.ts` | `scripts/setup-local-first.sh` |
+| `npx` | `npx -y -p @massa-ai/mcp-client massa-ai` (OpenCode: `bunx -p …`) | the root `install.sh` |
+| `auto` (default) | `local` when `apps/mcp-client/src/index.ts` exists, else `npx` | direct invocation |
+
+`MASSA_AI_MCP_SOURCE` sets it via the environment; the flag wins over the env var.
+Switching sources rewrites the entry in place — you never end up with two.
+
+Prefer `local` when you have a clone. The npx path resolves `@massa-ai/core`, which
+compiles native tree-sitter grammars on first run, and an MCP host will time out
+during the handshake long before that finishes. Note also that `-p` is required
+in both launchers: the package's bin is named `massa-ai`, not `mcp-client`, so a
+bare `npx @massa-ai/mcp-client` fails with "could not determine executable to
+run". `bunx` takes `-p` but has no `-y`.
+
+> Claude Code reads MCP *definitions* from `~/.claude.json`, not from
+> `~/.claude/settings.json` (that file holds approval controls — `allowedMcpServers`,
+> `enabledMcpjsonServers`, `disabledMcpServers` — plus `hooks`). Installs before
+> this release wrote to `settings.json`, where Claude Code ignored them; the
+> installer now migrates that stale owned entry away on the next apply.
+
 ### One-shot harness install
 
 `scripts/install-harness.sh` runs skills, MCP registration, and the plugin
@@ -274,10 +319,20 @@ bundles in one pass. Both `install.sh` (menu option `k`) and
 `scripts/setup-local-first.sh` (step 6/6) call it.
 
 ```bash
-bash scripts/install-harness.sh                      # --all (skills + agents + plugins)
-bash scripts/install-harness.sh --skills --agents    # skip the plugin bundles
-bash scripts/install-harness.sh --all --dry-run      # preview everything
+bash scripts/install-harness.sh --all --yes           # skills + MCP + all four plugin bundles
+bash scripts/install-harness.sh --skills --agents     # skip the plugin bundles
+bash scripts/install-harness.sh --all --dry-run       # preview everything (forces --verbose)
+bash scripts/install-harness.sh --all --yes --verbose # per-file / per-key detail
 ```
+
+Output is **quiet by default** — one line per changed thing plus a summary.
+`--verbose` (or `MASSA_AI_VERBOSE=1`) adds the per-file and per-config-key
+detail; `--dry-run` and `--check` force it on. Errors and warnings are never
+suppressed. The banner prints at most once per process tree, so nesting the
+plugin installers under the harness no longer repeats it four times.
+
+Plugin bundles are installed by default. Set `MASSA_AI_INSTALL_PLUGINS=0` to make
+`scripts/setup-local-first.sh` step 6 fall back to `--skills --agents`.
 
 Exit codes: `0` when every requested step completed, otherwise the first failing
 sub-installer's code (`13` = consent gate refused).
@@ -523,11 +578,10 @@ bash apps/codex-plugin/install.sh --user    # 6 events → ~/.codex/hooks.json
 bash apps/cursor-plugin/install.sh --user   # 7 events → ~/.cursor/hooks.json
 ```
 
-OpenCode is an npm plugin with **in-process hooks** — no installer script
-needed:
+OpenCode has **in-process hooks** — nothing to merge into a `hooks.json`:
 
 ```bash
-npm install @massa-ai/opencode-plugin
+bash apps/opencode-plugin/install.sh --user   # 6 in-process lifecycle handlers
 ```
 
 Or pick the `p` option from the root `bash install.sh` post-install menu, which
@@ -584,8 +638,8 @@ observations — zero loss across `/compact`.
 | `preCompact` | `pre-compact` | `pre-compact` |
 | `stop` | `stop` | `session-end` |
 
-**OpenCode (in-process, 6 lifecycle handlers)** — registered by the
-`@massa-ai/opencode-plugin` npm package, no external hooks file:
+**OpenCode (in-process, 6 lifecycle handlers)** — registered by the plugin
+itself (local install or `@massa-ai/opencode-plugin`), no external hooks file:
 `session.created`, `tool.execute.after`, `experimental.session.compacting`,
 `shell.env`, `event`, `dispose`.
 

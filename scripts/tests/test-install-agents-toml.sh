@@ -21,7 +21,7 @@ source "${SCRIPT_DIR}/lib/installer-test-helpers.sh"
 ROOT="$(mktemp -d "${TMPDIR:-/tmp}/massa-ai-agents-toml.XXXXXX")"
 trap 'rm -rf "$ROOT"' EXIT
 
-run() { bash "$INSTALLER" --target "$1" --agent codex --yes "${@:2}" 2>&1; }
+run() { bash "$INSTALLER" --target "$1" --agent codex --mcp-source npx --yes "${@:2}" 2>&1; }
 
 echo "Scenario 1: a fresh config.toml is created with the owned table"
 H1="$ROOT/h1"
@@ -30,7 +30,7 @@ CFG="$H1/.codex/config.toml"
 assert_file "config.toml created" "$CFG"
 assert_eq "exactly one owned table" "$(grep -c '^\[mcp_servers.massa-ai\]$' "$CFG")" "1"
 assert_contains "command written" "$(cat "$CFG")" 'command = "npx"'
-assert_contains "args written" "$(cat "$CFG")" 'args = ["@massa-ai/mcp-client"]'
+assert_contains "args with explicit bin name" "$(cat "$CFG")" 'args = ["-y", "-p", "@massa-ai/mcp-client", "massa-ai"]'
 assert_contains "env written" "$(cat "$CFG")" 'MASSA_AI_API_URL = "http://localhost:3333"'
 assert_contains "ownership marker written" "$(cat "$CFG")" '_massaAiOwned = true'
 

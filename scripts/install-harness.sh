@@ -15,13 +15,16 @@
 # Flags:
 #   --skills               Install repo skills into every detected agent
 #   --agents               Register the massa-ai MCP server (install-agents.sh)
-#   --plugins              Install the Claude / Codex / Cursor plugin bundles
+#   --plugins              Install the Claude / Codex / Cursor / OpenCode plugin bundles
 #   --all                  All three (default when no selection flag is given)
 #   --platform <name>      claude, codex, cursor, opencode, all (skills scope)
 #   --api-base <url>       MCP API base url (default http://localhost:3333)
+#   --mcp-source <type>    Command source: local, npx, auto (default auto)
 #   --target <dir>         Override $HOME root (tests / CI)
 #   --dry-run              Preview; writes nothing
 #   --uninstall            Remove skills + MCP entries + plugin bundles
+#   --quiet                Suppress per-phase output (errors/warnings always shown)
+#   --verbose              Show per-file / per-key detail
 #   --yes, -y              Consent to writing real $HOME
 #   -h, --help             Show this help
 #
@@ -46,10 +49,13 @@ DO_PLUGINS=0
 SELECTED=0
 PLATFORM="all"
 API_BASE="http://localhost:3333"
+MCP_SOURCE="${MASSA_AI_MCP_SOURCE:-auto}"
 TARGET_HOME="${HOME:-}"
 DRY_RUN=0
 UNINSTALL=0
 ASSUME_YES=0
+QUIET_MODE=1
+VERBOSE_MODE=0
 
 usage() { sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; }
 
@@ -61,9 +67,12 @@ while [ $# -gt 0 ]; do
     --all) DO_SKILLS=1; DO_AGENTS=1; DO_PLUGINS=1; SELECTED=1 ;;
     --platform) shift; PLATFORM="${1:-all}" ;;
     --api-base) shift; API_BASE="${1:-}" ;;
+    --mcp-source) shift; MCP_SOURCE="${1:-}" ;;
     --target) shift; TARGET_HOME="${1:-}" ;;
-    --dry-run) DRY_RUN=1 ;;
+    --dry-run) DRY_RUN=1; VERBOSE_MODE=1 ;;
     --uninstall) UNINSTALL=1 ;;
+    --quiet) QUIET_MODE=1; VERBOSE_MODE=0 ;;
+    --verbose) QUIET_MODE=0; VERBOSE_MODE=1 ;;
     --yes|-y) ASSUME_YES=1 ;;
     -h|--help) usage; exit 0 ;;
     *)
@@ -89,13 +98,33 @@ if [ "$DRY_RUN" != "1" ]; then
 fi
 
 source "$SCRIPT_DIR/banner.sh"
+
+# Set verbosity before banner so it respects the flag.
+if [ "$VERBOSE_MODE" = "1" ]; then
+  MASSA_AI_VERBOSE=1
+  export MASSA_AI_VERBOSE
+fi
+
 massa_ai_banner
 
 common_flags() {
   local out=""
   [ "$DRY_RUN" = "1" ] && out="$out --dry-run"
   [ "$ASSUME_YES" = "1" ] && out="$out --yes"
+  [ "$VERBOSE_MODE" = "1" ] && out="$out --verbose"
   echo "$out"
+}
+
+# Compact output when quiet: one line per phase.
+# Errors and warnings always show (never gated by --quiet).
+compact_phase() {
+  local action="$1"
+  if [ "$QUIET_MODE" = "1" ] && [ "$DRY_RUN" != "1" ]; then
+    info "$action"
+  else
+    echo ""
+    info "$action"
+  fi
 }
 
 STATUS=0
@@ -107,8 +136,7 @@ note_failure() {
 
 # ── Skills ──────────────────────────────────────────────────────────────────
 if [ "$DO_SKILLS" = "1" ]; then
-  echo ""
-  info "Installing massa-ai skills (platform: ${PLATFORM})..."
+  compact_phase "Installing skills (platform: ${PLATFORM})..."
   skills_action="--apply"
   [ "$UNINSTALL" = "1" ] && skills_action="--uninstall"
   # --dry-run is its own action in install-skills.sh, not a modifier.
@@ -124,12 +152,11 @@ fi
 
 # ── MCP registration ────────────────────────────────────────────────────────
 if [ "$DO_AGENTS" = "1" ]; then
-  echo ""
-  info "Registering the massa-ai MCP server..."
+  compact_phase "Registering MCP server..."
   set +e
   # shellcheck disable=SC2046
   bash "$SCRIPT_DIR/install-agents.sh" \
-    --target "$TARGET_HOME" --api-base "$API_BASE" \
+    --target "$TARGET_HOME" --api-base "$API_BASE" --mcp-source "$MCP_SOURCE" \
     $([ "$UNINSTALL" = "1" ] && echo "--uninstall") $(common_flags)
   rc=$?
   set -e
@@ -137,39 +164,36 @@ if [ "$DO_AGENTS" = "1" ]; then
 fi
 
 # ── Plugin bundles ──────────────────────────────────────────────────────────
-# The three script-based plugins read $HOME directly, so scope the child
-# environment rather than passing a flag they do not have. OpenCode ships as an
-# npm package and has no install.sh — print its instructions instead.
+# The four script-based plugins read $HOME directly, so scope the child
+# environment rather than passing a flag they do not have.
 if [ "$DO_PLUGINS" = "1" ]; then
-  echo ""
   if [ "$DRY_RUN" = "1" ]; then
-    info "Would install plugin bundles: claude, codex, cursor (dry-run)"
+    compact_phase "Would install plugin bundles: claude, codex, cursor, opencode (dry-run)"
   else
-    for host in claude codex cursor; do
+    compact_phase "Installing plugin bundles..."
+    for host in claude codex cursor opencode; do
       installer="$REPO_ROOT/apps/${host}-plugin/install.sh"
       if [ ! -f "$installer" ]; then
         warn "${host} plugin installer not found at ${installer}"
         continue
       fi
-      info "Installing the ${host} plugin bundle..."
+      vinfo "Installing the ${host} plugin bundle..."
       set +e
       if [ "$UNINSTALL" = "1" ]; then
-        HOME="$TARGET_HOME" bash "$installer" --uninstall
+        HOME="$TARGET_HOME" MASSA_AI_MCP_SOURCE="$MCP_SOURCE" bash "$installer" --uninstall $([ "$VERBOSE_MODE" = "1" ] && echo "--verbose")
       else
-        HOME="$TARGET_HOME" bash "$installer" --user
+        HOME="$TARGET_HOME" MASSA_AI_MCP_SOURCE="$MCP_SOURCE" bash "$installer" --user $([ "$VERBOSE_MODE" = "1" ] && echo "--verbose")
       fi
       rc=$?
       set -e
       [ "$rc" -eq 0 ] || note_failure "$rc" "${host}-plugin/install.sh"
     done
   fi
-  echo ""
-  info "OpenCode plugin is an npm package — install it with:"
-  echo "    npm install @massa-ai/opencode-plugin"
-  echo "    then add \"plugin\": [\"@massa-ai/opencode-plugin\"] to ~/.config/opencode/opencode.json"
 fi
 
-echo ""
+if [ "$QUIET_MODE" != "1" ] || [ "$STATUS" != "0" ]; then
+  echo ""
+fi
 if [ "$STATUS" = "0" ]; then
   ok "massa-ai harness install complete."
 else

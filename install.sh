@@ -42,16 +42,15 @@ _MASSA_AI_INSTALLER_VERSION="$(curl -fsSL --max-time 3 \
 # ── Banner ────────────────────────────────────────────────────
 cat << EOF
 
-              ██             ██████               ██
-    ███       ██          ███    ██     ███       ██
-   ░████      ██  ██      ███      █    ████      ██  ██
-  ███████     ████████   ███       █  ███████     ████████
-    ███       ██   ███   ███       █    ███       ██   ███
-    ███       ██    ██   ███      ██    ███       ██    ██
-    ███   █   ██    ██    ████   ███    ███   █   ██    ██
-    ███████  ███   ████    ████████     ███████░ ████  ████
-     ░████  █████  █████    █████         ████   ████░ █████
+   ██     ██      ████       ██████      ██████       ████
+   ███   ███     ██  ██     ██    ██    ██    ██     ██  ██
+   ████ ████    ██    ██    ██          ██          ██    ██
+   ██ ███ ██    ████████     ██████      ██████     ████████
+   ██  █  ██    ██    ██          ██          ██    ██    ██
+   ██     ██    ██    ██    ██    ██    ██    ██    ██    ██
+   ██     ██ ██ ██    ██ ██  ██████  ██  ██████  ██ ██    ██ ██
 
+   Memory-Augmented Semantic Search Agent
    Context, memory and cross-agent management.  v${_MASSA_AI_INSTALLER_VERSION}
    https://github.com/luizgmassa/massa-ai
 
@@ -596,6 +595,7 @@ post_install() {
 
   # Docker mode: only docker-compose.yml was downloaded; fetch scripts from GitHub.
   # The harness scripts are listed here too, or option k) below is dead in this mode.
+  # Plugin installers cannot be fetched (no apps/ tree); option p) will warn instead.
   local fetch_scripts="banner.sh setup-vscode.sh validate-vscode-integration.sh install-skills.sh install-agents.sh install-harness.sh lib/installer-shared.sh"
   if [ "$mode" = "docker" ]; then
     mkdir -p "${scripts_dir}" "${scripts_dir}/lib" "${install_dir}/apps/tools-api"
@@ -632,7 +632,7 @@ post_install() {
       echo -e "  ${CYAN}t)${NC} Run integration tests"
     fi
     echo -e "  ${CYAN}c)${NC} Configure passive-capture hooks (Claude Code, Codex, Cursor)"
-    echo -e "  ${CYAN}k)${NC} Install skills + MCP registration (all platforms)"
+    echo -e "  ${CYAN}k)${NC} Install skills + MCP + plugin bundles (all platforms)"
     echo -e "  ${CYAN}p)${NC} Install massa-ai plugins (Claude, Codex, Cursor, OpenCode)"
     echo -e "  ${CYAN}s)${NC} Skip (finish)"
     echo ""
@@ -662,10 +662,9 @@ post_install() {
   done
 }
 
-# ── massa-ai harness sub-menu (skills + MCP registration) ────────────────
-# scripts/install-harness.sh orchestrates install-skills.sh and
-# install-agents.sh. Plugin bundles stay behind option p) so this menu never
-# installs a plugin the user did not ask for.
+# ── massa-ai harness sub-menu (skills + MCP + plugins) ────────────────────
+# scripts/install-harness.sh orchestrates install-skills.sh, install-agents.sh,
+# and the four plugin installers.
 install_harness_menu() {
   local install_dir="$1"
   local harness="${install_dir}/scripts/install-harness.sh"
@@ -677,19 +676,19 @@ install_harness_menu() {
 
   while true; do
     echo ""
-    echo -e "${BOLD}Install massa-ai skills and MCP registration:${NC}"
+    echo -e "${BOLD}Install massa-ai skills, MCP, and plugins:${NC}"
     echo -e "  ${CYAN}1)${NC} Skills only (symlinks + AGENTS.md bootstrap, all platforms)"
     echo -e "  ${CYAN}2)${NC} MCP registration only (Claude, Claude Desktop, Codex, Cursor, OpenCode)"
-    echo -e "  ${CYAN}3)${NC} Both"
+    echo -e "  ${CYAN}3)${NC} Everything (skills + MCP + plugin bundles)"
     echo -e "  ${CYAN}4)${NC} Preview (dry run, writes nothing)"
     echo -e "  ${CYAN}s)${NC} Back"
     echo ""
     read -rp "  Choice [s]: " _harness_choice <>/dev/tty
     case "${_harness_choice:-s}" in
-      1) bash "$harness" --skills --platform all --yes || warn "Skills install failed" ;;
-      2) bash "$harness" --agents --yes || warn "MCP registration failed" ;;
-      3) bash "$harness" --skills --agents --platform all --yes || warn "Harness install failed" ;;
-      4) bash "$harness" --skills --agents --platform all --dry-run || true ;;
+      1) bash "$harness" --skills --platform all --mcp-source npx --yes || warn "Skills install failed" ;;
+      2) bash "$harness" --agents --mcp-source npx --yes || warn "MCP registration failed" ;;
+      3) bash "$harness" --all --platform all --mcp-source npx --yes || warn "Harness install failed" ;;
+      4) bash "$harness" --all --platform all --mcp-source npx --dry-run || true ;;
       s|S|"") return ;;
       *) warn "Unknown choice. Enter 1, 2, 3, 4, or s." ;;
     esac
@@ -700,13 +699,20 @@ install_harness_menu() {
 # The per-plugin installers source scripts/banner.sh relative to their own
 # location, so invoke them as bash <path> --user. Default to --user because the
 # root install.sh doesn't track whether the user installed at project scope.
-# OpenCode is an npm plugin (no install.sh) — its option prints install + config
-# instructions instead of invoking a script.
+# In docker mode, plugins require the source tree (apps/), so we warn instead.
 install_plugins_menu() {
   local install_dir="$1"
   local claude_installer="${install_dir}/apps/claude-plugin/install.sh"
   local codex_installer="${install_dir}/apps/codex-plugin/install.sh"
   local cursor_installer="${install_dir}/apps/cursor-plugin/install.sh"
+
+  # Docker mode: apps/ tree was not fetched. Warn and point to source.
+  if [ ! -d "${install_dir}/apps/claude-plugin" ] && [ ! -d "${install_dir}/apps/codex-plugin" ] && [ ! -d "${install_dir}/apps/cursor-plugin" ]; then
+    warn "Plugin bundles require the source repository (apps/ tree not present in docker mode)."
+    warn "To install plugins, clone the source from https://github.com/luizgmassa/massa-ai"
+    warn "and run: bash install.sh"
+    return
+  fi
 
   while true; do
     echo ""

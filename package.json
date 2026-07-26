@@ -29,6 +29,7 @@
     "lint": "turbo run lint",
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/dist packages/*/dist",
     "test:scripts": "bun test scripts/__tests__ scripts/tests/*.test.ts && for f in scripts/tests/*.sh; do bash \"$f\" || exit 1; done",
+    "test:plugins": "bun test apps/claude-plugin/__tests__ apps/codex-plugin/__tests__ apps/cursor-plugin/__tests__ apps/opencode-plugin/__tests__",
     "diagnose": "bun scripts/diagnose.ts",
     "version:sync": "bun scripts/version-sync.ts",
     "verify:tree-sitter-source-dist": "bun scripts/verify-tree-sitter-grammars.ts",

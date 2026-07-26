@@ -30,7 +30,7 @@ process.stdout.write(typeof v === "object" ? JSON.stringify(v) : String(v));
 NODE
 }
 
-run() { bash "$INSTALLER" --target "$1" --agent "$2" --yes "${@:3}" 2>&1; }
+run() { bash "$INSTALLER" --target "$1" --agent "$2" --mcp-source npx --yes "${@:3}" 2>&1; }
 
 echo "Scenario 1: cursor — creates ~/.cursor/mcp.json with an owned entry"
 H1="$ROOT/h1"
@@ -39,7 +39,12 @@ CFG="$H1/.cursor/mcp.json"
 assert_file "config created" "$CFG"
 assert_eq "entry lives under mcpServers" "$(jq_get "$CFG" 'c.mcpServers["massa-ai"] ? "yes" : "no"')" "yes"
 assert_eq "ownership marker present" "$(jq_get "$CFG" 'c.mcpServers["massa-ai"]._massaAiOwned')" "true"
-assert_eq "launcher is npx" "$(jq_get "$CFG" 'c.mcpServers["massa-ai"].command[0]')" "npx"
+assert_eq "command is string npx" "$(jq_get "$CFG" 'c.mcpServers["massa-ai"].command')" "npx"
+assert_eq "args[0] is -y flag" "$(jq_get "$CFG" 'c.mcpServers["massa-ai"].args[0]')" "-y"
+assert_eq "args[1] is -p flag" "$(jq_get "$CFG" 'c.mcpServers["massa-ai"].args[1]')" "-p"
+assert_eq "args[2] is package name" "$(jq_get "$CFG" 'c.mcpServers["massa-ai"].args[2]')" "@massa-ai/mcp-client"
+assert_eq "args[3] is bin name" "$(jq_get "$CFG" 'c.mcpServers["massa-ai"].args[3]')" "massa-ai"
+assert_eq "no type key for cursor" "$(jq_get "$CFG" 'c.mcpServers["massa-ai"].type === undefined ? "absent" : "present"')" "absent"
 assert_eq "env key is env" "$(jq_get "$CFG" 'c.mcpServers["massa-ai"].env.MASSA_AI_API_URL')" "http://localhost:3333"
 
 echo ""
@@ -78,13 +83,21 @@ assert_contains "backup holds the pre-merge content" "$(cat "$BAK")" "other-serv
 assert_not_contains "backup predates the massa-ai entry" "$(cat "$BAK")" "_massaAiOwned"
 
 echo ""
-echo "Scenario 5: opencode uses mcp / environment / bunx"
+echo "Scenario 5: opencode uses mcp / environment / bunx with explicit bin name"
 H5="$ROOT/h5"
 run "$H5" opencode >/dev/null
 CFG5="$H5/.config/opencode/opencode.json"
 assert_file "opencode config created" "$CFG5"
 assert_eq "top-level key is mcp (not mcpServers)" "$(jq_get "$CFG5" 'c.mcp ? "mcp" : (c.mcpServers ? "mcpServers" : "none")')" "mcp"
-assert_eq "launcher is bunx" "$(jq_get "$CFG5" 'c.mcp["massa-ai"].command[0]')" "bunx"
+# Asserted as the whole argv rather than by index, so the shape is readable and
+# a stray flag cannot hide between two passing index checks. bunx has no -y —
+# its flags are --bun, -p/--package, --no-install, --verbose, --silent — and -p
+# is required because the bin name (massa-ai) differs from the package name.
+assert_eq "opencode argv is the bunx -p form" \
+  "$(jq_get "$CFG5" 'c.mcp["massa-ai"].command.join(" ")')" \
+  "bunx -p @massa-ai/mcp-client massa-ai"
+assert_eq "no npm-only -y flag passed to bunx" \
+  "$(jq_get "$CFG5" 'c.mcp["massa-ai"].command.includes("-y") ? "present" : "absent"')" "absent"
 assert_eq "env key is environment" "$(jq_get "$CFG5" 'c.mcp["massa-ai"].environment.MASSA_AI_API_URL')" "http://localhost:3333"
 assert_eq "no env key present" "$(jq_get "$CFG5" 'c.mcp["massa-ai"].env === undefined ? "absent" : "present"')" "absent"
 
@@ -124,5 +137,49 @@ BEFORE9="$(cat "$H9/.cursor/mcp.json")"
 OUT9="$(run "$H9" cursor)"; RC9=$?
 assert_ne "invalid JSON is not a success" "$RC9" "0"
 assert_eq "the broken file is left as-is" "$(cat "$H9/.cursor/mcp.json")" "$BEFORE9"
+
+echo ""
+echo "Scenario 10: claude-code writes to ~/.claude.json with stdio type"
+H10="$ROOT/h10"
+run "$H10" claude-code >/dev/null
+CFG10="$H10/.claude.json"
+assert_file "claude.json created" "$CFG10"
+assert_eq "entry in mcpServers" "$(jq_get "$CFG10" 'c.mcpServers["massa-ai"] ? "yes" : "no"')" "yes"
+assert_eq "command is string" "$(jq_get "$CFG10" 'c.mcpServers["massa-ai"].command')" "npx"
+assert_eq "args has explicit bin name" "$(jq_get "$CFG10" 'c.mcpServers["massa-ai"].args[3]')" "massa-ai"
+assert_eq "type is stdio" "$(jq_get "$CFG10" 'c.mcpServers["massa-ai"].type')" "stdio"
+
+echo ""
+echo "Scenario 11: claude-desktop has no type key"
+H11="$ROOT/h11"
+run "$H11" claude-desktop >/dev/null
+CFG11="$H11/Library/Application Support/Claude/claude_desktop_config.json"
+if [ -f "$CFG11" ]; then
+  assert_eq "command is string" "$(jq_get "$CFG11" 'c.mcpServers["massa-ai"].command')" "npx"
+  assert_eq "args has explicit bin name" "$(jq_get "$CFG11" 'c.mcpServers["massa-ai"].args[3]')" "massa-ai"
+  assert_eq "no type key" "$(jq_get "$CFG11" 'c.mcpServers["massa-ai"].type === undefined ? "absent" : "present"')" "absent"
+else
+  ok "claude-desktop skipped on non-macOS"
+fi
+
+echo ""
+echo "Scenario 12: a pre-existing ~/.claude.json with other entries survives"
+H12="$ROOT/h12"; mkdir -p "$H12"
+printf '{"mcpServers":{"other-server":{"command":"x"}},"projects":{"key":"value"}}\n' > "$H12/.claude.json"
+run "$H12" claude-code >/dev/null
+CFG12="$H12/.claude.json"
+assert_eq "other server survives" "$(jq_get "$CFG12" 'c.mcpServers["other-server"].command')" "x"
+assert_eq "projects key survives" "$(jq_get "$CFG12" 'c.projects.key')" "value"
+assert_eq "massa-ai added" "$(jq_get "$CFG12" 'c.mcpServers["massa-ai"] ? "yes" : "no"')" "yes"
+
+echo ""
+echo "Scenario 13: opencode with local symlink registration skips MCP"
+H13="$ROOT/h13"; mkdir -p "$H13/.config/opencode"
+printf '{"plugin":["./plugins/massa-ai/index.js"]}\n' > "$H13/.config/opencode/opencode.json"
+BEFORE13="$(shasum -a 256 "$H13/.config/opencode/opencode.json" | cut -d' ' -f1)"
+OUT13="$(run "$H13" opencode)"
+AFTER13="$(shasum -a 256 "$H13/.config/opencode/opencode.json" | cut -d' ' -f1)"
+assert_contains "skip is explained" "$OUT13" "registers tools in-process"
+assert_eq "config untouched" "$AFTER13" "$BEFORE13"
 
 summary "install-agents JSON writers"

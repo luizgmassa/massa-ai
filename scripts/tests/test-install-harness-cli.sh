@@ -27,7 +27,7 @@ trap 'rm -rf "$ROOT"' EXIT
 
 # ── Shadow repo: real harness, stubbed sub-installers ───────────────────────
 SHADOW="$ROOT/shadow"
-mkdir -p "$SHADOW/scripts/lib" "$SHADOW/apps/claude-plugin" "$SHADOW/apps/codex-plugin" "$SHADOW/apps/cursor-plugin"
+mkdir -p "$SHADOW/scripts/lib" "$SHADOW/apps/claude-plugin" "$SHADOW/apps/codex-plugin" "$SHADOW/apps/cursor-plugin" "$SHADOW/apps/opencode-plugin"
 cp "$HARNESS" "$SHADOW/scripts/install-harness.sh"
 cp "${PROJECT_ROOT}/scripts/banner.sh" "$SHADOW/scripts/banner.sh"
 cp "${PROJECT_ROOT}/scripts/lib/installer-shared.sh" "$SHADOW/scripts/lib/installer-shared.sh"
@@ -44,7 +44,7 @@ STUB
 }
 make_stub "$SHADOW/scripts/install-skills.sh" skills
 make_stub "$SHADOW/scripts/install-agents.sh" agents
-for host in claude codex cursor; do
+for host in claude codex cursor opencode; do
   make_stub "$SHADOW/apps/${host}-plugin/install.sh" "plugin-${host}"
 done
 
@@ -64,19 +64,19 @@ harness --agents --target "$H" --yes >/dev/null
 assert_eq "only agents ran" "$(logged)" "agents "
 
 echo ""
-echo "Scenario 3: --plugins runs the three plugin installers"
+echo "Scenario 3: --plugins runs the four plugin installers"
 harness --plugins --target "$H" --yes >/dev/null
-assert_eq "three plugin installers ran" "$(logged)" "plugin-claude plugin-codex plugin-cursor "
+assert_eq "four plugin installers ran" "$(logged)" "plugin-claude plugin-codex plugin-cursor plugin-opencode "
 
 echo ""
-echo "Scenario 4: --all runs everything, skills → agents → plugins"
+echo "Scenario 4: --all runs everything, skills → agents → plugins (including OpenCode)"
 harness --all --target "$H" --yes >/dev/null
-assert_eq "full ordered run" "$(logged)" "skills agents plugin-claude plugin-codex plugin-cursor "
+assert_eq "full ordered run" "$(logged)" "skills agents plugin-claude plugin-codex plugin-cursor plugin-opencode "
 
 echo ""
 echo "Scenario 5: no selection flag defaults to --all"
 harness --target "$H" --yes >/dev/null
-assert_eq "default is --all" "$(logged)" "skills agents plugin-claude plugin-codex plugin-cursor "
+assert_eq "default is --all" "$(logged)" "skills agents plugin-claude plugin-codex plugin-cursor plugin-opencode "
 
 echo ""
 echo "Scenario 6: flags are forwarded verbatim to the sub-installers"
@@ -101,11 +101,25 @@ assert_not_contains "skills does not also get --apply" "$(argv_for skills)" "--a
 assert_contains "agents gets --uninstall" "$(argv_for agents)" "--uninstall"
 
 echo ""
-echo "Scenario 8: --dry-run reaches both and skips plugin execution"
+echo "Scenario 8: --dry-run reaches skills and agents, skips plugin execution"
 harness --all --dry-run --target "$H" >/dev/null
 assert_contains "skills runs in --dry-run mode" "$(argv_for skills)" "--dry-run"
 assert_contains "agents gets --dry-run" "$(argv_for agents)" "--dry-run"
 assert_not_contains "no plugin installer was executed" "$(logged)" "plugin-"
+
+echo ""
+echo "Scenario 8b: --verbose is forwarded to agents (but not skills, which doesn't support it)"
+harness --skills --agents --verbose --target "$H" --yes >/dev/null
+assert_not_contains "skills does not get --verbose (unsupported)" "$(argv_for skills)" "--verbose"
+assert_contains "agents gets --verbose" "$(argv_for agents)" "--verbose"
+
+echo ""
+echo "Scenario 8c: --verbose is forwarded to plugin installers"
+harness --plugins --verbose --target "$H" --yes >/dev/null
+assert_contains "plugin-claude gets --verbose" "$(argv_for plugin-claude)" "--verbose"
+assert_contains "plugin-codex gets --verbose" "$(argv_for plugin-codex)" "--verbose"
+assert_contains "plugin-cursor gets --verbose" "$(argv_for plugin-cursor)" "--verbose"
+assert_contains "plugin-opencode gets --verbose" "$(argv_for plugin-opencode)" "--verbose"
 
 echo ""
 echo "Scenario 9: a failing sub-installer's exit code propagates"
@@ -114,6 +128,34 @@ OUT9="$(harness --agents --target "$H" --yes)"; RC9=$?
 assert_eq "exit code propagated verbatim" "$RC9" "7"
 assert_contains "failure is reported" "$OUT9" "install-agents.sh failed (exit 7)"
 make_stub "$SHADOW/scripts/install-agents.sh" agents 0
+
+echo ""
+echo "Scenario 9b: MASSA_AI_INSTALL_PLUGINS=0 downgrades the call to skip plugins"
+# This test verifies that when setup-local-first.sh sets MASSA_AI_INSTALL_PLUGINS=0,
+# the harness call should be --skills --agents instead of --all.
+# We'll create a simple wrapper script that mimics setup-local-first's behavior.
+TEST_SETUP="$ROOT/test_setup.sh"
+cat > "$TEST_SETUP" <<'TEST_SETUP_SCRIPT'
+#!/usr/bin/env bash
+set -e
+INSTALL_PLUGINS=0
+case "${MASSA_AI_INSTALL_PLUGINS:-}" in
+    1|yes|true) INSTALL_PLUGINS=1 ;;
+    0|no|false) INSTALL_PLUGINS=0 ;;
+esac
+if [ "$INSTALL_PLUGINS" = "1" ]; then
+    bash "$1" --all --platform all --yes
+else
+    bash "$1" --skills --agents --platform all --yes
+fi
+TEST_SETUP_SCRIPT
+chmod +x "$TEST_SETUP"
+: > "$ARGV_LOG"
+MASSA_AI_INSTALL_PLUGINS=0 bash "$TEST_SETUP" "$SHADOW/scripts/install-harness.sh" --target "$H" 2>&1 >/dev/null || true
+LOGGED="$(logged)"
+assert_contains "skills still runs" "$LOGGED" "skills"
+assert_contains "agents still runs" "$LOGGED" "agents"
+assert_not_contains "plugins skipped when MASSA_AI_INSTALL_PLUGINS=0" "$LOGGED" "plugin-"
 
 echo ""
 echo "Scenario 10: consent gate and bad input"

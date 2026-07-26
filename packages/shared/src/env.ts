@@ -29,8 +29,9 @@ function findEnvFile(): string | undefined {
 }
 
 // Load .env file - walk up directories to find it (monorepo support)
+// Silence output to avoid corrupting stdio/MCP protocols
 const envPath = findEnvFile();
-dotenvConfig({ path: envPath });
+dotenvConfig({ path: envPath, quiet: true });
 
 /**
  * Seed process.env from config.json (best-effort, never throws).

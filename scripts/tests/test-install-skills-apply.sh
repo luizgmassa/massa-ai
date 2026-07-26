@@ -29,7 +29,7 @@ BOOTSTRAP_START="$(grep -m1 '^BOOTSTRAP_START=' "$INSTALLER" | cut -d'"' -f2)"
 run_apply() { # run_apply HOME [extra args...]
   local home="$1"; shift
   bash "$INSTALLER" --apply --platform claude --target "$home" \
-    --repo-root "$PROJECT_ROOT" --yes "$@" 2>&1
+    --repo-root "$PROJECT_ROOT" --yes "$@" --verbose 2>&1
 }
 
 echo "Scenario 1: fresh apply creates one symlink per skill + the bootstrap block"

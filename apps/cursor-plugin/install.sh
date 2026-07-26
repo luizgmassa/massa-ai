@@ -29,12 +29,16 @@ CLAUDE_PLUGIN_BIN="$REPO_ROOT/apps/claude-plugin/hooks/massa-ai-hook.ts"
 
 SCOPE="user"
 UNINSTALL=0
+DRY_RUN=0
 
 for arg in "$@"; do
   case "$arg" in
     --user) SCOPE="user" ;;
     --project) SCOPE="project" ;;
     --uninstall) UNINSTALL=1 ;;
+    --quiet) MASSA_AI_VERBOSE=0 ;;
+    --verbose) MASSA_AI_VERBOSE=1 ;;
+    --dry-run) DRY_RUN=1; MASSA_AI_VERBOSE=1 ;;
     -h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
@@ -180,77 +184,94 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
 fi
 
 # ── Install ──────────────────────────────────────────────────────────────────
-echo "Installing massa-ai Cursor plugin to: $PLUGIN_DIR"
+vecho "Installing massa-ai Cursor plugin to: $PLUGIN_DIR"
 mkdir -p "$PLUGIN_DIR/.cursor-plugin" "$PLUGIN_DIR/skills" "$PLUGIN_DIR/hooks" "$PLUGIN_DIR/agents"
 
 # Copy manifest
 cp "$SCRIPT_DIR/.cursor-plugin/plugin.json" "$PLUGIN_DIR/.cursor-plugin/plugin.json"
-echo "  + .cursor-plugin/plugin.json"
+vecho "  + .cursor-plugin/plugin.json"
 
 # Copy skills (each in a subdirectory: skills/<name>/SKILL.md)
+skill_count=0
 for src in "$SCRIPT_DIR/skills/"*/SKILL.md; do
   name="$(basename "$(dirname "$src")")"
   mkdir -p "$PLUGIN_DIR/skills/$name"
   cp "$src" "$PLUGIN_DIR/skills/$name/SKILL.md"
-  echo "  + skills/$name/SKILL.md"
+  vecho "  + skills/$name/SKILL.md"
+  skill_count=$((skill_count + 1))
 done
 
 # Copy hooks.json (the placeholder version — installer replaces paths)
 cp "$SCRIPT_DIR/hooks/hooks.json" "$PLUGIN_DIR/hooks/hooks.json"
-echo "  + hooks/hooks.json"
+vecho "  + hooks/hooks.json"
 
 # Older installs shipped a plugin-local mcp.json here. Cursor reads
 # ~/.cursor/mcp.json, not the plugin dir, and MCP is now owned by
 # scripts/install-agents.sh — drop the residue so upgraders converge.
 if [[ -f "$PLUGIN_DIR/mcp.json" ]]; then
   rm -f "$PLUGIN_DIR/mcp.json"
-  echo "  - removed stale mcp.json (MCP is now registered in ~/.cursor/mcp.json)"
+  # Not gated by --quiet: this deletes a file in the user's home, so it is a
+  # mutation notice rather than per-file chatter.
+  echo -e "  - removed stale mcp.json (MCP is now registered in ~/.cursor/mcp.json)"
 fi
 
 # Copy agents — navigator + 12 subagent specialists (auto-discovered by Cursor
 # from the plugin's agents/ dir). The existing navigator is preserved; the 12
 # specialists are additive (CRS-04).
 cp "$SCRIPT_DIR/agents/massa-ai-navigator.md" "$PLUGIN_DIR/agents/massa-ai-navigator.md"
-echo "  + agents/massa-ai-navigator.md"
+vecho "  + agents/massa-ai-navigator.md"
 specialist_count=0
 for src in "$SCRIPT_DIR/agents/"massa-ai-*.md; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
   [[ "$name" == *navigator* ]] && continue
   cp "$src" "$PLUGIN_DIR/agents/$name"
+  vecho "  + $name"
   specialist_count=$((specialist_count + 1))
 done
-echo "  + ${specialist_count} subagent specialists: investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist"
+vecho "  + ${specialist_count} subagent specialists: investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist"
 
 # Create the binary symlink → repo's claude-plugin binary (resolved at install
 # time via SCRIPT_DIR → REPO_ROOT). This keeps a single source of truth.
 if [[ -f "$CLAUDE_PLUGIN_BIN" ]]; then
   ln -sfn "$CLAUDE_PLUGIN_BIN" "$PLUGIN_DIR/hooks/massa-ai-hook"
-  echo "  + hooks/massa-ai-hook → $CLAUDE_PLUGIN_BIN"
+  vecho "  + hooks/massa-ai-hook → $CLAUDE_PLUGIN_BIN"
 else
   echo "  ⚠ Warning: claude-plugin binary not found at $CLAUDE_PLUGIN_BIN" >&2
   echo "    Hooks will not fire until the binary is available." >&2
 fi
 
 # Merge hooks.json (array-append, backup, idempotent)
-echo ""
-echo "Merging hooks into $HOOKS_JSON..."
+vecho ""
+vecho "Merging hooks into $HOOKS_JSON..."
 merge_hooks_json "$HOOKS_JSON" "install"
-echo "  + 7 massa-ai hook events wired (array-append, user hooks preserved)"
+vecho "  + 7 massa-ai hook events wired (array-append, user hooks preserved)"
 
 # ── MCP registration (delegated) ─────────────────────────────────────────────
 # scripts/install-agents.sh is the single writer of host MCP config. It writes
 # the massa-ai entry into ~/.cursor/mcp.json at USER scope — a --project plugin
 # install still registers MCP for the whole user.
-echo ""
-echo "Registering MCP server (user scope) via scripts/install-agents.sh..."
+vecho ""
+vecho "Registering MCP server (user scope) via scripts/install-agents.sh..."
 if [[ -f "$REPO_ROOT/scripts/install-agents.sh" ]]; then
-  MASSA_AI_SUPPRESS_SPECIALIST_HINT=1 bash "$REPO_ROOT/scripts/install-agents.sh" --agent cursor --yes \
-    || echo "  ⚠ MCP wiring failed — run: bash scripts/install-agents.sh --agent cursor --yes" >&2
+  # On success the delegated output is detail (usually "up to date"), so it is
+  # gated. On failure it is never gated: a silently-failed MCP registration is
+  # exactly the bug this change set exists to fix.
+  if agents_out="$(MASSA_AI_SUPPRESS_SPECIALIST_HINT=1 bash "$REPO_ROOT/scripts/install-agents.sh" --agent cursor --yes 2>&1)"; then
+    vecho "$agents_out"
+  else
+    echo "$agents_out" >&2
+    echo "  ⚠ MCP wiring failed — run: bash scripts/install-agents.sh --agent cursor --yes" >&2
+  fi
 else
   echo "  ⚠ scripts/install-agents.sh not found — register MCP with: bash scripts/install-agents.sh --agent cursor --yes" >&2
 fi
 
-echo ""
-echo "Done. Restart Cursor to pick up the plugin."
-echo "💡 MCP is registered in ~/.cursor/mcp.json by scripts/install-agents.sh (single writer)."
+# Summary line in quiet mode
+if [ "${MASSA_AI_VERBOSE:-0}" != "1" ]; then
+  ok "cursor plugin installed (${skill_count} skills, ${specialist_count} specialists, 7 hooks)"
+else
+  vecho ""
+  vecho "Done. Restart Cursor to pick up the plugin."
+  vecho "💡 MCP is registered in ~/.cursor/mcp.json by scripts/install-agents.sh (single writer)."
+fi
