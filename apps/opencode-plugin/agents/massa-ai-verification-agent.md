@@ -1,8 +1,8 @@
 ---
 name: massa-ai-verification-agent
 description: Read-only verification agent. Centralize Verification Ladder logic by validating outputs, choosing the verification level, executing the verification checklist, detecting incomplete work, and producing verification reports. Triggers as the mandatory final gate before a task is claimed complete. Never modifies implementation.
-mode: subagent
-model: GLM-5.2
+mode: all
+model: opencode-go/glm-5.2
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
 metadata: { massa-ai-owned: true }

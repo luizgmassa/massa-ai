@@ -15,6 +15,17 @@ export interface SyncedPackage {
 }
 
 /**
+ * Host plugin manifests that carry a `version` but live in a dotdir, so the
+ * `packages/*` + `apps/*` package.json discovery below cannot reach them. Both
+ * are public compatibility surfaces (a marketplace shows the manifest version),
+ * so they must not drift from the root version.
+ */
+const EXTRA_VERSIONED_MANIFESTS = [
+  "apps/claude-plugin/.claude-plugin/plugin.json",
+  "apps/codex-plugin/.codex-plugin/plugin.json",
+];
+
+/**
  * Sync every package/app version under `rootDir` to the root package.json
  * version. Returns one entry per discovered package.json so callers (tests)
  * can assert which files changed without parsing console output.
@@ -41,6 +52,7 @@ export function syncVersions(rootDir: string): SyncedPackage[] {
   } catch {
     // no apps dir
   }
+  targets.push(...EXTRA_VERSIONED_MANIFESTS.map((rel) => join(root, rel)));
 
   const synced: SyncedPackage[] = [];
   for (const pkgPath of targets) {

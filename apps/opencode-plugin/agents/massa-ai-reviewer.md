@@ -1,8 +1,8 @@
 ---
 name: massa-ai-reviewer
 description: Read-only diff review agent. Analyze diffs to detect bugs, regressions, code smells, missing edge cases, and suggest improvements. Triggers after a builder completes a task and before the verification gate. Never implements, rewrites files, or plans features.
-mode: subagent
-model: GLM-5.2
+mode: all
+model: opencode-go/glm-5.2
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
 metadata: { massa-ai-owned: true }

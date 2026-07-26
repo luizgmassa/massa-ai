@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "massa-ai",
+  "description": "massa-ai — semantic code search, durable memory, symbol graph, and context compression for Claude Code.",
+  "owner": {
+    "name": "Luiz Massa",
+    "url": "https://github.com/luizgmassa"
+  },
+  "plugins": [
+    {
+      "name": "massa-ai",
+      "description": "Semantic code search, memory, symbol graph, and context compression. 12 subagent specialists + 6 slash commands.",
+      "source": "./apps/claude-plugin",
+      "category": "productivity"
+    }
+  ]
+}

@@ -173,6 +173,27 @@ backup + `_massaAiOwned` marker — user hooks are always preserved.
 | **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + MCP into `~/.cursor/mcp.json` + 16 subagent specialists | No |
 | **OpenCode** | `bash apps/opencode-plugin/install.sh --user` | 6 (in-process) | 14 in-process tools + lifecycle handlers + 16 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
 
+Claude Code and Codex additionally support their **native plugin managers**,
+which is what makes massa-ai visible in `/plugin` and `/plugins`:
+
+```
+# Claude Code
+/plugin marketplace add ~/Projects/massa-ai
+/plugin install massa-ai@massa-ai
+```
+
+```bash
+# Codex
+codex plugin marketplace add ~/Projects/massa-ai
+codex plugin add massa-ai@massa-ai
+```
+
+On Claude Code the plugin ships its own hooks, so running `install.sh` after a
+plugin install skips the hook merge instead of double-firing. On Codex the two
+are complementary — a Codex plugin manifest cannot carry hooks, so `install.sh`
+is still what wires `~/.codex/hooks.json`. MCP registration stays with
+`scripts/install-agents.sh` on both, the single writer of host MCP config.
+
 All four installers support `--user` (default, e.g. `~/.claude`), `--project`
 (e.g. `./.claude`), `--uninstall` (removes only massa-ai-owned entries), and
 `--quiet` / `--verbose`. The OpenCode installer additionally needs

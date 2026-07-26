@@ -1,0 +1,18 @@
+{
+  "name": "massa-ai",
+  "version": "1.2.1",
+  "description": "massa-ai — semantic code search, durable memory, symbol graph, and context compression",
+  "author": {
+    "name": "Luiz Massa",
+    "url": "https://github.com/luizgmassa"
+  },
+  "homepage": "https://github.com/luizgmassa/massa-ai",
+  "repository": "https://github.com/luizgmassa/massa-ai",
+  "license": "MIT",
+  "keywords": [
+    "search",
+    "memory",
+    "context",
+    "productivity"
+  ]
+}

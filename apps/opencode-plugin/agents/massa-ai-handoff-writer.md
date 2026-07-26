@@ -1,8 +1,8 @@
 ---
 name: massa-ai-handoff-writer
 description: Read-only continuation-package agent. Build a compact handoff package for long-session compaction, agent-to-agent transfer, or new-chat continuation, using the required field set from references/handoff-package.md. Returns the package as its output; the main agent persists it. Never implements and never invents state.
-mode: subagent
-model: DeepSeek V4 Pro
+mode: all
+model: opencode-go/deepseek-v4-pro
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
 metadata: { massa-ai-owned: true }

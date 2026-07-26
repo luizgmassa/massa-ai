@@ -1,7 +1,30 @@
 {
   "name": "massa-ai",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "massa-ai — semantic code search, memory, and context compression for Codex",
-  "skills": ["skills/"],
-  "hooks": "hooks/hooks.json"
+  "author": {
+    "name": "Luiz Massa",
+    "url": "https://github.com/luizgmassa"
+  },
+  "homepage": "https://github.com/luizgmassa/massa-ai",
+  "repository": "https://github.com/luizgmassa/massa-ai",
+  "license": "MIT",
+  "keywords": [
+    "search",
+    "memory",
+    "context",
+    "productivity"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "massa-ai",
+    "shortDescription": "Semantic code search, memory, and context compression",
+    "longDescription": "Semantic search, durable memory, symbol graph, and context compression for Codex, backed by the massa-ai MCP server.",
+    "developerName": "Luiz Massa",
+    "category": "Productivity",
+    "capabilities": [
+      "Read"
+    ],
+    "websiteURL": "https://github.com/luizgmassa/massa-ai"
+  }
 }

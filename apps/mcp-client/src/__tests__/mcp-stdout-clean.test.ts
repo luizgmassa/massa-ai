@@ -11,16 +11,35 @@
 
 import { describe, test, expect } from "bun:test";
 import { spawn } from "child_process";
+import { mkdtempSync, rmSync } from "fs";
+import { tmpdir } from "os";
 import path from "path";
 
 const MCP_BIN = path.resolve(import.meta.dir, "../../dist/index.js");
 
+/**
+ * Spawn the server under a throwaway HOME.
+ *
+ * This is load-bearing, not hygiene. The startup path writes a default config
+ * when none exists, and that first-run branch is exactly where stdout leaks
+ * have hidden. Inheriting the developer's HOME means the branch never runs
+ * locally, so the suite passed on every workstation while failing CI — which
+ * boots with a fresh HOME. Isolating it makes the first-run path the path
+ * under test everywhere.
+ */
 function spawnMcp(): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {
+    const home = mkdtempSync(path.join(tmpdir(), "massa-ai-mcp-stdout-"));
     const proc = spawn("bun", [MCP_BIN], {
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 3000,
+      env: {
+        ...process.env,
+        HOME: home,
+        XDG_CONFIG_HOME: path.join(home, ".config"),
+      },
     });
+    const cleanup = () => rmSync(home, { recursive: true, force: true });
 
     let stdout = "";
     let stderr = "";
@@ -28,8 +47,12 @@ function spawnMcp(): Promise<{ stdout: string; stderr: string; code: number }> {
     proc.stdout?.on("data", (d) => (stdout += d.toString()));
     proc.stderr?.on("data", (d) => (stderr += d.toString()));
 
-    proc.on("error", reject);
+    proc.on("error", (err) => {
+      cleanup();
+      reject(err);
+    });
     proc.on("close", (code) => {
+      cleanup();
       resolve({ stdout, stderr, code: code ?? -1 });
     });
   });

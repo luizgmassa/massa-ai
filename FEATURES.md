@@ -216,6 +216,17 @@ bash apps/claude-plugin/install.sh --uninstall # removes only massa-ai-owned ent
 
 The installer auto-writes hooks into `settings.json` using array-append merge with backup + `_massaAiOwned` marker. No manual `settings.json` merge required.
 
+**Or install as a real plugin** (this is what makes massa-ai show up in `/plugin`):
+
+```
+/plugin marketplace add ~/Projects/massa-ai
+/plugin install massa-ai@massa-ai
+```
+
+The marketplace manifest is `.claude-plugin/marketplace.json` at the repo root; the plugin manifest is `apps/claude-plugin/.claude-plugin/plugin.json`. Skills installed this way are namespaced (`/massa-ai:find`).
+
+The two routes are mutually exclusive **for hooks**: the plugin ships `hooks/hooks.json`, so `install.sh` detects an existing `massa-ai@*` entry in `~/.claude/plugins/installed_plugins.json` and skips its own hook merge rather than double-firing every lifecycle event. MCP is unaffected either way — `scripts/install-agents.sh` remains its single writer, and neither manifest carries an `mcp` key.
+
 ### Codex plugin (`apps/codex-plugin/`)
 
 **What it bundles:** 6 skills (`map`, `index`, `find`, `def`, `graph`, `status`) and 6 hook events. MCP registration is delegated to `scripts/install-agents.sh --agent codex`, which the installer calls for you; nothing MCP-shaped ships inside the bundle.
@@ -230,7 +241,18 @@ bash apps/codex-plugin/install.sh --project    # ./.codex
 bash apps/codex-plugin/install.sh --uninstall
 ```
 
-**Trust step (required):** after install, run `/hooks` in Codex to trust massa-ai hooks — Codex skips non-managed plugin hooks until trusted.
+**Or install as a real plugin** (this is what makes massa-ai show up in `/plugins`):
+
+```bash
+codex plugin marketplace add ~/Projects/massa-ai
+codex plugin add massa-ai@massa-ai
+```
+
+The marketplace manifest is `.agents/plugins/marketplace.json` at the repo root; the plugin manifest is `apps/codex-plugin/.codex-plugin/plugin.json`.
+
+Unlike Claude Code, the two Codex routes are **complementary, not exclusive**. A Codex plugin manifest has no `hooks` key — none of the 203 manifests across Codex's bundled, curated and runtime marketplaces declares one — so the marketplace route delivers skills and the `/plugins` entry but no hooks. Run `install.sh` as well if you want lifecycle capture.
+
+**Trust step (required):** after install, run `/hooks` in Codex to trust massa-ai hooks — Codex skips non-managed plugin hooks until trusted. Hook entries use Codex's nested matcher-group shape (`{ "hooks": [ { "type": "command", … } ] }`); a flat entry has no `:<hook>` index in Codex's `"<file>:<event>:<group>:<hook>"` state key, so it is never enumerated and never appears in `/hooks` at all.
 
 ### Cursor plugin (`apps/cursor-plugin/`)
 
@@ -327,7 +349,7 @@ Workflows dispatch these agents under their **host-registered** names, prefixed 
 | Claude Code | `apps/claude-plugin/agents/massa-ai-*.md` → installed to `~/.claude/agents/` | `.md` (YAML frontmatter: `name`, `description`, `tools`, `model`, `effort`) | Name prefix `massa-ai-` (uninstall excludes `massa-ai-navigator.md` by name — R1) |
 | Codex | `apps/codex-plugin/agents/massa-ai-*.toml` → installed to `~/.codex/agents/` (OUTSIDE plugin dir) | `.toml` (`name`, `description`, `model`, `model_reasoning_effort`, `sandbox_mode`, `developer_instructions`) | `# massa-ai-owned` top comment |
 | Cursor | `apps/cursor-plugin/agents/massa-ai-*.md` → bundled in plugin `agents/` dir | `.md` (same shape as Claude) | Name prefix `massa-ai-` (removed with plugin dir) |
-| OpenCode | `apps/opencode-plugin/agents/massa-ai-*.md` → installed to `~/.config/opencode/agents/` (OUTSIDE npm package) | `.md` (`description`, `mode: subagent`, `model`, `reasoningEffort`, `permission`, `metadata`) | `metadata: { massa-ai-owned: true }` frontmatter |
+| OpenCode | `apps/opencode-plugin/agents/massa-ai-*.md` → installed to `~/.config/opencode/agents/` (OUTSIDE npm package) | `.md` (`description`, `mode: all`, `model`, `reasoningEffort`, `permission`, `metadata`) | `metadata: { massa-ai-owned: true }` frontmatter |
 
 > Codex and OpenCode agents live OUTSIDE the plugin dir / npm package because their host discovery loads agents from a shared config-root directory, not from the plugin bundle. The in-file ownership marker enables scoped uninstall that preserves user agents (R3).
 
@@ -404,28 +426,34 @@ Every Cursor agent sets `reasoningEffort: max` in frontmatter (pass-through; fie
 | handoff-writer | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
 | navigator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
 
-#### OpenCode (charter `metadata.model_hint` verbatim + `reasoningEffort: max`)
+#### OpenCode (pinned `provider/model-id` + `mode: all` + `reasoningEffort: max`)
 
-Every OpenCode agent sets `reasoningEffort: max` in frontmatter (pass-through to the provider; honoring is provider-dependent for DeepSeek/GLM/MiniMax). OpenCode `model` accepts `provider/model-id`; if the pinned model is unavailable, OpenCode gracefully falls back to the invoking primary agent's model.
+Every OpenCode agent sets `reasoningEffort: max` in frontmatter (pass-through to the provider; honoring is provider-dependent for DeepSeek/GLM/MiniMax).
 
-| Agent | Model (verbatim from charter) | Charter hint |
+Every OpenCode agent sets `mode: all`. OpenCode's Tab switcher lists `primary` and `all` agents only, so the previous `mode: subagent` made the 12 specialists impossible to select by hand. `all` keeps auto-delegation and `@`-mention and adds manual selection.
+
+`model` is a pinned `provider/model-id`, **not** the charter's human-readable `metadata.model_hint`: OpenCode resolves only that form and silently falls back to the invoking primary agent's model on anything else. The tiers below mirror the charter hints.
+
+| Agent | Model (pinned) | Charter hint (tier source) |
 | --- | --- | --- |
-| investigator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
-| context-curator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
-| documentation-agent | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
-| requirements-analyst | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
-| planner | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| builder | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| reviewer | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| verification-agent | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| test-engineer | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| audit-specialist | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| mobile-specialist | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| architecture-specialist | MiniMax M3 | `metadata.model_hint: MiniMax M3` |
-| plan-critic | MiniMax M3 | `metadata.model_hint: MiniMax M3` |
-| furps-analyst | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| handoff-writer | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
-| navigator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
+| investigator | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
+| context-curator | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
+| documentation-agent | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
+| requirements-analyst | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
+| planner | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| builder | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| reviewer | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| verification-agent | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| test-engineer | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| audit-specialist | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| mobile-specialist | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| architecture-specialist | `opencode-go/minimax-m3` | `metadata.model_hint: MiniMax M3` |
+| plan-critic | `opencode-go/minimax-m3` | `metadata.model_hint: MiniMax M3` |
+| furps-analyst | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| handoff-writer | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
+| navigator | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
+
+> The `opencode-go/` provider carries all three tiers. A user without it configured gets OpenCode's documented fallback to the primary agent's model — the same degrade the unresolvable hint caused, except no longer silently for everyone.
 
 ### Effort pinning (per host)
 

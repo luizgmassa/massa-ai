@@ -130,7 +130,11 @@ describe("emitOpenCode", () => {
     expect(out).toContain("edit: allow");
     expect(out).toContain("bash: allow");
     expect(out).toContain("massa-ai-owned: true");
-    expect(out).toContain("mode: subagent");
+    // `all`, not `subagent` — OpenCode's Tab switcher lists primary/all only.
+    expect(out).toContain("mode: all");
+    // Model must be a resolvable provider/model-id, not the charter's
+    // human-readable hint (which OpenCode silently ignores).
+    expect(out).toMatch(/^model: [a-z0-9-]+\/[a-z0-9.-]+$/m);
   });
 
   test("planner (inspection-capable) -> edit: deny, bash ask", () => {

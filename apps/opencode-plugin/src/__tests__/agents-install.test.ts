@@ -4,7 +4,7 @@
  * Verifies the `massa-ai-config agents` subcommand against spec ACs
  * (OPC-01,02,05,06,07 + DOC-01):
  * - `agents install --user` writes 16 .md files to ~/.config/opencode/agents/
- * - each file has mode: subagent + metadata: { massa-ai-owned: true }
+ * - each file has mode: all + metadata: { massa-ai-owned: true }
  * - `agents uninstall` removes only massa-ai-owned files (R3: user agents preserved)
  * - idempotent re-run overwrites with identical content
  * - install prints "+ 16 subagent specialists"
@@ -105,7 +105,7 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
     expect(res.stdout).toContain("16 subagent specialists");
   });
 
-  test("OPC-07: each installed agent has mode: subagent + metadata massa-ai-owned: true", async () => {
+  test("OPC-07: each installed agent has mode: all + metadata massa-ai-owned: true", async () => {
     runCli(["agents", "install", "--user"], {
       HOME: tmp,
       XDG_CONFIG_HOME: xdgConfig,
@@ -116,7 +116,7 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
         path.join(agentsDir, `massa-ai-${name}.md`),
         "utf8",
       );
-      expect(content).toContain("mode: subagent");
+      expect(content).toContain("mode: all");
       expect(content).toContain("massa-ai-owned: true");
     }
   });

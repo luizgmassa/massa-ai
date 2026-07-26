@@ -1,0 +1,20 @@
+{
+  "name": "massa-ai",
+  "interface": {
+    "displayName": "massa-ai"
+  },
+  "plugins": [
+    {
+      "name": "massa-ai",
+      "source": {
+        "source": "local",
+        "path": "./apps/codex-plugin"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

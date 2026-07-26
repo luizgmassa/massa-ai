@@ -1,8 +1,8 @@
 ---
 name: massa-ai-mobile-specialist
 description: Conditional mobile expertise agent. Provide Android, Kotlin, Compose, KMP, Swift, iOS, Gradle, CocoaPods, performance, lifecycle, and offline-sync guidance. Invoked only when the workflow detects a mobile-related project. Read-only. Triggers on mobile detection signals; refuses non-mobile targets.
-mode: subagent
-model: GLM-5.2
+mode: all
+model: opencode-go/glm-5.2
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
 metadata: { massa-ai-owned: true }

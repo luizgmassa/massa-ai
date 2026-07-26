@@ -38,7 +38,7 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 
 | Assumption / decision | Chosen default | Rationale | Confirmed? |
 | --- | --- | --- | --- |
-| Ship as host-native subagent definitions | Yes — Claude `agents/*.md`, Cursor `agents/*.md`, OpenCode `agents/<name>.md` (mode: subagent), Codex `agents/<name>.toml` | User selected "As agents". Each host has a native subagent concept; the charters describe bounded invocation specialists. Matches the registry's orchestration model. | y (user) |
+| Ship as host-native subagent definitions | Yes — Claude `agents/*.md`, Cursor `agents/*.md`, OpenCode `agents/<name>.md` (mode: all), Codex `agents/<name>.toml` | User selected "As agents". Each host has a native subagent concept; the charters describe bounded invocation specialists. Matches the registry's orchestration model. | y (user) |
 | Full native frontmatter adaptation | Yes — map `metadata.permission` → host tool/permission lists; `model` PINNED per host (see model tables below, NOT advisory); strip massa-ai-internal sections into advisory body prose | User selected "Full native adaptation". Preserves the read-only/write boundary central to the registry; drops fields hosts ignore. Model is pinned (user follow-up directive), not advisory. | y (user) |
 | No new hooks | Yes — record "hooks not applicable" as accepted assumption | User selected "No new hooks". Claude blocks plugin-agent hooks (security); OpenCode/Cursor/Codex have no per-subagent hook concept. Existing 6 lifecycle hooks unchanged. | y (user) |
 | **Model pinning** (user follow-up) | Each agent's `model` is PINNED in host-native frontmatter, NOT advisory. Per-host tables below. | User directive: "enforce the subagents to use specific models." Reverses the earlier "advisory body comment" decision. Pinning guarantees the cost/quality target per agent. | y (user follow-up) |
@@ -47,12 +47,12 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 | Cursor reasoningEffort | `reasoningEffort: max` added to every Cursor agent frontmatter as a pass-through field. Cursor's subagent frontmatter docs returned 404 (unverified); the field follows OpenCode's pass-through convention. If Cursor ignores unknown frontmatter (likely, matching the `.cursor-plugin/plugin.json` "optional manifest" behavior), the field is harmless. Verification deferred to Design. | User directive: enforce on all four, Cursor/OpenCode → max. | y (user; field-name unverified — recorded assumption) |
 | OpenCode reasoningEffort | `reasoningEffort: max` added to every OpenCode agent frontmatter. OpenCode docs confirm unknown options pass through to the provider ("Any other options you specify... will be passed through directly"). Whether DeepSeek V4 Pro / GLM-5.2 / MiniMax M3 honor `reasoningEffort: max` is provider-dependent — the pin is emitted verbatim; honoring is host/provider behavior. | User directive + OpenCode pass-through docs. | y (user; provider-honoring unverified) |
 | Cursor model + effort | Use the charter `metadata.model_hint` value verbatim in the `model` frontmatter field (e.g. `model: DeepSeek V4 Pro`, `model: GLM-5.2`, `model: MiniMax M3`). Plus `reasoningEffort: max` (see effort-pinning row). Cursor resolves the model by alias/name; if unavailable, the host falls back. | User directive: "use the models already defined in the agents skills markdown files in max reasoning/effort." The charters' `model_hint` is the chosen Cursor/OpenCode model. | y (user) |
-| OpenCode model + effort | Use the charter `metadata.model_hint` value verbatim in the `model` frontmatter field. Plus `reasoningEffort: max` (see effort-pinning row). OpenCode `model` accepts provider/model-id format; if the pinned model is unavailable, OpenCode falls back to the primary agent's model. | User directive (same as Cursor). OpenCode inherits the invoking primary agent's model if the pinned model is missing — acceptable graceful degrade. | y (user) |
+| OpenCode model + effort | Use the pinned `provider/model-id` for the charter's tier (see the OpenCode table below). Plus `reasoningEffort: max` (see effort-pinning row). OpenCode `model` resolves **only** `provider/model-id`; a human-readable hint such as `DeepSeek V4 Pro` is unresolvable and silently degrades to the invoking primary agent's model. | User directive (same tiers as Cursor), corrected after the verbatim-hint form was found unresolvable in OpenCode 1.18.5. Cursor keeps the verbatim hint; it resolves models by alias. | y (user follow-up 2026-07-26) |
 | Codex agent file format | TOML at `agents/<name>.toml` with `name`, `description`, `developer_instructions`, `sandbox_mode` (read-only agents → `read-only`; write agents → omit or `workspace-write`) | Official Codex subagents doc: custom agents are TOML files under `~/.codex/agents/` or `.codex/agents/`. The plugin manifest (`plugin.json`) has NO `agents` field; Codex does not bundle agents in plugins. So the Codex installer writes agent files into `~/.codex/agents/` (user) or `./.codex/agents/` (project), NOT into the plugin dir. | y (web research — Codex Subagents doc, verified live 2026-07-23) |
 | Codex agent file location vs plugin dir | Codex custom agents live in `<codex_dir>/agents/*.toml`, separate from `<codex_dir>/plugins/massa-ai/`. The Codex plugin installer SHALL write agent TOML files alongside copying the plugin bundle. Uninstall removes only ownership-marked agent files. | Codex plugin discovery loads `skills/` + `hooks/` + `.mcp.json` from the plugin dir, but custom agents are loaded from the `agents/` directory at the config root, not the plugin dir. This is a divergence from Claude/Cursor (whose plugins bundle `agents/`). | y (web research) |
 | Claude Code agent frontmatter | `name`, `description`, `tools` (comma string), `model`. Omit `hooks`/`mcpServers`/`permissionMode` (blocked on plugin-shipped agents). Read-only agents: `tools: Read, Grep, Glob` (+ `Bash(pwd)` where useful); write agents: add `Write, Edit, Bash`. | Official Claude Code sub-agents doc. Plugin-shipped agents load from the plugin's `agents/` directory (lowest priority). | y (web research) |
 | Cursor agent format | Same as Claude Code — `agents/*.md` with `name`, `description`, `tools`, `model`. Cursor auto-discovers `agents/` in a registered plugin path. | Prior parity feature confirmed Cursor auto-discovers `agents/`. Cursor skill format differs (`skills/<name>/SKILL.md`) but agent format matches Claude. | y (codebase + prior spec) |
-| OpenCode agent format | `.md` at `~/.config/opencode/agents/<name>.md` (user) or `.opencode/agents/<name>.md` (project), frontmatter `description` (required), `mode: subagent`, `model`, `permission` (e.g. `edit: deny` for read-only). The OpenCode Plugin API does NOT register agents — they are filesystem-discovered. | Official OpenCode agents doc + skills doc. OpenCode plugin (`@massa-ai/opencode-plugin`) currently has no agent registration; agents are a separate filesystem concept. So the OpenCode installer SHALL write `.md` agent files to the agents directory, NOT into the npm package. | y (web research) |
+| OpenCode agent format | `.md` at `~/.config/opencode/agents/<name>.md` (user) or `.opencode/agents/<name>.md` (project), frontmatter `description` (required), `mode: all`, `model`, `permission` (e.g. `edit: deny` for read-only). The OpenCode Plugin API does NOT register agents — they are filesystem-discovered. | Official OpenCode agents doc + skills doc. OpenCode plugin (`@massa-ai/opencode-plugin`) currently has no agent registration; agents are a separate filesystem concept. So the OpenCode installer SHALL write `.md` agent files to the agents directory, NOT into the npm package. | y (web research) |
 | OpenCode agent install path | The `config-cli.ts` (or a new install command) writes agent `.md` files to `~/.config/opencode/agents/` (user) or `.opencode/agents/` (project). The npm plugin itself is unchanged (it owns tools + in-process hooks). Agents are a separate filesystem-discovered layer. | OpenCode discovers agents from `.opencode/agents/`, `~/.config/opencode/agents/`, `.claude/agents/`, `~/.claude/agents/`, `.agents/skills/`, `~/.agents/skills/`. We use the native `.opencode/agents/` + `~/.config/opencode/agents/` pair. | y (web research) |
 | Model hint mapping | `DeepSeek V4 Pro` → omit (host default); `GLM-5.2` → omit (host default) or advisory note; `MiniMax M3` → omit. Model IDs are host-specific and the charters mark hints as advisory. We record the hint in the agent body as a comment, not in the frontmatter `model` field, to avoid hard-coding unavailable models. | OpenCode/Claude/Cursor `model` accepts provider-specific IDs; Codex uses `gpt-5.x`. Hard-coding a non-host model would break loading. The charters already say "advisory; fallback to configured default." | y (charter text + web research) |
 | Permission mapping | read-only → Claude/Cursor `tools: Read, Grep, Glob, Bash`; OpenCode `permission: { edit: deny, bash: <pattern> }`; Codex `sandbox_mode = "read-only"`. write → Claude/Cursor `tools: Read, Grep, Glob, Write, Edit, Bash`; OpenCode `permission: { edit: allow, bash: allow }` (or omit); Codex `sandbox_mode` omitted or `"workspace-write"`. test-write/doc-write scoped agents get the write tools but with a scoped body instruction. | Matches each host's native permission model. Preserves the registry's read-only/write boundary. | y (charter permissions + host docs) |
@@ -132,24 +132,30 @@ Every Cursor agent SHALL set `reasoningEffort: max` in frontmatter (pass-through
 | mobile-specialist | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
 | architecture-specialist | MiniMax M3 | `metadata.model_hint: MiniMax M3` |
 
-### OpenCode (charter `metadata.model_hint` verbatim + `reasoningEffort: max`)
+### OpenCode (pinned `provider/model-id` + `mode: all` + `reasoningEffort: max`)
 
-Every OpenCode agent SHALL set `reasoningEffort: max` in frontmatter (pass-through to the provider; honoring is provider-dependent for DeepSeek/GLM/MiniMax). OpenCode `model` accepts `provider/model-id`; if the pinned model is unavailable, OpenCode gracefully falls back to the invoking primary agent's model.
+Every OpenCode agent SHALL set `reasoningEffort: max` in frontmatter (pass-through to the provider; honoring is provider-dependent for DeepSeek/GLM/MiniMax).
 
-| Agent | Model (verbatim from charter) | Charter hint |
+Every OpenCode agent SHALL set `mode: all`. OpenCode's Tab switcher lists `primary` and `all` agents only, so `mode: subagent` made the 12 specialists impossible to select by hand. `all` keeps auto-delegation and `@`-mention while adding manual selection.
+
+`model` SHALL be a `provider/model-id` pair, NOT the charter's human-readable `metadata.model_hint`. OpenCode resolves only that form; anything else silently degrades to the invoking primary agent's model. The tiers below mirror the charter hints.
+
+| Agent | Model (pinned) | Charter hint (tier source) |
 | --- | --- | --- |
-| investigator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
-| context-curator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
-| documentation-agent | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
-| requirements-analyst | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
-| planner | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| builder | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| reviewer | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| verification-agent | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| test-engineer | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| audit-specialist | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| mobile-specialist | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| architecture-specialist | MiniMax M3 | `metadata.model_hint: MiniMax M3` |
+| investigator | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
+| context-curator | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
+| documentation-agent | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
+| requirements-analyst | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
+| planner | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| builder | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| reviewer | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| verification-agent | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| test-engineer | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| audit-specialist | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| mobile-specialist | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| architecture-specialist | `opencode-go/minimax-m3` | `metadata.model_hint: MiniMax M3` |
+
+> The `opencode-go/` provider carries all three tiers. A user without that provider configured gets OpenCode's documented graceful fallback to the primary agent's model — the same degrade the unresolvable hint produced, minus the silent-for-everyone part.
 
 > OpenCode pass-through confirmed by docs ("Any other options you specify... will be passed through directly to the provider"). The `reasoningEffort: max` pin is emitted verbatim; whether DeepSeek V4 Pro / GLM-5.2 / MiniMax M3 honor it is provider behavior, not a spec gap.
 
