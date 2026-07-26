@@ -422,17 +422,43 @@ describe("persona / sub-agent boundary", () => {
   const PERSONA_ROUTER = path.join(SKILLS_DIR, "persona-router", "SKILL.md");
 
   /**
+   * The span of a markdown section between a `## <heading>` line and the next
+   * `##` heading (or end of file). Generalizes the charter-specific span below
+   * to any named heading, so a rule's location can be asserted precisely
+   * instead of merely "somewhere in the file" (Task A,
+   * .specs/features/persona-emit/spec.md).
+   */
+  function namedSection(content: string, heading: string, label: string): string {
+    const marker = `## ${heading}`;
+    const start = content.indexOf(marker);
+    expect(start, `${label} has no "${marker}" section`).toBeGreaterThanOrEqual(0);
+    const rest = content.slice(start + marker.length);
+    const nextHeading = rest.search(/^## /m);
+    return nextHeading === -1 ? rest : rest.slice(0, nextHeading);
+  }
+
+  /**
    * The span of a charter between its `## Restrictions` heading and the next
    * `##` heading. PAB-02/AC2 and PAB-06 require the lines to live *there*, so a
    * whole-file search would not actually enforce the acceptance criterion.
    */
   function restrictionsSection(charter: string, name: string): string {
-    const start = charter.indexOf("## Restrictions");
-    expect(start, `charter ${name} has no ## Restrictions section`).toBeGreaterThanOrEqual(0);
-    const rest = charter.slice(start + "## Restrictions".length);
-    const nextHeading = rest.search(/^## /m);
-    return nextHeading === -1 ? rest : rest.slice(0, nextHeading);
+    return namedSection(charter, "Restrictions", `charter ${name}`);
   }
+
+  /**
+   * Deliberately narrow phrasings for a future edit that would *grant* a
+   * persona authority it does not have — the contradiction-by-addition risk
+   * accepted in design.md § Test design (cases 6, 8, 9). Each pattern anchors
+   * on a modal or a direct object so the file's own denial prose ("grants no
+   * tool access", "never authorizes", "cannot override") does not self-match:
+   * those use "no"/"never"/"cannot", never "may"/"can" immediately before the
+   * verb, and never "<verb> ... to the persona".
+   */
+  const AUTHORITY_GRANT_PATTERNS: RegExp[] = [
+    /\bpersonas?\s+(?:may|can)\s+(?:grant|authorize|widen|override)\b/i,
+    /\b(?:grant|authorize|widen|override)(?:s|ed|ing)?\s+(?:\w+\s+){0,3}(?:authority|permission|write scope)\s+to\s+(?:the\s+|a\s+)?persona\b/i,
+  ];
 
   // PAB-01
   test("all three Capability Packet copies declare the optional persona field", async () => {
@@ -500,11 +526,13 @@ describe("persona / sub-agent boundary", () => {
     expect(offenders).toEqual([]);
   });
 
-  // PAB-04
-  test("persona-router scopes its subagent prohibition to persona routing", async () => {
+  // PAB-04 — hardened (Task A): section-scoped, not merely present anywhere
+  // in the file.
+  test("persona-router's Stop Conditions section scopes its subagent prohibition to persona routing", async () => {
     const content = await read(PERSONA_ROUTER);
-    expect(content).toContain("Persona routing itself stays inline");
-    expect(content).toContain(
+    const section = namedSection(content, "Stop Conditions", "persona-router/SKILL.md");
+    expect(section).toContain("Persona routing itself stays inline");
+    expect(section).toContain(
       "workflow-mandated agent dispatch is unaffected by an active persona route",
     );
   });
@@ -515,17 +543,42 @@ describe("persona / sub-agent boundary", () => {
     expect(content).not.toContain("launch subagents, create subprocess orchestration");
   });
 
-  // PAB-03 + PAB-07
-  test("persona-router states persona grants no authority and reaches subagents as an id only", async () => {
+  // PAB-03 + PAB-07 — hardened (Task A): section-scoped to where the boundary
+  // is actually stated, not merely present anywhere in the file.
+  test("persona-router's Persona And Sub-Agents section states persona grants no authority and reaches subagents as an id only", async () => {
     const content = await read(PERSONA_ROUTER);
-    expect(content).toContain("grants no tool access, no write scope, and no permission");
-    expect(content).toContain("the persona is never authority");
-    expect(content).toContain("carries the persona **id only**, never the persona prompt");
+    const section = namedSection(
+      content,
+      "Persona And Sub-Agents",
+      "persona-router/SKILL.md",
+    );
+    expect(section).toContain("grants no tool access, no write scope, and no permission");
+    expect(section).toContain("the persona is never authority");
+    expect(section).toContain("carries the persona **id only**, never the persona prompt");
   });
 
-  // PAB-05
-  test("persona-router states a persona route is not a specialist consultation", async () => {
+  // PAB-05 — hardened (Task A): section-scoped.
+  test("persona-router's Persona And Sub-Agents section states a persona route is not a specialist consultation", async () => {
     const content = await read(PERSONA_ROUTER);
-    expect(content).toContain("A persona route is not a specialist consultation");
+    const section = namedSection(
+      content,
+      "Persona And Sub-Agents",
+      "persona-router/SKILL.md",
+    );
+    expect(section).toContain("A persona route is not a specialist consultation");
+  });
+
+  // Task A negative structural assertion — closes the contradiction-by-addition
+  // residual accepted in design.md § Test design for cases 6, 8, 9: a future
+  // edit granting persona authority anywhere in this file now fails the gate,
+  // instead of passing alongside the still-present denial prose.
+  test("no authority-granting claim about persona appears anywhere in persona-router/SKILL.md", async () => {
+    const content = await read(PERSONA_ROUTER);
+    const offenders: string[] = [];
+    for (const pattern of AUTHORITY_GRANT_PATTERNS) {
+      const match = pattern.exec(content);
+      if (match) offenders.push(`${pattern}: "${match[0]}"`);
+    }
+    expect(offenders).toEqual([]);
   });
 });
