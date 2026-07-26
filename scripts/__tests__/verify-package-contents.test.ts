@@ -88,14 +88,16 @@ describe("extractArtifactPaths", () => {
     expect(() => extractArtifactPaths(noPath)).toThrow(/path: \|.*not found/);
   });
 
-  test("parses this repo's real publish.yml without throwing", () => {
+  test("matches this repo's real publish.yml (regression pin, PDO-26)", () => {
     const workflowText = require("node:fs").readFileSync(
       resolve(REPO_ROOT, ".github/workflows/publish.yml"),
       "utf8",
     );
     const paths = extractArtifactPaths(workflowText);
     expect(paths).toContain("packages/shared/dist");
-    expect(paths.length).toBeGreaterThan(0);
+    // apps/opencode-plugin/agents is the PDO-26 fix: without it, the staged-copy this
+    // script reproduces cannot see the 15 agent charters declared in package.json#files.
+    expect(paths).toContain("apps/opencode-plugin/agents");
   });
 });
 
@@ -228,27 +230,21 @@ describe("EXPECTED_PACKAGES", () => {
 describe("verifyPackageContents (end-to-end, PDO-26 AC10)", () => {
   const builtDistExists = existsSync(resolve(REPO_ROOT, "packages/shared/dist"));
 
-  // This gate's acceptance test, per spec PDO-26 AC10: its first run against the real
-  // repo is expected to fail on @massa-ai/opencode-plugin's missing `agents/*.md` —
-  // `apps/opencode-plugin/agents` is not yet part of publish.yml's build-output artifact
-  // list, so the staged-copy this script reproduces cannot see the 15 charter files. This
-  // assertion is the discriminating proof that the gate catches a real, already-shipped
-  // defect rather than being introduced ceremonially with nothing to find. It flips to
-  // "all pass" in the very next commit, which adds that directory to the artifact list.
+  // A real staged-copy run against this repo's own publish.yml + package dirs must pass
+  // on all 5 current publishable packages. `apps/opencode-plugin/agents` is part of
+  // publish.yml's build-output artifact list (PDO-26's fix), so its 15 `agents/*.md`
+  // charters survive the artifact-only staging this gate reproduces. Before that entry
+  // existed, this exact assertion failed with `missing: ["agents"]` on
+  // @massa-ai/opencode-plugin — the live defect this gate exists to catch (spec PDO-26
+  // AC10; the captured red-state run is in this task's delivery notes).
   test.skipIf(!builtDistExists)(
-    "fails specifically on opencode-plugin's missing agents directory; all other packages pass",
+    "passes on all 5 packages against this repo's real publish.yml artifact list",
     () => {
       const results = verifyPackageContents();
       const byName = new Map(results.map((r) => [r.pkg.name, r]));
       expect(byName.size).toBe(5);
-      for (const [name, result] of byName) {
-        if (name === "@massa-ai/opencode-plugin") {
-          expect(result.ok).toBe(false);
-          expect(result.missing).toEqual(["agents"]);
-          expect(result.unexpected).toEqual([]);
-        } else {
-          expect(result.ok).toBe(true);
-        }
+      for (const result of results) {
+        expect(result.ok).toBe(true);
       }
     },
     60_000,
