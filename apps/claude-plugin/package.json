@@ -6,6 +6,7 @@
     "agents",
     "commands",
     "hooks",
+    "!hooks/__tests__",
     "skills",
     "install.sh",
     "README.md",
