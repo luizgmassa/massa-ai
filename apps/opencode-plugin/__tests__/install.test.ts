@@ -481,3 +481,63 @@ describe("opencode-plugin install.sh", () => {
     expect(await pathExists(path.join(configDir, "opencode.json"))).toBe(false);
   });
 });
+
+describe("opencode-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
+  test("install copies massa-ai + persona-router into ~/.config/opencode/skills as plugin-owned", async () => {
+    const res = runInstall(["--user", "--verbose"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("harness skills installed");
+
+    for (const name of ["massa-ai", "persona-router"]) {
+      const skillMd = path.join(tmp, `.config/opencode/skills/${name}/SKILL.md`);
+      expect(await pathExists(skillMd)).toBe(true);
+      const lst = await fs.lstat(skillMd);
+      expect(lst.isSymbolicLink()).toBe(false);
+    }
+
+    const state = await readJson(path.join(tmp, ".config/massa-ai/install-state.json"));
+    const platforms = state.platforms as Record<string, { skillsOwner: string }>;
+    expect(platforms.opencode.skillsOwner).toBe("plugin");
+  });
+
+  test("install defers to install-skills.sh when the state file already records a repo-owned install", async () => {
+    const stateFile = path.join(tmp, ".config/massa-ai/install-state.json");
+    await fs.mkdir(path.dirname(stateFile), { recursive: true });
+    await fs.writeFile(
+      stateFile,
+      JSON.stringify(
+        {
+          version: 2,
+          platforms: {
+            opencode: {
+              root: path.join(tmp, ".config/opencode"),
+              skillsOwner: "repo",
+              skills: ["massa-ai", "persona-router"],
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    const res = runInstall(["--user", "--verbose"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("repo-owned");
+    expect(
+      await pathExists(path.join(tmp, ".config/opencode/skills/massa-ai")),
+    ).toBe(false);
+  });
+
+  test("uninstall removes only a plugin-owned skills install and its state record", async () => {
+    runInstall(["--user"], { HOME: tmp });
+    expect(
+      await pathExists(path.join(tmp, ".config/opencode/skills/massa-ai")),
+    ).toBe(true);
+
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(
+      await pathExists(path.join(tmp, ".config/opencode/skills/massa-ai")),
+    ).toBe(false);
+  });
+});

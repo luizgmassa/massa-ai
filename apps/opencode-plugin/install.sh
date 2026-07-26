@@ -102,9 +102,128 @@ if [[ ! -f "$PLUGIN_JS" ]]; then
   exit 1
 fi
 
+# ── Skills bundling (PDO-08, 09 / D3 two-writer ownership) ──────────────────
+# scripts/install-skills.sh remains the single writer once it has already
+# claimed this platform (skillsOwner: "repo" in the shared install-state.json).
+# This plugin installs its bundled massa-ai/persona-router skills into the
+# SAME harness skills directory ($TARGET/skills) only when that has not
+# happened, mirroring the MCP single-writer precedent
+# (test-mcp-single-writer.sh). A repo checkout's own --apply always takes
+# precedence over a prior plugin install — see install-skills.sh.
+HARNESS_STATE_FILE="$HOME/.config/massa-ai/install-state.json"
+HARNESS_SKILLS_DIR="$TARGET/skills"
+HARNESS_HOST="opencode"
+
+harness_skills_owner() {
+  local runner="$1"
+  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" <<'NODE'
+const fs = require("fs");
+const [, , file, host] = process.argv;
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  const rec = data && data.platforms && data.platforms[host];
+  process.stdout.write(rec && rec.skillsOwner === "repo" ? "repo" : "none");
+} catch {
+  process.stdout.write("none");
+}
+NODE
+}
+
+install_bundled_skills() {
+  local runner=""
+  if command -v node &>/dev/null; then runner="node"
+  elif command -v bun &>/dev/null; then runner="bun"
+  else
+    echo "  ⚠ node or bun required to install bundled skills — skipping" >&2
+    return 0
+  fi
+
+  if [[ "$(harness_skills_owner "$runner")" == "repo" ]]; then
+    vecho "  ↷ skills already installed by scripts/install-skills.sh (repo-owned) — skipping bundled copy"
+    return 0
+  fi
+
+  local installed=0 name src dest
+  for name in massa-ai persona-router; do
+    src="$SCRIPT_DIR/skills/$name"
+    [[ -d "$src" ]] || continue
+    dest="$HARNESS_SKILLS_DIR/$name"
+    if [[ -e "$dest" && ! -d "$dest" ]]; then
+      echo "  ⚠ $dest exists and is not a directory — skipping" >&2
+      continue
+    fi
+    mkdir -p "$HARNESS_SKILLS_DIR"
+    rm -rf "$dest"
+    cp -R "$src" "$dest"
+    installed=$((installed + 1))
+  done
+  vecho "  + ${installed} harness skills installed to $HARNESS_SKILLS_DIR (plugin-owned)"
+
+  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" "$TARGET" <<'NODE'
+const fs = require("fs");
+const path = require("path");
+const [, , file, host, root] = process.argv;
+let data = { version: 2, platforms: {} };
+try {
+  const existing = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (existing && typeof existing === "object" && !Array.isArray(existing)) data = existing;
+} catch { /* fresh */ }
+if (typeof data.platforms !== "object" || data.platforms === null || Array.isArray(data.platforms)) {
+  data.platforms = {};
+}
+data.version = 2;
+data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router"] };
+fs.mkdirSync(path.dirname(file), { recursive: true });
+fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+NODE
+}
+
+uninstall_bundled_skills() {
+  local runner=""
+  if command -v node &>/dev/null; then runner="node"
+  elif command -v bun &>/dev/null; then runner="bun"
+  else return 0
+  fi
+
+  local raw_owner
+  raw_owner="$("$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" <<'NODE'
+const fs = require("fs");
+const [, , file, host] = process.argv;
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  const rec = data && data.platforms && data.platforms[host];
+  process.stdout.write(rec ? String(rec.skillsOwner) : "none");
+} catch {
+  process.stdout.write("none");
+}
+NODE
+  )"
+  [[ "$raw_owner" == "plugin" ]] || return 0
+
+  local name
+  for name in massa-ai persona-router; do
+    rm -rf "$HARNESS_SKILLS_DIR/$name"
+  done
+  rmdir "$HARNESS_SKILLS_DIR" 2>/dev/null || true
+  echo "  - removed plugin-owned harness skills from $HARNESS_SKILLS_DIR"
+
+  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" <<'NODE'
+const fs = require("fs");
+const [, , file, host] = process.argv;
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (data && data.platforms && data.platforms[host] && data.platforms[host].skillsOwner === "plugin") {
+    delete data.platforms[host];
+    fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+  }
+} catch { /* nothing to clean up */ }
+NODE
+}
+
 # ── Uninstall ────────────────────────────────────────────────────────────────
 if [[ "$UNINSTALL" -eq 1 ]]; then
   vecho "Uninstalling massa-ai OpenCode plugin (scope: $SCOPE)..."
+  uninstall_bundled_skills
 
   # Remove plugin symlink
   if [[ -L "$PLUGINS_DIR/index.js" ]]; then
@@ -253,6 +372,12 @@ for src in "$SCRIPT_DIR/agents/"massa-ai-*.md; do
 done
 
 vecho "  + ${specialist_count} subagent specialists (generated from skills/agents/*/SKILL.md)"
+vecho ""
+
+# Skills bundling (PDO-08, 09): install massa-ai/persona-router into the
+# shared harness skills directory, unless scripts/install-skills.sh already
+# owns it for this platform.
+install_bundled_skills
 vecho ""
 
 # Delegate to install-agents.sh to REMOVE the MCP entry (since the plugin registers tools in-process)
