@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The MCP server wrote 68 bytes to stdout on first run, breaking the stdio JSON-RPC handshake.** `initConfig()` in `packages/shared/src/config/config-loader.ts` announced `Created default config at <path>` on **stdout** via `console.log`. That branch fires only when `~/.config/massa-ai/config.json` does not exist yet — so it never fired on a machine that had already run massa-ai once, and always fired on a genuinely fresh install. Per this repo's own contract, a stdio MCP server's stdout carries nothing but protocol; one stray byte produces `connection closed: initialize response`. Now `console.error`. It deliberately does not use the shared logger: the logger reads config, so importing it here would be circular.
+
+  This is the same bug class as the logger fix in the previous release, which moved every log level to stderr but left this one direct `console.log` behind.
+
+  It had been failing CI on `main` for three consecutive commits (`26433af`, `4fa589b`, `85f1ad3`) and was misread as a flaky test. It was never flaky — it reproduced 3 of 3 times, and the byte count was the tell: `"Created default config at "` (26) + `"/home/runner/.config/massa-ai/config.json"` (41) + newline = exactly the 68 bytes asserted against.
+
+  **The test was the deeper problem.** `mcp-stdout-clean.test.ts` inherited the developer's `HOME`, so the first-run branch it exists to guard never executed locally — it passed on every workstation while failing CI, which boots with a fresh `HOME`. It now spawns the server under a throwaway `HOME`/`XDG_CONFIG_HOME`, making the first-run path the path under test everywhere. Confirmed discriminating by reverting the fix and watching it fail locally, which it previously could not do.
+
 - **massa-ai was invisible to every host's plugin manager, and its OpenCode specialists could not be selected by hand.** Three independent root causes, each confirmed by probing the installed host rather than reading the repo.
 
   1. **Claude Code: massa-ai was never a plugin.** `apps/claude-plugin/` had no `.claude-plugin/plugin.json` — the only host dir without a manifest — and the repo had no marketplace. `install.sh` copied commands and agents into `~/.claude/` and wired hooks, which works, but leaves the result permanently absent from `/plugin`: `~/.claude/plugins/installed_plugins.json` listed only unrelated plugins while all 13 massa-ai agents, 6 commands and 5 hooks were installed and firing. Added the manifest, `hooks/hooks.json` (addressed via `${CLAUDE_PLUGIN_ROOT}` — Claude Code copies the plugin dir on install, so an absolute repo path would break for everyone else), and `.claude-plugin/marketplace.json` at the repo root. `install.sh` still works unchanged.

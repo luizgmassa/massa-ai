@@ -130,7 +130,14 @@ export function saveConfig(config: MassaAiConfig): void {
 export function initConfig(): void {
   if (!fs.existsSync(CONFIG_FILE)) {
     saveConfig(defaultMassaAiConfig);
-    console.log(`Created default config at ${CONFIG_FILE}`);
+    // stderr, not stdout. initConfig() runs during MCP server startup, and a
+    // stdio MCP server's stdout carries nothing but JSON-RPC — one stray byte
+    // fails the handshake with "connection closed: initialize response".
+    // This only fires on a machine with no config yet, which is why it stayed
+    // invisible on developer machines and only ever broke first runs and CI.
+    // console.error (not the shared logger) keeps this module dependency-free:
+    // the logger reads config, so importing it here would be circular.
+    console.error(`Created default config at ${CONFIG_FILE}`);
   }
 }
 
