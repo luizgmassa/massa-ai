@@ -188,7 +188,7 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
   });
 
   test("MCP registration delegated to the single writer", () => {
-    const res = runInstall(["--user"], { HOME: tmp });
+    const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("scripts/install-agents.sh");
     expect(res.stdout.toLowerCase()).toContain("mcp");
@@ -215,7 +215,7 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
   ];
 
   test("CRS-01/CRS-04/DOC-01: install copies 12 specialists + navigator (13 .md) into plugin agents/ + prints summary", async () => {
-    const res = runInstall(["--user"], { HOME: tmp });
+    const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
     const agentsDir = path.join(tmp, ".cursor/plugins/massa-ai/agents");

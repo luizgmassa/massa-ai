@@ -144,7 +144,7 @@ Plugins: `apps/{claude,codex,cursor,opencode}-plugin/**` (manifests, skills, hoo
 - **R11.5** CI `skills/**` path trigger unchanged (dir name changes but glob still valid).
 
 ### R12 — Install scripts
-- **R12.1** `install.sh` banner ASCII (Thoth glyph) replaced with neutral AI glyph or removed; comment header `massa-th0th - Installer` → `massa-ai - Installer`; URL `luizgmassa/massa-th0th` → `luizgmassa/massa-ai`.
+- **R12.1** `install.sh` banner ASCII (Thoth glyph) replaced with neutral AI glyph or removed; comment header `massa-th0th - Installer` → `massa-ai - Installer`; URL `luizgmassa/massa-th0th` → `luizgmassa/massa-ai`. **Done** — the glyph now spells `M.A.S.S.A.` with the tagline "Memory-Augmented Semantic Search Agent", in both `install.sh` and `scripts/banner.sh`; `scripts/tests/test-banner-glyph-divergence.sh` keeps the two copies byte-identical.
 - **R12.2** `install.sh` `_MASSA_TH0TH_INSTALLER_VERSION` var → `_MASSA_AI_INSTALLER_VERSION`.
 - **R12.3** `install.sh` constants `INSTALL_DIR`, `GITHUB_REPO` default `luizgmassa/massa-th0th` → `luizgmassa/massa-ai`.
 - **R12.4** `apps/cursor-plugin/install.sh` content refs updated.

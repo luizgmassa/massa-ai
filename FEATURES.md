@@ -1189,7 +1189,7 @@ bash scripts/install-agents.sh --uninstall --yes     # remove only owned entries
 
 | Agent | Config file | Shape |
 |-------|-------------|-------|
-| `claude-code` | `~/.claude/settings.json` | `mcpServers` / `env` / `npx` |
+| `claude-code` | `~/.claude.json` | `mcpServers` / `env` / `npx` (string `command` + `args`, `type: "stdio"`) |
 | `claude-desktop` | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS only) | `mcpServers` / `env` / `npx` |
 | `codex` | `~/.codex/config.toml` | `[mcp_servers.massa-ai]` |
 | `cursor` | `~/.cursor/mcp.json` | `mcpServers` / `env` / `npx` |
@@ -1281,6 +1281,10 @@ Ported from the old repo's Python test suite to TypeScript/bun test:
 | `scripts/__tests__/subagent-parity.test.ts` | 16 | Drift gate, exact-12-per-host, name-collision, model+effort pinning (Claude/Codex/Cursor/OpenCode), permission boundary, Codex TOML round-trip+marker, OpenCode permission+marker, FEATURES.md table parity |
 
 Run everything (TypeScript suites plus every `scripts/tests/*.sh` suite) with `bun run test:scripts` — the same command CI runs.
+
+The four plugin installers have their own suites under `apps/<host>-plugin/__tests__/` (50
+tests). Three of those dirs are not workspace packages, so turbo's `test` cannot see them —
+`bun run test:plugins` covers all four, and CI runs it alongside `test:scripts`.
 
 ---
 

@@ -80,7 +80,8 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
     const pluginDir = path.join(tmp, ".codex/plugins/massa-ai");
     expect(await pathExists(path.join(pluginDir, ".codex-plugin/plugin.json"))).toBe(true);
 
-    const hooks = await readJson(path.join(tmp, ".codex/hooks.json"));
+    const cfg = await readJson(path.join(tmp, ".codex/hooks.json"));
+    expect(cfg.hooks).toBeDefined();
     const expectedEvents = [
       "SessionStart",
       "UserPromptSubmit",
@@ -89,7 +90,7 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
       "PreCompact",
       "Stop",
     ];
-    expect(Object.keys(hooks).sort()).toEqual(expectedEvents.sort());
+    expect(Object.keys(cfg.hooks).sort()).toEqual(expectedEvents.sort());
   });
 
   test("project-scope install creates ./.codex/plugins/massa-ai/", async () => {
@@ -105,7 +106,9 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
     // Pre-create hooks.json with a user hook under SessionStart (no marker)
     await fs.mkdir(path.join(tmp, ".codex"), { recursive: true });
     const userHooks = {
-      SessionStart: [{ type: "command", command: "echo user-hook" }],
+      hooks: {
+        SessionStart: [{ type: "command", command: "echo user-hook" }],
+      },
       model: "gpt-5",
     };
     await fs.writeFile(
@@ -116,8 +119,8 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
     const res = runInstall(["--user"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
-    const hooks = await readJson(path.join(tmp, ".codex/hooks.json"));
-    const sessionStart = hooks.SessionStart as Record<string, unknown>[];
+    const cfg = await readJson(path.join(tmp, ".codex/hooks.json"));
+    const sessionStart = cfg.hooks.SessionStart as Record<string, unknown>[];
     expect(sessionStart.length).toBe(2);
     // User hook survives
     const userEntry = sessionStart.find(
@@ -130,13 +133,15 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
     );
     expect(owned).toBeDefined();
     // User top-level key preserved
-    expect(hooks.model).toBe("gpt-5");
+    expect(cfg.model).toBe("gpt-5");
   });
 
   test("uninstall removes only owned entries; user hook survives", async () => {
     await fs.mkdir(path.join(tmp, ".codex"), { recursive: true });
     const userHooks = {
-      SessionStart: [{ type: "command", command: "echo user-hook" }],
+      hooks: {
+        SessionStart: [{ type: "command", command: "echo user-hook" }],
+      },
       model: "gpt-5",
     };
     await fs.writeFile(
@@ -148,8 +153,8 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
     const res = runInstall(["--uninstall"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
-    const hooks = await readJson(path.join(tmp, ".codex/hooks.json"));
-    const sessionStart = hooks.SessionStart as Record<string, unknown>[];
+    const cfg = await readJson(path.join(tmp, ".codex/hooks.json"));
+    const sessionStart = cfg.hooks.SessionStart as Record<string, unknown>[];
     // massa-ai entries gone
     expect(
       sessionStart.find((e) => e._massaAiOwned === true),
@@ -158,7 +163,7 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
     expect(
       sessionStart.find((e) => (e.command as string) === "echo user-hook"),
     ).toBeDefined();
-    expect(hooks.model).toBe("gpt-5");
+    expect(cfg.model).toBe("gpt-5");
     // Plugin dir removed
     expect(
       await pathExists(path.join(tmp, ".codex/plugins/massa-ai")),
@@ -180,14 +185,14 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
   });
 
   test("trust warning printed to stdout (contains /hooks and trust)", () => {
-    const res = runInstall(["--user"], { HOME: tmp });
+    const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("/hooks");
     expect(res.stdout.toLowerCase()).toContain("trust");
   });
 
   test("MCP registration delegated to the single writer", () => {
-    const res = runInstall(["--user"], { HOME: tmp });
+    const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("scripts/install-agents.sh");
     expect(res.stdout.toLowerCase()).toContain("mcp");
@@ -214,7 +219,7 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
   ];
 
   test("CDX-01/DOC-01: user-scope install writes 12 TOML agents to ~/.codex/agents/ + prints summary", async () => {
-    const res = runInstall(["--user"], { HOME: tmp });
+    const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
     // 12 TOML files at ~/.codex/agents/massa-ai-<name>.toml (OUTSIDE plugin dir)

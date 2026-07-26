@@ -28,12 +28,16 @@ CLAUDE_PLUGIN_BIN="$REPO_ROOT/apps/claude-plugin/hooks/massa-ai-hook.ts"
 
 SCOPE="user"
 UNINSTALL=0
+DRY_RUN=0
 
 for arg in "$@"; do
   case "$arg" in
     --user) SCOPE="user" ;;
     --project) SCOPE="project" ;;
     --uninstall) UNINSTALL=1 ;;
+    --quiet) MASSA_AI_VERBOSE=0 ;;
+    --verbose) MASSA_AI_VERBOSE=1 ;;
+    --dry-run) DRY_RUN=1; MASSA_AI_VERBOSE=1 ;;
     -h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
@@ -119,27 +123,52 @@ try {
   }
 }
 
+// Ensure nested hooks object exists (Codex schema requires this structure)
+if (typeof cfg.hooks !== "object" || cfg.hooks === null) {
+  cfg.hooks = {};
+}
+
 function hasOwned(arr) {
   return Array.isArray(arr) && arr.some((e) => e && e._massaAiOwned === true);
 }
 
 if (mode === "uninstall") {
+  // Remove owned entries from nested location + perform flat→nested migration
+  const hooks = cfg.hooks;
+
+  // First, remove owned entries from the correct nested location
   for (const [evt] of EVENTS) {
-    if (Array.isArray(cfg[evt])) {
-      cfg[evt] = cfg[evt].filter((e) => !(e && e._massaAiOwned === true));
-      if (cfg[evt].length === 0) delete cfg[evt];
+    if (Array.isArray(hooks[evt])) {
+      hooks[evt] = hooks[evt].filter((e) => !(e && e._massaAiOwned === true));
+      if (hooks[evt].length === 0) delete hooks[evt];
     }
   }
+
+  // Clean up if hooks object is now empty
+  if (Object.keys(hooks).length === 0) delete cfg.hooks;
 } else {
   // install: backup before first write if file existed
   if (existed) {
     const bak = `${file}.massa-ai.bak-${ts}`;
     fs.copyFileSync(file, bak);
   }
+
+  // Migration: check for broken flat-key entries at top level that should be removed
+  for (const [evt] of EVENTS) {
+    if (Array.isArray(cfg[evt])) {
+      const ownedEntries = cfg[evt].filter((e) => e && e._massaAiOwned === true);
+      // Only remove if ALL entries are owned (user entries are never marked)
+      if (ownedEntries.length > 0 && ownedEntries.length === cfg[evt].length) {
+        delete cfg[evt];
+      }
+    }
+  }
+
+  // Now write to the correct nested location
   for (const [evt, sub] of EVENTS) {
-    if (!Array.isArray(cfg[evt])) cfg[evt] = [];
-    if (!hasOwned(cfg[evt])) {
-      cfg[evt].push({
+    if (!Array.isArray(cfg.hooks[evt])) cfg.hooks[evt] = [];
+    if (!hasOwned(cfg.hooks[evt])) {
+      cfg.hooks[evt].push({
         type: "command",
         command: `${pluginDir}/hooks/massa-ai-hook ${sub}`,
         _massaAiOwned: true,
@@ -187,47 +216,51 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
 fi
 
 # ── Install ──────────────────────────────────────────────────────────────────
-echo "Installing massa-ai Codex plugin to: $PLUGIN_DIR"
+vecho "Installing massa-ai Codex plugin to: $PLUGIN_DIR"
 mkdir -p "$PLUGIN_DIR/.codex-plugin" "$PLUGIN_DIR/skills" "$PLUGIN_DIR/hooks"
 
 # Copy manifest
 cp "$SCRIPT_DIR/.codex-plugin/plugin.json" "$PLUGIN_DIR/.codex-plugin/plugin.json"
-echo "  + .codex-plugin/plugin.json"
+vecho "  + .codex-plugin/plugin.json"
 
 # Copy skills
+skill_count=0
 for src in "$SCRIPT_DIR/skills/"*.md; do
   name="$(basename "$src")"
   cp "$src" "$PLUGIN_DIR/skills/$name"
-  echo "  + skills/$name"
+  vecho "  + skills/$name"
+  skill_count=$((skill_count + 1))
 done
 
 # Copy hooks.json (the placeholder version — installer replaces paths)
 cp "$SCRIPT_DIR/hooks/hooks.json" "$PLUGIN_DIR/hooks/hooks.json"
-echo "  + hooks/hooks.json"
+vecho "  + hooks/hooks.json"
 
 # Older installs shipped a plugin-local .mcp.json here. It was never a Codex
 # read path, and MCP is now owned by scripts/install-agents.sh — drop the
 # residue so upgraders converge on a single registration.
 if [[ -f "$PLUGIN_DIR/.mcp.json" ]]; then
   rm -f "$PLUGIN_DIR/.mcp.json"
-  echo "  - removed stale .mcp.json (MCP is now registered in ~/.codex/config.toml)"
+  # Not gated by --quiet: this deletes a file in the user's home, so it is a
+  # mutation notice rather than per-file chatter.
+  echo -e "  - removed stale .mcp.json (MCP is now registered in ~/.codex/config.toml)"
 fi
 
 # Create the binary symlink → repo's claude-plugin binary (resolved at install
 # time via SCRIPT_DIR → REPO_ROOT). This keeps a single source of truth.
 if [[ -f "$CLAUDE_PLUGIN_BIN" ]]; then
   ln -sfn "$CLAUDE_PLUGIN_BIN" "$PLUGIN_DIR/hooks/massa-ai-hook"
-  echo "  + hooks/massa-ai-hook → $CLAUDE_PLUGIN_BIN"
+  vecho "  + hooks/massa-ai-hook → $CLAUDE_PLUGIN_BIN"
 else
   echo "  ⚠ Warning: claude-plugin binary not found at $CLAUDE_PLUGIN_BIN" >&2
   echo "    Hooks will not fire until the binary is available." >&2
 fi
 
 # Merge hooks.json (array-append, backup, idempotent)
-echo ""
-echo "Merging hooks into $HOOKS_JSON..."
+vecho ""
+vecho "Merging hooks into $HOOKS_JSON..."
 merge_hooks_json "$HOOKS_JSON" "install"
-echo "  + 6 massa-ai hook events wired (array-append, user hooks preserved)"
+vecho "  + 6 massa-ai hook events wired (array-append, user hooks preserved)"
 
 # Write 12 subagent specialist TOML files to ~/.codex/agents/ (OUTSIDE the
 # plugin dir — Codex custom agents load from the config-root agents/ dir, not
@@ -239,25 +272,38 @@ for src in "$SCRIPT_DIR/agents/"massa-ai-*.toml; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
   cp "$src" "$AGENTS_DIR/$name"
+  vecho "  + $name"
   specialist_count=$((specialist_count + 1))
 done
-echo "  + ${specialist_count} subagent specialists: investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist"
+vecho "  + ${specialist_count} subagent specialists: investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist"
 
 # ── MCP registration (delegated) ─────────────────────────────────────────────
 # scripts/install-agents.sh is the single writer of host MCP config. It writes
 # [mcp_servers.massa-ai] into ~/.codex/config.toml at USER scope — a --project
 # plugin install still registers MCP for the whole user.
-echo ""
-echo "Registering MCP server (user scope) via scripts/install-agents.sh..."
+vecho ""
+vecho "Registering MCP server (user scope) via scripts/install-agents.sh..."
 if [[ -f "$REPO_ROOT/scripts/install-agents.sh" ]]; then
-  MASSA_AI_SUPPRESS_SPECIALIST_HINT=1 bash "$REPO_ROOT/scripts/install-agents.sh" --agent codex --yes \
-    || echo "  ⚠ MCP wiring failed — run: bash scripts/install-agents.sh --agent codex --yes" >&2
+  # On success the delegated output is detail (usually "up to date"), so it is
+  # gated. On failure it is never gated: a silently-failed MCP registration is
+  # exactly the bug this change set exists to fix.
+  if agents_out="$(MASSA_AI_SUPPRESS_SPECIALIST_HINT=1 bash "$REPO_ROOT/scripts/install-agents.sh" --agent codex --yes 2>&1)"; then
+    vecho "$agents_out"
+  else
+    echo "$agents_out" >&2
+    echo "  ⚠ MCP wiring failed — run: bash scripts/install-agents.sh --agent codex --yes" >&2
+  fi
 else
   echo "  ⚠ scripts/install-agents.sh not found — register MCP with: bash scripts/install-agents.sh --agent codex --yes" >&2
 fi
 
-echo ""
-echo "Done. Restart Codex to pick up the plugin."
-echo ""
-echo "⚠ Run /hooks in Codex to trust massa-ai hooks, or no observations will be captured."
-echo "💡 MCP is registered in ~/.codex/config.toml by scripts/install-agents.sh (single writer)."
+# Summary line in quiet mode
+if [ "${MASSA_AI_VERBOSE:-0}" != "1" ]; then
+  ok "codex plugin installed (${skill_count} skills, ${specialist_count} specialists, 6 hooks)"
+else
+  vecho ""
+  vecho "Done. Restart Codex to pick up the plugin."
+  vecho ""
+  vecho "⚠ Run /hooks in Codex to trust massa-ai hooks, or no observations will be captured."
+  vecho "💡 MCP is registered in ~/.codex/config.toml by scripts/install-agents.sh (single writer)."
+fi

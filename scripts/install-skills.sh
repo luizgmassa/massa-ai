@@ -18,8 +18,10 @@
 # Flags:
 #   --apply                 Install skills (symlinks + bootstrap block) (default)
 #   --uninstall             Remove massa-ai-owned symlinks + bootstrap block
-#   --dry-run               Preview changes, write nothing
-#   --check                 Report drift, exit 1 if found
+#   --dry-run               Preview changes, write nothing; forces --verbose
+#   --check                 Report drift, exit 1 if found; forces --verbose
+#   --quiet                 Suppress per-item detail (default)
+#   --verbose               Show detailed per-item changes
 #   --platform <name>       claude, codex, cursor, opencode, all (default: all)
 #   --target <dir>          Override home directory (for tests)
 #   --repo-root <dir>       Override repo root detection
@@ -52,6 +54,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/lib/installer-shared.sh
 source "$SCRIPT_DIR/lib/installer-shared.sh"
+# shellcheck source=scripts/banner.sh
+source "$SCRIPT_DIR/banner.sh"
 
 BOOTSTRAP_START="<!-- massa-ai:bootstrap:start -->"
 BOOTSTRAP_END="<!-- massa-ai:bootstrap:end -->"
@@ -65,6 +69,7 @@ TARGET_HOME="${HOME:-}"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ASSUME_YES=0
 JSON_OUT=0
+MASSA_AI_VERBOSE="${MASSA_AI_VERBOSE:-0}"
 
 usage() { sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; }
 
@@ -73,8 +78,10 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --apply) ACTION="apply" ;;
     --uninstall) ACTION="uninstall" ;;
-    --dry-run) ACTION="dry-run" ;;
-    --check) ACTION="check" ;;
+    --dry-run) ACTION="dry-run"; MASSA_AI_VERBOSE=1 ;;
+    --check) ACTION="check"; MASSA_AI_VERBOSE=1 ;;
+    --quiet) MASSA_AI_VERBOSE=0 ;;
+    --verbose) MASSA_AI_VERBOSE=1 ;;
     --platform)
       shift
       case "${1:-}" in
@@ -240,7 +247,8 @@ else
     if tool_installed "$p"; then
       ACTIVE_PLATFORMS="${ACTIVE_PLATFORMS}${ACTIVE_PLATFORMS:+ }${p}"
     else
-      echo "  [$(platform_label "$p")] skipped — tool not on PATH" >&2
+      # Always visible (except JSON): skip notifications are errors/warnings, not verbose detail
+      [ "$JSON_OUT" = "1" ] || warn "$(platform_label "$p")  skipped — tool not on PATH"
     fi
   done
   if [ -z "$ACTIVE_PLATFORMS" ]; then
@@ -452,7 +460,7 @@ apply_platform() {
     fi
   done
 
-  local installed=""
+  local installed="" symlink_count=0
   for name in $SKILL_NAMES; do
     target="$skills_dir/$name"
     local source="$SKILLS_ROOT/$name"
@@ -467,28 +475,52 @@ apply_platform() {
       [ "$DRY_RUN" = "1" ] || rm -f "$target"
     fi
 
+    symlink_count=$((symlink_count + 1))
     if [ "$DRY_RUN" = "1" ]; then
+      vinfo "Would symlink: $target -> $source"
       record "would-change" "$p" "$target" "Would symlink: $target -> $source"
       continue
     fi
     mkdir -p "$skills_dir"
     ln -s "$source" "$target"
+    vinfo "Symlinked: $target -> $source"
     record "changed" "$p" "$target" "Symlinked: $target -> $source"
   done
 
-  local mode="apply"
+  local mode="apply" bootstrap_changed=0
   [ "$DRY_RUN" = "1" ] && mode="plan"
   local verdict
   verdict="$(bootstrap_op "$mode" "$agents_md")" || integration_error "Managed markers are incomplete or duplicated in $agents_md"
   if [ "$verdict" = "change" ]; then
+    bootstrap_changed=1
     if [ "$DRY_RUN" = "1" ]; then
+      vinfo "Would write bootstrap block"
       record "would-change" "$p" "$agents_md" "Would write bootstrap block"
     else
+      vinfo "Bootstrap block written"
       record "changed" "$p" "$agents_md" "Bootstrap block written"
     fi
   fi
 
   state_replace "$p" "$root" "$installed"
+
+  # Summary line (quiet mode only; verbose mode prints the per-item detail)
+  # Never printed in JSON mode.
+  if [ "$MASSA_AI_VERBOSE" = "0" ] && [ "$JSON_OUT" = "0" ]; then
+    local summary="$symlink_count skills"
+    if [ "$symlink_count" = "0" ]; then
+      [ "$bootstrap_changed" = "1" ] && summary="AGENTS.md updated" || summary="up to date"
+    elif [ "$bootstrap_changed" = "1" ]; then
+      summary="$symlink_count skills symlinked, AGENTS.md bootstrap written"
+    else
+      summary="$symlink_count skills symlinked"
+    fi
+    if [ "$DRY_RUN" = "1" ]; then
+      info "$(platform_label "$p")  would: $summary"
+    else
+      ok "$(platform_label "$p")  $summary"
+    fi
+  fi
 }
 
 # ── Per-platform: uninstall ─────────────────────────────────────────────────
@@ -499,7 +531,7 @@ uninstall_platform() {
   skills_dir="$root/skills"
   agents_md="$root/AGENTS.md"
 
-  local name target current
+  local name target current remove_count=0
   for name in $(state_skills_for "$p"); do
     target="$skills_dir/$name"
     [ -L "$target" ] || continue
@@ -509,30 +541,55 @@ uninstall_platform() {
       "$REPO_ROOT"/*|"$REPO_ROOT") ;;
       *) continue ;;
     esac
+    remove_count=$((remove_count + 1))
     if [ "$DRY_RUN" = "1" ]; then
+      vinfo "Would remove symlink: $target"
       record "would-change" "$p" "$target" "Would remove symlink: $target"
       continue
     fi
     rm -f "$target"
     rmdir "$skills_dir" 2>/dev/null || true
+    vinfo "Removed symlink: $target"
     record "changed" "$p" "$target" "Removed symlink: $target"
   done
 
+  local bootstrap_changed=0
   if [ -f "$agents_md" ]; then
     local mode="remove-apply"
     [ "$DRY_RUN" = "1" ] && mode="remove-plan"
     local verdict
     verdict="$(bootstrap_op "$mode" "$agents_md")" || integration_error "Managed markers are incomplete or duplicated in $agents_md"
     if [ "$verdict" = "change" ]; then
+      bootstrap_changed=1
       if [ "$DRY_RUN" = "1" ]; then
+        vinfo "Would remove bootstrap block"
         record "would-change" "$p" "$agents_md" "Would remove bootstrap block"
       else
+        vinfo "Bootstrap block removed"
         record "changed" "$p" "$agents_md" "Bootstrap block removed"
       fi
     fi
   fi
 
   state_delete "$p"
+
+  # Summary line (quiet mode only; verbose mode prints the per-item detail)
+  # Never printed in JSON mode.
+  if [ "$MASSA_AI_VERBOSE" = "0" ] && [ "$JSON_OUT" = "0" ]; then
+    local summary="$remove_count skills"
+    if [ "$remove_count" = "0" ]; then
+      [ "$bootstrap_changed" = "1" ] && summary="AGENTS.md updated" || summary="nothing to remove"
+    elif [ "$bootstrap_changed" = "1" ]; then
+      summary="$remove_count skills removed, AGENTS.md bootstrap removed"
+    else
+      summary="$remove_count skills removed"
+    fi
+    if [ "$DRY_RUN" = "1" ]; then
+      info "$(platform_label "$p")  would: $summary"
+    else
+      ok "$(platform_label "$p")  $summary"
+    fi
+  fi
 }
 
 # ── Per-platform: check ─────────────────────────────────────────────────────
@@ -542,20 +599,27 @@ check_platform() {
   root="$(platform_root "$p")"
   skills_dir="$root/skills"
 
+  local drift_count=0
   local name target current source
   for name in $SKILL_NAMES; do
     target="$skills_dir/$name"
     source="$SKILLS_ROOT/$name"
     if [ ! -L "$target" ] && [ ! -e "$target" ]; then
+      vinfo "Missing symlink: $name"
+      drift_count=$((drift_count + 1))
       record "drift" "$p" "$target" "Missing symlink: $name"
       continue
     fi
     if [ ! -L "$target" ]; then
+      vinfo "$name exists but is not a symlink"
+      drift_count=$((drift_count + 1))
       record "drift" "$p" "$target" "$name exists but is not a symlink"
       continue
     fi
     current="$(cd "$(dirname "$target")" 2>/dev/null && installer_resolve_path "$(readlink "$target")")"
     if [ "$current" != "$source" ]; then
+      vinfo "$name symlink points to $current, expected $source"
+      drift_count=$((drift_count + 1))
       record "drift" "$p" "$target" "$name symlink points to $current, expected $source"
     fi
   done
@@ -570,10 +634,22 @@ check_platform() {
     current="$(cd "$(dirname "$target")" 2>/dev/null && installer_resolve_path "$(readlink "$target")")"
     case "$current" in
       "$REPO_ROOT"/*|"$REPO_ROOT")
+        vinfo "Stale symlink: $name (skill no longer exists)"
+        drift_count=$((drift_count + 1))
         record "drift" "$p" "$target" "Stale symlink: $name (skill no longer exists)"
         ;;
     esac
   done
+
+  # Summary line (quiet mode only; verbose mode prints the per-item detail)
+  # Never printed in JSON mode.
+  if [ "$MASSA_AI_VERBOSE" = "0" ] && [ "$JSON_OUT" = "0" ]; then
+    if [ "$drift_count" = "0" ]; then
+      ok "$(platform_label "$p")  up to date"
+    else
+      warn "$(platform_label "$p")  $drift_count issues found"
+    fi
+  fi
 }
 
 # ── Run ─────────────────────────────────────────────────────────────────────
@@ -634,16 +710,19 @@ console.log(JSON.stringify({
 }, null, 2));
 NODE
 else
-  installed_desc=""
-  while IFS=$'\t' read -r _p exe abs; do
-    [ -n "${exe:-}" ] || continue
-    installed_desc="${installed_desc}${installed_desc:+, }${exe} (${abs})"
-  done < "$TOOLS_FILE"
-  echo "Installed tools: ${installed_desc:-none}"
-  while IFS=$'\t' read -r status plat target message; do
-    [ -n "${status:-}" ] || continue
-    echo "  [${status}] $(platform_label "$plat") ${target} — ${message}"
-  done < "$RESULTS_FILE"
+  # Verbose mode: print the original detailed output
+  if [ "$MASSA_AI_VERBOSE" = "1" ]; then
+    installed_desc=""
+    while IFS=$'\t' read -r _p exe abs; do
+      [ -n "${exe:-}" ] || continue
+      installed_desc="${installed_desc}${installed_desc:+, }${exe} (${abs})"
+    done < "$TOOLS_FILE"
+    vecho "Installed tools: ${installed_desc:-none}"
+    while IFS=$'\t' read -r status plat target message; do
+      [ -n "${status:-}" ] || continue
+      vinfo "[${status}] $(platform_label "$plat") ${target} — ${message}"
+    done < "$RESULTS_FILE"
+  fi
 fi
 
 # ── Exit codes ──────────────────────────────────────────────────────────────

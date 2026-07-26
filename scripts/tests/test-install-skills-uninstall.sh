@@ -25,8 +25,8 @@ RUNNER="node"; command -v node >/dev/null 2>&1 || RUNNER="bun"
 
 BOOTSTRAP_START="$(grep -m1 '^BOOTSTRAP_START=' "$INSTALLER" | cut -d'"' -f2)"
 
-apply()     { bash "$INSTALLER" --apply --platform claude --target "$1" --repo-root "$PROJECT_ROOT" --yes 2>&1; }
-uninstall() { bash "$INSTALLER" --uninstall --platform claude --target "$1" --repo-root "$PROJECT_ROOT" --yes 2>&1; }
+apply()     { bash "$INSTALLER" --apply --platform claude --target "$1" --repo-root "$PROJECT_ROOT" --yes --verbose 2>&1; }
+uninstall() { bash "$INSTALLER" --uninstall --platform claude --target "$1" --repo-root "$PROJECT_ROOT" --yes --verbose 2>&1; }
 
 echo "Scenario 1: uninstall removes every repo-owned symlink and the block"
 H1="$ROOT/h1"; mkdir -p "$H1"

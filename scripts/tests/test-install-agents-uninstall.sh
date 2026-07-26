@@ -30,8 +30,8 @@ process.stdout.write(typeof v === "object" ? JSON.stringify(v) : String(v));
 NODE
 }
 
-install()   { bash "$INSTALLER" --target "$1" --agent "$2" --yes 2>&1; }
-uninstall() { bash "$INSTALLER" --target "$1" --agent "$2" --yes --uninstall 2>&1; }
+install()   { bash "$INSTALLER" --target "$1" --agent "$2" --mcp-source npx --yes 2>&1; }
+uninstall() { bash "$INSTALLER" --target "$1" --agent "$2" --mcp-source npx --yes --uninstall 2>&1; }
 
 echo "Scenario 1: our entry is removed and the empty servers object goes with it"
 H1="$ROOT/h1"
@@ -93,5 +93,24 @@ uninstall "$H6" cursor >/dev/null
 BAK="$(find "$H6/.cursor" -name 'mcp.json.massa-ai.bak-*' | head -n1)"
 assert_ne "removal created a backup" "$BAK" ""
 assert_contains "backup still holds the entry that was removed" "$(cat "$BAK")" "_massaAiOwned"
+
+echo ""
+echo "Scenario 7: legacy owned entry in settings.json is removed during apply"
+H7="$ROOT/h7"; mkdir -p "$H7/.claude"
+printf '{"mcpServers":{"massa-ai":{"command":"npx","args":["-y","-p","@massa-ai/mcp-client","massa-ai"],"env":{},"_massaAiOwned":true}},"userKey":"keep"}\n' > "$H7/.claude/settings.json"
+install "$H7" claude-code >/dev/null
+assert_eq "legacy settings.json entry removed" "$(jq_get "$H7/.claude/settings.json" 'c.mcpServers === undefined ? "gone" : "present"')" "gone"
+assert_eq "user key survives" "$(jq_get "$H7/.claude/settings.json" 'c.userKey')" "keep"
+assert_eq "new .claude.json has the entry" "$(jq_get "$H7/.claude.json" 'c.mcpServers["massa-ai"] ? "yes" : "no"')" "yes"
+BAK7="$(find "$H7/.claude" -name 'settings.json.massa-ai.bak-*' | head -n1)"
+assert_ne "backup created for migration" "$BAK7" ""
+
+echo ""
+echo "Scenario 8: hand-written entry in settings.json is preserved"
+H8="$ROOT/h8"; mkdir -p "$H8/.claude"
+printf '{"mcpServers":{"massa-ai":{"command":"my-mcp"}},"userKey":"keep"}\n' > "$H8/.claude/settings.json"
+install "$H8" claude-code >/dev/null
+assert_eq "hand-written entry survives" "$(jq_get "$H8/.claude/settings.json" 'c.mcpServers["massa-ai"].command')" "my-mcp"
+assert_eq "new .claude.json has owned entry" "$(jq_get "$H8/.claude.json" 'c.mcpServers["massa-ai"]._massaAiOwned')" "true"
 
 summary "install-agents --uninstall"

@@ -578,27 +578,39 @@ else
 fi
 echo -e "  ${GREEN}✓${NC} PostgreSQL + pgvector: connected"
 
-# ---- Step 6: Agent harness (skills + MCP registration) ----
+# ---- Step 6: Agent harness (skills + MCP registration + plugin bundles) ----
 # Without this step a user who follows the documented install path ends up with
-# a working stack and no skills and no MCP registration. Non-interactive runs
-# drive it with MASSA_AI_INSTALL_HARNESS, mirroring MASSA_AI_DB_BACKEND above.
+# a working stack and no skills, no MCP registration, and no plugin bundles.
+# Non-interactive runs drive it with MASSA_AI_INSTALL_HARNESS, mirroring
+# MASSA_AI_DB_BACKEND above. Plugins can be optionally skipped via
+# MASSA_AI_INSTALL_PLUGINS.
 echo ""
-echo -e "${BOLD}[6/6] Agent harness (skills + MCP registration)...${NC}"
+echo -e "${BOLD}[6/6] Agent harness (skills + MCP + plugin bundles)...${NC}"
 echo ""
 
 HARNESS_SCRIPT="${PROJECT_ROOT}/scripts/install-harness.sh"
 HARNESS_CHOICE=""
+INSTALL_PLUGINS="1"
 
 if [ ! -f "$HARNESS_SCRIPT" ]; then
     echo -e "  ${YELLOW}⚠${NC} Harness installer not found at ${HARNESS_SCRIPT} — skipping."
 else
+    # Check plugin opt-out
+    case "${MASSA_AI_INSTALL_PLUGINS:-}" in
+        1|yes|true) INSTALL_PLUGINS="1" ;;
+        0|no|false) INSTALL_PLUGINS="0" ;;
+        "") INSTALL_PLUGINS="1" ;;
+        *) die "Invalid MASSA_AI_INSTALL_PLUGINS. Use 1/yes/true or 0/no/false." ;;
+    esac
+
     case "${MASSA_AI_INSTALL_HARNESS:-}" in
         1|yes|true) HARNESS_CHOICE="y" ;;
         0|no|false) HARNESS_CHOICE="n" ;;
         "")
-            echo -e "  Installs repo skills into every detected agent and registers the"
-            echo -e "  massa-ai MCP server (Claude, Claude Desktop, Codex, Cursor, OpenCode)."
-            read -rp "  Install massa-ai skills and MCP registration? [y/N]: " HARNESS_CHOICE </dev/tty || true
+            echo -e "  Installs repo skills into every detected agent, registers the"
+            echo -e "  massa-ai MCP server (Claude, Claude Desktop, Codex, Cursor, OpenCode),"
+            echo -e "  and installs plugin bundles for all four platforms."
+            read -rp "  Install massa-ai skills, MCP, and plugin bundles? [y/N]: " HARNESS_CHOICE </dev/tty || true
             HARNESS_CHOICE=${HARNESS_CHOICE:-n}
             ;;
         *) die "Invalid MASSA_AI_INSTALL_HARNESS. Use 1/yes/true or 0/no/false." ;;
@@ -606,8 +618,13 @@ else
 
     case "$HARNESS_CHOICE" in
         y|Y|yes|YES)
-            bash "$HARNESS_SCRIPT" --skills --agents --platform all --yes \
-                || echo -e "  ${YELLOW}⚠${NC} Harness install reported errors — re-run: bash scripts/install-harness.sh --skills --agents --yes"
+            if [ "$INSTALL_PLUGINS" = "1" ]; then
+                bash "$HARNESS_SCRIPT" --all --platform all --mcp-source local --yes \
+                    || echo -e "  ${YELLOW}⚠${NC} Harness install reported errors — re-run: bash scripts/install-harness.sh --all --mcp-source local --yes"
+            else
+                bash "$HARNESS_SCRIPT" --skills --agents --platform all --mcp-source local --yes \
+                    || echo -e "  ${YELLOW}⚠${NC} Harness install reported errors — re-run: bash scripts/install-harness.sh --skills --agents --mcp-source local --yes"
+            fi
             ;;
         *)
             echo -e "  ${BLUE}•${NC} Skipped. Run later: ${BOLD}bash scripts/install-harness.sh --all${NC}"

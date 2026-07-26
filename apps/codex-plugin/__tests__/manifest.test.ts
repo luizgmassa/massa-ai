@@ -57,8 +57,9 @@ describe("codex-plugin manifest (T5 / CPX-01,03,04,05)", () => {
     }
   });
 
-  test("hooks/hooks.json contains exactly 6 event keys, each with an owned entry", async () => {
-    const hooks = await readJson(path.join(PLUGIN_ROOT, "hooks/hooks.json"));
+  test("hooks/hooks.json contains exactly 6 event keys (nested under hooks), each with an owned entry", async () => {
+    const cfg = await readJson(path.join(PLUGIN_ROOT, "hooks/hooks.json"));
+    expect(cfg.hooks).toBeDefined();
     const expectedEvents = [
       "SessionStart",
       "UserPromptSubmit",
@@ -67,9 +68,9 @@ describe("codex-plugin manifest (T5 / CPX-01,03,04,05)", () => {
       "PreCompact",
       "Stop",
     ];
-    expect(Object.keys(hooks).sort()).toEqual(expectedEvents.sort());
+    expect(Object.keys(cfg.hooks).sort()).toEqual(expectedEvents.sort());
     for (const evt of expectedEvents) {
-      const arr = hooks[evt] as unknown[];
+      const arr = cfg.hooks[evt] as unknown[];
       expect(Array.isArray(arr)).toBe(true);
       expect(arr.length).toBeGreaterThanOrEqual(1);
       const owned = arr.find(

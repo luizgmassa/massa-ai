@@ -19,8 +19,18 @@ source "${SCRIPT_DIR}/lib/installer-test-helpers.sh"
 
 ROOT="$(mktemp -d "${TMPDIR:-/tmp}/massa-ai-agents-cli.XXXXXX")"
 trap 'rm -rf "$ROOT"' EXIT
+RUNNER="node"; command -v node >/dev/null 2>&1 || RUNNER="bun"
 
 rc_of() { "$@" >/dev/null 2>&1; echo $?; }
+
+jq_get() { # jq_get FILE EXPR
+  "$RUNNER" - "$1" "$2" <<'NODE'
+const fs = require("fs");
+const c = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const v = eval(process.argv[3]);
+process.stdout.write(typeof v === "object" ? JSON.stringify(v) : String(v));
+NODE
+}
 
 echo "Scenario 1: --help exits 0 and documents the flags"
 HELP="$(bash "$INSTALLER" --help 2>&1)"
@@ -74,7 +84,7 @@ echo ""
 echo "Scenario 6: with no --agent, every applicable host is written"
 H6="$ROOT/h6"
 bash "$INSTALLER" --target "$H6" --yes >/dev/null 2>&1
-assert_file "claude-code written" "$H6/.claude/settings.json"
+assert_file "claude-code written" "$H6/.claude.json"
 assert_file "codex written" "$H6/.codex/config.toml"
 assert_file "cursor written" "$H6/.cursor/mcp.json"
 assert_file "opencode written" "$H6/.config/opencode/opencode.json"
@@ -98,5 +108,38 @@ echo ""
 echo "Scenario 8: the single-writer statement is printed on a real write"
 assert_contains "ownership is stated" "$OUT7" "MCP registration is owned by this script"
 assert_not_contains "the old 'skip this step' advice is gone" "$OUT7" "skip this install-agents step"
+
+echo ""
+echo "Scenario 9: --mcp-source validation rejects invalid values"
+assert_eq "invalid source exits 2" "$(rc_of bash "$INSTALLER" --mcp-source bogus)" "2"
+BAD_SOURCE="$(bash "$INSTALLER" --mcp-source bogus 2>&1)"
+assert_contains "error message names valid sources" "$BAD_SOURCE" "local, npx, auto"
+
+echo ""
+echo "Scenario 10: --mcp-source is honored when specified"
+H10="$ROOT/h10"
+OUT10="$(bash "$INSTALLER" --target "$H10" --agent cursor --mcp-source npx --yes 2>&1)"
+CFG10="$H10/.cursor/mcp.json"
+assert_file "config written" "$CFG10"
+# With npx source, command should be "npx"
+CMD10="$(jq_get "$CFG10" 'c.mcpServers["massa-ai"].command')"
+assert_eq "npx source produces npx command" "$CMD10" "npx"
+
+echo ""
+echo "Scenario 11: MASSA_AI_MCP_SOURCE env var is honored"
+H11="$ROOT/h11"
+OUT11="$(MASSA_AI_MCP_SOURCE=npx bash "$INSTALLER" --target "$H11" --agent cursor --yes 2>&1)"
+CFG11="$H11/.cursor/mcp.json"
+assert_file "config written" "$CFG11"
+CMD11="$(jq_get "$CFG11" 'c.mcpServers["massa-ai"].command')"
+assert_eq "env var honored" "$CMD11" "npx"
+
+echo ""
+echo "Scenario 12: flag --mcp-source overrides env var"
+H12="$ROOT/h12"
+OUT12="$(MASSA_AI_MCP_SOURCE=npx bash "$INSTALLER" --target "$H12" --agent cursor --mcp-source npx --yes 2>&1)"
+CFG12="$H12/.cursor/mcp.json"
+CMD12="$(jq_get "$CFG12" 'c.mcpServers["massa-ai"].command')"
+assert_eq "flag overrides env" "$CMD12" "npx"
 
 summary "install-agents CLI"

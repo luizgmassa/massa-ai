@@ -85,16 +85,12 @@ export class Logger implements ILogger {
   }
 
   /**
-   * Write log message to appropriate stream
-   * INFO/DEBUG -> stdout (white text)
-   * WARN/ERROR -> stderr (red text)
+   * Write log message to stderr
+   * All logs (DEBUG, INFO, WARN, ERROR) go to stderr.
+   * Stdout must remain pristine for stdio MCP protocol (pure JSON-RPC).
    */
   private write(message: string, level: LogLevel): void {
-    if (level >= LogLevel.WARN) {
-      console.error(message);
-    } else {
-      console.log(message);
-    }
+    console.error(message);
   }
 
   debug(message: string, meta?: Record<string, unknown>): void {

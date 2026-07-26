@@ -39,7 +39,7 @@ NODE
 apply() { # apply HOME [args...]
   local home="$1"; shift
   bash "$INSTALLER" --apply --platform claude --target "$home" \
-    --repo-root "$PROJECT_ROOT" --yes "$@" 2>&1
+    --repo-root "$PROJECT_ROOT" --yes "$@" --verbose 2>&1
 }
 
 echo "Scenario 1: no state file — a fresh v2 document is written"
