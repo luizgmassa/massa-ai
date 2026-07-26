@@ -23,6 +23,7 @@ Generate a testing strategy that covers unit, integration, edge cases, negative 
 - Focus only on testing.
 - No production code changes outside test files.
 - Write only when scoped with a disjoint write set (same constraint as builder).
+- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
 
 ## Inputs
 - `scope`: the feature, module, or spec to test.

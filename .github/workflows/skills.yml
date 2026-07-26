@@ -20,29 +20,46 @@ jobs:
 
       - name: Validate SKILL.md
         run: |
-          for skill in skills/*/SKILL.md; do
+          # Both the top-level skills and the sub-agent charters. The charters
+          # were previously unvalidated, so a charter could ship without a
+          # description or a model hint and only fail at generator runtime.
+          for skill in skills/*/SKILL.md skills/agents/*/SKILL.md; do
             echo "Validating $skill"
-            
+
             if [ ! -f "$skill" ]; then
               echo "Error: SKILL.md not found"
               exit 1
             fi
-            
+
             if ! grep -q "^---$" "$skill"; then
               echo "Error: Missing YAML frontmatter in $skill"
               exit 1
             fi
-            
+
             if ! grep -q "^name:" "$skill"; then
-              echo "Error: Missing 'name' in frontmatter"
+              echo "Error: Missing 'name' in frontmatter of $skill"
               exit 1
             fi
-            
+
             if ! grep -q "^description:" "$skill"; then
-              echo "Error: Missing 'description' in frontmatter"
+              echo "Error: Missing 'description' in frontmatter of $skill"
               exit 1
             fi
-            
+
+            case "$skill" in
+              skills/agents/*)
+                # Charter-only fields consumed by scripts/generate-subagent-artifacts.ts
+                if ! grep -q "^  model_hint:" "$skill"; then
+                  echo "Error: Missing 'metadata.model_hint' in $skill"
+                  exit 1
+                fi
+                if ! grep -qE "^  permission: (read-only|write)$" "$skill"; then
+                  echo "Error: Missing or invalid 'metadata.permission' in $skill"
+                  exit 1
+                fi
+                ;;
+            esac
+
             echo "✓ $skill is valid"
           done
 
@@ -54,6 +71,14 @@ jobs:
             name=$(grep "^name:" "$skill" | head -1 | sed 's/name: *//')
             desc=$(grep "^description:" "$skill" | head -1 | sed 's/description: *//')
             echo "- **$name**: $desc" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Sub-Agent Charters" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          for skill in skills/agents/*/SKILL.md; do
+            name=$(grep "^name:" "$skill" | head -1 | sed 's/name: *//')
+            perm=$(grep "^  permission:" "$skill" | head -1 | sed 's/  permission: *//')
+            echo "- **massa-ai-$name** ($perm)" >> $GITHUB_STEP_SUMMARY
           done
 
   install-test:

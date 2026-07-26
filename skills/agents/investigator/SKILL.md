@@ -25,6 +25,7 @@ Read and understand the codebase to answer engineering questions without modifyi
 - Never modify code.
 - Never generate implementation.
 - Never perform reviews.
+- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
 
 ## Inputs
 - `scope`: files, modules, symbols, or questions to investigate.

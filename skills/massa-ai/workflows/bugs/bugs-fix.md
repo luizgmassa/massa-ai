@@ -42,7 +42,7 @@ Do not use this workflow for findings-only bug discovery; route that to `workflo
    - Do not weaken tests, fixtures, snapshots, types, or public contracts to make the fix pass.
 9. Use agent orchestration only when it improves signal. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: builder** — see `skills/agents/builder/SKILL.md`
+> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated bug finding with a disjoint write set
 > - permissions: write (disjoint write set)
@@ -52,7 +52,7 @@ Do not use this workflow for findings-only bug discovery; route that to `workflo
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable bug patterns
 
-> **Dispatch: verification-agent** — see `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: independent verification of a high-risk bug fix
 > - scope: the fixed finding's repro path, tests, and report claim closure
 > - permissions: read-only

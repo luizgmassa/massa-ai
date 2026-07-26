@@ -16,11 +16,16 @@ Check `.specs/project/STATE.md` for the current active feature and `.specs/proje
 
 ### Available Skills (repo-local)
 
-- `massa-ai-memory/` — memory system usage patterns
-- `synapse-usage/` — Synapse cognitive session lifecycle
-- `AGENTS.md` (under `skills/`) — sub-agent registry: 12 reusable specialist agents
+- `massa-ai/` — workflow router; MCP tool contracts and Synapse lifecycle live in
+  its `references/mcp-tools.md` and `references/synapse-policy.md`
+- `persona-router/` — persona selection
+- `AGENTS.md` (under `skills/`) — sub-agent registry: 16 reusable specialist
+  agents, plus the canonical policy bootstrap block
 
 #### Sub-Agent Skills (invocable by any workflow)
+
+Dispatch under the host-registered name `massa-ai-<role>`, never the bare role
+name (see `skills/massa-ai/references/agent-orchestration.md` → Name Resolution).
 
 - `investigator/` — read-only codebase investigation (locate, trace, impact)
 - `planner/` — read-only implementation planning (steps, deps, risks, order)
@@ -34,6 +39,10 @@ Check `.specs/project/STATE.md` for the current active feature and `.specs/proje
 - `documentation-agent/` — engineering documentation (README, ADR, RFC, changelog)
 - `audit-specialist/` — configurable 6-lens audit (bugs, architecture, security, requirements, code-quality, performance)
 - `mobile-specialist/` — conditional mobile expertise (Android, iOS, KMP; refuses non-mobile)
+- `plan-critic/` — read-only plan challenge for the lite and full Plan Challenge gates
+- `furps-analyst/` — read-only single-dimension FURPS+ analysis of a PRD or ADR
+- `handoff-writer/` — read-only continuation-package assembly
+- `navigator/` — read-only index-first codebase navigation (massa-ai MCP surface)
 
 ### Spec Artifacts
 
@@ -91,36 +100,28 @@ secrets.json
 Thumbs.db
 ```
 
-## Plan Challenge Policy
+## Agent Policies (single source elsewhere)
 
-```yaml
-plan_challenge:
-  enabled: auto
-  depth: lite
-  mode: auto
-  full_gate: high_risk_or_explicit
-  serious_findings: revise_plan
-```
+The Persona Router, Plan Challenge, and Conversation Feedback policies are
+defined **once**, in the `<!-- massa-ai:bootstrap -->` block of
+[`skills/AGENTS.md`](./skills/AGENTS.md). `scripts/install-skills.sh` copies that
+block to `<host>/AGENTS.md` (for example `~/.claude/AGENTS.md`), which is the
+copy an agent reads at runtime.
 
-Load full `workflows/the-fool.md` when the workflow is `spec-driven`, `feature`, `adr`, `rfc`, `tdd`, or `refactor`; when the plan touches security, data loss, migrations, irreversible actions, auth/privacy, cross-service contracts; or when the plan touches more than 5 files, classes, or modules.
-
-For low-risk plans, run the inline auto-lite checklist without loading The Fool references.
-
-## Conversation Feedback Policy
-
-```yaml
-conversation_feedback:
-  enabled: auto
-  density: transition_updates
-  style: emoji_capitalized_ascii
-  max_lines_per_update: 2
-  include: [workflow, loads, memory, notebooklm, subagents, divergences, verification]
-  suppress: [chain_of_thought, raw_tool_output, repeated_micro_events]
-```
+Edit the policies in `skills/AGENTS.md`. Do not restate them here or in a host
+copy — a second copy is how the repo previously ended up shipping two
+contradicting Plan Challenge gates.
+`scripts/__tests__/skills-harness-integrity.test.ts` fails if a
+`plan_challenge:` / `conversation_feedback:` / `persona_router:` block reappears
+in this file.
 
 ## Runtime Contract
 
-After activation, follow `skills/massa-ai/SKILL.md` (global, not repo-local) for all runtime behavior. The global skill defines workflow routing, project/session handling, retrieval, persistence, graceful degradation, and completion evidence.
+After activation, follow `skills/massa-ai/SKILL.md` for all runtime behavior — in
+a checkout that is this repo's copy, and in an installed host it is the symlink
+`scripts/install-skills.sh` created to the same file. It defines workflow
+routing, project/session handling, retrieval, persistence, graceful degradation,
+and completion evidence.
 
 ## Tech Stack
 

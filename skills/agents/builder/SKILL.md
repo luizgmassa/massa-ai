@@ -25,6 +25,7 @@ Implement an approved plan or task by modifying source code with a disjoint writ
 - Never perform reviews.
 - Never generate implementation plans.
 - Never write outside the assigned disjoint write set.
+- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
 
 ## Inputs
 - `scope`: exact files and modules to modify (disjoint write set).

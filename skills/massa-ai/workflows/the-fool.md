@@ -6,7 +6,9 @@ Do not use this workflow to build the initial plan, make the decision, or execut
 
 ## Configuration
 
-Read the canonical **Plan Challenge Policy** from root `AGENTS.md`. If that
+Read the canonical **Plan Challenge Policy** from the installed `AGENTS.md`
+bootstrap block (`<!-- massa-ai:bootstrap -->`), whose single source is
+`skills/AGENTS.md` in the product repo. If that
 file is unavailable, use the deterministic runtime fallback: run the lite gate
 with `pre_mortem` mode (do not judgment-select the gate or mode), and revise
 the parent plan when critical or high findings are valid.
@@ -20,16 +22,16 @@ User prompt overrides take precedence for the current turn only, such as "skip t
    - Post-plan gate: inherit the parent workflow's exact `projectId`,
      `workflowSessionId`, workflow name, entity, and memory context.
 2. `recall` -> load prior decisions, rejected approaches, constraints, accepted risks, and relevant evidence for the target entity.
-3. Require a concrete proposed plan before critique. If there is no plan, return to the parent workflow and construct the plan first. After a concrete plan exists, always attempt a read-only `plan-critic` subagent when subagent tooling is available.
+3. Require a concrete proposed plan before critique. If there is no plan, return to the parent workflow and construct the plan first. After a concrete plan exists, always attempt a read-only `massa-ai-plan-critic` subagent when subagent tooling is available. If that agent is unavailable, follow the no-agent fallback in `references/agent-orchestration.md` (Name Resolution): run the critique locally against the same output contract and report the skipped delegation.
 4. Resolve gate depth:
    - Post-plan lite gate: keep parent identifiers and dispatch a bounded lite checklist packet without loading The Fool mode references.
    - Post-plan full gate or direct challenge: continue to mode selection and full critique.
    - Direct challenge requests use `workflowSessionId=fool-[entity]`; post-plan gates keep the parent identifiers and send only a bounded packet.
-5. Lite `plan-critic` packet:
+5. Lite `massa-ai-plan-critic` packet:
    - Inputs: proposed plan, scope, constraints, parent workflow, compact recalled facts/evidence, known risks, verification recipe, context-firewall limits, and lite checklist.
    - Output must include the strongest low-risk challenges plus `escalate_to_full: true|false` and reason.
    - If `escalate_to_full: false`, synthesize the lite critique, revise or accept risk according to policy, and complete the gate without loading The Fool mode references.
-   - If `escalate_to_full: true`, the main agent selects full mode, loads the relevant references, and dispatches a full `plan-critic` pass.
+   - If `escalate_to_full: true`, the main agent selects full mode, loads the relevant references, and dispatches a full `massa-ai-plan-critic` pass.
 6. Select The Fool mode for full gates:
    - `mode: auto`: read `references/the-fool/mode-selection-guide.md` and choose the best mode from plan content and domain.
    - `mode: ask`: ask the user only when interactive input is available; otherwise fall back to `auto` and report the fallback.
@@ -43,7 +45,7 @@ User prompt overrides take precedence for the current turn only, such as "skip t
 7. Load only the selected The Fool reference plus `references/the-fool/cognitive-bias-inventory.md`.
 8. Dispatch the full critique:
    - Load `references/agent-orchestration.md`.
-   - Use the `plan-critic` contract and capability-packet shape from `references/agent-orchestration.md`.
+   - Use the `plan-critic` contract and capability-packet shape from `references/agent-orchestration.md`; dispatch under `massa-ai-plan-critic`.
    - Send only the proposed plan, scope, constraints, parent workflow, recalled facts, verification recipe, known risks, selected mode, context-firewall limits, and output contract.
    - If subagents are unavailable or platform policy forbids spawning, run a strict standalone fresh-eyes local critique and record the skipped delegation reason.
    - Normal delegation gates in `references/agent-orchestration.md` still apply to other roles, but Plan Challenge `plan-critic` is a standing policy exception after a concrete plan exists.

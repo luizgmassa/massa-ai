@@ -92,7 +92,7 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
     const mtFiles = files.filter((f) => f.startsWith("massa-ai-"));
     expect(mtFiles.length).toBeGreaterThan(0);
 
-    // Navigator agent copied
+    // Generated subagents copied
     expect(
       await pathExists(path.join(tmp, ".claude/agents/massa-ai-navigator.md")),
     ).toBe(true);
@@ -203,10 +203,10 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
       const files = await fs.readdir(commandsDir);
       expect(files.filter((f) => f.startsWith("massa-ai-"))).toHaveLength(0);
     }
-    // Navigator agent preserved on uninstall (CLA-05/R1: excluded by name)
+    // Generated subagents removed on uninstall (massa-ai- prefix is the marker)
     expect(
       await pathExists(path.join(tmp, ".claude/agents/massa-ai-navigator.md")),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   test("idempotent: running --user twice produces no diff in settings.json", async () => {
@@ -223,7 +223,7 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
     expect(afterSecond).toBe(afterFirst);
   });
 
-  // ── T3: 12 subagent specialists (CLA-01, CLA-02, CLA-05, CLA-06, DOC-01) ──
+  // ── T3: 16 subagent specialists (CLA-01, CLA-02, CLA-05, CLA-06, DOC-01) ──
   const SPECIALIST_NAMES = [
     "investigator",
     "planner",
@@ -237,25 +237,25 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
     "documentation-agent",
     "audit-specialist",
     "mobile-specialist",
+    "plan-critic",
+    "furps-analyst",
+    "handoff-writer",
+    "navigator",
   ];
 
-  test("CLA-01/DOC-01: user-scope install copies 12 subagent specialists + prints summary line", async () => {
+  test("CLA-01/DOC-01: user-scope install copies 16 subagent specialists + prints summary line", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
-    // 12 specialist agent files at ~/.claude/agents/massa-ai-<name>.md
+    // 16 specialist agent files at ~/.claude/agents/massa-ai-<name>.md
     for (const name of SPECIALIST_NAMES) {
       expect(
         await pathExists(path.join(tmp, `.claude/agents/massa-ai-${name}.md`)),
       ).toBe(true);
     }
-    // Navigator also present (preserved, additive)
-    expect(
-      await pathExists(path.join(tmp, ".claude/agents/massa-ai-navigator.md")),
-    ).toBe(true);
 
-    // Install output mentions the 12 subagent specialists (DOC-01)
-    expect(res.stdout).toContain("12 subagent specialists");
+    // Install output mentions the 16 subagent specialists (DOC-01)
+    expect(res.stdout).toContain("16 subagent specialists");
   });
 
   test("CLA-02: read-only agents lack Write/Edit; write agents include them", async () => {
@@ -285,31 +285,28 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
     }
   });
 
-  test("CLA-05: uninstall removes 12 specialists AND preserves navigator (R1 exclusion)", async () => {
+  test("CLA-05: uninstall removes every massa-ai-owned specialist, preserves user agents", async () => {
     runInstall(["--user"], { HOME: tmp });
-    // Sanity: 12 specialists + navigator present before uninstall
+    // Sanity: all 16 specialists present before uninstall
     for (const name of SPECIALIST_NAMES) {
       expect(
         await pathExists(path.join(tmp, `.claude/agents/massa-ai-${name}.md`)),
       ).toBe(true);
     }
-    expect(
-      await pathExists(path.join(tmp, ".claude/agents/massa-ai-navigator.md")),
-    ).toBe(true);
+    // A user-owned agent without the massa-ai- prefix must survive uninstall
+    const userAgent = path.join(tmp, ".claude/agents/my-own-agent.md");
+    await fs.writeFile(userAgent, "---\nname: my-own-agent\n---\n");
 
     const res = runInstall(["--uninstall"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
-    // 12 specialists removed
+    // Every generated specialist removed — navigator included, it is generated too
     for (const name of SPECIALIST_NAMES) {
       expect(
         await pathExists(path.join(tmp, `.claude/agents/massa-ai-${name}.md`)),
       ).toBe(false);
     }
-    // Navigator survives (R1: excluded by name in the uninstall loop)
-    expect(
-      await pathExists(path.join(tmp, ".claude/agents/massa-ai-navigator.md")),
-    ).toBe(true);
+    expect(await pathExists(userAgent)).toBe(true);
   });
 
   test("CLA-06: idempotent re-run overwrites specialists with identical content", async () => {

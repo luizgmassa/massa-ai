@@ -69,7 +69,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - The main agent still owns scope, memory recall, static leads, synthesis, final report, persistence, and Evidence Gate.
     - If delegating, dispatch `audit-specialist` with `lens: code-quality` per `references/agent-orchestration.md`:
 
-> **Dispatch: audit-specialist** — see `skills/agents/audit-specialist/SKILL.md`
+> **Dispatch: `massa-ai-audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
 > - trigger: large PR, codebase-wide audit, explicit parallel/subagent request, or independent verification of judgment-heavy finding
 > - scope: bounded read-only slice of the audit target
 > - permissions: read-only

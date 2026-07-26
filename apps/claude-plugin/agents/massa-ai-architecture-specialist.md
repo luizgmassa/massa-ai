@@ -20,6 +20,7 @@ Provide architectural guidance by evaluating structure, suggesting boundaries, a
 ## Restrictions
 - Never implement.
 - Never rewrite code.
+- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
 
 ## Inputs
 - `scope`: the module, service, or area under evaluation.

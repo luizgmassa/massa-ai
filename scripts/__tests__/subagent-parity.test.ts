@@ -1,9 +1,9 @@
 /**
  * Subagent parity test (T4).
  *
- * Asserts the 12 specialist agent files shipped across 4 hosts are byte-identical
+ * Asserts the 16 specialist agent files shipped across 4 hosts are byte-identical
  * to generator output (drift gate), correctly pinned per spec (model + effort +
- * permission), collision-free against host built-ins, exactly 12 per host, and
+ * permission), collision-free against host built-ins, exactly 16 per host, and
  * that Codex TOML parses with the # massa-ai-owned marker. FEATURES.md table
  * parity (DOC-06) is gated on the subagent section existing (lands in T10).
  *
@@ -32,6 +32,10 @@ const SPECIALIST_NAMES = [
   "documentation-agent",
   "audit-specialist",
   "mobile-specialist",
+  "plan-critic",
+  "furps-analyst",
+  "handoff-writer",
+  "navigator",
 ] as const;
 type SpecialistName = (typeof SPECIALIST_NAMES)[number];
 
@@ -55,6 +59,10 @@ const AGENT_MODELS_CLAUDE: Record<SpecialistName, string> = {
   "audit-specialist": "sonnet",
   "mobile-specialist": "sonnet",
   "architecture-specialist": "opus",
+  "plan-critic": "opus",
+  "furps-analyst": "sonnet",
+  "handoff-writer": "haiku",
+  navigator: "sonnet",
 };
 
 const AGENT_MODELS_CODEX: Record<SpecialistName, string> = {
@@ -70,6 +78,10 @@ const AGENT_MODELS_CODEX: Record<SpecialistName, string> = {
   "audit-specialist": "gpt-5.6-terra",
   "mobile-specialist": "gpt-5.6-terra",
   "architecture-specialist": "gpt-5.6-sol",
+  "plan-critic": "gpt-5.6-sol",
+  "furps-analyst": "gpt-5.6-terra",
+  "handoff-writer": "gpt-5.4-mini",
+  navigator: "gpt-5.4-mini",
 };
 
 // Cursor/OpenCode: charter metadata.model_hint verbatim
@@ -86,6 +98,10 @@ const CHARTER_MODEL_HINTS: Record<SpecialistName, string> = {
   "audit-specialist": "GLM-5.2",
   "mobile-specialist": "GLM-5.2",
   "architecture-specialist": "MiniMax M3",
+  "plan-critic": "MiniMax M3",
+  "furps-analyst": "GLM-5.2",
+  "handoff-writer": "DeepSeek V4 Pro",
+  navigator: "DeepSeek V4 Pro",
 };
 
 // ── Host built-in names (spec name-collision ACs) ───────────────────────────
@@ -136,39 +152,39 @@ describe("subagent parity — drift gate (CLA-07/CDX-08/CRS-06/OPC-08)", () => {
   });
 });
 
-describe("subagent parity — exact 12 names per host (CLA-09/CRS-07/OPC-09)", () => {
-  test("claude: exactly 12 specialist .md files with the registry names", async () => {
+describe("subagent parity — exact 16 names per host (CLA-09/CRS-07/OPC-09)", () => {
+  test("claude: exactly 16 specialist .md files with the registry names", async () => {
     const dir = path.join(REPO_ROOT, "apps/claude-plugin/agents");
     const files = (await fs.readdir(dir)).filter(
-      (f) => f.startsWith("massa-ai-") && f.endsWith(".md") && !f.includes("navigator"),
+      (f) => f.startsWith("massa-ai-") && f.endsWith(".md"),
     );
-    expect(files.length).toBe(12);
+    expect(files.length).toBe(16);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("codex: exactly 12 specialist .toml files with the registry names", async () => {
+  test("codex: exactly 16 specialist .toml files with the registry names", async () => {
     const dir = path.join(REPO_ROOT, "apps/codex-plugin/agents");
     const files = (await fs.readdir(dir)).filter((f) => f.startsWith("massa-ai-") && f.endsWith(".toml"));
-    expect(files.length).toBe(12);
+    expect(files.length).toBe(16);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.toml$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("cursor: exactly 12 specialist .md files (navigator excluded)", async () => {
+  test("cursor: exactly 16 specialist .md files", async () => {
     const dir = path.join(REPO_ROOT, "apps/cursor-plugin/agents");
     const files = (await fs.readdir(dir)).filter(
-      (f) => f.startsWith("massa-ai-") && f.endsWith(".md") && !f.includes("navigator"),
+      (f) => f.startsWith("massa-ai-") && f.endsWith(".md"),
     );
-    expect(files.length).toBe(12);
+    expect(files.length).toBe(16);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("opencode: exactly 12 specialist .md files", async () => {
+  test("opencode: exactly 16 specialist .md files", async () => {
     const dir = path.join(REPO_ROOT, "apps/opencode-plugin/agents");
     const files = (await fs.readdir(dir)).filter((f) => f.startsWith("massa-ai-") && f.endsWith(".md"));
-    expect(files.length).toBe(12);
+    expect(files.length).toBe(16);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
@@ -304,6 +320,9 @@ describe("subagent parity — OpenCode permission + owned marker (OPC-07)", () =
       } else if (name === "planner") {
         expect(perm).toContain("edit: deny");
         expect(perm).toContain('bash: { "*": "ask" }');
+      } else if (name === "navigator") {
+        expect(perm).toContain("edit: deny");
+        expect(perm).toContain('bash: { "pwd": "allow", "*": "deny" }');
       } else {
         expect(perm).toContain("edit: deny");
         expect(perm).toContain("bash: deny");
@@ -317,13 +336,13 @@ describe("subagent parity — FEATURES.md table parity (DOC-06, gated on T10)", 
     const featuresPath = path.join(REPO_ROOT, "FEATURES.md");
     const features = await fs.readFile(featuresPath, "utf8");
     // Gate: only assert if the subagent section exists (T10 lands later).
-    if (!features.includes("Subagent Skills (12 Specialists)")) {
-      console.log("  [gated] FEATURES.md subagent section not yet present (T10 pending) — skip DOC-06 sub-check");
+    if (!features.includes("Subagent Skills (16 Specialists)")) {
+      console.log("  [gated] FEATURES.md subagent section not yet present — skip DOC-06 sub-check");
       return;
     }
     // Assert the 4 model-pinning tables are present (byte-parity verified by
     // checking key model values appear in the FEATURES.md subagent section).
-    const section = features.split("Subagent Skills (12 Specialists)")[1] ?? "";
+    const section = features.split("Subagent Skills (16 Specialists)")[1] ?? "";
     // Claude table
     expect(section).toContain("haiku");
     expect(section).toContain("sonnet");

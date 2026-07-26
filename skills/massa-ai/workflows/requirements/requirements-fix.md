@@ -44,7 +44,7 @@ Do not use this workflow for findings-only requirements review; route that to `w
    - If a finding exposes a product decision gap, stop and ask rather than inventing policy.
 10. Use agent orchestration only when it improves signal. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: builder** — see `skills/agents/builder/SKILL.md`
+> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated requirements finding with a disjoint write set
 > - permissions: write (disjoint write set)
@@ -54,7 +54,7 @@ Do not use this workflow for findings-only requirements review; route that to `w
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable requirements patterns
 
-> **Dispatch: verification-agent** — see `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: independent verification of a high-risk requirements fix
 > - scope: the fixed finding's requirement alignment, test coverage, and report claim closure
 > - permissions: read-only
