@@ -112,21 +112,41 @@ test catch it?
 | 6. Invariants | Tests: happy + error + timeout + partial-failure |
 | 7. Tests | Discriminating tests that kill mutations |
 
-## Your CHANGELOG entry picks the version
+## CHANGELOG authoring — your entry picks the version
+
+This section is the single source for CHANGELOG rules. `CLAUDE.md` covers the release
+*mechanics* and links here; do not copy these rules into another file.
 
 Releases are automatic: merging to `main` with green CI derives the next version from the
 `[Unreleased]` section of `CHANGELOG.md`, tags it, and publishes it. So the heading you
 file your entry under is load-bearing, not cosmetic.
 
-| Heading | Effect |
-|---------|--------|
-| `### Added` / `### Changed` / `### Removed` / `### Deprecated` | minor bump (`1.2.1` → `1.3.0`) |
-| `### Fixed` / `### Security` | patch bump (`1.2.1` → `1.2.2`) |
-| no entry (the `no-changelog` label) | no release at all |
+Entries always go under `## [Unreleased]`, in Keep a Changelog format:
 
-A heading with no bullets under it is ignored, so an empty `### Added` will not force a
-minor bump. Major versions are never bumped automatically — cutting a `2.0.0` is a manual
+| Heading | Meaning | Effect |
+|---------|---------|--------|
+| `### Added` | new capability | minor bump (`1.2.1` → `1.3.0`) |
+| `### Changed` | change to existing behavior | minor bump |
+| `### Removed` | something taken away | minor bump |
+| `### Deprecated` | marked for removal | minor bump |
+| `### Fixed` | bug fix | patch bump (`1.2.1` → `1.2.2`) |
+| `### Security` | security fix | patch bump |
+| no entry (`no-changelog` label) | docs/chore only | no release at all |
+
+If both a minor-class and a patch-class heading have content, **minor wins**.
+
+**A heading with no bullets is ignored**, so an empty `### Added` will not force a minor
+bump — but don't commit one anyway.
+
+**Never hand-edit a released section.** `## [X.Y.Z] - DATE` and everything under it are
+written by `scripts/release-version.ts` and committed by `release.yml`. Likewise never
+hand-edit `version` in `package.json` for a routine change — the release derives it.
+Major versions are never bumped automatically; cutting a `2.0.0` is a deliberate manual
 `package.json` edit.
+
+**The CI merge gate** fails any PR that does not modify `CHANGELOG.md` unless it carries
+the `no-changelog` label (bot-authored PRs are exempt). Use that label for docs-only or
+chore-only work that should not cut a release.
 
 If your PR touches a file tracked by
 `packages/core/src/__tests__/e2e/fixtures/qwen-profile.json` (including `README.md` and
