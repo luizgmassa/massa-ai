@@ -50,8 +50,7 @@ Last updated: 2026-07-24. Acceptance backend: PostgreSQL 17 + pgvector 0.8.4.
 | `18.graph-phase4.test.ts` | typed edges, trace paths, impact analysis, architecture maps |
 | `19.web-exec.test.ts` | web controller and execution-tool behavior |
 | `20.new-features.test.ts` | observations, compact snapshots, proposals, Synapse PG persistence, dashboard route surface confirmation |
-| `21.qwen-fixture.test.ts` | negative discrimination for the commit-locked qwen fixture |
-| `22.path-identity.test.ts` | same-process wrong-root rebuild plus direct PostgreSQL manifest/path sentinels |
+| `22.path-identity.test.ts` | same-process wrong-root rebuild and non-force reuse rejection |
 | `23.owned-destructive.test.ts` | owned N1/N3/E25/F88 outage, restart, configuration, and recovery orchestration |
 | `24.dashboard-architecture.test.ts` | dashboard routes (scheduler/hooks), get_architecture MCP+HTTP, rename/merge dryRun preview |
 | `backend-attestation.test.ts` | dedicated/non-dedicated backend-detection unit contract |
@@ -155,7 +154,6 @@ RUN_E2E=1 bun test --max-concurrency 1 \
   src/__tests__/e2e/18.graph-phase4.test.ts \
   src/__tests__/e2e/19.web-exec.test.ts \
   src/__tests__/e2e/20.new-features.test.ts \
-  src/__tests__/e2e/21.qwen-fixture.test.ts \
   src/__tests__/e2e/22.path-identity.test.ts \
   src/__tests__/e2e/24.dashboard-architecture.test.ts
 RUN_E2E=1 bun test --max-concurrency 1 src/__tests__/e2e/17.cleanup-verify.test.ts

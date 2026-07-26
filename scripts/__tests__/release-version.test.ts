@@ -7,18 +7,15 @@
  * `--dry-run`, which writes nothing.
  */
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
 import {
-  FIXTURE_REL_PATH,
   decideBump,
   deriveRelease,
   extractUnreleased,
   nextVersion,
   promoteChangelog,
-  repinFixtureHashes,
   unreleasedHeadings,
   unreleasedNotes,
   utcToday,
@@ -211,8 +208,6 @@ describe("ARV-R4 / ARV-R6 — changelog promotion and notes", () => {
 describe("filesystem behaviour", () => {
   let tmp: string;
 
-  const sha = (buf: string | Buffer) => createHash("sha256").update(buf).digest("hex");
-
   async function write(rel: string, contents: string): Promise<void> {
     const file = path.join(tmp, rel);
     await fs.mkdir(path.dirname(file), { recursive: true });
@@ -223,7 +218,7 @@ describe("filesystem behaviour", () => {
     return fs.readFile(path.join(tmp, rel), "utf8");
   }
 
-  /** A workspace with a root manifest, two packages, and a qwen fixture. */
+  /** A workspace with a root manifest and two packages. */
   async function scaffold(version: string, unreleased: string): Promise<void> {
     await write("package.json", JSON.stringify({ name: "root", version }, null, 2) + "\n");
     await write(
@@ -236,19 +231,6 @@ describe("filesystem behaviour", () => {
     );
     await write("CHANGELOG.md", changelogWith(unreleased));
     await write("README.md", "# readme\n");
-
-    const manifest = {
-      version: 1,
-      supportFiles: [
-        { path: "package.json", sha256: sha(await read("package.json")) },
-        { path: "packages/core/package.json", sha256: sha(await read("packages/core/package.json")) },
-        { path: "README.md", sha256: sha(await read("README.md")) },
-        // Deliberately stale and unrelated — stands in for the 35 pre-existing stale
-        // entries on main. It must survive untouched (fool.md F8).
-        { path: "CHANGELOG.md", sha256: "0".repeat(64) },
-      ],
-    };
-    await write(FIXTURE_REL_PATH, JSON.stringify(manifest, null, 2) + "\n");
   }
 
   beforeEach(async () => {
@@ -262,29 +244,23 @@ describe("filesystem behaviour", () => {
   test("ARV-R3 — a null bump writes nothing at all", async () => {
     await scaffold("1.2.1", "### Notes\n\n- housekeeping");
     const before = await read("package.json");
-    const fixtureBefore = await read(FIXTURE_REL_PATH);
     const changelogBefore = await read("CHANGELOG.md");
 
     const result = deriveRelease(tmp);
 
     expect(result).toMatchObject({ current: "1.2.1", next: null, bump: null, notes: "" });
-    expect(result.repinned).toEqual([]);
     expect(await read("package.json")).toBe(before);
     expect(await read("CHANGELOG.md")).toBe(changelogBefore);
-    expect(await read(FIXTURE_REL_PATH)).toBe(fixtureBefore);
   });
 
   test("a dry run derives the version but writes nothing", async () => {
     await scaffold("1.2.1", "### Added\n\n- a feature");
     const before = await read("package.json");
-    const fixtureBefore = await read(FIXTURE_REL_PATH);
 
     const result = deriveRelease(tmp, { dryRun: true });
 
     expect(result).toMatchObject({ current: "1.2.1", next: "1.3.0", bump: "minor" });
-    expect(result.repinned).toEqual([]);
     expect(await read("package.json")).toBe(before);
-    expect(await read(FIXTURE_REL_PATH)).toBe(fixtureBefore);
   });
 
   test("ARV-R4 — a real run bumps the root and every workspace manifest", async () => {
@@ -297,73 +273,6 @@ describe("filesystem behaviour", () => {
     expect(JSON.parse(await read("packages/core/package.json")).version).toBe("1.3.0");
     expect(JSON.parse(await read("apps/tools-api/package.json")).version).toBe("1.3.0");
     expect(await read("CHANGELOG.md")).toContain("## [1.3.0] - 2026-07-26");
-  });
-
-  test("ARV-R13 — the bumped manifests are re-pinned to their new bytes", async () => {
-    await scaffold("1.2.1", "### Added\n\n- a feature");
-
-    const result = deriveRelease(tmp, { today: "2026-07-26" });
-
-    expect(result.repinned.sort()).toEqual(["package.json", "packages/core/package.json"]);
-
-    const manifest = JSON.parse(await read(FIXTURE_REL_PATH));
-    const pinned = Object.fromEntries(
-      manifest.supportFiles.map((e: { path: string; sha256: string }) => [e.path, e.sha256]),
-    );
-    expect(pinned["package.json"]).toBe(sha(await read("package.json")));
-    expect(pinned["packages/core/package.json"]).toBe(
-      sha(await read("packages/core/package.json")),
-    );
-  });
-
-  test("ARV-R13 — unrelated entries stay byte-identical, stale ones stay stale (F8)", async () => {
-    await scaffold("1.2.1", "### Added\n\n- a feature");
-    const readmeBefore = sha(await read("README.md"));
-
-    deriveRelease(tmp, { today: "2026-07-26" });
-
-    const manifest = JSON.parse(await read(FIXTURE_REL_PATH));
-    const pinned = Object.fromEntries(
-      manifest.supportFiles.map((e: { path: string; sha256: string }) => [e.path, e.sha256]),
-    );
-    // README was never rewritten, so its (correct) pin is unchanged...
-    expect(pinned["README.md"]).toBe(readmeBefore);
-    // ...and the deliberately stale CHANGELOG pin is NOT laundered, even though
-    // promoteChangelog just rewrote that file.
-    expect(pinned["CHANGELOG.md"]).toBe("0".repeat(64));
-  });
-
-  test("ARV-R13 — repin targets only the requested paths", async () => {
-    await scaffold("1.2.1", "### Added\n\n- a feature");
-    await write("README.md", "# changed readme\n");
-
-    const repinned = repinFixtureHashes(tmp, ["package.json"]);
-
-    expect(repinned).toEqual([]); // package.json is unchanged, so nothing to re-pin
-    const manifest = JSON.parse(await read(FIXTURE_REL_PATH));
-    const readmeEntry = manifest.supportFiles.find(
-      (e: { path: string }) => e.path === "README.md",
-    );
-    expect(readmeEntry.sha256).not.toBe(sha(await read("README.md")));
-  });
-
-  test("ARV-R13 — hashing matches sha256 over raw bytes", async () => {
-    await scaffold("1.2.1", "### Added\n\n- a feature");
-    await write("README.md", "# changed readme\n");
-
-    repinFixtureHashes(tmp, ["README.md"]);
-
-    const manifest = JSON.parse(await read(FIXTURE_REL_PATH));
-    const entry = manifest.supportFiles.find((e: { path: string }) => e.path === "README.md");
-    expect(entry.sha256).toBe(sha(await fs.readFile(path.join(tmp, "README.md"))));
-  });
-
-  test("a missing fixture is tolerated rather than fatal", async () => {
-    await scaffold("1.2.1", "### Added\n\n- a feature");
-    await fs.rm(path.join(tmp, FIXTURE_REL_PATH));
-
-    expect(() => deriveRelease(tmp, { today: "2026-07-26" })).not.toThrow();
-    expect(JSON.parse(await read("package.json")).version).toBe("1.3.0");
   });
 });
 
@@ -383,6 +292,5 @@ describe("CLI contract", () => {
     expect(stdout.trimEnd().split("\n")).toHaveLength(1);
     expect(parsed).toHaveProperty("current");
     expect(parsed).toHaveProperty("bump");
-    expect(parsed.repinned).toEqual([]);
   }, 30_000);
 });

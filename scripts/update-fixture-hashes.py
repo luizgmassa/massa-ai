@@ -7,10 +7,6 @@ corresponding integrity checks stop failing after a source change.
 
 Currently handled manifests:
 
-  qwen     packages/core/src/__tests__/e2e/fixtures/qwen-profile.json
-            Sections `needleTargets`, `distractors`, `supportFiles`.
-            Each entry: {"path": <repo-relative>, "sha256": <hex>}.
-
   corpus   benchmarks/parser/corpus/corpus-manifest.json
             Top-level `files` array of {"name", "extension", "bytes", "sha256"}.
             Files are rooted at benchmarks/parser/corpus/. Also refreshes the
@@ -23,7 +19,6 @@ Usage:
     bun run update-fixture-hashes             # update stale hashes in place
     bun run update-fixture-hashes -- --check  # dry-run: report mismatches only
     python3 scripts/update-fixture-hashes.py --root /path/to/repo
-    python3 scripts/update-fixture-hashes.py --manifest qwen
     python3 scripts/update-fixture-hashes.py --manifest corpus --check
 
 Exit codes:
@@ -76,52 +71,6 @@ class ManifestHandler(Protocol):
 
     def update(self, manifest_path: Path, root: Path, *, check: bool) -> tuple[int, list[str]]:
         ...
-
-
-class QwenFixtureHandler:
-    """Handler for packages/core/src/__tests__/e2e/fixtures/qwen-profile.json."""
-
-    name = "qwen"
-    rel_path = "packages/core/src/__tests__/e2e/fixtures/qwen-profile.json"
-    sections = ("needleTargets", "distractors", "supportFiles")
-
-    def update(self, manifest_path: Path, root: Path, *, check: bool) -> tuple[int, list[str]]:
-        manifest = load_manifest(manifest_path)
-        changed: list[str] = []
-        missing: list[str] = []
-
-        for section in self.sections:
-            for entry in manifest.get(section, []):
-                rel = entry["path"]
-                target = root / rel
-                if not target.exists():
-                    missing.append(rel)
-                    print(f"[qwen] error: missing file: {rel}", file=sys.stderr)
-                    continue
-                actual = sha256_file(target)
-                expected = entry.get("sha256", "")
-                if actual != expected:
-                    changed.append(rel)
-                    if check:
-                        print(f"[qwen] mismatch: {rel}\n  expected {expected}\n  got      {actual}")
-                    else:
-                        entry["sha256"] = actual
-                        print(f"[qwen] updated:  {rel}\n  was {expected}\n  now {actual}")
-
-        if missing:
-            return 2, changed
-
-        if changed and not check:
-            write_manifest(manifest_path, manifest, root)
-            print(f"[qwen] {len(changed)} hash(es) updated in {manifest_path.relative_to(root)}")
-            return 0, changed
-
-        if changed and check:
-            print(f"[qwen] {len(changed)} mismatch(es) found (dry-run, no writes)")
-            return 0, changed
-
-        print("[qwen] all hashes current")
-        return 1, changed
 
 
 class CorpusManifestHandler:
@@ -232,7 +181,6 @@ class CorpusManifestHandler:
 
 
 HANDLERS: dict[str, ManifestHandler] = {
-    QwenFixtureHandler.name: QwenFixtureHandler(),
     CorpusManifestHandler.name: CorpusManifestHandler(),
 }
 

@@ -10,9 +10,9 @@
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { realpath as fsRealpath } from "node:fs/promises";
 import path from "path";
+import { getProvidersByPriority } from "../../services/embeddings/config.js";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -107,16 +107,20 @@ export const POLY_FIXTURE_PATH = path.join(
 
 export interface SharedFixtureProfile {
   commit: string;
-  manifestHash: string;
   provider: string;
   model: string;
   dimensions: number;
 }
 
+/**
+ * The commit SHA already encodes "which files are at this revision", so
+ * dropping the former commit-locked-fixture manifest hash does not weaken
+ * the identity's discriminating power (see D5 in
+ * .specs/features/plugin-distribution-overhaul/design.md).
+ */
 export function deriveSharedProfileIdentity(profile: SharedFixtureProfile): string {
   if (
     !profile.commit ||
-    !profile.manifestHash ||
     !profile.provider ||
     !profile.model ||
     !Number.isInteger(profile.dimensions) ||
@@ -127,7 +131,6 @@ export function deriveSharedProfileIdentity(profile: SharedFixtureProfile): stri
   return createHash("sha256")
     .update(JSON.stringify([
       profile.commit,
-      profile.manifestHash,
       profile.provider,
       profile.model,
       profile.dimensions,
@@ -138,29 +141,24 @@ export function deriveSharedProfileIdentity(profile: SharedFixtureProfile): stri
 
 const DEDICATED_FIXTURE = isOwnedDedicatedE2eEnvironment();
 
+/**
+ * Provider/model/dimensions come from the embeddings config resolver (the
+ * same source the running server uses to pick its active provider), never
+ * from raw `process.env` with no fallback — that resolver already applies
+ * the correct defaults when EMBEDDING_PROVIDER / OLLAMA_EMBEDDING_MODEL /
+ * OLLAMA_EMBEDDING_DIMENSIONS are unset, so this stays non-null in that case.
+ */
 function resolveSharedProfileIdentity(): string | null {
   if (!DEDICATED_FIXTURE) return null;
-  const manifestPath = path.resolve(
-    import.meta.dir,
-    "./fixtures/qwen-profile.json",
-  );
-  const manifestBytes = readFileSync(manifestPath);
-  const manifest = JSON.parse(manifestBytes.toString("utf8")) as {
-    provider: string;
-    model: string;
-    dimensions: number;
-  };
+  const [, activeProvider] = getProvidersByPriority()[0]!;
   const commit = execFileSync("git", ["-C", PROJECT_PATH, "rev-parse", "HEAD"], {
     encoding: "utf8",
   }).trim();
   return deriveSharedProfileIdentity({
     commit,
-    manifestHash: createHash("sha256").update(manifestBytes).digest("hex"),
-    provider: process.env.EMBEDDING_PROVIDER ?? manifest.provider,
-    model: process.env.OLLAMA_EMBEDDING_MODEL ?? manifest.model,
-    dimensions: Number(
-      process.env.OLLAMA_EMBEDDING_DIMENSIONS ?? manifest.dimensions,
-    ),
+    provider: activeProvider.provider,
+    model: activeProvider.model,
+    dimensions: activeProvider.dimensions ?? 0,
   });
 }
 
