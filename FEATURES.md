@@ -272,7 +272,7 @@ bash apps/cursor-plugin/install.sh --uninstall
 
 ### OpenCode plugin (`apps/opencode-plugin/`)
 
-**What it bundles:** 14 in-process tools (search, remember, recall, index, compress, optimized_context, read, index_status, analytics, list_projects, search_definitions, get_references, go_to_definition) + 6 in-process lifecycle handlers. This is an npm package (`@massa-ai/opencode-plugin@1.1.0`), not a script-copy bundle.
+**What it bundles:** 14 in-process tools (search, remember, recall, index, compress, optimized_context, read, index_status, analytics, list_projects, search_definitions, get_references, go_to_definition) + 6 in-process lifecycle handlers. It is published as `@massa-ai/opencode-plugin`, and unlike the other three it registers its tools in-process rather than over MCP. All four plugins are now published npm packages (`@massa-ai/{claude,codex,cursor,opencode}-plugin`), each shipping its own copy of the `massa-ai` and `persona-router` skills plus the 15 agent charters, so a registry install needs no repository checkout.
 
 **Hook events (in-process, 6 lifecycle handlers):** `session.created`, `tool.execute.after`, `experimental.session.compacting`, `shell.env`, `event`, `dispose` — all registered in-process by the plugin. No external hooks file needed.
 
@@ -320,11 +320,11 @@ bundle, via `scripts/install-harness.sh`:
 4) Preview (dry run, writes nothing)
 ```
 
-**Shared binary:** all shell-script-based plugins (Claude Code, Codex, Cursor) use the same `massa-ai-hook.ts` Bun binary from `apps/claude-plugin/hooks/`. Codex and Cursor symlink to it. The binary resolves the project ID via: existing pin → `MASSA_AI_PROJECT_ID` env → git toplevel basename → cwd basename.
+**Shared binary:** all shell-script-based plugins (Claude Code, Codex, Cursor) use the same `massa-ai-hook.ts` Bun binary from `apps/claude-plugin/hooks/`. Codex and Cursor carry a **generated real copy** at `hooks/massa-ai-hook`, kept in sync by `scripts/generate-skill-artifacts.ts --check`. They used to symlink to it; that could not survive publishing, because `npm pack` silently drops symlinks — the linked file *and its containing directory* vanish from the tarball with no error. The binary resolves the project ID via: existing pin → `MASSA_AI_PROJECT_ID` env → git toplevel basename → cwd basename.
 
 **MCP single writer:** `scripts/install-agents.sh` owns every host's MCP config. The three script-based plugin installers call it (`--agent claude-code` / `codex` / `cursor`) instead of shipping their own MCP file, so installing a plugin and running the installer directly cannot double-register. MCP is always written at **user** scope, even for a `--project` plugin install.
 
-OpenCode is the exception: `@massa-ai/opencode-plugin` registers 14 tools in-process, so the installer skips the OpenCode MCP entry when that plugin is listed in `opencode.json` — and still writes it for users who do not have the plugin.
+OpenCode is the exception: `@massa-ai/opencode-plugin` registers 14 tools in-process, so the installer skips the OpenCode MCP entry when that plugin is listed in the resolved OpenCode config — and still writes it for users who do not have the plugin. That config is resolved as `opencode.jsonc` → `opencode.json` → create `opencode.jsonc`, and parsed comment-tolerantly. When both files exist the installer edits `opencode.json` and warns, because OpenCode merges `.json` over `.jsonc`, so writing to the other one would be a silent no-op.
 
 Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/plugins/massa-ai/` and `~/.cursor/plugins/massa-ai/`. Neither was a host read path; reinstalling a plugin removes the stale file.
 
@@ -349,9 +349,9 @@ Workflows dispatch these agents under their **host-registered** names, prefixed 
 | Claude Code | `apps/claude-plugin/agents/massa-ai-*.md` → installed to `~/.claude/agents/` | `.md` (YAML frontmatter: `name`, `description`, `tools`, `model`, `effort`) | Name prefix `massa-ai-` (uninstall excludes `massa-ai-navigator.md` by name — R1) |
 | Codex | `apps/codex-plugin/agents/massa-ai-*.toml` → installed to `~/.codex/agents/` (OUTSIDE plugin dir) | `.toml` (`name`, `description`, `model`, `model_reasoning_effort`, `sandbox_mode`, `developer_instructions`) | `# massa-ai-owned` top comment |
 | Cursor | `apps/cursor-plugin/agents/massa-ai-*.md` → bundled in plugin `agents/` dir | `.md` (same shape as Claude) | Name prefix `massa-ai-` (removed with plugin dir) |
-| OpenCode | `apps/opencode-plugin/agents/massa-ai-*.md` → installed to `~/.config/opencode/agents/` (OUTSIDE npm package) | `.md` (`description`, `mode: all`, `model`, `reasoningEffort`, `permission`, `metadata`) | `metadata: { massa-ai-owned: true }` frontmatter |
+| OpenCode | `apps/opencode-plugin/agents/massa-ai-*.md` → installed to `~/.config/opencode/agents/` (shipped IN the npm package, installed outside the plugin dir) | `.md` (`description`, `mode: all`, `model`, `reasoningEffort`, `permission`, `metadata`) | `metadata: { massa-ai-owned: true }` frontmatter |
 
-> Codex and OpenCode agents live OUTSIDE the plugin dir / npm package because their host discovery loads agents from a shared config-root directory, not from the plugin bundle. The in-file ownership marker enables scoped uninstall that preserves user agents (R3).
+> Codex and OpenCode agents are *installed* outside the plugin dir because their host discovery loads agents from a shared config-root directory, not from the plugin bundle. They are still **shipped inside** their npm package — OpenCode's `files` declares `agents/*.md`, and until the package-contents gate landed those 15 charters were silently missing from every published tarball, because the publish job has no `actions/checkout` and the build artifact never uploaded `agents/`. The in-file ownership marker enables scoped uninstall that preserves user agents (R3).
 
 ### Model pinning (PINNED per agent per host, NOT advisory)
 
@@ -1321,13 +1321,23 @@ Ported from the old repo's Python test suite to TypeScript/bun test:
 | `scripts/tests/test-install-agents-claude-hooks.sh` | 15 | Plugin hooks, permissions, and user keys survive an MCP write into the shared `settings.json` |
 | `scripts/tests/test-install-harness-cli.sh` | 25 | Step selection, ordering, verbatim argv forwarding to the sub-installers, exit-code propagation |
 | `scripts/tests/test-mcp-single-writer.sh` | 36 | Regression guard: no plugin ships or copies an MCP file, all three delegate, exactly one registration after (re)install |
-| `scripts/__tests__/subagent-parity.test.ts` | 16 | Drift gate, exact-12-per-host, name-collision, model+effort pinning (Claude/Codex/Cursor/OpenCode), permission boundary, Codex TOML round-trip+marker, OpenCode permission+marker, FEATURES.md table parity |
+| `scripts/__tests__/subagent-parity.test.ts` | 17 | Drift gate, exact-15-per-host, name-collision, model+effort pinning (Claude/Codex/Cursor/OpenCode), permission boundary, Codex TOML round-trip+marker, OpenCode permission+marker, FEATURES.md table parity |
 
 Run everything (TypeScript suites plus every `scripts/tests/*.sh` suite) with `bun run test:scripts` — the same command CI runs.
 
-The four plugin installers have their own suites under `apps/<host>-plugin/__tests__/` (50
-tests). Three of those dirs are not workspace packages, so turbo's `test` cannot see them —
-`bun run test:plugins` covers all four, and CI runs it alongside `test:scripts`.
+The four plugin installers have their own suites under `apps/<host>-plugin/__tests__/` (88
+tests across 7 files). All four dirs are now workspace packages, but none of them declares a
+`test` script — deliberately, so turbo's `test` cannot discover and double-run them.
+`bun run test:plugins` is their single execution point, and CI runs it alongside
+`test:scripts`.
+
+Two further gates guard the generated artifacts: `bun scripts/generate-skill-artifacts.ts
+--check` fails on any drift between `skills/` and the four bundled copies (comparing full
+directory inventories, so a stale file left behind by a source deletion is caught too), and
+`bun scripts/verify-package-contents.ts` packs all 8 publishable packages and diffs each
+tarball's inventory against a committed manifest. The latter exists because the publish jobs
+have no `actions/checkout` — a `files` entry can only ship what the `build-output` artifact
+uploaded.
 
 ---
 
