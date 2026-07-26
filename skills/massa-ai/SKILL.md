@@ -39,8 +39,8 @@ Before reading any massa-ai file:
 - Default startup/context recall is budgeted: use `limit <= 3`,
   `minImportance >= 0.7`, and `types=["critical","decision","pattern"]`
   unless the selected workflow explicitly needs a broader memory query.
-- Never use `recall` as an artifact loader. Exact project, restart,
-  handoff, feature, and validation state must come from .specs/ files.
+- Never use `recall` as an artifact loader. Exact project, handoff,
+  feature, and validation state must come from .specs/ files.
 - For multi-search tasks, use a separate ephemeral `synapseSessionId` according
   to `references/synapse-policy.md`; pass it only to `search.sessionId`.
   Never pass `workflowSessionId` in that field. Use `synapse_task_begin`/`synapse_task_end`
@@ -131,8 +131,6 @@ current context already contains it.
 | `bugs-audit` | findings-only bug discovery | `workflows/bugs/bugs-audit.md` |
 | `bugs-fix` | fix bugs audit report findings | `workflows/bugs/bugs-fix.md` |
 | `long-session` | context compaction / continuation package | `workflows/long-session.md` |
-| `restart-save` | preserve canonical massa-ai restart state for a clean/new chat | `workflows/restart-save.md` |
-| `restart-load` | load canonical massa-ai restart state in a clean/new chat | `workflows/restart-load.md` |
 | `exploration` | understand codebase/flow | `workflows/exploration.md` |
 | `spec-driven` | TLC v3 Specify, optional Design, optional Tasks, and Execute with mandatory independent validation | `workflows/spec-driven.md` |
 | `implementation-audit` | multi-lens audit of a concrete implementation target | `workflows/implementation/implementation-audit.md` |
@@ -140,7 +138,6 @@ current context already contains it.
 | `design` | implement supported mobile UI from Figma evidence or screenshot context | `workflows/design.md` |
 | `mobile-figma-audit` | compare an Android, iOS, or KMP UI implementation with a Figma design | `workflows/mobile-figma/mobile-figma-audit.md` |
 | `mobile-figma-fix` | fix saved mobile Figma findings | `workflows/mobile-figma/mobile-figma-fix.md` |
-| `agent-handoff` | agent-to-agent transfer | `workflows/agent-handoff.md` |
 | `refactor` | behavior-preserving structural cleanup | `workflows/refactor.md` |
 | `adr` | record a finalized decision | `workflows/adr.md` |
 | `rfc` | propose a significant change | `workflows/rfc.md` |
@@ -159,10 +156,10 @@ match or no match is resolved deterministically without asking.
 
 Deterministic routing precedence, first match wins:
 
-1. **Explicit route:** user names a massa-ai workflow, report family, saved finding type, restart save/load procedure, or asks for a direct challenge.
-2. **Requested artifact:** ADR, RFC, TDD, Jira ticket, commit, handoff, restart state, audit report, implementation audit report, mobile Figma report, or FURPS refinement report.
+1. **Explicit route:** user names a massa-ai workflow, report family, saved finding type, or asks for a direct challenge.
+2. **Requested artifact:** ADR, RFC, TDD, Jira ticket, commit, session guide, audit report, implementation audit report, mobile Figma report, or FURPS refinement report.
 3. **Target type:** broken behavior/error -> `debug`; saved audit finding -> matching `*-fix`; implementation scope review -> `implementation-audit`; Maestro E2E/device automation target -> `maestro`, `maestro-audit`, or child-only `maestro-fix` before generic tests workflows; security/privacy/auth finding -> security workflow; tests/flakes/coverage finding -> tests workflow; supplied Figma/screenshot mobile UI design -> `design`; mobile Figma compare/audit -> `mobile-figma-audit`; saved `MFM-*` findings -> `mobile-figma-fix`.
-4. **Primary verb:** save/preserve/prepare clean chat restart state -> `restart-save`; load/resume/continue from saved restart state -> `restart-load`; create/add/implement -> `feature` unless the concrete target is new Maestro flow work, which routes to `maestro`; restructure without behavior change -> `refactor`; inspect/understand only -> `exploration`; record selected decision -> `adr`; compare open options -> `rfc`; design settled implementation -> `tdd`; refine/quality-check an existing PRD or ADR document (not implementation auditing) -> `furps-refinement`.
+4. **Primary verb:** create/add/implement -> `feature` unless the concrete target is new Maestro flow work, which routes to `maestro`; restructure without behavior change -> `refactor`; inspect/understand only -> `exploration`; record selected decision -> `adr`; compare open options -> `rfc`; design settled implementation -> `tdd`; refine/quality-check an existing PRD or ADR document (not implementation auditing) -> `furps-refinement`.
 5. **Risk domain escalation:** migrations, irreversible operations, auth/privacy, cross-service contracts, public compatibility, or work over 10 files routes to `spec-driven` unless the user explicitly requests a narrower workflow and accepts the containment.
 6. **General fallback:** use `general` only after a one-line General fallback preflight names the specialized workflow considered, rejected reason, and why fallback does not change verification or mutation behavior.
 
@@ -271,8 +268,6 @@ Load only when a selected workflow asks for them:
 - `references/lessons.md`
 - `references/naming-standards.md`
 - `references/pr-task-fix.md`
-- `references/handoff-package.md`
-- `references/restart-state.md`
 - `references/architecture-lenses.md`
 - `references/architecture-domain-lens.md`
 - `references/architecture-coupling-lens.md`
@@ -280,6 +275,10 @@ Load only when a selected workflow asks for them:
 - `references/the-fool/`
 - `references/verification-ladder.md`
 - `references/context-firewall.md`
+- `references/project-context.md`
+- `references/implementation-delivery.md`
+- `references/code-annotation.md`
+- `references/root-cause-scripts.md`
 - `references/conversation-feedback.md`
 - `references/maestro.md`
 - `references/maestro/`

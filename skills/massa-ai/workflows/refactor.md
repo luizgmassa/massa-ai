@@ -2,6 +2,10 @@
 
 Use this workflow for behavior-preserving structural cleanup, simplification, decoupling, testability improvements, and code organization changes where the intended external behavior stays the same. Do not use it for broken behavior; route that to `workflows/debug.md`. Do not use it for broad boundary redesign, migration, or unclear architecture direction; route that to `workflows/architecture/architecture-audit.md` or `workflows/spec-driven.md`.
 
+Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+
+Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+
 1. Resolve/reuse `workflowSessionId`: `refactor-[entity]`
 2. `recall` → load architectural decisions and coupling patterns for the area
 3. Load shared references as needed:

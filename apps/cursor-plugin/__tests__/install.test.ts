@@ -198,7 +198,7 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
     ).toBe(false);
   });
 
-  // ── T6: 16 subagent specialists bundled into plugin agents/ (CRS-01,04,07 + DOC-01) ─
+  // ── T6: 15 subagent specialists bundled into plugin agents/ (CRS-01,04,07 + DOC-01) ─
   const SPECIALIST_NAMES = [
     "investigator",
     "planner",
@@ -214,30 +214,29 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
     "mobile-specialist",
     "plan-critic",
     "furps-analyst",
-    "handoff-writer",
     "navigator",
   ];
 
-  test("CRS-01/CRS-04/DOC-01: install copies all 16 specialists into plugin agents/ + prints summary", async () => {
+  test("CRS-01/CRS-04/DOC-01: install copies all 15 specialists into plugin agents/ + prints summary", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
     const agentsDir = path.join(tmp, ".cursor/plugins/massa-ai/agents");
-    // 16 specialists, navigator included (CRS-01/CRS-04)
+    // 15 specialists, navigator included (CRS-01/CRS-04)
     for (const name of SPECIALIST_NAMES) {
       expect(
         await pathExists(path.join(agentsDir, `massa-ai-${name}.md`)),
       ).toBe(true);
     }
-    // Total 16 .md files in agents/
+    // Total 15 .md files in agents/
     const files = (await fs.readdir(agentsDir)).filter((f) => f.endsWith(".md"));
-    expect(files.length).toBe(16);
+    expect(files.length).toBe(15);
 
-    // Install output mentions the 16 subagent specialists (DOC-01)
-    expect(res.stdout).toContain("16 subagent specialists");
+    // Install output mentions the 15 subagent specialists (DOC-01)
+    expect(res.stdout).toContain("15 subagent specialists");
   });
 
-  test("CRS-05: uninstall removes whole plugin dir (all 16 agents gone)", async () => {
+  test("CRS-05: uninstall removes whole plugin dir (all 15 agents gone)", async () => {
     runInstall(["--user"], { HOME: tmp });
     const agentsDir = path.join(tmp, ".cursor/plugins/massa-ai/agents");
     expect(await pathExists(agentsDir)).toBe(true);

@@ -2,6 +2,8 @@
 
 Use this workflow for findings-only review of whether a concrete target matches stated requirements without out-of-scope drift. Accepted targets include modified files, explicit files/globs, commit ranges, branch comparisons, modules/packages, symbols/classes/functions, feature/runtime flows, explicitly requested whole-repo scope, or an implementation scope packet supplied by `workflows/implementation/implementation-audit.md`.
 
+Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+
 Do not use this workflow for generic correctness bugs, security findings, architecture findings, code quality findings, or test coverage findings. Route correctness bugs to `workflows/bugs/bugs-audit.md` and route the other categories to their dedicated workflows.
 
 This workflow is findings-only. Do not edit code unless the user separately asks for fixes.

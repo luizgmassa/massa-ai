@@ -2,6 +2,10 @@
 
 Use this workflow for coding, planning-before-coding, review, or implementation work when no specialized massa-ai workflow is a better match. This is the final fallback, not a replacement for explicit or specialized workflows.
 
+Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+
+Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+
 1. Resolve or reuse `projectId` and a stable `workflowSessionId`: `general-[entity]`.
 2. Run General fallback preflight before source work: name the specialized workflow considered, the exact rejected reason, and why fallback does not change verification, mutation behavior, or memory scope. Ask the user only when the rejected workflow would change those behaviors.
 3. Recall relevant durable context with `recall`. Treat recalled memory as a lead until current source confirms it. Confirm recalled memory against current source before relying on it only when the change touches the enumerated risk-domain set: public API, data loss, auth/PII, migrations, or cross-service contracts. Otherwise trust recalled memory and cite it with a one-line source note.

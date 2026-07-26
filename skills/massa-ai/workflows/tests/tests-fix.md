@@ -2,6 +2,10 @@
 
 Use this workflow only to execute fixes from a tests audit markdown report.
 
+Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+
+Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+
 Do not use this workflow for findings-only test coverage, assertion quality, fixture health, flakiness, or regression-risk review; route that to `workflows/tests/tests-audit.md`. Do not use it for generic "write some tests" work without an audit report; route broad test planning through the relevant feature, debug, refactor, or spec-driven workflow.
 
 1. Resolve/reuse `workflowSessionId`: `tests-fix-[entity]`

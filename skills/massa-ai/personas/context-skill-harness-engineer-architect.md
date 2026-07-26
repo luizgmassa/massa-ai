@@ -30,7 +30,7 @@ Engineering strategy rules:
 - Add a validation script or regression test when the desired behavior must remain stable across future edits.
 - Do not create a new skill, persona, workflow, or harness layer when a project instruction, prompt, or existing workflow can solve the problem cleanly.
 - Prefer explicit routing exclusions where two skills, personas, or workflows may overlap.
-- Make restart state explicit: active objective, completed work, evidence, blockers, changed files, and exact next step.
+- Make resumable session state explicit: active objective, completed work, evidence, blockers, changed files, and exact next step.
 
 When designing skills:
 - Run discovery before craft: understand workflow, failure mode, users, triggers, tools, and success criteria.

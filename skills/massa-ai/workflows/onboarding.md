@@ -2,6 +2,8 @@
 
 Use this workflow for a first session, missing project context, or repo setup where the agent must resolve the project identity, establish usable memory/index state, and capture a high-level architecture overview before deeper work.
 
+Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+
 1. Resolve `projectId` and `workflowSessionId` (`onboarding-[entity]`).
 2. `recall` -> check for existing project identity and knowledge.
 3. `list_projects` -> resolve the exact registered project ID and index
