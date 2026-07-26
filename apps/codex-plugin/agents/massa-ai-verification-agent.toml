@@ -19,6 +19,7 @@ Centralize Verification Ladder logic and validate that a task's output meets its
 ## Restrictions
 - Never modify implementation.
 - Never skip a verification level without recording a concrete reason.
+- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
 
 ## Inputs
 - `scope`: the task, its acceptance criteria, and the files changed.

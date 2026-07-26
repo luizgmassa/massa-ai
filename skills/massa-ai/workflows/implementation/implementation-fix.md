@@ -43,7 +43,7 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 9. Size each finding with `references/verification-ladder.md`. Quick findings may proceed locally; Standard findings require characterization and an explicit recipe; ambiguous, cross-boundary, migration-heavy, or broad redesign findings pause and route to `spec-driven`.
 10. Orchestrate conservatively. The main agent owns report parsing, scope/freshness, prioritization, questions, memory, and final evidence. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: builder** — see `skills/agents/builder/SKILL.md`
+> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: isolated finding with disjoint write set and concrete verification
 > - scope: one isolated implementation finding with a disjoint write set
 > - permissions: write (disjoint write set)
@@ -53,7 +53,7 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable patterns
 
-> **Dispatch: verification-agent** — see `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: high-risk, security, public-contract, or multi-file fix
 > - scope: the fixed finding's behavior, contracts, tests, and report claim closure
 > - permissions: read-only

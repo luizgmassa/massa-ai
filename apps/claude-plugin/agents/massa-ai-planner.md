@@ -20,6 +20,7 @@ Transform an engineering request into a structured implementation plan.
 ## Restrictions
 - Never implement.
 - Never review code.
+- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
 
 ## Inputs
 - `scope`: the request, target area, and known constraints.

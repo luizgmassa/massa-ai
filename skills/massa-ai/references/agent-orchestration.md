@@ -49,27 +49,54 @@ Keep local when any are true:
 
 ## Plan Challenge Exception
 
-Plan Challenge `plan-critic` is a standing policy exception to the normal dispatch triggers after a concrete plan exists. Always attempt a read-only `plan-critic` for both `depth: lite` and `depth: full` when subagent tooling is available and platform policy permits spawning. Normal base requirements still matter for packet quality: the critique must be bounded, read-only, and concrete, but it does not need to satisfy the ordinary dispatch triggers such as file count, module count, or explicit user delegation.
+Plan Challenge `plan-critic` is a standing policy exception to the normal dispatch triggers after a concrete plan exists. Always attempt a read-only `massa-ai-plan-critic` for both `depth: lite` and `depth: full` when subagent tooling is available and platform policy permits spawning. Normal base requirements still matter for packet quality: the critique must be bounded, read-only, and concrete, but it does not need to satisfy the ordinary dispatch triggers such as file count, module count, or explicit user delegation.
 
 For all other roles, preserve the normal delegation gates above.
 
+## Name Resolution
+
+Charters live at `skills/agents/<role>/SKILL.md`. Hosts register every charter
+under the prefixed name `massa-ai-<role>` (Claude, Codex, Cursor, OpenCode all
+use that prefix; `scripts/generate-subagent-artifacts.ts` emits it).
+
+- **Dispatch under the prefixed host name**, never the bare role name. A bare
+  `subagent_type` does not resolve on any supported host.
+- The bare role name is the registry key: use it in memory tags, capability
+  packets, and prose.
+- Every dispatch block in a workflow carries the prefixed name inline so
+  dispatch never depends on this file being loaded.
+
+If the named agent is unavailable for any reason — not registered, plugin not
+installed, spawning forbidden by platform policy, or the host returns an unknown
+`subagent_type` — do not retry under another name and do not invent one. Run the
+delegated scope locally against the same output contract, and report the skipped
+delegation with its reason in the Evidence Gate.
+
 ## Roles
 
-Use these role names in prompts and memory tags when useful.
+Use the role names in prompts and memory tags; use the host agent names to
+dispatch.
 
 Before adding a new reusable role, load `references/subagent-design.md` and write a bounded role charter. For one-off tasks, use an existing role plus the prompt contract below instead of inventing a new role.
 
-| Role | Use For | Read/Write | Charter |
-|---|---|---|---|
-| `investigator` | Trace code paths, find entry points, summarize current behavior | read-only | `skills/agents/investigator/SKILL.md` |
-| `implementer` → `builder` | Execute one atomic task with a disjoint write set | write | `skills/agents/builder/SKILL.md` |
-| `verifier` → `verification-agent` | Independently run sensors and inspect whether claims hold | read-only | `skills/agents/verification-agent/SKILL.md` |
-| `domain-mapper` → `architecture-specialist` | Identify subdomains, bounded contexts, language conflicts, cohesion | read-only | `skills/agents/architecture-specialist/SKILL.md` (lens: `domain`) |
-| `coupling-auditor` → `architecture-specialist` | Analyze strength, distance, volatility, and risky dependencies | read-only | `skills/agents/architecture-specialist/SKILL.md` (lens: `coupling`) |
-| `deepening-architect` → `architecture-specialist` | Find shallow modules and deepening opportunities | read-only | `skills/agents/architecture-specialist/SKILL.md` (lens: `deepening`) |
-| `plan-critic` | Stress-test a constructed plan using The Fool mode and return bounded critique | read-only | role-based (no charter) |
-| `furps-analyst` | Analyze one FURPS+ dimension of a PRD/ADR against the checklist and return structured findings | read-only | role-based (no charter) |
-| `handoff-writer` | Build a compact continuation package | read-only unless asked to save | role-based (no charter) |
+| Role | Host agent name | Use For | Read/Write | Charter |
+|---|---|---|---|---|
+| `investigator` | `massa-ai-investigator` | Trace code paths, find entry points, summarize current behavior | read-only | `skills/agents/investigator/SKILL.md` |
+| `navigator` | `massa-ai-navigator` | Answer "where is X / who calls Y" from the massa-ai index before reading files | read-only | `skills/agents/navigator/SKILL.md` |
+| `implementer` → `builder` | `massa-ai-builder` | Execute one atomic task with a disjoint write set | write | `skills/agents/builder/SKILL.md` |
+| `verifier` → `verification-agent` | `massa-ai-verification-agent` | Independently run sensors and inspect whether claims hold | read-only | `skills/agents/verification-agent/SKILL.md` |
+| `domain-mapper` → `architecture-specialist` | `massa-ai-architecture-specialist` | Identify subdomains, bounded contexts, language conflicts, cohesion | read-only | `skills/agents/architecture-specialist/SKILL.md` (lens: `domain`) |
+| `coupling-auditor` → `architecture-specialist` | `massa-ai-architecture-specialist` | Analyze strength, distance, volatility, and risky dependencies | read-only | `skills/agents/architecture-specialist/SKILL.md` (lens: `coupling`) |
+| `deepening-architect` → `architecture-specialist` | `massa-ai-architecture-specialist` | Find shallow modules and deepening opportunities | read-only | `skills/agents/architecture-specialist/SKILL.md` (lens: `deepening`) |
+| `audit-specialist` | `massa-ai-audit-specialist` | Findings-only audit through one selected `lens` | read-only | `skills/agents/audit-specialist/SKILL.md` |
+| `plan-critic` | `massa-ai-plan-critic` | Stress-test a constructed plan using The Fool mode and return bounded critique | read-only | `skills/agents/plan-critic/SKILL.md` |
+| `furps-analyst` | `massa-ai-furps-analyst` | Analyze one FURPS+ dimension of a PRD/ADR against the checklist and return structured findings | read-only | `skills/agents/furps-analyst/SKILL.md` |
+| `handoff-writer` | `massa-ai-handoff-writer` | Build a compact continuation package | read-only | `skills/agents/handoff-writer/SKILL.md` |
+
+The remaining charters — `planner`, `reviewer`, `context-curator`,
+`requirements-analyst`, `test-engineer`, `documentation-agent`,
+`mobile-specialist` — follow the same `massa-ai-<role>` convention and are
+listed in the Agent Table of `skills/AGENTS.md`.
 
 **Role mapping:** `investigator`→`investigator` (identical); `implementer`→`builder` (renamed); `verifier`→`verification-agent` (renamed, centralizes Verification Ladder); `domain-mapper`+`coupling-auditor`+`deepening-architect`→`architecture-specialist` (three roles folded into one specialist; the `lens` input field selects the sub-mode). Workflows dispatch the new agent names via named dispatch blocks; the old role names above are kept for traceability only.
 
@@ -143,7 +170,7 @@ Example:
 
 ## Plan-Critic Contract
 
-Use `plan-critic` only after a concrete plan exists. Dispatch it with the capability packet above and the standard output contract. The subagent receives the plan, scope, constraints, compact recalled facts/evidence, selected depth, selected The Fool mode only for full gates, known risks, verification recipe, parent identifiers, and context-firewall limits. It never receives full conversation context.
+Dispatch `massa-ai-plan-critic` only after a concrete plan exists. Dispatch it with the capability packet above and the standard output contract. The subagent receives the plan, scope, constraints, compact recalled facts/evidence, selected depth, selected The Fool mode only for full gates, known risks, verification recipe, parent identifiers, and context-firewall limits. It never receives full conversation context.
 
 For `depth: lite`, the packet uses the low-risk checklist and does not include The Fool mode references. It returns:
 
@@ -166,7 +193,9 @@ For `depth: full`, or after lite escalation, the main agent selects the mode, lo
 - confidence impact
 - exact next step
 
-The main agent owns final synthesis and applies the configured Plan Challenge Policy from root `AGENTS.md`.
+The main agent owns final synthesis and applies the canonical Plan Challenge
+Policy: the `<!-- massa-ai:bootstrap -->` block installed as `<host>/AGENTS.md`,
+whose single source is `skills/AGENTS.md` in the product repo.
 
 ## Memory Rules
 

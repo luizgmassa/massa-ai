@@ -30,17 +30,40 @@ Default search budget inside a Synapse session:
 - Expanded deep reads: `maxResults=5` only when 4-5 exact files, symbols, or report finding IDs are already named.
 - Do not use Synapse for a single recall, project map, exact file read, or one symbol lookup.
 
+Server-side bounds that constrain the budget:
+
+- Working-memory buffer holds **20 entries** by default. Priming or prefetching
+  more than that evicts the earlier ones — seed the few memories that matter,
+  not a whole recall page.
+- Sessions expire after **1h**, sliding forward on every `synapse_get` or
+  recorded access.
+
+Config knobs (env, read by the server, not by the agent):
+
+| Env var | Default | Effect |
+|---|---|---|
+| `SYNAPSE_ENABLED` | `true` | Master kill switch; `false` bypasses the whole pipeline, and `search` behaves statelessly even when a `sessionId` is passed. |
+| `SYNAPSE_ATTENTION_ENABLED` | `false` | Multi-signal attention re-ranker. **Off by default** — do not attribute re-ranking to Synapse unless it is on. |
+| `LOG_LEVEL` | `info` | `debug` emits one pipeline log line per query (see Reading Pipeline Output). |
+
 ## MCP-First Lifecycle
 
 1. Call `synapse_session` with explicit `agentId`, `workspaceId`,
    one-sentence `taskContext`, and `ttlMs`. Omit `sessionId` so the server
-   generates a collision-free ID.
+   generates a collision-free ID. Keep `agentId` stable across the whole task —
+   agent affinity needs one identity.
 2. Call `recall` using `workflowSessionId` and project/entity context.
-3. Prime the buffer when the adapter supports it.
-4. Pass the returned `synapseSessionId` as `sessionId` on every related
+3. Open a task envelope with `synapse_task_begin` (`id` = the session id, plus a
+   one-sentence `taskContext`) before the task's searches.
+4. Prime the buffer when the adapter supports it, within the 20-entry bound.
+5. Pass the returned `synapseSessionId` as `sessionId` on every related
    `search` call.
-5. After consuming a result, record its `memoryId` through the verified access
+6. Call `synapse_prefetch` right after deciding to open a specific file, so the
+   buffer is warm before the next search.
+7. After consuming a result, record its `memoryId` through the verified access
    route when available.
+8. Close the task envelope with `synapse_task_end` when the task's work is done.
+   Update `taskContext` only when the *kind* of work changes, never per query.
 
 Verified v2.0.2 adapter warnings:
 
@@ -78,6 +101,36 @@ REST prime entries require `id` and `content`; `score` and `metadata` are
 optional. REST prefetch requires `filePath` and may include `symbols`, `chains`,
 `maxResults`, `minImportance`, or `entries`.
 
+## Reading Pipeline Output
+
+With `LOG_LEVEL=debug`, the server emits one structured line per Synapse-scoped
+query. Use it to decide whether Synapse is helping or whether the query needs
+refining — not as evidence about the codebase.
+
+```json
+{
+  "before": 16, "after": 14,
+  "queryClass": "specific",
+  "intent": "decision",
+  "appliedFilters": ["buffer-hit","pre-gate","attention","chain","diversity","temporal","confidence-gate","spectrum","buffer-put"],
+  "flags": { "lowConfidence": false, "noStrongMatch": false, "definitiveMatch": true,
+             "spread": 0.31, "mean": 0.78, "confidence": 0.24 }
+}
+```
+
+| Signal | Reading |
+|---|---|
+| `appliedFilters` has `buffer-hit` | Buffer had warm results — priming/prefetch is paying off. |
+| `appliedFilters` has `pre-gate` | Early raw-score filter cut noise before attention. |
+| `appliedFilters` lacks `attention` | `SYNAPSE_ATTENTION_ENABLED=false`; task alignment did not re-rank. |
+| `queryClass = "specific"` | Symbol-like query; confidence gate at 0.55. |
+| `queryClass = "focused"` | Tech terms; gate at 0.40. |
+| `queryClass = "broad"` | Exploratory; gate at 0.25. |
+| `intent != "general"` | Chain inhibition modulated results by memory type. |
+| `flags.definitiveMatch = true` | One dominant hit; the top result is trustworthy. |
+| `flags.lowConfidence = true` | Results clustered — the query is ambiguous. Refine it; this is not a failure. |
+| `flags.noStrongMatch = true` | Nothing crossed the threshold — the answer is probably not in the corpus. Fall back to source reads. |
+
 ## Failure Policy
 
 - Session creation fails: continue with stateless massa-ai search.
@@ -87,6 +140,17 @@ optional. REST prefetch requires `filePath` and may include `symbols`, `chains`,
 - Session expires or disappears after server restart: create a new session; do
   not reuse the old ID. Synapse state is ephemeral and process-local.
 - Never reset or reindex a project to repair a Synapse-only failure.
+
+## Anti-Patterns
+
+- Reusing one session across unrelated tasks: task-alignment, agent-affinity,
+  and buffer signals drift into noise. Open a fresh session per task.
+- Updating `taskContext` after every query — the signal stops meaning anything.
+- Priming hundreds of entries against a 20-entry buffer.
+- Sending a different `agentId` per call.
+- Passing `synapseSessionId` on a one-shot stateless lookup.
+- Treating `flags.lowConfidence` as "search failed".
+- Persisting `synapseSessionId` as the task's durable session identity.
 
 ## Completion
 

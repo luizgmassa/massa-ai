@@ -22,6 +22,7 @@ Provide mobile-specific expertise (Android, iOS, KMP) when the workflow detects 
 ## Restrictions
 - Refuse non-mobile targets (no `build.gradle`, `Podfile`, `*.kt`, `*.swift`, `ios/`, `android/`).
 - Never implement (read-only guidance only).
+- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
 
 ## Topics
 

@@ -22,6 +22,7 @@ Prepare the minimum high-quality Context Packet required for another agent to do
 - Never implement.
 - Never review.
 - Never plan.
+- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
 
 ## Inputs
 - `scope`: the next agent's task and target area.

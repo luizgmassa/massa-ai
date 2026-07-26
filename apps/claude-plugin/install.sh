@@ -2,7 +2,7 @@
 #
 # massa-ai Claude Code plugin installer
 #
-# Copies slash commands and the massa-ai-navigator subagent into the user's
+# Copies slash commands and the generated massa-ai subagents into the user's
 # Claude Code config directory AND auto-writes the 5 massa-ai hook events
 # into ~/.claude/settings.json (or ./.claude/settings.json) using an
 # array-append merge that preserves existing user hooks. The hooks block uses
@@ -219,19 +219,18 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
     done
     echo "  - removed massa-ai-* commands from $TARGET/commands/"
   fi
-  # Remove the 12 subagent specialists (exclude navigator — R1: name-prefix glob
-  # would catch massa-ai-navigator.md; preserve it per CLA-05).
+  # Remove every massa-ai-owned subagent specialist. All of them are generated
+  # from skills/agents/*/SKILL.md, so the massa-ai- name prefix is the ownership
+  # marker; user agents without that prefix are untouched.
   if [[ -d "$TARGET/agents" ]]; then
     for src in "$TARGET/agents/"massa-ai-*.md; do
       [[ -f "$src" ]] || continue
-      name="$(basename "$src")"
-      [[ "$name" == *navigator* ]] && continue
       rm -f "$src"
     done
-    echo "  - removed 12 subagent specialists from $TARGET/agents/ (navigator preserved)"
+    echo "  - removed massa-ai-* subagent specialists from $TARGET/agents/"
   fi
   echo ""
-  echo "Done. User hooks, keys, and navigator agent preserved."
+  echo "Done. User hooks, keys, and non-massa-ai agents preserved."
   exit 0
 fi
 
@@ -250,22 +249,17 @@ for src in "$SCRIPT_DIR/commands/"*.md; do
   command_count=$((command_count + 1))
 done
 
-# Subagent — keep original name
-cp "$SCRIPT_DIR/agents/massa-ai-navigator.md" "$TARGET/agents/massa-ai-navigator.md"
-vecho "  + agent: massa-ai-navigator"
-
-# 12 subagent specialists (generated from skills/*/SKILL.md). Exclude navigator
-# from the loop (it is copied above and preserved on uninstall per CLA-05/R1).
+# Subagent specialists (generated from skills/agents/*/SKILL.md, navigator
+# included). The massa-ai- name prefix is the ownership marker used by uninstall.
 specialist_count=0
 for src in "$SCRIPT_DIR/agents/"massa-ai-*.md; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
-  [[ "$name" == *navigator* ]] && continue
   cp "$src" "$TARGET/agents/$name"
   vecho "  + $name"
   specialist_count=$((specialist_count + 1))
 done
-vecho "  + ${specialist_count} subagent specialists: investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist"
+vecho "  + ${specialist_count} subagent specialists (generated from skills/agents/*/SKILL.md)"
 
 # Merge hooks into settings.json (array-append, backup, idempotent)
 vecho ""

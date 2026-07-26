@@ -2,11 +2,11 @@
 /**
  * massa-ai subagent-artifacts generator (single source of truth).
  *
- * Reads the 12 specialist charters under skills/ and emits per-host agent
- * files into apps/{claude,codex,cursor,opencode}-plugin/agents/. Outputs are
- * checked into git so the plugins ship without a runtime build step.
+ * Reads every charter under skills/agents/ and emits per-host agent files into
+ * apps/{claude,codex,cursor,opencode}-plugin/agents/. Outputs are checked into
+ * git so the plugins ship without a runtime build step.
  *
- *   bun run scripts/generate-subagent-artifacts.ts        # emit 48 files (12 x 4 hosts)
+ *   bun run scripts/generate-subagent-artifacts.ts        # emit 64 files (16 x 4 hosts)
  *   bun run scripts/generate-subagent-artifacts.ts --check # drift gate: diff vs checked-in
  *
  * Model + effort + permission are PINNED per host (spec, NOT advisory). A parity
@@ -30,7 +30,7 @@ const HOST_DIRS: Record<Host, string> = {
   opencode: path.join(APPS_DIR, "opencode-plugin", "agents"),
 };
 
-// ── Charter registry (the 12 specialists; excludes massa-ai-memory/synapse-usage) ─
+// ── Charter registry (every charter under skills/agents/) ───────────────────
 const SPECIALIST_NAMES = [
   "investigator",
   "planner",
@@ -44,12 +44,18 @@ const SPECIALIST_NAMES = [
   "documentation-agent",
   "audit-specialist",
   "mobile-specialist",
+  "plan-critic",
+  "furps-analyst",
+  "handoff-writer",
+  "navigator",
 ] as const;
 type SpecialistName = (typeof SPECIALIST_NAMES)[number];
 
-// ── Write-permission override (spec AC CLA-03 / design.md) ──────────────────
-// Charters mark test-engineer + documentation-agent as read-only, but the spec
-// grants them Write/Edit for the test/doc files in their disjoint write set.
+// ── Write-permission set (spec AC CLA-03 / design.md) ───────────────────────
+// These three charters declare `permission: write` (test-engineer and
+// documentation-agent are scoped writers: test files / doc files only, with a
+// disjoint write set). Charter frontmatter and this set must agree —
+// scripts/__tests__/skills-harness-integrity.test.ts enforces that.
 const WRITE_AGENTS: ReadonlySet<SpecialistName> = new Set<SpecialistName>([
   "builder",
   "test-engineer",
@@ -71,6 +77,10 @@ const AGENT_MODELS_CLAUDE: Record<SpecialistName, "haiku" | "sonnet" | "opus"> =
   "audit-specialist": "sonnet",
   "mobile-specialist": "sonnet",
   "architecture-specialist": "opus",
+  "plan-critic": "opus",
+  "furps-analyst": "sonnet",
+  "handoff-writer": "haiku",
+  navigator: "sonnet",
 };
 
 // Codex IDs + model_reasoning_effort = "high" (spec Codex table)
@@ -87,6 +97,10 @@ const AGENT_MODELS_CODEX: Record<SpecialistName, string> = {
   "audit-specialist": "gpt-5.6-terra",
   "mobile-specialist": "gpt-5.6-terra",
   "architecture-specialist": "gpt-5.6-sol",
+  "plan-critic": "gpt-5.6-sol",
+  "furps-analyst": "gpt-5.6-terra",
+  "handoff-writer": "gpt-5.4-mini",
+  navigator: "gpt-5.4-mini",
 };
 
 // OpenCode ids + reasoningEffort: max (spec OpenCode table). OpenCode resolves
@@ -107,6 +121,10 @@ const AGENT_MODELS_OPENCODE: Record<SpecialistName, string> = {
   "audit-specialist": "opencode-go/glm-5.2",
   "mobile-specialist": "opencode-go/glm-5.2",
   "architecture-specialist": "opencode-go/minimax-m3",
+  "plan-critic": "opencode-go/minimax-m3",
+  "furps-analyst": "opencode-go/glm-5.2",
+  "handoff-writer": "opencode-go/deepseek-v4-pro",
+  navigator: "opencode-go/deepseek-v4-pro",
 };
 
 // Cursor uses charter metadata.model_hint verbatim + reasoningEffort: max.
@@ -118,21 +136,26 @@ const AGENT_MODELS_OPENCODE: Record<SpecialistName, string> = {
 const READ_ONLY_TOOLS = ["Read", "Grep", "Glob", "Bash"];
 const WRITE_TOOLS = [...READ_ONLY_TOOLS, "Write", "Edit"];
 
-// OpenCode bash permission (spec OPC-07 / design.md plan-critic F4)
-const OPENCODE_STRICT_READONLY: ReadonlySet<SpecialistName> = new Set<
-  SpecialistName
->([
-  "investigator",
-  "context-curator",
-  "verification-agent",
-  "requirements-analyst",
-  "architecture-specialist",
-  "reviewer",
-  "audit-specialist",
-  "mobile-specialist",
-]);
-// planner is inspection-capable -> bash: { "*": "ask" }
-// write agents -> bash: allow
+// Charters whose tool set is not the default read-only/write set. The navigator
+// is index-first: it reaches the massa-ai MCP surface and needs only `pwd` from
+// the shell (charter metadata.tools: mcp-index).
+const AGENT_TOOLS_OVERRIDE: Partial<Record<SpecialistName, readonly string[]>> = {
+  navigator: ["mcp__massa-ai__*", "Read", "Grep", "Glob", "Bash(pwd)"],
+};
+
+export function toolsFor(name: SpecialistName): readonly string[] {
+  const override = AGENT_TOOLS_OVERRIDE[name];
+  if (override) return override;
+  return WRITE_AGENTS.has(name) ? WRITE_TOOLS : READ_ONLY_TOOLS;
+}
+
+// OpenCode bash permission (spec OPC-07 / design.md plan-critic F4).
+// Default: write agents -> bash: allow; planner -> bash: { "*": "ask" };
+// every other read-only agent -> bash: deny. Overrides narrow that further.
+const OPENCODE_BASH_OVERRIDE: Partial<Record<SpecialistName, string>> = {
+  planner: `{ "*": "ask" }`,
+  navigator: `{ "pwd": "allow", "*": "deny" }`,
+};
 
 // ── Host built-in names (spec name-collision ACs) ───────────────────────────
 const HOST_BUILTINS: Record<Host, ReadonlySet<string>> = {
@@ -252,9 +275,7 @@ export async function loadAllCharters(): Promise<Charter[]> {
 
 export function emitClaude(c: Charter): string {
   const agentName = `massa-ai-${c.name}`;
-  const isWrite = WRITE_AGENTS.has(c.name);
-  const tools = isWrite ? WRITE_TOOLS : READ_ONLY_TOOLS;
-  const toolsJson = JSON.stringify(tools);
+  const toolsJson = JSON.stringify(toolsFor(c.name));
   const model = AGENT_MODELS_CLAUDE[c.name];
   // CLA-04: omit hooks/mcpServers/permissionMode (blocked on plugin-shipped agents)
   const fm = [
@@ -272,9 +293,7 @@ export function emitClaude(c: Charter): string {
 
 export function emitCursor(c: Charter): string {
   const agentName = `massa-ai-${c.name}`;
-  const isWrite = WRITE_AGENTS.has(c.name);
-  const tools = isWrite ? WRITE_TOOLS : READ_ONLY_TOOLS;
-  const toolsJson = JSON.stringify(tools);
+  const toolsJson = JSON.stringify(toolsFor(c.name));
   // CRS-08: model = charter hint verbatim; reasoningEffort: max (pass-through)
   const fm = [
     "---",
@@ -322,11 +341,12 @@ export function emitOpenCode(c: Charter): string {
   const agentName = `massa-ai-${c.name}`;
   const isWrite = WRITE_AGENTS.has(c.name);
   // OPC-07: permission per-agent bash mapping
+  const bashOverride = OPENCODE_BASH_OVERRIDE[c.name];
   let permissionBlock: string;
   if (isWrite) {
     permissionBlock = `{ edit: allow, bash: allow }`;
-  } else if (c.name === "planner") {
-    permissionBlock = `{ edit: deny, bash: { "*": "ask" } }`;
+  } else if (bashOverride) {
+    permissionBlock = `{ edit: deny, bash: ${bashOverride} }`;
   } else {
     permissionBlock = `{ edit: deny, bash: deny }`;
   }
@@ -376,9 +396,8 @@ export async function diffHost(
   checkedInDir: string,
   host: Host
 ): Promise<string[]> {
-  // Compare ONLY the 12 generated specialist files per host. The navigator
-  // (Claude/Cursor) and any non-massa-ai files are not generator-owned and
-  // are excluded from the drift check (spec: navigator preserved as-is).
+  // Compare every generated charter file per host. Non-massa-ai files in the
+  // host dir are not generator-owned and are ignored.
   const ext = host === "codex" ? "toml" : "md";
   const expected = SPECIALIST_NAMES.map(
     (n) => `massa-ai-${n}.${ext}`
@@ -449,8 +468,11 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     return runCheck();
   }
   await emitAll(HOST_DIRS);
-  const total = SPECIALIST_NAMES.length * 4;
-  console.log(`Emitted ${total} agent files (12 x 4 hosts).`);
+  const hostCount = Object.keys(HOST_DIRS).length;
+  const total = SPECIALIST_NAMES.length * hostCount;
+  console.log(
+    `Emitted ${total} agent files (${SPECIALIST_NAMES.length} x ${hostCount} hosts).`
+  );
   return 0;
 }
 

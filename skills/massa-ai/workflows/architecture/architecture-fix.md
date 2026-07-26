@@ -53,7 +53,7 @@ Do not use this workflow for findings-only architecture review; route that to `w
    - Update tests, docs, and imports only where required by the architecture fix.
 10. Use agent orchestration only when it improves signal. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: builder** — see `skills/agents/builder/SKILL.md`
+> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated architecture finding with a disjoint write set
 > - permissions: write (disjoint write set)
@@ -63,7 +63,7 @@ Do not use this workflow for findings-only architecture review; route that to `w
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable architecture patterns
 
-> **Dispatch: verification-agent** — see `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: independent verification of a high-risk or multi-file architecture fix
 > - scope: the fixed finding's dependency direction, tests, imports, and report claim closure
 > - permissions: read-only

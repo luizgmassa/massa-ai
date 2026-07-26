@@ -37,7 +37,7 @@ Commands:
     --model <name>    Model name
     --base-url <url>  Base URL (for ollama)
 
-  agents            Manage the 12 subagent specialist definitions
+  agents            Manage the 16 subagent specialist definitions
     agents install [--user|--project]   Write 12 agent .md files
     agents uninstall [--user|--project] Remove only massa-ai-owned agents
 
@@ -234,7 +234,7 @@ export async function runCli(argv: string[]): Promise<number> {
         count++;
       }
       console.log(
-        `+ ${count} subagent specialists: investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist`,
+        `+ ${count} subagent specialists (generated from skills/agents/*/SKILL.md)`,
       );
       console.log(`  written to: ${agentsDir}`);
     } else {

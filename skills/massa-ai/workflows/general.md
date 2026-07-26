@@ -11,7 +11,7 @@ Use this workflow for coding, planning-before-coding, review, or implementation 
    Retrieve only the context required for the goal:
    - begin with focused local inspection or the shared summary-search sequence
    - deepen into enriched search, symbols, or exact files only when needed
-   - prefer `read_file` over native Read when symbol metadata + imports are useful (priority 14 per `massa-ai-memory` meta-skill); use `symbol_snippet` for raw code snippets by file + line range
+   - prefer `read_file` over native Read when symbol metadata + imports are useful (retrieval order per `references/mcp-tools.md`); use `symbol_snippet` for raw code snippets by file + line range
    - prefer current repository truth over stale or conflicting memories
 6. Execute the requested work using existing repository conventions. Tie verification depth to the Verification Ladder tier table in `references/verification-ladder.md`: Quick (<=3 files and <=200 changed LOC) runs static + file-integrity checks; Standard (<=10 files or <=500 changed LOC) adds a named verification recipe and behavioral checks; Spec-driven (>10 files, >500 changed LOC) escalates to `workflows/spec-driven.md`. Do not invent new thresholds; load specialized references only when the task needs their exact contracts.
    - For analysis that benefits from running code (derived values, data inspection, bulk transforms), call `execute` with `language` and `code` or `batch_execute` with `commands`[] instead of loading raw data into context. Respect the local-dev-only trust model (no untrusted-client exposure).

@@ -37,8 +37,6 @@ async function readFile(p: string): Promise<string> {
 describe("skill file structure validation", () => {
   const expectedSkills = [
     "massa-ai",
-    "massa-ai-memory",
-    "synapse-usage",
     "persona-router",
   ];
 
@@ -109,7 +107,7 @@ describe("skills/AGENTS.md bootstrap contract", () => {
     expect(block).not.toContain("UAS_");
   });
 
-  test("sub-agent registry preserved (12 agents)", async () => {
+  test("sub-agent registry preserved (16 agents)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "AGENTS.md"));
     expect(content).toContain("investigator");
     expect(content).toContain("planner");
@@ -123,6 +121,10 @@ describe("skills/AGENTS.md bootstrap contract", () => {
     expect(content).toContain("documentation-agent");
     expect(content).toContain("audit-specialist");
     expect(content).toContain("mobile-specialist");
+    expect(content).toContain("plan-critic");
+    expect(content).toContain("furps-analyst");
+    expect(content).toContain("handoff-writer");
+    expect(content).toContain("navigator");
   });
 });
 
@@ -701,7 +703,7 @@ describe("context slices", () => {
 });
 
 // ── Agents harness routing (ported from legacy) ──────────────────────────
-// Legacy asserted agents harness routing is enforced. The 12-agent registry
+// Legacy asserted agents harness routing is enforced. The 16-agent registry
 // lives in skills/AGENTS.md and each agent has a charter under skills/agents/.
 
 describe("agents harness routing", () => {
@@ -711,9 +713,10 @@ describe("agents harness routing", () => {
     "context-curator", "verification-agent", "requirements-analyst",
     "architecture-specialist", "test-engineer", "documentation-agent",
     "audit-specialist", "mobile-specialist",
+    "plan-critic", "furps-analyst", "handoff-writer", "navigator",
   ];
 
-  test("skills/agents/ exists with one subdir per agent (12)", async () => {
+  test("skills/agents/ exists with one subdir per agent (16)", async () => {
     expect(await fileExists(AGENTS_SUBDIR)).toBe(true);
     const entries = await fs.readdir(AGENTS_SUBDIR, { withFileTypes: true });
     const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
@@ -1140,10 +1143,12 @@ describe("canonical tool naming (no th0th_-prefixed tool names)", () => {
   const CHARTER_FILES = [
     "agents/investigator/SKILL.md",
     "agents/context-curator/SKILL.md",
+    "agents/navigator/SKILL.md",
+    "agents/plan-critic/SKILL.md",
     "persona-router/SKILL.md",
-    "synapse-usage/SKILL.md",
     "massa-ai/SKILL.md",
-    "massa-ai-memory/SKILL.md",
+    "massa-ai/references/mcp-tools.md",
+    "massa-ai/references/synapse-policy.md",
   ];
 
   for (const rel of CHARTER_FILES) {

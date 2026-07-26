@@ -52,9 +52,25 @@ shape or package version.
 | `memory_list` | Chronological memory audit | Treat as unscoped until runtime proves project filtering. |
 | `memory_update` | Update a memory by id; re-embeds on content change | Req: `id`. Opt: `content`, `importance`, `tags`, `mergeTags`, `format`. |
 | `memory_delete` | Hard-delete a memory by id; severs graph edges | Req: `id`. Opt: `format`. |
-| `compress` | Compress large context | Use structured strategies; do not persist output automatically. |
+| `compress` | Compress large context | Pick a strategy from the table below; do not persist output automatically. |
 | `analytics` | Inspect search/cache usage | Requires analytics `type` (summary, project, query, cache, recent). |
 | `compact_snapshot` | Bounded (<2KB) session compaction snapshot | Req: `sessionId` (lifecycle session id, NOT workflowSessionId). Opt: `projectId`, `persist`. Zero-loss table-of-contents for /compact recovery. |
+
+### Compression Strategies
+
+`compress` takes one explicit `strategy`. Match the strategy to the input shape;
+the reduction ranges are observed, not guaranteed.
+
+| Strategy | Use case | Reduction |
+|---|---|---|
+| `code_structure` | Source code | 70-90% |
+| `conversation_summary` | Chat history | 80-95% |
+| `semantic_dedup` | Repetitive content | 50-70% |
+| `hierarchical` | Structured docs | 60-80% |
+
+Compress before persisting a large artifact into memory, not after. Compressed
+output is a lead, not a source of truth: re-read the original file when a claim
+depends on exact content.
 
 ## MCP Capability Matrix — Synapse (Cognitive Layer)
 

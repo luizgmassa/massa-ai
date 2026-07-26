@@ -332,13 +332,15 @@ Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/p
 
 ---
 
-## Subagent Skills (12 Specialists)
+## Subagent Skills (16 Specialists)
 
-**What:** massa-ai defines 12 reusable sub-agent specialists in `skills/*/SKILL.md` (charter files). These ship as host-native subagent definitions across all four plugins so the massa-ai workflow router's delegation model works inside Claude Code, Codex, Cursor, and OpenCode. The 12 specialists are additive to the existing `massa-ai-navigator` (Claude/Cursor), which is a distinct index-first agent.
+**What:** massa-ai defines 16 reusable sub-agent specialists in `skills/agents/*/SKILL.md` (charter files). These ship as host-native subagent definitions across all four plugins so the massa-ai workflow router's delegation model works inside Claude Code, Codex, Cursor, and OpenCode.
 
-**The 12 specialists:** investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist.
+**The 16 specialists:** investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist, plan-critic, furps-analyst, handoff-writer, navigator.
 
-**Single source of truth:** `scripts/generate-subagent-artifacts.ts` reads `skills/*/SKILL.md` and emits per-host agent files into `apps/{claude,codex,cursor,opencode}-plugin/agents/`. Outputs are checked into git. A parity test (`scripts/__tests__/subagent-parity.test.ts`) re-runs the generator in `--check` mode and asserts byte-identity — drift fails CI.
+Workflows dispatch these agents under their **host-registered** names, prefixed `massa-ai-` (for example `massa-ai-investigator`). The bare charter name is the registry key, not the dispatch name.
+
+**Single source of truth:** `scripts/generate-subagent-artifacts.ts` reads `skills/agents/*/SKILL.md` and emits per-host agent files into `apps/{claude,codex,cursor,opencode}-plugin/agents/`. Outputs are checked into git. A parity test (`scripts/__tests__/subagent-parity.test.ts`) re-runs the generator in `--check` mode and asserts byte-identity — drift fails CI.
 
 ### File locations + formats (per host)
 
@@ -373,6 +375,10 @@ Every Claude Code agent sets `effort: high` in addition to its pinned `model`.
 | audit-specialist | sonnet | Most audits don't justify Opus unless architectural. |
 | mobile-specialist | sonnet | Android/iOS implementation is primarily coding work. |
 | architecture-specialist | opus | Large-scale design, trade-offs, migrations, RFC guidance. |
+| plan-critic | opus | Adversarial critique of a plan is the other highest-leverage token spend. |
+| furps-analyst | sonnet | Checklist-driven document analysis per FURPS+ dimension. |
+| handoff-writer | haiku | Assembling a continuation package from artifacts is summarization. |
+| navigator | sonnet | Index-first lookups with cited answers; no frontier reasoning needed. |
 
 #### Codex (model IDs + `model_reasoning_effort = "high"`)
 
@@ -392,6 +398,10 @@ Every Codex agent TOML sets `model_reasoning_effort = "high"` in addition to its
 | audit-specialist | gpt-5.6-terra | Most audits don't justify Opus unless architectural. |
 | mobile-specialist | gpt-5.6-terra | Android/iOS implementation is primarily coding work. |
 | architecture-specialist | gpt-5.6-sol | Large-scale design, trade-offs, migrations, RFC guidance. |
+| plan-critic | gpt-5.6-sol | Adversarial critique of a plan is the other highest-leverage token spend. |
+| furps-analyst | gpt-5.6-terra | Checklist-driven document analysis per FURPS+ dimension. |
+| handoff-writer | gpt-5.4-mini | Assembling a continuation package from artifacts is summarization. |
+| navigator | gpt-5.4-mini | Index-first lookups with cited answers; no frontier reasoning needed. |
 
 #### Cursor (charter `metadata.model_hint` verbatim + `reasoningEffort: max`)
 
@@ -411,6 +421,10 @@ Every Cursor agent sets `reasoningEffort: max` in frontmatter (pass-through; fie
 | audit-specialist | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
 | mobile-specialist | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
 | architecture-specialist | MiniMax M3 | `metadata.model_hint: MiniMax M3` |
+| plan-critic | MiniMax M3 | `metadata.model_hint: MiniMax M3` |
+| furps-analyst | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
+| handoff-writer | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
+| navigator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
 
 #### OpenCode (pinned `provider/model-id` + `mode: all` + `reasoningEffort: max`)
 
@@ -434,6 +448,10 @@ Every OpenCode agent sets `mode: all`. OpenCode's Tab switcher lists `primary` a
 | audit-specialist | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
 | mobile-specialist | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
 | architecture-specialist | `opencode-go/minimax-m3` | `metadata.model_hint: MiniMax M3` |
+| plan-critic | `opencode-go/minimax-m3` | `metadata.model_hint: MiniMax M3` |
+| furps-analyst | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
+| handoff-writer | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
+| navigator | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
 
 > The `opencode-go/` provider carries all three tiers. A user without it configured gets OpenCode's documented fallback to the primary agent's model — the same degrade the unresolvable hint caused, except no longer silently for everyone.
 
@@ -448,20 +466,23 @@ Every OpenCode agent sets `mode: all`. OpenCode's Tab switcher lists `primary` a
 
 ### Permission mapping (read-only vs write)
 
-Write-permitted agents: `builder`, `test-engineer`, `documentation-agent`. All others are read-only.
+Write-permitted agents: `builder`, `test-engineer`, `documentation-agent` (the last two are scoped writers — test files / doc files only, with a disjoint write set). All others are read-only. Each charter's `metadata.permission` must agree with the shipped artifact; `scripts/__tests__/skills-harness-integrity.test.ts` enforces that.
 
 | Host | Read-only | Write |
 | --- | --- | --- |
 | Claude Code | `tools: ["Read","Grep","Glob","Bash"]` (no Write/Edit) | `tools: ["Read","Grep","Glob","Bash","Write","Edit"]` |
 | Codex | `sandbox_mode = "read-only"` | `sandbox_mode = "workspace-write"` |
 | Cursor | Same `tools` as Claude | Same `tools` as Claude |
-| OpenCode | `permission: { edit: deny, bash: deny }` (strict) or `{ edit: deny, bash: { "*": "ask" } }` (planner — inspection-capable) | `permission: { edit: allow, bash: allow }` |
+| OpenCode | `permission: { edit: deny, bash: deny }` (strict), `{ edit: deny, bash: { "*": "ask" } }` (planner — inspection-capable), or `{ edit: deny, bash: { "pwd": "allow", "*": "deny" } }` (navigator — index-first) | `permission: { edit: allow, bash: allow }` |
+
+`navigator` is the one charter with a non-default tool set: `tools: ["mcp__massa-ai__*","Read","Grep","Glob","Bash(pwd)"]` on Claude/Cursor, declared in the generator's `AGENT_TOOLS_OVERRIDE`.
 
 ### Generator + parity contract
 
-- **Generator:** `scripts/generate-subagent-artifacts.ts` reads `skills/*/SKILL.md` (12 charters), emits 48 files (12 × 4 hosts) into `apps/*/agents/`. Run via `bun run scripts/generate-subagent-artifacts.ts`. Outputs checked into git.
+- **Generator:** `scripts/generate-subagent-artifacts.ts` reads `skills/agents/*/SKILL.md` (16 charters), emits 64 files (16 × 4 hosts) into `apps/*/agents/`. Run via `bun run scripts/generate-subagent-artifacts.ts`. Outputs checked into git.
 - **Drift gate:** `bun run scripts/generate-subagent-artifacts.ts --check` emits to a temp dir and diffs against checked-in files. Exit non-zero on drift.
-- **Parity test:** `scripts/__tests__/subagent-parity.test.ts` runs the drift gate + asserts model/effort/permission pinning, name-collision-free, exact 12 per host, Codex TOML round-trip + owned marker, and FEATURES.md ↔ spec table byte-parity (DOC-06).
+- **Parity test:** `scripts/__tests__/subagent-parity.test.ts` runs the drift gate + asserts model/effort/permission pinning, name-collision-free, exact 16 per host, Codex TOML round-trip + owned marker, and FEATURES.md ↔ spec table byte-parity (DOC-06).
+- **Harness integrity:** `scripts/__tests__/skills-harness-integrity.test.ts` asserts every workflow `Dispatch:` block names an agent that exists in all four host dirs, every role in `references/agent-orchestration.md` has a real charter, and charter permission matches the shipped artifact.
 
 **Spec:** `.specs/features/subagent-skills-plugin-parity/`
 
@@ -1151,8 +1172,6 @@ The installer writes the bootstrap block into each tool's `AGENTS.md` using the 
 | Skill | Location | Description |
 |-------|----------|-------------|
 | `massa-ai` | `skills/massa-ai/` | Default memory-backed workflow router for every coding session. 30+ workflows (spec-driven, debug, feature, refactor, audits, ADR/RFC/TDD, commit, ticket, etc.) and 30+ references (evidence gate, context firewall, verification ladder, agent orchestration, etc.). |
-| `massa-ai-memory` | `skills/massa-ai-memory/` | Mandatory rules for using massa-ai semantic search, compression, memory, and symbol graph tools. Prioritizes massa-ai tools over native Glob/Grep/Read. |
-| `synapse-usage` | `skills/synapse-usage/` | Synapse cognitive modulation layer for focused, low-noise retrieval during multi-step coding tasks. Open sessions, prime buffers, pass session IDs. |
 | `persona-router` | `skills/persona-router/` | Automatic persona selection from catalog. Reads `skills/massa-ai/personas/catalog.json`, routes based on primary deliverable ownership, supports explicit selection, ambiguity policy, and mid-conversation rerouting. |
 
 ### Unified Skills Installer (`scripts/install-skills.sh`)

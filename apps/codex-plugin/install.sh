@@ -296,7 +296,7 @@ vecho "Merging hooks into $HOOKS_JSON..."
 merge_hooks_json "$HOOKS_JSON" "install"
 vecho "  + 6 massa-ai hook events wired (array-append, user hooks preserved)"
 
-# Write 12 subagent specialist TOML files to ~/.codex/agents/ (OUTSIDE the
+# Write the generated subagent specialist TOML files to ~/.codex/agents/ (OUTSIDE the
 # plugin dir — Codex custom agents load from the config-root agents/ dir, not
 # the plugin dir). Each file carries a "# massa-ai-owned" top comment for
 # scoped uninstall (R3: shared agents dir, user agents preserved).
@@ -309,7 +309,7 @@ for src in "$SCRIPT_DIR/agents/"massa-ai-*.toml; do
   vecho "  + $name"
   specialist_count=$((specialist_count + 1))
 done
-vecho "  + ${specialist_count} subagent specialists: investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist"
+vecho "  + ${specialist_count} subagent specialists (generated from skills/agents/*/SKILL.md)"
 
 # ── MCP registration (delegated) ─────────────────────────────────────────────
 # scripts/install-agents.sh is the single writer of host MCP config. It writes

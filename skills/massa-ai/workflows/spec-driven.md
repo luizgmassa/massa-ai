@@ -97,7 +97,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
    - Update logical feature artifacts in `.specs/features/<slug>/` and `.specs/project/STATE.md` after meaningful progress.
     - Finish Execute by running `references/spec-driven/validate.md`. Dispatch `verification-agent` (author ≠ verifier) per `references/agent-orchestration.md`; the verification-agent always runs automatically and writes `.specs/features/<slug>/validation.md`. Without subagents, run the standalone fresh-eyes fallback in `validate.md`.
 
-> **Dispatch: verification-agent** — see `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: spec-driven Execute final gate; author ≠ verifier independence required
 > - scope: the feature's git diff surface, test files, and spec ACs
 > - permissions: read-only
@@ -150,6 +150,9 @@ Step 4: Web search → official docs, reputable sources, community patterns
 Step 5: Flag as uncertain → "I'm not certain about X — here's my reasoning, but verify"
 ```
 
+- If a chain step's tool is unavailable (Context7 MCP not registered, no web
+  access), record it as a skipped sensor with its reason and continue to the next
+  step. An unavailable step is skipped, never silently treated as answered.
 - Never skip to Step 5 if Steps 1-4 are available.
 - Step 5 is always flagged uncertain — never presented as fact.
 - Never assume or fabricate. If no answer is found, say "I don't know" or "I couldn't find documentation for this". Uncertainty is always preferable to fabrication; invented APIs/patterns cause cascading failures across design → tasks → implementation.
