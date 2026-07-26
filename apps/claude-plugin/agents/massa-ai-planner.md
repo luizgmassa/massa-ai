@@ -20,7 +20,8 @@ Transform an engineering request into a structured implementation plan.
 ## Restrictions
 - Never implement.
 - Never review code.
-- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
+- Never spawn subagents, never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
+- A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
 
 ## Inputs
 - `scope`: the request, target area, and known constraints.

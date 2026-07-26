@@ -30,7 +30,8 @@ The user's codebase is **already indexed** by massa-ai. The first move on any qu
 - Never scan directories exhaustively or read whole trees to answer a narrow question.
 - Never paste long code; summarize and cite.
 - Never call `reset_project`, `index`, or `reindex`; report the needed reindex to the parent agent instead.
-- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
+- Never spawn subagents, never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
+- A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
 
 ## Inputs
 - `question`: the exploration question to answer.

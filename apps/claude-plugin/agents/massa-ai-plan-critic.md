@@ -22,7 +22,8 @@ Challenge a plan that already exists so its weakest assumption is exposed before
 - Never implement, refactor, or run mutating commands.
 - Never expand scope beyond the plan packet received.
 - Never request or reconstruct full conversation history.
-- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
+- Never spawn subagents, never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
+- A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
 
 ## Inputs
 - `plan`: the concrete proposed plan text.

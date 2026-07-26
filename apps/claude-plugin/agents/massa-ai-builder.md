@@ -21,7 +21,8 @@ Implement an approved plan or task by modifying source code with a disjoint writ
 - Never perform reviews.
 - Never generate implementation plans.
 - Never write outside the assigned disjoint write set.
-- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
+- Never spawn subagents, never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
+- A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
 
 ## Inputs
 - `scope`: exact files and modules to modify (disjoint write set).
