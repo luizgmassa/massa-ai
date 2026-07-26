@@ -103,6 +103,7 @@ When a workflow dispatches a reusable role, send a capability packet rather than
 - `output`: the exact output contract
 - `firewall`: raw logs, diffs, snapshots, or research that must be summarized
 - `memory`: whether the subagent may suggest memory and who persists it
+- `persona`: optional. The cataloged persona id in effect for the parent conversation, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions. Pass the id alone, never the persona prompt.
 
 ## Quality Checklist
 

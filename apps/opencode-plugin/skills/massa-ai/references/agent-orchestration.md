@@ -112,6 +112,7 @@ When dispatching a subagent, send a compact capability packet rather than a loos
 - output: the exact output contract
 - firewall: raw logs, diffs, snapshots, reports, or research that must be summarized
 - memory boundary: whether the subagent may suggest memories and who persists them
+- `persona`: optional. The cataloged persona id in effect for the parent conversation, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions. Pass the id alone, never the persona prompt.
 - exact next step: what the main agent should do with the result
 
 ## Prompt Contract
