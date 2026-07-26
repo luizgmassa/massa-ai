@@ -106,10 +106,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-          # The fixture is staged too: it content-hash-pins the package.json files the
-          # bump just rewrote, and qwen-fixture.ts throws on a mismatch (ARV-R13).
-          git add package.json CHANGELOG.md \
-            packages/core/src/__tests__/e2e/fixtures/qwen-profile.json
+          git add package.json CHANGELOG.md
           git add -u packages apps
           git commit -m "chore(release): v$VERSION [skip ci]"
           git tag -a "v$VERSION" -m "v$VERSION"
