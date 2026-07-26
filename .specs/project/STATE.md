@@ -1,6 +1,54 @@
 # massa-ai Spec State
 
-## Current — Install Harness Migration
+## Current — Auto Release Versioning
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-auto-release-versioning`
+- workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
+- feature: `auto-release-versioning` — COMPLETE + validated PASS
+- branch: `feat/auto-release-versioning` (not pushed)
+- scope: 13 requirements (ARV-R1..R13) — derive the version bump from the `[Unreleased]`
+  section of `CHANGELOG.md` on every green CI run over `main`, tag it, publish a GitHub
+  Release, publish to npmjs.org **and** GitHub Packages, remove the GitHub Deployment
+  surface and the `next` prerelease channel
+- Spec: `.specs/features/auto-release-versioning/spec.md`
+- Design: `.specs/features/auto-release-versioning/design.md`
+- Tasks: `.specs/features/auto-release-versioning/tasks.md` (T0-T8)
+- Challenge: `.specs/features/auto-release-versioning/fool.md` (full gate, pre-mortem)
+- Report: `.specs/features/auto-release-versioning/validation.md`
+- Key decisions:
+  - D1 GitHub Packages publishes as `@luizgmassa/*` — that registry resolves an npm scope
+    to a GitHub owner, and `@massa-ai` is not one
+  - D2 one `release.yml` calling `publish.yml` via `workflow_call`; **no PAT**, because a
+    tag or release created with `GITHUB_TOKEN` raises no event
+  - D3 the `next` prerelease channel is retired
+  - D4 `Added`/`Changed`/`Removed`/`Deprecated` ⇒ minor; `Fixed`/`Security` ⇒ patch;
+    empty `[Unreleased]` ⇒ no release; major never auto-incremented
+  - D5 (user decision) CHANGELOG authoring rules are documented in **three** places by
+    choice: full copies in both `CLAUDE.md` (§ Releasing and CHANGELOG authoring) and
+    `CONTRIBUTING.md`, plus a quick-reference in the `skills/AGENTS.md` **bootstrap
+    block**. `README.md` links to `CONTRIBUTING.md`. The bootstrap placement is
+    deliberate: `install-skills.sh` copies that block to user-global
+    `~/.claude|.codex|.cursor/AGENTS.md` and `~/.config/opencode/AGENTS.md`, so the rules
+    load at session start in every project. Accepted trade-offs — this repo's versioning
+    policy is visible outside this repo, and the two full copies can drift; keep them in
+    sync when either is edited.
+- Constraints: `qwen-profile.json` content-hash-pins the 5 `package.json` files the bump
+  rewrites, so the release commit must carry a **selective** re-pin (ARV-R13) — never
+  `bun run update-qwen-hashes` from the release path
+- Validation: PASS — 13/13 requirements evidenced, 5/5 mutants killed, actionlint 0
+  across all 5 workflows, `test:scripts` 0, `type-check` 6/6
+- **Blocked on one operator action before merge:** `NPM_TOKEN` lived only inside the
+  `DEPLOY` environment, and the repo-level secret list is empty. Removing
+  `environment: DEPLOY` unbinds it. Re-create it at repository scope:
+  `gh secret set NPM_TOKEN --repo luizgmassa/massa-ai`
+- Open follow-up (out of scope here): **35 of 71** entries in `qwen-profile.json` are
+  already stale on `main` — see `fool.md` F8. Needs its own `bench:needles:gate` evidence.
+  Note `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` do not exist in any scope, so the Docker job
+  has always failed silently behind `continue-on-error: true`.
+- Expected first automated release: **v1.3.0** (minor, from `1.2.1`)
+
+## Previous — Install Harness Migration
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-install-harness-migration`

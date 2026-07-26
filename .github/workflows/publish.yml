@@ -1,38 +1,37 @@
 name: Build and Publish
 
+# Reusable publish workflow. The only automatic caller is release.yml, which passes the
+# tag it just created.
+#
+# There is deliberately no `release: published`, `push: tags`, or `workflow_run` trigger:
+# a tag or release created with GITHUB_TOKEN raises no event (GitHub's recursion guard),
+# so those triggers would be dead. Keeping them would only create a second, divergent
+# publish path. A manual release goes through release.yml's workflow_dispatch.
 on:
-  release:
-    types: [published]
-  push:
-    tags: ['v*']
+  workflow_call:
+    inputs:
+      ref:
+        description: Tag or SHA to publish (e.g. v1.3.0)
+        required: true
+        type: string
   workflow_dispatch:
-  # Auto-publish `next` after a successful CI run on main (continuous delivery
-  # of prereleases). Release/tag events still publish `latest`; manual dispatch
-  # is unchanged. The build job below gates on the triggering run's conclusion.
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
-
-env:
-  NPM_TAG: ${{ github.event_name == 'release' && 'latest' || 'next' }}
+    inputs:
+      ref:
+        description: Tag or SHA to publish (e.g. v1.3.0)
+        required: true
+        type: string
 
 jobs:
   build:
-    # For workflow_run triggers, only proceed when the triggering CI run
-    # actually succeeded — a `completed` workflow_run can also be a failure,
-    # which must not publish.
-    if: >-
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # workflow_run fires against the default branch; pin to the exact
-          # commit CI validated instead of whatever main points at now.
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          # Always an explicit, caller-supplied ref. The old
+          # `workflow_run.head_sha || github.ref` fallback is gone: with `ref` optional it
+          # silently published the tip of main as `latest`.
+          ref: ${{ inputs.ref }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -61,6 +60,8 @@ jobs:
             fi
           done
 
+      # Uploaded AFTER the resolve step on purpose: the publish jobs must receive
+      # manifests whose deps are pinned to ^X.Y.Z, never `workspace:*`.
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -82,7 +83,6 @@ jobs:
   publish-packages:
     needs: build
     runs-on: ubuntu-latest
-    environment: DEPLOY
     permissions:
       contents: read
       id-token: write
@@ -101,20 +101,19 @@ jobs:
 
       - name: Publish @massa-ai/shared
         working-directory: packages/shared
-        run: npm publish --access public --tag ${{ env.NPM_TAG }}
+        run: npm publish --access public --tag latest
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @massa-ai/core
         working-directory: packages/core
-        run: npm publish --access public --tag ${{ env.NPM_TAG }}
+        run: npm publish --access public --tag latest
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-apps:
     needs: [build, publish-packages]
     runs-on: ubuntu-latest
-    environment: DEPLOY
     permissions:
       contents: read
       id-token: write
@@ -133,39 +132,110 @@ jobs:
 
       - name: Publish @massa-ai/tools-api
         working-directory: apps/tools-api
-        run: npm publish --access public --tag ${{ env.NPM_TAG }}
+        run: npm publish --access public --tag latest
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @massa-ai/mcp-client
         working-directory: apps/mcp-client
-        run: npm publish --access public --tag ${{ env.NPM_TAG }}
+        run: npm publish --access public --tag latest
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @massa-ai/opencode-plugin
         working-directory: apps/opencode-plugin
-        run: npm publish --access public --tag ${{ env.NPM_TAG }}
+        run: npm publish --access public --tag latest
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+  publish-github-packages:
+    # Must NOT race the npm jobs. If npm publishes shared+core then fails on tools-api,
+    # publishing all five here would leave the two registries divergent at one version.
+    needs: [build, publish-packages, publish-apps]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@luizgmassa'
+
+      # Its own copy of the artifact. This job rewrites package.json, and a rewritten
+      # manifest must never be what reaches registry.npmjs.org.
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+
+      # GitHub Packages resolves an npm scope to a GitHub owner, and `@massa-ai` is not
+      # one — the repo is luizgmassa/massa-ai — so `@massa-ai/core` fails with
+      # `403 Permission not_found: owner not found`. Republish under the owner scope.
+      # The dependency keys must be rewritten too, or @luizgmassa/tools-api would depend
+      # on @massa-ai/core, which does not exist on this registry.
+      - name: Rewrite manifests for the @luizgmassa scope
+        run: |
+          node <<'NODE'
+          const { readFileSync, writeFileSync } = require('fs');
+
+          const manifests = [
+            'packages/shared/package.json',
+            'packages/core/package.json',
+            'apps/tools-api/package.json',
+            'apps/mcp-client/package.json',
+            'apps/opencode-plugin/package.json',
+          ];
+          const rescope = (n) => n.replace(/^@massa-ai\//, '@luizgmassa/');
+
+          for (const file of manifests) {
+            const pkg = JSON.parse(readFileSync(file, 'utf8'));
+            pkg.name = rescope(pkg.name);
+
+            for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+              if (!pkg[field]) continue;
+              pkg[field] = Object.fromEntries(
+                Object.entries(pkg[field]).map(([name, range]) => [rescope(name), range]),
+              );
+            }
+
+            // GitHub Packages routes a package to its repository via this URL.
+            pkg.repository = { type: 'git', url: 'https://github.com/luizgmassa/massa-ai.git' };
+            pkg.publishConfig = { ...pkg.publishConfig, registry: 'https://npm.pkg.github.com' };
+
+            writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n');
+            console.log(`  ✓ ${file} → ${pkg.name}`);
+          }
+          NODE
+
+      - name: Publish to GitHub Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Dependency order: shared -> core -> apps.
+          for dir in packages/shared packages/core apps/tools-api apps/mcp-client apps/opencode-plugin; do
+            echo "Publishing $dir"
+            (cd "$dir" && npm publish --tag latest)
+          done
+
   publish-docker:
     needs: build
-    # Docker multi-arch builds are heavy and OPTIONAL — npm package publishing
-    # is the Publish contract. Skip on the per-push workflow_run (auto `next`)
-    # trigger; on release/tag/dispatch, attempt the build but tolerate failure
-    # (continue-on-error) so a missing DockerHub credential or image-build
-    # issue never fails the Publish run.
-    if: github.event_name != 'workflow_run'
+    # Docker multi-arch builds are heavy and OPTIONAL — npm package publishing is the
+    # Publish contract. Tolerate failure so a missing DockerHub credential never fails
+    # the release.
     continue-on-error: true
     runs-on: ubuntu-latest
-    environment: DEPLOY
     permissions:
       contents: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -180,7 +250,7 @@ jobs:
         id: version
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Docker meta for API
         id: meta-api
@@ -188,9 +258,8 @@ jobs:
         with:
           images: massa/massa-ai
           tags: |
-            type=raw,value=api-${{ steps.version.outputs.version }},enable=${{ github.event_name == 'release' }}
-            type=raw,value=api-latest,enable=${{ github.event_name == 'release' }}
-            type=raw,value=api-new,enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=api-${{ steps.version.outputs.version }}
+            type=raw,value=api-latest
 
       - name: Docker meta for MCP
         id: meta-mcp
@@ -198,9 +267,8 @@ jobs:
         with:
           images: massa/massa-ai
           tags: |
-            type=raw,value=mcp-${{ steps.version.outputs.version }},enable=${{ github.event_name == 'release' }}
-            type=raw,value=mcp-latest,enable=${{ github.event_name == 'release' }}
-            type=raw,value=mcp-new,enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=mcp-${{ steps.version.outputs.version }}
+            type=raw,value=mcp-latest
 
       - name: Build and push API image
         uses: docker/build-push-action@v6

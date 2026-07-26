@@ -65,21 +65,23 @@ jobs:
 
       - name: List available skills
         run: |
-          echo "## Available Skills" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          for skill in skills/*/SKILL.md; do
-            name=$(grep "^name:" "$skill" | head -1 | sed 's/name: *//')
-            desc=$(grep "^description:" "$skill" | head -1 | sed 's/description: *//')
-            echo "- **$name**: $desc" >> $GITHUB_STEP_SUMMARY
-          done
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Sub-Agent Charters" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          for skill in skills/agents/*/SKILL.md; do
-            name=$(grep "^name:" "$skill" | head -1 | sed 's/name: *//')
-            perm=$(grep "^  permission:" "$skill" | head -1 | sed 's/  permission: *//')
-            echo "- **massa-ai-$name** ($perm)" >> $GITHUB_STEP_SUMMARY
-          done
+          {
+            echo "## Available Skills"
+            echo ""
+            for skill in skills/*/SKILL.md; do
+              name=$(grep "^name:" "$skill" | head -1 | sed 's/name: *//')
+              desc=$(grep "^description:" "$skill" | head -1 | sed 's/description: *//')
+              echo "- **$name**: $desc"
+            done
+            echo ""
+            echo "## Sub-Agent Charters"
+            echo ""
+            for skill in skills/agents/*/SKILL.md; do
+              name=$(grep "^name:" "$skill" | head -1 | sed 's/name: *//')
+              perm=$(grep "^  permission:" "$skill" | head -1 | sed 's/  permission: *//')
+              echo "- **massa-ai-$name** ($perm)"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
 
   install-test:
     runs-on: ubuntu-latest
