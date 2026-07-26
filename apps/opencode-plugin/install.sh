@@ -58,13 +58,42 @@ if [[ "$SCOPE" == "project" ]]; then
 else
   TARGET="$HOME/.config/opencode"
 fi
-CONFIG_JSON="$TARGET/opencode.json"
 PLUGINS_DIR="$TARGET/plugins/massa-ai"
 AGENTS_DIR="$TARGET/agents"
 PLUGIN_JS="$REPO_ROOT/apps/opencode-plugin/dist/index.js"
+# Vendored, byte-identical copy of scripts/lib/opencode-config.cjs (PDO-01/03/04). This
+# install.sh ships inside the npm tarball, where scripts/lib/ does not exist, so it
+# cannot shell out to the repo copy — a generator adopts keeping the two in sync in a
+# later PR; for now they are hand-kept identical.
+CONFIG_LIB="$SCRIPT_DIR/lib/opencode-config.cjs"
 
 # vecho / vinfo / ok / warn / err / die come from scripts/banner.sh — do not
 # redefine them here, or --quiet stops matching the other three installers.
+
+# ── Runner + config-path resolution (PDO-01/03/04) ───────────────────────────
+# Both the install and uninstall branches below need CONFIG_JSON, so the runner is
+# detected and the path resolved once, here, rather than twice (as this script used
+# to). Resolution order (A1): opencode.jsonc -> opencode.json -> create opencode.jsonc.
+RUNNER=""
+if command -v node &>/dev/null; then
+  RUNNER="node"
+elif command -v bun &>/dev/null; then
+  RUNNER="bun"
+else
+  echo "Error: node or bun required to read/write the opencode config (JSON/JSONC manipulation)" >&2
+  exit 3
+fi
+
+resolved="$("$RUNNER" - "$CONFIG_LIB" "$TARGET" <<'NODE'
+const { resolveConfigPath } = require(process.argv[2]);
+const r = resolveConfigPath(process.argv[3]);
+process.stdout.write(`${r.path}\t${r.both ? "1" : "0"}\n`);
+NODE
+)"
+IFS=$'\t' read -r CONFIG_JSON CONFIG_BOTH <<<"$resolved"
+if [[ "$CONFIG_BOTH" == "1" ]]; then
+  echo "Warning: both opencode.jsonc and opencode.json exist in $TARGET — editing opencode.json, because OpenCode core merges .json OVER .jsonc and the .jsonc copy would be silently ignored." >&2
+fi
 
 # ── Build guard ──────────────────────────────────────────────────────────────
 if [[ ! -f "$PLUGIN_JS" ]]; then
@@ -102,28 +131,20 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
     fi
   fi
 
-  # Remove plugin entry from opencode.json
+  # Remove plugin entry from the resolved config file (.jsonc or .json — see the
+  # resolution block above). parseJsonc tolerates the comments/trailing commas a
+  # .jsonc user's file may have; writeConfig backs up before writing and returns the
+  # backup path so the message below can name it.
   if [[ -f "$CONFIG_JSON" ]]; then
-    ts="$(date +%Y%m%d%H%M%S)"
-    runner=""
-    if command -v node &>/dev/null; then
-      runner="node"
-    elif command -v bun &>/dev/null; then
-      runner="bun"
-    else
-      echo "Error: node or bun required to edit opencode.json" >&2
-      exit 3
-    fi
-
-    "$runner" - "$CONFIG_JSON" "$ts" <<'NODE'
+    backup_path="$("$RUNNER" - "$CONFIG_LIB" "$CONFIG_JSON" <<'NODE'
+const { parseJsonc, writeConfig } = require(process.argv[2]);
 const fs = require("fs");
-const file = process.argv[2];
-const ts = process.argv[3];
+const file = process.argv[3];
 
 let cfg = {};
 try {
   const raw = fs.readFileSync(file, "utf8");
-  if (raw.trim()) cfg = JSON.parse(raw);
+  if (raw.trim()) cfg = parseJsonc(raw);
 } catch (e) {
   if (e.code !== "ENOENT") throw e;
 }
@@ -133,9 +154,11 @@ if (Array.isArray(cfg.plugin)) {
   if (cfg.plugin.length === 0) delete cfg.plugin;
 }
 
-fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n");
+process.stdout.write(writeConfig(file, cfg));
 NODE
+    )"
     vinfo "removed plugin entry from $CONFIG_JSON"
+    vinfo "backup: $backup_path"
   fi
 
   # Delegate to install-agents.sh to remove the MCP entry (if it exists). No
@@ -175,34 +198,23 @@ fi
 ln -sfn "$resolved_plugin_js" "$PLUGINS_DIR/index.js"
 vinfo "symlink: $PLUGINS_DIR/index.js → $resolved_plugin_js"
 
-# Merge into opencode.json
+# Merge into the resolved config file (.jsonc or .json). parseJsonc tolerates an
+# existing .jsonc user's comments/trailing commas; writeConfig backs up BEFORE writing
+# and hands back the backup path — the message below names it, since a backup is the
+# only place a .jsonc user's comments survive (this write re-serializes without them,
+# per A1/the "backup-then-restringify" tradeoff — comment-preserving writes are
+# explicitly out of scope).
 mkdir -p "$TARGET"
 
-if [[ -f "$CONFIG_JSON" ]]; then
-  # Backup before modifying
-  ts="$(date +%Y%m%d%H%M%S)"
-  cp "$CONFIG_JSON" "$CONFIG_JSON.massa-ai.bak-${ts}"
-  vinfo "backup: $CONFIG_JSON.massa-ai.bak-${ts}"
-fi
-
-runner=""
-if command -v node &>/dev/null; then
-  runner="node"
-elif command -v bun &>/dev/null; then
-  runner="bun"
-else
-  echo "Error: node or bun required to edit opencode.json" >&2
-  exit 3
-fi
-
-"$runner" - "$CONFIG_JSON" <<'NODE'
+backup_path="$("$RUNNER" - "$CONFIG_LIB" "$CONFIG_JSON" <<'NODE'
+const { parseJsonc, writeConfig } = require(process.argv[2]);
 const fs = require("fs");
-const file = process.argv[2];
+const file = process.argv[3];
 
 let cfg = {};
 try {
   const raw = fs.readFileSync(file, "utf8");
-  if (raw.trim()) cfg = JSON.parse(raw);
+  if (raw.trim()) cfg = parseJsonc(raw);
 } catch (e) {
   if (e.code !== "ENOENT") throw e;
 }
@@ -214,11 +226,12 @@ if (!cfg.plugin.includes(entry)) {
   cfg.plugin.push(entry);
 }
 
-fs.mkdirSync(require("path").dirname(file), { recursive: true });
-fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n");
+process.stdout.write(writeConfig(file, cfg));
 NODE
+)"
 
 vinfo "plugin entry added to $CONFIG_JSON"
+vinfo "backup: $backup_path"
 
 # Install agent symlinks
 mkdir -p "$AGENTS_DIR"

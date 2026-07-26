@@ -122,24 +122,29 @@ describe("opencode-plugin install.sh", () => {
       expect(await isSymlink(agentPath)).toBe(true);
     }
 
-    // Config entry added
-    const cfg = await readJson(path.join(tmp, ".config/opencode/opencode.json"));
+    // Config entry added. Neither opencode.jsonc nor opencode.json pre-existed, so
+    // PDO-01/A1 creates opencode.jsonc (never opencode.json) — see the dedicated
+    // four-combination coverage further down this file.
+    const cfg = await readJson(path.join(tmp, ".config/opencode/opencode.jsonc"));
     expect(cfg).toHaveProperty("plugin");
     expect((cfg.plugin as string[]).includes("./plugins/massa-ai/index.js")).toBe(
       true,
     );
+    expect(await pathExists(path.join(tmp, ".config/opencode/opencode.json"))).toBe(
+      false,
+    );
   });
 
-  test("plugin entry in opencode.json is idempotent", async () => {
+  test("plugin entry in opencode.jsonc is idempotent", async () => {
     runInstall(["--user"], { HOME: tmp });
     const afterFirst = await fs.readFile(
-      path.join(tmp, ".config/opencode/opencode.json"),
+      path.join(tmp, ".config/opencode/opencode.jsonc"),
       "utf8",
     );
 
     runInstall(["--user"], { HOME: tmp });
     const afterSecond = await fs.readFile(
-      path.join(tmp, ".config/opencode/opencode.json"),
+      path.join(tmp, ".config/opencode/opencode.jsonc"),
       "utf8",
     );
 
@@ -302,11 +307,15 @@ describe("opencode-plugin install.sh", () => {
       expect(await pathExists(agentPath)).toBe(true);
     }
 
-    // Config in project scope
-    const cfg = await readJson(path.join(projectDir, ".opencode/opencode.json"));
+    // Config in project scope. Fresh project dir → opencode.jsonc, not opencode.json
+    // (PDO-01/A1).
+    const cfg = await readJson(path.join(projectDir, ".opencode/opencode.jsonc"));
     expect((cfg.plugin as string[]).includes("./plugins/massa-ai/index.js")).toBe(
       true,
     );
+    expect(
+      await pathExists(path.join(projectDir, ".opencode/opencode.json")),
+    ).toBe(false);
   });
 
   test("backup is created before modifying opencode.json", async () => {
@@ -331,5 +340,144 @@ describe("opencode-plugin install.sh", () => {
       "utf8",
     );
     expect(bakContent).toContain("someKey");
+  });
+
+  // ── PDO-01/03/04: the four opencode config existence combinations ──────────
+  // Exercised through the real install.sh (which requires the vendored
+  // apps/opencode-plugin/lib/opencode-config.cjs), not just as unit tests of the
+  // library — a regression in how install.sh wires the vendored copy in would be
+  // caught here even if the library itself were correct.
+
+  test("existence combination: .jsonc only — edits opencode.jsonc, creates no opencode.json", async () => {
+    const configDir = path.join(tmp, ".config/opencode");
+    await fs.mkdir(configDir, { recursive: true });
+    await fs.writeFile(
+      path.join(configDir, "opencode.jsonc"),
+      '{\n  "theme": "dark"\n}\n',
+    );
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const cfg = await readJson(path.join(configDir, "opencode.jsonc"));
+    expect((cfg.plugin as string[]).includes("./plugins/massa-ai/index.js")).toBe(
+      true,
+    );
+    expect(cfg.theme).toBe("dark");
+    expect(await pathExists(path.join(configDir, "opencode.json"))).toBe(false);
+  });
+
+  test("existence combination: .json only — edits opencode.json, creates no opencode.jsonc", async () => {
+    const configDir = path.join(tmp, ".config/opencode");
+    await fs.mkdir(configDir, { recursive: true });
+    await fs.writeFile(
+      path.join(configDir, "opencode.json"),
+      '{\n  "theme": "light"\n}\n',
+    );
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const cfg = await readJson(path.join(configDir, "opencode.json"));
+    expect((cfg.plugin as string[]).includes("./plugins/massa-ai/index.js")).toBe(
+      true,
+    );
+    expect(cfg.theme).toBe("light");
+    expect(await pathExists(path.join(configDir, "opencode.jsonc"))).toBe(false);
+  });
+
+  test("existence combination: both exist — .json wins, .jsonc is left untouched, and a warning names both files", async () => {
+    const configDir = path.join(tmp, ".config/opencode");
+    await fs.mkdir(configDir, { recursive: true });
+    await fs.writeFile(
+      path.join(configDir, "opencode.jsonc"),
+      '{"jsoncMarker": true}\n',
+    );
+    await fs.writeFile(
+      path.join(configDir, "opencode.json"),
+      '{"jsonMarker": true}\n',
+    );
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr).toContain("opencode.jsonc");
+    expect(res.stderr).toContain("opencode.json");
+    expect(res.stderr).toContain("merges .json");
+
+    const cfg = await readJson(path.join(configDir, "opencode.json"));
+    expect((cfg.plugin as string[]).includes("./plugins/massa-ai/index.js")).toBe(
+      true,
+    );
+    const jsoncRaw = await fs.readFile(
+      path.join(configDir, "opencode.jsonc"),
+      "utf8",
+    );
+    expect(jsoncRaw).toBe('{"jsoncMarker": true}\n');
+  });
+
+  test("existence combination: neither exists — creates opencode.jsonc, never opencode.json", async () => {
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const configDir = path.join(tmp, ".config/opencode");
+    expect(await pathExists(path.join(configDir, "opencode.jsonc"))).toBe(true);
+    expect(await pathExists(path.join(configDir, "opencode.json"))).toBe(false);
+  });
+
+  test("commented .jsonc with trailing commas and a URL value installs without aborting", async () => {
+    const configDir = path.join(tmp, ".config/opencode");
+    await fs.mkdir(configDir, { recursive: true });
+    const commented = [
+      "{",
+      '  // user\'s own theme choice with a "quote" in the comment',
+      '  "theme": "dark",',
+      '  "docsUrl": "https://opencode.ai/docs",',
+      "}",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(configDir, "opencode.jsonc"), commented);
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const cfg = await readJson(path.join(configDir, "opencode.jsonc"));
+    expect(cfg.docsUrl).toBe("https://opencode.ai/docs");
+    expect(cfg.theme).toBe("dark");
+    expect((cfg.plugin as string[]).includes("./plugins/massa-ai/index.js")).toBe(
+      true,
+    );
+  });
+
+  test("genuinely malformed .jsonc (not merely commented) is refused, not overwritten", async () => {
+    const configDir = path.join(tmp, ".config/opencode");
+    await fs.mkdir(configDir, { recursive: true });
+    const broken = '{ "theme": \n';
+    await fs.writeFile(path.join(configDir, "opencode.jsonc"), broken);
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).not.toBe(0);
+
+    const after = await fs.readFile(
+      path.join(configDir, "opencode.jsonc"),
+      "utf8",
+    );
+    expect(after).toBe(broken);
+  });
+
+  test("uninstall on a .jsonc-only config removes the entry and creates no opencode.json", async () => {
+    runInstall(["--user"], { HOME: tmp });
+    const configDir = path.join(tmp, ".config/opencode");
+    // Fresh install created opencode.jsonc; confirm the fixture assumption before
+    // exercising uninstall against it.
+    expect(await pathExists(path.join(configDir, "opencode.jsonc"))).toBe(true);
+
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const cfg = await readJson(path.join(configDir, "opencode.jsonc"));
+    expect((cfg.plugin as string[] | undefined) ?? []).not.toContain(
+      "./plugins/massa-ai/index.js",
+    );
+    expect(await pathExists(path.join(configDir, "opencode.json"))).toBe(false);
   });
 });
