@@ -15,24 +15,41 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const STATIC_DIR_CANDIDATES = (() => {
-  const here = path.dirname(fileURLToPath(import.meta.url));
+/**
+ * Build the ordered static-dir candidate list.
+ *
+ * Resolution must not depend on process.cwd(): the API is launched from the
+ * monorepo root (`bun run dev:api`), from the package dir (turbo), from a
+ * container WORKDIR, and from arbitrary cwds by supervisors. So walk up from
+ * the module's own directory first, then from cwd, checking both layouts at
+ * every level:
+ *   <root>/apps/web-ui/src/static   (walking up from the monorepo root)
+ *   <apps>/web-ui/src/static        (sibling package, walking up from tools-api)
+ * This covers the src layout (src/routes/), the dist layout (dist/), and a
+ * cwd anywhere at or below the repo root.
+ *
+ * Exported for tests: the route-level tests mock fs.stat, so only a direct
+ * unit test on this pure function can catch a wrong candidate path.
+ */
+export function buildStaticDirCandidates(moduleDir: string, cwd: string): string[] {
   const candidates: string[] = [];
-  // source layout: apps/tools-api/src/routes/  ->  ../../web-ui/src/static
-  candidates.push(path.resolve(here, "../../web-ui/src/static"));
-  // dist layout fallback: apps/tools-api/dist/  ->  ../web-ui/src/static
-  candidates.push(path.resolve(here, "../web-ui/src/static"));
-  // Walk up from cwd looking for apps/web-ui/src/static (robust to test-runner
-  // cwd being the package dir, the monorepo root, or a parent).
-  let dir = process.cwd();
-  for (let i = 0; i < 8; i++) {
-    candidates.push(path.resolve(dir, "apps/web-ui/src/static"));
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
+  for (const root of [moduleDir, cwd]) {
+    let dir = root;
+    for (let i = 0; i < 10; i++) {
+      candidates.push(path.resolve(dir, "apps/web-ui/src/static"));
+      candidates.push(path.resolve(dir, "web-ui/src/static"));
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
   }
-  return candidates;
-})();
+  return [...new Set(candidates)];
+}
+
+const STATIC_DIR_CANDIDATES = buildStaticDirCandidates(
+  path.dirname(fileURLToPath(import.meta.url)),
+  process.cwd(),
+);
 
 async function resolveStaticDir(): Promise<string | null> {
   for (const dir of STATIC_DIR_CANDIDATES) {
