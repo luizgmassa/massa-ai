@@ -46,7 +46,6 @@ const SPECIALIST_NAMES = [
   "mobile-specialist",
   "plan-critic",
   "furps-analyst",
-  "handoff-writer",
   "navigator",
 ] as const;
 type SpecialistName = (typeof SPECIALIST_NAMES)[number];
@@ -79,7 +78,6 @@ const AGENT_MODELS_CLAUDE: Record<SpecialistName, "haiku" | "sonnet" | "opus"> =
   "architecture-specialist": "opus",
   "plan-critic": "opus",
   "furps-analyst": "sonnet",
-  "handoff-writer": "haiku",
   navigator: "sonnet",
 };
 
@@ -99,7 +97,6 @@ const AGENT_MODELS_CODEX: Record<SpecialistName, string> = {
   "architecture-specialist": "gpt-5.6-sol",
   "plan-critic": "gpt-5.6-sol",
   "furps-analyst": "gpt-5.6-terra",
-  "handoff-writer": "gpt-5.4-mini",
   navigator: "gpt-5.4-mini",
 };
 
@@ -123,7 +120,6 @@ const AGENT_MODELS_OPENCODE: Record<SpecialistName, string> = {
   "architecture-specialist": "opencode-go/minimax-m3",
   "plan-critic": "opencode-go/minimax-m3",
   "furps-analyst": "opencode-go/glm-5.2",
-  "handoff-writer": "opencode-go/deepseek-v4-pro",
   navigator: "opencode-go/deepseek-v4-pro",
 };
 

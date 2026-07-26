@@ -210,5 +210,5 @@ Required massa-ai tags for durable memory:
 
 Current source and `.specs/` artifacts remain authoritative for implementation evidence; massa-ai durable memory is context until confirmed against current source.
 
-Completion, restart-save, and handoff reports must state the memory outcome:
+Completion and handoff reports must state the memory outcome:
 written, intentionally skipped with reason, duplicate skipped, forbidden payload skipped, or failed write with recovery note.

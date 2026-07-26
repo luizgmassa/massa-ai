@@ -19,7 +19,7 @@ Check `.specs/project/STATE.md` for the current active feature and `.specs/proje
 - `massa-ai/` — workflow router; MCP tool contracts and Synapse lifecycle live in
   its `references/mcp-tools.md` and `references/synapse-policy.md`
 - `persona-router/` — persona selection
-- `AGENTS.md` (under `skills/`) — sub-agent registry: 16 reusable specialist
+- `AGENTS.md` (under `skills/`) — sub-agent registry: 15 reusable specialist
   agents, plus the canonical policy bootstrap block
 
 #### Sub-Agent Skills (invocable by any workflow)
@@ -41,7 +41,6 @@ name (see `skills/massa-ai/references/agent-orchestration.md` → Name Resolutio
 - `mobile-specialist/` — conditional mobile expertise (Android, iOS, KMP; refuses non-mobile)
 - `plan-critic/` — read-only plan challenge for the lite and full Plan Challenge gates
 - `furps-analyst/` — read-only single-dimension FURPS+ analysis of a PRD or ADR
-- `handoff-writer/` — read-only continuation-package assembly
 - `navigator/` — read-only index-first codebase navigation (massa-ai MCP surface)
 
 ### Spec Artifacts

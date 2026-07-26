@@ -3,11 +3,11 @@
  *
  * Verifies the `massa-ai-config agents` subcommand against spec ACs
  * (OPC-01,02,05,06,07 + DOC-01):
- * - `agents install --user` writes 16 .md files to ~/.config/opencode/agents/
+ * - `agents install --user` writes 15 .md files to ~/.config/opencode/agents/
  * - each file has mode: all + metadata: { massa-ai-owned: true }
  * - `agents uninstall` removes only massa-ai-owned files (R3: user agents preserved)
  * - idempotent re-run overwrites with identical content
- * - install prints "+ 16 subagent specialists"
+ * - install prints "+ 15 subagent specialists"
  *
  * Uses spawnSync to run the source CLI with overridden HOME + XDG_CONFIG_HOME.
  */
@@ -82,12 +82,11 @@ const SPECIALIST_NAMES = [
   "mobile-specialist",
   "plan-critic",
   "furps-analyst",
-  "handoff-writer",
   "navigator",
 ];
 
 describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 + DOC-01)", () => {
-  test("OPC-01/DOC-01: agents install --user writes 16 .md to ~/.config/opencode/agents/ + prints summary", async () => {
+  test("OPC-01/DOC-01: agents install --user writes 15 .md to ~/.config/opencode/agents/ + prints summary", async () => {
     const res = runCli(["agents", "install", "--user"], {
       HOME: tmp,
       XDG_CONFIG_HOME: xdgConfig,
@@ -101,8 +100,8 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
       ).toBe(true);
     }
 
-    // Install output mentions the 16 subagent specialists (DOC-01)
-    expect(res.stdout).toContain("16 subagent specialists");
+    // Install output mentions the 15 subagent specialists (DOC-01)
+    expect(res.stdout).toContain("15 subagent specialists");
   });
 
   test("OPC-07: each installed agent has mode: all + metadata massa-ai-owned: true", async () => {

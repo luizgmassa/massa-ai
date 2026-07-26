@@ -45,7 +45,7 @@ Every hook exits 0 on bad stdin or non-critical error. Blocking hooks are
 |---|---|---|
 | `stop_evidence_gate.py` | Stop | `references/evidence-gate.md` |
 | `continuous_learning_evaluate.py` | Stop | `references/lessons.md`, `scripts/lessons.py` |
-| `precompact_save_state.py` | PreCompact | `workflows/restart-save.md`, `references/restart-state.md` |
+| `precompact_save_state.py` | PreCompact | `workflows/long-session.md`, `references/context-firewall.md` |
 | `suggest_compact.py` | PreToolUse(Edit\|Write) | `references/context-firewall.md` (compaction boundary) |
 | `gateguard_fact_force.py` | PreToolUse(Edit) | `references/context-firewall.md` (investigate-before-edit) |
 | `config_protection.py` | PreToolUse(Edit\|Write) | `references/verification-ladder.md` (scope) |
@@ -74,7 +74,6 @@ absent, it falls back to the flat evidence matrix (graceful degradation).
 | `feature` | lite evidence matrix (`references/evidence-gate.md`) |
 | `refactor` | lite evidence matrix |
 | `exploration` | no-mutation gate (read-only invariant) |
-| `restart-save` | preflight matrix (`references/restart-state.md`) |
 | `architecture-audit` | flat evidence matrix |
 | `bugs-audit` | flat evidence matrix |
 | `code-quality-audit` | flat evidence matrix |
@@ -86,14 +85,12 @@ absent, it falls back to the flat evidence matrix (graceful degradation).
 | `tests-audit` | flat evidence matrix |
 | `furps-refinement` | flat evidence matrix (findings-only; report written + DoR coverage gaps listed) |
 | `adr` | flat evidence matrix |
-| `agent-handoff` | flat evidence matrix |
 | `commit` | flat evidence matrix |
 | `design` | flat evidence matrix |
 | `general` | flat evidence matrix |
 | `long-session` | flat evidence matrix |
 | `maestro` | flat evidence matrix |
 | `onboarding` | flat evidence matrix |
-| `restart-load` | flat evidence matrix |
 | `rfc` | flat evidence matrix |
 | `tdd` | flat evidence matrix |
 | `the-fool` | flat evidence matrix |

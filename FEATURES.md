@@ -332,11 +332,11 @@ Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/p
 
 ---
 
-## Subagent Skills (16 Specialists)
+## Subagent Skills (15 Specialists)
 
-**What:** massa-ai defines 16 reusable sub-agent specialists in `skills/agents/*/SKILL.md` (charter files). These ship as host-native subagent definitions across all four plugins so the massa-ai workflow router's delegation model works inside Claude Code, Codex, Cursor, and OpenCode.
+**What:** massa-ai defines 15 reusable sub-agent specialists in `skills/agents/*/SKILL.md` (charter files). These ship as host-native subagent definitions across all four plugins so the massa-ai workflow router's delegation model works inside Claude Code, Codex, Cursor, and OpenCode.
 
-**The 16 specialists:** investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist, plan-critic, furps-analyst, handoff-writer, navigator.
+**The 15 specialists:** investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist, plan-critic, furps-analyst, navigator.
 
 Workflows dispatch these agents under their **host-registered** names, prefixed `massa-ai-` (for example `massa-ai-investigator`). The bare charter name is the registry key, not the dispatch name.
 
@@ -377,7 +377,6 @@ Every Claude Code agent sets `effort: high` in addition to its pinned `model`.
 | architecture-specialist | opus | Large-scale design, trade-offs, migrations, RFC guidance. |
 | plan-critic | opus | Adversarial critique of a plan is the other highest-leverage token spend. |
 | furps-analyst | sonnet | Checklist-driven document analysis per FURPS+ dimension. |
-| handoff-writer | haiku | Assembling a continuation package from artifacts is summarization. |
 | navigator | sonnet | Index-first lookups with cited answers; no frontier reasoning needed. |
 
 #### Codex (model IDs + `model_reasoning_effort = "high"`)
@@ -400,7 +399,6 @@ Every Codex agent TOML sets `model_reasoning_effort = "high"` in addition to its
 | architecture-specialist | gpt-5.6-sol | Large-scale design, trade-offs, migrations, RFC guidance. |
 | plan-critic | gpt-5.6-sol | Adversarial critique of a plan is the other highest-leverage token spend. |
 | furps-analyst | gpt-5.6-terra | Checklist-driven document analysis per FURPS+ dimension. |
-| handoff-writer | gpt-5.4-mini | Assembling a continuation package from artifacts is summarization. |
 | navigator | gpt-5.4-mini | Index-first lookups with cited answers; no frontier reasoning needed. |
 
 #### Cursor (charter `metadata.model_hint` verbatim + `reasoningEffort: max`)
@@ -423,7 +421,6 @@ Every Cursor agent sets `reasoningEffort: max` in frontmatter (pass-through; fie
 | architecture-specialist | MiniMax M3 | `metadata.model_hint: MiniMax M3` |
 | plan-critic | MiniMax M3 | `metadata.model_hint: MiniMax M3` |
 | furps-analyst | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| handoff-writer | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
 | navigator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
 
 #### OpenCode (pinned `provider/model-id` + `mode: all` + `reasoningEffort: max`)
@@ -450,7 +447,6 @@ Every OpenCode agent sets `mode: all`. OpenCode's Tab switcher lists `primary` a
 | architecture-specialist | `opencode-go/minimax-m3` | `metadata.model_hint: MiniMax M3` |
 | plan-critic | `opencode-go/minimax-m3` | `metadata.model_hint: MiniMax M3` |
 | furps-analyst | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
-| handoff-writer | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
 | navigator | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
 
 > The `opencode-go/` provider carries all three tiers. A user without it configured gets OpenCode's documented fallback to the primary agent's model — the same degrade the unresolvable hint caused, except no longer silently for everyone.
@@ -499,8 +495,8 @@ Write-permitted agents: `builder`, `test-engineer`, `documentation-agent` (the l
 | Tool(s) | Workflow | Where in the flow |
 | --- | --- | --- |
 | `bootstrap` | `onboarding` | After indexing, before manual `remember` |
-| `create_checkpoint` / `list_checkpoints` / `restore_checkpoint` | `spec-driven`, `long-session`, `restart-save` | Task boundaries; resume after interruption; milestone before restart |
-| `handoff_begin` / `handoff_accept` / `handoff_list_pending` / `handoff_cancel` | `agent-handoff`, `restart-load` | Persist + resume cross-session handoffs |
+| `create_checkpoint` / `list_checkpoints` / `restore_checkpoint` | `spec-driven`, `long-session` | Task boundaries; resume after interruption; milestone before compaction |
+| `handoff_begin` / `handoff_accept` / `handoff_list_pending` / `handoff_cancel` | `long-session` | Persist + resume cross-session handoffs |
 | `compact_snapshot` | `long-session` | Before compaction fires (zero-loss /compact recovery) |
 | `trace_path` | `debug` | Root-cause call/data-flow path tracing |
 | `impact_analysis` | `architecture-audit`, `refactor` | Git-diff centrality-ranked blast radius |

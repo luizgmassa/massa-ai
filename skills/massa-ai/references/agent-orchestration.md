@@ -91,7 +91,6 @@ Before adding a new reusable role, load `references/subagent-design.md` and writ
 | `audit-specialist` | `massa-ai-audit-specialist` | Findings-only audit through one selected `lens` | read-only | `skills/agents/audit-specialist/SKILL.md` |
 | `plan-critic` | `massa-ai-plan-critic` | Stress-test a constructed plan using The Fool mode and return bounded critique | read-only | `skills/agents/plan-critic/SKILL.md` |
 | `furps-analyst` | `massa-ai-furps-analyst` | Analyze one FURPS+ dimension of a PRD/ADR against the checklist and return structured findings | read-only | `skills/agents/furps-analyst/SKILL.md` |
-| `handoff-writer` | `massa-ai-handoff-writer` | Build a compact continuation package | read-only | `skills/agents/handoff-writer/SKILL.md` |
 
 The remaining charters — `planner`, `reviewer`, `context-curator`,
 `requirements-analyst`, `test-engineer`, `documentation-agent`,

@@ -29,7 +29,7 @@ The workflow combines .specs/ artifact files with massa-ai durable memory:
 
 Use `skills/massa-ai/references/spec-driven/artifact-store.md` for guidance on reading and writing `.specs/` files directly with standard shell commands. Root aliases are not runtime fallback. Optional `.specs-exports/` projections are untracked review aids only.
 
-Restart-save and restart-load are artifact checkpoint/resume mechanisms. They are not substitutes for saving an unattached plan file; chat-only plans must be promoted into `.specs/` artifacts or supplied again after restart.
+`.specs/` artifacts are the only checkpoint/resume mechanism. They are not substitutes for saving an unattached plan file; chat-only plans must be promoted into `.specs/` artifacts or supplied again in a new session.
 
 ## Quick Start
 
@@ -42,7 +42,7 @@ This migration affects public contracts and state. Run it through spec-driven.
 ```
 
 ```text
-Use restart-load to resume the active spec-driven feature from canonical `.specs/` artifacts.
+Resume the active spec-driven feature from canonical `.specs/` artifacts.
 ```
 
 These are natural-language requests, not CLI commands.
@@ -56,7 +56,7 @@ These are natural-language requests, not CLI commands.
 - Execute: one approved step at a time, protected validation assets, per-task test adequacy review, evidence-or-zero mapping, shallow assertion rejection, payload/conjunction checks, build/test count evidence, and restartable state updates.
 - Validate: independent read-only verifier or standalone fresh-eyes fallback, spec-anchored outcome checks, interactive UAT when user-facing behavior needs human judgment, reversible scratch-state discrimination sensor, expanded validation report, and 3-iteration fix loop.
 - Lessons and memory: section-scoped `project/STATE.md` artifact writes, explicit lesson signal table, no-script fallback, and massa-ai memory used as context until confirmed against current source.
-- Restart across clean chats: save artifact state with `workflows/restart-save.md`, load artifact state with `workflows/restart-load.md`, then return to spec-driven for the owning phase or Execute step.
+- Resume across clean chats: canonical state is read from and written to `.specs/` artifacts, then spec-driven resumes at the owning phase or Execute step.
 
 ## Verification Rules
 

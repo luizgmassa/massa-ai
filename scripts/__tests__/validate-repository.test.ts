@@ -123,7 +123,6 @@ describe("skills/AGENTS.md bootstrap contract", () => {
     expect(content).toContain("mobile-specialist");
     expect(content).toContain("plan-critic");
     expect(content).toContain("furps-analyst");
-    expect(content).toContain("handoff-writer");
     expect(content).toContain("navigator");
   });
 });
@@ -144,9 +143,6 @@ describe("workflow files referenced in SKILL.md exist", () => {
     "workflows/exploration.md",
     "workflows/onboarding.md",
     "workflows/long-session.md",
-    "workflows/restart-save.md",
-    "workflows/restart-load.md",
-    "workflows/agent-handoff.md",
     "workflows/commit.md",
     "workflows/ticket.md",
     "workflows/design.md",
@@ -713,7 +709,7 @@ describe("agents harness routing", () => {
     "context-curator", "verification-agent", "requirements-analyst",
     "architecture-specialist", "test-engineer", "documentation-agent",
     "audit-specialist", "mobile-specialist",
-    "plan-critic", "furps-analyst", "handoff-writer", "navigator",
+    "plan-critic", "furps-analyst", "navigator",
   ];
 
   test("skills/agents/ exists with one subdir per agent (16)", async () => {

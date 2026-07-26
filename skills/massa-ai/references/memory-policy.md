@@ -74,7 +74,7 @@ remember({
   sessionId: "spec-memory-routing",
   type: "decision",
   importance: 0.8,
-  content: "2026-06-27 workflows/spec-driven.md owns the TLC v3 Specify, optional Design, optional Tasks, and Execute flow with mandatory independent validation as Execute's final gate. Approved feature artifacts own phase contracts, .specs/project/STATE.md owns restart state, and massa-ai owns durable cross-session decisions and patterns.",
+  content: "2026-06-27 workflows/spec-driven.md owns the TLC v3 Specify, optional Design, optional Tasks, and Execute flow with mandatory independent validation as Execute's final gate. Approved feature artifacts own phase contracts, .specs/project/STATE.md owns resumable session state, and massa-ai owns durable cross-session decisions and patterns.",
   tags: [
     "project:massa-ai",
     "session:spec-memory-routing",

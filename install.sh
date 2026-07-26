@@ -716,11 +716,11 @@ install_plugins_menu() {
 
   while true; do
     echo ""
-    echo -e "${BOLD}Install massa-ai plugins (skills + hooks + MCP + 16 subagent specialists):${NC}"
-    echo -e "  ${CYAN}1)${NC} Claude Code plugin (skills + commands + 16 subagent specialists + hooks auto-write)"
-    echo -e "  ${CYAN}2)${NC} Codex plugin (6 skills, 6 hook events, MCP, 16 subagent specialists)"
-    echo -e "  ${CYAN}3)${NC} Cursor plugin (6 skills, 7 hook events, MCP, 16 subagent specialists)"
-    echo -e "  ${CYAN}4)${NC} OpenCode plugin (npm install + 16 subagent specialists via config CLI)"
+    echo -e "${BOLD}Install massa-ai plugins (skills + hooks + MCP + 15 subagent specialists):${NC}"
+    echo -e "  ${CYAN}1)${NC} Claude Code plugin (skills + commands + 15 subagent specialists + hooks auto-write)"
+    echo -e "  ${CYAN}2)${NC} Codex plugin (6 skills, 6 hook events, MCP, 15 subagent specialists)"
+    echo -e "  ${CYAN}3)${NC} Cursor plugin (6 skills, 7 hook events, MCP, 15 subagent specialists)"
+    echo -e "  ${CYAN}4)${NC} OpenCode plugin (npm install + 15 subagent specialists via config CLI)"
     echo -e "  ${CYAN}5)${NC} All four (Claude, Codex, Cursor, OpenCode)"
     echo -e "  ${CYAN}s)${NC} Back"
     echo ""
@@ -801,7 +801,7 @@ print_opencode_plugin_instructions() {
   echo -e "  OpenCode hooks are in-process (no hooks.json to merge)."
   echo -e "  Prerequisite: the Tools API must be running (bun run dev:api)."
   echo ""
-  echo -e "  ${CYAN}3. Install the 16 subagent specialists:${NC}"
+  echo -e "  ${CYAN}3. Install the 15 subagent specialists:${NC}"
   echo -e "     ${CYAN}massa-ai-config agents install --user${NC}"
   echo -e "     (writes 12 massa-ai-*.md to ~/.config/opencode/agents/)"
 }

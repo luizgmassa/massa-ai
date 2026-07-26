@@ -293,7 +293,7 @@ Thumbs.db
 
 # Sub-Agent Registry
 
-Single registry for the 16 reusable sub-agent skills in this repo. Workflows remain the orchestrators; these agents are single-purpose specialists any workflow can invoke via the host's task/subagent tool.
+Single registry for the 15 reusable sub-agent skills in this repo. Workflows remain the orchestrators; these agents are single-purpose specialists any workflow can invoke via the host's task/subagent tool.
 
 **Dispatch names are prefixed.** A charter at `skills/agents/<role>/SKILL.md` is registered by every host as `massa-ai-<role>`. Dispatch `massa-ai-investigator`, not `investigator`; the bare name is the registry key only. See `massa-ai/references/agent-orchestration.md` -> Name Resolution for the convention and for the fallback when a named agent is unavailable.
 
@@ -366,7 +366,6 @@ Dispatch each agent as `massa-ai-<Name>`.
 | mobile-specialist | Provide mobile-specific expertise (conditional) | read-only | GLM-5.2 | Mobile-related project detected (Android/iOS/KMP) | `skills/agents/mobile-specialist/SKILL.md` |
 | plan-critic | Challenge a constructed plan (lite or full Plan Challenge gate) | read-only | MiniMax M3 | A concrete plan exists; standing policy exception to the dispatch triggers | `skills/agents/plan-critic/SKILL.md` |
 | furps-analyst | Analyze one FURPS+ dimension of a PRD/ADR | read-only | GLM-5.2 | `furps-refinement` fans out per-dimension analysis | `skills/agents/furps-analyst/SKILL.md` |
-| handoff-writer | Build a compact continuation package | read-only | DeepSeek V4 Pro | Long-session compaction, agent handoff, restart-save | `skills/agents/handoff-writer/SKILL.md` |
 | navigator | Navigate an indexed codebase index-first | read-only | DeepSeek V4 Pro | "where is X", "who calls Y" against a fresh massa-ai index | `skills/agents/navigator/SKILL.md` |
 
 ## Mapping — New Agents ↔ Existing Roles
@@ -389,7 +388,6 @@ The symlinked massa-ai skill defines the roles in `references/agent-orchestratio
 | mobile-specialist | — | New capability (conditional). |
 | plan-critic | `plan-critic` | Identical capability; the former charter-less role now has a charter. |
 | furps-analyst | `furps-analyst` | Identical capability; charter sourced from `references/furps/analyst-role.md`. |
-| handoff-writer | `handoff-writer` | Identical capability; charter sourced from `references/handoff-package.md`. Read-only: the main agent persists the package. |
 | navigator | — | Pre-existing Claude/Cursor index-first agent, now charter-governed and shipped to all four hosts. |
 
 ## How to Add an Agent
@@ -417,4 +415,4 @@ All agents integrate these concepts (documented per-agent in each charter):
 - **References**: agents point to the relevant massa-ai reference files by name.
 - **Lessons**: agents surface reusable failures for lesson distillation.
 
-<!-- validator anchors: 16 agents | mapping table | capability packet | output contract -->
+<!-- validator anchors: 15 agents | mapping table | capability packet | output contract -->
