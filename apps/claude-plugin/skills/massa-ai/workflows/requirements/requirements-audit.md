@@ -69,6 +69,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
 > - output: findings with requirement gap, location, evidence, severity, confidence, simplest fix direction, verification suggestion
 > - firewall: raw diffs/logs/search output summarized, not returned raw
 > - memory: suggest-only; main agent persists reusable requirements patterns
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
     - Build a requirement checklist from the source: must-have behavior, non-goals, acceptance criteria, compatibility constraints, inputs, outputs, and user-visible promises.
    - Compare implementation and tests against each checklist item.

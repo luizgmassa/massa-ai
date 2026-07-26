@@ -41,6 +41,7 @@ Do not use this parent workflow when the user wants only one audit lens; route d
 > - output: `Status`, `Scope checked`, `Evidence`, `Findings`, `Verification/Test Fidelity Checklist`, `Risks and skipped checks`, and `Exact next step`
 > - firewall: raw diffs/logs/search output summarized, not returned raw
 > - memory: suggest-only; children must not persist broad project memory unless assigned
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
     - Repeated-search children receive isolated Synapse sessions. Durable child tags retain the parent session and workflow-specific session.
 8. Use deterministic sensors when target-relevant commands are expected to finish in <=5 minutes and need no network, destructive action, production credential, or unapproved external service: tests, builds, lint, type checks, static checks, import checks, or focused runtime commands. Record skipped commands with one reason enum: `too-expensive`, `needs-network`, `needs-credentials`, `destructive-risk`, `outside-scope`, `tool-missing`, or `not-applicable`. Model judgment alone is not completion evidence.

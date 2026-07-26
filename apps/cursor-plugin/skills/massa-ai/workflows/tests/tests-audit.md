@@ -67,6 +67,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
 > - output: findings with missing/weak coverage type, location, evidence, regression risk, severity, simplest test direction, deterministic sensor, verification suggestion
 > - firewall: raw diffs/logs/search output summarized, not returned raw
 > - memory: suggest-only; main agent persists reusable testing patterns
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
     - Map changed or targeted behavior to existing tests, fixtures, mocks, and deterministic harnesses.
    - Check missing tests for new branches, error paths, auth/validation/persistence changes, async or race-prone logic, migrations, public contracts, and recalled bug patterns.

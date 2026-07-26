@@ -69,6 +69,7 @@ Do not use this workflow for findings-only test coverage, assertion quality, fix
 > - output: implementation summary, test counts, commands run, deviations
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists reusable testing patterns
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: independent verification of a high-risk test fix
@@ -79,6 +80,7 @@ Do not use this workflow for findings-only test coverage, assertion quality, fix
 > - output: confirmed/disproven closure verdict with evidence
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists reusable verification recipes
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
    - Main agent owns report parsing, prioritization, memory writes, final synthesis, and Evidence Gate.
 12. At completion, persist only durable knowledge after scoring with the Importance Calibration System:
    - Testing conventions, deterministic harness recipes, flaky-test root causes, accepted exceptions, or reusable edge-case coverage patterns.

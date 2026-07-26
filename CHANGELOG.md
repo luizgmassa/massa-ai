@@ -48,6 +48,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `apps/*/skills/agents/`) and `generate-subagent-artifacts.ts`, which embeds the body
     verbatim into `apps/*/agents/massa-ai-*.{md,toml}`. Both mirrors are regenerated and
     both `--check` gates are clean.
+- **Workflows now emit the `persona` field the Capability Packet defines.** The prior entry
+  defined the field but deferred populating it; all 24 `Dispatch: massa-ai-*` blocks across
+  the 16 workflow files carry it now, uniformly — no allowlist. The field stays optional
+  (absent is valid), carries the cataloged persona **id only**, never the persona prompt,
+  and never overrides the receiving charter's Restrictions.
+  - The persona-router boundary's three presence-only assertions for persona-router prose
+    (Stop Conditions scoping; grants-no-authority; not-a-specialist-consultation) are now
+    section-scoped to the exact heading each rule lives under, plus one new negative scan
+    that fails if any future edit adds authority-granting phrasing about persona anywhere
+    in `persona-router/SKILL.md`.
+  - A new discriminating test enumerates every `Dispatch:` block on disk (no hardcoded
+    roster) and fails if any one lacks the persona line; the existing packet-definition
+    uniqueness test is scoped to definitions only so dispatch-block *uses* of the same
+    canonical clause no longer collide with it.
 
 ## [1.6.0] - 2026-07-26
 

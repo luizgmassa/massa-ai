@@ -57,6 +57,7 @@ Do not use this workflow for findings-only requirements review; route that to `w
 > - output: implementation summary, commands run, test counts, deviations
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable requirements patterns
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: independent verification of a high-risk requirements fix
@@ -67,6 +68,7 @@ Do not use this workflow for findings-only requirements review; route that to `w
 > - output: confirmed/disproven closure verdict with evidence
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists reusable verification recipes
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
    - Main agent owns report parsing, traceability matrix, memory writes, final synthesis, and Evidence Gate.
 11. Verify each completed finding:
    - If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:

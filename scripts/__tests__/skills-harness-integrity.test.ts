@@ -22,6 +22,10 @@
  *      Stop Conditions read as an absolute ban on subagents rather than a bound
  *      on persona routing. See
  *      .specs/features/persona-agent-boundary/spec.md.
+ *   8. Dispatch persona emission — the Capability Packet's `persona` field was
+ *      defined (class 7) but no workflow `Dispatch:` block ever emitted it, so
+ *      a subagent never actually received the id the contract describes. See
+ *      .specs/features/persona-emit/spec.md.
  *
  * `bun run test:scripts` runs this file; CI runs that script.
  */
@@ -73,6 +77,32 @@ async function skillMarkdownFiles(): Promise<string[]> {
   }
   await walk(SKILLS_DIR);
   return out.sort();
+}
+
+/**
+ * Every `Dispatch:` capability-packet block in a file, as the contiguous run
+ * of `> `-prefixed lines starting at its `**Dispatch:` line. Shared by the
+ * dispatch resolution and dispatch persona-emission describe blocks below.
+ */
+function dispatchBlocks(content: string): string[] {
+  const lines = content.split(/\r?\n/);
+  const blocks: string[] = [];
+  let current: string[] | null = null;
+  for (const line of lines) {
+    if (/^> \*\*Dispatch: `massa-ai-/.test(line)) {
+      if (current) blocks.push(current.join("\n"));
+      current = [line];
+    } else if (current) {
+      if (line.startsWith(">")) {
+        current.push(line);
+      } else {
+        blocks.push(current.join("\n"));
+        current = null;
+      }
+    }
+  }
+  if (current) blocks.push(current.join("\n"));
+  return blocks;
 }
 
 async function charterNames(): Promise<string[]> {
@@ -472,13 +502,22 @@ describe("persona / sub-agent boundary", () => {
     expect(missing).toEqual([]);
   });
 
-  // PAB-01/AC3 — a fourth packet definition would fork the contract silently.
-  test("the canonical persona clause appears in exactly those three files", async () => {
+  // PAB-01/AC3 — a fourth packet *definition* would fork the contract
+  // silently. Workflow dispatch blocks are packet *uses*, not definitions:
+  // every `Dispatch:` block also carries this clause (see the dispatch
+  // persona-emission describe block below), so this assertion strips
+  // blockquote (`> `) lines — the format every dispatch block uses
+  // exclusively — before scanning, isolating definitions from uses.
+  test("the canonical persona clause appears in exactly those three files, outside dispatch-block uses", async () => {
     const files = await skillMarkdownFiles();
     const found: string[] = [];
     for (const file of files) {
       const content = await read(file);
-      if (content.includes(PACKET_PERSONA_CLAUSE)) {
+      const definitionProse = content
+        .split(/\r?\n/)
+        .filter((line) => !line.startsWith(">"))
+        .join("\n");
+      if (definitionProse.includes(PACKET_PERSONA_CLAUSE)) {
         found.push(path.relative(SKILLS_DIR, file));
       }
     }
@@ -580,5 +619,39 @@ describe("persona / sub-agent boundary", () => {
       if (match) offenders.push(`${pattern}: "${match[0]}"`);
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+// ── 8. Dispatch persona emission ───────────────────────────────────────────
+//
+// The Capability Packet's `persona` field was defined (class 7 / PAB-01) but
+// deferred by .specs/features/persona-agent-boundary/spec.md § Out of scope:
+// no workflow `Dispatch:` block emitted it. See
+// .specs/features/persona-emit/spec.md.
+
+describe("dispatch persona emission: every Dispatch block emits the optional persona field", () => {
+  const PACKET_PERSONA_CLAUSE =
+    "advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions";
+
+  test("every Dispatch block on disk emits the optional persona field", async () => {
+    const files = await skillMarkdownFiles();
+    let total = 0;
+    const missing: string[] = [];
+    for (const file of files) {
+      const content = await read(file);
+      const blocks = dispatchBlocks(content);
+      total += blocks.length;
+      for (const block of blocks) {
+        const hasPersonaBullet = /^> - persona:/m.test(block);
+        if (!hasPersonaBullet || !block.includes(PACKET_PERSONA_CLAUSE)) {
+          const m = /\*\*Dispatch: `([^`]+)`\*\*/.exec(block);
+          missing.push(`${path.relative(REPO_ROOT, file)} -> ${m?.[1] ?? "unknown"}`);
+        }
+      }
+    }
+    // Guard the guard: the "dispatch resolution" describe block above already
+    // requires >=20 blocks repo-wide; this parser must agree.
+    expect(total).toBeGreaterThanOrEqual(20);
+    expect(missing).toEqual([]);
   });
 });
