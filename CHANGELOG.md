@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Releases are now automatic.** Merging a PR into `main` with a green CI run derives the
+  next version from this file, tags it, publishes a GitHub Release, and pushes the packages
+  to npmjs.org **and** GitHub Packages. New `.github/workflows/release.yml` owns the chain;
+  `publish.yml` became a reusable workflow (`workflow_call` + `workflow_dispatch`, both
+  requiring an explicit `ref`) with no triggers of its own.
+
+  The bump comes from the `[Unreleased]` headings, via the new, unit-tested
+  `scripts/release-version.ts`: a non-empty `### Added`/`### Changed`/`### Removed`/
+  `### Deprecated` is a **minor** bump, only `### Fixed`/`### Security` is a **patch**, and
+  nothing releasable means **no release** — the run ends green with no tag. A heading with
+  no bullets is ignored, so a stray empty `### Added` cannot force a minor. Major is never
+  auto-incremented.
+
+  The chain is sequenced with `workflow_call` rather than events on purpose: a tag or
+  release created with `GITHUB_TOKEN` raises **no event**, so the intuitive
+  `push tag → release → publish` wiring is dead at every arrow. That same recursion guard
+  is what keeps the bump commit from starting another CI run, and so another release — no
+  PAT is needed anywhere.
+
+- **Packages are mirrored to GitHub Packages** under `@luizgmassa/*`. GitHub Packages
+  resolves an npm scope to a GitHub *owner*, and `@massa-ai` is not one (the repo is
+  `luizgmassa/massa-ai`), so publishing `@massa-ai/core` there fails with
+  `403 Permission not_found: owner not found`. An isolated `publish-github-packages` job
+  downloads its own copy of the build artifact and rewrites `name`, the `@massa-ai/*`
+  dependency **keys**, `repository.url`, and `publishConfig.registry` before publishing —
+  the npmjs.org artifact is never touched. The dependency-key rewrite is not cosmetic:
+  without it `@luizgmassa/tools-api` would depend on `@massa-ai/core`, which does not exist
+  on that registry. It runs `needs: [build, publish-packages, publish-apps]` so it can
+  never race the npm jobs and leave the two registries divergent at one version.
+
+### Removed
+
+- **The GitHub Deployment surface.** `environment: DEPLOY` is gone from every job — that
+  declaration is what wrote a Deployment record per publish (22 had accumulated). npm
+  packages are released, not deployed. The environment carried no protection rules, so no
+  approval gate is lost. **`NPM_TOKEN` must be re-created at repository scope**, since it
+  lived only inside that environment.
+- **The `next` prerelease channel.** The `workflow_run` auto-publish and `env.NPM_TAG` are
+  removed; every merge now cuts a real `vX.Y.Z` on `latest`, which made `next` a duplicate
+  publish of the same version.
+- The `workflow_run.head_sha || github.ref` checkout fallback in `publish.yml`. With `ref`
+  optional, a manual dispatch silently published the tip of `main` as `latest`; `ref` is
+  now `required: true` on both triggers.
+
 ### Fixed
 
 - **The MCP server wrote 68 bytes to stdout on first run, breaking the stdio JSON-RPC handshake.** `initConfig()` in `packages/shared/src/config/config-loader.ts` announced `Created default config at <path>` on **stdout** via `console.log`. That branch fires only when `~/.config/massa-ai/config.json` does not exist yet — so it never fired on a machine that had already run massa-ai once, and always fired on a genuinely fresh install. Per this repo's own contract, a stdio MCP server's stdout carries nothing but protocol; one stray byte produces `connection closed: initialize response`. Now `console.error`. It deliberately does not use the shared logger: the logger reads config, so importing it here would be circular.

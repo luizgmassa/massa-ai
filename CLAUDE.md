@@ -303,8 +303,42 @@ Every job runs against a real `pgvector/pgvector:pg17` service with
 pins npm to 11.14.1 explicitly before install.
 
 Separate workflows: `needles-gate.yml` (retrieval floors — `bun run bench:needles:gate`,
-`NEEDLE_FLOOR_HIT1=0.5 NEEDLE_FLOOR_MRR=0.65`), `publish.yml` (npm, fires on green
-`main`), `skills.yml` — which only validates `SKILL.md` frontmatter, it runs no tests.
+`NEEDLE_FLOOR_HIT1=0.5 NEEDLE_FLOOR_MRR=0.65`), `skills.yml` — which only validates
+`SKILL.md` frontmatter, it runs no tests — plus the release pair below.
+
+### Releasing
+
+`release.yml` fires on a **green CI run on `main`** and owns the whole chain;
+`publish.yml` is a reusable workflow (`workflow_call` + `workflow_dispatch`, both
+requiring an explicit `ref`) and has no triggers of its own.
+
+`scripts/release-version.ts` derives the bump from the `[Unreleased]` section of
+`CHANGELOG.md`: a non-empty `### Added`/`### Changed`/`### Removed`/`### Deprecated`
+means **minor**, only `### Fixed`/`### Security` means **patch**, and nothing releasable
+means **no release at all** (the run ends green with no tag). Major is never
+auto-incremented — a `2.0.0` is a manual `package.json` edit. So the heading a PR writes
+in the changelog decides the version.
+
+Then: bump root + `version:sync`, promote the changelog section, commit
+`chore(release): vX.Y.Z [skip ci]`, annotated tag, `gh release create`, and finally
+publish to **both** registries — `@massa-ai/*` on npmjs.org and `@luizgmassa/*` on GitHub
+Packages (that scope must equal the repo owner, so the manifests are rewritten in an
+isolated job that never touches the npmjs.org artifact).
+
+Three traps live here:
+
+- A tag or release created with `GITHUB_TOKEN` raises **no event**. `push: tags` and
+  `release: published` triggers would be dead, which is why the chain is sequenced with
+  `workflow_call` and not events. The same guard is what stops the bump commit from
+  starting another CI run, and so another release.
+- No job may declare `environment:` — that is what writes a GitHub *Deployment* record.
+  `NPM_TOKEN` therefore has to live at **repository** scope, not environment scope.
+- The release commit must carry a re-pinned
+  `packages/core/src/__tests__/e2e/fixtures/qwen-profile.json`: it content-hash-pins the
+  five `package.json` files the bump rewrites, and `qwen-fixture.ts` throws on a mismatch.
+  `release-version.ts` re-pins **only** those entries — never run
+  `bun run update-qwen-hashes` from the release path, which would refresh the whole
+  manifest.
 
 ## Working conventions
 

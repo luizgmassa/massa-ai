@@ -878,6 +878,48 @@ embedded parsing, verification commands, and performance details.
 
 ---
 
+## Releases
+
+Releases are automatic. Merging a PR into `main` with a green CI run cuts the next
+version, tags it, publishes a GitHub Release, and pushes the packages to both registries —
+there is no manual release step.
+
+The version comes from the `[Unreleased]` section of [`CHANGELOG.md`](./CHANGELOG.md):
+
+| `[Unreleased]` contains | Bump | `1.2.1` becomes |
+| --- | --- | --- |
+| `### Added`, `### Changed`, `### Removed`, `### Deprecated` | minor | `1.3.0` |
+| only `### Fixed`, `### Security` | patch | `1.2.2` |
+| nothing releasable | none — no tag, no release | `1.2.1` |
+
+Major versions are never bumped automatically. Because the heading you write decides the
+version, `### Added` vs `### Fixed` is a real choice, not a formality.
+
+### Installing
+
+The same build ships to two registries under two scopes.
+
+**npmjs.org** — the public packages, no configuration needed:
+
+```bash
+npm install @massa-ai/core
+```
+
+**GitHub Packages** — mirrored under `@luizgmassa`, because GitHub Packages requires the
+npm scope to equal the repository owner. Add this to `.npmrc` first:
+
+```ini
+@luizgmassa:registry=https://npm.pkg.github.com
+```
+
+```bash
+npm install @luizgmassa/core
+```
+
+Both carry identical code at identical versions; only the scope differs.
+
+---
+
 ## Credits
 
 massa-ai builds on ideas and inspiration from these open-source projects:

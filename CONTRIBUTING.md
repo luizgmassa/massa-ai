@@ -111,3 +111,23 @@ test catch it?
 | 5. Deliver-before-ack | Test: result delivered before ack resolves |
 | 6. Invariants | Tests: happy + error + timeout + partial-failure |
 | 7. Tests | Discriminating tests that kill mutations |
+
+## Your CHANGELOG entry picks the version
+
+Releases are automatic: merging to `main` with green CI derives the next version from the
+`[Unreleased]` section of `CHANGELOG.md`, tags it, and publishes it. So the heading you
+file your entry under is load-bearing, not cosmetic.
+
+| Heading | Effect |
+|---------|--------|
+| `### Added` / `### Changed` / `### Removed` / `### Deprecated` | minor bump (`1.2.1` → `1.3.0`) |
+| `### Fixed` / `### Security` | patch bump (`1.2.1` → `1.2.2`) |
+| no entry (the `no-changelog` label) | no release at all |
+
+A heading with no bullets under it is ignored, so an empty `### Added` will not force a
+minor bump. Major versions are never bumped automatically — cutting a `2.0.0` is a manual
+`package.json` edit.
+
+If your PR touches a file tracked by
+`packages/core/src/__tests__/e2e/fixtures/qwen-profile.json` (including `README.md` and
+the workspace `package.json` files), refresh its hash or the e2e suite will throw.
