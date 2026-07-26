@@ -43,6 +43,30 @@ apps/codex-plugin/install.sh --uninstall
 
 The installer copies the plugin bundle to `~/.codex/plugins/massa-ai/` (user) or `./.codex/plugins/massa-ai/` (project), creates the `massa-ai-hook` symlink to the repo's shared binary, and merges the 6 hook events into `~/.codex/hooks.json` (or `./.codex/hooks.json`) using an array-append merge that preserves any existing user hooks (a timestamped backup is written before the first write). Re-running is a no-op when massa-ai-owned entries already exist.
 
+### Or install as a plugin
+
+This is the route that makes massa-ai appear in `/plugins`:
+
+```bash
+codex plugin marketplace add ~/Projects/massa-ai
+codex plugin add massa-ai@massa-ai
+codex plugin list          # expect: massa-ai@massa-ai  installed, enabled
+```
+
+The marketplace manifest is `.agents/plugins/marketplace.json` at the repo root; the plugin manifest is `.codex-plugin/plugin.json` here. Codex copies the bundle to `~/.codex/plugins/cache/massa-ai/massa-ai/<version>/` — a *different* location from the flat `~/.codex/plugins/massa-ai/` the installer writes, and the only one Codex scans.
+
+The two routes are **complementary, not exclusive**. A Codex plugin manifest has no `hooks` key (0 of the 203 manifests across Codex's bundled, curated and runtime marketplaces declares one), so the marketplace route delivers skills and the `/plugins` entry but no lifecycle capture. Run `install.sh` as well for hooks.
+
+### Hook entry shape
+
+Codex hook entries are matcher-groups whose `hooks` is an array:
+
+```json
+{ "hooks": [ { "type": "command", "command": "<bin> session-start" } ] }
+```
+
+Codex addresses hook state as `"<file>:<event>:<group>:<hook>"`. A flat entry — `type` and `command` at the top level, no inner array — has no `:<hook>` index, so Codex never enumerates it: it does not appear in `/hooks`, cannot be trusted, and never fires. Releases before 1.2.1 wrote exactly that shape; an install now migrates any owned flat entry to the nested form, leaving user entries untouched.
+
 ## Trust step (required)
 
 Codex skips non-managed plugin hooks until they are trusted. After install, run:

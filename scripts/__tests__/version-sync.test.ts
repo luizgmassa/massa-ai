@@ -3,8 +3,12 @@
  *
  * syncVersions is a pure(ish) filesystem function: given a root dir it reads
  * the root package.json version, walks packages/ and apps/, and rewrites every
- * child package.json's version. We exercise it against a throwaway temp tree
- * so no real workspace file is touched.
+ * child package.json's version. It additionally targets a fixed list of host
+ * plugin manifests that live in dotdirs and so cannot be globbed. We exercise
+ * it against a throwaway temp tree so no real workspace file is touched.
+ *
+ * The temp trees below have no plugin manifests, so those fixed targets always
+ * report `skipped` — assertions count synced entries rather than raw length.
  */
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { promises as fs } from "fs";
@@ -43,11 +47,10 @@ describe("syncVersions", () => {
       version: "1.2.3",
     });
 
-    const synced = syncVersions(tmp);
+    const written = syncVersions(tmp).filter((s) => !s.skipped);
 
-    expect(synced.length).toBe(2);
-    expect(synced.every((s) => !s.skipped)).toBe(true);
-    expect(synced.map((s) => s.version)).toEqual(["9.9.9", "9.9.9"]);
+    expect(written.length).toBe(2);
+    expect(written.map((s) => s.version)).toEqual(["9.9.9", "9.9.9"]);
 
     expect((await readPkg(path.join(tmp, "packages", "alpha", "package.json"))).version).toBe("9.9.9");
     expect((await readPkg(path.join(tmp, "apps", "beta", "package.json"))).version).toBe("9.9.9");
@@ -83,9 +86,9 @@ describe("syncVersions", () => {
       version: "0.0.1",
     });
 
-    const synced = syncVersions(tmp);
-    expect(synced.length).toBe(1);
-    expect(synced[0]!.version).toBe("3.1.0");
+    const written = syncVersions(tmp).filter((s) => !s.skipped);
+    expect(written.length).toBe(1);
+    expect(written[0]!.version).toBe("3.1.0");
   });
 
   test("handles a missing apps/ dir (catch branch) and still syncs packages/", async () => {
@@ -95,9 +98,32 @@ describe("syncVersions", () => {
       version: "0.0.1",
     });
 
+    const written = syncVersions(tmp).filter((s) => !s.skipped);
+    expect(written.length).toBe(1);
+    expect(written[0]!.version).toBe("3.2.0");
+  });
+
+  test("reaches host plugin manifests in dotdirs, which no glob can find", async () => {
+    // A marketplace shows the manifest version, so drift there is user-visible.
+    // The packages/* + apps/* discovery walks one level and matches only
+    // package.json, so both of these need an explicit target entry.
+    const manifests = [
+      "apps/claude-plugin/.claude-plugin/plugin.json",
+      "apps/codex-plugin/.codex-plugin/plugin.json",
+    ];
+    await writePkg(path.join(tmp, "package.json"), { name: "root", version: "5.0.0" });
+    for (const rel of manifests) {
+      await writePkg(path.join(tmp, rel), { name: "massa-ai", version: "0.0.1" });
+    }
+
     const synced = syncVersions(tmp);
-    expect(synced.length).toBe(1);
-    expect(synced[0]!.version).toBe("3.2.0");
+
+    for (const rel of manifests) {
+      const entry = synced.find((s) => s.path === path.join(tmp, rel));
+      expect(entry).toBeDefined();
+      expect(entry!.skipped).toBe(false);
+      expect((await readPkg(path.join(tmp, rel))).version).toBe("5.0.0");
+    }
   });
 
   test("skips unreadable/malformed child manifest (catch branch reports skipped)", async () => {

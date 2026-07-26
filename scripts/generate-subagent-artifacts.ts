@@ -89,7 +89,27 @@ const AGENT_MODELS_CODEX: Record<SpecialistName, string> = {
   "architecture-specialist": "gpt-5.6-sol",
 };
 
-// Cursor + OpenCode use charter metadata.model_hint verbatim + reasoningEffort: max.
+// OpenCode ids + reasoningEffort: max (spec OpenCode table). OpenCode resolves
+// `model` as `<provider>/<model-id>` and silently falls back to the session
+// default on anything else — the charter's human-readable model_hint
+// ("DeepSeek V4 Pro") is not resolvable, so OpenCode pins ids like the other
+// two hosts. The tier split matches the charter hints.
+const AGENT_MODELS_OPENCODE: Record<SpecialistName, string> = {
+  investigator: "opencode-go/deepseek-v4-pro",
+  "context-curator": "opencode-go/deepseek-v4-pro",
+  "documentation-agent": "opencode-go/deepseek-v4-pro",
+  "requirements-analyst": "opencode-go/deepseek-v4-pro",
+  planner: "opencode-go/glm-5.2",
+  builder: "opencode-go/glm-5.2",
+  reviewer: "opencode-go/glm-5.2",
+  "verification-agent": "opencode-go/glm-5.2",
+  "test-engineer": "opencode-go/glm-5.2",
+  "audit-specialist": "opencode-go/glm-5.2",
+  "mobile-specialist": "opencode-go/glm-5.2",
+  "architecture-specialist": "opencode-go/minimax-m3",
+};
+
+// Cursor uses charter metadata.model_hint verbatim + reasoningEffort: max.
 // (Resolved at parse time from each charter's frontmatter.)
 
 // ── Permission -> tools mapping (spec permission mapping) ───────────────────
@@ -315,8 +335,11 @@ export function emitOpenCode(c: Charter): string {
     "---",
     `name: ${agentName}`,
     `description: ${c.description}`,
-    `mode: subagent`,
-    `model: ${c.modelHint}`,
+    // `all` (not `subagent`): OpenCode's Tab switcher lists primary/all agents
+    // only, so `subagent` made the 12 specialists unselectable by hand. `all`
+    // keeps auto-delegation and @-mention while adding manual selection.
+    `mode: all`,
+    `model: ${AGENT_MODELS_OPENCODE[c.name]}`,
     `reasoningEffort: max`,
     `permission: ${permissionBlock}`,
     `metadata: { massa-ai-owned: true }`,

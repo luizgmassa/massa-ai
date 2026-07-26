@@ -3,9 +3,11 @@
  *
  * Verifies the static plugin bundle shape against the spec acceptance
  * criteria (CPX-01, CPX-03, CPX-04, CPX-05):
- * - .codex-plugin/plugin.json has name, version, description, skills, hooks
+ * - .codex-plugin/plugin.json has name, version, description, string skills,
+ *   and an interface block — matching the shape Codex's plugin UI renders
  * - 6 skills/*.md files exist (map, index, find, def, graph, status)
- * - hooks/hooks.json has exactly 6 event keys, each with an owned entry
+ * - hooks/hooks.json has exactly 6 event keys, each with an owned entry in
+ *   Codex's nested matcher-group shape
  * - no plugin-local .mcp.json and no manifest "mcp" pointer — MCP is owned
  *   solely by scripts/install-agents.sh (writes ~/.codex/config.toml)
  * - hooks/massa-ai-hook symlink resolves to the claude-plugin binary
@@ -27,7 +29,7 @@ async function readJson(p: string): Promise<Record<string, unknown>> {
 }
 
 describe("codex-plugin manifest (T5 / CPX-01,03,04,05)", () => {
-  test(".codex-plugin/plugin.json has name, version, description, skills, hooks", async () => {
+  test(".codex-plugin/plugin.json has name, version, description, string skills", async () => {
     const manifest = await readJson(
       path.join(PLUGIN_ROOT, ".codex-plugin/plugin.json"),
     );
@@ -37,11 +39,37 @@ describe("codex-plugin manifest (T5 / CPX-01,03,04,05)", () => {
     expect(typeof manifest.version).toBe("string");
     expect(manifest).toHaveProperty("description");
     expect(typeof manifest.description).toBe("string");
-    expect(manifest).toHaveProperty("skills");
-    expect(manifest).toHaveProperty("hooks");
+    // `skills` is a STRING path, not an array. Codex ships 203 manifests across
+    // its bundled/curated/runtime marketplaces and every one uses the string
+    // form; the array form is what kept massa-ai out of /plugins.
+    expect(typeof manifest.skills).toBe("string");
     // MCP has exactly one writer (scripts/install-agents.sh). A manifest
     // pointer here would reintroduce a second registration path.
     expect(manifest).not.toHaveProperty("mcp");
+    // No `hooks` pointer: it is not a Codex manifest key (0 of those 203
+    // manifests declares one). Hooks reach Codex through ~/.codex/hooks.json,
+    // written by install.sh. Re-adding it here would also point Codex at a
+    // hooks.json whose <PLUGIN_DIR> placeholder is never substituted.
+    expect(manifest).not.toHaveProperty("hooks");
+  });
+
+  test("manifest carries the interface block Codex's plugin UI renders", async () => {
+    const manifest = await readJson(
+      path.join(PLUGIN_ROOT, ".codex-plugin/plugin.json"),
+    );
+    const iface = manifest.interface as Record<string, unknown> | undefined;
+    expect(iface).toBeDefined();
+    expect(typeof iface!.displayName).toBe("string");
+    expect(typeof iface!.shortDescription).toBe("string");
+    expect(typeof iface!.category).toBe("string");
+  });
+
+  test("manifest version matches the root package.json version", async () => {
+    const manifest = await readJson(
+      path.join(PLUGIN_ROOT, ".codex-plugin/plugin.json"),
+    );
+    const rootPkg = await readJson(path.join(REPO_ROOT, "package.json"));
+    expect(manifest.version).toBe(rootPkg.version);
   });
 
   test("6 skills/*.md files exist (map, index, find, def, graph, status)", async () => {
@@ -79,9 +107,42 @@ describe("codex-plugin manifest (T5 / CPX-01,03,04,05)", () => {
       );
       expect(owned).toBeDefined();
       // Each owned entry points at the binary with a subcommand
-      const cmd = (owned as Record<string, unknown>).command as string;
-      expect(cmd).toContain("massa-ai-hook");
+      const inner = (owned as Record<string, unknown>).hooks as {
+        command: string;
+      }[];
+      expect(inner[0]!.command).toContain("massa-ai-hook");
     }
+  });
+
+  test("every owned hook entry uses Codex's nested matcher-group shape", async () => {
+    // Codex addresses hook state as "<file>:<event>:<group>:<hook>", so an
+    // entry whose type/command sit at the top level has no ":<hook>" index. It
+    // is never enumerated, never appears in /hooks, and never fires. Releases
+    // before this one wrote exactly that flat shape.
+    const cfg = await readJson(path.join(PLUGIN_ROOT, "hooks/hooks.json"));
+    const events = cfg.hooks as Record<string, Record<string, unknown>[]>;
+    for (const entries of Object.values(events)) {
+      for (const entry of entries) {
+        expect(entry.type).toBeUndefined();
+        expect(entry.command).toBeUndefined();
+        expect(Array.isArray(entry.hooks)).toBe(true);
+        const inner = entry.hooks as Record<string, unknown>[];
+        expect(inner.length).toBeGreaterThanOrEqual(1);
+        for (const h of inner) {
+          expect(h.type).toBe("command");
+          expect(h.command as string).toContain("massa-ai-hook");
+        }
+      }
+    }
+  });
+
+  test("install.sh writes the nested shape, never the flat one", async () => {
+    const src = await fs.readFile(path.join(PLUGIN_ROOT, "install.sh"), "utf8");
+    // The push must nest under a `hooks: [` array.
+    expect(src).toMatch(/push\(\{\s*\n\s*hooks: \[/);
+    // And it must migrate pre-fix flat entries rather than leaving them to
+    // satisfy the idempotency check and silently block the fix.
+    expect(src).toContain("isOwnedMatcherGroup");
   });
 
   test("no plugin-local .mcp.json ships — MCP has a single writer", async () => {

@@ -1,22 +1,52 @@
 {
   "hooks": {
     "SessionStart": [
-      { "type": "command", "command": "<PLUGIN_DIR>/hooks/massa-ai-hook session-start", "_massaAiOwned": true }
+      {
+        "hooks": [
+          { "type": "command", "command": "<PLUGIN_DIR>/hooks/massa-ai-hook session-start" }
+        ],
+        "_massaAiOwned": true
+      }
     ],
     "UserPromptSubmit": [
-      { "type": "command", "command": "<PLUGIN_DIR>/hooks/massa-ai-hook user-prompt-submit", "_massaAiOwned": true }
+      {
+        "hooks": [
+          { "type": "command", "command": "<PLUGIN_DIR>/hooks/massa-ai-hook user-prompt-submit" }
+        ],
+        "_massaAiOwned": true
+      }
     ],
     "PreToolUse": [
-      { "type": "command", "command": "<PLUGIN_DIR>/hooks/massa-ai-hook pre-tool-use", "_massaAiOwned": true }
+      {
+        "hooks": [
+          { "type": "command", "command": "<PLUGIN_DIR>/hooks/massa-ai-hook pre-tool-use" }
+        ],
+        "_massaAiOwned": true
+      }
     ],
     "PostToolUse": [
-      { "type": "command", "command": "<PLUGIN_DIR>/hooks/massa-ai-hook post-tool-use", "_massaAiOwned": true }
+      {
+        "hooks": [
+          { "type": "command", "command": "<PLUGIN_DIR>/hooks/massa-ai-hook post-tool-use" }
+        ],
+        "_massaAiOwned": true
+      }
     ],
     "PreCompact": [
-      { "type": "command", "command": "<PLUGIN_DIR>/hooks/massa-ai-hook pre-compact", "_massaAiOwned": true }
+      {
+        "hooks": [
+          { "type": "command", "command": "<PLUGIN_DIR>/hooks/massa-ai-hook pre-compact" }
+        ],
+        "_massaAiOwned": true
+      }
     ],
     "Stop": [
-      { "type": "command", "command": "<PLUGIN_DIR>/hooks/massa-ai-hook stop", "_massaAiOwned": true }
+      {
+        "hooks": [
+          { "type": "command", "command": "<PLUGIN_DIR>/hooks/massa-ai-hook stop" }
+        ],
+        "_massaAiOwned": true
+      }
     ]
   }
 }

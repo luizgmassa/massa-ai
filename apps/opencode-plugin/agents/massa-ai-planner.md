@@ -1,8 +1,8 @@
 ---
 name: massa-ai-planner
 description: Read-only planning agent. Transform engineering requests into implementation plans by breaking work into steps, identifying dependencies and risks, suggesting execution order, and producing an implementation strategy. Triggers when a workflow needs a plan before implementation. Never implements or reviews code.
-mode: subagent
-model: GLM-5.2
+mode: all
+model: opencode-go/glm-5.2
 reasoningEffort: max
 permission: { edit: deny, bash: { "*": "ask" } }
 metadata: { massa-ai-owned: true }

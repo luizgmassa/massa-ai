@@ -98,7 +98,7 @@ T9 → T10 → T11 → T12
 - [ ] Claude emitter: array-form `tools`, `model` (haiku/sonnet/opus), `effort: high`, omits `hooks`/`mcpServers`/`permissionMode`
 - [ ] Codex emitter: TOML with `# massa-ai-owned` top comment, `model`, `model_reasoning_effort = "high"`, `sandbox_mode` (read-only→`"read-only"`, write→`"workspace-write"`), `developer_instructions` triple-quoted with `"""` escaped as `\"\"\"`
 - [ ] Cursor emitter: array-form `tools`, `model` = charter hint verbatim, `reasoningEffort: max`
-- [ ] OpenCode emitter: `mode: subagent`, `model` = charter hint verbatim, `reasoningEffort: max`, `permission` (bash deny/ask/allow per mapping), `metadata: { massa-ai-owned: true }`
+- [ ] OpenCode emitter: `mode: all`, `model` = pinned `provider/model-id` (`AGENT_MODELS_OPENCODE`), `reasoningEffort: max`, `permission` (bash deny/ask/allow per mapping), `metadata: { massa-ai-owned: true }`
 - [ ] `--check` mode exits non-zero on drift
 - [ ] `bun run scripts/generate-subagent-artifacts.ts` runs clean; `bun run type-check` passes for the new file
 

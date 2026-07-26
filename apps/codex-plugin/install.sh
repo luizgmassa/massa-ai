@@ -10,6 +10,14 @@
 # MCP registration is delegated to scripts/install-agents.sh, the single writer
 # of host MCP config. This installer no longer ships a plugin-local .mcp.json.
 #
+# Complementary to the marketplace route, NOT a duplicate of it. Installing via
+# `codex plugin add massa-ai@massa-ai` gives Codex the skills and the /plugins
+# entry; it CANNOT give it hooks, because a Codex plugin manifest has no hooks
+# key (none of the 203 manifests shipped by the bundled/curated/runtime
+# marketplaces declares one). Hooks reach Codex only through ~/.codex/hooks.json,
+# which this script writes. So there is no double-fire to guard against here —
+# unlike apps/claude-plugin/install.sh, whose plugin does ship hooks/hooks.json.
+#
 # Idempotent: re-running is a no-op when owned entries already present.
 # Uninstall removes only ownership-marked entries + the plugin directory.
 #
@@ -60,19 +68,19 @@ PLUGIN_DIR="$CODEX_DIR/plugins/massa-ai"
 HOOKS_JSON="$CODEX_DIR/hooks.json"
 AGENTS_DIR="$CODEX_DIR/agents"
 
-# The 6 Codex events → binary subcommands. The command path uses the
-# INSTALLED plugin dir (not the placeholder), so Codex invokes the copy.
-massa_ai_event_entry() {
-  local subcommand="$1"
-  cat <<JSON
-{ "type": "command", "command": "$PLUGIN_DIR/hooks/massa-ai-hook $subcommand", "_massaAiOwned": true }
-JSON
-}
-
 # Array-append merge (F5 mitigation): for each of the 6 events, append the
 # massa-ai hook entry to the event's array if no entry with
 # _massaAiOwned: true already exists. Backup before first write. Uses node
 # (preferred) or bun for safe JSON manipulation — bash cannot do JSON safely.
+#
+# Entry shape is Codex's matcher-group form — an outer object whose "hooks" is
+# an ARRAY of { type, command }:
+#   { "hooks": [{ "type": "command", "command": "<bin> <sub>" }],
+#     "_massaAiOwned": true }
+# Codex addresses hook state as "<file>:<event>:<group>:<hook>", so a flat entry
+# (type/command at the top level, no inner array) has no ":<hook>" index, is
+# never enumerated, and never appears in /hooks. Releases before this one wrote
+# the flat form; the install path migrates them (see MIGRATION below).
 merge_hooks_json() {
   local file="$1"
   local mode="$2" # "install" or "uninstall"
@@ -128,8 +136,18 @@ if (typeof cfg.hooks !== "object" || cfg.hooks === null) {
   cfg.hooks = {};
 }
 
+function isOwned(e) {
+  return Boolean(e) && e._massaAiOwned === true;
+}
+
+// A correctly-shaped owned entry is a matcher group: its "hooks" is an array.
+// Anything owned that fails this is a pre-fix flat entry Codex cannot enumerate.
+function isOwnedMatcherGroup(e) {
+  return isOwned(e) && Array.isArray(e.hooks);
+}
+
 function hasOwned(arr) {
-  return Array.isArray(arr) && arr.some((e) => e && e._massaAiOwned === true);
+  return Array.isArray(arr) && arr.some(isOwnedMatcherGroup);
 }
 
 if (mode === "uninstall") {
@@ -164,13 +182,29 @@ if (mode === "uninstall") {
     }
   }
 
+  // MIGRATION: drop owned entries written in the pre-fix flat shape. They are
+  // invisible to Codex, so leaving them would both keep /hooks empty and make
+  // hasOwned() below treat the event as already wired. Only owned entries are
+  // touched — user entries are never marked.
+  for (const [evt] of EVENTS) {
+    if (Array.isArray(cfg.hooks[evt])) {
+      cfg.hooks[evt] = cfg.hooks[evt].filter(
+        (e) => !(isOwned(e) && !isOwnedMatcherGroup(e)),
+      );
+    }
+  }
+
   // Now write to the correct nested location
   for (const [evt, sub] of EVENTS) {
     if (!Array.isArray(cfg.hooks[evt])) cfg.hooks[evt] = [];
     if (!hasOwned(cfg.hooks[evt])) {
       cfg.hooks[evt].push({
-        type: "command",
-        command: `${pluginDir}/hooks/massa-ai-hook ${sub}`,
+        hooks: [
+          {
+            type: "command",
+            command: `${pluginDir}/hooks/massa-ai-hook ${sub}`,
+          },
+        ],
         _massaAiOwned: true,
       });
     }

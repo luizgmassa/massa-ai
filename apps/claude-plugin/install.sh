@@ -60,6 +60,11 @@ SETTINGS_JSON="$TARGET/settings.json"
 # The shared binary lives in the repo (not copied) — settings.json references
 # its absolute path so Claude Code can invoke `bun run <path> <subcommand>`.
 HOOK_BIN="$SCRIPT_DIR/hooks/massa-ai-hook.ts"
+# Double-fire guard input. The plugin now ships hooks/hooks.json, so a user who
+# installed massa-ai through /plugin AND ran this script would ingest every
+# lifecycle event twice. Claude Code records plugin installs at USER scope even
+# for --project, so this resolves from $HOME, never from $SCOPE.
+PLUGIN_REGISTRY="$HOME/.claude/plugins/installed_plugins.json"
 
 # The 5 Claude Code events → binary subcommands. The matcher-group entry shape:
 #   { "hooks": [{ "type": "command", "command": "bun run \"<HOOK_BIN>\" <sub>" }],
@@ -82,7 +87,7 @@ merge_settings_hooks() {
     exit 3
   fi
 
-  "$runner" - "$file" "$mode" "$ts" "$HOOK_BIN" <<'NODE'
+  "$runner" - "$file" "$mode" "$ts" "$HOOK_BIN" "$PLUGIN_REGISTRY" <<'NODE'
 const fs = require("fs");
 const path = require("path");
 
@@ -90,6 +95,7 @@ const file = process.argv[2];
 const mode = process.argv[3];
 const ts = process.argv[4];
 const hookBin = process.argv[5];
+const pluginRegistry = process.argv[6];
 
 const EVENTS = [
   ["SessionStart", "session-start"],
@@ -119,6 +125,37 @@ function hasOwned(arr) {
   return Array.isArray(arr) && arr.some((e) => e && e._massaAiOwned === true);
 }
 
+// Double-fire guard: true when massa-ai is already installed as a Claude Code
+// plugin, in which case the plugin's own hooks/hooks.json is already wired and
+// appending owned entries here would ingest every event twice.
+//
+// Fails OPEN in every uncertain case — a missing registry is the normal fresh
+// install, and a malformed one must not block installation. That is deliberately
+// unlike the read at the top of this script, which only tolerates ENOENT.
+function pluginAlreadyInstalled() {
+  let raw;
+  try {
+    raw = fs.readFileSync(pluginRegistry, "utf8");
+  } catch (e) {
+    if (e.code !== "ENOENT") {
+      console.error(
+        `  ⚠ could not read ${pluginRegistry} (${e.code}) — wiring hooks anyway`,
+      );
+    }
+    return false;
+  }
+  try {
+    const plugins = JSON.parse(raw).plugins;
+    if (!plugins || typeof plugins !== "object") return false;
+    return Object.keys(plugins).some((k) => /^massa-ai@/.test(k));
+  } catch {
+    console.error(
+      `  ⚠ ${pluginRegistry} is not valid JSON — wiring hooks anyway`,
+    );
+    return false;
+  }
+}
+
 if (mode === "uninstall") {
   const hooks = cfg.hooks;
   if (hooks && typeof hooks === "object" && !Array.isArray(hooks)) {
@@ -130,6 +167,12 @@ if (mode === "uninstall") {
     }
     if (Object.keys(hooks).length === 0) delete cfg.hooks;
   }
+} else if (pluginAlreadyInstalled()) {
+  console.error(
+    "  ↷ massa-ai is installed as a Claude Code plugin — skipping settings.json" +
+      " hooks (the plugin already provides them; wiring both would double-fire)",
+  );
+  process.exit(0);
 } else {
   // install: backup before first write if file existed
   if (existed) {

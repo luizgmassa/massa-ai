@@ -166,7 +166,7 @@ graph TD
 - **Claude emitter**: `name: massa-ai-<charter-name>`, `description: <charter description>`, `tools: [...]` (read-only → `["Read","Grep","Glob","Bash"]`; write → + `Write`,`Edit`), `model: <claude alias>` (haiku/sonnet/opus), `effort: high`. Omits `hooks`/`mcpServers`/`permissionMode`. Body = charter body (Mission…Memory Boundary) verbatim.
 - **Codex emitter**: TOML file. Top comment `# massa-ai-owned`. `name = "massa-ai-<name>"`, `description = "..."`, `model = "<codex id>"`, `model_reasoning_effort = "high"`, `sandbox_mode = "read-only"` (read-only) or `"workspace-write"` (write), `developer_instructions = """<escaped body>"""`. Escape `"""` → `\"\"\"` in body.
 - **Cursor emitter**: same frontmatter shape as Claude (array `tools`, `model` = charter hint verbatim, `reasoningEffort: max`). Body = charter body verbatim.
-- **OpenCode emitter**: `description: <charter description>`, `mode: subagent`, `model: <charter hint verbatim>`, `reasoningEffort: max`, `permission: {edit: deny/allow, bash: deny/ask/allow}`, `metadata: {massa-ai-owned: true}`. Body = charter body verbatim.
+- **OpenCode emitter**: `description: <charter description>`, `mode: all`, `model: <pinned provider/model-id from AGENT_MODELS_OPENCODE>`, `reasoningEffort: max`, `permission: {edit: deny/allow, bash: deny/ask/allow}`, `metadata: {massa-ai-owned: true}`. Body = charter body verbatim.
 - **Dependencies**: charter parsed fields
 - **Reuses**: the spec's model-pinning + permission-mapping tables (encoded as constants)
 
@@ -234,7 +234,8 @@ interface Charter {
 
 const AGENT_MODELS_CLAUDE: Record<string, "haiku"|"sonnet"|"opus"> = { /* spec Claude table */ };
 const AGENT_MODELS_CODEX: Record<string, string> = { /* spec Codex table */ };
-// Cursor + OpenCode use charter.modelHint verbatim
+const AGENT_MODELS_OPENCODE: Record<string, string> = { /* spec OpenCode table */ };
+// Cursor uses charter.modelHint verbatim (Cursor resolves models by alias)
 
 const READ_ONLY_TOOLS = ["Read", "Grep", "Glob", "Bash"];
 const WRITE_TOOLS = [...READ_ONLY_TOOLS, "Write", "Edit"];
@@ -317,7 +318,8 @@ const WRITE_TOOLS = [...READ_ONLY_TOOLS, "Write", "Edit"];
 | Claude uninstall scoping | Exclude `massa-ai-navigator.md` by name in the loop | R1: the `massa-ai-*.md` glob would catch navigator; explicit exclusion preserves it per CLA-05 |
 | Codex/OpenCode ownership marker | In-file (`# massa-ai-owned` / `metadata`) | R3: shared agent dirs need a per-file marker for scoped uninstall |
 | Cursor `reasoningEffort` field | Emit `reasoningEffort: max` (pass-through) | R6: unverified but harmless if ignored; matches OpenCode convention |
-| Model hint for Cursor/OpenCode | Charter `metadata.model_hint` verbatim | User directive: "use the models already defined in the agents skills markdown files" |
+| Model hint for Cursor | Charter `metadata.model_hint` verbatim | User directive: "use the models already defined in the agents skills markdown files"; Cursor resolves models by alias |
+| Model for OpenCode | Pinned `provider/model-id` from `AGENT_MODELS_OPENCODE` (same tiers as the charter hints) | OpenCode resolves only `provider/model-id`; the verbatim hint silently degraded to the primary agent's model |
 | Generator output location | `apps/<plugin>/agents/` (checked in) | Co-located with each plugin; installers copy from there; parity test diffs there |
 
 > **Project-level decisions:** None. All decisions here are feature-local. No `AD-NNN` entry needed — the feature is additive (no DB, no binary, no LLM behavior, no cross-service contract). Active AD-007/008/009 unaffected.

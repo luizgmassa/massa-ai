@@ -88,6 +88,28 @@ const CHARTER_MODEL_HINTS: Record<SpecialistName, string> = {
   "architecture-specialist": "MiniMax M3",
 };
 
+// OpenCode pins provider/model-id, NOT the charter hint: OpenCode resolves only
+// that form and silently degrades to the primary agent's model otherwise.
+// Restated here (not imported) so the test fails on an unreviewed generator edit.
+const OPENCODE_MODELS: Record<SpecialistName, string> = {
+  investigator: "opencode-go/deepseek-v4-pro",
+  "context-curator": "opencode-go/deepseek-v4-pro",
+  "documentation-agent": "opencode-go/deepseek-v4-pro",
+  "requirements-analyst": "opencode-go/deepseek-v4-pro",
+  planner: "opencode-go/glm-5.2",
+  builder: "opencode-go/glm-5.2",
+  reviewer: "opencode-go/glm-5.2",
+  "verification-agent": "opencode-go/glm-5.2",
+  "test-engineer": "opencode-go/glm-5.2",
+  "audit-specialist": "opencode-go/glm-5.2",
+  "mobile-specialist": "opencode-go/glm-5.2",
+  "architecture-specialist": "opencode-go/minimax-m3",
+};
+
+// The shape OpenCode can actually resolve. This is the assertion that matters:
+// it rejects a human-readable hint like "DeepSeek V4 Pro" under any provider.
+const OPENCODE_MODEL_ID = /^[a-z0-9-]+\/[a-z0-9.-]+$/;
+
 // ── Host built-in names (spec name-collision ACs) ───────────────────────────
 const HOST_BUILTINS: Record<string, ReadonlySet<string>> = {
   claude: new Set(["Explore", "Plan", "general-purpose"]),
@@ -279,12 +301,21 @@ describe("subagent parity — Cursor model + effort pin (CRS-08)", () => {
 });
 
 describe("subagent parity — OpenCode model + effort pin (OPC-10)", () => {
-  test("each OpenCode agent has model = charter hint verbatim + reasoningEffort: max", async () => {
+  test("each OpenCode agent has model = pinned provider/model-id + reasoningEffort: max", async () => {
     for (const name of SPECIALIST_NAMES) {
       const raw = await readAgentMd("opencode-plugin", name);
       const fm = parseMdFrontmatter(raw);
-      expect(fm.model).toBe(CHARTER_MODEL_HINTS[name]);
+      expect(fm.model).toBe(OPENCODE_MODELS[name]);
       expect(fm.reasoningEffort).toBe("max");
+    }
+  });
+
+  test("every OpenCode model is a resolvable provider/model-id, never a charter hint", async () => {
+    for (const name of SPECIALIST_NAMES) {
+      const raw = await readAgentMd("opencode-plugin", name);
+      const fm = parseMdFrontmatter(raw);
+      expect(fm.model).toMatch(OPENCODE_MODEL_ID);
+      expect(fm.model).not.toBe(CHARTER_MODEL_HINTS[name]);
     }
   });
 });
@@ -294,7 +325,9 @@ describe("subagent parity — OpenCode permission + owned marker (OPC-07)", () =
     for (const name of SPECIALIST_NAMES) {
       const raw = await readAgentMd("opencode-plugin", name);
       const fm = parseMdFrontmatter(raw);
-      expect(fm.mode).toBe("subagent");
+      // `all`, not `subagent`: OpenCode's Tab switcher lists primary/all only,
+      // so `subagent` made the 12 specialists unselectable by hand.
+      expect(fm.mode).toBe("all");
       // Owned marker
       expect(fm.metadata).toContain("massa-ai-owned: true");
       const perm = fm.permission ?? "";

@@ -31,6 +31,36 @@ apps/claude-plugin/install.sh --project
 
 Restart Claude Code to pick up the new commands.
 
+### Or install as a plugin
+
+This is the route that makes massa-ai appear in `/plugin`:
+
+```
+/plugin marketplace add ~/Projects/massa-ai
+/plugin install massa-ai@massa-ai
+/reload-plugins
+```
+
+The marketplace manifest is `.claude-plugin/marketplace.json` at the repo root;
+the plugin manifest is `.claude-plugin/plugin.json` here. Commands installed this
+way are namespaced (`/massa-ai:find` rather than `/massa-ai-find`).
+
+Claude Code **copies** the plugin directory into a cache on install, so the
+plugin can only reference files inside itself — `hooks/hooks.json` addresses the
+hook binary through `${CLAUDE_PLUGIN_ROOT}`, never an absolute repo path.
+
+Because the plugin ships hooks, running `install.sh` afterwards would wire a
+second copy of all 5 events. It doesn't: the installer checks
+`~/.claude/plugins/installed_plugins.json` for a `massa-ai@*` entry and skips its
+hook merge when it finds one. The check fails open — a missing or malformed
+registry never blocks an install. Note it resolves from `$HOME` even under
+`--project`, because Claude Code records plugin installs at user scope
+regardless of install scope.
+
+Neither manifest carries an `mcp` key: `scripts/install-agents.sh` is the single
+writer of host MCP config, and it writes to `~/.claude.json` (not
+`~/.claude/settings.json`, which holds only approval controls and hooks).
+
 ## Prerequisites
 
 The massa-ai MCP server must be registered for Claude Code. See `apps/mcp-client/README.md`.
