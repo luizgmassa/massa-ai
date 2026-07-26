@@ -1,6 +1,51 @@
 # massa-ai Spec State
 
-## Current — Plugin Distribution Overhaul
+## Current — Persona / Sub-Agent Boundary
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-persona-agent-boundary`
+- workflow: spec-driven (Large — Specify + Design + Tasks + full Plan Challenge + Execute)
+- feature: `persona-agent-boundary` — **Execute complete, independently validated PASS**
+- worktree: `../massa-ai-wt-persona-agent-boundary`; branch `feat/persona-agent-boundary`
+  off `origin/main` @ `77dd144` (v1.6.0)
+- scope: 10 requirements (PAB-01..10) closing five unstated boundaries between the persona
+  layer and the 15 sub-agent charters
+- Artifacts: `.specs/features/persona-agent-boundary/{spec,design,tasks,validation}.md`
+- Key decisions:
+  - D1 Persona propagates to sub-agents as an **optional advisory packet field** carrying
+    the **id only, never the prompt**. User chose this over main-agent-only and over a
+    read-only-roles allowlist (rejected as a new drift surface needing its own parity test).
+  - D2 The Capability Packet's three definitions are **not** collapsed. They are three
+    legitimate views (registry / runtime dispatch / role authoring). Instead the new field
+    uses byte-identical clause text in all three, gated by a test asserting the clause
+    appears in exactly those three files. Per-file paraphrase reads better and is
+    untestable — a substring gate cannot tell a paraphrase from a weakening.
+  - D3 Charter bodies feed **two** generators, not one. `generate-subagent-artifacts.ts`
+    embeds the charter body verbatim (`:287`, `fm + c.body`) into
+    `apps/*/agents/massa-ai-*.{md,toml}`, distinct from `generate-skill-artifacts.ts`'s
+    raw copy into `apps/*/skills/agents/`. Naming only one was the plan's most serious
+    defect; `subagent-parity.test.ts` would have gone red at the pre-PR aggregate, after
+    six commits.
+  - D4 A bare persona id is **not self-defining**, so "shapes emphasis" is an instruction
+    a sub-agent cannot follow without knowing what the persona is. Banning `persona-router`
+    does not ban reading `personas/<id>.md` — different paths. Both are banned now, or the
+    outer-layer stance-vs-tool-scope conflict reappears inside a write-permitted agent.
+  - D5 This takes a real release rather than the `no-changelog` label: harness contract
+    text **is** the shipped product for the four plugin packages.
+- Plan Challenge: full gate, mode `pre_mortem`, `massa-ai-plan-critic`. 2 critical, 1 high,
+  2 medium — all incorporated before Execute began. D3 and D4 are findings 1 and 2.
+- Evidence: integrity suite 24/24 (9 new cases observed red before the content commits);
+  both generators `--check` no drift; `subagent-parity` + `skill-artifact-parity` 36/36;
+  aggregate 567 pass / 4 fail where all 4 are the native tree-sitter suites failing only
+  because the worktree was provisioned with `--ignore-scripts` (same suites 14/14 in the
+  fully-installed checkout). Independent verifier PASS, 6 discrimination mutations killed.
+- Residual risk: 5 test cases are presence-only by accepted design (no bounded absence
+  fragment exists to assert against). The `persona` field is defined but no workflow emits
+  it yet — runtime adoption is a tracked follow-up.
+- Skipped sensor: massa-ai MCP server not registered this session, so `recall`/`remember`
+  were unavailable; no durable memory was written for this feature.
+
+## Superseded — Plugin Distribution Overhaul
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-plugin-distribution-overhaul`
