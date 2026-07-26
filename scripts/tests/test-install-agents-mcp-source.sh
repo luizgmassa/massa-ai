@@ -46,7 +46,8 @@ assert_eq "claude-code: args[3] is bin name" "$(jq_get "$CFG1B" 'c.mcpServers["m
 
 H1C="$ROOT/h1c"
 run "$H1C" opencode --mcp-source npx >/dev/null
-CFG1C="$H1C/.config/opencode/opencode.json"
+# Fresh $HOME creates opencode.jsonc, not opencode.json (PDO-01/A1).
+CFG1C="$H1C/.config/opencode/opencode.jsonc"
 assert_eq "opencode: launcher bunx at index 0" "$(jq_get "$CFG1C" 'c.mcp["massa-ai"].command[0]')" "bunx"
 assert_eq "opencode: argv is the bunx -p form" \
   "$(jq_get "$CFG1C" 'c.mcp["massa-ai"].command.join(" ")')" \
@@ -67,7 +68,7 @@ if [ -f "$PROJECT_ROOT/apps/mcp-client/src/index.ts" ]; then
 
   H2B="$ROOT/h2b"
   run "$H2B" opencode --mcp-source local >/dev/null
-  CFG2B="$H2B/.config/opencode/opencode.json"
+  CFG2B="$H2B/.config/opencode/opencode.jsonc"
   assert_eq "opencode: launcher bun at index 0" "$(jq_get "$CFG2B" 'c.mcp["massa-ai"].command[0]')" "bun"
   assert_eq "opencode: run at index 1" "$(jq_get "$CFG2B" 'c.mcp["massa-ai"].command[1]')" "run"
   PATH2B="$(jq_get "$CFG2B" 'c.mcp["massa-ai"].command[2]')"
@@ -131,6 +132,21 @@ if [ -f "$PROJECT_ROOT/apps/mcp-client/src/index.ts" ]; then
   CFG7B="$H7B/.codex/config.toml"
   assert_contains "codex: bun command written" "$(cat "$CFG7B")" 'command = "bun"'
   assert_contains "codex: local path in args" "$(cat "$CFG7B")" '/apps/mcp-client/src/index.ts'
+fi
+
+echo ""
+echo "Scenario 7b: a pre-existing commented .jsonc combines correctly with --mcp-source local"
+if [ -f "$PROJECT_ROOT/apps/mcp-client/src/index.ts" ]; then
+  H7C="$ROOT/h7c"; mkdir -p "$H7C/.config/opencode"
+  printf '{\n  // user setting\n  "theme": "dark",\n}\n' > "$H7C/.config/opencode/opencode.jsonc"
+  run "$H7C" opencode --mcp-source local >/dev/null
+  CFG7C="$H7C/.config/opencode/opencode.jsonc"
+  assert_eq "opencode: launcher bun (local source) in the existing .jsonc" \
+    "$(jq_get "$CFG7C" 'c.mcp["massa-ai"].command[0]')" "bun"
+  assert_eq "user's theme key survives" "$(jq_get "$CFG7C" 'c.theme')" "dark"
+  assert_no_file "no opencode.json created alongside" "$H7C/.config/opencode/opencode.json"
+else
+  echo "  skipped: apps/mcp-client/src/index.ts not found"
 fi
 
 echo ""

@@ -81,8 +81,10 @@ echo "Scenario 5: opencode uninstall targets the mcp key, not mcpServers"
 H5="$ROOT/h5"
 install "$H5" opencode >/dev/null
 uninstall "$H5" opencode >/dev/null
+# A fresh install creates opencode.jsonc (PDO-01/A1); uninstall must resolve to the
+# SAME file it was created in.
 assert_eq "opencode entry gone" \
-  "$(jq_get "$H5/.config/opencode/opencode.json" 'c.mcp === undefined ? "gone" : "present"')" "gone"
+  "$(jq_get "$H5/.config/opencode/opencode.jsonc" 'c.mcp === undefined ? "gone" : "present"')" "gone"
 
 echo ""
 echo "Scenario 6: a backup is taken before the removal write"
@@ -106,7 +108,31 @@ BAK7="$(find "$H7/.claude" -name 'settings.json.massa-ai.bak-*' | head -n1)"
 assert_ne "backup created for migration" "$BAK7" ""
 
 echo ""
-echo "Scenario 8: hand-written entry in settings.json is preserved"
+echo "Scenario 9: opencode uninstall on a .json-only config edits .json and creates no .jsonc"
+H9="$ROOT/h9"; mkdir -p "$H9/.config/opencode"
+printf '{"theme":"light"}\n' > "$H9/.config/opencode/opencode.json"
+install "$H9" opencode >/dev/null
+uninstall "$H9" opencode >/dev/null
+assert_eq "opencode entry gone from .json" \
+  "$(jq_get "$H9/.config/opencode/opencode.json" 'c.mcp === undefined ? "gone" : "present"')" "gone"
+assert_eq "user key survives" "$(jq_get "$H9/.config/opencode/opencode.json" 'c.theme')" "light"
+assert_no_file "uninstall did not create opencode.jsonc" "$H9/.config/opencode/opencode.jsonc"
+
+echo ""
+echo "Scenario 10: opencode uninstall when both files exist targets .json only, .jsonc is untouched"
+H10="$ROOT/h10"; mkdir -p "$H10/.config/opencode"
+printf '{"jsoncMarker":true}\n' > "$H10/.config/opencode/opencode.jsonc"
+printf '{"jsonMarker":true}\n' > "$H10/.config/opencode/opencode.json"
+install "$H10" opencode >/dev/null
+BEFORE10JSONC="$(cat "$H10/.config/opencode/opencode.jsonc")"
+uninstall "$H10" opencode >/dev/null
+assert_eq "opencode entry gone from .json" \
+  "$(jq_get "$H10/.config/opencode/opencode.json" 'c.mcp === undefined ? "gone" : "present"')" "gone"
+assert_eq ".jsonc is byte-for-byte untouched by uninstall" \
+  "$(cat "$H10/.config/opencode/opencode.jsonc")" "$BEFORE10JSONC"
+
+echo ""
+echo "Scenario 11: hand-written entry in settings.json is preserved"
 H8="$ROOT/h8"; mkdir -p "$H8/.claude"
 printf '{"mcpServers":{"massa-ai":{"command":"my-mcp"}},"userKey":"keep"}\n' > "$H8/.claude/settings.json"
 install "$H8" claude-code >/dev/null

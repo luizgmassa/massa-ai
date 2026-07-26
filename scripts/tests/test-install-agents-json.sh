@@ -86,8 +86,11 @@ echo ""
 echo "Scenario 5: opencode uses mcp / environment / bunx with explicit bin name"
 H5="$ROOT/h5"
 run "$H5" opencode >/dev/null
-CFG5="$H5/.config/opencode/opencode.json"
+# Neither opencode.jsonc nor opencode.json pre-existed, so PDO-01/A1 says the installer
+# creates opencode.jsonc (not opencode.json) — see the four-combination coverage below.
+CFG5="$H5/.config/opencode/opencode.jsonc"
 assert_file "opencode config created" "$CFG5"
+assert_no_file "opencode.json NOT also created" "$H5/.config/opencode/opencode.json"
 assert_eq "top-level key is mcp (not mcpServers)" "$(jq_get "$CFG5" 'c.mcp ? "mcp" : (c.mcpServers ? "mcpServers" : "none")')" "mcp"
 # Asserted as the whole argv rather than by index, so the shape is readable and
 # a stray flag cannot hide between two passing index checks. bunx has no -y —
@@ -181,5 +184,86 @@ OUT13="$(run "$H13" opencode)"
 AFTER13="$(shasum -a 256 "$H13/.config/opencode/opencode.json" | cut -d' ' -f1)"
 assert_contains "skip is explained" "$OUT13" "registers tools in-process"
 assert_eq "config untouched" "$AFTER13" "$BEFORE13"
+
+# ── PDO-01/02/04/05: the four opencode config existence combinations ─────────
+# scripts/lib/opencode-config.cjs's resolveConfigPath contract, exercised through the
+# real installer rather than as unit tests, so a regression in how install-agents.sh
+# wires the helper in (not just the helper itself) would be caught here.
+
+echo ""
+echo "Scenario 14: .jsonc only — editor is opencode.jsonc, no opencode.json appears"
+H14="$ROOT/h14"; mkdir -p "$H14/.config/opencode"
+printf '{\n  "theme": "dark"\n}\n' > "$H14/.config/opencode/opencode.jsonc"
+run "$H14" opencode >/dev/null
+CFG14="$H14/.config/opencode/opencode.jsonc"
+assert_eq "opencode entry lands in the existing .jsonc" \
+  "$(jq_get "$CFG14" 'c.mcp["massa-ai"] ? "yes" : "no"')" "yes"
+assert_eq "existing user key survives" "$(jq_get "$CFG14" 'c.theme')" "dark"
+assert_no_file "no opencode.json created alongside" "$H14/.config/opencode/opencode.json"
+
+echo ""
+echo "Scenario 15: .json only — editor is opencode.json, no opencode.jsonc appears"
+H15="$ROOT/h15"; mkdir -p "$H15/.config/opencode"
+printf '{\n  "theme": "light"\n}\n' > "$H15/.config/opencode/opencode.json"
+run "$H15" opencode >/dev/null
+CFG15="$H15/.config/opencode/opencode.json"
+assert_eq "opencode entry lands in the existing .json" \
+  "$(jq_get "$CFG15" 'c.mcp["massa-ai"] ? "yes" : "no"')" "yes"
+assert_eq "existing user key survives" "$(jq_get "$CFG15" 'c.theme')" "light"
+assert_no_file "no opencode.jsonc created alongside" "$H15/.config/opencode/opencode.jsonc"
+
+echo ""
+echo "Scenario 16: both exist — .json wins (OpenCode core merges .json over .jsonc), and a warning names both files"
+H16="$ROOT/h16"; mkdir -p "$H16/.config/opencode"
+printf '{"jsoncMarker": true}\n' > "$H16/.config/opencode/opencode.jsonc"
+printf '{"jsonMarker": true}\n' > "$H16/.config/opencode/opencode.json"
+OUT16="$(run "$H16" opencode)"
+CFG16JSONC="$H16/.config/opencode/opencode.jsonc"
+CFG16JSON="$H16/.config/opencode/opencode.json"
+assert_contains "warning names opencode.jsonc" "$OUT16" "opencode.jsonc"
+assert_contains "warning names opencode.json" "$OUT16" "opencode.json"
+assert_contains "warning explains the merge-order reason" "$OUT16" "merges .json"
+assert_eq "opencode.json got the massa-ai entry" \
+  "$(jq_get "$CFG16JSON" 'c.mcp["massa-ai"] ? "yes" : "no"')" "yes"
+assert_eq "opencode.jsonc is untouched (still just its marker)" \
+  "$(jq_get "$CFG16JSONC" 'JSON.stringify(c)')" '{"jsoncMarker":true}'
+
+echo ""
+echo "Scenario 17: neither exists — opencode.jsonc is created, never opencode.json"
+H17="$ROOT/h17"
+run "$H17" opencode >/dev/null
+assert_file "opencode.jsonc created" "$H17/.config/opencode/opencode.jsonc"
+assert_no_file "opencode.json NOT created" "$H17/.config/opencode/opencode.json"
+
+echo ""
+echo "Scenario 18: a commented .jsonc with trailing commas parses successfully (does not abort)"
+H18="$ROOT/h18"; mkdir -p "$H18/.config/opencode"
+cat > "$H18/.config/opencode/opencode.jsonc" <<'JSONC'
+{
+  // user's own theme choice
+  "theme": "dark",
+  "keybinds": {
+    "leader": "ctrl+a", // comment with a "quote" inside it
+  },
+  /* block comment
+     spanning lines */
+  "docsUrl": "https://opencode.ai/docs",
+}
+JSONC
+OUT18="$(run "$H18" opencode)"; RC18=$?
+CFG18="$H18/.config/opencode/opencode.jsonc"
+assert_eq "commented config does not abort the install" "$RC18" "0"
+assert_eq "URL value survives intact" "$(jq_get "$CFG18" 'c.docsUrl')" "https://opencode.ai/docs"
+assert_eq "nested user key survives" "$(jq_get "$CFG18" 'c.keybinds.leader')" "ctrl+a"
+assert_eq "massa-ai entry added" "$(jq_get "$CFG18" 'c.mcp["massa-ai"] ? "yes" : "no"')" "yes"
+
+echo ""
+echo "Scenario 19: a genuinely malformed .jsonc (not merely commented) is still refused"
+H19="$ROOT/h19"; mkdir -p "$H19/.config/opencode"
+printf '{ "theme": \n' > "$H19/.config/opencode/opencode.jsonc"
+BEFORE19="$(cat "$H19/.config/opencode/opencode.jsonc")"
+OUT19="$(run "$H19" opencode)"; RC19=$?
+assert_ne "malformed jsonc is not a success" "$RC19" "0"
+assert_eq "the broken file is left as-is" "$(cat "$H19/.config/opencode/opencode.jsonc")" "$BEFORE19"
 
 summary "install-agents JSON writers"
