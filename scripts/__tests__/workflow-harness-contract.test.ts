@@ -154,8 +154,11 @@ describe("removal: the chat-restart and context-handoff surface is gone", () => 
   }
 
   test("no live source references a removed route", async () => {
-    // .specs/ is historical record and CHANGELOG.md documents the removal
-    // itself; both legitimately keep the old names.
+    // Three legitimate holders of the old names: .specs/ is historical
+    // record, CHANGELOG.md documents the removal, and THIS FILE carries them
+    // as assertion data. Excluding self is required, not cosmetic -- git grep
+    // reads tracked files, so the suite passes while uncommitted and fails the
+    // moment it is committed.
     const proc = Bun.spawn(
       [
         "git",
@@ -167,6 +170,7 @@ describe("removal: the chat-restart and context-handoff surface is gone", () => 
         ".",
         ":(exclude).specs",
         ":(exclude)CHANGELOG.md",
+        ":(exclude)scripts/__tests__/workflow-harness-contract.test.ts",
       ],
       { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe" },
     );
@@ -354,6 +358,7 @@ describe("roster: nothing still advertises 16 specialists", () => {
         ".",
         ":(exclude).specs",
         ":(exclude)CHANGELOG.md",
+        ":(exclude)scripts/__tests__/workflow-harness-contract.test.ts",
       ],
       { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe" },
     );
