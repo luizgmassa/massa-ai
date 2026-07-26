@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The persona layer and the sub-agent layer now have a stated contract.** Auditing
+  `skills/persona-router/SKILL.md` against the 15 charters in `skills/agents/*/SKILL.md`
+  found five boundaries that were never written down. None was a runtime bug; each let a
+  reader draw a wrong conclusion with no gate to catch it.
+  - The **Capability Packet** gains an optional `persona` field, declared identically in
+    all three of its definitions (`skills/AGENTS.md`, `references/agent-orchestration.md`,
+    `references/subagent-design.md`). It carries the cataloged persona **id only**, never
+    the persona prompt, as advisory framing that never overrides an agent's charter
+    Restrictions, scope, or permissions. Absent is the valid default — no workflow emits
+    it yet.
+  - **All 15 charters** gain two adjacent Restrictions lines: a supplied persona shapes
+    emphasis only and the charter's Restrictions win on conflict; and the self-routing ban
+    now covers `persona-router` and reading a `personas/` prompt file, not just the
+    `massa-ai` router. Together they mean an agent may *receive* a persona and may never
+    *select* or *expand* one — the second half closes a path by which an agent handed a
+    bare id could have opened a persona prompt claiming implementation ownership.
+  - **`persona-router` Stop Conditions are scoped.** The clause forbidding subagents and
+    subprocess orchestration was written unscoped and could be read as disabling the whole
+    16-agent dispatch layer during a persona session. It now bounds the routing step only
+    and says workflow-mandated dispatch is unaffected.
+  - **A new Persona And Sub-Agents section** states that a persona grants no tool access,
+    no write scope, and no permission, never authorizes inline implementation in place of
+    a dispatch, and never widens a builder's disjoint write set — and that a persona route
+    is not a specialist consultation, naming the four persona↔agent pairs that overlap
+    (`senior-mobile-engineer`↔`mobile-specialist`,
+    `senior-mobile-qa-automation-engineer`↔`test-engineer`,
+    `context-skill-harness-engineer-architect`↔`architecture-specialist`,
+    `product-manager`↔`requirements-analyst`).
+  - **Nine discriminating tests** land as defect class 7 in
+    `scripts/__tests__/skills-harness-integrity.test.ts`. Charter cases enumerate
+    `skills/agents/*/` from disk and are scoped to the `## Restrictions` span, so a charter
+    added later cannot skip the rules and a line landing in the wrong section still fails.
+    Two cases assert *absence* (the superseded charter sentence, the unscoped
+    persona-router clause), because presence alone would pass if the old text were
+    re-added alongside the new.
+  - Charter bodies feed **two** generators — `generate-skill-artifacts.ts` (raw copy into
+    `apps/*/skills/agents/`) and `generate-subagent-artifacts.ts`, which embeds the body
+    verbatim into `apps/*/agents/massa-ai-*.{md,toml}`. Both mirrors are regenerated and
+    both `--check` gates are clean.
+
 ## [1.6.0] - 2026-07-26
 
 ### Added
