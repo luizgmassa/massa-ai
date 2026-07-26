@@ -21,6 +21,7 @@
  */
 
 import { describe, test, expect } from "bun:test";
+import { execFileSync } from "child_process";
 import { promises as fs } from "fs";
 import path from "path";
 
@@ -212,6 +213,46 @@ describe("policy single-source: one copy of each agent policy", () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+// ── 3b. CHANGELOG heading-to-bump table single-source ──────────────────────
+//
+// Same mechanism as POLICY_KEYS above (P0-3), extended to the CHANGELOG
+// heading→bump table: a distinctive substring of the canonical table must
+// occur exactly once repo-wide, and that occurrence must live in
+// CONTRIBUTING.md (see D6 in
+// .specs/features/plugin-distribution-overhaul/design.md).
+
+describe("CHANGELOG heading-to-bump table is single-sourced", () => {
+  // Built by concatenation so this guard's own source never self-matches the
+  // repo-wide scan below.
+  const CHANGELOG_TABLE_SUBSTRING =
+    "| `### Added` | new capability | minor bump (`" + "1.2.1` → `1.3.0`) |";
+  const SELF_FILE = path.relative(REPO_ROOT, import.meta.path);
+
+  /** Every git-tracked file, read as a repo-wide scan (matches .gitignore). */
+  async function repoTrackedFiles(): Promise<string[]> {
+    const output = execFileSync("git", ["ls-files"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+    });
+    return output.split("\n").filter(Boolean).filter((rel) => rel !== SELF_FILE);
+  }
+
+  test("the canonical heading table appears exactly once repo-wide, in CONTRIBUTING.md", async () => {
+    const files = await repoTrackedFiles();
+    const occurrences: string[] = [];
+    for (const rel of files) {
+      let content: string;
+      try {
+        content = await read(path.join(REPO_ROOT, rel));
+      } catch {
+        continue; // binary or unreadable — cannot contain the substring meaningfully
+      }
+      if (content.includes(CHANGELOG_TABLE_SUBSTRING)) occurrences.push(rel);
+    }
+    expect(occurrences).toEqual(["CONTRIBUTING.md"]);
   });
 });
 

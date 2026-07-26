@@ -148,10 +148,6 @@ Major versions are never bumped automatically; cutting a `2.0.0` is a deliberate
 the `no-changelog` label (bot-authored PRs are exempt). Use that label for docs-only or
 chore-only work that should not cut a release.
 
-If your PR touches a file tracked by
-`packages/core/src/__tests__/e2e/fixtures/qwen-profile.json` (including `README.md` and
-the workspace `package.json` files), refresh its hash or the e2e suite will throw.
-
 **Never write the skip-ci marker literally in a commit message, a commit body, or a PR
 body.** GitHub scans the entire commit message for `[skip ci]`, not just the subject, and a
 squash merge folds every commit body into it. Writing it — even while explaining it —

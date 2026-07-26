@@ -6,7 +6,7 @@
  * apps/{claude,codex,cursor,opencode}-plugin/agents/. Outputs are checked into
  * git so the plugins ship without a runtime build step.
  *
- *   bun run scripts/generate-subagent-artifacts.ts        # emit 64 files (16 x 4 hosts)
+ *   bun run scripts/generate-subagent-artifacts.ts        # emit 60 files (15 x 4 hosts)
  *   bun run scripts/generate-subagent-artifacts.ts --check # drift gate: diff vs checked-in
  *
  * Model + effort + permission are PINNED per host (spec, NOT advisory). A parity

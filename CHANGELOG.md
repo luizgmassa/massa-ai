@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Publish-artifact package-contents gate.** `scripts/verify-package-contents.ts` stages a
+  scratch copy limited to exactly the paths `publish.yml`'s artifact step declares, packs it,
+  and diffs the tarball inventory against a committed manifest. It reproduces the
+  no-`actions/checkout` condition the publish jobs actually run under, so a package's `files`
+  field can no longer promise content the artifact never uploaded. Wired into CI as a
+  blocking step and mutation-verified in both directions.
+- **JSONC support for OpenCode config.** `scripts/lib/opencode-config.cjs` (vendored
+  byte-identically into `apps/opencode-plugin/lib/`) resolves the config path, parses with a
+  state-machine comment stripper that leaves `https://` values intact, and backs up before
+  every write.
+
+### Changed
+
+- **OpenCode installers edit the config file you actually have.** Both writers previously
+  hardcoded `opencode.json` and parsed it with bare `JSON.parse`, so a `opencode.jsonc` user
+  got a second competing file and a commented config aborted the install outright. Resolution
+  is now `opencode.jsonc` → `opencode.json` → create `opencode.jsonc`, with a warning when
+  both exist because OpenCode merges `.json` over `.jsonc`. A fresh install now creates
+  `opencode.jsonc`.
+
+### Removed
+
+- **The `qwen-profile.json` content-hash fixture and its whole maintenance tax.** Editing any
+  tracked file — including `README.md` or a workspace `package.json` — used to break two
+  tests until the manifest was refreshed, and 35 of its 71 entries were already stale. Gone
+  with it: `qwen-fixture.ts`, two test files, `prepare-qwen-e2e-fixture.ts`, the
+  `update-qwen-hashes` script, `release-version.ts`'s `repinFixtureHashes`, and the release
+  workflow's fixture pathspec. The shared E2E index identity now derives from the resolved
+  embedding config plus the commit SHA, so per-profile isolation survives the removal.
+- **CHANGELOG authoring rules in `skills/AGENTS.md`.** The rules lived in three files naming
+  three different canonical sources. `CONTRIBUTING.md` is now the only copy; `CLAUDE.md`
+  links to it and keeps the release mechanics; the harness bootstrap block drops the section
+  entirely. A single-source test asserts the heading-to-bump table appears exactly once.
+
+### Fixed
+
+- **Published `@massa-ai/opencode-plugin` tarballs were missing their 15 agent charters.**
+  The manifest declared `files: ["dist", "agents/*.md"]`, but the publish jobs have no
+  `actions/checkout` and the build artifact uploaded only `dist` and `package.json`, so
+  `agents/` was never present to include. Shipped broken since the package was first
+  published; caught by the new gate on its first run.
+
 ## [1.4.0] - 2026-07-26
 
 ### Removed

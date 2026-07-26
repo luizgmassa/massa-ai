@@ -1,6 +1,46 @@
 # massa-ai Spec State
 
-## Current — Workflow Harness Overhaul
+## Current — Plugin Distribution Overhaul
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-plugin-distribution-overhaul`
+- workflow: spec-driven (Large — Specify + Design + Tasks + full Plan Challenge + Execute)
+- feature: `plugin-distribution-overhaul` — **PR1 execute complete**, PR2 not started
+- worktrees: `massa-ai-wt-pdo-a` (PR1 branch), `massa-ai-wt-pdo-b` (batch B, merged into A)
+- branch: `feat/plugin-harness-gate-and-cleanup` (from `origin/main` @ `64b6feb`, v1.4.0)
+- scope: 26 requirements (PDO-01..26) across 5 workstreams — OpenCode `.jsonc` resolution,
+  skills bundled into all 4 plugins, all 4 plugins published, `qwen-profile.json` removal,
+  CHANGELOG single-sourcing
+- Spec: `.specs/features/plugin-distribution-overhaul/spec.md`
+- Design: `.specs/features/plugin-distribution-overhaul/design.md`
+- Tasks: `.specs/features/plugin-distribution-overhaul/tasks.md`
+- Key decisions:
+  - D1 `.jsonc` is **not** unconditionally correct — OpenCode core merges `opencode.json`
+    *over* `opencode.jsonc`, so the installer probes for an existing file and only creates
+    `.jsonc` when neither exists. Editing the losing file would be a silent no-op.
+  - D2 `npm pack` **silently drops symlinks** (verified empirically: the linked file and its
+    containing directory were both absent from the tarball, with no pack-time error). This is
+    why skills are bundled as real checked-in files and why `codex`/`cursor`'s
+    `hooks/massa-ai-hook` symlinks must become real files before those plugins can publish.
+  - D3 The publish jobs have **no `actions/checkout`** — their entire filesystem is the
+    `build-output` artifact. A `files` field cannot include what was never uploaded. This was
+    already shipping broken: `@massa-ai/opencode-plugin@1.3.1` contained only `dist/` and
+    `package.json` despite declaring `agents/*.md`.
+  - D4 Two PRs, gate first (A10). The tarball gate landed in PR1 and was observed failing on
+    the real defect before the fix existed — a gate never seen red is not evidence.
+  - D5 `manifestHash` leaves the shared E2E identity; the commit SHA already encodes revision
+    content. Provider/model/dimensions come from the embeddings config resolver, never raw
+    `process.env` — a throw there nulls `SHARED_PID` and reintroduces a documented OOM.
+  - D6 The Sub-Agent Registry stays **outside** the bootstrap markers. The boundary is
+    host-portable policy vs repo-internal contribution machinery.
+- Evidence: package-contents gate 5/5 pass (4/5 before the T2 fix, as designed); OpenCode
+  helper 21 pass; install-agents shell suites 66/48/27/25 pass; `test-mcp-single-writer` 36
+  pass; opencode-plugin 16 pass; `test:plugins` 73 pass; skills-harness-integrity 15 pass;
+  `SHARED_PID` non-null with all three embedding env vars unset.
+- Residual risk: PR2 (skills bundling + 4-plugin publishing) unstarted. The ~5 MB / 580-file
+  bundle cost and the `hooks/massa-ai-hook` symlink replacement both land there.
+
+## Previous — Workflow Harness Overhaul
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-workflow-harness-overhaul`

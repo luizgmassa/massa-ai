@@ -78,7 +78,8 @@ bash "$INSTALLER" --target "$H5" --agent codex --yes >/dev/null 2>&1
 assert_file "codex config written" "$H5/.codex/config.toml"
 assert_no_file "cursor config not touched" "$H5/.cursor/mcp.json"
 assert_no_file "claude config not touched" "$H5/.claude/settings.json"
-assert_no_file "opencode config not touched" "$H5/.config/opencode/opencode.json"
+assert_no_file "opencode config not touched (.json)" "$H5/.config/opencode/opencode.json"
+assert_no_file "opencode config not touched (.jsonc)" "$H5/.config/opencode/opencode.jsonc"
 
 echo ""
 echo "Scenario 6: with no --agent, every applicable host is written"
@@ -87,7 +88,10 @@ bash "$INSTALLER" --target "$H6" --yes >/dev/null 2>&1
 assert_file "claude-code written" "$H6/.claude.json"
 assert_file "codex written" "$H6/.codex/config.toml"
 assert_file "cursor written" "$H6/.cursor/mcp.json"
-assert_file "opencode written" "$H6/.config/opencode/opencode.json"
+# Fresh $HOME: neither opencode.jsonc nor opencode.json pre-existed, so PDO-01/A1
+# creates opencode.jsonc (scripts/tests/test-install-agents-json.sh covers all four
+# existence combinations in depth).
+assert_file "opencode written" "$H6/.config/opencode/opencode.jsonc"
 if [ "$(uname -s)" = "Darwin" ]; then
   assert_file "claude-desktop written on macOS" \
     "$H6/Library/Application Support/Claude/claude_desktop_config.json"
@@ -108,6 +112,17 @@ echo ""
 echo "Scenario 8: the single-writer statement is printed on a real write"
 assert_contains "ownership is stated" "$OUT7" "MCP registration is owned by this script"
 assert_not_contains "the old 'skip this step' advice is gone" "$OUT7" "skip this install-agents step"
+
+echo ""
+echo "Scenario 8b: --dry-run against a pre-existing .jsonc writes nothing and creates no .json"
+H8B="$ROOT/h8b"; mkdir -p "$H8B/.config/opencode"
+printf '{\n  // a comment\n  "theme": "dark",\n}\n' > "$H8B/.config/opencode/opencode.jsonc"
+BEFORE8B="$(tree_fingerprint "$H8B")"
+OUT8B="$(bash "$INSTALLER" --target "$H8B" --agent opencode --dry-run 2>&1)"
+AFTER8B="$(tree_fingerprint "$H8B")"
+assert_eq "dry-run against an existing .jsonc mutates nothing" "$AFTER8B" "$BEFORE8B"
+assert_no_file "dry-run creates no opencode.json" "$H8B/.config/opencode/opencode.json"
+assert_contains "dry-run reports it would edit the existing .jsonc" "$OUT8B" "opencode.jsonc"
 
 echo ""
 echo "Scenario 9: --mcp-source validation rejects invalid values"

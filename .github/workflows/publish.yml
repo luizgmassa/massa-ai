@@ -76,6 +76,14 @@ jobs:
 
       # Uploaded AFTER the resolve step on purpose: the publish jobs must receive
       # manifests whose deps are pinned to ^X.Y.Z, never `workspace:*`.
+      #
+      # This list is the ONLY filesystem the publish-* jobs below get (no checkout), so it
+      # must enumerate every directory a package's `files` field declares — not just its
+      # build output. PDO-26: apps/opencode-plugin/package.json declares
+      # files: ["dist", "agents/*.md"], but agents/ was missing here, so every published
+      # tarball silently shipped without the 15 agent charters. scripts/verify-package-
+      # contents.ts (wired into ci.yml) reproduces this exact artifact-only filesystem and
+      # would have failed on day one had it existed — keep the two lists in sync.
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -91,6 +99,7 @@ jobs:
             apps/mcp-client/dist
             apps/mcp-client/package.json
             apps/opencode-plugin/dist
+            apps/opencode-plugin/agents
             apps/opencode-plugin/package.json
           retention-days: 1
 

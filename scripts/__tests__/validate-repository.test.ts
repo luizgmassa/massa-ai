@@ -107,7 +107,7 @@ describe("skills/AGENTS.md bootstrap contract", () => {
     expect(block).not.toContain("UAS_");
   });
 
-  test("sub-agent registry preserved (16 agents)", async () => {
+  test("sub-agent registry preserved (15 agents)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "AGENTS.md"));
     expect(content).toContain("investigator");
     expect(content).toContain("planner");

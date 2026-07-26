@@ -84,6 +84,15 @@ jobs:
       - name: Build
         run: bun run build
 
+      # PDO-26. publish.yml's publish jobs have NO actions/checkout — they can only see
+      # whatever the Build step's `build-output` artifact uploaded. This reproduces that
+      # constrained filesystem (stage only the declared artifact paths, then `npm pack`
+      # from inside the staged copy) so a package's `files` field silently outrunning the
+      # artifact list fails here, before a release, rather than in a published tarball.
+      # Must run after Build: it packs each package's real dist/ output.
+      - name: Verify package contents (publish artifact parity)
+        run: bun scripts/verify-package-contents.ts
+
       - name: Detect grammar-related changes
         id: filter
         uses: dorny/paths-filter@v3

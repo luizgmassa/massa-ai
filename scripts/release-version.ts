@@ -20,9 +20,8 @@
  * pipe stdout straight into `jq` from a workflow step.
  */
 
-import { createHash } from "crypto";
 import { readFileSync, writeFileSync } from "fs";
-import { join, relative } from "path";
+import { join } from "path";
 import { syncVersions } from "./version-sync";
 
 export type Bump = "minor" | "patch" | null;
@@ -31,14 +30,6 @@ export type Bump = "minor" | "patch" | null;
 const MINOR_HEADINGS = new Set(["added", "changed", "removed", "deprecated"]);
 /** Headings that mean "bug / minor stuff" — bump Z. */
 const PATCH_HEADINGS = new Set(["fixed", "security"]);
-
-/**
- * The e2e needle fixture content-hash-pins several files that a version bump rewrites.
- * `qwen-fixture.ts` throws on a mismatch, so the release commit must carry refreshed
- * hashes for exactly those files (ARV-R13).
- */
-export const FIXTURE_REL_PATH =
-  "packages/core/src/__tests__/e2e/fixtures/qwen-profile.json";
 
 const UNRELEASED_RE = /^##\s+\[Unreleased\]/i;
 const ANY_SECTION_RE = /^##\s+\[/;
@@ -159,57 +150,6 @@ export function promoteChangelog(
   ].join("\n");
 }
 
-/**
- * Re-pin `sha256` for EXACTLY `changedPaths` in the qwen e2e fixture (ARV-R13).
- *
- * Deliberately NOT `bun run update-qwen-hashes`, which refreshes the whole manifest:
- * 35 of its 71 entries are already stale on main, and sweeping those into an unattended
- * release commit would launder an unrelated benchmark regression. Returns the
- * repo-relative paths actually re-pinned.
- *
- * The hash is `sha256` over raw bytes — byte-identical to `qwen-fixture.ts` and to
- * `scripts/update-fixture-hashes.py`.
- */
-export function repinFixtureHashes(rootDir: string, changedPaths: string[]): string[] {
-  const fixturePath = join(rootDir, FIXTURE_REL_PATH);
-  let raw: string;
-  try {
-    raw = readFileSync(fixturePath, "utf8");
-  } catch {
-    return []; // fixture absent (e.g. a trimmed test repo) — nothing to keep consistent
-  }
-
-  const manifest = JSON.parse(raw);
-  const wanted = new Set(
-    changedPaths.map((p) => relative(rootDir, join(rootDir, p)).split("\\").join("/")),
-  );
-  const repinned: string[] = [];
-
-  for (const group of ["needleTargets", "distractors", "supportFiles"]) {
-    for (const entry of manifest[group] ?? []) {
-      if (!wanted.has(entry.path)) continue;
-      let bytes: Buffer;
-      try {
-        bytes = readFileSync(join(rootDir, entry.path));
-      } catch {
-        continue;
-      }
-      const actual = createHash("sha256").update(bytes).digest("hex");
-      if (actual !== entry.sha256) {
-        entry.sha256 = actual;
-        repinned.push(entry.path);
-      }
-    }
-  }
-
-  // The fixture is exactly `JSON.stringify(x, null, 2) + "\n"`, so this round-trip is
-  // byte-stable: only the changed hashes show up in the diff.
-  if (repinned.length > 0) {
-    writeFileSync(fixturePath, JSON.stringify(manifest, null, 2) + "\n");
-  }
-  return repinned;
-}
-
 export interface ReleaseDerivation {
   /** Root version before the bump. */
   current: string;
@@ -218,13 +158,11 @@ export interface ReleaseDerivation {
   bump: Bump;
   /** Promoted changelog body — the GitHub Release notes. Empty when bump is null. */
   notes: string;
-  /** Fixture entries re-pinned. Always empty on a dry run. */
-  repinned: string[];
 }
 
 /**
  * Derive and (unless `dryRun`) apply the release: root version, workspace sync,
- * changelog promotion, fixture re-pin.
+ * changelog promotion.
  */
 export function deriveRelease(
   rootDir: string,
@@ -239,12 +177,12 @@ export function deriveRelease(
 
   const bump = decideBump(unreleasedHeadings(extractUnreleased(changelog)));
   if (bump === null) {
-    return { current, next: null, bump: null, notes: "", repinned: [] };
+    return { current, next: null, bump: null, notes: "" };
   }
 
   const next = nextVersion(current, bump);
   const notes = unreleasedNotes(changelog);
-  if (opts.dryRun) return { current, next, bump, notes, repinned: [] };
+  if (opts.dryRun) return { current, next, bump, notes };
 
   // Replace only the first `"version": "..."` — the root manifest's own field — so the
   // diff stays one line regardless of how the file happens to be formatted.
@@ -256,23 +194,15 @@ export function deriveRelease(
   // syncVersions logs progress on stdout; stdout here is reserved for the JSON result.
   const originalLog = console.log;
   console.log = (...args: unknown[]) => console.error(...args);
-  let syncedPaths: string[];
   try {
-    syncedPaths = syncVersions(rootDir)
-      .filter((entry) => !entry.skipped)
-      .map((entry) => entry.path);
+    syncVersions(rootDir);
   } finally {
     console.log = originalLog;
   }
 
   writeFileSync(changelogPath, promoteChangelog(changelog, next, opts.today ?? utcToday()));
 
-  const repinned = repinFixtureHashes(
-    rootDir,
-    [rootPkgPath, ...syncedPaths].map((p) => relative(rootDir, p)),
-  );
-
-  return { current, next, bump, notes, repinned };
+  return { current, next, bump, notes };
 }
 
 if (import.meta.main) {

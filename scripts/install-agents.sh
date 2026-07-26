@@ -147,6 +147,21 @@ RESULT_FILE="$WORK_DIR/result.tsv"   # written<TAB>backupPath<TAB>changeCount
 : > "$RESULT_FILE"
 
 UNAME_S="$(uname -s)"
+# PDO-01/02/04/05: single source of truth for the .jsonc/.json resolution + JSONC-
+# tolerant parse, shared with apps/opencode-plugin/install.sh's vendored copy.
+CONFIG_LIB="$SCRIPT_DIR/lib/opencode-config.cjs"
+
+# opencode_resolve — runs resolveConfigPath() from CONFIG_LIB against
+# $TARGET_HOME/.config/opencode and prints "path<TAB>both" on stdout. Kept as its own
+# function (rather than inlined in agent_config_path) so agent_config_path stays a
+# simple case statement for every other host.
+opencode_resolve() {
+  "$RUNNER" - "$CONFIG_LIB" "$TARGET_HOME/.config/opencode" <<'NODE'
+const { resolveConfigPath } = require(process.argv[2]);
+const r = resolveConfigPath(process.argv[3]);
+process.stdout.write(`${r.path}\t${r.both ? "1" : "0"}\n`);
+NODE
+}
 
 agent_config_path() {
   case "$1" in
@@ -158,7 +173,17 @@ agent_config_path() {
       ;;
     codex) echo "$TARGET_HOME/.codex/config.toml" ;;
     cursor) echo "$TARGET_HOME/.cursor/mcp.json" ;;
-    opencode) echo "$TARGET_HOME/.config/opencode/opencode.json" ;;
+    opencode)
+      # Resolve against whichever of opencode.jsonc / opencode.json the user actually
+      # has (A1); only fall back to creating opencode.jsonc when neither exists.
+      local resolved path both
+      resolved="$(opencode_resolve)"
+      IFS=$'\t' read -r path both <<<"$resolved"
+      if [ "$both" = "1" ]; then
+        echo "  [opencode] both opencode.jsonc and opencode.json exist in $(dirname "$path") — editing opencode.json, because OpenCode core merges .json OVER .jsonc and the .jsonc copy would be silently ignored." >&2
+      fi
+      echo "$path"
+      ;;
   esac
 }
 
@@ -186,10 +211,10 @@ json_op() {
   local mode="$1" agent="$2" cfg="$3" mcp_source="$4"
   "$RUNNER" - "$mode" "$agent" "$cfg" "$mcp_source" \
     "$(agent_servers_key "$agent")" "$(agent_env_key "$agent")" "$(agent_launcher "$agent")" \
-    "$(agent_entry_style "$agent")" "$API_BASE" "$(installer_timestamp)" "$RESULT_FILE" "$REPO_ROOT_FOR_AGENT" "$VERBOSE" <<'NODE'
+    "$(agent_entry_style "$agent")" "$API_BASE" "$(installer_timestamp)" "$RESULT_FILE" "$REPO_ROOT_FOR_AGENT" "$VERBOSE" "$CONFIG_LIB" <<'NODE'
 const fs = require("fs");
 const path = require("path");
-const [, , mode, agent, file, mcpSource, serversKey, envKey, launcher, entryStyle, apiBase, ts, resultFile, repoRoot, verbosity] = process.argv;
+const [, , mode, agent, file, mcpSource, serversKey, envKey, launcher, entryStyle, apiBase, ts, resultFile, repoRoot, verbosity, configLib] = process.argv;
 const VERBOSE = verbosity === "1";
 
 const OWNED_KEY = "massa-ai";
@@ -199,6 +224,12 @@ function read() {
   try {
     const raw = fs.readFileSync(file, "utf8");
     if (!raw.trim()) return { cfg: {}, existed: true };
+    // Only OpenCode gets JSONC tolerance (PDO-02) — every other host's config is
+    // strict JSON and keeps the plain JSON.parse behavior/error shape it always had.
+    if (agent === "opencode") {
+      const { parseJsonc } = require(configLib);
+      return { cfg: parseJsonc(raw), existed: true };
+    }
     return { cfg: JSON.parse(raw), existed: true };
   } catch (e) {
     if (e.code === "ENOENT") return { cfg: {}, existed: false };
@@ -546,11 +577,15 @@ NODE
 opencode_plugin_present() {
   local cfg="$1"
   [ -f "$cfg" ] || return 1
-  "$RUNNER" - "$cfg" <<'NODE'
+  "$RUNNER" - "$cfg" "$CONFIG_LIB" <<'NODE'
 const fs = require("fs");
+const { parseJsonc } = require(process.argv[3]);
 try {
   const raw = fs.readFileSync(process.argv[2], "utf8");
-  const cfg = raw.trim() ? JSON.parse(raw) : {};
+  // Checked against the RESOLVED path (agent_config_path already picked .jsonc vs
+  // .json), so a .jsonc user's plugin listing is detected too — before this fix a
+  // .jsonc user always got a redundant MCP registration (design.md D1).
+  const cfg = raw.trim() ? parseJsonc(raw) : {};
   const plugins = Array.isArray(cfg.plugin) ? cfg.plugin : [];
   // Match npm package or local symlink path or bare directory name
   process.exit(plugins.some((p) => {
