@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **The chat-restart and context-handoff surface is gone.** `restart-save`, `restart-load`,
+  and `agent-handoff` were three workflows encoding a manual save/resume protocol that
+  duplicated `.specs/` artifact state and the host's own compaction — three router rows and
+  two references the agent paid for on every routing decision, to re-derive state that was
+  already canonical on disk. Deleted with them: `references/restart-state.md`,
+  `references/handoff-package.md`, and the `handoff-writer` specialist, whose only callers
+  were those workflows.
+
+  The specialist roster drops **16 → 15**, so each host now installs 15 agents (60
+  artifacts, not 64). Registries, the generator, both shell installers, `README.md`,
+  `FEATURES.md`, and every guard test moved in the same commit — a partial removal fails
+  `skills-harness-integrity`, which rejects any dangling harness path.
+
+  Surviving deliberately: `workflows/long-session.md`, now the sole owner of the Session
+  Guide, and the MCP `handoff_begin`/`handoff_accept`/`handoff_cancel`/`handoff_list_pending`
+  tools, which are published product surface rather than harness routing. The new contract
+  suite asserts their survival as a negative control, so a future blunt sweep for "handoff"
+  cannot take them out.
+
+### Added
+
+- **Implementation workflows now deliver, not just commit.**
+  `references/implementation-delivery.md` defines the chain that was missing after "one
+  atomic commit per task": worktree isolation → push → PR via `gh` → CI watch → bounded
+  repair loop → **stop and ask before merging**. Two rules are stated rather than left to
+  judgment. Worktree isolation has **no size exemption** — a one-line fix is isolated like a
+  twelve-file feature, because "too small to isolate" is exactly the call that strands
+  half-finished work on a shared branch; only two skip reasons are legal (not a repository,
+  or the user declined). And merge is **never** automatic: green CI is the precondition for
+  asking, not the approval, which matters in a repo where merging to `main` auto-cuts a
+  release. Missing `gh`, missing remote, or absent CI each downgrade the chain and record
+  the skip instead of silently reporting success.
+
+- **A circuit breaker for agents going in circles.**
+  `references/root-cause-scripts.md` fires after **two** consecutive failed fix attempts on
+  one symptom — two, not three, because the second failure is where writing a probe becomes
+  cheaper than another guess. Its value is the forbidden list: reading more source,
+  re-reasoning about the code, adding a defensive guard, or rerunning the same command
+  uninstrumented are all explicitly not progress. The only legal next action is an
+  executable probe emitting **real runtime data**, held to a six-point contract
+  (deterministic, prints observed beside expected, exits non-zero while the bug is present,
+  probes exactly one hypothesis, never touches production state, and is either deleted or
+  promoted to a regression test). An unbuildable probe means `Blocked`, not a return to
+  guessing.
+
+- **Doc blocks, rationale comments, and tests are now obligations, not habits.**
+  `references/code-annotation.md` maps 12 languages to their native doc syntax and requires
+  a block on every *created or updated* public unit — updated included, since a doc
+  describing behavior that has since changed is worse than none. Alongside it, a
+  three-field rationale comment (`Why:` / `Impacts:` / `Test:`) records why the change
+  exists, what feature it serves, and the exact command that exercises it. Test coverage is
+  specified per change shape, and the bug-fix rule is the sharp one: a regression test must
+  be run against the *unfixed* code first, because a test that has never been red proves
+  nothing.
+
+- **Every workflow now reads the project before acting.**
+  `references/project-context.md` defines a five-tier intake sweep — agent contract
+  (`AGENTS.md`/`CLAUDE.md`, nearest ancestor wins), host config (`.claude/`, `.cursor/`,
+  `.github/`), product docs (`README.md`, `CONTRIBUTING.md`, `docs/`), delivery config (CI
+  workflows, toolchain pins, `CHANGELOG.md`), and live `.specs/` state — with an explicit
+  precedence order for conflicts and a once-per-session dedupe guard. All 35 workflows load
+  it; the 16 that mutate the repository additionally load the three references above, and
+  the 19 read-only ones provably do not.
+
+- **`scripts/__tests__/workflow-harness-contract.test.ts`** — 46 assertions that make the
+  above a gate rather than a convention. The workflow set is walked off disk, so a workflow
+  added later is force-enrolled instead of silently exempt; scope is asserted in both
+  directions, catching an audit workflow that quietly gains mutation permissions as well as
+  an implementation workflow that loses them; and invariants are checked **by value**, so a
+  reference shipping the wrong circling threshold or dropping the merge-approval sentence
+  fails even though every file still exists.
+
 ## [1.3.1] - 2026-07-26
 
 ### Fixed

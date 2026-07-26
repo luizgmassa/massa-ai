@@ -1,6 +1,42 @@
 # massa-ai Spec State
 
-## Current — Auto Release Versioning
+## Current — Workflow Harness Overhaul
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-workflow-harness-overhaul`
+- workflow: spec-driven (Large — Specify + Design + Tasks + full Plan Challenge + Execute)
+- feature: `workflow-harness-overhaul` — Execute complete, awaiting CI + merge approval
+- worktree: `/Users/luizmassa/Projects/massa-ai-wt-harness`
+- branch: `feat/workflow-harness-overhaul` (from `origin/main` @ `fd35379`, v1.3.1)
+- scope: 24 requirements (WHO-R1..R24) — delete the `restart-save`, `restart-load`, and
+  `agent-handoff` workflows plus the `handoff-writer` specialist and two references; add
+  four cross-cutting references (project-context intake, implementation delivery protocol,
+  code annotation, root-cause proof scripts); wire them across all 35 workflows
+- Spec: `.specs/features/workflow-harness-overhaul/spec.md`
+- Design: `.specs/features/workflow-harness-overhaul/design.md`
+- Tasks: `.specs/features/workflow-harness-overhaul/tasks.md`
+- Challenge: `.specs/features/workflow-harness-overhaul/fool.md` (full gate, pre-mortem)
+- Report: `.specs/features/workflow-harness-overhaul/validation.md`
+- Key decisions:
+  - D1 Removal is harness-only. The MCP `handoff_*` tools and `workflows/long-session.md`
+    survive — they are published product surface and compaction ownership respectively,
+    not chat-restart routing. The contract suite asserts their survival as a negative
+    control.
+  - D2 Worktree isolation carries no size exemption. The exemption, not the ceremony, is
+    what strands half-finished work on shared branches.
+  - D3 Merge is never automatic. Green CI is the precondition for asking, not the approval
+    — decisive in a repo where merging to `main` auto-cuts a release.
+  - D4 Each new obligation is one reference plus one load line per workflow, never inlined
+    prose, so a future edit stays a one-file change instead of a 35-file sweep.
+  - D5 T1 and T2 merged into one removal commit: `skills-harness-integrity` rejects any
+    dangling harness path, so splitting them would leave an intermediate commit where
+    `agent-handoff.md` pointed at a deleted `restart-save.md`.
+- Evidence: `test:scripts` 493 pass / 4 pre-existing env failures (no `packages/core/dist`
+  in this worktree); `test:plugins` 66 pass / 0 fail; contract suite 46 pass / 0 fail,
+  mutation-verified in both directions.
+
+
+## Previous — Auto Release Versioning
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-auto-release-versioning`
