@@ -15,6 +15,11 @@
  *   skills/persona-router/**      -> apps/<host>-plugin/skills/persona-router/**
  *   skills/agents/<n>/SKILL.md    -> apps/<host>-plugin/skills/agents/<n>/SKILL.md
  *   scripts/lib/opencode-config.cjs -> apps/opencode-plugin/lib/opencode-config.cjs
+ *   apps/claude-plugin/hooks/massa-ai-hook.ts -> apps/{codex,cursor}-plugin/hooks/massa-ai-hook
+ *     (real, executable file — `npm pack` silently drops symlinks, verified
+ *     empirically this session: both apps/{codex,cursor}-plugin/hooks/massa-ai-hook
+ *     were symlinks to this file, and neither the link nor its target directory
+ *     made it into the published tarball)
  *
  * `skills/agents/<name>/SKILL.md` bundles the raw charter (A3) — a second copy of
  * each charter beside the per-host generated agent file
@@ -40,6 +45,12 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 const SKILLS_DIR = path.join(ROOT, "skills");
 const APPS_DIR = path.join(ROOT, "apps");
 const OPENCODE_CONFIG_LIB_SOURCE = path.join(ROOT, "scripts", "lib", "opencode-config.cjs");
+const HOOK_BINARY_SOURCE = path.join(APPS_DIR, "claude-plugin", "hooks", "massa-ai-hook.ts");
+// Hosts whose hooks/massa-ai-hook was a symlink to HOOK_BINARY_SOURCE and is
+// now a generated real file (T14/PDO-14). claude-plugin IS the source, and
+// opencode-plugin has no shared hook binary (its plugin entry is src/index.ts).
+const HOOK_BINARY_HOSTS: readonly Host[] = ["codex", "cursor"];
+const HOOK_BINARY_MODE = 0o755; // invoked directly (no "bun run" prefix), so it must be executable.
 
 export type Host = "claude" | "codex" | "cursor" | "opencode";
 export const HOSTS: readonly Host[] = ["claude", "codex", "cursor", "opencode"];
@@ -139,6 +150,16 @@ export async function collectOpencodeLibEntries(): Promise<ManagedEntry[]> {
   return [{ relPath: "opencode-config.cjs", sourceAbsPath: OPENCODE_CONFIG_LIB_SOURCE }];
 }
 
+/**
+ * codex/cursor-only: the real-file replacement for the old
+ * `hooks/massa-ai-hook -> ../../claude-plugin/hooks/massa-ai-hook.ts` symlink
+ * (T14/PDO-14/D2). Single-entry list, same shape as the others.
+ */
+export async function collectHookBinaryEntries(): Promise<ManagedEntry[]> {
+  await fs.access(HOOK_BINARY_SOURCE);
+  return [{ relPath: "massa-ai-hook", sourceAbsPath: HOOK_BINARY_SOURCE }];
+}
+
 async function assertCopyable(entry: ManagedEntry): Promise<void> {
   const stat = await fs.stat(entry.sourceAbsPath);
   if (stat.size > MAX_SOURCE_BYTES) {
@@ -182,6 +203,7 @@ async function copyEntries(
 export async function emitAll(targetRoots: Record<Host, string>): Promise<number> {
   const skillEntries = await collectSkillEntries();
   const opencodeLibEntries = await collectOpencodeLibEntries();
+  const hookBinaryEntries = await collectHookBinaryEntries();
 
   let total = 0;
   for (const host of HOSTS) {
@@ -193,6 +215,15 @@ export async function emitAll(targetRoots: Record<Host, string>): Promise<number
       const libDest = path.join(targetRoots[host], "lib");
       await copyEntries(opencodeLibEntries, libDest);
       total += opencodeLibEntries.length;
+    }
+
+    if (HOOK_BINARY_HOSTS.includes(host)) {
+      const hooksDest = path.join(targetRoots[host], "hooks");
+      await copyEntries(hookBinaryEntries, hooksDest);
+      for (const entry of hookBinaryEntries) {
+        await fs.chmod(path.join(hooksDest, ...entry.relPath.split("/")), HOOK_BINARY_MODE);
+      }
+      total += hookBinaryEntries.length;
     }
   }
   return total;
@@ -261,6 +292,30 @@ export async function runCheck(): Promise<number> {
         for (const f of diff.missing) console.error(`  + ${f} (missing — regenerate and commit)`);
         for (const f of diff.unexpected) console.error(`  - ${f} (unexpected — stale file, source was likely deleted)`);
         for (const f of diff.modified) console.error(`  M ${f} (content differs from source)`);
+      }
+
+      // hooks/massa-ai-hook lives beside hand-maintained hooks.json, so this is
+      // a single-file check, not a managed-root directory walk (a directory
+      // walk would wrongly flag hooks.json as an unmanaged extra).
+      if (HOOK_BINARY_HOSTS.includes(host)) {
+        const rel = path.join("hooks", "massa-ai-hook");
+        const generatedFile = path.join(tmpRoots[host], rel);
+        const checkedInFile = path.join(pluginRoot(host), rel);
+        const label = `${host}-plugin/${rel}`;
+        const lst = await fs.lstat(checkedInFile).catch(() => null);
+        if (!lst) {
+          drift = true;
+          console.error(`[${label}] drift detected:\n  + massa-ai-hook (missing — regenerate and commit)`);
+        } else if (lst.isSymbolicLink()) {
+          drift = true;
+          console.error(`[${label}] drift detected:\n  M massa-ai-hook (is a symlink — npm pack drops symlinks; regenerate as a real file)`);
+        } else {
+          const [gBuf, cBuf] = await Promise.all([fs.readFile(generatedFile), fs.readFile(checkedInFile)]);
+          if (!gBuf.equals(cBuf)) {
+            drift = true;
+            console.error(`[${label}] drift detected:\n  M massa-ai-hook (content differs from source)`);
+          }
+        }
       }
     }
 

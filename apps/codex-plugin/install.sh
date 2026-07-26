@@ -400,13 +400,19 @@ if [[ -f "$PLUGIN_DIR/.mcp.json" ]]; then
   echo -e "  - removed stale .mcp.json (MCP is now registered in ~/.codex/config.toml)"
 fi
 
-# Create the binary symlink → repo's claude-plugin binary (resolved at install
-# time via SCRIPT_DIR → REPO_ROOT). This keeps a single source of truth.
-if [[ -f "$CLAUDE_PLUGIN_BIN" ]]; then
+# Copy the real hooks/massa-ai-hook this plugin already ships (T14/PDO-14: a
+# generated real file, no longer a symlink into apps/claude-plugin/ — that
+# path does not exist in a registry tarball install, where $REPO_ROOT is not
+# this monorepo. $CLAUDE_PLUGIN_BIN is kept only as a repo-checkout fallback.
+if [[ -f "$SCRIPT_DIR/hooks/massa-ai-hook" ]]; then
+  cp "$SCRIPT_DIR/hooks/massa-ai-hook" "$PLUGIN_DIR/hooks/massa-ai-hook"
+  chmod +x "$PLUGIN_DIR/hooks/massa-ai-hook"
+  vecho "  + hooks/massa-ai-hook"
+elif [[ -f "$CLAUDE_PLUGIN_BIN" ]]; then
   ln -sfn "$CLAUDE_PLUGIN_BIN" "$PLUGIN_DIR/hooks/massa-ai-hook"
   vecho "  + hooks/massa-ai-hook → $CLAUDE_PLUGIN_BIN"
 else
-  echo "  ⚠ Warning: claude-plugin binary not found at $CLAUDE_PLUGIN_BIN" >&2
+  echo "  ⚠ Warning: no massa-ai-hook binary found" >&2
   echo "    Hooks will not fire until the binary is available." >&2
 fi
 

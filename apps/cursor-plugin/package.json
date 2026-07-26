@@ -1,0 +1,30 @@
+{
+  "name": "@massa-ai/cursor-plugin",
+  "version": "1.5.0",
+  "description": "massa-ai plugin for Cursor — semantic code search, memory, and context compression",
+  "files": [
+    "agents",
+    "hooks",
+    "skills",
+    "install.sh",
+    "README.md",
+    ".cursor-plugin/plugin.json"
+  ],
+  "author": "luizgmassa",
+  "keywords": [
+    "cursor",
+    "plugin",
+    "massa-ai",
+    "semantic-search",
+    "code-search",
+    "memory",
+    "context-compression",
+    "ai",
+    "llm"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/luizgmassa/massa-ai"
+  }
+}
