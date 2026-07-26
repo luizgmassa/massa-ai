@@ -53,7 +53,7 @@ Implement an approved plan or task by modifying source code with a disjoint writ
 - Verification Ladder: run the task's sensors (static + behavioral) before claiming Complete.
 - Massa-ai Memory: suggest durable code-pattern memories only when the implementation establishes a reusable convention; main agent persists.
 - Synapse: none (implementation is not a repeated-search task).
-- References: `references/agent-orchestration.md`, `references/naming-standards.md`.
+- References: `references/agent-orchestration.md`, `references/naming-standards.md`, `references/code-annotation.md`, `references/root-cause-scripts.md`.
 
 ## Model Hint
 GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.

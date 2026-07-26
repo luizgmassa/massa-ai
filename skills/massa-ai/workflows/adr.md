@@ -2,6 +2,8 @@
 
 Use this workflow to record a finalized or being-finalized architecture decision. Do not use it to decide among open options; route undecided proposals to `workflows/rfc.md`. Do not use it for implementation planning; route that to `workflows/tdd.md`.
 
+Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+
 1. Resolve/reuse `projectId` and `workflowSessionId`: `adr-[entity]`.
 2. Load shared references:
    - `references/adr-authoring.md` always.

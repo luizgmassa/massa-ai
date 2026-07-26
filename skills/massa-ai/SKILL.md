@@ -275,6 +275,10 @@ Load only when a selected workflow asks for them:
 - `references/the-fool/`
 - `references/verification-ladder.md`
 - `references/context-firewall.md`
+- `references/project-context.md`
+- `references/implementation-delivery.md`
+- `references/code-annotation.md`
+- `references/root-cause-scripts.md`
 - `references/conversation-feedback.md`
 - `references/maestro.md`
 - `references/maestro/`

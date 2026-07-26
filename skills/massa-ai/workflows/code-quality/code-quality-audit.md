@@ -2,6 +2,8 @@
 
 Use this workflow for findings-only audit of SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, overengineering, code smell, or violations-check issues in a concrete target: modified files, explicit files/globs, commit ranges, branch comparisons, modules/packages, symbols/classes/functions, feature/runtime flows, explicitly requested whole-repo scope, or an implementation scope packet supplied by `workflows/implementation/implementation-audit.md`.
 
+Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+
 Do not use this workflow for domain boundaries, bounded contexts, coupling analysis, module depth, seams, adapters, or architecture refactor opportunities. Route those to `workflows/architecture/architecture-audit.md`. Keep local pass-through wrappers, unused speculation, vague names, duplicate literals, and simple overengineering here when the finding does not require architecture-lens evidence.
 
 This workflow is findings-only. Do not edit code unless the user separately asks for fixes.

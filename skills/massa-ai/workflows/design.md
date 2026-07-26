@@ -2,6 +2,10 @@
 
 Use this workflow to implement or update a concrete Android, iOS, or KMP Compose Multiplatform UI from structured Figma evidence or supplied screenshot context when no saved mobile Figma audit report is the source of truth. Route findings-only comparison to `mobile-figma-audit` and saved `MFM-*` remediation to `mobile-figma-fix`.
 
+Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+
+Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+
 Do not use this workflow for Flutter, React Native, web UI, generic Figma exploration, variable-only queries, or MCP troubleshooting.
 
 1. Resolve/reuse `workflowSessionId`: `design-[entity]`.

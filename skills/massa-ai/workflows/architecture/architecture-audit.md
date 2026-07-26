@@ -2,6 +2,8 @@
 
 Use this workflow for findings-only audit of domain boundaries, bounded contexts, DDD strategic design, coupling, dependency health, architecture review, deepening opportunities, seams, adapters, module depth, and architecture-focused refactor planning in a concrete target: modified files, explicit files/globs, commit ranges, branch comparisons, modules/packages, symbols/classes/functions, feature/runtime flows, explicitly requested whole-repo scope, or an implementation scope packet supplied by `workflows/implementation/implementation-audit.md`.
 
+Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+
 Do not use this workflow for plain SOLID, Clean Code, KISS, YAGNI, DRY, or code smell scans; use `workflows/code-quality/code-quality-audit.md` for those.
 
 This workflow is findings-only. Do not edit code unless the user separately asks for fixes.
