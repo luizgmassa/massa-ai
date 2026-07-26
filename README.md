@@ -885,15 +885,10 @@ version, tags it, publishes a GitHub Release, and pushes the packages to both re
 there is no manual release step.
 
 The version comes from the `[Unreleased]` section of [`CHANGELOG.md`](./CHANGELOG.md):
-
-| `[Unreleased]` contains | Bump | `1.2.1` becomes |
-| --- | --- | --- |
-| `### Added`, `### Changed`, `### Removed`, `### Deprecated` | minor | `1.3.0` |
-| only `### Fixed`, `### Security` | patch | `1.2.2` |
-| nothing releasable | none — no tag, no release | `1.2.1` |
-
-Major versions are never bumped automatically. Because the heading you write decides the
-version, `### Added` vs `### Fixed` is a real choice, not a formality.
+feature-shaped entries cut a minor, bug-shaped entries cut a patch, and majors are only
+ever bumped by hand. Contributors — the exact heading-to-bump mapping lives in
+[`CONTRIBUTING.md`](./CONTRIBUTING.md), and the heading you write decides the released
+version.
 
 ### Installing
 
