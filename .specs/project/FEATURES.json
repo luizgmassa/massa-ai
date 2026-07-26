@@ -550,7 +550,23 @@
       "design": ".specs/features/install-harness-migration/design.md",
       "tasks": ".specs/features/install-harness-migration/tasks.md",
       "validation": ".specs/features/install-harness-migration/validation.md"
+    },
+    {
+      "slug": "auto-release-versioning",
+      "title": "Auto release versioning — CHANGELOG-derived bump, GitHub Release, GitHub Packages, no Deployments",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/auto-release-versioning/spec.md",
+      "design": ".specs/features/auto-release-versioning/design.md",
+      "tasks": ".specs/features/auto-release-versioning/tasks.md",
+      "validation": ".specs/features/auto-release-versioning/validation.md"
     }
   ],
-  "active_feature": "install-harness-migration"
+  "active_feature": "auto-release-versioning"
 }
