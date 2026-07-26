@@ -62,8 +62,40 @@ describe("root install.sh menu — four-plugin parity (T17)", () => {
     expect(src).toContain("MASSA_AI_API_URL");
   });
 
-  test("unknown-choice prompt updated to include 'p'", async () => {
+  test("unknown-choice prompt updated to include 'k' and 'p'", async () => {
     const src = await fs.readFile(ROOT_INSTALL, "utf8");
-    expect(src).toContain("Enter w, v, t, c, p, or s.");
+    expect(src).toContain("Enter w, v, t, c, k, p, or s.");
+  });
+});
+
+describe("root install.sh menu — harness option (install-harness-migration)", () => {
+  test("menu offers the 'k' skills + MCP option", async () => {
+    const src = await fs.readFile(ROOT_INSTALL, "utf8");
+    expect(src).toContain("k)${NC} Install skills + MCP registration");
+  });
+
+  test("case statement routes k|K to install_harness_menu", async () => {
+    const src = await fs.readFile(ROOT_INSTALL, "utf8");
+    expect(src).toMatch(/k\|K\)\s*\n\s*install_harness_menu/);
+  });
+
+  test("install_harness_menu invokes scripts/install-harness.sh", async () => {
+    const src = await fs.readFile(ROOT_INSTALL, "utf8");
+    expect(src).toContain("scripts/install-harness.sh");
+    expect(src).toMatch(/bash "\$harness" --skills --agents/);
+  });
+
+  test("docker-mode back-fetch includes the harness scripts", async () => {
+    const src = await fs.readFile(ROOT_INSTALL, "utf8");
+    // Otherwise option k) is dead in docker mode, where only
+    // docker-compose.yml is downloaded.
+    for (const s of [
+      "install-skills.sh",
+      "install-agents.sh",
+      "install-harness.sh",
+      "lib/installer-shared.sh",
+    ]) {
+      expect(src).toContain(s);
+    }
   });
 });

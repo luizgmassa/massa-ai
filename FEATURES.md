@@ -196,7 +196,7 @@ memory_delete { id: "<id>" }
 **Why:** Without a plugin, you'd need to manually register the MCP server, manually wire hooks, and have no slash commands. The plugins make massa-ai feel native in each tool — install once, get everything.
 
 **The three layers (not the same thing):**
-- **Agent** = MCP server registration (`scripts/install-agents.ts` — wires 5 targets: claude-code, claude-desktop, codex, cursor, opencode)
+- **Agent** = MCP server registration (`scripts/install-agents.sh` — the single writer, wiring 5 targets: claude-code, claude-desktop, codex, cursor, opencode)
 - **Hook** = lifecycle capture → `POST /api/v1/hook[/batch]` (6 event kinds)
 - **Plugin** = host-native integration bundle (skills + hooks + MCP + agents)
 
@@ -218,7 +218,7 @@ The installer auto-writes hooks into `settings.json` using array-append merge wi
 
 ### Codex plugin (`apps/codex-plugin/`)
 
-**What it bundles:** 6 skills (`map`, `index`, `find`, `def`, `graph`, `status`), 6 hook events, `.mcp.json` (MCP server auto-discovered).
+**What it bundles:** 6 skills (`map`, `index`, `find`, `def`, `graph`, `status`) and 6 hook events. MCP registration is delegated to `scripts/install-agents.sh --agent codex`, which the installer calls for you; nothing MCP-shaped ships inside the bundle.
 
 **Hook events (6):** `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PreCompact`, `Stop`.
 
@@ -234,7 +234,7 @@ bash apps/codex-plugin/install.sh --uninstall
 
 ### Cursor plugin (`apps/cursor-plugin/`)
 
-**What it bundles:** 6 skills, 7 hook events, `mcp.json`, and the `massa-ai-navigator` agent.
+**What it bundles:** 6 skills, 7 hook events, and the `massa-ai-navigator` agent. MCP registration is delegated to `scripts/install-agents.sh --agent cursor`, which the installer calls for you.
 
 **Hook events (7):** `sessionStart`, `sessionEnd`, `beforeSubmitPrompt`, `preToolUse`, `postToolUse`, `preCompact`, `stop`. This closes the historical gap where Cursor was documented as having only 3 events — Cursor now supports 18+ events including `sessionStart` and `preCompact`.
 
@@ -288,9 +288,23 @@ All four plugins can be installed from the root `install.sh` post-install menu (
 5) All four (Claude, Codex, Cursor, OpenCode)
 ```
 
+Option `k` in the same menu installs skills and MCP registration without any plugin
+bundle, via `scripts/install-harness.sh`:
+
+```
+1) Skills only (symlinks + AGENTS.md bootstrap, all platforms)
+2) MCP registration only (Claude, Claude Desktop, Codex, Cursor, OpenCode)
+3) Both
+4) Preview (dry run, writes nothing)
+```
+
 **Shared binary:** all shell-script-based plugins (Claude Code, Codex, Cursor) use the same `massa-ai-hook.ts` Bun binary from `apps/claude-plugin/hooks/`. Codex and Cursor symlink to it. The binary resolves the project ID via: existing pin → `MASSA_AI_PROJECT_ID` env → git toplevel basename → cwd basename.
 
-**MCP deconfliction:** if you install a plugin, the MCP server is already registered via the plugin's `.mcp.json`/`mcp.json`. Skip the `install-agents.ts` MCP step for that tool to avoid double-registration.
+**MCP single writer:** `scripts/install-agents.sh` owns every host's MCP config. The three script-based plugin installers call it (`--agent claude-code` / `codex` / `cursor`) instead of shipping their own MCP file, so installing a plugin and running the installer directly cannot double-register. MCP is always written at **user** scope, even for a `--project` plugin install.
+
+OpenCode is the exception: `@massa-ai/opencode-plugin` registers 14 tools in-process, so the installer skips the OpenCode MCP entry when that plugin is listed in `opencode.json` — and still writes it for users who do not have the plugin.
+
+Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/plugins/massa-ai/` and `~/.cursor/plugins/massa-ai/`. Neither was a host read path; reinstalling a plugin removes the stale file.
 
 **Spec:** `.specs/features/codex-cursor-plugin-parity/`
 
@@ -1113,17 +1127,17 @@ The installer writes the bootstrap block into each tool's `AGENTS.md` using the 
 | `synapse-usage` | `skills/synapse-usage/` | Synapse cognitive modulation layer for focused, low-noise retrieval during multi-step coding tasks. Open sessions, prime buffers, pass session IDs. |
 | `persona-router` | `skills/persona-router/` | Automatic persona selection from catalog. Reads `skills/massa-ai/personas/catalog.json`, routes based on primary deliverable ownership, supports explicit selection, ambiguity policy, and mid-conversation rerouting. |
 
-### Unified Skills Installer (`scripts/install-skills.ts`)
+### Unified Skills Installer (`scripts/install-skills.sh`)
 
-A TypeScript port of the old repo's Python `agent_integrations.py`, adapted for the Bun/TS stack. Symlink-based — skills are symlinked from the repo into each tool's config directory so updates are immediately reflected.
+Bash, matching every other installer in the repo. All structured-data work (the state file, the `AGENTS.md` marker block) runs through an inline `node`/`bun` heredoc — the same pattern the plugin installers use; there is no `jq` dependency. Symlink-based, so repo updates are reflected without re-running.
 
 **Commands:**
 
 ```bash
-bun scripts/install-skills.ts --apply --platform all --yes      # install
-bun scripts/install-skills.ts --uninstall --platform all --yes   # remove
-bun scripts/install-skills.ts --dry-run --platform all          # preview
-bun scripts/install-skills.ts --check --platform all            # drift check (exit 1 if drift)
+bash scripts/install-skills.sh --apply --platform all --yes      # install
+bash scripts/install-skills.sh --uninstall --platform all --yes  # remove
+bash scripts/install-skills.sh --dry-run --platform all          # preview
+bash scripts/install-skills.sh --check --platform all            # drift check (exit 1 if drift)
 ```
 
 **Flags:**
@@ -1151,21 +1165,64 @@ bun scripts/install-skills.ts --check --platform all            # drift check (e
 
 **State management:** `~/.config/massa-ai/install-state.json` (v2 format). Records installed platforms, roots, and skill names. v1 state (legacy) auto-migrates to v2. State is used by `--uninstall` to know what to remove and by `--check` to detect stale symlinks.
 
-**Safety:**
-- Aborts on non-symlink conflict at a target path (won't overwrite user files).
-- `--dry-run` writes nothing.
-- Requires `--yes` for real `$HOME` (not test target).
-- Idempotent: re-running `--apply` is a no-op when symlinks already point to the correct targets.
-- Uninstall removes only symlinks pointing into the massa-ai repo root.
+**Exit codes:** `0` success or clean `--check`; `1` real `$HOME` without `--yes`, `--check` drift, or a symlink conflict; `2` unknown platform/flag, no agent tool on PATH, or invalid installer state; `3` neither `node` nor `bun` on PATH.
 
-**Repo root resolution:** uses `import.meta.url` (script file location), not CWD — so it works regardless of where the command is invoked from. Override with `--repo-root`.
+**Safety:**
+- The non-symlink conflict scan is a **pre-pass**: a regular file at any target aborts that platform before the first symlink is created, so a partial install can never overwrite user data.
+- `--dry-run` and `--check` write nothing at all (the suites assert this with a recursive checksum of the fake home taken before and after).
+- Requires `--yes` for real `$HOME` (not a `--target` test home).
+- Idempotent: re-running `--apply` is a no-op when symlinks already point at the correct targets.
+- Uninstall removes only symlinks that resolve inside the massa-ai repo root; a foreign symlink is left alone.
+
+**Repo root resolution:** derived from the script's own location (`BASH_SOURCE`), not CWD — so it works from anywhere. Override with `--repo-root`.
+
+### MCP Installer (`scripts/install-agents.sh`)
+
+The single writer of host MCP config. Deep-merges the `massa-ai` server entry into each host's own config shape, preserving every existing user key, after taking a `<config>.massa-ai.bak-<ts>` backup.
+
+```bash
+bash scripts/install-agents.sh --yes                 # every applicable host
+bash scripts/install-agents.sh --agent codex --yes   # one host
+bash scripts/install-agents.sh --dry-run             # plan only
+bash scripts/install-agents.sh --uninstall --yes     # remove only owned entries
+```
+
+| Agent | Config file | Shape |
+|-------|-------------|-------|
+| `claude-code` | `~/.claude/settings.json` | `mcpServers` / `env` / `npx` |
+| `claude-desktop` | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS only) | `mcpServers` / `env` / `npx` |
+| `codex` | `~/.codex/config.toml` | `[mcp_servers.massa-ai]` |
+| `cursor` | `~/.cursor/mcp.json` | `mcpServers` / `env` / `npx` |
+| `opencode` | `~/.config/opencode/opencode.json` | `mcp` / `environment` / `bunx` |
+
+**Exit codes:** `0` success; `1` write/parse error; `2` unknown flag or agent; `3` no `node`/`bun`; `13` consent gate refused.
+
+**Ownership:** every written value carries `_massaAiOwned: true` (`_massaAiOwned = true` in TOML). Uninstall removes only marked entries — a `massa-ai` entry you wrote by hand survives, and the servers object is dropped only when it empties.
+
+**Codex TOML:** the parser/emitter is hand-rolled and deliberately minimal so preamble, comments, blank lines, and unrelated tables round-trip byte-for-byte. A general TOML library would reformat the file and drop comments.
+
+### Harness Orchestrator (`scripts/install-harness.sh`)
+
+One entry point for skills + MCP + plugin bundles, in that order (registering MCP first makes the plugin installers' delegated call a verified no-op rather than the first write).
+
+```bash
+bash scripts/install-harness.sh                      # --all
+bash scripts/install-harness.sh --skills --agents    # skip plugin bundles
+bash scripts/install-harness.sh --all --dry-run      # preview
+```
+
+Flags: `--skills`, `--agents`, `--plugins`, `--all`, `--platform`, `--api-base`, `--target`, `--dry-run`, `--uninstall`, `--yes`. Exit `0` when every requested step completed, otherwise the first failing sub-installer's code propagated verbatim.
+
+**Entry points:** `install.sh` post-install menu option `k`, and `scripts/setup-local-first.sh` step 6/6 (honours `MASSA_AI_INSTALL_HARNESS=1|0` for non-interactive runs).
 
 **npm scripts:**
 
 ```json
 {
-  "install:skills": "bun scripts/install-skills.ts",
-  "uninstall:skills": "bun scripts/install-skills.ts --uninstall"
+  "install:skills": "bash scripts/install-skills.sh --apply",
+  "uninstall:skills": "bash scripts/install-skills.sh --uninstall",
+  "install:agents": "bash scripts/install-agents.sh",
+  "install:harness": "bash scripts/install-harness.sh --all"
 }
 ```
 
@@ -1209,11 +1266,21 @@ Ported from the old repo's Python test suite to TypeScript/bun test:
 | Test file | Scenarios | Covers |
 |-----------|-----------|--------|
 | `scripts/__tests__/validate-repository.test.ts` | 185 | Skill structure, workflow/reference existence, bootstrap contract, persona catalog (deep: schema/fields/duplicates/path-escape/mirror-drift), hooks enforcement contract, lessons dual-write contract, harness state path migration, gitignore, context slices, agents harness routing, RFC/TDD/ticket/commit workflow contracts, deterministic router precedence, verification ladder, spec-driven phase gates, audit-report-IO, evidence gate, context firewall, synapse policy, mcp-tools matrix, canonical tool naming (no `th0th_*` prefixes), docs guides |
-| `scripts/__tests__/install-skills.test.ts` | 39 | Apply/uninstall idempotency, dry-run, conflict abort, state v1→v2 migration, drift detection, partial uninstall, hook gating scenarios (bad stdin, malformed state) |
-| `scripts/__tests__/install-agents.test.ts` | 56 | JSON writer plan/apply/idempotent/uninstall (claude-code, claude-desktop, cursor), OpenCode writer (`mcp` key + `bunx` + `environment` shape), Codex TOML writer, Claude settings.json plugin-hooks coordination, orchestration, consent gate, deconfliction hints |
+| `scripts/tests/test-install-skills-apply.sh` | 22 | Symlink creation, idempotent re-run, bootstrap insert/replace, non-symlink conflict aborts before any mutation |
+| `scripts/tests/test-install-skills-state.sh` | 21 | State v1→v2 migration, malformed JSON, path-traversal skill names, dedupe, unsupported version |
+| `scripts/tests/test-install-skills-check.sh` | 19 | Drift detection (missing / wrong target / not-a-symlink / stale), `--json` shape, and proof that `--check` and `--dry-run` write nothing |
+| `scripts/tests/test-install-skills-uninstall.sh` | 13 | Removes only repo-pointing symlinks; foreign symlinks, regular files, and user `AGENTS.md` content survive |
+| `scripts/tests/test-install-skills-cli.sh` | 36 | Every flag, exit codes 0/1/2, consent gate, `--json` shape, platform roots, `~/.config/codex` fallback |
+| `scripts/tests/test-install-agents-json.sh` | 27 | Deep merge preserves user keys, OpenCode `mcp`/`environment`/`bunx` shape, plugin-detection skip, `--api-base`, invalid JSON refused |
+| `scripts/tests/test-install-agents-toml.sh` | 29 | Codex `[mcp_servers.massa-ai]`; preamble, comments, and user tables preserved through install and uninstall |
+| `scripts/tests/test-install-agents-uninstall.sh` | 16 | Removes only `_massaAiOwned` entries; an unmarked `massa-ai` entry survives; empty servers object dropped |
+| `scripts/tests/test-install-agents-cli.sh` | 37 | Flags, exit 2 / exit 13, `--dry-run` writes nothing and creates no backup, `--agent` narrowing |
+| `scripts/tests/test-install-agents-claude-hooks.sh` | 15 | Plugin hooks, permissions, and user keys survive an MCP write into the shared `settings.json` |
+| `scripts/tests/test-install-harness-cli.sh` | 25 | Step selection, ordering, verbatim argv forwarding to the sub-installers, exit-code propagation |
+| `scripts/tests/test-mcp-single-writer.sh` | 36 | Regression guard: no plugin ships or copies an MCP file, all three delegate, exactly one registration after (re)install |
 | `scripts/__tests__/subagent-parity.test.ts` | 16 | Drift gate, exact-12-per-host, name-collision, model+effort pinning (Claude/Codex/Cursor/OpenCode), permission boundary, Codex TOML round-trip+marker, OpenCode permission+marker, FEATURES.md table parity |
 
-Run: `bun test scripts/__tests__/validate-repository.test.ts scripts/__tests__/install-skills.test.ts scripts/__tests__/install-agents.test.ts scripts/__tests__/subagent-parity.test.ts`
+Run everything (TypeScript suites plus every `scripts/tests/*.sh` suite) with `bun run test:scripts` — the same command CI runs.
 
 ---
 

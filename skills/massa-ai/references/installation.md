@@ -97,8 +97,12 @@ behavior through MCP declarations and non-destructive runtime probes.
 
 ## Client Integrations
 
+- Preferred: `bash scripts/install-agents.sh --agent <host>` — the single writer
+  of host MCP config (Claude Code, Claude Desktop, Codex, Cursor, OpenCode).
+  Plugin installers call it; nothing else writes an MCP entry.
 - OpenCode: local MCP package via `bunx @massa-ai/mcp-client`, or
-  `@massa-ai/opencode-plugin`.
+  `@massa-ai/opencode-plugin` (which registers tools in-process, so
+  `install-agents.sh` skips the MCP entry when that plugin is present).
 - VS Code/Antigravity: `.vscode/mcp.json` or `./scripts/setup-vscode.sh`.
 - Docker: run the `mcp` service through `docker compose run --rm -i mcp`.
 

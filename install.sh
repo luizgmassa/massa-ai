@@ -594,16 +594,18 @@ post_install() {
   local scripts_dir="${install_dir}/scripts"
   local wsl_script="${install_dir}/apps/tools-api/setup-ollama-wsl.sh"
 
-  # Docker mode: only docker-compose.yml was downloaded; fetch scripts from GitHub
+  # Docker mode: only docker-compose.yml was downloaded; fetch scripts from GitHub.
+  # The harness scripts are listed here too, or option k) below is dead in this mode.
+  local fetch_scripts="banner.sh setup-vscode.sh validate-vscode-integration.sh install-skills.sh install-agents.sh install-harness.sh lib/installer-shared.sh"
   if [ "$mode" = "docker" ]; then
-    mkdir -p "${scripts_dir}" "${install_dir}/apps/tools-api"
+    mkdir -p "${scripts_dir}" "${scripts_dir}/lib" "${install_dir}/apps/tools-api"
     local need_fetch=false
-    for s in banner.sh setup-vscode.sh validate-vscode-integration.sh; do
+    for s in $fetch_scripts; do
       [ -f "${scripts_dir}/${s}" ] || { need_fetch=true; break; }
     done
     if [ "$need_fetch" = true ]; then
       info "Fetching setup scripts from GitHub..."
-      for s in banner.sh setup-vscode.sh validate-vscode-integration.sh; do
+      for s in $fetch_scripts; do
         curl -fsSL --silent "${GITHUB_RAW}/${BRANCH}/scripts/${s}" \
           -o "${scripts_dir}/${s}" 2>/dev/null || true
       done
@@ -630,6 +632,7 @@ post_install() {
       echo -e "  ${CYAN}t)${NC} Run integration tests"
     fi
     echo -e "  ${CYAN}c)${NC} Configure passive-capture hooks (Claude Code, Codex, Cursor)"
+    echo -e "  ${CYAN}k)${NC} Install skills + MCP registration (all platforms)"
     echo -e "  ${CYAN}p)${NC} Install massa-ai plugins (Claude, Codex, Cursor, OpenCode)"
     echo -e "  ${CYAN}s)${NC} Skip (finish)"
     echo ""
@@ -648,11 +651,47 @@ post_install() {
           || warn "Validation script not found" ;;
       c|C)
         print_hooks_guide "$mode" "$install_dir" ;;
+      k|K)
+        install_harness_menu "$install_dir" ;;
       p|P)
         install_plugins_menu "$install_dir" ;;
       s|S|"") return ;;
-      *) warn "Unknown choice. Enter w, v, t, c, p, or s." ;;
+      *) warn "Unknown choice. Enter w, v, t, c, k, p, or s." ;;
       # NOTE: prompt text kept stable for existing root-install-menu test.
+    esac
+  done
+}
+
+# ── massa-ai harness sub-menu (skills + MCP registration) ────────────────
+# scripts/install-harness.sh orchestrates install-skills.sh and
+# install-agents.sh. Plugin bundles stay behind option p) so this menu never
+# installs a plugin the user did not ask for.
+install_harness_menu() {
+  local install_dir="$1"
+  local harness="${install_dir}/scripts/install-harness.sh"
+
+  if [ ! -f "$harness" ]; then
+    warn "Harness installer not found at $harness"
+    return
+  fi
+
+  while true; do
+    echo ""
+    echo -e "${BOLD}Install massa-ai skills and MCP registration:${NC}"
+    echo -e "  ${CYAN}1)${NC} Skills only (symlinks + AGENTS.md bootstrap, all platforms)"
+    echo -e "  ${CYAN}2)${NC} MCP registration only (Claude, Claude Desktop, Codex, Cursor, OpenCode)"
+    echo -e "  ${CYAN}3)${NC} Both"
+    echo -e "  ${CYAN}4)${NC} Preview (dry run, writes nothing)"
+    echo -e "  ${CYAN}s)${NC} Back"
+    echo ""
+    read -rp "  Choice [s]: " _harness_choice <>/dev/tty
+    case "${_harness_choice:-s}" in
+      1) bash "$harness" --skills --platform all --yes || warn "Skills install failed" ;;
+      2) bash "$harness" --agents --yes || warn "MCP registration failed" ;;
+      3) bash "$harness" --skills --agents --platform all --yes || warn "Harness install failed" ;;
+      4) bash "$harness" --skills --agents --platform all --dry-run || true ;;
+      s|S|"") return ;;
+      *) warn "Unknown choice. Enter 1, 2, 3, 4, or s." ;;
     esac
   done
 }

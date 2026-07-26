@@ -47,7 +47,7 @@ require_postgres_database_url() {
 }
 
 # ---- Step 1: Check Ollama ----
-echo -e "${BOLD}[1/5] Checking Ollama...${NC}"
+echo -e "${BOLD}[1/6] Checking Ollama...${NC}"
 
 OLLAMA_URL="${OLLAMA_HOST:-http://localhost:11434}"
 OLLAMA_HAS_CLI=false
@@ -148,7 +148,7 @@ print('yes' if any(search in m for m in models) else 'no')
 
 # ---- Step 2: Pull embedding models ----
 echo ""
-echo -e "${BOLD}[2/5] Pulling embedding models...${NC}"
+echo -e "${BOLD}[2/6] Pulling embedding models...${NC}"
 
 EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:8b}"
 
@@ -222,7 +222,7 @@ fi
 
 # ---- Step 3: Database selection ----
 echo ""
-echo -e "${BOLD}[3/5] Database selection...${NC}"
+echo -e "${BOLD}[3/6] Database selection...${NC}"
 echo ""
 echo -e "  Choose your database backend:"
 echo -e "    ${BLUE}1)${NC} Native PostgreSQL  (recommended, ~100MB RAM, no Docker)"
@@ -328,7 +328,7 @@ require_postgres_database_url "$DATABASE_URL"
 
 # ---- Step 4: Create directories and config ----
 echo ""
-echo -e "${BOLD}[4/5] Creating directories and config...${NC}"
+echo -e "${BOLD}[4/6] Creating directories and config...${NC}"
 
 # Data directory — unified under the XDG config home so config + data live in
 # one place (~/.config/massa-ai/). The legacy ~/.massa-ai-data/ location
@@ -531,7 +531,7 @@ bunx prisma migrate deploy \
 
 # ---- Step 5: Verify setup ----
 echo ""
-echo -e "${BOLD}[5/5] Verifying setup...${NC}"
+echo -e "${BOLD}[5/6] Verifying setup...${NC}"
 
 # Check Ollama health
 if curl -s "${OLLAMA_URL}/api/tags" > /dev/null 2>&1; then
@@ -578,6 +578,43 @@ else
 fi
 echo -e "  ${GREEN}✓${NC} PostgreSQL + pgvector: connected"
 
+# ---- Step 6: Agent harness (skills + MCP registration) ----
+# Without this step a user who follows the documented install path ends up with
+# a working stack and no skills and no MCP registration. Non-interactive runs
+# drive it with MASSA_AI_INSTALL_HARNESS, mirroring MASSA_AI_DB_BACKEND above.
+echo ""
+echo -e "${BOLD}[6/6] Agent harness (skills + MCP registration)...${NC}"
+echo ""
+
+HARNESS_SCRIPT="${PROJECT_ROOT}/scripts/install-harness.sh"
+HARNESS_CHOICE=""
+
+if [ ! -f "$HARNESS_SCRIPT" ]; then
+    echo -e "  ${YELLOW}⚠${NC} Harness installer not found at ${HARNESS_SCRIPT} — skipping."
+else
+    case "${MASSA_AI_INSTALL_HARNESS:-}" in
+        1|yes|true) HARNESS_CHOICE="y" ;;
+        0|no|false) HARNESS_CHOICE="n" ;;
+        "")
+            echo -e "  Installs repo skills into every detected agent and registers the"
+            echo -e "  massa-ai MCP server (Claude, Claude Desktop, Codex, Cursor, OpenCode)."
+            read -rp "  Install massa-ai skills and MCP registration? [y/N]: " HARNESS_CHOICE </dev/tty || true
+            HARNESS_CHOICE=${HARNESS_CHOICE:-n}
+            ;;
+        *) die "Invalid MASSA_AI_INSTALL_HARNESS. Use 1/yes/true or 0/no/false." ;;
+    esac
+
+    case "$HARNESS_CHOICE" in
+        y|Y|yes|YES)
+            bash "$HARNESS_SCRIPT" --skills --agents --platform all --yes \
+                || echo -e "  ${YELLOW}⚠${NC} Harness install reported errors — re-run: bash scripts/install-harness.sh --skills --agents --yes"
+            ;;
+        *)
+            echo -e "  ${BLUE}•${NC} Skipped. Run later: ${BOLD}bash scripts/install-harness.sh --all${NC}"
+            ;;
+    esac
+fi
+
 # ---- Summary ----
 echo ""
 echo -e "${BOLD}╔═══════════════════════════════════════════════════════════════╗${NC}"
@@ -617,13 +654,17 @@ if command -v bun &> /dev/null && [ -f "${SCRIPT_DIR}/../scripts/diagnose.ts" 2>
 fi
 
 echo -e "  ${BOLD}Or use with OpenCode:${NC}"
-echo -e '    Add to ~/.config/opencode/opencode.json:'
+echo -e "    ${CYAN}bash scripts/install-agents.sh --agent opencode${NC}"
+echo -e '    (or add this to ~/.config/opencode/opencode.json by hand —'
+echo -e '     note OpenCode uses "mcp" / "environment" / bunx, not'
+echo -e '     "mcpServers" / "env" / npx):'
 echo ""
 echo -e '    {'
-echo -e '      "mcpServers": {'
+echo -e '      "mcp": {'
 echo -e '        "massa-ai": {'
 echo -e '          "type": "local",'
-echo -e '          "command": ["npx", "@massa-ai/mcp-client"],'
+echo -e '          "command": ["bunx", "@massa-ai/mcp-client"],'
+echo -e '          "environment": { "MASSA_AI_API_URL": "http://localhost:3333" },'
 echo -e '          "enabled": true'
 echo -e '        }'
 echo -e '      }'

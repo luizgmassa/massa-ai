@@ -15,7 +15,7 @@ Skills (invocable via Codex `$` mentions):
 | `graph` | Reference graph (who calls / imports / extends) |
 | `status` | Workspaces health + search analytics |
 
-MCP server: `massa-ai` (`npx @massa-ai/mcp-client` with `MASSA_AI_API_URL`) — auto-discovered from the bundled `.mcp.json`, no separate `install-agents.ts` run needed for the plugin's scope.
+MCP server: `massa-ai` (`npx @massa-ai/mcp-client` with `MASSA_AI_API_URL`) — registered into `~/.codex/config.toml` by `scripts/install-agents.sh`, which this installer calls for you. That script is the single writer of host MCP config; the plugin ships no `.mcp.json`.
 
 Hooks: 6 Codex lifecycle events wired to the shared `massa-ai-hook` binary (fire-and-forget POSTs to the tools-api):
 
@@ -61,8 +61,12 @@ in Codex and trust the massa-ai hooks. **Without this step, no observations will
 
 ## Local plugin dir discovery
 
-Codex discovers plugins from `~/.codex/plugins/` (user scope) or `./.codex/plugins/` (project scope). The installer places the bundle at `~/.codex/plugins/massa-ai/` (or the project equivalent). Codex reads `.codex-plugin/plugin.json` for the manifest (`skills`, `mcp`, `hooks` pointers), then auto-loads `skills/*.md`, `.mcp.json`, and `hooks/hooks.json`.
+Codex discovers plugins from `~/.codex/plugins/` (user scope) or `./.codex/plugins/` (project scope). The installer places the bundle at `~/.codex/plugins/massa-ai/` (or the project equivalent). Codex reads `.codex-plugin/plugin.json` for the manifest (`skills`, `hooks` pointers), then auto-loads `skills/*.md` and `hooks/hooks.json`. MCP is not bundled — it lives in `~/.codex/config.toml`.
 
-## MCP deconfliction
+## MCP ownership
 
-If you also run `scripts/install-agents.ts --agent codex` (which writes MCP config to `~/.codex/config.toml`), skip the MCP step or you may double-register the `massa-ai` server. The plugin's bundled `.mcp.json` is the canonical MCP source when the plugin is installed.
+`scripts/install-agents.sh` is the only writer of host MCP config. This installer calls it with `--agent codex --yes`, so there is exactly one `[mcp_servers.massa-ai]` table in `~/.codex/config.toml` no matter how many times you install.
+
+MCP is always registered at **user** scope. A `--project` plugin install still writes `~/.codex/config.toml`.
+
+Earlier versions copied a plugin-local `.mcp.json` into `~/.codex/plugins/massa-ai/`. That was never a Codex read path; reinstalling removes the stale file.

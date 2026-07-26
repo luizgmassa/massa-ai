@@ -15,7 +15,7 @@ Skills (auto-loaded from `skills/<name>/SKILL.md`):
 | `graph` | Reference graph (who calls / imports / extends) |
 | `status` | Workspaces health + search analytics |
 
-MCP server: `massa-ai` (`npx @massa-ai/mcp-client` with `MASSA_AI_API_URL`) — auto-discovered from the bundled `mcp.json`, no separate `install-agents.ts` run needed for the plugin's scope.
+MCP server: `massa-ai` (`npx @massa-ai/mcp-client` with `MASSA_AI_API_URL`) — registered into `~/.cursor/mcp.json` by `scripts/install-agents.sh`, which this installer calls for you. That script is the single writer of host MCP config; the plugin ships no `mcp.json`.
 
 Subagent: `massa-ai-navigator` — a code exploration specialist that queries the massa-ai semantic index before falling back to file reads.
 
@@ -62,7 +62,7 @@ If you are building a VS Code extension for Cursor, you can register the plugin 
 vscode.cursor.plugins.registerPath("/abs/path/to/apps/cursor-plugin");
 ```
 
-Cursor auto-discovers `skills/`, `hooks/hooks.json`, `mcp.json`, and `agents/` inside the registered directory. The `.cursor-plugin/plugin.json` manifest is optional — Cursor discovers the subdirectories without it, but including one aids marketplace submission later.
+Cursor auto-discovers `skills/`, `hooks/hooks.json`, and `agents/` inside the registered directory. MCP is not bundled — Cursor reads `~/.cursor/mcp.json`, which `scripts/install-agents.sh` owns. The `.cursor-plugin/plugin.json` manifest is optional — Cursor discovers the subdirectories without it, but including one aids marketplace submission later.
 
 Use `unregisterPath` to remove:
 
@@ -78,6 +78,10 @@ See `cursor.com/docs/extension-api` and `cursor.com/docs/reference/plugins` for 
 - [Bun](https://bun.sh) installed (the `massa-ai-hook` binary is a Bun script).
 - The `massa-ai-hook` symlink points at `apps/claude-plugin/hooks/massa-ai-hook.ts` in this repo — keep the repo checkout present, or replace the symlink with a copy of the binary if you relocate.
 
-## MCP deconfliction
+## MCP ownership
 
-If you also run `scripts/install-agents.ts --agent cursor` (which writes MCP config to `~/.cursor/mcp.json`), skip the MCP step or you may double-register the `massa-ai` server. The plugin's bundled `mcp.json` is the canonical MCP source when the plugin is installed.
+`scripts/install-agents.sh` is the only writer of host MCP config. This installer calls it with `--agent cursor --yes`, so there is exactly one `massa-ai` entry in `~/.cursor/mcp.json` no matter how many times you install.
+
+MCP is always registered at **user** scope. A `--project` plugin install still writes `~/.cursor/mcp.json`.
+
+Earlier versions copied a plugin-local `mcp.json` into `~/.cursor/plugins/massa-ai/`. Cursor never read it; reinstalling removes the stale file.

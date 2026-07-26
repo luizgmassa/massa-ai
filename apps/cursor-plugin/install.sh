@@ -2,11 +2,14 @@
 #
 # massa-ai Cursor plugin installer
 #
-# Copies the plugin bundle (skills, hooks.json, mcp.json, agents, optional
-# manifest, binary symlink) into the user's or project's Cursor config
-# directory and merges the 7 massa-ai hook events into
-# ~/.cursor/hooks.json (or ./.cursor/hooks.json) using an array-append merge
-# that preserves existing user hooks.
+# Copies the plugin bundle (skills, hooks.json, agents, optional manifest,
+# binary symlink) into the user's or project's Cursor config directory and
+# merges the 7 massa-ai hook events into ~/.cursor/hooks.json (or
+# ./.cursor/hooks.json) using an array-append merge that preserves existing
+# user hooks.
+#
+# MCP registration is delegated to scripts/install-agents.sh, the single writer
+# of host MCP config. This installer no longer ships a plugin-local mcp.json.
 #
 # Idempotent: re-running is a no-op when owned entries already present.
 # Uninstall removes only ownership-marked entries + the plugin directory.
@@ -196,9 +199,13 @@ done
 cp "$SCRIPT_DIR/hooks/hooks.json" "$PLUGIN_DIR/hooks/hooks.json"
 echo "  + hooks/hooks.json"
 
-# Copy mcp.json
-cp "$SCRIPT_DIR/mcp.json" "$PLUGIN_DIR/mcp.json"
-echo "  + mcp.json"
+# Older installs shipped a plugin-local mcp.json here. Cursor reads
+# ~/.cursor/mcp.json, not the plugin dir, and MCP is now owned by
+# scripts/install-agents.sh — drop the residue so upgraders converge.
+if [[ -f "$PLUGIN_DIR/mcp.json" ]]; then
+  rm -f "$PLUGIN_DIR/mcp.json"
+  echo "  - removed stale mcp.json (MCP is now registered in ~/.cursor/mcp.json)"
+fi
 
 # Copy agents — navigator + 12 subagent specialists (auto-discovered by Cursor
 # from the plugin's agents/ dir). The existing navigator is preserved; the 12
@@ -231,6 +238,19 @@ echo "Merging hooks into $HOOKS_JSON..."
 merge_hooks_json "$HOOKS_JSON" "install"
 echo "  + 7 massa-ai hook events wired (array-append, user hooks preserved)"
 
+# ── MCP registration (delegated) ─────────────────────────────────────────────
+# scripts/install-agents.sh is the single writer of host MCP config. It writes
+# the massa-ai entry into ~/.cursor/mcp.json at USER scope — a --project plugin
+# install still registers MCP for the whole user.
+echo ""
+echo "Registering MCP server (user scope) via scripts/install-agents.sh..."
+if [[ -f "$REPO_ROOT/scripts/install-agents.sh" ]]; then
+  MASSA_AI_SUPPRESS_SPECIALIST_HINT=1 bash "$REPO_ROOT/scripts/install-agents.sh" --agent cursor --yes \
+    || echo "  ⚠ MCP wiring failed — run: bash scripts/install-agents.sh --agent cursor --yes" >&2
+else
+  echo "  ⚠ scripts/install-agents.sh not found — register MCP with: bash scripts/install-agents.sh --agent cursor --yes" >&2
+fi
+
 echo ""
 echo "Done. Restart Cursor to pick up the plugin."
-echo "💡 If you also run install-agents.ts --agent cursor, skip MCP — the plugin already registers it."
+echo "💡 MCP is registered in ~/.cursor/mcp.json by scripts/install-agents.sh (single writer)."
