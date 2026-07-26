@@ -110,6 +110,7 @@ describe("syncVersions", () => {
     const manifests = [
       "apps/claude-plugin/.claude-plugin/plugin.json",
       "apps/codex-plugin/.codex-plugin/plugin.json",
+      "apps/cursor-plugin/.cursor-plugin/plugin.json",
     ];
     await writePkg(path.join(tmp, "package.json"), { name: "root", version: "5.0.0" });
     for (const rel of manifests) {

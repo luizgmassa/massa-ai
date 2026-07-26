@@ -67,6 +67,7 @@ export function repinWorkspaceDependencies(
 const EXTRA_VERSIONED_MANIFESTS = [
   "apps/claude-plugin/.claude-plugin/plugin.json",
   "apps/codex-plugin/.codex-plugin/plugin.json",
+  "apps/cursor-plugin/.cursor-plugin/plugin.json",
 ];
 
 /**
