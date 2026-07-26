@@ -19,7 +19,7 @@ function spawnMcp(): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {
     const proc = spawn("bun", [MCP_BIN], {
       stdio: ["ignore", "pipe", "pipe"],
-      timeout: 2000,
+      timeout: 3000,
     });
 
     let stdout = "";
