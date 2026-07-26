@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **All four host plugins now publish to npm and GitHub Packages.**
+  `@massa-ai/claude-plugin`, `@massa-ai/codex-plugin`, and `@massa-ai/cursor-plugin` join
+  `@massa-ai/opencode-plugin` as real workspace packages, each installable from a registry
+  tarball with no repo checkout present. None declares a `test` script, so turbo's `test`
+  task never double-runs `apps/*/__tests__` alongside the existing `bun run test:plugins`.
+- **`scripts/generate-skill-artifacts.ts` bundles `skills/` into every plugin.** Emits real,
+  byte-identical files (never symlinks — `npm pack` silently drops them) for
+  `skills/massa-ai/`, `skills/persona-router/`, and every `skills/agents/<name>/SKILL.md`
+  charter into `apps/<host>-plugin/skills/` for all four hosts, plus
+  `apps/opencode-plugin/lib/opencode-config.cjs` and the codex/cursor
+  `hooks/massa-ai-hook` binary. `--check` diffs full directory inventories per managed
+  subtree, catching both a changed source file and a stale bundle entry left behind after
+  a source deletion.
+- **Version-manifest equality gate (discovery-based, not a hardcoded list).**
+  `scripts/version-manifest-equality.ts` globs every `package.json` under `packages/*` /
+  `apps/*` plus any `apps/*/.<host>-plugin/plugin.json` dotdir manifest and asserts each
+  equals the root version — closing the gap that let
+  `apps/cursor-plugin/.cursor-plugin/plugin.json` drift to `1.0.0` five minors behind root
+  with `version-sync.ts`'s hardcoded `EXTRA_VERSIONED_MANIFESTS` never erroring on the
+  omission.
+
+### Changed
+
+- **`install-skills.sh` copies instead of symlinking.** Nothing it installs depends on
+  this repo checkout staying at the path it was installed from. Ownership between the
+  repo installer and each plugin's own `install.sh` is coordinated the same way MCP
+  registration is: a per-host `skillsOwner: "repo" | "plugin"` field in
+  `install-state.json` (v2), with an explicit repo `--apply` always taking precedence
+  over a prior plugin install.
+- **`publish.yml`'s build-output artifact list, GitHub Packages rescope list, and
+  `verify-package-contents.ts`'s expected-manifest gate all extended from 5 to 8
+  packages** to cover the three new plugins, whose entire publishable surface is static
+  source (no `dist/`).
+
 ## [1.5.0] - 2026-07-26
 
 ### Added

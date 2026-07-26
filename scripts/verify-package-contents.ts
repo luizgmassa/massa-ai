@@ -87,6 +87,24 @@ export const EXPECTED_PACKAGES: readonly PackageExpectation[] = [
     // the matching files under an "agents/" top-level directory in the tarball.
     requiredTopLevel: ["dist", "agents", "package.json"],
   },
+  // apps/{claude,codex,cursor}-plugin (PDO-10, PDO-25) have NO dist/ — their entire
+  // publishable surface is static source, so requiredTopLevel is exactly each
+  // package's own package.json#files field (the dotdir host manifest included).
+  {
+    dir: "apps/claude-plugin",
+    name: "@massa-ai/claude-plugin",
+    requiredTopLevel: ["agents", "commands", "hooks", "skills", "install.sh", "README.md", ".claude-plugin", "package.json"],
+  },
+  {
+    dir: "apps/codex-plugin",
+    name: "@massa-ai/codex-plugin",
+    requiredTopLevel: ["agents", "hooks", "skills", "install.sh", "README.md", ".codex-plugin", "package.json"],
+  },
+  {
+    dir: "apps/cursor-plugin",
+    name: "@massa-ai/cursor-plugin",
+    requiredTopLevel: ["agents", "hooks", "skills", "install.sh", "README.md", ".cursor-plugin", "package.json"],
+  },
 ];
 
 interface PublishManifest {

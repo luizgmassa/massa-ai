@@ -216,9 +216,129 @@ fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n");
 NODE
 }
 
+# ── Skills bundling (PDO-08, 09 / D3 two-writer ownership) ──────────────────
+# scripts/install-skills.sh remains the single writer once it has already
+# claimed this platform (skillsOwner: "repo" in the shared install-state.json).
+# This plugin installs its bundled massa-ai/persona-router skills into the
+# SAME harness skills directory ($CODEX_DIR/skills — NOT $PLUGIN_DIR/skills,
+# which is Codex's own marketplace-plugin skill cache, a separate mechanism)
+# only when that has not happened, mirroring the MCP single-writer precedent
+# (test-mcp-single-writer.sh). A repo checkout's own --apply always takes
+# precedence over a prior plugin install — see install-skills.sh.
+HARNESS_STATE_FILE="$HOME/.config/massa-ai/install-state.json"
+HARNESS_SKILLS_DIR="$CODEX_DIR/skills"
+HARNESS_HOST="codex"
+
+harness_skills_owner() {
+  local runner="$1"
+  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" <<'NODE'
+const fs = require("fs");
+const [, , file, host] = process.argv;
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  const rec = data && data.platforms && data.platforms[host];
+  process.stdout.write(rec && rec.skillsOwner === "repo" ? "repo" : "none");
+} catch {
+  process.stdout.write("none");
+}
+NODE
+}
+
+install_bundled_skills() {
+  local runner=""
+  if command -v node &>/dev/null; then runner="node"
+  elif command -v bun &>/dev/null; then runner="bun"
+  else
+    echo "  ⚠ node or bun required to install bundled skills — skipping" >&2
+    return 0
+  fi
+
+  if [[ "$(harness_skills_owner "$runner")" == "repo" ]]; then
+    vecho "  ↷ skills already installed by scripts/install-skills.sh (repo-owned) — skipping bundled copy"
+    return 0
+  fi
+
+  local installed=0 name src dest
+  for name in massa-ai persona-router; do
+    src="$SCRIPT_DIR/skills/$name"
+    [[ -d "$src" ]] || continue
+    dest="$HARNESS_SKILLS_DIR/$name"
+    if [[ -e "$dest" && ! -d "$dest" ]]; then
+      echo "  ⚠ $dest exists and is not a directory — skipping" >&2
+      continue
+    fi
+    mkdir -p "$HARNESS_SKILLS_DIR"
+    rm -rf "$dest"
+    cp -R "$src" "$dest"
+    installed=$((installed + 1))
+  done
+  vecho "  + ${installed} harness skills installed to $HARNESS_SKILLS_DIR (plugin-owned)"
+
+  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" "$CODEX_DIR" <<'NODE'
+const fs = require("fs");
+const path = require("path");
+const [, , file, host, root] = process.argv;
+let data = { version: 2, platforms: {} };
+try {
+  const existing = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (existing && typeof existing === "object" && !Array.isArray(existing)) data = existing;
+} catch { /* fresh */ }
+if (typeof data.platforms !== "object" || data.platforms === null || Array.isArray(data.platforms)) {
+  data.platforms = {};
+}
+data.version = 2;
+data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router"] };
+fs.mkdirSync(path.dirname(file), { recursive: true });
+fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+NODE
+}
+
+uninstall_bundled_skills() {
+  local runner=""
+  if command -v node &>/dev/null; then runner="node"
+  elif command -v bun &>/dev/null; then runner="bun"
+  else return 0
+  fi
+
+  local raw_owner
+  raw_owner="$("$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" <<'NODE'
+const fs = require("fs");
+const [, , file, host] = process.argv;
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  const rec = data && data.platforms && data.platforms[host];
+  process.stdout.write(rec ? String(rec.skillsOwner) : "none");
+} catch {
+  process.stdout.write("none");
+}
+NODE
+  )"
+  [[ "$raw_owner" == "plugin" ]] || return 0
+
+  local name
+  for name in massa-ai persona-router; do
+    rm -rf "$HARNESS_SKILLS_DIR/$name"
+  done
+  rmdir "$HARNESS_SKILLS_DIR" 2>/dev/null || true
+  echo "  - removed plugin-owned harness skills from $HARNESS_SKILLS_DIR"
+
+  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" <<'NODE'
+const fs = require("fs");
+const [, , file, host] = process.argv;
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (data && data.platforms && data.platforms[host] && data.platforms[host].skillsOwner === "plugin") {
+    delete data.platforms[host];
+    fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+  }
+} catch { /* nothing to clean up */ }
+NODE
+}
+
 # ── Uninstall ───────────────────────────────────────────────────────────────
 if [[ "$UNINSTALL" -eq 1 ]]; then
   echo "Uninstalling massa-ai Codex plugin (scope: $SCOPE)..."
+  uninstall_bundled_skills
   # Remove owned hook entries (preserves user hooks)
   if [[ -f "$HOOKS_JSON" ]]; then
     merge_hooks_json "$HOOKS_JSON" "uninstall"
@@ -280,13 +400,19 @@ if [[ -f "$PLUGIN_DIR/.mcp.json" ]]; then
   echo -e "  - removed stale .mcp.json (MCP is now registered in ~/.codex/config.toml)"
 fi
 
-# Create the binary symlink → repo's claude-plugin binary (resolved at install
-# time via SCRIPT_DIR → REPO_ROOT). This keeps a single source of truth.
-if [[ -f "$CLAUDE_PLUGIN_BIN" ]]; then
+# Copy the real hooks/massa-ai-hook this plugin already ships (T14/PDO-14: a
+# generated real file, no longer a symlink into apps/claude-plugin/ — that
+# path does not exist in a registry tarball install, where $REPO_ROOT is not
+# this monorepo. $CLAUDE_PLUGIN_BIN is kept only as a repo-checkout fallback.
+if [[ -f "$SCRIPT_DIR/hooks/massa-ai-hook" ]]; then
+  cp "$SCRIPT_DIR/hooks/massa-ai-hook" "$PLUGIN_DIR/hooks/massa-ai-hook"
+  chmod +x "$PLUGIN_DIR/hooks/massa-ai-hook"
+  vecho "  + hooks/massa-ai-hook"
+elif [[ -f "$CLAUDE_PLUGIN_BIN" ]]; then
   ln -sfn "$CLAUDE_PLUGIN_BIN" "$PLUGIN_DIR/hooks/massa-ai-hook"
   vecho "  + hooks/massa-ai-hook → $CLAUDE_PLUGIN_BIN"
 else
-  echo "  ⚠ Warning: claude-plugin binary not found at $CLAUDE_PLUGIN_BIN" >&2
+  echo "  ⚠ Warning: no massa-ai-hook binary found" >&2
   echo "    Hooks will not fire until the binary is available." >&2
 fi
 
@@ -310,6 +436,12 @@ for src in "$SCRIPT_DIR/agents/"massa-ai-*.toml; do
   specialist_count=$((specialist_count + 1))
 done
 vecho "  + ${specialist_count} subagent specialists (generated from skills/agents/*/SKILL.md)"
+
+# Skills bundling (PDO-08, 09): install massa-ai/persona-router into the
+# shared harness skills directory, unless scripts/install-skills.sh already
+# owns it for this platform.
+vecho ""
+install_bundled_skills
 
 # ── MCP registration (delegated) ─────────────────────────────────────────────
 # scripts/install-agents.sh is the single writer of host MCP config. It writes

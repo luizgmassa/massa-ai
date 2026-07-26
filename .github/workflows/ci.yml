@@ -93,6 +93,14 @@ jobs:
       - name: Verify package contents (publish artifact parity)
         run: bun scripts/verify-package-contents.ts
 
+      # PDO-06/07. Same drift-gate shape as the subagent-artifact check
+      # (scripts/generate-subagent-artifacts.ts --check, exercised via
+      # scripts/__tests__/subagent-parity.test.ts in the Test scripts step
+      # below), run explicitly here too so a stale apps/*-plugin/skills/ bundle
+      # fails loudly and early rather than only inside the isolated test run.
+      - name: Verify skill-bundle artifacts (drift gate)
+        run: bun scripts/generate-skill-artifacts.ts --check
+
       - name: Detect grammar-related changes
         id: filter
         uses: dorny/paths-filter@v3

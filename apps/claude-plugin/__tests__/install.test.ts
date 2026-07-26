@@ -328,3 +328,90 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
     }
   });
 });
+
+describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
+  test("install copies massa-ai + persona-router into ~/.claude/skills as plugin-owned", async () => {
+    const res = runInstall(["--user", "--verbose"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("harness skills installed");
+
+    for (const name of ["massa-ai", "persona-router"]) {
+      const skillMd = path.join(tmp, `.claude/skills/${name}/SKILL.md`);
+      expect(await pathExists(skillMd)).toBe(true);
+      const lst = await fs.lstat(skillMd);
+      expect(lst.isSymbolicLink()).toBe(false);
+    }
+
+    const state = await readJson(path.join(tmp, ".config/massa-ai/install-state.json"));
+    const platforms = state.platforms as Record<string, { skillsOwner: string }>;
+    expect(platforms.claude.skillsOwner).toBe("plugin");
+  });
+
+  test("install defers to install-skills.sh when the state file already records a repo-owned install", async () => {
+    const stateFile = path.join(tmp, ".config/massa-ai/install-state.json");
+    await fs.mkdir(path.dirname(stateFile), { recursive: true });
+    await fs.writeFile(
+      stateFile,
+      JSON.stringify(
+        {
+          version: 2,
+          platforms: {
+            claude: { root: path.join(tmp, ".claude"), skillsOwner: "repo", skills: ["massa-ai", "persona-router"] },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    const res = runInstall(["--user", "--verbose"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("repo-owned");
+    expect(await pathExists(path.join(tmp, ".claude/skills/massa-ai"))).toBe(false);
+  });
+
+  test("uninstall removes only a plugin-owned skills install and its state record", async () => {
+    runInstall(["--user"], { HOME: tmp });
+    expect(await pathExists(path.join(tmp, ".claude/skills/massa-ai"))).toBe(true);
+
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(await pathExists(path.join(tmp, ".claude/skills/massa-ai"))).toBe(false);
+    expect(await pathExists(path.join(tmp, ".claude/skills/persona-router"))).toBe(false);
+
+    const stateFile = path.join(tmp, ".config/massa-ai/install-state.json");
+    if (await pathExists(stateFile)) {
+      const state = await readJson(stateFile);
+      const platforms = state.platforms as Record<string, unknown>;
+      expect(platforms.claude).toBeUndefined();
+    }
+  });
+
+  test("uninstall never touches a repo-owned skills install", async () => {
+    const skillsDir = path.join(tmp, ".claude/skills/massa-ai");
+    await fs.mkdir(skillsDir, { recursive: true });
+    await fs.writeFile(path.join(skillsDir, "SKILL.md"), "repo-owned content");
+    const stateFile = path.join(tmp, ".config/massa-ai/install-state.json");
+    await fs.mkdir(path.dirname(stateFile), { recursive: true });
+    await fs.writeFile(
+      stateFile,
+      JSON.stringify(
+        {
+          version: 2,
+          platforms: {
+            claude: { root: path.join(tmp, ".claude"), skillsOwner: "repo", skills: ["massa-ai"] },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(
+      await fs.readFile(path.join(skillsDir, "SKILL.md"), "utf8"),
+    ).toBe("repo-owned content");
+    const state = await readJson(stateFile);
+    const platforms = state.platforms as Record<string, { skillsOwner: string }>;
+    expect(platforms.claude.skillsOwner).toBe("repo");
+  });
+});

@@ -208,14 +208,17 @@ describe("topLevelEntries", () => {
 // ── EXPECTED_PACKAGES sanity ─────────────────────────────────────────────────
 
 describe("EXPECTED_PACKAGES", () => {
-  test("covers exactly the current 5 publishable packages (PR1 scope)", () => {
+  test("covers exactly the current 8 publishable packages (PR2 scope, T17)", () => {
     expect(EXPECTED_PACKAGES.map((pkg) => pkg.name).sort()).toEqual([
+      "@massa-ai/claude-plugin",
       "@massa-ai/core",
+      "@massa-ai/cursor-plugin",
+      "@massa-ai/codex-plugin",
       "@massa-ai/mcp-client",
       "@massa-ai/opencode-plugin",
       "@massa-ai/shared",
       "@massa-ai/tools-api",
-    ]);
+    ].sort());
   });
 
   test("every declared package directory exists in this repo", () => {
@@ -231,18 +234,19 @@ describe("verifyPackageContents (end-to-end, PDO-26 AC10)", () => {
   const builtDistExists = existsSync(resolve(REPO_ROOT, "packages/shared/dist"));
 
   // A real staged-copy run against this repo's own publish.yml + package dirs must pass
-  // on all 5 current publishable packages. `apps/opencode-plugin/agents` is part of
+  // on all 8 current publishable packages. `apps/opencode-plugin/agents` is part of
   // publish.yml's build-output artifact list (PDO-26's fix), so its 15 `agents/*.md`
   // charters survive the artifact-only staging this gate reproduces. Before that entry
   // existed, this exact assertion failed with `missing: ["agents"]` on
   // @massa-ai/opencode-plugin — the live defect this gate exists to catch (spec PDO-26
-  // AC10; the captured red-state run is in this task's delivery notes).
+  // AC10; the captured red-state run is in this task's delivery notes). T17 extended the
+  // package count from 5 to 8 for the three new static-source host plugins.
   test.skipIf(!builtDistExists)(
-    "passes on all 5 packages against this repo's real publish.yml artifact list",
+    "passes on all 8 packages against this repo's real publish.yml artifact list",
     () => {
       const results = verifyPackageContents();
       const byName = new Map(results.map((r) => [r.pkg.name, r]));
-      expect(byName.size).toBe(5);
+      expect(byName.size).toBe(8);
       for (const result of results) {
         expect(result.ok).toBe(true);
       }
@@ -256,5 +260,39 @@ describe("verifyPackageContents (end-to-end, PDO-26 AC10)", () => {
     } else {
       expect(builtDistExists).toBe(true);
     }
+  });
+
+  // T17 mutation-verification: simulates the exact real-world defect class this gate
+  // exists to catch — a package's build-output artifact list in publish.yml silently
+  // dropping one of its declared directories — for one of the three new static-source
+  // plugins, without mutating the real workflow file on disk.
+  test("mutation: dropping a declared artifact path for a new plugin fails the check", () => {
+    const claudePlugin = EXPECTED_PACKAGES.find((pkg) => pkg.name === "@massa-ai/claude-plugin")!;
+    expect(claudePlugin).toBeDefined();
+
+    const fullArtifactPaths = [
+      "apps/claude-plugin/agents",
+      "apps/claude-plugin/commands",
+      "apps/claude-plugin/hooks",
+      "apps/claude-plugin/skills",
+      "apps/claude-plugin/install.sh",
+      "apps/claude-plugin/README.md",
+      "apps/claude-plugin/.claude-plugin/plugin.json",
+      "apps/claude-plugin/package.json",
+    ];
+    const actualFull = new Set(
+      pathsForPackage(fullArtifactPaths, claudePlugin.dir).map((p) => p.split("/")[2]!),
+    );
+    expect(diffInventory(claudePlugin, actualFull).ok).toBe(true);
+
+    // Mutation: publish.yml's artifact list silently drops "skills" (the actual
+    // shape of the opencode-plugin agents/ defect this gate was built to catch).
+    const droppedArtifactPaths = fullArtifactPaths.filter((p) => !p.endsWith("/skills"));
+    const actualDropped = new Set(
+      pathsForPackage(droppedArtifactPaths, claudePlugin.dir).map((p) => p.split("/")[2]!),
+    );
+    const result = diffInventory(claudePlugin, actualDropped);
+    expect(result.ok).toBe(false);
+    expect(result.missing).toEqual(["skills"]);
   });
 });

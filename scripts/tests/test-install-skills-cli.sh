@@ -89,8 +89,10 @@ echo "Scenario 8: --repo-root and --target are honoured"
 H8="$ROOT/h8"; mkdir -p "$H8"
 bash "$INSTALLER" --apply --platform cursor --target "$H8" --repo-root "$PROJECT_ROOT" --yes >/dev/null 2>&1
 assert_file "--target picked the fake home" "$H8/.cursor/AGENTS.md"
-LINK="$(find "$H8/.cursor/skills" -type l | head -n1)"
-assert_contains "symlink resolves into --repo-root" "$(readlink "$LINK")" "$PROJECT_ROOT/skills/"
+COPY="$(find "$H8/.cursor/skills" -mindepth 1 -maxdepth 1 -type d | head -n1)"
+assert_ne "skills were installed as real directories" "$COPY" ""
+assert_eq "no symlink exists anywhere under the installed skills tree" \
+  "$(find "$H8/.cursor/skills" -type l | wc -l | tr -d ' ')" "0"
 
 echo ""
 echo "Scenario 9: --platform all covers the four platform roots"
@@ -107,6 +109,36 @@ H10="$ROOT/h10"; mkdir -p "$H10/.config/codex"
 bash "$INSTALLER" --apply --platform codex --target "$H10" --repo-root "$PROJECT_ROOT" --yes >/dev/null 2>&1
 assert_file "fallback codex home used" "$H10/.config/codex/AGENTS.md"
 assert_no_file "primary codex home not created" "$H10/.codex/AGENTS.md"
+
+echo ""
+echo "Scenario 11: scratch-HOME install survives the source repo checkout disappearing (PDO-08 AC4)"
+# install-skills.sh only reads $SKILLS_ROOT (derived from --repo-root) at apply
+# time; it sources its own helpers from $SCRIPT_DIR (this real checkout), so a
+# throwaway --repo-root needs nothing but a skills/ tree to exercise the copy
+# path end to end.
+DECOY_REPO="$ROOT/decoy-repo"
+mkdir -p "$DECOY_REPO"
+cp -R "$PROJECT_ROOT/skills" "$DECOY_REPO/skills"
+H11="$ROOT/h11"; mkdir -p "$H11"
+bash "$INSTALLER" --apply --platform all --target "$H11" --repo-root "$DECOY_REPO" --yes >/dev/null 2>&1
+TOTAL_SYMLINKS="$(find "$H11" -type l | wc -l | tr -d ' ')"
+assert_eq "zero symlinks anywhere in the scratch-home install" "$TOTAL_SYMLINKS" "0"
+
+FIRST_SKILL=""
+for d in "$DECOY_REPO"/skills/*/; do
+  [ -f "${d}SKILL.md" ] || continue
+  FIRST_SKILL="$(basename "$d")"; break
+done
+EXPECTED_CONTENT="$(cat "$DECOY_REPO/skills/$FIRST_SKILL/SKILL.md")"
+
+# The decoy repo checkout is now gone. A symlinked install would dangle here.
+rm -rf "$DECOY_REPO"
+
+ACTUAL_CONTENT="$(cat "$H11/.claude/skills/$FIRST_SKILL/SKILL.md" 2>&1)"
+assert_eq "installed skill content is still readable with the repo checkout gone" \
+  "$ACTUAL_CONTENT" "$EXPECTED_CONTENT"
+check "installed skills tree resolves entirely inside the scratch \$HOME" \
+  "$([ -d "$H11/.claude/skills/$FIRST_SKILL" ] && [ ! -L "$H11/.claude/skills/$FIRST_SKILL" ] && echo 0 || echo 1)"
 
 export PATH="$REAL_PATH"
 summary "install-skills CLI"

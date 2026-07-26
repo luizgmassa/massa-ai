@@ -2,10 +2,18 @@
 #
 # massa-ai unified skills installer
 #
-# Symlinks every repo-local skill (skills/<name>/SKILL.md) into each supported
-# coding agent's config directory and writes the bootstrap contract block into
-# that agent's AGENTS.md. Supports install (--apply), uninstall, dry-run, and
-# drift check (--check) across Claude Code, Codex, Cursor, and OpenCode.
+# Copies every repo-local skill (skills/<name>/SKILL.md and its directory) into
+# each supported coding agent's config directory and writes the bootstrap
+# contract block into that agent's AGENTS.md. Supports install (--apply),
+# uninstall, dry-run, and drift check (--check) across Claude Code, Codex,
+# Cursor, and OpenCode.
+#
+# Real copies, not symlinks (PDO-08): a symlinked install depends on this repo
+# checkout staying in place at the path it was installed from. Ownership of an
+# installed skill is tracked in install-state.json (v2, skillsOwner: "repo"),
+# not by "is this path a symlink" — a plugin tarball install (apps/<host>-plugin/
+# install.sh) writes the same target path when this installer has not already
+# claimed it (D3, PDO-09), and the two must never fight over the same files.
 #
 # Usage:
 #   scripts/install-skills.sh --apply --platform all            # install
@@ -36,12 +44,18 @@
 #   opencode   ~/.config/opencode/skills/<name>   + ~/.config/opencode/AGENTS.md
 #
 # Safety:
-#   - Aborts on non-symlink conflict at a target path (never overwrites user files).
-#     The conflict scan is a pre-pass: an abort happens before the first symlink.
+#   - Aborts on a foreign (not massa-ai-owned) conflict at a target path — never
+#     overwrites user files or directories. The conflict scan is a pre-pass: an
+#     abort happens before the first copy. Ownership is decided by the state
+#     file (a skill this installer already tracks for the platform), a
+#     per-skill marker file (`.massa-ai-owned-<name>`, the safety net for a
+#     lost/reset state file), or — for migration off the old symlink-based
+#     install — any existing symlink at the target, which is always safe to
+#     replace since removing a symlink never touches what it pointed to.
 #   - --dry-run and --check write nothing.
-#   - Uninstall removes only symlinks resolving inside the repo root.
+#   - Uninstall removes only copies (or legacy symlinks) this installer owns.
 #   - State persisted to ~/.config/massa-ai/install-state.json (v2; v1 migrated).
-#   - Idempotent: re-running --apply is a no-op when symlinks are correct.
+#   - Idempotent: re-running --apply is a no-op when the copies already match.
 #
 # Exit codes:
 #   0  success, or --check with no drift
@@ -306,7 +320,9 @@ if (version === 1) {
       console.error(`Invalid platform in installer state: ${file}`);
       process.exit(2);
     }
-    out.push([p, rootFor(p), ""]);
+    // v1 predates the plugin-writer concept — everything it recorded was a
+    // repo-owned symlink install.
+    out.push([p, rootFor(p), "", "repo"]);
   }
 } else if (version === 2) {
   const platforms = data.platforms;
@@ -331,7 +347,12 @@ if (version === 1) {
       console.error(`Invalid skill list in installer state: ${file}`);
       process.exit(2);
     }
-    out.push([p, rec.root, [...new Set(skills)].join(",")]);
+    // skillsOwner is new (D3/PDO-08): a state file written before this field
+    // existed recorded only repo-owned symlink installs, so a missing/invalid
+    // value defaults to "repo" rather than failing closed on every prior
+    // install-state.json on disk.
+    const owner = rec.skillsOwner === "plugin" ? "plugin" : "repo";
+    out.push([p, rec.root, [...new Set(skills)].join(","), owner]);
   }
 } else {
   console.error(`Unsupported installer state version in ${file}`);
@@ -351,13 +372,21 @@ state_skills_for() {
   printf '%s' "$line" | cut -f3 | tr ',' ' '
 }
 
+# state_owner_for PLATFORM — "repo" | "plugin" | "" (no prior record).
+state_owner_for() {
+  local p="$1" line
+  line="$(grep "^$p$TAB" "$STATE_IN" 2>/dev/null | head -n1 || true)"
+  [ -n "$line" ] || return 0
+  printf '%s' "$line" | cut -f4
+}
+
 # Seed the outgoing state with everything we are not touching this run.
 cp "$STATE_IN" "$STATE_OUT"
 
 state_replace() {
-  local p="$1" root="$2" csv="$3" tmp="$WORK_DIR/state.tmp"
+  local p="$1" root="$2" csv="$3" owner="${4:-repo}" tmp="$WORK_DIR/state.tmp"
   grep -v "^$p$TAB" "$STATE_OUT" > "$tmp" 2>/dev/null || true
-  printf '%s\t%s\t%s\n' "$p" "$root" "$csv" >> "$tmp"
+  printf '%s\t%s\t%s\t%s\n' "$p" "$root" "$csv" "$owner" >> "$tmp"
   mv "$tmp" "$STATE_OUT"
 }
 
@@ -440,6 +469,33 @@ process.stdout.write("change");
 NODE
 }
 
+# Marker file for a copied skill: "$skills_dir/.massa-ai-owned-<name>". Lives
+# beside the skill directory, never inside it, so the copied tree stays a
+# byte-perfect mirror of $SKILLS_ROOT/$name (no injected file to exclude from
+# drift/idempotency comparisons). It is the safety net D3 calls for: ownership
+# is decided primarily by the state file, but a lost or hand-edited state file
+# must not turn every subsequent run into a false "foreign conflict" abort.
+skill_marker_path() { # skill_marker_path SKILLS_DIR NAME
+  printf '%s/.massa-ai-owned-%s' "$1" "$2"
+}
+
+# is_owned_target PLATFORM NAME TARGET SKILLS_DIR — 0 if massa-ai already owns
+# whatever currently occupies TARGET, 1 if it is foreign (never overwritten).
+#   - a symlink is always ours to replace: removing a symlink node never
+#     touches whatever it pointed to, and a symlink here is exactly the
+#     pre-copy (pre-migration) install shape.
+#   - a name this run's state already tracks for the platform is ours.
+#   - a marker file for NAME is ours (state-loss safety net).
+is_owned_target() {
+  local p="$1" name="$2" target="$3" skills_dir="$4"
+  [ -L "$target" ] && return 0
+  case " $(state_skills_for "$p") " in
+    *" $name "*) return 0 ;;
+  esac
+  [ -f "$(skill_marker_path "$skills_dir" "$name")" ] && return 0
+  return 1
+}
+
 # ── Per-platform: apply ─────────────────────────────────────────────────────
 apply_platform() {
   local p="$1"
@@ -448,43 +504,42 @@ apply_platform() {
   skills_dir="$root/skills"
   agents_md="$root/AGENTS.md"
 
-  # Pre-pass: a regular file or directory where a symlink belongs aborts the
-  # whole platform BEFORE any mutation. Never overwrite user data.
+  # Pre-pass: a foreign (not massa-ai-owned) file or directory where a copy
+  # belongs aborts the whole platform BEFORE any mutation. Never overwrite
+  # user data.
   local name target
   for name in $SKILL_NAMES; do
     target="$skills_dir/$name"
-    if [ -e "$target" ] && [ ! -L "$target" ]; then
-      record "error" "$p" "$target" "Conflict: $target exists as a regular file (not a symlink). Aborting to avoid overwriting user data."
-      state_replace "$p" "$root" ""
+    if { [ -e "$target" ] || [ -L "$target" ]; } && ! is_owned_target "$p" "$name" "$target" "$skills_dir"; then
+      record "error" "$p" "$target" "Conflict: $target exists and is not massa-ai-owned. Aborting to avoid overwriting user data."
+      state_replace "$p" "$root" "" "repo"
       return 0
     fi
   done
 
-  local installed="" symlink_count=0
+  local installed="" copy_count=0 marker
   for name in $SKILL_NAMES; do
     target="$skills_dir/$name"
     local source="$SKILLS_ROOT/$name"
+    marker="$(skill_marker_path "$skills_dir" "$name")"
     installed="${installed}${installed:+,}${name}"
 
-    if [ -L "$target" ]; then
-      local current
-      current="$(cd "$(dirname "$target")" 2>/dev/null && installer_resolve_path "$(readlink "$target")")"
-      if [ "$current" = "$source" ]; then
-        continue   # already correct — idempotent
-      fi
-      [ "$DRY_RUN" = "1" ] || rm -f "$target"
+    if [ -d "$target" ] && [ ! -L "$target" ] && diff -rq "$source" "$target" >/dev/null 2>&1; then
+      continue   # already correct — idempotent
     fi
 
-    symlink_count=$((symlink_count + 1))
+    copy_count=$((copy_count + 1))
     if [ "$DRY_RUN" = "1" ]; then
-      vinfo "Would symlink: $target -> $source"
-      record "would-change" "$p" "$target" "Would symlink: $target -> $source"
+      vinfo "Would copy: $source -> $target"
+      record "would-change" "$p" "$target" "Would copy: $source -> $target"
       continue
     fi
     mkdir -p "$skills_dir"
-    ln -s "$source" "$target"
-    vinfo "Symlinked: $target -> $source"
-    record "changed" "$p" "$target" "Symlinked: $target -> $source"
+    rm -rf "$target"
+    cp -R "$source" "$target"
+    : > "$marker"
+    vinfo "Copied: $source -> $target"
+    record "changed" "$p" "$target" "Copied: $source -> $target"
   done
 
   local mode="apply" bootstrap_changed=0
@@ -502,18 +557,18 @@ apply_platform() {
     fi
   fi
 
-  state_replace "$p" "$root" "$installed"
+  state_replace "$p" "$root" "$installed" "repo"
 
   # Summary line (quiet mode only; verbose mode prints the per-item detail)
   # Never printed in JSON mode.
   if [ "$MASSA_AI_VERBOSE" = "0" ] && [ "$JSON_OUT" = "0" ]; then
-    local summary="$symlink_count skills"
-    if [ "$symlink_count" = "0" ]; then
+    local summary="$copy_count skills"
+    if [ "$copy_count" = "0" ]; then
       [ "$bootstrap_changed" = "1" ] && summary="AGENTS.md updated" || summary="up to date"
     elif [ "$bootstrap_changed" = "1" ]; then
-      summary="$symlink_count skills symlinked, AGENTS.md bootstrap written"
+      summary="$copy_count skills copied, AGENTS.md bootstrap written"
     else
-      summary="$symlink_count skills symlinked"
+      summary="$copy_count skills copied"
     fi
     if [ "$DRY_RUN" = "1" ]; then
       info "$(platform_label "$p")  would: $summary"
@@ -526,32 +581,53 @@ apply_platform() {
 # ── Per-platform: uninstall ─────────────────────────────────────────────────
 uninstall_platform() {
   local p="$1"
-  local root skills_dir agents_md
+  local root skills_dir agents_md owner
   root="$(platform_root "$p")"
   skills_dir="$root/skills"
   agents_md="$root/AGENTS.md"
+  owner="$(state_owner_for "$p")"
 
-  local name target current remove_count=0
-  for name in $(state_skills_for "$p"); do
-    target="$skills_dir/$name"
-    [ -L "$target" ] || continue
-    current="$(cd "$(dirname "$target")" 2>/dev/null && installer_resolve_path "$(readlink "$target")")"
-    # Ownership: only remove links that resolve inside the repo root.
-    case "$current" in
-      "$REPO_ROOT"/*|"$REPO_ROOT") ;;
-      *) continue ;;
-    esac
-    remove_count=$((remove_count + 1))
-    if [ "$DRY_RUN" = "1" ]; then
-      vinfo "Would remove symlink: $target"
-      record "would-change" "$p" "$target" "Would remove symlink: $target"
-      continue
-    fi
-    rm -f "$target"
-    rmdir "$skills_dir" 2>/dev/null || true
-    vinfo "Removed symlink: $target"
-    record "changed" "$p" "$target" "Removed symlink: $target"
-  done
+  # D3/PDO-09: a "plugin"-owned record means a plugin tarball install claimed
+  # this platform's skills directory, not this repo installer — never remove
+  # or otherwise touch what we do not own, and never drop that record either.
+  local name target current marker remove_count=0
+  if [ "$owner" != "plugin" ]; then
+    for name in $(state_skills_for "$p"); do
+      target="$skills_dir/$name"
+      marker="$(skill_marker_path "$skills_dir" "$name")"
+      if [ -L "$target" ]; then
+        # Legacy symlink install: only remove links that resolve inside the
+        # repo root (the same ownership test the pre-copy installer used).
+        current="$(cd "$(dirname "$target")" 2>/dev/null && installer_resolve_path "$(readlink "$target")")"
+        case "$current" in
+          "$REPO_ROOT"/*|"$REPO_ROOT") ;;
+          *) continue ;;
+        esac
+        remove_count=$((remove_count + 1))
+        if [ "$DRY_RUN" = "1" ]; then
+          vinfo "Would remove symlink: $target"
+          record "would-change" "$p" "$target" "Would remove symlink: $target"
+          continue
+        fi
+        rm -f "$target"
+        vinfo "Removed symlink: $target"
+        record "changed" "$p" "$target" "Removed symlink: $target"
+      elif [ -d "$target" ] && [ -f "$marker" ]; then
+        # Copy-based install: the per-skill marker is the ownership proof.
+        remove_count=$((remove_count + 1))
+        if [ "$DRY_RUN" = "1" ]; then
+          vinfo "Would remove copy: $target"
+          record "would-change" "$p" "$target" "Would remove copy: $target"
+          continue
+        fi
+        rm -rf "$target"
+        rm -f "$marker"
+        vinfo "Removed copy: $target"
+        record "changed" "$p" "$target" "Removed copy: $target"
+      fi
+    done
+    [ "$DRY_RUN" = "1" ] || rmdir "$skills_dir" 2>/dev/null || true
+  fi
 
   local bootstrap_changed=0
   if [ -f "$agents_md" ]; then
@@ -571,7 +647,10 @@ uninstall_platform() {
     fi
   fi
 
-  state_delete "$p"
+  # Only drop the platform record when this installer actually owns it —
+  # dropping a plugin-owned record here would let a subsequent apply overwrite
+  # a tarball install this run never touched.
+  [ "$owner" = "plugin" ] || state_delete "$p"
 
   # Summary line (quiet mode only; verbose mode prints the per-item detail)
   # Never printed in JSON mode.
@@ -595,51 +674,68 @@ uninstall_platform() {
 # ── Per-platform: check ─────────────────────────────────────────────────────
 check_platform() {
   local p="$1"
-  local root skills_dir
+  local root skills_dir owner
   root="$(platform_root "$p")"
   skills_dir="$root/skills"
+  owner="$(state_owner_for "$p")"
 
   local drift_count=0
-  local name target current source
-  for name in $SKILL_NAMES; do
-    target="$skills_dir/$name"
-    source="$SKILLS_ROOT/$name"
-    if [ ! -L "$target" ] && [ ! -e "$target" ]; then
-      vinfo "Missing symlink: $name"
-      drift_count=$((drift_count + 1))
-      record "drift" "$p" "$target" "Missing symlink: $name"
-      continue
-    fi
-    if [ ! -L "$target" ]; then
-      vinfo "$name exists but is not a symlink"
-      drift_count=$((drift_count + 1))
-      record "drift" "$p" "$target" "$name exists but is not a symlink"
-      continue
-    fi
-    current="$(cd "$(dirname "$target")" 2>/dev/null && installer_resolve_path "$(readlink "$target")")"
-    if [ "$current" != "$source" ]; then
-      vinfo "$name symlink points to $current, expected $source"
-      drift_count=$((drift_count + 1))
-      record "drift" "$p" "$target" "$name symlink points to $current, expected $source"
-    fi
-  done
-
-  # Stale: tracked in state, no longer a repo skill, still pointing into the repo.
-  for name in $(state_skills_for "$p"); do
-    case " $SKILL_NAMES " in
-      *" $name "*) continue ;;
-    esac
-    target="$skills_dir/$name"
-    [ -L "$target" ] || continue
-    current="$(cd "$(dirname "$target")" 2>/dev/null && installer_resolve_path "$(readlink "$target")")"
-    case "$current" in
-      "$REPO_ROOT"/*|"$REPO_ROOT")
-        vinfo "Stale symlink: $name (skill no longer exists)"
+  # A "plugin"-owned platform is not this installer's to check — its skills
+  # directory belongs to a plugin tarball install, so an absent repo copy
+  # there is correct, not drift.
+  if [ "$owner" != "plugin" ]; then
+    local name target source current marker
+    for name in $SKILL_NAMES; do
+      target="$skills_dir/$name"
+      source="$SKILLS_ROOT/$name"
+      if [ ! -L "$target" ] && [ ! -e "$target" ]; then
+        vinfo "Missing skill copy: $name"
         drift_count=$((drift_count + 1))
-        record "drift" "$p" "$target" "Stale symlink: $name (skill no longer exists)"
-        ;;
-    esac
-  done
+        record "drift" "$p" "$target" "Missing skill copy: $name"
+        continue
+      fi
+      if [ -L "$target" ]; then
+        vinfo "$name is a symlink (legacy install) — expected a real copy"
+        drift_count=$((drift_count + 1))
+        record "drift" "$p" "$target" "$name is a symlink (legacy install) — expected a real copy"
+        continue
+      fi
+      if [ ! -d "$target" ]; then
+        vinfo "$name exists but is not a directory"
+        drift_count=$((drift_count + 1))
+        record "drift" "$p" "$target" "$name exists but is not a directory"
+        continue
+      fi
+      if ! diff -rq "$source" "$target" >/dev/null 2>&1; then
+        vinfo "$name copy differs from $source"
+        drift_count=$((drift_count + 1))
+        record "drift" "$p" "$target" "$name copy differs from $source"
+      fi
+    done
+
+    # Stale: tracked in state, no longer a repo skill, still massa-ai-owned.
+    for name in $(state_skills_for "$p"); do
+      case " $SKILL_NAMES " in
+        *" $name "*) continue ;;
+      esac
+      target="$skills_dir/$name"
+      marker="$(skill_marker_path "$skills_dir" "$name")"
+      if [ -L "$target" ]; then
+        current="$(cd "$(dirname "$target")" 2>/dev/null && installer_resolve_path "$(readlink "$target")")"
+        case "$current" in
+          "$REPO_ROOT"/*|"$REPO_ROOT")
+            vinfo "Stale symlink: $name (skill no longer exists)"
+            drift_count=$((drift_count + 1))
+            record "drift" "$p" "$target" "Stale symlink: $name (skill no longer exists)"
+            ;;
+        esac
+      elif [ -d "$target" ] && [ -f "$marker" ]; then
+        vinfo "Stale copy: $name (skill no longer exists)"
+        drift_count=$((drift_count + 1))
+        record "drift" "$p" "$target" "Stale copy: $name (skill no longer exists)"
+      fi
+    done
+  fi
 
   # Summary line (quiet mode only; verbose mode prints the per-item detail)
   # Never printed in JSON mode.
@@ -672,8 +768,12 @@ const raw = fs.readFileSync(tsvFile, "utf8");
 const platforms = {};
 for (const line of raw.split("\n")) {
   if (!line.trim()) continue;
-  const [p, root, csv] = line.split("\t");
-  platforms[p] = { root, skills: csv ? csv.split(",").filter(Boolean) : [] };
+  const [p, root, csv, owner] = line.split("\t");
+  platforms[p] = {
+    root,
+    skills: csv ? csv.split(",").filter(Boolean) : [],
+    skillsOwner: owner === "plugin" ? "plugin" : "repo",
+  };
 }
 fs.writeFileSync(file, JSON.stringify({ version: 2, repository: repoRoot, platforms }, null, 2) + "\n");
 NODE

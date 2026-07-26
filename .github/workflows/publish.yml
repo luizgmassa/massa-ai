@@ -84,6 +84,10 @@ jobs:
       # tarball silently shipped without the 15 agent charters. scripts/verify-package-
       # contents.ts (wired into ci.yml) reproduces this exact artifact-only filesystem and
       # would have failed on day one had it existed — keep the two lists in sync.
+      #
+      # apps/{claude,codex,cursor}-plugin (PDO-10, PDO-25) have NO dist/ — their entire
+      # publishable surface is static source, so every entry below is exactly that
+      # package's own package.json#files field, nothing derived from a build step.
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -101,6 +105,28 @@ jobs:
             apps/opencode-plugin/dist
             apps/opencode-plugin/agents
             apps/opencode-plugin/package.json
+            apps/claude-plugin/agents
+            apps/claude-plugin/commands
+            apps/claude-plugin/hooks
+            apps/claude-plugin/skills
+            apps/claude-plugin/install.sh
+            apps/claude-plugin/README.md
+            apps/claude-plugin/.claude-plugin/plugin.json
+            apps/claude-plugin/package.json
+            apps/codex-plugin/agents
+            apps/codex-plugin/hooks
+            apps/codex-plugin/skills
+            apps/codex-plugin/install.sh
+            apps/codex-plugin/README.md
+            apps/codex-plugin/.codex-plugin/plugin.json
+            apps/codex-plugin/package.json
+            apps/cursor-plugin/agents
+            apps/cursor-plugin/hooks
+            apps/cursor-plugin/skills
+            apps/cursor-plugin/install.sh
+            apps/cursor-plugin/README.md
+            apps/cursor-plugin/.cursor-plugin/plugin.json
+            apps/cursor-plugin/package.json
           retention-days: 1
 
   publish-packages:
@@ -211,6 +237,44 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      # apps/{claude,codex,cursor}-plugin (PDO-10, PDO-11): same already-published guard,
+      # static source only — no dist/, nothing to build.
+      - name: Publish @massa-ai/claude-plugin
+        working-directory: apps/claude-plugin
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@massa-ai/claude-plugin@$VERSION" version >/dev/null 2>&1; then
+            echo "@massa-ai/claude-plugin@$VERSION already on npm — skipping"
+            exit 0
+          fi
+          npm publish --access public --tag latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @massa-ai/codex-plugin
+        working-directory: apps/codex-plugin
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@massa-ai/codex-plugin@$VERSION" version >/dev/null 2>&1; then
+            echo "@massa-ai/codex-plugin@$VERSION already on npm — skipping"
+            exit 0
+          fi
+          npm publish --access public --tag latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @massa-ai/cursor-plugin
+        working-directory: apps/cursor-plugin
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@massa-ai/cursor-plugin@$VERSION" version >/dev/null 2>&1; then
+            echo "@massa-ai/cursor-plugin@$VERSION already on npm — skipping"
+            exit 0
+          fi
+          npm publish --access public --tag latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
   publish-github-packages:
     # Must NOT race the npm jobs. If npm publishes shared+core then fails on tools-api,
     # publishing all five here would leave the two registries divergent at one version.
@@ -251,6 +315,9 @@ jobs:
             'apps/tools-api/package.json',
             'apps/mcp-client/package.json',
             'apps/opencode-plugin/package.json',
+            'apps/claude-plugin/package.json',
+            'apps/codex-plugin/package.json',
+            'apps/cursor-plugin/package.json',
           ];
           const rescope = (n) => n.replace(/^@massa-ai\//, '@luizgmassa/');
 
@@ -281,7 +348,7 @@ jobs:
           # Dependency order: shared -> core -> apps.
           # Names are read back from the manifests the rescope step just rewrote, so the
           # already-published check queries @luizgmassa/*, not @massa-ai/*.
-          for dir in packages/shared packages/core apps/tools-api apps/mcp-client apps/opencode-plugin; do
+          for dir in packages/shared packages/core apps/tools-api apps/mcp-client apps/opencode-plugin apps/claude-plugin apps/codex-plugin apps/cursor-plugin; do
             NAME=$(node -p "require('./$dir/package.json').name")
             VERSION=$(node -p "require('./$dir/package.json').version")
             if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then

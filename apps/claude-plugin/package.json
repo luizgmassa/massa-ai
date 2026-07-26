@@ -1,0 +1,32 @@
+{
+  "name": "@massa-ai/claude-plugin",
+  "version": "1.5.0",
+  "description": "massa-ai plugin for Claude Code — semantic code search, durable memory, symbol graph, and context compression",
+  "files": [
+    "agents",
+    "commands",
+    "hooks",
+    "!hooks/__tests__",
+    "skills",
+    "install.sh",
+    "README.md",
+    ".claude-plugin/plugin.json"
+  ],
+  "author": "luizgmassa",
+  "keywords": [
+    "claude-code",
+    "plugin",
+    "massa-ai",
+    "semantic-search",
+    "code-search",
+    "memory",
+    "context-compression",
+    "ai",
+    "llm"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/luizgmassa/massa-ai"
+  }
+}

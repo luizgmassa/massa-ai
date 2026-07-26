@@ -99,4 +99,31 @@ OUT7="$(uninstall "$H7")"; RC7=$?
 assert_eq "no-op uninstall exits 0" "$RC7" "0"
 assert_not_contains "nothing was removed" "$OUT7" "Removed symlink"
 
+echo ""
+echo "Scenario 8: a plugin-owned platform (D3/PDO-09) is never touched by this installer"
+H8="$ROOT/h8"; mkdir -p "$H8/.claude/skills/massa-ai"
+printf 'plugin content\n' > "$H8/.claude/skills/massa-ai/PLUGIN-OWNED.md"
+mkdir -p "$H8/.config/massa-ai"
+cat > "$H8/.config/massa-ai/install-state.json" <<EOF
+{
+  "version": 2,
+  "repository": "$PROJECT_ROOT",
+  "platforms": {
+    "claude": { "root": "$H8/.claude", "skills": ["massa-ai"], "skillsOwner": "plugin" }
+  }
+}
+EOF
+BEFORE8="$(tree_fingerprint "$H8/.claude")"
+OUT8="$(uninstall "$H8")"; RC8=$?
+AFTER8="$(tree_fingerprint "$H8/.claude")"
+assert_eq "uninstall against a plugin-owned platform exits 0" "$RC8" "0"
+assert_eq "plugin-owned skills tree is byte-for-byte unchanged" "$AFTER8" "$BEFORE8"
+HAS_CLAUDE8="$("$RUNNER" - "$H8/.config/massa-ai/install-state.json" <<'NODE'
+const fs = require("fs");
+const s = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+process.stdout.write(s.platforms.claude && s.platforms.claude.skillsOwner === "plugin" ? "yes" : "no");
+NODE
+)"
+assert_eq "plugin-owned record survives (not dropped by the repo uninstaller)" "$HAS_CLAUDE8" "yes"
+
 summary "install-skills --uninstall"
