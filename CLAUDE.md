@@ -404,6 +404,37 @@ Every trap below is load-bearing, not stylistic:
   `bun run update-qwen-hashes` from the release path, which would refresh the whole
   manifest.
 
+#### Recovering a half-released version
+
+The release is two irreversible halves — tag + GitHub Release, then registry publish — and
+**only the first half is idempotent-by-refusal**. If `publish` fails after the tag is
+pushed, git says `vX.Y.Z` shipped while npm still serves the previous version. That is what
+happened to v1.4.0 (run `30208930036`): `publish / build` died in `bun install`, so all four
+publish jobs skipped.
+
+`release.yml` cannot retry this. Re-running it hits the tag-exists guard, and it never gets
+that far anyway — `[Unreleased]` was already promoted, so it derives `null` and exits at
+"no releasable entry". **That message on a run whose CHANGELOG looks full usually means the
+release already happened and your checkout is behind `main`, not that the gate is broken.**
+
+Recovery goes through `publish.yml` directly:
+
+```bash
+gh workflow enable publish.yml                  # it ships disabled; workflow_call still works
+gh workflow run publish.yml -f ref=vX.Y.Z
+```
+
+`workflow_dispatch` takes the workflow *file* from `main` while `inputs.ref` only drives
+`actions/checkout`, so fixes to `publish.yml` apply retroactively to old tags. That property
+is why the install retry in that job is an inline `run:` and **must never become a
+`uses: ./.github/actions/...` composite** — a local action resolves from the checked-out
+tree and would be missing on every tag older than itself.
+
+Re-dispatching is safe: each publish step checks `npm view <pkg>@<version>` first and skips
+what already landed, so a partial publish resumes instead of dying on `403
+EPUBLISHCONFLICT`. Rehearse the guard against an already-complete tag (`-f ref=v1.3.1`),
+where the correct outcome is five "already on npm — skipping" lines and zero publishes.
+
 ## Working conventions
 
 - `.specs/` is the source of truth for in-flight work: `project/STATE.md`,
