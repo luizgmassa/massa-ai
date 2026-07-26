@@ -3,10 +3,11 @@
  *
  * Verifies the static plugin bundle shape against the spec acceptance
  * criteria (CPX-01, CPX-03, CPX-04, CPX-05):
- * - .codex-plugin/plugin.json has name, version, description, skills, mcp, hooks
+ * - .codex-plugin/plugin.json has name, version, description, skills, hooks
  * - 6 skills/*.md files exist (map, index, find, def, graph, status)
  * - hooks/hooks.json has exactly 6 event keys, each with an owned entry
- * - .mcp.json declares the massa-ai MCP server (npx @massa-ai/mcp-client)
+ * - no plugin-local .mcp.json and no manifest "mcp" pointer — MCP is owned
+ *   solely by scripts/install-agents.sh (writes ~/.codex/config.toml)
  * - hooks/massa-ai-hook symlink resolves to the claude-plugin binary
  */
 
@@ -26,7 +27,7 @@ async function readJson(p: string): Promise<Record<string, unknown>> {
 }
 
 describe("codex-plugin manifest (T5 / CPX-01,03,04,05)", () => {
-  test(".codex-plugin/plugin.json has name, version, description, skills, mcp, hooks", async () => {
+  test(".codex-plugin/plugin.json has name, version, description, skills, hooks", async () => {
     const manifest = await readJson(
       path.join(PLUGIN_ROOT, ".codex-plugin/plugin.json"),
     );
@@ -37,8 +38,10 @@ describe("codex-plugin manifest (T5 / CPX-01,03,04,05)", () => {
     expect(manifest).toHaveProperty("description");
     expect(typeof manifest.description).toBe("string");
     expect(manifest).toHaveProperty("skills");
-    expect(manifest).toHaveProperty("mcp");
     expect(manifest).toHaveProperty("hooks");
+    // MCP has exactly one writer (scripts/install-agents.sh). A manifest
+    // pointer here would reintroduce a second registration path.
+    expect(manifest).not.toHaveProperty("mcp");
   });
 
   test("6 skills/*.md files exist (map, index, find, def, graph, status)", async () => {
@@ -80,17 +83,20 @@ describe("codex-plugin manifest (T5 / CPX-01,03,04,05)", () => {
     }
   });
 
-  test(".mcp.json declares massa-ai MCP server with npx @massa-ai/mcp-client", async () => {
-    const mcp = await readJson(path.join(PLUGIN_ROOT, ".mcp.json"));
-    expect(mcp).toHaveProperty("mcpServers");
-    const servers = mcp.mcpServers as Record<string, Record<string, unknown>>;
-    expect(servers).toHaveProperty("massa-ai");
-    const entry = servers["massa-ai"];
-    const cmd = entry.command as unknown[];
-    expect(Array.isArray(cmd)).toBe(true);
-    expect(cmd).toContain("npx");
-    expect(cmd).toContain("@massa-ai/mcp-client");
-    expect(entry.env).toHaveProperty("MASSA_AI_API_URL");
+  test("no plugin-local .mcp.json ships — MCP has a single writer", async () => {
+    const present = await fs
+      .access(path.join(PLUGIN_ROOT, ".mcp.json"))
+      .then(() => true)
+      .catch(() => false);
+    expect(present).toBe(false);
+  });
+
+  test("installer delegates MCP registration to scripts/install-agents.sh", async () => {
+    const src = await fs.readFile(path.join(PLUGIN_ROOT, "install.sh"), "utf8");
+    expect(src).toContain("scripts/install-agents.sh");
+    expect(src).toContain("--agent codex");
+    // The old copy step must not come back.
+    expect(src).not.toMatch(/cp\s+"\$SCRIPT_DIR\/\.mcp\.json"/);
   });
 
   test("hooks/massa-ai-hook symlink resolves to the claude-plugin binary", async () => {

@@ -81,17 +81,20 @@ describe("cursor-plugin manifest (T10 / CRS-01,03,04,05,06,08)", () => {
     expect(content).toContain("massa-ai-navigator");
   });
 
-  test("mcp.json declares massa-ai MCP server with npx @massa-ai/mcp-client", async () => {
-    const mcp = await readJson(path.join(PLUGIN_ROOT, "mcp.json"));
-    expect(mcp).toHaveProperty("mcpServers");
-    const servers = mcp.mcpServers as Record<string, Record<string, unknown>>;
-    expect(servers).toHaveProperty("massa-ai");
-    const entry = servers["massa-ai"];
-    const cmd = entry.command as unknown[];
-    expect(Array.isArray(cmd)).toBe(true);
-    expect(cmd).toContain("npx");
-    expect(cmd).toContain("@massa-ai/mcp-client");
-    expect(entry.env).toHaveProperty("MASSA_AI_API_URL");
+  test("no plugin-local mcp.json ships — MCP has a single writer", async () => {
+    const present = await fs
+      .access(path.join(PLUGIN_ROOT, "mcp.json"))
+      .then(() => true)
+      .catch(() => false);
+    expect(present).toBe(false);
+  });
+
+  test("installer delegates MCP registration to scripts/install-agents.sh", async () => {
+    const src = await fs.readFile(path.join(PLUGIN_ROOT, "install.sh"), "utf8");
+    expect(src).toContain("scripts/install-agents.sh");
+    expect(src).toContain("--agent cursor");
+    // The old copy step must not come back.
+    expect(src).not.toMatch(/cp\s+"\$SCRIPT_DIR\/mcp\.json"/);
   });
 
   test(".cursor-plugin/plugin.json has name and version", async () => {
@@ -119,7 +122,9 @@ describe("cursor-plugin manifest (T10 / CRS-01,03,04,05,06,08)", () => {
   });
 
   test("directory layout matches vscode.cursor.plugins.registerPath auto-discovery", async () => {
-    // Cursor auto-discovers: skills/, hooks/hooks.json, mcp.json, agents/
+    // Cursor auto-discovers: skills/, hooks/hooks.json, agents/. MCP is not
+    // discovered from the plugin dir — Cursor reads ~/.cursor/mcp.json, which
+    // scripts/install-agents.sh owns.
     const required = [
       "skills",
       "skills/map/SKILL.md",
@@ -129,7 +134,6 @@ describe("cursor-plugin manifest (T10 / CRS-01,03,04,05,06,08)", () => {
       "skills/graph/SKILL.md",
       "skills/status/SKILL.md",
       "hooks/hooks.json",
-      "mcp.json",
       "agents/massa-ai-navigator.md",
     ];
     for (const rel of required) {

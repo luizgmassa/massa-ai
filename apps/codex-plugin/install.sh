@@ -2,10 +2,13 @@
 #
 # massa-ai Codex plugin installer
 #
-# Copies the plugin bundle (manifest, skills, hooks.json, .mcp.json, binary
-# symlink) into the user's or project's Codex config directory and merges the
-# 6 massa-ai hook events into ~/.codex/hooks.json (or ./.codex/hooks.json)
-# using an array-append merge that preserves existing user hooks.
+# Copies the plugin bundle (manifest, skills, hooks.json, binary symlink) into
+# the user's or project's Codex config directory and merges the 6 massa-ai hook
+# events into ~/.codex/hooks.json (or ./.codex/hooks.json) using an
+# array-append merge that preserves existing user hooks.
+#
+# MCP registration is delegated to scripts/install-agents.sh, the single writer
+# of host MCP config. This installer no longer ships a plugin-local .mcp.json.
 #
 # Idempotent: re-running is a no-op when owned entries already present.
 # Uninstall removes only ownership-marked entries + the plugin directory.
@@ -202,9 +205,13 @@ done
 cp "$SCRIPT_DIR/hooks/hooks.json" "$PLUGIN_DIR/hooks/hooks.json"
 echo "  + hooks/hooks.json"
 
-# Copy .mcp.json
-cp "$SCRIPT_DIR/.mcp.json" "$PLUGIN_DIR/.mcp.json"
-echo "  + .mcp.json"
+# Older installs shipped a plugin-local .mcp.json here. It was never a Codex
+# read path, and MCP is now owned by scripts/install-agents.sh — drop the
+# residue so upgraders converge on a single registration.
+if [[ -f "$PLUGIN_DIR/.mcp.json" ]]; then
+  rm -f "$PLUGIN_DIR/.mcp.json"
+  echo "  - removed stale .mcp.json (MCP is now registered in ~/.codex/config.toml)"
+fi
 
 # Create the binary symlink → repo's claude-plugin binary (resolved at install
 # time via SCRIPT_DIR → REPO_ROOT). This keeps a single source of truth.
@@ -236,8 +243,21 @@ for src in "$SCRIPT_DIR/agents/"massa-ai-*.toml; do
 done
 echo "  + ${specialist_count} subagent specialists: investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist"
 
+# ── MCP registration (delegated) ─────────────────────────────────────────────
+# scripts/install-agents.sh is the single writer of host MCP config. It writes
+# [mcp_servers.massa-ai] into ~/.codex/config.toml at USER scope — a --project
+# plugin install still registers MCP for the whole user.
+echo ""
+echo "Registering MCP server (user scope) via scripts/install-agents.sh..."
+if [[ -f "$REPO_ROOT/scripts/install-agents.sh" ]]; then
+  MASSA_AI_SUPPRESS_SPECIALIST_HINT=1 bash "$REPO_ROOT/scripts/install-agents.sh" --agent codex --yes \
+    || echo "  ⚠ MCP wiring failed — run: bash scripts/install-agents.sh --agent codex --yes" >&2
+else
+  echo "  ⚠ scripts/install-agents.sh not found — register MCP with: bash scripts/install-agents.sh --agent codex --yes" >&2
+fi
+
 echo ""
 echo "Done. Restart Codex to pick up the plugin."
 echo ""
 echo "⚠ Run /hooks in Codex to trust massa-ai hooks, or no observations will be captured."
-echo "💡 If you also run install-agents.ts --agent codex, skip MCP — the plugin already registers it."
+echo "💡 MCP is registered in ~/.codex/config.toml by scripts/install-agents.sh (single writer)."

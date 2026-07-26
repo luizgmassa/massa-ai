@@ -1,6 +1,31 @@
 # massa-ai Spec State
 
-## Current — Coverage >90% Unit Tests
+## Current — Install Harness Migration
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-install-harness-migration`
+- workflow: spec-driven (Large/Complex)
+- feature: `install-harness-migration` — COMPLETE + validated PASS
+- branch: `feat/install-harness-migration`
+- scope: 7 requirements (IHM-R1..R7) — migrate `install-skills.ts` / `install-agents.ts` to
+  bash following the plugin-installer heredoc pattern, make `install-agents.sh` the sole
+  writer of host MCP config, add `scripts/install-harness.sh` and wire it into `install.sh`
+  and `scripts/setup-local-first.sh`, replace the TypeScript installer suites with
+  CI-gated bash suites, refresh README/FEATURES/CHANGELOG
+- Spec: `.specs/features/install-harness-migration/spec.md`
+- Design: `.specs/features/install-harness-migration/design.md`
+- Tasks: `.specs/features/install-harness-migration/tasks.md` (T1-T20)
+- Report: `.specs/features/install-harness-migration/validation.md`
+- Key decisions:
+  - D1 pure bash + inline `node`/`bun` heredoc (no `jq`, no `.ts` shim)
+  - D2 `install-agents.sh` sole MCP writer; plugin installers delegate to it
+  - D3 shared `install-harness.sh` orchestrator called from both entry points
+- Constraints: `scripts/__tests__/root-install-menu.test.ts` grep-pins the `install.sh`
+  menu strings, so the new option is additive (`k)`), never a rewrite of `c)`/`p)`
+- Validation: PASS — test:scripts exit 0 (396 TS + 12 bash suites, 296 assertions), type-check 6/6, build 5/5, plugin tests 33/33
+- Next step: none — feature complete.
+
+## Previous — Coverage >90% Unit Tests
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-coverage-90pct`

@@ -1,10 +1,24 @@
 import { describe, test, expect } from "bun:test";
-import { promises as fs } from "fs";
+import { promises as fs, readFileSync } from "fs";
 import path from "path";
 
-import { resolveRepoRoot, BOOTSTRAP_START, BOOTSTRAP_END } from "../install-skills";
+const REPO_ROOT = path.resolve(import.meta.dir, "..", "..");
 
-const REPO_ROOT = resolveRepoRoot();
+// The bootstrap markers live in scripts/install-skills.sh (bash, no importable
+// module). Reading them out of the installer keeps a single source of truth and
+// makes this assertion discriminating: it fails if the markers ever drift.
+function markerFromInstaller(name: "BOOTSTRAP_START" | "BOOTSTRAP_END"): string {
+  const src = readFileSync(
+    path.join(REPO_ROOT, "scripts", "install-skills.sh"),
+    "utf8",
+  );
+  const m = src.match(new RegExp(`^${name}="([^"]+)"`, "m"));
+  if (!m) throw new Error(`${name} not found in scripts/install-skills.sh`);
+  return m[1];
+}
+
+const BOOTSTRAP_START = markerFromInstaller("BOOTSTRAP_START");
+const BOOTSTRAP_END = markerFromInstaller("BOOTSTRAP_END");
 const SKILLS_DIR = path.join(REPO_ROOT, "skills");
 const DOCS_DIR = path.join(REPO_ROOT, "docs");
 

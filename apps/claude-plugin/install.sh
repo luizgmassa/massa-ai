@@ -9,6 +9,9 @@
 # Claude Code's nested matcher-group + hooks[] form, each owned entry marked
 # with _massaAiOwned: true.
 #
+# MCP registration is delegated to scripts/install-agents.sh, the single writer
+# of host MCP config; it merges the massa-ai entry alongside the hooks block.
+#
 # Idempotent: re-running is a no-op when owned hooks already present.
 # Uninstall removes only ownership-marked hook entries + commands/agents,
 # preserving user keys and user hooks.
@@ -23,6 +26,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SCOPE="user"
 UNINSTALL=0
 
@@ -222,11 +226,24 @@ fi
 merge_settings_hooks "$SETTINGS_JSON" "install"
 echo "  + 5 massa-ai hook events wired (array-append, user hooks preserved)"
 
+# ── MCP registration (delegated) ─────────────────────────────────────────────
+# scripts/install-agents.sh is the single writer of host MCP config. It merges
+# the massa-ai entry into ~/.claude/settings.json alongside the hooks block
+# written above, at USER scope — a --project plugin install still registers MCP
+# for the whole user.
+echo ""
+echo "Registering MCP server (user scope) via scripts/install-agents.sh..."
+if [[ -f "$REPO_ROOT/scripts/install-agents.sh" ]]; then
+  MASSA_AI_SUPPRESS_SPECIALIST_HINT=1 bash "$REPO_ROOT/scripts/install-agents.sh" --agent claude-code --yes \
+    || echo "  ⚠ MCP wiring failed — run: bash scripts/install-agents.sh --agent claude-code --yes" >&2
+else
+  echo "  ⚠ scripts/install-agents.sh not found — register MCP with: bash scripts/install-agents.sh --agent claude-code --yes" >&2
+fi
+
 echo ""
 echo "Done. Restart Claude Code to pick up the new commands and hooks."
 echo ""
 echo "Next steps:"
-echo "  1. Make sure the massa-ai MCP server is registered (see apps/mcp-client/README.md)."
-echo "  2. Try: /massa-ai-status"
-echo "  3. Try: /massa-ai-map (on an indexed project)"
-echo "💡 If you also run install-agents.ts --agent claude-code, skip it — hooks + MCP are already wired by this plugin."
+echo "  1. Try: /massa-ai-status"
+echo "  2. Try: /massa-ai-map (on an indexed project)"
+echo "💡 Hooks are wired by this plugin; MCP is registered in ~/.claude/settings.json by scripts/install-agents.sh (single writer)."

@@ -16,7 +16,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { spawnSync } from "child_process";
-import { promises as fs } from "fs";
+import { promises as fs, existsSync } from "fs";
 import path from "path";
 import os from "os";
 
@@ -186,11 +186,15 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
     expect(res.stdout.toLowerCase()).toContain("trust");
   });
 
-  test("MCP deconfliction hint printed", () => {
+  test("MCP registration delegated to the single writer", () => {
     const res = runInstall(["--user"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("install-agents.ts");
+    expect(res.stdout).toContain("scripts/install-agents.sh");
     expect(res.stdout.toLowerCase()).toContain("mcp");
+    // No plugin-local MCP file is written into the installed bundle.
+    expect(
+      existsSync(path.join(tmp, ".codex/plugins/massa-ai/.mcp.json")),
+    ).toBe(false);
   });
 
   // ── T5: 12 subagent TOML agents (CDX-01,02,05,06,07 + DOC-01) ──────────────

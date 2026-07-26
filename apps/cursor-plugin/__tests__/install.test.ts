@@ -8,7 +8,7 @@
  * - array-append merge preserves pre-existing user hooks
  * - uninstall removes only owned entries; user hooks survive
  * - idempotent re-run is a no-op
- * - MCP deconfliction hint printed
+ * - MCP registration delegated to scripts/install-agents.sh (single writer)
  *
  * Uses spawnSync to run install.sh with an overridden HOME (temp dir),
  * mirroring the apps/codex-plugin/__tests__/install.test.ts convention.
@@ -16,7 +16,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { spawnSync } from "child_process";
-import { promises as fs } from "fs";
+import { promises as fs, existsSync } from "fs";
 import path from "path";
 import os from "os";
 
@@ -187,11 +187,15 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
     expect(afterSecond).toBe(afterFirst);
   });
 
-  test("MCP deconfliction hint printed", () => {
+  test("MCP registration delegated to the single writer", () => {
     const res = runInstall(["--user"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("install-agents.ts");
+    expect(res.stdout).toContain("scripts/install-agents.sh");
     expect(res.stdout.toLowerCase()).toContain("mcp");
+    // No plugin-local MCP file is written into the installed bundle.
+    expect(
+      existsSync(path.join(tmp, ".cursor/plugins/massa-ai/mcp.json")),
+    ).toBe(false);
   });
 
   // ── T6: 12 subagent specialists bundled into plugin agents/ (CRS-01,04,07 + DOC-01) ─

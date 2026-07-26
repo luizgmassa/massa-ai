@@ -156,8 +156,8 @@ backup + `_massaAiOwned` marker — user hooks are always preserved.
 | Tool | Install command | Events | Bundles | Trust step? |
 |------|----------------|--------|---------|-------------|
 | **Claude Code** | `bash apps/claude-plugin/install.sh --user` | 5 | 6 slash commands + navigator subagent + 12 subagent specialists + hooks into `settings.json` | No |
-| **Codex** | `bash apps/codex-plugin/install.sh --user` | 6 | 6 skills + 12 subagent specialists (TOML to `~/.codex/agents/`) + hooks into `hooks.json` + `.mcp.json` | Yes — run `/hooks` in Codex |
-| **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + `mcp.json` + navigator agent + 12 subagent specialists | No |
+| **Codex** | `bash apps/codex-plugin/install.sh --user` | 6 | 6 skills + 12 subagent specialists (TOML to `~/.codex/agents/`) + hooks into `hooks.json` + MCP into `~/.codex/config.toml` | Yes — run `/hooks` in Codex |
+| **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + MCP into `~/.cursor/mcp.json` + navigator agent + 12 subagent specialists | No |
 | **OpenCode** | `npm install @massa-ai/opencode-plugin` then `massa-ai-config agents install --user` | 6 (in-process) | 14 in-process tools + lifecycle handlers + 12 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
 
 All installers support `--user` (default, e.g. `~/.claude`), `--project` (e.g.
@@ -166,15 +166,22 @@ OpenCode is an npm package — add `"plugin": ["@massa-ai/opencode-plugin"]`
 to `~/.config/opencode/opencode.json`.
 
 Or pick the `p` option from the root `bash install.sh` post-install menu, which
-offers all four plugin choices plus an "All four" shortcut.
+offers all four plugin choices plus an "All four" shortcut. The `k` option in
+the same menu installs skills and MCP registration without any plugin bundle.
 
 **Shared binary:** Claude Code, Codex, and Cursor all use the same
 `massa-ai-hook.ts` Bun binary from `apps/claude-plugin/hooks/`. Codex and
 Cursor symlink to it. OpenCode uses in-process handlers (no external hooks file).
 
-**MCP deconfliction:** if you install a plugin, the MCP server is already
-registered via the plugin's `.mcp.json`/`mcp.json`. Skip the
-`install-agents.ts` MCP step for that tool to avoid double-registration.
+**MCP has exactly one writer.** `scripts/install-agents.sh` owns every host's
+MCP config; the plugin installers call it for you (`--agent claude-code` /
+`codex` / `cursor`). Nothing else writes an MCP entry, so installing a plugin
+and running the installer directly cannot double-register. MCP is always
+registered at **user** scope, even for a `--project` plugin install.
+
+OpenCode is the one exception: `@massa-ai/opencode-plugin` registers 14 tools
+in-process, so `install-agents.sh` skips the OpenCode MCP entry when that plugin
+is listed in `opencode.json` — and still writes it for users without the plugin.
 
 **12 subagent specialists:** all four plugins ship the 12 massa-ai
 sub-agent specialists (investigator, planner, builder, reviewer,
@@ -217,24 +224,63 @@ Symlinks all `skills/*/SKILL.md` into each detected tool's config dir and writes
 
 ```bash
 # Install skills for all detected tools
-bun scripts/install-skills.ts --apply --platform all --yes
+bash scripts/install-skills.sh --apply --platform all --yes
 
 # Install for one platform
-bun scripts/install-skills.ts --apply --platform claude --yes
+bash scripts/install-skills.sh --apply --platform claude --yes
 
 # Preview changes (write nothing)
-bun scripts/install-skills.ts --dry-run --platform all
+bash scripts/install-skills.sh --dry-run --platform all
 
 # Check for drift (exit 1 if symlinks missing or pointing wrong)
-bun scripts/install-skills.ts --check --platform all
+bash scripts/install-skills.sh --check --platform all
 
 # Uninstall (remove only massa-ai-owned symlinks + bootstrap block)
-bun scripts/install-skills.ts --uninstall --platform all --yes
+bash scripts/install-skills.sh --uninstall --platform all --yes
 ```
 
 **State:** `~/.config/massa-ai/install-state.json` (v2 format; v1 auto-migrates).
 
-**Safety:** aborts on non-symlink conflict (won't overwrite user files); `--dry-run` writes nothing; requires `--yes` for real `$HOME`.
+**Safety:** aborts on non-symlink conflict (won't overwrite user files); `--dry-run` and `--check` write nothing; requires `--yes` for real `$HOME`.
+
+### MCP registration
+
+`scripts/install-agents.sh` is the single writer of host MCP config. It merges
+the `massa-ai` server entry into each host's own config shape, preserving every
+existing user key and taking a `<config>.massa-ai.bak-<ts>` backup first.
+
+```bash
+bash scripts/install-agents.sh --yes                 # every applicable host
+bash scripts/install-agents.sh --agent codex --yes   # one host
+bash scripts/install-agents.sh --dry-run             # plan only, writes nothing
+bash scripts/install-agents.sh --uninstall --yes     # remove only owned entries
+```
+
+| Agent | Config file | Shape |
+|-------|-------------|-------|
+| `claude-code` | `~/.claude/settings.json` | `mcpServers`, `env`, `npx` |
+| `claude-desktop` | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) | `mcpServers`, `env`, `npx` |
+| `codex` | `~/.codex/config.toml` | `[mcp_servers.massa-ai]` (comments and user tables preserved) |
+| `cursor` | `~/.cursor/mcp.json` | `mcpServers`, `env`, `npx` |
+| `opencode` | `~/.config/opencode/opencode.json` | `mcp`, `environment`, `bunx` |
+
+Uninstall removes only entries carrying `_massaAiOwned: true` — a `massa-ai`
+entry you wrote by hand is left alone.
+
+### One-shot harness install
+
+`scripts/install-harness.sh` runs skills, MCP registration, and the plugin
+bundles in one pass. Both `install.sh` (menu option `k`) and
+`scripts/setup-local-first.sh` (step 6/6) call it.
+
+```bash
+bash scripts/install-harness.sh                      # --all (skills + agents + plugins)
+bash scripts/install-harness.sh --skills --agents    # skip the plugin bundles
+bash scripts/install-harness.sh --all --dry-run      # preview everything
+```
+
+Exit codes: `0` when every requested step completed, otherwise the first failing
+sub-installer's code (`13` = consent gate refused).
 
 See [FEATURES.md → Skills & Install System](./FEATURES.md#skills--install-system) for the full reference.
 
@@ -485,7 +531,8 @@ npm install @massa-ai/opencode-plugin
 ```
 
 Or pick the `p` option from the root `bash install.sh` post-install menu, which
-offers all four plugin choices plus an "All four" shortcut. See
+offers all four plugin choices plus an "All four" shortcut. The `k` option in
+the same menu installs skills and MCP registration without any plugin bundle. See
 [§Integration](#integration) for per-plugin details.
 
 ### What each hook captures
