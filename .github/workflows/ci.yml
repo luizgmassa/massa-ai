@@ -52,8 +52,28 @@ jobs:
       - name: Reconcile npm to contract version (11.14.1)
         run: npm install -g npm@11.14.1
 
+      # Bun's own install cache (~/.bun/install/cache, populated and read inside this
+      # same job — nothing here restores it from actions/cache) intermittently races
+      # the lifecycle scripts it feeds, and the casualty is always a native grammar:
+      #   gyp ERR! stack Error: Cannot find module '../core/request.js'
+      #   error: install script from "tree-sitter" exited with 1
+      #   FileNotFound: failed copying files from cache to destination for package undici
+      #   error: install script from "tree-sitter-clojure-orchard" exited with 1
+      # Same family as the node-gyp resolution failure noted above, different trigger.
+      # It took down the v1.4.0 release chain twice in one hour: CI run 30208529279
+      # attempt 1, then publish run 30208930036, which left v1.4.0 tagged but unpublished.
+      #
+      # Purge the cache and retry once with serialized scripts. Attempt 2 of that same
+      # commit passed unchanged, so a retry is the proportionate fix; `no-cache: true` on
+      # setup-bun is not, because that input only skips caching the bun *executable*.
+      # The happy path pays nothing: `&&` short-circuits straight to `exit 0`, and a
+      # command before the final `&&` of an AND-list is exempt from `set -e`.
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: |
+          bun install --frozen-lockfile && exit 0
+          echo "::warning::bun install failed — purging Bun's install cache and retrying once"
+          rm -rf ~/.bun/install/cache node_modules
+          bun install --frozen-lockfile --concurrent-scripts 1
 
       - name: Deploy Prisma migrations
         run: cd packages/core && bunx prisma migrate deploy
@@ -228,8 +248,14 @@ jobs:
         with:
           node-version: '22'
 
+      # Purge-and-retry against the Bun install-cache race — see the `build` job for the
+      # full signature and why this is not a composite action.
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: |
+          bun install --frozen-lockfile && exit 0
+          echo "::warning::bun install failed — purging Bun's install cache and retrying once"
+          rm -rf ~/.bun/install/cache node_modules
+          bun install --frozen-lockfile --concurrent-scripts 1
 
       - name: Build workspace
         run: bun run build
@@ -266,8 +292,14 @@ jobs:
       - name: Reconcile npm to contract version (11.14.1)
         run: npm install -g npm@11.14.1
 
+      # This job's install is where the race actually fired on CI run 30208529279
+      # attempt 1. Purge-and-retry — see the `build` job for the full signature.
       - name: Install dependencies (build native addon from source)
-        run: bun install --frozen-lockfile
+        run: |
+          bun install --frozen-lockfile && exit 0
+          echo "::warning::bun install failed — purging Bun's install cache and retrying once"
+          rm -rf ~/.bun/install/cache node_modules
+          bun install --frozen-lockfile --concurrent-scripts 1
 
       - name: Build workspace
         run: bun run build
