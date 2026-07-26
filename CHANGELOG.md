@@ -55,6 +55,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The first automated release could not push, because branch protection blocked its own
+  release bot.** `release.yml` pushes the version-bump commit straight to `main`, and the
+  branch ruleset there requires a pull request plus 5 status checks, so the push was
+  rejected with `GH013: Repository rule violations found`. `--atomic` rejected the tag
+  along with the commit, so nothing partial landed — no tag, no GitHub Release, npm still
+  on 1.2.1, and the `publish` job skipped rather than running against a phantom ref. The
+  atomicity design held; only the identity was wrong.
+
+  The ruleset's bypass list is the only way through, and **GitHub Actions cannot be a
+  bypass actor on a user-owned repository** — the API rejects it with `must be part of the
+  ruleset source or owner organization`, and it is absent from the UI bypass list. The push
+  now uses a write-enabled **deploy key** (`RELEASE_SSH_KEY`), which is the narrowest
+  identity that *can* be a bypass actor: repo-scoped, git-only, no API access, no expiry.
+
+  One behavioural consequence: unlike `GITHUB_TOKEN`, a deploy-key push **does** raise
+  events, so ARV-R12 loop safety no longer comes from GitHub's recursion guard. The
+  `[skip ci]` in the release commit subject is now load-bearing, backed by the fact that a
+  second run finds an emptied `[Unreleased]` and derives no bump. The workflow comments
+  that credited the old guard were corrected rather than left to mislead.
+
 - **skills.yml shellcheck issues.** Fixed 7 unquoted variables (SC2086) and 1 redirect
   style issue (SC2129). Behavior is identical; the script now passes `actionlint`.
 - **The MCP server wrote 68 bytes to stdout on first run, breaking the stdio JSON-RPC handshake.** `initConfig()` in `packages/shared/src/config/config-loader.ts` announced `Created default config at <path>` on **stdout** via `console.log`. That branch fires only when `~/.config/massa-ai/config.json` does not exist yet — so it never fired on a machine that had already run massa-ai once, and always fired on a genuinely fresh install. Per this repo's own contract, a stdio MCP server's stdout carries nothing but protocol; one stray byte produces `connection closed: initialize response`. Now `console.error`. It deliberately does not use the shared logger: the logger reads config, so importing it here would be circular.

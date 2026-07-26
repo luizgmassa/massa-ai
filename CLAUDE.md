@@ -364,6 +364,15 @@ Three traps live here:
   starting another CI run, and so another release.
 - No job may declare `environment:` — that is what writes a GitHub *Deployment* record.
   `NPM_TOKEN` therefore has to live at **repository** scope, not environment scope.
+- **The bump commit is pushed with the `release-bot` deploy key (`RELEASE_SSH_KEY`), not
+  `GITHUB_TOKEN`.** The branch ruleset on `main` requires a PR + 5 checks, so
+  `GITHUB_TOKEN`'s push is rejected with `GH013`. Getting through means being in the
+  ruleset's bypass list, and GitHub Actions *cannot* be a bypass actor on a user-owned repo
+  (`must be part of the ruleset source or owner organization`; it is also absent from the
+  UI list). A deploy key can, and is the narrowest option — repo-scoped, git-only, no
+  expiry. Requires `Deploy keys` in the ruleset bypass list; without it the release fails
+  at "Commit, tag and push". Because a deploy-key push *does* raise events, the `[skip ci]`
+  in the commit subject is load-bearing — do not remove it.
 - The release commit must carry a re-pinned
   `packages/core/src/__tests__/e2e/fixtures/qwen-profile.json`: it content-hash-pins the
   five `package.json` files the bump rewrites, and `qwen-fixture.ts` throws on a mismatch.

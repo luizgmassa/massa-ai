@@ -42,8 +42,8 @@ both npmjs.org and GitHub Packages — with no human step and no new repository 
 | **ARV-R8** | Publish the same 5 packages to GitHub Packages under the `@luizgmassa` scope. | `@luizgmassa/{shared,core,tools-api,mcp-client,opencode-plugin}@X.Y.Z` resolve on npm.pkg.github.com. Their `name`, inter-package dependency names, and `repository.url` are rewritten for that registry only; the npmjs.org artifacts are byte-identical to ARV-R7 and still carry `@massa-ai/*`. |
 | **ARV-R9** | Remove the GitHub Deployment surface. | No job in `.github/workflows/` declares `environment:`. A publish run creates zero Deployment records. |
 | **ARV-R10** | Remove the `next` prerelease channel. | `publish.yml` no longer declares a `workflow_run`, `release`, or `push: tags` trigger, and no step passes `--tag next`. Its triggers are `workflow_call` and `workflow_dispatch` only. |
-| **ARV-R11** | The release chain must not depend on a new secret. | The full merge → release → publish chain runs using `secrets.GITHUB_TOKEN`, `secrets.NPM_TOKEN`, and the existing `DOCKERHUB_*` secrets. No new secret is introduced. |
-| **ARV-R12** | The release chain must not recurse. | The bump commit pushed by the release workflow does not start a new CI run, and therefore does not start a new release run. |
+| **ARV-R11** | ~~The release chain must not depend on a new secret.~~ **AMENDED — see A1.** | Superseded. The chain now requires `RELEASE_SSH_KEY`. |
+| **ARV-R12** | The release chain must not recurse. **Mechanism amended — see A1.** | Two independent runs of `release.yml` from one merge never both produce a tag. Originally satisfied by GitHub's `GITHUB_TOKEN` recursion guard; now satisfied by `[skip ci]` in the release commit subject, with the emptied `[Unreleased]` as a second layer. |
 | **ARV-R13** | The release commit keeps the qwen e2e fixture self-consistent, without laundering unrelated drift. | `packages/core/src/__tests__/e2e/fixtures/qwen-profile.json` is staged into the release commit with the `sha256` of exactly the entries the bump rewrote (the 5 workspace `package.json` files) re-pinned. Every other entry in the manifest is byte-identical before and after. |
 
 ## Out of scope
@@ -88,6 +88,49 @@ both npmjs.org and GitHub Packages — with no human step and no new repository 
 - **Concurrent merges.** Two merges landing close together must not race on the tag. The
   release workflow is serialized by a `concurrency` group and its push is atomic; a losing
   run fails loudly rather than force-pushing, and the next merge picks the work up.
+
+## Amendments
+
+### A1 — deploy-key push (post-merge, 2026-07-26)
+
+Discovered by the first real release run, which failed at "Commit, tag and push":
+
+```
+remote: error: GH013: Repository rule violations found for refs/heads/main.
+remote: - Changes must be made through a pull request.
+remote: - 5 of 5 required status checks are expected.
+```
+
+A branch ruleset was added to `main` between spec approval and merge. `release.yml` pushes
+the bump commit directly to `main`, which the ruleset forbids. **ARV-R5 was never
+achievable as specified under that ruleset** — the spec assumed an unprotected `main`.
+
+`--atomic` rejected the tag with the commit, so the failure was clean: no tag, no Release,
+npm still `1.2.1`, `publish` skipped. ARV-R5's atomicity clause held; only the pushing
+identity was wrong.
+
+**Resolution.** The ruleset's bypass list is the only route, and GitHub Actions cannot be a
+bypass actor on a user-owned repository (API: `must be part of the ruleset source or owner
+organization`; also absent from the UI bypass list — verified by the user). The push now
+uses a write-enabled deploy key, the narrowest identity that can be a bypass actor:
+repo-scoped, git-only, no API access, no expiry.
+
+**ARV-R11 is withdrawn.** The chain now requires one new secret, `RELEASE_SSH_KEY`. The
+options that preserved R11 were all dead ends: GitHub Actions bypass is unavailable here; a
+bot-opened PR gets no CI checks (`GITHUB_TOKEN`-created PRs raise no events) so its 5
+required checks never report; and a tag-only release cannot promote the changelog or bump
+`package.json` on `main`. Rejected alternatives with wider blast radius: a PAT (expires,
+needs rotation, broader scope) and repository-admin bypass (applies to every admin).
+
+**ARV-R12's mechanism changed.** A deploy-key push *does* raise events, unlike
+`GITHUB_TOKEN`. Loop safety now rests on `[skip ci]` in the release commit subject, backed
+by a second run finding an emptied `[Unreleased]` and deriving no bump. The requirement
+still holds; the reason it holds is different, and the workflow comments were corrected so
+they do not credit a guard that no longer applies.
+
+**New operational prerequisite:** `Deploy keys` must be in the ruleset's bypass list.
+Without it the release fails at the same step. This is repo configuration, not code, so no
+test can assert it — it is recorded in `CLAUDE.md` and `.specs/project/STATE.md`.
 
 ## Verification recipe
 
