@@ -118,7 +118,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "0a2a895919fe68f46ed683d050c1dbeb9c0d2437d00becbd8e3915a1e00171ad"
+      "sha256": "59c0f0ef413e1d47a3f174ee2dd6e5f1bee860ca13f00edde73891a7d0b281ea"
     },
     {
       "path": "turbo.json",
@@ -130,19 +130,19 @@
     },
     {
       "path": "packages/core/package.json",
-      "sha256": "5467845a115e2a83461dca5adc0d14732f8c417675f77bae7fc5948e3da19e23"
+      "sha256": "4b774fe5fa9e7d3be48d9d8b6dbcd45d8b1a15a0ca80a0e9976e6c4e70c79e43"
     },
     {
       "path": "packages/shared/package.json",
-      "sha256": "0e8f6d4b84da2308c9ea1889df97ecc75c87c33a1a17c72925c5791ef9d66cf3"
+      "sha256": "d66d478184be2b80542114b8fd0dd323e3616565f0916cef0579f29f74f389dd"
     },
     {
       "path": "apps/tools-api/package.json",
-      "sha256": "5cb78da46466769fafbda548f4fc9e6733163d21a079d0440123dd1e3f8699d7"
+      "sha256": "8e57927d0db6865b791aa6ac6d59dd36f1c49fa2ba7c1d61b791fcb12cc70377"
     },
     {
       "path": "apps/mcp-client/package.json",
-      "sha256": "05afbf209843ce9a02021f6454ecef3aa20b93a64e7676e16ecb3b0f1c8d381d"
+      "sha256": "d3756e8813cb906a7b2840f4dfaecbe37bc0b40da8cdc77f0aae224d43226b5f"
     },
     {
       "path": "benchmarks/needles/fixtures/massa-ai.json",

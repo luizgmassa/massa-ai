@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-07-26
+
 ### Fixed
 
 - **v1.3.0 was tagged and released on GitHub but published no packages.** Two independent
