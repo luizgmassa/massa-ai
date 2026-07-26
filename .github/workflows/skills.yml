@@ -5,10 +5,14 @@ on:
     branches: [main]
     paths:
       - 'skills/**'
+  # NO `paths:` filter here, deliberately. `validate` is a required status check in the
+  # `main` branch ruleset, and a required check that does not run never reports — the PR
+  # then sits forever on "Expected — waiting for status to be reported" instead of failing.
+  # Path-filtering a required check is a deadlock, not an optimisation. The job is
+  # checkout + frontmatter greps (~8s), so running it on every PR costs nothing.
+  # `push` above stays filtered: nothing requires it there.
   pull_request:
     branches: [main]
-    paths:
-      - 'skills/**'
   workflow_dispatch:
 
 jobs:
