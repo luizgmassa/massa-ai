@@ -132,6 +132,56 @@ they do not credit a guard that no longer applies.
 Without it the release fails at the same step. This is repo configuration, not code, so no
 test can assert it — it is recorded in `CLAUDE.md` and `.specs/project/STATE.md`.
 
+### A2 — the version bump must realign exact cross-package pins (post-release, 2026-07-26)
+
+Discovered by the first real release. Two failures, in sequence:
+
+1. **The merge never triggered the chain.** PR #29's squash commit body explained the
+   skip-ci marker and quoted it verbatim. GitHub scans the entire commit message for that
+   marker, not just the subject, so CI was skipped on the merge commit — and with no
+   completed `CI` run there was no `workflow_run` event for `release.yml`. Nothing in the
+   chain was wrong; nothing pulled the trigger. **No test can guard this**, because CI is
+   the thing that gets skipped. Recorded in `CONTRIBUTING.md` and `CLAUDE.md`.
+
+2. **`publish` failed on `bun install --frozen-lockfile`.** Dispatched manually, the
+   `release` job succeeded end to end — deploy-key push, tag, GitHub Release — so A1's
+   resolution is confirmed working. `publish` then died on `lockfile had changes, but
+   lockfile is frozen`. `packages/core` pins `@massa-ai/shared` to the exact root version
+   (a contract asserted by `verifyStaticContract` in
+   `scripts/verify-tree-sitter-grammars.ts`), and `version:sync` rewrote `version` fields
+   only, so the pin stayed at `1.2.1` while `shared` became `1.3.0`. bun then resolved the
+   dependency from the registry.
+
+   ARV-R7's "inter-package deps pin `^X.Y.Z` (no `workspace:*`)" was therefore
+   **unachievable for `core`**: `publish.yml`'s resolve step only rewrites the literal
+   `"workspace:*"`, so an exact pin is invisible to it and a published
+   `@massa-ai/core@1.3.0` would have declared `@massa-ai/shared@1.2.1`. The spec assumed
+   every cross-package edge used `workspace:*`; one does not, by design.
+
+**Resolution.** `scripts/version-sync.ts` realigns every non-`workspace:` `@massa-ai/*`
+dependency spec to the version it syncs. That is the single place both `release.yml` and
+`publish.yml` bump versions, so both paths are fixed at once. `workspace:*` specs are left
+alone — they are version-independent and resolved at publish time.
+
+**New requirement (ARV-R14).** A version bump leaves every cross-package `@massa-ai/*`
+dependency spec either `workspace:*` or equal to the new root version, and `bun.lock`
+resolves every `@massa-ai/*` package to its workspace copy. Acceptance: after
+`bun run version:sync`, `bun install --frozen-lockfile` succeeds and
+`verifyStaticContract` passes. Guarded by
+`scripts/__tests__/workspace-dependency-pinning.test.ts` (3 tests) and a `syncVersions`
+unit test.
+
+**Observation for the record.** `bun.lock`'s `workspaces[*].version` fields were stale for
+two releases and bun never validated them — they are descriptive, not authoritative. Only
+the resolution graph is compared, which is why the exact pin broke the install and the
+stale version fields did not. Do not "fix" the lockfile versions in pursuit of this class
+of failure.
+
+**Blast radius of the skipped CI run.** `bun run test:scripts` was already failing on
+`main` at `df02f9e` through the static contract above. The skipped CI run is what let a
+broken `main` sit unnoticed until `publish` surfaced it — the gate existed and worked; it
+just never ran.
+
 ## Verification recipe
 
 ```bash

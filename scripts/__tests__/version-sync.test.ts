@@ -126,6 +126,44 @@ describe("syncVersions", () => {
     }
   });
 
+  test("realigns exact cross-package pins, leaving workspace:* alone", async () => {
+    // The v1.3.0 regression: bumping `version` fields without moving an exact
+    // cross-package pin leaves it naming the previous release, so the workspace
+    // copy stops satisfying it and bun resolves that dependency from the
+    // registry — `bun install --frozen-lockfile` then fails outright.
+    await writePkg(path.join(tmp, "package.json"), { name: "root", version: "1.3.0" });
+    await writePkg(path.join(tmp, "packages", "core", "package.json"), {
+      name: "@massa-ai/core",
+      version: "1.2.1",
+      dependencies: { "@massa-ai/shared": "1.2.1", "some-dep": "^1.0.0" },
+      devDependencies: { "@massa-ai/tooling": "1.2.1" },
+    });
+    await writePkg(path.join(tmp, "apps", "api", "package.json"), {
+      name: "@massa-ai/api",
+      version: "1.2.1",
+      dependencies: { "@massa-ai/core": "workspace:*" },
+    });
+
+    const synced = syncVersions(tmp);
+
+    const core = await readPkg(path.join(tmp, "packages", "core", "package.json"));
+    expect((core.dependencies as Record<string, string>)["@massa-ai/shared"]).toBe("1.3.0");
+    expect((core.devDependencies as Record<string, string>)["@massa-ai/tooling"]).toBe("1.3.0");
+    // third-party specs are never touched
+    expect((core.dependencies as Record<string, string>)["some-dep"]).toBe("^1.0.0");
+    // workspace:* is version-independent; publish.yml resolves it later
+    const api = await readPkg(path.join(tmp, "apps", "api", "package.json"));
+    expect((api.dependencies as Record<string, string>)["@massa-ai/core"]).toBe("workspace:*");
+
+    const coreEntry = synced.find((s) => s.path.endsWith("packages/core/package.json"))!;
+    expect(coreEntry.repinned).toEqual([
+      "dependencies.@massa-ai/shared",
+      "devDependencies.@massa-ai/tooling",
+    ]);
+    const apiEntry = synced.find((s) => s.path.endsWith("apps/api/package.json"))!;
+    expect(apiEntry.repinned).toEqual([]);
+  });
+
   test("skips unreadable/malformed child manifest (catch branch reports skipped)", async () => {
     await writePkg(path.join(tmp, "package.json"), { name: "root", version: "4.0.0" });
     // malformed JSON

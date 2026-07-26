@@ -151,3 +151,10 @@ chore-only work that should not cut a release.
 If your PR touches a file tracked by
 `packages/core/src/__tests__/e2e/fixtures/qwen-profile.json` (including `README.md` and
 the workspace `package.json` files), refresh its hash or the e2e suite will throw.
+
+**Never write the skip-ci marker literally in a commit message, a commit body, or a PR
+body.** GitHub scans the entire commit message for `[skip ci]`, not just the subject, and a
+squash merge folds every commit body into it. Writing it — even while explaining it —
+skips CI on the merge commit, and no CI run means no release: `release.yml` triggers on a
+completed `CI` run. Refer to it as "the skip-ci marker" in prose instead. This one cannot
+be caught by a test, because the thing that would run the test is what gets skipped.
