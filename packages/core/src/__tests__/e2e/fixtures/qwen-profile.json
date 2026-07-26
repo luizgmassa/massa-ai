@@ -130,7 +130,7 @@
     },
     {
       "path": "packages/core/package.json",
-      "sha256": "8aa361cf9ac02069e6d945652d38582bc50ffbf7af7e22acbb9089ae6c0309e4"
+      "sha256": "5467845a115e2a83461dca5adc0d14732f8c417675f77bae7fc5948e3da19e23"
     },
     {
       "path": "packages/shared/package.json",

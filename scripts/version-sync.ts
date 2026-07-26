@@ -12,6 +12,50 @@ export interface SyncedPackage {
   path: string;
   version: string | null;
   skipped: boolean;
+  /** Cross-package `@massa-ai/*` dependency specs realigned to the root version. */
+  repinned?: string[];
+}
+
+const DEP_FIELDS = [
+  "dependencies",
+  "devDependencies",
+  "peerDependencies",
+  "optionalDependencies",
+] as const;
+
+/**
+ * Realign every pinned cross-package `@massa-ai/*` dependency to `version`.
+ *
+ * A spec of `workspace:*` is already version-independent and is left alone —
+ * `publish.yml` rewrites those to `^X.Y.Z` at publish time. An *exact* pin is
+ * not: `packages/core` deliberately pins `@massa-ai/shared` to the root version
+ * (asserted by `verify-tree-sitter-grammars.ts`), and bumping `version` fields
+ * without moving that pin leaves it naming the previous release. The workspace
+ * copy then no longer satisfies it, so bun resolves the dependency from the
+ * registry, `bun install --frozen-lockfile` fails with `lockfile had changes,
+ * but lockfile is frozen`, and the published manifest would depend on the old
+ * version. That is exactly how the v1.3.0 publish broke.
+ *
+ * Mutates `pkg` in place and returns the dependency keys it changed.
+ */
+export function repinWorkspaceDependencies(
+  pkg: Record<string, unknown>,
+  version: string,
+): string[] {
+  const repinned: string[] = [];
+  for (const field of DEP_FIELDS) {
+    const deps = pkg[field];
+    if (!deps || typeof deps !== "object") continue;
+
+    for (const [dep, spec] of Object.entries(deps as Record<string, string>)) {
+      if (!dep.startsWith("@massa-ai/")) continue;
+      if (typeof spec !== "string" || spec.startsWith("workspace:")) continue;
+      if (spec === version) continue;
+      (deps as Record<string, string>)[dep] = version;
+      repinned.push(`${field}.${dep}`);
+    }
+  }
+  return repinned;
 }
 
 /**
@@ -63,9 +107,11 @@ export function syncVersions(rootDir: string): SyncedPackage[] {
         continue;
       }
       pkg.version = version;
+      const repinned = repinWorkspaceDependencies(pkg, version);
       writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
-      console.log(`  ✓ ${pkgPath.replace(root + "/", "")} → ${version}`);
-      synced.push({ path: pkgPath, version, skipped: false });
+      const suffix = repinned.length > 0 ? ` (repinned ${repinned.join(", ")})` : "";
+      console.log(`  ✓ ${pkgPath.replace(root + "/", "")} → ${version}${suffix}`);
+      synced.push({ path: pkgPath, version, skipped: false, repinned });
     } catch {
       // skip missing/unreadable paths
       synced.push({ path: pkgPath, version: null, skipped: true });

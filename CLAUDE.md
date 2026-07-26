@@ -356,8 +356,32 @@ component. A `2.0.0` requires a manual edit to `package.json`.
 changelog section, commits `chore(release): vX.Y.Z [skip ci]`, tags it, and calls
 `publish.yml` to publish to **both** npmjs.org and GitHub Packages.
 
-Three traps live here:
+Every trap below is load-bearing, not stylistic:
 
+- **Never write the skip-ci marker literally in a commit message or PR body.** GitHub scans
+  the **entire** commit message for `[skip ci]`, not just the subject line, and a squash
+  merge concatenates every commit body into that message. PR #29's body *explained* the
+  marker and quoted it in prose, which skipped CI on the merge commit — and with no `CI`
+  run there is no `completed` `workflow_run` event, so `release.yml` never fired and
+  `v1.3.0` sat underived. Nothing in CI can catch this, because CI is what got skipped.
+  Call it "the skip-ci marker" in prose; the literal belongs only in the release commit
+  subject and in files like this one.
+- **A cross-package `@massa-ai/*` dep is either `workspace:*` or the exact root version —
+  and `version:sync` owns keeping the exact ones current.** The three apps use
+  `workspace:*`, which `publish.yml` rewrites to `^X.Y.Z` at publish time. `packages/core`
+  instead pins `@massa-ai/shared` to the root version *exactly*, and that is a tested
+  contract: `verifyStaticContract` in `scripts/verify-tree-sitter-grammars.ts` asserts
+  `core.dependencies["@massa-ai/shared"] === root.version`. `version:sync` originally
+  rewrote `version` fields only, so the v1.3.0 bump left that pin at `1.2.1` — the
+  workspace copy stopped satisfying it, bun resolved `shared` from the **registry**, and
+  `bun install --frozen-lockfile` failed with `lockfile had changes, but lockfile is
+  frozen`. A successful install would have been worse: `publish.yml`'s resolve step only
+  rewrites the literal `"workspace:*"`, so the published core would have depended on the
+  previous release. `version-sync.ts` now realigns every non-`workspace:` `@massa-ai/*`
+  spec, guarded by `scripts/__tests__/workspace-dependency-pinning.test.ts` and a
+  `syncVersions` unit test. Note that bun does **not** validate `bun.lock`'s
+  `workspaces[*].version` fields, so their staleness is cosmetic and never the cause —
+  don't chase it.
 - A tag or release created with `GITHUB_TOKEN` raises **no event**. `push: tags` and
   `release: published` triggers would be dead, which is why the chain is sequenced with
   `workflow_call` and not events. The same guard is what stops the bump commit from

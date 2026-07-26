@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **v1.3.0 was tagged and released on GitHub but published no packages.** Two independent
+  defects, in sequence.
+
+  The merge of #29 never triggered `release.yml` at all. Its commit body *explained* the
+  skip-ci marker and quoted it verbatim, and GitHub scans the **entire** commit message for
+  that marker, not just the subject — so CI was skipped on the merge commit, and with no
+  completed `CI` run there was no `workflow_run` event for `release.yml` to fire on. The
+  chain was never wrong; nothing pulled the trigger. Recorded in `CONTRIBUTING.md` and
+  `CLAUDE.md`. No test can guard this one: CI is the thing that gets skipped.
+
+  Once dispatched manually, the `release` job succeeded — tag, GitHub Release and the
+  deploy-key push all worked — and `publish` then failed on
+  `bun install --frozen-lockfile`: `lockfile had changes, but lockfile is frozen`.
+  `version:sync` rewrote `version` fields only, but `packages/core` pins
+  `@massa-ai/shared` to the **exact** root version rather than `workspace:*` — a contract
+  `verifyStaticContract` in `scripts/verify-tree-sitter-grammars.ts` asserts. So the bump
+  left that pin at `1.2.1` while `shared` became `1.3.0`, the workspace copy stopped
+  satisfying it, and bun resolved `@massa-ai/shared` from the **registry** instead. A
+  successful install would have been worse than the failure: `publish.yml`'s resolve step
+  only rewrites the literal `"workspace:*"`, so `@massa-ai/core@1.3.0` would have shipped
+  declaring a hard dependency on `@massa-ai/shared@1.2.1`, violating ARV-R7. The same drift
+  had already broken `bun run test:scripts` on `main`, via that static contract — a gate
+  the skipped CI run would otherwise have caught before publish ever started.
+
+  `scripts/version-sync.ts` now realigns every non-`workspace:` `@massa-ai/*` dependency
+  spec to the version it is syncing, in the one place both `release.yml` and `publish.yml`
+  bump versions. Two guards were added: a `syncVersions` unit test for the realignment, and
+  `scripts/__tests__/workspace-dependency-pinning.test.ts`, which fails on any
+  cross-package spec that is neither `workspace:*` nor the current root version, and on any
+  `bun.lock` entry resolving a `@massa-ai/*` package off-workspace. `bun.lock`'s
+  `workspaces[*].version` fields are *not* validated by bun, so their staleness is
+  cosmetic and was never the cause.
+
 ## [1.3.0] - 2026-07-26
 
 ### Added
