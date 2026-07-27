@@ -78,7 +78,16 @@ const app = new Elysia({ adapter: node() })
   .get("/uixyz", () => ({ leaked: true }))
   .get("/ui-admin", () => ({ leaked: true }))
   .get("/healthz", () => ({ leaked: true }))
-  .get("/swaggerui", () => ({ leaked: true }));
+  .get("/swaggerui", () => ({ leaked: true }))
+  // The six paths the deleted admin-preservation ladder claimed to protect
+  // (SEC-04). Stubs, because the real handlers need PostgreSQL and the claim
+  // under test is about the middleware, not the controllers.
+  .post("/api/v1/project/reset", () => ({ ok: true }))
+  .post("/api/v1/project/index", () => ({ ok: true }))
+  .post("/api/v1/project/upload-and-index", () => ({ ok: true }))
+  .post("/api/v1/bootstrap", () => ({ ok: true }))
+  .post("/api/v1/project/rename", () => ({ ok: true }))
+  .post("/api/v1/project/merge", () => ({ ok: true }));
 
 let server: { stop?: () => void } | undefined;
 let base = "";
@@ -155,6 +164,36 @@ describe("SEC-01 over a real socket — other guarded routes", () => {
 
   test("GET /api/v1/search with the key returns 200", async () => {
     const res = await fetch(`${base}/api/v1/search`, { headers: { "x-api-key": API_KEY } });
+    expect(res.status).toBe(200);
+  }, 15_000);
+});
+
+// SEC-04. `admin-preservation.ts` documented a four-rung ladder — "0 users →
+// open, 1+ users → require auth" — on top of `getUserCount()`, which was
+// hardcoded `return 0`. The 1+ rung was unreachable, so the middleware's only
+// behavior was to allow, and its 11 tests asserted a no-op. It is deleted; the
+// protection it claimed is provided by the API-key middleware, and these
+// assertions are what makes that claim true rather than documented.
+const FORMER_ADMIN_ENDPOINTS = [
+  "/api/v1/project/reset",
+  "/api/v1/project/index",
+  "/api/v1/project/upload-and-index",
+  "/api/v1/bootstrap",
+  "/api/v1/project/rename",
+  "/api/v1/project/merge",
+];
+
+describe("SEC-04 — former admin endpoints are gated by the API key", () => {
+  test.each(FORMER_ADMIN_ENDPOINTS)("POST %s without a key returns 401", async (path) => {
+    const res = await post(path, {});
+    expect(res.status).toBe(401);
+    const json = (await res.json()) as { ok?: boolean; success?: boolean };
+    expect(json.ok).toBeUndefined();
+    expect(json.success).toBe(false);
+  }, 15_000);
+
+  test.each(FORMER_ADMIN_ENDPOINTS)("POST %s with the key is not rejected", async (path) => {
+    const res = await post(path, {}, API_KEY);
     expect(res.status).toBe(200);
   }, 15_000);
 });
