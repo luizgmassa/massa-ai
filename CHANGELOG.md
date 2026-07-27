@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-07-27
+
 ### Changed
 
 - **The persona layer and the sub-agent layer now have a stated contract.** Auditing
