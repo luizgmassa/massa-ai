@@ -9,8 +9,8 @@
  */
 
 import "@massa-ai/shared/config";
-import { parsePositiveIntEnv } from "@massa-ai/shared/config";
-import { validateApiStartup, initAuthOrExit } from "./startup-config.js";
+import { parsePositiveIntEnv, config as serverConfig } from "@massa-ai/shared/config";
+import { validateApiStartup, initAuthOrExit, buildCorsOptions } from "./startup-config.js";
 
 // Fail fast if a DEDICATE-flagged process would bind the shared production DB.
 // Must run AFTER env loading and BEFORE any DB/client initialization. No-op
@@ -70,7 +70,9 @@ const JOB_REAPER_INTERVAL_MS = parsePositiveIntEnv(
 );
 
 const app = new Elysia({ adapter: node() })
-  .use(cors())
+  // SEC-02: an explicit allowlist, not the reflected-Origin default. Throws at
+  // startup on a `*` entry rather than serving a weaker policy than configured.
+  .use(cors(buildCorsOptions(serverConfig.get("security").corsOrigins)))
   .use(
     swagger({
       documentation: {

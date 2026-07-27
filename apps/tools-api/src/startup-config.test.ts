@@ -10,7 +10,7 @@
 import { describe, test, expect } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { initAuthOrExit } from "./startup-config.js";
+import { initAuthOrExit, buildCorsOptions } from "./startup-config.js";
 import { ApiKeyProvisioningError } from "@massa-ai/shared/config";
 
 const INDEX_SOURCE = fs.readFileSync(path.join(import.meta.dir, "index.ts"), "utf-8");
@@ -63,6 +63,46 @@ describe("initAuthOrExit", () => {
       ),
     ).toThrow("EXITED");
     expect(seen[0]).toContain("plain string failure");
+  });
+});
+
+describe("buildCorsOptions (SEC-02)", () => {
+  test("an empty allowlist permits no cross-origin request and no credentials", () => {
+    expect(buildCorsOptions([])).toEqual({ origin: false, credentials: false });
+  });
+
+  test("a blank-only allowlist is treated as empty, not as an origin that matches nothing", () => {
+    expect(buildCorsOptions(["", "   "])).toEqual({ origin: false, credentials: false });
+  });
+
+  test("a populated allowlist is passed through exactly, with credentials", () => {
+    expect(buildCorsOptions(["http://localhost:5173", "https://app.example.com"])).toEqual({
+      origin: ["http://localhost:5173", "https://app.example.com"],
+      credentials: true,
+    });
+  });
+
+  test("entries are trimmed so a comma-separated env var with spaces still matches", () => {
+    expect(buildCorsOptions([" http://localhost:5173 ", "  "])).toEqual({
+      origin: ["http://localhost:5173"],
+      credentials: true,
+    });
+  });
+
+  test("a wildcard entry throws instead of being served", () => {
+    // `*` cannot combine with credentials, and as an allowlist entry it means
+    // "no allowlist" — the configuration SEC-02 exists to remove.
+    expect(() => buildCorsOptions(["*"])).toThrow(/"\*" is not an allowed origin/);
+  });
+
+  test("a wildcard mixed with real origins still throws", () => {
+    expect(() => buildCorsOptions(["http://localhost:5173", "*"])).toThrow(
+      /not an allowed origin/,
+    );
+  });
+
+  test("the error names the env var an operator has to fix", () => {
+    expect(() => buildCorsOptions(["*"])).toThrow(/MASSA_AI_API_CORS_ORIGINS/);
   });
 });
 
