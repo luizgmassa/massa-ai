@@ -126,6 +126,19 @@ export interface MassaAiConfig {
   handoffs: {
     enabled: boolean;
   };
+  // Tools API access control. `apiKey` is the runtime auth secret: it is
+  // auto-provisioned into this file on first start when neither the
+  // MASSA_AI_API_KEY env var nor a stored value is present, so an existing
+  // install keeps working without an operator edit. Storing it here rather
+  // than in a second secret file follows the `llm.apiKey` / `embedding.apiKey`
+  // precedent and inherits the documented env > config.json > default chain.
+  security?: {
+    apiKey?: string;
+    // Exact browser origins allowed to call the API. Empty (the default) means
+    // no cross-origin request is permitted at all — the previous behavior
+    // reflected any Origin back with credentials enabled.
+    corsOrigins?: string[];
+  };
   // NOTE: `scheduler` is intentionally NOT a config key — it is env-driven
   // (MASSA_AI_SCHEDULER_ENABLED + job-stale/reaper env vars). Do not add it.
 }
@@ -332,5 +345,10 @@ export const defaultMassaAiConfig: MassaAiConfig = {
   },
   handoffs: {
     enabled: true,
+  },
+  // No apiKey by default — it is generated and persisted on first start.
+  // Empty corsOrigins means no cross-origin request is permitted.
+  security: {
+    corsOrigins: [],
   },
 };
