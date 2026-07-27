@@ -21,6 +21,20 @@ mock.restore();
 mock.module("../data/keyword/keyword-search-factory.js", () => ({
   getKeywordSearch: mock(async () => ({})),
 }));
+// ensureInitializedImpl falls back to the real factory for any dependency the
+// subject did not inject (`injected.vectorStore ? ... : getVectorStore()`).
+// The four factories around this one were already mocked for exactly that
+// reason; this one was missed, so every `makeRlm({})` subject built a real
+// PostgresVectorStore and ran live embedding-provider auto-selection —
+// measured at ~13.4s cold, against bunfig.toml's 5s per-test budget. The three
+// warmupCache tests below are the ones that construct without deps.
+mock.module("../data/vector/vector-store-factory.js", () => ({
+  getVectorStore: mock(async () => ({
+    search: async () => [],
+    searchByEmbedding: async () => [],
+    addDocuments: async () => {},
+  })),
+}));
 mock.module("../services/search/cache-factory.js", () => ({
   getSearchCache: mock(async () => ({})),
 }));
