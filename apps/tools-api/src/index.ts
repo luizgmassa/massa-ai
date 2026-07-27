@@ -10,7 +10,7 @@
 
 import "@massa-ai/shared/config";
 import { parsePositiveIntEnv } from "@massa-ai/shared/config";
-import { validateApiStartup } from "./startup-config.js";
+import { validateApiStartup, initAuthOrExit } from "./startup-config.js";
 
 // Fail fast if a DEDICATE-flagged process would bind the shared production DB.
 // Must run AFTER env loading and BEFORE any DB/client initialization. No-op
@@ -109,7 +109,7 @@ const app = new Elysia({ adapter: node() })
               type: "apiKey",
               in: "header",
               name: "x-api-key",
-              description: "API key — set MASSA_AI_API_KEY on the server. Omit when running locally without a key configured.",
+              description: "API key — required on every route except /health, /swagger and /ui. Set MASSA_AI_API_KEY, or read the key the server auto-provisioned into ~/.config/massa-ai/config.json on first start.",
             },
           },
         },
@@ -141,6 +141,11 @@ const app = new Elysia({ adapter: node() })
   .use(architectureRoutes)
   .use(dashboardRoutes)
   .get("/health", () => buildHealthResponse(getParserReadiness()));
+
+// SEC-01: resolve (and if necessary provision) the API key BEFORE the port
+// binds. An unwritable config.json exits non-zero here rather than binding an
+// unauthenticated listener.
+initAuthOrExit();
 
 await listenAfterParserValidation({
   validate: validateAllGrammars,
