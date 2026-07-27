@@ -212,6 +212,15 @@ export async function buildGraphStreamImpl(
         // Backend-polymorphic: PostgreSQL getById is sync, Pg is async. Normalize.
         const row = await Promise.resolve(repo.getById(id));
         if (!row || row.deleted_at !== null) continue;
+        // BUG-02: project-scope the stream here. `memory_edges` has no
+        // `project_id` (schema.prisma:335), so bfsNeighbors walks edges
+        // globally and a single cross-project edge would publish another
+        // project's content. Deliberately uses the caller's id unresolved and
+        // skips when it is absent — the exact scope semantics of every other
+        // read seam this path fuses (postgres-vector-store `WHERE project_id =
+        // $2`, memory-repository-pg `fullTextSearch`). Resolving the canonical
+        // alias only here would admit rows those seams reject.
+        if (projectId && row.project_id !== projectId) continue;
         out.push({
           id: row.id,
           content: row.content,

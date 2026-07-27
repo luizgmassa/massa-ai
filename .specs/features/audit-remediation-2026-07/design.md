@@ -357,6 +357,49 @@ instead of the container's ephemeral `/root/.config` — which is what spec SEC-
   migration (a 25th) for a latent, currently-unexploitable defect; the read-side guard closes it
   with one line and no migration. Recorded as a deliberate narrowing.
 
+> **Amended during TASK-010 — the guard is `projectId && row.project_id !== projectId`, and it
+> deliberately does NOT resolve the canonical project id.** The prescription above was checked
+> against source before implementing, because `buildGraphStreamImpl` receives an unresolved
+> caller-supplied `projectId?: string` while `memories.project_id` holds canonical ids
+> (`memory-repository-pg.ts:161-163` resolves the alias at the write seam). A strict `!==`
+> against a retired alias would drop **every** neighbor — a worse defect than the latent one
+> BUG-02 closes. Two facts, both read from current source, resolve it:
+>
+> 1. **Every read seam in this search path is equally alias-unaware.**
+>    `postgres-vector-store.ts:545` filters `WHERE project_id = $2`,
+>    `memory-repository-pg.ts:289` (`fullTextSearch`) and `:226` (`search`) filter
+>    `project_id = ${filters.projectId}` — all on the caller's raw id.
+>    `getProjectIdentityAliasResolver()` appears at **write** seams only (`memory-repository-pg.ts:162`
+>    insert / `:405` delete, `observation-repository-pg.ts:189`, `etl/pipeline.ts:177,209`,
+>    `rlm-indexing.ts:477` `indexFileImpl`, and the checkpoint/handoff/proposal/scheduler/job stores).
+>    Resolving the alias *only* in the graph stream would make it the single seam that admits rows
+>    the vector and keyword seams reject — results the rest of the search structurally cannot produce
+>    — at the cost of an async DB round trip inside an optional silent-omit path.
+> 2. **With a retired alias the stream never reaches the filter.** Seeds come from
+>    `resultSets[0]` (the vector stream) and from `fullTextSearch` anchors derived from those same
+>    hits. Both return zero rows for an id no row carries, so `seedIds.size === 0` and the function
+>    returns `[]` at `rlm-synapse.ts:191`, above the loop. The strict comparison cannot kill a
+>    stream that had no seeds.
+>
+> The guard is therefore gated on `projectId` being truthy, mirroring `if (filters?.projectId)` and
+> `projectId ? … : …` in those same seams: no `projectId` ⇒ no filter, and a `NULL` `project_id`
+> row does not match a supplied one (`project_id = $x` never matches `NULL`).
+>
+> **Consequence for the test, per the spec's Independent Test.** A one-sided "project B's content
+> is absent" assertion cannot distinguish a correct cross-project drop from a filter that dropped
+> everything. `graph-stream-project-scope-pg.test.ts` is therefore two-sided against real
+> PostgreSQL — one same-project edge and one cross-project edge from the same seed, asserting B is
+> gone *and* A's own neighbor survives — plus a no-`projectId` case pinning the filter inert and a
+> `NULL`-project case pinning the `= NULL` semantics. Observed red:
+> `Expected to not contain: "PROJECT-B-SECRET-CONTENT"` /
+> `Received: [ "PROJECT-A-NEIGHBOR-CONTENT", "PROJECT-B-SECRET-CONTENT" ]`.
+>
+> **No interaction with TASK-013.** T13 fixes `rlm-indexing.ts:179`, where `getCentrality` is
+> called with the unresolved id while `indexFileImpl` resolves it at `:477` — an *intra-write-path*
+> inconsistency in the indexing call graph. T10 is a read seam in the search call graph; the two
+> share no state and no call path, and T13 makes the write path more consistent rather than
+> changing what a read seam must compare against.
+
 ### `ExecResult.sandboxMode` (modified)
 
 - **Location**: `packages/core/src/services/executor/executor.ts:44-56` (interface) and `:453` (`#spawn`)

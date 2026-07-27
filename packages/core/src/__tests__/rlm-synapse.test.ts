@@ -312,6 +312,71 @@ describe("rlm-synapse — buildGraphStream", () => {
     expect(result).toEqual([]);
   });
 
+  test("BUG-02: a neighbor from another project is dropped, the same-project one is kept", async () => {
+    mockBfsNeighbors = () => ["same-project-mem", "other-project-mem"];
+    mockGetById = async (id: string) => ({
+      id,
+      content: `memory ${id}`,
+      deleted_at: null,
+      project_id: id === "other-project-mem" ? "other" : "p",
+      type: "decision",
+      importance: 0.6,
+    });
+    const rlm = new ContextualSearchRLM();
+    const result = await rlm.buildGraphStream([[makeResult("a")]], 10, "p");
+    // Two-sided: a filter that dropped everything would fail the first assert.
+    expect(result.map((r) => r.id)).toEqual(["same-project-mem"]);
+  });
+
+  test("BUG-02: a NULL-project neighbor is dropped when a projectId is supplied", async () => {
+    // Matches the scope semantics of every other read seam in the search path:
+    // `WHERE project_id = $x` never matches NULL.
+    mockBfsNeighbors = () => ["unscoped-mem"];
+    mockGetById = async (id: string) => ({
+      id,
+      content: `memory ${id}`,
+      deleted_at: null,
+      project_id: null,
+      type: "decision",
+      importance: 0.6,
+    });
+    const rlm = new ContextualSearchRLM();
+    const result = await rlm.buildGraphStream([[makeResult("a")]], 10, "p");
+    expect(result).toEqual([]);
+  });
+
+  test("BUG-02: no projectId → the filter is inert, every neighbor survives", async () => {
+    mockBfsNeighbors = () => ["mem-p", "mem-other", "mem-null"];
+    mockGetById = async (id: string) => ({
+      id,
+      content: `memory ${id}`,
+      deleted_at: null,
+      project_id: id === "mem-p" ? "p" : id === "mem-other" ? "other" : null,
+      type: "decision",
+      importance: 0.6,
+    });
+    const rlm = new ContextualSearchRLM();
+    const result = await rlm.buildGraphStream([[makeResult("a")]], 10, undefined);
+    expect(result.map((r) => r.id)).toEqual(["mem-p", "mem-other", "mem-null"]);
+  });
+
+  test("BUG-02: the filter removing every neighbor yields [], never a throw", async () => {
+    mockBfsNeighbors = () => ["other-1", "other-2"];
+    mockGetById = async (id: string) => ({
+      id,
+      content: `memory ${id}`,
+      deleted_at: null,
+      project_id: "other",
+      type: "decision",
+      importance: 0.6,
+    });
+    const rlm = new ContextualSearchRLM();
+    const result = await rlm.buildGraphStream([[makeResult("a")]], 10, "p");
+    // searchImpl only appends a non-empty stream, so the other RRF streams are
+    // returned unchanged (spec Edge Case).
+    expect(result).toEqual([]);
+  });
+
   test("outer catch: getGraphStore throwing → returns [] with degradation", async () => {
     // Override the graph mock to throw. We need to re-mock the module, but
     // since mock.module is process-wide, we use a throwing bfsNeighbors that
