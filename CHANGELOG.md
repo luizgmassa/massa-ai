@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Web UI Checkpoints view was permanently empty.** `POST /api/v1/checkpoints/list`
+  defaults to `format: "toon"`, whose `data` is a formatted *string* while `success` stays
+  `true`, so no error path fires. The view omitted `format`, and `extractCheckpointRows`
+  collapsed the unreadable payload to `[]` — rendering "No checkpoints" against a database
+  holding 458 of them. The request now sends `format: "json"` via the exported
+  `CHECKPOINTS_LIST_BODY`, and a non-array payload surfaces an error block instead of
+  masquerading as an empty state.
+- **Checkpoint rows rendered a blank `type` column.** The list route emits `type`
+  (`list_checkpoints.ts` maps `type: cp.checkpointType`); the renderer read
+  `checkpointType`, which no response has ever carried.
+- **Web UI Proposals view could never show data.** `POST /api/v1/proposal/list` returns
+  `{ pending, count }`; the renderer read `payload.proposals`. It now reads `pending`, with
+  `proposals` kept as a legacy alias. Note that pending proposals are only persisted when
+  `AUTO_IMPROVE_REVIEW_GATE=true` — the default auto-approves silently.
+- **Renderer tests could not have caught any of the three.** They passed hand-written
+  fixtures whose shape no endpoint emits. A golden response captured from the live API
+  (`apps/web-ui/src/__tests__/fixtures/checkpoints-list.json`) is now read by both sides:
+  `apps/web-ui/src/__tests__/route-contract.test.ts` asserts the renderer consumes it, and
+  `apps/tools-api/src/routes/web-ui-contract.test.ts` asserts the route still produces it.
+  The fixture is read with `fs` rather than imported, because `apps/tools-api` sets
+  `rootDir: ./src` with no `allowJs` and a cross-package module import would break
+  `type-check`.
+
 ## [1.7.0] - 2026-07-27
 
 ### Changed

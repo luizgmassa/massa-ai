@@ -166,6 +166,51 @@ describe("renderCheckpoints", () => {
     expect(renderCheckpoints({ data: [{ taskId: "t2" }] })).toContain("t2");
     expect(renderCheckpoints({ data: { data: [{ taskId: "t3" }] } })).toContain("t3");
   });
+
+  // The list route emits `type`, not `checkpointType` (list_checkpoints.ts maps
+  // `type: cp.checkpointType`). Assert the real field name renders without
+  // leaning on the legacy fallback.
+  it("renders the API field name `type` for the type column", () => {
+    const html = renderCheckpoints({
+      data: { checkpoints: [{ taskId: "t4", type: "milestone", status: "in_progress" }] },
+    });
+    expect(html).toContain("t4");
+    expect(html).toContain("milestone");
+  });
+
+  // Regression: format omitted -> route falls back to "toon" -> data is a
+  // *string* while success stays true. This must not read as "no checkpoints".
+  it("surfaces a TOON string payload instead of faking the empty state", () => {
+    const html = renderCheckpoints({
+      success: true,
+      data: "checkpoints: []\ntotal: 458\nstats:\n  byType:\n    manual: 339",
+    });
+    expect(html).not.toContain("No checkpoints");
+    expect(html).toContain("TOON");
+    expect(html).toContain('class="error"');
+  });
+});
+
+describe("renderProposals response shape", () => {
+  // POST /api/v1/proposal/list returns `{ pending, count }` (proposals.ts).
+  // Reading only `proposals` here is what made the view permanently empty.
+  it("reads the `pending` key the route actually returns", () => {
+    const html = renderProposals(
+      { success: true, data: { pending: [{ id: "prop-1", type: "edit", status: "pending", description: "tighten recall" }], count: 1 } },
+      { project: "massa-ai" },
+    );
+    expect(html).not.toContain("No pending proposals");
+    expect(html).toContain("tighten recall");
+    expect(html).toContain("prop-1");
+  });
+
+  it("still accepts the legacy `proposals` key", () => {
+    const html = renderProposals(
+      { success: true, data: { proposals: [{ id: "prop-2", description: "legacy shape" }] } },
+      { project: "massa-ai" },
+    );
+    expect(html).toContain("legacy shape");
+  });
 });
 
 describe("renderMemoryBrowser edge cases", () => {

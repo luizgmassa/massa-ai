@@ -1,0 +1,55 @@
+{
+  "success": true,
+  "data": {
+    "checkpoints": [
+      {
+        "id": "ckpt_manual_1785094116430_fwi88q",
+        "taskId": "cov-tools-task-filter",
+        "description": "filtered checkpoint",
+        "status": "in_progress",
+        "progress": "0%",
+        "currentStep": "",
+        "type": "manual",
+        "createdAt": 1785094116430,
+        "expiresAt": 1785698916430,
+        "memoriesCount": 0,
+        "filesCount": 0
+      },
+      {
+        "id": "ckpt_manual_1785094116426_fv9qtn",
+        "taskId": "cov-tools-task-list",
+        "description": "checkpoint for listing",
+        "status": "in_progress",
+        "progress": "0%",
+        "currentStep": "",
+        "type": "manual",
+        "createdAt": 1785094116426,
+        "expiresAt": 1785698916426,
+        "memoriesCount": 0,
+        "filesCount": 0
+      },
+      {
+        "id": "ckpt_manual_1785094116424_tve7d5",
+        "taskId": "cov-tools-task-restore",
+        "description": "checkpoint to restore",
+        "status": "in_progress",
+        "progress": "0%",
+        "currentStep": "",
+        "type": "manual",
+        "createdAt": 1785094116424,
+        "expiresAt": 1785698916424,
+        "memoriesCount": 0,
+        "filesCount": 0
+      }
+    ],
+    "total": 458,
+    "stats": {
+      "byType": {
+        "manual": 339,
+        "auto": 70,
+        "milestone": 49
+      },
+      "totalSizeBytes": 108721
+    }
+  }
+}
