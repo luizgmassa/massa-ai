@@ -7,6 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **The Tools API no longer serves anonymous requests.** `authMiddleware` contained
+  `if (!apiKey) return;` — and no key was configured on any documented install path, so
+  every route was open, including the three `POST /api/v1/executor/*` routes that run
+  commands. The bypass is deleted. **A key is now required on every non-public route**;
+  `/health`, `/swagger`, `/swagger/json`, `/ui` and `/ui/` stay public (the Docker
+  healthcheck depends on `/health`, and `/ui` serves only a static shell whose every data
+  call is still authenticated).
+- **A key is auto-provisioned on first start, so existing installs keep working.** The
+  precedence chain is the documented one: `MASSA_AI_API_KEY` env > `security.apiKey` in
+  `~/.config/massa-ai/config.json` > a freshly generated 32-byte hex key persisted there.
+  The path is logged once at startup; **the value never is**. The API refuses to start only
+  when no key exists *and* the config file cannot be written. Concurrent cold starts elect
+  a single writer through an atomic exclusive-create lock, so every process agrees on the
+  key that is actually on disk — re-reading after a write was implemented first and proven
+  insufficient, since any read-then-return is invalidated by a later writer.
+- **CORS is an explicit allowlist instead of a wildcard.** `.use(cors())` accepted every
+  origin. Origins now come from `MASSA_AI_API_CORS_ORIGINS` / `security.corsOrigins`;
+  unset means `{ origin: false, credentials: false }`, and `*` combined with credentials is
+  rejected at startup rather than served.
+- **The Web UI authenticates itself without a new login surface.** `/ui` receives the key
+  in a `<meta name="massa-ai-api-key">` tag only when the request's remote address is
+  loopback; other callers get the shell plus a configure-access state. Loopback has three
+  spellings on this stack (`127.0.0.0/8`, `::1`, `::ffff:127.0.0.1`) and all three are
+  accepted. **Known limitation:** a reverse proxy terminating on loopback appears local.
+  See `docs/web-ui-access.md`.
+- **Every documented install path now provisions a key**, including the lifecycle hook
+  binary, which reads `config.json` directly rather than importing `@massa-ai/shared` (it
+  is fire-and-forget and silent-degrading, so a 401 would have stopped observation capture
+  with no visible symptom). Two further defects surfaced here: `setup-local-first.sh`
+  regenerated `config.json` wholesale and so silently *rotated* the credential on every
+  re-run, and the compose `mcp` service had neither a volume nor a key, so on a default
+  `docker compose up` it could not learn the key the `api` service provisioned. Both images
+  now set `XDG_CONFIG_HOME=/data` so `config.json` lands inside the mounted volume.
+- **The inert admin-preservation middleware is removed.** It gated six endpoints on a user
+  count that was always zero, so it never denied anything. Those endpoints are protected by
+  the mandatory key like every other route, and a parameterised test asserts 401 for each.
+
+### Changed
+
+- **BREAKING — embedding failures now throw instead of returning random vectors.** With no
+  reachable provider, `EmbeddingService` returned `Math.random()` vectors under a
+  `NODE_ENV` check, and `getDimensions()` fell back to 384. Those vectors were stored and
+  searched as if they were real, so retrieval silently returned nonsense. Both branches now
+  throw; `store_memory` and `update_memory` return `{ success: false }`, and HyDE degrades
+  through the existing `QUERY_UNDERSTANDING_UNAVAILABLE` signal.
+
+  **Action required if you ever ran without a reachable embedding provider.** A 384-d
+  random vector is indistinguishable from a real embedding after the fact, so there is no
+  detector and no repair: **re-index affected projects** (`reindex` with `force: true`) to
+  overwrite them. Memories stored during such a window cannot be recovered by re-indexing
+  and need to be re-created.
+- **Executor responses report the sandbox mode that was actually used.**
+  `MASSA_AI_EXECUTOR_SANDBOX=auto` silently degrades to `none` when no sandbox tool is
+  present, and nothing in the response said so. Every `execute`, `execute_file` and
+  `batch_execute` result now carries `sandboxMode`, and one warning per process names the
+  missing tool when `auto` resolves to `none`. An explicit `none` warns nothing. The `auto`
+  default and its best-effort fallback are unchanged (AD-007).
+
+### Fixed
+
+- **Graph-neighbor search results are scoped to the searched project.** `memory_edges` has
+  no `project_id`, so BFS walks edges globally; the graph stream checked only `deleted_at`
+  before pushing a neighbor's content into the result set, letting a single cross-project
+  edge surface another project's memory. The read seam now filters by project, using the
+  caller's id unresolved and skipping when it is absent — the exact scope semantics of
+  every other read seam the search fuses.
+- **A stale-generation retry no longer leaks its managed-run heartbeat.** The retry
+  returned from inside the `try`, reaching none of the three teardown sites, so each
+  abandoned attempt left a loop renewing a lease its run no longer owned for the life of
+  the process. Exhausting all three retries leaked three loops.
+- **Namespace-imported callees resolve against their own module first.** The resolver's
+  documented order was inverted, so `import * as Utils from './utils'; Utils.parse(x)`
+  bound to whichever *other* file in the project happened to export a top-level `parse`.
+- **Centrality is loaded under the canonical project id.** Indexing with a retired project
+  alias queried centrality for a project that owns no symbols, so every chunk was written
+  with `centralityScore: 0` — silently, because 0 is also the legitimate "not computed yet"
+  value. Both load sites are fixed, including the incremental reindex path that
+  auto-reindex actually takes.
+- **An observation written under a retired alias is findable by its canonical id in the
+  same tick.** The synchronous mirror was keyed on the caller's id until the asynchronous
+  persist resolved the alias a tick later, so a reader holding the post-rename id missed a
+  write that had already returned. A bounded residual remains for an alias this process has
+  never resolved — nothing can consult the database synchronously — and it is documented at
+  the call site and pinned by a test rather than left implicit.
+
 ## [1.7.1] - 2026-07-27
 
 ### Fixed

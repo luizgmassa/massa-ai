@@ -539,6 +539,25 @@ ollama pull qwen2.5-coder:7b      # code-oriented LLM sites (bootstrap seed, rer
 checks Ollama connectivity, database access, embedding generation, and migration
 status.
 
+> **Ran without a reachable embedding provider before? Re-index.** Earlier versions
+> silently substituted **random vectors** when no provider was available, and stored and
+> searched them as if they were real — so retrieval returned plausible-looking nonsense
+> with no error anywhere. That fallback is gone: embedding now fails loudly instead.
+>
+> There is no detector and no repair. A 384-dimension random vector is indistinguishable
+> from a genuine embedding after the fact, so the only fix is to overwrite the affected
+> rows:
+>
+> ```bash
+> # per affected project
+> curl -X POST http://localhost:3333/api/v1/project/reindex \
+>   -H "x-api-key: $MASSA_AI_API_KEY" -H "Content-Type: application/json" \
+>   -d '{"projectId": "my-project", "force": true}'
+> ```
+>
+> Memories stored during such a window are not covered by re-indexing — their embeddings
+> were written at `store_memory` time — and need to be re-created.
+
 ### Turn the LLM features on
 
 ```bash
@@ -728,7 +747,39 @@ bun run start:api
 
 Swagger docs: `http://localhost:3333/swagger` · Web UI: `http://localhost:3333/ui`
 
+### Authentication (required)
+
+Every route except `/health`, `/swagger`, `/swagger/json` and `/ui` requires an
+`x-api-key` header. There is no supported way to run the API unauthenticated — it binds
+`0.0.0.0`, and the executor routes run commands.
+
+You do not have to create the key. On first start the API generates one and saves it to
+`security.apiKey` in `~/.config/massa-ai/config.json`, logging the *path* and never the
+value. It refuses to start only when no key exists **and** that file cannot be written.
+Set `MASSA_AI_API_KEY` only to pin a specific value; env wins over `config.json`.
+
+```bash
+# Read the provisioned key
+grep -A2 '"security"' ~/.config/massa-ai/config.json
+
+curl -X POST http://localhost:3333/api/v1/search/project \
+  -H "x-api-key: $MASSA_AI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "auth", "projectId": "my-project"}'
+```
+
+The Web UI needs no configuration on a normal local install: `/ui` is served with the key
+embedded for loopback callers only. A browser reaching it from anywhere else gets a
+configure-access screen instead — see [docs/web-ui-access.md](./docs/web-ui-access.md),
+which also covers the Docker case and the reverse-proxy limitation.
+
+Cross-origin browser access is closed by default. Add exact origins through
+`MASSA_AI_API_CORS_ORIGINS` (comma-separated) when you need it; `*` together with
+credentials is rejected at startup rather than served.
+
 ### Endpoints
+
+> The examples below omit `-H "x-api-key: …"` for brevity. Every one of them requires it.
 
 ```bash
 # Index a project

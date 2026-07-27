@@ -50,15 +50,17 @@
     asserts the deleted bypass and is now named for rewrite.
   - Rejected as not-a-gap: CORS-as-theatre — the plan never overclaims CORS as the primary control.
 - Task count: 24 across 6 phases, 2 PRs. Packs into 4 batches at the ~7-task budget.
-- Execute: **PR1 in progress — 11 of 15 tasks committed**, executed inline (the user declined
-  sub-agents for PR1; the T15 verification agent is the one accepted exception).
-  - Order: T0 → T1 → T2 → T3 → T4 → T5 → T6 → T7 → T23 → T8 → T9 → **T10 (next)** → T11 → T12 →
-    T13 → T14 → T15.
+- Execute: **PR1 in progress — 16 of 16 implementation tasks committed; T15 (PR1 close) in
+  progress**, executed inline (the user declined sub-agents for PR1; the T15 verification agent is
+  the one accepted exception).
+  - Order: T0 → T1 → T2 → T3 → T4 → T5 → T6 → T7 → T23 → T8 → T9 → T10 → T11 → T12 → T13 → T14 →
+    **T15 (in progress)**.
   - Committed: `30e710a` T1, `a081406` T0, `41b2f90` T2, `976370f` T3, `e17bd5d` T4, `079cc49` T5,
-    `5908960` T6, `a646204` T7, `7ee6fa4` T23, `640fd3c` T8, `085e3e8` T9.
-    (`f26060b` corrected this section's own stale `Execute: not started` line.)
-  - **Remaining: T10, T11, T12, T13, T14 (Phase 4 bugs), then T15 (PR1 close).** Phases 0-3 are
-    complete.
+    `5908960` T6, `a646204` T7, `7ee6fa4` T23, `640fd3c` T8, `085e3e8` T9, `92912ce` T10,
+    `81c6841` T11, `287df69` T12, `c3510d3` T13, `af008e0` T14.
+    (`f26060b` corrected this section's own stale `Execute: not started` line; `18a992e` recorded
+    progress through T9; `48d0f39` is the out-of-band test fix described below.)
+  - **Phases 0-4 are complete. Only T15 remains.**
   - Three Execute-phase divergences, all written back into `spec.md` / `design.md`:
     1. **T2** — the specified "re-read after conflict" concurrency fix does not converge; proven by
        its own test. Replaced with an `open(…, "wx")` exclusive-create writer election in
@@ -91,12 +93,50 @@
     8. **T8** — `tsc` found three `ExecResult` constructions the design did not name (two
        path-boundary refusals and the compile-failure return). They report the mode that would
        have applied rather than omitting the field.
+    9. **T10** — the design prescribed a bare `row.project_id !== projectId`. Verified against
+       source before implementing: `buildGraphStreamImpl` takes an *unresolved* `projectId?`, while
+       `memories.project_id` holds canonical ids, so a strict `!==` against a retired alias would
+       have dropped **every** neighbor. Two facts settle it — every read seam the search fuses is
+       equally alias-unaware (`postgres-vector-store.ts:545`, `memory-repository-pg.ts:226,289`;
+       the resolver appears only at write seams), and with a retired alias the seed set is empty so
+       the function returns above the loop. Shipped as
+       `projectId && row.project_id !== projectId`, matching those seams' `if (projectId)`
+       semantics. Recorded in `design.md`.
+    10. **T12** — BUG-04 needed one structure the plan did not anticipate, so it is wider than its
+        "1 function" granularity row. `symbolIndex` is `Map<name, fqn>` with one entry per *name*
+        and therefore cannot answer "does the namespace-imported module define this?" once another
+        file wins the name — exactly the collision the bug is about. `buildSymbolIndex` now also
+        returns `fqns: Set<string>`; one extra parameter each on `resolveFile` /
+        `resolveEdgeTarget`, no extra pass.
+    11. **T13** — tasks named one centrality call site (`rlm-indexing.ts:179`); there are **two**.
+        `ensureFreshIndexImpl`'s incremental path (`:385`) carries the identical defect and is the
+        path auto-reindex actually takes. Both fixed, both tested.
+    12. **T14** — `insert` is synchronous and alias resolution is not, so the fix required a new
+        cache-only `ProjectIdentityAliasResolver.resolveCached()`. It closes the window whenever
+        the mapping is cached and **cannot** close it for an alias this process has never resolved
+        — nothing can consult the database synchronously. That residual is documented at the call
+        site and pinned by its own test; closing it would mean making `insert` async and changing
+        the fire-and-forget contract the hook paths depend on.
+  - **Out-of-band fix approved by the user (`48d0f39`, test-only).**
+    `contextual-search-rlm-coverage.test.ts` was failing 11 pass / 3 fail **at HEAD**, verified by
+    stashing all PR1 work and reproducing it. `ensureInitializedImpl` falls back to the real
+    factory for any dependency the subject did not inject, and the file mocked four sibling
+    factories but not `vector-store-factory.js` — so the three `makeRlm({})` warmupCache tests
+    built a real `PostgresVectorStore` and ran live embedding-provider auto-selection, measured at
+    **13.4 s cold** against `bunfig.toml`'s 5 s budget. The missing mock was added; no test was
+    weakened, skipped or removed (14 before, 14 after) and the group now runs in 144 ms. This also
+    explains why the recorded baseline and the observed red are both true: the cost is provider
+    latency, so the same tests pass on a warm model cache and fail on a cold one.
   - **Owed measurement (T7):** the Docker bridge address is instrumented, not yet observed — this
     machine has no container runtime (`docker`/`podman`/`colima`/`lima` all absent). CI's `mcp`
     job runs `scripts/tests/test-docker-remote-address.sh` with `MASSA_AI_DOCKER_PROBE=1`; the
     observed `ctx.request.ip` must be pasted verbatim into `design.md` → "TASK-007 — the Docker
     path, instrumented rather than asserted" from that job log. Without the flag the suite reports
     `# NOT RUN`; with the flag and no runtime it fails rather than skipping.
+    **Still owed at T15.** SEC-06 is therefore evidenced by the instrument, not by an observation,
+    and must not be marked fully evidenced until the address is pasted in. The first CI run on
+    this branch produces it; PR1 may open before then, but the SEC-06 row stays qualified in
+    `validation.md` until it lands.
   - Known load flakes seen repeatedly this session, green standalone every time, a different one
     each run: `apps/mcp-client` `embedded-api-client-endpoints.test.ts`, and `packages/core`'s
     `mock-free (113 files)` group and `trace-path.test.ts`. Do not chase them; re-run the package
@@ -436,6 +476,7 @@
 | AD-007 | active (T12) | Executor sandbox default is `auto` (not `on`); uses platform tool if available, falls back to best-effort. F1 mitigation. | `sandbox.ts` getSandboxMode, `MASSA_AI_EXECUTOR_SANDBOX=auto\|on\|none` |
 | AD-008 | active (T11) | json_schema constrained decoding for Ollama structured calls; version-gated (>= 0.5.0), graceful fallback to json_object. F3 mitigation. | `llm-client.ts` _checkJsonSchemaSupport, llmObject |
 | AD-009 | active (T5) | D5 Cypher subset deferral formally removed — structural graph traversal covers use cases. | `docs/adr/0001-remove-d5-cypher-subset.md` |
+| AD-011 | active (audit-remediation-2026-07 T3/T15) | **The Tools API never serves an anonymous request.** A key is always present — by `MASSA_AI_API_KEY`, by `security.apiKey` in `config.json`, or by first-start provisioning. The no-key pass-through is deleted, not made configurable: there is no supported way to run the API open. Startup fails non-zero only when no key exists *and* the config file is unwritable. The bind address stays `0.0.0.0` (AS-05) precisely because exposure is now closed by authentication rather than by address, so Docker port mapping keeps working unmodified. Public paths are a fixed, tested list (`/health`, `/swagger`, `/swagger/json`, `/ui`, `/ui/`) matched by prefix, with a decoy-path test proving `/uixyz` is not exempt. | `apps/tools-api/src/middleware/auth.ts` (`initAuth`, `isPublicPath`), `src/startup-config.ts` (`initAuthOrExit`), `packages/shared/src/config/api-key.ts` (`resolveApiKey`), commits `41b2f90` / `976370f` |
 
 ---
 

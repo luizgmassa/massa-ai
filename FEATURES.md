@@ -34,6 +34,7 @@ Every feature in massa-ai, what it does, why it exists, and how to use it.
 - [Fetch and Index](#fetch-and-index)
 - [MCP Server (52 Tools)](#mcp-server-52-tools)
 - [REST API](#rest-api)
+- [API Authentication](#api-authentication)
 - [Configuration](#configuration)
 - [Skills & Install System](#skills--install-system)
 
@@ -1025,6 +1026,32 @@ bun run start:api  # production
 Swagger: `http://localhost:3333/swagger` · Web UI: `http://localhost:3333/ui` · Health: `http://localhost:3333/health`
 
 See [README §REST API](./README.md#rest-api) for endpoint examples.
+
+---
+
+## API Authentication
+
+**What:** Every REST route except `/health`, `/swagger`, `/swagger/json` and `/ui` requires an `x-api-key` header. A key is auto-provisioned on first start, so nothing has to be configured to get a working authenticated setup.
+
+**Why:** The API binds `0.0.0.0` and exposes `POST /api/v1/executor/*`, which runs commands. Exposure is closed by authentication rather than by bind address, so Docker port mapping keeps working unchanged. There is no supported way to run the API open — the previous no-key pass-through is deleted, not made configurable (AD-011).
+
+**How to use:**
+
+Precedence is the documented chain: `MASSA_AI_API_KEY` (env) > `security.apiKey` in `~/.config/massa-ai/config.json` > a generated 32-byte hex key persisted there. On first start the API generates one, logs the **path** (never the value), and continues. It exits non-zero before binding only when no key exists *and* the config file cannot be written.
+
+```bash
+grep -A2 '"security"' ~/.config/massa-ai/config.json   # read the provisioned key
+
+curl -X POST http://localhost:3333/api/v1/search/project \
+  -H "x-api-key: $MASSA_AI_API_KEY" -H "Content-Type: application/json" \
+  -d '{"query": "auth", "projectId": "my-project"}'
+```
+
+Concurrent cold starts elect a single writer through an atomic exclusive-create lock, so every process returns the key that is actually on disk. Exactly one reports having provisioned it, and exactly one warning line is emitted.
+
+**CORS** is a closed allowlist. `MASSA_AI_API_CORS_ORIGINS` (comma-separated) or `security.corsOrigins` lists exact origins; unset means no cross-origin request is permitted, and `*` combined with credentials is rejected at startup. Treat it as a secondary browser-only layer over the mandatory key, never as the control itself.
+
+**Web UI and hooks** need no manual configuration locally: `/ui` is served with the key embedded for loopback callers only (see [Web UI & Dashboard](#web-ui--dashboard) and [`docs/web-ui-access.md`](./docs/web-ui-access.md)), and the lifecycle hook binary reads the same `config.json` directly so passive capture keeps working.
 
 ---
 
