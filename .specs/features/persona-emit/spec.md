@@ -44,14 +44,29 @@ in".
 - AC5: Each new/changed assertion is mutation-checked: the target fault is injected,
   confirmed red, reverted, confirmed green.
 
-**PE-02 (accepted, not closed)** — Cases 1 and 2 (PAB-01, the three Capability Packet
-*definition* files) remain presence-based beyond the fix in PE-03 below. The approved
-concrete design for this feature scoped the section/negative-scan technique to
-`persona-router/SKILL.md` only; extending an authority-granting negative scan to
-`skills/AGENTS.md`, `references/agent-orchestration.md`, and `references/subagent-design.md`
-was not part of the approved steps and would need its own regex-precision work (those
-files' prose about personas is broader and less uniform than persona-router's, raising
-false-failure risk). Recorded here rather than silently left as a gap.
+**PE-02 (CLOSED)** — Cases 1 and 2 (PAB-01, the three Capability Packet *definition*
+files) are no longer presence-only. The authority scan now covers
+`skills/persona-router/SKILL.md`, `skills/AGENTS.md`,
+`references/agent-orchestration.md`, and `references/subagent-design.md`.
+
+Closing it required abandoning the detection method, not widening it. The phrase-list
+approach — enumerate `persona may grant`, `grant authority to the persona` — killed
+exactly the two mutations it was written against and nothing else: `a persona is
+permitted to write` and `personas hold write access` both passed. Enumeration cannot
+win, because the space of ways to write "persona has power" is unbounded, and every
+pattern added to chase it raises the false-failure risk that made PE-02 defensible in
+the first place.
+
+The replacement inverts the test. Find every sentence mentioning a persona alongside an
+authority term, then require that sentence to carry a negator. Every real rule in this
+repository already does — "grants **no** tool access", "**never** overrides", "is
+**never** authority" — so correct prose passes untouched while an affirmative grant
+fails regardless of phrasing.
+
+- AC1: The scan covers all four files.
+- AC2: No false positive on current prose (26 pass / 0 fail).
+- AC3: Mutation-checked with five faults, including two the phrase list demonstrably
+  missed and one in each of the three PE-02 files. All five killed, all reverted.
 
 ### Task B — emit `persona` from all 24 dispatch blocks
 

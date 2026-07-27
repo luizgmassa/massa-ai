@@ -55,9 +55,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and never overrides the receiving charter's Restrictions.
   - The persona-router boundary's three presence-only assertions for persona-router prose
     (Stop Conditions scoping; grants-no-authority; not-a-specialist-consultation) are now
-    section-scoped to the exact heading each rule lives under, plus one new negative scan
-    that fails if any future edit adds authority-granting phrasing about persona anywhere
-    in `persona-router/SKILL.md`.
+    section-scoped to the exact heading each rule lives under.
+  - **All five presence-only assertions are closed, and the detection method changed to
+    close them.** A phrase list (`persona may grant`, `grant authority to the persona`)
+    killed the two mutations it was written against and nothing else — `a persona is
+    permitted to write` and `personas hold write access` both passed it. Enumeration
+    cannot win, since the ways to write "persona has power" are unbounded, and each
+    pattern added to chase them raises false-failure risk. The scan now inverts the test:
+    every sentence mentioning a persona alongside an authority term must carry a negator.
+    Real rules already do ("grants **no** tool access", "**never** overrides"), so correct
+    prose passes while an affirmative grant fails however it is phrased. Coverage extends
+    beyond `persona-router/SKILL.md` to all three packet definitions — the worst place for
+    a contradicting sentence, and previously unguarded.
   - A new discriminating test enumerates every `Dispatch:` block on disk (no hardcoded
     roster) and fails if any one lacks the persona line; the existing packet-definition
     uniqueness test is scoped to definitions only so dispatch-block *uses* of the same

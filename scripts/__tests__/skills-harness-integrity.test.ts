@@ -477,18 +477,49 @@ describe("persona / sub-agent boundary", () => {
   }
 
   /**
-   * Deliberately narrow phrasings for a future edit that would *grant* a
-   * persona authority it does not have — the contradiction-by-addition risk
-   * accepted in design.md § Test design (cases 6, 8, 9). Each pattern anchors
-   * on a modal or a direct object so the file's own denial prose ("grants no
-   * tool access", "never authorizes", "cannot override") does not self-match:
-   * those use "no"/"never"/"cannot", never "may"/"can" immediately before the
-   * verb, and never "<verb> ... to the persona".
+   * Files whose persona prose must never grant authority. The three packet
+   * definitions join persona-router here: PE-02 left them presence-only, so a
+   * contradicting sentence could be added to a *definition* — the worst place
+   * for one — and every gate would stay green.
    */
-  const AUTHORITY_GRANT_PATTERNS: RegExp[] = [
-    /\bpersonas?\s+(?:may|can)\s+(?:grant|authorize|widen|override)\b/i,
-    /\b(?:grant|authorize|widen|override)(?:s|ed|ing)?\s+(?:\w+\s+){0,3}(?:authority|permission|write scope)\s+to\s+(?:the\s+|a\s+)?persona\b/i,
+  const AUTHORITY_SCANNED_FILES = [
+    path.join("persona-router", "SKILL.md"),
+    ...PACKET_FILES,
   ];
+
+  /**
+   * An authority-granting claim is detected structurally, not by phrase list.
+   *
+   * The earlier approach enumerated phrasings (`persona may grant`, `grant
+   * authority to the persona`). It killed the two mutations it was written
+   * against and nothing else: "a persona is permitted to write" and "personas
+   * hold write access" both sailed through. Enumeration cannot win here — the
+   * space of ways to say "persona has power" is unbounded.
+   *
+   * So invert it. Find every sentence that mentions a persona *and* an
+   * authority term, then require that sentence to carry a negator. This
+   * repository's actual rules all do ("grants **no** tool access", "**never**
+   * overrides", "is **never** authority"), so correct prose passes while any
+   * affirmative grant fails regardless of how it is worded.
+   */
+  const AUTHORITY_TERM =
+    /\b(?:grant|authoriz|widen|overrid|permit|allow|entitl|empower|confer)\w*\b|\bwrite (?:scope|access|permission)\b|\bauthority\b|\bpermissions?\b|\btool access\b/i;
+  const NEGATOR = /\b(?:never|not|no|non-|cannot|can't|neither|nor|without|only)\b/i;
+
+  /** Sentence-ish split: markdown lines are short, so split on both. */
+  function sentences(content: string): string[] {
+    return content
+      .split(/\r?\n/)
+      .flatMap((line) => line.split(/(?<=[.!?;])\s+/))
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  function authorityGrants(content: string): string[] {
+    return sentences(content).filter(
+      (s) => /\bpersonas?\b/i.test(s) && AUTHORITY_TERM.test(s) && !NEGATOR.test(s),
+    );
+  }
 
   // PAB-01
   test("all three Capability Packet copies declare the optional persona field", async () => {
@@ -607,16 +638,18 @@ describe("persona / sub-agent boundary", () => {
     expect(section).toContain("A persona route is not a specialist consultation");
   });
 
-  // Task A negative structural assertion — closes the contradiction-by-addition
-  // residual accepted in design.md § Test design for cases 6, 8, 9: a future
-  // edit granting persona authority anywhere in this file now fails the gate,
-  // instead of passing alongside the still-present denial prose.
-  test("no authority-granting claim about persona appears anywhere in persona-router/SKILL.md", async () => {
-    const content = await read(PERSONA_ROUTER);
+  // Negative structural assertion — closes the contradiction-by-addition
+  // residual accepted in design.md § Test design for cases 6, 8, 9, and PE-02
+  // for cases 1 and 2. A future edit granting persona authority in the router
+  // OR in any of the three packet definitions now fails the gate, instead of
+  // passing alongside the still-present denial prose.
+  test("no file grants persona authority in prose", async () => {
     const offenders: string[] = [];
-    for (const pattern of AUTHORITY_GRANT_PATTERNS) {
-      const match = pattern.exec(content);
-      if (match) offenders.push(`${pattern}: "${match[0]}"`);
+    for (const rel of AUTHORITY_SCANNED_FILES) {
+      const content = await read(path.join(SKILLS_DIR, rel));
+      for (const sentence of authorityGrants(content)) {
+        offenders.push(`${rel}: "${sentence.slice(0, 120)}"`);
+      }
     }
     expect(offenders).toEqual([]);
   });
