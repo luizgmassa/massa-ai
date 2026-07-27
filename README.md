@@ -374,6 +374,7 @@ Migrated documentation for massa-ai workflows lives in `docs/`:
 | Maestro | `docs/massa-ai-maestro.md` |
 | Mobile Figma | `docs/massa-ai-mobile-figma.md` |
 | Context Slices | `docs/context-slices.md` |
+| Onboarding (generated) | `docs/ONBOARDING.md` — see [Understanding the codebase](#understanding-the-codebase) |
 
 ```json
 {
@@ -852,6 +853,40 @@ massa-ai/
 | **Handoffs** | Cross-session structured records (summary/next-steps/files), dual-written as searchable memories |
 | **Auto-improvement** | Rule-based pattern detection → proposals (auto-approve or review-gated) |
 | **Web UI** | Read-only browser served by the Tools API at `/ui` |
+
+### Understanding the codebase
+
+New to the repo? **[docs/ONBOARDING.md](./docs/ONBOARDING.md)** is a generated guide to the
+runtime architecture: the nine layers, the seven recurring patterns (two-transports-one-contract,
+LLM-off-by-default, `get*()`/`reset*()` factories, blue-green symbol-graph generations), a
+13-step guided tour, a per-layer file map, and the complexity hotspots worth approaching
+carefully.
+
+It is generated from a knowledge graph of the source tree — 1847 nodes, 4226 edges — built
+with the [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything) plugin. The
+graph itself lives in `.ua/knowledge-graph.json` and is pinned to the commit it was built
+from, so it goes stale as `main` moves. Regenerate both when it drifts:
+
+```bash
+/understand              # rebuild .ua/knowledge-graph.json (scoped by .ua/.understandignore)
+/understand-dashboard    # interactive graph explorer on 127.0.0.1:5173
+/understand-onboard      # regenerate docs/ONBOARDING.md from the graph
+```
+
+Two caveats worth knowing before you trust it:
+
+- **The graph covers `src/` trees only** — 733 of 2094 tracked files. `scripts/`, `prisma/`,
+  `skills/`, `.specs/`, `benchmarks/`, and the four generated `apps/*-plugin/` duplicate
+  trees are excluded by `.ua/.understandignore`. So `ONBOARDING.md` describes the runtime
+  architecture completely, but says nothing about the release chain, the agent-harness
+  surface, or the Prisma schema. It names those gaps and points at `CLAUDE.md` and
+  `CONTRIBUTING.md` for each.
+- **Barrel `index.ts` files show as graph orphans.** A re-export (`export * from`) is not a
+  value import, so static analysis does not trace through it. That isolation is an artifact,
+  not dead code.
+
+`ONBOARDING.md` is a convenience, not a source of truth. `CLAUDE.md`, `CONTRIBUTING.md`, and
+`.specs/` remain canonical.
 
 ---
 
