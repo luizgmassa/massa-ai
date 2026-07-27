@@ -5,7 +5,9 @@
 - projectId: `massa-ai`
 - workflowSessionId: `spec-audit-remediation-2026-07`
 - workflow: spec-driven (Large — Specify + Design + Tasks + full Plan Challenge + Execute)
-- feature: `audit-remediation-2026-07` — **Specify/Design/Tasks complete; Plan Challenge in progress; Execute not started**
+- feature: `audit-remediation-2026-07` — **Specify/Design/Tasks complete; Plan Challenge complete; Execute in progress (PR1)**
+- worktree: `/Users/luizmassa/Projects/massa-ai-wt-audit-remediation`; branch
+  `fix/audit-remediation-security-and-bugs` off `origin/main` @ `3a25cc6` (v1.7.1)
 - scope: 17 requirements (SEC-01..06, BUG-01..06, DEBT-01..05) across 22 tasks and 2 PRs
 - Artifacts: `.specs/features/audit-remediation-2026-07/{spec,design,tasks}.md`
 - Origin: knowledge-graph analysis at `17ee708` (1847 nodes / 4226 edges) plus two verification
@@ -48,7 +50,28 @@
     asserts the deleted bypass and is now named for rewrite.
   - Rejected as not-a-gap: CORS-as-theatre — the plan never overclaims CORS as the primary control.
 - Task count: 24 across 6 phases, 2 PRs. Packs into 4 batches at the ~7-task budget.
-- Execute: **not started** — awaiting user approval of the revised plan and the sub-agent offer.
+- Execute: **PR1 in progress — 7 of 15 tasks committed**, executed inline (the user declined
+  sub-agents for PR1; the T15 verification agent is the one accepted exception).
+  - Order: T0 → T1 → T2 → T3 → T4 → T5 → T6 → **T7 (next)** → T23 → T8 → T9 → T10 → T11 → T12 →
+    T13 → T14 → T15.
+  - Committed: `30e710a` T1, `a081406` T0, `41b2f90` T2, `976370f` T3, `e17bd5d` T4, `079cc49` T5,
+    `5908960` T6.
+  - Three Execute-phase divergences, all written back into `spec.md` / `design.md`:
+    1. **T2** — the specified "re-read after conflict" concurrency fix does not converge; proven by
+       its own test. Replaced with an `open(…, "wx")` exclusive-create writer election in
+       `packages/shared/src/config/api-key.ts`.
+    2. **T0** — `ctx.request.ip` is the verified mechanism. `ctx.server` is *absent* under
+       `adapter: node()`, so `server.requestIP()` is `undefined` rather than throwing. Loopback has
+       three accepted spellings: `::1`, `::ffff:127.0.0.1`, `127.0.0.0/8`.
+    3. **T5** — a second admin-preservation test file lived in a different directory. Do a
+       repo-wide reference sweep after deleting a module.
+  - New decision (T6): Docker gets an explicit `MASSA_AI_WEB_UI_TRUST_LOCAL=true` opt-in set in the
+    `Dockerfile`. A bridge-mapped container can never satisfy the loopback check, so this is the
+    only way `/ui` works in Docker. Exposure accepted knowingly by the user: with the `0.0.0.0`
+    bind, anyone reaching `:3333` can read the key out of `/ui`'s HTML. It is off by default,
+    accepts only the exact string `"true"`, warns once at startup, and is documented in
+    `docs/web-ui-access.md`. Do not silently widen or narrow it.
+  - PR1 cannot open before T15: the `CHANGELOG.md` entry is a CI merge gate and is still unwritten.
 - Skipped sensor: `recall` returned 0 memories for this workspace, so no durable memory informed
   this plan. Context7 MCP not registered — oxlint's rule catalogue is unverified against upstream
   docs and must be confirmed in TASK-018.
