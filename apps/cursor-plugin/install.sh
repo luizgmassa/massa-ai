@@ -57,7 +57,18 @@ if [[ "$SCOPE" == "project" ]]; then
 else
   CURSOR_DIR="$HOME/.cursor"
 fi
-PLUGIN_DIR="$CURSOR_DIR/plugins/massa-ai"
+# Cursor discovers locally-installed plugins under plugins/local/<name>/, not
+# plugins/<name>/. Installing to the latter is why massa-ai never appeared in
+# Cursor's plugin list even though every file was written correctly.
+#
+# UNVERIFIED against a running Cursor.app — this path comes from Cursor's
+# plugin documentation, not from an observed load, because Cursor is not
+# installed on the machine this was developed on. Treat it as lower confidence
+# than the Claude/Codex routes, which were verified end-to-end.
+PLUGIN_DIR="$CURSOR_DIR/plugins/local/massa-ai"
+# Pre-fix installs wrote here; removed on install so the two cannot both be
+# discovered and register duplicate hooks.
+LEGACY_PLUGIN_DIR="$CURSOR_DIR/plugins/massa-ai"
 HOOKS_JSON="$CURSOR_DIR/hooks.json"
 
 # The 7 Cursor events → binary subcommands. The command path uses the
@@ -294,6 +305,10 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
     echo "  - removed massa-ai hook entries from $HOOKS_JSON"
   fi
   # Remove plugin directory
+  if [[ -d "$LEGACY_PLUGIN_DIR" ]]; then
+    rm -rf "$LEGACY_PLUGIN_DIR"
+    echo "  - removed $LEGACY_PLUGIN_DIR (pre-fix location)"
+  fi
   if [[ -d "$PLUGIN_DIR" ]]; then
     rm -rf "$PLUGIN_DIR"
     echo "  - removed $PLUGIN_DIR"
@@ -305,6 +320,13 @@ fi
 
 # ── Install ──────────────────────────────────────────────────────────────────
 vecho "Installing massa-ai Cursor plugin to: $PLUGIN_DIR"
+# Migration: a pre-fix install left a copy at plugins/massa-ai. Leaving it in
+# place risks Cursor discovering both and firing every hook twice, so it goes
+# before the new location is written.
+if [[ -d "$LEGACY_PLUGIN_DIR" ]]; then
+  rm -rf "$LEGACY_PLUGIN_DIR"
+  echo -e "  - removed pre-fix plugin copy at $LEGACY_PLUGIN_DIR"
+fi
 mkdir -p "$PLUGIN_DIR/.cursor-plugin" "$PLUGIN_DIR/skills" "$PLUGIN_DIR/hooks" "$PLUGIN_DIR/agents"
 
 # Copy manifest

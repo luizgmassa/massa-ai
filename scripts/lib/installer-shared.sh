@@ -90,6 +90,96 @@ installer_is_real_home() {
   [ "$candidate" = "$resolved_home" ]
 }
 
+# ── Host plugin CLI probing ──────────────────────────────────
+# installer_host_cli_supports <cli> <subcommand...>
+# 0 only when <cli> is on PATH AND `<cli> <subcommand...> --help` succeeds.
+# Both halves matter. `plugin marketplace add` is recent CLI surface, so an
+# older host binary can be present and still not understand it; and the name
+# `claude`/`codex`/`cursor` is not reserved, so PATH may hold an unrelated
+# binary entirely. Either case must degrade to a printed manual instruction
+# rather than a failed install — this probe is what makes that possible.
+installer_host_cli_supports() {
+  local cli="$1"
+  shift
+  command -v "$cli" >/dev/null 2>&1 || return 1
+  "$cli" "$@" --help </dev/null >/dev/null 2>&1
+}
+
+# ── Plugin marketplace source ────────────────────────────────
+# A host plugin registry stores the marketplace ROOT PATH, not a copy of its
+# contents, so whatever path we register has to keep existing. Registering the
+# live checkout was measured to fail two ways once that checkout is deleted:
+# Claude reports `failed to load: cache-miss`, and `codex plugin list` errors
+# out for EVERY configured marketplace, not just massa-ai. That is the same
+# fragility the "real copies, not symlinks" rule in CLAUDE.md already exists to
+# avoid for skills.
+#
+# Modes mirror --mcp-source:
+#   local  register the live checkout — edits apply instantly, dies if it moves
+#   copy   register a stable copy under <home>/.config/massa-ai/marketplace
+#   auto   local when run from a checkout, copy otherwise (npx / published)
+MASSA_AI_PLUGIN_SOURCE_DIRNAME=".config/massa-ai/marketplace"
+
+# installer_plugin_source_mode <requested> <repo_root>
+installer_plugin_source_mode() {
+  local requested="${1:-auto}" repo_root="$2"
+  case "$requested" in
+    local|copy) echo "$requested"; return 0 ;;
+    auto) ;;
+    *)
+      echo "Error: --plugin-source must be local, copy, or auto (got '${requested}')" >&2
+      return 2
+      ;;
+  esac
+  # The Claude marketplace manifest only exists in a source checkout; its
+  # absence is what distinguishes an npx/published install.
+  if [ -f "${repo_root}/.claude-plugin/marketplace.json" ]; then
+    echo "local"
+  else
+    echo "copy"
+  fi
+}
+
+# installer_plugin_source_root <mode> <repo_root> <target_home>
+# Echoes the marketplace root to register. In copy mode the bundle is
+# re-materialised first, so the registered path never points at the checkout.
+installer_plugin_source_root() {
+  local mode="$1" repo_root="$2" target_home="$3"
+
+  if [ "$mode" = "local" ]; then
+    echo "$repo_root"
+    return 0
+  fi
+
+  local dest="${target_home}/${MASSA_AI_PLUGIN_SOURCE_DIRNAME}"
+  mkdir -p "$dest"
+
+  # Each host resolves its marketplace manifest from a different dotdir, and
+  # all of them are relative to the same root, so the copy has to preserve the
+  # repo's relative layout rather than flattening it.
+  local rel
+  for rel in .claude-plugin .agents .cursor-plugin; do
+    [ -d "${repo_root}/${rel}" ] || continue
+    rm -rf "${dest:?}/${rel}"
+    cp -R "${repo_root}/${rel}" "${dest}/${rel}"
+  done
+
+  mkdir -p "${dest}/apps"
+  local host src
+  for host in claude codex cursor opencode; do
+    src="${repo_root}/apps/${host}-plugin"
+    [ -d "$src" ] || continue
+    rm -rf "${dest:?}/apps/${host}-plugin"
+    cp -R "$src" "${dest}/apps/${host}-plugin"
+    # node_modules is a workspace symlink farm pointing back into the checkout;
+    # copying it would reintroduce the very dependency this mode removes.
+    rm -rf "${dest}/apps/${host}-plugin/node_modules"
+    rm -rf "${dest}/apps/${host}-plugin/.turbo"
+  done
+
+  echo "$dest"
+}
+
 # installer_consent_gate <target_home> <yes_flag> <exit_code> [label]
 # Refuses to write the real $HOME without --yes. A TTY gets an interactive
 # prompt; a non-TTY refuses outright. The exit code is a parameter because
