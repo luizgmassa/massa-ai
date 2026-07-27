@@ -50,12 +50,15 @@
     asserts the deleted bypass and is now named for rewrite.
   - Rejected as not-a-gap: CORS-as-theatre — the plan never overclaims CORS as the primary control.
 - Task count: 24 across 6 phases, 2 PRs. Packs into 4 batches at the ~7-task budget.
-- Execute: **PR1 in progress — 7 of 15 tasks committed**, executed inline (the user declined
+- Execute: **PR1 in progress — 11 of 15 tasks committed**, executed inline (the user declined
   sub-agents for PR1; the T15 verification agent is the one accepted exception).
-  - Order: T0 → T1 → T2 → T3 → T4 → T5 → T6 → **T7 (next)** → T23 → T8 → T9 → T10 → T11 → T12 →
+  - Order: T0 → T1 → T2 → T3 → T4 → T5 → T6 → T7 → T23 → T8 → T9 → **T10 (next)** → T11 → T12 →
     T13 → T14 → T15.
   - Committed: `30e710a` T1, `a081406` T0, `41b2f90` T2, `976370f` T3, `e17bd5d` T4, `079cc49` T5,
-    `5908960` T6.
+    `5908960` T6, `a646204` T7, `7ee6fa4` T23, `640fd3c` T8, `085e3e8` T9.
+    (`f26060b` corrected this section's own stale `Execute: not started` line.)
+  - **Remaining: T10, T11, T12, T13, T14 (Phase 4 bugs), then T15 (PR1 close).** Phases 0-3 are
+    complete.
   - Three Execute-phase divergences, all written back into `spec.md` / `design.md`:
     1. **T2** — the specified "re-read after conflict" concurrency fix does not converge; proven by
        its own test. Replaced with an `open(…, "wx")` exclusive-create writer election in
@@ -71,6 +74,33 @@
     bind, anyone reaching `:3333` can read the key out of `/ui`'s HTML. It is off by default,
     accepts only the exact string `"true"`, warns once at startup, and is documented in
     `docs/web-ui-access.md`. Do not silently widen or narrow it.
+  - Further divergences found in Phase 3/4, all written back into `design.md`:
+    4. **T7** — `setup-local-first.sh` regenerated `config.json` wholesale, so a re-run destroyed
+       the auto-provisioned key. Key resolution + the config writer moved to
+       `scripts/lib/installer-api-key.sh` so the contract is executable, not grep-pinned.
+    5. **T7** — `env.ts` seeded `MASSA_AI_API_KEY` on a bare truthiness check while `usable()`
+       treats whitespace as unset, so a `"   "` stored key made the API provision a fresh key
+       while clients sent blanks. Both sides now trim.
+    6. **T7** — the compose `mcp` service had no volume and no key, so a default
+       `docker compose up` could not authenticate. It now shares `massa-ai-data`, and both
+       images set `XDG_CONFIG_HOME=/data` so `config.json` lands in the mounted volume.
+    7. **T23** — the Codex/Cursor hook copies are owned by `generate-skill-artifacts.ts`, **not**
+       `generate-subagent-artifacts.ts` as CLAUDE.md's hook paragraph implies. The subagent
+       generator reported "No drift" against stale copies still shipping the broken hook. Run
+       **both** `--check`s after touching any managed harness surface.
+    8. **T8** — `tsc` found three `ExecResult` constructions the design did not name (two
+       path-boundary refusals and the compile-failure return). They report the mode that would
+       have applied rather than omitting the field.
+  - **Owed measurement (T7):** the Docker bridge address is instrumented, not yet observed — this
+    machine has no container runtime (`docker`/`podman`/`colima`/`lima` all absent). CI's `mcp`
+    job runs `scripts/tests/test-docker-remote-address.sh` with `MASSA_AI_DOCKER_PROBE=1`; the
+    observed `ctx.request.ip` must be pasted verbatim into `design.md` → "TASK-007 — the Docker
+    path, instrumented rather than asserted" from that job log. Without the flag the suite reports
+    `# NOT RUN`; with the flag and no runtime it fails rather than skipping.
+  - Known load flakes seen repeatedly this session, green standalone every time, a different one
+    each run: `apps/mcp-client` `embedded-api-client-endpoints.test.ts`, and `packages/core`'s
+    `mock-free (113 files)` group and `trace-path.test.ts`. Do not chase them; re-run the package
+    alone and say so rather than claiming a clean parallel aggregate.
   - PR1 cannot open before T15: the `CHANGELOG.md` entry is a CI merge gate and is still unwritten.
 - Skipped sensor: `recall` returned 0 memories for this workspace, so no durable memory informed
   this plan. Context7 MCP not registered — oxlint's rule catalogue is unverified against upstream
