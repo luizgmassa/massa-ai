@@ -56,6 +56,7 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 > - output: implementation summary, commands run, test counts, deviations
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable patterns
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: high-risk, security, public-contract, or multi-file fix
@@ -66,6 +67,7 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 > - output: confirmed/disproven closure verdict with evidence
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists reusable verification recipes
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
     Never run parallel writers against shared files or contracts.
 11. Verify each completed finding with the Mandatory Verification Fix Gate from `references/verification-ladder.md`: run the report's Verification Suggestion or an equivalent deterministic command/artifact check, then run focused tests, build, lint, type, static, or runtime checks relevant to the source lens. Reinspect tests, fixtures, snapshots, types, specs, public contracts, and touched identifiers so validation assets were not weakened and names follow `references/naming-standards.md`. A finding cannot be marked `fixed` when a target-relevant command or artifact check exists but was not attempted; if verification cannot run, mark it `blocked`, `deferred`, or `skipped` with an allowed skipped-check reason.

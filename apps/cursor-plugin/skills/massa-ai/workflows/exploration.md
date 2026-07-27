@@ -69,6 +69,7 @@ Step 5: Flag as uncertain → "I'm not certain about X — here's my reasoning, 
 > - output: entry points, core flow, dependencies, data ownership, relevant contracts, exact evidence pointers (path, symbol, line), confirmed facts vs inferences
 > - firewall: raw logs, snapshots, generated reports, and broad search output summarized, not returned raw
 > - memory: suggest-only; main agent persists durable discoveries
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
     - Follow the shared retrieval order: project map, summary search, targeted
       enriched search, symbol/file tools, optimized context, then focused shell

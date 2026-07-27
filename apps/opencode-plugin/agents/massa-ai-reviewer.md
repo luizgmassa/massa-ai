@@ -23,7 +23,8 @@ Review implementation quality by analyzing the diff and flagging bugs, regressio
 - Never implement.
 - Never rewrite files.
 - Never plan features.
-- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
+- Never spawn subagents, never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
+- A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
 
 ## Inputs
 - `scope`: the diff, changed files, or PR to review.

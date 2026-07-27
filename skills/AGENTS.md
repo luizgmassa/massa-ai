@@ -314,8 +314,11 @@ Workflows send this packet when dispatching any agent:
 - `output`: the exact output contract (see below)
 - `firewall`: raw logs, diffs, snapshots, or research that must be summarized, not returned raw
 - `memory`: whether the agent may suggest memory and who persists it (default: suggest only; main agent persists)
+- `persona`: optional. The cataloged persona id in effect for the parent conversation, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions. Pass the id alone, never the persona prompt.
 
 For `audit-specialist`, the packet also includes `lens`: one of `bugs | architecture | security | requirements | code-quality | performance`.
+
+The `persona` field is optional and absent is the valid default. Personas and agents are different layers: a persona shapes the main agent's stance, an agent executes a bounded capability under its own charter. See `skills/persona-router/SKILL.md` -> Persona And Sub-Agents for the boundary rules.
 
 ## Output Contract (shared by all agents)
 
@@ -376,7 +379,7 @@ The symlinked massa-ai skill defines the roles in `references/agent-orchestratio
 
 ## How to Add an Agent
 
-1. Create `skills/agents/<name>/SKILL.md` from the charter template (see any existing agent skill), including `metadata.model_hint` and `metadata.permission`.
+1. Create `skills/agents/<name>/SKILL.md` from the charter template (see any existing agent skill), including `metadata.model_hint` and `metadata.permission`. Its `## Restrictions` section must carry both persona-boundary lines verbatim — the self-routing ban (`never load the massa-ai or persona-router routers, and never open a personas/ prompt file`) and the precedence line (`a persona supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict`). `scripts/__tests__/skills-harness-integrity.test.ts` enumerates charters from disk and is section-scoped, so a new charter missing either line fails the gate.
 2. Add one row to the Agent Table above.
 3. Add one row to the Mapping table if it maps to an existing role.
 4. Add `<name>` to `SPECIALIST_NAMES` plus the two model-pinning tables in `scripts/generate-subagent-artifacts.ts`, then run it to regenerate the host artifacts.

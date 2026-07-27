@@ -110,6 +110,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
 > - output: `.specs/features/<slug>/validation.md` (PASS/FAIL, per-AC evidence, sensor result, diff range); compact verdict + ranked gap list; gaps become fix tasks
 > - firewall: raw diffs/logs/test output summarized; mutations run in scratch state only
 > - memory: suggest-only; main agent persists validation outcomes
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
     - The verification-agent re-derives coverage independently using evidence-or-zero and does not inherit the author's mental model.
    - The fix → re-verify loop is capped at 3 iterations before escalating to `Blocked`.

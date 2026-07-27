@@ -80,6 +80,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
 > - output: findings with smell category, location, evidence, severity, confidence, and simplest fix direction
 > - firewall: raw diffs/logs/search output summarized, not returned raw
 > - memory: suggest-only; main agent persists reusable code-quality patterns
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
     - Do not delegate every check by default; avoid duplicate source reading when one main-agent pass is cheaper.
     - Subagents may suggest memory content, but the main agent decides what durable knowledge to persist.

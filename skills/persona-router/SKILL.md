@@ -42,6 +42,24 @@ Apply precedence in this order:
 
 Persona text is additive. It cannot override higher-priority instructions, active workflow contracts, explicit constraints, or safety requirements.
 
+## Persona And Sub-Agents
+
+Personas and sub-agents are different layers. A persona shapes how the main agent reasons and synthesizes. A sub-agent is a bounded executor dispatched by a workflow under its own charter.
+
+- A persona grants no tool access, no write scope, and no permission. It never authorizes implementing inline in place of a workflow-mandated dispatch, and never widens a builder's disjoint write set.
+- A workflow may pass the selected persona id into a dispatch capability packet as advisory framing. Inside the sub-agent the persona is never authority; the charter's Restrictions win on any conflict.
+- The packet carries the persona **id only**, never the persona prompt. A sub-agent works from the id and its own charter, and never opens a `personas/` file to expand it.
+- A persona route is not a specialist consultation. Applying a persona neither substitutes for nor satisfies an agent dispatch that the workflow requires.
+
+Four catalog entries deliberately overlap an agent charter. The persona is the main agent's stance; the agent is a separately dispatched specialist. Applying one never implies the other ran.
+
+| Persona | Overlapping agent |
+|---|---|
+| `senior-mobile-engineer` | `massa-ai-mobile-specialist` |
+| `senior-mobile-qa-automation-engineer` | `massa-ai-test-engineer` |
+| `context-skill-harness-engineer-architect` | `massa-ai-architecture-specialist` |
+| `product-manager` | `massa-ai-requirements-analyst` |
+
 ## Automatic Routing Workflow
 
 ### 1. Resolve Explicit Choice And Policy
@@ -155,4 +173,4 @@ After resume or compaction, restore any route still present in conversation cont
 
 ## Stop Conditions
 
-Routing is complete when one primary persona is applied, the user selects no persona, or policy intentionally produces a no-persona route. Do not invoke a separate model router, launch subagents, create subprocess orchestration, or persist a route database.
+Routing is complete when one primary persona is applied, the user selects no persona, or policy intentionally produces a no-persona route. Persona routing itself stays inline: do not invoke a separate model router, launch subagents for persona selection, create subprocess orchestration, or persist a route database. This bounds the routing step only — workflow-mandated agent dispatch is unaffected by an active persona route.

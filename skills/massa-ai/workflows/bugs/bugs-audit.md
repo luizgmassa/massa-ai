@@ -66,6 +66,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
 > - output: findings with bug category, location, evidence, trigger, severity, confidence, simplest fix direction, verification suggestion
 > - firewall: raw diffs/logs/search output summarized, not returned raw
 > - memory: suggest-only; main agent persists reusable bug patterns
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
     - Trace input -> transformation -> output for each suspicious path.
    - Check diffs, surrounding code, callers and callees, tests, config, migrations, schemas, and recalled project patterns.

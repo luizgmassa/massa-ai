@@ -67,6 +67,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
 > - output: findings with security boundary, asset, trigger/exploit path, severity, confidence, evidence, simplest fix direction, verification suggestion
 > - firewall: raw diffs/logs/search output summarized, not returned raw
 > - memory: suggest-only; main agent persists reusable security patterns
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
     - Trace untrusted input -> validation -> authorization -> transformation -> persistence or side effect.
    - Check authn/authz, object ownership, tenant isolation, input validation, output encoding, secret handling, cryptography use, SSRF/path traversal/injection risks, logging privacy, dependency/config exposure, and security-sensitive tests.

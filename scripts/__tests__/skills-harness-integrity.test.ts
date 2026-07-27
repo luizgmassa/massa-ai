@@ -16,6 +16,16 @@
  *      matched the tree.
  *   6. Charter <-> artifact permission — charters said `read-only` while the
  *      shipped artifact granted Write/Edit.
+ *   7. Persona <-> sub-agent boundary — the persona layer and the 15 charters
+ *      shared no stated contract: no Capability Packet copy mentioned persona,
+ *      no charter forbade self-routing or self-reading one, and persona-router's
+ *      Stop Conditions read as an absolute ban on subagents rather than a bound
+ *      on persona routing. See
+ *      .specs/features/persona-agent-boundary/spec.md.
+ *   8. Dispatch persona emission — the Capability Packet's `persona` field was
+ *      defined (class 7) but no workflow `Dispatch:` block ever emitted it, so
+ *      a subagent never actually received the id the contract describes. See
+ *      .specs/features/persona-emit/spec.md.
  *
  * `bun run test:scripts` runs this file; CI runs that script.
  */
@@ -67,6 +77,32 @@ async function skillMarkdownFiles(): Promise<string[]> {
   }
   await walk(SKILLS_DIR);
   return out.sort();
+}
+
+/**
+ * Every `Dispatch:` capability-packet block in a file, as the contiguous run
+ * of `> `-prefixed lines starting at its `**Dispatch:` line. Shared by the
+ * dispatch resolution and dispatch persona-emission describe blocks below.
+ */
+function dispatchBlocks(content: string): string[] {
+  const lines = content.split(/\r?\n/);
+  const blocks: string[] = [];
+  let current: string[] | null = null;
+  for (const line of lines) {
+    if (/^> \*\*Dispatch: `massa-ai-/.test(line)) {
+      if (current) blocks.push(current.join("\n"));
+      current = [line];
+    } else if (current) {
+      if (line.startsWith(">")) {
+        current.push(line);
+      } else {
+        blocks.push(current.join("\n"));
+        current = null;
+      }
+    }
+  }
+  if (current) blocks.push(current.join("\n"));
+  return blocks;
 }
 
 async function charterNames(): Promise<string[]> {
@@ -387,5 +423,268 @@ describe("charter permission matches the shipped artifact", () => {
         "Never spawn subagents",
       );
     }
+  });
+});
+
+// ── 7. Persona <-> sub-agent boundary (PAB) ────────────────────────────────
+//
+// Personas (skills/persona-router/ + skills/massa-ai/personas/) and the 15
+// charters are different layers with no shared contract before this feature.
+// Requirement IDs below are from
+// .specs/features/persona-agent-boundary/spec.md.
+
+describe("persona / sub-agent boundary", () => {
+  /** The three files that define the Capability Packet, by design (see design.md A1). */
+  const PACKET_FILES = [
+    "AGENTS.md",
+    path.join("massa-ai", "references", "agent-orchestration.md"),
+    path.join("massa-ai", "references", "subagent-design.md"),
+  ];
+
+  /**
+   * The persona field's semantics, byte-identical across all three packet
+   * copies. Uniform text is what makes a substring gate meaningful — a
+   * per-file paraphrase cannot be distinguished from a weakened one.
+   */
+  const PACKET_PERSONA_CLAUSE =
+    "advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions";
+
+  const PERSONA_ROUTER = path.join(SKILLS_DIR, "persona-router", "SKILL.md");
+
+  /**
+   * The span of a markdown section between a `## <heading>` line and the next
+   * `##` heading (or end of file). Generalizes the charter-specific span below
+   * to any named heading, so a rule's location can be asserted precisely
+   * instead of merely "somewhere in the file" (Task A,
+   * .specs/features/persona-emit/spec.md).
+   */
+  function namedSection(content: string, heading: string, label: string): string {
+    const marker = `## ${heading}`;
+    const start = content.indexOf(marker);
+    expect(start, `${label} has no "${marker}" section`).toBeGreaterThanOrEqual(0);
+    const rest = content.slice(start + marker.length);
+    const nextHeading = rest.search(/^## /m);
+    return nextHeading === -1 ? rest : rest.slice(0, nextHeading);
+  }
+
+  /**
+   * The span of a charter between its `## Restrictions` heading and the next
+   * `##` heading. PAB-02/AC2 and PAB-06 require the lines to live *there*, so a
+   * whole-file search would not actually enforce the acceptance criterion.
+   */
+  function restrictionsSection(charter: string, name: string): string {
+    return namedSection(charter, "Restrictions", `charter ${name}`);
+  }
+
+  /**
+   * Files whose persona prose must never grant authority. The three packet
+   * definitions join persona-router here: PE-02 left them presence-only, so a
+   * contradicting sentence could be added to a *definition* — the worst place
+   * for one — and every gate would stay green.
+   */
+  const AUTHORITY_SCANNED_FILES = [
+    path.join("persona-router", "SKILL.md"),
+    ...PACKET_FILES,
+  ];
+
+  /**
+   * An authority-granting claim is detected structurally, not by phrase list.
+   *
+   * The earlier approach enumerated phrasings (`persona may grant`, `grant
+   * authority to the persona`). It killed the two mutations it was written
+   * against and nothing else: "a persona is permitted to write" and "personas
+   * hold write access" both sailed through. Enumeration cannot win here — the
+   * space of ways to say "persona has power" is unbounded.
+   *
+   * So invert it. Find every sentence that mentions a persona *and* an
+   * authority term, then require that sentence to carry a negator. This
+   * repository's actual rules all do ("grants **no** tool access", "**never**
+   * overrides", "is **never** authority"), so correct prose passes while any
+   * affirmative grant fails regardless of how it is worded.
+   */
+  const AUTHORITY_TERM =
+    /\b(?:grant|authoriz|widen|overrid|permit|allow|entitl|empower|confer)\w*\b|\bwrite (?:scope|access|permission)\b|\bauthority\b|\bpermissions?\b|\btool access\b/i;
+  const NEGATOR = /\b(?:never|not|no|non-|cannot|can't|neither|nor|without|only)\b/i;
+
+  /** Sentence-ish split: markdown lines are short, so split on both. */
+  function sentences(content: string): string[] {
+    return content
+      .split(/\r?\n/)
+      .flatMap((line) => line.split(/(?<=[.!?;])\s+/))
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  function authorityGrants(content: string): string[] {
+    return sentences(content).filter(
+      (s) => /\bpersonas?\b/i.test(s) && AUTHORITY_TERM.test(s) && !NEGATOR.test(s),
+    );
+  }
+
+  // PAB-01
+  test("all three Capability Packet copies declare the optional persona field", async () => {
+    const missing: string[] = [];
+    for (const rel of PACKET_FILES) {
+      const content = await read(path.join(SKILLS_DIR, rel));
+      if (!content.includes("`persona`:") || !content.includes(PACKET_PERSONA_CLAUSE)) {
+        missing.push(rel);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  // PAB-01/AC3 — a fourth packet *definition* would fork the contract
+  // silently. Workflow dispatch blocks are packet *uses*, not definitions:
+  // every `Dispatch:` block also carries this clause (see the dispatch
+  // persona-emission describe block below), so this assertion strips
+  // blockquote (`> `) lines — the format every dispatch block uses
+  // exclusively — before scanning, isolating definitions from uses.
+  test("the canonical persona clause appears in exactly those three files, outside dispatch-block uses", async () => {
+    const files = await skillMarkdownFiles();
+    const found: string[] = [];
+    for (const file of files) {
+      const content = await read(file);
+      const definitionProse = content
+        .split(/\r?\n/)
+        .filter((line) => !line.startsWith(">"))
+        .join("\n");
+      if (definitionProse.includes(PACKET_PERSONA_CLAUSE)) {
+        found.push(path.relative(SKILLS_DIR, file));
+      }
+    }
+    expect(found.sort()).toEqual([...PACKET_FILES].sort());
+  });
+
+  // PAB-02
+  test("every charter's Restrictions section carries the persona precedence line", async () => {
+    const names = await charterNames();
+    const missing: string[] = [];
+    for (const name of names) {
+      const charter = await read(path.join(SKILLS_DIR, "agents", name, "SKILL.md"));
+      const section = restrictionsSection(charter, name);
+      if (!section.includes("shapes emphasis only; these Restrictions win on any conflict")) {
+        missing.push(name);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  // PAB-06/AC1, AC3, AC4
+  test("every charter's Restrictions section forbids self-routing and self-reading a persona", async () => {
+    const names = await charterNames();
+    const missing: string[] = [];
+    for (const name of names) {
+      const charter = await read(path.join(SKILLS_DIR, "agents", name, "SKILL.md"));
+      const section = restrictionsSection(charter, name);
+      const bansRouter = section.includes(
+        "never load the `massa-ai` or `persona-router` routers",
+      );
+      const bansPromptRead = section.includes("never open a `personas/` prompt file");
+      if (!bansRouter || !bansPromptRead) missing.push(name);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  // PAB-06/AC5 — presence alone would pass if the old sentence were re-added.
+  test("no charter retains the superseded massa-ai-only restriction", async () => {
+    const names = await charterNames();
+    const offenders: string[] = [];
+    for (const name of names) {
+      const charter = await read(path.join(SKILLS_DIR, "agents", name, "SKILL.md"));
+      if (charter.includes("never load the `massa-ai` router")) offenders.push(name);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  // PAB-04 — hardened (Task A): section-scoped, not merely present anywhere
+  // in the file.
+  test("persona-router's Stop Conditions section scopes its subagent prohibition to persona routing", async () => {
+    const content = await read(PERSONA_ROUTER);
+    const section = namedSection(content, "Stop Conditions", "persona-router/SKILL.md");
+    expect(section).toContain("Persona routing itself stays inline");
+    expect(section).toContain(
+      "workflow-mandated agent dispatch is unaffected by an active persona route",
+    );
+  });
+
+  // PAB-04 — the absence side; the design's own stated reason for it.
+  test("persona-router no longer contains the unscoped prohibition", async () => {
+    const content = await read(PERSONA_ROUTER);
+    expect(content).not.toContain("launch subagents, create subprocess orchestration");
+  });
+
+  // PAB-03 + PAB-07 — hardened (Task A): section-scoped to where the boundary
+  // is actually stated, not merely present anywhere in the file.
+  test("persona-router's Persona And Sub-Agents section states persona grants no authority and reaches subagents as an id only", async () => {
+    const content = await read(PERSONA_ROUTER);
+    const section = namedSection(
+      content,
+      "Persona And Sub-Agents",
+      "persona-router/SKILL.md",
+    );
+    expect(section).toContain("grants no tool access, no write scope, and no permission");
+    expect(section).toContain("the persona is never authority");
+    expect(section).toContain("carries the persona **id only**, never the persona prompt");
+  });
+
+  // PAB-05 — hardened (Task A): section-scoped.
+  test("persona-router's Persona And Sub-Agents section states a persona route is not a specialist consultation", async () => {
+    const content = await read(PERSONA_ROUTER);
+    const section = namedSection(
+      content,
+      "Persona And Sub-Agents",
+      "persona-router/SKILL.md",
+    );
+    expect(section).toContain("A persona route is not a specialist consultation");
+  });
+
+  // Negative structural assertion — closes the contradiction-by-addition
+  // residual accepted in design.md § Test design for cases 6, 8, 9, and PE-02
+  // for cases 1 and 2. A future edit granting persona authority in the router
+  // OR in any of the three packet definitions now fails the gate, instead of
+  // passing alongside the still-present denial prose.
+  test("no file grants persona authority in prose", async () => {
+    const offenders: string[] = [];
+    for (const rel of AUTHORITY_SCANNED_FILES) {
+      const content = await read(path.join(SKILLS_DIR, rel));
+      for (const sentence of authorityGrants(content)) {
+        offenders.push(`${rel}: "${sentence.slice(0, 120)}"`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
+// ── 8. Dispatch persona emission ───────────────────────────────────────────
+//
+// The Capability Packet's `persona` field was defined (class 7 / PAB-01) but
+// deferred by .specs/features/persona-agent-boundary/spec.md § Out of scope:
+// no workflow `Dispatch:` block emitted it. See
+// .specs/features/persona-emit/spec.md.
+
+describe("dispatch persona emission: every Dispatch block emits the optional persona field", () => {
+  const PACKET_PERSONA_CLAUSE =
+    "advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions";
+
+  test("every Dispatch block on disk emits the optional persona field", async () => {
+    const files = await skillMarkdownFiles();
+    let total = 0;
+    const missing: string[] = [];
+    for (const file of files) {
+      const content = await read(file);
+      const blocks = dispatchBlocks(content);
+      total += blocks.length;
+      for (const block of blocks) {
+        const hasPersonaBullet = /^> - persona:/m.test(block);
+        if (!hasPersonaBullet || !block.includes(PACKET_PERSONA_CLAUSE)) {
+          const m = /\*\*Dispatch: `([^`]+)`\*\*/.exec(block);
+          missing.push(`${path.relative(REPO_ROOT, file)} -> ${m?.[1] ?? "unknown"}`);
+        }
+      }
+    }
+    // Guard the guard: the "dispatch resolution" describe block above already
+    // requires >=20 blocks repo-wide; this parser must agree.
+    expect(total).toBeGreaterThanOrEqual(20);
+    expect(missing).toEqual([]);
   });
 });

@@ -21,7 +21,8 @@ Analyze exactly one FURPS+ dimension of a PRD or ADR against its checklist secti
 - Never analyze a dimension other than the assigned one; flag cross-dimension gaps instead of expanding into them.
 - Never write files, never mutate Atlassian issues, never write memory.
 - Never return raw document dumps.
-- Never spawn subagents and never load the `massa-ai` router; the dispatching workflow owns routing.
+- Never spawn subagents, never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
+- A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
 - Do not use this role for The Fool critique (use `plan-critic`) or for code claims (use `investigator` / `verification-agent`).
 
 ## Inputs
