@@ -174,11 +174,29 @@ across a 2101-file repo and collide with the deferred layering/god-module refact
 - **Location**: `packages/shared/src/config/api-key.ts`
 - **Interface**: `resolveApiKey(): { key: string; provisioned: boolean; source: "env" | "config" | "generated" }`
 - **Behavior**: return `process.env.MASSA_AI_API_KEY` when set (`source: "env"`); else
-  `loadConfig().security?.apiKey` when set; else generate 32 bytes via `crypto.randomBytes`,
-  hex-encode, persist through the atomic `saveConfig`, re-read to adopt a concurrent winner, and
-  return `provisioned: true`. Throws when generation is needed and the config dir is unwritable.
-- **Dependencies**: `config-loader.ts`, `node:crypto`
+  `loadConfig().security?.apiKey` when set; else provision — see the amendment below. Throws when
+  generation is needed and the config dir is unwritable. Empty or whitespace-only values from
+  either source count as unset, and a resolved key is trimmed.
+- **Dependencies**: `config-loader.ts`, `node:crypto`, `node:fs`
 - **Reuses**: the existing `llm.apiKey` / `embedding.apiKey` storage and seeding pattern.
+
+> **Amended during TASK-002 — "re-read after write" does not converge.** The mechanism specified
+> here and in spec Edge Cases ("write must be atomic or re-read after conflict") was implemented
+> and its discriminating test failed: with N processes starting at once, every one generates and
+> writes its own key, the last write wins, and any process that re-read *before* that last write
+> returns a key that is not the one on disk. Since operators are told to read the key out of
+> `config.json`, such a process rejects every request they subsequently make. Atomic write is
+> necessary but not sufficient — no read-then-return can be made safe against a later write.
+>
+> Provisioning therefore elects a single writer with `fs.openSync(lockPath, "wx")`, an atomic
+> exclusive create, on `.api-key.provision.lock` beside `config.json`. The winner generates,
+> persists, and warns. The losers block (bounded `Atomics.wait` spin, 5 s deadline with stale-lock
+> recovery for a holder that died) and then take the ordinary `config.json` branch, so they return
+> `source: "config"`, `provisioned: false`, and emit no second warning. `Atomics.wait` rather than
+> `Bun.sleepSync` because `packages/shared` is published and must not require the Bun runtime.
+>
+> Proof: 4 concurrent cold starts all return the key that is on disk, exactly one reports
+> `provisioned: true`, exactly one line reaches stderr, and no lock file is left behind.
 
 ### `authMiddleware` (modified)
 

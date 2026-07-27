@@ -7,15 +7,9 @@
  * config.json. SEC-01 auto-provisions an API key on first start, so two
  * processes starting at once is the real case, not a hypothetical.
  *
- * `CONFIG_DIR` is a module-level const (`config-loader.ts:7`) frozen at module
- * evaluation, and `bun test` shares one process across every file in the
- * package — the sibling suite already imports `config-loader` statically, so
- * assigning `XDG_CONFIG_HOME` here would come too late and these tests would
- * write into the developer's real `~/.config/massa-ai/`. Every scenario below
- * therefore runs in a **subprocess** whose `XDG_CONFIG_HOME` is set before
- * `bun` ever loads the module. That is the "set XDG_CONFIG_HOME before
- * importing config-loader" contract, enforced by process boundary rather than
- * by ordering discipline.
+ * Isolation runs through `isolated-config.ts` — see that module for why every
+ * scenario needs a subprocess rather than an in-process `XDG_CONFIG_HOME`
+ * assignment.
  */
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
@@ -23,53 +17,25 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-const LOADER = path.join(import.meta.dir, "..", "config-loader.ts");
-const CONFIG_TYPES = path.join(import.meta.dir, "..", "massa-ai-config.ts");
+import {
+  CONFIG_TYPES,
+  LOADER,
+  makeIsolatedConfigHome,
+  removeIsolatedConfigHome,
+  runIsolated,
+  spawnIsolated,
+  type IsolatedConfigHome,
+} from "./isolated-config";
 
-let xdgHome: string;
-let configDir: string;
-let configPath: string;
-let scriptDir: string;
+let home: IsolatedConfigHome;
 
 beforeEach(() => {
-  scriptDir = fs.mkdtempSync(path.join(os.tmpdir(), "massa-ai-cfg-"));
-  xdgHome = path.join(scriptDir, "xdg");
-  configDir = path.join(xdgHome, "massa-ai");
-  configPath = path.join(configDir, "config.json");
+  home = makeIsolatedConfigHome();
 });
 
 afterEach(() => {
-  fs.rmSync(scriptDir, { recursive: true, force: true });
+  removeIsolatedConfigHome(home);
 });
-
-/** Write a throwaway script and run it with an isolated XDG_CONFIG_HOME. */
-function runIsolated(
-  name: string,
-  source: string,
-  args: string[] = [],
-): { exitCode: number; stdout: string; stderr: string } {
-  const file = path.join(scriptDir, `${name}.ts`);
-  fs.writeFileSync(file, source);
-  const proc = Bun.spawnSync(["bun", file, ...args], {
-    env: { ...process.env, XDG_CONFIG_HOME: xdgHome },
-  });
-  return {
-    exitCode: proc.exitCode,
-    stdout: proc.stdout.toString(),
-    stderr: proc.stderr.toString(),
-  };
-}
-
-/** Same, but async so the parent can read the file while the child writes. */
-function spawnIsolated(name: string, source: string, args: string[] = []) {
-  const file = path.join(scriptDir, `${name}.ts`);
-  fs.writeFileSync(file, source);
-  return Bun.spawn(["bun", file, ...args], {
-    env: { ...process.env, XDG_CONFIG_HOME: xdgHome },
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-}
 
 const WRITER = `
 import { saveConfig } from ${JSON.stringify(LOADER)};
@@ -90,6 +56,7 @@ describe("config-loader real-filesystem persistence", () => {
     // Guards the isolation contract itself: if this ever reports the real home
     // dir, every test below is silently writing to the developer's ~/.config.
     const { exitCode, stdout, stderr } = runIsolated(
+      home,
       "probe",
       `
 import { getConfigDir, getConfigPath } from ${JSON.stringify(LOADER)};
@@ -99,13 +66,14 @@ console.log(JSON.stringify({ dir: getConfigDir(), file: getConfigPath() }));
     expect(stderr).toBe("");
     expect(exitCode).toBe(0);
     const observed = JSON.parse(stdout);
-    expect(observed.dir).toBe(configDir);
-    expect(observed.file).toBe(configPath);
+    expect(observed.dir).toBe(home.configDir);
+    expect(observed.file).toBe(home.configPath);
     expect(observed.dir.startsWith(os.homedir() + path.sep + ".config")).toBe(false);
   }, 15_000);
 
   test("a partial config.json round-trips through save without losing other sections", () => {
     const { exitCode, stdout, stderr } = runIsolated(
+      home,
       "roundtrip",
       `
 import { saveConfig, loadConfig } from ${JSON.stringify(LOADER)};
@@ -136,7 +104,7 @@ console.log(JSON.stringify(reloaded));
     expect(reloaded.embedding.provider).toBe("ollama");
     expect(reloaded.synapse.enabled).toBe(true);
 
-    const onDisk = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    const onDisk = JSON.parse(fs.readFileSync(home.configPath, "utf-8"));
     expect(onDisk.security.apiKey).toBe("hand-written");
   }, 15_000);
 
@@ -148,7 +116,7 @@ console.log(JSON.stringify(reloaded));
     // either the whole old file or the whole new one.
     const rounds = 250;
     const procs = ["a", "b", "c"].map((tag) =>
-      spawnIsolated(`writer-${tag}`, WRITER, [tag, String(rounds)]),
+      spawnIsolated(home, `writer-${tag}`, WRITER, [tag, String(rounds)]),
     );
 
     let reads = 0;
@@ -158,7 +126,7 @@ console.log(JSON.stringify(reloaded));
       for (let i = 0; i < 40; i++) {
         let raw: string;
         try {
-          raw = fs.readFileSync(configPath, "utf-8");
+          raw = fs.readFileSync(home.configPath, "utf-8");
         } catch {
           continue; // not created yet
         }
@@ -185,12 +153,12 @@ console.log(JSON.stringify(reloaded));
 
   test("no temp files are left behind in the config dir", async () => {
     const procs = ["a", "b"].map((tag) =>
-      spawnIsolated(`leftover-${tag}`, WRITER, [tag, "60"]),
+      spawnIsolated(home, `leftover-${tag}`, WRITER, [tag, "60"]),
     );
     await Promise.all(procs.map((p) => p.exited));
     for (const p of procs) expect(p.exitCode).toBe(0);
 
-    const entries = fs.readdirSync(configDir);
+    const entries = fs.readdirSync(home.configDir);
     expect(entries).toEqual(["config.json"]);
   }, 30_000);
 });

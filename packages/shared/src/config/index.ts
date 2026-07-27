@@ -1040,6 +1040,12 @@ export {
   migrateDataDirOnce,
 } from "./config-loader";
 
+// Tools API key resolution + first-start provisioning (SEC-01). resolveApiKey
+// WRITES on the provisioning path, so callers invoke it explicitly at startup;
+// it is never reached by importing this module.
+export { resolveApiKey, ApiKeyProvisioningError } from "./api-key";
+export type { ResolvedApiKey, ApiKeySource } from "./api-key";
+
 // DEDICATED-stack DB guard — fails fast if a dedicated-flagged process would
 // bind the shared production DB name (`massa_ai`). See db-guard.ts.
 export {

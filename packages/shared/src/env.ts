@@ -68,6 +68,12 @@ try {
     // an embedding auth token; only seed when the env var is unset.
     process.env.OLLAMA_API_KEY = cfg.embedding.apiKey;
   }
+  if (cfg.security?.apiKey && !process.env.MASSA_AI_API_KEY) {
+    // Tools API key (SEC-01). This is a READ, never a provision: importing this
+    // module must not write a secret to the user's home directory. Generation
+    // lives in resolveApiKey(), called explicitly by the API at startup.
+    process.env.MASSA_AI_API_KEY = cfg.security.apiKey;
+  }
 } catch {
   // Defensive: config.json is a best-effort layer; missing/invalid file or
   // any loader error must never abort startup.

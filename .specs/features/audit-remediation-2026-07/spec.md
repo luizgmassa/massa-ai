@@ -316,7 +316,10 @@ implementation, so that the documented contract matches the code.
 ## Edge Cases
 
 - WHEN two processes start concurrently with no key configured THEN exactly one key SHALL end up
-  persisted and both processes SHALL use it (write must be atomic or re-read after conflict).
+  persisted and both processes SHALL use it. *(Narrowed during TASK-002: "re-read after conflict"
+  was implemented and proven insufficient — a read-then-return is always invalidated by a later
+  writer. Provisioning elects one writer via an atomic exclusive-create lock; see `design.md` →
+  `resolveApiKey` amendment.)*
 - WHEN `MASSA_AI_API_KEY` is set in env **and** a different key exists in `config.json` THEN env
   SHALL win, per the documented `env > config.json > defaults` precedence.
 - WHEN the CORS allowlist contains `*` and credentials are enabled THEN startup SHALL reject the
