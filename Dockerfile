@@ -76,6 +76,17 @@ ENV MASSA_AI_API_PORT=3333
 ENV OLLAMA_BASE_URL=http://host.docker.internal:11434
 ENV OLLAMA_EMBEDDING_MODEL=qwen3-embedding:8b
 ENV OLLAMA_EMBEDDING_DIMENSIONS=4096
+# SEC-05: a container reached through a bridge port mapping sees the host
+# browser as a bridge address (::ffff:172.17.0.x), never as loopback, so the
+# address check can never pass here and /ui would be permanently unusable.
+# This opts the container in to serving the key in the page.
+#
+# It means EVERY caller that can reach this port gets the key, and the API binds
+# 0.0.0.0 — publish the port only to a trusted network, or set
+# MASSA_AI_WEB_UI_TRUST_LOCAL=false to disable /ui key injection entirely and
+# read security.apiKey from the mounted config.json instead. The API logs a
+# warning at startup while this is on.
+ENV MASSA_AI_WEB_UI_TRUST_LOCAL=true
 
 EXPOSE 3333
 

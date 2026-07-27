@@ -53,6 +53,7 @@ import {
   validateAllGrammars,
 } from "@massa-ai/core/services";
 import { buildHealthResponse, listenAfterParserValidation } from "./health.js";
+import { warnIfTrustOverrideEnabled } from "./web-ui-trust.js";
 
 const PORT = process.env.MASSA_AI_API_PORT || 3333;
 
@@ -146,6 +147,9 @@ const app = new Elysia({ adapter: node() })
 // binds. An unwritable config.json exits non-zero here rather than binding an
 // unauthenticated listener.
 initAuthOrExit();
+
+// SEC-05: say so when /ui hands the key to any caller, not just a local one.
+warnIfTrustOverrideEnabled();
 
 await listenAfterParserValidation({
   validate: validateAllGrammars,

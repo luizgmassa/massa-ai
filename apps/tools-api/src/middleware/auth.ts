@@ -74,6 +74,17 @@ export function initAuth(): ResolvedApiKey {
 }
 
 /**
+ * The key `initAuth()` resolved, or `undefined` before it runs.
+ *
+ * Exists so `web-ui.ts` can stamp the key into the dashboard shell without
+ * calling `resolveApiKey()` again — a second call on a fresh install would
+ * provision, and provisioning belongs to startup, not to a GET.
+ */
+export function getConfiguredApiKey(): string | undefined {
+  return configuredApiKey;
+}
+
+/**
  * Test-only seam: set the key without touching the filesystem. Production code
  * never calls this — `initAuth()` is the only supported entry point.
  */
