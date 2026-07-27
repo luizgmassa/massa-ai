@@ -256,9 +256,11 @@ working, authenticated setup, so that the security fix does not turn into an onb
 4. WHEN `/ui` is requested from a trusted local caller THEN the served `index.html` SHALL carry
    the key and the dashboard SHALL function; WHEN requested from an untrusted caller THEN it SHALL
    render a configure-access state and issue no authenticated call. *(Revised after the Plan
-   Challenge: "trusted local" is defined by TASK-000's verified mechanism — the caller's remote
-   address if `@elysiajs/node` exposes it, otherwise the explicit `MASSA_AI_WEB_UI_TRUST_LOCAL`
-   flag. The spec does not assert a mechanism the stack cannot perform.)*
+   Challenge, then narrowed by TASK-000: "trusted local" is the caller's remote address read from
+   `ctx.request.ip`, which the spike verified against a booted `adapter: node()` server. The
+   `MASSA_AI_WEB_UI_TRUST_LOCAL` fallback is not implemented. Loopback means any of `::1`,
+   `::ffff:127.0.0.1`, or `127.0.0.0/8` — the spike observed the first two from `localhost` and
+   `127.0.0.1` respectively. See `design.md` → "TASK-000 — remote-address spike result".)*
 5. WHEN `/ui` or `/ui/<asset>` is requested with no API key THEN the static shell SHALL be served,
    because `authMiddleware` runs before `webUiRoutes` and would otherwise 401 the page that
    carries the key. WHEN `/uixyz` is requested with no key THEN it SHALL still return 401 — the

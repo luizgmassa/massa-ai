@@ -212,21 +212,59 @@ across a 2101-file repo and collide with the deferred layering/god-module refact
   `<meta name="massa-ai-api-key" content="…">`; otherwise inject nothing and add a
   configure-access banner element. `apps/web-ui/src/static/app.js:625` `request()` reads the meta
   tag and sets `x-api-key` when present.
-- **Mechanism is UNVERIFIED — spike required first (REVISED — Plan Challenge finding 1b)**. This
-  app is built with `adapter: node()` (`index.ts:72`). Elysia's documented `server.requestIP()`
-  throws `"This adapter doesn't support Bun requestIP method"` under `@elysiajs/node`. An
-  undocumented `srvx` `NodeRequest.ip` getter (`req.socket?.remoteAddress`) may survive into
-  `Context.request`, but nothing in this repo uses it. **TASK-000 spikes this against a real booted
-  server before T6 commits to the design.**
-- **Fallback if the spike fails**: gate injection on an explicit
-  `MASSA_AI_WEB_UI_TRUST_LOCAL` flag (default `true`, and set to `false` in the Docker image)
-  instead of a remote-address test. This keeps SEC-05 implementable either way and is strictly
-  more honest than a loopback check the stack cannot actually perform.
+- **Mechanism VERIFIED by TASK-000** — see "TASK-000 — remote-address spike result" below. Use
+  `ctx.request.ip`. The `MASSA_AI_WEB_UI_TRUST_LOCAL` fallback is **not** implemented; T6 ships
+  the remote-address mechanism only.
 - **Known limitations (documented)**: (a) a reverse proxy terminating on loopback appears local;
-  (b) **the Docker path may fail in the opposite direction** — `docker-compose.yml:66-71` maps
-  `3333:3333`, and a host browser reaching the container through the userland proxy may present a
-  bridge address rather than loopback, denying the key to the one deployment SEC-06 promises to
-  support. Both are covered by explicit tests, not assumptions.
+  (b) **the Docker path fails in the opposite direction** — `docker-compose.yml:66-71` maps
+  `3333:3333`, and the spike confirms `request.ip` reports the true peer address, so a host
+  browser reaching the container over the bridge presents a bridge address (e.g.
+  `::ffff:172.17.0.1`), not loopback. The key is therefore denied to the one deployment SEC-06
+  promises to support. This is now a **confirmed mechanism with an unmeasured value**, not a
+  speculative risk: T7 must observe the actual address and resolve it. Both limitations are
+  covered by explicit tests, not assumptions.
+
+### TASK-000 — remote-address spike result
+
+Run against a **really booted** `new Elysia({ adapter: node() })` on port 39117 (not
+`app.handle()`), probing every plausible source from three origins. Bun 1.3.14, `elysia@^1.2.25`,
+`@elysiajs/node@^1.2.0`. Values recorded verbatim:
+
+| Probe | loopback `127.0.0.1` | loopback `localhost` | non-loopback `192.168.15.12` |
+| --- | --- | --- | --- |
+| `ctx.server` | `<absent>` | `<absent>` | `<absent>` |
+| `ctx.server?.requestIP(request)` | `undefined` | `undefined` | `undefined` |
+| **`ctx.request.ip`** | **`::ffff:127.0.0.1`** | **`::1`** | **`::ffff:192.168.15.12`** |
+| `request.socket?.remoteAddress` | `undefined` | `undefined` | `undefined` |
+| `request.raw?.socket?.remoteAddress` | `undefined` | `undefined` | `undefined` |
+| `request.node?.req?.socket?.remoteAddress` | `undefined` | `undefined` | `undefined` |
+| `x-forwarded-for` | `null` | `null` | `null` |
+
+Findings:
+
+1. **`ctx.request.ip` is the only working source, and it discriminates correctly.** The `srvx`
+   `NodeRequest.ip` getter does survive into `Context.request`. Enumerating the request's own +
+   prototype property names for anything matching `/ip|addr|socket|remote|conn|node|raw/i` returns
+   exactly `["ip"]` — there is no second source to fall back to.
+2. **`server.requestIP()` never throws here; it is simply unreachable.** `ctx.server` is `absent`
+   under `adapter: node()`, so the documented Bun API is `undefined` rather than an error. Plan
+   Challenge finding 1b's conclusion holds — the documented mechanism is unusable — but its stated
+   symptom does not.
+3. **Loopback has three spellings and all three must be accepted.** `localhost` resolved to `::1`,
+   while explicit `127.0.0.1` produced the IPv4-mapped `::ffff:127.0.0.1`. A check written against
+   the literal `"127.0.0.1"` alone would deny the key to anyone typing `localhost` — the URL the
+   README prints. T6 must accept `::1`, `::ffff:127.0.0.1`, and the whole `127.0.0.0/8` range.
+4. **`request.ip` is undocumented** — an `srvx` implementation detail, not Elysia public API. A
+   dependency bump can remove it. The failure direction is **safe** (an `undefined` address is not
+   loopback ⇒ no key injected ⇒ the dashboard renders the configure-access state), but it is
+   silent, so T6 carries a test asserting the property is present at all. That test is the
+   tripwire for a future `elysia` / `@elysiajs/node` bump.
+5. **Open for T6/T7:** the Docker bridge case above. The mechanism reporting the true peer address
+   is exactly what makes the container deployment fail. T7's Docker-path assertion must produce an
+   actual observed address before SEC-06 can be claimed.
+
+Spike code was throwaway per TASK-000 and is not committed; the probe table above is the
+deliverable.
 
 ### `EmbeddingService` (modified)
 
