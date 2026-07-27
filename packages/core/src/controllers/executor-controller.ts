@@ -21,6 +21,7 @@ import {
   DEFAULT_TIMEOUT_MS,
   MAX_TIMEOUT_MS,
   runPool,
+  getSandboxMode,
   type Language,
   type ExecResult,
 } from "../services/executor/index.js";
@@ -122,6 +123,9 @@ export class ExecutorController {
           backgrounded: finalResult.backgrounded ?? false,
           command: finalResult.command,
           cwd: finalResult.cwd,
+          // SEC-03: the effective OS isolation, so a caller never has to infer
+          // it from configuration that may have silently fallen back.
+          sandboxMode: finalResult.sandboxMode,
         },
       };
     } catch (error) {
@@ -166,6 +170,7 @@ export class ExecutorController {
           timedOut: finalResult.timedOut,
           command: finalResult.command,
           cwd: finalResult.cwd,
+          sandboxMode: finalResult.sandboxMode,
         },
       };
     } catch (error) {
@@ -227,6 +232,7 @@ export class ExecutorController {
             stderr: r.stderr,
             exitCode: r.exitCode,
             timedOut: r.timedOut,
+            sandboxMode: r.sandboxMode,
           };
         }
         return {
@@ -235,6 +241,11 @@ export class ExecutorController {
           stderr: String(s.reason ?? "unknown error"),
           exitCode: null,
           timedOut: false,
+          // The command never produced a result, so report the mode the pool
+          // would have run it under. Per-item rather than per-batch: the spec
+          // says every executor result, and this rejected branch is the
+          // easiest one to leave the field off.
+          sandboxMode: getSandboxMode(),
         };
       });
 
