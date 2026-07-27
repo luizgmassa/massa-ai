@@ -15,7 +15,6 @@ import {
   ExtractedRelation,
   logger,
 } from "@massa-ai/shared";
-import { EmbeddingService } from "../embeddings/index.js";
 import { getGraphStore } from "./graph-store-factory.js";
 import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
 import type { MemoryRow } from "../../data/memory/memory-repository.js";
@@ -98,11 +97,9 @@ const SUPPORT_SIGNALS = [
 ];
 
 export class RelationExtractor {
-  private embeddingService: EmbeddingService;
   private graphStore: IGraphStore;
 
   constructor(graphStore?: IGraphStore) {
-    this.embeddingService = new EmbeddingService();
     this.graphStore = graphStore ?? getGraphStore();
   }
 

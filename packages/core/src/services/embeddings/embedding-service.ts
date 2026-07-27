@@ -22,6 +22,14 @@
 import { logger } from "@massa-ai/shared";
 import { createEmbeddingProvider, type EmbeddingProvider } from "./index.js";
 
+/**
+ * Raised whenever an embedding is requested and no provider initialized.
+ * A failed dependency surfaces as an error in every environment -- it is never
+ * replaced with fabricated data (BUG-01).
+ */
+const NO_PROVIDER_MESSAGE =
+  'No embedding provider available. Configure OLLAMA_BASE_URL or an API key.';
+
 export class EmbeddingService {
   private provider: EmbeddingProvider | null = null;
   private initPromise: Promise<void> | null = null;
@@ -74,12 +82,15 @@ export class EmbeddingService {
     await this.ensureInitialized();
 
     if (!this.provider) {
-      const msg = 'No embedding provider available. Configure OLLAMA_BASE_URL or an API key.';
-      if (process.env.NODE_ENV === 'production') {
-        throw new Error(msg);
-      }
-      logger.warn(msg + ' Using random embeddings (dev only).');
-      return new Array(384).fill(0).map(() => Math.random());
+      // BUG-01: this used to return 384 pseudo-random numbers whenever
+      // NODE_ENV !== 'production'. That variable is set in the Dockerfile and
+      // docker-compose but NOT on the local-first path, so the most common
+      // install silently wrote fabricated vectors into the index and then
+      // ranked real searches against them. A fabricated vector is
+      // indistinguishable from a real one after the fact, which is why the
+      // fallback is deleted rather than narrowed — and why AS-03 tells
+      // affected operators to re-index.
+      throw new Error(NO_PROVIDER_MESSAGE);
     }
 
     try {
@@ -105,12 +116,8 @@ export class EmbeddingService {
     await this.ensureInitialized();
 
     if (!this.provider) {
-      const msg = 'No embedding provider available. Configure OLLAMA_BASE_URL or an API key.';
-      if (process.env.NODE_ENV === 'production') {
-        throw new Error(msg);
-      }
-      logger.warn(msg + ' Using random embeddings (dev only).');
-      return texts.map(() => new Array(384).fill(0).map(() => Math.random()));
+      // BUG-01: same fabrication as embed(), one vector per input text.
+      throw new Error(NO_PROVIDER_MESSAGE);
     }
 
     try {
@@ -129,7 +136,13 @@ export class EmbeddingService {
    * @returns Number of dimensions in embeddings (e.g., 768, 1536)
    */
   getDimensions(): number {
-    return this.provider?.dimensions || 384; // Fallback dimension
+    // BUG-01: the `|| 384` fallback went with the random vectors. Reporting a
+    // plausible width for a provider that does not exist is the same class of
+    // defect, and 384 was not even the configured default (4096).
+    if (!this.provider) {
+      throw new Error(NO_PROVIDER_MESSAGE);
+    }
+    return this.provider.dimensions;
   }
 
   /**

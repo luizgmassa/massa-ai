@@ -63,23 +63,36 @@ describe("EmbeddingService", () => {
     expect(results).toEqual([Array(8).fill(1), Array(8).fill(2)]);
   });
 
-  test("embed falls back to random embeddings in non-production when init fails", async () => {
+  // BUG-01: this case used to assert the defect -- that a missing provider
+  // yields 384 random numbers outside production. It is rewritten, not
+  // deleted, because it is the exact regression that must never come back.
+  test("embed throws when no provider is available, outside production too", async () => {
     initShouldThrow = true;
-    const service = new EmbeddingService();
-    const result = await service.embed("test");
-    expect(result).toHaveLength(384);
-    // Random values should not all be the same.
-    const allSame = result.every((v) => v === result[0]);
-    expect(allSame).toBe(false);
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "development";
+    try {
+      const service = new EmbeddingService();
+      await expect(service.embed("test")).rejects.toThrow(
+        /No embedding provider available/,
+      );
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+    }
   });
 
-  test("embedBatch falls back to random embeddings in non-production when init fails", async () => {
+  // BUG-01: likewise rewritten from "falls back to random embeddings".
+  test("embedBatch throws when no provider is available, outside production too", async () => {
     initShouldThrow = true;
-    const service = new EmbeddingService();
-    const results = await service.embedBatch(["a", "b"]);
-    expect(results).toHaveLength(2);
-    expect(results[0]).toHaveLength(384);
-    expect(results[1]).toHaveLength(384);
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "development";
+    try {
+      const service = new EmbeddingService();
+      await expect(service.embedBatch(["a", "b"])).rejects.toThrow(
+        /No embedding provider available/,
+      );
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+    }
   });
 
   test("embed throws in production when no provider available", async () => {
@@ -129,11 +142,17 @@ describe("EmbeddingService", () => {
     expect(service.getDimensions()).toBe(1536);
   });
 
-  test("getDimensions returns 384 fallback when no provider", async () => {
+  // BUG-01: the 384 fallback went with the random vectors. Reporting a
+  // plausible width for a provider that does not exist is the same class of
+  // lie -- and the real default (OLLAMA_EMBEDDING_DIMENSIONS) is 4096, so the
+  // fallback was not even the right number.
+  test("getDimensions throws when no provider is available", async () => {
     initShouldThrow = true;
     const service = new EmbeddingService();
-    await service.embed("init"); // Trigger fallback init.
-    expect(service.getDimensions()).toBe(384);
+    await expect(service.embed("init")).rejects.toThrow();
+    expect(() => service.getDimensions()).toThrow(
+      /No embedding provider available/,
+    );
   });
 
   test("getProviderInfo returns id/model when initialized", async () => {
@@ -149,7 +168,12 @@ describe("EmbeddingService", () => {
   test("getProviderInfo returns null when no provider", async () => {
     initShouldThrow = true;
     const service = new EmbeddingService();
-    await service.embed("init");
+    // embed() was only the init trigger here; after BUG-01 it throws instead
+    // of fabricating, so the rejection is awaited rather than the value. The
+    // assertion below is unchanged — getProviderInfo still reports null, and
+    // unlike getDimensions() that stays honest: null IS "there is no
+    // provider", not a plausible stand-in for one.
+    await expect(service.embed("init")).rejects.toThrow();
     expect(service.getProviderInfo()).toBeNull();
   });
 
