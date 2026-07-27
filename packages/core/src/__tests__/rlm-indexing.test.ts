@@ -70,9 +70,12 @@ mock.module("../data/memory/memory-repository-factory.js", () => ({
 mock.module("../events/event-bus.js", () => ({
   eventBus: { publish: () => {} },
 }));
+// Identity by default (what every pre-existing test in this file assumes);
+// the BUG-05 tests below swap in a retiring alias for their duration.
+let aliasResolve: (id: string) => Promise<string> = async (id) => id;
 mock.module("../services/project-identity/alias-resolver.js", () => ({
   getProjectIdentityAliasResolver: () => ({
-    resolve: async (id: string) => id,
+    resolve: (id: string) => aliasResolve(id),
   }),
 }));
 mock.module("../data/managed-runs/managed-run-repository-pg.js", () => ({
@@ -450,6 +453,97 @@ describe("indexFile", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// ── BUG-05 / TASK-013: canonical project id before getCentrality ────────────
+//
+// `indexFileImpl` resolves the canonical project id at its own write seam
+// (rlm-indexing.ts:477), so chunks land under the canonical project. Both
+// centrality loads ran with the CALLER's id. Hand them a retired alias and
+// getCentrality queried a project that no longer owns any symbol: an empty
+// map, and every chunk written with `centralityScore: 0` — silently, because
+// 0 is also the legitimate "no centrality yet" value.
+
+const RETIRED = "retired-proj";
+const CANONICAL = "canonical-proj";
+
+/** Centrality exists only under the canonical id, as it does in the DB. */
+function canonicalOnlyCentrality(seen: string[]) {
+  return async (id: string) => {
+    seen.push(id);
+    return id === CANONICAL ? new Map([["src/a.ts", 0.42]]) : new Map<string, number>();
+  };
+}
+
+describe("centrality is loaded under the canonical project id (BUG-05)", () => {
+  beforeEach(() => {
+    aliasResolve = async (id: string) => (id === RETIRED ? CANONICAL : id);
+  });
+  afterEach(() => {
+    aliasResolve = async (id: string) => id;
+  });
+
+  test("full project indexing with a retired alias still scores chunks", async () => {
+    const seen: string[] = [];
+    const documents: any[] = [];
+    const rlm = new ContextualSearchRLM({
+      vectorStore: {} as any, keywordSearch: {} as any,
+      symbolRepo: { getCentrality: canonicalOnlyCentrality(seen) } as any,
+    } as any);
+    (rlm as any).initialized = true;
+    (rlm as any).symbolRepo = { getCentrality: canonicalOnlyCentrality(seen) };
+    (rlm as any).indexManager = { updateIndexMetadata: async () => {} };
+    (rlm as any).vectorStore = { addDocuments: async (docs: any[]) => { documents.push(...docs); } };
+    (rlm as any).keywordSearch = { index: async () => {} };
+
+    const { mkdtemp, rm, writeFile, mkdir } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const path = (await import("node:path")).default;
+    const dir = await mkdtemp(path.join((tmpdir as any)(), "indexproj-alias-"));
+    await mkdir(path.join(dir, "src"), { recursive: true });
+    await writeFile(path.join(dir, "src", "a.ts"), "export const a = 1;");
+
+    try {
+      // indexFile is NOT stubbed — the assertion is on the real
+      // metadata.centralityScore the chunk carries into the vector store.
+      await rlm.indexProject(dir, RETIRED);
+
+      expect(seen).toContain(CANONICAL);
+      const chunk = documents.find((d) => d.metadata?.filePath === "src/a.ts");
+      expect(chunk).toBeDefined();
+      expect(chunk.metadata.centralityScore).toBe(0.42);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  test("incremental reindex with a retired alias still scores chunks", async () => {
+    const seen: string[] = [];
+    let receivedMap: Map<string, number> | undefined;
+    const rlm = new ContextualSearchRLM({
+      vectorStore: {} as any, keywordSearch: {} as any,
+      searchCache: { invalidateProject: async () => {} } as any,
+      symbolRepo: { getCentrality: canonicalOnlyCentrality(seen) } as any,
+    } as any);
+    (rlm as any).initialized = true;
+    (rlm as any).searchCache = { invalidateProject: async () => {} };
+    (rlm as any).symbolRepo = { getCentrality: canonicalOnlyCentrality(seen) };
+    (rlm as any).indexManager = {
+      isIndexStale: async () => ({ isStale: true, reason: "files_changed" }),
+      getFilesToReindex: async () => ["src/a.ts"],
+      updateIndexMetadata: async () => {},
+    };
+    rlm.indexFile = async (_p: string, _id: string, _root: string, map?: Map<string, number>) => {
+      receivedMap = map;
+      return { chunks: 1 };
+    };
+
+    const result = await rlm.ensureFreshIndex(RETIRED, "/path");
+    expect(result.reindexed).toBe(true);
+    expect(seen).toContain(CANONICAL);
+    // This map is what indexFileImpl turns into metadata.centralityScore.
+    expect(receivedMap?.get("src/a.ts")).toBe(0.42);
   });
 });
 

@@ -400,6 +400,19 @@ instead of the container's ephemeral `/root/.config` — which is what spec SEC-
 > share no state and no call path, and T13 makes the write path more consistent rather than
 > changing what a read seam must compare against.
 
+### Centrality load sites (amended during TASK-013)
+
+Tasks named one call site for BUG-05, `rlm-indexing.ts:179` in
+`_indexProjectInternalImpl`. There are **two**: `ensureFreshIndexImpl`'s incremental path
+(`:385`) loads centrality the same way, feeds the same `rlm.indexFile(..., centralityMap)`, and
+carries the identical defect. Fixing only the named one would have left the incremental reindex —
+the path auto-reindex actually takes — still writing `centralityScore: 0` under a retired alias.
+Both are resolved; both have a test.
+
+The failure is silent by construction, which is why the test asserts a **non-zero** score rather
+than "getCentrality was called": `centralityMap?.get(relativePath) ?? 0` (`:495`) makes the bug
+indistinguishable from the legitimate "no centrality computed yet" case in any stored artifact.
+
 ### `resolveEdgeTarget` (modified — component added during TASK-012)
 
 BUG-04 had no component entry; the tasks-level instruction was "module-scoped FQN attempted
