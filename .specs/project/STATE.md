@@ -1,6 +1,59 @@
 # massa-ai Spec State
 
-## Current — Persona / Sub-Agent Boundary
+## Current — Audit Remediation 2026-07
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-audit-remediation-2026-07`
+- workflow: spec-driven (Large — Specify + Design + Tasks + full Plan Challenge + Execute)
+- feature: `audit-remediation-2026-07` — **Specify/Design/Tasks complete; Plan Challenge in progress; Execute not started**
+- scope: 17 requirements (SEC-01..06, BUG-01..06, DEBT-01..05) across 22 tasks and 2 PRs
+- Artifacts: `.specs/features/audit-remediation-2026-07/{spec,design,tasks}.md`
+- Origin: knowledge-graph analysis at `17ee708` (1847 nodes / 4226 edges) plus two verification
+  passes. Every finding confirmed against current source, not inferred from the graph.
+- Headline finding: the Tools API serves unauthenticated requests by default
+  (`auth.ts:51` `if (!apiKey) return;`) and exposes three arbitrary-code-execution routes
+  (`routes/executor.ts:38,72,94`); `.use(cors())` at `index.ts:73` reflects any Origin with
+  credentials, making it reachable from a developer's browser.
+- User decisions locked at Specify/Design:
+  - Two PRs: PR1 correctness (SEC + BUG), PR2 debt (DEBT).
+  - Bind address stays `0.0.0.0`; exposure is closed by auth, not by address.
+  - API key auto-provisioned into `config.json` on first start; hard-refuse only when unwritable.
+  - Web UI key injected server-side for loopback callers only.
+  - `RLM_LLM_*` → `MASSA_AI_LLM_*` hard rename, no dual-read (requires AD-010 supersession).
+  - BUG-02 closed by a read-side project filter; no 25th migration.
+  - oxlint, correctness rules, **no formatter** — repo-wide reformat is its own later PR.
+  - Layering refactor and `contextual-search-rlm.ts` god-module split deferred to their own specs.
+- Conforms to: **AD-007** (executor sandbox default `auto` with best-effort fallback is unchanged;
+  SEC-03 only makes the fallback observable) and **AD-008** (json_schema gating untouched;
+  DEBT-03 renames env vars only).
+- Pending decisions to append during Execute: `AD-010` (one env prefix, supersedes the
+  `RLM_LLM_*` compatibility boundary recorded in `repo-rename-massa-ai` and
+  `project-identity-rename`) and `AD-011` (the Tools API never serves an anonymous request).
+- Plan Challenge: **full gate**, mode `red_team`, `massa-ai-plan-critic`. 2 critical, 1 high,
+  1 medium/high — all four verified against source by the main agent, all incorporated before
+  Execute (`serious_findings: revise_plan`).
+  - C1a `/ui` would 401 after SEC-01: `authMiddleware` (`index.ts:121`) precedes `webUiRoutes`
+    (`:140`) and `PUBLIC_PATHS.some(p => path.startsWith(p))` (`auth.ts:46`) lacks `/ui`. The
+    whole SEC-05 injection mechanism was dead code. `/ui` + `/ui/` added, decoy-path test required.
+  - C1b The loopback check has no supported implementation on `@elysiajs/node` (`index.ts:72`);
+    `server.requestIP()` throws there. **TASK-000 spike added** with a
+    `MASSA_AI_WEB_UI_TRUST_LOCAL` fallback so SEC-05 is implementable either way.
+  - C2 `apps/claude-plugin/hooks/massa-ai-hook.ts:152` reads `process.env.MASSA_AI_API_KEY` only,
+    never imports `@massa-ai/shared`, and silent-degrades — the auto-provisioned key never reaches
+    it, so lifecycle capture would die invisibly. **TASK-023 added**; closes candidate lesson L-002.
+  - H3 Docker may fail the trust check in the opposite direction from the documented risk
+    (bridge mapping, not loopback). Explicit Docker assertion added to TASK-007.
+  - M4 `CONFIG_DIR` is a module-level const (`config-loader.ts:7`) ⇒ resolve the key in an explicit
+    `initAuth()`, never at import, or `bun test` writes to the real `~/.config`. `auth.test.ts:24-34`
+    asserts the deleted bypass and is now named for rewrite.
+  - Rejected as not-a-gap: CORS-as-theatre — the plan never overclaims CORS as the primary control.
+- Task count: 24 across 6 phases, 2 PRs. Packs into 4 batches at the ~7-task budget.
+- Execute: **not started** — awaiting user approval of the revised plan and the sub-agent offer.
+- Skipped sensor: `recall` returned 0 memories for this workspace, so no durable memory informed
+  this plan. Context7 MCP not registered — oxlint's rule catalogue is unverified against upstream
+  docs and must be confirmed in TASK-018.
+
+## Previous — Persona / Sub-Agent Boundary
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-persona-agent-boundary`
