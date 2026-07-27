@@ -12,7 +12,7 @@
  * require a real active graph generation.
  */
 
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, jest, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { EtlPipeline } from "../services/etl/pipeline.js";
 import { buildGraphInputSnapshotHash } from "../services/etl/graph-generation-coordinator.js";
@@ -223,6 +223,140 @@ describe.skipIf(!DB_AVAILABLE)("EtlPipeline managed_runs lease (T13 / AC-7)", ()
       });
       expect(next.status).toBe("acquired");
       if (next.status === "acquired") await repo.complete(next.lease);
+    }
+    await cleanupProject(currentProjectId);
+  });
+
+  // ── BUG-03 / TASK-011 ──────────────────────────────────────────────────
+  //
+  // `runInternal` tears the managed-run heartbeat down at three sites (the
+  // pre-activation point, the success path, and the catch path). The
+  // stale-generation retry is a bare `return this.runInternal(...)` from
+  // inside the try, so it reaches none of them: every abandoned frame leaves
+  // its `while (!stopManagedRunHeartbeat)` loop awaiting `delay(30_000)`
+  // forever, heartbeating a lease its run no longer owns.
+  //
+  // Fake timers make the leak observable in milliseconds: no heartbeat can
+  // fire during the run (nothing advances the clock), so any call counted
+  // after the outer run settles came from an orphaned loop.
+
+  /** Let each fired timer's continuation run to its next await. */
+  async function flushMicrotasks(): Promise<void> {
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+  }
+
+  /** Advance past several heartbeat intervals, draining the loop each time. */
+  async function advancePastHeartbeats(): Promise<void> {
+    for (let i = 0; i < 3; i++) {
+      jest.advanceTimersByTime(31_000);
+      await flushMicrotasks();
+    }
+  }
+
+  test("stale-generation retry does not leak the managed-run heartbeat", async () => {
+    const repo = ManagedRunRepositoryPg.getInstance();
+    const eventId = `evt-retry-${randomUUID()}`;
+    const begin = await repo.begin({ projectId: currentProjectId, runKind: "indexing", eventId });
+    if (begin.status !== "acquired") throw new Error("expected acquired");
+    const lease: ManagedRunLease = begin.lease;
+
+    const originalHeartbeat = repo.heartbeat.bind(repo);
+    let heartbeats = 0;
+    (repo as any).heartbeat = async () => {
+      heartbeats++;
+      return { status: "renewed" as const };
+    };
+
+    // First attempt hits a stale active generation; the retry succeeds.
+    let beginCalls = 0;
+    const succeedingBegin = (pipeline as any).graphGenerations.begin;
+    (pipeline as any).graphGenerations.begin = async (...args: unknown[]) => {
+      beginCalls++;
+      if (beginCalls === 1) throw new Error("graph_generation_stale_active:g0");
+      return succeedingBegin(...args);
+    };
+
+    (pipeline as any).discover.run = async () => [];
+    (pipeline as any).parse.run = async () => [];
+    (pipeline as any).resolve.run = async () => [];
+    (pipeline as any).load.run = async () => ({ filesLoaded: 0, chunksLoaded: 0, symbolsLoaded: 0, errors: 0 });
+
+    // The success path writes the search-admission marker through
+    // `getVectorStore()`, which auto-selects an embedding provider (~13 s cold)
+    // and races a `setTimeout`. Neither can finish once the clock is frozen, so
+    // warm the cached singleton here, outside the fake-timer window.
+    const { getVectorStore } = await import("../data/vector/vector-store-factory.js");
+    await getVectorStore();
+
+    jest.useFakeTimers();
+    try {
+      const job = indexJobTracker.createJob(currentProjectId, "/tmp");
+      await pipeline.run({
+        projectId: currentProjectId,
+        projectPath: "/tmp",
+        jobId: job.jobId,
+        managedRunLease: lease,
+      });
+
+      expect(beginCalls).toBe(2);
+      // Nothing advanced the clock during the run, so this is the baseline.
+      expect(heartbeats).toBe(0);
+
+      await advancePastHeartbeats();
+      expect(heartbeats).toBe(0);
+    } finally {
+      jest.useRealTimers();
+      (repo as any).heartbeat = originalHeartbeat;
+    }
+    await cleanupProject(currentProjectId);
+  }, 60_000);
+
+  test("exhausting all 3 stale-generation retries leaves zero running heartbeat loops", async () => {
+    const repo = ManagedRunRepositoryPg.getInstance();
+    const eventId = `evt-retry-exhaust-${randomUUID()}`;
+    const begin = await repo.begin({ projectId: currentProjectId, runKind: "indexing", eventId });
+    if (begin.status !== "acquired") throw new Error("expected acquired");
+    const lease: ManagedRunLease = begin.lease;
+
+    const originalHeartbeat = repo.heartbeat.bind(repo);
+    let heartbeats = 0;
+    (repo as any).heartbeat = async () => {
+      heartbeats++;
+      return { status: "renewed" as const };
+    };
+
+    let beginCalls = 0;
+    (pipeline as any).graphGenerations.begin = async () => {
+      beginCalls++;
+      throw new Error("graph_generation_stale_active:g0");
+    };
+
+    (pipeline as any).discover.run = async () => [];
+    (pipeline as any).parse.run = async () => [];
+    (pipeline as any).resolve.run = async () => [];
+    (pipeline as any).load.run = async () => ({ filesLoaded: 0, chunksLoaded: 0, symbolsLoaded: 0, errors: 0 });
+
+    jest.useFakeTimers();
+    try {
+      const job = indexJobTracker.createJob(currentProjectId, "/tmp");
+      await expect(
+        pipeline.run({
+          projectId: currentProjectId,
+          projectPath: "/tmp",
+          jobId: job.jobId,
+          managedRunLease: lease,
+        }),
+      ).rejects.toThrow("graph_generation_stale_active:");
+
+      // Attempts 0..3: three retries then the throw.
+      expect(beginCalls).toBe(4);
+      expect(heartbeats).toBe(0);
+
+      await advancePastHeartbeats();
+      expect(heartbeats).toBe(0);
+    } finally {
+      jest.useRealTimers();
+      (repo as any).heartbeat = originalHeartbeat;
     }
     await cleanupProject(currentProjectId);
   });

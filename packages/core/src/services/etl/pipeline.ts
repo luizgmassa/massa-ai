@@ -347,6 +347,14 @@ export class EtlPipeline {
         });
       } catch (beginError) {
         if ((beginError as Error).message.startsWith("graph_generation_stale_active:") && generationRetry < 3) {
+          // BUG-03: this frame is abandoned without reaching any of the three
+          // teardown sites below, so its managed-run heartbeat must be stopped
+          // here or the loop outlives the run and keeps renewing a lease the
+          // retry now owns. The graph heartbeat is not started until after this
+          // catch, so there is nothing of its own to tear down.
+          stopManagedRunHeartbeat = true;
+          managedRunTimerController.abort();
+          if (managedRunHeartbeat) await managedRunHeartbeat;
           return this.runInternal(input, generationRetry + 1);
         }
         throw beginError;
