@@ -68,6 +68,18 @@ describe("POST /api/v1/proposal/list", () => {
     expect(res.json.data.count).toBe(2);
   });
 
+  // Web UI contract: renderProposals in apps/web-ui/src/static/app.js reads
+  // `data.pending`. It previously read `data.proposals`, which this route has
+  // never emitted, so the Proposals view was empty regardless of the data.
+  test("keys the list as `pending`, which is what the Web UI renders", async () => {
+    reset();
+    job.listPending.mockImplementationOnce(async () => [{ id: "p1", description: "d" }]);
+    const res = await post("/api/v1/proposal/list", { projectId: "proj" });
+    expect(Array.isArray(res.json.data.pending)).toBe(true);
+    expect(res.json.data.pending[0].id).toBe("p1");
+    expect(res.json.data.proposals).toBeUndefined();
+  });
+
   test("423 when auto-improve disabled", async () => {
     memoryConfig = { autoImprove: { enabled: false } };
     const res = await post("/api/v1/proposal/list", { projectId: "proj" });

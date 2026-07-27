@@ -43,6 +43,19 @@ export const MEMORY_LEVELS = [
   { value: 3, label: "3 — Session" },
 ];
 
+/**
+ * Base request body for the checkpoints view.
+ *
+ * `format: "json"` is load-bearing. POST /api/v1/checkpoints/list defaults to
+ * `format: "toon"`, whose `data` is a formatted *string*, not an object — the
+ * renderer cannot read rows out of it and the view silently shows the empty
+ * state no matter how many checkpoints exist.
+ *
+ * Exported so route-contract.test.ts posts the exact body the UI posts, which
+ * is what keeps this bound to the real route response.
+ */
+export const CHECKPOINTS_LIST_BODY = { limit: 50, format: "json" };
+
 const THEME_STORAGE_KEY = "massa-ai-ui-theme";
 
 /** Check if write mode is enabled (MASSA_AI_WEB_WRITE_MODE=true). Default off. */
@@ -452,7 +465,9 @@ export function renderProposals(data, state) {
     return '<section class="view"><h2>Proposals</h2>' + errorBlock(data) + "</section>";
   }
   const payload = data.data || data;
-  const proposals = (payload && payload.proposals) || [];
+  // The route returns `pending` (see apps/tools-api/src/routes/proposals.ts);
+  // `proposals` is accepted only as a legacy alias.
+  const proposals = (payload && (payload.pending || payload.proposals)) || [];
   if (proposals.length === 0) {
     return '<section class="view"><h2>Proposals</h2><p class="empty">No pending proposals.</p></section>';
   }
@@ -492,6 +507,17 @@ export function renderCheckpoints(data) {
     return '<section class="view"><h2>Checkpoints</h2>' + errorBlock(data) + "</section>";
   }
   const rows = extractCheckpointRows(data);
+  if (rows === null) {
+    return (
+      '<section class="view"><h2>Checkpoints</h2>' +
+      errorBlock({
+        error:
+          'Unreadable checkpoints response: expected JSON rows. The list route ' +
+          'returns a TOON string unless the request sends format:"json".',
+      }) +
+      "</section>"
+    );
+  }
   if (rows.length === 0) {
     return '<section class="view"><h2>Checkpoints</h2><p class="empty">No checkpoints.</p></section>';
   }
@@ -505,7 +531,7 @@ export function renderCheckpoints(data) {
           escapeHtml(c.taskId || "") +
           "</td>" +
           "<td>" +
-          escapeHtml(c.checkpointType || "") +
+          escapeHtml(c.type || c.checkpointType || "") +
           "</td>" +
           "<td>" +
           escapeHtml(c.status || "") +
@@ -542,13 +568,21 @@ function extractSearchResults(data) {
   return [];
 }
 
-/** Normalize the ListCheckpointsTool response shape into a flat row list. */
+/**
+ * Normalize the ListCheckpointsTool response shape into a flat row list.
+ *
+ * Returns `null` — not `[]` — when the payload carries no recognizable row
+ * container. A TOON-formatted response (`format` omitted, so the route falls
+ * back to its "toon" default) puts a *string* here; collapsing that to `[]`
+ * renders "No checkpoints" and hides the real failure.
+ */
 function extractCheckpointRows(data) {
   const payload = data && (data.data || data);
   if (Array.isArray(payload && payload.checkpoints)) return payload.checkpoints;
   if (Array.isArray(payload && payload.data)) return payload.data;
   if (Array.isArray(payload)) return payload;
-  return [];
+  if (payload && typeof payload === "object") return [];
+  return null;
 }
 
 // ── Theme helpers ──────────────────────────────────────────────────────────
@@ -702,7 +736,7 @@ function startApp(opts) {
         }
         root.innerHTML = renderProposals(data, { project: state.project });
       } else if (state.view === "checkpoints") {
-        const body = { limit: 50 };
+        const body = { ...CHECKPOINTS_LIST_BODY };
         if (state.project) body.projectId = state.project;
         const data = await api.request("/api/v1/checkpoints/list", { method: "POST", body });
         root.innerHTML = renderCheckpoints(data);
@@ -885,6 +919,7 @@ const MASSA_AI_UI = {
   FORBIDDEN_MUTATING_PATHS,
   MEMORY_TYPES,
   MEMORY_LEVELS,
+  CHECKPOINTS_LIST_BODY,
 };
 if (typeof globalThis !== "undefined") {
   globalThis.MASSA_AI_UI = MASSA_AI_UI;
