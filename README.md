@@ -669,7 +669,7 @@ itself (local install or `@massa-ai/opencode-plugin`), no external hooks file:
 | Variable | Default | Notes |
 |----------|---------|-------|
 | `MASSA_AI_API_BASE` | `http://localhost:3333` | Tools API base URL |
-| `MASSA_AI_API_KEY` | _(none)_ | Optional auth key |
+| `MASSA_AI_API_KEY` | auto-provisioned | Required by every route except `/health`, `/swagger` and `/ui`. Generated on first API start and saved to `security.apiKey` in `~/.config/massa-ai/config.json`; set this only to pin a specific value. See [docs/web-ui-access.md](./docs/web-ui-access.md) |
 | `MASSA_AI_PROJECT_ID` | cwd basename | Project the observations attach to |
 
 ### Non-Claude hosts

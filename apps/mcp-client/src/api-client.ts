@@ -33,7 +33,12 @@ export class ApiClient {
   constructor(config?: Partial<ApiClientConfig>) {
     this.baseUrl =
       config?.baseUrl || process.env.MASSA_AI_API_URL || "http://localhost:3333";
-    this.apiKey = config?.apiKey || process.env.MASSA_AI_API_KEY || "";
+    // Trimmed to match usable() in packages/shared/src/config/api-key.ts, which
+    // is what the API applies to the same value. Untrimmed, a whitespace-only
+    // key is truthy here and goes out as an `X-API-Key` header the API has
+    // already decided is unset — producing a 401 that reads like a wrong key
+    // rather than a missing one.
+    this.apiKey = (config?.apiKey || process.env.MASSA_AI_API_KEY || "").trim();
     // Proxy timeout: an explicit `config.timeoutMs` (incl. 0 = disable) wins.
     // Otherwise parse MASSA_AI_PROXY_TIMEOUT_MS with allowZero so `=0`
     // means "no timeout" rather than silently becoming 120000ms. Unset /

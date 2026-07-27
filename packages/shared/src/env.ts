@@ -68,11 +68,18 @@ try {
     // an embedding auth token; only seed when the env var is unset.
     process.env.OLLAMA_API_KEY = cfg.embedding.apiKey;
   }
-  if (cfg.security?.apiKey && !process.env.MASSA_AI_API_KEY) {
-    // Tools API key (SEC-01). This is a READ, never a provision: importing this
-    // module must not write a secret to the user's home directory. Generation
-    // lives in resolveApiKey(), called explicitly by the API at startup.
-    process.env.MASSA_AI_API_KEY = cfg.security.apiKey;
+  // Tools API key (SEC-01). This is a READ, never a provision: importing this
+  // module must not write a secret to the user's home directory. Generation
+  // lives in resolveApiKey(), called explicitly by the API at startup.
+  //
+  // Trimmed on both sides to match usable() in ./config/api-key.ts. A bare
+  // truthiness check disagrees with it on a whitespace-only value: the server
+  // would call that "unconfigured" and provision a fresh key, while every
+  // client seeded from here would send the blanks and get 401s that look like
+  // a wrong key rather than an unset one.
+  const securityApiKey = cfg.security?.apiKey?.trim();
+  if (securityApiKey && !process.env.MASSA_AI_API_KEY?.trim()) {
+    process.env.MASSA_AI_API_KEY = securityApiKey;
   }
 } catch {
   // Defensive: config.json is a best-effort layer; missing/invalid file or

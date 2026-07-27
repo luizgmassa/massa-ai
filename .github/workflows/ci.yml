@@ -229,6 +229,19 @@ jobs:
           grep -q '<!DOCTYPE html>' /tmp/ui.html || { echo "no HTML shell in /ui"; head -5 /tmp/ui.html; exit 1; }
           curl -sf http://localhost:3333/ui/app.js > /dev/null || { echo "GET /ui/app.js failed"; exit 1; }
 
+      # SEC-06 / Plan Challenge finding 3. The container above runs with
+      # --network host, which bypasses the bridge and reports loopback, so it
+      # cannot answer the question docker-compose actually poses: what address
+      # does a host request present through a published port mapping? This step
+      # measures that on a bridge-mapped container and prints it. Setting the
+      # flag makes the suite FAIL rather than skip if no runtime is present, so
+      # a measurement that did not happen can never read as one that passed.
+      - name: Measure the Docker bridge remote address
+        env:
+          MASSA_AI_DOCKER_PROBE: "1"
+          MASSA_AI_DOCKER_PROBE_PORT: "3334"
+        run: bash scripts/tests/test-docker-remote-address.sh
+
       - name: Cleanup
         if: always()
         run: docker rm -f massa-ai-api 2>/dev/null || true

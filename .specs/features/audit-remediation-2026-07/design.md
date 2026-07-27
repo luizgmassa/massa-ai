@@ -284,6 +284,62 @@ Findings:
 Spike code was throwaway per TASK-000 and is not committed; the probe table above is the
 deliverable.
 
+### TASK-007 — the Docker path, instrumented rather than asserted
+
+TASK-000 finding 5 left the bridge address as a **confirmed mechanism with an unmeasured
+value**, owed by T7. The value could not be observed on the development machine: it has no
+container runtime at all (`docker`, `podman`, `colima`, `lima` all absent; no Docker Desktop,
+no socket). Rather than assert it by analogy — which is exactly what the finding forbids — T7
+commits the instrument and runs it where a runtime exists.
+
+- `scripts/docker/remote-address-probe.ts` + `.Dockerfile` — a minimal
+  `new Elysia({ adapter: node() })` on the same `elysia@^1.2.25` / `@elysiajs/node@^1.2.0`
+  majors as `apps/tools-api`, exposing `GET /whoami` that returns `ctx.request.ip`. Not the API
+  image: the address is a property of the network path and of srvx's `NodeRequest.ip` getter,
+  not of any route here, and the API image needs PostgreSQL, migrations, and Ollama first.
+- `scripts/tests/test-docker-remote-address.sh` — static preconditions always run; the live
+  measurement is opt-in behind `MASSA_AI_DOCKER_PROBE=1` (the `RUN_E2E` precedent). It runs the
+  probe **bridge-mapped** (`-p 3333:3333`), deliberately not `--network host`, and asserts the
+  observed address is **not** loopback in any of the three spellings TASK-000 recorded.
+- CI wiring: a new step in `ci.yml`'s `mcp` job sets the flag. That job already has buildx and a
+  runtime. Its existing API container runs `--network host`, which bypasses the bridge and
+  reports loopback — it structurally cannot answer this question, which is why the probe is
+  separate and why it uses port 3334 to avoid colliding with it.
+
+The skip semantics are load-bearing and were verified in both directions: without the flag the
+suite prints `# NOT RUN` and passes on the static checks (5 passed / 0 failed); with the flag
+and no runtime it **fails** (5 passed / 1 failed, exit 1). A measurement that did not happen can
+never read as one that passed.
+
+**Status: still unmeasured locally.** The observed value lands in the CI job log on the first
+run of this branch and must be pasted back into this section verbatim. Until then SEC-06's
+Docker clause rests on the instrument, not on an observation.
+
+### TASK-007 — two further divergences found during Execute
+
+1. **`setup-local-first.sh` destroyed the key on every re-run.** The wizard regenerates
+   `config.json` wholesale (`backup_if_exists` + `cat >`), so once SEC-01 started persisting
+   `security.apiKey` there, a second `./scripts/setup-local-first.sh` silently rotated the
+   credential every configured MCP host, `.env`, and agent hook was still sending. The key is
+   now resolved *before* the rewrite and carried across it
+   (`scripts/lib/installer-api-key.sh` → `installer_resolve_api_key`), with the config writer
+   extracted to the same lib so the contract is executable by a test instead of grep-pinned.
+
+2. **`env.ts` and `usable()` disagreed about whitespace.** `env.ts` seeded
+   `MASSA_AI_API_KEY` from `cfg.security.apiKey` on a bare truthiness check, while
+   `resolveApiKey`'s `usable()` treats a whitespace-only value as unset. A `"   "` stored key
+   therefore made the API provision a *fresh* key while every client seeded from `env.ts` sent
+   the blanks — a 401 that reads like a wrong key rather than a missing one. Caught red by
+   `apps/mcp-client/src/__tests__/api-key-config-seeded.test.ts` (`expect(header).toBeNull()`
+   → `Received: ""`). Both sides now trim: `env.ts` and `api-client.ts:36`.
+
+Also folded into T7 because SEC-06 names the deployment: the compose `mcp` service had **no
+volume and no key**, so on a default `docker compose up` it could not learn the key the `api`
+service auto-provisioned and every call it made would 401. It now shares `massa-ai-data`, and
+both images set `XDG_CONFIG_HOME=/data` so `config.json` lands inside that mounted volume
+instead of the container's ephemeral `/root/.config` — which is what spec SEC-06 AC 2's
+"auto-provision a key into its mounted data volume" literally requires.
+
 ### `EmbeddingService` (modified)
 
 - **Location**: `packages/core/src/services/embeddings/embedding-service.ts`

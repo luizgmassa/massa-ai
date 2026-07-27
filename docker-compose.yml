@@ -50,6 +50,11 @@ services:
     environment:
       - NODE_ENV=production
       - MASSA_AI_API_PORT=3333
+      # Optional. Left unset, the API generates a key on first start and saves
+      # it to security.apiKey inside the mounted volume
+      # (/data/massa-ai/config.json) — read it from there. Set it to pin a
+      # specific value; an explicit env var always wins over the stored one.
+      - MASSA_AI_API_KEY=${MASSA_AI_API_KEY:-}
       - DATABASE_URL=postgresql://massa_ai:${POSTGRES_PASSWORD:-massa_ai_password}@postgres:5432/massa_ai
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_EMBEDDING_MODEL=${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:8b}
@@ -74,9 +79,19 @@ services:
     image: ${MASSA_AI_MCP_IMAGE:-massa/massa-ai:mcp-latest}
     container_name: massa-ai-mcp
     stdin_open: true
+    # Shares the API's volume so the MCP client can read the key the API
+    # auto-provisioned into /data/massa-ai/config.json. Without it this
+    # container has no way to learn the generated key and every call it makes
+    # to the API returns 401 — `depends_on: service_healthy` guarantees the API
+    # has already provisioned by the time this starts.
+    volumes:
+      - massa-ai-data:/data
     environment:
       - NODE_ENV=production
       - MASSA_AI_API_URL=http://api:3333
+      # Same contract as the api service: unset means "read it from the shared
+      # config.json", set means "pin this value".
+      - MASSA_AI_API_KEY=${MASSA_AI_API_KEY:-}
     depends_on:
       api:
         condition: service_healthy

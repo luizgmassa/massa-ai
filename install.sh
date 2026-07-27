@@ -576,7 +576,10 @@ print_hooks_guide() {
 
   echo -e "  ${BOLD}Env vars (set in your shell or .env; all platforms):${NC}"
   echo -e "    ${CYAN}MASSA_AI_API_BASE${NC}   default http://localhost:3333"
-  echo -e "    ${CYAN}MASSA_AI_API_KEY${NC}    optional (x-api-key header)"
+  echo -e "    ${CYAN}MASSA_AI_API_KEY${NC}    x-api-key header — now required by every route"
+  echo -e "                          except /health, /swagger and /ui. Auto-provisioned"
+  echo -e "                          into ~/.config/massa-ai/config.json (security.apiKey)"
+  echo -e "                          on first API start; set this only to pin a value."
   echo -e "    ${CYAN}MASSA_AI_PROJECT_ID${NC} optional (defaults to cwd basename)"
   echo ""
   echo -e "  ${DIM}Observations are stored in PostgreSQL and consolidated into${NC}"

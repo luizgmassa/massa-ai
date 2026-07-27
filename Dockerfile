@@ -72,6 +72,15 @@ RUN mkdir -p /data
 
 ENV NODE_ENV=production
 ENV MASSA_AI_API_PORT=3333
+# SEC-06: config.json is where SEC-01 persists the auto-provisioned API key,
+# and its location is XDG-derived (packages/shared/src/config/xdg.ts). Left at
+# the default it would land in the container's own /root/.config, which is NOT
+# the volume docker-compose mounts — the key would be unreadable by the
+# operator and regenerated on every `docker compose up --force-recreate`.
+# Pointing XDG_CONFIG_HOME at /data puts config.json (and the default data dir)
+# inside the mounted volume, which is what "auto-provision a key into its
+# mounted data volume" requires.
+ENV XDG_CONFIG_HOME=/data
 # Default: Ollama on host network
 ENV OLLAMA_BASE_URL=http://host.docker.internal:11434
 ENV OLLAMA_EMBEDDING_MODEL=qwen3-embedding:8b
@@ -108,6 +117,13 @@ COPY --from=base /app ./
 ENV NODE_ENV=production
 # MCP client connects to the API container
 ENV MASSA_AI_API_URL=http://massa-ai-api:3333
+# SEC-06: that API now rejects unauthenticated requests, and api-client.ts:36
+# reads the key from MASSA_AI_API_KEY. When the operator does not pin one,
+# @massa-ai/shared's env.ts seeds it from config.json's security.apiKey — so
+# this container has to resolve the same config the API provisioned into the
+# shared /data volume. Without it every MCP call 401s on a default
+# `docker compose up`.
+ENV XDG_CONFIG_HOME=/data
 
 # stdio transport - no ports exposed
 CMD ["bun", "./apps/mcp-client/src/index.ts"]
