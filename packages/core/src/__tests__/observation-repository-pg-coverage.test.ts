@@ -66,16 +66,28 @@ async function cleanup(): Promise<void> {
 function identityResolver(): ProjectIdentityAliasResolver {
   return {
     resolve: async (id: string) => id,
+    resolveCached: () => undefined,
     invalidateProject: () => {},
     clearCache: () => {},
     cacheSize: 0,
   } as unknown as ProjectIdentityAliasResolver;
 }
 
-/** A resolver that maps a known source id to a canonical target id. */
-function renamingResolver(map: Map<string, string>): ProjectIdentityAliasResolver {
+/**
+ * A resolver that maps a known source id to a canonical target id.
+ *
+ * `warmCache` models whether the real resolver's TTL cache already holds the
+ * mapping. `resolveCached` is cache-only by contract, so a cold resolver
+ * returns undefined from it while still resolving asynchronously — those are
+ * the two halves of BUG-06's boundary.
+ */
+function renamingResolver(
+  map: Map<string, string>,
+  { warmCache = true }: { warmCache?: boolean } = {},
+): ProjectIdentityAliasResolver {
   return {
     resolve: async (id: string) => map.get(id) ?? id,
+    resolveCached: (id: string) => (warmCache ? map.get(id) : undefined),
     invalidateProject: () => {},
     clearCache: () => {},
     cacheSize: 0,
@@ -359,6 +371,53 @@ describe.skipIf(!DEDICATED_DB)("PgObservationStore — coverage", () => {
     // Mirror entry was overwritten to the canonical id (sync reads key on canonical).
     expect(store.countByProject(source)).toBe(0);
     expect(store.countByProject(canonical)).toBe(1);
+  });
+
+  // ── BUG-06 / TASK-014: same-tick read-after-write across a rename ──────────
+  //
+  // `insert` is synchronous but alias resolution is not, so the mirror was
+  // keyed on the CALLER's id until the fire-and-forget persist resolved a tick
+  // later. A reader holding the canonical id — the post-rename id every other
+  // seam uses — got nothing back from a write that had already "succeeded".
+
+  test("a read by the canonical id in the same tick as a retired-alias insert finds it", async () => {
+    const source = projectId();
+    const canonical = projectId();
+    setProjectIdentityAliasResolverForTests(renamingResolver(new Map([[source, canonical]])));
+    const store = new PgObservationStore();
+    const id = newObservationId();
+
+    store.insert(makeObservation({ id, projectId: source, createdAt: 11 }));
+    // Deliberately NOT awaited: this is the same tick as the insert.
+    expect(store.countByProject(canonical)).toBe(1);
+    expect(store.listRecent(canonical, 10).map((o) => o.id)).toEqual([id]);
+    // And the retired id no longer answers, matching the post-await behaviour.
+    expect(store.countByProject(source)).toBe(0);
+
+    await settle(store);
+    expect(store.countByProject(canonical)).toBe(1);
+  });
+
+  test("cold alias cache: the same-tick read still misses, and the async persist repairs it", async () => {
+    // Bounded, documented residual. `resolveCached` cannot consult the database,
+    // so a mapping this process has never resolved is unknowable synchronously;
+    // closing that window would require making insert() async and changing a
+    // fire-and-forget contract the hook paths depend on.
+    const source = projectId();
+    const canonical = projectId();
+    setProjectIdentityAliasResolverForTests(
+      renamingResolver(new Map([[source, canonical]]), { warmCache: false }),
+    );
+    const store = new PgObservationStore();
+    const id = newObservationId();
+
+    store.insert(makeObservation({ id, projectId: source, createdAt: 12 }));
+    expect(store.countByProject(canonical)).toBe(0);
+    expect(store.countByProject(source)).toBe(1);
+
+    await settle(store);
+    expect(store.countByProject(canonical)).toBe(1);
+    expect(store.countByProject(source)).toBe(0);
   });
 
   test("insert with no alias (canonical === source) keeps the mirror entry unchanged", async () => {
