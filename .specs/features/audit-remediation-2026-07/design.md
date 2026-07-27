@@ -400,6 +400,27 @@ instead of the container's ephemeral `/root/.config` — which is what spec SEC-
 > share no state and no call path, and T13 makes the write path more consistent rather than
 > changing what a read seam must compare against.
 
+### `resolveEdgeTarget` (modified — component added during TASK-012)
+
+BUG-04 had no component entry; the tasks-level instruction was "module-scoped FQN attempted
+first; the global `symbolIndex` becomes the fallback". Implementing that needed one structure the
+plan did not anticipate, recorded here because it widens the task past the "1 function" its
+granularity row claims.
+
+`symbolIndex` is `Map<name, fqn>` with **one entry per name** (first-def-wins across the repo
+seed, then unconditionally overlaid by the batch). It therefore cannot answer the question
+module-scoped resolution has to ask — *does the namespace-imported module define this name?* —
+whenever another file already won that name, which is precisely the collision BUG-04 is about.
+`buildSymbolIndex` now also returns `fqns: Set<string>`, every `path#name` it sees from both
+sources, and `resolveEdgeTarget` checks `knownFqns.has(nsFqn)` before falling back to
+`symbolIndex`. Threading it through adds one parameter to `resolveFile` and one to
+`resolveEdgeTarget`; the set is filled in the two loops that already exist, so there is no extra
+pass over the symbols.
+
+The documented best-effort tail is preserved deliberately: a namespace-imported callee that
+nothing in the project defines still resolves to `${nsPath}#${name}`, and a test pins it so the
+fallback cannot be dropped silently later.
+
 ### `ExecResult.sandboxMode` (modified)
 
 - **Location**: `packages/core/src/services/executor/executor.ts:44-56` (interface) and `:453` (`#spawn`)

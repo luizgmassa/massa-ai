@@ -996,6 +996,118 @@ describe("ResolveStage", () => {
     expect(resolvedB.resolvedEdges.length).toBe(1);
     expect(resolvedB.resolvedEdges[0]!.targetFqn).toBe("a.ts#foo");
   });
+
+  // ── BUG-04 / TASK-012 ────────────────────────────────────────────────────
+  //
+  // `resolveEdgeTarget`'s docstring promises "First try the imported module's
+  // file-scoped FQN, then fall through to the project-wide index", but the
+  // code consulted the project-wide index first. With a namespace import, any
+  // other file in the project that happens to export the same bare name won
+  // the binding, so `Utils.parse(x)` pointed at a `parse` the caller never
+  // imported.
+
+  /** Build a ParsedFile shell; only the fields resolve() reads are populated. */
+  function parsedFile(
+    dir: string,
+    relativePath: string,
+    symbols: string[],
+    rawImports: RawImport[] = [],
+    rawEdges: RawEdge[] = [],
+  ): ParsedFile {
+    return {
+      file: {
+        absolutePath: path.join(dir, relativePath),
+        relativePath,
+        mtime: 0, size: 0, contentHash: "h", needsReparse: true,
+      },
+      chunks: [],
+      symbols: symbols.map((name, i) => (
+        { kind: "function", name, lineStart: i + 1, lineEnd: i + 1, exported: true } as RawSymbol
+      )),
+      rawImports,
+      rawEdges,
+    };
+  }
+
+  test("namespace-import callee binds to its own module, not a colliding global", async () => {
+    const dir = await makeProjectDir({
+      "other.ts": "export function parse() { return 1; }\n",
+      "utils.ts": "export function parse() { return 2; }\n",
+      "app.ts": "import * as Utils from './utils';\nexport function go() { return Utils.parse(1); }\n",
+    });
+    const ctx = makeCtx(dir);
+    const stage = new ResolveStage();
+
+    // `other.ts` is listed first, so it wins the project-wide `parse` entry
+    // (first-def-wins). The namespace import must still beat it.
+    const files = [
+      parsedFile(dir, "other.ts", ["parse"]),
+      parsedFile(dir, "utils.ts", ["parse"]),
+      parsedFile(
+        dir,
+        "app.ts",
+        ["go"],
+        [{ specifier: "./utils", names: ["*"], isTypeOnly: false, form: "esm_import" } as RawImport],
+        [{ kind: "call", line: 2, symbolName: "parse" } as RawEdge],
+      ),
+    ];
+
+    const resolved = await stage.run(ctx, files);
+    const app = resolved.find((r) => r.file.relativePath === "app.ts")!;
+    expect(app.resolvedEdges[0]!.targetFqn).toBe("utils.ts#parse");
+  });
+
+  test("namespace import that does not define the callee still falls back to the global index", async () => {
+    const dir = await makeProjectDir({
+      "helpers.ts": "export function format() { return 1; }\n",
+      "utils.ts": "export function parse() { return 2; }\n",
+      "app.ts": "import * as Utils from './utils';\nexport function go() { return format(1); }\n",
+    });
+    const ctx = makeCtx(dir);
+    const stage = new ResolveStage();
+
+    const files = [
+      parsedFile(dir, "helpers.ts", ["format"]),
+      parsedFile(dir, "utils.ts", ["parse"]),
+      parsedFile(
+        dir,
+        "app.ts",
+        ["go"],
+        [{ specifier: "./utils", names: ["*"], isTypeOnly: false, form: "esm_import" } as RawImport],
+        [{ kind: "call", line: 2, symbolName: "format" } as RawEdge],
+      ),
+    ];
+
+    const resolved = await stage.run(ctx, files);
+    const app = resolved.find((r) => r.file.relativePath === "app.ts")!;
+    // `utils.ts` has no `format`, so the project-wide index is the right answer.
+    expect(app.resolvedEdges[0]!.targetFqn).toBe("helpers.ts#format");
+  });
+
+  test("namespace import with no definition anywhere keeps the best-effort module FQN", async () => {
+    const dir = await makeProjectDir({
+      "utils.ts": "export function parse() { return 2; }\n",
+      "app.ts": "import * as Utils from './utils';\nexport function go() { return Utils.mystery(1); }\n",
+    });
+    const ctx = makeCtx(dir);
+    const stage = new ResolveStage();
+
+    const files = [
+      parsedFile(dir, "utils.ts", ["parse"]),
+      parsedFile(
+        dir,
+        "app.ts",
+        ["go"],
+        [{ specifier: "./utils", names: ["*"], isTypeOnly: false, form: "esm_import" } as RawImport],
+        [{ kind: "call", line: 2, symbolName: "mystery" } as RawEdge],
+      ),
+    ];
+
+    const resolved = await stage.run(ctx, files);
+    const app = resolved.find((r) => r.file.relativePath === "app.ts")!;
+    // Documented best-effort: assume the imported module exports the callee.
+    expect(app.resolvedEdges[0]!.targetFqn).toBe("utils.ts#mystery");
+  });
 });
 
 describe("LoadStage", () => {

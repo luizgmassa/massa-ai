@@ -81,7 +81,7 @@ export class ResolveStage {
     // within each source. This closes the D1 cross-file gap: a call edge in
     // a newly-indexed file can now resolve to a callee defined in an
     // unchanged file that was fingerprint-skipped this run.
-    const { index: symbolIndex, definitions: repositoryDefinitions } = await this.buildSymbolIndex(ctx.projectId, files);
+    const { index: symbolIndex, fqns: knownFqns, definitions: repositoryDefinitions } = await this.buildSymbolIndex(ctx.projectId, files);
     if (ctx.abortSignal?.aborted) throw ctx.abortSignal.reason;
 
     // Parse tsconfig.json compilerOptions.paths for workspace alias resolution
@@ -149,6 +149,7 @@ export class ResolveStage {
         rootAliases,
         monorepoPackages,
         symbolIndex,
+        knownFqns,
       );
       resolved.push(resolvedFile);
       processed++;
@@ -316,6 +317,7 @@ export class ResolveStage {
     rootAliases: TsPathAlias[],
     monorepoPackages: MonorepoPackage[],
     symbolIndex: Map<string, string>,
+    knownFqns: Set<string>,
   ): ResolvedFile {
     const fromDir = path.dirname(path.join(projectPath, parsed.file.relativePath));
 
@@ -373,6 +375,7 @@ export class ResolveStage {
         importNameToPath,
         namespaceToPath,
         symbolIndex,
+        knownFqns,
       );
       // Stamp the caller FQN into meta for downstream traversal.
       const meta = { ...(edge.meta ?? {}) };
@@ -407,16 +410,24 @@ export class ResolveStage {
     importNameToPath: Map<string, string | null>,
     namespaceToPath: Map<string, string>,
     symbolIndex: Map<string, string>,
+    knownFqns: Set<string>,
   ): string | undefined {
     if (localNames.has(name)) return `${thisFile}#${name}`;
     const importedPath = importNameToPath.get(name);
     if (importedPath) return `${importedPath}#${name}`;
     // Namespace/default binding: the bare callee may be a member of the
-    // imported module. First try the imported module's file-scoped FQN, then
+    // imported module. Try the imported module's file-scoped FQN first, then
     // fall through to the project-wide index (handles re-exports + aliases).
+    //
+    // BUG-04: this order was inverted, so any other file exporting the same
+    // bare name won the binding and `Utils.parse()` pointed at a `parse` the
+    // caller never imported. `symbolIndex` holds one entry per NAME, so it
+    // cannot answer "does nsPath define this?" once a different file wins the
+    // name — that is what `knownFqns` is for.
     const nsPath = namespaceToPath.get("*") ?? namespaceToPath.get("default");
     if (nsPath) {
       const nsFqn = `${nsPath}#${name}`;
+      if (knownFqns.has(nsFqn)) return nsFqn;
       if (symbolIndex.has(name)) return symbolIndex.get(name);
       return nsFqn; // best-effort: assume the module exports the callee
     }
@@ -438,8 +449,13 @@ export class ResolveStage {
   private async buildSymbolIndex(
     projectId: string,
     files: ParsedFile[],
-  ): Promise<{ index: Map<string, string>; definitions: SymbolDefinition[] }> {
+  ): Promise<{ index: Map<string, string>; fqns: Set<string>; definitions: SymbolDefinition[] }> {
     const index = new Map<string, string>();
+    // Every `path#name` seen, repo and batch alike. `index` keeps one entry per
+    // NAME, so it cannot answer "does THIS file define that name?" once another
+    // file wins the name — which is exactly what namespace-import resolution
+    // has to ask (BUG-04).
+    const fqns = new Set<string>();
     let repositoryDefinitions: SymbolDefinition[] = [];
 
     // 1. Seed from the repo (project-wide), first-def-wins. Catches unchanged
@@ -447,6 +463,7 @@ export class ResolveStage {
     try {
       repositoryDefinitions = await this.symbolRepository.listAllDefinitions(projectId);
       for (const def of repositoryDefinitions) {
+        fqns.add(`${def.file_path}#${def.name}`);
         if (index.has(def.name)) continue;
         index.set(def.name, `${def.file_path}#${def.name}`);
       }
@@ -467,6 +484,7 @@ export class ResolveStage {
     const inBatch = new Map<string, string>();
     for (const f of files) {
       for (const sym of f.symbols) {
+        fqns.add(`${f.file.relativePath}#${sym.name}`);
         if (inBatch.has(sym.name)) continue;
         inBatch.set(sym.name, `${f.file.relativePath}#${sym.name}`);
       }
@@ -474,7 +492,7 @@ export class ResolveStage {
     for (const [name, fqn] of inBatch) {
       index.set(name, fqn);
     }
-    return { index, definitions: repositoryDefinitions };
+    return { index, fqns, definitions: repositoryDefinitions };
   }
 
   private resolveSpecifier(
