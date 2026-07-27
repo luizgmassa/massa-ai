@@ -49,7 +49,12 @@ function runInstall(
 ): RunResult {
   const result = spawnSync("bash", [INSTALL_SH, ...args], {
     encoding: "utf8",
-    env: { ...process.env, ...env },
+    // These suites assert the file route (loose commands, merged hooks). The
+    // installer prefers the plugin route whenever the claude CLI is present, so
+    // without pinning this the results would differ between a machine with
+    // Claude Code installed and a CI runner without it. Plugin-route coverage
+    // lives in scripts/tests/test-plugin-registry-registration.sh.
+    env: { MASSA_AI_SKIP_PLUGIN_REGISTRY: "1", ...process.env, ...env },
     cwd: cwd ?? REPO_ROOT,
     timeout: 30000,
   });

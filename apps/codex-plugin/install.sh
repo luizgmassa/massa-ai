@@ -10,13 +10,18 @@
 # MCP registration is delegated to scripts/install-agents.sh, the single writer
 # of host MCP config. This installer no longer ships a plugin-local .mcp.json.
 #
-# Complementary to the marketplace route, NOT a duplicate of it. Installing via
-# `codex plugin add massa-ai@massa-ai` gives Codex the skills and the /plugins
-# entry; it CANNOT give it hooks, because a Codex plugin manifest has no hooks
-# key (none of the 203 manifests shipped by the bundled/curated/runtime
-# marketplaces declares one). Hooks reach Codex only through ~/.codex/hooks.json,
-# which this script writes. So there is no double-fire to guard against here —
-# unlike apps/claude-plugin/install.sh, whose plugin does ship hooks/hooks.json.
+# This script now drives BOTH halves. `codex plugin marketplace add` +
+# `codex plugin add massa-ai@massa-ai` supply the skills and the /plugins entry;
+# they CANNOT supply hooks, because a Codex plugin manifest has no hooks key
+# (none of the 203 manifests shipped by the bundled/curated/runtime marketplaces
+# declares one). Hooks reach Codex only through ~/.codex/hooks.json, which this
+# script writes. The two halves are therefore additive, not exclusive — unlike
+# apps/claude-plugin/install.sh, whose plugin does ship hooks/hooks.json and so
+# has to pick one route or double-fire.
+#
+# Skills are likewise not duplicated: the marketplace route populates Codex's
+# own plugin skill cache, while the harness skills go to $CODEX_DIR/skills under
+# the skillsOwner coordination described further down. Separate mechanisms.
 #
 # Idempotent: re-running is a no-op when owned entries already present.
 # Uninstall removes only ownership-marked entries + the plugin directory.
@@ -33,6 +38,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CLAUDE_PLUGIN_BIN="$REPO_ROOT/apps/claude-plugin/hooks/massa-ai-hook.ts"
+# shellcheck source=scripts/lib/installer-shared.sh
+source "$REPO_ROOT/scripts/lib/installer-shared.sh"
+# Marketplace root to register; install-harness.sh resolves it once per run
+# (--plugin-source local|copy|auto). Direct invocation uses this checkout.
+PLUGIN_SOURCE_ROOT="${MASSA_AI_PLUGIN_SOURCE_ROOT:-$REPO_ROOT}"
 
 SCOPE="user"
 UNINSTALL=0
@@ -335,9 +345,59 @@ try {
 NODE
 }
 
+# ── Plugin-registry registration (delegated to the codex CLI) ───────────────
+# The CLI owns config.toml's [marketplaces.*] / [plugins."x@y"] tables and the
+# plugins/cache layout, so it is the only supported way to reach /plugins.
+# Failure is never fatal: without this the rest of the install (hooks, agents,
+# MCP) is still fully functional, it just does not show in the plugins screen.
+CODEX_MARKETPLACE="massa-ai"
+CODEX_PLUGIN_ID="massa-ai@massa-ai"
+
+# Where the CLI is allowed to write. Pinned explicitly, and not left to the
+# CLI's own resolution, for two reasons:
+#
+#  1. The codex CLI resolves its config root from $CODEX_HOME before falling
+#     back to $HOME/.codex — and the Codex app exports CODEX_HOME into every
+#     shell it spawns. This script resolves CODEX_DIR from $HOME alone, so an
+#     install running against an overridden $HOME (tests, --target) would write
+#     its files into the sandbox while registering the marketplace into the
+#     developer's real ~/.codex. That is not hypothetical: it silently removed
+#     a live [marketplaces.massa-ai] table during development of this change.
+#  2. Codex records plugin installs at user scope, so this stays $HOME-derived
+#     even for --project, mirroring PLUGIN_REGISTRY in apps/claude-plugin.
+#
+# Note the pre-existing divergence left untouched here: the file-copy half of
+# this installer still ignores CODEX_HOME entirely. Making both halves honour
+# it is a separate change with a much wider blast radius.
+CODEX_CLI_HOME="$HOME/.codex"
+
+register_codex_plugin() {
+  # Explicit opt-out; see the same knob in apps/claude-plugin/install.sh.
+  [[ "${MASSA_AI_SKIP_PLUGIN_REGISTRY:-0}" == "1" ]] && return 1
+  installer_host_cli_supports codex plugin marketplace || return 1
+  if [[ ! -f "$PLUGIN_SOURCE_ROOT/.agents/plugins/marketplace.json" ]]; then
+    vecho "  – no marketplace manifest under $PLUGIN_SOURCE_ROOT — skipping /plugins registration"
+    return 1
+  fi
+  # Idempotent: a second run reports "already added" and leaves config.toml
+  # byte-identical.
+  CODEX_HOME="$CODEX_CLI_HOME" codex plugin marketplace add "$PLUGIN_SOURCE_ROOT" </dev/null >/dev/null 2>&1 || return 1
+  CODEX_HOME="$CODEX_CLI_HOME" codex plugin add "$CODEX_PLUGIN_ID" </dev/null >/dev/null 2>&1 || return 1
+}
+
+unregister_codex_plugin() {
+  installer_host_cli_supports codex plugin marketplace || return 0
+  CODEX_HOME="$CODEX_CLI_HOME" codex plugin remove "$CODEX_PLUGIN_ID" </dev/null >/dev/null 2>&1 || true
+  # Order matters: the marketplace entry must go last, because removing it
+  # first leaves `codex plugin list` unable to resolve the plugin it still has
+  # registered — the same cache-miss failure a deleted checkout produces.
+  CODEX_HOME="$CODEX_CLI_HOME" codex plugin marketplace remove "$CODEX_MARKETPLACE" </dev/null >/dev/null 2>&1 || true
+}
+
 # ── Uninstall ───────────────────────────────────────────────────────────────
 if [[ "$UNINSTALL" -eq 1 ]]; then
   echo "Uninstalling massa-ai Codex plugin (scope: $SCOPE)..."
+  unregister_codex_plugin
   uninstall_bundled_skills
   # Remove owned hook entries (preserves user hooks)
   if [[ -f "$HOOKS_JSON" ]]; then
@@ -463,9 +523,24 @@ else
   echo "  ⚠ scripts/install-agents.sh not found — register MCP with: bash scripts/install-agents.sh --agent codex --yes" >&2
 fi
 
+# ── Plugin-registry registration ─────────────────────────────────────────────
+# Runs after the file writes above because it is additive here: hooks and agent
+# TOMLs stay owned by this script either way.
+CODEX_PLUGIN_ROUTE=0
+if register_codex_plugin; then
+  CODEX_PLUGIN_ROUTE=1
+  vecho "  + registered ${CODEX_PLUGIN_ID} (marketplace root: ${PLUGIN_SOURCE_ROOT})"
+fi
+
 # Summary line in quiet mode
 if [ "${MASSA_AI_VERBOSE:-0}" != "1" ]; then
-  ok "codex plugin installed (${skill_count} skills, ${specialist_count} specialists, 6 hooks)"
+  if [[ "$CODEX_PLUGIN_ROUTE" -eq 1 ]]; then
+    ok "codex plugin installed (${skill_count} skills, ${specialist_count} specialists, 6 hooks) — shows in /plugins"
+  else
+    ok "codex plugin installed (${skill_count} skills, ${specialist_count} specialists, 6 hooks)"
+    warn "codex CLI unavailable — not registered in /plugins. Register it with:"
+    warn "  codex plugin marketplace add \"$PLUGIN_SOURCE_ROOT\" && codex plugin add $CODEX_PLUGIN_ID"
+  fi
 else
   vecho ""
   vecho "Done. Restart Codex to pick up the plugin."

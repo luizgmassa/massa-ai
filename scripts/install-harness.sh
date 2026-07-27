@@ -20,6 +20,7 @@
 #   --platform <name>      claude, codex, cursor, opencode, all (skills scope)
 #   --api-base <url>       MCP API base url (default http://localhost:3333)
 #   --mcp-source <type>    Command source: local, npx, auto (default auto)
+#   --plugin-source <type> Marketplace root: local, copy, auto (default auto)
 #   --target <dir>         Override $HOME root (tests / CI)
 #   --dry-run              Preview; writes nothing
 #   --uninstall            Remove skills + MCP entries + plugin bundles
@@ -50,6 +51,7 @@ SELECTED=0
 PLATFORM="all"
 API_BASE="http://localhost:3333"
 MCP_SOURCE="${MASSA_AI_MCP_SOURCE:-auto}"
+PLUGIN_SOURCE="${MASSA_AI_PLUGIN_SOURCE:-auto}"
 TARGET_HOME="${HOME:-}"
 DRY_RUN=0
 UNINSTALL=0
@@ -68,6 +70,7 @@ while [ $# -gt 0 ]; do
     --platform) shift; PLATFORM="${1:-all}" ;;
     --api-base) shift; API_BASE="${1:-}" ;;
     --mcp-source) shift; MCP_SOURCE="${1:-}" ;;
+    --plugin-source) shift; PLUGIN_SOURCE="${1:-}" ;;
     --target) shift; TARGET_HOME="${1:-}" ;;
     --dry-run) DRY_RUN=1; VERBOSE_MODE=1 ;;
     --uninstall) UNINSTALL=1 ;;
@@ -171,6 +174,13 @@ if [ "$DO_PLUGINS" = "1" ]; then
     compact_phase "Would install plugin bundles: claude, codex, cursor, opencode (dry-run)"
   else
     compact_phase "Installing plugin bundles..."
+    # Resolved once for the whole run: in copy mode this materialises the
+    # stable marketplace root, and doing it per-host would re-copy four times.
+    if ! plugin_mode="$(installer_plugin_source_mode "$PLUGIN_SOURCE" "$REPO_ROOT")"; then
+      exit 2
+    fi
+    plugin_source_root="$(installer_plugin_source_root "$plugin_mode" "$REPO_ROOT" "$TARGET_HOME")"
+    vinfo "Plugin marketplace source: ${plugin_mode} (${plugin_source_root})"
     for host in claude codex cursor opencode; do
       installer="$REPO_ROOT/apps/${host}-plugin/install.sh"
       if [ ! -f "$installer" ]; then
@@ -180,9 +190,13 @@ if [ "$DO_PLUGINS" = "1" ]; then
       vinfo "Installing the ${host} plugin bundle..."
       set +e
       if [ "$UNINSTALL" = "1" ]; then
-        HOME="$TARGET_HOME" MASSA_AI_MCP_SOURCE="$MCP_SOURCE" bash "$installer" --uninstall $([ "$VERBOSE_MODE" = "1" ] && echo "--verbose")
+        HOME="$TARGET_HOME" MASSA_AI_MCP_SOURCE="$MCP_SOURCE" \
+          MASSA_AI_PLUGIN_SOURCE_ROOT="$plugin_source_root" \
+          bash "$installer" --uninstall $([ "$VERBOSE_MODE" = "1" ] && echo "--verbose")
       else
-        HOME="$TARGET_HOME" MASSA_AI_MCP_SOURCE="$MCP_SOURCE" bash "$installer" --user $([ "$VERBOSE_MODE" = "1" ] && echo "--verbose")
+        HOME="$TARGET_HOME" MASSA_AI_MCP_SOURCE="$MCP_SOURCE" \
+          MASSA_AI_PLUGIN_SOURCE_ROOT="$plugin_source_root" \
+          bash "$installer" --user $([ "$VERBOSE_MODE" = "1" ] && echo "--verbose")
       fi
       rc=$?
       set -e

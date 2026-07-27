@@ -26,6 +26,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Marketplace/bundle root resolved once per run by install-harness.sh
+# (--plugin-source local|copy|auto). OpenCode has no marketplace registry — its
+# opencode.json `plugin` array IS the registry — but the symlink below still has
+# to point somewhere that outlives the checkout, so it honours the same root.
+PLUGIN_SOURCE_ROOT="${MASSA_AI_PLUGIN_SOURCE_ROOT:-$REPO_ROOT}"
 SCOPE="user"
 UNINSTALL=0
 DRY_RUN=0
@@ -304,8 +309,15 @@ vinfo "Installing massa-ai OpenCode plugin to: $TARGET"
 # Create plugin directory
 mkdir -p "$PLUGINS_DIR"
 
-# Symlink the plugin bundle (resolve to repo's dist/index.js)
-resolved_plugin_js="$(cd "$REPO_ROOT" && pwd)/apps/opencode-plugin/dist/index.js"
+# Symlink the plugin bundle (resolve to the bundle's dist/index.js). Under
+# --plugin-source copy this points at the stable copy rather than the checkout,
+# so deleting the checkout no longer breaks the plugin.
+resolved_plugin_js="$PLUGIN_SOURCE_ROOT/apps/opencode-plugin/dist/index.js"
+if [[ ! -f "$resolved_plugin_js" ]]; then
+  # The copy is made before `bun run build` has necessarily run in that tree;
+  # the checkout's dist is the only other place it can come from.
+  resolved_plugin_js="$REPO_ROOT/apps/opencode-plugin/dist/index.js"
+fi
 
 # Pre-flight check: refuse to clobber a regular file
 if [[ -e "$PLUGINS_DIR/index.js" && ! -L "$PLUGINS_DIR/index.js" ]]; then

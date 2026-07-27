@@ -1,0 +1,17 @@
+{
+  "name": "massa-ai",
+  "owner": {
+    "name": "Luiz Massa",
+    "url": "https://github.com/luizgmassa"
+  },
+  "metadata": {
+    "description": "massa-ai — semantic code search, durable memory, symbol graph, and context compression for Cursor."
+  },
+  "plugins": [
+    {
+      "name": "massa-ai",
+      "source": "apps/cursor-plugin",
+      "description": "Semantic code search, memory, symbol graph, and context compression. 15 subagent specialists + 6 skills."
+    }
+  ]
+}
