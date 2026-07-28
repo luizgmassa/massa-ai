@@ -239,12 +239,51 @@ It is the **cold/warm model against the 5 s budget**, the same root cause as T3 
 **Three details it will fail on if guessed**: `assertDedicatedDatabase()` matches `/127\.0\.0\.1:5433\/massa_ai_test(?:\?|$)/`, so the URL must use literal **`127.0.0.1`** — every other job in `ci.yml:13` uses `localhost`, which fails the regex. Port must be **5433**, not the `5432:5432` at `ci.yml:23,159`. Database is `massa_ai_test`. Copy the service block from `ci.yml:15-23` and change all three.
 
 **Done when**:
-- [ ] Runs `bun run test:coverage` with `MASSA_AI_DEDICATED=1`
-- [ ] **No `continue-on-error`** — a gate that reports and never enforces is the failure mode this repo already rejected once (oxlint's 15 firing rules kept at `error`)
-- [ ] Not inside `ci.yml`, so it does not extend the `workflow_run` chain `release.yml` keys off — releases must keep firing on CI alone
-- [ ] `CLAUDE.md`'s CI-gates section names it and its separate-workflow count is corrected
+- [x] Runs `bun run test:coverage` with `MASSA_AI_DEDICATED=1`
+- [x] **No `continue-on-error`** — a gate that reports and never enforces is the failure mode this repo already rejected once (oxlint's 15 firing rules kept at `error`)
+- [x] Not inside `ci.yml`, so it does not extend the `workflow_run` chain `release.yml` keys off — releases must keep firing on CI alone
+- [x] `CLAUDE.md`'s CI-gates section names it and its separate-workflow count is corrected
 
-**Tests**: none (CI config) · **Gate**: green run on the PR itself
+**DONE.** `.github/workflows/coverage.yml`, name **`Coverage`**, `ubuntu-latest`, own
+`pgvector/pgvector:pg17` service, push-to-`main` + every PR, `timeout-minutes: 60`.
+
+**AC-3 holds by construction, and the mechanism is worth stating.** `release.yml` triggers on
+`workflow_run: workflows: [CI]` — the coupling is by workflow **name**, not by file. A separate
+workflow named anything but `CI` cannot extend the release chain. That is now written into
+`CLAUDE.md` as a rename hazard, because the property is invisible from this file alone.
+
+**The three URL details were verified against the real predicate, not eyeballed.** Running
+`isDedicatedDatabase()` from `scripts/check-coverage.ts` against the workflow's literal env:
+
+| Input | Result |
+| --- | --- |
+| `127.0.0.1:5433/massa_ai_test` + `MASSA_AI_DEDICATED=1` (what the workflow sets) | **accepted** |
+| `localhost:5433/massa_ai_test` (the shape every `ci.yml` job uses) | rejected |
+| `127.0.0.1:5432/massa_ai_test` (the port `ci.yml` services use) | rejected |
+| `127.0.0.1:5433/massa_ai` (the db name `ci.yml` uses) | rejected |
+| `MASSA_AI_DEDICATED` absent | rejected |
+
+**A fourth detail the task list did not carry, and it would have failed the gate.**
+`RUN_POSTGRES_TESTS=1` is **not** vestigial and is not implied by `DATABASE_URL`. Ten-plus core
+suites still gate on `process.env.RUN_POSTGRES_TESTS === "1"` — `attribution-resolver`,
+`keyword-search-pg`, `keyword-search-factory`, `search-analytics-pg-pg`,
+`synapse-session-store-pg`, `operation-log-repository` among them. Without it they report
+`0 pass / N skip`, their subjects measure near zero, and the gate fails with a flood of phantom
+below-floor files instead of the truth — the exact confusion `check-coverage.ts`'s own header
+describes. The workflow sets it, with that reason recorded inline.
+
+`MASSA_AI_EXECUTOR_SANDBOX: none` mirrors `ci.yml`'s Test step. A `Build` step precedes the gate,
+mirroring `ci.yml`'s ordering: core's `prebuild` runs `bunx prisma generate`, which the suites need.
+Coverage measures `src` and `isMeasuredSource()` excludes `/dist/`, so building cannot move the
+numbers.
+
+**No suite fix was needed, and the reason the task list expected one is falsified — see T3.** The
+gate exits **0** locally, twice. `test:scripts` **616 pass / 0 fail**, so
+`workflow-harness-contract.test.ts` and `validate-repository.test.ts` accept the new file.
+
+**Not verifiable locally**: AC-1's green run on the PR itself. Confirm on the PR before merge.
+
+**Tests**: none (CI config) · **Gate**: green run on the PR itself (pending push)
 **Commit**: `ci: run the coverage gate on its own blocking workflow`
 
 ---

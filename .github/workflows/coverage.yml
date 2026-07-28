@@ -1,0 +1,134 @@
+name: Coverage
+
+# Per-file coverage floor gate (SEN-02).
+#
+# `bun run test:coverage` existed but ran only when a human remembered to run it:
+# `rg 'test:coverage|check-coverage' .github/workflows/*.yml` returned zero hits.
+# Only its arithmetic was covered, by scripts/__tests__/check-coverage.test.ts.
+# This workflow gives it CI reach.
+#
+# BLOCKING BY DESIGN — no `continue-on-error`. A gate that reports and never
+# enforces is the exact failure mode this repo already rejected once, when
+# oxlint's firing rules were kept at `error` rather than downgraded to `warn`.
+# If this proves unstable the correct response is to fix the instability, not to
+# add `continue-on-error` — that would recreate the defect this workflow closes.
+#
+# WHY IT IS NOT A JOB INSIDE ci.yml. release.yml triggers on
+# `workflow_run: workflows: [CI]`, so anything added to CI extends the chain that
+# cuts and publishes a release. Coverage must be able to fail a merge without
+# being able to hold up or misfire a release, and CI must keep being the sole
+# release trigger. Keeping this a separate workflow with a different name is what
+# guarantees both — the coupling is by workflow *name*, so this file must never
+# be named `CI`.
+#
+# Runs the full instrumented suite, so it roughly doubles per-PR test time. That
+# cost was accepted with the decision; the alternative was a floor nothing checked.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  # A superseded PR revision's coverage run has no value; cancel it. Never cancel
+  # on main, where the run is the post-merge record for that commit.
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      # Three details this fails on if they are guessed rather than read from
+      # `isDedicatedDatabase()` in scripts/check-coverage.ts, which matches
+      # /127\.0\.0\.1:5433\/massa_ai_test(?:\?|$)/ :
+      #
+      #   1. literal `127.0.0.1`, NOT `localhost` — every other job in ci.yml
+      #      uses localhost, which fails the regex and the gate refuses to run
+      #   2. port 5433, not the 5432 the ci.yml services use
+      #   3. database `massa_ai_test`, not `massa_ai`
+      DATABASE_URL: postgresql://massa_ai:massa_ai_password@127.0.0.1:5433/massa_ai_test
+
+      # The other half of the same predicate. Both are required, and the reset
+      # that truncates the database at gate start is guarded by that one shared
+      # predicate rather than a second condition that could drift from it.
+      MASSA_AI_DEDICATED: "1"
+
+      # Not optional, and not implied by DATABASE_URL. Ten-plus core suites gate
+      # on `process.env.RUN_POSTGRES_TESTS === "1"` (attribution-resolver,
+      # keyword-search-pg, keyword-search-factory, search-analytics-pg-pg,
+      # synapse-session-store-pg, operation-log-repository, …). Without it they
+      # report 0 pass / N skip, their subjects measure near zero, and the gate
+      # fails with a flood of phantom below-floor files rather than the truth.
+      RUN_POSTGRES_TESTS: "1"
+
+      # Mirrors ci.yml's Test step. The executor suites force best-effort mode
+      # themselves, but this job runs the same suites as that known-green job and
+      # an unexplained env divergence between them is its own hazard.
+      MASSA_AI_EXECUTOR_SANDBOX: none
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: massa_ai
+          POSTGRES_PASSWORD: massa_ai_password
+          POSTGRES_DB: massa_ai_test
+        ports:
+          # Host 5433 -> container 5432. The host side is what DATABASE_URL and
+          # the dedicated-database regex see.
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U massa_ai"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          # keep in sync with package.json packageManager
+          bun-version: 1.3.14
+
+      # The coverage run exercises the native tree-sitter structural path, so it
+      # needs the same node-gyp build helper ci.yml's build job uses.
+      - name: Setup Node (node-gyp build helper)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Reconcile npm to contract version (11.14.1)
+        run: npm install -g npm@11.14.1
+
+      # Same purge-and-retry as ci.yml's install step, for the same reason: Bun's
+      # install cache intermittently races the lifecycle scripts it feeds and the
+      # casualty is always a native grammar. The happy path pays nothing — `&&`
+      # short-circuits straight to `exit 0`.
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile && exit 0
+          echo "::warning::bun install failed — purging Bun's install cache and retrying once"
+          rm -rf ~/.bun/install/cache node_modules
+          bun install --frozen-lockfile --concurrent-scripts 1
+
+      - name: Deploy Prisma migrations
+        run: cd packages/core && bunx prisma migrate deploy
+
+      # Mirrors ci.yml's ordering. core's `prebuild` runs `bunx prisma generate`,
+      # which the suites need, and packages/core's build copies src/generated into
+      # dist/ — a plain tsc would not produce a working dist. Coverage measures
+      # src, and isMeasuredSource() excludes /dist/, so building does not alter
+      # the numbers.
+      - name: Build
+        run: bun run build
+
+      # No `continue-on-error`. See the header.
+      - name: Coverage gate
+        run: bun run test:coverage
