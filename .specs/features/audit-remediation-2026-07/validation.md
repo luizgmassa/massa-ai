@@ -31,7 +31,7 @@ SEC-06's Docker bridge-address measurement (see Residual Risk).
 | SEC-03 | PASS | `ExecResult.sandboxMode` (`executor.ts:62`) set on all `#spawn` branches **plus** the two refusal paths `tsc` surfaced during Execute. Three-place rule checked: controller copies it into every `data:{…}` including each `batchExecute` item, and both the REST route and `embedded-api-client.ts:483-489` are unmodified passthroughs. `executor-sandbox-passthrough.test.ts` asserts the field survives the embedded client — the one hand-written mirror. |
 | SEC-04 | PASS | `admin-preservation.ts`, its wiring and **both** its test files removed (the second lived in a different directory than tasks.md named). `rg 'getUserCount\|adminPreservation'` returns only explanatory comments. The six former `ADMIN_ENDPOINTS` are covered by a parameterised 401 test. |
 | SEC-05 | PASS | `isPublicPath` uses exact-or-child matching, so `/uixyz` and `/ui-admin` are **not** exempt (table-driven test). `web-ui-trust.ts` accepts all three loopback spellings (`::1`, `::ffff:127.0.0.1`, `127.0.0.0/8`). `web-ui.ts` returns a `Buffer`, sidestepping the documented bare-string content-type trap. |
-| SEC-06 | PASS, one clause qualified | `scripts/lib/installer-api-key.sh` fixes the key-destroying `setup-local-first.sh` re-run; the compose `mcp` service gains the shared volume and both images set `XDG_CONFIG_HOME=/data`. T23's hook resolves the key from `config.json` directly; the Codex/Cursor copies are byte-identical. **The Docker bridge address itself is instrumented but unmeasured** — see Residual Risk. |
+| SEC-06 | PASS, fully evidenced | `scripts/lib/installer-api-key.sh` fixes the key-destroying `setup-local-first.sh` re-run; the compose `mcp` service gains the shared volume and both images set `XDG_CONFIG_HOME=/data`. T23's hook resolves the key from `config.json` directly; the Codex/Cursor copies are byte-identical. **The Docker bridge address is now observed**: CI run `30317033460`, `mcp` job, printed `ctx.request.ip = ::ffff:172.17.0.1` — non-loopback, confirming the design premise. Recorded verbatim in `design.md` → TASK-007. |
 | BUG-01 | PASS | Both `!this.provider` branches throw unconditionally; the `NODE_ENV` check and `getDimensions()`'s 384 fallback are gone. `rg 'Math.random' packages/core/src/services/embeddings/` — no match. The three tests that pinned the defect are **rewritten to assert the throw**, not deleted. |
 | BUG-02 | PASS | `rlm-synapse.ts:213` `if (projectId && row.project_id !== projectId) continue;`. Two-sided PG integration test against the dedicated DB: 3/3, including "filter removes every neighbor ⇒ empty stream, not a throw" and "no projectId ⇒ filter inert". See Adjudicated findings below. |
 | BUG-03 | PASS | `pipeline.ts:347-354` tears the managed-run heartbeat down before the retry re-enters. Fake-timer tests assert no heartbeat after the outer run settles, and zero leaked loops after all 3 retries. |
@@ -106,18 +106,16 @@ TASK-022.
 
 ## Residual risk / not evidenced
 
-- **SEC-06's Docker clause rests on the instrument, not an observation.** This machine has no
-  container runtime (`docker`, `podman`, `colima`, `lima` all absent). The probe is wired into
-  CI's `mcp` job behind `MASSA_AI_DOCKER_PROBE=1`, and the fail-not-skip semantics were verified
-  in **both** directions, so a measurement that did not happen can never read as one that
-  passed. Until an observed `ctx.request.ip` from that job log is pasted verbatim into
-  `design.md` → "TASK-007 — the Docker path", the premise the entire
-  `MASSA_AI_WEB_UI_TRUST_LOCAL` mitigation is built on — that a host browser through the
-  bridge-mapped port presents a non-loopback address — is a plausible mechanism, not a fact.
-  **SEC-06 must not be marked fully evidenced before then.**
-- **CI itself was not observed.** The PG suites were run locally against the dedicated `:5433`
-  database and the Docker probe's static and failure paths were run locally; the live bridge
-  measurement was not.
+- **SEC-06's Docker clause is now evidenced by observation, not just the instrument.** PR1's
+  own CI run (`30317033460`, `mcp` job, "Measure the Docker bridge remote address" step)
+  produced `ctx.request.ip = ::ffff:172.17.0.1`, a non-loopback IPv4-mapped bridge address,
+  confirming the premise the `MASSA_AI_WEB_UI_TRUST_LOCAL` mitigation is built on: a host
+  request through a bridge-mapped published port does **not** present as loopback. Recorded
+  verbatim in `design.md` → "TASK-007 — the Docker path, instrumented rather than asserted".
+  This item is closed.
+- **CI itself was observed for this run.** The PG suites were run locally against the
+  dedicated `:5433` database during development; the Docker bridge measurement above is a
+  live CI observation, not a local one — this machine has no container runtime.
 - **PR1 proves nothing about PR2.** No DEBT-scope file (`bunfig.toml` coverage, `.oxlintrc.json`,
   the `turbo.json` lint task, any `RLM_` occurrence) was touched — confirmed.
 - **Known pre-existing flake, not a regression:** `apps/mcp-client`

@@ -127,16 +127,11 @@
     weakened, skipped or removed (14 before, 14 after) and the group now runs in 144 ms. This also
     explains why the recorded baseline and the observed red are both true: the cost is provider
     latency, so the same tests pass on a warm model cache and fail on a cold one.
-  - **Owed measurement (T7):** the Docker bridge address is instrumented, not yet observed — this
-    machine has no container runtime (`docker`/`podman`/`colima`/`lima` all absent). CI's `mcp`
-    job runs `scripts/tests/test-docker-remote-address.sh` with `MASSA_AI_DOCKER_PROBE=1`; the
-    observed `ctx.request.ip` must be pasted verbatim into `design.md` → "TASK-007 — the Docker
-    path, instrumented rather than asserted" from that job log. Without the flag the suite reports
-    `# NOT RUN`; with the flag and no runtime it fails rather than skipping.
-    **Still owed at T15.** SEC-06 is therefore evidenced by the instrument, not by an observation,
-    and must not be marked fully evidenced until the address is pasted in. The first CI run on
-    this branch produces it; PR1 may open before then, but the SEC-06 row stays qualified in
-    `validation.md` until it lands.
+  - **Owed measurement (T7): satisfied.** PR1's own CI run (`30317033460`, `mcp` job, "Measure
+    the Docker bridge remote address" step) observed `ctx.request.ip = ::ffff:172.17.0.1` — a
+    non-loopback bridge address, confirming the design premise. Recorded verbatim in
+    `design.md` → "TASK-007 — the Docker path, instrumented rather than asserted", and SEC-06
+    is now fully evidenced in `validation.md`.
   - Known load flakes seen repeatedly this session, green standalone every time, a different one
     each run: `apps/mcp-client` `embedded-api-client-endpoints.test.ts`, and `packages/core`'s
     `mock-free (113 files)` group and `trace-path.test.ts`. Do not chase them; re-run the package

@@ -311,9 +311,23 @@ suite prints `# NOT RUN` and passes on the static checks (5 passed / 0 failed); 
 and no runtime it **fails** (5 passed / 1 failed, exit 1). A measurement that did not happen can
 never read as one that passed.
 
-**Status: still unmeasured locally.** The observed value lands in the CI job log on the first
-run of this branch and must be pasted back into this section verbatim. Until then SEC-06's
-Docker clause rests on the instrument, not on an observation.
+**Status: measured.** Observed on 2026-07-28 from PR1's own CI run (`gh run view 30317033460`,
+`mcp` job, step "Measure the Docker bridge remote address"):
+
+```
+raw response: {"ip":"::ffff:172.17.0.1","forwardedFor":null,"host":"127.0.0.1:3334"}
+ctx.request.ip = ::ffff:172.17.0.1
+```
+
+This **confirms** the design's premise. A host request through a bridge-mapped published port
+(`docker -p 3334:3333`) presents `::ffff:172.17.0.1` — an IPv4-mapped bridge-gateway address,
+not loopback in any of the three accepted spellings (`::1`, `::ffff:127.0.0.1`,
+`127.0.0.0/8`). The suite's own assertion agrees: "a bridge-mapped container does NOT see
+loopback (observed '::ffff:172.17.0.1')", 9 passed / 0 failed. The `MASSA_AI_WEB_UI_TRUST_LOCAL`
+opt-in this finding motivated is therefore necessary, not speculative: without it, a Docker
+deployment's loopback check would correctly — and permanently — reject every request to `/ui`,
+including the host's own browser through the published port. SEC-06 is now fully evidenced;
+see `validation.md`.
 
 ### TASK-007 — two further divergences found during Execute
 
