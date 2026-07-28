@@ -19,13 +19,15 @@
 
 Three tasks are dominated by machine time, not edit time. No task title implies this.
 
-| Task | Cost | Why |
-| --- | --- | --- |
-| T3 | ~15 min × 2 | `bun run test:coverage` is a full instrumented suite run against the dedicated DB. Needs one run to measure and one to confirm. |
-| T7 | **~90 min × 2** | SEN-04 AC-4's equivalence baseline. qwen3-embedding:8b is ~60 s/embed and the fixture has 14 needles across ~6 files; `needles-gate.yml`'s own header sizes the fixture at ~90 min on a 2-core runner. Requires a **local Ollama with the model pulled**. |
-| T9 | ~15 min | Full gate including `test:coverage`. |
+| Task | Estimated | **Measured 2026-07-28** | Why |
+| --- | --- | --- | --- |
+| T3 | ~15 min × 2 | **~3 min** per run | `bun run test:coverage` end to end on this machine. The 15 min figure did not hold. |
+| T7 | ~90 min × 2 | **~2 min** per run | The 90 min figure is `needles-gate.yml`'s **2-core CI** estimate, carried into this file as if it were the local cost. The fixture is 6 files / 68 chunks + 14 queries against a local Ollama. |
+| T9 | ~15 min | ~3 min | Full gate including `test:coverage`. |
 
-**Roughly 3.5 hours of the PR is waiting.** Start T5/T6 before T7 so the long runs are the last thing blocking.
+**The ~3.5 hours of waiting does not exist on this machine — it is closer to 10 minutes.** The
+ordering advice still holds for a different reason: T7's pre-change baseline must run on a tree
+where `benchmarks/` is untouched, so it goes before T5 regardless of cost.
 
 ---
 
@@ -121,10 +123,23 @@ T8 → T9
 **The trap (Plan Challenge finding 3)**: `_prisma_migrations` lives in the same `public` schema as every data table. "Truncate every table in the schema" empties Prisma's applied-migration bookkeeping while leaving all 24 migrations' DDL applied — the next `migrate deploy` replays non-idempotent `ALTER TABLE ADD COLUMN` and fails. **Enumerate tables; exclude `_prisma_migrations` by name.** Repo precedent for the reset shape: `packages/core/src/__tests__/graph-generation-symbol-repository-pg.test.ts` (`TRUNCATE TABLE … CASCADE`).
 
 **Done when**:
-- [ ] Truncation is guarded by the **existing** `assertDedicatedDatabase()` (`check-coverage.ts:359-382`), not a second condition — two conditions drift apart, one cannot
-- [ ] `_prisma_migrations` explicitly excluded
-- [ ] `bunx prisma migrate status` reports **up to date** after a gate run
-- [ ] Discriminating sensor: a non-dedicated `DATABASE_URL` makes the truncation refuse
+- [x] Truncation is guarded by the **existing** `assertDedicatedDatabase()` — extracted as `isDedicatedDatabase()` and used by both call sites, so it is one predicate, not two
+- [x] `_prisma_migrations` explicitly excluded, and the row count compared before/after because `CASCADE` follows foreign keys out of the listed set
+- [x] `bunx prisma migrate status` reports **up to date** after a gate run
+- [x] Discriminating sensor: a non-dedicated `DATABASE_URL` makes the truncation refuse
+
+**DONE** — `85ff20a`. Verified live: **36 tables truncated, `_prisma_migrations` intact at 23
+rows**, migrate status clean. `lint` 0, `test:scripts` 0 (616 pass). Removing the exclusion turns
+2 tests red.
+
+**Divergence — the table list must be read from the catalog, not hardcoded.** A fresh database has
+**31** data tables; after two gate runs it has **36**, because `vector_documents_<n>d` tables are
+created per embedding dimension at run time. A hardcoded list would already have missed five.
+
+**Divergence — the justification does not survive measurement.** Truncation does *not* stabilise
+`architecture-map`'s timing, which was SEN-01's stated motivation (see T3). What it does buy:
+a known starting state matching CI's, and `postgres-vector-store.integration.test.ts` going from
+**8 failures to 6** across the same gate run. Both `spec.md` and the script header are rewritten.
 
 **Tests**: `scripts/__tests__/check-coverage.test.ts` extended — refusal path, exclusion set · **Gate**: `bun run test:scripts`
 **Commit**: `fix(tooling): reset the dedicated test database before the coverage gate`
@@ -139,13 +154,35 @@ T8 → T9
 **Requirement**: SEN-01 (AC-3)
 **Why it is a separate task**: lowering the budget is the **only** observable evidence that T2 worked. Leaving it at `300_000` makes the reset unfalsifiable.
 
-**Done when**:
-- [ ] Measured value recorded in this file (prior readings: **1213 ms** fresh / **16.59 s** post-gate / **>120 s** mid-gate)
-- [ ] Budgets lowered to the measurement plus stated headroom; `bunfig.toml`'s global 5 s default untouched
-- [ ] Full `test:coverage` passes twice with the new budgets — once is not evidence for a budget that already flapped between gate runs
+**BLOCKED on a seam — the premise was falsified during Execute. Do the seam first.**
 
-**Tests**: existing · **Gate**: `bun run test:coverage` ×2 (~30 min)
-**Commit**: `test(core): size the architecture-map budgets against a reset database`
+Three full gate runs, with and without truncation:
+
+| Run | Provider init | Whole file | **File − provider** |
+| --- | --- | --- | --- |
+| with reset | 3.29 s | 5.23 s | **1.94 s** |
+| no reset | 2.80 s | 3.68 s | **0.88 s** |
+| with reset | **117.46 s** | **119.47 s** | **2.01 s** |
+
+The test's own cost is flat at **0.9–2.0 s**. Every second of variance is Ollama reloading an
+evicted `qwen3-embedding:8b` during embedding-provider auto-selection. **Truncation cannot affect
+it, so the budget is not evidence that the reset works.** A `60_000` budget was set from the
+measurement and failed the very next run at 119.47 s — correctly, and for a reason unrelated to
+the database.
+
+`architecture-map.test.ts` has **no mocks and no seam**: it runs the real ETL, which auto-selects a
+live embedding provider. This is the recurring omission `CLAUDE.md` documents — *"the test is
+missing a seam, not a timeout."*
+
+**Done when**:
+- [ ] `architecture-map.test.ts` gets a deterministic embedding seam so it never reaches a live provider. Its assertions are on the **symbol graph** (layers, routes, centrality, cycles) which comes from tree-sitter structural parsing, not from vectors — so a fake provider does not weaken what it tests. Confirm that before building it
+- [ ] Adding `mock.module(` keeps the file in the isolation runner's forked-process set; core's `--unit` group count must stay **126**
+- [ ] Budgets then lowered to the measured value plus stated headroom, and the number recorded here
+- [ ] Full `test:coverage` passes **twice** with the new budgets — once is not evidence for a budget that already flapped
+- [ ] The uncommitted `60_000` edit in the working tree is superseded by this; do not ship it as-is
+
+**Tests**: existing · **Gate**: `bun run test:coverage` ×2 (~6 min)
+**Commit**: `test(core): give the architecture-map budgets a deterministic embedding seam`
 
 ---
 
@@ -177,6 +214,30 @@ T8 → T9
 **Requirement**: SEN-04 (AC-1, AC-2, AC-3, AC-5, AC-6, AC-8, AC-9)
 
 **The loud-failure half matters more than the anchoring half.** The silent skip is what made the gate untrustworthy: `run.ts:233-236` skips a missing target with a `[warn]`, and `scorer.ts:111,124,135` average that zero over the full needle count rather than dropping it.
+
+**SPLIT INTO T5a / T5b — see `design.md`.** Recovering N07/N08/N09 pulls `chunker-*.ts` into the
+corpus (**6 files → 8**), which changes rank competition for **all 14** needles. T7's "identical
+ranks" then cannot hold, and would fail for a reason unrelated to whether the anchoring is correct
+— the exact failure mode that criterion exists to detect.
+
+| Step | Change | Corpus | T7 equivalence |
+| --- | --- | --- | --- |
+| **T5a** | Anchor the 11 valid needles; leave N07/N08/N09 pointing at `smart-chunker.ts` as they are. Both loud-failure paths land here | **unchanged** — 6 files, 68 chunks | **provable and required**: ranks byte-identical, MRR stays **0.569** |
+| **T5b** | Recover N07/N08/N09 from `af3dab6`, anchor into `chunker/*.ts` | 6 → 8 files | not applicable; a **new baseline** is recorded |
+
+**The anchors are already recovered and verified unique repo-wide:**
+
+| Needle | Anchor (substring, code only — never a comment) | Resolves to |
+| --- | --- | --- |
+| N07 | `function netBraceDelta(line: string): number {` | `chunker/chunker-code.ts:168` |
+| N08 | `if (chunk.label && chunk.type === "code_block") {` | `chunker/chunker-post.ts:33` |
+| N09 | `const hasHeading = /^\s*#{1,6}\s+/m.test(content);` | `chunker/chunker-markdown.ts:11` |
+
+Two traps found while recovering them. The Wave 6 split **stripped comments while moving code**, so
+anchors must sit on code lines — N07's original span *starts* on a comment that no longer exists
+anywhere, and a span cannot be carried forward as a line-count delta because the regions are
+shorter now. And anchors must match as **substrings**: `netBraceDelta` gained an `export ` prefix,
+which a whole-line match would miss.
 
 **Done when**:
 - [ ] Each needle carries a content anchor; `filePath`/`lineStart`/`lineEnd` are resolved from it before file collection
@@ -219,11 +280,22 @@ T8 → T9
 **Cost**: **~90 min × 2**, local Ollama with qwen3-embedding:8b pulled.
 **Why it is the most important evidence in this PR**: without it the repaired sensor's own calibration is unproven, and every needles observation in PR-B is uninterpretable. A representation change that moves a score is not a representation change.
 
+**Pre-change baseline is DONE** — captured at `c33a5c1` before any T5 work, per the ordering
+constraint. `benchmarks/needles/reports/massa-ai-before-anchoring-results.json`.
+
+```
+hit@1 = 0.500 >= 0.5  → PASS   (exact knife edge)
+MRR   = 0.569 >= 0.65 → FAIL
+N07, N08, N09 MISS — all three top-hit smart-chunker.ts:30-82
+N01 @1  N02 @1  N03 @1  N04 @1  N05 @5  N06 @3  N10 @1  N11 @1  N12 @10  N13 @1  N14 @3
+```
+
 **Done when**:
-- [ ] Pre-change and post-change runs recorded verbatim, per-needle ranks compared
-- [ ] Ranks **identical**; any divergence is investigated and explained before proceeding, not averaged away
-- [ ] Both floors still clear (`hit@1 ≥ 0.5`, `MRR ≥ 0.65`)
-- [ ] If T5's AC-8 span check was clean and ranks still moved, **stop** — that is an unmodelled mechanism, not a tolerance to widen
+- [x] Pre-change run recorded verbatim, per-needle ranks captured
+- [ ] **After T5a**: ranks byte-identical to the above, MRR **0.569**, hit@1 **0.500**. Corpus and representation are both unchanged, so a rank move has no legitimate explanation — investigate, do not average away
+- [ ] **After T5b**: a new baseline recorded and explained needle by needle
+- [ ] ~~Both floors still clear~~ — **struck. The floors fail on the tree this PR starts from**, for a reason that predates it. SEN-04's Out of Scope already forbids touching the floors here; the same logic forbids adopting them as this PR's bar. What this PR owes is a sensor that reports the truth loudly. Whether the truth clears 0.65 is a retrieval-quality question and belongs to whoever answers it with retrieval work, not fixture edits
+- [ ] If T5's AC-8 span check was clean and T5a's ranks still moved, **stop** — that is an unmodelled mechanism, not a tolerance to widen
 
 **Tests**: none (measurement is the deliverable) · **Gate**: `bun run bench:needles:gate` ×2
 **Commit**: `docs(specs): record the needle-anchoring equivalence baseline`
@@ -256,10 +328,13 @@ T8 → T9
 **Requirement**: all
 
 **Done when**:
-- [ ] `CHANGELOG.md` `[Unreleased]` entries present — the CI merge gate fails a PR without them. Also fix the stale "nine documented exclusions" (actual: **11**) — validation-pr2 gap #2, still open
+- [ ] `CHANGELOG.md` `[Unreleased]` entries present — the CI merge gate fails a PR without them
+- [x] ~~fix the stale "nine documented exclusions" (actual: 11)~~ — **struck. Measured: `EXCLUSIONS.length` is 9 and the gate prints `9 documented exclusions`. `CHANGELOG.md` was right; `HANDOFF.md` was wrong.** Making this "fix" would have introduced the error it meant to remove. validation-pr2 gap #2 is closed
 - [ ] Full gate green: `lint`, `type-check`, `build`, `test`, `test:scripts`, `test:plugins`, `test:coverage`
 - [ ] **No new exclusion** added to `scripts/check-coverage.ts`
-- [ ] `git log --format='%B' | grep -ci 'skip.ci'` → **0**. A squash merge folds every commit body into the merge message; that killed the v1.3.0 release
+- [ ] `git log --format='%B' origin/main..HEAD | grep -ci 'skip.ci'` → **0**. A squash merge folds every commit body into the merge message; that killed the v1.3.0 release.
+      **Corrected during Execute**: as originally written this command scanned the *entire* history and can never return 0 — the repo's own `chore(release): vX.Y.Z` commits legitimately carry the marker, and it currently matches **11** times. Scoped to the PR range it is a real check, and it currently returns **0**.
+      Also: run verification commands through `rtk proxy`. The unscoped form returned `11` and then `0` for the same input under rtk's filter, which would have recorded a false pass
 - [ ] `massa-ai-verification-agent` (author ≠ verifier) writes `validation.md`
 - [ ] STATE.md: flip **AD-013** from `proposed` to `active`
 

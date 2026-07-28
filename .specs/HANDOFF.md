@@ -1,10 +1,13 @@
 # Sensor Repair 2026-07 — Handoff
 
-**Active Feature**: `sensor-repair-2026-07` — Execute in progress. **T1 of 9 committed.**
+**Active Feature**: `sensor-repair-2026-07` — Execute in progress. **T2 of 9 committed.**
 **Branch**: `fix/sensor-repair` off `origin/main` @ `a6216cd` (v1.9.0). Not pushed; no PR open.
 Working in place, no worktree.
-**Commits**: `e95050e` specs · `39afe59` T1 (SEN-03)
-**Spec**: `.specs/features/sensor-repair-2026-07/spec.md`
+**Commits**: `e95050e` specs · `39afe59` T1 · `c33a5c1` T1 handoff · `85ff20a` T2 · `1dc59c8` SEN-04 fork
+**Spec**: `.specs/features/sensor-repair-2026-07/spec.md` — SEN-01 AC-3, SEN-04 AC-2/AC-6/AC-8 now
+carry recorded divergences.
+**Design**: `.specs/features/sensor-repair-2026-07/design.md` — **written mid-Execute** under the
+tasks.md safety valve. Read it before touching SEN-04.
 **Tasks**: `.specs/features/sensor-repair-2026-07/tasks.md` — approved, Execute inline one task at
 a time, user declined sub-agents.
 **Downstream**: `.specs/features/core-layering-god-module-split/spec.md` — revised, blocked on
@@ -15,14 +18,36 @@ this feature.
 | Task | Req | State |
 | --- | --- | --- |
 | T1 | SEN-03 | **DONE** `39afe59` |
-| T2 | SEN-01 truncation | next |
-| T3 | SEN-01 re-measure `architecture-map` | pending — this is the only proof T2 worked |
-| T4 | SEN-02 `coverage.yml` | pending |
-| T5 | SEN-04 content anchors | pending |
+| T2 | SEN-01 truncation | **DONE** `85ff20a` — verified live; justification rewritten |
+| T3 | SEN-01 `architecture-map` budgets | **BLOCKED on a seam** — premise falsified, see below. A `60_000` edit sits **uncommitted** in the working tree; supersede it |
+| T4 | SEN-02 `coverage.yml` | pending — note the gate is **red** today for a pre-existing reason |
+| T5a | SEN-04 anchor the 11 valid needles | pending — corpus unchanged, equivalence provable |
+| T5b | SEN-04 recover N07/N08/N09 | pending — anchors already recovered and verified |
 | T6 | SEN-04 third consumer `14.needles.test.ts` | pending |
-| T7 | SEN-04 equivalence baseline | pending — **2 × ~90 min**, Ollama, the long pole |
+| T7 | SEN-04 equivalence baseline | **pre-change run DONE** — and it is what broke the spec open |
 | T8 | BEH-01 `includePersistent` | pending |
 | T9 | PR close + validation agent | pending |
+
+## The three things this session measured that the spec had wrong
+
+Each was a named mechanism that turned out not to be the firing one — the same shape as T1.
+
+1. **The needles gate is already red, on an untouched tree.** `MRR 0.569` against a `0.65` floor at
+   `c33a5c1`. `smart-chunker.ts` was split at `56c84d1` (945 → 81 lines) *before this feature was
+   specified*; the fixture was authored at `af3dab6`, the commit before. N07/N08/N09 target lines
+   past EOF. **SEN-04 AC-2 targets the wrong branch** — `run.ts:233-236` is guarded by `existsSync`
+   and the file exists, so not even the `[warn]` fires. Implementing AC-2 as written would not have
+   caught the defect that is actually firing.
+2. **SEN-01's truncation does not fix the timing it was specified to fix.** `architecture-map`'s own
+   cost is flat at **0.9–2.0 s** across three gate runs; the 120 s outlier is Ollama reloading an
+   evicted `qwen3-embedding:8b`. The spec's reasoning — *"strictly sequential, so this is
+   accumulation, not contention"* — excludes contention and then asserts accumulation, never testing
+   the third option that `CLAUDE.md` already names as the commoner cause. Truncation is kept, on a
+   rewritten justification: known start state matching CI, and `postgres-vector-store.integration`
+   going **8 failures → 6**.
+3. **The wall-clock budget was ~20× too pessimistic.** T7 measured **~2 min**, not ~90; the 90 min
+   figure is `needles-gate.yml`'s 2-core CI estimate quoted as a local cost. Full `test:coverage` is
+   **~3 min**, not ~15. The "~3.5 hours of waiting" is about 10 minutes.
 
 ## What T1 taught — apply these to the rest
 
@@ -48,8 +73,23 @@ this feature.
   then read the log.
 - Root `node_modules` may be absent — `bun run lint` exits **127** with `oxlint: command not
   found`. Fix with `bun install --frozen-lockfile`, not with `bunx`.
-- Dedicated test DB on `127.0.0.1:5433/massa_ai_test` is up. `qwen3-embedding:8b` is pulled, so
-  T7 can run locally.
+- **The dedicated test DB was re-provisioned on 2026-07-28 and now lives in a durable directory.**
+  The previous cluster's data dir was `/tmp/pg5433`, which macOS purges; it was still listening but
+  rejected the documented credential with `FATAL: role "massa_ai" does not exist`. It is now
+  `~/.local/share/massa-ai/pg5433`, role `massa_ai`, db `massa_ai_test`, pgvector 0.8.4, 23
+  migrations applied, `migrate status` clean. Start it with:
+  `/opt/homebrew/opt/postgresql@17/bin/pg_ctl -D ~/.local/share/massa-ai/pg5433 -o "-p 5433 -h 127.0.0.1 -k /tmp" start`
+- **Prisma reports 23 migrations, not the 24 `CLAUDE.md` states.** Cosmetic; do not chase.
+- `qwen3-embedding:8b` is pulled, so T7 runs locally in ~2 min.
+- **Run any command whose output you will treat as evidence through `rtk proxy`.** The rtk filter
+  rewrites numbers and paths: it returned `11` and then `0` for the same `grep -c` invocation, and
+  renders `5433` as `n` and long filenames as `n.ts`. That nearly recorded a false pass on T9's
+  skip-ci check.
+- **`postgres-vector-store.integration.test.ts` is flaky and fails inside the coverage gate**
+  (10 pass/6 fail with the reset, 8/8 without; standalone 15/1 then 16/0). It asserts absolute row
+  counts and is contaminated by *other suites in the same run*, which a reset at gate start cannot
+  reach. Pre-existing — identical with and without T2. **It is what makes `test:coverage` exit 1
+  today**, so T4's blocking `coverage.yml` would be red on arrival.
 - **`bun run test` fails one task per run, a different one each time** — `mcp-client` once,
   `core`'s `trace-path.test.ts` the next. Pre-existing and documented in STATE.md. `trace-path`
   passes 18/0 standalone both with and without the T1 changes, and there were zero 5001 ms
@@ -129,11 +169,16 @@ against source before building a plan on them.
 
 ## Coverage-gate facts carried forward from PR2 (still true)
 
-The floor is **90% line, per file**, with **11 exclusions**, both as executable data in
+The floor is **90% line, per file**, with **9 exclusions**, both as executable data in
 `scripts/check-coverage.ts` rather than in prose here — deliberately, because this file is
-rewritten every feature and a gate pinned to prose would lose its own definition. (Note
-`CHANGELOG.md` still says "nine documented exclusions"; that was validation-pr2 gap #2 and is
-still open.)
+rewritten every feature and a gate pinned to prose would lose its own definition.
+
+**Correction, measured 2026-07-28: the count is 9, not 11.** `EXCLUSIONS.length` is 9 and the gate
+prints `9 documented exclusions` on every run. So **`CHANGELOG.md`'s "nine documented exclusions"
+is correct** and it was this file that was wrong. T9's instruction to "fix the stale nine (actual:
+11)" would have introduced the error it was trying to remove — validation-pr2 gap #2 is **closed,
+not open**. Verify with:
+`bun -e 'import("./scripts/check-coverage.ts").then(m=>console.log(m.EXCLUSIONS.length))'`
 
 Do not "fix" a low coverage number by touching the floor before checking whether the file is
 simply widely imported. Bun emits two shapes of lcov record for one file; `check-coverage.ts`
