@@ -162,6 +162,33 @@ otherwise.
 to a value derived from a **measurement taken after the reset lands**, and the measured number is
 recorded in `tasks.md`. Lowering the budget is the discriminating evidence that the reset works;
 leaving it at `300_000` would make the change unobservable.
+
+**Divergence, recorded during Execute (T3) — the premise is falsified. The budget does not measure
+the reset.** Three full gate runs, with and without truncation:
+
+| Run | Provider init | Whole file | File − provider |
+| --- | --- | --- | --- |
+| with reset | 3.29 s | 5.23 s | **1.94 s** |
+| no reset | 2.80 s | 3.68 s | **0.88 s** |
+| with reset | **117.46 s** | **119.47 s** | **2.01 s** |
+
+`architecture-map.test.ts`'s own cost is flat at **0.9–2.0 s** in every run. 100% of the variance is
+Ollama reloading an evicted `qwen3-embedding:8b` during embedding-provider auto-selection
+(`19:55:05.989` → `19:57:03.447`). Truncation cannot affect it. A `60_000` budget was set from the
+measurement and **failed the very next run** at 119.47 s — correctly, but for a reason unrelated to
+the database.
+
+The Problem Statement's reasoning — *"the isolation runner is strictly sequential, so this is
+accumulation, not contention"* — excludes contention and then **asserts** accumulation. It never
+tested the third option, which `CLAUDE.md` already names as the commoner cause of exactly this
+symptom: *"the test reached a live LLM or embedding provider… 42030 ms on a cold model load, 690 ms
+warm… that is exactly why it looks like flakiness."*
+
+**Rewritten**: the budget is lowered only after `architecture-map.test.ts` is given a deterministic
+embedding seam so it stops reaching a live provider — the remedy `CLAUDE.md` prescribes (*"the test
+is missing a seam, not a timeout"*). The discriminating evidence for the reset is **not** the
+budget; it is `postgres-vector-store.integration.test.ts` going from **8 failures to 6** across the
+same gate run when the database starts clean, plus AC-2a's migration check.
 **AC-4**: A test proves the truncation refuses to run against a non-dedicated `DATABASE_URL`.
 
 ### SEN-02 — The coverage gate runs in CI
@@ -279,6 +306,25 @@ fixture carries an anchor for each needle that is resolved to a concrete
 exits non-zero with the needle id and the anchor, and never proceeds to scoring. This is the
 core of the requirement — the silent-skip is what made the gate untrustworthy, more than the
 positional pinning did.
+
+**Divergence, recorded during Execute (T7 pre-baseline) — this criterion targets the wrong branch.**
+`run.ts:233-236` is guarded by `existsSync(abs)`. The three needles actually failing today target
+`smart-chunker.ts`, which **exists** — so the branch never runs, no `[warn]` is printed, and the
+needle scores zero through `scorer.ts:94-104` against a span with no chunk behind it. There are
+three paths, and the criterion as written covers only the first:
+
+| Path | Firing today | Signal | Covered as written |
+| --- | --- | --- | --- |
+| Target file absent | no | `[warn]`, skip | yes |
+| Target file present, span past EOF | **yes, ×3** | **none at all** | **no** |
+| Target present, span in range, content moved | not currently | none | partly (AC-3) |
+
+Path 2 is quieter than the one the criterion calls "the core of the requirement". **Implementing
+this AC exactly as written would not have caught the defect that is actually firing.**
+
+**Extended**: a resolved span falling outside the target file's line count is also a hard failure,
+named with the needle id, file, resolved span and file length. Discriminating check: point a needle
+past EOF and assert non-zero exit — today that yields a passing run with a silently wrong number.
 **AC-3**: Anchor resolution tolerates the three transformations this refactor actually performs:
 moving a span verbatim to a different file, renaming the file it lives in, and **moving a span
 more than `lineTolerance` (5) lines within a file of the same name** — the last is the one the
@@ -295,6 +341,19 @@ exits non-zero. It must not require an embedding provider to run, so it exercise
 retrieval.
 **AC-6**: All 14 needles keep their identical target span. No needle is added, removed, retargeted
 or re-queried in this PR.
+
+**Divergence, recorded during Execute (T7 pre-baseline) — unsatisfiable as written; see
+`design.md`.** Three of the fourteen have no valid span to keep. `smart-chunker.ts` was split into
+`services/search/chunker/` at `56c84d1` (945 lines → 81); the fixture was authored at `af3dab6`,
+the commit before. N07, N08 and N09 target lines **642-674, 737-744 and 198-206** of a file that
+now ends at **81**. The transformation SEN-04 predicts has already happened, to this exact file,
+and the gate has been failing since.
+
+**Rewritten**: the **11** needles whose targets resolve within their current files keep
+byte-identical spans, and no needle is added, removed or **re-queried**. N07/N08/N09 are
+re-targeted once, to the location their original content now occupies, **recovered from `af3dab6`
+rather than re-authored against current code**. Recovery is recorded needle-by-needle with the
+source commit and the pre-split span.
 **AC-7**: **The fixture has three consumers, not two.**
 `packages/core/src/__tests__/e2e/14.needles.test.ts:119-133` replicates `intersects` and
 `findRank` **verbatim** — same `filePath` equality plus line-intersection predicate — reading
@@ -311,6 +370,17 @@ happens to sit can drift a few lines, and with `lineTolerance` at 5 that drift a
 borderline chunk from hit to miss. Diffing resolved spans against the current static values on an
 unchanged tree is the check, and a non-zero diff falsifies "representation-only" before AC-4's
 expensive end-to-end run is even attempted.
+
+**Divergence, recorded during Execute (T7 pre-baseline).** Unsatisfiable for N07/N08/N09 — their
+existing values are stale, so there is nothing valid to reproduce. **Rewritten**: resolution
+reproduces the existing `lineStart`/`lineEnd` exactly for the **11 valid needles**, and a non-zero
+diff on any of them falsifies "representation-only". For the three recovered needles the recorded
+spans *are* the resolved ones; the check there is AC-9 uniqueness plus in-range-ness.
+
+Two further findings, both in `design.md`. The Wave 6 split **stripped comments while moving code**,
+so it is none of AC-3's three tolerated transformations — anchors must be authored on code, never
+comments, and a span cannot be carried forward as a line-count delta. And anchors must match as
+**substrings**: `netBraceDelta` gained an `export ` prefix, which a whole-line match would miss.
 **AC-9**: Anchors are unique. Because AC-2 makes ambiguity a hard failure and resolution searches
 beyond the declared target file, an anchor short enough to match elsewhere — a bare magic number,
 say — fails the run for a reason unrelated to the refactor. Each anchor is verified to resolve to
