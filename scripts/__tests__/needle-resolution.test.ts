@@ -339,12 +339,18 @@ describe("resolution survives code movement (AC-3)", () => {
 
   test("anchors match as substrings, so an added `export ` prefix still resolves", () => {
     // Not hypothetical: `netBraceDelta` gained exactly this prefix during the
-    // Wave 6 split. A whole-line match would have missed it.
-    const repo = makeRepo({ "src/a.ts": "export function netBraceDelta(line: string): number {\n  return 0;\n}\n" });
+    // Wave 6 split, and a whole-line match would have missed it.
+    //
+    // The symbol here is deliberately synthetic rather than the real one. Quoting
+    // a live product symbol verbatim in a test makes that symbol ambiguous
+    // repo-wide, which would break the very needle it illustrates — the resolver
+    // caught exactly that when N07 was first anchored, reporting three matches:
+    // chunker-code.ts plus two copies in this file.
+    const repo = makeRepo({ "src/a.ts": "export function synthNetDelta(line: string): number {\n  return 0;\n}\n" });
     try {
       const span = resolveAnchoredNeedle(
         "N-prefix",
-        { anchor: "function netBraceDelta(line: string): number {", startOffset: 0, endOffset: 2 },
+        { anchor: "function synthNetDelta(line: string): number {", startOffset: 0, endOffset: 2 },
         repo,
         collectSourceFiles(repo),
       );

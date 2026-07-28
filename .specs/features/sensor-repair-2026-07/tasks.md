@@ -398,11 +398,29 @@ reaches it — `benchmarks/` is not a workspace package and turbo cannot see it)
 
 ---
 
-### T5b — recover N07/N08/N09 and anchor them into `chunker/*.ts` — pending
+### T5b — recover N07/N08/N09 and anchor them into `chunker/*.ts` — **DONE**
 
-Anchors already recovered from `af3dab6` and verified unique repo-wide; see the table above this
-section and in `design.md`. Deleting the three `scoring.staleNeedles` entries is mandatory — the
-resolver hard-fails on an entry that outlives its reason.
+Recovered from `af3dab6` (the commit that authored the fixture, before the split at `56c84d1`) and
+re-anchored into the modules that received the code. `scoring.staleNeedles` is now **empty**;
+leaving an entry would have hard-failed the run, which is what forced this step to complete itself.
+
+| Needle | Anchor | Recovered from | Now resolves to | Span |
+| --- | --- | --- | --- | --- |
+| N07 | `export function netBraceDelta(line: string): number {` | `smart-chunker.ts:642-674` | `chunker/chunker-code.ts:155-176` | 33 → **22** lines |
+| N08 | `if (chunk.label && chunk.type === "code_block") {` | `smart-chunker.ts:737-744` | `chunker/chunker-post.ts:33-36` | 8 → **4** lines |
+| N09 | `const hasHeading = /^\s*#{1,6}\s+/m.test(content);` | `smart-chunker.ts:198-206` | `chunker/chunker-markdown.ts:10-12` | 9 → **3** lines |
+
+Every span is shorter because the split stripped comments while moving the code. **That measurement
+is the concrete proof of design.md's claim that a span cannot be carried forward as a line-count
+delta** — an `anchor + spanLines` scheme would have reproduced 33/8/9 lines against regions that are
+22/4/3, silently over-running each one. Queries unchanged; content recovered, never re-authored.
+
+**The uniqueness guard caught a self-inflicted collision, which is worth recording.** N07's first
+anchor resolved to **3** locations: `chunker-code.ts:168` plus two copies in
+`scripts/__tests__/needle-resolution.test.ts`, where the test quoted the real symbol verbatim to
+illustrate the `export ` prefix case. Fixed in the test — a synthetic symbol name — rather than by
+narrowing the scan, because narrowing it would have hidden exactly the class of ambiguity AC-9
+exists to catch. The tool built in T5a found the defect in its own test fixture on first use.
 
 ---
 
@@ -463,8 +481,48 @@ N01 @1  N02 @1  N03 @1  N04 @1  N05 @5  N06 @3  N10 @1  N11 @1  N12 @10  N13 @1 
 
   Corpus stayed **6 files / 68 chunks**, which is the precondition that made this provable.
   Report: `benchmarks/needles/reports/massa-ai-after-t5a-anchoring-results.json`.
-- [ ] **After T5b**: a new baseline recorded and explained needle by needle
+- [x] **After T5b**: a new baseline recorded and explained needle by needle
+
+  **The repaired sensor changed the answer, and it changed it upward.** Corpus 6 → **8 files**,
+  68 → **86 chunks**: `smart-chunker.ts` left (no needle targets it any more) and the three
+  `chunker/*.ts` modules entered, exactly as `design.md` predicted.
+
+  ```
+  hit@1  = 64.3%   hit@3 = 85.7%   hit@5 = 92.9%   hit@10 = 100.0%   MRR = 0.736
+  ```
+
+  | | before (stale fixture) | after T5b | |
+  | --- | --- | --- | --- |
+  | hit@1 | 0.500 | **0.643** | floor 0.5 — was a knife edge, now clears by 2 needles |
+  | MRR | 0.569 | **0.736** | floor 0.65 — **was failing, now clears** |
+
+  Needle by needle, the only changes are the three that were broken:
+
+  | Needle | before | after | why |
+  | --- | --- | --- | --- |
+  | N07 | MISS | **@1** | target recovered into `chunker-code.ts` |
+  | N08 | MISS | **@3** | target recovered into `chunker-post.ts` |
+  | N09 | MISS | **@1** | target recovered into `chunker-markdown.ts` |
+  | N01–N06, N10–N14 | @1 @1 @1 @1 @5 @3 @1 @1 @10 @1 @3 | **identical** | 11 unchanged, despite 18 new chunks competing |
+
+  All eleven untouched needles held their exact ranks even though the corpus grew by 18 chunks —
+  so the movement is entirely attributable to the three repairs, not to corpus churn.
+
+  **This is the finding of the feature.** The gate was red because the fixture was stale, not
+  because retrieval had regressed. Repairing the instrument — touching no floor, no chunker
+  parameter and no retrieval code — took MRR from a failing 0.569 to a passing 0.736. Every
+  needles number read between `56c84d1` and this commit was measuring the fixture, not the
+  search.
+
+  Report: `benchmarks/needles/reports/massa-ai-after-t5b-recovery-results.json`.
 - [ ] ~~Both floors still clear~~ — **struck. The floors fail on the tree this PR starts from**, for a reason that predates it. SEN-04's Out of Scope already forbids touching the floors here; the same logic forbids adopting them as this PR's bar. What this PR owes is a sensor that reports the truth loudly. Whether the truth clears 0.65 is a retrieval-quality question and belongs to whoever answers it with retrieval work, not fixture edits
+
+  **Confirmed by the spec owner, and then made moot by the measurement: both floors now clear
+  anyway** — hit@1 0.643 ≥ 0.5, MRR 0.736 ≥ 0.65. The strike stands as reasoning even though the
+  outcome is green, and it is worth keeping for that reason. Had the floors been adopted as this
+  PR's completion bar, the pressure at T5a — where the honest interim number was still 0.569 —
+  would have been to reach for the fixture. The number moved because the sensor was repaired, which
+  is the only reason it was ever allowed to move
 - [ ] If T5's AC-8 span check was clean and T5a's ranks still moved, **stop** — that is an unmodelled mechanism, not a tolerance to widen
 
 **Tests**: none (measurement is the deliverable) · **Gate**: `bun run bench:needles:gate` ×2

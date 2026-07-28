@@ -1,7 +1,7 @@
 {
   "projectId": "massa-ai",
-  "version": "1.3.0",
-  "description": "Needles validated against the massa-ai codebase itself (dogfooding). Each needle targets a non-obvious heuristic, magic constant, or scoring rule that pure keyword search would miss. Targets are identified by CONTENT (anchor + signed line offsets), not by physical position — see benchmarks/needles/resolve.ts. Anchors authored 2026-07-28; the 11 anchored spans reproduce the positional values they replaced byte-exactly.",
+  "version": "1.4.0",
+  "description": "Needles validated against the massa-ai codebase itself (dogfooding). Each needle targets a non-obvious heuristic, magic constant, or scoring rule that pure keyword search would miss. All 14 targets are identified by CONTENT (anchor + signed line offsets), never by physical position — see benchmarks/needles/resolve.ts. Anchors authored 2026-07-28. The 11 needles whose targets never moved reproduce the positional values they replaced byte-exactly; N07/N08/N09 were recovered from af3dab6 (the commit that authored this fixture, before smart-chunker.ts was split at 56c84d1) and re-anchored into services/search/chunker/. No needle's query was changed.",
   "scoring": {
     "topK": 10,
     "hitAtK": [
@@ -12,12 +12,8 @@
     ],
     "lineTolerance": 5,
     "notes": "A hit requires the returned chunk's filePath to equal the needle's RESOLVED filePath AND [lineStart, lineEnd] to intersect the resolved range (with ±lineTolerance on each side).",
-    "staleNeedlesNote": "Needle ids permitted to carry a legacy positional target instead of an anchor. These three point into smart-chunker.ts at lines 198-206 / 642-674 / 737-744, but that file was split into services/search/chunker/ at 56c84d1 and now ends at line 81 — the fixture was authored at af3dab6, the commit before. They are carried unchanged for exactly one commit so the anchoring change can be proven rank-for-rank equivalent on an unchanged corpus before the repair moves the score. The list must shrink to empty: an id listed here that also carries an anchor is a hard failure, so the entry cannot outlive its reason.",
-    "staleNeedles": [
-      "N07-brace-counter-strip-strings",
-      "N08-no-merge-labeled-chunks",
-      "N09-markdown-no-headings-fallback"
-    ]
+    "staleNeedlesNote": "Empty, and it must stay that way. Every needle is identified by content. A needle with no anchor whose id is not listed here is a hard failure, and an id listed here that does carry an anchor is also a hard failure — so this list cannot quietly grow, and an entry cannot outlive its reason. N07/N08/N09 were carried here for exactly one commit while the anchoring change was proven rank-for-rank equivalent; they were re-anchored into services/search/chunker/ immediately after and the entries removed.",
+    "staleNeedles": []
   },
   "needles": [
     {
@@ -98,11 +94,11 @@
       "difficulty": "hard",
       "query": "lógica que ignora chaves dentro de strings, regex ou comentários ao contar profundidade de bloco",
       "expected": {
-        "filePath": "packages/core/src/services/search/smart-chunker.ts",
-        "lineStart": 642,
-        "lineEnd": 674
+        "anchor": "export function netBraceDelta(line: string): number {",
+        "startOffset": -13,
+        "endOffset": 8
       },
-      "rationale": "netBraceDelta strip prévio. Crítico para arquivos com regex literais (parsers, validadores) — drift de depth quebra chunking. STALE: alvo aponta para além do EOF de smart-chunker.ts (81 linhas) desde o split em 56c84d1; recuperado e re-ancorado no passo seguinte."
+      "rationale": "netBraceDelta strip prévio. Crítico para arquivos com regex literais (parsers, validadores) — drift de depth quebra chunking. RECUPERADO de af3dab6:642-674 (smart-chunker.ts, pré-split) e re-ancorado em chunker/chunker-code.ts:155-176. O conteúdo é o mesmo; a região encolheu de 33 para 22 linhas porque o split em 56c84d1 removeu os comentários ao mover o código — motivo pelo qual o span não pode ser transportado como delta de contagem de linhas."
     },
     {
       "id": "N08-no-merge-labeled-chunks",
@@ -110,11 +106,11 @@
       "difficulty": "medium",
       "query": "regra que impede que chunks de código com rótulo semântico sejam mesclados com vizinhos pequenos",
       "expected": {
-        "filePath": "packages/core/src/services/search/smart-chunker.ts",
-        "lineStart": 737,
-        "lineEnd": 744
+        "anchor": "if (chunk.label && chunk.type === \"code_block\") {",
+        "startOffset": 0,
+        "endOffset": 3
       },
-      "rationale": "Métodos curtos (3-4L getter/setter) têm label = não devem ser absorvidos pelo merge anti-fragmentação. STALE: ver N07."
+      "rationale": "Métodos curtos (3-4L getter/setter) têm label = não devem ser absorvidos pelo merge anti-fragmentação. RECUPERADO de af3dab6:737-744 e re-ancorado em chunker/chunker-post.ts:33-36; 8 → 4 linhas (comentários removidos no split)."
     },
     {
       "id": "N09-markdown-no-headings-fallback",
@@ -122,11 +118,11 @@
       "difficulty": "medium",
       "query": "fallback que usa chunking fixo quando arquivo markdown não tem nenhum heading",
       "expected": {
-        "filePath": "packages/core/src/services/search/smart-chunker.ts",
-        "lineStart": 198,
-        "lineEnd": 206
+        "anchor": "const hasHeading = /^\\s*#{1,6}\\s+/m.test(content);",
+        "startOffset": -1,
+        "endOffset": 1
       },
-      "rationale": "Sem essa regra, README sem ## vira 1 mega-chunk que matcha qualquer query (bias .md descoberto no benchmark Sicad). STALE: ver N07."
+      "rationale": "Sem essa regra, README sem ## vira 1 mega-chunk que matcha qualquer query (bias .md descoberto no benchmark Sicad). RECUPERADO de af3dab6:198-206 e re-ancorado em chunker/chunker-markdown.ts:10-12; 9 → 3 linhas (JSDoc e comentários removidos no split)."
     },
     {
       "id": "N10-discover-sort-priority",
