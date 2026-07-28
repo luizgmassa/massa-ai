@@ -1,11 +1,60 @@
 # Sensor Repair 2026-07 — Handoff
 
-**Active Feature**: `sensor-repair-2026-07` — Specified 2026-07-28, decisions closed, Tasks not
-yet written.
-**Base**: `origin/main` @ `a6216cd` (v1.9.0). No branch, no worktree, no commits yet.
+**Active Feature**: `sensor-repair-2026-07` — Execute in progress. **T1 of 9 committed.**
+**Branch**: `fix/sensor-repair` off `origin/main` @ `a6216cd` (v1.9.0). Not pushed; no PR open.
+Working in place, no worktree.
+**Commits**: `e95050e` specs · `39afe59` T1 (SEN-03)
 **Spec**: `.specs/features/sensor-repair-2026-07/spec.md`
-**Downstream**: `.specs/features/core-layering-god-module-split/spec.md` — revised in the same
-session, blocked on this feature.
+**Tasks**: `.specs/features/sensor-repair-2026-07/tasks.md` — approved, Execute inline one task at
+a time, user declined sub-agents.
+**Downstream**: `.specs/features/core-layering-god-module-split/spec.md` — revised, blocked on
+this feature.
+
+## Progress
+
+| Task | Req | State |
+| --- | --- | --- |
+| T1 | SEN-03 | **DONE** `39afe59` |
+| T2 | SEN-01 truncation | next |
+| T3 | SEN-01 re-measure `architecture-map` | pending — this is the only proof T2 worked |
+| T4 | SEN-02 `coverage.yml` | pending |
+| T5 | SEN-04 content anchors | pending |
+| T6 | SEN-04 third consumer `14.needles.test.ts` | pending |
+| T7 | SEN-04 equivalence baseline | pending — **2 × ~90 min**, Ollama, the long pole |
+| T8 | BEH-01 `includePersistent` | pending |
+| T9 | PR close + validation agent | pending |
+
+## What T1 taught — apply these to the rest
+
+- **A criterion written as "the key must be absent" produced the bug it existed to prevent.**
+  Deleting `MASSA_AI_LLM_ENABLED` from the child env is the intuitive fix and it does not work:
+  absent is exactly what `.env` refills. Measured through the real runner — delete → child sees
+  `"true"`; assign `"false"` → child sees `"false"`. The gate is now pinned, not deleted.
+- **A probe that imports nothing proves nothing.** Bun's `.env` auto-load reads **cwd** (the
+  package root); the leak comes from `env.ts` walking up to the **repo root**, which only happens
+  once something imports `@massa-ai/shared`. The first counter-proof was inconclusive for exactly
+  this reason and nearly got recorded as a pass.
+- **State the runner mode with the group count.** Core reports **126 groups in `--unit`** and
+  **133 by default** (19 extra e2e files). Both correct. An unqualified "126" reads as a
+  regression against a default run. Verified on a stashed tree that 133 is a property of the
+  checkout, not of any change.
+- **There is a real `.env` in this checkout** holding `DATABASE_URL`. The spec originally claimed
+  there was none. Back it up and restore it byte-identical around any probe; do not clobber it.
+
+## Environment facts that cost time
+
+- `timeout` is **not** available (macOS). To sample a runner's discovery line without running the
+  full suite: background it writing to a log, `sleep 20-25`, `kill -9` the pid and its children,
+  then read the log.
+- Root `node_modules` may be absent — `bun run lint` exits **127** with `oxlint: command not
+  found`. Fix with `bun install --frozen-lockfile`, not with `bunx`.
+- Dedicated test DB on `127.0.0.1:5433/massa_ai_test` is up. `qwen3-embedding:8b` is pulled, so
+  T7 can run locally.
+- **`bun run test` fails one task per run, a different one each time** — `mcp-client` once,
+  `core`'s `trace-path.test.ts` the next. Pre-existing and documented in STATE.md. `trace-path`
+  passes 18/0 standalone both with and without the T1 changes, and there were zero 5001 ms
+  timeouts, so it carries none of the live-provider signature. Re-run the package alone and say
+  so; do not claim a clean parallel aggregate.
 
 ## What this is
 
@@ -134,12 +183,22 @@ Nothing was refuted. The needles arithmetic was independently confirmed twice.
 
 ## Next steps
 
-1. Write `.specs/features/sensor-repair-2026-07/tasks.md`. **Budget the wall clock explicitly**:
-   `test:coverage` is ~15 min per run, and SEN-04 AC-4's equivalence baseline is two needles runs
-   at ~90 min each against a local Ollama. That is ~3 hours in PR-A that no task title implies.
-2. Execute PR-A. `CHANGELOG.md` needs `[Unreleased]` entries or the CI merge gate fails; BEH-01
-   goes under `### Fixed`.
-3. Only then write `core-layering-god-module-split/design.md`. AS-01..06 are closed. **AD-012**
-   (retire the controllers layer) and **AD-013** (content-anchored needles) are recorded in
-   STATE.md's Decisions table as `proposed … not yet implemented`; flip them to `active` when
-   their PRs land.
+1. **T2** — truncate the dedicated DB at gate start in `scripts/check-coverage.ts`. Guard with the
+   **existing** `assertDedicatedDatabase()` (`:359-382`), not a second condition. **Exclude
+   `_prisma_migrations` by name** and enumerate tables rather than sweeping the `public` schema —
+   it lives in the same schema, and emptying it leaves 24 migrations' DDL applied with no record,
+   so the next `migrate deploy` replays non-idempotent `ALTER TABLE ADD COLUMN` and fails. Repo
+   precedent: `packages/core/src/__tests__/graph-generation-symbol-repository-pg.test.ts`.
+2. **T3** — re-measure and lower `architecture-map.test.ts`'s three `300_000` budgets. Prior
+   readings 1213 ms fresh / 16.59 s post-gate / >120 s mid-gate. Lowering them is the **only**
+   observable evidence T2 worked; leaving `300_000` makes the reset unfalsifiable.
+3. T4 → T9 per `tasks.md`. **Budget the wall clock**: `test:coverage` ~15 min per run, T7 is
+   2 × ~90 min against a local Ollama. ~3.5 hours of PR-A is waiting, and no task title implies it.
+4. `CHANGELOG.md` needs `[Unreleased]` entries or the CI merge gate fails. BEH-01 goes under
+   `### Fixed`. Also fix the stale "nine documented exclusions" — the actual count is **11**
+   (validation-pr2 gap #2, still open).
+5. Close with a fresh `massa-ai-verification-agent` (author ≠ verifier) writing `validation.md`,
+   then flip **AD-013** from `proposed` to `active` in STATE.md.
+6. Only then write `core-layering-god-module-split/design.md`. AS-01..06 are closed. **AD-012**
+   (retire the controllers layer) and **AD-013** (content-anchored needles) sit in STATE.md's
+   Decisions table as `proposed … not yet implemented`.
