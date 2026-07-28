@@ -23,10 +23,14 @@ import path from "node:path";
 import {
   EXCLUSIONS,
   LINE_COVERAGE_FLOOR,
+  TRUNCATION_EXCLUSIONS,
+  isDedicatedDatabase,
   isMeasuredSource,
   linePercent,
   mergeInto,
   parseLcov,
+  resetDedicatedDatabase,
+  selectTruncationTargets,
   type FileCoverage,
 } from "../check-coverage.ts";
 
@@ -183,5 +187,97 @@ describe("EXCLUSIONS", () => {
 describe("LINE_COVERAGE_FLOOR", () => {
   test("is the 90% floor the coverage-90pct feature established", () => {
     expect(LINE_COVERAGE_FLOOR).toBe(90);
+  });
+});
+
+/**
+ * SEN-01. The gate now truncates before it measures, so the thing under test is
+ * no longer only arithmetic — it is a destructive operation against whatever
+ * `DATABASE_URL` names. These pin the two properties that keep it safe: the
+ * condition that permits it, and the one table it must never empty.
+ *
+ * None of them opens a connection. The refusal is checked before `pg` is
+ * touched, and the target selection is a pure filter over a table list, so this
+ * whole block runs in `bun run test:scripts` with no database at all.
+ */
+
+const DEDICATED = {
+  MASSA_AI_DEDICATED: "1",
+  DATABASE_URL: "postgresql://u:p@127.0.0.1:5433/massa_ai_test",
+};
+
+describe("isDedicatedDatabase — the one condition guarding a destructive reset", () => {
+  test("accepts the designated scratch database, with or without a query string", () => {
+    expect(isDedicatedDatabase(DEDICATED)).toBe(true);
+    expect(
+      isDedicatedDatabase({
+        ...DEDICATED,
+        DATABASE_URL: "postgresql://u:p@127.0.0.1:5433/massa_ai_test?schema=public",
+      }),
+    ).toBe(true);
+  });
+
+  test("both halves are required — the flag alone does not designate a database", () => {
+    expect(isDedicatedDatabase({ MASSA_AI_DEDICATED: "1" })).toBe(false);
+    expect(isDedicatedDatabase({ ...DEDICATED, MASSA_AI_DEDICATED: undefined })).toBe(false);
+    expect(isDedicatedDatabase({ ...DEDICATED, MASSA_AI_DEDICATED: "true" })).toBe(false);
+  });
+
+  test("rejects every near miss of the dedicated URL", () => {
+    // `localhost` is the one that matters: every other job in `ci.yml` uses it,
+    // so a workflow copied from there would otherwise truncate whatever it
+    // happened to be pointed at.
+    for (const databaseUrl of [
+      "postgresql://u:p@localhost:5433/massa_ai_test",
+      "postgresql://u:p@127.0.0.1:5432/massa_ai_test",
+      "postgresql://u:p@127.0.0.1:5433/massa_ai",
+      "postgresql://u:p@127.0.0.1:5433/massa_ai_test_scratch",
+      "",
+    ]) {
+      expect(isDedicatedDatabase({ ...DEDICATED, DATABASE_URL: databaseUrl })).toBe(false);
+    }
+  });
+});
+
+describe("resetDedicatedDatabase — the refusal", () => {
+  test("refuses a non-dedicated DATABASE_URL", async () => {
+    // AC-4's discriminating sensor. It has to reject before it connects, or the
+    // proof would need a live database to demonstrate that it does not touch a
+    // live database.
+    await expect(
+      resetDedicatedDatabase({
+        MASSA_AI_DEDICATED: "1",
+        DATABASE_URL: "postgresql://u:p@localhost:5432/massa_ai",
+      }),
+    ).rejects.toThrow(/refusing to truncate/);
+  });
+
+  test("refuses when the dedicated flag is not set, even on the right URL", async () => {
+    await expect(
+      resetDedicatedDatabase({ DATABASE_URL: DEDICATED.DATABASE_URL }),
+    ).rejects.toThrow(/refusing to truncate/);
+  });
+});
+
+describe("selectTruncationTargets", () => {
+  test("_prisma_migrations is never a target", () => {
+    // The Plan Challenge finding this task exists to avoid: it sits in the same
+    // `public` schema as the data tables, and emptying it leaves 24 migrations'
+    // DDL applied with no record of it. Deleting the exclusion fails here.
+    const present = ["_prisma_migrations", "chunks", "files", "workspaces"];
+    expect(selectTruncationTargets(present)).toEqual(["chunks", "files", "workspaces"]);
+    expect(selectTruncationTargets(present)).not.toContain("_prisma_migrations");
+    expect(TRUNCATION_EXCLUSIONS).toContain("_prisma_migrations");
+  });
+
+  test("targets come from the list it is given, not from a hardcoded set", () => {
+    // A table added by a future migration has to be reset too. Hardcoding the
+    // data tables instead would leave it accumulating silently, which is the
+    // defect this whole task is removing.
+    expect(selectTruncationTargets(["a_table_added_next_year"])).toEqual([
+      "a_table_added_next_year",
+    ]);
+    expect(selectTruncationTargets([])).toEqual([]);
+    expect(selectTruncationTargets(["_prisma_migrations"])).toEqual([]);
   });
 });
