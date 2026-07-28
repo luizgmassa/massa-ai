@@ -128,16 +128,41 @@ Claude/Codex/Cursor/OpenCode plugin artifacts. Run it after touching
 `generate-subagent-artifacts.ts`. `scripts/run-deterministic.ts` only scans
 `packages/core/src/__tests__` — it is a core gate, not a repo-wide one.
 
-`bunfig.toml` sets a global **5 s per-test timeout** and `coverage = true`. A test doing
-real indexing, embedding, or a cold native compile needs an explicit longer budget, passed
-as the third arg to `test()` — the established idiom here is `}, 60_000);` or `}, 30_000);`
-(see `architecture-map.test.ts`, `vector-store-factory.test.ts`). Raise the per-test value,
-never the global one; the 5 s default is what keeps real hangs visible. Two
-tests currently flake this way in the full parallel aggregate while passing standalone —
-`mcp-client` `embedded-api-client-endpoints.test.ts` ("routes without 404") and core's
-Dart `structural` case, both dying at exactly 5001 ms when Postgres and Ollama are
-contended. A 5001 ms failure is a load problem, not a logic bug; re-run the package alone
-before chasing it.
+`bunfig.toml` sets a global **5 s per-test timeout**. Coverage is no longer on by default —
+it is the explicit `bun run test:coverage` gate (DEBT-02). A test doing real indexing,
+embedding, or a cold native compile needs an explicit longer budget, passed as the third
+arg to `test()` — the established idiom here is `}, 60_000);` or `}, 30_000);` (see
+`architecture-map.test.ts`, `vector-store-factory.test.ts`). Raise the per-test value,
+never the global one; the 5 s default is what keeps real hangs visible.
+
+**A 5001 ms failure is not automatically a load problem.** That was the standing advice and
+it was wrong at least as often as it was right. The commoner cause is that the test reached
+a **live LLM or embedding provider**, because the config layer reads the developer's own
+`~/.config/massa-ai/config.json` — and on a machine with a local Ollama, `llm.enabled` is
+`true` there. Measured on `CodeCompressor`: **42030 ms on a cold model load, 690 ms warm**.
+That is exactly why it looks like flakiness — it passes on a warm model and hangs on a cold
+one — and why **CI never sees it**, since CI has no config file and every LLM feature
+defaults off.
+
+Before reaching for a bigger budget, re-run with an empty config dir:
+
+```bash
+XDG_CONFIG_HOME=$(mktemp -d) bun test <file>
+```
+
+If that fixes it, the test is missing a seam, not a timeout. Pin `_setLlmEnabledForTesting(false)`,
+inject the subject's own LLM seam, or add the `mock.module` the file is missing — the recurring
+omission is `../data/vector/vector-store-factory.js`, without which `ensureInitializedImpl`
+falls back to the real factory and runs live embedding-provider auto-selection. `dart-support`,
+`code-compressor` and `rlm-admin` were all this, and were fixed rather than budgeted.
+
+Genuinely slow tests are a separate class and do get budgets: `etl-cache-invalidation` measures
+**66 s** under `--coverage` instrumentation, and `architecture-map`'s `getProjectMap` cases need
+headroom for the gate's 126-group contention. **Known outstanding case:** `mcp-client`
+`embedded-api-client-endpoints.test.ts` ("routes without 404" for `/search/project` and
+`/search/code`) fails at 5001 ms under a real user config and passes with an empty one. It is
+deliberately unmocked integration and core does not export the LLM seam to `apps/`, so it has no
+one-line fix; run that package with `XDG_CONFIG_HOME` set until it does.
 
 ```bash
 # one file (safe — single process)

@@ -5,9 +5,12 @@
 - projectId: `massa-ai`
 - workflowSessionId: `spec-audit-remediation-2026-07`
 - workflow: spec-driven (Large — Specify + Design + Tasks + full Plan Challenge + Execute)
-- feature: `audit-remediation-2026-07` — **Specify/Design/Tasks complete; Plan Challenge complete; Execute in progress (PR1)**
-- worktree: `/Users/luizmassa/Projects/massa-ai-wt-audit-remediation`; branch
+- feature: `audit-remediation-2026-07` — **COMPLETE. PR1 merged and released as v1.8.0;
+  PR2 execute complete on `feat/audit-remediation-debt`, independently validated.**
+- worktree (PR1): `/Users/luizmassa/Projects/massa-ai-wt-audit-remediation`; branch
   `fix/audit-remediation-security-and-bugs` off `origin/main` @ `3a25cc6` (v1.7.1)
+- worktree (PR2): `/Users/luizmassa/Projects/massa-ai-wt-audit-remediation-debt`; branch
+  `feat/audit-remediation-debt` off `origin/main` @ `c992ae9` (v1.8.0). Not pushed; no PR open.
 - scope: 17 requirements (SEC-01..06, BUG-01..06, DEBT-01..05) across 22 tasks and 2 PRs
 - Artifacts: `.specs/features/audit-remediation-2026-07/{spec,design,tasks}.md`
 - Origin: knowledge-graph analysis at `17ee708` (1847 nodes / 4226 edges) plus two verification
@@ -136,7 +139,76 @@
     each run: `apps/mcp-client` `embedded-api-client-endpoints.test.ts`, and `packages/core`'s
     `mock-free (113 files)` group and `trace-path.test.ts`. Do not chase them; re-run the package
     alone and say so rather than claiming a clean parallel aggregate.
-  - PR1 cannot open before T15: the `CHANGELOG.md` entry is a CI merge gate and is still unwritten.
+  - PR1 shipped: merged as `af16ea2`, released as **v1.8.0**.
+- **PR2 (DEBT-01..05, T16–T22) — execute complete** on `feat/audit-remediation-debt`.
+  - Order: T16 → T17 → T18 → **T20 → T19** → T21 → T22. T20 precedes T19 deliberately: T19's
+    gate needs the `--coverage` passthrough T20 added to the shared runner.
+  - Committed: `2380615` T16, `2e6c16d` T17, `17f345a` T18, `7199d27` T20, `469fa4f` T19
+    (implementation), `32a647a` T21, `dc7fee3` (scope addition), `341a9a5` T19 (verification),
+    `6cf97ae` follow-on spec.
+  - **AD-010** recorded before the rename it authorises (T16), superseding the `RLM_LLM_*`
+    compatibility boundary held by `repo-rename-massa-ai` and `project-identity-rename`.
+  - Two Execute-phase supersessions by the spec owner, both written into `tasks.md`/`design.md`:
+    1. **T18** — the "zero source changes" non-goal was superseded. Adoption found **337**
+       violations; honouring the non-goal literally meant downgrading 15 firing rules to `warn`,
+       i.e. a gate that reports and never enforces. All 337 fixed instead; every correctness rule
+       ships at `error`. The "no formatter, no reformat" non-goal is unchanged.
+    2. **T18** — `turbo.json`'s `lint` task is not implementable per-package: turbo dispatches only
+       to workspace packages, and `scripts/`/`benchmarks/` held 21 of the 337. Shipped as a root
+       `oxlint` over the whole repo; the dead turbo task was removed.
+  - PR2 Execute-phase divergences beyond those:
+    13. **T19 — the gate's arithmetic was wrong, not the floor.** Run against the dedicated test
+        database it reported **130 of 314** files below 90%, including files `coverage-90pct` had
+        measured at 100%. Bun emits two shapes of lcov record for one file: an instrumenting group
+        reports the real executable lines, a group that only imports the module transitively emits
+        a degenerate record marking *every physical line* uncovered — blanks, braces and JSDoc
+        included. On `graph-queries.ts` that was 220 lines covered 220/220 against seven shallow
+        groups reporting 377 and covering 14, and the 157-line difference is entirely
+        non-executable text. Unioning the denominators scored a fully covered file at 58.4%.
+        `check-coverage.ts` now unions the **covered** set and takes the **minimum** executable
+        set. 130 → 3, floor untouched at 90%.
+    14. **T19 — the gate pins its own config environment.** Suites now run against a scratch
+        `XDG_CONFIG_HOME`. Without it the numbers are a property of the machine, not the tree, and
+        the developer's real `~/.config/massa-ai/` is writable by the run. This also closes the
+        second open finding carried out of PR1.
+    15. **T19 — 2 of the 3 remaining below-floor files are excluded as measurement blind spots**
+        (`config/api-key.ts` 13.79%, `env.ts` 88.89%), taking the list from 9 to **11**. The third,
+        `contextual-search-rlm.ts` at 63.55%, was a **real** gap and was closed to 100% with 27
+        facade-forwarding tests rather than excluded — user decision. In-process coverage of
+        `env.ts`'s four seeding lines was attempted and abandoned with evidence: `CONFIG_DIR`
+        freezes at first import, `packages/shared` runs single-process so no test can guarantee it
+        loads `env.ts` first, and `env.ts` dotenv-loads the nearest `.env` before consulting
+        config.json.
+    16. **Scope addition (user-approved): unit tests were reaching live providers.** The 2 Dart
+        timeouts pre-existing at `c992ae9` were **not** a cold native compile. `CodeCompressor`
+        reads `llm.enabled` from the developer's `~/.config/massa-ai/config.json`; with a local
+        Ollama that is `true`, so the tests made a real network call — **42030 ms cold / 690 ms
+        warm** against a 5 s budget. Passes warm, hangs cold, so it read as flakiness, and CI
+        never saw it because CI has no config file. Fixed by pinning the seams the subjects
+        already expose. The sweep found two siblings: `code-compressor.test.ts`'s first describe
+        block, and `rlm-admin.test.ts`, which was missing the `vector-store-factory` mock — the
+        identical omission `48d0f39` fixed in PR1 (2 fail / 10.15 s → 7 pass / 176 ms).
+    17. **Instrumentation cost is a separate class from the leak, and is budgeted.**
+        `etl-cache-invalidation` measured **66.42 s** standalone under `--coverage`; 30_000 passed
+        one gate run and failed the next at 30001 ms, so it is 180_000. `etl-idempotent` is 670 ms
+        instrumented — its 5 s failures were pure contention — so 30_000 is headroom, not cost.
+        `architecture-map`'s three `getProjectMap` cases went 60_000 → 120_000 for the same reason.
+        `bunfig.toml`'s global 5 s default is untouched throughout.
+  - Core's isolated-group count is still exactly **126** (T20's pinned invariant): the 27 new
+    facade tests extended the already-forked `contextual-search-rlm-coverage.test.ts` rather than
+    adding a file, which would have made it 127.
+  - `packages/core` merging **122** lcov files for **126** groups is explained and benign: Bun
+    writes no lcov when a run's coverage record set is empty, and four groups either skip behind
+    their own opt-in flags or import no product source. Not a collision — group indices are unique
+    by construction.
+- Follow-on registered: **`core-layering-god-module-split`**, Specify-only, `execute: false`. Owns
+  the three items this feature deferred — the controllers-layer restructuring, the
+  `contextual-search-rlm.ts` split, and the `rlm-*` filename rename. All six of its assumptions are
+  open questions.
+- Open findings carried forward, not actioned: `memory-controller.ts:274`'s inert
+  `includePersistent` option (a behavior decision), and `packages/core`'s test runner having no
+  isolation rule for `@massa-ai/shared` — 75 core test files import it and its barrel side-effects
+  run against the real `CONFIG_DIR` under a plain `bun run test`.
 - Skipped sensor: `recall` returned 0 memories for this workspace, so no durable memory informed
   this plan. Context7 MCP not registered — oxlint's rule catalogue is unverified against upstream
   docs and must be confirmed in TASK-018.
