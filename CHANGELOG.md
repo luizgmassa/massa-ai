@@ -93,6 +93,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   write that had already returned. A bounded residual remains for an alias this process has
   never resolved — nothing can consult the database synchronously — and it is documented at
   the call site and pinned by a test rather than left implicit.
+- **Plugin bundles never appeared in any host's plugins screen.** The installers wrote
+  MCP entries, hooks, skills and agent files, but no host *plugin registry* — the thing
+  `/plugin` (Claude Code), `/plugins` (Codex) and Cursor's plugin list actually read. All
+  four hosts reported `✓ installed` while showing nothing. `apps/claude-plugin/install.sh`
+  and `apps/codex-plugin/install.sh` now delegate registration to `claude plugin
+  marketplace add` + `claude plugin install` and `codex plugin marketplace add` + `codex
+  plugin add` respectively, guarded by a capability probe so a missing or older CLI falls
+  back to the previous file-only behaviour and prints the manual command instead of
+  failing.
+- **Cursor plugin installed to a path Cursor does not scan.** The bundle went to
+  `~/.cursor/plugins/massa-ai/`; Cursor discovers local plugins under
+  `~/.cursor/plugins/local/<name>/`. Installing now targets the correct directory and
+  removes a pre-fix copy so the two cannot both be discovered and double-register hooks.
+  This path is derived from Cursor's plugin documentation and is **not verified against a
+  running Cursor.app** — unlike the Claude and Codex routes, which were verified
+  end-to-end. Please report if Cursor still does not list the plugin.
+- **Codex plugin registration escaped a sandboxed install via `CODEX_HOME`.** The Codex
+  app exports `CODEX_HOME` into every shell it spawns, and the `codex` CLI prefers it over
+  `$HOME`. `apps/codex-plugin/install.sh` resolves its own paths from `$HOME` alone, so an
+  install run against an overridden `$HOME` (tests, `--target`) wrote files into the
+  sandbox while registering the marketplace into the real `~/.codex` — and an
+  `--uninstall` in a test suite silently removed a live `[marketplaces.massa-ai]` table.
+  The CLI is now pinned to the same root the installer writes. Note the pre-existing
+  divergence left in place: the file-copy half still ignores `CODEX_HOME` entirely.
+- **Claude file-route artifacts survived an upgrade.** A user who had installed via the
+  old file route kept their loose `~/.claude/commands/massa-ai-*.md`, subagent files and
+  merged `settings.json` hooks after upgrading, while the newly-registered plugin supplied
+  the same three — double-firing every lifecycle event. The installer now removes those
+  artifacts when it takes the plugin route.
+
+### Added
+
+- **`--plugin-source local|copy|auto`** on `scripts/install-harness.sh`, mirroring
+  `--mcp-source`. A host plugin registry stores the marketplace *root path*, so
+  registering a live checkout makes the install die when that checkout moves — measured:
+  Claude reports `failed to load: cache-miss`, and `codex plugin list` then errors for
+  **every** configured marketplace, not just massa-ai. `copy` materialises a stable
+  marketplace root under `~/.config/massa-ai/marketplace`; `auto` picks `local` in a
+  checkout and `copy` otherwise (npx / published installs). The OpenCode plugin symlink
+  honours the same root.
+- Root `.cursor-plugin/marketplace.json`, the Cursor counterpart to the existing
+  `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`.
+- `MASSA_AI_SKIP_PLUGIN_REGISTRY=1` opt-out, which also pins the file-route test suites so
+  their outcome no longer depends on whether the machine running them has the host CLI
+  installed.
+- `scripts/tests/test-plugin-registry-registration.sh` (45 assertions). The CLI-dependent
+  scenarios **skip** rather than fail when `claude`/`codex` are absent, which is the case
+  on every CI runner — that surface is covered by the capability probe and by manual
+  verification, not by CI.
 
 ## [1.7.1] - 2026-07-27
 

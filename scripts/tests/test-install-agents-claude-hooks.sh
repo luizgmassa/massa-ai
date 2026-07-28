@@ -86,7 +86,12 @@ assert_not_contains "no notice on dry-run" "$OUT4" "plugin hooks preserved"
 echo ""
 echo "Scenario 5: real plugin install then MCP write — both blocks coexist"
 H5="$ROOT/h5"; mkdir -p "$H5"
-HOME="$H5" bash "$PLUGIN_INSTALLER" --user >/dev/null 2>&1
+# Pinned to the file route: this scenario is about the plugin's settings.json
+# hook block coexisting with the MCP entry. On the plugin route those hooks come
+# from the bundle's own hooks/hooks.json and settings.json carries none, so
+# without this the assertion would depend on whether the machine running the
+# suite has the claude CLI installed.
+HOME="$H5" MASSA_AI_SKIP_PLUGIN_REGISTRY=1 bash "$PLUGIN_INSTALLER" --user >/dev/null 2>&1
 SETTINGS5="$H5/.claude/settings.json"
 CLAUDE_JSON5="$H5/.claude.json"
 assert_file "plugin wrote settings.json" "$SETTINGS5"
