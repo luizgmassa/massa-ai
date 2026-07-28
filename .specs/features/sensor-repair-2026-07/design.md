@@ -261,11 +261,126 @@ the next question, and it belongs to whoever answers it with retrieval work, not
 
 ---
 
+---
+
+# Second fork — the anchor shape itself (T5a, 2026-07-28)
+
+The shape proposed above (`{anchor, endAnchor}`) does not survive contact with the
+fixture's actual boundaries. Same failure mode as everything else on this feature: the
+design was written without looking at the lines it describes.
+
+## The measurement
+
+Repo-wide occurrence counts of each of the 11 valid needles' boundary lines, over tracked
+`.ts` excluding `node_modules`, `dist` and `generated`:
+
+| Needle | `lineStart` line | n | `lineEnd` line | n |
+| --- | --- | --- | --- | --- |
+| N01 | `const DAMPING = 0.85;` | 1 | same | 1 |
+| N02 | `const ITERATIONS = 20;` | 1 | same | 1 |
+| N03 | *comment* | — | **blank line** | — |
+| N04 | `const rrfNormalized = rrfScore / maxRrfScore;` | 1 | `const combinedScore = …` | 1 |
+| N05 | *comment* | — | `const normalizedScore = …` | 1 |
+| N06 | `    }` | **11130** | `rerankedTop = applyProximityRerank(…)` | 1 |
+| N10 | `const results = await Promise.all(` | **4** | `ctx.emit({` | **16** |
+| N11 | `projectId: ctx.projectId,` | **11** | `return discovered;` | 1 |
+| N12 | *comment separator* | — | `` return `vector_documents_${dimensions}d`; `` | 1 |
+| N13 | **blank line** | — | `` GROUP BY project_id`, `` | 1 |
+| N14 | *comment (JSDoc)* | — | `private normalizeScore(raw: unknown): number {` | 1 |
+
+**Only 3 of 11 — N01, N02, N04 — have both boundaries on a repo-wide-unique code line.**
+The `endAnchor` half is mostly fine; it is the **start** boundaries that are comments,
+blank lines, or `    }`.
+
+Two of these are not merely hard, they are impossible: a **blank line cannot be a unique
+anchor**, and N03 ends on one while N13 starts on one. No amount of lengthening fixes that.
+
+The root cause is that the existing spans are eyeballed chunk-ish regions, not syntactic
+units. Their boundaries are arbitrary. Any scheme required to reproduce them *exactly*
+inherits that arbitrariness.
+
+## Decision — anchor on code inside the span, plus signed offsets
+
+Confirmed by the user, 2026-07-28.
+
+```jsonc
+"expected": {
+  "anchor":      "<unique code substring INSIDE the span>",
+  "startOffset": <signed line delta from the anchor's line to lineStart>,
+  "endOffset":   <signed line delta from the anchor's line to lineEnd>
+}
+```
+
+This keeps every property that mattered and drops only the one that was unbuildable:
+
+- **AC-8 holds exactly.** Measured: all 11 resolve to `n = 1` repo-wide and reproduce their
+  previous `lineStart`/`lineEnd` **byte-for-byte, zero diff**.
+- **Every anchor sits on code**, never a comment — the Wave 6 lesson is preserved, and now
+  enforced by a test rather than by convention.
+- **AC-3's three transformations all still work**: verbatim move to another file, file
+  rename, and within-file move of any distance. All three preserve the span's *internal*
+  line structure, which is exactly what offsets depend on.
+
+The tradeoff is stated rather than hidden: offsets do **not** survive edits *inside* the
+span. AC-3 already excludes that class ("not required to tolerate reformatting, because the
+repo-wide reformat is a separate PR").
+
+**Why this is not the `anchor + spanLines` design rejected above.** That objection was that
+"the regions are shorter now" — true, and it is an objection about the three *stale* needles
+whose content genuinely changed between `af3dab6` and HEAD. It does not apply to the 11
+whose files never moved, and for the three recovered in T5b the offsets are authored against
+*current* content, so they are correct by construction. The rejected design carried an
+**old** length forward onto **new** content; this one measures the length that is there.
+
+## Third fork — scoping the loud failure so T5a remains measurable
+
+Landing the out-of-range hard failure in T5a collides with T5a's own purpose. N07/N08/N09
+have spans past EOF *right now*; a hard failure that covers them aborts the T5a run before
+scoring, and the equivalence baseline — the single most important evidence in this PR —
+cannot be produced at all.
+
+**Decision, confirmed by the user**: hard failure is a property of **anchor resolution**, so
+it covers anchored needles only. N07/N08/N09 stay positional and are grandfathered by an
+explicit `scoring.staleNeedles` id list for exactly one commit.
+
+The list is checked in **both** directions, which is what keeps it from becoming a
+permanent exemption:
+
+| Condition | Outcome |
+| --- | --- |
+| needle has no anchor, id **not** in the list | `NEEDLE_ANCHOR_MISSING` — hard failure |
+| needle has an anchor, id **is** in the list | `NEEDLE_STALE_ENTRY_OBSOLETE` — hard failure |
+| grandfathered needle's file deleted | `NEEDLE_FILE_MISSING` — hard failure, not a skip |
+
+So a positional needle cannot be added back later, and T5b cannot anchor the three without
+also deleting their entries. The run additionally prints the grandfathered ids to stderr
+every time, stating their scores are not trustworthy.
+
+## AC-8, rewritten once more — and why it is not frozen into a test
+
+AC-8's exact-span reproduction was run as **one-time calibration** and its result recorded
+in `tasks.md`. It is deliberately **not** a permanent test.
+
+A test asserting absolute `lineStart`/`lineEnd` forever would fail the moment code
+legitimately moves — which is precisely the positional pinning SEN-04 exists to delete. It
+would rebuild the defect one layer up, in the suite meant to prevent it.
+
+What `scripts/__tests__/needle-resolution.test.ts` asserts permanently are the properties
+that hold wherever the code lives: every needle resolves, every anchor is unique repo-wide,
+every resolved span lies inside its file, no anchor sits on a comment, the grandfather list
+is consistent in both directions, and each of the failure paths fails loudly.
+
+---
+
 ## Evidence
 
 | Claim | How it was measured |
 | --- | --- |
 | Baseline: hit@1 0.500 PASS, MRR 0.569 FAIL | `bun benchmarks/needles/run.ts --label before-anchoring` at `c33a5c1` |
+| Only 3 of 11 boundaries are unique code lines | `git grep -F -c` per boundary literal over tracked `.ts` |
+| `    }` occurs 11130 times | same |
+| All 11 anchors resolve `n = 1` and reproduce spans exactly | `resolveAnchoredNeedle` over the pre-change fixture values, zero diff |
+| Loud failure precedes embedding | broken fixture run with `OLLAMA_HOST=http://127.0.0.1:1` → exit 1 |
 | N07/N08/N09 MISS, shared top hit `smart-chunker.ts:30-82` | same run, per-needle table |
 | `smart-chunker.ts` is 81 lines | `wc -l` at `c33a5c1` |
 | Needle spans 198-206 / 642-674 / 737-744 | `benchmarks/needles/fixtures/massa-ai.json` |

@@ -321,17 +321,88 @@ anywhere, and a span cannot be carried forward as a line-count delta because the
 shorter now. And anchors must match as **substrings**: `netBraceDelta` gained an `export ` prefix,
 which a whole-line match would miss.
 
-**Done when**:
-- [ ] Each needle carries a content anchor; `filePath`/`lineStart`/`lineEnd` are resolved from it before file collection
-- [ ] Zero matches **or** two-or-more matches → non-zero exit naming the needle id and anchor. Never proceeds to scoring
-- [ ] Resolution tolerates: verbatim move to another file; file rename; **and a within-file move beyond `lineTolerance` (5)** — the last is why the split breaks needles even where no file is renamed
-- [ ] **AC-8 cheap check, run before T7's expensive one**: resolving the unchanged tree at `a6216cd` reproduces every needle's existing `lineStart`/`lineEnd` **exactly**. A non-zero diff falsifies "representation-only" for ~1 min of compute instead of 3 hours
-- [ ] AC-9: every anchor verified to resolve to exactly one location repo-wide
-- [ ] All 14 needles keep identical target spans; none added, removed, retargeted or re-queried
-- [ ] Discriminating sensor: a fixture with a deliberately unresolvable anchor exits non-zero — and does **not** require an embedding provider, so it exercises resolution, not retrieval
+### T5a — anchor the 11 valid needles + land both loud-failure paths — **DONE**
 
-**Tests**: new `benchmarks/needles/__tests__/` (or `scripts/__tests__/`) resolution suite, provider-free · **Gate**: `bun run test:scripts`
+- [x] Each anchored needle carries a content anchor; `filePath`/`lineStart`/`lineEnd` resolved before file collection
+- [x] Zero matches **or** two-or-more matches → non-zero exit naming the needle id and anchor. Never proceeds to scoring
+- [x] Resolution tolerates verbatim move to another file, file rename, and a within-file move beyond `lineTolerance` (5)
+- [x] **AC-8 cheap check, run before T7's expensive one** — clean, zero diff
+- [x] AC-9: every anchor resolves to exactly one location repo-wide
+- [x] All 14 needles keep identical target spans; none added, removed, retargeted or re-queried
+- [x] Discriminating sensor: unresolvable anchor exits non-zero without an embedding provider
+
+**Second design fork — `{anchor, endAnchor}` was unbuildable. See `design.md`.** Measured every
+boundary's repo-wide uniqueness: **only 3 of 11** (N01, N02, N04) have both boundaries on a unique
+code line. N06 starts on `    }` (**11130** occurrences), N10 on a 4-occurrence line ending on a
+16-occurrence one, N11 on an 11-occurrence line. N05/N12/N14 start on comments. **N03 ends on a
+blank line and N13 starts on one** — not merely hard, impossible, since a blank line can never be a
+unique anchor.
+
+**Resolved as `anchor` + signed `startOffset`/`endOffset`**, anchoring on a unique code substring
+*inside* the span. Keeps AC-8 exact, keeps every anchor on code, and still survives AC-3's three
+transformations (all preserve internal line structure). Not the rejected `anchor + spanLines`: that
+carried an **old** length onto **new** content; this measures the length that is there.
+
+**AC-8 calibration — all 11 resolve `n = 1` repo-wide and reproduce their previous spans exactly:**
+
+| Needle | anchor line | resolved | previous | |
+| --- | --- | --- | --- | --- |
+| N01 | `const DAMPING = 0.85;` | centrality.ts:14-14 | 14-14 | exact |
+| N02 | `const ITERATIONS = 20;` | centrality.ts:15-15 | 15-15 | exact |
+| N03 | `const KEYWORD_BOOST = isCodeQuery ? …` | rlm-fusion.ts:57-66 | 57-66 | exact |
+| N04 | `const rrfNormalized = rrfScore / maxRrfScore;` | rlm-fusion.ts:170-175 | 170-175 | exact |
+| N05 | `const normalizedScore = Math.min(1, …` | rlm-fusion.ts:177-184 | 177-184 | exact |
+| N06 | `rerankedTop = applyProximityRerank(…)` | rlm-search.ts:340-354 | 340-354 | exact |
+| N10 | `batch.map((rel) => this.processFile(…)` | discover.ts:125-132 | 125-132 | exact |
+| N11 | `return discovered;` | discover.ts:168-174 | 168-174 | exact |
+| N12 | `` return `vector_documents_${dimensions}d`; `` | postgres-vector-store.ts:60-63 | 60-63 | exact |
+| N13 | `` GROUP BY project_id`, `` | postgres-vector-store.ts:137-181 | 137-181 | exact |
+| N14 | `private normalizeScore(raw: unknown): number {` | postgres-vector-store.ts:67-74 | 67-74 | exact |
+
+**Zero diff across all 11.** 815 source files scanned.
+
+**Third fork — loud failure scoped to anchored needles.** Applying the out-of-range check to
+N07/N08/N09 would abort the T5a run before scoring and make the equivalence baseline
+unmeasurable. Hard failure is therefore a property of **anchor resolution**; the three are
+grandfathered by an explicit `scoring.staleNeedles` id list, checked in **both** directions:
+no-anchor-and-not-listed → `NEEDLE_ANCHOR_MISSING`; has-anchor-and-listed →
+`NEEDLE_STALE_ENTRY_OBSOLETE`. So a positional needle cannot creep back, and T5b cannot anchor
+the three without deleting their entries. The run prints the grandfathered ids to stderr every
+time, stating their scores are not trustworthy.
+
+**Loud-failure paths verified end-to-end with `OLLAMA_HOST=http://127.0.0.1:1`** — proving
+resolution runs before any embedding, so a stale fixture costs seconds instead of a wrong number:
+
+| Injected defect | Exit | Message |
+| --- | --- | --- |
+| anchor matching nothing | **1** | `NEEDLE_ANCHOR_UNRESOLVED` naming needle + anchor |
+| `endOffset` past EOF | **1** | `NEEDLE_SPAN_OUT_OF_RANGE`, `file length: 79 lines` |
+
+The second is the path that previously produced **no signal at all** — the one actually firing.
+
+**AC-8 is calibration, not a permanent test — deliberately.** A test asserting absolute
+`lineStart`/`lineEnd` forever would fail the moment code legitimately moves, rebuilding the exact
+positional pinning SEN-04 deletes, inside the suite meant to prevent it. The permanent suite
+asserts properties that hold wherever code lives: resolves, unique repo-wide, span in range, no
+comment anchors, grandfather list consistent both ways, every failure path loud.
+
+**Gate**: `test:scripts` **634 pass / 0 fail** (was 616 — 18 new). `lint` 0, `type-check` 0.
+
+**Files**: `benchmarks/needles/resolve.ts` (new, shared — T6 consumes it),
+`benchmarks/needles/run.ts`, `benchmarks/needles/fixtures/massa-ai.json`,
+`scripts/__tests__/needle-resolution.test.ts` (new; placed under `scripts/` so `test:scripts`
+reaches it — `benchmarks/` is not a workspace package and turbo cannot see it).
+
+**Tests**: `scripts/__tests__/needle-resolution.test.ts`, provider-free · **Gate**: `bun run test:scripts`
 **Commit**: `fix(bench): identify needles by content and fail loudly on a stale fixture`
+
+---
+
+### T5b — recover N07/N08/N09 and anchor them into `chunker/*.ts` — pending
+
+Anchors already recovered from `af3dab6` and verified unique repo-wide; see the table above this
+section and in `design.md`. Deleting the three `scoring.staleNeedles` entries is mandatory — the
+resolver hard-fails on an entry that outlives its reason.
 
 ---
 
@@ -374,7 +445,24 @@ N01 @1  N02 @1  N03 @1  N04 @1  N05 @5  N06 @3  N10 @1  N11 @1  N12 @10  N13 @1 
 
 **Done when**:
 - [x] Pre-change run recorded verbatim, per-needle ranks captured
-- [ ] **After T5a**: ranks byte-identical to the above, MRR **0.569**, hit@1 **0.500**. Corpus and representation are both unchanged, so a rank move has no legitimate explanation — investigate, do not average away
+- [x] **After T5a**: ranks byte-identical to the above, MRR **0.569**, hit@1 **0.500**
+
+  **PASSED, and more strongly than the criterion asked.** Compared the two results JSONs
+  programmatically rather than reading the printed table: for all **14** needles the full top-10
+  **hit lists** and the **cosine score vectors** are identical, not merely the ranks.
+
+  ```
+  before: 14 needles, totalChunks=68
+  after : 14 needles, totalChunks=68
+  per-needle hit lists differing   : 0
+  per-needle score vectors differing: 0
+  hit@1 = 50.0%   hit@3 = 64.3%   hit@5 = 71.4%   hit@10 = 78.6%   MRR = 0.569
+  N01 @1  N02 @1  N03 @1  N04 @1  N05 @5  N06 @3  N10 @1  N11 @1  N12 @10  N13 @1  N14 @3
+  N07, N08, N09 MISS — all three still top-hit smart-chunker.ts:30-82
+  ```
+
+  Corpus stayed **6 files / 68 chunks**, which is the precondition that made this provable.
+  Report: `benchmarks/needles/reports/massa-ai-after-t5a-anchoring-results.json`.
 - [ ] **After T5b**: a new baseline recorded and explained needle by needle
 - [ ] ~~Both floors still clear~~ — **struck. The floors fail on the tree this PR starts from**, for a reason that predates it. SEN-04's Out of Scope already forbids touching the floors here; the same logic forbids adopting them as this PR's bar. What this PR owes is a sensor that reports the truth loudly. Whether the truth clears 0.65 is a retrieval-quality question and belongs to whoever answers it with retrieval work, not fixture edits
 - [ ] If T5's AC-8 span check was clean and T5a's ranks still moved, **stop** — that is an unmodelled mechanism, not a tolerance to widen

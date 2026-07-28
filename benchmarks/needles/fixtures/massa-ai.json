@@ -1,7 +1,7 @@
 {
   "projectId": "massa-ai",
-  "version": "1.2.0",
-  "description": "Needles validated against the massa-ai codebase itself (dogfooding). Each needle targets a non-obvious heuristic, magic constant, or scoring rule that pure keyword search would miss. Line spans refreshed 2026-07-13.",
+  "version": "1.3.0",
+  "description": "Needles validated against the massa-ai codebase itself (dogfooding). Each needle targets a non-obvious heuristic, magic constant, or scoring rule that pure keyword search would miss. Targets are identified by CONTENT (anchor + signed line offsets), not by physical position — see benchmarks/needles/resolve.ts. Anchors authored 2026-07-28; the 11 anchored spans reproduce the positional values they replaced byte-exactly.",
   "scoring": {
     "topK": 10,
     "hitAtK": [
@@ -11,7 +11,13 @@
       10
     ],
     "lineTolerance": 5,
-    "notes": "A hit requires the returned chunk's filePath to equal the needle's filePath AND [lineStart, lineEnd] to intersect the expected range (with ±lineTolerance on each side)."
+    "notes": "A hit requires the returned chunk's filePath to equal the needle's RESOLVED filePath AND [lineStart, lineEnd] to intersect the resolved range (with ±lineTolerance on each side).",
+    "staleNeedlesNote": "Needle ids permitted to carry a legacy positional target instead of an anchor. These three point into smart-chunker.ts at lines 198-206 / 642-674 / 737-744, but that file was split into services/search/chunker/ at 56c84d1 and now ends at line 81 — the fixture was authored at af3dab6, the commit before. They are carried unchanged for exactly one commit so the anchoring change can be proven rank-for-rank equivalent on an unchanged corpus before the repair moves the score. The list must shrink to empty: an id listed here that also carries an anchor is a hard failure, so the entry cannot outlive its reason.",
+    "staleNeedles": [
+      "N07-brace-counter-strip-strings",
+      "N08-no-merge-labeled-chunks",
+      "N09-markdown-no-headings-fallback"
+    ]
   },
   "needles": [
     {
@@ -20,9 +26,9 @@
       "difficulty": "medium",
       "query": "constante de damping usada no algoritmo iterativo de relevância de arquivos",
       "expected": {
-        "filePath": "packages/core/src/services/symbol/centrality.ts",
-        "lineStart": 14,
-        "lineEnd": 14
+        "anchor": "const DAMPING = 0.85;",
+        "startOffset": 0,
+        "endOffset": 0
       },
       "rationale": "DAMPING=0.85 declarado como constante top-level. Sem `pagerank` no nome, exige conectar 'damping' ao conceito de PageRank."
     },
@@ -32,9 +38,9 @@
       "difficulty": "medium",
       "query": "limite máximo de iterações no cálculo de centralidade",
       "expected": {
-        "filePath": "packages/core/src/services/symbol/centrality.ts",
-        "lineStart": 15,
-        "lineEnd": 15
+        "anchor": "const ITERATIONS = 20;",
+        "startOffset": 0,
+        "endOffset": 0
       },
       "rationale": "ITERATIONS=20 sem ligação textual a centralidade ou PageRank."
     },
@@ -44,11 +50,11 @@
       "difficulty": "hard",
       "query": "fator multiplicador aplicado a resultados de keyword search quando a query parece código",
       "expected": {
-        "filePath": "packages/core/src/services/search/rlm-fusion.ts",
-        "lineStart": 57,
-        "lineEnd": 66
+        "anchor": "const KEYWORD_BOOST = isCodeQuery ? codeKeywordBoost : 1.0;",
+        "startOffset": -8,
+        "endOffset": 1
       },
-      "rationale": "isCodeQuery + KEYWORD_BOOST (RRF_KEYWORD_BOOST env, default 2.5). Heurística de boost para code queries."
+      "rationale": "isCodeQuery + KEYWORD_BOOST (RRF_KEYWORD_BOOST env, default 2.5). Heurística de boost para code queries. Anchor na própria linha de KEYWORD_BOOST: o lineStart original (57) é um comentário e o lineEnd (66) é uma linha em branco, nenhum dos dois ancorável."
     },
     {
       "id": "N04-rrf-vector-blend",
@@ -56,9 +62,9 @@
       "difficulty": "hard",
       "query": "proporção entre score RRF e similaridade vetorial bruta na composição do score final",
       "expected": {
-        "filePath": "packages/core/src/services/search/rlm-fusion.ts",
-        "lineStart": 170,
-        "lineEnd": 175
+        "anchor": "const rrfNormalized = rrfScore / maxRrfScore;",
+        "startOffset": 0,
+        "endOffset": 5
       },
       "rationale": "vectorWeight (RRF_VECTOR_WEIGHT env, default 0.3) → combinedScore = rrfNormalized*(1-w) + vectorSimilarity*w. Split 70/30 sem constantes nomeadas."
     },
@@ -68,11 +74,11 @@
       "difficulty": "hard",
       "query": "bônus aplicado no ranking final para arquivos com alta centralidade no graph",
       "expected": {
-        "filePath": "packages/core/src/services/search/rlm-fusion.ts",
-        "lineStart": 177,
-        "lineEnd": 184
+        "anchor": "const normalizedScore = Math.min(1, combinedScore * (1 + 0.2 * centralityScore));",
+        "startOffset": -7,
+        "endOffset": 0
       },
-      "rationale": "normalizedScore = combinedScore * (1 + 0.2 * centralityScore). Multiplicador 0.2 nu, sem constante."
+      "rationale": "normalizedScore = combinedScore * (1 + 0.2 * centralityScore). Multiplicador 0.2 nu, sem constante. Anchor no fim do span: o lineStart original (177) é um comentário."
     },
     {
       "id": "N06-minscore-on-raw-vector",
@@ -80,11 +86,11 @@
       "difficulty": "hard",
       "query": "filtro de score mínimo aplicado na similaridade vetorial bruta e não no score normalizado por RRF",
       "expected": {
-        "filePath": "packages/core/src/services/search/rlm-search.ts",
-        "lineStart": 340,
-        "lineEnd": 354
+        "anchor": "rerankedTop = applyProximityRerank(rerankInput, query);",
+        "startOffset": -14,
+        "endOffset": 0
       },
-      "rationale": "Decisão crítica: minScore usa _rrfRawVectorScore quando disponível porque RRF normaliza top=1.0."
+      "rationale": "Decisão crítica: minScore usa _rrfRawVectorScore quando disponível porque RRF normaliza top=1.0. Anchor no fim do span: o lineStart original (340) é `    }`, que ocorre 11130 vezes no repo."
     },
     {
       "id": "N07-brace-counter-strip-strings",
@@ -96,7 +102,7 @@
         "lineStart": 642,
         "lineEnd": 674
       },
-      "rationale": "netBraceDelta strip prévio. Crítico para arquivos com regex literais (parsers, validadores) — drift de depth quebra chunking."
+      "rationale": "netBraceDelta strip prévio. Crítico para arquivos com regex literais (parsers, validadores) — drift de depth quebra chunking. STALE: alvo aponta para além do EOF de smart-chunker.ts (81 linhas) desde o split em 56c84d1; recuperado e re-ancorado no passo seguinte."
     },
     {
       "id": "N08-no-merge-labeled-chunks",
@@ -108,7 +114,7 @@
         "lineStart": 737,
         "lineEnd": 744
       },
-      "rationale": "Métodos curtos (3-4L getter/setter) têm label = não devem ser absorvidos pelo merge anti-fragmentação."
+      "rationale": "Métodos curtos (3-4L getter/setter) têm label = não devem ser absorvidos pelo merge anti-fragmentação. STALE: ver N07."
     },
     {
       "id": "N09-markdown-no-headings-fallback",
@@ -120,7 +126,7 @@
         "lineStart": 198,
         "lineEnd": 206
       },
-      "rationale": "Sem essa regra, README sem ## vira 1 mega-chunk que matcha qualquer query (bias .md descoberto no benchmark Sicad)."
+      "rationale": "Sem essa regra, README sem ## vira 1 mega-chunk que matcha qualquer query (bias .md descoberto no benchmark Sicad). STALE: ver N07."
     },
     {
       "id": "N10-discover-sort-priority",
@@ -128,11 +134,11 @@
       "difficulty": "medium",
       "query": "ordem de prioridade dos arquivos durante a fase de discover do ETL",
       "expected": {
-        "filePath": "packages/core/src/services/etl/stages/discover.ts",
-        "lineStart": 125,
-        "lineEnd": 132
+        "anchor": "batch.map((rel) => this.processFile(ctx, rel, opts.forceReindex ?? false)),",
+        "startOffset": -1,
+        "endOffset": 6
       },
-      "rationale": "Ordem: centrality desc → mtime desc → path asc. Garante que arquivos importantes são embebidos primeiro (early-stop friendly)."
+      "rationale": "Ordem: centrality desc → mtime desc → path asc. Garante que arquivos importantes são embebidos primeiro (early-stop friendly). Anchor interno: `const results = await Promise.all(` ocorre 4× e `ctx.emit({` 16×."
     },
     {
       "id": "N11-fingerprint-cache-key",
@@ -140,11 +146,11 @@
       "difficulty": "medium",
       "query": "comparação de hash que decide se um arquivo precisa ser reparseado no incremental reindex",
       "expected": {
-        "filePath": "packages/core/src/services/etl/stages/discover.ts",
-        "lineStart": 168,
-        "lineEnd": 174
+        "anchor": "return discovered;",
+        "startOffset": -6,
+        "endOffset": 0
       },
-      "rationale": "needsReparse = stored.content_hash !== contentHash. Skip por SHA-256 é o que torna reindex incremental viável."
+      "rationale": "needsReparse = stored.content_hash !== contentHash. Skip por SHA-256 é o que torna reindex incremental viável. Anchor no fim do span: `projectId: ctx.projectId,` ocorre 11×."
     },
     {
       "id": "N12-vector-table-by-dimension",
@@ -152,11 +158,11 @@
       "difficulty": "medium",
       "query": "roteamento dinâmico para tabela do postgres baseado na dimensão do embedding",
       "expected": {
-        "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
-        "lineStart": 60,
-        "lineEnd": 63
+        "anchor": "return `vector_documents_${dimensions}d`;",
+        "startOffset": -3,
+        "endOffset": 0
       },
-      "rationale": "getTableName retorna `vector_documents_${dim}d`. Conecta env var → provider config → schema postgres."
+      "rationale": "getTableName retorna `vector_documents_${dim}d`. Conecta env var → provider config → schema postgres. Anchor no fim do span: o lineStart original (60) é um comentário separador."
     },
     {
       "id": "N13-orphaned-chunks-warning",
@@ -164,11 +170,11 @@
       "difficulty": "hard",
       "query": "alerta emitido quando troca de modelo de embedding deixa chunks de outro tamanho dimensional órfãos",
       "expected": {
-        "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
-        "lineStart": 137,
-        "lineEnd": 181
+        "anchor": "GROUP BY project_id`,",
+        "startOffset": -44,
+        "endOffset": 0
       },
-      "rationale": "detectOrphanedChunks varre tabelas vector_documents_*d e avisa se houver dados em dim antiga. Bug silencioso comum."
+      "rationale": "detectOrphanedChunks varre tabelas vector_documents_*d e avisa se houver dados em dim antiga. Bug silencioso comum. Anchor no fim do span: o lineStart original (137) é uma linha em branco."
     },
     {
       "id": "N14-binary-quantization-sign",
@@ -176,11 +182,11 @@
       "difficulty": "medium",
       "query": "regra de conversão de embedding float em bit-string usando o sinal do valor",
       "expected": {
-        "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
-        "lineStart": 67,
-        "lineEnd": 74
+        "anchor": "private normalizeScore(raw: unknown): number {",
+        "startOffset": -7,
+        "endOffset": 0
       },
-      "rationale": "floatsToBit: x ≥ 0 → '1', senão '0'. Threshold 0 hardcoded; base do binary quantization (≥ 2000d)."
+      "rationale": "floatsToBit: x ≥ 0 → '1', senão '0'. Threshold 0 hardcoded; base do binary quantization (≥ 2000d). Anchor no fim do span: o lineStart original (67) é um comentário de JSDoc."
     }
   ]
 }
