@@ -541,10 +541,32 @@ Phase 6:  T16 ──→ T17 ──→ T18 ──→ T19 ──→ T20 ──→ 
 **Requirement**: DEBT-02
 
 **Done when**:
-- [ ] `coverage = true` removed from `bunfig.toml`; the 5 s global timeout is left untouched
-- [ ] `bun run test:coverage` exists and fails below a documented threshold
-- [ ] The threshold matches the 90% floor and the 9 documented exclusions already recorded in `.specs/HANDOFF.md`
-- [ ] Full gate passes; test count unchanged
+- [x] `coverage = true` removed from `bunfig.toml`; the 5 s global timeout is left untouched
+- [x] `bun run test:coverage` exists and fails below a documented threshold — `scripts/check-coverage.ts`, wired as a root script
+- [x] The threshold matches the 90% floor and the 9 documented exclusions — **moved out of `.specs/HANDOFF.md` into the script as executable data** (`LINE_COVERAGE_FLOOR`, `EXCLUSIONS`), each exclusion carrying the justification that earned it. Per the user's decision, and for the same reason as the T7 installer-api-key precedent: T22 rewrites `HANDOFF.md`, so a gate pinned to it would silently lose its own definition.
+- [ ] **BLOCKED — the floor is implemented but unverified.** See below.
+
+**Blocker: the floor cannot be measured without the dedicated test database.**
+
+50 core suites are wrapped in `describe.skipIf(!DEDICATED_DB)`, requiring `MASSA_AI_DEDICATED=1`
+and a `DATABASE_URL` on `127.0.0.1:5433/massa_ai_test`. Run without them, the suites report
+`0 pass / N skip` and their subjects measure near zero — a first full run reported **132 of 314
+files below the floor**, including `graph-queries.ts` at 3.98% while its own 19 tests sat
+skipped beside it. That number is an artifact, not a coverage gap.
+
+The script therefore refuses to run without that environment rather than emitting a report that
+looks like a catastrophe; a gate that silently measures a skipped suite trains people to ignore
+it. The refusal path is verified. **The passing path is not** — running it needs the dedicated
+database, and the attempt was denied by the sandbox classifier as credential exploration.
+
+Two further findings the first run surfaced, both real:
+
+- `packages/shared/src/config/api-key.ts` measures **13.79%** despite 373 lines of dedicated
+  tests, because `api-key.test.ts` exercises it exclusively through the `runIsolated` subprocess
+  harness (21 call sites) and Bun's coverage does not cross a process boundary. This is a
+  measurement blind spot, not missing tests, and it is not among the 9 recorded exclusions.
+- Core emitted **122** lcov files for **126** groups, so 4 groups produced no coverage output at
+  all. Unexplained; needs its own look before the floor can be trusted.
 
 **Tests**: none (config) · **Gate**: full
 **Commit**: `chore(tooling): make coverage an explicit gate instead of a default`
