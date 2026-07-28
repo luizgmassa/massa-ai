@@ -598,6 +598,19 @@
       "design": ".specs/features/audit-remediation-2026-07/design.md",
       "tasks": ".specs/features/audit-remediation-2026-07/tasks.md",
       "validation": ".specs/features/audit-remediation-2026-07/validation.md"
+    },
+    {
+      "slug": "core-layering-god-module-split",
+      "title": "Core layering and god-module split \u2014 adopt or retire the controllers layer, break the contextual-search-rlm facade, rename rlm-* once",
+      "status": "specified",
+      "priority": "P2",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": false,
+        "execute": false
+      },
+      "spec": ".specs/features/core-layering-god-module-split/spec.md"
     }
   ],
   "active_feature": "audit-remediation-2026-07"
