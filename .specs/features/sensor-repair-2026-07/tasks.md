@@ -332,9 +332,25 @@ N01 @1  N02 @1  N03 @1  N04 @1  N05 @5  N06 @3  N10 @1  N11 @1  N12 @10  N13 @1 
 - [x] ~~fix the stale "nine documented exclusions" (actual: 11)~~ — **struck. Measured: `EXCLUSIONS.length` is 9 and the gate prints `9 documented exclusions`. `CHANGELOG.md` was right; `HANDOFF.md` was wrong.** Making this "fix" would have introduced the error it meant to remove. validation-pr2 gap #2 is closed
 - [ ] Full gate green: `lint`, `type-check`, `build`, `test`, `test:scripts`, `test:plugins`, `test:coverage`
 - [ ] **No new exclusion** added to `scripts/check-coverage.ts`
-- [ ] `git log --format='%B' origin/main..HEAD | grep -ci 'skip.ci'` → **0**. A squash merge folds every commit body into the merge message; that killed the v1.3.0 release.
-      **Corrected during Execute**: as originally written this command scanned the *entire* history and can never return 0 — the repo's own `chore(release): vX.Y.Z` commits legitimately carry the marker, and it currently matches **11** times. Scoped to the PR range it is a real check, and it currently returns **0**.
-      Also: run verification commands through `rtk proxy`. The unscoped form returned `11` and then `0` for the same input under rtk's filter, which would have recorded a false pass
+- [x] **No commit carries a marker GitHub acts on.** A squash merge folds every commit body into the merge message; that killed the v1.3.0 release. Verified **0** in the PR range:
+
+      ```bash
+      git log --format=%B origin/main..HEAD | grep -ciE '\[(skip ci|ci skip|no ci|skip actions|actions skip)\]'
+      ```
+
+      **Corrected twice during Execute.** As written the AC was
+      `git log --format='%B' | grep -ci 'skip.ci'` → 0, which is wrong in two independent ways:
+
+      1. **Unscoped**, it scans the whole history and can never return 0 — the repo's own
+         `chore(release): vX.Y.Z` commits legitimately carry the marker (**10** bracketed matches).
+      2. **`skip.ci` is too broad.** GitHub only acts on the *bracketed* forms. The loose pattern
+         also flags the phrase `skip-ci` in ordinary prose — which `CLAUDE.md` **explicitly
+         instructs** you to write (*"Call it 'the skip-ci marker' in prose"*). The guard as written
+         fails the guidance the repo gives. It matches **1** here, on a commit body explaining this
+         very correction, and that commit is harmless.
+
+      Run it through `rtk proxy`. Under rtk's filter the same `grep -c` returned `11` and then `0`,
+      which would have recorded a false pass
 - [ ] `massa-ai-verification-agent` (author ≠ verifier) writes `validation.md`
 - [ ] STATE.md: flip **AD-013** from `proposed` to `active`
 
