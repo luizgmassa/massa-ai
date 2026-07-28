@@ -676,7 +676,7 @@ forward.
 | `bun run type-check` | 6/6 |
 | `bun run build` | 5/5 |
 | `bun run test:scripts` | 584 pass / 0 fail, exit 0 |
-| `bun run test:coverage` | **PASS**, exit 0 — 314 files measured, 11 exclusions, 0 failures, groups 126 / 25 / 8 |
+| `bun run test:coverage` | **PASS**, exit 0 — 314 files measured, 9 exclusions, 0 failures, groups 126 / 25 / 8 |
 | `bun run test` | green **except** one pre-existing failure — see below |
 
 `apps/mcp-client`'s `embedded-api-client-endpoints.test.ts` ("routes without 404" for

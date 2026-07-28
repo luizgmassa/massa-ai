@@ -117,14 +117,12 @@ export const EXCLUSIONS: ReadonlyArray<{ file: string; reason: string }> = [
     file: "packages/core/src/services/query/prisma-client.ts",
     reason: "connection singleton and env boilerplate",
   },
-  {
-    file: "packages/core/src/__tests__/e2e/_helpers.ts",
-    reason: "test infrastructure, not product source",
-  },
-  {
-    file: "packages/core/src/__tests__/e2e/qwen-fixture.ts",
-    reason: "test fixture, not product source",
-  },
+  // `packages/core/src/__tests__/e2e/{_helpers,qwen-fixture}.ts` were carried
+  // here from the `coverage-90pct` report and have been removed: `isMeasuredSource`
+  // already drops everything under `__tests__/`, so both entries were inert.
+  // A dead exclusion is worse than no exclusion — it reads as an active
+  // exemption in review. `check-coverage.test.ts` now pins the invariant that
+  // every entry here is a path the gate would otherwise measure.
   {
     // Added by DEBT-02 once the gate could actually be run. Not a coverage gap:
     // `api-key.test.ts` is 373 lines of dedicated tests, but all 21 of its call
@@ -138,9 +136,12 @@ export const EXCLUSIONS: ReadonlyArray<{ file: string; reason: string }> = [
     reason: "measurement blind spot — fully tested through the runIsolated subprocess harness, which Bun coverage cannot see",
   },
   {
-    // 88.89%: 32 of 36 lines. The four uncovered ones are the config.json ->
-    // process.env seeding branches for DATABASE_URL, OLLAMA_API_KEY and
-    // MASSA_AI_API_KEY, each guarded by "only when the env var is unset".
+    // 88.89%: 32 of 36 lines. Three of the four uncovered lines are the
+    // config.json -> process.env seeding branches for DATABASE_URL,
+    // OLLAMA_API_KEY and MASSA_AI_API_KEY, each guarded by "only when the env
+    // var is unset". The fourth is unrelated: it is `findEnvFile()`'s loop exit,
+    // reached only when the walk up from cwd hits the filesystem root without
+    // finding a `.env` at all — which cannot happen in a checkout that has one.
     //
     // Reaching them in-process was attempted and does not work here, for three
     // compounding reasons: `CONFIG_DIR` is frozen at the config layer's first

@@ -57,7 +57,7 @@ DATABASE_URL=postgresql://massa_th0th:massa_th0th_password@127.0.0.1:5433/massa_
 MASSA_AI_DEDICATED=1 RUN_POSTGRES_TESTS=1 bun run test:coverage
 ```
 
-`bun run test:coverage` **PASS**, exit 0 — 314 source files measured, 11 exclusions, every
+`bun run test:coverage` **PASS**, exit 0 — 314 source files measured, 9 exclusions, every
 measured file at or above 90%, 0 test failures. Group counts: core **126**, tools-api **25**,
 mcp-client **8**, all PASS.
 
@@ -78,15 +78,17 @@ Both live in `scripts/check-coverage.ts` as executable data, not in this file. T
 deliberate: this file gets rewritten at the start of every feature, and a gate pinned to
 prose here would silently lose its own definition.
 
-Floor: **90% line**, per file. **11 exclusions**, each carrying the justification that
+Floor: **90% line**, per file. **9 exclusions**, each carrying the justification that
 earned it. Two were added by DEBT-02 once the gate could actually be run, and both are
 measurement blind spots rather than coverage gaps:
 
 - `packages/shared/src/config/api-key.ts` (13.79%) — 373 lines of dedicated tests, but all
   21 call sites go through the `runIsolated` subprocess harness because `CONFIG_DIR` is
   frozen at first import. Bun coverage does not cross a process boundary.
-- `packages/shared/src/env.ts` (88.89%) — the four uncovered lines are the config-to-env
-  seeding branches. In-process coverage was attempted and does not work: `CONFIG_DIR`
+- `packages/shared/src/env.ts` (88.89%) — three of the four uncovered lines are the
+  config-to-env seeding branches; the fourth is `findEnvFile()`'s loop exit, reached only
+  when the walk up from cwd finds no `.env` anywhere, which cannot happen in a checkout that
+  has one. In-process coverage was attempted and does not work: `CONFIG_DIR`
   freezes at first import, `packages/shared` runs as a single `bun test` process so no test
   can guarantee it loads `env.ts` first, and `env.ts` dotenv-loads the nearest `.env`
   walking up from cwd before consulting config.json. Cache-busting the import re-evaluates
@@ -127,11 +129,14 @@ Fixed in `dc7fee3`: `dart-support.test.ts` and `code-compressor.test.ts` (LLM se
 Raising the timeout is not the fix. 42 s exceeds any sane per-test budget, and a unit test
 asserting a regex result should not be on the network.
 
-The genuinely-slow suites are a separate class and *are* budgeted: `etl-cache-invalidation`
-and `etl-idempotent` at `30_000`, `architecture-map`'s three `getProjectMap` cases at
-`120_000`. Those exceed 5 s only under `--coverage` instrumentation (357 ms plain vs over
-5003 ms instrumented, roughly 40x) or under the gate's 126-group contention. Always raise
-the per-test value; never `bunfig.toml`'s global default.
+The genuinely-slow suites are a separate class and *are* budgeted, each sized from a
+measurement rather than a guess: `etl-cache-invalidation` at `180_000` (measured **66.42 s**
+standalone under `--coverage`; `30_000` passed one gate run and failed the next at 30001 ms),
+`etl-idempotent` at `30_000` (670 ms instrumented — its 5 s failures were pure contention, so
+the budget is headroom, not cost), and `architecture-map`'s three `getProjectMap` cases at
+`120_000` (they pass standalone even with coverage, and hit exactly 60 s only inside the
+gate's 126-group contention). Always raise the per-test value; never `bunfig.toml`'s global
+default.
 
 ## Open findings carried forward — not actioned
 
