@@ -35,4 +35,8 @@ export {
   migrateDataDirOnce,
   type MassaAiConfig,
   defaultMassaAiConfig,
+  resolveApiKey,
+  ApiKeyProvisioningError,
+  type ResolvedApiKey,
+  type ApiKeySource,
 } from "./config/index.js";

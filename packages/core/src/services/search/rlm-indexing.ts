@@ -176,7 +176,15 @@ export async function _indexProjectInternalImpl(
 
     // Load centrality map once for the whole project so each chunk
     // carries its file's PageRank score in metadata.
-    const centralityMap = await rlm.symbolRepo.getCentrality(projectId);
+    //
+    // BUG-05: resolve the alias first. `indexFileImpl` resolves the canonical
+    // id at its own write seam (`:477`), so chunks land under the canonical
+    // project; querying centrality with the caller's retired id returns an
+    // empty map and every chunk is written with `centralityScore: 0` — a
+    // silent failure, because 0 is also the legitimate "no centrality" value.
+    const centralityMap = await rlm.symbolRepo.getCentrality(
+      await getProjectIdentityAliasResolver().resolve(projectId),
+    );
 
     let filesIndexed = 0;
     let chunksIndexed = 0;
@@ -381,8 +389,11 @@ export async function ensureFreshIndexImpl(
     fileCount: filesToReindex.length,
   });
 
-  // Load centrality map so chunks carry PageRank scores
-  const centralityMap = await rlm.symbolRepo.getCentrality(projectId);
+  // Load centrality map so chunks carry PageRank scores. Alias-resolved for
+  // the same reason as the full-index path above (BUG-05).
+  const centralityMap = await rlm.symbolRepo.getCentrality(
+    await getProjectIdentityAliasResolver().resolve(projectId),
+  );
 
   let filesIndexed = 0;
   let chunksIndexed = 0;

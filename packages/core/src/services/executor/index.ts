@@ -20,6 +20,9 @@ export {
   DEFAULT_HARD_CAP_BYTES,
 } from "./executor.js";
 
+export { getSandboxMode, wrapSpawn } from "./sandbox.js";
+export type { SandboxMode } from "./sandbox.js";
+
 export { runPool, fulfilledValues } from "./run-pool.js";
 export type {
   PoolJob,

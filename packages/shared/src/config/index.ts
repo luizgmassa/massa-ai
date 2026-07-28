@@ -219,6 +219,13 @@ export interface ServerConfig {
     maxIndexSize: number;
     allowedExtensions: string[];
     excludePatterns: string[];
+    /**
+     * Exact browser origins allowed to call the Tools API (SEC-02). Empty — the
+     * default — permits no cross-origin request at all. The API previously ran
+     * bare `cors()`, which reflects any Origin back with credentials enabled,
+     * so any page a developer visited could call the local API.
+     */
+    corsOrigins: string[];
   };
 
   // Logging
@@ -308,6 +315,19 @@ function envBool(key: string, fallback: boolean): boolean {
 function envString(key: string, fallback: string): string {
   const s = process.env[key];
   return s === undefined || s === "" ? fallback : s;
+}
+
+/**
+ * Read an env var as a comma-separated list. Entries are trimmed and blanks
+ * dropped, so `"a, ,b,"` yields `["a","b"]` and an all-blank value falls back
+ * rather than producing a list of empty strings — an empty-string CORS origin
+ * would otherwise be an allowlist entry that matches nothing but is not empty.
+ */
+function envList(key: string, fallback: string[]): string[] {
+  const s = process.env[key];
+  if (s === undefined) return fallback;
+  const parsed = s.split(",").map((v) => v.trim()).filter((v) => v.length > 0);
+  return parsed.length > 0 ? parsed : fallback;
 }
 
 // ── Wave 5 FR-11 / AD-W5-005: capture-policy config validation ──────────────
@@ -785,6 +805,7 @@ export const defaultConfig: ServerConfig = {
       "*.min.js",
       "*.min.css",
     ],
+    corsOrigins: envList("MASSA_AI_API_CORS_ORIGINS", fileConfig.security?.corsOrigins ?? []),
   },
 
   logging: {
@@ -1039,6 +1060,12 @@ export {
   getConfigForEnv,
   migrateDataDirOnce,
 } from "./config-loader";
+
+// Tools API key resolution + first-start provisioning (SEC-01). resolveApiKey
+// WRITES on the provisioning path, so callers invoke it explicitly at startup;
+// it is never reached by importing this module.
+export { resolveApiKey, ApiKeyProvisioningError } from "./api-key";
+export type { ResolvedApiKey, ApiKeySource } from "./api-key";
 
 // DEDICATED-stack DB guard — fails fast if a dedicated-flagged process would
 // bind the shared production DB name (`massa_ai`). See db-guard.ts.

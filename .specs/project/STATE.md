@@ -1,6 +1,147 @@
 # massa-ai Spec State
 
-## Current — Persona / Sub-Agent Boundary
+## Current — Audit Remediation 2026-07
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-audit-remediation-2026-07`
+- workflow: spec-driven (Large — Specify + Design + Tasks + full Plan Challenge + Execute)
+- feature: `audit-remediation-2026-07` — **Specify/Design/Tasks complete; Plan Challenge complete; Execute in progress (PR1)**
+- worktree: `/Users/luizmassa/Projects/massa-ai-wt-audit-remediation`; branch
+  `fix/audit-remediation-security-and-bugs` off `origin/main` @ `3a25cc6` (v1.7.1)
+- scope: 17 requirements (SEC-01..06, BUG-01..06, DEBT-01..05) across 22 tasks and 2 PRs
+- Artifacts: `.specs/features/audit-remediation-2026-07/{spec,design,tasks}.md`
+- Origin: knowledge-graph analysis at `17ee708` (1847 nodes / 4226 edges) plus two verification
+  passes. Every finding confirmed against current source, not inferred from the graph.
+- Headline finding: the Tools API serves unauthenticated requests by default
+  (`auth.ts:51` `if (!apiKey) return;`) and exposes three arbitrary-code-execution routes
+  (`routes/executor.ts:38,72,94`); `.use(cors())` at `index.ts:73` reflects any Origin with
+  credentials, making it reachable from a developer's browser.
+- User decisions locked at Specify/Design:
+  - Two PRs: PR1 correctness (SEC + BUG), PR2 debt (DEBT).
+  - Bind address stays `0.0.0.0`; exposure is closed by auth, not by address.
+  - API key auto-provisioned into `config.json` on first start; hard-refuse only when unwritable.
+  - Web UI key injected server-side for loopback callers only.
+  - `RLM_LLM_*` → `MASSA_AI_LLM_*` hard rename, no dual-read (requires AD-010 supersession).
+  - BUG-02 closed by a read-side project filter; no 25th migration.
+  - oxlint, correctness rules, **no formatter** — repo-wide reformat is its own later PR.
+  - Layering refactor and `contextual-search-rlm.ts` god-module split deferred to their own specs.
+- Conforms to: **AD-007** (executor sandbox default `auto` with best-effort fallback is unchanged;
+  SEC-03 only makes the fallback observable) and **AD-008** (json_schema gating untouched;
+  DEBT-03 renames env vars only).
+- Pending decisions to append during Execute: `AD-010` (one env prefix, supersedes the
+  `RLM_LLM_*` compatibility boundary recorded in `repo-rename-massa-ai` and
+  `project-identity-rename`) and `AD-011` (the Tools API never serves an anonymous request).
+- Plan Challenge: **full gate**, mode `red_team`, `massa-ai-plan-critic`. 2 critical, 1 high,
+  1 medium/high — all four verified against source by the main agent, all incorporated before
+  Execute (`serious_findings: revise_plan`).
+  - C1a `/ui` would 401 after SEC-01: `authMiddleware` (`index.ts:121`) precedes `webUiRoutes`
+    (`:140`) and `PUBLIC_PATHS.some(p => path.startsWith(p))` (`auth.ts:46`) lacks `/ui`. The
+    whole SEC-05 injection mechanism was dead code. `/ui` + `/ui/` added, decoy-path test required.
+  - C1b The loopback check has no supported implementation on `@elysiajs/node` (`index.ts:72`);
+    `server.requestIP()` throws there. **TASK-000 spike added** with a
+    `MASSA_AI_WEB_UI_TRUST_LOCAL` fallback so SEC-05 is implementable either way.
+  - C2 `apps/claude-plugin/hooks/massa-ai-hook.ts:152` reads `process.env.MASSA_AI_API_KEY` only,
+    never imports `@massa-ai/shared`, and silent-degrades — the auto-provisioned key never reaches
+    it, so lifecycle capture would die invisibly. **TASK-023 added**; closes candidate lesson L-002.
+  - H3 Docker may fail the trust check in the opposite direction from the documented risk
+    (bridge mapping, not loopback). Explicit Docker assertion added to TASK-007.
+  - M4 `CONFIG_DIR` is a module-level const (`config-loader.ts:7`) ⇒ resolve the key in an explicit
+    `initAuth()`, never at import, or `bun test` writes to the real `~/.config`. `auth.test.ts:24-34`
+    asserts the deleted bypass and is now named for rewrite.
+  - Rejected as not-a-gap: CORS-as-theatre — the plan never overclaims CORS as the primary control.
+- Task count: 24 across 6 phases, 2 PRs. Packs into 4 batches at the ~7-task budget.
+- Execute: **PR1 in progress — 16 of 16 implementation tasks committed; T15 (PR1 close) in
+  progress**, executed inline (the user declined sub-agents for PR1; the T15 verification agent is
+  the one accepted exception).
+  - Order: T0 → T1 → T2 → T3 → T4 → T5 → T6 → T7 → T23 → T8 → T9 → T10 → T11 → T12 → T13 → T14 →
+    **T15 (in progress)**.
+  - Committed: `30e710a` T1, `a081406` T0, `41b2f90` T2, `976370f` T3, `e17bd5d` T4, `079cc49` T5,
+    `5908960` T6, `a646204` T7, `7ee6fa4` T23, `640fd3c` T8, `085e3e8` T9, `92912ce` T10,
+    `81c6841` T11, `287df69` T12, `c3510d3` T13, `af008e0` T14.
+    (`f26060b` corrected this section's own stale `Execute: not started` line; `18a992e` recorded
+    progress through T9; `48d0f39` is the out-of-band test fix described below.)
+  - **Phases 0-4 are complete. Only T15 remains.**
+  - Three Execute-phase divergences, all written back into `spec.md` / `design.md`:
+    1. **T2** — the specified "re-read after conflict" concurrency fix does not converge; proven by
+       its own test. Replaced with an `open(…, "wx")` exclusive-create writer election in
+       `packages/shared/src/config/api-key.ts`.
+    2. **T0** — `ctx.request.ip` is the verified mechanism. `ctx.server` is *absent* under
+       `adapter: node()`, so `server.requestIP()` is `undefined` rather than throwing. Loopback has
+       three accepted spellings: `::1`, `::ffff:127.0.0.1`, `127.0.0.0/8`.
+    3. **T5** — a second admin-preservation test file lived in a different directory. Do a
+       repo-wide reference sweep after deleting a module.
+  - New decision (T6): Docker gets an explicit `MASSA_AI_WEB_UI_TRUST_LOCAL=true` opt-in set in the
+    `Dockerfile`. A bridge-mapped container can never satisfy the loopback check, so this is the
+    only way `/ui` works in Docker. Exposure accepted knowingly by the user: with the `0.0.0.0`
+    bind, anyone reaching `:3333` can read the key out of `/ui`'s HTML. It is off by default,
+    accepts only the exact string `"true"`, warns once at startup, and is documented in
+    `docs/web-ui-access.md`. Do not silently widen or narrow it.
+  - Further divergences found in Phase 3/4, all written back into `design.md`:
+    4. **T7** — `setup-local-first.sh` regenerated `config.json` wholesale, so a re-run destroyed
+       the auto-provisioned key. Key resolution + the config writer moved to
+       `scripts/lib/installer-api-key.sh` so the contract is executable, not grep-pinned.
+    5. **T7** — `env.ts` seeded `MASSA_AI_API_KEY` on a bare truthiness check while `usable()`
+       treats whitespace as unset, so a `"   "` stored key made the API provision a fresh key
+       while clients sent blanks. Both sides now trim.
+    6. **T7** — the compose `mcp` service had no volume and no key, so a default
+       `docker compose up` could not authenticate. It now shares `massa-ai-data`, and both
+       images set `XDG_CONFIG_HOME=/data` so `config.json` lands in the mounted volume.
+    7. **T23** — the Codex/Cursor hook copies are owned by `generate-skill-artifacts.ts`, **not**
+       `generate-subagent-artifacts.ts` as CLAUDE.md's hook paragraph implies. The subagent
+       generator reported "No drift" against stale copies still shipping the broken hook. Run
+       **both** `--check`s after touching any managed harness surface.
+    8. **T8** — `tsc` found three `ExecResult` constructions the design did not name (two
+       path-boundary refusals and the compile-failure return). They report the mode that would
+       have applied rather than omitting the field.
+    9. **T10** — the design prescribed a bare `row.project_id !== projectId`. Verified against
+       source before implementing: `buildGraphStreamImpl` takes an *unresolved* `projectId?`, while
+       `memories.project_id` holds canonical ids, so a strict `!==` against a retired alias would
+       have dropped **every** neighbor. Two facts settle it — every read seam the search fuses is
+       equally alias-unaware (`postgres-vector-store.ts:545`, `memory-repository-pg.ts:226,289`;
+       the resolver appears only at write seams), and with a retired alias the seed set is empty so
+       the function returns above the loop. Shipped as
+       `projectId && row.project_id !== projectId`, matching those seams' `if (projectId)`
+       semantics. Recorded in `design.md`.
+    10. **T12** — BUG-04 needed one structure the plan did not anticipate, so it is wider than its
+        "1 function" granularity row. `symbolIndex` is `Map<name, fqn>` with one entry per *name*
+        and therefore cannot answer "does the namespace-imported module define this?" once another
+        file wins the name — exactly the collision the bug is about. `buildSymbolIndex` now also
+        returns `fqns: Set<string>`; one extra parameter each on `resolveFile` /
+        `resolveEdgeTarget`, no extra pass.
+    11. **T13** — tasks named one centrality call site (`rlm-indexing.ts:179`); there are **two**.
+        `ensureFreshIndexImpl`'s incremental path (`:385`) carries the identical defect and is the
+        path auto-reindex actually takes. Both fixed, both tested.
+    12. **T14** — `insert` is synchronous and alias resolution is not, so the fix required a new
+        cache-only `ProjectIdentityAliasResolver.resolveCached()`. It closes the window whenever
+        the mapping is cached and **cannot** close it for an alias this process has never resolved
+        — nothing can consult the database synchronously. That residual is documented at the call
+        site and pinned by its own test; closing it would mean making `insert` async and changing
+        the fire-and-forget contract the hook paths depend on.
+  - **Out-of-band fix approved by the user (`48d0f39`, test-only).**
+    `contextual-search-rlm-coverage.test.ts` was failing 11 pass / 3 fail **at HEAD**, verified by
+    stashing all PR1 work and reproducing it. `ensureInitializedImpl` falls back to the real
+    factory for any dependency the subject did not inject, and the file mocked four sibling
+    factories but not `vector-store-factory.js` — so the three `makeRlm({})` warmupCache tests
+    built a real `PostgresVectorStore` and ran live embedding-provider auto-selection, measured at
+    **13.4 s cold** against `bunfig.toml`'s 5 s budget. The missing mock was added; no test was
+    weakened, skipped or removed (14 before, 14 after) and the group now runs in 144 ms. This also
+    explains why the recorded baseline and the observed red are both true: the cost is provider
+    latency, so the same tests pass on a warm model cache and fail on a cold one.
+  - **Owed measurement (T7): satisfied.** PR1's own CI run (`30317033460`, `mcp` job, "Measure
+    the Docker bridge remote address" step) observed `ctx.request.ip = ::ffff:172.17.0.1` — a
+    non-loopback bridge address, confirming the design premise. Recorded verbatim in
+    `design.md` → "TASK-007 — the Docker path, instrumented rather than asserted", and SEC-06
+    is now fully evidenced in `validation.md`.
+  - Known load flakes seen repeatedly this session, green standalone every time, a different one
+    each run: `apps/mcp-client` `embedded-api-client-endpoints.test.ts`, and `packages/core`'s
+    `mock-free (113 files)` group and `trace-path.test.ts`. Do not chase them; re-run the package
+    alone and say so rather than claiming a clean parallel aggregate.
+  - PR1 cannot open before T15: the `CHANGELOG.md` entry is a CI merge gate and is still unwritten.
+- Skipped sensor: `recall` returned 0 memories for this workspace, so no durable memory informed
+  this plan. Context7 MCP not registered — oxlint's rule catalogue is unverified against upstream
+  docs and must be confirmed in TASK-018.
+
+## Previous — Persona / Sub-Agent Boundary
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-persona-agent-boundary`
@@ -330,6 +471,7 @@
 | AD-007 | active (T12) | Executor sandbox default is `auto` (not `on`); uses platform tool if available, falls back to best-effort. F1 mitigation. | `sandbox.ts` getSandboxMode, `MASSA_AI_EXECUTOR_SANDBOX=auto\|on\|none` |
 | AD-008 | active (T11) | json_schema constrained decoding for Ollama structured calls; version-gated (>= 0.5.0), graceful fallback to json_object. F3 mitigation. | `llm-client.ts` _checkJsonSchemaSupport, llmObject |
 | AD-009 | active (T5) | D5 Cypher subset deferral formally removed — structural graph traversal covers use cases. | `docs/adr/0001-remove-d5-cypher-subset.md` |
+| AD-011 | active (audit-remediation-2026-07 T3/T15) | **The Tools API never serves an anonymous request.** A key is always present — by `MASSA_AI_API_KEY`, by `security.apiKey` in `config.json`, or by first-start provisioning. The no-key pass-through is deleted, not made configurable: there is no supported way to run the API open. Startup fails non-zero only when no key exists *and* the config file is unwritable. The bind address stays `0.0.0.0` (AS-05) precisely because exposure is now closed by authentication rather than by address, so Docker port mapping keeps working unmodified. Public paths are a fixed, tested list (`/health`, `/swagger`, `/swagger/json`, `/ui`, `/ui/`) matched by prefix, with a decoy-path test proving `/uixyz` is not exempt. | `apps/tools-api/src/middleware/auth.ts` (`initAuth`, `isPublicPath`), `src/startup-config.ts` (`initAuthOrExit`), `packages/shared/src/config/api-key.ts` (`resolveApiKey`), commits `41b2f90` / `976370f` |
 
 ---
 

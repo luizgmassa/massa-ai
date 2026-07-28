@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
+import crypto from "crypto";
 import { MassaAiConfig, defaultMassaAiConfig } from "./massa-ai-config";
 import { configDir } from "./xdg";
 
@@ -41,6 +42,7 @@ export function loadConfig(): MassaAiConfig {
       memory: { ...defaultMassaAiConfig.memory, ...userConfig.memory },
       hooks: { ...defaultMassaAiConfig.hooks, ...userConfig.hooks },
       handoffs: { ...defaultMassaAiConfig.handoffs, ...userConfig.handoffs },
+      security: { ...defaultMassaAiConfig.security, ...userConfig.security },
     };
   } catch (error) {
     console.error(`Error loading config from ${CONFIG_FILE}:`, error);
@@ -119,12 +121,46 @@ export function __resetMigrationForTests(): void {
   migrationAttempted = false;
 }
 
+/**
+ * Monotonic per-process suffix. Combined with the pid and 6 random bytes it
+ * keeps two temp files distinct even when the same process saves twice inside
+ * the same millisecond.
+ */
+let tempFileCounter = 0;
+
+/**
+ * Persist the config atomically: write a uniquely-named temp file in the SAME
+ * directory, then rename(2) it over the target.
+ *
+ * A bare `writeFileSync` truncates the live config.json before rewriting it,
+ * so any concurrent reader that lands in that window reads a partial file, and
+ * two concurrent writers can interleave into a corrupt one. That stopped being
+ * hypothetical with SEC-01: the API auto-provisions a key into this file on
+ * first start, so two processes starting at once both write it. rename(2) is
+ * atomic within a filesystem — hence the temp file must be a sibling of the
+ * target, never in os.tmpdir(), which may be a different volume.
+ */
 export function saveConfig(config: MassaAiConfig): void {
   if (!fs.existsSync(CONFIG_DIR)) {
     fs.mkdirSync(CONFIG_DIR, { recursive: true });
   }
-  
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+
+  const unique = `${process.pid}.${++tempFileCounter}.${crypto.randomBytes(6).toString("hex")}`;
+  const tempFile = path.join(CONFIG_DIR, `.config.json.${unique}.tmp`);
+
+  try {
+    fs.writeFileSync(tempFile, JSON.stringify(config, null, 2));
+    fs.renameSync(tempFile, CONFIG_FILE);
+  } catch (error) {
+    // Never leave the temp file behind — a failed save must not litter the
+    // config dir with partial copies of a file that holds the API key.
+    try {
+      fs.unlinkSync(tempFile);
+    } catch {
+      // Best effort: the temp file may never have been created.
+    }
+    throw error;
+  }
 }
 
 export function initConfig(): void {

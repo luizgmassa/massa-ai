@@ -97,6 +97,23 @@ export class ProjectIdentityAliasResolver {
     }
   }
 
+  /**
+   * Cache-only resolution for seams that cannot await. Returns the canonical id
+   * when a live (unexpired) entry exists, `undefined` otherwise. Never performs
+   * a lookup and never writes the cache, so it cannot turn a synchronous caller
+   * into a database call.
+   *
+   * Added for BUG-06: {@link PgObservationStore.insert} is synchronous, so its
+   * in-memory mirror was keyed on the caller's id until the async persist path
+   * resolved the alias a tick later — a reader using the canonical id inside
+   * that window missed the row entirely.
+   */
+  resolveCached(projectId: string): string | undefined {
+    if (!projectId) return undefined;
+    const cached = this.cache.get(projectId);
+    return cached && cached.expiresAt > this.now() ? cached.canonical : undefined;
+  }
+
   private async resolveWithTimeout(projectId: string): Promise<string> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {

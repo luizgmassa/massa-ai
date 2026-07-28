@@ -178,6 +178,18 @@ Repositories and services are reached through `get*()` factory functions with ma
 
 - `apps/tools-api` — Elysia REST on :3333, routes in `src/routes/*.ts`, Swagger at
   `/swagger`, Web UI mounted at `/ui`. Route files sit beside their own `*.test.ts`.
+
+  **Auth is mandatory (AD-011).** Every route outside `PUBLIC_PATHS` (`/health`,
+  `/swagger`, `/swagger/json`, `/ui`, `/ui/`) needs `x-api-key`; the old no-key
+  pass-through is deleted and is not configurable. The key is resolved by an explicit
+  `initAuth()` called **only from `index.ts`** — never at module-import time, because
+  `CONFIG_DIR` is a module-level const and an import-time resolve would provision a key
+  into the real `~/.config` of every developer and CI runner running `bun test`. Use
+  `__setAuthKeyForTests()` in tests. Two further traps: Elysia runs `onBeforeHandle`
+  *after* route matching, so an unregistered path 404s before auth is consulted and a
+  "this path must 401" test proves nothing unless a real route is registered; and HTTP
+  strips whitespace from header values, so a `"   "` key arrives as `""`.
+
 - `apps/mcp-client` — MCP stdio server exposing 52 tools. Tool schemas are plain
   `ToolDefinition[]` JSON Schema arrays in `src/tool-defs/tool-defs-*.ts`;
   `call-tool-proxy.ts` maps a tool call onto an HTTP method + endpoint template.

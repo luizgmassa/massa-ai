@@ -582,7 +582,23 @@
       "design": ".specs/features/workflow-harness-overhaul/design.md",
       "tasks": ".specs/features/workflow-harness-overhaul/tasks.md",
       "validation": ".specs/features/workflow-harness-overhaul/validation.md"
+    },
+    {
+      "slug": "audit-remediation-2026-07",
+      "title": "Audit remediation 2026-07 \u2014 unauthenticated-RCE fix, CORS lockdown, 6 correctness bugs, and 5 tech-debt items",
+      "status": "in-progress",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": false
+      },
+      "spec": ".specs/features/audit-remediation-2026-07/spec.md",
+      "design": ".specs/features/audit-remediation-2026-07/design.md",
+      "tasks": ".specs/features/audit-remediation-2026-07/tasks.md",
+      "validation": ".specs/features/audit-remediation-2026-07/validation.md"
     }
   ],
-  "active_feature": "workflow-harness-overhaul"
+  "active_feature": "audit-remediation-2026-07"
 }

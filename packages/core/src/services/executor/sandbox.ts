@@ -68,6 +68,59 @@ export function _resetSandboxAvailabilityCache(): void {
 }
 
 /**
+ * Force the availability caches. Test seam.
+ *
+ * The real checks shell out to `docker --version` / `sandbox-exec --version`,
+ * so the degraded path is untestable on a machine that has the tool — which is
+ * every macOS box, `sandbox-exec` being part of the OS.
+ * @internal
+ */
+export function _setSandboxAvailabilityForTesting(available: {
+  docker: boolean;
+  seatbelt: boolean;
+}): void {
+  _dockerAvailable = available.docker;
+  _seatbeltAvailable = available.seatbelt;
+}
+
+/**
+ * One warn per process, however many executions run through it. An executor
+ * can be called hundreds of times in a session; a per-call warning is noise,
+ * and noise gets filtered.
+ */
+let _warnedAboutNoSandbox = false;
+
+/**
+ * Clear the one-shot warning guard. Test seam.
+ * @internal
+ */
+export function _resetSandboxWarningForTesting(): void {
+  _warnedAboutNoSandbox = false;
+}
+
+/**
+ * Announce that `auto` found no sandbox tool and fell back to best-effort
+ * (SEC-03 AC 1).
+ *
+ * Called only from the `auto` fallback, never from an explicit
+ * `MASSA_AI_EXECUTOR_SANDBOX=none`: that is the operator's own decision, and
+ * warning about a configuration someone deliberately chose is exactly how a
+ * warning becomes something people learn to ignore.
+ */
+function warnSandboxUnavailable(): void {
+  if (_warnedAboutNoSandbox) return;
+  _warnedAboutNoSandbox = true;
+
+  const missingTool = process.platform === "darwin" ? "sandbox-exec" : "docker";
+  logger.warn(
+    `sandbox: MASSA_AI_EXECUTOR_SANDBOX=auto found no '${missingTool}' on this platform, ` +
+      `so code is executing with best-effort containment and no OS-level isolation. ` +
+      `Install '${missingTool}', or set MASSA_AI_EXECUTOR_SANDBOX=on to fail loudly instead of falling back.`,
+    { missingTool, platform: process.platform, effectiveMode: "none" },
+  );
+}
+
+/**
  * Determine the sandbox mode based on env + platform + tool availability.
  *
  * - `MASSA_AI_EXECUTOR_SANDBOX=none` → best-effort (no sandbox)
@@ -91,9 +144,11 @@ export function getSandboxMode(): SandboxMode {
     );
   }
 
-  // auto: use if available, fall back to best-effort
+  // auto: use if available, fall back to best-effort (AD-007, unchanged).
   if (isMac && isSeatbeltAvailable()) return "seatbelt";
   if (isLinux && isDockerAvailable()) return "docker";
+  // SEC-03: the fallback itself is unchanged, but it stops being silent.
+  warnSandboxUnavailable();
   return "none";
 }
 

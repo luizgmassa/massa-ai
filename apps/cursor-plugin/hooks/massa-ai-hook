@@ -29,6 +29,7 @@
 
 import { spawnSync } from "child_process";
 import { readFileSync, writeFileSync, mkdirSync, existsSync, fstatSync } from "fs";
+import { homedir } from "os";
 import path from "path";
 
 // ── Event type mapping ──────────────────────────────────────────────────────
@@ -132,6 +133,60 @@ export function readStdin(): string {
   }
 }
 
+// ── API key resolution (SEC-06) ─────────────────────────────────────────────
+
+/**
+ * Path to the runtime config file, resolved the same way
+ * `packages/shared/src/config/xdg.ts` resolves it: `XDG_CONFIG_HOME` when set
+ * and non-blank, else `~/.config`.
+ *
+ * Duplicated rather than imported on purpose. This binary's entire dependency
+ * surface is `child_process`/`fs`/`os`/`path`; pulling in `@massa-ai/shared`
+ * would drag the config loader, its Prisma-adjacent transitive graph, and its
+ * startup cost into a process that runs on every single tool call and is
+ * budgeted in milliseconds. The duplication is nine lines and is pinned by
+ * tests on both sides.
+ */
+export function getHookConfigPath(): string {
+  const xdg = process.env.XDG_CONFIG_HOME;
+  const base = xdg && xdg.trim() ? xdg : path.join(homedir(), ".config");
+  return path.join(base, "massa-ai", "config.json");
+}
+
+/**
+ * Resolve the Tools API key: `MASSA_AI_API_KEY` → `config.json`
+ * `security.apiKey` → none. Returns "" when no key is available.
+ *
+ * SEC-01 auto-provisions the key into config.json on first API start, and this
+ * binary never runs the `env.ts` seeding that puts it in the environment for
+ * everything else — so without reading the file it would send unauthenticated
+ * POSTs forever. Because the hook silent-degrades by contract, that failure
+ * has no symptom: observation capture just stops.
+ *
+ * Whitespace-only values count as unset, matching `usable()` in
+ * `packages/shared/src/config/api-key.ts`. Every failure mode (missing file,
+ * unreadable, malformed JSON, wrong shape) degrades to "" rather than throwing:
+ * a hook must never block the agent.
+ *
+ * Deliberately not memoised. A hook process handles exactly one event and
+ * exits, so there is no second call to amortise, and a module-level cache would
+ * make the resolution untestable without a reset seam.
+ */
+export function resolveHookApiKey(): string {
+  const fromEnv = process.env.MASSA_AI_API_KEY;
+  if (fromEnv && fromEnv.trim()) return fromEnv.trim();
+
+  try {
+    const parsed = JSON.parse(readFileSync(getHookConfigPath(), "utf8"));
+    const stored = parsed?.security?.apiKey;
+    if (typeof stored === "string" && stored.trim()) return stored.trim();
+  } catch {
+    // Missing, unreadable, or malformed config → no key (silent-degrade).
+  }
+
+  return "";
+}
+
 // ── POST helper ─────────────────────────────────────────────────────────────
 
 export function postObservation(
@@ -149,7 +204,7 @@ export function postObservation(
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
-    const apiKey = process.env.MASSA_AI_API_KEY;
+    const apiKey = resolveHookApiKey();
     if (apiKey) {
       headers["x-api-key"] = apiKey;
     }

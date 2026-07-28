@@ -53,6 +53,13 @@ export interface ExecResult {
   command?: string;
   /** Effective cwd the script ran in. */
   cwd?: string;
+  /**
+   * OS isolation this run actually got (SEC-03). `"none"` means the code ran
+   * with best-effort containment only — which `auto` falls back to whenever
+   * the platform sandbox tool is absent. Reported on every result so a caller
+   * never has to infer it from configuration that may not have applied.
+   */
+  sandboxMode: SandboxMode;
 }
 
 export interface ExecuteOptions {
@@ -358,6 +365,10 @@ export class PolyglotExecutor {
         stderr: `Blocked: path "${filePath}" resolves outside the project root (${root}).`,
         exitCode: 1,
         timedOut: false,
+        // Nothing ran, so this reports the mode that would have applied. The
+        // field is documented as present on every executor result; omitting it
+        // on the refusal paths would make callers branch on its absence.
+        sandboxMode: getSandboxMode(),
       };
       return err;
     }
@@ -371,6 +382,7 @@ export class PolyglotExecutor {
         stderr: `Blocked: path "${filePath}" matches a deny-listed pattern (secrets/credentials).`,
         exitCode: 1,
         timedOut: false,
+        sandboxMode: getSandboxMode(),
       };
       return err;
     }
@@ -428,6 +440,7 @@ export class PolyglotExecutor {
           stderr: `Compilation failed:\n${message}`,
           exitCode: 1,
           timedOut: false,
+          sandboxMode: getSandboxMode(),
         };
       }
       return await this.#spawn([binPath], cwd, cwd, timeout, false);
@@ -489,6 +502,7 @@ export class PolyglotExecutor {
             backgrounded: true,
             command: cmd.join(" "),
             cwd,
+            sandboxMode,
           });
         } else {
           killTree(proc);
@@ -528,6 +542,7 @@ export class PolyglotExecutor {
           timedOut,
           command: cmd.join(" "),
           cwd,
+          sandboxMode,
         });
       });
 
@@ -544,6 +559,7 @@ export class PolyglotExecutor {
           timedOut: false,
           command: cmd.join(" "),
           cwd,
+          sandboxMode,
         });
       });
     });

@@ -618,19 +618,40 @@ export function toggleTheme(doc, store) {
 
 // ── Browser bootstrap (guarded; skipped under test/Node) ───────────────────
 
+// Every /api/v1/* route now requires a key (SEC-01). The dashboard has no
+// login: the server stamps the key into this page's <head> when the request
+// came from a caller it trusts, and we read it back here. When the tag is
+// absent the caller was untrusted, requests go out without the header, and the
+// server answers 401 — the server-rendered banner already explains why.
+function readInjectedApiKey(doc) {
+  try {
+    if (!doc || typeof doc.querySelector !== "function") return null;
+    const el = doc.querySelector('meta[name="massa-ai-api-key"]');
+    if (!el || typeof el.getAttribute !== "function") return null;
+    const value = el.getAttribute("content");
+    return value && value.trim() ? value.trim() : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 function createApiClient(opts) {
   opts = opts || {};
   const base = opts.base != null ? opts.base : "";
   const fetchImpl = opts.fetch || (typeof fetch !== "undefined" ? fetch : null);
+  const doc = opts.document || (typeof document !== "undefined" ? document : null);
+  // opts.apiKey is the explicit seam tests use; otherwise read the meta tag.
+  const apiKey = opts.apiKey !== undefined ? opts.apiKey : readInjectedApiKey(doc);
   async function request(path, init) {
     init = init || {};
     if (!fetchImpl) throw new Error("fetch unavailable");
     const url = base + path;
+    const headers = {};
+    if (init.body) headers["content-type"] = "application/json";
+    if (apiKey) headers["x-api-key"] = apiKey;
     const res = await fetchImpl(url, {
       method: init.method || "GET",
-      headers: init.body
-        ? { "content-type": "application/json" }
-        : undefined,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
       body: init.body ? JSON.stringify(init.body) : undefined,
     });
     const ct = res.headers.get("content-type") || "";
@@ -915,6 +936,7 @@ const MASSA_AI_UI = {
   toggleTheme,
   isWriteModeEnabled,
   createApiClient,
+  readInjectedApiKey,
   startApp,
   FORBIDDEN_MUTATING_PATHS,
   MEMORY_TYPES,

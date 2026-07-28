@@ -164,7 +164,21 @@ export class PgObservationStore implements ObservationStore {
 
   insert(obs: Observation): void {
     // Mirror update is synchronous so a subsequent sync read sees the value.
-    this.mirror.set(obs.id, obs);
+    //
+    // BUG-06: key it on the canonical project id when the alias resolver
+    // already knows the mapping. The durable row always lands under the
+    // canonical id (see the persist seam below), so mirroring under the
+    // caller's retired id meant a reader holding the canonical id — the id
+    // every other seam uses after a rename — missed a write that had already
+    // returned. `resolveCached` is cache-only and never issues a query, so
+    // this stays synchronous.
+    const cachedCanonical = getProjectIdentityAliasResolver().resolveCached(obs.projectId);
+    this.mirror.set(
+      obs.id,
+      cachedCanonical && cachedCanonical !== obs.projectId
+        ? { ...obs, projectId: cachedCanonical }
+        : obs,
+    );
     void this.ensureHydrated();
     // Fire-and-forget persist (best-effort, matching PgScheduledJobStore).
     //
@@ -178,6 +192,16 @@ export class PgObservationStore implements ObservationStore {
     // observations are best-effort telemetry, ids are normally unique per
     // event, and the in-memory mirror (the sync read path) is already correct.
     // The nondeterminism only affects same-id concurrent writes to PG.
+    //
+    // Alias caveat (2026-07-27, BUG-06): the mirror keying above is only as
+    // good as the resolver's TTL cache. For a source id this process has never
+    // resolved, `resolveCached` returns undefined — nothing can consult the
+    // database synchronously — so the mirror briefly keeps the caller's id and
+    // a same-tick read by the canonical id still misses. The resolve below
+    // repairs it on the next tick, and both halves of that boundary are pinned
+    // by tests. Closing the cold window entirely would mean making `insert`
+    // async, which changes the fire-and-forget contract its hook callers rely
+    // on; that is deliberately not done here.
     void (async () => {
       try {
         const prisma = this.getClient();

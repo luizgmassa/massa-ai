@@ -164,6 +164,87 @@ describe("saveConfig / loadConfig (with file)", () => {
   });
 });
 
+describe("security section (SEC-01 storage)", () => {
+  test("defaults carry an empty corsOrigins and no apiKey", () => {
+    expect(defaultMassaAiConfig.security).toEqual({ corsOrigins: [] });
+    expect(defaultMassaAiConfig.security?.apiKey).toBeUndefined();
+  });
+
+  test("a partial security block merges over the defaults instead of replacing it", () => {
+    // Discriminating case. Without an explicit `security` merge line in
+    // loadConfig, the top-level `...userConfig` spread replaces the whole
+    // section and the default corsOrigins vanishes — which is how a
+    // provisioned apiKey would later drop a co-resident setting on save.
+    saveConfig({ security: { apiKey: "provisioned-key" } } as any);
+    const loaded = loadConfig();
+    expect(loaded.security?.apiKey).toBe("provisioned-key");
+    expect(loaded.security?.corsOrigins).toEqual([]);
+  });
+
+  test("a stored corsOrigins list survives a load/save/reload round-trip", () => {
+    saveConfig({ security: { corsOrigins: ["http://localhost:5173"] } } as any);
+    const first = loadConfig();
+    saveConfig(first);
+    const second = loadConfig();
+    expect(second.security?.corsOrigins).toEqual(["http://localhost:5173"]);
+    expect(second.security?.apiKey).toBeUndefined();
+  });
+
+  test("a config.json with no security section still loads the default section", () => {
+    saveConfig({ logging: { level: "debug", enableMetrics: false } } as any);
+    const loaded = loadConfig();
+    expect(loaded.security).toEqual({ corsOrigins: [] });
+    expect(loaded.cache.enabled).toBe(defaultMassaAiConfig.cache.enabled);
+  });
+});
+
+describe("saveConfig atomicity (SEC-01 concurrent provisioning)", () => {
+  test("writes a temp file in the config dir and renames it over the target", () => {
+    saveConfig(defaultMassaAiConfig);
+
+    const written = writeSpy.mock.calls.map((c) => String(c[0]));
+    expect(written).toHaveLength(1);
+    const tmpPath = written[0]!;
+    // rename(2) is only atomic within one filesystem, so the temp file must be
+    // a sibling of the target, never in os.tmpdir().
+    expect(tmpPath).not.toBe(CONFIG_PATH);
+    expect(path.dirname(tmpPath)).toBe(CONFIG_DIR);
+
+    const renames = renameSpy.mock.calls.map((c) => [String(c[0]), String(c[1])]);
+    expect(renames).toEqual([[tmpPath, CONFIG_PATH]]);
+  });
+
+  test("the temp path differs between calls so concurrent writers cannot collide", () => {
+    saveConfig(defaultMassaAiConfig);
+    saveConfig(defaultMassaAiConfig);
+    const [first, second] = writeSpy.mock.calls.map((c) => String(c[0]));
+    expect(first).not.toBe(second);
+  });
+
+  test("a failed rename removes the temp file and rethrows", () => {
+    const unlinkSpy = spyOn(fs, "unlinkSync").mockImplementation((p: any) => {
+      existing.delete(String(p));
+      vfs.delete(String(p));
+    });
+    renameSpy.mockImplementation(() => {
+      const e = new Error("EACCES: permission denied");
+      (e as any).code = "EACCES";
+      throw e;
+    });
+
+    try {
+      expect(() => saveConfig(defaultMassaAiConfig)).toThrow(/EACCES/);
+      const tmpPath = String(writeSpy.mock.calls[0]![0]);
+      expect(unlinkSpy.mock.calls.map((c) => String(c[0]))).toEqual([tmpPath]);
+      expect(existing.has(tmpPath)).toBe(false);
+      // The live config was never touched.
+      expect(existing.has(CONFIG_PATH)).toBe(false);
+    } finally {
+      unlinkSpy.mockRestore();
+    }
+  });
+});
+
 describe("initConfig", () => {
   test("creates default config when none exists", () => {
     expect(configExists()).toBe(false);

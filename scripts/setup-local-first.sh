@@ -14,6 +14,10 @@ set -e
 source "$(dirname "${BASH_SOURCE[0]}")/banner.sh"
 # shellcheck source=scripts/lib/installer-env-transaction.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-env-transaction.sh"
+# shellcheck source=scripts/lib/installer-shared.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-shared.sh"
+# shellcheck source=scripts/lib/installer-api-key.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-api-key.sh"
 massa_ai_banner
 
 # Back up an existing config file to <file>.bak before it gets regenerated.
@@ -410,104 +414,18 @@ ENVEOF
     echo -e "  ${GREEN}✓${NC} Created thin .env file: ${ENV_FILE} (config.json is the runtime source)"
 
 # Regenerate the config file, backing up any existing copy first.
+#
+# The API key is resolved BEFORE the backup and rewrite. This script writes
+# config.json wholesale, and SEC-01 made that key the credential every MCP
+# host, .env and agent hook sends on every request — minting a fresh one on a
+# re-run would silently invalidate all of them. installer_resolve_api_key
+# reuses the stored key when there is one and mints a key only on a genuinely
+# first install.
+MASSA_AI_API_KEY_VALUE="$(installer_resolve_api_key "$CONFIG_FILE")"
 backup_if_exists "$CONFIG_FILE"
-    cat > "$CONFIG_FILE" << EOF
-{
-  "database": {
-    "url": "${DATABASE_URL}"
-  },
-  "embedding": {
-    "provider": "ollama",
-    "model": "${EMBEDDING_MODEL}",
-    "baseURL": "${OLLAMA_URL}",
-    "dimensions": 4096
-  },
-  "llm": {
-    "enabled": true,
-    "baseUrl": "http://localhost:11434/v1",
-    "apiKey": "ollama",
-    "model": "${LLM_MODEL}",
-    "codeModel": "${CODE_MODEL}",
-    "temperature": 0.2,
-    "maxOutputTokens": 8000,
-    "timeoutMs": 90000,
-    "disableThink": true
-  },
-  "compression": {
-    "defaultStrategy": "code_structure",
-    "minTokensForCompression": 100,
-    "targetCompressionRatio": 0.7
-  },
-  "cache": {
-    "enabled": true,
-    "l1MaxSizeMB": 100,
-    "l2MaxSizeMB": 500,
-    "defaultTTLSeconds": 3600
-  },
-  "search": {
-    "autoReindexMaxFiles": 200,
-    "queryUnderstanding": {
-      "enabled": ${SEARCH_QU_ENABLED:-false},
-      "hydeEnabled": true,
-      "cacheTtlMs": 300000,
-      "cacheMaxSize": 256
-    },
-    "rerank": {
-      "enabled": ${SEARCH_RERANK_ENABLED:-false},
-      "rerankWindow": 50
-    }
-  },
-  "memory": {
-    "decay": {
-      "lambda": 0.02,
-      "sigma": 0.6,
-      "mu": 0.04,
-      "coldThreshold": 0.2
-    },
-    "bootstrap": {
-      "enabled": true,
-      "maxSeedMemories": 8,
-      "centralityLimit": 10,
-      "gitLogLimit": 20,
-      "refreshEnabled": true
-    },
-    "autoImprove": {
-      "enabled": true,
-      "reviewGate": false,
-      "minObservations": 8,
-      "minIntervalMs": 300000,
-      "maxWindow": 16,
-      "minQueryHits": 3,
-      "minFileHits": 3,
-      "minFixHits": 2
-    },
-    "autoImportance": {
-      "enabled": true
-    }
-  },
-  "hooks": {
-    "enabled": true,
-    "maxPayloadBytes": 65536,
-    "queue": {
-      "maxPending": 256
-    },
-    "bridge": {
-      "enabled": true,
-      "minObservations": 8,
-      "minIntervalMs": 300000,
-      "maxWindow": 8
-    }
-  },
-  "dataDir": "${DATA_DIR}",
-  "logging": {
-    "level": "info",
-    "enableMetrics": false
-  }
-}
-EOF
-    # config.json now contains DATABASE_URL (a secret) — restrict to owner.
-    chmod 600 "$CONFIG_FILE"
-    echo -e "  ${GREEN}✓${NC} Created config: ${CONFIG_FILE} (chmod 600)"
+installer_write_config "$CONFIG_FILE" "$MASSA_AI_API_KEY_VALUE"
+echo -e "  ${GREEN}✓${NC} Created config: ${CONFIG_FILE} (chmod 600)"
+installer_report_api_key "$CONFIG_FILE"
 
 # Run Prisma migrations unconditionally. A connection, pgvector, or migration
 # failure stops setup before final configuration is reported as usable.

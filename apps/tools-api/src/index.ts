@@ -9,8 +9,8 @@
  */
 
 import "@massa-ai/shared/config";
-import { parsePositiveIntEnv } from "@massa-ai/shared/config";
-import { validateApiStartup } from "./startup-config.js";
+import { parsePositiveIntEnv, config as serverConfig } from "@massa-ai/shared/config";
+import { validateApiStartup, initAuthOrExit, buildCorsOptions } from "./startup-config.js";
 
 // Fail fast if a DEDICATE-flagged process would bind the shared production DB.
 // Must run AFTER env loading and BEFORE any DB/client initialization. No-op
@@ -42,7 +42,6 @@ import { webUiRoutes } from "./routes/web-ui.js";
 import { architectureRoutes } from "./routes/architecture.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { authMiddleware } from "./middleware/auth.js";
-import { adminPreservationMiddleware } from "./middleware/admin-preservation.js";
 import { errorHandler } from "./middleware/error.js";
 import { getHealthChecker, searchSessionHook, coRetrievalHook } from "@massa-ai/core";
 import { installProjectIdentityGuardsFromPool } from "@massa-ai/core";
@@ -54,6 +53,7 @@ import {
   validateAllGrammars,
 } from "@massa-ai/core/services";
 import { buildHealthResponse, listenAfterParserValidation } from "./health.js";
+import { warnIfTrustOverrideEnabled } from "./web-ui-trust.js";
 
 const PORT = process.env.MASSA_AI_API_PORT || 3333;
 
@@ -70,7 +70,9 @@ const JOB_REAPER_INTERVAL_MS = parsePositiveIntEnv(
 );
 
 const app = new Elysia({ adapter: node() })
-  .use(cors())
+  // SEC-02: an explicit allowlist, not the reflected-Origin default. Throws at
+  // startup on a `*` entry rather than serving a weaker policy than configured.
+  .use(cors(buildCorsOptions(serverConfig.get("security").corsOrigins)))
   .use(
     swagger({
       documentation: {
@@ -109,7 +111,7 @@ const app = new Elysia({ adapter: node() })
               type: "apiKey",
               in: "header",
               name: "x-api-key",
-              description: "API key — set MASSA_AI_API_KEY on the server. Omit when running locally without a key configured.",
+              description: "API key — required on every route except /health, /swagger and /ui. Set MASSA_AI_API_KEY, or read the key the server auto-provisioned into ~/.config/massa-ai/config.json on first start.",
             },
           },
         },
@@ -119,7 +121,6 @@ const app = new Elysia({ adapter: node() })
   )
   .use(errorHandler)
   .use(authMiddleware)
-  .use(adminPreservationMiddleware)
   .use(searchRoutes)
   .use(memoryRoutes)
   .use(checkpointRoutes)
@@ -141,6 +142,14 @@ const app = new Elysia({ adapter: node() })
   .use(architectureRoutes)
   .use(dashboardRoutes)
   .get("/health", () => buildHealthResponse(getParserReadiness()));
+
+// SEC-01: resolve (and if necessary provision) the API key BEFORE the port
+// binds. An unwritable config.json exits non-zero here rather than binding an
+// unauthenticated listener.
+initAuthOrExit();
+
+// SEC-05: say so when /ui hands the key to any caller, not just a local one.
+warnIfTrustOverrideEnabled();
 
 await listenAfterParserValidation({
   validate: validateAllGrammars,
