@@ -8,6 +8,8 @@ Slug: `project-identity-rename`. Source: `rename-the-entire-project-quiet-torval
 - Runtime server identity is `massa-ai` and MCP tools remain unprefixed.
 - New functionality preserves scoped package resolution and current storage/config conventions.
 - Retained subsystem names such as `RLM_LLM_*` are intentional compatibility boundaries.
+  **Superseded by AD-010** (`audit-remediation-2026-07`, DEBT-03): the project now has exactly one
+  env prefix, `MASSA_AI_`, and `RLM_LLM_*` is hard-renamed with no dual-read.
 
 ## Deviations and Out of Scope
 

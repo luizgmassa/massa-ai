@@ -70,7 +70,8 @@ with the `massa-ai` identity, across the categories the first PR missed.
 - `.specs/archive/**` (historical archive, preserved).
 - `.specs/features/repo-rename-massa-ai/**` own artifacts quoting the old name
   as the rename record (preserved as quoted history of the rename itself).
-- `RLM_LLM_*` env namespace (unchanged).
+- `RLM_LLM_*` env namespace (unchanged). **Superseded by AD-010** — hard-renamed to
+  `MASSA_AI_LLM_*` in `audit-remediation-2026-07` (DEBT-03).
 - Tree-sitter `patches/`, `node_modules/`, `dist/`, `build/`, `.turbo/` (build
   artifacts regenerated).
 - README/FEATURES Credits line `[th0th](https://github.com/S1LV4/th0th)`.
