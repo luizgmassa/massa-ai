@@ -227,7 +227,11 @@ describe.skipIf(!DB_AVAILABLE)("ETL idempotent import + FileCursor (T14 / AC-8 /
     // cursor writes).
     expect(cursorPaths).toEqual(["a.ts", "b.ts", "c.ts"]);
     await cleanupProject(currentProjectId);
-  });
+    // Real ETL pass over the native parser plus Postgres. 357 ms for this file
+    // uninstrumented; under the `--coverage` instrumentation that
+    // `bun run test:coverage` applies, it exceeds the 5 s default at 5003 ms.
+    // Budgeted for the instrumented cost — never raise the global default.
+  }, 30_000);
 
   test("kill mid-load leaves cursor at previous file; restart re-processes file N (AC-24)", async () => {
     const repo = ManagedRunRepositoryPg.getInstance();
@@ -340,7 +344,9 @@ describe.skipIf(!DB_AVAILABLE)("ETL idempotent import + FileCursor (T14 / AC-8 /
     expect(rowAfterRestart[0]?.status).toBe("completed");
     expect(rowAfterRestart[0]?.file_cursor?.path).toBe("c.ts");
     await cleanupProject(currentProjectId);
-  });
+    // Two full ETL passes (kill + restart) over the native parser and Postgres.
+    // Same instrumentation cost as the sibling above; see that note.
+  }, 30_000);
 
   test("discover with a cursor skips files at-or-before the cursor path", async () => {
     // Direct Discover-stage unit test of the resume-skip filter. Uses the

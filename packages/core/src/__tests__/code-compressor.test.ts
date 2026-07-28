@@ -24,7 +24,19 @@ describe("CodeCompressor — characterization (regex path)", () => {
   let compressor: CodeCompressor;
 
   beforeEach(() => {
+    // This block characterizes the REGEX path, so the LLM branch must be off.
+    // Leaving the seam at `null` falls through to `config.get("llm").enabled`,
+    // read from the developer's real `~/.config/massa-ai/config.json` — where a
+    // local Ollama makes `compress()` a live network call. Measured on the same
+    // code path in `dart-support.test.ts`: 42030 ms cold, 690 ms warm, against
+    // `bunfig.toml`'s 5 s budget. That is why these passed on a warm model and
+    // hung on a cold one. CI has no config file, so CI never saw it.
+    _setLlmEnabledForTesting(false);
     compressor = new CodeCompressor();
+  });
+
+  afterEach(() => {
+    _setLlmEnabledForTesting(null);
   });
 
   test("default strategy is CODE_STRUCTURE", () => {

@@ -103,5 +103,11 @@ describeNative("ETL search-cache consistency", () => {
     pipeline.graphGenerations = originalGraphGenerations;
     symbolRepo.getActiveGraphSnapshot = originalGetActiveGraphSnapshot;
     resetParserReadinessForTests();
-  });
+    // Runs a real ETL pass over the native tree-sitter parser. Uninstrumented it
+    // finishes in well under a second, but `bun run test:coverage` measures it
+    // with `--coverage`, and that instrumentation costs roughly 40x here: the
+    // same file takes 357 ms plain and blows the 5 s default at 5003 ms under
+    // coverage. Budgeted for the instrumented cost, per CLAUDE.md — raise the
+    // per-test value, never `bunfig.toml`'s global default.
+  }, 30_000);
 });

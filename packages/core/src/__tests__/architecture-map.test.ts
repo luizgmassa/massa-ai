@@ -561,7 +561,14 @@ describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
-  }, 60000);
+    // Each of the three tests in this block indexes a fixture repo through the
+    // real native tree-sitter pipeline into Postgres. Standalone — even with
+    // `--coverage` — the whole file is 24 pass in 1213 ms, so 60 s was ample.
+    // It is not ample inside `bun run test:coverage`, which runs 126 instrumented
+    // groups against one Postgres: all three hit exactly 60 s there. That is the
+    // load signature CLAUDE.md describes, not a logic change, so the budget buys
+    // headroom for the contended case rather than papering over a hang.
+  }, 120_000);
 
   test("routes surfaced from http_call edges (fetch('/api/items'))", async () => {
     const dir = await makeTempProject(FIXTURE);
@@ -579,7 +586,7 @@ describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
-  }, 60000);
+  }, 120_000);
 
   test("architecture failure never breaks the base response (defensive)", async () => {
     // Even if the env is broken, getProjectMap must either return null (no
@@ -596,5 +603,5 @@ describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
-  }, 60000);
+  }, 120_000);
 });
