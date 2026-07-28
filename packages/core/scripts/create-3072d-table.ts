@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import '@massa-ai/shared/config';
-import { getPgPool } from './src/data/db-connection.js';
+import { getPgPool } from '../src/data/db-connection.js';
 
 async function main() {
   const url = process.env.DATABASE_URL;

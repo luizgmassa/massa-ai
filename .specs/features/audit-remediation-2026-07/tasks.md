@@ -606,10 +606,10 @@ Two further findings the first run surfaced, both real:
 **Non-goals**: `rlm-*` source filenames stay — deferred to the god-module refactor that rewrites them (spec Out of Scope).
 
 **Done when**:
-- [ ] `bunfig.toml` header names this project, not `MCP RLM Mem0`
-- [ ] Both scripts moved under `packages/core/scripts/` (or deleted if dead — verify no reference first)
-- [ ] `rg 'create-3072d-table|create-progress-memory'` shows no stale path reference
-- [ ] Quick gate passes
+- [x] `bunfig.toml` header names this project, not `MCP RLM Mem0`
+- [x] Both scripts moved under `packages/core/scripts/` — verified first that nothing references either (only `.specs` mentions them). Moved rather than deleted: `packages/core/scripts/check-indexes.ts` is the existing precedent for exactly this kind of one-off. Their `./src/…` imports were repointed to `../src/…` for the extra directory level, and both still bundle.
+- [x] `rg 'create-3072d-table|create-progress-memory'` shows no stale path reference
+- [x] Quick gate passes — `test:scripts` exit 0, lint 0
 
 **Tests**: none (config/move) · **Gate**: quick
 **Commit**: `chore: fix stale naming and relocate one-off core scripts`

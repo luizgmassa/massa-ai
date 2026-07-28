@@ -4,7 +4,7 @@
  */
 
 import { logger, MemoryType } from "@massa-ai/shared";
-import { getPrismaClient, disconnectPrisma } from "./src/services/query/prisma-client.js";
+import { getPrismaClient, disconnectPrisma } from "../src/services/query/prisma-client.js";
 import { randomUUID } from "crypto";
 
 async function createProgressMemory() {
