@@ -625,6 +625,60 @@ rg 'RLM_' --hidden --glob '!CHANGELOG.md' --glob '!.specs/**' \
 That returns nothing. The requirement it enforces is unchanged: **no live `RLM_` reference
 remains** — only the two proofs that it is dead, and the decision record that killed it.
 
+### TASK-018/020 — de-tautologising a test made it flaky; the fix was the wrong observable
+
+`memory-clustering.test.ts:298` asserted `expect(cluster === null || cluster !== null).toBe(true)`.
+That is a tautology and had to go. The replacement asserted what the test's name implied —
+`expect(cluster).not.toBeNull()` and `expect(cluster!.memberIds).toContain("a")` — and it passed
+standalone (19/19), passed eight consecutive package runs, and passed the whole T18 gate.
+
+It then failed once under the isolation runner during TASK-020.
+
+The cause is not the runner. `clusterMemories()` seeds K-means++ centroids with `Math.random()`
+(`memory-clustering.ts:248`, `:269`, `:273`), so for the three near-identical fixture vectors it
+is genuinely non-deterministic whether `"a"` ends up in a cluster at all. The original author
+knew — the deleted line carried the comment *"May or may not find depending on clustering
+result"*. The tautology was a bad answer to a real problem.
+
+The honest observable for "re-runs clustering when no cached result" is the **memory-table load**:
+nothing else issues one. The test now counts `$queryRaw` invocations and asserts exactly one more
+after `findCluster(id)` with no cached argument, and the sibling cached-path test asserts the
+count does **not** move. Only the pair discriminates — without the negative control, an
+implementation that always re-clustered would still satisfy the re-run assertion.
+
+Verified: 8/8 consecutive runs green, and a scratch mutation making `findCluster` ignore its
+`cached` argument is killed by the negative control (18 pass / 1 fail), reverting to 19/19.
+
+The transferable lesson: a stronger-*looking* assertion is not automatically a better one. When
+the production path is non-deterministic, assert the deterministic effect the behavior is named
+for, not the value it happens to produce.
+
+### TASK-020 — what the three runners had actually drifted into
+
+The shared module is `scripts/lib/run-tests-isolated.ts`; the three wrappers keep only their
+`testsRoot` and their isolation predicate, plus core's `--unit`/`--e2e`/`--filter` discovery.
+Group counts are unchanged: core 126 (224 files → 99 shared + 125 isolated), tools-api 25
+(44 → 20 + 24), mcp-client 8 (20 → 13 + 7).
+
+Preserved deliberately, because they are observable output rather than internals:
+
+- mcp-client labels its batched group `shared (N files)` where the other two say
+  `mock-free (N files)`, and all three word the census line differently. The labels are
+  wrapper-supplied overrides rather than normalised, so no CI log changes shape in the same
+  commit that moves the code.
+- tools-api prints `isolated: <path>` with no reason, having only ever had one reason.
+- Unknown arguments still exit **2** in all three; core still rejects `--unit --e2e` together.
+
+One latent defect was fixed in passing: core's database predicate read
+`/\b(?:DATABASE_URL|DATABASE_URL)\b/` — the same alternative twice. Behaviourally identical,
+now `/\bDATABASE_URL\b/`.
+
+The shared module also gained `--coverage` / `--coverage-dir=` passthrough, which is what makes
+TASK-019's gate able to reach the three packages that cannot run a plain `bun test`. Each group
+is a separate child process writing its own `lcov.info`, so groups get numbered subdirectories
+and the caller merges them; without that they would silently overwrite each other and the gate
+would measure only the last group.
+
 ### TASK-018 — scope amended by the spec owner during Execute
 
 The task shipped with an explicit non-goal: *"The initial rule set passes on the current tree

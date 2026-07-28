@@ -561,11 +561,14 @@ Phase 6:  T16 ──→ T17 ──→ T18 ──→ T19 ──→ T20 ──→ 
 **Non-goals**: `packages/shared` is a published package (`files: ["dist"]`) and does not host dev tooling.
 
 **Done when**:
-- [ ] Shared module owns `findTestFiles`, signal forwarding, `runGroup`, and reporting
-- [ ] Each package's wrapper supplies only its own `isolationReason` predicate; core additionally supplies `--unit/--e2e/--filter` and the forced-last `17.cleanup-verify.test.ts` ordering
-- [ ] Each package's suite runs green through its wrapper with the **same** group counts as before
-- [ ] Test asserting the three wrappers resolve the same shared module
-- [ ] Build gate passes; per-package group counts recorded and compared against `.specs/HANDOFF.md`'s baseline
+- [x] Shared module owns `findTestFiles`, `findTopLevelTestFiles`, signal forwarding, `runGroup`, reporting and exit codes — `scripts/lib/run-tests-isolated.ts`
+- [x] Each package's wrapper supplies only its own `isolationReason` predicate; core additionally supplies `--unit/--e2e/--filter` and the forced-last `17.cleanup-verify.test.ts` ordering
+- [x] Each package's suite runs green through its wrapper with the **same** group counts as before — core **126** (224 files → 99 shared + 125 isolated), tools-api **25** (44 → 20 + 24), mcp-client **8** (20 → 13 + 7). All three identical to the pre-change baseline captured at `origin/main` @ `c992ae9`.
+- [x] Test asserting the three wrappers resolve the same shared module — `scripts/__tests__/isolated-runner-parity.test.ts`, 5/5. Also asserts no wrapper re-implements `spawn`/signal handling/`process.exitCode`, which is what would signal a partial revert.
+- [x] Build gate passes; group counts recorded above. lint 0, type-check 6/6, build 5/5, `test:scripts` 584 exit 0 (579 + 5 new).
+- [x] Observable contracts preserved rather than normalised: unknown args still exit **2** in all three; core still rejects `--unit --e2e`; mcp-client still prints `shared (N files)` and tools-api still prints `isolated: <path>` without a reason. Normalising the wording would have changed CI log shape in the same commit that moved the code.
+- [x] Latent defect fixed in passing: core's predicate read `/\b(?:DATABASE_URL|DATABASE_URL)\b/` — the same alternative twice. Now `/\bDATABASE_URL\b/`, behaviourally identical.
+- [x] Shared module gained `--coverage` / `--coverage-dir=` passthrough with a per-group subdirectory, which is the prerequisite that lets **TASK-019**'s gate reach the three packages that cannot run a plain `bun test`. This is why T20 was executed before T19.
 
 **Tests**: unit (`scripts/__tests__`) · **Gate**: build
 **Commit**: `refactor(scripts): share one isolated-test-runner implementation`

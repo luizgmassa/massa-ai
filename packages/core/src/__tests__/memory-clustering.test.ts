@@ -11,10 +11,20 @@ import { describe, test, expect, beforeEach, mock } from "bun:test";
 // ── Mock prisma-client ──────────────────────────────────────────────────────
 
 let queryRawResult: any[] = [];
+/**
+ * Counts loads of the memory table. `clusterMemories()` is the only thing that
+ * reads it, so this is the deterministic observable for "did clustering run?" —
+ * see the findCluster re-run test, which cannot assert on cluster membership
+ * because K-means++ seeds its centroids with Math.random().
+ */
+let queryRawCalls = 0;
 
 mock.module("../services/query/prisma-client.js", () => ({
   getPrismaClient: () => ({
-    $queryRaw: () => Promise.resolve(queryRawResult),
+    $queryRaw: () => {
+      queryRawCalls += 1;
+      return Promise.resolve(queryRawResult);
+    },
   }),
 }));
 
@@ -259,9 +269,15 @@ describe("MemoryClustering", () => {
         durationMs: 5,
       };
       const clustering = MemoryClustering.getInstance();
+      const before = queryRawCalls;
       const cluster = await clustering.findCluster("a", cached);
       expect(cluster).not.toBeNull();
       expect(cluster!.id).toBe("cluster_1_0");
+      // Negative control for the re-run test below: given a cached result,
+      // findCluster must NOT reload the memory table. Without this half, a
+      // findCluster that always re-clustered would still satisfy the re-run
+      // assertion.
+      expect(queryRawCalls).toBe(before);
     });
 
     test("returns null when memory not in any cluster", async () => {
@@ -292,14 +308,21 @@ describe("MemoryClustering", () => {
         makeRow("c", "content c", [0.98, 0.02, 0, 0]),
       ];
       const clustering = MemoryClustering.getInstance();
-      const cluster = await clustering.findCluster("a");
-      // With no `cached` argument findCluster must re-run clusterMemories over the
-      // rows above. Those three vectors are near-identical, so "a" lands in a real
-      // cluster alongside them. The previous assertion here was
-      // `cluster === null || cluster !== null`, a tautology that passed under every
-      // possible implementation, including one that never re-ran clustering at all.
-      expect(cluster).not.toBeNull();
-      expect(cluster!.memberIds).toContain("a");
+      const before = queryRawCalls;
+      await clustering.findCluster("a");
+
+      // The behavior this test names is "re-runs clustering", and the honest
+      // observable for that is the memory-table load — nothing else issues one.
+      //
+      // Deliberately NOT asserting cluster membership: clusterMemories() seeds
+      // K-means++ centroids with Math.random() (memory-clustering.ts:248,269,273),
+      // so which cluster "a" lands in, and whether it is clustered at all, varies
+      // between runs. The assertion that used to be here was
+      // `cluster === null || cluster !== null` — a tautology, true under every
+      // implementation including one that never re-ran clustering. Replacing it
+      // with a membership assertion looked stronger but was simply flaky, and was
+      // observed failing under the isolation runner after passing standalone.
+      expect(queryRawCalls).toBe(before + 1);
     });
   });
 
