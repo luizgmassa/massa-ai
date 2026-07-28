@@ -424,6 +424,57 @@ exists to catch. The tool built in T5a found the defect in its own test fixture 
 
 ---
 
+### T6a / SEN-04 prerequisite: Stop a full index aborting on a same-name/different-kind declaration — **DONE**
+
+**Unplanned.** Discovered while trying to run T6's gate. T6's `bun run test:e2e` reaches
+`ensureSharedIndex`, which indexes the whole repo and blocks on probe queries — and that index
+aborted at **1219/1219 files in ~4 s** with
+`fqn_identity_collision: apps/tools-api/scripts/coverage-by-file.ts#total`, twice, deterministically
+(`index_jobs` rows `16b38fd0`, `07862bf3`). Not slow — throwing. **Every** E2E suite in the repo was
+unrunnable, which is why T6's gate had never been run at any point in this feature.
+
+Offered as a decision with the evidence — record T6 not-run, force the index locally, or repair the
+defect. Spec owner chose repair. Full mechanism, blast-radius argument and the divergence it creates
+are in `design.md`, **Fourth fork**.
+
+**The fix**: `declarationGroupKey(file, qualifiedName)` in
+`packages/core/src/services/structural/resolver.ts` — the uniqueness count was keyed on
+`(file, qualifiedName, kind)`, finer than the `(file, name)` namespace the simple FQN occupies, so
+two top-level declarations sharing a name but differing in kind each believed themselves unique and
+both claimed `file#name`.
+
+**Measured before the fix was written, not after**:
+
+| Symbol | kinds | classified | outcome |
+| --- | --- | --- | --- |
+| `total` | `variable` + `constant` | `unique`, `unique` | **abort** |
+| `pct` | `constant` ×2 | `overloaded` ×2 | disambiguated correctly |
+| `i` | nested | — | unaffected (nested always takes the modern FQN) |
+
+`pct` is the control that made the diagnosis exact: same-name/**same**-kind already worked.
+
+- [x] `total` reclassifies to `overloaded`/`overloaded`; registry no longer throws on the real file
+- [x] The pre-existing test asserting this **should** throw is rewritten, not deleted — `class Same` +
+      `interface Same` is declaration merging, legal source. It now asserts two distinct identities,
+      neither claiming bare `file#Same`, both resolvable
+- [x] Discriminating sensor: restoring `kind` to the group key turns the two new tests **red**
+      (measured: `54 pass / 2 fail`, vs `56 pass / 0 fail` with the fix). A same-name/**same**-kind
+      test cannot discriminate — it passed before the fix too — so the sensor had to use a
+      different-kind pair
+- [x] Uncontested names in the same file keep the simple FQN — the key widens, the legacy shape is
+      not disabled
+- [x] Full index gets past the abort: `running`, 1219 files discovered, symbols and vectors written
+      (previously 0 rows, dead at 4 s)
+
+**Gate**: `bun test structural-resolver.test.ts` **56 pass / 0 fail**; isolation runner
+`--unit --filter='structural|fqn|identity'` **PASS: all 4 groups**; `lint` 0; `type-check` 6/6;
+`build` 5/5.
+
+**Tests**: `packages/core/src/__tests__/structural-resolver.test.ts` (1 rewritten, 1 added)
+**Commit**: `fix(structural): stop a same-name different-kind declaration aborting the index`
+
+---
+
 ### T6 / SEN-04: Repair the third fixture consumer
 
 **What**: Point `14.needles.test.ts` at the shared resolution path instead of its own copied predicate.

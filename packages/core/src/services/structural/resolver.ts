@@ -149,6 +149,48 @@ export interface StructuralResolverDocument {
   structure: NormalizedStructure;
 }
 
+/**
+ * Uniqueness key for the "is this name claimed more than once in this file?"
+ * question — deliberately **kind-free**.
+ *
+ * `createStructuralIdentity` hands a top-level, unique, unreserved symbol the
+ * simple FQN `file#name` and everything else a disambiguated
+ * `file#qualifiedName~kind~hash`. So the namespace this count protects is keyed
+ * on `(file, name)` alone. Keying the count on `(file, qualifiedName, kind)`
+ * made it *finer* than the namespace it guards: two top-level declarations
+ * sharing a name but differing in kind each landed in a group of one, each was
+ * therefore classified `unique`, and both then claimed the same `file#name` —
+ * whereupon `StructuralFqnRegistry.register` threw `fqn_identity_collision` and
+ * aborted the whole index.
+ *
+ * That is not a hypothetical, and it is not rare source. Measured on this repo
+ * at v1.9.0: indexing aborted at 1219/1219 files in ~4 s on
+ * `apps/tools-api/scripts/coverage-by-file.ts#total`, where `let total` (kind
+ * `variable`) and `const total` (kind `constant`) share a name. The same file
+ * declares `pct` twice as well — but both are kind `constant`, so they shared a
+ * group, were classified `overloaded`, and disambiguated correctly. Same-name /
+ * same-kind already worked; only same-name / different-kind crashed. In
+ * TypeScript that shape is also plain declaration merging (`class X` +
+ * `interface X`), which is legal source the indexer must not reject.
+ *
+ * Making the key kind-free is the general form of a remedy this function
+ * already applied one-off: `isExportMarker` below forces export-clause markers
+ * to the `overloaded` shape for exactly this reason, and its comment describes
+ * exactly this failure. That special case stays — a marker can be the only
+ * claimant of a name, so its group size is 1 and the count alone would not
+ * cover it.
+ *
+ * Blast radius is provably confined to the crashing set. `overload` is not an
+ * input to `canonicalizeStructuralSignature`, so flipping it cannot move a
+ * `signatureHash`; and a `nested` symbol takes the disambiguated FQN whatever
+ * its overload says. The only identities this changes are top-level symbols
+ * that share a name with a different-kind sibling — which today do not have a
+ * usable identity at all, because they abort the index instead.
+ */
+function declarationGroupKey(file: string, qualifiedName: string): string {
+  return `${file}\0${qualifiedName}`;
+}
+
 /** Converts one immutable parse generation into FQN-ready resolver definitions. */
 export function buildStructuralResolverDefinitions(
   documents: readonly StructuralResolverDocument[],
@@ -156,14 +198,14 @@ export function buildStructuralResolverDefinitions(
   const groups = new Map<string, number>();
   const exportedRoots = new Set<string>();
   for (const document of documents) for (const symbol of document.structure.symbols) {
-    const key = `${document.file}\0${symbol.qualifiedName}\0${symbol.kind}`;
+    const key = declarationGroupKey(document.file, symbol.qualifiedName);
     groups.set(key, (groups.get(key) ?? 0) + 1);
     if (symbol.exported && symbol.qualifiedName === symbol.name) {
       exportedRoots.add(`${document.file}\0${symbol.qualifiedName.split(".")[0]}`);
     }
   }
   return Object.freeze(documents.flatMap((document) => document.structure.symbols.map((symbol) => {
-    const key = `${document.file}\0${symbol.qualifiedName}\0${symbol.kind}`;
+    const key = declarationGroupKey(document.file, symbol.qualifiedName);
     const visibleNested = document.dialect === "java"
       ? symbol.signatureMaterial.modifiers.includes("public") && (
         ["class", "interface", "enum"].includes(symbol.kind) ||

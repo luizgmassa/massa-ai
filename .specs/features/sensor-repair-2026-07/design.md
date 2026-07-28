@@ -391,3 +391,98 @@ is consistent in both directions, and each of the failure paths fails loudly.
 | `export` prefix added to `netBraceDelta` | `af3dab6:642-674` vs `chunker-code.ts:168` |
 | Corpus is the distinct `expected.filePath` set | `run.ts` "files: 6, total chunks: 68" against 6 distinct target files |
 | Run cost ~2 min, not ~90 | wall clock on the baseline run; 90 min is `needles-gate.yml`'s 2-core CI figure |
+
+---
+
+# Fourth fork — T6's gate is unrunnable, because a full index aborts (T6, 2026-07-28)
+
+T6's stated gate is `cd packages/core && bun run test:e2e`. It cannot run on this tree,
+and the reason is not cost. Every E2E suite reaches `ensureSharedIndex`, which indexes the
+whole repository into `e2e-ai-shared` and blocks until probe queries hit. That index
+**aborts**.
+
+## The measurement
+
+Two index jobs for `e2e-ai-shared`, one launched by the previous session and one by this
+one, read from `index_jobs` on the developer database:
+
+| job_id | status | progress | elapsed | error |
+| --- | --- | --- | --- | --- |
+| `16b38fd0` | failed | 1219/1219 | 4392 ms | `fqn_identity_collision: apps/tools-api/scripts/coverage-by-file.ts#total` |
+| `07862bf3` | failed | 1219/1219 | 4118 ms | same |
+
+Deterministic, and **fast** — ~4 s, not a timeout. Discovery and parsing complete; the
+abort is in structural resolution. So "the shared index is impractical" was the wrong
+diagnosis to reach for: nothing was slow, something was throwing.
+
+## Root cause, measured rather than inferred
+
+Parsing the real file and printing every symbol that shares a name:
+
+```
+pct    kind=constant  qualifiedName=pct    scope=top_level  overload=overloaded
+pct    kind=constant  qualifiedName=pct    scope=top_level  overload=overloaded
+total  kind=variable  qualifiedName=total  scope=top_level  overload=unique
+total  kind=constant  qualifiedName=total  scope=top_level  overload=unique     → THROWS
+```
+
+`createStructuralIdentity` (`fqn-codec.ts:205-209`) gives a symbol the simple FQN
+`file#name` only when it is `top_level`, `unique`, and unreserved; everything else gets
+`file#qualifiedName~kind~hash`. The `overload` classification that decides this was
+computed from a group keyed on `(file, qualifiedName, kind)` — **finer than the
+`(file, name)` namespace it protects**. Two top-level declarations sharing a name but
+differing in kind each sat alone in a group, each was classified `unique`, and both then
+claimed `file#total`. `StructuralFqnRegistry.register` (`fqn-codec.ts:313-316`) saw two
+different canonical signatures on one FQN and threw, aborting the index.
+
+`pct` is the control: declared twice, but both `constant`, so they shared a group, were
+classified `overloaded`, and disambiguated correctly. **Same-name/same-kind already
+worked. Only same-name/different-kind crashed.** That asymmetry is the whole defect.
+
+The source that triggers it is not exotic. `let total` in one block and `const total` in
+another is ordinary TypeScript; `class X` + `interface X` is declaration merging, which is
+legal and which the indexer must not reject.
+
+## Decision — make the uniqueness key kind-free
+
+`declarationGroupKey(file, qualifiedName)`, dropping `kind`, so the count is taken over
+exactly the namespace the FQN occupies.
+
+This is the **general form of a remedy the same function already applied one-off**.
+`isExportMarker` (`resolver.ts:177-181`) forces export-clause markers to the `overloaded`
+shape, and its comment describes precisely this failure — "would otherwise share its simple
+FQN (file#name) and abort the index via fqn_identity_collision". The special case stays: a
+marker can be the sole claimant of a name, so its group size is 1 and a count alone would
+not cover it.
+
+**Blast radius is provably confined to the crashing set**, which is why this is safe to
+land inside a sensor-repair PR:
+
+- `overload` is not an input to `canonicalizeStructuralSignature` (`fqn-codec.ts:127-136`
+  lists version, language, dialect, qualifiedName, kind, arity, typeTokens, modifiers). So
+  flipping it cannot move a `signatureHash`.
+- A `nested` symbol takes the disambiguated FQN whatever its overload says, so nested
+  identities are untouched.
+- The only identities that change are top-level symbols sharing a name with a
+  different-kind sibling — which today have no usable identity at all, because they abort
+  the index instead of receiving one.
+
+## The existing test asserted the defect
+
+`structural-resolver.test.ts` "fails session construction on a generation identity
+collision" pinned exactly this scenario — `class Same` + `interface Same` — as a throw. It
+was rewritten, not deleted: the same input now asserts two distinct identities, neither
+claiming the bare `file#name`, both resolvable. Pinning a crash on legal source is not a
+contract worth keeping.
+
+## Divergence — this is a second behavior change, and the spec said there would be one
+
+`spec.md`'s BEH-01 states the programme has exactly one behavior change, "deliberately
+isolated here so that neither PR-B nor PR-C — both behavior-preserving — carries one".
+That is now false for PR-A: the indexer no longer rejects a file it used to reject. The
+claim is corrected rather than quietly broken. It remains true that PR-B and PR-C carry
+none, which is what the isolation was protecting.
+
+The alternative was to record T6's gate as not-run. That was offered with the evidence
+above and declined in favour of repairing the blocker — correctly, since a gate that
+cannot run is the same class of defect this whole feature exists to remove.
