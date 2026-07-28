@@ -589,13 +589,43 @@ N01 @1  N02 @1  N03 @1  N04 @1  N05 @5  N06 @3  N10 @1  N11 @1  N12 @10  N13 @1 
 **Requirement**: BEH-01 (AC-1..AC-4)
 **Why it is isolated here**: it is the one behavior change in the four-PR programme. PR-B and PR-C are behavior-preserving; a behavior change riding along in either would make them validatable as neither.
 
-**Done when**:
-- [ ] `includePersistent: false` excludes persistent memories from the result set
-- [ ] The published MCP schema at `tools/search_memories.ts:61` is **unchanged** — this makes the existing advertisement true, it does not alter it
-- [ ] Discriminating sensor: reverting to `_includePersistent` makes the new test fail
-- [ ] `CHANGELOG.md` `### Fixed` — callers passing `false` today silently receive persistent results and will see a result-set change
+**The open question — what `false` means with no `sessionId` — was dissolved, not answered.** The
+premise carried into this task was that no `persistent` concept exists. There is no such *column*,
+but `MemoryLevel.PERSISTENT = 0` is a first-class level (`packages/shared/src/types/index.ts:19-25`),
+assigned by `memory-service.determineLevel` at `:91`/`:115` and written by `bootstrap-service:656`.
+Measured distribution: **L0 2 · L1 32 · L2 304 · L3 138 · L4 23**. The spec owner chose the
+level-based reading, which is well-defined with or without a `sessionId`. Rationale and the two
+rejected readings are recorded in `spec.md`.
 
-**Tests**: new unit test on `MemoryController.searchMemories` · **Gate**: `bun run test`
+**Done when**:
+- [x] `includePersistent: false` excludes persistent memories from the result set
+- [x] The published MCP schema at `tools/search_memories.ts:61` is **unchanged** — this makes the existing advertisement true, it does not alter it
+- [x] Discriminating sensor: reverting to `_includePersistent` makes the new test fail
+- [x] `CHANGELOG.md` `### Fixed` — callers passing `false` today silently receive persistent results and will see a result-set change
+
+**DONE.** Filter is applied **in SQL**, not after the fact: the controller asks for a `limit * 3`
+candidate pool and then re-ranks it, so dropping rows after `LIMIT` would have shrunk that pool
+instead of filling it with eligible rows.
+
+**Divergence — the same unmet promise existed in a second method.**
+`MemoryRepositoryPg.search(SearchFilters)` declares `includePersistent` as a *required* field and
+ignored it. Honoured there too. It has no production callers (tests only), so no live behavior
+changes; leaving it would have left the contract type false while "fixing" the contract.
+
+**Discriminating sensors, both layers, measured by reverting:**
+
+| Reverted | Result |
+| --- | --- |
+| controller back to `includePersistent: _includePersistent` | `memory-controller.test.ts` **30 pass / 2 fail** |
+| repository SQL predicate removed | `memory-repository-pg-coverage.test.ts` **52 pass / 1 fail** |
+| both restored | **32 / 0** and **53 / 0** |
+
+The repository test asserts a *pair* — the L0 row disappears and the non-L0 row survives — because
+an assertion on the excluded row alone would also pass if the query returned nothing at all. It also
+pins that omitting the filter behaves as `true`, matching the schema's documented default.
+
+**Tests**: `memory-controller.test.ts` (forwarding + default), `memory-repository-pg-coverage.test.ts`
+(behavioral L0 exclusion, dedicated DB) · **Gate**: `bun run test`
 **Commit**: `fix(memory): honour includePersistent in search_memories`
 
 ---

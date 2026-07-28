@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Indexing no longer aborts when one file declares the same name twice with different
+  kinds.** `let total` in one block and `const total` in another — or `class X` alongside
+  `interface X`, which is ordinary TypeScript declaration merging — made the whole index
+  fail with `fqn_identity_collision`, discarding every file in the run. Measured on this
+  repository: the abort came after all 1219 files had been discovered and parsed, roughly
+  four seconds in, so the visible symptom was a project that simply never became
+  searchable. The uniqueness check that decides whether a symbol gets the simple
+  `file#name` identity or a disambiguated one was counting names per `(file, name, kind)`
+  while the identity it protects is keyed on `(file, name)` alone; two declarations
+  differing only in kind therefore each believed themselves unique and both claimed the
+  same identity. Same-name/same-kind declarations were already disambiguated correctly and
+  are unaffected. Symbols that do not share a name keep the identity they had.
+
+- **`search_memories` honours `includePersistent`.** The option has been advertised in the
+  published MCP tool schema — and forwarded from the tool to the controller — while
+  nothing ever read it, so a caller passing `false` silently received persistent memories
+  anyway. It now excludes L0 (`MemoryLevel.PERSISTENT`) memories: the level assigned to
+  orchestrator decisions and criticals, and the one the bootstrap seed writes. The
+  published schema is unchanged; this makes the existing advertisement true rather than
+  altering it. **Callers passing `includePersistent: false` today will see a smaller
+  result set.** The default remains `true`, so callers that omit it are unaffected.
+
 ## [1.9.0] - 2026-07-28
 
 ### Changed

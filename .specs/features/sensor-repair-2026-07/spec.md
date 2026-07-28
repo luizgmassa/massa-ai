@@ -402,6 +402,32 @@ exactly one location repo-wide at authoring time.
 This is the one behavior change in the programme, and it is deliberately isolated here so that
 neither PR-B nor PR-C — both behavior-preserving — carries one.
 
+**Divergence — PR-A carries two behavior changes, not one.** T6a repairs a structural-resolver
+defect that aborted every full index (`design.md`, Fourth fork), so the indexer now accepts a file
+it used to reject. Recorded rather than quietly broken. The isolation's actual purpose survives:
+PR-B and PR-C still carry none.
+
+**Divergence — "persistent" is defined, and the handoff's premise that it is not was wrong.** The
+carried-forward note into this task said there is no `persistent` field on a memory. There is no
+such *column*, but `MemoryLevel.PERSISTENT = 0` (`packages/shared/src/types/index.ts:19-25`) is a
+first-class level, assigned by `memory-service.determineLevel` (`:91`, `:115`) to orchestrator
+decisions and criticals, and written by `bootstrap-service` (`:656`). Measured distribution on the
+developer database: **L0 2 · L1 32 · L2 304 · L3 138 · L4 23**.
+
+**Decision — `includePersistent: false` excludes L0.** Taken by the spec owner against two
+alternatives. The session-based reading ("memories from other sessions", per the schema string) was
+rejected on measurement: `fullTextSearch` already hard-filters `session_id = sessionId`, so `false`
+is *already* today's behavior under that reading and it is the `true` **default** that is unhonoured
+— honouring it would widen the result set for every caller, contradicting AC-4, which scopes the
+change to callers passing `false`. It is also nearly vacuous here: only **2 of 499** rows carry a
+`session_id` at all. The level-based reading is well-defined whether or not a `sessionId` is passed,
+which closes the open question without inventing meaning for it.
+
+**Scope note**: `MemoryRepositoryPg.search(SearchFilters)` declared `includePersistent` as a
+*required* field and ignored it too — the same unmet promise in a second method. Honoured there as
+well. That method has no production callers (tests only), so this changes no live behavior; leaving
+it would have left the contract type false.
+
 **AC-1**: `MemoryController.searchMemories` honours `includePersistent`; passing `false` excludes
 persistent memories from the result set.
 **AC-2**: A test fails against the current `_includePersistent` code and passes after the change.

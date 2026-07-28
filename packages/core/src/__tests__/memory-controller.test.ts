@@ -391,6 +391,27 @@ describe("MemoryController", () => {
       });
     });
 
+    // BEH-01. The controller used to destructure this as `_includePersistent`
+    // and never read it, so the option the MCP schema advertises did nothing.
+    // Asserting on the forwarded filter is what discriminates: under the old
+    // code the key is simply absent from the repository call, whatever value
+    // the caller passed.
+    test("forwards includePersistent:false to fullTextSearch", async () => {
+      lastRepo.fullTextSearch = mock(() => Promise.resolve([]));
+      await ctrl.search({ query: "q", includePersistent: false });
+      expect(lastRepo.fullTextSearch.mock.calls[0][2]).toMatchObject({
+        includePersistent: false,
+      });
+    });
+
+    test("defaults includePersistent to true when the caller omits it", async () => {
+      lastRepo.fullTextSearch = mock(() => Promise.resolve([]));
+      await ctrl.search({ query: "q" });
+      expect(lastRepo.fullTextSearch.mock.calls[0][2]).toMatchObject({
+        includePersistent: true,
+      });
+    });
+
     test("increments access counts for each result", async () => {
       lastRepo.fullTextSearch = mock(() =>
         Promise.resolve([makeRow({ id: "r1" })]),
