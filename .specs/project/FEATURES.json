@@ -602,7 +602,7 @@
     },
     {
       "slug": "core-layering-god-module-split",
-      "title": "Core layering and god-module split \u2014 adopt or retire the controllers layer, break the contextual-search-rlm facade, rename rlm-* once",
+      "title": "Core layering and god-module split \u2014 retire the controllers layer, break the contextual-search-rlm facade, rename rlm-* once",
       "status": "specified",
       "priority": "P2",
       "phases": {
@@ -611,8 +611,25 @@
         "tasks": false,
         "execute": false
       },
-      "spec": ".specs/features/core-layering-god-module-split/spec.md"
+      "spec": ".specs/features/core-layering-god-module-split/spec.md",
+      "depends_on": [
+        "sensor-repair-2026-07"
+      ]
+    },
+    {
+      "slug": "sensor-repair-2026-07",
+      "title": "Sensor repair 2026-07 \u2014 reset the coverage gate's database, wire it into CI, stop tests reading the real config, content-anchor the needles fixture, honour includePersistent",
+      "status": "specified",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": true,
+        "execute": false
+      },
+      "spec": ".specs/features/sensor-repair-2026-07/spec.md",
+      "tasks": ".specs/features/sensor-repair-2026-07/tasks.md"
     }
   ],
-  "active_feature": "audit-remediation-2026-07"
+  "active_feature": "sensor-repair-2026-07"
 }
