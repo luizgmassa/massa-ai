@@ -156,7 +156,10 @@ shared index.
 Turbo sandboxes the environment: any env var a test reads must be listed in
 `turbo.json` → `tasks.test.passThroughEnv`, or it arrives `undefined` under
 `bun run test` while working fine when you invoke `bun test` directly. Adding a new
-`RLM_*` / `MASSA_AI_*` knob means editing that list too.
+`MASSA_AI_*` knob means editing that list too. There is exactly one env prefix in this
+project (**AD-010**), and all ten `MASSA_AI_LLM_*` vars are now listed — six of them were
+absent before that decision, so they arrived `undefined` under `bun run test` while
+appearing to work under a direct `bun test`.
 
 ## Architecture
 
@@ -208,10 +211,10 @@ response.
 ### LLM behaviour
 
 Every LLM-driven feature defaults **OFF** and silently degrades to a rule-based path;
-`RLM_LLM_ENABLED=true` turns them all on. There are 11 call sites split by task shape via
-a `modelRole` option in `packages/core/src/services/memory/llm-client.ts`: 8 NL-judgment
-sites use `RLM_LLM_MODEL`, 3 code-oriented sites (bootstrap seed, reranker,
-code-compressor) use `RLM_LLM_CODE_MODEL`. Both must be **non-thinking instruct** models —
+`MASSA_AI_LLM_ENABLED=true` turns them all on. There are 10 call sites split by task shape
+via a `modelRole` option in `packages/core/src/services/memory/llm-client.ts`: 7 NL-judgment
+sites use `MASSA_AI_LLM_MODEL`, 3 code-oriented sites (bootstrap seed, reranker,
+code-compressor) use `MASSA_AI_LLM_CODE_MODEL`. Both must be **non-thinking instruct** models —
 a thinking model routes structured output into the reasoning channel and silently burns
 the 90 s timeout.
 

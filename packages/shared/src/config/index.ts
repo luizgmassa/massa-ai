@@ -20,14 +20,14 @@ import { loadConfigSafe, getConfigDir } from "./config-loader";
  * so structured/free-text calls finish fast and never stall on a reasoning
  * channel (the qwen3 thinking-model 90s-timeout degrade). Single source of
  * truth — `llm-client.ts` falls back to this constant instead of a bare literal.
- * Override via RLM_LLM_MODEL.
+ * Override via MASSA_AI_LLM_MODEL.
  */
 export const DEFAULT_LLM_MODEL = "qwen2.5:7b-instruct";
 
 /**
  * Default LLM model for code-oriented sites (bootstrap summarization, reranker
  * verdict, code compression). Coder-tuned instruct model. Override via
- * RLM_LLM_CODE_MODEL.
+ * MASSA_AI_LLM_CODE_MODEL.
  */
 export const DEFAULT_LLM_CODE_MODEL = "qwen2.5-coder:7b";
 
@@ -77,7 +77,7 @@ export interface ServerConfig {
   // Shared local-first LLM configuration (cross-cutting §1).
   // Consumed by consolidation (Phase 1), query rewrite (Phase 2),
   // compression (Phase 7), bootstrap (Phase 4), auto-improve (Phase 5).
-  // Default-off; env RLM_LLM_ENABLED=true opts in. Ollama-local defaults.
+  // Default-off; env MASSA_AI_LLM_ENABLED=true opts in. Ollama-local defaults.
   llm: {
     enabled: boolean;
     baseUrl: string;
@@ -86,13 +86,13 @@ export interface ServerConfig {
      * Default model for NL/instruction-shaped LLM sites (consolidation,
      * salience, query rewrite, handoff polish, etc.). Pure-instruct by default
      * so structured/free-text calls finish fast and never stall on a reasoning
-     * channel. Override via RLM_LLM_MODEL.
+     * channel. Override via MASSA_AI_LLM_MODEL.
      */
     model: string;
     /**
      * Model for code-oriented LLM sites (bootstrap summarization, reranker
      * verdict, code compression). Defaults to a coder-tuned instruct model.
-     * Override via RLM_LLM_CODE_MODEL.
+     * Override via MASSA_AI_LLM_CODE_MODEL.
      */
     codeModel: string;
     temperature: number;
@@ -572,26 +572,26 @@ export const defaultConfig: ServerConfig = {
   // Shared local-first LLM block (cross-cutting §1). Ollama defaults; the
   // OpenAI-compatible provider is created from these in services/memory/llm-client.ts.
   llm: {
-    enabled: envBool("RLM_LLM_ENABLED", fileConfig.llm?.enabled ?? false),
+    enabled: envBool("MASSA_AI_LLM_ENABLED", fileConfig.llm?.enabled ?? false),
     baseUrl: envString(
-      "RLM_LLM_BASE_URL",
+      "MASSA_AI_LLM_BASE_URL",
       fileConfig.llm?.baseUrl ?? "http://localhost:11434/v1",
     ),
-    apiKey: envString("RLM_LLM_API_KEY", fileConfig.llm?.apiKey ?? "ollama"),
-    model: envString("RLM_LLM_MODEL", fileConfig.llm?.model ?? DEFAULT_LLM_MODEL),
+    apiKey: envString("MASSA_AI_LLM_API_KEY", fileConfig.llm?.apiKey ?? "ollama"),
+    model: envString("MASSA_AI_LLM_MODEL", fileConfig.llm?.model ?? DEFAULT_LLM_MODEL),
     codeModel: envString(
-      "RLM_LLM_CODE_MODEL",
+      "MASSA_AI_LLM_CODE_MODEL",
       fileConfig.llm?.codeModel ?? DEFAULT_LLM_CODE_MODEL,
     ),
     temperature: envNum(
-      "RLM_LLM_TEMPERATURE",
+      "MASSA_AI_LLM_TEMPERATURE",
       fileConfig.llm?.temperature ?? 0.2,
     ),
     maxOutputTokens: envNum(
-      "RLM_LLM_MAX_OUTPUT_TOKENS",
+      "MASSA_AI_LLM_MAX_OUTPUT_TOKENS",
       fileConfig.llm?.maxOutputTokens ?? 8000,
     ),
-    timeoutMs: envNum("RLM_LLM_TIMEOUT_MS", fileConfig.llm?.timeoutMs ?? 90000),
+    timeoutMs: envNum("MASSA_AI_LLM_TIMEOUT_MS", fileConfig.llm?.timeoutMs ?? 90000),
     // qwen3 thinking models return their answer in the reasoning channel; the
     // content channel can come back empty when thinking consumes the token
     // budget. disableThink (a) asks Ollama to stop thinking (best-effort) and
@@ -600,7 +600,7 @@ export const defaultConfig: ServerConfig = {
     // so this fallback is dormant — kept as a safety net for any Ollama shape
     // shift or an env override back to a thinking model.
     disableThink: envBool(
-      "RLM_LLM_DISABLE_THINK",
+      "MASSA_AI_LLM_DISABLE_THINK",
       fileConfig.llm?.disableThink ?? true,
     ),
   },
@@ -735,9 +735,9 @@ export const defaultConfig: ServerConfig = {
       "TARGET_COMPRESSION_RATIO",
       fileConfig.compression?.targetCompressionRatio ?? 0.7,
     ),
-    // Compression-specific prompt override (env RLM_LLM_PROMPT). The LLM
+    // Compression-specific prompt override (env MASSA_AI_LLM_PROMPT). The LLM
     // connection fields (model/baseUrl/etc.) live in the top-level `llm` block.
-    prompt: process.env.RLM_LLM_PROMPT || fileConfig.compression?.prompt || undefined,
+    prompt: process.env.MASSA_AI_LLM_PROMPT || fileConfig.compression?.prompt || undefined,
   },
 
   // Wave 5 FR-05 / N3: impact-analysis graph traversal options.

@@ -60,8 +60,8 @@ try {
   if (cfg.database?.url && !process.env.DATABASE_URL) {
     process.env.DATABASE_URL = cfg.database.url;
   }
-  if (cfg.llm?.apiKey && !process.env.RLM_LLM_API_KEY) {
-    process.env.RLM_LLM_API_KEY = cfg.llm.apiKey;
+  if (cfg.llm?.apiKey && !process.env.MASSA_AI_LLM_API_KEY) {
+    process.env.MASSA_AI_LLM_API_KEY = cfg.llm.apiKey;
   }
   if (cfg.embedding?.apiKey && !process.env.OLLAMA_API_KEY) {
     // Embedding provider key — OLLAMA_API_KEY is the ollama-agnostic home for

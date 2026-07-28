@@ -386,14 +386,14 @@ ENABLE_METRICS=true
 
 # ── Local-first LLM (Ollama); default OFF, silent degrade ──
 # Auto-set ON by install.sh only when qwen2.5:7b-instruct is pulled in Ollama.
-RLM_LLM_ENABLED=${llm_enabled}
-RLM_LLM_BASE_URL=http://localhost:11434/v1
-RLM_LLM_API_KEY=ollama
-RLM_LLM_MODEL=${llm_model}
-RLM_LLM_CODE_MODEL=${llm_code_model}
-RLM_LLM_TEMPERATURE=0.2
-RLM_LLM_MAX_OUTPUT_TOKENS=8000
-RLM_LLM_TIMEOUT_MS=90000
+MASSA_AI_LLM_ENABLED=${llm_enabled}
+MASSA_AI_LLM_BASE_URL=http://localhost:11434/v1
+MASSA_AI_LLM_API_KEY=ollama
+MASSA_AI_LLM_MODEL=${llm_model}
+MASSA_AI_LLM_CODE_MODEL=${llm_code_model}
+MASSA_AI_LLM_TEMPERATURE=0.2
+MASSA_AI_LLM_MAX_OUTPUT_TOKENS=8000
+MASSA_AI_LLM_TIMEOUT_MS=90000
 
 # ── Passive capture ───────────────────────────────────────────
 HOOKS_ENABLED=true
@@ -583,7 +583,7 @@ print_hooks_guide() {
   echo -e "    ${CYAN}MASSA_AI_PROJECT_ID${NC} optional (defaults to cwd basename)"
   echo ""
   echo -e "  ${DIM}Observations are stored in PostgreSQL and consolidated into${NC}"
-  echo -e "  ${DIM}memories only when RLM_LLM_ENABLED=true (otherwise stored raw).${NC}"
+  echo -e "  ${DIM}memories only when MASSA_AI_LLM_ENABLED=true (otherwise stored raw).${NC}"
   echo ""
 }
 
@@ -871,7 +871,7 @@ show_integration() {
   fi
   echo ""
   echo -e "  ${DIM}For Ollama completion features (consolidation, rerank, query understanding):${NC}"
-  echo -e "  ${DIM}set RLM_LLM_ENABLED=true — see .env.example and README §Local-first LLM.${NC}"
+  echo -e "  ${DIM}set MASSA_AI_LLM_ENABLED=true — see .env.example and README §Local-first LLM.${NC}"
   echo ""
 }
 

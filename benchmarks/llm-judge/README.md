@@ -77,9 +77,9 @@ harness — no `Date.now()` for the path).
 
 | Var | Default | Purpose |
 |---|---|---|
-| `RLM_LLM_MODEL` | `qwen2.5:7b-instruct` | instruct model (consolidator + salience probes) |
-| `RLM_LLM_CODE_MODEL` | `qwen2.5-coder:7b` | coder model (reranker probe) |
-| `RLM_LLM_BASE_URL` | `http://localhost:11434/v1` | Ollama OpenAI-compat endpoint |
+| `MASSA_AI_LLM_MODEL` | `qwen2.5:7b-instruct` | instruct model (consolidator + salience probes) |
+| `MASSA_AI_LLM_CODE_MODEL` | `qwen2.5-coder:7b` | coder model (reranker probe) |
+| `MASSA_AI_LLM_BASE_URL` | `http://localhost:11434/v1` | Ollama OpenAI-compat endpoint |
 
 ## Comparing vs the baseline
 

@@ -421,7 +421,7 @@ hosts use `hook_ingest` or `POST /api/v1/hook/batch`.
 
 ```bash
 # Observations persist in PostgreSQL and are consolidated into memories only
-# when RLM_LLM_ENABLED=true (else stored raw, bridge skips silently).
+# when MASSA_AI_LLM_ENABLED=true (else stored raw, bridge skips silently).
 ```
 
 ### 3. Work — recall and search
@@ -562,15 +562,15 @@ status.
 
 ```bash
 # .env  — all LLM-gated features default OFF; flip one switch to enable them all
-RLM_LLM_ENABLED=true
-RLM_LLM_BASE_URL=http://localhost:11434/v1
-RLM_LLM_API_KEY=ollama
-RLM_LLM_MODEL=qwen2.5:7b-instruct        # default instruct model (NL-judgment sites)
-RLM_LLM_CODE_MODEL=qwen2.5-coder:7b      # code-oriented sites (bootstrap seed, reranker, compress)
-# RLM_LLM_DISABLE_THINK=true             # best-effort thinking-disable (default true; safety net)
+MASSA_AI_LLM_ENABLED=true
+MASSA_AI_LLM_BASE_URL=http://localhost:11434/v1
+MASSA_AI_LLM_API_KEY=ollama
+MASSA_AI_LLM_MODEL=qwen2.5:7b-instruct        # default instruct model (NL-judgment sites)
+MASSA_AI_LLM_CODE_MODEL=qwen2.5-coder:7b      # code-oriented sites (bootstrap seed, reranker, compress)
+# MASSA_AI_LLM_DISABLE_THINK=true             # best-effort thinking-disable (default true; safety net)
 ```
 
-With `RLM_LLM_ENABLED=true` you get: hook→memory consolidation, handoff-summary
+With `MASSA_AI_LLM_ENABLED=true` you get: hook→memory consolidation, handoff-summary
 polish, query understanding (rewrite + HyDE), LLM-judge rerank, and auto
 importance scoring. Set it `false` (the default) and every one of those silently
 falls back to its rule-based path.
@@ -578,8 +578,8 @@ falls back to its rule-based path.
 > **Per-task model routing (new 2026-07-09):** the 11 LLM call sites split by
 > task shape. The 8 NL-judgment sites (salience judge, consolidator,
 > observation/auto-improve jobs, handoff summary, query rewrite, HyDE) use
-> `RLM_LLM_MODEL`; the 3 code-oriented sites (bootstrap `SeedMemoriesSchema`,
-> reranker, `code-compressor`) use `RLM_LLM_CODE_MODEL`. Routing is per-call via
+> `MASSA_AI_LLM_MODEL`; the 3 code-oriented sites (bootstrap `SeedMemoriesSchema`,
+> reranker, `code-compressor`) use `MASSA_AI_LLM_CODE_MODEL`. Routing is per-call via
 > a `modelRole` option in `packages/core/src/services/memory/llm-client.ts`.
 > Both default to **non-thinking instruct** models so structured-output calls
 > return fast (~5 s) and reliably, instead of burning a 90 s wall-clock timeout
@@ -728,7 +728,7 @@ bun run dev:api
 
 Environment variables for fine-tuning retrieval (all optional). LLM-gated
 knobs (`SEARCH_QUERY_UNDERSTANDING_*`, `SEARCH_RERANK_*`) default **OFF** and
-require `RLM_LLM_ENABLED=true`.
+require `MASSA_AI_LLM_ENABLED=true`.
 
 **See [FEATURES.md](./FEATURES.md#search-quality-tuning) for the full table**
 of search quality variables and defaults.

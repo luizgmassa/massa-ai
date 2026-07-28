@@ -598,6 +598,44 @@ secondary browser-only layer over the mandatory key and never overclaims it in a
   a fresh auto-provisioned install. This also closes lesson **L-002** (hook tests assert exit 0
   only, never the POST body/endpoint) — the first time that candidate lesson has been actionable.
 
+### TASK-017 — the zero-`RLM_` gate cannot be literally zero
+
+The task's done-when was `rg 'RLM_' --glob '!CHANGELOG.md' --glob '!.specs/archive/**'
+--glob '!.specs/features/**'` returns nothing. Executed verbatim after the rename it returns
+**eight** hits in three places, none of them a live reference:
+
+1. `.specs/project/STATE.md` (3) — AD-010 itself plus the feature's own plan notes. The gate
+   excluded `.specs/archive/**` and `.specs/features/**` but not `.specs/project/**`, and a
+   decision record that authorises retiring a name has to be able to name it.
+2. `packages/shared/src/config/__tests__/llm-env-prefix.test.ts` (3) — the discriminating test.
+   Its whole job is to set `RLM_LLM_*` and prove nothing moves, so it must contain the literal.
+3. `scripts/__tests__/llm-env-passthrough.test.ts` (2) — the regression guard asserting `RLM_`
+   never reappears in `turbo.json`. It must name the pattern it forbids.
+
+The tempting fix — building the old prefix by concatenation (`"RLM" + "_LLM_"`) so the literal
+never appears — was rejected. It would satisfy the grep while making the gate lie about what the
+tree contains, which is worse than an exclusion a reviewer can see. The gate is therefore amended
+to name its exclusions explicitly:
+
+```
+rg 'RLM_' --hidden --glob '!CHANGELOG.md' --glob '!.specs/**' \
+  --glob '!**/llm-env-prefix.test.ts' --glob '!**/llm-env-passthrough.test.ts'
+```
+
+That returns nothing. The requirement it enforces is unchanged: **no live `RLM_` reference
+remains** — only the two proofs that it is dead, and the decision record that killed it.
+
+### TASK-017 — the call-site count was wrong in the source it was corrected from
+
+`CLAUDE.md` claimed "11 call sites … 8 NL-judgment sites". Counted from source, there are **10**:
+three `modelRole: "code"` (`bootstrap-service.ts:496`, `reranker.ts:92`,
+`code-compressor.ts:103`) and seven default-instruct (`consolidator.ts:211`,
+`handoff-service.ts:278`, `salience-judge.ts:78`, `query-understanding.ts:102` and `:132`,
+`observation-consolidation-job.ts:190`, `auto-improve-llm.ts:44`). Four further `modelRole`
+occurrences are option-type signatures threading the value through, not call sites — counting
+those is the likeliest origin of the 11. The task text's "correct 11 → 10" was right, and the
+"8 NL-judgment" half needed correcting to 7 as well, which the task text did not name.
+
 ## Done Criteria
 
 An implementer can execute PR1 and PR2 without inventing a contract decision. Every requirement

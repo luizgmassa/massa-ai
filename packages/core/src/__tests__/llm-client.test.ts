@@ -266,7 +266,7 @@ describe("llm-client — per-task model routing (T4)", () => {
   test("instruct role (default) selects config.llm.model", async () => {
     await llmComplete("hello"); // default role = instruct
     // lastModel is whatever config.llm.model resolves to (constant fallback in
-    // test env where RLM_LLM_MODEL is unset → DEFAULT_LLM_MODEL). The key
+    // test env where MASSA_AI_LLM_MODEL is unset → DEFAULT_LLM_MODEL). The key
     // assertion is that it is NOT the codeModel.
     expect(lastModel).not.toBeNull();
     expect(typeof lastModel).toBe("string");
@@ -297,7 +297,7 @@ describe("llm-client — per-task model routing (T4)", () => {
 
   test("constant-based fallback: default path resolves to config.llm.model (env or constant)", async () => {
     // The instruct default must equal whatever config.llm.model resolves to
-    // (env RLM_LLM_MODEL if set, else the DEFAULT_LLM_MODEL constant). The
+    // (env MASSA_AI_LLM_MODEL if set, else the DEFAULT_LLM_MODEL constant). The
     // load-bearing assertion: no bare qwen3.5:9b literal is hardcoded in
     // llm-client.ts — the source of truth is config (which itself references the
     // constant). We assert the resolved model matches config, and that the

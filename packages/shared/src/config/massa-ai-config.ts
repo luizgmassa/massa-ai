@@ -19,7 +19,7 @@ export interface MassaAiConfig {
     // Runtime canonical shape — mirrors ServerConfig.compression. The loader
     // consumes `targetCompressionRatio` + `minTokensForCompression` +
     // `defaultStrategy`. `prompt` is an optional compression-specific override
-    // (env `RLM_LLM_PROMPT`); the LLM connection fields live in the top-level
+    // (env `MASSA_AI_LLM_PROMPT`); the LLM connection fields live in the top-level
     // `llm` block.
     defaultStrategy: string;
     minTokensForCompression: number;

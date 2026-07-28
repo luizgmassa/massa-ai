@@ -151,7 +151,7 @@ export class ObservationConsolidationJob {
     };
 
     // R7 silent-skip: trust the injected surface's enabled flag. The default
-    // surface reads the real config (llm.enabled / RLM_LLM_ENABLED); a test
+    // surface reads the real config (llm.enabled / MASSA_AI_LLM_ENABLED); a test
     // injects a fake surface whose isEnabled() is authoritative. This avoids
     // depending on the process-wide shared-config singleton (test-isolation).
     let llmOn = false;

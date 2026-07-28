@@ -499,11 +499,12 @@ Phase 6:  T16 ──→ T17 ──→ T18 ──→ T19 ──→ T20 ──→ 
 **Non-goals**: config.json keys are already prefix-free — **no config-file migration**.
 
 **Done when**:
-- [ ] `rg 'RLM_' --glob '!CHANGELOG.md' --glob '!.specs/archive/**' --glob '!.specs/features/**'` returns nothing
-- [ ] `turbo.json` `passThroughEnv` lists **all 10** `MASSA_AI_LLM_*` vars (today only 4 of 10 are listed — renaming without this preserves a silent bug under a new name)
-- [ ] `CLAUDE.md:159` reworded (not substituted) and the "11 call sites" claim corrected to **10** (3 `modelRole:"code"` + 7 default-instruct)
-- [ ] Test: `MASSA_AI_LLM_ENABLED=true` activates the call sites; the old name does nothing
-- [ ] Full gate passes; test count recorded
+- [x] `rg 'RLM_' --hidden --glob '!CHANGELOG.md' --glob '!.specs/**' --glob '!**/llm-env-prefix.test.ts' --glob '!**/llm-env-passthrough.test.ts'` returns nothing.
+      **Glob set amended during Execute** — the original omitted `.specs/project/**` (which holds AD-010 itself) and predates the two test files whose entire purpose is to name the retired prefix. Hiding the literal by string concatenation was considered and rejected: it satisfies the grep while making the gate lie. See `design.md` → "TASK-017 — the zero-`RLM_` gate cannot be literally zero".
+- [x] `turbo.json` `passThroughEnv` lists **all 10** `MASSA_AI_LLM_*` vars (was 4 of 10 — renaming without this preserves a silent bug under a new name)
+- [x] `CLAUDE.md:159` reworded (not substituted) and the "11 call sites" claim corrected to **10** (3 `modelRole:"code"` + 7 default-instruct). The companion "8 NL-judgment sites" was also wrong and is corrected to **7**, which the task text did not name; counted from source in `design.md`.
+- [x] Test: `MASSA_AI_LLM_ENABLED=true` activates the call sites; the old name does nothing — `packages/shared/src/config/__tests__/llm-env-prefix.test.ts`, observed **red in both directions** before the rename
+- [x] Full gate passes; test count recorded — shared 207 pass/0 fail (was 204), `test:scripts` 577 pass/0 fail (was 574), type-check 6/6, build 5/5, core LLM filter PASS all 14 groups
 
 **Tests**: unit · **Gate**: full
 **Commit**: `feat(config)!: rename RLM_LLM_* env vars to MASSA_AI_LLM_*`
