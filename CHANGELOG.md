@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-07-28
+
 ### Changed
 
 - **BREAKING — the ten `RLM_LLM_*` environment variables are renamed to `MASSA_AI_LLM_*`.
