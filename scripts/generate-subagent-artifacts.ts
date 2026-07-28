@@ -16,7 +16,6 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { tmpdir } from "os";
-import { spawnSync } from "child_process";
 
 // ── Paths ───────────────────────────────────────────────────────────────────
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -151,14 +150,6 @@ export function toolsFor(name: SpecialistName): readonly string[] {
 const OPENCODE_BASH_OVERRIDE: Partial<Record<SpecialistName, string>> = {
   planner: `{ "*": "ask" }`,
   navigator: `{ "pwd": "allow", "*": "deny" }`,
-};
-
-// ── Host built-in names (spec name-collision ACs) ───────────────────────────
-const HOST_BUILTINS: Record<Host, ReadonlySet<string>> = {
-  claude: new Set(["Explore", "Plan", "general-purpose"]),
-  codex: new Set(["default", "worker", "explorer"]),
-  cursor: new Set(["Explore", "Plan", "general-purpose"]),
-  opencode: new Set(["build", "plan", "general", "explore", "scout"]),
 };
 
 // ── Types ───────────────────────────────────────────────────────────────────

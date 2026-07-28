@@ -11,7 +11,6 @@ import type {
   SymbolDefinition,
   SymbolReference,
   SymbolImport,
-  CentralityEntry,
   WorkspaceRow,
   WorkspaceStatus,
   SymbolKind,

@@ -25,7 +25,6 @@ import type {
   TaskCheckpoint,
   TaskState,
   CheckpointType,
-  RestoreResult,
 } from "@massa-ai/shared";
 
 export interface CheckpointMetadata {

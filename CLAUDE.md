@@ -63,9 +63,21 @@ bun run dev:mcp                # MCP server (stdio) with watch
 cd packages/core && bunx prisma migrate deploy
 ```
 
-`bun run lint` is a **no-op** — `turbo.json` declares a `lint` task but no package
-implements it ("No tasks were executed"). There is no linter in this repo; don't cite it
-as a gate.
+`bun run lint` is **oxlint** (pinned exact, root devDependency), configured by
+`.oxlintrc.json`: the `correctness` category at `error`, every other category off. It is a
+real gate — CI's `build` job runs it and it exits non-zero on a violation.
+
+It runs **once from the repo root**, not through turbo. Turbo only dispatches tasks to
+workspace packages (`packages/*`, `apps/*`), so a per-package `lint` task could never reach
+`scripts/` or `benchmarks/` — neither is a workspace package, and they held 21 of the
+violations found on adoption. `turbo.json` no longer declares a `lint` task at all.
+
+Two consequences worth knowing. `oxlint --quiet` reports only errors, and it surfaces oxc
+**semantic** errors (duplicate declarations and the like) that no rule severity can silence
+— that is how the duplicate `AttributionResolverLike` import in `hook-service.test.ts` was
+found, which `tsc` structurally could not see because `packages/core/tsconfig.json` excludes
+`src/__tests__`. And `--fix` is safe, while `--fix-suggestions` / `--fix-dangerously` are
+documented as behavior-changing; only `--fix` is wired into `bun run lint:fix`.
 
 `type-check` only covers the 4 packages that declare the script (tools-api, mcp-client,
 opencode-plugin, web-ui). `packages/core` and `packages/shared` are type-checked by their
@@ -116,16 +128,44 @@ Claude/Codex/Cursor/OpenCode plugin artifacts. Run it after touching
 `generate-subagent-artifacts.ts`. `scripts/run-deterministic.ts` only scans
 `packages/core/src/__tests__` — it is a core gate, not a repo-wide one.
 
-`bunfig.toml` sets a global **5 s per-test timeout** and `coverage = true`. A test doing
-real indexing, embedding, or a cold native compile needs an explicit longer budget, passed
-as the third arg to `test()` — the established idiom here is `}, 60_000);` or `}, 30_000);`
-(see `architecture-map.test.ts`, `vector-store-factory.test.ts`). Raise the per-test value,
-never the global one; the 5 s default is what keeps real hangs visible. Two
-tests currently flake this way in the full parallel aggregate while passing standalone —
-`mcp-client` `embedded-api-client-endpoints.test.ts` ("routes without 404") and core's
-Dart `structural` case, both dying at exactly 5001 ms when Postgres and Ollama are
-contended. A 5001 ms failure is a load problem, not a logic bug; re-run the package alone
-before chasing it.
+`bunfig.toml` sets a global **5 s per-test timeout**. Coverage is no longer on by default —
+it is the explicit `bun run test:coverage` gate (DEBT-02). A test doing real indexing,
+embedding, or a cold native compile needs an explicit longer budget, passed as the third
+arg to `test()` — the established idiom here is `}, 60_000);` or `}, 30_000);` (see
+`architecture-map.test.ts`, `vector-store-factory.test.ts`). Raise the per-test value,
+never the global one; the 5 s default is what keeps real hangs visible.
+
+**A 5001 ms failure is not automatically a load problem.** That was the standing advice and
+it was wrong at least as often as it was right. The commoner cause is that the test reached
+a **live LLM or embedding provider**, because the config layer reads the developer's own
+`~/.config/massa-ai/config.json` — and on a machine with a local Ollama, `llm.enabled` is
+`true` there. Measured on `CodeCompressor`: **42030 ms on a cold model load, 690 ms warm**.
+That is exactly why it looks like flakiness — it passes on a warm model and hangs on a cold
+one — and why **CI never sees it**, since CI has no config file and every LLM feature
+defaults off.
+
+Before reaching for a bigger budget, re-run with an empty config dir:
+
+```bash
+XDG_CONFIG_HOME=$(mktemp -d) bun test <file>
+```
+
+If that fixes it, the test is missing a seam, not a timeout. Pin `_setLlmEnabledForTesting(false)`,
+inject the subject's own LLM seam, or add the `mock.module` the file is missing — the recurring
+omission is `../data/vector/vector-store-factory.js`, without which `ensureInitializedImpl`
+falls back to the real factory and runs live embedding-provider auto-selection. `dart-support`,
+`code-compressor` and `rlm-admin` were all this, and were fixed rather than budgeted.
+
+Genuinely slow tests are a separate class and do get budgets: `etl-cache-invalidation` measures
+**66 s** under `--coverage` instrumentation, and `architecture-map`'s `getProjectMap` cases need
+a budget that tracks accumulated shared test-database state rather than the fixture — the
+same file measures 1213 ms against a fresh database and over 120 s partway through the gate.
+Note the isolation runner is **sequential**, one child process at a time, so a slow suite
+inside it is accumulation, not contention. **Known outstanding case:** `mcp-client`
+`embedded-api-client-endpoints.test.ts` ("routes without 404" for `/search/project` and
+`/search/code`) fails at 5001 ms under a real user config and passes with an empty one. It is
+deliberately unmocked integration and core does not export the LLM seam to `apps/`, so it has no
+one-line fix; run that package with `XDG_CONFIG_HOME` set until it does.
 
 ```bash
 # one file (safe — single process)
@@ -156,7 +196,10 @@ shared index.
 Turbo sandboxes the environment: any env var a test reads must be listed in
 `turbo.json` → `tasks.test.passThroughEnv`, or it arrives `undefined` under
 `bun run test` while working fine when you invoke `bun test` directly. Adding a new
-`RLM_*` / `MASSA_AI_*` knob means editing that list too.
+`MASSA_AI_*` knob means editing that list too. There is exactly one env prefix in this
+project (**AD-010**), and all ten `MASSA_AI_LLM_*` vars are now listed — six of them were
+absent before that decision, so they arrived `undefined` under `bun run test` while
+appearing to work under a direct `bun test`.
 
 ## Architecture
 
@@ -208,10 +251,10 @@ response.
 ### LLM behaviour
 
 Every LLM-driven feature defaults **OFF** and silently degrades to a rule-based path;
-`RLM_LLM_ENABLED=true` turns them all on. There are 11 call sites split by task shape via
-a `modelRole` option in `packages/core/src/services/memory/llm-client.ts`: 8 NL-judgment
-sites use `RLM_LLM_MODEL`, 3 code-oriented sites (bootstrap seed, reranker,
-code-compressor) use `RLM_LLM_CODE_MODEL`. Both must be **non-thinking instruct** models —
+`MASSA_AI_LLM_ENABLED=true` turns them all on. There are 10 call sites split by task shape
+via a `modelRole` option in `packages/core/src/services/memory/llm-client.ts`: 7 NL-judgment
+sites use `MASSA_AI_LLM_MODEL`, 3 code-oriented sites (bootstrap seed, reranker,
+code-compressor) use `MASSA_AI_LLM_CODE_MODEL`. Both must be **non-thinking instruct** models —
 a thinking model routes structured output into the reasoning channel and silently burns
 the 90 s timeout.
 

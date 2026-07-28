@@ -44,7 +44,7 @@ function runBin(bin: string, args: string[], env?: Record<string, string>): Prom
   return new Promise((resolve, reject) => {
     const child = spawn("bun", [bin, ...args], {
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, ...(env ?? {}) },
+      env: { ...process.env, ...env },
     });
     let stdout = "";
     let stderr = "";
@@ -104,9 +104,6 @@ describe.skipIf(!READY)("T12 — CLI smoke", () => {
     // Hard gate: the loader MUST honor XDG_CONFIG_HOME. Failing here is the
     // correct signal — mutating tests below depend on temp-dir isolation.
     const honored = !probeError && !line.startsWith(REAL_CONFIG_MARKER) && line.includes(tmp);
-    const reason = probeError
-      ? `XDG probe threw: ${probeError}`
-      : `config-loader ignores XDG_CONFIG_HOME (resolved "${line}", expected under "${tmp}")`;
     expect(honored).toBe(true);
   });
 

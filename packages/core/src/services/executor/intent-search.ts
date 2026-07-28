@@ -147,7 +147,6 @@ function distinctiveTerms(sections: IndexedSection[], limit: number): string[] {
       docFreq.set(term, (docFreq.get(term) ?? 0) + 1);
     }
   }
-  const total = sections.length || 1;
   // Score = total occurrences / docFreq (terms concentrated in few docs rank
   // higher). Cap docFreq divisor at 1 so we never divide by zero.
   const scored: { term: string; score: number }[] = [];

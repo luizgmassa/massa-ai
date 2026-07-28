@@ -1,9 +1,14 @@
-# Bun configuration for MCP RLM Mem0
+# Bun configuration for massa-ai
 
 [test]
 # Test configuration
 # preload = []
-coverage = true
+#
+# Coverage is NOT enabled globally (DEBT-02). It was, and every `bun test`
+# invocation — including a single-file run during a debug loop — paid to
+# instrument and report it. It is now an explicit gate: `bun run test:coverage`,
+# which enforces the floor and the documented exclusions in
+# `scripts/check-coverage.ts`. Pass `--coverage` yourself for an ad-hoc run.
 coverageDir = "./coverage"
 
 # Test pattern matching

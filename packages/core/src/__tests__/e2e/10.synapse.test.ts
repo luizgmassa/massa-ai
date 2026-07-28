@@ -33,12 +33,8 @@ import {
   PREFIX,
   RUN_STAMP,
   probeAvailability,
-  httpGet,
-  httpPost,
-  normalize,
   assertMatrix,
   ensureSharedIndex,
-  SHARED_PID,
   assertE2ePrefix,
 } from "./_helpers";
 import { startMcp, mcpCall, requireTool, type McpHandle } from "./_mcp";

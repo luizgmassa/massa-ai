@@ -26,7 +26,7 @@ describe("native grammar integrity pins", () => {
   });
 
   test("every registry package has sri, every git package has gitIdentity, all have sourceIntegrity", () => {
-    for (const [pkg, id] of Object.entries(NATIVE_LOCK_IDENTITIES)) {
+    for (const [, id] of Object.entries(NATIVE_LOCK_IDENTITIES)) {
       expect(typeof id.sourceIntegrity).toBe("string");
       expect(id.sourceIntegrity.startsWith("sha512-")).toBe(true);
       const isGit = id.resolved.includes("@github:");

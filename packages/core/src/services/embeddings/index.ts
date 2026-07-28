@@ -25,7 +25,7 @@
  */
 
 import { EmbeddingProvider, createProvider } from "./provider.js";
-import { CachedEmbeddingProvider, withCache } from "./cached-provider.js";
+import { withCache } from "./cached-provider.js";
 import type { EmbeddingCacheStore } from "../cache/embedding-cache-contract.js";
 import { createEmbeddingCache } from "../cache/embedding-cache-factory.js";
 import {

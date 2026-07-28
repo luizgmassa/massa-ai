@@ -19,7 +19,6 @@ import {
   chunkFixed,
 } from "../services/search/chunker/chunker-post.js";
 import {
-  chunkCode,
   findCodeBoundaries,
   netBraceDelta,
   extractFileImports,

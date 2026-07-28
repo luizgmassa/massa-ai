@@ -81,6 +81,12 @@ jobs:
       - name: Type check
         run: bun run type-check
 
+      # DEBT-01. oxlint, correctness rules only. Runs before Build because it is
+      # the cheapest gate in the job (single Rust binary over the whole repo) and
+      # a violation should not wait on a full turbo build to surface.
+      - name: Lint
+        run: bun run lint
+
       - name: Build
         run: bun run build
 

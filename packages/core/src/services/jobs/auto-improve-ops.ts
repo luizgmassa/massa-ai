@@ -13,7 +13,6 @@ import { SearchServiceError } from "../search/search-diagnostics.js";
 import { detectPatterns } from "./auto-improve-patterns.js";
 import { enrichWithLlm } from "./auto-improve-llm.js";
 import { applyProposal, ApplyRejection } from "./auto-improve-apply.js";
-import { readAutoImproveConfig } from "./auto-improve-config.js";
 import type { AutoImproveJob, AutoImproveResult, ApproveRejectResult } from "./auto-improve-job.js";
 
 export async function runOnce(job: AutoImproveJob, projectId: string): Promise<AutoImproveResult> {

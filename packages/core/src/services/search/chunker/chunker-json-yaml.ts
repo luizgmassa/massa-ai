@@ -130,7 +130,7 @@ export function chunkYAML(content: string, cfg: ChunkerConfig): Chunk[] {
     }
   }
 
-  if (currentLines.length > 0 && currentLines.some((l) => l.trim())) {
+  if (currentLines.some((l) => l.trim())) {
     chunks.push({
       content: currentLines.join("\n"),
       lineStart: currentStart,

@@ -58,8 +58,6 @@ const MAX_EVENT_ID = 2_000;
 const MAX_CONTENT_HASH = 2_000;
 const MAX_LEASE_TOKEN = 512;
 
-type TransactionClient = Parameters<Parameters<ReturnType<typeof getPrismaClient>["$transaction"]>[0]>[0];
-
 interface ManagedRunRow {
   id: bigint;
   project_id: string;

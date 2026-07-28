@@ -9,7 +9,6 @@ import { Elysia } from "elysia";
 
 const handle = mock((): unknown => ({ success: true, data: { indexed: 1 } }));
 const instantiate = mock((_opts?: unknown) => {});
-let instance: any = null;
 
 mock.module("@massa-ai/core", () => {
   const actual = require("@massa-ai/core");
@@ -21,7 +20,6 @@ mock.module("@massa-ai/core", () => {
       class {
         static instantiate(opts: unknown) {
           instantiate(opts);
-          instance = opts;
         }
         static getInstance() {
           return {

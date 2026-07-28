@@ -239,8 +239,6 @@ export class CodeCompressor implements ICompressor {
     };
 
     let inMultilineComment = false;
-    let inInterface = false;
-    let inClass = false;
     let braceDepth = 0;
 
     for (let i = 0; i < lines.length; i++) {
@@ -281,7 +279,6 @@ export class CodeCompressor implements ICompressor {
 
       // Interfaces
       if (line.includes('interface ')) {
-        inInterface = true;
         const signature = this.extractSignature(line);
         structure.interfaces.push(signature);
         continue;
@@ -289,7 +286,6 @@ export class CodeCompressor implements ICompressor {
 
       // Classes
       if (line.includes('class ')) {
-        inClass = true;
         const signature = this.extractSignature(line);
         structure.classes.push(signature);
         continue;
@@ -302,11 +298,6 @@ export class CodeCompressor implements ICompressor {
         continue;
       }
 
-      // End of interface/class
-      if (braceDepth === 0) {
-        inInterface = false;
-        inClass = false;
-      }
     }
 
     return structure;

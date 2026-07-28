@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING — the ten `RLM_LLM_*` environment variables are renamed to `MASSA_AI_LLM_*`.
+  The old names no longer do anything.** There is no dual-read and no deprecation window:
+  an unrenamed variable is silently ignored, and the setting falls back to its default —
+  which for `RLM_LLM_ENABLED` means every LLM-driven feature degrades to its rule-based
+  path. `RLM_` was the last surviving prefix from the pre-rename project identity, kept as
+  a compatibility boundary by two earlier renames; that boundary is now retired
+  (`AD-010`). Update any `.env`, shell profile, CI secret, compose file, or systemd unit:
+
+  | Retired | Replacement |
+  |---|---|
+  | `RLM_LLM_ENABLED` | `MASSA_AI_LLM_ENABLED` |
+  | `RLM_LLM_BASE_URL` | `MASSA_AI_LLM_BASE_URL` |
+  | `RLM_LLM_API_KEY` | `MASSA_AI_LLM_API_KEY` |
+  | `RLM_LLM_MODEL` | `MASSA_AI_LLM_MODEL` |
+  | `RLM_LLM_CODE_MODEL` | `MASSA_AI_LLM_CODE_MODEL` |
+  | `RLM_LLM_TEMPERATURE` | `MASSA_AI_LLM_TEMPERATURE` |
+  | `RLM_LLM_MAX_OUTPUT_TOKENS` | `MASSA_AI_LLM_MAX_OUTPUT_TOKENS` |
+  | `RLM_LLM_TIMEOUT_MS` | `MASSA_AI_LLM_TIMEOUT_MS` |
+  | `RLM_LLM_DISABLE_THINK` | `MASSA_AI_LLM_DISABLE_THINK` |
+  | `RLM_LLM_PROMPT` | `MASSA_AI_LLM_PROMPT` |
+
+  **`config.json` is unaffected** — its keys were already prefix-free, so there is no
+  config migration and no file to edit. Only environment variables change.
+
+  The rename also fixed a bug it would otherwise have carried under a new name: only four
+  of the ten were listed in `turbo.json`'s `passThroughEnv`, so the other six arrived
+  `undefined` in any test run under `bun run test` while working fine when `bun test` was
+  invoked directly. All ten are listed now.
+
+- **Coverage is no longer computed on every `bun test`.** `bunfig.toml` set
+  `coverage = true`, so every invocation — including a single-file run in a debug loop —
+  paid to instrument and report coverage, and nothing ever failed on the result: the cost
+  of a gate without the gate. Coverage is now opt-in (`--coverage`) and enforced by the
+  new explicit gate below.
+
+- **The three divergent copies of `run-tests-isolated.ts` are one shared module.**
+  `packages/core`, `apps/tools-api` and `apps/mcp-client` each carried their own copy
+  (236 / 124 / 141 lines) which had drifted apart; they now share
+  `scripts/lib/run-tests-isolated.ts` and supply only their own isolation predicate.
+  Observable behaviour is deliberately unchanged, including each package's distinct log
+  wording and its exit code for unknown arguments.
+
+### Added
+
+- **`bun run lint` is a real gate.** It was declared in `turbo.json` but implemented by no
+  package, so it printed "No tasks were executed" and passed unconditionally. It now runs
+  oxlint (pinned exactly to `1.76.0`) with the `correctness` category on and every other
+  category off. Adoption surfaced 337 violations; all 337 were fixed rather than
+  downgraded, so every correctness rule ships at `error` rather than `warn`. It runs over
+  the whole repository rather than per package, because turbo dispatches only to workspace
+  packages and `scripts/` and `benchmarks/` — which held 21 of the 337 — are neither. CI
+  runs it in the `build` job. **No formatter was added and nothing was reformatted.**
+
+- **`bun run test:coverage` enforces a coverage floor.** 90% line coverage per file, with
+  nine documented exclusions, each carrying the justification that earned it. Both the
+  floor and the exclusions live in `scripts/check-coverage.ts` as executable data rather
+  than as prose in a scratch file that gets rewritten. The gate refuses to run unless the
+  dedicated test database is configured, because 50 core suites are gated behind
+  `describe.skipIf(!DEDICATED_DB)` and would otherwise report near-zero coverage for
+  subjects whose own tests are sitting skipped beside them. It also runs the suites against
+  a scratch `XDG_CONFIG_HOME`, so the numbers are a property of the tree rather than of
+  whatever is in the developer's `~/.config/massa-ai/config.json`.
+
+### Fixed
+
+- **Unit tests no longer make live LLM calls against the developer's own configuration.**
+  `CodeCompressor` resolves `llm.enabled` from `~/.config/massa-ai/config.json`, so on a
+  machine with a local Ollama configured, tests that construct it without pinning the
+  test seam issued real network requests — measured at 42 s on a cold model load against
+  a 5 s per-test budget, and 0.7 s once warm. That is why they looked flaky rather than
+  broken, and why CI, which has no configuration file, never saw it. The affected tests
+  now inject the seam their subject already exposes.
+
 ## [1.8.0] - 2026-07-28
 
 ### Security

@@ -40,7 +40,7 @@ export function chunkMarkdownByHeadings(content: string, _cfg: ChunkerConfig): C
     const headingMatch = line.match(/^(#{1,6})\s+(.+)/);
 
     if (headingMatch) {
-      if (currentLines.length > 0 && currentLines.some((l) => l.trim())) {
+      if (currentLines.some((l) => l.trim())) {
         chunks.push({
           content: currentLines.join("\n"),
           lineStart: currentStart,
@@ -69,7 +69,7 @@ export function chunkMarkdownByHeadings(content: string, _cfg: ChunkerConfig): C
     }
   }
 
-  if (currentLines.length > 0 && currentLines.some((l) => l.trim())) {
+  if (currentLines.some((l) => l.trim())) {
     chunks.push({
       content: currentLines.join("\n"),
       lineStart: currentStart,

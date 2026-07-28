@@ -28,9 +28,9 @@
  *   bun benchmarks/llm-judge/run.ts --label qwen25 --salienceType decision
  *
  * Env (defaults match the live swap):
- *   RLM_LLM_MODEL         instruct model (default qwen2.5:7b-instruct)
- *   RLM_LLM_CODE_MODEL    coder model  (default qwen2.5-coder:7b)
- *   RLM_LLM_BASE_URL      Ollama /v1  (default http://localhost:11434/v1)
+ *   MASSA_AI_LLM_MODEL         instruct model (default qwen2.5:7b-instruct)
+ *   MASSA_AI_LLM_CODE_MODEL    coder model  (default qwen2.5-coder:7b)
+ *   MASSA_AI_LLM_BASE_URL      Ollama /v1  (default http://localhost:11434/v1)
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
@@ -254,9 +254,9 @@ async function main() {
   config.set("llm", {
     ...ORIGINAL_LLM,
     enabled: true,
-    model: process.env.RLM_LLM_MODEL ?? "qwen2.5:7b-instruct",
-    codeModel: process.env.RLM_LLM_CODE_MODEL ?? "qwen2.5-coder:7b",
-    baseUrl: process.env.RLM_LLM_BASE_URL ?? "http://localhost:11434/v1",
+    model: process.env.MASSA_AI_LLM_MODEL ?? "qwen2.5:7b-instruct",
+    codeModel: process.env.MASSA_AI_LLM_CODE_MODEL ?? "qwen2.5-coder:7b",
+    baseUrl: process.env.MASSA_AI_LLM_BASE_URL ?? "http://localhost:11434/v1",
   });
   config.set("search", {
     ...ORIGINAL_SEARCH,
@@ -275,9 +275,9 @@ async function main() {
     }
 
     const model =
-      process.env.RLM_LLM_MODEL ?? ORIGINAL_LLM.model ?? "qwen2.5:7b-instruct";
+      process.env.MASSA_AI_LLM_MODEL ?? ORIGINAL_LLM.model ?? "qwen2.5:7b-instruct";
     const codeModel =
-      process.env.RLM_LLM_CODE_MODEL ?? ORIGINAL_LLM.codeModel ?? "qwen2.5-coder:7b";
+      process.env.MASSA_AI_LLM_CODE_MODEL ?? ORIGINAL_LLM.codeModel ?? "qwen2.5-coder:7b";
 
     console.log(`\n=== LLM-judge benchmark — label ${args.label} ===`);
     console.log(`instruct model: ${model}`);

@@ -167,7 +167,6 @@ describe("HookService.ingestOne", () => {
   });
 
   it("P3-QUEUE-01: persists in submission order under concurrent posts", async () => {
-    const ids: string[] = [];
     let counter = 0;
     const svc = new HookService({
       store: env.store,
@@ -336,10 +335,12 @@ describe("WriterQueue saturation (P3-BACKPRESSURE)", () => {
 
 // ── Attribution wiring (M45/HAR-01/04/05/06) ────────────────────────────────
 
+// AttributionResolverLike is already imported at the top of this file; re-importing
+// it here is a duplicate declaration. tsconfig excludes src/__tests__, so tsc never
+// saw it — oxlint did.
 import type {
   AttributionInput,
   AttributionResult,
-  AttributionResolverLike,
 } from "../services/hooks/attribution-resolver.js";
 
 class FakeResolver implements AttributionResolverLike {

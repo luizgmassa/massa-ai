@@ -179,7 +179,7 @@ else
 fi
 
 # Pull the local-first LLM model (consolidation, salience, query rewrite, HyDE).
-LLM_MODEL="${RLM_LLM_MODEL:-qwen2.5:7b-instruct}"
+LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen2.5:7b-instruct}"
 LLM_EXISTS="$(ollama_model_exists "$LLM_MODEL")"
 
 if [ "$LLM_EXISTS" = "yes" ]; then
@@ -202,7 +202,7 @@ else
 fi
 
 # Pull the code-oriented LLM model (bootstrap seed, reranker, code compression).
-CODE_MODEL="${RLM_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
+CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
 CODE_EXISTS="$(ollama_model_exists "$CODE_MODEL")"
 
 if [ "$CODE_EXISTS" = "yes" ]; then

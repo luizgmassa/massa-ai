@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, mock, test } from "bun:test";
+import { beforeAll, expect, mock, test } from "bun:test";
 import { describeNative } from "./_helpers/native-skip.js";
 import { resetParserReadinessForTests } from "../services/structural/parser-readiness.js";
 import { LANGUAGE_MANIFEST } from "../services/structural/language-manifest.js";
@@ -103,5 +103,16 @@ describeNative("ETL search-cache consistency", () => {
     pipeline.graphGenerations = originalGraphGenerations;
     symbolRepo.getActiveGraphSnapshot = originalGetActiveGraphSnapshot;
     resetParserReadinessForTests();
-  });
+    // Drives a full ETL run. Uninstrumented the whole file finishes in well
+    // under a second, but `bun run test:coverage` measures it with `--coverage`,
+    // and instrumenting the ETL module graph is expensive: measured at
+    // **66.42 s** standalone under coverage. The grammar set is stubbed above, so
+    // that cost is instrumentation, not native parsing.
+    //
+    // 30_000 was tried first and is not enough — it passed one gate run and
+    // failed the next at 30001 ms, because the gate runs 126 instrumented groups
+    // against one Postgres. Sized here with headroom over the measured value
+    // rather than just above it. Per CLAUDE.md, raise the per-test budget, never
+    // `bunfig.toml`'s global default.
+  }, 180_000);
 });

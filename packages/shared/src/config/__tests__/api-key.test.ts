@@ -14,8 +14,6 @@ import path from "path";
 
 import {
   API_KEY,
-  CONFIG_TYPES,
-  LOADER,
   makeIsolatedConfigHome,
   removeIsolatedConfigHome,
   runIsolated,

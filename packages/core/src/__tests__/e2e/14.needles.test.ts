@@ -182,7 +182,7 @@ async function runSweep(pid: string, dataset: Dataset): Promise<SweepResult> {
     }));
     const empty = hits.length === 0;
     if (empty) emptyNeedles.push(needle.id);
-    const { rank, hit } = findRank(needle, hits, tol);
+    const { rank } = findRank(needle, hits, tol);
     perNeedle.push({
       id: needle.id,
       difficulty: needle.difficulty,

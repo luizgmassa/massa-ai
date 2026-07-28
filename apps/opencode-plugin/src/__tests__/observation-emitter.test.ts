@@ -13,7 +13,7 @@
  *  - malformed events are dropped client-side (do not poison the batch)
  *  - primary function unaffected: emit() returns synchronously (non-blocking)
  */
-import { test, expect, describe, mock, beforeEach, afterEach } from "bun:test"
+import { test, expect, describe, afterEach } from "bun:test"
 import {
   ObservationEmitter,
   makeDefaultDeps,
@@ -381,6 +381,6 @@ describe("makeDefaultDeps", () => {
     e.emit({ event: "post-tool-use", projectId: "p", payload: { tool_name: "Read" } })
     // maxBatch=1 → immediate flush timer; fire after a tick
     await new Promise((r) => setTimeout(r, 30))
-    expect(logs.length === 0 || logs.every((l) => !l.startsWith("warn"))).toBe(true)
+    expect(logs.every((l) => !l.startsWith("warn"))).toBe(true)
   })
 })

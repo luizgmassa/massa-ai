@@ -30,7 +30,6 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import {
   API,
-  API_KEY,
   E2E_ENABLED,
   PREFIX,
   RUN_STAMP,
@@ -38,11 +37,8 @@ import {
   assertE2ePrefix,
   probeAvailability,
   httpPost,
-  httpGet,
   resetProject,
   normalize,
-  assertMatrix,
-  SHARED_PID,
   ensureSharedIndex,
 } from "./_helpers";
 import { startMcp, mcpCall, requireTool, type McpHandle } from "./_mcp";
@@ -91,16 +87,6 @@ async function searchMemories(projectId: string, query: string): Promise<any[]> 
       format: "json",
     });
     return r?.data?.results ?? r?.results ?? [];
-  } catch {
-    return [];
-  }
-}
-
-/** List memories for a project (bucket view). */
-async function listMemories(projectId: string): Promise<any[]> {
-  try {
-    const r = await httpGet<any>("/api/v1/memory/list", { projectId });
-    return r?.data?.memories ?? r?.memories ?? [];
   } catch {
     return [];
   }

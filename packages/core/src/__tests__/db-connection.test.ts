@@ -2,7 +2,7 @@
  * db-connection unit tests — covers getDbConfig, getPgPool, closeConnections.
  */
 
-import { afterEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { getDbConfig, getPgPool, closeConnections } from "../data/db-connection.js";
 
 const DB_AVAILABLE = (process.env.DATABASE_URL ?? "").startsWith("postgres");

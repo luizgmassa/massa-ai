@@ -18,7 +18,6 @@
  */
 
 import { logger } from "@massa-ai/shared";
-import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import { symbolGraphService } from "./symbol-graph.service.js";
 import type { EdgeType, EdgeResult } from "./symbol-graph.service.js";
 import { definitionLookupService, type DefinitionLookupResult } from "./definition-lookup.js";
@@ -480,7 +479,7 @@ export class TracePathService {
    * `meta.callerFqn` on CALL edges; fall back to the edge's symbol name when no
    * FQN is recorded (e.g. cross-file calls that did not resolve).
    */
-  private extractCallerFqn(e: EdgeResult, currentFqn: string): string | undefined {
+  private extractCallerFqn(e: EdgeResult, _currentFqn: string): string | undefined {
     const caller = e.meta?.callerFqn;
     if (typeof caller === "string" && caller) return caller;
     // For non-CALL typed edges inbound, there is no caller concept — skip.

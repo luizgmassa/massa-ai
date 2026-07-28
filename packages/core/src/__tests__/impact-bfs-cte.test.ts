@@ -12,7 +12,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { randomUUID } from "crypto";
 import { getSymbolRepository } from "../data/symbol/symbol-repository-factory.js";
-import { SymbolRepositoryPg } from "../data/symbol/symbol-repository-pg.js";
 
 const DB_AVAILABLE = /^(postgres|postgresql):/.test(process.env.DATABASE_URL ?? "");
 const RUN = DB_AVAILABLE && (process.env.RUN_POSTGRES_TESTS !== "0");

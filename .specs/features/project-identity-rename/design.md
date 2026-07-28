@@ -34,14 +34,16 @@ Current source confirms `name: "massa-ai"` (renamed from `massa-th0th` by the su
 ## Spec/acceptance facts now worth preserving
 
 - Package scope is `@massa-ai` (subsequently renamed from `@massa-th0th`); configuration type is `MassaAiConfig`.
-- Project-owned environment variables use `MASSA_AI_*` (subsequently renamed from `MASSA_TH0TH_*`); `RLM_LLM_*` remains a subsystem configuration namespace.
+- Project-owned environment variables use `MASSA_AI_*` (subsequently renamed from `MASSA_TH0TH_*`); `RLM_LLM_*` remains a subsystem configuration namespace. **Superseded by AD-010** — renamed to
+  `MASSA_AI_LLM_*` in `audit-remediation-2026-07` (DEBT-03).
 - Runtime MCP server identity is `massa-ai` (subsequently renamed from `massa-th0th`); current MCP tool names are unprefixed.
 - Post-rename additions must preserve scoped package resolution: build repair explicitly protects `@massa-ai/shared` emission, and executor coverage asserts `@massa-ai/core`.
 
 ## Deviations or unresolved gaps
 
 - Source plan proposed `massa_th0th_*` MCP tool names. Verified execution instead stripped the prefix; current source dispatches unprefixed names. This is a material plan deviation.
-- Source plan’s default proposed `.massa-th0th` data directory, `.massa-th0th-src` install directory, and `MASSA_TH0TH_LLM_*`. Verified execution uses `.massa-th0th-data`, an install default of `.massa-th0th`, and retains `RLM_LLM_*`.
+- Source plan’s default proposed `.massa-th0th` data directory, `.massa-th0th-src` install directory, and `MASSA_TH0TH_LLM_*`. Verified execution uses `.massa-th0th-data`, an install default of `.massa-th0th`, and retains `RLM_LLM_*`. That retention is **superseded by
+  AD-010**; the vars are now `MASSA_AI_LLM_*`.
 - The assigned range begins after rename implementation, so it cannot independently prove the plan’s original full type-check/build/test/install verification claims. No external platform rename or existing-user migration evidence was inspected.
 
 ## Cross-references to existing `.specs/features/*`

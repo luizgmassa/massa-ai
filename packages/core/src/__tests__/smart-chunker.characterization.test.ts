@@ -21,10 +21,6 @@ import { smartChunk, type Chunk } from "../services/search/smart-chunker.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function bodies(chunks: Chunk[]): string[] {
-  return chunks.map((c) => c.content);
-}
-
 function summary(chunks: Chunk[]): Array<{
   lineStart: number;
   lineEnd: number;

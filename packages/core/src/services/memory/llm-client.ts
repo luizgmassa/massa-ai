@@ -8,7 +8,7 @@
  * Contract (cross-cutting §1):
  *   (a) respect `timeoutMs` (via AbortSignal.timeout),
  *   (b) degrade silently to a non-LLM path on any failure — never throw,
- *   (c) be config-gated default-off (`config.llm.enabled`, env RLM_LLM_ENABLED).
+ *   (c) be config-gated default-off (`config.llm.enabled`, env MASSA_AI_LLM_ENABLED).
  *
  * Consumers (Phase 1: consolidator; Phase 2: query-understanding; Phase 4:
  * bootstrap; Phase 5: auto-improve; Phase 7: compression) MUST treat a
@@ -146,7 +146,7 @@ export function _setLlmEnabledForTesting(flag: boolean | null): void {
  *       empty/invalid, recover the answer from the reasoning channel the SDK
  *       exposes (`result.reasoning`). This is the load-bearing protection.
  *
- * Config: `RLM_LLM_DISABLE_THINK` (default `"1"`). When disabled, behavior
+ * Config: `MASSA_AI_LLM_DISABLE_THINK` (default `"1"`). When disabled, behavior
  * regresses to today's (content-only) path exactly.
  */
 

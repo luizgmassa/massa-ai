@@ -58,7 +58,6 @@ const agg = new Map<string, Agg>();
 let anyFail = false;
 
 for (const file of files) {
-  const rel = path.relative(packageRoot, file);
   await new Promise<void>((resolve) => {
     const child = spawn(
       process.execPath,

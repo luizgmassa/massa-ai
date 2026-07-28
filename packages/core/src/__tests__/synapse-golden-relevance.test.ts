@@ -15,8 +15,6 @@ import { describe, test, expect } from "bun:test";
 import { SynapseManager } from "../services/synapse/synapse-manager.js";
 import { CORPUS, GOLDEN, toResult } from "./fixtures/synapse-test-corpus.js";
 import {
-  precisionAtK,
-  recallAtK,
   mrrAtK,
   ndcgAtK,
 } from "./fixtures/ir-metrics.js";

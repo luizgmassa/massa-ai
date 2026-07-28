@@ -44,7 +44,6 @@
  */
 import { describe, test, expect, afterAll } from "bun:test";
 import {
-  E2E_ENABLED,
   PREFIX,
   RUN_STAMP,
   PROJECT_PATH,

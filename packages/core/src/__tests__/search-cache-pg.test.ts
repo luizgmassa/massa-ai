@@ -6,7 +6,7 @@
  * Same pool-mock pattern as search-cache-persistence-order.test.ts.
  */
 
-import { describe, test, expect, beforeEach } from "bun:test";
+import { describe, test, expect } from "bun:test";
 import type { SearchResult } from "@massa-ai/shared";
 import { SearchCachePg } from "../services/search/search-cache-pg.js";
 

@@ -279,7 +279,7 @@ export class IndexManager {
             mtime: stat.mtimeMs,
             size: stat.size,
           });
-        } catch (error) {
+        } catch {
           logger.warn("Failed to stat file during scan", { filePath: match });
         }
       }
@@ -327,7 +327,7 @@ export class IndexManager {
         this.metadataCache.set(projectId, metadata);
         return metadata;
       }
-    } catch (error) {
+    } catch {
       logger.debug("No metadata found for project", { projectId });
     }
 
@@ -370,7 +370,7 @@ export class IndexManager {
         {
           id: `_metadata:${metadata.projectId}`,
           content: JSON.stringify(metadata),
-          embedding: new Array(dim).fill(0), // Zero vector for metadata docs
+          embedding: Array.from<number>({ length: dim }).fill(0), // Zero vector for metadata docs
           metadata: {
             type: "_metadata",
             projectId: metadata.projectId,

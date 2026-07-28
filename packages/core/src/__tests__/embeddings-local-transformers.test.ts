@@ -24,7 +24,7 @@ import { CachedEmbeddingProvider, withCache } from "../services/embeddings/cache
 
 /** Deterministic fake embedding generator (unit-length after normalize). */
 function makeEmbedding(seed: number, dim: number): number[] {
-  const v = new Array(dim)
+  const v = Array.from({ length: dim })
     .fill(0)
     .map((_, i) => Math.sin(seed * 1000 + i) * 0.01 + 0.1);
   const norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0)) || 1;
@@ -214,7 +214,7 @@ describe("local-transformers provider: embed call shape", () => {
 
   test("rejects embeddings containing NaN/Infinity", async () => {
     const dim = 384;
-    const bad = new Array(dim).fill(0);
+    const bad = Array.from({ length: dim }).fill(0);
     bad[0] = NaN;
     mockTransformers([bad]);
 

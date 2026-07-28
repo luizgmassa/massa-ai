@@ -105,7 +105,7 @@ export class WebController {
   }
 
   /** Build the WebIndexDeps seam from the real stores + the in-memory cache. */
-  private indexDeps(projectId: string): WebIndexDeps {
+  private indexDeps(_projectId: string): WebIndexDeps {
     return {
       indexChunk: async (chunk: IndexedChunk) => {
         const doc: VectorDocument = {

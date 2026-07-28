@@ -19,10 +19,14 @@ import { config } from "@massa-ai/shared";
 
 let lastSearchEngine: any;
 
+function registerLastSearchEngine(instance: unknown): void {
+  lastSearchEngine = instance;
+}
+
 mock.module("../services/search/contextual-search-rlm.js", () => ({
   ContextualSearchRLM: class {
     constructor() {
-      lastSearchEngine = this;
+      registerLastSearchEngine(this);
     }
     async checkSearchAdmission(_projectId: string, _projectPath?: string) {
       return { admitted: true, stale: null };

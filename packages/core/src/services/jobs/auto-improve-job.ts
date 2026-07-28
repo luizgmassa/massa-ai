@@ -19,7 +19,7 @@ import {
 } from "../../data/proposal/proposal-repository.js";
 import {
   getObservationStore,
-  type Observation, type ObservationStore,
+  type ObservationStore,
 } from "../../data/memory/observation-repository.js";
 import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
 import type { InsertMemoryInput, MemoryRow, UpdateMemoryPatch } from "../../data/memory/memory-repository.js";
@@ -72,7 +72,7 @@ export class AutoImproveJob {
     this.llm = opts.llm ?? defaultLlmSurface;
     this.observationStore = opts.observationStore ?? getObservationStore();
     this.proposalStore = opts.proposalStore ?? getProposalStore();
-    this.thresholds = { ...DEFAULT_THRESHOLDS, ...(opts.thresholds ?? {}) };
+    this.thresholds = { ...DEFAULT_THRESHOLDS, ...opts.thresholds };
     this.reviewGateOverride = opts.reviewGate;
     this.idFactory = opts.idFactory ?? (() => newProposalId());
     const injected = opts.memoryRepo;

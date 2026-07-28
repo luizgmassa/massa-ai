@@ -115,7 +115,7 @@ Adapter pattern doing real work: the proxy never knows whether a call crosses a 
 
 ### 2. Everything LLM defaults OFF and degrades gracefully
 
-Every LLM-driven feature falls back to a rule-based path; `RLM_LLM_ENABLED=true` turns them
+Every LLM-driven feature falls back to a rule-based path; `MASSA_AI_LLM_ENABLED=true` turns them
 all on. `llm-client.ts` is the shared gate (Ollama over an OpenAI-compatible endpoint, with
 timeout enforcement and default-off gating built in). `bootstrap-service.ts`,
 `handoff-service.ts`, `handoff-auto-injector.ts`, and the rerank/query-understanding
@@ -325,4 +325,6 @@ bun run dev:mcp                        # MCP stdio server
 
 Or the full offline wizard: `bash scripts/setup-local-first.sh`.
 
-Note: `bun run lint` is a **no-op** — the repo has no linter. Don't cite it as a gate.
+Note: `bun run lint` runs **oxlint** over the whole repo (`correctness` rules at `error`,
+config in `.oxlintrc.json`). It is a real gate and CI enforces it. `bun run lint:fix`
+applies only the fixes oxlint documents as safe.

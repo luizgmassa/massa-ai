@@ -25,7 +25,6 @@ import {
   fetchAndConvertOne,
   composeFetchCacheKey,
   MAX_FETCH_BYTES,
-  DEFAULT_FETCH_TTL_MS,
   WebController,
   type IndexedChunk,
   type WebIndexDeps,
@@ -418,7 +417,7 @@ describe("fetchAndConvertOne — TTL cache", () => {
   afterEach(() => dnsRestore());
 
   test("first call fetches + indexes, second within TTL is a cache hit", async () => {
-    const { deps, cache } = captureDeps();
+    const { deps } = captureDeps();
     const fetchStub = stubFetch(
       () =>
         new Response("<html><body><h1>Doc</h1><p>hi</p></body></html>", {
@@ -614,8 +613,6 @@ describe("fetchAndConvertOne — MAX_FETCH_BYTES cap", () => {
 });
 
 describe("fetchAndConvertOne — SSRF blocks propagate as error results", () => {
-  let dnsRestore: () => void;
-
   test("a private-IP URL returns an error result (no throw)", async () => {
     const { deps } = captureDeps();
     const r = await fetchAndConvertOne("http://169.254.169.254/latest/meta-data/", deps);
@@ -674,7 +671,7 @@ describe("WebController — parallel fetch + serial index", () => {
       },
     };
     const fakeKeywordSearch = {
-      index: async (id: string, content: string) => {
+      index: async (_id: string, _content: string) => {
         // capture handled by vectorStore.addDocuments in this double-capture;
         // dedupe is not the concern of this test.
       },

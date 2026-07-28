@@ -146,7 +146,7 @@ export function findMinSpan(positionLists: number[][]): number {
   if (positionLists.length === 0) return Infinity;
   if (positionLists.length === 1) return 0;
 
-  const ptrs = new Array(positionLists.length).fill(0);
+  const ptrs = Array.from<number>({ length: positionLists.length }).fill(0);
   let minSpan = Infinity;
 
   while (true) {

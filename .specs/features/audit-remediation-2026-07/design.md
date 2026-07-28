@@ -598,6 +598,157 @@ secondary browser-only layer over the mandatory key and never overclaims it in a
   a fresh auto-provisioned install. This also closes lesson **L-002** (hook tests assert exit 0
   only, never the POST body/endpoint) — the first time that candidate lesson has been actionable.
 
+### TASK-017 — the zero-`RLM_` gate cannot be literally zero
+
+The task's done-when was `rg 'RLM_' --glob '!CHANGELOG.md' --glob '!.specs/archive/**'
+--glob '!.specs/features/**'` returns nothing. Executed verbatim after the rename it returns
+**eight** hits in three places, none of them a live reference:
+
+1. `.specs/project/STATE.md` (3) — AD-010 itself plus the feature's own plan notes. The gate
+   excluded `.specs/archive/**` and `.specs/features/**` but not `.specs/project/**`, and a
+   decision record that authorises retiring a name has to be able to name it.
+2. `packages/shared/src/config/__tests__/llm-env-prefix.test.ts` (3) — the discriminating test.
+   Its whole job is to set `RLM_LLM_*` and prove nothing moves, so it must contain the literal.
+3. `scripts/__tests__/llm-env-passthrough.test.ts` (2) — the regression guard asserting `RLM_`
+   never reappears in `turbo.json`. It must name the pattern it forbids.
+
+The tempting fix — building the old prefix by concatenation (`"RLM" + "_LLM_"`) so the literal
+never appears — was rejected. It would satisfy the grep while making the gate lie about what the
+tree contains, which is worse than an exclusion a reviewer can see. The gate is therefore amended
+to name its exclusions explicitly:
+
+```
+rg 'RLM_' --hidden --glob '!CHANGELOG.md' --glob '!.specs/**' \
+  --glob '!**/llm-env-prefix.test.ts' --glob '!**/llm-env-passthrough.test.ts'
+```
+
+That returns nothing. The requirement it enforces is unchanged: **no live `RLM_` reference
+remains** — only the two proofs that it is dead, and the decision record that killed it.
+
+### TASK-018/020 — de-tautologising a test made it flaky; the fix was the wrong observable
+
+`memory-clustering.test.ts:298` asserted `expect(cluster === null || cluster !== null).toBe(true)`.
+That is a tautology and had to go. The replacement asserted what the test's name implied —
+`expect(cluster).not.toBeNull()` and `expect(cluster!.memberIds).toContain("a")` — and it passed
+standalone (19/19), passed eight consecutive package runs, and passed the whole T18 gate.
+
+It then failed once under the isolation runner during TASK-020.
+
+The cause is not the runner. `clusterMemories()` seeds K-means++ centroids with `Math.random()`
+(`memory-clustering.ts:248`, `:269`, `:273`), so for the three near-identical fixture vectors it
+is genuinely non-deterministic whether `"a"` ends up in a cluster at all. The original author
+knew — the deleted line carried the comment *"May or may not find depending on clustering
+result"*. The tautology was a bad answer to a real problem.
+
+The honest observable for "re-runs clustering when no cached result" is the **memory-table load**:
+nothing else issues one. The test now counts `$queryRaw` invocations and asserts exactly one more
+after `findCluster(id)` with no cached argument, and the sibling cached-path test asserts the
+count does **not** move. Only the pair discriminates — without the negative control, an
+implementation that always re-clustered would still satisfy the re-run assertion.
+
+Verified: 8/8 consecutive runs green, and a scratch mutation making `findCluster` ignore its
+`cached` argument is killed by the negative control (18 pass / 1 fail), reverting to 19/19.
+
+The transferable lesson: a stronger-*looking* assertion is not automatically a better one. When
+the production path is non-deterministic, assert the deterministic effect the behavior is named
+for, not the value it happens to produce.
+
+### TASK-020 — what the three runners had actually drifted into
+
+The shared module is `scripts/lib/run-tests-isolated.ts`; the three wrappers keep only their
+`testsRoot` and their isolation predicate, plus core's `--unit`/`--e2e`/`--filter` discovery.
+Group counts are unchanged: core 126 (224 files → 99 shared + 125 isolated), tools-api 25
+(44 → 20 + 24), mcp-client 8 (20 → 13 + 7).
+
+Preserved deliberately, because they are observable output rather than internals:
+
+- mcp-client labels its batched group `shared (N files)` where the other two say
+  `mock-free (N files)`, and all three word the census line differently. The labels are
+  wrapper-supplied overrides rather than normalised, so no CI log changes shape in the same
+  commit that moves the code.
+- tools-api prints `isolated: <path>` with no reason, having only ever had one reason.
+- Unknown arguments still exit **2** in all three; core still rejects `--unit --e2e` together.
+
+One latent defect was fixed in passing: core's database predicate read
+`/\b(?:DATABASE_URL|DATABASE_URL)\b/` — the same alternative twice. Behaviourally identical,
+now `/\bDATABASE_URL\b/`.
+
+The shared module also gained `--coverage` / `--coverage-dir=` passthrough, which is what makes
+TASK-019's gate able to reach the three packages that cannot run a plain `bun test`. Each group
+is a separate child process writing its own `lcov.info`, so groups get numbered subdirectories
+and the caller merges them; without that they would silently overwrite each other and the gate
+would measure only the last group.
+
+### TASK-018 — scope amended by the spec owner during Execute
+
+The task shipped with an explicit non-goal: *"The initial rule set passes on the current tree
+with **zero source changes**."* Adoption found **337** `correctness` violations, so honouring
+that literally would have meant downgrading the 15 firing rules to `warn` — a gate that reports
+but does not enforce. The spec owner was asked and chose the opposite: **fix all 337 and keep
+every correctness rule at `error`.** That is a requirement change made during Execute by the
+requirement's owner, recorded here rather than silently absorbed. The original non-goal is
+superseded for this task only; "no formatter, no reformat" still stands.
+
+### TASK-018 — `bun run lint` cannot go through turbo
+
+The task said *"`turbo.json`'s `lint` task is implemented by real per-package scripts."* It
+cannot be, and shipping it that way would have produced a gate with a silent hole.
+
+Turbo dispatches tasks only to workspace packages — `workspaces` is `["packages/*", "apps/*"]`.
+`scripts/` and `benchmarks/` are neither, and they held **21** of the 337 violations. A
+per-package `lint` task would have reported success while never reading those files. A second,
+subtler problem: `ignorePatterns` in `.oxlintrc.json` are resolved against the working
+directory, so root-relative entries silently stop matching once oxlint is invoked per package.
+
+Shipped instead: root `"lint": "oxlint"` (plus `"lint:fix": "oxlint --fix"`), one invocation
+over the whole repo, and the now-unused `"lint": {}` turbo task is **removed** rather than left
+as dead config. `bun run lint` remains the command every doc and the CI job cite, so the public
+surface is unchanged.
+
+### TASK-018 — oxc semantic errors are not rule-governed
+
+The adoption run exited non-zero with **zero** rule-severity errors reported, which is not a
+state the `rules` block can express. `oxlint --quiet` (errors only) revealed why:
+
+```
+packages/core/src/__tests__/hook-service.test.ts:26:3: error: Identifier `AttributionResolverLike` has already been declared
+```
+
+That is an **oxc semantic error**, not a lint rule, so no severity setting can silence it — the
+only levers are fixing it or ignoring the file. It is also a genuine defect: the identifier is
+imported at line 26 and again at line 342. It survived because `packages/core/tsconfig.json:25`
+excludes `src/__tests__`, so `tsc` never parsed the file. This is the first thing the linter
+caught that `type-check` is structurally incapable of catching, and it is the strongest single
+argument for DEBT-01.
+
+Two further real findings, both fixed under the amended scope:
+
+- `packages/core/src/__tests__/memory-clustering.test.ts:298` asserted
+  `expect(cluster === null || cluster !== null).toBe(true)` — a tautology true under every
+  possible implementation, including one that never re-ran clustering. Replaced with
+  `expect(cluster).not.toBeNull()` + `expect(cluster!.memberIds).toContain("a")`, which is what
+  the test's own name ("re-runs clustering when no cached result") claims.
+- `apps/mcp-client/src/api-client.ts:111` passed `body` as a key on every request including
+  `GET`. Per the fetch spec a GET/HEAD carrying a body key is a `TypeError`. The key is now
+  omitted rather than set to `undefined`; the truthiness check is preserved verbatim so falsy
+  bodies behave exactly as before.
+
+**Honest limit of the sweep:** `--fix` (documented safe) resolved 16. The remaining 321 were
+applied by hand across four disjoint write sets. `--fix-suggestions` and `--fix-dangerously` are
+documented by oxc as behavior-changing and were **not** used; only `--fix` is wired into
+`lint:fix`.
+
+### TASK-017 — the call-site count was wrong in the source it was corrected from
+
+`CLAUDE.md` claimed "11 call sites … 8 NL-judgment sites". Counted from source, there are **10**:
+three `modelRole: "code"` (`bootstrap-service.ts:496`, `reranker.ts:92`,
+`code-compressor.ts:103`) and seven default-instruct (`consolidator.ts:211`,
+`handoff-service.ts:278`, `salience-judge.ts:78`, `query-understanding.ts:102` and `:132`,
+`observation-consolidation-job.ts:190`, `auto-improve-llm.ts:44`). Four further `modelRole`
+occurrences are option-type signatures threading the value through, not call sites — counting
+those is the likeliest origin of the 11. The task text's "correct 11 → 10" was right, and the
+"8 NL-judgment" half needed correcting to 7 as well, which the task text did not name.
+
 ## Done Criteria
 
 An implementer can execute PR1 and PR2 without inventing a contract decision. Every requirement

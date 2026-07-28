@@ -169,7 +169,7 @@ memory_delete { id: "<id>" }
 
 ## Passive Capture (Hooks)
 
-**What:** Streams agent lifecycle events into massa-ai as Observations — without any change to how you prompt. Six lifecycle event kinds: `session-start`, `user-prompt`, `pre-tool-use`, `post-tool-use`, `pre-compact`, `session-end`. Observations are stored raw in PostgreSQL and optionally consolidated into structured memories by an LLM bridge (when `RLM_LLM_ENABLED=true`).
+**What:** Streams agent lifecycle events into massa-ai as Observations — without any change to how you prompt. Six lifecycle event kinds: `session-start`, `user-prompt`, `pre-tool-use`, `post-tool-use`, `pre-compact`, `session-end`. Observations are stored raw in PostgreSQL and optionally consolidated into structured memories by an LLM bridge (when `MASSA_AI_LLM_ENABLED=true`).
 
 **Why:** Manually telling your agent to "remember this" is tedious and lossy. Passive capture records what the agent did automatically — every prompt, every tool call, every session — so the memory builds itself.
 
@@ -802,16 +802,16 @@ batch_execute { commands: ["rg 'function' src/", "wc -l src/*.ts"] }
 
 ```bash
 # .env
-RLM_LLM_ENABLED=true
-RLM_LLM_BASE_URL=http://localhost:11434/v1
-RLM_LLM_API_KEY=ollama
-RLM_LLM_MODEL=qwen2.5:7b-instruct         # NL-judgment sites
-RLM_LLM_CODE_MODEL=qwen2.5-coder:7b       # code-oriented sites (bootstrap seed, reranker, compress)
+MASSA_AI_LLM_ENABLED=true
+MASSA_AI_LLM_BASE_URL=http://localhost:11434/v1
+MASSA_AI_LLM_API_KEY=ollama
+MASSA_AI_LLM_MODEL=qwen2.5:7b-instruct         # NL-judgment sites
+MASSA_AI_LLM_CODE_MODEL=qwen2.5-coder:7b       # code-oriented sites (bootstrap seed, reranker, compress)
 ```
 
-With `RLM_LLM_ENABLED=true` you get: hook→memory consolidation, handoff-summary polish, query understanding (rewrite + HyDE), LLM-judge rerank, and auto importance scoring.
+With `MASSA_AI_LLM_ENABLED=true` you get: hook→memory consolidation, handoff-summary polish, query understanding (rewrite + HyDE), LLM-judge rerank, and auto importance scoring.
 
-**Per-task model routing:** the 11 LLM call sites split by task shape. 8 NL-judgment sites use `RLM_LLM_MODEL`; 3 code-oriented sites use `RLM_LLM_CODE_MODEL`.
+**Per-task model routing:** the 11 LLM call sites split by task shape. 8 NL-judgment sites use `MASSA_AI_LLM_MODEL`; 3 code-oriented sites use `MASSA_AI_LLM_CODE_MODEL`.
 
 ---
 
@@ -845,7 +845,7 @@ SEARCH_RERANK_ENABLED=true    # OFF by default
 SEARCH_RERANK_WINDOW=50       # top-K re-scored by the LLM judge
 ```
 
-Uses the code-oriented model (`RLM_LLM_CODE_MODEL`).
+Uses the code-oriented model (`MASSA_AI_LLM_CODE_MODEL`).
 
 ---
 
@@ -1072,15 +1072,15 @@ rows default **OFF** and degrade silently when disabled.
 | `database.postgresPassword` | `POSTGRES_PASSWORD` | `massa_ai_password` | Docker postgres container |
 | `database.port` | `MASSA_AI_POSTGRES_PORT` | `5432` | host port (Docker) |
 | `database.backend` | `MASSA_AI_DB_BACKEND` | _(interactive)_ | installer provisioning: `native`/`docker` |
-| `llm.enabled` | `RLM_LLM_ENABLED` | `false` | **OFF** |
-| `llm.baseUrl` | `RLM_LLM_BASE_URL` | `http://localhost:11434/v1` | — |
-| `llm.apiKey` | `RLM_LLM_API_KEY` | `ollama` | — |
-| `llm.model` | `RLM_LLM_MODEL` | `qwen2.5:7b-instruct` | default instruct model (NL-judgment sites) |
-| `llm.codeModel` | `RLM_LLM_CODE_MODEL` | `qwen2.5-coder:7b` | code-oriented sites (bootstrap seed, reranker, compress) |
-| `llm.disableThink` | `RLM_LLM_DISABLE_THINK` | `true` | best-effort thinking-disable (safety net for thinking models) |
-| `llm.temperature` | `RLM_LLM_TEMPERATURE` | `0.2` | — |
-| `llm.maxOutputTokens` | `RLM_LLM_MAX_OUTPUT_TOKENS` | `8000` | — |
-| `llm.timeoutMs` | `RLM_LLM_TIMEOUT_MS` | `90000` | — |
+| `llm.enabled` | `MASSA_AI_LLM_ENABLED` | `false` | **OFF** |
+| `llm.baseUrl` | `MASSA_AI_LLM_BASE_URL` | `http://localhost:11434/v1` | — |
+| `llm.apiKey` | `MASSA_AI_LLM_API_KEY` | `ollama` | — |
+| `llm.model` | `MASSA_AI_LLM_MODEL` | `qwen2.5:7b-instruct` | default instruct model (NL-judgment sites) |
+| `llm.codeModel` | `MASSA_AI_LLM_CODE_MODEL` | `qwen2.5-coder:7b` | code-oriented sites (bootstrap seed, reranker, compress) |
+| `llm.disableThink` | `MASSA_AI_LLM_DISABLE_THINK` | `true` | best-effort thinking-disable (safety net for thinking models) |
+| `llm.temperature` | `MASSA_AI_LLM_TEMPERATURE` | `0.2` | — |
+| `llm.maxOutputTokens` | `MASSA_AI_LLM_MAX_OUTPUT_TOKENS` | `8000` | — |
+| `llm.timeoutMs` | `MASSA_AI_LLM_TIMEOUT_MS` | `90000` | — |
 | `memory.bootstrap.enabled` | `BOOTSTRAP_ENABLED` | `true` | on (rule-based) |
 | `memory.bootstrap.maxSeedMemories` | `BOOTSTRAP_MAX_SEED_MEMORIES` | `8` | — |
 | `memory.bootstrap.centralityLimit` | `BOOTSTRAP_CENTRALITY_LIMIT` | `10` | — |

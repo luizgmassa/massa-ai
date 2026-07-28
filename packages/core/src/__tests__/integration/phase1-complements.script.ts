@@ -101,7 +101,7 @@ async function testPhase1Complements() {
       `;
       logger.info(`✓ Found ${indexes.length} indexes on symbol_imports`);
       indexes.forEach(idx => logger.info(`    - ${idx.indexname}`));
-    } catch (err) {
+    } catch {
       logger.warn('Could not check indexes (non-critical)');
     }
 

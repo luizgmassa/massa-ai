@@ -59,9 +59,9 @@ services:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_EMBEDDING_MODEL=${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:8b}
       - OLLAMA_EMBEDDING_DIMENSIONS=${OLLAMA_EMBEDDING_DIMENSIONS:-4096}
-      - RLM_LLM_ENABLED=${RLM_LLM_ENABLED:-false}
-      - RLM_LLM_API_KEY=${RLM_LLM_API_KEY:-}
-      - RLM_LLM_MODEL=${RLM_LLM_MODEL:-}
+      - MASSA_AI_LLM_ENABLED=${MASSA_AI_LLM_ENABLED:-false}
+      - MASSA_AI_LLM_API_KEY=${MASSA_AI_LLM_API_KEY:-}
+      - MASSA_AI_LLM_MODEL=${MASSA_AI_LLM_MODEL:-}
       - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"

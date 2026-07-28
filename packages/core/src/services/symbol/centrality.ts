@@ -34,7 +34,7 @@ export function computePageRank(
   // Adjacency: inLinks[i] = list of node indices that link INTO i
   const inLinks: number[][] = Array.from({ length: N }, () => []);
   // Out-degree: how many links go OUT from node i
-  const outDegree: number[] = new Array(N).fill(0);
+  const outDegree: number[] = Array.from({ length: N }, () => 0);
 
   for (const { from_file, to_file } of edges) {
     const from = nodeIndex.get(from_file);
@@ -46,10 +46,10 @@ export function computePageRank(
   }
 
   // Initialize uniform scores
-  let scores = new Array(N).fill(1 / N);
+  let scores = Array.from({ length: N }, () => 1 / N);
 
   for (let iter = 0; iter < ITERATIONS; iter++) {
-    const newScores = new Array(N).fill((1 - DAMPING) / N);
+    const newScores = Array.from({ length: N }, () => (1 - DAMPING) / N);
 
     for (let i = 0; i < N; i++) {
       let rank = 0;

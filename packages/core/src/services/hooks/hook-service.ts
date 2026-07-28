@@ -25,7 +25,7 @@ import {
   type Observation,
   type ObservationStore,
 } from "../../data/memory/observation-repository.js";
-import { QueueSaturatedError, WriterQueue } from "./writer-queue.js";
+import { WriterQueue } from "./writer-queue.js";
 import { extractCategory } from "./observation-extractor.js";
 import { observationConsolidationJob } from "../jobs/observation-consolidation-job.js";
 import {

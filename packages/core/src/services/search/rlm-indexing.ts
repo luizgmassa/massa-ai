@@ -17,7 +17,6 @@ import { randomUUID } from "node:crypto";
 import { smartChunk } from "./smart-chunker.js";
 import { loadProjectIgnore } from "./ignore-patterns.js";
 import { IndexManager } from "./index-manager.js";
-import { assertParserReadyForIndexing } from "../structural/parser-readiness.js";
 import { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
 import { getVectorStore } from "../../data/vector/vector-store-factory.js";
 import { getSearchCache } from "./cache-factory.js";

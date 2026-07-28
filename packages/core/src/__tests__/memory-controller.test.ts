@@ -45,7 +45,7 @@ const memoryServiceInstance = {
     if (opts.userId) return MemoryLevel.USER;
     return MemoryLevel.SESSION;
   },
-  generateEmbedding: async (_text: string) => new Array(384).fill(0.1),
+  generateEmbedding: async (_text: string) => Array.from({ length: 384 }).fill(0.1),
   rowToMemory: (row: MemoryRow) => ({
     id: row.id,
     content: row.content,
@@ -154,7 +154,7 @@ describe("MemoryController", () => {
       expect(lastRepo.insert).toHaveBeenCalledTimes(1);
       const input = lastRepo.insert.mock.calls[0][0];
       expect(input.importance).toBe(0.9);
-      expect(input.embedding).toEqual(new Array(384).fill(0.1));
+      expect(input.embedding).toEqual(Array.from({ length: 384 }).fill(0.1));
     });
 
     test("auto-importance via salience judge when importance omitted", async () => {
@@ -239,7 +239,7 @@ describe("MemoryController", () => {
       expect((res.memory as any).embedding).toBeUndefined();
       // update called with embedding present
       const patch = lastRepo.update.mock.calls[0][1];
-      expect(patch.embedding).toEqual(new Array(384).fill(0.1));
+      expect(patch.embedding).toEqual(Array.from({ length: 384 }).fill(0.1));
     });
 
     test("replaces tags when mergeTags false (default)", async () => {
@@ -404,7 +404,7 @@ describe("MemoryController", () => {
     test("falls back to non-semantic ranking when query embedding is all-zero", async () => {
       // Override the shared service instance's embedding to return all-zero.
       const original = memoryServiceInstance.generateEmbedding;
-      memoryServiceInstance.generateEmbedding = async () => new Array(384).fill(0);
+      memoryServiceInstance.generateEmbedding = async () => Array.from({ length: 384 }).fill(0);
       lastRepo.fullTextSearch = mock(() =>
         Promise.resolve([makeRow({ id: "r1" }), makeRow({ id: "r2" })]),
       );

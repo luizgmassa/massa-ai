@@ -65,7 +65,7 @@ export async function runPool<T>(
   const effectiveConcurrency = Math.min(requested, cpuCap, jobs.length);
   const capped = effectiveConcurrency < requested;
 
-  const settled: PromiseSettledResult<T>[] = new Array(jobs.length);
+  const settled: PromiseSettledResult<T>[] = Array.from({ length: jobs.length });
   let nextIdx = 0;
 
   async function worker(): Promise<void> {

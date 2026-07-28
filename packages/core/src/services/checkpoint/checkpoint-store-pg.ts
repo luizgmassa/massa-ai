@@ -85,11 +85,6 @@ interface CheckpointRow {
   expires_at: number | bigint | null;
 }
 
-interface CheckpointSizeRow {
-  id: string;
-  state: Buffer;
-}
-
 function toNum(v: number | bigint | null | undefined): number | null {
   if (v == null) return null;
   return typeof v === "bigint" ? Number(v) : v;

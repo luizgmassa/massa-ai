@@ -25,18 +25,6 @@ import {
 import { SearchSource } from "@massa-ai/shared";
 import { Elysia, t } from "elysia";
 
-const SessionInfoSchema = t.Object({
-  sessionId: t.String(),
-  agentId: t.String(),
-  workspaceId: t.Optional(t.String()),
-  taskContext: t.Optional(t.String()),
-  createdAt: t.Number(),
-  expiresAt: t.Number(),
-  accessHistorySize: t.Number(),
-  bufferEnabled: t.Boolean(),
-  bufferSize: t.Optional(t.Number()),
-});
-
 function serializeSession(s: ReturnType<ReturnType<typeof getSessionRegistry>["get"]>) {
   if (!s) return null;
   return {

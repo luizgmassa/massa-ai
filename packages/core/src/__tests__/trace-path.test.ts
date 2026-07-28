@@ -10,7 +10,7 @@
  * typed-edges.test.ts).
  */
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { test, expect, beforeEach, afterEach } from "bun:test";
 import { describeNative } from "./_helpers/native-skip.js";
 import fs from "fs/promises";
 import path from "path";

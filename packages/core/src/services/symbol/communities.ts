@@ -192,7 +192,7 @@ function localMove(
   if (twom <= 0) return false;
 
   const inq = new Uint8Array(n);
-  const queue: number[] = new Array(n);
+  const queue: number[] = Array.from({ length: n });
   for (let i = 0; i < n; i++) {
     queue[i] = i;
     inq[i] = 1;

@@ -38,11 +38,7 @@ import {
 } from "./graph-generation-coordinator.js";
 import type { GraphGenerationLease } from "../../data/graph-generation/graph-generation-contract.js";
 import { ManagedRunRepositoryPg } from "../../data/managed-runs/managed-run-repository-pg.js";
-import type {
-  BeginManagedRunOutcome,
-  ManagedRunLease,
-  ManagedRunRepository,
-} from "../../data/managed-runs/managed-run-contract.js";
+import type { ManagedRunLease } from "../../data/managed-runs/managed-run-contract.js";
 import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
 import type { DiscoveredFile } from "./stage-context.js";

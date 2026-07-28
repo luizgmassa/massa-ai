@@ -35,7 +35,7 @@ describe("computeAgentAffinity", () => {
 
   test("usage adds up to 0.4 with cap at 10 accesses", () => {
     const reg = new SessionRegistry();
-    const session = reg.create({ sessionId: "s1", agentId: "claude" });
+    reg.create({ sessionId: "s1", agentId: "claude" });
     // simulate 5 accesses
     for (let i = 0; i < 5; i++) reg.recordAccess("s1", "mem1");
     const refreshed = reg.get("s1")!;
@@ -44,7 +44,7 @@ describe("computeAgentAffinity", () => {
 
   test("authorship + heavy usage saturates at 1.0", () => {
     const reg = new SessionRegistry();
-    const session = reg.create({ sessionId: "s1", agentId: "claude" });
+    reg.create({ sessionId: "s1", agentId: "claude" });
     for (let i = 0; i < 15; i++) reg.recordAccess("s1", "mem1");
     const refreshed = reg.get("s1")!;
     const out = computeAgentAffinity(r("mem1", "claude"), refreshed);

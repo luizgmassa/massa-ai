@@ -69,7 +69,7 @@ beforeEach(() => {
     existing.delete(fromKey);
     existing.add(toKey);
     const prefix = fromKey + path.sep;
-    for (const [k, v] of [...vfs.entries()]) {
+    for (const [k, v] of vfs.entries()) {
       if (k === fromKey || k.startsWith(prefix)) {
         const moved = k === fromKey ? toKey : toKey + k.slice(fromKey.length);
         vfs.set(moved, v);

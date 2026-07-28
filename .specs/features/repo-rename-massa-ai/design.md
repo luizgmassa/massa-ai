@@ -43,7 +43,8 @@ Substitution MUST be applied in this exact order to avoid partial mangling (E2).
 
 ### Out-of-order caution
 - `Thoth` / `thoth` (Egyptian deity, not `th0th`) — handled per-prose in docs only; NOT a mechanical replace. Design decision: replace deity prose with neutral "the project"/"the system" or drop; ASCII glyph in `install.sh` replaced with neutral AI glyph.
-- `RLM_LLM_*` — explicitly excluded; no substitution.
+- `RLM_LLM_*` — explicitly excluded; no substitution. **Superseded by AD-010** — hard-renamed to
+  `MASSA_AI_LLM_*` in `audit-remediation-2026-07` (DEBT-03).
 - Historical `th0th → massa-th0th` CHANGELOG/spec archive quotes — preserve verbatim; they describe the old name in past tense.
 
 ## Architecture Decisions

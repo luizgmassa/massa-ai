@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "off",
+    "pedantic": "off",
+    "perf": "off",
+    "style": "off",
+    "restriction": "off",
+    "nursery": "off"
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/build/**",
+    "**/node_modules/**",
+    "**/.turbo/**",
+    "**/coverage/**",
+    "packages/core/src/generated/**",
+    "apps/*-plugin/skills/**",
+    ".ua/**",
+    "benchmarks/parser/corpus/**",
+    "**/__fixtures__/**",
+    "**/fixtures/**"
+  ]
+}

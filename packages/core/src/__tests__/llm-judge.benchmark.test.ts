@@ -164,8 +164,8 @@ beforeAll(() => {
   config.set("llm", {
     ...ORIGINAL_LLM,
     enabled: true,
-    model: process.env.RLM_LLM_MODEL ?? "qwen2.5:7b-instruct",
-    codeModel: process.env.RLM_LLM_CODE_MODEL ?? "qwen2.5-coder:7b",
+    model: process.env.MASSA_AI_LLM_MODEL ?? "qwen2.5:7b-instruct",
+    codeModel: process.env.MASSA_AI_LLM_CODE_MODEL ?? "qwen2.5-coder:7b",
   });
   config.set("search", {
     ...ORIGINAL_SEARCH,

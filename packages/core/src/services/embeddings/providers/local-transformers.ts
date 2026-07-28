@@ -124,7 +124,7 @@ export class LocalTransformersEmbeddingProvider implements EmbeddingProvider {
         // namespace; pull the named exports we need.
         const mod = (await import("@huggingface/transformers")) as unknown;
         transformers = mod as TransformersModule;
-      } catch (err) {
+      } catch {
         throw new Error(
           `[${this.id}] @huggingface/transformers is not installed. Install it in packages/core to use the local embedding provider.`,
         );

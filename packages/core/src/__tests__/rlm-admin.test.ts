@@ -8,12 +8,28 @@
  * group.
  */
 
-import { describe, test, expect, mock, beforeEach } from "bun:test";
+import { describe, test, expect, mock } from "bun:test";
 
 // Restore stale mocks before importing.
 mock.restore();
 
 // Mock heavy infrastructure (same set as characterization test).
+//
+// `vector-store-factory` is the one that bites. `ensureInitializedImpl` falls
+// back to the real factory for any dependency the subject did not receive, so
+// without this the two `warmupCache` tests that construct without deps built a
+// real PostgresVectorStore and ran live embedding-provider auto-selection —
+// ~10 s here, against `bunfig.toml`'s 5 s per-test budget. It passes on a warm
+// provider and times out on a cold one, which is why it read as flakiness. This
+// is the identical omission fixed in `contextual-search-rlm-coverage.test.ts`
+// by commit `48d0f39`; see that file's header.
+mock.module("../data/vector/vector-store-factory.js", () => ({
+  getVectorStore: mock(async () => ({
+    search: async () => [],
+    searchByEmbedding: async () => [],
+    addDocuments: async () => {},
+  })),
+}));
 mock.module("../data/keyword/keyword-search-factory.js", () => ({
   getKeywordSearch: mock(async () => ({})),
 }));

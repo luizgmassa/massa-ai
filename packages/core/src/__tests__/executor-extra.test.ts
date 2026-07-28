@@ -6,7 +6,7 @@
  */
 process.env.MASSA_AI_EXECUTOR_SANDBOX = "none";
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect } from "bun:test";
 import { PolyglotExecutor, detectRuntimes } from "../services/executor/index.js";
 
 const RUNTIMES = detectRuntimes();
@@ -40,7 +40,7 @@ describe("PolyglotExecutor getters", () => {
 
 describe("PolyglotExecutor error handling", () => {
   test("spawn ENOENT: returns error result with stderr message", async () => {
-    const exec = new PolyglotExecutor({ projectRoot: "/tmp" });
+    new PolyglotExecutor({ projectRoot: "/tmp" });
     // Use a language that is available but craft a code that spawns a
     // non-existent binary via shell. Actually the executor spawns the runtime
     // itself, so to get ENOENT we need a runtime that doesn't exist.

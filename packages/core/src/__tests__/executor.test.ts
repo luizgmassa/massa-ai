@@ -36,7 +36,6 @@ import {
   renderIntentResult,
   INTENT_SEARCH_THRESHOLD,
   type DetectDeps,
-  type Language,
 } from "../services/executor/index.js";
 import { ExecutorController } from "../controllers/executor-controller.js";
 

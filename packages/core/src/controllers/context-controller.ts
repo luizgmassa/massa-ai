@@ -17,10 +17,7 @@ import { logger, estimateTokens } from "@massa-ai/shared";
 import { SearchController } from "./search-controller.js";
 import { MemoryController } from "./memory-controller.js";
 import { CompressContextTool } from "../tools/compress_context.js";
-import {
-  SessionFileCache,
-  REFERENCE_TOKEN_COST,
-} from "../services/context/session-file-cache.js";
+import { SessionFileCache } from "../services/context/session-file-cache.js";
 import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
 import { TokenMetrics } from "../services/metrics/token-metrics.js";
 

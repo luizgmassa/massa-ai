@@ -113,7 +113,7 @@ describe("GET /api/v1/events ?jobId= filter (W5-T23, FR-16/AC-13)", () => {
   test("?jobId= receives only events whose payload.jobId matches", async () => {
     const target = "job-A";
     const other = "job-B";
-    const { collector } = await withCollector(`?jobId=${target}`, async (c) => {
+    const { collector } = await withCollector(`?jobId=${target}`, async (_c) => {
       pub("indexing:progress", { jobId: target, projectId: "p1", stage: "parse", current: 1, total: 10, percentage: 10 });
       pub("indexing:progress", { jobId: other, projectId: "p1", stage: "parse", current: 2, total: 10, percentage: 20 });
       pub("indexing:progress", { jobId: target, projectId: "p1", stage: "parse", current: 3, total: 10, percentage: 30 });

@@ -13,7 +13,7 @@
  * config — which is fine here because we inject all deps.
  */
 
-import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
+import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -27,7 +27,6 @@ import {
   SeedMemoriesSchema,
   type BootstrapSeed,
   type BootstrapSignals,
-  type BootstrapResult,
   type MemoryRepoSeam,
 } from "../services/bootstrap/bootstrap-service.js";
 import type { InsertMemoryInput } from "../data/memory/memory-repository.js";

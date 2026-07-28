@@ -258,7 +258,6 @@ export class RelationExtractor {
     existingMemory: MemoryRow & { similarity: number },
   ): ExtractedRelation {
     const newContent = newMemory.content.toLowerCase();
-    const existingContent = existingMemory.content.toLowerCase();
     const similarity = existingMemory.similarity;
 
     // ── Rule 1: SUPERSEDES ───────────────────────────────────

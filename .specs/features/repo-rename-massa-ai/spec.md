@@ -61,6 +61,9 @@ Plugins: `apps/{claude,codex,cursor,opencode}-plugin/**` (manifests, skills, hoo
 - npm registry republish under new scope (only local package.json names updated).
 - Existing-user data migration (old `~/.massa-th0th-data` left in place; legacy migration code in `config-loader.ts` is updated to reference `.massa-ai-data` going forward — old `.massa-th0th-data` is NOT auto-migrated to preserve existing users' data).
 - `RLM_LLM_*` subsystem env namespace (intentional compatibility boundary; unchanged).
+  **Superseded by AD-010** (`audit-remediation-2026-07`, DEBT-03): these ten vars are hard-renamed
+  to `MASSA_AI_LLM_*` with no dual-read. The exclusion was correct for this feature's scope and is
+  kept as the historical record, not as the project's active position.
 - The historical `.specs/features/project-identity-rename/` feature docs (record of the prior th0th→massa-th0th rename) — preserved as historical record but its content references updated to the new name where they describe current identity.
 - Tree-sitter grammar patches, `patches/` content (unrelated).
 
@@ -86,7 +89,7 @@ Plugins: `apps/{claude,codex,cursor,opencode}-plugin/**` (manifests, skills, hoo
 - **R3.1** All `MASSA_TH0TH_*` env vars → `MASSA_AI_*` across `.env.example`, `.env`, `.env.bak`, install.sh, setup-local-first.sh, config-loader, CI workflows, source, tests, specs, docs.
 - **R3.2** Default install dir env `MASSA_TH0TH_DIR` (default `~/.massa-th0th`) → `MASSA_AI_DIR` (default `~/.massa-ai`).
 - **R3.3** Image env `MASSA_TH0TH_API_IMAGE=massa/massa-th0th:api-latest` → `MASSA_AI_API_IMAGE=massa/massa-ai:api-latest`; same for MCP image.
-- **R3.4** `RLM_LLM_*` env vars unchanged (out of scope).
+- **R3.4** `RLM_LLM_*` env vars unchanged (out of scope). **Superseded by AD-010.**
 
 ### R4 — User-facing paths
 - **R4.1** Install dir default `~/.massa-th0th` → `~/.massa-ai` in install.sh, scripts, docs.

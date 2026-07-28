@@ -28,10 +28,7 @@ import path from "node:path";
 import { logger } from "@massa-ai/shared";
 import { getPgPool } from "../../data/db-connection.js";
 import type { AttributionSource } from "../../data/memory/observation-contract.js";
-import {
-  getProjectIdentityAliasResolver,
-  type ProjectIdentityAliasResolver,
-} from "../project-identity/alias-resolver.js";
+import { getProjectIdentityAliasResolver } from "../project-identity/alias-resolver.js";
 import { SessionPinStore } from "./session-pin-store.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────

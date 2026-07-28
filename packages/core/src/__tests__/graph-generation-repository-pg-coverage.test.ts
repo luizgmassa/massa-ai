@@ -13,7 +13,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { GraphGenerationRepositoryPg } from "../data/graph-generation/graph-generation-repository-pg.js";
-import type { GraphGenerationLease } from "../data/graph-generation/graph-generation-contract.js";
 
 const DB_AVAILABLE = /^(postgres|postgresql):/.test(process.env.DATABASE_URL ?? "");
 const TEST_PREFIX = "cov-graphgen-";

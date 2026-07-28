@@ -15,7 +15,6 @@
 
 import { z } from "zod";
 import type { MemoryRow } from "../../data/memory/memory-repository.js";
-import type { llm as LlmHandle } from "./llm-client.js";
 
 /** Tunable prefilter constants. */
 export const CONSOLIDATE_COSINE_THRESHOLD = 0.65;
@@ -145,7 +144,7 @@ export function pickConsolidationWindow(
     const seedIdx = sorted.findIndex((c) => vecFrom(c.embedding) !== null);
     if (seedIdx === -1) continue;
     const seed = sorted[seedIdx];
-    const seedVec = vecFrom(seed.embedding)!;
+    vecFrom(seed.embedding)!;
     const clique: ConsolidateCandidate[] = [seed];
     for (let i = 0; i < sorted.length && clique.length < maxWindow; i++) {
       if (i === seedIdx) continue;

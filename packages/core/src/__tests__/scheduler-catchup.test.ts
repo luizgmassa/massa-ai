@@ -17,7 +17,6 @@ import { Scheduler } from "../services/scheduler/index.js";
 import type {
   ScheduledJob,
   ScheduledJobStore,
-  JobHandler,
   JobKind,
 } from "../services/scheduler/index.js";
 

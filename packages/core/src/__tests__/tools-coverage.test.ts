@@ -5,7 +5,6 @@
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, mock, test } from "bun:test";
-import { randomUUID } from "node:crypto";
 import { GetIndexStatusTool } from "../tools/get_index_status.js";
 import { CreateCheckpointTool } from "../tools/create_checkpoint.js";
 import { RestoreCheckpointTool } from "../tools/restore_checkpoint.ts";
@@ -192,7 +191,6 @@ describe.skipIf(!DB_AVAILABLE)("CreateCheckpointTool", () => {
 
 describe.skipIf(!DB_AVAILABLE)("RestoreCheckpointTool", () => {
   let prisma: any;
-  let createdCheckpointId: string | undefined;
 
   beforeAll(async () => {
     if (!DB_AVAILABLE) return;

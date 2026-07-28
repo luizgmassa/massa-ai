@@ -57,7 +57,7 @@ function cosine(a: number[] | Float32Array, b: number[] | Float32Array): number 
 function centroidOf(vectors: Array<number[] | Float32Array>): number[] {
   if (vectors.length === 0) return [];
   const dim = vectors[0].length;
-  const out = new Array(dim).fill(0);
+  const out: number[] = Array.from<number>({ length: dim }).fill(0);
   for (const v of vectors) {
     for (let i = 0; i < dim; i++) out[i] += v[i];
   }
@@ -72,7 +72,7 @@ function blend(
   wb: number,
 ): number[] {
   const dim = a.length;
-  const out = new Array(dim);
+  const out: number[] = Array.from<number>({ length: dim });
   for (let i = 0; i < dim; i++) out[i] = wa * a[i] + wb * b[i];
   return out;
 }

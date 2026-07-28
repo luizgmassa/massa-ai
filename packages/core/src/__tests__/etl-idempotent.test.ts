@@ -14,7 +14,7 @@
  * semantics and not on the full parse/resolve pipeline.
  */
 
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { EtlPipeline } from "../services/etl/pipeline.js";
 import { buildGraphInputSnapshotHash } from "../services/etl/graph-generation-coordinator.js";
@@ -227,7 +227,14 @@ describe.skipIf(!DB_AVAILABLE)("ETL idempotent import + FileCursor (T14 / AC-8 /
     // cursor writes).
     expect(cursorPaths).toEqual(["a.ts", "b.ts", "c.ts"]);
     await cleanupProject(currentProjectId);
-  });
+    // A real ETL pass against Postgres. The intrinsic cost is small — this file
+    // is 357 ms plain and 670 ms under `--coverage` — but it blew the 5 s
+    // default at 5003 ms inside `bun run test:coverage`, which runs 126
+    // instrumented groups against one Postgres. The budget is therefore for
+    // contention, not for the work; a run that gets near it is a loaded machine
+    // rather than a regression. Per CLAUDE.md, raise the per-test value, never
+    // `bunfig.toml`'s global default.
+  }, 30_000);
 
   test("kill mid-load leaves cursor at previous file; restart re-processes file N (AC-24)", async () => {
     const repo = ManagedRunRepositoryPg.getInstance();
@@ -340,7 +347,8 @@ describe.skipIf(!DB_AVAILABLE)("ETL idempotent import + FileCursor (T14 / AC-8 /
     expect(rowAfterRestart[0]?.status).toBe("completed");
     expect(rowAfterRestart[0]?.file_cursor?.path).toBe("c.ts");
     await cleanupProject(currentProjectId);
-  });
+    // Two full ETL passes (kill + restart). Same reasoning as the sibling above.
+  }, 30_000);
 
   test("discover with a cursor skips files at-or-before the cursor path", async () => {
     // Direct Discover-stage unit test of the resume-skip filter. Uses the

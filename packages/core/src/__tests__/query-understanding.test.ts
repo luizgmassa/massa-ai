@@ -404,7 +404,7 @@ describe("P2-FANOUT-01 + P2-QUALITY-01: rewrite-on retrieval >= rewrite-off base
   }
 
   function rewrittenStreams(): SearchResult[][] {
-    const [vector, keyword] = baselineStreams();
+    const [vector] = baselineStreams();
     // Rewritten-FTS keyword stream: the strong terms "jwt"/"auth" float the
     // needle to rank 0.
     const rewrittenKeyword = [

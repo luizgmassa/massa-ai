@@ -13,7 +13,7 @@
  *        bun test src/__tests__/integration/real-api.test.ts
  */
 
-import { describe, test, expect, beforeAll } from "bun:test";
+import { describe, test, expect } from "bun:test";
 import path from "path";
 
 const API = process.env.MASSA_AI_API_URL ?? "http://localhost:3333";
@@ -228,10 +228,6 @@ describe.skipIf(!API_AVAILABLE)("massa-ai API — real integration (using massa-
       const res = await get(`/api/v1/workspace/list`);
       expect(res.success ?? true).toBeTruthy();
 
-      const projects = res.data ?? res;
-      const found = Array.isArray(projects)
-        ? projects.find((p: any) => p.projectId === PROJECT_ID || p.id === PROJECT_ID)
-        : null;
       // May not be in list API depending on implementation — just assert no crash
       expect(res).toBeTruthy();
     }, 10_000);

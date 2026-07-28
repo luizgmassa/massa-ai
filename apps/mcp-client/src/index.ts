@@ -258,7 +258,7 @@ export class McpProxyServer {
   async start(): Promise<void> {
     // Check API health before starting
     // Silence output: MCP protocol is pure JSON-RPC on stdout; any preamble breaks handshakes.
-    const healthy = await this.apiClient.healthCheck();
+    await this.apiClient.healthCheck();
     // Health check failures are logged via stderr by the client; no need to duplicate.
 
     await this.server.connect(this.transport);

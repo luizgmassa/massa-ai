@@ -158,7 +158,7 @@ describe("IndexManager — staleness detection", () => {
       // Save the modified metadata to the store
       const store = (mgr as any).vectorStore;
       const col = await store.getCollection("proj-age");
-      await col.add([{ id: "_metadata:proj-age", content: JSON.stringify(meta), embedding: new Array(768).fill(0), metadata: {} }]);
+      await col.add([{ id: "_metadata:proj-age", content: JSON.stringify(meta), embedding: Array.from({ length: 768 }).fill(0), metadata: {} }]);
       mgr.clearCache("proj-age");
       const result = await mgr.isIndexStale("proj-age", ageDir);
       expect(result.isStale).toBe(true);

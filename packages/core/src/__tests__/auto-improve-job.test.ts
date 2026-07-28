@@ -16,11 +16,9 @@ import {
   detectPatterns,
   type AutoImproveJobOptions,
   type MemoryApplySeam,
-  type PatternCandidate,
 } from "../services/jobs/auto-improve-job.js";
 import {
   MemoryProposalStore,
-  type ProposalRecord,
 } from "../data/proposal/proposal-repository.js";
 import {
   MemoryObservationStore,

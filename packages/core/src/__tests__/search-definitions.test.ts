@@ -11,7 +11,6 @@
  */
 
 import { describe, test, expect, beforeAll, mock } from "bun:test";
-import { STRUCTURAL_SYMBOL_KINDS } from "@massa-ai/shared";
 
 // ── Mocks ─────────────────────────────────────────────────────
 

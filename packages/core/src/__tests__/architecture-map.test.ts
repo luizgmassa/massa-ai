@@ -532,7 +532,7 @@ describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
       // entryPoints: server.ts is a bootstrap-named module.
       if (map!.entryPoints && map!.entryPoints.length > 0) {
         const hasBootstrap = map!.entryPoints.some((e) =>
-          /server\.ts$/.test(e.file),
+          e.file.endsWith('server.ts'),
         );
         expect(hasBootstrap).toBe(true);
       }
@@ -561,7 +561,26 @@ describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
-  }, 60000);
+    // Each of the three tests in this block indexes a fixture repo through the
+    // real native tree-sitter pipeline into Postgres, then queries back over it.
+    //
+    // Its cost is a function of how much is already in the shared test database,
+    // not of the fixture. Measured on the same command and the same file: 24 pass
+    // in **1213 ms** against a fresh-ish database, **16.59 s** against the state
+    // `bun run test:coverage` leaves behind, and over **120 s** when run partway
+    // through that gate, after ~100 earlier groups have written to it.
+    //
+    // This is NOT contention — `scripts/lib/run-tests-isolated.ts` runs groups
+    // strictly sequentially (`for … await runGroup`), one child process at a
+    // time. It is accumulation.
+    //
+    // The budget is therefore a stopgap and is honest about being one: it will
+    // drift again as the test database grows. The real fix is for the gate to
+    // start from a known database state, the same way it already starts from a
+    // scratch `XDG_CONFIG_HOME` — see `scripts/check-coverage.ts`. That is a
+    // destructive operation on a developer's database and was not taken
+    // unilaterally.
+  }, 300_000);
 
   test("routes surfaced from http_call edges (fetch('/api/items'))", async () => {
     const dir = await makeTempProject(FIXTURE);
@@ -579,7 +598,7 @@ describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
-  }, 60000);
+  }, 300_000);
 
   test("architecture failure never breaks the base response (defensive)", async () => {
     // Even if the env is broken, getProjectMap must either return null (no
@@ -596,5 +615,5 @@ describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
-  }, 60000);
+  }, 300_000);
 });

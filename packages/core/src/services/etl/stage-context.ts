@@ -19,10 +19,7 @@ import type {
 import type { GraphGenerationLease } from "../../data/graph-generation/graph-generation-contract.js";
 import type { HeaderLanguageEvidence } from "../structural/language-manifest.js";
 import type { FileCursor, ManagedRunLease } from "../../data/managed-runs/managed-run-contract.js";
-import type {
-  ActiveGraphDiagnostics,
-  ParserDiagnosticsSummary,
-} from "@massa-ai/shared";
+import type { ActiveGraphDiagnostics } from "@massa-ai/shared";
 
 // ─── Event types ─────────────────────────────────────────────────────────────
 

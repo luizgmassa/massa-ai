@@ -44,11 +44,6 @@ mock.module("../services/symbol/definition-lookup.js", () => ({
 }));
 
 import { TracePathService } from "../services/symbol/trace-path.js";
-import type {
-  TracePathOptions,
-  TracePathResult,
-  EdgeType,
-} from "../services/symbol/trace-path.js";
 import type { DefinitionLookupResult } from "../services/symbol/definition-lookup.js";
 import type { SymbolDefinition } from "../data/symbol/symbol-repository-pg.js";
 

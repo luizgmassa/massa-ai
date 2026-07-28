@@ -40,7 +40,6 @@ const DEDICATED_DB =
 const TEST_PREFIX = "cov-srg-";
 
 let pool: Pool;
-let prisma: any;
 
 function projectId(): string {
   return `${TEST_PREFIX}${randomUUID()}`;
@@ -174,7 +173,7 @@ describe.skipIf(!DEDICATED_DB)("symbol-repo-graph — coverage", () => {
   beforeAll(async () => {
     pool = new Pool({ connectionString: databaseUrl });
     const { getPrismaClient } = await import("../services/query/prisma-client.js");
-    prisma = getPrismaClient();
+    getPrismaClient();
     await cleanup();
   });
 

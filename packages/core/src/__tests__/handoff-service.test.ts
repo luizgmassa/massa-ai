@@ -9,10 +9,7 @@
  * in afterEach.
  */
 
-import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
-import fs from "fs";
-import path from "path";
-import os from "os";
+import { describe, expect, it, beforeEach } from "bun:test";
 import type { z } from "zod";
 
 import {

@@ -15,7 +15,7 @@
  * with an in-memory store + explicit tickIntervalMs/maxConcurrent/enabled.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import {
   parseCron,
   nextCronRun,
@@ -861,8 +861,7 @@ describe("unregisterHandler", () => {
   test("unregisterHandler removes a handler", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({ store, enabled: true });
-    let fired = false;
-    scheduler.registerHandler("unreg-kind" as JobKind, async () => { fired = true; });
+    scheduler.registerHandler("unreg-kind" as JobKind, async () => {});
     expect(scheduler.registeredKinds()).toContain("unreg-kind");
     scheduler.unregisterHandler("unreg-kind" as JobKind);
     expect(scheduler.registeredKinds()).not.toContain("unreg-kind");
@@ -1006,8 +1005,7 @@ describe("catchUpMissedJobs", () => {
       maxConcurrent: 5,
       enabled: true,
     });
-    let fired = 0;
-    scheduler.registerHandler("catchup-kind" as JobKind, async () => { fired++; });
+    scheduler.registerHandler("catchup-kind" as JobKind, async () => {});
     // Two jobs that are way overdue (5 minutes past + tick = 60s → missed).
     const now = Date.now();
     store.save(makeJob({

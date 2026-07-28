@@ -400,7 +400,6 @@ export class SymbolGraphService {
     total_exact: boolean;
   }> {
     const repo = getSymbolRepository();
-    const limit = opts.limit ?? 100;
     const [defs, centrality, total] = await Promise.all([
       repo.listDefinitions(projectId, opts),
       repo.getCentrality(projectId),

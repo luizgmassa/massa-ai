@@ -13,8 +13,7 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
-import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const packageRoot = path.resolve(import.meta.dir, "..", "packages", "core");

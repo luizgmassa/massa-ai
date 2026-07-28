@@ -7,7 +7,6 @@
 
 import {
   Memory,
-  CacheEntry,
   SearchResult,
   RetrievalOptions,
   StorageOptions,

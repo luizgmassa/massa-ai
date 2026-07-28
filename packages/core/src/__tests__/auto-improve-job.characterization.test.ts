@@ -19,7 +19,6 @@ import {
   AutoImproveJob,
   detectPatterns,
   type MemoryApplySeam,
-  type PatternCandidate,
   type PatternThresholds,
 } from "../services/jobs/auto-improve-job.js";
 import {

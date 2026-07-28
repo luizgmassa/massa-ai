@@ -13,7 +13,6 @@ import { describe, test, expect, beforeEach, mock } from "bun:test";
 let queryRawResult: any[] = [];
 let executeRawCalls: any[] = [];
 let executeRawResults: number[] = [];
-let transactionFn: ((tx: any) => Promise<void>) | null = null;
 
 mock.module("../services/query/prisma-client.js", () => ({
   getPrismaClient: () => ({
@@ -23,7 +22,6 @@ mock.module("../services/query/prisma-client.js", () => ({
       return Promise.resolve(executeRawResults.shift() ?? 1);
     },
     $transaction: async (fn: (tx: any) => Promise<void>) => {
-      transactionFn = fn;
       const tx = {
         $queryRaw: () => Promise.resolve(queryRawResult),
         $executeRaw: (sql: any) => {

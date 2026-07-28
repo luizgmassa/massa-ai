@@ -16,7 +16,7 @@
  * with ?jobId= receives the tracker's early-exit indexing:failed event.
  */
 
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { Elysia } from "elysia";
 import { eventBus } from "../services/events/event-bus.js";
 // The SSE route imports `@massa-ai/core` (the built dist), whose `eventBus`

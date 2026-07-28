@@ -32,7 +32,7 @@
  * JSON + Markdown report under benchmarks/needles/reports/ (gitignored).
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { resolve } from "node:path";
 import { smartChunk, type ChunkerConfig, type Chunk } from "../../packages/core/src/services/search/smart-chunker.ts";
 
 // ── Types (mirror fixtures/massa-ai.json + scorer.ts) ───────────────────
@@ -162,7 +162,7 @@ async function mapPool<T, R>(
   concurrency: number,
   onProgress?: (done: number, total: number) => void,
 ): Promise<R[]> {
-  const results: R[] = new Array(items.length);
+  const results: R[] = Array.from({ length: items.length });
   const total = items.length;
   let next = 0;
   let done = 0;

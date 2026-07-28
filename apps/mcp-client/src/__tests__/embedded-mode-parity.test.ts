@@ -10,8 +10,8 @@
  * DB-free: these tests check routing and error shapes, not DB-dependent results.
  */
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { ApiClient, ApiHttpError } from "../api-client.js";
+import { describe, test, expect, afterEach } from "bun:test";
+import { ApiClient } from "../api-client.js";
 import { EmbeddedApiClient } from "../embedded-api-client.js";
 import { proxyCallTool } from "../call-tool-proxy.js";
 import type { ToolProxyApiClient } from "../call-tool-proxy.js";

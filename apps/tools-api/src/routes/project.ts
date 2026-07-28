@@ -235,7 +235,7 @@ export const projectRoutes = new Elysia({ prefix: "/api/v1/project" })
         try {
           await workspaceManager.removeWorkspace(projectId);
           result.symbolsCleared = 1;
-        } catch (e) {
+        } catch {
           // workspace may not exist — treat as success
           result.symbolsCleared = 0;
         }

@@ -255,7 +255,7 @@ export class SearchAnalyticsPg {
     };
   }
 
-  async getProjectStats(projectId: string, limit: number = 10): Promise<any> {
+  async getProjectStats(projectId: string, _limit: number = 10): Promise<any> {
     const pool = await this.getPool();
     
     const stats = await pool.query(

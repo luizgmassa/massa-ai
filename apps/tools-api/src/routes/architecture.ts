@@ -12,7 +12,7 @@
  */
 
 import { GetArchitectureTool, VALID_ARCHITECTURE_ASPECTS } from "@massa-ai/core";
-import { Elysia, t } from "elysia";
+import { Elysia } from "elysia";
 
 let getArchitectureTool: GetArchitectureTool | null = null;
 function getGetArchitectureTool(): GetArchitectureTool {

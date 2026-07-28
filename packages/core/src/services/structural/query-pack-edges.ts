@@ -1,4 +1,4 @@
-import type { NativeQueryCapture, NativeQueryNode } from "./grammar-loaders.js";
+import type { NativeQueryCapture } from "./grammar-loaders.js";
 import { SourceIndex } from "./source-span.js";
 import type {
   NormalizedStructuralEdge,

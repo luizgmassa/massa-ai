@@ -15,7 +15,7 @@
  *   PG integrity: N14, N15, N16, N17
  *   Auth:         N18 (skip+reason), N19, N20
  */
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { describe, test, expect, afterAll } from "bun:test";
 import path from "node:path";
 import { Pool } from "pg";
 import {
@@ -27,7 +27,6 @@ import {
   httpRaw,
   pollUntil,
   resetProject,
-  isSearchable,
   RUN_STAMP,
   PREFIX,
   POLY_FIXTURE_PATH,
@@ -53,7 +52,7 @@ if (E2E_ENABLED) {
 let AVAIL: Availability | null = null;
 
 // ── Long-timeout POST (shared helper caps at 120s; index embeds can exceed) ─
-async function postLong<T = any>(
+async function postLong(
   endpoint: string,
   body?: unknown,
   timeoutMs = 300_000,
@@ -84,7 +83,7 @@ async function postLong<T = any>(
   }
 }
 
-async function getLong<T = any>(endpoint: string, timeoutMs = 60_000): Promise<{ status: number; json: any }> {
+async function getLong(endpoint: string, timeoutMs = 60_000): Promise<{ status: number; json: any }> {
   const headers: Record<string, string> = {};
   const key = process.env.MASSA_AI_API_KEY ?? "";
   if (key) headers["x-api-key"] = key;
