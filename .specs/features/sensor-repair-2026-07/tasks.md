@@ -175,13 +175,56 @@ live embedding provider. This is the recurring omission `CLAUDE.md` documents �
 missing a seam, not a timeout."*
 
 **Done when**:
-- [ ] `architecture-map.test.ts` gets a deterministic embedding seam so it never reaches a live provider. Its assertions are on the **symbol graph** (layers, routes, centrality, cycles) which comes from tree-sitter structural parsing, not from vectors — so a fake provider does not weaken what it tests. Confirm that before building it
-- [ ] Adding `mock.module(` keeps the file in the isolation runner's forked-process set; core's `--unit` group count must stay **126**
-- [ ] Budgets then lowered to the measured value plus stated headroom, and the number recorded here
-- [ ] Full `test:coverage` passes **twice** with the new budgets — once is not evidence for a budget that already flapped
-- [ ] The uncommitted `60_000` edit in the working tree is superseded by this; do not ship it as-is
+- [x] `architecture-map.test.ts` gets a deterministic embedding seam so it never reaches a live provider. Its assertions are on the **symbol graph** (layers, routes, centrality, cycles) which comes from tree-sitter structural parsing, not from vectors — so a fake provider does not weaken what it tests. Confirm that before building it
+- [x] Adding `mock.module(` keeps the file in the isolation runner's forked-process set; core's `--unit` group count must stay **126**
+- [x] Budgets then lowered to the measured value plus stated headroom, and the number recorded here
+- [x] Full `test:coverage` passes **twice** with the new budgets — once is not evidence for a budget that already flapped
+- [x] The uncommitted `60_000` edit in the working tree is superseded by this; do not ship it as-is
 
-**Tests**: existing · **Gate**: `bun run test:coverage` ×2 (~6 min)
+**DONE.** Seam is `mock.module("../data/vector/vector-store-factory.js")`, the repo idiom already used
+by `rlm-admin.test.ts` and `contextual-search-rlm-coverage.test.ts`. The faked surface is exactly what
+the ETL exercises: `deleteByProject` (`pipeline.ts:222`, reached because these tests pass
+`forceReindex: true`), `addDocuments` (`stages/load.ts:344`), and `getCollection`/`getStats` for the
+best-effort admission marker (`pipeline.ts:506`).
+
+**The assertion check was run before building the seam, not assumed.** All 24 tests read
+`projectId`/`stats`/`topCentralFiles`/`symbolsByKind`/`filesByLanguage`/`recentFiles`/`packages`/
+`entryPoints`/`hotspots`/`communities`/`layers`/`routes`. None touches a vector, a similarity score
+or a chunk embedding. Discover, parse, resolve and symbol persistence still run for real.
+
+| Measurement | Before | After |
+| --- | --- | --- |
+| Whole file, real developer config, live Ollama available | 119.47 s worst | **895 ms** |
+| Same file under `--coverage` | — | **1008 ms** (1.13× instrumentation) |
+| `vector store initialized` log lines | ≥1 | **0** |
+| ollama / embedding-provider / qwen3 log lines | ≥1 | **0** |
+| admission-marker warn lines | — | **0** |
+
+**Budget: `300_000` → `30_000`**, chosen against two anchors rather than as a round number. Above the
+largest historical reading that was never decomposed (**16.59 s**), so genuine accumulation cannot make
+it flap; below the smallest documented cold-provider load (**42030 ms**, `CLAUDE.md`), so deleting the
+seam makes the test **fail** rather than merely slow down. The prior `60_000` had neither property —
+it passed a 42 s cold load.
+
+**Gate evidence.** `test:coverage` ×2, both **exit 0**, `[coverage] PASS — every measured source file
+is at or above 90%`, `314 source files measured · 9 documented exclusions`. Group counts byte-identical
+in both runs: core `224 files: 99 pure/shared, 125 stateful/isolated` = **126** (`--unit`), tools-api
+**25**, mcp-client **8**. T2's reset fired both runs: `truncated 36 data table(s); _prisma_migrations
+intact at 23 row(s)`. **0** FAIL lines, **0** timeouts. `lint` 0, `type-check` 0.
+
+**Divergence — the gate is not red, and the stated reason for its redness is falsified.** Both runs
+exited **0**, including `postgres-vector-store.integration.test.ts`. `HANDOFF.md` attributes that
+suite's flakiness to being *"contaminated by other suites in the same run, which a reset at gate start
+cannot reach."* That mechanism does not hold: every count assertion in the file is **project-scoped**
+(`store.getStats("integration-test")`, `:79,92,106,123,137,138`) behind a `beforeEach` that deletes
+that project (`:51-54`). Rows written by other suites under other project ids cannot reach those
+numbers. The file's own header states the actual mechanism — *"These tests need real embeddings, so we
+don't mock the embedding service. Make sure OLLAMA_URL is set"* — and the gate log shows
+`Auto-selecting embedding provider… Selected provider: ollama, qwen3-embedding:8b, dimensions 4096`.
+It is the **cold/warm model against the 5 s budget**, the same root cause as T3 and the same class
+`CLAUDE.md` documents. It passes here because the model is warm. See T4.
+
+**Tests**: existing · **Gate**: `bun run test:coverage` ×2 (measured ~3 min each, not ~15)
 **Commit**: `test(core): give the architecture-map budgets a deterministic embedding seam`
 
 ---

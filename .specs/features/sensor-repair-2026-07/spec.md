@@ -189,6 +189,15 @@ embedding seam so it stops reaching a live provider — the remedy `CLAUDE.md` p
 is missing a seam, not a timeout"*). The discriminating evidence for the reset is **not** the
 budget; it is `postgres-vector-store.integration.test.ts` going from **8 failures to 6** across the
 same gate run when the database starts clean, plus AC-2a's migration check.
+
+**Closed during Execute (T3).** Seam landed as
+`mock.module("../data/vector/vector-store-factory.js")`, the idiom already used by
+`rlm-admin.test.ts`. Confirmed before building it that all 24 assertions read the symbol graph and
+none reads a vector. Whole file went **119.47 s worst → 895 ms** under the developer's real config
+with a live Ollama available, with **zero** provider-init log lines. Budget `300_000` → **`30_000`**,
+set above the largest undecomposed historical reading (16.59 s) and below the smallest documented
+cold-provider load (42030 ms), so removing the seam fails the test instead of merely slowing it.
+`test:coverage` ×2 both exit 0; group counts 126 (`--unit`) / 25 / 8 unchanged.
 **AC-4**: A test proves the truncation refuses to run against a non-dedicated `DATABASE_URL`.
 
 ### SEN-02 — The coverage gate runs in CI
