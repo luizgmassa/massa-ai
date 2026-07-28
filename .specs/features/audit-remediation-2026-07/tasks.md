@@ -544,29 +544,62 @@ Phase 6:  T16 ──→ T17 ──→ T18 ──→ T19 ──→ T20 ──→ 
 - [x] `coverage = true` removed from `bunfig.toml`; the 5 s global timeout is left untouched
 - [x] `bun run test:coverage` exists and fails below a documented threshold — `scripts/check-coverage.ts`, wired as a root script
 - [x] The threshold matches the 90% floor and the 9 documented exclusions — **moved out of `.specs/HANDOFF.md` into the script as executable data** (`LINE_COVERAGE_FLOOR`, `EXCLUSIONS`), each exclusion carrying the justification that earned it. Per the user's decision, and for the same reason as the T7 installer-api-key precedent: T22 rewrites `HANDOFF.md`, so a gate pinned to it would silently lose its own definition.
-- [ ] **BLOCKED — the floor is implemented but unverified.** See below.
+- [x] **Passing path verified.** `bun run test:coverage` → `PASS — every measured source file is
+      at or above 90%`, exit 0: 314 source files measured, **11** exclusions, 0 test failures,
+      groups 126 / 25 / 8. The refusal path was already verified.
 
-**Blocker: the floor cannot be measured without the dedicated test database.**
+**The blocker is resolved, and the first diagnosis of it was wrong.**
 
-50 core suites are wrapped in `describe.skipIf(!DEDICATED_DB)`, requiring `MASSA_AI_DEDICATED=1`
-and a `DATABASE_URL` on `127.0.0.1:5433/massa_ai_test`. Run without them, the suites report
-`0 pass / N skip` and their subjects measure near zero — a first full run reported **132 of 314
-files below the floor**, including `graph-queries.ts` at 3.98% while its own 19 tests sat
-skipped beside it. That number is an artifact, not a coverage gap.
+Run against the dedicated database, the gate reported **130 of 314** files below the floor —
+barely different from the 132 reported without it, and including files `coverage-90pct` had
+measured at 100%. The dedicated database was necessary but was never the whole story: **the
+merge arithmetic was wrong.**
 
-The script therefore refuses to run without that environment rather than emitting a report that
-looks like a catastrophe; a gate that silently measures a skipped suite trains people to ignore
-it. The refusal path is verified. **The passing path is not** — running it needs the dedicated
-database, and the attempt was denied by the sandbox classifier as credential exploration.
+Bun emits two shapes of lcov record for the same file. A group that genuinely instruments a
+module reports its real executable lines; a group that only pulls the module in as a transitive
+import emits a degenerate record marking *every physical line* uncovered — blank lines, closing
+braces and JSDoc included. Measured on `services/graph/graph-queries.ts` (440 lines): the
+instrumenting group reported 220 executable lines and covered all 220, while seven shallow groups
+each reported 377 and covered 14. The 157-line difference is entirely non-executable text, and
+the real set is a strict subset of the degenerate one. Unioning the denominators scored a fully
+covered file at 220/377 = 58.4% — which is exactly the 58.36% the gate reported.
 
-Two further findings the first run surfaced, both real:
+`check-coverage.ts` now unions the **covered** set across groups, so a file split across several
+test files keeps credit for all of them, and takes the **minimum** executable set, so the
+denominator stays on Bun's real executable lines. **130 below floor became 3, with no change to
+the 90% floor.**
 
-- `packages/shared/src/config/api-key.ts` measures **13.79%** despite 373 lines of dedicated
-  tests, because `api-key.test.ts` exercises it exclusively through the `runIsolated` subprocess
-  harness (21 call sites) and Bun's coverage does not cross a process boundary. This is a
-  measurement blind spot, not missing tests, and it is not among the 9 recorded exclusions.
-- Core emitted **122** lcov files for **126** groups, so 4 groups produced no coverage output at
-  all. Unexplained; needs its own look before the floor can be trusted.
+The three, and what each turned out to be:
+
+- `packages/shared/src/config/api-key.ts` (13.79%) — **excluded.** 373 lines of dedicated tests,
+  but all 21 call sites run through the `runIsolated` subprocess harness because `CONFIG_DIR` is
+  frozen at first import, and Bun coverage does not cross a process boundary. Driving it
+  in-process would defeat the isolation that stops those tests writing to a real `~/.config`.
+- `packages/shared/src/env.ts` (88.89%) — **excluded**, after the in-process route was attempted
+  and shown blocked by three compounding mechanisms: `CONFIG_DIR` freezes at first import;
+  `packages/shared` runs as a single `bun test` process so no test can guarantee it loads
+  `env.ts` first; and `env.ts` dotenv-loads the nearest `.env` walking up from cwd before
+  consulting config.json. Cache-busting the import re-evaluates `env.ts` but reuses the cached
+  loader, so the config dir cannot be re-pointed.
+- `packages/core/src/services/search/contextual-search-rlm.ts` (63.55%) — **a real gap, closed to
+  100%, not excluded** (user decision). After the M14 split every public method is a one-line
+  forward to an `*Impl` delegate; the delegates had tests and the seam between them did not, so
+  all 78 uncovered lines were delegation bodies. 27 forwarding tests were added to the existing
+  `contextual-search-rlm-coverage.test.ts` — extended rather than added as a new file, since the
+  isolation runner forks on `mock.module(` and a new file would have taken core from 126 groups
+  to 127, breaking T20's pinned invariant.
+
+The **122 lcov files for 126 groups** is explained and benign: Bun writes no lcov at all when a
+run's coverage record set is empty. Two of the four skip entirely behind their own narrower
+opt-in flags (`RUN_GRAPH_GENERATION_LIFECYCLE`, `RUN_GRAPH_GENERATION_SYMBOL_REPOSITORY`), and
+two import no product source. Group indices are unique by construction, so it was never a
+collision.
+
+One further change the verification forced: the gate runs the suites against a scratch
+`XDG_CONFIG_HOME`. Without it the numbers are a property of the machine rather than of the tree —
+a developer with `llm.enabled: true` takes LLM branches CI never reaches — and the developer's
+real `~/.config/massa-ai/` is writable by the run, which is the second open finding PR1 carried
+forward.
 
 **Tests**: none (config) · **Gate**: full
 **Commit**: `chore(tooling): make coverage an explicit gate instead of a default`
@@ -624,11 +657,44 @@ Two further findings the first run surfaced, both real:
 **Requirement**: DEBT-01..05
 
 **Done when**:
-- [ ] `### Changed` entry states that `RLM_LLM_*` no longer works and names each replacement
-- [ ] `### Added` entry for the lint gate
-- [ ] The skip-ci marker is never written in any commit or PR body
-- [ ] Build gate green including `bun run lint`
-- [ ] STATE.md and HANDOFF.md updated
+- [x] `### Changed` entry states that `RLM_LLM_*` no longer works and names each replacement — a
+      10-row table, plus the consequence stated plainly (an unrenamed var is silently ignored and
+      falls back to its default; for `RLM_LLM_ENABLED` that silently disables every LLM feature)
+      and the note that `config.json` needs no migration
+- [x] `### Added` entry for the lint gate, and for the coverage gate
+- [x] The skip-ci marker is never written in any commit or PR body — verified across the whole
+      `c992ae9..HEAD` range: `git log --format='%H%n%B' | grep -ci 'skip.ci'` returns **0**
+- [x] Build gate green including `bun run lint` — see below
+- [x] STATE.md and HANDOFF.md updated. HANDOFF.md was fully rewritten; it still described
+      `coverage-90pct`. FEATURES.json flipped to `execute: true` / `status: complete`.
+
+**Gate evidence at `2dac830`:**
+
+| Gate | Result |
+| --- | --- |
+| `bun run lint` | 0 diagnostics |
+| `bun run type-check` | 6/6 |
+| `bun run build` | 5/5 |
+| `bun run test:scripts` | 584 pass / 0 fail, exit 0 |
+| `bun run test:coverage` | **PASS**, exit 0 — 314 files measured, 11 exclusions, 0 failures, groups 126 / 25 / 8 |
+| `bun run test` | green **except** one pre-existing failure — see below |
+
+`apps/mcp-client`'s `embedded-api-client-endpoints.test.ts` ("routes without 404" for
+`/search/project` and `/search/code`) fails under a plain `bun run test` and passes under the
+coverage gate's scratch config dir, with `DATABASE_URL` identical in both — so it is a config
+leak to a live provider, not the contention CLAUDE.md previously attributed it to. **Reproduced
+at `c992ae9` in the clean main checkout**, so it is pre-existing and not caused by this branch.
+It has no one-line fix: the file is deliberately unmocked integration and `@massa-ai/core` does
+not export `_setLlmEnabledForTesting` to `apps/`. CLAUDE.md's note is corrected and the case is
+carried forward in `HANDOFF.md`.
+
+**Scope addition executed under T22 (user-approved):** unit tests were reaching live providers
+because the config layer reads the developer's own `~/.config/massa-ai/config.json`. Fixed in
+`dc7fee3` for `dart-support.test.ts`, `code-compressor.test.ts` and `rlm-admin.test.ts`; the
+genuinely-slow suites were budgeted separately from measurement (`etl-cache-invalidation`
+180_000 from a measured 66.42 s under instrumentation, `etl-idempotent` 30_000 at 670 ms
+instrumented, `architecture-map` 120_000 for gate contention). `bunfig.toml`'s global 5 s
+default is untouched.
 
 **Tests**: none (docs) · **Gate**: build
 **Commit**: `docs: record the audit-remediation debt changes`
