@@ -300,6 +300,7 @@ export class AISDKEmbeddingProvider implements EmbeddingProvider {
   private sanitizeText(text: string): string {
     // Step 1: Remove control characters and replacement char
     let sanitized = text
+      // oxlint-disable-next-line no-control-regex -- intentional: strips control chars to prevent NaN errors in embedding models
       .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
       .replace(/\uFFFD/g, " ");
     
@@ -376,8 +377,7 @@ export class AISDKEmbeddingProvider implements EmbeddingProvider {
    */
   async embedQuery(text: string): Promise<number[]> {
     const startTime = Date.now();
-    let error = false;
-    
+
     try {
       const result = await withTimeout(
         () =>
@@ -450,7 +450,6 @@ export class AISDKEmbeddingProvider implements EmbeddingProvider {
       
       return result;
     } catch (err) {
-      error = true;
       const latency = Date.now() - startTime;
       const tokens = Math.ceil(text.length / 4);
       metrics.recordEmbedding({
@@ -611,7 +610,7 @@ export class AISDKEmbeddingProvider implements EmbeddingProvider {
                 `[${this.id}] Ollama batch fallback aborted after 3 consecutive failures: ${(singleErr as Error).message}`,
               );
             }
-            embeddings.push(new Array(this.dimensions).fill(0));
+            embeddings.push(Array.from({ length: this.dimensions }, () => 0));
           }
         }
         return embeddings;

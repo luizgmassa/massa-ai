@@ -14,7 +14,7 @@
 
 import { ToolError } from "../../tools/enum-validation.js";
 
-const GIT_REF_PATTERN = /^[A-Za-z0-9._\/+-]+$/;
+const GIT_REF_PATTERN = /^[A-Za-z0-9._/+-]+$/;
 
 /**
  * Validate a git ref param before it reaches `execFileSync("git", [...])`.

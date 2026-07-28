@@ -71,15 +71,15 @@ class TestableVectorStore extends BaseVectorStore {
   }
 
   // Stub implementations for abstract methods
-  async addDocument(id: string, content: string, metadata?: Record<string, unknown>): Promise<void> {}
-  async addDocuments(documents: VectorDocument[]): Promise<void> {}
-  async search(query: string, limit?: number, projectId?: string): Promise<SearchResult[]> { return []; }
-  async searchByEmbedding(embedding: number[], limit?: number, projectId?: string): Promise<SearchResult[]> { return []; }
-  async delete(id: string): Promise<boolean> { return true; }
-  async deleteByProject(projectId: string): Promise<number> { return 0; }
-  async update(id: string, content: string, metadata?: Record<string, unknown>): Promise<void> {}
-  async getCollection(name: string): Promise<IVectorCollection> { return {} as IVectorCollection; }
-  async getStats(projectId?: string): Promise<VectorStoreStats> { return { totalDocuments: 0, totalSize: 0 }; }
+  async addDocument(_id: string, _content: string, _metadata?: Record<string, unknown>): Promise<void> {}
+  async addDocuments(_documents: VectorDocument[]): Promise<void> {}
+  async search(_query: string, _limit?: number, _projectId?: string): Promise<SearchResult[]> { return []; }
+  async searchByEmbedding(_embedding: number[], _limit?: number, _projectId?: string): Promise<SearchResult[]> { return []; }
+  async delete(_id: string): Promise<boolean> { return true; }
+  async deleteByProject(_projectId: string): Promise<number> { return 0; }
+  async update(_id: string, _content: string, _metadata?: Record<string, unknown>): Promise<void> {}
+  async getCollection(_name: string): Promise<IVectorCollection> { return {} as IVectorCollection; }
+  async getStats(_projectId?: string): Promise<VectorStoreStats> { return { totalDocuments: 0, totalSize: 0 }; }
   async listProjects(): Promise<ProjectInfo[]> { return []; }
   async healthCheck(): Promise<boolean> { return true; }
   async close(): Promise<void> {}
@@ -143,11 +143,11 @@ describe("BaseVectorStore", () => {
     test("works with high-dimensional vectors (384)", () => {
       const store = new TestableVectorStore();
       const dim = 384;
-      const vectorA = new Array(dim).fill(0.1);
-      const vectorB = new Array(dim).fill(0.1);
-      
+      const vectorA = Array.from({ length: dim }).fill(0.1);
+      const vectorB = Array.from({ length: dim }).fill(0.1);
+
       const similarity = store.testCosineSimilarity(vectorA, vectorB);
-      
+
       // Identical vectors should have similarity 1
       expect(similarity).toBeCloseTo(1, 5);
     });
@@ -155,8 +155,8 @@ describe("BaseVectorStore", () => {
     test("works with high-dimensional vectors (1024)", () => {
       const store = new TestableVectorStore();
       const dim = 1024;
-      const vectorA = new Array(dim).fill(0.5);
-      const vectorB = new Array(dim).fill(0.5);
+      const vectorA = Array.from({ length: dim }).fill(0.5);
+      const vectorB = Array.from({ length: dim }).fill(0.5);
       
       const similarity = store.testCosineSimilarity(vectorA, vectorB);
       

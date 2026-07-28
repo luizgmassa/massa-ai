@@ -2,7 +2,6 @@ import { describe, test, expect } from "bun:test";
 import {
   applyAttentionScore,
   DEFAULT_ATTENTION_CONFIG,
-  DEFAULT_ATTENTION_WEIGHTS,
 } from "../services/synapse/scoring/attention-score.js";
 import { SessionRegistry } from "../services/synapse/session/session-registry.js";
 import type { SearchResult } from "@massa-ai/shared";

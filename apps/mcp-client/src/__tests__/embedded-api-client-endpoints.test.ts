@@ -11,7 +11,7 @@
 import { describe, test, expect } from "bun:test";
 import { EmbeddedApiClient } from "../embedded-api-client.js";
 import { ApiHttpError } from "../api-client.js";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 

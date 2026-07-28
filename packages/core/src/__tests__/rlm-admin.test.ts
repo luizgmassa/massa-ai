@@ -8,7 +8,7 @@
  * group.
  */
 
-import { describe, test, expect, mock, beforeEach } from "bun:test";
+import { describe, test, expect, mock } from "bun:test";
 
 // Restore stale mocks before importing.
 mock.restore();

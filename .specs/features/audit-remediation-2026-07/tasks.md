@@ -520,12 +520,13 @@ Phase 6:  T16 ──→ T17 ──→ T18 ──→ T19 ──→ T20 ──→ 
 **Non-goals**: **No formatter, no reformat.** A repo-wide format is a separate PR by user direction.
 
 **Done when**:
-- [ ] oxlint added as a root devDependency; `.oxlintrc.json` enables correctness rules only
-- [ ] The initial rule set passes on the current tree with **zero source changes**
-- [ ] `turbo.json`'s `lint` task is implemented by real per-package scripts
-- [ ] Test: a seeded violation file makes `bun run lint` exit non-zero; removed, it exits 0
-- [ ] CI `build` job runs `bun run lint`
-- [ ] Build gate passes
+- [x] oxlint added as a root devDependency (**exact** `1.76.0`); `.oxlintrc.json` enables `correctness` only, every other category `off`
+- [x] ~~The initial rule set passes on the current tree with **zero source changes**~~ — **SUPERSEDED during Execute by the spec owner.** Adoption found **337** violations; honouring this literally meant downgrading the 15 firing rules to `warn`, i.e. a gate that reports but never enforces. The owner chose instead to **fix all 337 and keep every correctness rule at `error`**. See `design.md` → "TASK-018 — scope amended by the spec owner during Execute". The "no formatter, no reformat" non-goal is unchanged.
+- [x] ~~`turbo.json`'s `lint` task is implemented by real per-package scripts~~ — **not implementable.** Turbo dispatches only to workspace packages (`packages/*`, `apps/*`); `scripts/` and `benchmarks/` are neither and held 21 of the 337 violations, so a per-package task would report success while never reading them. `ignorePatterns` also resolve against cwd and stop matching per-package. Shipped as root `"lint": "oxlint"` over the whole repo; the dead `"lint": {}` turbo task is removed. See `design.md`.
+- [x] Test: a seeded violation file makes `bun run lint` exit non-zero; removed, it exits 0 — `scripts/__tests__/lint-gate.test.ts`, 2/2. Uses `no-dupe-keys` (clean across the tree, and not auto-fixable, so `--fix` cannot erase the probe); `afterEach` removes the probe even when an assertion throws, since a leaked probe would break every later lint run.
+- [x] CI `build` job runs `bun run lint` (placed before Build — cheapest gate in the job)
+- [x] Build gate passes — and the full matrix beyond it: oxlint exit 0 / 0 diagnostics (from 337), type-check 6/6, build 5/5, `test:scripts` 579 pass exit 0, shared 207, web-ui 113, plugins 94, tools-api 25 groups, mcp-client 8 groups, **core unit 126 groups all passing** vs a baseline of 126 groups with 2 Dart timeouts
+- [x] All 337 violations cleared: 16 by `oxlint --fix` (documented-safe fixes only), 321 by hand across six disjoint write sets. `--fix-suggestions` / `--fix-dangerously` were **not** used — oxc documents both as behavior-changing.
 
 **Tests**: unit (`scripts/__tests__`) · **Gate**: build
 **Commit**: `feat(tooling): add oxlint and implement the lint gate`

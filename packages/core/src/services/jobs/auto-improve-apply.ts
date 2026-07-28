@@ -10,9 +10,9 @@
 
 import { randomUUID } from "crypto";
 import { MemoryLevel, MemoryType } from "@massa-ai/shared";
-import type { InsertMemoryInput, MemoryRow, UpdateMemoryPatch } from "../../data/memory/memory-repository.js";
+import type { MemoryRow, UpdateMemoryPatch } from "../../data/memory/memory-repository.js";
 import type { ProposalRecord } from "../../data/proposal/proposal-repository.js";
-import type { AutoImproveJob, MemoryApplySeam } from "./auto-improve-job.js";
+import type { MemoryApplySeam } from "./auto-improve-job.js";
 import { VALID_MEMORY_TYPES } from "./auto-improve-config.js";
 
 // ── Apply-rejection + payload validation (M40 fail-closed) ──────────────────

@@ -14,7 +14,7 @@
 import path from "path";
 import fs from "fs/promises";
 import { logger } from "@massa-ai/shared";
-import { smartChunk, type Chunk } from "../../search/smart-chunker.js";
+import { smartChunk } from "../../search/smart-chunker.js";
 import { structuralRuntime, type StructuralRuntime } from "../../structural/structural-runtime.js";
 import { LANGUAGE_MANIFEST } from "../../structural/language-manifest.js";
 import { deriveLegacyLineRange } from "../../structural/source-span.js";
@@ -133,7 +133,7 @@ export class ParseStage {
     const knownHeaders = new Set(files.filter((file) => path.extname(file.relativePath).toLowerCase() === ".h")
       .map((file) => path.posix.normalize(file.relativePath)));
     const mutable: Record<string, { cImporters?: readonly string[]; cppImporters?: readonly string[]; buildLanguage?: "c" | "cpp" | "conflict" }> = {
-      ...(ctx.structuralHeaderEvidenceByFile ?? {}),
+      ...ctx.structuralHeaderEvidenceByFile,
     };
     for (const parsed of parsedFiles) {
       const extension = path.extname(parsed.file.relativePath).toLowerCase();
@@ -304,7 +304,7 @@ export class ParseStage {
         ...(owner ? { callerSymbol: owner.name } : {}),
         span: edge.span,
         meta: {
-          ...(edge.metadata ?? {}),
+          ...edge.metadata,
           ...(edge.paramIndex !== undefined ? { paramIndex: edge.paramIndex } : {}),
           ...(target.qualifier ? { qualifier: target.qualifier } : {}),
           sourceSpan: edge.span,

@@ -11,7 +11,6 @@ import { describe, test, expect, beforeEach, mock } from "bun:test";
 // ── Mock prisma-client ──────────────────────────────────────────────────────
 
 let queryRawResult: any[] = [];
-let queryRawResult2: any[] = [];
 
 mock.module("../services/query/prisma-client.js", () => ({
   getPrismaClient: () => ({
@@ -294,8 +293,13 @@ describe("MemoryClustering", () => {
       ];
       const clustering = MemoryClustering.getInstance();
       const cluster = await clustering.findCluster("a");
-      // May or may not find depending on clustering result
-      expect(cluster === null || cluster !== null).toBe(true);
+      // With no `cached` argument findCluster must re-run clusterMemories over the
+      // rows above. Those three vectors are near-identical, so "a" lands in a real
+      // cluster alongside them. The previous assertion here was
+      // `cluster === null || cluster !== null`, a tautology that passed under every
+      // possible implementation, including one that never re-ran clustering at all.
+      expect(cluster).not.toBeNull();
+      expect(cluster!.memberIds).toContain("a");
     });
   });
 

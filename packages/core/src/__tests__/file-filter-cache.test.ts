@@ -5,7 +5,7 @@
  * (include/exclude), evictOldest, invalidateProject, clear, getStats.
  */
 
-import { describe, test, expect, beforeEach } from "bun:test";
+import { describe, test, expect } from "bun:test";
 import { FileFilterCache } from "../services/search/file-filter-cache.js";
 
 describe("FileFilterCache — getValidFiles", () => {

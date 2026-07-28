@@ -16,7 +16,6 @@
  */
 import { describe, test, expect, beforeAll } from "bun:test";
 import {
-  API,
   E2E_ENABLED,
   PREFIX,
   SHARED_PID,
@@ -84,7 +83,6 @@ describe.skipIf(!READY)("T14 — cleanup verification (e2e-ai-* pollution)", () 
     const scopedRows: any[] = scoped?.data?.memories ?? scoped?.data ?? scoped?.memories ?? [];
     const recentRows: any[] = recent?.data?.memories ?? recent?.data ?? recent?.memories ?? [];
 
-    const scopedE2e = scopedRows;
     const recentE2e = recentRows.filter((m: any) => {
       const pid = m?.projectId ?? m?.project_id;
       return typeof pid === "string" && pid.startsWith(PREFIX) && pid !== SHARED_PID;

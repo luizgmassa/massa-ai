@@ -37,7 +37,6 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import {
   API,
-  API_KEY,
   E2E_ENABLED,
   PREFIX,
   RUN_STAMP,
@@ -47,7 +46,6 @@ import {
   httpPost,
   resetProject,
   ensureSharedIndex,
-  SHARED_PID,
   pollUntil,
 } from "./_helpers";
 import { startMcp, mcpCall, requireTool, type McpHandle } from "./_mcp";

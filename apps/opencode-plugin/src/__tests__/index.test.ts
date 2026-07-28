@@ -6,7 +6,7 @@
  * no real API or filesystem config is needed.
  */
 
-import { describe, test, expect, mock, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { MassaAiPlugin } from "../index";
 
 const originalFetch = globalThis.fetch;

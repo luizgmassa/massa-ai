@@ -6,7 +6,7 @@
  * round-trip, and getDefaultTTL per level.
  */
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect } from "bun:test";
 import { CacheLevel } from "@massa-ai/shared";
 import { CacheEntry } from "../models/CacheEntry.js";
 

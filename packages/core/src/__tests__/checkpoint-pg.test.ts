@@ -8,7 +8,6 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test
 import { TaskState, TaskStatus, CheckpointType } from "@massa-ai/shared";
 import { PgCheckpointStore } from "../services/checkpoint/checkpoint-store-pg.js";
 import { CheckpointManager } from "../services/checkpoint/checkpoint-manager.js";
-import type { CheckpointMetadata } from "../services/checkpoint/checkpoint-manager.js";
 import { AutoCheckpointer } from "../services/checkpoint/auto-checkpointer.js";
 
 const DB_AVAILABLE = (process.env.DATABASE_URL ?? "").startsWith("postgres");
@@ -194,7 +193,7 @@ describe.skipIf(!DB_AVAILABLE)("PgCheckpointStore (PostgreSQL)", () => {
   test("getLatestCheckpoint returns the newest non-expired checkpoint for a task", async () => {
     const store = new PgCheckpointStore();
     const state = makeState();
-    const cp1 = store.createCheckpoint(state);
+    store.createCheckpoint(state);
     await new Promise((r) => setTimeout(r, 10));
     const cp2 = store.createCheckpoint(state);
     const latest = store.getLatestCheckpoint(state.taskId);
@@ -514,11 +513,11 @@ describe.skipIf(!DB_AVAILABLE)("AutoCheckpointer (PostgreSQL)", () => {
     AutoCheckpointer.instance = null;
     const ac = AutoCheckpointer.getInstance({ operationInterval: 2 });
     const state = makeState();
-    const cp1 = ac.recordOperation(state);
+    ac.recordOperation(state);
     ac.recordOperation(state); // 2nd op → checkpoint
-    const cp2 = ac.recordOperation(state); // 1st op of next cycle
+    ac.recordOperation(state); // 1st op of next cycle
     ac.recordOperation(state); // 2nd op → checkpoint with parent
-    const cp3 = ac.recordOperation(state);
+    ac.recordOperation(state);
     // cp2 or cp3 should have parentCheckpointId set to a prior checkpoint.
     const lastCp = ac.getLastCheckpointId();
     expect(lastCp).not.toBeNull();

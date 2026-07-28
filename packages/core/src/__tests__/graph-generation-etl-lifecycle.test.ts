@@ -127,7 +127,7 @@ describe("TASK-013 graph generation ETL lifecycle", () => {
       generationId: "held-generation",
       leaseExpiresAt: Date.now() + 600_000,
     });
-    const coordinator = new GraphGenerationCoordinator(repository);
+    new GraphGenerationCoordinator(repository);
     // The coordinator has a 300s deadline, but we can test the timeout path
     // by mocking Date.now or using a very short deadline. Since the deadline
     // is hardcoded, we verify the throw path by having busy persist.

@@ -325,4 +325,6 @@ bun run dev:mcp                        # MCP stdio server
 
 Or the full offline wizard: `bash scripts/setup-local-first.sh`.
 
-Note: `bun run lint` is a **no-op** — the repo has no linter. Don't cite it as a gate.
+Note: `bun run lint` runs **oxlint** over the whole repo (`correctness` rules at `error`,
+config in `.oxlintrc.json`). It is a real gate and CI enforces it. `bun run lint:fix`
+applies only the fixes oxlint documents as safe.

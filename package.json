@@ -26,7 +26,8 @@
     "bench:needles": "bun benchmarks/needles/run.ts",
     "bench:needles:gate": "NEEDLE_FLOOR_HIT1=0.5 NEEDLE_FLOOR_MRR=0.65 bun benchmarks/needles/run.ts --label ci-gate",
     "bench:parser": "bun benchmarks/parser/run.ts --baseline 5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03",
-    "lint": "turbo run lint",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/dist packages/*/dist",
     "test:scripts": "bun test scripts/__tests__ scripts/tests/*.test.ts && for f in scripts/tests/*.sh; do bash \"$f\" || exit 1; done",
     "test:plugins": "bun test apps/claude-plugin/__tests__ apps/codex-plugin/__tests__ apps/cursor-plugin/__tests__ apps/opencode-plugin/__tests__",
@@ -58,6 +59,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/pg": "^8.18.0",
+    "oxlint": "1.76.0",
     "toml": "^4.3.0",
     "turbo": "^2.5.0",
     "typescript": "^5.4.0"

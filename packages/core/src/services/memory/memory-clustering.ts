@@ -134,7 +134,7 @@ export class MemoryClustering {
       const newCentroids: number[][] = [];
       const counts: number[] = [];
       for (let c = 0; c < centroids.length; c++) {
-        newCentroids.push(new Array(dim).fill(0));
+        newCentroids.push(Array.from({ length: dim }, () => 0));
         counts.push(0);
       }
       for (let i = 0; i < items.length; i++) {

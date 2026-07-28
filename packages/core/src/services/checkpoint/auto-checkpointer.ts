@@ -17,7 +17,6 @@ import {
   TaskState,
   TaskCheckpoint,
   CheckpointType,
-  TaskStatus,
   logger,
 } from "@massa-ai/shared";
 import { CheckpointManager } from "./checkpoint-manager.js";

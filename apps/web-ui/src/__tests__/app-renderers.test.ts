@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, afterEach } from "bun:test";
 
 const mod = await import("../static/app.js");
 const UI = (globalThis as any).MASSA_AI_UI || {};
@@ -12,7 +12,6 @@ const {
   renderProposals,
   initTheme,
   toggleTheme,
-  isWriteModeEnabled,
   createApiClient,
   startApp,
 } = { ...mod, ...UI };

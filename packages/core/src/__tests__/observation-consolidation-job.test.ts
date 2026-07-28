@@ -14,7 +14,6 @@ import {
 } from "../services/jobs/observation-consolidation-job.js";
 import {
   MemoryObservationStore,
-  newObservationId,
   type Observation,
 } from "../data/memory/observation-repository.js";
 import { eventBus } from "../services/events/event-bus.js";
@@ -48,7 +47,6 @@ function makeFakeMemoryRepo() {
 
 /** A fake LlmSurface that returns a fixed valid batch when enabled. */
 function enabledSurface(): LlmSurface & { calls: number } {
-  let calls = 0;
   const surface = {
     calls: 0,
     isEnabled: () => true,
@@ -57,7 +55,6 @@ function enabledSurface(): LlmSurface & { calls: number } {
       value?: T;
       error?: string;
     }> {
-      calls++;
       // Return a valid ConsolidatedBatch-compatible value.
       return {
         ok: true,

@@ -22,10 +22,8 @@ import {
   computeAgentAffinity,
 } from "../services/synapse/index.js";
 import type {
-  AgentSession,
   QueryIntent,
   SpectrumFlags,
-  SynapsePipelineResult,
 } from "../services/synapse/index.js";
 
 describe("synapse/index — getSynapseManager singleton", () => {

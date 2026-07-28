@@ -236,7 +236,6 @@ describe("defaultDiffRunner — N7 three-source diff + secrets denylist", () => 
  * the 1000-line-file test fails (content would be 1000 lines, not 500).
  */
 import { ReadFileTool } from "../tools/read_file.js";
-import { SymbolGraphService } from "../services/symbol/symbol-graph.service.js";
 
 describe("ReadFileTool — N9 read_file cap + source_clipped", () => {
   test("1000-line file, no range → 500 lines + source_clipped:true + total:1000", async () => {

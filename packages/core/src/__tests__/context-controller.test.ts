@@ -256,7 +256,6 @@ function buildFakeController(overrides: {
 
     let finalContext = rawContext;
     let compressionRatio = 0;
-    let tokensSaved = 0;
 
     if (rawTokens > maxTokens) {
       const resp = await ctrl.compressor.handle({
@@ -268,7 +267,6 @@ function buildFakeController(overrides: {
       if (resp.success && resp.data) {
         finalContext = (resp.data as any).compressed;
         compressionRatio = resp.metadata?.compressionRatio || 0;
-        tokensSaved = resp.metadata?.tokensSaved || 0;
       }
     }
 

@@ -256,7 +256,7 @@ export class StructuralResolverSession {
     this.#build = Object.freeze({
       ...build,
       importsByFile: Object.freeze({
-        ...(build.importsByFile ?? {}),
+        ...build.importsByFile,
         ...Object.fromEntries(documents.map((document) => [document.file, document.structure.imports])),
       }),
     });

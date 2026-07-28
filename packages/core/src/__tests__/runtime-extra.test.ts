@@ -16,7 +16,6 @@ import {
   runnableExists,
   getVersion,
   type RuntimeMap,
-  type Language,
   type DetectDeps,
 } from "../services/executor/runtime.js";
 

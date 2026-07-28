@@ -863,7 +863,8 @@ and config CLI commands.**
 | `bun run start:api` | Start REST API |
 | `bun run start:mcp` | Start MCP server |
 | `bun run test` | Run tests |
-| `bun run lint` | Lint code |
+| `bun run lint` | Lint code (oxlint, `correctness` rules — CI-enforced) |
+| `bun run lint:fix` | Apply oxlint's safe auto-fixes |
 | `bun run type-check` | Type checking |
 | `bun run diagnose` | Validate full stack (Ollama, database, embeddings) |
 | `bun run bench:fixture` | Run the massa-ai retrieval fixture benchmark |

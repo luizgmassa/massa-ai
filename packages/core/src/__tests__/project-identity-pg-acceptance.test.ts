@@ -22,7 +22,6 @@ import { randomUUID } from "crypto";
 import { Pool, type PoolClient } from "pg";
 
 import {
-  ProjectIdentityError,
   ProjectIdentityInvalidatorRegistry,
   createProjectIdentityService,
   installProjectIdentityGuards,

@@ -5,7 +5,6 @@
  */
 
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import path from "node:path";
 import { realpathSync } from "node:fs";
 import {
   canonicalizeProjectRoot,

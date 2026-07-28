@@ -42,11 +42,9 @@ import {
   E2E_ENABLED,
   PREFIX,
   RUN_STAMP,
-  PROJECT_PATH,
   assertE2ePrefix,
   probeAvailability,
   httpPost,
-  httpGet,
   resetProject,
   pollUntil,
 } from "./_helpers";

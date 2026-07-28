@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 
 import {
-  getConfigDir,
   getConfigPath,
   configExists,
   loadConfig,

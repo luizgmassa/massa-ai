@@ -294,30 +294,6 @@ function renderMarkdown(
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
-interface DupGroup {
-  groupId: string;
-  expectedMerge: boolean;
-  expectedType: string;
-  members: Array<{ id: string; content: string; type: string }>;
-}
-interface DupFixtureFile {
-  version: string;
-  description: string;
-  distractors: Array<{ id: string; content: string; type: string }>;
-  groups: DupGroup[];
-}
-interface DistinctFixtureFile {
-  version: string;
-  description: string;
-  pairs: Array<{
-    pairId: string;
-    expectedMerge: boolean;
-    rationale: string;
-    a: { id: string; content: string; type: string };
-    b: { id: string; content: string; type: string };
-  }>;
-}
-
 function parseArgs(argv: string[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (let i = 0; i < argv.length; i++) {

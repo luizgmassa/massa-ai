@@ -92,7 +92,7 @@ export function buildSymbolPersistenceBatch(
     target_fqn: edge.targetFqn,
     ref_kind: edge.kind,
     meta: {
-      ...(edge.meta ?? {}),
+      ...edge.meta,
       ...(edge.span ? { sourceSpan: edge.span } : {}),
       ...(edge.sourceFqn ? { callerFqn: edge.sourceFqn } : {}),
     },

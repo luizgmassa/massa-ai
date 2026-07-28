@@ -119,8 +119,8 @@ export const MassaAiPlugin: Plugin = async ({ project, directory, worktree, clie
   // Auto-configure on first run
   ensureConfig()
   
-  const config = loadConfig()
-  
+  loadConfig()
+
   const projectPath = worktree || directory
 
   // Per-session project id memo (M45/HAR-04): the first event of a session
@@ -371,7 +371,7 @@ export const MassaAiPlugin: Plugin = async ({ project, directory, worktree, clie
           includeSymbols: tool.schema.boolean().optional().default(true).describe("Include symbol metadata from graph"),
           includeImports: tool.schema.boolean().optional().default(true).describe("Extract and show import statements"),
         },
-        async execute(args, ctx: ToolContext) {
+        async execute(args, _ctx: ToolContext) {
           const result = await massaAiFetch("/api/v1/file/read", {
             filePath: args.filePath,
             projectId: args.projectId || projectId,
@@ -464,7 +464,7 @@ export const MassaAiPlugin: Plugin = async ({ project, directory, worktree, clie
             .default(20)
             .describe("Maximum number of results to return (default: 20)"),
         },
-        async execute(args, ctx: ToolContext) {
+        async execute(args, _ctx: ToolContext) {
           const result = await massaAiGetWithQuery("/api/v1/symbol/definitions", {
             projectId,
             search: args.query,

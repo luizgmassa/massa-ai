@@ -114,7 +114,7 @@ describeNative("ContextualSearchRLM — concurrent indexing mutex", () => {
       const order: string[] = [];
 
       let callCount = 0;
-      (inst as any)._indexProjectInternal = async (_path: string, id: string) => {
+      (inst as any)._indexProjectInternal = async (_path: string, _id: string) => {
         callCount++;
         const myCall = callCount;
         order.push(`start:${myCall}`);
@@ -143,7 +143,7 @@ describeNative("ContextualSearchRLM — concurrent indexing mutex", () => {
       const order: string[] = [];
 
       let callCount = 0;
-      (inst as any)._indexProjectInternal = async (_path: string, id: string) => {
+      (inst as any)._indexProjectInternal = async (_path: string, _id: string) => {
         callCount++;
         const n = callCount;
         order.push(`start:${n}`);

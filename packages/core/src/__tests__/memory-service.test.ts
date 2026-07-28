@@ -12,10 +12,10 @@ import { MemoryType, MemoryLevel } from "@massa-ai/shared";
 mock.module("../services/embeddings/index.js", () => ({
   EmbeddingService: class MockEmbeddingService {
     async embed(_text: string): Promise<number[]> {
-      return new Array(384).fill(0.1);
+      return Array.from({ length: 384 }).fill(0.1);
     }
     async embedBatch(texts: string[]): Promise<number[][]> {
-      return texts.map(() => new Array(384).fill(0.1));
+      return texts.map(() => Array.from({ length: 384 }).fill(0.1));
     }
     getDimensions() {
       return 384;
@@ -208,10 +208,10 @@ describe("MemoryService", () => {
     test("ranks memories by composite score", () => {
       const now = Date.now();
       // Create a known embedding
-      const embedding = new Array(384).fill(0);
+      const embedding = Array.from({ length: 384 }).fill(0);
       embedding[0] = 1.0;
 
-      const queryEmbedding = new Array(384).fill(0);
+      const queryEmbedding = Array.from({ length: 384 }).fill(0);
       queryEmbedding[0] = 1.0;
 
       const memories = [
@@ -262,7 +262,7 @@ describe("MemoryService", () => {
     });
 
     test("respects limit parameter", () => {
-      const queryEmbedding = new Array(384).fill(0.1);
+      const queryEmbedding = Array.from({ length: 384 }).fill(0.1);
 
       const memories = Array.from({ length: 10 }, (_, i) => ({
         id: `m${i}`,
@@ -287,7 +287,7 @@ describe("MemoryService", () => {
 
     test("recomputes a higher score after access reinforcement", () => {
       const now = Date.now();
-      const queryEmbedding = new Array(384).fill(0);
+      const queryEmbedding = Array.from({ length: 384 }).fill(0);
       queryEmbedding[0] = 1;
       const embedding = Buffer.from(
         new Float32Array(queryEmbedding).buffer,
@@ -323,7 +323,7 @@ describe("MemoryService", () => {
     });
 
     test("handles memories with no embedding (assigns 0.5 base score)", () => {
-      const queryEmbedding = new Array(384).fill(0.1);
+      const queryEmbedding = Array.from({ length: 384 }).fill(0.1);
 
       const memories = [
         {

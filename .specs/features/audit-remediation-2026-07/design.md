@@ -625,6 +625,65 @@ rg 'RLM_' --hidden --glob '!CHANGELOG.md' --glob '!.specs/**' \
 That returns nothing. The requirement it enforces is unchanged: **no live `RLM_` reference
 remains** — only the two proofs that it is dead, and the decision record that killed it.
 
+### TASK-018 — scope amended by the spec owner during Execute
+
+The task shipped with an explicit non-goal: *"The initial rule set passes on the current tree
+with **zero source changes**."* Adoption found **337** `correctness` violations, so honouring
+that literally would have meant downgrading the 15 firing rules to `warn` — a gate that reports
+but does not enforce. The spec owner was asked and chose the opposite: **fix all 337 and keep
+every correctness rule at `error`.** That is a requirement change made during Execute by the
+requirement's owner, recorded here rather than silently absorbed. The original non-goal is
+superseded for this task only; "no formatter, no reformat" still stands.
+
+### TASK-018 — `bun run lint` cannot go through turbo
+
+The task said *"`turbo.json`'s `lint` task is implemented by real per-package scripts."* It
+cannot be, and shipping it that way would have produced a gate with a silent hole.
+
+Turbo dispatches tasks only to workspace packages — `workspaces` is `["packages/*", "apps/*"]`.
+`scripts/` and `benchmarks/` are neither, and they held **21** of the 337 violations. A
+per-package `lint` task would have reported success while never reading those files. A second,
+subtler problem: `ignorePatterns` in `.oxlintrc.json` are resolved against the working
+directory, so root-relative entries silently stop matching once oxlint is invoked per package.
+
+Shipped instead: root `"lint": "oxlint"` (plus `"lint:fix": "oxlint --fix"`), one invocation
+over the whole repo, and the now-unused `"lint": {}` turbo task is **removed** rather than left
+as dead config. `bun run lint` remains the command every doc and the CI job cite, so the public
+surface is unchanged.
+
+### TASK-018 — oxc semantic errors are not rule-governed
+
+The adoption run exited non-zero with **zero** rule-severity errors reported, which is not a
+state the `rules` block can express. `oxlint --quiet` (errors only) revealed why:
+
+```
+packages/core/src/__tests__/hook-service.test.ts:26:3: error: Identifier `AttributionResolverLike` has already been declared
+```
+
+That is an **oxc semantic error**, not a lint rule, so no severity setting can silence it — the
+only levers are fixing it or ignoring the file. It is also a genuine defect: the identifier is
+imported at line 26 and again at line 342. It survived because `packages/core/tsconfig.json:25`
+excludes `src/__tests__`, so `tsc` never parsed the file. This is the first thing the linter
+caught that `type-check` is structurally incapable of catching, and it is the strongest single
+argument for DEBT-01.
+
+Two further real findings, both fixed under the amended scope:
+
+- `packages/core/src/__tests__/memory-clustering.test.ts:298` asserted
+  `expect(cluster === null || cluster !== null).toBe(true)` — a tautology true under every
+  possible implementation, including one that never re-ran clustering. Replaced with
+  `expect(cluster).not.toBeNull()` + `expect(cluster!.memberIds).toContain("a")`, which is what
+  the test's own name ("re-runs clustering when no cached result") claims.
+- `apps/mcp-client/src/api-client.ts:111` passed `body` as a key on every request including
+  `GET`. Per the fetch spec a GET/HEAD carrying a body key is a `TypeError`. The key is now
+  omitted rather than set to `undefined`; the truthiness check is preserved verbatim so falsy
+  bodies behave exactly as before.
+
+**Honest limit of the sweep:** `--fix` (documented safe) resolved 16. The remaining 321 were
+applied by hand across four disjoint write sets. `--fix-suggestions` and `--fix-dangerously` are
+documented by oxc as behavior-changing and were **not** used; only `--fix` is wired into
+`lint:fix`.
+
 ### TASK-017 — the call-site count was wrong in the source it was corrected from
 
 `CLAUDE.md` claimed "11 call sites … 8 NL-judgment sites". Counted from source, there are **10**:

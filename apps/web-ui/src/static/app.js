@@ -63,7 +63,7 @@ export function isWriteModeEnabled() {
   if (typeof globalThis !== "undefined" && globalThis.MASSA_AI_WEB_WRITE_MODE === true) return true;
   try {
     return localStorage.getItem("massa-ai-write-mode") === "true";
-  } catch (_) {
+  } catch {
     return false;
   }
 }
@@ -103,7 +103,7 @@ export function markdownToHtml(md) {
       try {
         const rawHtml = markedLib.parse(text);
         return purifyLib.sanitize(rawHtml);
-      } catch (_) {
+      } catch {
         // fall through to minimal renderer on parse error
       }
     }
@@ -596,7 +596,7 @@ export function initTheme(doc, store) {
       const t = store.getItem(THEME_STORAGE_KEY);
       if (t === "dark" || t === "light") theme = t;
     }
-  } catch (_) {}
+  } catch {}
   if (doc && doc.documentElement) {
     doc.documentElement.setAttribute("data-theme", theme);
   }
@@ -612,7 +612,7 @@ export function toggleTheme(doc, store) {
   doc.documentElement.setAttribute("data-theme", next);
   try {
     if (store) store.setItem(THEME_STORAGE_KEY, next);
-  } catch (_) {}
+  } catch {}
   return next;
 }
 
@@ -630,7 +630,7 @@ function readInjectedApiKey(doc) {
     if (!el || typeof el.getAttribute !== "function") return null;
     const value = el.getAttribute("content");
     return value && value.trim() ? value.trim() : null;
-  } catch (_) {
+  } catch {
     return null;
   }
 }
@@ -709,7 +709,7 @@ function startApp(opts) {
             return '<option value="' + escapeHtml(id) + '">' + escapeHtml(id) + "</option>";
           })
           .join("");
-    } catch (_) {}
+    } catch {}
   }
 
   async function render() {
@@ -907,7 +907,7 @@ function startApp(opts) {
           if (data && (data.type === "index_status" || data.type === "observation" || data.event === "index_status" || data.event === "observation")) {
             render();
           }
-        } catch (_) {
+        } catch {
           // ignore parse errors
         }
       };
@@ -915,7 +915,7 @@ function startApp(opts) {
         // SSE reconnection is handled by the browser automatically;
         // no action needed on error
       };
-    } catch (_) {
+    } catch {
       // EventSource unavailable or connection failed — non-fatal
     }
   }

@@ -17,8 +17,7 @@
  * paths (F2 mitigation — worktree symlink breakage).
  */
 
-import { spawn } from "node:child_process";
-import { realpathSync, existsSync } from "node:fs";
+import { realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { logger } from "@massa-ai/shared";
 

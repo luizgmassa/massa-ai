@@ -30,7 +30,6 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import {
   API,
-  API_KEY,
   E2E_ENABLED,
   PREFIX,
   RUN_STAMP,
@@ -39,12 +38,9 @@ import {
   httpGet,
   httpPost,
   httpRaw,
-  normalize,
-  assertMatrix,
   ensureSharedIndex,
   indexAndAwait,
   resetProject,
-  SHARED_PID,
   POLY_FIXTURE_PATH,
   type Availability,
 } from "./_helpers";

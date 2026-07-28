@@ -13,7 +13,6 @@
 
 import { describe, test, expect } from "bun:test";
 import { spawnSync, spawn } from "child_process";
-import { writeFileSync, unlinkSync } from "fs";
 import path from "path";
 
 const HOOK_SCRIPT = path.resolve(import.meta.dir, "../massa-ai-hook.ts");
@@ -22,101 +21,6 @@ interface RunResult {
   exitCode: number | null;
   stdout: string;
   stderr: string;
-}
-
-/**
- * Start a mock HTTP server in a separate Bun child process.
- * The server writes its port to stdout, then listens.
- * delayMs > 0: respond after delay. delayMs = 0: never respond (hanging).
- */
-function startServerInChild(delayMs: number): {
-  baseUrl: string;
-  stop: () => void;
-} {
-  const serverScript = `
-import http from "node:http";
-const delayMs = ${delayMs};
-const server = http.createServer((req, res) => {
-  if (delayMs > 0) {
-    setTimeout(() => { res.writeHead(200); res.end("{}"); }, delayMs);
-  }
-  // delayMs === 0: never respond (hanging server)
-});
-server.listen(0, "127.0.0.1", () => {
-  process.stdout.write(String(server.address().port));
-});
-`;
-
-  const tmpFile = path.join(import.meta.dir, `_tmp_server_${Date.now()}.ts`);
-  writeFileSync(tmpFile, serverScript);
-
-  const child = spawn("bun", [tmpFile], {
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-
-  // Read port from stdout
-  const port = parseInt(
-    new Promise<string>((resolve) => {
-      let data = "";
-      child.stdout?.on("data", (d) => {
-        data += d.toString();
-        if (data.trim().length > 0) resolve(data.trim());
-      });
-    }).toString(),
-    10,
-  );
-
-  // Actually, we need to get the port synchronously. Let me use a sync approach.
-  // Wait for the port with a promise.
-  return {
-    baseUrl: "", // placeholder, filled below
-    stop: () => {
-      child.kill("SIGTERM");
-      try { unlinkSync(tmpFile); } catch { /* ok */ }
-    },
-  };
-}
-
-/**
- * Synchronous version: start server in child, get port via blocking read.
- */
-function startServerSync(delayMs: number): { baseUrl: string; stop: () => void } {
-  const serverScript = `
-import http from "node:http";
-const delayMs = ${delayMs};
-const server = http.createServer((req, res) => {
-  if (delayMs > 0) {
-    setTimeout(() => { res.writeHead(200); res.end("{}"); }, delayMs);
-  }
-});
-server.listen(0, "127.0.0.1", () => {
-  process.stdout.write(String(server.address().port));
-  process.stdout.write("\\n");
-});
-process.on("SIGTERM", () => { server.close(); process.exit(0); });
-`;
-
-  const tmpFile = path.join(import.meta.dir, `_tmp_server_${Date.now()}_${Math.random().toString(36).slice(2)}.ts`);
-  writeFileSync(tmpFile, serverScript);
-
-  const child = spawn("bun", [tmpFile], {
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-
-  // Block until we get the port — use a synchronous read via spawnSync trick
-  // Actually we can't sync-read from spawn. Let me use a different approach.
-  // Write port to a temp file instead.
-  child.unref();
-
-  // Poll for the port file — but that's async too.
-  // Simpler: just use a known approach — spawn the server with spawnSync to get port.
-  return {
-    baseUrl: "",
-    stop: () => {
-      child.kill("SIGTERM");
-      try { unlinkSync(tmpFile); } catch { /* ok */ }
-    },
-  };
 }
 
 function runHook(baseUrl: string, payload: string): RunResult {

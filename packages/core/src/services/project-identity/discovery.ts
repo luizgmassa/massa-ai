@@ -127,7 +127,7 @@ export async function discoverProjectIdentityStorage(
   const payloadStores: DiscoveredPayloadStore[] = [];
   const unknown = new Set<string>();
   for (const [tableName, columns] of columnsByTable) {
-    for (const [column, dataType] of columns) {
+    for (const [column, _dataType] of columns) {
       if (!IDENTITY_COLUMNS.has(column)) continue;
       const policy = directStorePolicy(tableName, column as IdentityColumn);
       if (!policy) unknown.add(`${tableName}.${column}`);

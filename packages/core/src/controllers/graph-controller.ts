@@ -14,7 +14,6 @@
 import { logger } from "@massa-ai/shared";
 import { tracePathService } from "../services/symbol/trace-path.js";
 import type {
-  TracePathOptions,
   TracePathResult,
   TraceDirection,
   TraceMode,

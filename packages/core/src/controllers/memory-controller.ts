@@ -14,7 +14,6 @@ import { getMemoryRepository } from "../data/memory/memory-repository-factory.js
 import type { MemoryRow } from "../data/memory/memory-repository.js";
 import {
   MemoryService,
-  type Memory,
   type ScoredMemory,
 } from "../services/memory/memory-service.js";
 import { MemoryGraphService } from "../services/graph/memory-graph.service.js";
@@ -272,7 +271,13 @@ export class MemoryController {
       types,
       minImportance = 0.3,
       limit = 10,
-      includePersistent = true,
+      // Accepted but not yet honoured: `search_memories` declares
+      // `includePersistent` in its tool schema (tools/search_memories.ts:61) and
+      // forwards it here, but nothing below ever reads it, so setting it has no
+      // effect. Kept destructured and renamed rather than deleted, so the gap
+      // stays visible at the site instead of looking like the option was never
+      // passed. Closing it is a behavior decision, not a lint fix.
+      includePersistent: _includePersistent = true,
       includeRelated = false,
     } = input;
 

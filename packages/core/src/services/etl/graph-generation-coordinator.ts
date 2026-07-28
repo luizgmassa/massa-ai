@@ -35,7 +35,7 @@ export class GraphGenerationCoordinator {
 
   async begin(input: BeginGraphBuildInput): Promise<GraphGenerationLease> {
     const deadline = Date.now() + GRAPH_GENERATION_LEASE_TTL_MS;
-    do {
+    for (;;) {
       const outcome = await this.repository.begin({ ...input, leaseTtlMs: GRAPH_GENERATION_LEASE_TTL_MS });
       if (outcome.status === "acquired") return outcome.lease;
       if (outcome.status === "stale_active") {
@@ -43,7 +43,7 @@ export class GraphGenerationCoordinator {
       }
       if (Date.now() >= deadline) throw new Error(`graph_generation_busy:${outcome.generationId}`);
       await new Promise((resolve) => setTimeout(resolve, 100));
-    } while (true);
+    }
   }
 
   async heartbeat(lease: GraphGenerationLease): Promise<void> {

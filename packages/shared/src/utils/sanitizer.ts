@@ -19,7 +19,8 @@ export function sanitizeInput(input: string): string {
   // Remove potentially dangerous characters
   let sanitized = input
     .replace(/[<>]/g, '') // Remove HTML tags
-    .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+    // oxlint-disable-next-line no-control-regex -- intentional: stripping control chars is this function's job
+    .replace(/[\u0000-\u001F\u007F]/g, '') // Remove control characters
     .slice(0, maxLength); // Enforce max length
 
   return sanitized;

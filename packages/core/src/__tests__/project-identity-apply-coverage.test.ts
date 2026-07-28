@@ -21,7 +21,6 @@ import {
   canonicalProjectIdentityJson,
   createProjectIdentityApplyService,
   hashProjectIdentityPlan,
-  hashProjectIdentityRequest,
   type ProjectIdentityChangedPayload,
   type ProjectIdentityChangedPublisher,
   type ProjectIdentityTransactionClient,

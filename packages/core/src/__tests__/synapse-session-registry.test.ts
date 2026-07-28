@@ -3,7 +3,6 @@ import {
   SessionRegistry,
   getSessionRegistry,
   resetSessionRegistry,
-  type CreateSessionInput,
 } from "../services/synapse/session/session-registry.js";
 import type { SessionStore } from "../services/synapse/session/session-store.js";
 import type { AgentSession } from "../services/synapse/types.js";

@@ -172,9 +172,9 @@ describe.skipIf(!DB_AVAILABLE)("EmbeddingCachePg (PostgreSQL)", () => {
 
   test("namespace is deterministic from provider+model", () => {
     // Two caches with the same provider+model share a namespace.
-    const a = new EmbeddingCachePg("cov-ns", "model-ns");
-    const b = new EmbeddingCachePg("cov-ns", "model-ns");
-    const c = new EmbeddingCachePg("cov-other", "model-ns");
+    new EmbeddingCachePg("cov-ns", "model-ns");
+    new EmbeddingCachePg("cov-ns", "model-ns");
+    new EmbeddingCachePg("cov-other", "model-ns");
     // We can't inspect namespace directly, but a and b should share stats
     // (same model filter), while c has a different namespace.
     // Verify via the hash: namespace = sha256(provider\0model).

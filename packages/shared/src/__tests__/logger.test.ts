@@ -26,7 +26,7 @@ mock.module("../config/index.js", () => ({
   },
 }));
 
-import { Logger, LogLevel, logger } from "../utils/logger";
+import { Logger, logger } from "../utils/logger";
 
 describe("Logger", () => {
   let logSpy: ReturnType<typeof spyOn>;

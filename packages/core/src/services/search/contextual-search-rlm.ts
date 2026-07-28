@@ -18,34 +18,14 @@
  * - Embedding reuse across projects
  */
 
-import {
-  SearchResult,
-  VectorDocument,
-} from "@massa-ai/shared";
-import { logger } from "@massa-ai/shared";
-import { config } from "@massa-ai/shared";
+import { SearchResult } from "@massa-ai/shared";
 import { IndexManager } from "./index-manager.js";
 import { SearchAnalytics } from "./search-analytics.js";
 import type { SearchAnalyticsPg } from "./search-analytics-pg.js";
-import { getGraphStore } from "../graph/graph-store-factory.js";
-import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
-import fs from "fs/promises";
-import path from "path";
-import { glob } from "glob";
-import { minimatch } from "minimatch";
 import { FileFilterCache } from "./file-filter-cache.js";
-import { smartChunk } from "./smart-chunker.js";
-import {
-  QueryUnderstandingService,
-  buildRewrittenFTSQuery,
-} from "./query-understanding.js";
-import { applyProximityRerank, extractQueryTerms } from "./lexical-search.js";
-import { eventBus } from "../events/event-bus.js";
-import { getSynapseManager } from "../synapse/index.js";
-import { getSessionRegistry } from "../synapse/session/index.js";
+import { QueryUnderstandingService } from "./query-understanding.js";
 import type { SynapseManager } from "../synapse/synapse-manager.js";
 import type { SessionRegistry } from "../synapse/session/session-registry.js";
-import type { AgentSession } from "../synapse/types.js";
 import { assertParserReadyForIndexing } from "../structural/parser-readiness.js";
 import type { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
 import type { getVectorStore } from "../../data/vector/vector-store-factory.js";
@@ -86,8 +66,6 @@ import {
   warmupCacheImpl,
   getAnalyticsImpl,
 } from "./rlm-admin.js";
-
-const globAsync = glob;
 
 /**
  * ContextualSearchRLM - Main contextual search service

@@ -17,7 +17,6 @@ import path from "path";
 import os from "os";
 
 import { ReadFileTool } from "../tools/read_file.js";
-import type { SymbolGraphService } from "../services/symbol/symbol-graph.service.js";
 
 type IndexingStartedPayload = {
   jobId: string;

@@ -89,7 +89,7 @@ function dispatchBlocks(content: string): string[] {
   const blocks: string[] = [];
   let current: string[] | null = null;
   for (const line of lines) {
-    if (/^> \*\*Dispatch: `massa-ai-/.test(line)) {
+    if (line.startsWith('> **Dispatch: `massa-ai-')) {
       if (current) blocks.push(current.join("\n"));
       current = [line];
     } else if (current) {
@@ -302,12 +302,12 @@ describe("reference integrity: relative harness paths resolve on disk", () => {
       const content = await read(file);
       const mentions = new Set<string>();
       for (const m of content.matchAll(
-        /`((?:references|workflows|personas)\/[A-Za-z0-9._\/-]+\.md)`/g,
+        /`((?:references|workflows|personas)\/[A-Za-z0-9._/-]+\.md)`/g,
       )) {
         mentions.add(path.join(SKILLS_DIR, "massa-ai", m[1]!));
       }
       for (const m of content.matchAll(
-        /`(skills\/[A-Za-z0-9._\/-]+\.md)`/g,
+        /`(skills\/[A-Za-z0-9._/-]+\.md)`/g,
       )) {
         mentions.add(path.join(REPO_ROOT, m[1]!));
       }
@@ -327,7 +327,7 @@ describe("router table matches the workflow and reference trees", () => {
   test("every workflow file on disk appears in the router table, and vice versa", async () => {
     const router = await read(ROUTER);
     const listed = new Set(
-      [...router.matchAll(/`(workflows\/[A-Za-z0-9._\/-]+\.md)`/g)].map((m) => m[1]!),
+      [...router.matchAll(/`(workflows\/[A-Za-z0-9._/-]+\.md)`/g)].map((m) => m[1]!),
     );
 
     const onDisk = new Set<string>();
@@ -352,7 +352,7 @@ describe("router table matches the workflow and reference trees", () => {
   test("every reference path listed in the router exists", async () => {
     const router = await read(ROUTER);
     const listed = new Set(
-      [...router.matchAll(/`(references\/[A-Za-z0-9._\/-]+)`/g)].map((m) => m[1]!),
+      [...router.matchAll(/`(references\/[A-Za-z0-9._/-]+)`/g)].map((m) => m[1]!),
     );
     expect(listed.size).toBeGreaterThan(20);
     const missing: string[] = [];

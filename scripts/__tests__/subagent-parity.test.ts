@@ -213,7 +213,7 @@ describe("subagent parity — exact 15 names per host (CLA-09/CRS-07/OPC-09)", (
 
 describe("subagent parity — name collision (CLA-08/CDX-09/OPC-09)", () => {
   test("no shipped agent name collides with host built-ins", async () => {
-    for (const [host, builtins] of Object.entries(HOST_BUILTINS)) {
+    for (const [_host, builtins] of Object.entries(HOST_BUILTINS)) {
       for (const name of SPECIALIST_NAMES) {
         // The shipped name is massa-ai-<name>; the registry name is <name>.
         // Collision check is against the registry name (spec AC: "name fields").

@@ -148,20 +148,6 @@ function refRaw(over: Partial<Record<string, unknown>> = {}): Record<string, unk
   };
 }
 
-function impRaw(over: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
-  return {
-    id: 1,
-    project_id: "p1",
-    from_file: "src/b.ts",
-    to_file: "src/a.ts",
-    specifier: "./a",
-    imported_names: ["Foo"],
-    is_external: false,
-    is_type_only: false,
-    ...over,
-  };
-}
-
 function wsRaw(over: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
   return {
     project_id: "p1",

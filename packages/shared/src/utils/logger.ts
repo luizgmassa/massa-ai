@@ -32,7 +32,7 @@ export class Logger implements ILogger {
         const configLevel = config.get('logging').level;
         this._level = this.parseLogLevel(configLevel);
         this._enableMetrics = config.get('logging').enableMetrics;
-      } catch (error) {
+      } catch {
         // Fallback if config is not available yet
         this._level = LogLevel.INFO;
         this._enableMetrics = false;
@@ -89,7 +89,7 @@ export class Logger implements ILogger {
    * All logs (DEBUG, INFO, WARN, ERROR) go to stderr.
    * Stdout must remain pristine for stdio MCP protocol (pure JSON-RPC).
    */
-  private write(message: string, level: LogLevel): void {
+  private write(message: string, _level: LogLevel): void {
     console.error(message);
   }
 

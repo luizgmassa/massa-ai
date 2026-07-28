@@ -9,7 +9,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { DiscoverStage } from "../services/etl/stages/discover.js";
-import { ParseStage, StructuralEtlParseError } from "../services/etl/stages/parse.js";
+import { ParseStage } from "../services/etl/stages/parse.js";
 import { ResolveStage } from "../services/etl/stages/resolve.js";
 import { LoadStage, buildSymbolPersistenceBatch } from "../services/etl/stages/load.js";
 import { buildHeaderLanguageEvidence } from "../services/etl/pipeline.js";
@@ -718,7 +718,7 @@ import com.example.*
   test("resolveChunkerMaxChars reads EMBEDDING_MAX_CHARS env", () => {
     const original = process.env.EMBEDDING_MAX_CHARS;
     process.env.EMBEDDING_MAX_CHARS = "8000";
-    const result = (ParseStage as unknown as { resolveChunkerMaxChars?: () => number | undefined }).resolveChunkerMaxChars?.();
+    (ParseStage as unknown as { resolveChunkerMaxChars?: () => number | undefined }).resolveChunkerMaxChars?.();
     // The function is module-private, not exported. We test it indirectly via
     // the parse stage. Just verify env is read without error.
     process.env.EMBEDDING_MAX_CHARS = original;

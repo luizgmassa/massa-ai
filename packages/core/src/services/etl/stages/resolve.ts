@@ -36,8 +36,6 @@ import type {
   ResolvedFile,
   ResolvedImport,
   ResolvedEdge,
-  RawImport,
-  RawSymbol,
 } from "../stage-context.js";
 
 const TS_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.js"];
@@ -237,7 +235,7 @@ export class ResolveStage {
           span: edge.span,
           ...(ownerIndex >= 0 ? { sourceFqn: identities[ownerIndex]?.fqn } : {}),
           meta: {
-            ...(edge.metadata ?? {}),
+            ...edge.metadata,
             ...(edge.paramIndex !== undefined ? { paramIndex: edge.paramIndex } : {}),
             sourceSpan: edge.span,
             ...(unresolved?.qualifier ? { qualifier: unresolved.qualifier } : {}),
@@ -378,7 +376,7 @@ export class ResolveStage {
         knownFqns,
       );
       // Stamp the caller FQN into meta for downstream traversal.
-      const meta = { ...(edge.meta ?? {}) };
+      const meta = { ...edge.meta };
       if (edge.callerSymbol) {
         meta.callerFqn = `${parsed.file.relativePath}#${edge.callerSymbol}`;
       }

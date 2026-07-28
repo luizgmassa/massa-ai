@@ -9,20 +9,6 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import { SearchAnalyticsPg, type SearchEvent } from "../services/search/search-analytics-pg.js";
 
-function makeFakePool(queries: { sql: string; params?: unknown[]; rows?: unknown[] }[]) {
-  const calls: { sql: string; params: unknown[] }[] = [];
-  const pool = {
-    query: async (sql: string, params?: unknown[]) => {
-      calls.push({ sql, params: params ?? [] });
-      const match = queries.find((q) => (typeof q.sql === "string" ? q.sql === sql : q.sql.test(sql)));
-      if (match) return { rows: match.rows ?? [] };
-      return { rows: [] };
-    },
-    end: async () => {},
-  };
-  return { pool, calls };
-}
-
 describe("SearchAnalyticsPg — pool-mocked", () => {
   let analytics: SearchAnalyticsPg;
   let pool: any;
@@ -55,10 +41,8 @@ describe("SearchAnalyticsPg — pool-mocked", () => {
   });
 
   test("getProjectAnalytics returns aggregated stats", async () => {
-    let callIndex = 0;
     pool.query = async (sql: string, params?: unknown[]) => {
       calls.push({ sql, params: params ?? [] });
-      callIndex++;
       if (sql.includes("COUNT(*) as total_queries")) {
         return {
           rows: [
@@ -207,10 +191,8 @@ describe("SearchAnalyticsPg — pool-mocked", () => {
   });
 
   test("getSummary returns total searches + top queries", async () => {
-    let callIndex = 0;
     pool.query = async (sql: string, params?: unknown[]) => {
       calls.push({ sql, params: params ?? [] });
-      callIndex++;
       if (sql.includes("SELECT COUNT(*) as count FROM search_events")) {
         return { rows: [{ count: "42" }] };
       }
@@ -344,7 +326,6 @@ describe("SearchAnalyticsPg — lazy pool init", () => {
       end: async () => {},
     };
     // Mock getPgPool by injecting before first getPool call
-    const initCalls: string[] = [];
     analytics.pool = null;
     analytics.initialized = false;
     // We can't easily mock getPgPool (imported), so test the already-initialized path

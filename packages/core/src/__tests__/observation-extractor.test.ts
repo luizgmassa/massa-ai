@@ -12,7 +12,6 @@ import {
   CATEGORY_LABELS,
   type ObservationCategory,
 } from "../services/hooks/observation-extractor.js";
-import type { LifecycleEventKind } from "../data/memory/observation-repository.js";
 
 function payload(over: Record<string, unknown> = {}): Record<string, unknown> {
   return over;

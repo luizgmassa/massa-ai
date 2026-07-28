@@ -9,7 +9,7 @@
  * - Status reporting
  */
 
-import { describe, test, expect, beforeEach } from "bun:test";
+import { describe, test, expect } from "bun:test";
 import { EmbeddingRateLimiter } from "../services/embeddings/rate-limiter.js";
 
 describe("EmbeddingRateLimiter", () => {

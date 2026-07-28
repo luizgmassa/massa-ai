@@ -105,12 +105,14 @@ export class ApiClient {
           headers["X-API-Key"] = this.apiKey;
         }
 
-        const response = await fetch(`${this.baseUrl}${endpoint}`, {
-          method,
-          headers,
-          body: body ? JSON.stringify(body) : undefined,
-          signal: controller.signal,
-        });
+        // `body` is omitted rather than set to undefined: a GET/HEAD request that
+        // carries a body key at all is a TypeError in the fetch spec. The
+        // truthiness check is preserved verbatim from the previous shape, so a
+        // falsy body still sends nothing.
+        const init: RequestInit = { method, headers, signal: controller.signal };
+        if (body) init.body = JSON.stringify(body);
+
+        const response = await fetch(`${this.baseUrl}${endpoint}`, init);
 
         clearTimeout(timeout);
 

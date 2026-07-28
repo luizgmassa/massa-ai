@@ -63,9 +63,21 @@ bun run dev:mcp                # MCP server (stdio) with watch
 cd packages/core && bunx prisma migrate deploy
 ```
 
-`bun run lint` is a **no-op** — `turbo.json` declares a `lint` task but no package
-implements it ("No tasks were executed"). There is no linter in this repo; don't cite it
-as a gate.
+`bun run lint` is **oxlint** (pinned exact, root devDependency), configured by
+`.oxlintrc.json`: the `correctness` category at `error`, every other category off. It is a
+real gate — CI's `build` job runs it and it exits non-zero on a violation.
+
+It runs **once from the repo root**, not through turbo. Turbo only dispatches tasks to
+workspace packages (`packages/*`, `apps/*`), so a per-package `lint` task could never reach
+`scripts/` or `benchmarks/` — neither is a workspace package, and they held 21 of the
+violations found on adoption. `turbo.json` no longer declares a `lint` task at all.
+
+Two consequences worth knowing. `oxlint --quiet` reports only errors, and it surfaces oxc
+**semantic** errors (duplicate declarations and the like) that no rule severity can silence
+— that is how the duplicate `AttributionResolverLike` import in `hook-service.test.ts` was
+found, which `tsc` structurally could not see because `packages/core/tsconfig.json` excludes
+`src/__tests__`. And `--fix` is safe, while `--fix-suggestions` / `--fix-dangerously` are
+documented as behavior-changing; only `--fix` is wired into `bun run lint:fix`.
 
 `type-check` only covers the 4 packages that declare the script (tools-api, mcp-client,
 opencode-plugin, web-ui). `packages/core` and `packages/shared` are type-checked by their

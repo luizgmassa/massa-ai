@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, afterEach } from "bun:test";
 
-const { markdownToHtml, escapeHtml, isWriteModeEnabled, renderMemoryBrowser, renderProposals } = await import("../static/app.js");
+const { markdownToHtml, isWriteModeEnabled, renderMemoryBrowser, renderProposals } = await import("../static/app.js");
 
 describe("markdown rendering (marked + DOMPurify)", () => {
   describe("minimal fallback renderer", () => {

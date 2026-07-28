@@ -46,7 +46,6 @@ import { lockActiveGenerations } from "./symbol-repo-generation.js";
 // Workspace upsert + status re-exported from the workspace module (keeps
 // this file ≤500 LOC — the two largest workspace methods are pure SQL).
 export { upsertWorkspace, updateWorkspaceStatus } from "./symbol-repo-workspace.js";
-import { upsertWorkspace, updateWorkspaceStatus } from "./symbol-repo-workspace.js";
 
 // ─── Workspace read operations ──────────────────────────────────────────────
 

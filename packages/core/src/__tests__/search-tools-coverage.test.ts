@@ -5,7 +5,7 @@
  * Mocks the controllers so the tool handlers can be tested in isolation.
  */
 
-import { describe, test, expect, mock, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, mock } from "bun:test";
 import { SearchProjectTool } from "../tools/search_project.js";
 import { SearchCodeTool } from "../tools/search_code.js";
 import { FetchAndIndexTool } from "../tools/fetch_and_index.js";
@@ -47,8 +47,6 @@ mock.module("../controllers/context-controller.js", () => ({
     }),
   },
 }));
-
-import { config } from "@massa-ai/shared";
 
 describe("SearchProjectTool", () => {
   test("successful search → ToolResponse with results", async () => {

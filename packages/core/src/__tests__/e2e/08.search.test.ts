@@ -52,9 +52,7 @@ import {
   E2E_ENABLED,
   probeAvailability,
   httpGet,
-  httpPost,
   ensureSharedIndex,
-  SHARED_PID,
   assertMatrix,
 } from "./_helpers";
 import { startMcp, mcpCall, requireTool, type McpHandle } from "./_mcp";
@@ -348,7 +346,7 @@ describe.skipIf(!READY)("T3 search & context", () => {
       // TOON: HTTP body is {success:true, data:"<string>"}.
       expect(toon?.success).toBe(true);
       expect(typeof toon?.data).toBe("string");
-      expect((toon?.data as string).length).toBeGreaterThan(0);
+      expect(((toon?.data ?? "") as string).length).toBeGreaterThan(0);
       // JSON: data is an object with results[].
       expect(json?.success).toBe(true);
       expect(json?.data).toEqual(expect.any(Object));
@@ -552,7 +550,7 @@ describe.skipIf(!READY)("T3 search & context", () => {
       }
       expect(r?.success).toBe(true);
       expect(typeof r?.data?.compressed).toBe("string");
-      expect((r?.data?.compressed as string).length).toBeGreaterThan(0);
+      expect(((r?.data?.compressed ?? "") as string).length).toBeGreaterThan(0);
       // Best-effort: the actual ratio may not hit 0.3 exactly; just assert
       // compressionRatio is a finite number.
       expect(Number.isFinite(r?.metadata?.compressionRatio ?? NaN)).toBe(true);
@@ -930,7 +928,7 @@ describe.skipIf(!READY)("T3 search & context", () => {
     });
     expect(toon?.success).toBe(true);
     expect(typeof toon?.data).toBe("string");
-    expect((toon?.data as string).length).toBeGreaterThan(0);
+    expect(((toon?.data ?? "") as string).length).toBeGreaterThan(0);
 
     // --- format:"json" (default): response body must be a JSON object ---
     const json = await readFileApi({

@@ -6,7 +6,7 @@
 import { logger } from "@massa-ai/shared";
 import type { GraphGenerationLease } from "../graph-generation/graph-generation-contract.js";
 import type {
-  SymbolKind, RefKind, WorkspaceStatus, SymbolFileRow, SymbolDefinition,
+  SymbolKind, WorkspaceStatus, SymbolFileRow, SymbolDefinition,
   SymbolReference, SymbolImport, CentralityEntry, WorkspaceRow,
   ProjectMapGraphSnapshot, ProjectMapSnapshotOptions, ActiveGenerationScope,
   GenerationFileWrite, DefinitionFqnResolution,

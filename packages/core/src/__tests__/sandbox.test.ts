@@ -20,7 +20,7 @@ let _execFileResult: { stdout: string; stderr: string } | Error | null = null;
 mock.module("node:child_process", () => ({
   spawn: () => {},
   execSync: () => {},
-  execFileSync: (...args: any[]) => {
+  execFileSync: (..._args: any[]) => {
     if (_execFileResult instanceof Error) throw _execFileResult;
     return _execFileResult?.stdout ?? "";
   },
@@ -33,7 +33,6 @@ import {
   isDockerAvailable,
   isSeatbeltAvailable,
   _resetSandboxAvailabilityCache,
-  type SandboxMode,
 } from "../services/executor/sandbox.js";
 
 const origEnv = process.env.MASSA_AI_EXECUTOR_SANDBOX;

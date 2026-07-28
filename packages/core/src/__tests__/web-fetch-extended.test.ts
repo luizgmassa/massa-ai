@@ -326,7 +326,7 @@ describe("fetcher — extended coverage", () => {
   });
 
   test("force=true bypasses cache even when fresh", async () => {
-    const { deps, cache } = captureDeps();
+    const { deps } = captureDeps();
     const fetchStub = stubFetch(() => new Response("content", {
       headers: { "content-type": "text/plain" },
     }));

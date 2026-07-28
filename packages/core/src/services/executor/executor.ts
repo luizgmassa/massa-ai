@@ -247,7 +247,6 @@ export class PolyglotExecutor {
   #projectRootResolver: () => string;
   #runtimes: RuntimeMap;
   #backgroundedPids = new Set<number>();
-  #deps?: DetectDeps;
 
   constructor(opts?: {
     hardCapBytes?: number;
@@ -260,7 +259,6 @@ export class PolyglotExecutor {
     this.#projectRootResolver =
       typeof pr === "function" ? pr : typeof pr === "string" ? () => pr : () => process.cwd();
     this.#runtimes = opts?.runtimes ?? detectRuntimes(opts?.deps);
-    this.#deps = opts?.deps;
   }
 
   get runtimes(): RuntimeMap {

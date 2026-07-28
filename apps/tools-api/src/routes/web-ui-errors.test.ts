@@ -29,8 +29,6 @@ import { Elysia } from "elysia";
 const { webUiRoutes } = await import("./web-ui.js");
 const app = new Elysia().use(webUiRoutes);
 
-const origEnabled = process.env.WEB_UI_ENABLED;
-
 async function get(path: string) {
   const res = await app.handle(new Request(`http://localhost${path}`));
   const text = await res.text();

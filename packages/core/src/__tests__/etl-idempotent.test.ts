@@ -14,7 +14,7 @@
  * semantics and not on the full parse/resolve pipeline.
  */
 
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { EtlPipeline } from "../services/etl/pipeline.js";
 import { buildGraphInputSnapshotHash } from "../services/etl/graph-generation-coordinator.js";

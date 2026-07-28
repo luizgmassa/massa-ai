@@ -25,7 +25,6 @@ import { describe, test, expect, afterEach } from "bun:test";
 import {
   assertUrlSafe,
   fetchWithSsrfGuard,
-  SsrfBlockedError,
   setDnsResolver,
   type UrlSafetyResult,
 } from "../services/web/index.js";

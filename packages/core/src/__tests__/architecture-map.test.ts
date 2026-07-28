@@ -532,7 +532,7 @@ describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
       // entryPoints: server.ts is a bootstrap-named module.
       if (map!.entryPoints && map!.entryPoints.length > 0) {
         const hasBootstrap = map!.entryPoints.some((e) =>
-          /server\.ts$/.test(e.file),
+          e.file.endsWith('server.ts'),
         );
         expect(hasBootstrap).toBe(true);
       }
