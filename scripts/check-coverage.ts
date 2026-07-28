@@ -125,7 +125,7 @@ export const EXCLUSIONS: ReadonlyArray<{ file: string; reason: string }> = [
   // every entry here is a path the gate would otherwise measure.
   {
     // Added by DEBT-02 once the gate could actually be run. Not a coverage gap:
-    // `api-key.test.ts` is 373 lines of dedicated tests, but all 21 of its call
+    // `api-key.test.ts` is 373 lines of dedicated tests, but all 18 of its call
     // sites go through the `runIsolated` subprocess harness, because `CONFIG_DIR`
     // is a module-level const frozen at first import and an in-process test
     // cannot re-point it. Bun's coverage does not cross a process boundary, so

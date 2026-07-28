@@ -158,7 +158,10 @@ falls back to the real factory and runs live embedding-provider auto-selection. 
 
 Genuinely slow tests are a separate class and do get budgets: `etl-cache-invalidation` measures
 **66 s** under `--coverage` instrumentation, and `architecture-map`'s `getProjectMap` cases need
-headroom for the gate's 126-group contention. **Known outstanding case:** `mcp-client`
+a budget that tracks accumulated shared test-database state rather than the fixture — the
+same file measures 1213 ms against a fresh database and over 120 s partway through the gate.
+Note the isolation runner is **sequential**, one child process at a time, so a slow suite
+inside it is accumulation, not contention. **Known outstanding case:** `mcp-client`
 `embedded-api-client-endpoints.test.ts` ("routes without 404" for `/search/project` and
 `/search/code`) fails at 5001 ms under a real user config and passes with an empty one. It is
 deliberately unmocked integration and core does not export the LLM seam to `apps/`, so it has no

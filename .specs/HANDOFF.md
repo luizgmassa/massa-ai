@@ -83,7 +83,7 @@ earned it. Two were added by DEBT-02 once the gate could actually be run, and bo
 measurement blind spots rather than coverage gaps:
 
 - `packages/shared/src/config/api-key.ts` (13.79%) — 373 lines of dedicated tests, but all
-  21 call sites go through the `runIsolated` subprocess harness because `CONFIG_DIR` is
+  18 call sites go through the `runIsolated` subprocess harness because `CONFIG_DIR` is
   frozen at first import. Bun coverage does not cross a process boundary.
 - `packages/shared/src/env.ts` (88.89%) — three of the four uncovered lines are the
   config-to-env seeding branches; the fourth is `findEnvFile()`'s loop exit, reached only
@@ -132,11 +132,18 @@ asserting a regex result should not be on the network.
 The genuinely-slow suites are a separate class and *are* budgeted, each sized from a
 measurement rather than a guess: `etl-cache-invalidation` at `180_000` (measured **66.42 s**
 standalone under `--coverage`; `30_000` passed one gate run and failed the next at 30001 ms),
-`etl-idempotent` at `30_000` (670 ms instrumented — its 5 s failures were pure contention, so
-the budget is headroom, not cost), and `architecture-map`'s three `getProjectMap` cases at
-`120_000` (they pass standalone even with coverage, and hit exactly 60 s only inside the
-gate's 126-group contention). Always raise the per-test value; never `bunfig.toml`'s global
-default.
+`etl-idempotent` at `30_000` (670 ms instrumented), and `architecture-map`'s three
+`getProjectMap` cases at `300_000`.
+
+**The `architecture-map` budget is a stopgap and will drift again.** Its cost is a function of
+how much is already in the shared test database, not of the fixture: the same command on the
+same file measured **1213 ms** against a fresh-ish database, **16.59 s** against the state the
+coverage gate leaves behind, and over **120 s** run partway through that gate. This is *not*
+contention — `scripts/lib/run-tests-isolated.ts` runs groups strictly sequentially, one child
+at a time. It is accumulation. The real fix is for the gate to start from a known database
+state, mirroring the scratch `XDG_CONFIG_HOME` it already uses; that is destructive to a
+developer's database and was deliberately not done unilaterally. Always raise the per-test
+value; never `bunfig.toml`'s global default.
 
 ## Open findings carried forward — not actioned
 

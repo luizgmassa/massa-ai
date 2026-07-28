@@ -192,7 +192,10 @@
         `etl-cache-invalidation` measured **66.42 s** standalone under `--coverage`; 30_000 passed
         one gate run and failed the next at 30001 ms, so it is 180_000. `etl-idempotent` is 670 ms
         instrumented — its 5 s failures were pure contention — so 30_000 is headroom, not cost.
-        `architecture-map`'s three `getProjectMap` cases went 60_000 → 120_000 for the same reason.
+        `architecture-map`'s three `getProjectMap` cases went 60_000 → 300_000, but for a
+        different reason and only as a stopgap: their cost tracks accumulated shared test-database
+        state (1213 ms fresh / 16.59 s post-gate / over 120 s mid-gate), and the isolation runner
+        is sequential, so this is accumulation rather than contention.
         `bunfig.toml`'s global 5 s default is untouched throughout.
   - Core's isolated-group count is still exactly **126** (T20's pinned invariant): the 27 new
     facade tests extended the already-forked `contextual-search-rlm-coverage.test.ts` rather than

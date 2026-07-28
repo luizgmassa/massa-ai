@@ -572,7 +572,7 @@ the 90% floor.**
 The three, and what each turned out to be:
 
 - `packages/shared/src/config/api-key.ts` (13.79%) — **excluded.** 373 lines of dedicated tests,
-  but all 21 call sites run through the `runIsolated` subprocess harness because `CONFIG_DIR` is
+  but all 18 call sites run through the `runIsolated` subprocess harness because `CONFIG_DIR` is
   frozen at first import, and Bun coverage does not cross a process boundary. Driving it
   in-process would defeat the isolation that stops those tests writing to a real `~/.config`.
 - `packages/shared/src/env.ts` (88.89%) — **excluded**, after the in-process route was attempted
@@ -693,7 +693,9 @@ because the config layer reads the developer's own `~/.config/massa-ai/config.js
 `dc7fee3` for `dart-support.test.ts`, `code-compressor.test.ts` and `rlm-admin.test.ts`; the
 genuinely-slow suites were budgeted separately from measurement (`etl-cache-invalidation`
 180_000 from a measured 66.42 s under instrumentation, `etl-idempotent` 30_000 at 670 ms
-instrumented, `architecture-map` 120_000 for gate contention). `bunfig.toml`'s global 5 s
+instrumented, `architecture-map` 300_000 — a stopgap: its cost tracks accumulated shared
+test-database state, measured at 1213 ms / 16.59 s / over 120 s against a fresh, a
+post-gate, and a mid-gate database respectively). `bunfig.toml`'s global 5 s
 default is untouched.
 
 **Tests**: none (docs) · **Gate**: build

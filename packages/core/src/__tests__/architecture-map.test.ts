@@ -562,13 +562,25 @@ describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
       await fs.rm(dir, { recursive: true, force: true });
     }
     // Each of the three tests in this block indexes a fixture repo through the
-    // real native tree-sitter pipeline into Postgres. Standalone — even with
-    // `--coverage` — the whole file is 24 pass in 1213 ms, so 60 s was ample.
-    // It is not ample inside `bun run test:coverage`, which runs 126 instrumented
-    // groups against one Postgres: all three hit exactly 60 s there. That is the
-    // load signature CLAUDE.md describes, not a logic change, so the budget buys
-    // headroom for the contended case rather than papering over a hang.
-  }, 120_000);
+    // real native tree-sitter pipeline into Postgres, then queries back over it.
+    //
+    // Its cost is a function of how much is already in the shared test database,
+    // not of the fixture. Measured on the same command and the same file: 24 pass
+    // in **1213 ms** against a fresh-ish database, **16.59 s** against the state
+    // `bun run test:coverage` leaves behind, and over **120 s** when run partway
+    // through that gate, after ~100 earlier groups have written to it.
+    //
+    // This is NOT contention — `scripts/lib/run-tests-isolated.ts` runs groups
+    // strictly sequentially (`for … await runGroup`), one child process at a
+    // time. It is accumulation.
+    //
+    // The budget is therefore a stopgap and is honest about being one: it will
+    // drift again as the test database grows. The real fix is for the gate to
+    // start from a known database state, the same way it already starts from a
+    // scratch `XDG_CONFIG_HOME` — see `scripts/check-coverage.ts`. That is a
+    // destructive operation on a developer's database and was not taken
+    // unilaterally.
+  }, 300_000);
 
   test("routes surfaced from http_call edges (fetch('/api/items'))", async () => {
     const dir = await makeTempProject(FIXTURE);
@@ -586,7 +598,7 @@ describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
-  }, 120_000);
+  }, 300_000);
 
   test("architecture failure never breaks the base response (defensive)", async () => {
     // Even if the env is broken, getProjectMap must either return null (no
@@ -603,5 +615,5 @@ describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
-  }, 120_000);
+  }, 300_000);
 });
