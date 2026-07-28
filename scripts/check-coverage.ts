@@ -398,8 +398,18 @@ async function main(): Promise<void> {
 
   // See the header: an empty scratch config dir is CI's state, and it is what
   // makes these numbers a property of the tree rather than of this machine.
+  //
+  // `MASSA_AI_TEST_CONFIG_HOME` is how this composes with the isolated runner
+  // rather than fighting it. That runner also mints a scratch config dir, and
+  // it cannot tell a deliberate `XDG_CONFIG_HOME` from a Linux shell exporting
+  // the real `~/.config` — so intent travels in its own variable, and this dir
+  // wins for every child the runner spawns underneath us.
   const configHome = fs.mkdtempSync(path.join(os.tmpdir(), "massa-ai-coverage-"));
-  const childEnv = { ...process.env, XDG_CONFIG_HOME: configHome };
+  const childEnv = {
+    ...process.env,
+    XDG_CONFIG_HOME: configHome,
+    MASSA_AI_TEST_CONFIG_HOME: configHome,
+  };
   console.log(`[coverage] XDG_CONFIG_HOME=${configHome} (scratch; the real user config is not read)`);
 
   for (const unit of units) {

@@ -46,6 +46,8 @@
         "MASSA_AI_LLM_PROMPT",
         "MASSA_AI_LLM_TEMPERATURE",
         "MASSA_AI_LLM_TIMEOUT_MS",
+        "MASSA_AI_TEST_ALLOW_LLM",
+        "MASSA_AI_TEST_CONFIG_HOME",
         "RUN_E2E",
         "RUN_E2E_DESTRUCTIVE"
       ]

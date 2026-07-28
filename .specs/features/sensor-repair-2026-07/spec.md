@@ -202,12 +202,36 @@ is respected rather than overridden, so the two mechanisms compose instead of fi
 shared runner. Either they get the same protection by a stated second mechanism, or their
 exposure is explicitly recorded as accepted with the reason. Silence is not an acceptable outcome
 for this criterion.
+
+**Closed during Execute (T1)**, each on measured exposure rather than uniformly:
+
+| Surface | Exposure | Resolution |
+| --- | --- | --- |
+| `packages/shared` | Its 13 test files were audited in PR2 and drive `CONFIG_DIR` explicitly through the `runIsolated` subprocess harness, so the config-dir path is already covered. The ambient env path was not. | `test` script pins `MASSA_AI_LLM_ENABLED=false`, following the `RUN_E2E=1` precedent in `packages/core`. Safe for `llm-env-prefix.test.ts`, which asserts each var reaches its config field: `childEnv` (`config/__tests__/isolated-config.ts:70-71`) spreads `process.env` and then applies the test's `extraEnv` **last**, so an explicit per-test value still wins over the pin. |
+| `apps/opencode-plugin` | **None.** Its only test file is `__tests__/install.test.ts`, which references no config loader, no `XDG_CONFIG_HOME`, no `MASSA_AI_LLM_*` and no `@massa-ai/shared`. | Accepted with reason; no change. Pinning an env var a suite never reads would be ceremony. |
+| `packages/core` `test:integration` | Bypasses the runner by design — `bun test src/__tests__/integration/real-api.test.ts` is the opt-in live-API gate and *wants* a real provider. | Accepted; pinning it would defeat the suite's purpose. Never part of the default aggregate. |
+| `packages/core` `test:watch` | Bypasses the runner. Developer convenience only, never a gate. | Accepted with reason. |
 **AC-4**: `apps/mcp-client`'s `embedded-api-client-endpoints.test.ts` — the one visibly failing
 instance, on `/search/project` and `/search/code` — passes under a plain `bun run test`, repeated
 3 times consecutively. Validation-pr2 established it is *flaky*, not deterministically red
 (95/0 then 92/3 at the base commit), so a single green run proves nothing.
-**AC-5**: Core's isolated-group count stays exactly **126**, tools-api **25**, mcp-client **8**.
-That invariant is T20's and this work must not disturb it.
+**AC-5**: Core's isolated-group count stays exactly **126 in `--unit` mode**, tools-api **25**,
+mcp-client **8**. That invariant is T20's and this work must not disturb it.
+
+**Divergence, recorded during Execute (T1).** This criterion originally said "core **126**" with no
+mode, and that omission is a trap the author walked into. Core's runner reports **two** different
+counts and both are correct:
+
+| Mode | Discovery line | Groups |
+| --- | --- | --- |
+| `--unit` | `224 files: 99 pure/shared, 125 stateful/isolated` | **126** |
+| default (unit + e2e, 19 extra e2e files) | `245 files: 113 pure/shared, 132 stateful/isolated` | **133** |
+
+`126` is the `--unit` figure — it is what `validation-pr2.md` measured and what T20 pinned, and it
+reproduces byte-identically at `a6216cd`. A default-mode run reports 133, which looks like a
+regression against an unqualified "126" and is not one. Confirmed by measuring the default mode on
+a **stashed, unmodified tree** and getting the identical 245/113/132, so the count is a property of
+the checkout and not of this change. **Always state the mode with the number.**
 **AC-6**: **`XDG_CONFIG_HOME` is not the only leak path, and the fix must close the other one or
 this requirement's own title is false.** `packages/shared/src/env.ts:33-34` dotenv-loads the
 nearest `.env` by walking up from `cwd`, entirely independently of `XDG_CONFIG_HOME`, and
@@ -220,6 +244,28 @@ active** — which is exactly why it would be found the hard way later. The runn
 neutralizes the `MASSA_AI_LLM_*` keys in the child environment by default, and a suite that
 genuinely needs them opts in explicitly. Verified by: set `MASSA_AI_LLM_ENABLED=true` in a
 throwaway repo-root `.env`, run a test under the patched runner, assert the LLM branch stays off.
+
+**Divergence, recorded during Execute (T1) — this criterion as first written would have produced
+the bug it exists to prevent.** It said the `MASSA_AI_LLM_*` keys must be **absent** from the child
+environment. Absent is precisely the state `.env` refills. `packages/shared/src/env.ts` walks up
+from cwd, finds the repo-root `.env`, and calls `dotenvConfig`, which does not override an
+existing key but *does* set a missing one — so deleting the gate hands the child back the value
+that was just deleted. An explicitly assigned value outranks it and survives.
+
+Measured through the real runner, with a repo-root `.env` setting `MASSA_AI_LLM_ENABLED=true` and
+a probe importing `@massa-ai/shared` so `env.ts` actually executes:
+
+| Child env construction | Child observes |
+| --- | --- |
+| delete the key (the literal reading of this AC) | `MASSA_AI_LLM_ENABLED="true"` — **leak open** |
+| assign `"false"` | `MASSA_AI_LLM_ENABLED="false"` — leak closed |
+
+A probe that imports nothing observes `undefined` under both and proves nothing: Bun's automatic
+`.env` load reads cwd, which is the package root, not the repo root, so the leak only appears once
+something pulls in `@massa-ai/shared`. **The corrected criterion: the gate
+`MASSA_AI_LLM_ENABLED` is pinned to `"false"`, not deleted.** The other nine knobs stay deleted —
+they are inert once the gate is off, and assigning them empty strings would be a worse lie than
+their absence.
 
 ### SEN-04 — A needle survives code movement, and a stale fixture fails loudly
 
