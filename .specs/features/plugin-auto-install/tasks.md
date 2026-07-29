@@ -198,16 +198,16 @@ T5 → T6
   Plan Challenge C-5).
 - **MCP/skill question**: NONE/NONE.
 - **Done when**:
-  - [ ] e2e chain green for claude/codex/cursor; opencode record asserted in its own suite (or justified absence recorded)
-  - [ ] record shape identical across ×4 hosts (parity test); root + four
+  - [x] e2e chain green for claude/codex/cursor; opencode record asserted in its own suite (or justified absence recorded)
+  - [x] record shape identical across ×4 hosts (parity test); root + four
         plugin `package.json` versions asserted equal (closes latent F — no
         PR gate runs `version:sync`)
-  - [ ] forced hooks-merge failure after `install_bundled_skills` → no
+  - [x] forced hooks-merge failure after `install_bundled_skills` → no
         `plugin` subfield written (AC-16)
-  - [ ] uninstall: `skillsOwner=="plugin"` → whole record gone (unchanged);
+  - [x] uninstall: `skillsOwner=="plugin"` → whole record gone (unchanged);
         otherwise `plugin` subfield gone, skills fields intact (AC-15)
-  - [ ] record-write failure warns but does not fail the install
-  - [ ] Gate: `bun run test:scripts && bun run test:plugins` green, pass counts recorded
+  - [x] record-write failure warns but does not fail the install
+  - [x] Gate: `bun run test:scripts && bun run test:plugins` green, pass counts recorded
 - **Tests**: shell integration + TS parity (matrix rows 1–3)
 - **Gate**: full
 - **Commit**: `feat(installer): plugin installers record bundle version on success and remove it on uninstall`
