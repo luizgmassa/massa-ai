@@ -278,12 +278,21 @@ deterministically — each will get another roll on every Phase 1 push.
    **4910.31 ms** (pass, 98.2%). It measures RSS over 100 parse cycles in a cold Bun child on a
    2-core runner. Load-sensitive, not deterministic.
 
-   **Left alone deliberately.** The branch adds ~30 `spawnSync` Bun subprocesses ahead of it, so
-   this branch plausibly raised the odds — but a passing re-run is not a fix and must not be
-   presented as one, and a per-test budget applied to a test that has never failed twice would be
-   papering over an unmeasured base rate. The 4910 ms reading says the margin is thin; if it trips
-   again in Phase 1, that is the second data point, and *then* it earns an explicit budget with a
-   comment naming the mechanism. Never the global `bunfig.toml` 5 s, never fewer cycles.
+   **Budgeted at 30 s (spec-owner decision).** Held back at first on the rule that one failure is
+   not a base rate — but a fourth reading at **4710.44 ms** made the pattern the criterion, not
+   the single failure: three of four runs sit at 94%, 98% and 103% of budget on effectively
+   identical code. The cost is honest (two child processes × 100 parse cycles on a 2-core runner),
+   not a leak.
+
+   The decisive point is that **nothing in the test asserts elapsed time.** Its assertions are
+   `control.cycles === 100`, `control.growthBytes > 8 MiB`, `patched.cycles === 100`, and
+   `patched.cycles81To100Median <= cycles21To40Median + 16 MiB`. The 5 s was `bunfig.toml`'s
+   global default truncating it, never part of the contract, so raising the per-test budget
+   removes a red that would land on roughly one Phase 1 push in four while weakening nothing.
+   The diff is one non-comment line — `});` → `}, 30_000);` — which is the evidence.
+
+   Never raise `bunfig.toml`'s global 5 s, and never reduce the cycle count: the first keeps real
+   hangs visible everywhere else, the second *is* the measurement.
 
 3. **`coverage` → `error: graph_generation_workspace_missing:p4d2-trace-path`** at
    `graph-generation-repository-pg.ts:113` in `lockWorkspace`, failing
