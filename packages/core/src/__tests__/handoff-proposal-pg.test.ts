@@ -15,17 +15,18 @@ import {
   type ProposalRecord,
 } from "../data/proposal/proposal-repository.js";
 
-const url = (() => {
-  try {
-    return new URL(process.env.DATABASE_URL ?? "");
-  } catch {
-    return null;
-  }
-})();
+// The dedicated-database predicate, in the form the other 12 `DEDICATED_DB`
+// suites under this directory already use. Source of truth is
+// `isDedicatedDatabase()` in `scripts/check-coverage.ts`, which is what the
+// coverage gate itself refuses to run without; `scripts/` is not a workspace
+// package, so it cannot be imported from here and the shape is mirrored instead.
+//
+// This file used to hand-roll a `new URL()` variant that omitted the
+// `MASSA_AI_DEDICATED` half — the only one of the 13 that did.
+const databaseUrl = process.env.DATABASE_URL ?? "";
 const DEDICATED_DB =
-  url?.hostname === "127.0.0.1" &&
-  url.port === "5433" &&
-  url.pathname === "/massa_ai_test";
+  process.env.MASSA_AI_DEDICATED === "1" &&
+  /127\.0\.0\.1:5433\/massa_ai_test(?:\?|$)/.test(databaseUrl);
 const PREFIX = "pg-runtime-parity-";
 let prisma: any;
 
@@ -75,13 +76,24 @@ describe.skipIf(!DEDICATED_DB)("handoff/proposal PostgreSQL parity", () => {
   beforeAll(async () => {
     const { getPrismaClient } = await import("../services/query/prisma-client.js");
     prisma = getPrismaClient();
+    // Assert only what a client can observe about the server it reached.
+    //
+    // This used to also assert `inet_server_port() === 5433`, which can never
+    // hold behind a Docker port map: `inet_server_port()` reports the port
+    // PostgreSQL is *bound to inside the container* (5432), while the 5433 in
+    // DATABASE_URL is host-side only. It passed locally against a native 5433
+    // install and failed the moment the suite first reached CI, where
+    // `coverage.yml` maps `5433:5432`. Confirmed against the real run: received
+    // 5432, expected 5433, `database_name` already matching.
+    //
+    // The database name is the load-bearing half and is kept: the development
+    // database is `massa_ai`, so this alone still refuses to run against it.
+    // The URL shape — host, port, database — is checked by `DEDICATED_DB` above,
+    // which gates this whole `describe`.
     const identity = await prisma.$queryRaw<
-      Array<{ database_name: string; server_port: number }>
-    >`SELECT current_database() AS database_name, inet_server_port() AS server_port`;
-    expect(identity[0]).toEqual({
-      database_name: "massa_ai_test",
-      server_port: 5433,
-    });
+      Array<{ database_name: string }>
+    >`SELECT current_database() AS database_name`;
+    expect(identity[0]).toEqual({ database_name: "massa_ai_test" });
     await cleanup();
   });
   afterEach(cleanup);
