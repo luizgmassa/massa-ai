@@ -29,11 +29,25 @@
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
+import {
+  findRank,
+  resolveAnchoredNeedle,
+  collectSourceFiles,
+  type NeedleAnchor,
+  type ResolvedSpan,
+} from "./resolve.ts";
+
+const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 
 interface NeedleExpected {
-  filePath: string;
-  lineStart: number;
-  lineEnd: number;
+  /** Content anchor (massa-ai fixture). Resolved against the working tree. */
+  anchor?: string;
+  startOffset?: number;
+  endOffset?: number;
+  /** Legacy positional target, still used by external corpora — see below. */
+  filePath?: string;
+  lineStart?: number;
+  lineEnd?: number;
 }
 
 interface Needle {
@@ -85,33 +99,53 @@ interface Evaluation {
   reciprocalRank: number;
 }
 
-function intersects(a: [number, number], b: [number, number], tol: number): boolean {
-  const aStart = a[0] - tol;
-  const aEnd = a[1] + tol;
-  return !(aEnd < b[0] || aStart > b[1]);
-}
-
-function findRank(needle: Needle, hits: Hit[], tol: number): { rank: number | null; hit: Hit | null } {
-  for (let i = 0; i < hits.length; i++) {
-    const h = hits[i];
-    if (
-      h.filePath === needle.expected.filePath &&
-      intersects([h.lineStart, h.lineEnd], [needle.expected.lineStart, needle.expected.lineEnd], tol)
-    ) {
-      return { rank: i + 1, hit: h };
-    }
+/**
+ * Resolve a needle's target span.
+ *
+ * `intersects`/`findRank` themselves now live in `./resolve.ts` — this file used
+ * to carry the original copy and both `run.ts` and
+ * `packages/core/src/__tests__/e2e/14.needles.test.ts` carried transcriptions of
+ * it, so the same predicate existed three times against one fixture.
+ *
+ * Anchored needles resolve against the working tree. Positional ones are still
+ * accepted **here specifically**, and that is not the silent fallback this work
+ * removed: this scorer is an offline reporting CLI that scores a saved results
+ * file for an arbitrary corpus, including external ones like `sicad` whose
+ * sources are not in this repository at all and therefore cannot be anchored.
+ * The gate that decides pass/fail — `run.ts` — accepts no such fallback: there,
+ * a needle without an anchor is a hard failure unless explicitly grandfathered.
+ */
+function spanFor(needle: Needle, sourceFiles: string[]): ResolvedSpan {
+  const expected = needle.expected;
+  if (typeof expected.anchor === "string" && expected.anchor.length > 0) {
+    return resolveAnchoredNeedle(needle.id, expected as NeedleAnchor, REPO_ROOT, sourceFiles);
   }
-  return { rank: null, hit: null };
+  if (
+    typeof expected.filePath !== "string" ||
+    typeof expected.lineStart !== "number" ||
+    typeof expected.lineEnd !== "number"
+  ) {
+    throw new Error(`${needle.id}: needle has neither an anchor nor a positional target`);
+  }
+  return {
+    filePath: expected.filePath,
+    lineStart: expected.lineStart,
+    lineEnd: expected.lineEnd,
+  };
 }
 
 function evaluate(dataset: Dataset, results: ResultsFile): { evaluations: Evaluation[]; summary: any } {
   const tol = dataset.scoring.lineTolerance;
   const byId = new Map(results.results.map((r) => [r.needleId, r]));
+  // Scanned once for the whole dataset rather than per needle.
+  const sourceFiles = dataset.needles.some((n) => n.expected.anchor)
+    ? collectSourceFiles(REPO_ROOT)
+    : [];
 
   const evaluations: Evaluation[] = dataset.needles.map((needle) => {
     const raw = byId.get(needle.id);
     const hits = raw?.hits ?? [];
-    const { rank, hit } = findRank(needle, hits, tol);
+    const { rank, hit } = findRank(spanFor(needle, sourceFiles), hits, tol);
     return {
       needleId: needle.id,
       category: needle.category,

@@ -36,6 +36,7 @@ import { resolve } from "node:path";
 import { smartChunk, type ChunkerConfig, type Chunk } from "../../packages/core/src/services/search/smart-chunker.ts";
 import {
   resolveNeedles,
+  findRank,
   NeedleResolutionError,
   type NeedleExpected,
   type ResolvedSpan,
@@ -83,24 +84,8 @@ interface ResultsFile {
   results: RawResult[];
 }
 
-// ── Scoring (verbatim semantics from benchmarks/needles/scorer.ts) ─────────
-function intersects(a: [number, number], b: [number, number], tol: number): boolean {
-  const aStart = a[0] - tol;
-  const aEnd = a[1] + tol;
-  return !(aEnd < b[0] || aStart > b[1]);
-}
-function findRank(expected: ResolvedSpan, hits: Hit[], tol: number): { rank: number | null; hit: Hit | null } {
-  for (let i = 0; i < hits.length; i++) {
-    const h = hits[i];
-    if (
-      h.filePath === expected.filePath &&
-      intersects([h.lineStart, h.lineEnd], [expected.lineStart, expected.lineEnd], tol)
-    ) {
-      return { rank: i + 1, hit: h };
-    }
-  }
-  return { rank: null, hit: null };
-}
+// Scoring comes from ./resolve.ts — one copy, shared with scorer.ts and the
+// e2e suite. This file used to carry its own transcription of it.
 
 // ── Embedding (Ollama /api/embeddings, bounded-parallel pool) ─────────────
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? "http://localhost:11434";

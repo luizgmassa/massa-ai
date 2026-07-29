@@ -103,6 +103,46 @@ export interface ResolvedSpan {
   lineEnd: number;
 }
 
+/** A retrieved chunk, as every consumer of this fixture models one. */
+export interface ScoredHit {
+  filePath: string;
+  lineStart: number;
+  lineEnd: number;
+}
+
+/**
+ * The hit predicate — the single copy.
+ *
+ * It lived in three places: `scorer.ts`, `run.ts`, and
+ * `packages/core/src/__tests__/e2e/14.needles.test.ts`, the last two both
+ * carrying a comment saying they replicate the first. Repairing two of the three
+ * would have left the third positionally pinned against the same fixture, so a
+ * later refactor could break it invisibly.
+ */
+export function intersects(a: [number, number], b: [number, number], tol: number): boolean {
+  const aStart = a[0] - tol;
+  const aEnd = a[1] + tol;
+  return !(aEnd < b[0] || aStart > b[1]);
+}
+
+/** First hit whose file matches and whose line range intersects, within `tol`. */
+export function findRank(
+  expected: ResolvedSpan,
+  hits: ScoredHit[],
+  tol: number,
+): { rank: number | null; hit: ScoredHit | null } {
+  for (let i = 0; i < hits.length; i++) {
+    const hit = hits[i]!;
+    if (
+      hit.filePath === expected.filePath &&
+      intersects([hit.lineStart, hit.lineEnd], [expected.lineStart, expected.lineEnd], tol)
+    ) {
+      return { rank: i + 1, hit };
+    }
+  }
+  return { rank: null, hit: null };
+}
+
 export interface AnchorMatch {
   filePath: string;
   line: number;
