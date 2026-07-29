@@ -155,14 +155,14 @@ T5 → T6
   seeded state only; no plugin installer edits.
 - **MCP/skill question**: NONE/NONE.
 - **Done when**:
-  - [ ] every matrix branch above asserts green in the new suite — including
+  - [x] every matrix branch above asserts green in the new suite — including
         the cursor binary-only branch run against the existing
         `installer-test-helpers.sh` mock (`cursor-agent`, Plan Challenge C-2)
-  - [ ] marketplace resolution runs only when ≥1 host installs/upgrades;
+  - [x] marketplace resolution runs only when ≥1 host installs/upgrades;
         harness with 0 detected hosts creates no
         `.config/massa-ai/marketplace/` directory (Plan Challenge C-3)
-  - [ ] `test-install-harness-cli.sh` and `root-install-menu.test.ts` green unchanged
-  - [ ] Gate: `bun run test:scripts` — full suite green, record pass counts
+  - [x] `test-install-harness-cli.sh` and `root-install-menu.test.ts` green unchanged
+  - [x] Gate: `bun run test:scripts` — full suite green, record pass counts
 - **Tests**: shell integration (matrix row 1)
 - **Gate**: full
 - **Commit**: `feat(installer): harness plugin phase detects hosts and gates on bundle version`

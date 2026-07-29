@@ -241,8 +241,9 @@ Also update the feature block above: **Phase 0 is done, remaining Execute is ~21
   2026-07-29 (Plan Challenge: full gate, pre_mortem, 4 findings incorporated). Execute
   IN PROGRESS: T1 DONE (`41bfda3`, 45/45 helper assertions), T2 DONE (`c2ee9b0`, TS
   suite 4/4, full TS 633 pass + 4 pre-existing env failures red at HEAD, all shell
-  suites green). Next action: T3 (harness plugin phase: detection, version gate,
-  dry-run + shell suite).**
+  suites green), T3 DONE (`9c68012`, suite 104/104 incl. detection matrix ×4, dry-run,
+  failure isolation, AC-12; CLI 34/34 + menu pins 14/14 unchanged). Next action: T4
+  (plugin installers record/preserve/remove version ×4).**
 - worktree: `/Users/luizmassa/Projects/massa-ai-wt-plugin-auto-install`; branch
   `feat/plugin-auto-install` cut from `origin/main` @ `ce26f28` (v1.9.1)
 - scope: 10 requirements (PAI-01..10) — harness plugin phase detects the four agent hosts
