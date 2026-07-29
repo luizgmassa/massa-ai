@@ -1,6 +1,58 @@
-# Sensor Repair 2026-07 — Handoff
+# Handoff
 
-**Active Feature**: `sensor-repair-2026-07` — **COMPLETE AND MERGED.** All 9 planned tasks plus
+## Active — Core Layering and God-Module Split (PR-B), Phase 0 complete
+
+**Feature**: `core-layering-god-module-split` · branch `refactor/search-facade-split`, cut from
+`main` @ `ce26f28` (v1.9.1). **Phase 0 (T0–T5) is done and committed; T6 is not started.**
+Stopping here is the plan's own review point, not an interruption — Phase 0 locks every
+before/after measurement, and none can be taken retroactively once a structural commit lands.
+
+**Working tree is clean. Nothing is uncommitted.**
+
+Commits: `ab80e62` T0 · `3dee676` T1 · `8fd3983` T2 · `e359115` T3 · `0129207` T4 · `06bde32` T5,
+plus the artifact commit that follows this file.
+
+**Read before resuming**, in order:
+
+1. `.specs/features/core-layering-god-module-split/tasks.md` → *Phase 0 — executed* (commits,
+   sensors, and the five things Phase 0 changed in the plan), then Phase 1's table.
+2. `.specs/features/core-layering-god-module-split/validation.md` — the complete before-record.
+   **It carries no verdict**; the verdict is T20's, by a fresh verifier.
+3. `.specs/project/STATE.md` → *Execute — Phase 0 COMPLETE*.
+
+**Next action**: review Phase 0, then start **T6** (`fuseResults`, `generateScoreExplanation` →
+`result-fusion.ts`). Read `design.md` §3.4, §4.3.1, §4.4, §5.4 and §6.1 first — T6 touches three
+of the four frozen anchors.
+
+**Every Phase 1 commit additionally runs** `bun run lint`, `bun run type-check`,
+`bun scripts/check-frozen-anchors.ts`, `bun scripts/check-characterization.ts`, and a
+`git diff --name-only` review against PR-C-BOUNDARY and AC-3. Both new checks are sub-second and
+locate their subjects by content and by symbol rather than by path, so **neither should ever need
+editing as files move** — if one goes red, the task is wrong, not the check.
+
+**Two decisions waiting on the reviewer:**
+
+- The `[Unreleased]` CHANGELOG entry sits under `### Changed`, which cuts a **minor** release.
+  Move it to `### Fixed` if PR-B should land as a patch. Left alone deliberately — release
+  semantics is not the executor's call.
+- `.ua/` regeneration stays deferred to after PR-C, so **PR-B does not close GMS-04 AC-3** for the
+  320 `rlm-` occurrences in those three tracked generated artifacts. T20's verifier has to be told
+  this explicitly or it reads as a miss.
+
+**The trap that cost the most this phase**, three separate times: *a measurement whose reading was
+an artifact of the state it was taken in.* T2's suite was verified at 17 pass / 0 fail while its
+own files were **untracked** — and it enumerates `git ls-files`, so it was blind to itself.
+Staging them moved fan-in from 26 to 27 and turned three of its own tests red. Verify any
+measurement script in the tracked state it ships in, never the state it was written in.
+
+---
+
+## Superseded — Sensor Repair 2026-07 (PR-A), merged
+
+Kept for its close-out detail; PR-B depends on it. Full record lives in
+`.specs/features/sensor-repair-2026-07/`.
+
+**Feature**: `sensor-repair-2026-07` — **COMPLETE AND MERGED.** All 9 planned tasks plus
 **7** unplanned repairs are DONE. Every requirement is VERIFIED; SEN-02 was the last to close.
 **PR**: [#42](https://github.com/luizgmassa/massa-ai/pull/42) — **merged** as `33efc82`, a merge
 commit preserving all 21 commits (each carries its own discriminating-sensor evidence).

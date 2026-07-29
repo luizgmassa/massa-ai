@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A structural refactor of the search subsystem is now measurable, not asserted.** `contextual-search-rlm.ts`
+  was split once before, in M14, and the split moved code without moving responsibility: the host
+  file went from 1668 to 463 lines while every extracted delegate took the class straight back as
+  its first parameter. Lines-per-file — the only metric anyone watched — reported that as a
+  success. `scripts/search-hub-metric.ts` measures what it missed. For every `class`, `interface`
+  and `type` declared in a directory it counts `maxForeignReach`: the most distinct members any
+  single *other* module reads off a binding of that type. Run across M14, the numbers invert the
+  verdict — deepest foreign reach went **1 → 14** while the member count stayed flat (**26 → 24**).
+  M14 did not widen the type; it multiplied who reaches into it.
+
+  The script takes no type name, deliberately. An earlier version audited one hardcoded name and
+  was evaded two ways: renaming the class produced a vacuous `0/0` pass, and moving the same state
+  onto a differently-named aggregate record made the identical hub invisible. Enumerating every
+  declaration closes both, and each has a regression test. One evasion is documented as surviving —
+  passing collaborators as N individual parameters drives reach to 0 with coupling unchanged — so
+  the gate is stated as necessary, not sufficient.
+
+  It ships with 13 unit tests, one per defect found while building it. That is not ceremony: the
+  measurement method was wrong **four** separate times, and two of the defects pushed in opposite
+  directions, so the reported figure was stable across runs and commits and still incorrect. The
+  worst of them stripped string literals, which pairs quotes across unrelated apostrophes and
+  deleted real code — under-reporting by 42% on one commit and 0% on the others, which is exactly
+  the shape that survives cross-commit comparison. Stability is evidence of determinism, not of
+  correctness.
+
+- **Four more sensors, so the refactor's before/after can be taken at all.**
+  `scripts/search-facade-matrix.ts` rebuilds the facade's member→consumer matrix from source;
+  `scripts/search-facade-metrics.ts` measures fan-in and fan-out over `git ls-files`;
+  `scripts/check-frozen-anchors.ts` verifies every needle anchor still resolves to exactly one
+  location, in under a second, instead of only at the Ollama-backed retrieval gate; and
+  `scripts/check-characterization.ts` pins the three behaviors that have exactly one real test
+  each, by assertion count rather than by the presence of a `describe` name a hollowed block
+  keeps.
+
+  `benchmarks/needles/run.ts` now records each needle's rank and its resolved target into the
+  report. Both were computed and then dropped on write, which made a report uncomparable across
+  exactly the kind of change it exists to measure: recomputing an old report's rank against a
+  renamed tree resolves the anchor to its new home, matches nothing in the old hit list, and
+  reads as a miss on every needle — a total collapse manufactured by the measurement rather than
+  observed by it.
+
+  The recurring lesson, hit three times while building these: a reading can be an artifact of the
+  state it was taken in. One suite was green at 17 pass / 0 fail while its own files were
+  untracked, and it enumerates `git ls-files` — so it was blind to itself, and tracking it moved
+  the number it reported.
+
 ## [1.9.1] - 2026-07-29
 
 ### Fixed

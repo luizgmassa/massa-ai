@@ -603,18 +603,21 @@
     {
       "slug": "core-layering-god-module-split",
       "title": "Core layering and god-module split \u2014 retire the controllers layer, break the contextual-search-rlm facade, rename rlm-* once",
-      "status": "specified",
+      "status": "in_progress",
       "priority": "P2",
       "phases": {
         "specify": true,
-        "design": false,
-        "tasks": false,
+        "design": true,
+        "tasks": true,
         "execute": false
       },
       "spec": ".specs/features/core-layering-god-module-split/spec.md",
       "depends_on": [
         "sensor-repair-2026-07"
-      ]
+      ],
+      "design": ".specs/features/core-layering-god-module-split/design.md",
+      "tasks": ".specs/features/core-layering-god-module-split/tasks.md",
+      "validation": ".specs/features/core-layering-god-module-split/validation.md"
     },
     {
       "slug": "sensor-repair-2026-07",
@@ -633,5 +636,5 @@
       "validation": ".specs/features/sensor-repair-2026-07/validation.md"
     }
   ],
-  "active_feature": "sensor-repair-2026-07"
+  "active_feature": "core-layering-god-module-split"
 }

@@ -1,6 +1,169 @@
 # massa-ai Spec State
 
-## Current — Sensor Repair 2026-07
+## Current — Core Layering and God-Module Split (PR-B)
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-core-layering-god-module-split`
+- workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
+- feature: `core-layering-god-module-split` — **Specify, Design and Tasks COMPLETE 2026-07-29.
+  `tasks.md` revised and APPROVED after an independent Plan Challenge on that file. Execute
+  IN PROGRESS on `refactor/search-facade-split`: Phase 0 (T0–T5) COMPLETE 2026-07-29 and stopped
+  at its planned session boundary. Next action: review Phase 0, then T6.** Artifacts added this
+  phase: `validation.md` (before-record, no verdict) and `needles-before.json`.
+- base: `main` @ `ce26f28` (v1.9.1). Branch `refactor/search-facade-split` cut from it.
+  Dependency `sensor-repair-2026-07` (PR-A) satisfied.
+- Artifacts: `.specs/features/core-layering-god-module-split/{spec.md,design.md,tasks.md}`
+- **Scope is PR-B only**: search facade split (GMS-03) + `rlm-*` rename (GMS-04), validated by
+  GMS-05. AD-012 / GMS-01 / GMS-02 are **PR-C**; `read_file.ts` is **PR-D**.
+
+### What Design settled
+
+- **AS-02's dangling forward reference is resolved.** `git log --all` shows no `design.md` ever
+  existed on any branch. The member→consumer matrix it cited was built at `a6216cd` and read
+  correctly — all three retained statistics reproduce (`searchImpl` 13 members, `ensureInitialized`
+  7 of 15 delegates, `RRF_K`/`fileFilterCache`/`queryUnderstanding` 1 each) — but the artifact was
+  never written down. AS-02 **stands, not re-opened**; `design.md` §2 supplies the missing matrix.
+- **R-03 is falsified by measurement.** `scripts/search-hub-metric.ts`
+  (+13 unit tests) measures `maxForeignReach` over every type declared in a directory.
+  *(This line previously read "and the metric is committed". It was not — the Design session wrote
+  the file and committed nothing. It lands at Execute T0. See the Execute block below.)* Calibrated
+  against M14 (`c92e481`), the split that failed: host file **1668 → 463 LOC** while deepest
+  foreign reach went **1 → 14** and members stayed flat (**26 → 24**). M14 moved code without
+  moving responsibility, and lines-per-file — the only metric watched — said it succeeded.
+  Today's tree is unchanged from post-M14 on both coupling numbers.
+- **Gate G-HUB**: every declared type `maxForeignReach ≤ 3`, every file ≤ 700 LOC. Today exactly
+  one type fails and it is the target (`ContextualSearchRLM`, 14). Stated limit: necessary, not
+  sufficient — N-individual-parameters evades it; GMS-03 AC-2 is the compensating control.
+- **The design's first draft was wrong and was replaced.** `#private` state fields would have
+  broken **77 post-construction test assignments** across 12 files, and constructor injection would
+  have made those stubs *silently ineffective*. Capability modules are therefore **functions taking
+  narrow per-call deps records** (constraint LATE-BIND), state fields stay public, and PR-B needs
+  **zero test-file edits** outside the 4 rename sites.
+- **R-08 answered to PR-B's depth, deferred to PR-C with a precondition.** The rule of thumb passes
+  under every unit pairing (0.5× / 2.3×, both under 3×), but its premise was ~10× low and file
+  count is not where the risk is: 12 of the 24 `data → services` edges are one misfiled module
+  (`prisma-client.ts`); the other five targets are **cross-cutting modules with no legal home** —
+  `search-diagnostics.ts` is imported by all four layers. PR-C's Design must answer *"where do
+  cross-cutting modules live?"* before it sizes itself.
+- **New PR-B constraint the spec did not have: FROZEN-ANCHOR.** PR-A content-anchored all 14
+  needles and removed every `filePath`, so the rename is invisible to the fixture — but 4 of 14
+  anchors are *content* inside files PR-B rewrites (3 in `rlm-fusion.ts`, 1 in `rlm-search.ts`),
+  and an unresolvable anchor is now a hard failure. Those four strings are frozen text.
+
+### Plan Challenge
+
+Full The Fool, mode `evidence_audit`, two parallel read-only critics. Two **critical** findings —
+the deliverable scripts did not exist, and the M14 calibration table did not reproduce — plus two
+successful **breaks of G-HUB** (aggregate-holder rename; class rename giving a vacuous pass). All
+incorporated: D2 committed with tests, the gate rewritten to enumerate declarations rather than
+audit a name, and the table corrected. The measurement method was wrong **four** separate times;
+two of the defects cancelled, so the reported number was stable and incorrect.
+
+### Spec corrections owed (design.md §10, applied at task T19)
+
+C1 AS-02 tense · C2 `~16` denominator → 23 · **C3 needles cost 90 min → ~2 min** · C4 GMS-04 AC-4's
+fixture clause is obsolete, replaced by FROZEN-ANCHOR · C5 R-08 premise · C6 R-03 falsifier ·
+C7 `data → services` is 24 edges / 14 files.
+
+### Execute — Phase 0 COMPLETE (2026-07-29), stopped at the session boundary
+
+**T0–T5 are committed; T6 is not started.** That stop is the plan's, not an interruption: Phase 0
+locks every before/after measurement — G-HUB, the needles baseline, the characterization record —
+and none can be taken retroactively once a structural commit lands. It is the one review point
+Phase 1 cannot be re-done without.
+
+| # | commit | deliverable |
+| --- | --- | --- |
+| T0 | `ab80e62` | `search-hub-metric.ts` + 13 tests, `.specs/` artifacts |
+| T1 | `3dee676` | `search-facade-matrix.ts` + 20 tests (D1) |
+| T2 | `8fd3983` | `search-facade-metrics.ts` + 18 tests (D3) |
+| T3 | `e359115` | `check-frozen-anchors.ts` + 9 tests |
+| T4 | `0129207` | needles baseline + `needles-diff.ts` + 17 tests |
+| T5 | `06bde32` | `check-characterization.ts` + 14 tests, `validation.md` |
+
+Gates at `06bde32`: `lint` 0 · `type-check` 0 · `test:scripts` **725 pass / 0 fail across 39
+files** · `check-frozen-anchors` exit 0 (14/14 unique) · `check-characterization` exit 0 (3/3 at
+floor) · characterization net **160** across 7 suites · G-HUB exit 1 at reach **14** · needles
+gate PASS at hit@1 **0.6429** / MRR **0.7357** · PATCHABLE **16 across 3 files** · exclusions **9**.
+
+The before-record is `validation.md`. **It carries no verdict** — that is T20's, by a fresh
+verifier. Two spec corrections were added to `design.md` §10 for T19: **C8** (the dynamic
+importers are `packages/core/src/scripts/{beir,symbol}-benchmark.ts` at `:259`/`:214`; the cited
+`scripts/…:258`/`:213` paths do not exist) and **C9** (§5.1 names two dynamic `controllers`
+importers; there is one — measured 22 deep + 1 barrel + 1 dynamic = 24).
+
+**The recurring defect of this phase, three times in one session: a measurement whose reading was
+an artifact of the state it was taken in.** T2's suite was verified at 17 pass / 0 fail while its
+own files were *untracked*, and it enumerates `git ls-files` — staging them moved fan-in to 27 and
+turned 3 of its own tests red. The same shape then moved the mention-only count twice more as
+later tooling landed, which is why that count is now a floor plus a partition invariant rather
+than an exact pin. **A measurement script has to be verified in the tracked state it ships in.**
+`design.md` §13 already recorded the method being wrong four times with two defects cancelling;
+this is the same family and it is not exhausted.
+
+Two further findings recorded rather than corrected. **"Each anchor appears exactly once
+repo-wide" was already false** — each of the four appears 4–6 times across tracked files and is
+unique only inside `resolve.ts`'s `.ts`/`.tsx` corpus, which is the scope the real gate uses.
+And **LATE-BIND's site count now has four values from four methods** (77 prose / 82 table / a
+third from direct measurement / 91 here): the spread is the finding, so the sensor is the
+per-suite pass count, which is exact.
+
+`benchmarks/needles/run.ts` was changed at T4 to record each needle's `rank` and resolved
+`expected` span into its report. Without it, comparing an old report against a post-rename tree
+resolves anchors to their new homes, matches nothing in the old hit lists, and reads as a miss on
+every needle — a total collapse manufactured entirely by the measurement. The baseline is
+committed at `.specs/features/core-layering-god-module-split/needles-before.json` because
+`benchmarks/needles/reports/` is gitignored and a baseline that does not survive a fresh checkout
+cannot be T17's referent.
+
+**Open for the reviewer:** the `[Unreleased]` CHANGELOG entry sits under `### Changed`, which cuts
+a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
+unilaterally — it is a release-semantics decision.
+
+### Execute — Phase 0, the plan revisions that preceded it
+
+`tasks.md` was **not approvable as written**. An independent `massa-ai-plan-critic` was run against
+it (the file had never been challenged; `design.md` §13's gate predates it) and returned nine
+findings, two critical. Three more came from the main agent's own re-measurement. All twelve are
+incorporated; the record is `tasks.md` → *Plan Challenge — tasks*. The four that changed the plan:
+
+1. **Nothing from the Design session was ever committed.** Five artifacts claimed
+   `scripts/search-hub-metric.ts` was committed; `git log --all` was empty. The script stays —
+   it is correct, tested and attacked three ways, and re-deriving a measurement that was already
+   wrong four times buys nothing — but it lands as **T0, the first commit of Execute**, not as
+   Design output. Only its provenance claim was false.
+2. **`ensureInitializedImpl` had no destination.** `rlm-indexing.ts` exports 7 functions;
+   `design.md` §4.1 names 6. The seventh reads **8** facade members, so anywhere but the root it
+   fails G-HUB permanently and T14's gate could never go green. §4.5(b) had already decided the
+   substance; the module table never recorded it. **T10 owns it**; T11's F4 seam re-points from
+   `rlm-indexing.ts:586` (a line T10 deletes) to the root.
+3. **GMS-04 AC-3 was unsatisfiable.** `rg 'rlm-'` returning only CHANGELOG and `.specs/` cannot
+   hold: `.ua/{knowledge-graph,fingerprints,intermediate/scan-result}.json` carry **320**
+   occurrences in tracked generated output, plus two unnamed test-file comments. Sensor scoped to
+   exclude `.ua/`; the two comments corrected as explicitly-authorised edits; **`.ua/` regeneration
+   deferred to after PR-C** — PR-B does not close AC-3 for it and must not claim to.
+4. **T16 tested redness, not blocking** — the exact SEN-02 AC-5 defect PR-A closed. A `gh api`
+   ruleset assertion was added.
+
+Two `design.md` provenance figures also failed to reproduce and are corrected in place:
+**PATCHABLE is 16 sites across 3 files, not 4** (the 16 reproduces exactly; the file count does
+not), and **LATE-BIND's "77 across 12" is unverified** — the table sums to 82 and direct
+measurement gives a third answer once `LoadStage` assignments are excluded. Neither weakens its
+constraint; both replace a hand-tabulated count with the per-suite pass counts, which are exact.
+
+Estimate revised **~22 h → ~25 h**. Baselines re-measured at `ce26f28`: hub-metric reach **14**,
+largest file **592**, `lint` **0**, coverage exclusions **9**, `scripts/__tests__` **602 pass /
+0 fail**, characterization net **160** across 7 suites, 4 frozen anchors present exactly once,
+`:3333` free. All still reproduce at `06bde32` except `scripts/__tests__`, which is **725 pass /
+0 fail across 39 files** after Phase 0 added six suites.
+
+Also update the feature block above: **Phase 0 is done, remaining Execute is ~21 h** (Phase 1
+~17.5 h, Phase 2 ~3.5 h).
+
+---
+
+## Previous — Sensor Repair 2026-07
+
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-sensor-repair-2026-07`

@@ -200,6 +200,22 @@ describe("native Tree-sitter package contract", () => {
     expect(behavior.sensors.cursorResetToCrossTree).toContain("same tree");
   });
 
+  // Budgeted at 30 s against bunfig.toml's 5 s default, and the budget is the
+  // only thing that changes: every assertion below is untouched.
+  //
+  // This spawns two child processes that each run 100 parse cycles, so its cost
+  // is process startup plus real parsing on whatever core count the runner has.
+  // Measured on CI across four runs of effectively identical code: 3790, 4710,
+  // 4910 and 5157 ms — 75%, 94%, 98% and 103% of a 5000 ms budget. It failed
+  // once, at 5157. That is not a leak and not a regression; it is a test whose
+  // honest cost sits on top of the global default.
+  //
+  // Nothing here asserts elapsed time — the assertions are RSS bounds and cycle
+  // counts — so the timeout was never part of the contract, only the thing that
+  // truncated it. Raising it removes a recurring red that would otherwise land
+  // on roughly one push in four and teach everyone to re-run without reading.
+  // Raise this value, never bunfig.toml's global 5 s: that default is what keeps
+  // real hangs visible everywhere else.
   test("discriminates no-delete growth and bounds patched 100-cycle RSS", () => {
     const rss = verifyRssDiscriminationProcesses();
     expect(rss.control.cycles).toBe(100);
@@ -211,7 +227,7 @@ describe("native Tree-sitter package contract", () => {
     expect(rss.patched.cycles81To100Median).toBeLessThanOrEqual(
       rss.patched.cycles21To40Median + 16 * 1024 * 1024,
     );
-  });
+  }, 30_000);
 
   test("distinguishes missing and incompatible native packages without rejected artifacts", () => {
     expect(runDiscriminationSensors()).toEqual({ missing: true, incompatible: true });

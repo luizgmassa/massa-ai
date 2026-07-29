@@ -75,12 +75,34 @@ interface RawResult {
   query: string;
   hits: Hit[];
   latencyMs?: number;
+  /**
+   * Rank of the needle's resolved target within `hits`, or null for a miss.
+   *
+   * Recorded rather than left to be recomputed. Both were already in memory and
+   * were dropped on write, which made a report uncomparable across exactly the
+   * change it exists to measure: after a rename, `expected.filePath` no longer
+   * names a file that exists, so recomputing an old report's rank against the
+   * new tree resolves the anchor to its new home, matches nothing in the old
+   * hit list, and reports every needle as a miss. A before/after comparison
+   * would then show a total collapse caused entirely by the measurement.
+   */
+  rank: number | null;
+  /** The span `rank` was computed against, as resolved at run time. */
+  expected: ResolvedSpan;
 }
 interface ResultsFile {
   projectId: string;
   ranAt: string;
   config: Record<string, unknown>;
   model: string;
+  /** Aggregates, so a report can be compared without re-deriving them. */
+  aggregate: {
+    hitAt1: number;
+    hitAt3: number;
+    hitAt5: number;
+    hitAt10: number;
+    mrr: number;
+  };
   results: RawResult[];
 }
 
@@ -346,7 +368,14 @@ async function main() {
       reciprocalRank: rank ? 1 / rank : 0,
       empty,
     });
-    rawResults.push({ needleId: needle.id, query: needle.query, hits, latencyMs: Date.now() - qStart });
+    rawResults.push({
+      needleId: needle.id,
+      query: needle.query,
+      hits,
+      latencyMs: Date.now() - qStart,
+      rank,
+      expected: expectedSpan,
+    });
   }
 
   const total = perNeedle.length;
@@ -388,6 +417,13 @@ async function main() {
     ranAt: new Date().toISOString(),
     model,
     config: { ...cfgOverride, totalChunks: allChunks.length },
+    aggregate: {
+      hitAt1: +hitAt1.toFixed(4),
+      hitAt3: +hitAt3.toFixed(4),
+      hitAt5: +hitAt5.toFixed(4),
+      hitAt10: +hitAt10.toFixed(4),
+      mrr: +mrr.toFixed(4),
+    },
     results: rawResults,
   };
   const resultsPath = resolve(reportsDir, `massa-ai-${label}-results.json`);

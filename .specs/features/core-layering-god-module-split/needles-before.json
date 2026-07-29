@@ -1,0 +1,1039 @@
+{
+  "projectId": "massa-ai",
+  "ranAt": "2026-07-29T14:33:43.386Z",
+  "model": "qwen3-embedding:8b",
+  "config": {
+    "totalChunks": 87
+  },
+  "aggregate": {
+    "hitAt1": 0.6429,
+    "hitAt3": 0.8571,
+    "hitAt5": 0.9286,
+    "hitAt10": 1,
+    "mrr": 0.7357
+  },
+  "results": [
+    {
+      "needleId": "N01-pagerank-damping",
+      "query": "constante de damping usada no algoritmo iterativo de relevância de arquivos",
+      "hits": [
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 14,
+          "lineEnd": 14,
+          "score": 0.6512
+        },
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 15,
+          "lineEnd": 15,
+          "score": 0.5929
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 97,
+          "lineEnd": 186,
+          "score": 0.5784
+        },
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 18,
+          "lineEnd": 80,
+          "score": 0.5691
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 320,
+          "lineEnd": 418,
+          "score": 0.5627
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 13,
+          "lineEnd": 96,
+          "score": 0.5577
+        },
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 16,
+          "lineEnd": 23,
+          "score": 0.5499
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 187,
+          "lineEnd": 225,
+          "score": 0.5383
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 39,
+          "lineEnd": 131,
+          "score": 0.5144
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 1,
+          "lineEnd": 26,
+          "score": 0.512
+        }
+      ],
+      "latencyMs": 8,
+      "rank": 1,
+      "expected": {
+        "filePath": "packages/core/src/services/symbol/centrality.ts",
+        "lineStart": 14,
+        "lineEnd": 14
+      }
+    },
+    {
+      "needleId": "N02-pagerank-iterations",
+      "query": "limite máximo de iterações no cálculo de centralidade",
+      "hits": [
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 15,
+          "lineEnd": 15,
+          "score": 0.7222
+        },
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 14,
+          "lineEnd": 14,
+          "score": 0.6509
+        },
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 16,
+          "lineEnd": 23,
+          "score": 0.6059
+        },
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 18,
+          "lineEnd": 80,
+          "score": 0.6013
+        },
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 1,
+          "lineEnd": 13,
+          "score": 0.5606
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 320,
+          "lineEnd": 418,
+          "score": 0.5099
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 97,
+          "lineEnd": 186,
+          "score": 0.5084
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 187,
+          "lineEnd": 225,
+          "score": 0.4735
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 13,
+          "lineEnd": 96,
+          "score": 0.4734
+        },
+        {
+          "filePath": "packages/core/src/services/etl/stages/discover.ts",
+          "lineStart": 150,
+          "lineEnd": 195,
+          "score": 0.4643
+        }
+      ],
+      "latencyMs": 2,
+      "rank": 1,
+      "expected": {
+        "filePath": "packages/core/src/services/symbol/centrality.ts",
+        "lineStart": 15,
+        "lineEnd": 15
+      }
+    },
+    {
+      "needleId": "N03-keyword-boost-code-query",
+      "query": "fator multiplicador aplicado a resultados de keyword search quando a query parece código",
+      "hits": [
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 13,
+          "lineEnd": 96,
+          "score": 0.7171
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 232,
+          "lineEnd": 319,
+          "score": 0.6637
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 320,
+          "lineEnd": 418,
+          "score": 0.624
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 187,
+          "lineEnd": 225,
+          "score": 0.6236
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 39,
+          "lineEnd": 131,
+          "score": 0.6175
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 97,
+          "lineEnd": 186,
+          "score": 0.6082
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 1,
+          "lineEnd": 26,
+          "score": 0.6022
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 223,
+          "lineEnd": 264,
+          "score": 0.5992
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 27,
+          "lineEnd": 38,
+          "score": 0.584
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 419,
+          "lineEnd": 504,
+          "score": 0.576
+        }
+      ],
+      "latencyMs": 1,
+      "rank": 1,
+      "expected": {
+        "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+        "lineStart": 57,
+        "lineEnd": 66
+      }
+    },
+    {
+      "needleId": "N04-rrf-vector-blend",
+      "query": "proporção entre score RRF e similaridade vetorial bruta na composição do score final",
+      "hits": [
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 97,
+          "lineEnd": 186,
+          "score": 0.7504
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 187,
+          "lineEnd": 225,
+          "score": 0.6906
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 223,
+          "lineEnd": 264,
+          "score": 0.6813
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 13,
+          "lineEnd": 96,
+          "score": 0.6783
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 320,
+          "lineEnd": 418,
+          "score": 0.6588
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 232,
+          "lineEnd": 319,
+          "score": 0.5709
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 62,
+          "lineEnd": 71,
+          "score": 0.5578
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 566,
+          "lineEnd": 624,
+          "score": 0.5573
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 534,
+          "lineEnd": 571,
+          "score": 0.5507
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 39,
+          "lineEnd": 131,
+          "score": 0.5477
+        }
+      ],
+      "latencyMs": 1,
+      "rank": 1,
+      "expected": {
+        "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+        "lineStart": 170,
+        "lineEnd": 175
+      }
+    },
+    {
+      "needleId": "N05-centrality-rerank-bonus",
+      "query": "bônus aplicado no ranking final para arquivos com alta centralidade no graph",
+      "hits": [
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 16,
+          "lineEnd": 23,
+          "score": 0.6712
+        },
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 1,
+          "lineEnd": 13,
+          "score": 0.6552
+        },
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 18,
+          "lineEnd": 80,
+          "score": 0.625
+        },
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 14,
+          "lineEnd": 14,
+          "score": 0.6018
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 97,
+          "lineEnd": 186,
+          "score": 0.5954
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 320,
+          "lineEnd": 418,
+          "score": 0.582
+        },
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 15,
+          "lineEnd": 15,
+          "score": 0.5694
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 13,
+          "lineEnd": 96,
+          "score": 0.5494
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 187,
+          "lineEnd": 225,
+          "score": 0.536
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 223,
+          "lineEnd": 264,
+          "score": 0.5181
+        }
+      ],
+      "latencyMs": 0,
+      "rank": 5,
+      "expected": {
+        "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+        "lineStart": 177,
+        "lineEnd": 184
+      }
+    },
+    {
+      "needleId": "N06-minscore-on-raw-vector",
+      "query": "filtro de score mínimo aplicado na similaridade vetorial bruta e não no score normalizado por RRF",
+      "hits": [
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 97,
+          "lineEnd": 186,
+          "score": 0.7397
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 187,
+          "lineEnd": 225,
+          "score": 0.7049
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 320,
+          "lineEnd": 418,
+          "score": 0.7043
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 223,
+          "lineEnd": 264,
+          "score": 0.6663
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 13,
+          "lineEnd": 96,
+          "score": 0.6614
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 62,
+          "lineEnd": 71,
+          "score": 0.6233
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 66,
+          "lineEnd": 86,
+          "score": 0.6188
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 27,
+          "lineEnd": 38,
+          "score": 0.6167
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 534,
+          "lineEnd": 571,
+          "score": 0.6041
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 232,
+          "lineEnd": 319,
+          "score": 0.6017
+        }
+      ],
+      "latencyMs": 2,
+      "rank": 3,
+      "expected": {
+        "filePath": "packages/core/src/services/search/rlm-search.ts",
+        "lineStart": 340,
+        "lineEnd": 354
+      }
+    },
+    {
+      "needleId": "N07-brace-counter-strip-strings",
+      "query": "lógica que ignora chaves dentro de strings, regex ou comentários ao contar profundidade de bloco",
+      "hits": [
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+          "lineStart": 105,
+          "lineEnd": 167,
+          "score": 0.601
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+          "lineStart": 168,
+          "lineEnd": 178,
+          "score": 0.6009
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+          "lineStart": 38,
+          "lineEnd": 104,
+          "score": 0.5283
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+          "lineStart": 1,
+          "lineEnd": 11,
+          "score": 0.5085
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-markdown.ts",
+          "lineStart": 16,
+          "lineEnd": 83,
+          "score": 0.4997
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+          "lineStart": 34,
+          "lineEnd": 37,
+          "score": 0.4875
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+          "lineStart": 12,
+          "lineEnd": 20,
+          "score": 0.4808
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 538,
+          "lineEnd": 545,
+          "score": 0.4713
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-markdown.ts",
+          "lineStart": 10,
+          "lineEnd": 15,
+          "score": 0.4695
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+          "lineStart": 30,
+          "lineEnd": 34,
+          "score": 0.4691
+        }
+      ],
+      "latencyMs": 1,
+      "rank": 1,
+      "expected": {
+        "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+        "lineStart": 155,
+        "lineEnd": 176
+      }
+    },
+    {
+      "needleId": "N08-no-merge-labeled-chunks",
+      "query": "regra que impede que chunks de código com rótulo semântico sejam mesclados com vizinhos pequenos",
+      "hits": [
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+          "lineStart": 38,
+          "lineEnd": 104,
+          "score": 0.6198
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+          "lineStart": 1,
+          "lineEnd": 11,
+          "score": 0.6029
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-post.ts",
+          "lineStart": 10,
+          "lineEnd": 59,
+          "score": 0.5957
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-markdown.ts",
+          "lineStart": 16,
+          "lineEnd": 83,
+          "score": 0.543
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-markdown.ts",
+          "lineStart": 1,
+          "lineEnd": 9,
+          "score": 0.5396
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-post.ts",
+          "lineStart": 1,
+          "lineEnd": 9,
+          "score": 0.5377
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+          "lineStart": 12,
+          "lineEnd": 20,
+          "score": 0.5336
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-markdown.ts",
+          "lineStart": 10,
+          "lineEnd": 15,
+          "score": 0.5318
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-post.ts",
+          "lineStart": 60,
+          "lineEnd": 123,
+          "score": 0.5231
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+          "lineStart": 105,
+          "lineEnd": 167,
+          "score": 0.5224
+        }
+      ],
+      "latencyMs": 2,
+      "rank": 3,
+      "expected": {
+        "filePath": "packages/core/src/services/search/chunker/chunker-post.ts",
+        "lineStart": 33,
+        "lineEnd": 36
+      }
+    },
+    {
+      "needleId": "N09-markdown-no-headings-fallback",
+      "query": "fallback que usa chunking fixo quando arquivo markdown não tem nenhum heading",
+      "hits": [
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-markdown.ts",
+          "lineStart": 10,
+          "lineEnd": 15,
+          "score": 0.7704
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-markdown.ts",
+          "lineStart": 16,
+          "lineEnd": 83,
+          "score": 0.7499
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-markdown.ts",
+          "lineStart": 1,
+          "lineEnd": 9,
+          "score": 0.7192
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-post.ts",
+          "lineStart": 146,
+          "lineEnd": 164,
+          "score": 0.6201
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-post.ts",
+          "lineStart": 1,
+          "lineEnd": 9,
+          "score": 0.5944
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-post.ts",
+          "lineStart": 10,
+          "lineEnd": 59,
+          "score": 0.5909
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+          "lineStart": 1,
+          "lineEnd": 11,
+          "score": 0.583
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+          "lineStart": 38,
+          "lineEnd": 104,
+          "score": 0.5772
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-post.ts",
+          "lineStart": 60,
+          "lineEnd": 123,
+          "score": 0.5739
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-post.ts",
+          "lineStart": 124,
+          "lineEnd": 145,
+          "score": 0.4988
+        }
+      ],
+      "latencyMs": 1,
+      "rank": 1,
+      "expected": {
+        "filePath": "packages/core/src/services/search/chunker/chunker-markdown.ts",
+        "lineStart": 10,
+        "lineEnd": 12
+      }
+    },
+    {
+      "needleId": "N10-discover-sort-priority",
+      "query": "ordem de prioridade dos arquivos durante a fase de discover do ETL",
+      "hits": [
+        {
+          "filePath": "packages/core/src/services/etl/stages/discover.ts",
+          "lineStart": 54,
+          "lineEnd": 149,
+          "score": 0.6407
+        },
+        {
+          "filePath": "packages/core/src/services/etl/stages/discover.ts",
+          "lineStart": 53,
+          "lineEnd": 59,
+          "score": 0.6281
+        },
+        {
+          "filePath": "packages/core/src/services/etl/stages/discover.ts",
+          "lineStart": 150,
+          "lineEnd": 195,
+          "score": 0.6245
+        },
+        {
+          "filePath": "packages/core/src/services/etl/stages/discover.ts",
+          "lineStart": 1,
+          "lineEnd": 30,
+          "score": 0.5767
+        },
+        {
+          "filePath": "packages/core/src/services/etl/stages/discover.ts",
+          "lineStart": 196,
+          "lineEnd": 238,
+          "score": 0.5282
+        },
+        {
+          "filePath": "packages/core/src/services/etl/stages/discover.ts",
+          "lineStart": 266,
+          "lineEnd": 289,
+          "score": 0.4753
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 320,
+          "lineEnd": 418,
+          "score": 0.4746
+        },
+        {
+          "filePath": "packages/core/src/services/etl/stages/discover.ts",
+          "lineStart": 233,
+          "lineEnd": 265,
+          "score": 0.4726
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 566,
+          "lineEnd": 624,
+          "score": 0.4602
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 232,
+          "lineEnd": 319,
+          "score": 0.4577
+        }
+      ],
+      "latencyMs": 1,
+      "rank": 1,
+      "expected": {
+        "filePath": "packages/core/src/services/etl/stages/discover.ts",
+        "lineStart": 144,
+        "lineEnd": 151
+      }
+    },
+    {
+      "needleId": "N11-fingerprint-cache-key",
+      "query": "comparação de hash que decide se um arquivo precisa ser reparseado no incremental reindex",
+      "hits": [
+        {
+          "filePath": "packages/core/src/services/etl/stages/discover.ts",
+          "lineStart": 196,
+          "lineEnd": 238,
+          "score": 0.6181
+        },
+        {
+          "filePath": "packages/core/src/services/etl/stages/discover.ts",
+          "lineStart": 1,
+          "lineEnd": 30,
+          "score": 0.5319
+        },
+        {
+          "filePath": "packages/core/src/services/etl/stages/discover.ts",
+          "lineStart": 53,
+          "lineEnd": 59,
+          "score": 0.5276
+        },
+        {
+          "filePath": "packages/core/src/services/etl/stages/discover.ts",
+          "lineStart": 54,
+          "lineEnd": 149,
+          "score": 0.4997
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-code.ts",
+          "lineStart": 212,
+          "lineEnd": 214,
+          "score": 0.4917
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 320,
+          "lineEnd": 418,
+          "score": 0.4691
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-search.ts",
+          "lineStart": 419,
+          "lineEnd": 504,
+          "score": 0.4644
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 97,
+          "lineEnd": 186,
+          "score": 0.4586
+        },
+        {
+          "filePath": "packages/core/src/services/search/rlm-fusion.ts",
+          "lineStart": 13,
+          "lineEnd": 96,
+          "score": 0.4565
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 284,
+          "lineEnd": 339,
+          "score": 0.4552
+        }
+      ],
+      "latencyMs": 0,
+      "rank": 1,
+      "expected": {
+        "filePath": "packages/core/src/services/etl/stages/discover.ts",
+        "lineStart": 187,
+        "lineEnd": 193
+      }
+    },
+    {
+      "needleId": "N12-vector-table-by-dimension",
+      "query": "roteamento dinâmico para tabela do postgres baseado na dimensão do embedding",
+      "hits": [
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 203,
+          "lineEnd": 236,
+          "score": 0.6927
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 514,
+          "lineEnd": 536,
+          "score": 0.6908
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 40,
+          "lineEnd": 48,
+          "score": 0.6875
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 566,
+          "lineEnd": 624,
+          "score": 0.6823
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 740,
+          "lineEnd": 745,
+          "score": 0.6771
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 534,
+          "lineEnd": 571,
+          "score": 0.6698
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 93,
+          "lineEnd": 157,
+          "score": 0.6502
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 448,
+          "lineEnd": 508,
+          "score": 0.6398
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 237,
+          "lineEnd": 287,
+          "score": 0.6391
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 62,
+          "lineEnd": 71,
+          "score": 0.6373
+        }
+      ],
+      "latencyMs": 0,
+      "rank": 10,
+      "expected": {
+        "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+        "lineStart": 60,
+        "lineEnd": 63
+      }
+    },
+    {
+      "needleId": "N13-orphaned-chunks-warning",
+      "query": "alerta emitido quando troca de modelo de embedding deixa chunks de outro tamanho dimensional órfãos",
+      "hits": [
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 152,
+          "lineEnd": 202,
+          "score": 0.6417
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 340,
+          "lineEnd": 385,
+          "score": 0.5814
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 93,
+          "lineEnd": 157,
+          "score": 0.5738
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 828,
+          "lineEnd": 895,
+          "score": 0.5639
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 448,
+          "lineEnd": 508,
+          "score": 0.5635
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 514,
+          "lineEnd": 536,
+          "score": 0.5632
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 380,
+          "lineEnd": 448,
+          "score": 0.5544
+        },
+        {
+          "filePath": "packages/core/src/services/search/chunker/chunker-post.ts",
+          "lineStart": 1,
+          "lineEnd": 9,
+          "score": 0.5467
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 566,
+          "lineEnd": 624,
+          "score": 0.5437
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 203,
+          "lineEnd": 236,
+          "score": 0.5293
+        }
+      ],
+      "latencyMs": 1,
+      "rank": 1,
+      "expected": {
+        "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+        "lineStart": 137,
+        "lineEnd": 181
+      }
+    },
+    {
+      "needleId": "N14-binary-quantization-sign",
+      "query": "regra de conversão de embedding float em bit-string usando o sinal do valor",
+      "hits": [
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 82,
+          "lineEnd": 92,
+          "score": 0.7202
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 750,
+          "lineEnd": 755,
+          "score": 0.7156
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 66,
+          "lineEnd": 86,
+          "score": 0.6298
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 745,
+          "lineEnd": 750,
+          "score": 0.6124
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 566,
+          "lineEnd": 624,
+          "score": 0.5319
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 534,
+          "lineEnd": 571,
+          "score": 0.5081
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 514,
+          "lineEnd": 536,
+          "score": 0.507
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 62,
+          "lineEnd": 71,
+          "score": 0.4978
+        },
+        {
+          "filePath": "packages/core/src/services/symbol/centrality.ts",
+          "lineStart": 14,
+          "lineEnd": 14,
+          "score": 0.4846
+        },
+        {
+          "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+          "lineStart": 448,
+          "lineEnd": 508,
+          "score": 0.4754
+        }
+      ],
+      "latencyMs": 0,
+      "rank": 3,
+      "expected": {
+        "filePath": "packages/core/src/data/vector/postgres-vector-store.ts",
+        "lineStart": 67,
+        "lineEnd": 74
+      }
+    }
+  ]
+}
