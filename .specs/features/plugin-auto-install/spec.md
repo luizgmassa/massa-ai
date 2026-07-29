@@ -62,6 +62,8 @@ only those, and upgrade only when the bundle version changed.
 12. WHEN the OpenCode host is detected but `apps/opencode-plugin/dist/index.js` is missing THEN the existing refuse-without-build behavior SHALL apply (host fails with its documented error, other hosts continue, exit code propagates) — detection does not bypass the build requirement.
 13. WHEN the root `install.sh` `k)`/`p)` menus or `setup-local-first.sh` reach the plugin phase THEN the identical detection + version gating SHALL apply (single shared implementation).
 14. Existing suites SHALL pass unchanged in behavior: `root-install-menu` grep-pins, `test-mcp-single-writer.sh`, plugin `__tests__`, and the install shell suites (update only where the new skip/upgrade behavior is itself the subject).
+15. WHEN a plugin's `--uninstall` runs THEN (a) a platform whose `skillsOwner` is `"plugin"` SHALL keep today's whole-record delete (clean-slate semantics unchanged), and (b) any other platform SHALL lose only its `plugin` subfield while `root`/`skills`/`skillsOwner` survive intact.
+16. WHEN a plugin installer's run fails at any step THEN no `plugin` version record SHALL be written for that host (a half-installed plugin is treated as unknown-version on the next run, never as current).
 
 ## Edge cases
 
@@ -91,6 +93,7 @@ only those, and upgrade only when the bundle version changed.
 | Downgrade | skip with log, never auto-downgrade | Reinstalling older over newer destroys data silently | y |
 | Unknown/corrupt version record | treat as unknown → install once, then record | Self-healing; matches PAI-06 | y |
 | OpenCode build-missing | remains a failure, not a silent skip | Host IS detected; missing build is an error the user must see | y |
+| Marketplace copy scope | copy stays the full four-bundle set whenever ≥1 host installs; gated off only when 0 hosts install / dry-run | Marketplace manifests enumerate all four plugins; a per-host partial copy risks a registered marketplace referencing missing dirs. Disk cost is bounded and copy mode is the npx path, not the checkout path | y |
 
 **Open questions:** none.
 
