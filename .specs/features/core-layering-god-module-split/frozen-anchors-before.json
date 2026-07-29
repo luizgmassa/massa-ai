@@ -1,0 +1,29 @@
+{
+  "baseCommit": "d628464d6bd35d09897d91cda6fb342526fbe22b",
+  "capturedAt": "569de25452f6ea673958b3a724d3ac79c3dddbe8",
+  "subjectAtBase": true,
+  "generatedBy": "scripts/capture-facade-baseline.ts",
+  "note": "Frozen before-record for PR-B. Do not regenerate during Phase 1 — see the header of the generator.",
+  "anchors": [
+    {
+      "needleId": "N03-keyword-boost-code-query",
+      "anchor": "const KEYWORD_BOOST = isCodeQuery ? codeKeywordBoost : 1.0;",
+      "filePathAtBase": "packages/core/src/services/search/rlm-fusion.ts"
+    },
+    {
+      "needleId": "N04-rrf-vector-blend",
+      "anchor": "const rrfNormalized = rrfScore / maxRrfScore;",
+      "filePathAtBase": "packages/core/src/services/search/rlm-fusion.ts"
+    },
+    {
+      "needleId": "N05-centrality-rerank-bonus",
+      "anchor": "const normalizedScore = Math.min(1, combinedScore * (1 + 0.2 * centralityScore));",
+      "filePathAtBase": "packages/core/src/services/search/rlm-fusion.ts"
+    },
+    {
+      "needleId": "N06-minscore-on-raw-vector",
+      "anchor": "rerankedTop = applyProximityRerank(rerankInput, query);",
+      "filePathAtBase": "packages/core/src/services/search/rlm-search.ts"
+    }
+  ]
+}

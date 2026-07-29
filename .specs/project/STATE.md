@@ -30,11 +30,12 @@
 - workflowSessionId: `spec-core-layering-god-module-split`
 - workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
 - feature: `core-layering-god-module-split` — **Specify, Design and Tasks COMPLETE 2026-07-29.
-  `tasks.md` revised and APPROVED after an independent Plan Challenge on that file. Execute
-  IN PROGRESS on `refactor/search-facade-split`: Phase 0 (T0–T5) COMPLETE 2026-07-29 and stopped
-  at its planned session boundary. Next action: review Phase 0, then T6.** Artifacts added this
-  phase: `validation.md` (before-record, no verdict) and `needles-before.json`.
-- base: `main` @ `ce26f28` (v1.9.1). Branch `refactor/search-facade-split` cut from it.
+  Execute IN PROGRESS. Phase 0 (T0–T5) COMPLETE and MERGED (PR #44, released v1.9.2).
+  Phase 1 STARTED on `refactor/search-facade-split-phase-1`: T6a and T6 committed and green.
+  Next action: review the two plan amendments, then T7.**
+- base: Phase 0 merged to `main` @ `d628464`; `origin/main` is now `7c20d47`
+  (`chore(release): v1.9.2`), one release-only commit ahead of this branch's base.
+  Branch `refactor/search-facade-split-phase-1` cut from `d628464`.
   Dependency `sensor-repair-2026-07` (PR-A) satisfied.
 - Artifacts: `.specs/features/core-layering-god-module-split/{spec.md,design.md,tasks.md}`
 - **Scope is PR-B only**: search facade split (GMS-03) + `rlm-*` rename (GMS-04), validated by
@@ -143,6 +144,51 @@ cannot be T17's referent.
 **Open for the reviewer:** the `[Unreleased]` CHANGELOG entry sits under `### Changed`, which cuts
 a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
 unilaterally — it is a release-semantics decision.
+
+### Execute — Phase 1 STARTED (2026-07-29), stopped after T6
+
+Branch `refactor/search-facade-split-phase-1`, cut from `main` @ `d628464`. Three commits.
+
+| # | commit | deliverable |
+| --- | --- | --- |
+| — | `569de25` | plan amendment: AC-3 retired, T6's sensor corrected |
+| T6a | `7996c2d` | `capture-facade-baseline.ts` + 3 frozen fixtures; 9 assertions re-pointed |
+| T6 | `f612e03` | `rlm-fusion.ts` → `result-fusion.ts` |
+
+Gates at `f612e03`: `lint` 0 · `type-check` 0 · `test:scripts` **732 pass / 0 fail across 39
+files**, exit 0 · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
+characterization net **160** unchanged · coverage exclusions **9** · G-HUB exit 1, foreign modules
+**6 → 5**, reach still 14 (expected until T13).
+
+**T6 alone surfaced three plan defects, two needing a spec-owner decision.** All three are the
+`ensureInitializedImpl` class — a consequence `design.md` settled in substance and never wrote into
+the constraint it contradicts. Full record in `tasks.md`.
+
+1. **AC-3 vs GMS-03 AC-1 are contradictory.** AC-1 requires no `*Impl` signature to begin with the
+   facade; `contextual-search-rlm-coverage.test.ts` holds **18 assertions whose content is that it
+   does**. Measured before any test edit: the other six suites unchanged at 119, the coverage suite
+   41 → **37 pass / 4 fail**. §4.3.1's "zero test-file edits" reasoned about post-construction state
+   assignment — correct, and the ~80 LATE-BIND sites did survive untouched — but never covered
+   delegate call-signature forwarding. **Resolved: AC-3 amended, edits bounded and enumerated per
+   task** (T6 2, T7 2, T8 2, T9 1, T10 8, T13 3). File stays at 41 tests and 75 expect() calls.
+2. **Phase 0's before-baselines were live-tree assertions**, so `test:scripts` could not stay green
+   through Phase 1 — the "725 pass / 0 fail" known-good was an invariant Phase 1 destroys.
+   **Resolved: frozen to committed fixtures (T6a)**, the fix T4 already applied to needles.
+   Scoped to the 9 assertions that actually move, not all 16.
+3. **T6's sensor could not fire.** "Reach drops below 14" — reach is set by `rlm-search.ts`, not by
+   the 1-member `rlm-fusion.ts`. Measured 14 → 14, foreign modules 6 → 5. Read literally it reports
+   T6–T12 as failed. Corrected to the foreign-module count; G-HUB's exit status is T14's gate alone.
+
+Two smaller findings recorded: `graph-stream-project-scope-pg.test.ts` passes `NO_RLM` at 3 call
+sites, so §4.6's "rename-only" is wrong for it (T7 owns them); and the frozen-anchor suite pinned
+the four anchors **by path**, which asserts the opposite of FROZEN-ANCHOR — moving an anchor is
+legal, reflowing is not. It now pins the text.
+
+**A measurement trap repeated at this level.** The Phase 1 baseline was first reported as
+`test:scripts` 730 pass / 0 fail. It was **726 pass / 4 fail** — the count line was read and the
+pass/fail split was not. The 4 were environmental in a fresh worktree (3× tree-sitter, and
+`verifyPackageContents` needing `bun run build`), and `bun run build` clears the last one. Same
+family as Phase 0's three: *assert the pass count, never the count of tests.*
 
 ### Execute — Phase 0, the plan revisions that preceded it
 

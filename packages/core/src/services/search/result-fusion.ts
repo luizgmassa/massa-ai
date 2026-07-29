@@ -1,14 +1,22 @@
 /**
- * rlm-fusion — Reciprocal Rank Fusion + score explanation delegates for
- * ContextualSearchRLM.
+ * result-fusion — Reciprocal Rank Fusion + score explanation.
  *
- * Split (M14 Phase 3, T3.3 safety valve) from rlm-search.ts so each module
- * stays under the ~600 LOC budget. Behavior is byte-preserved: bodies moved
- * verbatim with `this` → `rlm`.
+ * PR-B capability module (design.md §4.1). Takes no dependency record at all:
+ * the only facade member it ever read was `RRF_K`, the literal 60, which is a
+ * module constant here. It has never heard of ContextualSearchRLM, which is
+ * what drops the root's maxForeignReach (G-HUB, design.md §3.4).
+ *
+ * Behavior is byte-preserved from rlm-fusion.ts: bodies moved verbatim. Three
+ * of the four FROZEN-ANCHOR needle anchors live in this file (design.md §6.1)
+ * — `KEYWORD_BOOST`, `rrfNormalized`, `normalizedScore`. Moving them between
+ * files is safe because resolution is by content; reformatting them is a hard
+ * gate failure.
  */
 
 import { SearchResult, logger } from "@massa-ai/shared";
-import type { ContextualSearchRLM } from "./contextual-search-rlm.js";
+
+/** Constant for Reciprocal Rank Fusion (design.md §2.3 F2). */
+const RRF_K = 60;
 
 /**
  * Reciprocal Rank Fusion (RRF) - Combines multiple result lists.
@@ -17,8 +25,7 @@ import type { ContextualSearchRLM } from "./contextual-search-rlm.js";
  * - Keywords get higher weight when query contains function/class names
  * - Exact matches in keyword results get additional boost
  */
-export function fuseResultsImpl(
-  rlm: ContextualSearchRLM,
+export function fuseResults(
   resultSets: SearchResult[][],
   query: string,
   explainScores: boolean = false,
@@ -90,7 +97,7 @@ export function fuseResultsImpl(
     const boost = isVector ? 1.0 : isMemoryStream ? 1.0 : KEYWORD_BOOST;
 
     results.forEach((result, rank) => {
-      const rrfScore = (1 / (rlm.RRF_K + rank + 1)) * boost;
+      const rrfScore = (1 / (RRF_K + rank + 1)) * boost;
 
       if (scoreMap.has(result.id)) {
         const existing = scoreMap.get(result.id)!;
@@ -187,7 +194,7 @@ export function fuseResultsImpl(
 
         // Generate explanation if requested
         const explanation = explainScores
-          ? generateScoreExplanationImpl(
+          ? generateScoreExplanation(
               normalizedScore,
               rrfScore,
               vectorScore,
@@ -223,7 +230,7 @@ export function fuseResultsImpl(
 /**
  * Generate detailed score explanation
  */
-export function generateScoreExplanationImpl(
+export function generateScoreExplanation(
   finalScore: number,
   rrfScore: number,
   vectorScore?: number,

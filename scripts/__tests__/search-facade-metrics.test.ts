@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   importSpecifiers,
   isBarrelSpecifier,
@@ -8,9 +10,11 @@ import {
   stripComments,
   trackedFiles,
 } from "../search-facade-metrics.ts";
+import { BASE_COMMIT } from "../capture-facade-baseline.ts";
 
 const FACADE = "packages/core/src/services/search/contextual-search-rlm.ts";
 const SELF = "scripts/__tests__/search-facade-metrics.test.ts";
+const BASELINE_DIR = join(import.meta.dir, "../../.specs/features/core-layering-god-module-split");
 
 describe("importSpecifiers — static forms", () => {
   test("named, default, namespace, type-only and bare imports", () => {
@@ -151,15 +155,40 @@ describe("isBarrelSpecifier", () => {
   });
 });
 
-describe("the real repository at PR-B's base commit", () => {
-  const files = trackedFiles();
-  const r = measure(FACADE, files);
+// Frozen, not live: fan-out is the facade's own import list, and every Phase 1
+// task rewrites it. See the header of scripts/capture-facade-baseline.ts.
+describe("the recorded before-baseline — PR-B's base commit", () => {
+  const baseline = JSON.parse(
+    readFileSync(join(BASELINE_DIR, "facade-metrics-before.json"), "utf8"),
+  ) as {
+    baseCommit: string;
+    subjectAtBase: boolean;
+    subject: string;
+    fanInStatic: string[];
+    fanInDynamic: string[];
+    fanOut: string[];
+  };
+
+  test("the record was captured over an unchanged subject", () => {
+    expect(baseline.baseCommit).toBe(BASE_COMMIT);
+    expect(baseline.subjectAtBase).toBe(true);
+    expect(baseline.subject).toBe(FACADE);
+  });
 
   test("reproduces design.md §7 exactly", () => {
-    expect(r.fanInStatic).toHaveLength(24);
-    expect(r.fanInStatic.length + r.fanInDynamic.length).toBe(26);
-    expect(r.fanOut).toHaveLength(19);
+    expect(baseline.fanInStatic).toHaveLength(24);
+    expect(baseline.fanInStatic.length + baseline.fanInDynamic.length).toBe(26);
+    expect(baseline.fanOut).toHaveLength(19);
   });
+});
+
+// Still measured live. These are invariants of the *tool* and facts about
+// `packages/core/src/controllers`, which is PR-C's territory and untouched
+// here — none of them moves as the search subsystem splits, so freezing them
+// would give up a real check for nothing.
+describe("the real repository", () => {
+  const files = trackedFiles();
+  const r = measure(FACADE, files);
 
   // design.md §7 and spec.md both cite `scripts/beir-benchmark.ts:258` and
   // `scripts/symbol-benchmark.ts:213`, and the design records them as "both,

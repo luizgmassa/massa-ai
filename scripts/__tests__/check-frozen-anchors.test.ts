@@ -74,12 +74,30 @@ describe("the real repository", () => {
   // like this one — the anchor resolves twice and `bench:needles:gate` fails
   // for a reason that has nothing to do with retrieval. This is the cheap,
   // Ollama-free place that says so.
-  test("PR-B's four frozen anchors are where tasks.md says they are", () => {
-    const at = (id: string): string | undefined => parsed?.reports.find((r) => r.needleId === id)?.filePath;
-    expect(at("N03-keyword-boost-code-query")).toBe("packages/core/src/services/search/rlm-fusion.ts");
-    expect(at("N04-rrf-vector-blend")).toBe("packages/core/src/services/search/rlm-fusion.ts");
-    expect(at("N05-centrality-rerank-bonus")).toBe("packages/core/src/services/search/rlm-fusion.ts");
-    expect(at("N06-minscore-on-raw-vector")).toBe("packages/core/src/services/search/rlm-search.ts");
+  // Was: "the four anchors are where tasks.md says they are", pinned to
+  // rlm-fusion.ts / rlm-search.ts. That asserted the opposite of the
+  // constraint. FROZEN-ANCHOR (design.md §6.1) says the anchor *text* is
+  // frozen and explicitly permits moving it between files, because resolution
+  // is by content — so the path pin went red on the legal operation (T6's
+  // rename) and stayed green on nothing the constraint forbids that the
+  // uniqueness test above does not already catch.
+  //
+  // Pinning the text instead tests what FROZEN-ANCHOR says: reformatting, a
+  // renamed local, or a re-wrap fails here, and a file move does not.
+  test("PR-B's four frozen anchor strings are byte-identical to the record", () => {
+    const recorded = JSON.parse(
+      readFileSync(join(REPO_ROOT, ".specs/features/core-layering-god-module-split/frozen-anchors-before.json"), "utf8"),
+    ) as { baseCommit: string; subjectAtBase: boolean; anchors: { needleId: string; anchor: string }[] };
+    expect(recorded.subjectAtBase).toBe(true);
+    expect(recorded.anchors).toHaveLength(4);
+
+    const live = JSON.parse(
+      readFileSync(join(REPO_ROOT, "benchmarks/needles/fixtures/massa-ai.json"), "utf8"),
+    ) as { needles: { id: string; expected: { anchor: string } }[] };
+
+    for (const { needleId, anchor } of recorded.anchors) {
+      expect(live.needles.find((n) => n.id === needleId)?.expected.anchor).toBe(anchor);
+    }
   });
 
   test("no needle is grandfathered as positional", () => {

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   DEFAULT_FACADE,
@@ -7,11 +8,20 @@ import {
   findFunctions,
   measureSource,
   membersRead,
-  scan,
   stripNonCode,
 } from "../search-facade-matrix.ts";
+import { BASE_COMMIT } from "../capture-facade-baseline.ts";
 
-const SEARCH_DIR = join(import.meta.dir, "../../packages/core/src/services/search");
+const BASELINE_DIR = join(import.meta.dir, "../../.specs/features/core-layering-god-module-split");
+
+/** One row of the frozen matrix. Mirrors `delegateScope`'s element shape. */
+interface BaselineRow {
+  name: string;
+  file: string;
+  loc: number;
+  facadeParam: string | null;
+  members: string[];
+}
 
 describe("findFunctions — body boundaries", () => {
   // Defect 1, and the reason this file exists. A brace-matching first draft
@@ -165,8 +175,25 @@ describe("delegateScope", () => {
   });
 });
 
-describe("the real search directory at PR-B's base commit", () => {
-  const scoped = delegateScope(scan(SEARCH_DIR, DEFAULT_FACADE));
+// Frozen, not live. These figures describe the tree PR-B starts from, and
+// Phase 1's whole job is to move them: by T14 `delegateScope` over the live
+// directory is *empty* — the target state, asserted synthetically above. Read
+// against the live tree these would go red task by task and take `test:scripts`
+// with them, and updating the numbers per task would convert a before-record
+// into an after-record tracking whatever the refactor produced, leaving T17/T20
+// without a referent. Same fix, same reason, as T4's needles-before.json.
+// Re-capture is not silent: the provenance test below fails if it happens.
+describe("the recorded before-baseline — PR-B's base commit", () => {
+  const baseline = JSON.parse(
+    readFileSync(join(BASELINE_DIR, "facade-matrix-before.json"), "utf8"),
+  ) as { baseCommit: string; subjectAtBase: boolean; facade: string; delegateScope: BaselineRow[] };
+  const scoped = baseline.delegateScope;
+
+  test("the record was captured over an unchanged subject", () => {
+    expect(baseline.baseCommit).toBe(BASE_COMMIT);
+    expect(baseline.subjectAtBase).toBe(true);
+    expect(baseline.facade).toBe(DEFAULT_FACADE);
+  });
 
   test("reproduces design.md §2.1's totals exactly", () => {
     expect(scoped).toHaveLength(21);

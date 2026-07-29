@@ -492,14 +492,6 @@ export async function searchImpl(
   }
 }
 
-// fuseResultsImpl + generateScoreExplanationImpl live in ./rlm-fusion.js
-// (split safety valve — kept rlm-search.ts under the ~600 LOC budget).
-// Re-exported here so callers that import from rlm-search keep resolving.
-export {
-  fuseResultsImpl,
-  generateScoreExplanationImpl,
-} from "./rlm-fusion.js";
-
 // ── addContextToResults ──────────────────────────────────────────────────────
 
 export async function addContextToResultsImpl(

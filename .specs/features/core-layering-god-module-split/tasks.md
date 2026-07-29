@@ -24,7 +24,7 @@ it looks done; the sensor decides.
 | **FROZEN-ANCHOR** | Four needle anchor strings are frozen text. Moving them between files is safe; rewriting or reflowing them is not. | `scripts/check-frozen-anchors.ts` (T3) |
 | **PATCHABLE** | `ensureInitialized` and `_indexProjectInternal` stay public patchable instance methods; internal calls route through `this.`. **16 monkey-patch sites across 3 files** (measured — see below). | `concurrent-indexing.test.ts` pass count |
 | **PR-C-BOUNDARY** | Do not move or rename `search-diagnostics.ts` or `lexical-search.ts`. Either alters a `data → services` edge and absorbs PR-C's unanswered contract question. | `git diff --name-only` review per commit |
-| **AC-3** | No test weakened, skipped or deleted. Under the §4.4 shape PR-B needs **zero** test-file edits except the 4 rename sites. | diff review; any test edit stops the task |
+| **AC-3** | No test weakened, skipped or deleted. **Signature-tracking edits are authorised and bounded** — see [AC-3 vs GMS-03 AC-1](#ac-3-vs-gms-03-ac-1--the-zero-test-edits-claim-is-false) below. The original "**zero** test-file edits except the 4 rename sites" is **false** and was retired at T6. | per-suite pass counts unchanged (160 net); `contextual-search-rlm-coverage.test.ts` stays at **41** tests; zero assertions deleted; zero skips |
 | **AC-2** | No new exclusion in `scripts/check-coverage.ts`. Count stays **9**. | `bun -e '…EXCLUSIONS.length'` |
 
 The four frozen anchors — each unique in its file:
@@ -175,8 +175,9 @@ it is cheapest and `searchImpl` (455 LOC, 13 members) lands last, when everythin
 
 | # | task | from → to | members to remove | sensor | cost |
 | --- | --- | --- | --- | --- | --- |
-| **T6** | `fuseResults`, `generateScoreExplanation` | `rlm-fusion.ts` → `result-fusion.ts` | `RRF_K` → module const. **No deps parameter at all.** **Also updates two files the original row missed**: the re-export at `rlm-search.ts:498-501` (`export { fuseResultsImpl, generateScoreExplanationImpl } from "./rlm-fusion.js"`) and the import block at `contextual-search-rlm.ts:52-53`, which reaches these two symbols **through `rlm-search.js`, not directly**. | hub-metric reach drops below 14; frozen-anchor check (3 of the 4 live here); `rlm-search.test.ts` **31** + characterization **21** pass counts | 1.5 h |
-| **T7** | `buildGraphStream` | `rlm-synapse.ts` → `graph-stream.ts` | none — it already reads **zero** facade members | `rlm-synapse.test.ts` pass count = **26** (the "14" in the first draft is the `buildGraphStream` describe block, not the file total); note `graph-stream-project-scope-pg.test.ts` imports it directly and needs a live DB | 1 h |
+| **T6a** | **freeze Phase 0's before-baselines** — `scripts/capture-facade-baseline.ts` + three committed fixtures; re-point 9 assertions. Unplanned; see [the section below](#phase-0s-before-baselines-were-live-tree-assertions). | — | — | three mutants observed red first: a dropped delegate row, a whitespace-reflowed anchor, and a forced re-capture over a changed subject. Then: the three suites green **both** at base **and** with T6 applied — the second is the whole point | 1 h |
+| **T6** | `fuseResults`, `generateScoreExplanation` | `rlm-fusion.ts` → `result-fusion.ts` | `RRF_K` → module const. **No deps parameter at all.** **Also updates two files the original row missed**: the re-export at `rlm-search.ts:498-501` (`export { fuseResultsImpl, generateScoreExplanationImpl } from "./rlm-fusion.js"`) and the import block at `contextual-search-rlm.ts:52-53`, which reaches these two symbols **through `rlm-search.js`, not directly**. | **hub-metric foreign modules 6 → 5** (*not* reach — see the correction below); frozen-anchor check (3 of the 4 live here); `rlm-search.test.ts` **31** + characterization **21** + coverage **41** pass counts | 1.5 h |
+| **T7** | `buildGraphStream` | `rlm-synapse.ts` → `graph-stream.ts` | none — it already reads **zero** facade members, but its signature still *takes* one (the deliberately-unused `_rlm`), and dropping it is what makes the file `graph-stream.ts` rather than a rename | `rlm-synapse.test.ts` pass count = **26** (the "14" in the first draft is the `buildGraphStream` describe block, not the file total); `graph-stream-project-scope-pg.test.ts` imports it directly, needs a live DB, and passes `NO_RLM` at **3 call sites** — it is **not** rename-only, see the AC-3 section | 1 h |
 | **T8** | `applySynapseState` | `rlm-synapse.ts` → `session-bias.ts` | `injectedDeps` → `SessionBiasDeps {sessionRegistry, synapseManager}` | **GMS-03 AC-2 sensor**: a new unit test constructs it from an object literal with **zero** `mock.module` calls | 1.5 h |
 | **T9** | `correctQuery` | `rlm-synapse.ts` → **`hybrid-search.ts`** (§4.1/§4.2). The first draft said "folded into the query module", which names nothing — and `query-understanding.ts` is a real, unrelated file in the same directory that an executor could plausibly pick. | `keywordSearch` → `HybridSearchDeps` | `rlm-synapse.test.ts` correctQuery cases (5) pass unmodified | 45 m |
 | **T10** | indexing surfaces **and `ensureInitializedImpl`** | `rlm-indexing.ts` → `project-indexer.ts`; **`ensureInitializedImpl`'s body → `ContextualSearchRLM.ensureInitialized()`** | `indexManager`, `symbolRepo`, `keywordSearch`, `vectorStore`, `searchCache` → `IndexerDeps` | **LATE-BIND sensor**: `rlm-indexing.test.ts` pass count = **25**. Any drop means stubs stopped taking effect. **Plus**: `git grep -n 'ensureInitializedImpl' -- packages/core/src` returns nothing outside tests. | 3.5 h |
@@ -190,6 +191,120 @@ it is cheapest and `searchImpl` (455 LOC, 13 members) lands last, when everythin
 `git diff --name-only` reviewed against PR-C-BOUNDARY and AC-3. The two checks are sub-second
 and both are path-independent, so neither needs editing as files move — if either goes red the
 task is wrong, not the check.
+
+### AC-3 vs GMS-03 AC-1 — the "zero test edits" claim is false
+
+Found at **T6**, by executing T6 and measuring rather than by reading. Same class as the
+`ensureInitializedImpl` omission: a consequence the design decided in substance and never wrote
+into the constraint that contradicts it.
+
+**GMS-03 AC-1** requires that no `*Impl` signature begin with the facade instance.
+`packages/core/src/__tests__/contextual-search-rlm-coverage.test.ts` contains **18 assertions
+whose content is that the facade *is* the first argument** — `toHaveBeenCalledWith(rlm, …)` /
+`toHaveBeenLastCalledWith(rlm, …)`. The two criteria cannot both hold. AC-3's *"PR-B needs zero
+test-file edits except the 4 rename sites"* is therefore false, and it is false for every Phase 1
+task, not just one.
+
+**Where §4.3.1's reasoning was right and where it stopped.** Its subject is *post-construction
+state assignment* — `(rlm as any).keywordSearch = …`. Those ~80 sites do survive untouched, exactly
+as LATE-BIND predicts, and T6 confirms it: `rlm-indexing` 25, `rlm-search` 31, `rlm-synapse` 26,
+`rlm-admin` 7, `concurrent-indexing` 9, characterization 21 — all unchanged. What it never covered
+is *delegate call-signature forwarding*, which GMS-03 AC-1 exists to change. `design.md` D-R7 saw
+the tests ("24 of the facade's 41 tests are forwarding-only") without drawing the consequence.
+
+**Measured at T6**, before any test edit:
+
+| suite | before | after T6 source change |
+| --- | --- | --- |
+| the other six characterization suites | 119 | **119** — unchanged |
+| `contextual-search-rlm-coverage.test.ts` | 41 pass / 0 fail | **37 pass / 4 fail** |
+
+The four are precisely the `fuseResults` / `generateScoreExplanation` forwarding tests.
+
+**Resolution (spec-owner, 2026-07-29): amend AC-3, bounded.** Signature-tracking edits are
+authorised, enumerated per task below, and each may do exactly one thing — drop the facade argument
+that no longer exists, or re-point a `mock.module` specifier and the symbol names inside it.
+
+| task | assertions | also |
+| --- | --- | --- |
+| T6 | 2 | `mock.module` split: `fuseResults`/`generateScoreExplanation` leave the `rlm-search.js` mock for a new `result-fusion.js` one |
+| T7 | 2 | **plus 3 call sites** in `graph-stream-project-scope-pg.test.ts`, which passes `NO_RLM` as the first argument — that file is **not** rename-only, contrary to §4.6 |
+| T8 | 2 | — |
+| T9 | 1 | — |
+| T10 | 8 | — |
+| T13 | 3 | — |
+| **total** | **18** | 3 `mock.module` targets re-pointed across 6 modules; ~14 mocked symbol names |
+
+`rlm-indexing.test.ts` **is** genuinely rename-only: it imports only `runWithIndexLock`, whose
+signature `(lockMap, projectId, work)` never took the facade.
+
+**This is not a weakening, and the sensor says so rather than the author.** The file stays at
+**41** tests, no assertion is deleted, nothing is skipped, and each edited assertion remains an
+exact-argument check over every parameter that still exists. Any diff that drops a test, adds a
+skip, or relaxes an assertion to a looser matcher is out of bounds and stops the task.
+**T20's verifier must be told this explicitly**, alongside the two authorised comment edits in
+T15 — otherwise 18 assertion changes in a PR claiming "no test weakened" read as the violation
+they are not.
+
+### Phase 0's before-baselines were live-tree assertions
+
+Third defect found at T6, and the one that would have made Phase 1 unrunnable as specified.
+
+Phase 0 recorded its before-measurements as unit tests that measure the **live tree** —
+`describe("the real search directory at PR-B's base commit")` in `search-facade-matrix.test.ts`,
+and its twin in `search-facade-metrics.test.ts`. Those pins hold exactly until the refactor they
+exist to police begins. `search-facade-matrix.test.ts` even contains a synthetic test named
+*"is empty when nothing takes the facade — the target state"*, so the suite knew the end state
+empties `delegateScope` and still pinned **21** against the live directory.
+
+**Consequence: `bun run test:scripts` could not stay green through Phase 1**, and the "Gate check
+commands" section's *725 pass / 0 fail* known-good was an invariant Phase 1 necessarily destroys.
+T6 alone reddened 5 assertions; by T14 the whole matrix block goes.
+
+Note what this is **not**. The *gates* are fine and Phase 0 got them right: `check-frozen-anchors.ts`,
+`check-characterization.ts` and `search-hub-metric.ts` all still exit correctly under T6, and
+`check-characterization.test.ts` stays green because item 5 of *What Phase 0 changed in the plan*
+deliberately located its blocks **by symbol, not by path**. That reasoning was simply never applied
+to D1's and D3's own suites.
+
+**Resolution (spec-owner, 2026-07-29): freeze to committed fixtures — T6a.** Same fix, same
+reason, as T4's `needles-before.json`: *a baseline that does not survive a fresh checkout cannot be
+T17's referent.* `scripts/capture-facade-baseline.ts` writes `facade-matrix-before.json`,
+`facade-metrics-before.json` and `frozen-anchors-before.json` beside it.
+
+Scoped to what actually moves — **9 assertions, not 16**:
+
+| suite | frozen | left live, and why |
+| --- | --- | --- |
+| `search-facade-matrix.test.ts` | **7** | 15 synthetic-fixture tests — the real guards on the tool |
+| `search-facade-metrics.test.ts` | **1** (§7 fan-in/fan-out) | 5: the mention-bucket partition is explicitly *a floor, not a pin*, and three measure `packages/core/src/controllers`, which is PR-C's territory and untouched here |
+| `check-frozen-anchors.test.ts` | **1**, rewritten | 2 invariants (uniqueness; no grandfathered needle) |
+
+Two things worth keeping straight:
+
+- **The anchor test was asserting the opposite of its constraint.** It pinned the four anchors to
+  `rlm-fusion.ts` / `rlm-search.ts` by path. FROZEN-ANCHOR says the anchor **text** is frozen and
+  explicitly permits moving it between files, because resolution is by content — so the path pin
+  went red on the one operation the constraint allows and added nothing the uniqueness test above
+  it does not already catch. It now pins the text, which fails on a reflow and passes on a move.
+- **Re-freezing is detectable.** The generator refuses to run when any measured path differs from
+  the base commit, records `subjectAtBase`, and the suites assert it. `--force` over a changed
+  subject turns the provenance tests red rather than quietly rebasing the record. The check is on
+  the measured **subject**, not on `HEAD`'s sha: a docs-only commit has a different sha and an
+  identical subject, and rejecting it would be the same conflation in the other direction.
+
+### T6's sensor was unfirable — corrected
+
+The T6 row read *"hub-metric reach drops below 14"*. It cannot. `maxForeignReach` is the deepest
+single foreign **module**, and that module is `rlm-search.ts` at **14** — the union of `searchImpl`
+(13) with its file-mates. `rlm-fusion.ts` read **one** member, so removing it cannot move the
+maximum. Measured, before and after T6: reach **14 → 14**, foreign modules **6 → 5**.
+
+Taken literally the row would have reported T6 as failed while it succeeded, and the same is true
+of T7–T12: **reach cannot fall until T13 rewrites `rlm-search.ts`, and G-HUB cannot go green until
+T14.** The per-task sensor is the foreign-module count; G-HUB's exit status is T14's gate and
+nobody else's. Recorded because a sensor that reports failure on an axis its task does not touch is
+the same defect class Phase 0 found four times, pointing the other way.
 
 ### `ensureInitializedImpl` — the export that had no destination
 

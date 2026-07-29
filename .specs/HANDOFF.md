@@ -1,6 +1,56 @@
 # Handoff
 
-## Active — Core Layering and God-Module Split (PR-B), Phase 0 complete
+## Active — Core Layering and God-Module Split (PR-B), Phase 1 started
+
+**Feature**: `core-layering-god-module-split` · branch
+`refactor/search-facade-split-phase-1`, cut from `main` @ `d628464`.
+**Phase 0 is merged and released (PR #44, v1.9.2). T6a and T6 are committed and green; T7 is not
+started.** Working tree clean. Nothing is pushed — the branch is local only.
+
+| # | commit | deliverable |
+| --- | --- | --- |
+| — | `569de25` | plan amendment: AC-3 retired, T6's sensor corrected |
+| T6a | `7996c2d` | `capture-facade-baseline.ts` + 3 frozen fixtures; 9 assertions re-pointed |
+| T6 | `f612e03` | `rlm-fusion.ts` → `result-fusion.ts` |
+
+Gates at `f612e03`: `lint` 0 · `type-check` 0 · `test:scripts` **732 pass / 0 fail across 39
+files** · `check-frozen-anchors` exit 0 · `check-characterization` exit 0 · characterization net
+**160** · exclusions **9** · G-HUB exit 1, foreign modules **6 → 5**.
+
+**Read before resuming**: `tasks.md` → *AC-3 vs GMS-03 AC-1*, *Phase 0's before-baselines were
+live-tree assertions*, *T6's sensor was unfirable*, then the Phase 1 table.
+Then `STATE.md` → *Execute — Phase 1 STARTED*.
+
+**Next action: T7** (`buildGraphStream` → `graph-stream.ts`). It is **not** rename-only:
+`graph-stream-project-scope-pg.test.ts` passes `NO_RLM` at **3 call sites** plus its import, and
+the coverage suite has **2** forwarding assertions. Both are authorised under the amended AC-3.
+That file needs a live PostgreSQL and will not run in a plain `bun test`.
+
+**Two things a resumer must not re-derive the hard way:**
+
+- **A fresh worktree needs `bunx prisma generate` and `bun run build`** before any gate is
+  meaningful. Without the first, every `packages/core` suite dies on
+  `Cannot find module '../../generated/prisma/index.js'`. Without the second,
+  `verifyPackageContents` fails on `apps/tools-api/dist` and reads exactly like a real regression.
+- **The Phase 1 baseline is `test:scripts` 732 pass / 0 fail**, not 730. The first reading here was
+  taken by grepping the `Ran N tests` line and never the pass/fail split, which hid 4 environmental
+  failures. Assert the pass count.
+
+**Do not regenerate the frozen baselines.** `capture-facade-baseline.ts` refuses off the base
+subject, and `--force` over a changed subject turns the provenance tests red rather than quietly
+moving T17/T20's referent.
+
+**Still open, unchanged from Phase 0**: `.ua/` regeneration is deferred to after PR-C, so **PR-B
+does not close GMS-04 AC-3** for those 320 `rlm-` occurrences — T20's verifier has to be told
+explicitly. The 18 authorised signature-tracking test edits must be told to it too, or they read as
+the AC-3 violation they are not.
+
+**Rebase note**: `origin/main` is `7c20d47` (`chore(release): v1.9.2`), one release-only commit
+ahead of this branch's base. Merge must be a merge commit, not a squash (R-04).
+
+---
+
+## Superseded — Core Layering and God-Module Split (PR-B), Phase 0 complete
 
 **Feature**: `core-layering-god-module-split` · branch `refactor/search-facade-split`, cut from
 `main` @ `ce26f28` (v1.9.1). **Phase 0 (T0–T5) is done and committed; T6 is not started.**
