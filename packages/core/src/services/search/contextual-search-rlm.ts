@@ -49,13 +49,16 @@ import {
 } from "./rlm-synapse.js";
 import {
   searchImpl,
-  fuseResultsImpl,
-  generateScoreExplanationImpl,
   addContextToResultsImpl,
   extractPreviewImpl,
   calculateAvgScoreImpl,
   filterByPatternsImpl,
 } from "./rlm-search.js";
+// Capability module (design.md §4.1). These share a name with the class
+// methods that delegate to them — the shape §4.3 sketches. Class members are
+// not in lexical scope, so a bare call inside a method body resolves to the
+// module import, not to itself.
+import { fuseResults, generateScoreExplanation } from "./result-fusion.js";
 import type {
   SearchDegradation,
   SearchDegradationReporter,
@@ -87,8 +90,10 @@ export class ContextualSearchRLM {
   /** Phase 2: query understanding (LLM rewrite + HyDE). Default-off, silent-degrade. */
   // Visibility relaxed from `private` so rlm-search.ts can read via rlm param.
   queryUnderstanding: QueryUnderstandingService;
-  // Visibility relaxed from `private` so rlm-search.ts (fuseResults) can read.
-  readonly RRF_K = 60; // Constant for Reciprocal Rank Fusion
+  // RRF_K was a public field only so rlm-fusion.ts could read it off the
+  // instance. It is the literal 60 and is now a module constant in
+  // result-fusion.ts (design.md §2.3 F2, §4.1). Zero post-construction
+  // assignment sites, so removing it disables no test stub.
   initialized = false;
 
   // Per-project mutex to prevent concurrent indexing
@@ -356,7 +361,7 @@ export class ContextualSearchRLM {
     query: string,
     explainScores: boolean = false,
   ): SearchResult[] {
-    return fuseResultsImpl(this, resultSets, query, explainScores);
+    return fuseResults(resultSets, query, explainScores);
   }
 
   /**
@@ -372,7 +377,7 @@ export class ContextualSearchRLM {
     keywordRank?: number,
     combinedRank?: number,
   ): any {
-    return generateScoreExplanationImpl(
+    return generateScoreExplanation(
       finalScore,
       rrfScore,
       vectorScore,

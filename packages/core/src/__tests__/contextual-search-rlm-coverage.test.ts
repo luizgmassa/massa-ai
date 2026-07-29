@@ -72,7 +72,7 @@ mock.module("@massa-ai/shared", () => {
 // ── Forwarding-contract mocks (M14 facade delegation) ───────────────────────
 //
 // indexFileImpl / searchImpl / applySynapseStateImpl / correctQueryImpl /
-// buildGraphStreamImpl / fuseResultsImpl / generateScoreExplanationImpl /
+// buildGraphStreamImpl / fuseResults / generateScoreExplanation /
 // addContextToResultsImpl / extractPreviewImpl / calculateAvgScoreImpl /
 // runWithIndexLock / _indexProjectInternalImpl / ensureFreshIndexImpl /
 // checkSearchAdmissionImpl are replaced with spies below so the describe
@@ -129,8 +129,6 @@ mock.module("../services/structural/parser-readiness.js", () => ({
 }));
 
 const searchImplMock = mock(async () => [] as SearchResult[]);
-const fuseResultsImplMock = mock((): SearchResult[] => []);
-const generateScoreExplanationImplMock = mock((): unknown => ({}));
 const addContextToResultsImplMock = mock(async () => [] as SearchResult[]);
 const extractPreviewImplMock = mock((): string => "");
 const calculateAvgScoreImplMock = mock((): number => 0);
@@ -138,11 +136,21 @@ const calculateAvgScoreImplMock = mock((): number => 0);
 mock.module("../services/search/rlm-search.js", () => ({
   ...rlmSearchActual,
   searchImpl: searchImplMock,
-  fuseResultsImpl: fuseResultsImplMock,
-  generateScoreExplanationImpl: generateScoreExplanationImplMock,
   addContextToResultsImpl: addContextToResultsImplMock,
   extractPreviewImpl: extractPreviewImplMock,
   calculateAvgScoreImpl: calculateAvgScoreImplMock,
+}));
+
+// PR-B T6: fuseResults / generateScoreExplanation moved out of rlm-search.ts's
+// re-export into their own capability module, and lost the facade parameter
+// (GMS-03 AC-1). Mocking them means naming the new module, so this block can
+// no longer ride along on the rlm-search.js one above.
+const fuseResultsMock = mock((): SearchResult[] => []);
+const generateScoreExplanationMock = mock((): unknown => ({}));
+
+mock.module("../services/search/result-fusion.js", () => ({
+  fuseResults: fuseResultsMock,
+  generateScoreExplanation: generateScoreExplanationMock,
 }));
 
 const applySynapseStateImplMock = mock(async () => [] as SearchResult[]);
@@ -167,8 +175,8 @@ beforeEach(() => {
   ensureFreshIndexImplMock.mockClear();
   checkSearchAdmissionImplMock.mockClear();
   searchImplMock.mockClear();
-  fuseResultsImplMock.mockClear();
-  generateScoreExplanationImplMock.mockClear();
+  fuseResultsMock.mockClear();
+  generateScoreExplanationMock.mockClear();
   addContextToResultsImplMock.mockClear();
   extractPreviewImplMock.mockClear();
   calculateAvgScoreImplMock.mockClear();
@@ -665,20 +673,22 @@ describe("ContextualSearchRLM.fuseResults (instance delegate)", () => {
     const rlm = makeRlm();
     const resultSets = [[makeResult("f1")]];
     const sentinelReturn = [makeResult("f2")];
-    fuseResultsImplMock.mockImplementationOnce(() => sentinelReturn);
+    fuseResultsMock.mockImplementationOnce(() => sentinelReturn);
 
     const result = rlm.fuseResults(resultSets, "fq", true);
 
-    expect(fuseResultsImplMock).toHaveBeenCalledWith(rlm, resultSets, "fq", true);
+    // PR-B T6: the facade argument is gone (GMS-03 AC-1). Every parameter that
+    // still exists is still asserted exactly.
+    expect(fuseResultsMock).toHaveBeenCalledWith(resultSets, "fq", true);
     expect(result).toBe(sentinelReturn);
   });
 
   test("explainScores defaults to false when omitted", () => {
     const rlm = makeRlm();
     const resultSets = [[makeResult("f3")]];
-    fuseResultsImplMock.mockImplementationOnce(() => []);
+    fuseResultsMock.mockImplementationOnce(() => []);
     rlm.fuseResults(resultSets, "fq2");
-    expect(fuseResultsImplMock).toHaveBeenLastCalledWith(rlm, resultSets, "fq2", false);
+    expect(fuseResultsMock).toHaveBeenLastCalledWith(resultSets, "fq2", false);
   });
 });
 
@@ -686,11 +696,11 @@ describe("ContextualSearchRLM.generateScoreExplanation (instance delegate)", () 
   test("forwards all 7 params in order with distinct sentinel values (catches any swap), returns impl result unchanged", () => {
     const rlm = makeRlm();
     const sentinelReturn = { explanation: "distinct-sentinel-explanation" };
-    generateScoreExplanationImplMock.mockImplementationOnce(() => sentinelReturn);
+    generateScoreExplanationMock.mockImplementationOnce(() => sentinelReturn);
 
     const result = rlm.generateScoreExplanation(0.11, 0.22, 0.33, 0.44, 1, 2, 3);
 
-    expect(generateScoreExplanationImplMock).toHaveBeenCalledWith(
+    expect(generateScoreExplanationMock).toHaveBeenCalledWith(
       0.11,
       0.22,
       0.33,
@@ -704,9 +714,9 @@ describe("ContextualSearchRLM.generateScoreExplanation (instance delegate)", () 
 
   test("optional trailing params omitted → forwarded as undefined", () => {
     const rlm = makeRlm();
-    generateScoreExplanationImplMock.mockImplementationOnce(() => ({}));
+    generateScoreExplanationMock.mockImplementationOnce(() => ({}));
     rlm.generateScoreExplanation(0.5, 0.6);
-    expect(generateScoreExplanationImplMock).toHaveBeenLastCalledWith(
+    expect(generateScoreExplanationMock).toHaveBeenLastCalledWith(
       0.5,
       0.6,
       undefined,
