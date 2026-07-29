@@ -145,13 +145,25 @@ describe("the real repository at PR-B's base commit", () => {
     ]);
   });
 
-  test("mentioning is not importing: 15 files name it without depending on it", () => {
-    expect(r.mentionsOnly).toHaveLength(15);
-    // 24 + 2 + 15 = 41, which is what a plain string search returns.
-    expect(r.fanInStatic.length + r.fanInDynamic.length + r.mentionsOnly.length).toBe(41);
-    // Two of the 15 are this measurement itself: the script names the facade in
-    // its header, this file names it in a const and in assertions. Both mention
-    // it and neither imports it, which is the bucket working, not a leak.
+  // A floor, not a pin, and the third revision of this number in one session:
+  // 13 when D3 was written, 15 once its own two files were tracked, 17 once the
+  // frozen-anchor and characterization tooling landed. Every one of those
+  // movements was a new file *about* the facade, not a change to the facade.
+  // The mention count measures how many things discuss the subject, which grows
+  // monotonically during a refactor whose whole activity is discussing it.
+  // Pinning it exactly makes every unrelated tool a test failure. The buckets
+  // partitioning correctly is the real invariant; fan-in is the real figure.
+  test("mentioning is not importing: the three buckets partition the mentions", () => {
+    expect(r.mentionsOnly.length).toBeGreaterThanOrEqual(13);
+    const total = r.fanInStatic.length + r.fanInDynamic.length + r.mentionsOnly.length;
+    expect(total).toBe(new Set([...r.fanInStatic, ...r.fanInDynamic, ...r.mentionsOnly]).size);
+    // What actually matters: tooling that names the facade must land in the
+    // mention-only bucket, never in fan-in. An instrument counted as a consumer
+    // of its own subject is the defect this suite was fixed for.
+    for (const f of r.mentionsOnly.filter((m) => m.startsWith("scripts/"))) {
+      expect(r.fanInStatic).not.toContain(f);
+      expect(r.fanInDynamic).not.toContain(f);
+    }
     expect(r.mentionsOnly).toContain("scripts/search-facade-metrics.ts");
     expect(r.mentionsOnly).toContain(SELF);
   });
