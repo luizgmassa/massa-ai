@@ -486,3 +486,99 @@ none, which is what the isolation was protecting.
 The alternative was to record T6's gate as not-run. That was offered with the evidence
 above and declined in favour of repairing the blocker — correctly, since a gate that
 cannot run is the same class of defect this whole feature exists to remove.
+
+---
+
+# Fifth fork — the corpus bound does not exist (T6b/T6c/T6d, 2026-07-28)
+
+T6a made the index *run*. It did not make it cheap. A full-repo index measures ~3.2 h at
+`qwen3-embedding:8b` on this host, and while it runs a single embedding call exceeds the
+5 s test budget — so it cannot overlap T9's gate. The session was handed a plan to bound the
+corpus with a scratch `config.json` carrying a `capturePolicy` limited to 81 files.
+
+**That plan could not have worked, and neither could its two successors.** Three separate
+configuration knobs promise to bound what gets indexed. All three were inert.
+
+## The measurements
+
+| # | Knob | Promised by | Actual behaviour | Measurement |
+| --- | --- | --- | --- | --- |
+| 1 | `capturePolicy` | `ignore-patterns.ts:110` — *"a path is indexed iff `!ig.ignores(path) && applyCapturePolicy(path) !== 'Drop'`"* | `applyCapturePolicy` has **zero production callers**; the block is validated at load then discarded | repo-wide search finds only its own doc comment |
+| 2 | `security.allowedExtensions` | `config/index.ts:445` — *"User config (`security.allowedExtensions`) overrides this at runtime"* | assembly hardcodes `[...DEFAULT_ALLOWED_EXTENSIONS]`; the field is absent from the user-facing `MassaAiConfig.security` type | scratch config sets `[".ts"]`; `config.get` returns all 33 |
+| 3 | the glob those extensions build | — | `**/*{.ts}` is matched **literally**; a one-extension list matches nothing | bounded index **completed in 181 ms over 0 files** |
+
+Each was found by trying to use the previous one. Knob 3 did not exist as a reachable defect
+until knob 2 was fixed — the extension list had always been the 33 defaults, which contain
+commas, so the brace expansion always had ≥2 alternatives.
+
+## Why this belongs in this feature and not a follow-up
+
+Every one of the three fails the same way SEN-01..04 and BEH-01 fail: **the knob accepts
+input, the documentation describes an effect, and nothing enforces it.** Knob 3's failure
+mode is the feature's thesis in miniature — indexing reports success over an empty corpus,
+emitting no warning at all. It is `design.md`'s own "path 2" (quieter than the path the spec
+called the core of the requirement) reappearing in a different subsystem.
+
+Two of the three were *documented* to work. That is worse than undocumented, because the
+comment is what stops the next person from measuring.
+
+**Decision, confirmed by the spec owner, 2026-07-28: fix all three.** The alternatives —
+index the full repo for ~3.2 h, switch the e2e index to `bge-m3`, or record T6's gate as
+not-run — were offered with costs. `bge-m3` was rejected on the same ground the floors are
+out of scope: changing the embedding model changes what the floors mean.
+
+## What the existing suite caught, and why it matters
+
+The naive wiring of knob 1 — `filter(p => !ig.ignores(p) && applyCapturePolicy(p) !== "Drop")` —
+turned `etl-stages-coverage.test.ts` red on its `includeTests` case. `DEFAULT_POLICY` carries
+the same test globs `DEFAULT_IGNORES` does, so the policy layer re-dropped every test file
+and **silently neutralized the option**. `includeTests` has to reach both layers or it
+reaches neither.
+
+The fix mirrors the structure that was already there: `loadPolicy` strips test globs from the
+policy exactly as `loadIgnore` strips them from the ignore list, and only `Drop` rules on a
+known test glob — an unrelated `Drop` keeps applying. Worth recording because the naive
+version passed its own new tests; only the pre-existing suite disagreed.
+
+## Divergence — the behaviour-change count is now four, not one
+
+`spec.md`'s BEH-01 claimed the programme has exactly one behaviour change. T6a already made
+that false. These three make it four, all in PR-A:
+
+| Change | Who is affected |
+| --- | --- |
+| T6a — indexer accepts same-name/different-kind declarations | anyone whose repo contains such a file; today their index aborts |
+| T6b — `security.allowedExtensions` honoured | only installs that **set** the key, which until now did nothing |
+| T6c — `capturePolicy` honoured | only installs that **set** the block, which until now did nothing |
+| T6d — one-extension glob | only reachable via T6b; nobody could have depended on it |
+
+The three new ones share a property T6a does not: **no existing install can have been
+depending on the broken behaviour**, because the broken behaviour was "your configuration is
+ignored". An install that never set the key sees byte-identical discovery, which is pinned by
+a default-parity test in each case.
+
+What the isolation was protecting still holds: PR-B and PR-C remain behaviour-preserving.
+
+## Divergence — a bounded corpus is weaker evidence, and is recorded as such
+
+The corpus T6's gate ran against is `.ts`-only: **382 files**, down from 1219 across the 33
+default extensions. `14.needles.test.ts`'s floors were calibrated on a full warm shared
+index. Fewer competing chunks makes retrieval strictly easier, so **a pass on this corpus is
+weaker evidence than a pass on the full one**, and the two are not comparable.
+
+Stated here rather than reported as if equivalent. What the run does prove is T6's subject:
+the sweep, the shared resolver, `findRank` and the determinism assertions execute end to end
+against a live API and a real index.
+
+## Operational note — "the API is down" was false
+
+Before any of the above: the handoff stated the API had been stopped. It had not. PID
+`47108`, orphaned to PPID 1, had been indexing the full repository for 48 minutes and held
+the `managed_runs` indexing lease (`id 869`, heartbeat 6 s old) that refused every new index
+with `indexing_busy`. It also still held port 3333, so a newly started API bound the same
+port alongside it and requests were split between an instance with the bounded config and one
+without.
+
+The previous session's check — `pgrep -fl "tools-api"` — cannot match it: the process command
+line is `bun src/index.ts`. **Check the port, not the name**:
+`lsof -nP -iTCP:3333 -sTCP:LISTEN`. Two `LISTEN` rows is the signal.

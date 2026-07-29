@@ -402,10 +402,24 @@ exactly one location repo-wide at authoring time.
 This is the one behavior change in the programme, and it is deliberately isolated here so that
 neither PR-B nor PR-C — both behavior-preserving — carries one.
 
-**Divergence — PR-A carries two behavior changes, not one.** T6a repairs a structural-resolver
-defect that aborted every full index (`design.md`, Fourth fork), so the indexer now accepts a file
-it used to reject. Recorded rather than quietly broken. The isolation's actual purpose survives:
+**Divergence — PR-A carries four behavior changes, not one.** Recorded rather than quietly
+broken, and updated twice as the count grew. The isolation's actual purpose survives throughout:
 PR-B and PR-C still carry none.
+
+| Change | Where | Who is affected |
+| --- | --- | --- |
+| BEH-01 — `includePersistent` honoured | this requirement | callers passing `false`, who silently received persistent memories |
+| T6a — indexer accepts same-name/different-kind declarations | `design.md`, Fourth fork | anyone whose repo contains such a file; today their index aborts entirely |
+| T6b — `security.allowedExtensions` honoured | `design.md`, Fifth fork | only installs that **set** the key, which until now did nothing |
+| T6c — `capturePolicy` honoured | `design.md`, Fifth fork | only installs that **set** the block, which until now did nothing |
+
+T6d (the one-extension glob) is not listed as a behavior change: it is reachable only through
+T6b, and the behavior it replaces was "match zero files".
+
+The last three share a property BEH-01 and T6a do not — **no existing install can have depended
+on the broken behavior, because the broken behavior was "your configuration is ignored".** An
+install that never set the key sees byte-identical discovery, pinned by a default-parity test in
+each case. That is why they were judged safe to land inside a sensor-repair PR.
 
 **Divergence — "persistent" is defined, and the handoff's premise that it is not was wrong.** The
 carried-forward note into this task said there is no `persistent` field on a memory. There is no

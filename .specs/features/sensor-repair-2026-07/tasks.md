@@ -475,6 +475,105 @@ both claimed `file#name`.
 
 ---
 
+### T6b / T6c / T6d — bounding the e2e corpus, and the three inert knobs it exposed
+
+**Unplanned, and not the task that was handed over.** The plan carried into this session was
+to bound the shared e2e index with a scratch `config.json` carrying a `capturePolicy` that
+kept 81 files. That plan could not have worked, and the reason is the same defect class this
+whole feature exists to remove.
+
+**Before any of it: the premise "the API is currently DOWN" was false.** PID `47108`,
+orphaned (PPID 1), had been running since 20:03 and was still indexing the full repository
+48 minutes later — holding the `managed_runs` indexing lease (`id 869`, heartbeat 6 s old)
+that made every new index return `indexing_busy`. It also still held port 3333, so a second
+API started beside it and **both** were `LISTEN`ing; requests were being split between an
+instance with the bounded config and one without. The previous session's `pgrep` patterns
+(`tools-api`, `bun test`) could not match its command line, which is literally
+`bun src/index.ts`. Check `lsof -nP -iTCP:3333 -sTCP:LISTEN`, not a name pattern.
+
+**Three knobs, each documented, each enforcing nothing.** Found in the order below, each one
+by trying to use the previous one:
+
+| # | Knob | What was wrong | How it was measured |
+| --- | --- | --- | --- |
+| 1 | `capturePolicy` | `applyCapturePolicy` had **zero production callers**. The block was parsed, bounds-checked and `denyUnknownFields`-validated at load, then never consulted | repo-wide search: only its own doc comment refers to it |
+| 2 | `security.allowedExtensions` | assembly hardcoded `[...DEFAULT_ALLOWED_EXTENSIONS]`; `MassaAiConfig.security` did not declare the field at all | scratch config set `[".ts"]`; `config.get` returned all 33 |
+| 3 | one-extension glob | `**/*{.ts}` — a brace expansion with one alternative — is matched **literally** | bounded index **completed in 181 ms over 0 files** |
+
+Knob 3 is the one worth dwelling on. It was **unreachable** while the extension list was
+always the 33 defaults, and fixing knob 2 is what reached it. It was found by *using* the
+fix, not by reading it — and its failure mode is the exact one this feature is about: a run
+that reports success over an empty corpus, with no error anywhere.
+
+`ignore-patterns.ts` has documented the composition as *"a path is indexed iff
+`!ig.ignores(path) && applyCapturePolicy(path) !== 'Drop'`"* since the policy was added. The
+second half was never performed. **A doc comment is not a sensor.**
+
+**Decision (spec owner, this session): fix all three rather than route around them.** The
+alternative — index the full repo for ~3.2 h, or record T6's gate as not-run — was offered
+with costs. Consistent with the T6a precedent: a gate that cannot run is the same defect
+class the feature exists to remove.
+
+#### T6b — `security.allowedExtensions` propagates — **DONE** (`ee07326`)
+
+Wired through `fileConfig` the way `corsOrigins` at the adjacent line already was, and the
+field added to the user-facing `MassaAiConfig.security` type. An **empty array is refused at
+load**, not honoured: it matches nothing, so honouring it would rebuild the silent-zero
+failure inside the fix meant to remove it. Entries must be dot-prefixed.
+
+- [x] Discriminating sensor: reverting the assembly gives **2 pass / 4 fail**; fixed, **6 / 0**.
+      The two survivors are the default-fallback guards, which do not discriminate by design
+- [x] Omitting the key still yields the 33 defaults — the property that keeps every existing
+      install unaffected
+
+#### T6c — `capturePolicy` reaches discovery — **DONE** (`8ea1a4d`)
+
+Discovery applies the policy after the `.gitignore` + `DEFAULT_IGNORES` merge, in that order.
+
+**The existing suite caught a real flaw in the naive wiring, which is the reason it is worth
+having.** `DEFAULT_POLICY` carries the same test globs `DEFAULT_IGNORES` does, so the first
+version re-dropped every test file and **silently neutralized `includeTests`** —
+`etl-stages-coverage.test.ts` went red immediately. `loadPolicy` now mirrors `loadIgnore`,
+stripping only `Drop` rules on a known test glob; an unrelated `Drop` rule keeps applying.
+
+- [x] Discriminating sensor: **4 pass / 3 fail** unwired, **7 / 0** wired
+- [x] Default parity: with no policy configured, `DEFAULT_POLICY`'s Drop set mirrors
+      `DEFAULT_IGNORES`, so a default install discovers the same files. Pinned by test
+- [x] Layer ordering pinned: a `Keep` rule cannot resurrect a `.gitignore`d path — AND, not
+      a precedence chain. Only `Drop` excludes; `MetadataOnly` is still discovered
+- [x] Core `--unit` group count **126 → 127**, entirely the new file (225 files, 99
+      pure/shared + 126 stateful/isolated)
+
+#### T6d — the one-extension glob, and the bounded corpus — **DONE** (`c3f10ec`)
+
+`buildExtensionGlob` returns one pattern per extension instead of one combined brace
+pattern. `glob` accepts the array and still performs a single traversal, so the reason the
+combined form existed is preserved. Applied at all three scanners that built it — the ETL
+discover stage, the index manager's staleness scan, and the RLM indexer — because it is one
+defect in three copies.
+
+- [x] Discriminating sensor: restoring the combined pattern gives **23 pass / 6 fail**;
+      fixed, **29 / 0**
+
+**Corpus actually indexed**: `.ts` only, **382 files** discovered (from 1219 across the 33
+default extensions), parsed in 2.2 s.
+
+**Honesty note on what this corpus proves — read before quoting any needle number from T6.**
+This is **not** the corpus `14.needles.test.ts`'s floors (`hit@1 ≥ 0.36`, `hit@5 ≥ 0.64`)
+were calibrated against; those came from a full warm shared index on this host. Less
+competition makes retrieval strictly easier, so **a pass here is weaker evidence than a pass
+on the full corpus**, and the floors are not comparable across the two. What the run does
+prove is T6's actual subject: that the sweep, the shared resolver, `findRank` and the
+determinism assertions all execute end to end against a live API and a real index.
+
+The `bge-m3` / `qwen3-embedding:4b` option was considered and **not taken** — changing the
+embedding model changes what the floors mean, and SEN-04's Out of Scope forbids touching
+floors in this PR.
+
+**Commits**: `ee07326`, `8ea1a4d`, `c3f10ec`
+
+---
+
 ### T6 / SEN-04: Repair the third fixture consumer
 
 **What**: Point `14.needles.test.ts` at the shared resolution path instead of its own copied predicate.
@@ -484,12 +583,50 @@ both claimed `file#name`.
 **Why it exists (Plan Challenge finding 2)**: it replicates `intersects` and `findRank` **verbatim** against the same fixture JSON. Repairing `run.ts` and `scorer.ts` while leaving this pinned would let PR-B break it invisibly — with the 7 `services/search/` targets moved, its `hit@5` caps at 7/14 = 0.50 against its own **0.64** floor (`:302`). Gated behind `describe.skipIf(!READY)` (`:236` — `RUN_E2E` + live API + Ollama), which lowers blast radius but does not make it exempt.
 
 **Done when**:
-- [ ] No third copy of the predicate remains; it consumes the shared resolver
-- [ ] Its documented floors (`hit@1 ≥ 0.36`, `hit@5 ≥ 0.64`) and its determinism assertions (`:273-276`) are unchanged
-- [ ] A repo-wide search finds no fourth consumer of `expected.filePath`
+- [x] No third copy of the predicate remains; it consumes the shared resolver
+- [x] Its documented floors (`hit@1 ≥ 0.36`, `hit@5 ≥ 0.64`) and its determinism assertions are unchanged
+- [x] A repo-wide search finds no fourth consumer of `expected.filePath` — the remaining
+      uses read a **resolved** span, or are `scorer.ts`'s documented external-corpus fallback
 
-**Tests**: existing e2e · **Gate**: `cd packages/core && bun run test:e2e`
-**Commit**: `test(e2e): consume the shared needle resolver instead of a copied predicate`
+**DONE** — `d5b5813`, with the harness blocker in `fedc202`.
+
+**A second blocker sat between this suite and its own gate, and it was not slow either.**
+`probeAvailability` fetched `/api/v1/system/ollama` and `/api/v1/system/info` with **no
+`x-api-key`**. Neither path is in `PUBLIC_PATHS`, so under AD-011 both answer **401**;
+`ollama?.available` came back undefined, `OLLAMA_UP` was false, and the suite reported
+**`0 pass / 2 skip / 0 fail`** — which reads like a pass. The same file detects auth two
+calls later with a deliberate keyless 401 probe, so it already knew the API needed a key.
+
+Together with T6a that is **two** blockers, neither of which failed: one aborted the index,
+one skipped the suite. That is the feature's thesis holding up under its own gate.
+
+**Gate result** — 382-file bounded corpus (T6b/T6c/T6d above; a pass here is weaker
+evidence than a pass on the full corpus, and the floors are not comparable):
+
+```
+hit@1  = 50.0%   hit@3 = 71.4%   hit@5 = 78.6%   hit@10 = 78.6%   MRR = 0.610
+
+hit@1 0.500 ≥ 0.36  → PASS
+hit@5 0.786 ≥ 0.64  → PASS
+MRR   0.610 ≥ 0.47  → PASS
+
+1 pass / 0 fail
+```
+
+Run #1 and run #2 are **byte-identical across all five aggregates** — the determinism
+assertions hold unchanged, which is what the criterion asked for.
+
+**The anchoring proved itself by accident, on the commit that completes it.** T6c and T6d
+edited `discover.ts` *above* both of its needle targets. N10 and N11 resolved to their new
+lines — `144-151` and `187-193`, not the fixture's old values — and both still ranked **@1**,
+with no fixture edit. That is exactly AC-3's "within-file move beyond `lineTolerance`",
+exercised for real rather than in a constructed test.
+
+- [x] Discriminating sensor for the harness fix: omitting the key gives `0 pass / 2 skip /
+      0 fail`; sending it gives `1 pass / 0 fail`
+
+**Tests**: existing e2e · **Gate**: `RUN_E2E=1 bun test …/e2e/14.needles.test.ts` — **PASS**
+**Commits**: `fedc202` (harness), `d5b5813` (T6)
 
 ---
 
@@ -574,10 +711,19 @@ N01 @1  N02 @1  N03 @1  N04 @1  N05 @5  N06 @3  N10 @1  N11 @1  N12 @10  N13 @1 
   PR's completion bar, the pressure at T5a — where the honest interim number was still 0.569 —
   would have been to reach for the fixture. The number moved because the sensor was repaired, which
   is the only reason it was ever allowed to move
-- [ ] If T5's AC-8 span check was clean and T5a's ranks still moved, **stop** — that is an unmodelled mechanism, not a tolerance to widen
+- [x] If T5's AC-8 span check was clean and T5a's ranks still moved, **stop** — that is an unmodelled
+      mechanism, not a tolerance to widen. **Did not trigger**: the AC-8 span check was clean *and*
+      T5a's ranks did not move (0 differing hit lists, 0 differing score vectors across all 14)
 
 **Tests**: none (measurement is the deliverable) · **Gate**: `bun run bench:needles:gate` ×2
-**Commit**: `docs(specs): record the needle-anchoring equivalence baseline`
+
+**Commit — correction.** This task planned a commit
+`docs(specs): record the needle-anchoring equivalence baseline`. **No such commit exists**, and the
+citation was wrong rather than the work being missing: T7's evidence is the two results JSONs under
+`benchmarks/needles/reports/` plus the tables recorded in this file, which landed with the work they
+describe (`27dda6c` for the T5a equivalence, `5e018e5` for the T5b baseline) and with this file's own
+docs commit. Recorded here rather than fabricating the subject retroactively — flagged by the
+independent verifier, `validation.md`.
 
 ---
 
@@ -637,10 +783,65 @@ pins that omitting the filter behaves as `true`, matching the schema's documente
 **Requirement**: all
 
 **Done when**:
-- [ ] `CHANGELOG.md` `[Unreleased]` entries present — the CI merge gate fails a PR without them
+- [x] `CHANGELOG.md` `[Unreleased]` entries present — the CI merge gate fails a PR without them.
+      **Five** entries under `### Fixed`: the index abort (T6a), the one-extension glob (T6d),
+      `capturePolicy` (T6c), `security.allowedExtensions` (T6b), and `includePersistent` (BEH-01)
 - [x] ~~fix the stale "nine documented exclusions" (actual: 11)~~ — **struck. Measured: `EXCLUSIONS.length` is 9 and the gate prints `9 documented exclusions`. `CHANGELOG.md` was right; `HANDOFF.md` was wrong.** Making this "fix" would have introduced the error it meant to remove. validation-pr2 gap #2 is closed
-- [ ] Full gate green: `lint`, `type-check`, `build`, `test`, `test:scripts`, `test:plugins`, `test:coverage`
-- [ ] **No new exclusion** added to `scripts/check-coverage.ts`
+- [x] Full gate green: `lint`, `type-check`, `build`, `test`, `test:scripts`, `test:plugins`, `test:coverage`
+
+      | Gate | Result |
+      | --- | --- |
+      | `bun run lint` | **0** (oxlint, exit 0) |
+      | `bun run type-check` | **6 / 6 successful** |
+      | `bun run build` | **5 / 5 successful** |
+      | `bun run test` | **11 / 11 tasks**, core `PASS: all 134 group(s)` |
+      | `bun run test:scripts` | **634 pass / 0 fail** (33 files) + shell 5 / 22 / 26 / 11 / 8 |
+      | `bun run test:plugins` | **94 pass / 0 fail** (8 files) |
+      | `bun run test:coverage` | **PASS** — 314 files, **9** documented exclusions |
+      | `RUN_E2E=1 … 14.needles.test.ts` | **1 pass / 0 fail** |
+
+      **`bun run test` was run 6 times this session and passed 3 of them.** Reporting the tally
+      rather than the best run, because "green" from one attempt would be the same overclaim this
+      feature exists to remove. Both failure modes are attributed and neither is this diff:
+
+      | Run | Result | Cause |
+      | --- | --- | --- |
+      | 1 | red | `mcp-client` — a **tools-api running on :3333** |
+      | 2 | red | `core/trace-path` — `graph_generation_workspace_missing:p4d2-trace-path` |
+      | 3, 4 | green | — |
+      | 5 | red | `core/architecture-map` — `graph_generation_workspace_missing:p4d4-arch-map` |
+      | 6 | green | — |
+
+      1. **A running tools-api poisons `apps/mcp-client`.** `embedded-api-client-endpoints.test.ts`
+         gave **2 fail** at 5001 ms with the API up, **6 fail** with the API up *and* a scratch
+         `XDG_CONFIG_HOME`, and **95 pass / 0 fail in 4.34 s** with the API stopped. `CLAUDE.md`
+         attributes this suite to a real developer config; measured here the config made it **worse**
+         and the live API — sharing the Postgres pool (size 10) and Ollama — was the whole variable.
+         Avoidable: stop the API before the aggregate.
+
+      2. **Cross-package concurrency against one database.** `turbo.json`'s `test` task sets no
+         concurrency limit and no cross-package ordering, so `@massa-ai/core#test`,
+         `@massa-ai/tools-api#test` and `@massa-ai/mcp-client#test` run **at the same time against
+         the same `DATABASE_URL`** — and `apps/mcp-client`'s deliberately-unmocked
+         `embedded-api-client-endpoints.test.ts` performs project resets there while core is
+         mid-file. Both failures are the same signature on different projects, and each failing
+         suite passes alone (`trace-path` **18 / 0**, `architecture-map` **24 / 0** in 857 ms). The
+         failing assertion in `architecture-map` is its *setup* line (`indexFixture`), not its own
+         expectation — the test explicitly tolerates a missing workspace row and returns early.
+
+         **Pre-existing and out of scope here.** Every file involved —
+         `graph-generation-{lifecycle,symbol-repository}-pg.test.ts` (which `TRUNCATE TABLE
+         workspaces CASCADE`), `project-reset.test.ts`, `embedded-api-client-endpoints.test.ts` — is
+         untouched by this branch. Worth its own task: it is a real hazard that CI is also exposed
+         to, since CI likewise runs one service database for all packages.
+
+      Group counts moved **133 → 134** by default and **126 → 127** under `--unit`, entirely from
+      `discover-capture-policy.test.ts`.
+- [x] **No new exclusion** added to `scripts/check-coverage.ts` — the gate still prints
+      **9 documented exclusions**. The coverage floor was met by *covering* the code instead: both
+      config-load validators were only ever exercised in subprocesses, so the parent process's
+      instrumentation counted them as dead. `validateCapturePolicyConfig` had been uncovered that way
+      since it was written; this branch made the gap visible rather than causing it (`fcf5a02`)
 - [x] **No commit carries a marker GitHub acts on.** A squash merge folds every commit body into the merge message; that killed the v1.3.0 release. Verified **0** in the PR range:
 
       ```bash
@@ -660,8 +861,31 @@ pins that omitting the filter behaves as `true`, matching the schema's documente
 
       Run it through `rtk proxy`. Under rtk's filter the same `grep -c` returned `11` and then `0`,
       which would have recorded a false pass
-- [ ] `massa-ai-verification-agent` (author ≠ verifier) writes `validation.md`
-- [ ] STATE.md: flip **AD-013** from `proposed` to `active`
+- [x] `massa-ai-verification-agent` (author ≠ verifier) writes `validation.md` — **DONE.** Verdicts:
+      SEN-01 VERIFIED · SEN-02 **PARTIAL** · SEN-03 VERIFIED · SEN-04 VERIFIED · BEH-01 VERIFIED, and
+      all six unplanned repairs VERIFIED. It reasoned three discriminating sensors through the source
+      and **reproduced one empirically** — confirming `glob("**/*{.ts}")` really does match 0 files —
+      and re-ran seven test files live, all matching the recorded counts byte-for-byte.
+
+      SEN-02 is PARTIAL for the reason T4 already recorded: AC-1's green run on the PR is not
+      observable without a PR. Not a defect.
+
+      **It found 4 discrepancies, all documentation state, none in code. All are now fixed:**
+
+      | # | Finding | Resolution |
+      | --- | --- | --- |
+      | 1 | The four-behaviour-change correction, the whole T6b/T6c/T6d narrative and — critically — **the bounded-corpus honesty caveat** existed only in the uncommitted working tree. Committed `HEAD` still said "two behaviour changes" | fixed by committing these files; the caveat is now in the PR record, which is the only place it protects a reader |
+      | 2 | `FEATURES.json` still `status: specified`, `execute: false` | set to `complete`, all four phases true, `design`/`validation` paths added |
+      | 3 | T9's own checklist left unticked | this section |
+      | 4 | T7 cited a commit subject that does not exist | corrected in T7 above — the evidence landed in `27dda6c` / `5e018e5`, and the citation was wrong rather than the work missing |
+
+      Finding #1 is the one worth keeping. The caveat that matters most is the one saying the
+      evidence is *weaker than it looks*, and it was sitting where no reviewer would ever load it.
+- [x] STATE.md: flip **AD-013** from `proposed` to `active` — done, with the implementation
+      recorded in the decision cell and the commits cited (`27dda6c` / `5e018e5` / `d5b5813`)
+
+**Not verifiable locally, carried to the PR**: SEN-02 AC-1 — the `Coverage` workflow's green run on
+the PR itself.
 
 **Tests**: full gate · **Gate**: all of the above
 **Commit**: `docs: record the sensor-repair changes and close PR-A`
@@ -677,4 +901,19 @@ pins that omitting the filter behaves as `true`, matching the schema's documente
 | 3 — retrieval sensor | T5 → T6 → T7 | Independent of 1/2; **start early**, T7 is the long pole |
 | 4 — behavior + close | T8, T9 | T8 anytime; T9 last |
 
-**9 tasks** — over the ~8-task batch budget, so the sub-agent offer applies. Offer-then-confirm; never auto-spawn.
+**9 tasks planned; 15 executed.** The six unplanned ones were not scope creep — each was a blocker
+discovered by trying to use the previous fix, and each was offered to the spec owner with its cost
+before being taken:
+
+| Unplanned | Blocked | Failure mode |
+| --- | --- | --- |
+| T6a | every E2E suite in the repo | index **aborted** at 1219/1219 files |
+| T6b | bounding the corpus | config value **read then discarded** |
+| T6c | bounding the corpus | policy **validated then never consulted** |
+| T6d | bounding the corpus | index **succeeded over 0 files** in 181 ms |
+| e2e auth probe | every E2E suite gated on `OLLAMA_UP` | suite **skipped**, reported `0 pass / 2 skip / 0 fail` |
+| coverage | the coverage gate | validators covered only in **subprocesses** |
+
+**Not one of the six failed loudly.** They aborted, skipped, or reported success over an empty
+result — the same defect class SEN-01..04 exist to remove, found inside the tooling meant to measure
+it. That is the strongest evidence this feature produced, and none of it was in the plan.

@@ -619,16 +619,18 @@
     {
       "slug": "sensor-repair-2026-07",
       "title": "Sensor repair 2026-07 \u2014 reset the coverage gate's database, wire it into CI, stop tests reading the real config, content-anchor the needles fixture, honour includePersistent",
-      "status": "specified",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
-        "design": false,
+        "design": true,
         "tasks": true,
-        "execute": false
+        "execute": true
       },
       "spec": ".specs/features/sensor-repair-2026-07/spec.md",
-      "tasks": ".specs/features/sensor-repair-2026-07/tasks.md"
+      "design": ".specs/features/sensor-repair-2026-07/design.md",
+      "tasks": ".specs/features/sensor-repair-2026-07/tasks.md",
+      "validation": ".specs/features/sensor-repair-2026-07/validation.md"
     }
   ],
   "active_feature": "sensor-repair-2026-07"
