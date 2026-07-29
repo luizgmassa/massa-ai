@@ -181,7 +181,7 @@ trap cleanup EXIT
 RESULTS_FILE="$WORK_DIR/results.tsv"   # status<TAB>platform<TAB>target<TAB>message
 : > "$RESULTS_FILE"
 BOOTSTRAP_FILE="$WORK_DIR/bootstrap.md"
-STATE_IN="$WORK_DIR/state-in.tsv"      # platform<TAB>root<TAB>csv-skills
+STATE_IN="$WORK_DIR/state-in.tsv"      # platform<TAB>root<TAB>csv-skills<TAB>owner<TAB>plugin-version<TAB>plugin-installed-at
 STATE_OUT="$WORK_DIR/state-out.tsv"
 
 record() { printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" >> "$RESULTS_FILE"; }
@@ -272,6 +272,12 @@ else
 fi
 
 # ── State: load ─────────────────────────────────────────────────────────────
+# Why: plugin auto-install (PAI-03/06) extends v2 state with an optional
+#      per-platform `plugin` record ({version, installedAt}) that skills runs
+#      must round-trip byte-identically but never write — the TSV intermediate
+#      carries it as fields 5-6 (design C5).
+# Impacts: PAI-06 state compatibility, AC-7; plugin records survive skills runs.
+# Test: bun test scripts/__tests__/install-state-plugin-version.test.ts
 : > "$STATE_IN"
 if ! "$RUNNER" - "$STATE_PATH" "$TARGET_HOME" "$CODEX_HOME" > "$STATE_IN" <<'NODE'
 const fs = require("fs");
@@ -321,8 +327,8 @@ if (version === 1) {
       process.exit(2);
     }
     // v1 predates the plugin-writer concept — everything it recorded was a
-    // repo-owned symlink install.
-    out.push([p, rootFor(p), "", "repo"]);
+    // repo-owned symlink install. Plugin fields (5-6) are always empty.
+    out.push([p, rootFor(p), "", "repo", "", ""]);
   }
 } else if (version === 2) {
   const platforms = data.platforms;
@@ -352,7 +358,14 @@ if (version === 1) {
     // value defaults to "repo" rather than failing closed on every prior
     // install-state.json on disk.
     const owner = rec.skillsOwner === "plugin" ? "plugin" : "repo";
-    out.push([p, rec.root, [...new Set(skills)].join(","), owner]);
+    // plugin (PAI-03) is optional pass-through: skills runs never write it,
+    // but the TSV must carry it so the state rewrite round-trips the records
+    // the plugin installers write. Absent stays absent — never empty strings
+    // re-materialised as an object downstream (design C5).
+    const plugin = rec.plugin && typeof rec.plugin === "object" && !Array.isArray(rec.plugin) ? rec.plugin : null;
+    const pluginVersion = plugin && typeof plugin.version === "string" ? plugin.version : "";
+    const pluginInstalledAt = plugin && typeof plugin.installedAt === "string" ? plugin.installedAt : "";
+    out.push([p, rec.root, [...new Set(skills)].join(","), owner, pluginVersion, pluginInstalledAt]);
   }
 } else {
   console.error(`Unsupported installer state version in ${file}`);
@@ -383,10 +396,20 @@ state_owner_for() {
 # Seed the outgoing state with everything we are not touching this run.
 cp "$STATE_IN" "$STATE_OUT"
 
+# state_replace PLATFORM ROOT CSV [OWNER]
+# Rewrites the platform's outgoing row. Plugin-version fields (5-6) are
+# pass-through: preserved from the existing row, never written here — a skills
+# run must not create or destroy plugin records (design C5).
 state_replace() {
   local p="$1" root="$2" csv="$3" owner="${4:-repo}" tmp="$WORK_DIR/state.tmp"
+  local existing plugin_version="" plugin_installed_at=""
+  existing="$(grep "^$p$TAB" "$STATE_OUT" 2>/dev/null | head -n1 || true)"
+  if [ -n "$existing" ]; then
+    plugin_version="$(printf '%s' "$existing" | cut -f5)"
+    plugin_installed_at="$(printf '%s' "$existing" | cut -f6)"
+  fi
   grep -v "^$p$TAB" "$STATE_OUT" > "$tmp" 2>/dev/null || true
-  printf '%s\t%s\t%s\t%s\n' "$p" "$root" "$csv" "$owner" >> "$tmp"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$p" "$root" "$csv" "$owner" "$plugin_version" "$plugin_installed_at" >> "$tmp"
   mv "$tmp" "$STATE_OUT"
 }
 
@@ -768,12 +791,19 @@ const raw = fs.readFileSync(tsvFile, "utf8");
 const platforms = {};
 for (const line of raw.split("\n")) {
   if (!line.trim()) continue;
-  const [p, root, csv, owner] = line.split("\t");
-  platforms[p] = {
+  const [p, root, csv, owner, pluginVersion, pluginInstalledAt] = line.split("\t");
+  const rec = {
     root,
     skills: csv ? csv.split(",").filter(Boolean) : [],
     skillsOwner: owner === "plugin" ? "plugin" : "repo",
   };
+  // Plugin records are pass-through (design C5): re-attach only a complete
+  // record. An absent subfield must round-trip as absent — never as
+  // {version: "", installedAt: ""}.
+  if (pluginVersion && pluginInstalledAt) {
+    rec.plugin = { version: pluginVersion, installedAt: pluginInstalledAt };
+  }
+  platforms[p] = rec;
 }
 fs.writeFileSync(file, JSON.stringify({ version: 2, repository: repoRoot, platforms }, null, 2) + "\n");
 NODE
