@@ -22,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same identity. Same-name/same-kind declarations were already disambiguated correctly and
   are unaffected. Symbols that do not share a name keep the identity they had.
 
+- **`security.allowedExtensions` in `config.json` now actually narrows what gets indexed.**
+  Setting the key had no effect whatsoever: the assembled config hardcoded the built-in
+  default list and never read the value, and the user-facing config type did not declare
+  the field at all — so the value was parsed, then discarded. The indexer, the search index
+  scanner and the MCP upload collector all read the assembled value, so every consumer saw
+  the defaults no matter what the file said. Omitting the key still yields the same 33
+  default extensions, so installs that never set it are unaffected. An **empty array is now
+  rejected at config load** rather than honoured: it would match no files, and indexing
+  would report success over an empty corpus. Entries must be dot-prefixed (`.ts`, not `ts`).
+
 - **`search_memories` honours `includePersistent`.** The option has been advertised in the
   published MCP tool schema — and forwarded from the tool to the controller — while
   nothing ever read it, so a caller passing `false` silently received persistent memories
