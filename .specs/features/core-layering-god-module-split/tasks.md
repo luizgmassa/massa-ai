@@ -175,6 +175,7 @@ it is cheapest and `searchImpl` (455 LOC, 13 members) lands last, when everythin
 
 | # | task | from → to | members to remove | sensor | cost |
 | --- | --- | --- | --- | --- | --- |
+| **T6a** | **freeze Phase 0's before-baselines** — `scripts/capture-facade-baseline.ts` + three committed fixtures; re-point 9 assertions. Unplanned; see [the section below](#phase-0s-before-baselines-were-live-tree-assertions). | — | — | three mutants observed red first: a dropped delegate row, a whitespace-reflowed anchor, and a forced re-capture over a changed subject. Then: the three suites green **both** at base **and** with T6 applied — the second is the whole point | 1 h |
 | **T6** | `fuseResults`, `generateScoreExplanation` | `rlm-fusion.ts` → `result-fusion.ts` | `RRF_K` → module const. **No deps parameter at all.** **Also updates two files the original row missed**: the re-export at `rlm-search.ts:498-501` (`export { fuseResultsImpl, generateScoreExplanationImpl } from "./rlm-fusion.js"`) and the import block at `contextual-search-rlm.ts:52-53`, which reaches these two symbols **through `rlm-search.js`, not directly**. | **hub-metric foreign modules 6 → 5** (*not* reach — see the correction below); frozen-anchor check (3 of the 4 live here); `rlm-search.test.ts` **31** + characterization **21** + coverage **41** pass counts | 1.5 h |
 | **T7** | `buildGraphStream` | `rlm-synapse.ts` → `graph-stream.ts` | none — it already reads **zero** facade members, but its signature still *takes* one (the deliberately-unused `_rlm`), and dropping it is what makes the file `graph-stream.ts` rather than a rename | `rlm-synapse.test.ts` pass count = **26** (the "14" in the first draft is the `buildGraphStream` describe block, not the file total); `graph-stream-project-scope-pg.test.ts` imports it directly, needs a live DB, and passes `NO_RLM` at **3 call sites** — it is **not** rename-only, see the AC-3 section | 1 h |
 | **T8** | `applySynapseState` | `rlm-synapse.ts` → `session-bias.ts` | `injectedDeps` → `SessionBiasDeps {sessionRegistry, synapseManager}` | **GMS-03 AC-2 sensor**: a new unit test constructs it from an object literal with **zero** `mock.module` calls | 1.5 h |
@@ -244,6 +245,53 @@ skip, or relaxes an assertion to a looser matcher is out of bounds and stops the
 **T20's verifier must be told this explicitly**, alongside the two authorised comment edits in
 T15 — otherwise 18 assertion changes in a PR claiming "no test weakened" read as the violation
 they are not.
+
+### Phase 0's before-baselines were live-tree assertions
+
+Third defect found at T6, and the one that would have made Phase 1 unrunnable as specified.
+
+Phase 0 recorded its before-measurements as unit tests that measure the **live tree** —
+`describe("the real search directory at PR-B's base commit")` in `search-facade-matrix.test.ts`,
+and its twin in `search-facade-metrics.test.ts`. Those pins hold exactly until the refactor they
+exist to police begins. `search-facade-matrix.test.ts` even contains a synthetic test named
+*"is empty when nothing takes the facade — the target state"*, so the suite knew the end state
+empties `delegateScope` and still pinned **21** against the live directory.
+
+**Consequence: `bun run test:scripts` could not stay green through Phase 1**, and the "Gate check
+commands" section's *725 pass / 0 fail* known-good was an invariant Phase 1 necessarily destroys.
+T6 alone reddened 5 assertions; by T14 the whole matrix block goes.
+
+Note what this is **not**. The *gates* are fine and Phase 0 got them right: `check-frozen-anchors.ts`,
+`check-characterization.ts` and `search-hub-metric.ts` all still exit correctly under T6, and
+`check-characterization.test.ts` stays green because item 5 of *What Phase 0 changed in the plan*
+deliberately located its blocks **by symbol, not by path**. That reasoning was simply never applied
+to D1's and D3's own suites.
+
+**Resolution (spec-owner, 2026-07-29): freeze to committed fixtures — T6a.** Same fix, same
+reason, as T4's `needles-before.json`: *a baseline that does not survive a fresh checkout cannot be
+T17's referent.* `scripts/capture-facade-baseline.ts` writes `facade-matrix-before.json`,
+`facade-metrics-before.json` and `frozen-anchors-before.json` beside it.
+
+Scoped to what actually moves — **9 assertions, not 16**:
+
+| suite | frozen | left live, and why |
+| --- | --- | --- |
+| `search-facade-matrix.test.ts` | **7** | 15 synthetic-fixture tests — the real guards on the tool |
+| `search-facade-metrics.test.ts` | **1** (§7 fan-in/fan-out) | 5: the mention-bucket partition is explicitly *a floor, not a pin*, and three measure `packages/core/src/controllers`, which is PR-C's territory and untouched here |
+| `check-frozen-anchors.test.ts` | **1**, rewritten | 2 invariants (uniqueness; no grandfathered needle) |
+
+Two things worth keeping straight:
+
+- **The anchor test was asserting the opposite of its constraint.** It pinned the four anchors to
+  `rlm-fusion.ts` / `rlm-search.ts` by path. FROZEN-ANCHOR says the anchor **text** is frozen and
+  explicitly permits moving it between files, because resolution is by content — so the path pin
+  went red on the one operation the constraint allows and added nothing the uniqueness test above
+  it does not already catch. It now pins the text, which fails on a reflow and passes on a move.
+- **Re-freezing is detectable.** The generator refuses to run when any measured path differs from
+  the base commit, records `subjectAtBase`, and the suites assert it. `--force` over a changed
+  subject turns the provenance tests red rather than quietly rebasing the record. The check is on
+  the measured **subject**, not on `HEAD`'s sha: a docs-only commit has a different sha and an
+  identical subject, and rejecting it would be the same conflation in the other direction.
 
 ### T6's sensor was unfirable — corrected
 

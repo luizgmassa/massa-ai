@@ -1,0 +1,221 @@
+{
+  "baseCommit": "d628464d6bd35d09897d91cda6fb342526fbe22b",
+  "capturedAt": "569de25452f6ea673958b3a724d3ac79c3dddbe8",
+  "subjectAtBase": true,
+  "generatedBy": "scripts/capture-facade-baseline.ts",
+  "note": "Frozen before-record for PR-B. Do not regenerate during Phase 1 — see the header of the generator.",
+  "searchDir": "packages/core/src/services/search",
+  "facade": "ContextualSearchRLM",
+  "delegateScope": [
+    {
+      "name": "searchImpl",
+      "file": "rlm-search.ts",
+      "loc": 455,
+      "facadeParam": "rlm",
+      "members": [
+        "addContextToResults",
+        "analytics",
+        "applySynapseState",
+        "buildGraphStream",
+        "calculateAvgScore",
+        "correctQuery",
+        "ensureInitialized",
+        "filterByPatterns",
+        "fuseResults",
+        "keywordSearch",
+        "queryUnderstanding",
+        "searchCache",
+        "vectorStore"
+      ]
+    },
+    {
+      "name": "ensureInitializedImpl",
+      "file": "rlm-indexing.ts",
+      "loc": 40,
+      "facadeParam": "rlm",
+      "members": [
+        "analytics",
+        "indexManager",
+        "initialized",
+        "injectedDeps",
+        "keywordSearch",
+        "searchCache",
+        "symbolRepo",
+        "vectorStore"
+      ]
+    },
+    {
+      "name": "ensureFreshIndexImpl",
+      "file": "rlm-indexing.ts",
+      "loc": 187,
+      "facadeParam": "rlm",
+      "members": [
+        "ensureInitialized",
+        "indexFile",
+        "indexManager",
+        "indexProject",
+        "searchCache",
+        "symbolRepo"
+      ]
+    },
+    {
+      "name": "clearProjectIndexImpl",
+      "file": "rlm-admin.ts",
+      "loc": 28,
+      "facadeParam": "rlm",
+      "members": [
+        "ensureInitialized",
+        "fileFilterCache",
+        "keywordSearch",
+        "searchCache",
+        "vectorStore"
+      ]
+    },
+    {
+      "name": "_indexProjectInternalImpl",
+      "file": "rlm-indexing.ts",
+      "loc": 126,
+      "facadeParam": "rlm",
+      "members": [
+        "ensureInitialized",
+        "indexFile",
+        "indexManager",
+        "symbolRepo"
+      ]
+    },
+    {
+      "name": "checkSearchAdmissionImpl",
+      "file": "rlm-indexing.ts",
+      "loc": 35,
+      "facadeParam": "rlm",
+      "members": [
+        "ensureInitialized",
+        "indexManager"
+      ]
+    },
+    {
+      "name": "getProjectStatsImpl",
+      "file": "rlm-admin.ts",
+      "loc": 10,
+      "facadeParam": "rlm",
+      "members": [
+        "ensureInitialized",
+        "vectorStore"
+      ]
+    },
+    {
+      "name": "indexFileImpl",
+      "file": "rlm-indexing.ts",
+      "loc": 64,
+      "facadeParam": "rlm",
+      "members": [
+        "keywordSearch",
+        "vectorStore"
+      ]
+    },
+    {
+      "name": "warmupCacheImpl",
+      "file": "rlm-admin.ts",
+      "loc": 59,
+      "facadeParam": "rlm",
+      "members": [
+        "ensureInitialized",
+        "search"
+      ]
+    },
+    {
+      "name": "addContextToResultsImpl",
+      "file": "rlm-search.ts",
+      "loc": 30,
+      "facadeParam": "rlm",
+      "members": [
+        "extractPreview"
+      ]
+    },
+    {
+      "name": "applySynapseStateImpl",
+      "file": "rlm-synapse.ts",
+      "loc": 54,
+      "facadeParam": "rlm",
+      "members": [
+        "injectedDeps"
+      ]
+    },
+    {
+      "name": "correctQueryImpl",
+      "file": "rlm-synapse.ts",
+      "loc": 24,
+      "facadeParam": "rlm",
+      "members": [
+        "keywordSearch"
+      ]
+    },
+    {
+      "name": "fuseResultsImpl",
+      "file": "rlm-fusion.ts",
+      "loc": 202,
+      "facadeParam": "rlm",
+      "members": [
+        "RRF_K"
+      ]
+    },
+    {
+      "name": "getAnalyticsImpl",
+      "file": "rlm-admin.ts",
+      "loc": 5,
+      "facadeParam": "rlm",
+      "members": [
+        "analytics"
+      ]
+    },
+    {
+      "name": "buildGraphStreamImpl",
+      "file": "rlm-synapse.ts",
+      "loc": 124,
+      "facadeParam": "_rlm",
+      "members": []
+    },
+    {
+      "name": "calculateAvgScoreImpl",
+      "file": "rlm-search.ts",
+      "loc": 5,
+      "facadeParam": null,
+      "members": []
+    },
+    {
+      "name": "extractPreviewImpl",
+      "file": "rlm-search.ts",
+      "loc": 5,
+      "facadeParam": null,
+      "members": []
+    },
+    {
+      "name": "filterByPatternsImpl",
+      "file": "rlm-search.ts",
+      "loc": 29,
+      "facadeParam": null,
+      "members": []
+    },
+    {
+      "name": "generateScoreExplanationImpl",
+      "file": "rlm-fusion.ts",
+      "loc": 38,
+      "facadeParam": null,
+      "members": []
+    },
+    {
+      "name": "loadGitignoreImpl",
+      "file": "rlm-indexing.ts",
+      "loc": 3,
+      "facadeParam": null,
+      "members": []
+    },
+    {
+      "name": "runWithIndexLock",
+      "file": "rlm-indexing.ts",
+      "loc": 27,
+      "facadeParam": null,
+      "members": []
+    }
+  ]
+}
