@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-07-29
+
 ### Changed
 
 - **The search subsystem's first capability module is extracted, and the split is now measured rather than asserted.**
