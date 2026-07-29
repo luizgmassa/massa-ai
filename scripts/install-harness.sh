@@ -167,41 +167,147 @@ if [ "$DO_AGENTS" = "1" ]; then
 fi
 
 # ── Plugin bundles ──────────────────────────────────────────────────────────
+# Host-detected + version-gated (PAI-01..10, design C3): this phase is the only
+# place that decides WHETHER a host's installer runs. A host is detected when
+# its config dir exists under the target home OR its binary is on PATH. It
+# installs with no recorded version, upgrades on an older one, is skipped at
+# the same version, and is never downgraded. Absent/skip decisions are exactly
+# one log line each and never affect the exit code.
+#
+# Why: the blind four-host loop created config trees for hosts the user never
+#      installed and rewrote current bundles on every re-run.
+# Impacts: PAI-01 detection, PAI-02 absent skip, PAI-04 upgrade, PAI-05 no-op,
+#          PAI-09 dry-run, PAI-10 failure isolation; AC-1..6, AC-9, AC-10, AC-12.
+# Test: bash scripts/tests/test-plugin-auto-install.sh
+#
 # The four script-based plugins read $HOME directly, so scope the child
 # environment rather than passing a flag they do not have.
 if [ "$DO_PLUGINS" = "1" ]; then
-  if [ "$DRY_RUN" = "1" ]; then
-    compact_phase "Would install plugin bundles: claude, codex, cursor, opencode (dry-run)"
-  else
-    compact_phase "Installing plugin bundles..."
-    # Resolved once for the whole run: in copy mode this materialises the
-    # stable marketplace root, and doing it per-host would re-copy four times.
-    if ! plugin_mode="$(installer_plugin_source_mode "$PLUGIN_SOURCE" "$REPO_ROOT")"; then
-      exit 2
-    fi
-    plugin_source_root="$(installer_plugin_source_root "$plugin_mode" "$REPO_ROOT" "$TARGET_HOME")"
-    vinfo "Plugin marketplace source: ${plugin_mode} (${plugin_source_root})"
+  runner="$(installer_require_runner "plugin version gating")"
+  bundle_version="$(installer_bundle_version "$REPO_ROOT/package.json")"
+  state_file="$TARGET_HOME/.config/massa-ai/install-state.json"
+  recorded_versions="$(installer_plugin_versions "$runner" "$state_file")"
+
+  # recorded_version_for <host> — echoes the recorded plugin version ("" when
+  # the platform has none; unknown versions upgrade once, then get recorded).
+  recorded_version_for() {
+    local host="$1"
+    printf '%s\n' "$recorded_versions" | while IFS="$(printf '\t')" read -r h v; do
+      if [ "$h" = "$host" ]; then
+        printf '%s' "$v"
+        break
+      fi
+    done
+  }
+
+  # Phase 1: decide per host. --uninstall is deliberately ungated (covers
+  # host-removed-after-install; the installers are no-op safe on absent hosts).
+  plugin_plan=""
+  if [ "$UNINSTALL" = "1" ]; then
     for host in claude codex cursor opencode; do
-      installer="$REPO_ROOT/apps/${host}-plugin/install.sh"
-      if [ ! -f "$installer" ]; then
-        warn "${host} plugin installer not found at ${installer}"
+      plugin_plan="${plugin_plan}${host}|uninstall|
+"
+    done
+  else
+    for host in claude codex cursor opencode; do
+      if ! signal="$(installer_host_detected "$host" "$TARGET_HOME")"; then
+        plugin_plan="${plugin_plan}${host}|skip-absent|
+"
         continue
       fi
-      vinfo "Installing the ${host} plugin bundle..."
-      set +e
-      if [ "$UNINSTALL" = "1" ]; then
-        HOME="$TARGET_HOME" MASSA_AI_MCP_SOURCE="$MCP_SOURCE" \
-          MASSA_AI_PLUGIN_SOURCE_ROOT="$plugin_source_root" \
-          bash "$installer" --uninstall $([ "$VERBOSE_MODE" = "1" ] && echo "--verbose")
+      vinfo "detected ${host} (${signal})"
+      rec="$(recorded_version_for "$host")"
+      if [ -n "$rec" ] && [ "$rec" = "$bundle_version" ]; then
+        plugin_plan="${plugin_plan}${host}|skip-current|${rec}
+"
+      elif [ "$(installer_compare_versions "$runner" "$rec" "$bundle_version")" = "1" ]; then
+        plugin_plan="${plugin_plan}${host}|skip-newer|${rec}
+"
+      elif [ -z "$rec" ]; then
+        plugin_plan="${plugin_plan}${host}|install|
+"
       else
-        HOME="$TARGET_HOME" MASSA_AI_MCP_SOURCE="$MCP_SOURCE" \
-          MASSA_AI_PLUGIN_SOURCE_ROOT="$plugin_source_root" \
-          bash "$installer" --user $([ "$VERBOSE_MODE" = "1" ] && echo "--verbose")
+        plugin_plan="${plugin_plan}${host}|upgrade|${rec}
+"
       fi
-      rc=$?
-      set -e
-      [ "$rc" -eq 0 ] || note_failure "$rc" "${host}-plugin/install.sh"
     done
+  fi
+
+  if [ "$DRY_RUN" = "1" ]; then
+    # Steps 1-3 above are read-only; report the would-be action per host and
+    # stop — no marketplace copy, no installer calls (PAI-09, AC-10).
+    compact_phase "Plugin bundle decisions (dry-run):"
+    while IFS='|' read -r host action rec; do
+      [ -n "$host" ] || continue
+      case "$action" in
+        install) info "install ${host}@${bundle_version}" ;;
+        upgrade) info "upgrade ${host}: ${rec} → ${bundle_version}" ;;
+        skip-current) info "skip-current ${host}: already at ${rec}" ;;
+        skip-absent) info "skip-absent ${host}: host not detected" ;;
+        skip-newer) info "skip-newer ${host}: installed ${rec} newer than bundle ${bundle_version}" ;;
+        uninstall) info "uninstall ${host}" ;;
+      esac
+    done <<PLUGIN_PLAN_EOF
+$plugin_plan
+PLUGIN_PLAN_EOF
+  else
+    if [ "$UNINSTALL" = "1" ]; then
+      compact_phase "Uninstalling plugin bundles..."
+    else
+      compact_phase "Installing plugin bundles..."
+    fi
+
+    # Marketplace source resolution is a WRITE in copy mode, so it runs only
+    # when at least one host will actually install/upgrade — never on dry-run
+    # (above), uninstall, or all-skip runs (design C3.4 / R6). The copy stays
+    # the full four-bundle set: marketplace manifests enumerate all four
+    # plugins, so a per-host partial copy could strand a registered
+    # marketplace on missing dirs (spec assumption, Plan Challenge C-3).
+    plugin_source_root=""
+    if [ "$UNINSTALL" != "1" ] && printf '%s' "$plugin_plan" | grep -q '|install\||upgrade'; then
+      if ! plugin_mode="$(installer_plugin_source_mode "$PLUGIN_SOURCE" "$REPO_ROOT")"; then
+        exit 2
+      fi
+      plugin_source_root="$(installer_plugin_source_root "$plugin_mode" "$REPO_ROOT" "$TARGET_HOME")"
+      vinfo "Plugin marketplace source: ${plugin_mode} (${plugin_source_root})"
+    fi
+
+    while IFS='|' read -r host action rec; do
+      [ -n "$host" ] || continue
+      case "$action" in
+        skip-absent) info "skip ${host}: host not detected" ;;
+        skip-current) info "skip ${host}: already at ${rec}" ;;
+        skip-newer) info "skip ${host}: installed ${rec} newer than bundle ${bundle_version}" ;;
+        install|upgrade|uninstall)
+          installer="$REPO_ROOT/apps/${host}-plugin/install.sh"
+          if [ ! -f "$installer" ]; then
+            warn "${host} plugin installer not found at ${installer}"
+            continue
+          fi
+          case "$action" in
+            install) info "install ${host}@${bundle_version}" ;;
+            upgrade) info "upgrade ${host}: ${rec} → ${bundle_version}" ;;
+          esac
+          set +e
+          if [ "$action" = "uninstall" ]; then
+            HOME="$TARGET_HOME" MASSA_AI_MCP_SOURCE="$MCP_SOURCE" \
+              MASSA_AI_PLUGIN_SOURCE_ROOT="$plugin_source_root" \
+              bash "$installer" --uninstall $([ "$VERBOSE_MODE" = "1" ] && echo "--verbose")
+          else
+            HOME="$TARGET_HOME" MASSA_AI_MCP_SOURCE="$MCP_SOURCE" \
+              MASSA_AI_PLUGIN_SOURCE_ROOT="$plugin_source_root" \
+              bash "$installer" --user $([ "$VERBOSE_MODE" = "1" ] && echo "--verbose")
+          fi
+          rc=$?
+          set -e
+          # PAI-10: a failed host records nothing, never aborts the remaining
+          # hosts, and the run propagates the first failing exit code.
+          [ "$rc" -eq 0 ] || note_failure "$rc" "${host}-plugin/install.sh"
+          ;;
+      esac
+    done <<PLUGIN_PLAN_EOF
+$plugin_plan
+PLUGIN_PLAN_EOF
   fi
 fi
 
