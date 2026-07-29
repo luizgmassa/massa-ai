@@ -6,6 +6,8 @@
  * windows for an agent working on a task right now.
  */
 
+import { randomUUID } from "node:crypto";
+
 import type { AgentSession } from "../types.js";
 import {
   WorkingMemoryBuffer,
@@ -42,6 +44,25 @@ export interface CreateSessionInput {
 }
 
 const DEFAULT_ACCESS_HISTORY_LIMIT = 1000;
+
+/**
+ * Generate a collision-safe, unguessable Synapse session identifier.
+ *
+ * @returns A `syn_<uuidv4>` identifier with 122 bits of CSPRNG entropy.
+ */
+// Why: the previous `syn_<timestamp36>_<Math.random()>` format was flagged by
+//      CodeQL js/insecure-randomness (SEC-2, alerts #10-#12): the timestamp
+//      narrows the search window and Math.random() is a predictable PRNG, so
+//      an authenticated caller could guess another agent's sessionId and read
+//      or poison its working-memory buffer. crypto.randomUUID() is the
+//      CSPRNG-backed replacement. This helper lives in one place because the
+//      template was previously duplicated across three call sites.
+// Impacts: Synapse session creation in task-envelope.ts, tools-api
+//          routes/synapse.ts, and mcp-client embedded-api-client.ts.
+// Test: bun test packages/core/src/__tests__/synapse-session-id.test.ts
+export function newSynapseSessionId(): string {
+  return `syn_${randomUUID()}`;
+}
 
 export class SessionRegistry {
   private sessions = new Map<string, AgentSession>();

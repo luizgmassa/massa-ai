@@ -428,6 +428,7 @@ export {
   DEFAULT_BUFFER_CONFIG,
   SessionRegistry,
   getSessionRegistry,
+  newSynapseSessionId,
   resetSessionRegistry,
   WorkingMemoryBuffer,
   computeStrengthenUpdates,
