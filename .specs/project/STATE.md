@@ -232,8 +232,26 @@ Also update the feature block above: **Phase 0 is done, remaining Execute is ~21
 
 ---
 
-## Previous — Sensor Repair 2026-07
+## Current — Plugin Auto-Install
 
+- projectId: `massa-ai`
+- workflowSessionId: `spec-plugin-auto-install`
+- workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
+- feature: `plugin-auto-install` — **Specify COMPLETE 2026-07-29, awaiting spec confirmation.
+  Design/Tasks pending.**
+- worktree: `/Users/luizmassa/Projects/massa-ai-wt-plugin-auto-install`; branch
+  `feat/plugin-auto-install` cut from `origin/main` @ `ce26f28` (v1.9.1)
+- scope: 10 requirements (PAI-01..10) — harness plugin phase detects the four agent hosts
+  (config dir OR PATH binary), skips absent hosts with one log line, records bundle version
+  per platform in `install-state.json` (v2-compatible extension), no-ops at same version,
+  upgrades on version change, never downgrades, isolates per-host failures
+- Artifacts: `.specs/features/plugin-auto-install/spec.md`
+- User decisions: trigger = install-time auto-detect (not npm postinstall); all four hosts;
+  absent host = skip + log; re-run = auto-upgrade on version change
+- Note: `core-layering-god-module-split` (PR-B) Execute is in progress on
+  `refactor/search-facade-split` in the main checkout — untouched by this feature.
+
+## Previous — Sensor Repair 2026-07
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-sensor-repair-2026-07`
