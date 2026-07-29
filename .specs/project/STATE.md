@@ -237,8 +237,9 @@ Also update the feature block above: **Phase 0 is done, remaining Execute is ~21
 - projectId: `massa-ai`
 - workflowSessionId: `spec-plugin-auto-install`
 - workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
-- feature: `plugin-auto-install` — **Specify COMPLETE 2026-07-29, awaiting spec confirmation.
-  Design/Tasks pending.**
+- feature: `plugin-auto-install` — **Specify + Design + Tasks COMPLETE and APPROVED
+  2026-07-29 (Plan Challenge: full gate, pre_mortem, 4 findings incorporated). Execute
+  NOT STARTED. Next action: T1 (host detection + version helpers in installer-shared.sh).**
 - worktree: `/Users/luizmassa/Projects/massa-ai-wt-plugin-auto-install`; branch
   `feat/plugin-auto-install` cut from `origin/main` @ `ce26f28` (v1.9.1)
 - scope: 10 requirements (PAI-01..10) — harness plugin phase detects the four agent hosts
