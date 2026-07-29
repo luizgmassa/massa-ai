@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The search subsystem's first capability module is extracted, and the split is now measured rather than asserted.**
+  `rlm-fusion.ts` becomes `result-fusion.ts`: `fuseResults` and `generateScoreExplanation` take no
+  dependency record at all. The only facade member either ever read was `RRF_K`, the literal `60`,
+  now a module constant — so the module has never heard of `ContextualSearchRLM`, which is the
+  property `scripts/search-hub-metric.ts` measures. Foreign modules reading the facade drop from
+  **6 to 5**. Deepest foreign reach stays at **14** and the gate still fails, both expected: the
+  maximum is set by `rlm-search.ts` and cannot move until that file is split. Three of the four
+  frozen needle anchors live in this file and travelled byte-identical — resolution is by content,
+  so moving an anchor is safe and reflowing one is a hard gate failure.
+
+- **Before-baselines are frozen to committed fixtures instead of measured against the working tree.**
+  The previous sensors recorded their before-state as unit tests that scan the live directory, which
+  holds only until the refactor those baselines exist to police begins — one extraction reddened five
+  of them, and at the target state the scanned set is empty by design. Updating the pins per task
+  would have turned a before-record into an after-record tracking whatever the change produced,
+  leaving the final comparison with no referent. `scripts/capture-facade-baseline.ts` writes the
+  matrix, fan-in/fan-out and anchor records once and refuses to run when the measured subject has
+  moved; the suites assert that attestation, so a silent re-capture fails loudly instead of
+  relocating the reference. Scoped to the nine figures that actually change — assertions about
+  untouched directories, and those written as floors rather than pins, still measure the live tree.
+
+- **The frozen-anchor check now pins anchor text, not anchor paths.** It asserted that four needles
+  resolved to two named files, which is the opposite of the constraint it enforces: anchors are
+  resolved by content, so moving one between files is explicitly legal and only reformatting is
+  not. The path pin therefore failed on the permitted operation and caught nothing the uniqueness
+  check above it did not already catch.
+
 ## [1.10.0] - 2026-07-29
 
 ### Changed
