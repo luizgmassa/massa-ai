@@ -634,6 +634,22 @@
       "design": ".specs/features/sensor-repair-2026-07/design.md",
       "tasks": ".specs/features/sensor-repair-2026-07/tasks.md",
       "validation": ".specs/features/sensor-repair-2026-07/validation.md"
+    },
+    {
+      "slug": "plugin-auto-install",
+      "title": "Plugin auto-install — host detection + version-gated upgrade for the four plugin bundles",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/plugin-auto-install/spec.md",
+      "design": ".specs/features/plugin-auto-install/design.md",
+      "tasks": ".specs/features/plugin-auto-install/tasks.md",
+      "validation": ".specs/features/plugin-auto-install/validation.md"
     }
   ],
   "active_feature": "core-layering-god-module-split"

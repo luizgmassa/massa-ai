@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Plugin bundles now auto-detect hosts and upgrade only on version change.** The
+  harness plugin phase (the root `install.sh` `k)` harness menu,
+  `scripts/setup-local-first.sh`, `scripts/install-harness.sh --plugins`) detects each agent host — its config dir
+  exists or its binary is on `PATH` — and installs only detected hosts; absent hosts
+  produce one skip log line and no filesystem writes. Every successful plugin install
+  records the bundle version and an ISO-8601 timestamp in
+  `~/.config/massa-ai/install-state.json` (a v2-compatible extension that
+  `install-skills.sh` round-trips but never writes): re-runs at the same version are
+  no-ops, older recorded versions upgrade automatically, newer ones are never
+  downgraded, and a host whose installer fails records nothing and never aborts the
+  remaining hosts. `--dry-run` reports the per-host decision (install / upgrade /
+  skip-current / skip-absent) without writing anything, and `--uninstall` removes the
+  version record while keeping its existing semantics (whole-record delete only for
+  plugin-owned platforms). Direct `apps/<host>-plugin/install.sh --user` installs
+  behave exactly as before, plus the same version recording.
+
 ## [1.11.0] - 2026-07-29
 
 ### Changed

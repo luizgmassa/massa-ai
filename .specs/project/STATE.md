@@ -232,8 +232,36 @@ Also update the feature block above: **Phase 0 is done, remaining Execute is ~21
 
 ---
 
-## Previous — Sensor Repair 2026-07
+## Previous — Plugin Auto-Install
 
+- projectId: `massa-ai`
+- workflowSessionId: `spec-plugin-auto-install`
+- workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
+- feature: `plugin-auto-install` — **COMPLETE 2026-07-29, independently validated PASS,
+  PR [#47](https://github.com/luizgmassa/massa-ai/pull/47) OPEN with CI green (14 pass /
+  0 fail / install-test skips by condition). DO NOT MERGE per user instruction.**
+  Specify + Design + Tasks approved (Plan Challenge: full gate, pre_mortem, 4 findings
+  incorporated). Execute T1–T6 all DONE: T1, T2, T3, T4, T5 (docs), T6 (aggregate gate +
+  4/4 discrimination mutants killed and reverted). Independent verification-agent PASS
+  (`.specs/features/plugin-auto-install/validation.md`): PAI-01..10 + AC-1..16 VERIFIED
+  (AC-13 under corrected text), docs fixed in one loop iteration. Branch rebased onto
+  `origin/main` @ v1.11.0 (conflicts in FEATURES.json/STATE.md/HANDOFF.md/CHANGELOG.md
+  resolved union-style; registry closed out). Post-rebase gate: lint clean, type-check
+  6/6, TS 735 pass + 3 pre-existing env failures red at HEAD
+  (`verify-tree-sitter-grammars`), shell 21/21, plugins 96/96.
+- worktree: `/Users/luizmassa/Projects/massa-ai-wt-plugin-auto-install`; branch
+  `feat/plugin-auto-install` cut from `origin/main` @ `ce26f28` (v1.9.1)
+- scope: 10 requirements (PAI-01..10) — harness plugin phase detects the four agent hosts
+  (config dir OR PATH binary), skips absent hosts with one log line, records bundle version
+  per platform in `install-state.json` (v2-compatible extension), no-ops at same version,
+  upgrades on version change, never downgrades, isolates per-host failures
+- Artifacts: `.specs/features/plugin-auto-install/spec.md`
+- User decisions: trigger = install-time auto-detect (not npm postinstall); all four hosts;
+  absent host = skip + log; re-run = auto-upgrade on version change
+- Note: `core-layering-god-module-split` (PR-B) Execute is in progress on
+  `refactor/search-facade-split` in the main checkout — untouched by this feature.
+
+## Previous — Sensor Repair 2026-07
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-sensor-repair-2026-07`

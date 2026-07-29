@@ -247,7 +247,13 @@ if (typeof data.platforms !== "object" || data.platforms === null || Array.isArr
   data.platforms = {};
 }
 data.version = 2;
+const prev = data.platforms[host];
 data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router"] };
+// The whole-record replace must not drop the plugin version record a previous
+// successful install wrote (R2) — re-attach it.
+if (prev && typeof prev === "object" && !Array.isArray(prev) && prev.plugin && typeof prev.plugin === "object") {
+  data.platforms[host].plugin = prev.plugin;
+}
 fs.mkdirSync(path.dirname(file), { recursive: true });
 fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
 NODE
@@ -273,25 +279,84 @@ try {
 }
 NODE
   )"
-  [[ "$raw_owner" == "plugin" ]] || return 0
+  [[ "$raw_owner" == "plugin" ]] && {
+    local name
+    for name in massa-ai persona-router; do
+      rm -rf "$HARNESS_SKILLS_DIR/$name"
+    done
+    rmdir "$HARNESS_SKILLS_DIR" 2>/dev/null || true
+    echo "  - removed plugin-owned harness skills from $HARNESS_SKILLS_DIR"
+  }
 
-  local name
-  for name in massa-ai persona-router; do
-    rm -rf "$HARNESS_SKILLS_DIR/$name"
-  done
-  rmdir "$HARNESS_SKILLS_DIR" 2>/dev/null || true
-  echo "  - removed plugin-owned harness skills from $HARNESS_SKILLS_DIR"
-
+  # AC-15: a plugin-owned platform keeps the whole-record delete (clean-slate
+  # semantics unchanged); any other platform loses only its plugin version
+  # record while root/skills/skillsOwner survive (Plan Challenge C-4).
   "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" <<'NODE'
 const fs = require("fs");
 const [, , file, host] = process.argv;
 try {
   const data = JSON.parse(fs.readFileSync(file, "utf8"));
-  if (data && data.platforms && data.platforms[host] && data.platforms[host].skillsOwner === "plugin") {
-    delete data.platforms[host];
-    fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+  const rec = data && data.platforms && data.platforms[host];
+  if (rec && typeof rec === "object") {
+    if (rec.skillsOwner === "plugin") {
+      delete data.platforms[host];
+      fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+    } else if (rec.plugin && typeof rec.plugin === "object") {
+      delete rec.plugin;
+      fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+    }
   }
 } catch { /* nothing to clean up */ }
+NODE
+}
+
+# ── Plugin version recording (PAI-03/04/07) ─────────────────────────────────
+# Why: the harness gates re-runs on the recorded bundle version, so a
+#      successful install records it — but ONLY as the final step of the
+#      install path. A version written before a later step fails would mark a
+#      broken install "current" and skip it forever (AC-16, Plan Challenge C-1).
+# Impacts: PAI-03 record, PAI-04 upgrade trigger, PAI-07 uninstall, AC-3/16.
+# Test: bash scripts/tests/test-plugin-auto-install.sh (Section 3 e2e chain)
+record_plugin_version() {
+  local runner=""
+  if command -v node &>/dev/null; then runner="node"
+  elif command -v bun &>/dev/null; then runner="bun"
+  else
+    echo "  ⚠ node or bun required to record the plugin version — next run will reinstall" >&2
+    return 0
+  fi
+
+  local version installed_at
+  version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$SCRIPT_DIR/package.json" | head -n 1)"
+  installed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  # Tolerant of a corrupt/missing state file (rewrites a minimal valid one —
+  # AC-8). A record-write failure warns but never fails the install: the next
+  # run treats the host as unknown-version and reinstalls.
+  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" "$CURSOR_DIR" "$version" "$installed_at" <<'NODE' || \
+    echo "  ⚠ could not record the plugin version — next run will reinstall (unknown version)" >&2
+const fs = require("fs");
+const path = require("path");
+const [, , file, host, root, version, installedAt] = process.argv;
+let data = { version: 2, platforms: {} };
+try {
+  const existing = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (existing && typeof existing === "object" && !Array.isArray(existing)) data = existing;
+} catch { /* fresh */ }
+if (typeof data.platforms !== "object" || data.platforms === null || Array.isArray(data.platforms)) {
+  data.platforms = {};
+}
+data.version = 2;
+// Preserve every unrelated field; a missing record gets the minimal shape the
+// strict skills reader accepts (non-empty root + a skills list).
+const rec =
+  data.platforms[host] && typeof data.platforms[host] === "object" && !Array.isArray(data.platforms[host])
+    ? data.platforms[host]
+    : { root, skillsOwner: "plugin", skills: [] };
+rec.plugin = { version, installedAt };
+data.platforms[host] = rec;
+fs.mkdirSync(path.dirname(file), { recursive: true });
+fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
 NODE
 }
 
@@ -433,3 +498,7 @@ else
   vecho "Done. Restart Cursor to pick up the plugin."
   vecho "💡 MCP is registered in ~/.cursor/mcp.json by scripts/install-agents.sh (single writer)."
 fi
+
+# Final step of the install path: record the bundle version. Reached only when
+# every fallible step succeeded (AC-16) — never on --uninstall (exits above).
+record_plugin_version

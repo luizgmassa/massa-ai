@@ -482,6 +482,64 @@ describe("opencode-plugin install.sh", () => {
   });
 });
 
+describe("opencode-plugin version recording (PAI-03/07, AC-15)", () => {
+  test("install records {version, installedAt}; a plugin-owned uninstall deletes the whole record", async () => {
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const stateFile = path.join(tmp, ".config/massa-ai/install-state.json");
+    const state = await readJson(stateFile);
+    const platforms = state.platforms as Record<
+      string,
+      { plugin?: { version: string; installedAt: string } }
+    >;
+    const plugin = platforms.opencode.plugin!;
+    // Identical record shape to the other three installers (R7 parity).
+    expect(Object.keys(plugin).sort()).toEqual(["installedAt", "version"]);
+    const pkgVersion = JSON.parse(
+      await fs.readFile(path.join(REPO_ROOT, "apps/opencode-plugin/package.json"), "utf8"),
+    ).version;
+    expect(plugin.version).toBe(pkgVersion);
+    expect(plugin.installedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+
+    const un = runInstall(["--uninstall"], { HOME: tmp });
+    expect(un.exitCode).toBe(0);
+    const after = await readJson(stateFile);
+    expect((after.platforms as Record<string, unknown>).opencode).toBeUndefined();
+  });
+
+  test("uninstall on a repo-owned platform removes only the plugin subfield (AC-15b)", async () => {
+    const stateFile = path.join(tmp, ".config/massa-ai/install-state.json");
+    await fs.mkdir(path.dirname(stateFile), { recursive: true });
+    await fs.writeFile(
+      stateFile,
+      JSON.stringify({
+        version: 2,
+        repository: "/x",
+        platforms: {
+          opencode: {
+            root: path.join(tmp, ".config/opencode"),
+            skills: ["massa-ai"],
+            skillsOwner: "repo",
+            plugin: { version: "1.2.3", installedAt: "2026-01-01T00:00:00Z" },
+          },
+        },
+      }),
+    );
+
+    const un = runInstall(["--uninstall"], { HOME: tmp });
+    expect(un.exitCode).toBe(0);
+
+    const after = await readJson(stateFile);
+    const rec = (after.platforms as Record<string, Record<string, unknown>>).opencode;
+    expect(rec).toBeDefined();
+    expect(rec.plugin).toBeUndefined();
+    expect(rec.skillsOwner).toBe("repo");
+    expect(rec.skills).toEqual(["massa-ai"]);
+    expect(rec.root).toBe(path.join(tmp, ".config/opencode"));
+  });
+});
+
 describe("opencode-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
   test("install copies massa-ai + persona-router into ~/.config/opencode/skills as plugin-owned", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });

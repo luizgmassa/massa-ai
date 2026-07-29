@@ -306,7 +306,12 @@ repo, and `exit 3` means neither runtime was on PATH. Skills have two writers pe
 tarball) — coordinated the same way MCP registration is: `install-state.json` (v2)
 records a per-host `skillsOwner: "repo" | "plugin"`, a plugin's `install.sh` installs its
 bundled skills only when that field is not already `"repo"`, and an explicit repo
-`--apply` always takes precedence over a prior plugin install.
+`--apply` always takes precedence over a prior plugin install. The harness plugin phase
+is host-detected and version-gated: it installs a host's bundle only when the host's
+config dir exists or its binary is on `PATH`, skips hosts already at the bundle
+version, upgrades older records, never downgrades, and records each successful
+install as `platforms[host].plugin = {version, installedAt}` in `install-state.json`
+(a v2 extension `install-skills.sh` round-trips but never writes).
 
 **`scripts/install-agents.sh` is the only writer of host MCP config.** The plugin
 installers call it rather than shipping their own MCP file; a manifest `mcp` pointer or a
