@@ -4,7 +4,7 @@ Use this workflow for explicit spec-driven requests and broad, ambiguous, migrat
 
 Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit, and `references/repo-rules-discovery.md` to discover and enforce the target repository's own `.claude/`, `.cursor/`, and module/unit-test/testing-area conventions. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
 
 ## TLC v3 Flow
 
@@ -90,6 +90,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
 5. Decide whether `Tasks` is required. If yes, run `references/spec-driven/tasks.md`; if no, list the inline atomic execution steps before editing. If the inline list reveals more than 5 steps or complex dependencies, stop and create `tasks.md` — the Tasks phase was wrongly skipped (safety valve).
 6. Run `Execute` with `references/spec-driven/execute.md`.
    - Load `references/spec-driven/coding-principles.md` before implementation.
+   - Run repo-rules discovery from `references/repo-rules-discovery.md` before the first repository mutation: record the harness sources loaded (or `repo-rules: none present`), and implement so every new or changed file conforms to the target repo's module layout, unit-test location, and testing-area conventions. A repo rule wins over a skill default for placement and gate commands; record any deviation with an explicit reason. Never fabricate rules or create `.claude/`/`.cursor/` directories the repo lacks.
    - Use the Test Coverage Matrix and Gate Check Commands from `tasks.md`, or state their inline equivalents when Tasks was skipped.
    - Ask the MCP and skill question in Tasks or inline Execute when tool choice can change correctness or verification.
    - If a formal `tasks.md` packs into more than one task-budgeted batch (> ~8 tasks), present the sub-agent offer from `references/spec-driven/sub-agents.md` before starting Execute. Offer-then-confirm — never auto-spawn; the user must accept before any sub-agent is dispatched. One worker per batch (~7 tasks, whole phases): each batch worker executes all its tasks in order (implement → gate → atomic commit), then reports a compact summary (tasks done, commit hashes, test counts, deviations). Workers never spawn further sub-agents.

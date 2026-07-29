@@ -104,6 +104,34 @@ Rules:
 - If no valid test seam exists, document why in the completion report rather
   than silently shipping untested code.
 
+### Exception — data and domain models are not unit-tested
+
+Data models and anemic domain models carry state, not behavior. A unit test
+that constructs them and asserts their own getters, setters, fields, or
+constructor defaults mirrors the implementation and cannot detect that the
+model is wrong — it is the "test that mirrors the code" anti-pattern from the
+rule above. **Do not write unit tests for these kinds:**
+
+- **Data models** — persistence-layer entities: ORM-mapped classes, database
+  schema-mapped types, Prisma/TypeORM/Entity Framework/Hibernate/JPA entities,
+  SQL row types, and repository entity structs.
+- **Anemic domain models** — DDD value objects and domain entities whose public
+  surface is fields, accessors, and constructors with no meaningful behavior
+  (no invariants, no state transitions, no domain rules).
+
+This applies across every language the workflows touch (TypeScript/JavaScript,
+Kotlin, Swift, Java, Python, Go, Rust, C#, Ruby, PHP, SQL). Test the **behavior**
+that uses the model at the seam where it lives — the repository, service,
+use-case, or mapper that creates, validates, persists, or transforms it.
+
+This exception does **not** weaken the "test every changed code path" rule for
+code that has behavior. A model with invariants, validation, state machines, or
+domain rules is not anemic — test those rules at the model or the seam that
+exercises them, wherever the contract is observable. When unsure whether a model
+is anemic, the test is: "does this type have a method whose outcome is not fully
+determined by its inputs and field assignments?" If yes, it has behavior; test
+it. If no, it is a data model; test its consumers instead.
+
 ## Completion Evidence
 
 Report, per changed unit: doc block present (yes / not-applicable-because), the

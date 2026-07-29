@@ -111,6 +111,30 @@ A sub-task cannot exist without one standard parent issue. Do not use sub-tasks 
 - Do not enforce fixed day estimates. Size by outcome coherence, dependency boundaries, reviewability, and whether an assignee can complete the work without reopening product decisions.
 - Express dependency edges through stable draft IDs before Jira keys exist. Reject self-dependencies and cycles.
 
+### Phased Decomposition (spec-driven / TDD source)
+
+When the source plan is already phased — a spec-driven `tasks.md` with
+Phases/Waves, or a TDD implementation PR-group table — decompose to match the
+phases, not by layer:
+
+- **Phase/Wave → one standard Jira Task.** Each phase or wave becomes one
+  standard issue whose acceptance criteria are the phase's exit gate.
+- **Task inside a phase → one sub-task.** Each atomic task listed inside a
+  phase becomes one sub-task parented to that phase's Task. The sub-task's
+  acceptance criteria are the task's own gate.
+- **Branch naming follows the Phase/Wave key.** One branch per phase, named with
+  the phase's Jira key; the branch command itself is owned by
+  `references/implementation-delivery.md` Stage 1 — do not restate it here.
+- **One commit per task sub-task.** Each sub-task maps to exactly one atomic
+  commit prefixed with its sub-task key `[XXX-YYYY]`; the commit contract is
+  owned by `workflows/commit.md` — do not restate it here.
+- Emit every created phase-Task key and task-sub-task key back to the caller so
+  the branch/commit/PR rules can consume them.
+
+This is the `tickets-subtasks` hierarchy mode driven by a phased input. It does
+not create a new issue type and does not require an Epic; the Epic layer stays
+optional.
+
 ## Deterministic Quality Gate
 
 Before review approval, verify every draft:

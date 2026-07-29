@@ -278,6 +278,7 @@ Load only when a selected workflow asks for them:
 - `references/project-context.md`
 - `references/implementation-delivery.md`
 - `references/code-annotation.md`
+- `references/repo-rules-discovery.md`
 - `references/root-cause-scripts.md`
 - `references/conversation-feedback.md`
 - `references/maestro.md`
