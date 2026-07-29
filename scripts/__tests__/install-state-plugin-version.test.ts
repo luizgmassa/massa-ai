@@ -51,6 +51,57 @@ function runInstallSkills(home: string, mockBin: string, args: string[]) {
   });
 }
 
+describe("plugin version record parity (PAI-03, R7, F)", () => {
+  let home: string;
+
+  beforeEach(async () => {
+    home = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-parity-home-"));
+  });
+
+  afterEach(async () => {
+    await fs.rm(home, { recursive: true, force: true });
+  });
+
+  test("root + all four plugin package.json versions are equal (closes latent F — no PR gate runs version:sync)", async () => {
+    const rootVersion = JSON.parse(await fs.readFile(path.join(REPO_ROOT, "package.json"), "utf8")).version;
+    for (const host of ["claude", "codex", "cursor", "opencode"]) {
+      const pkg = JSON.parse(
+        await fs.readFile(path.join(REPO_ROOT, "apps", `${host}-plugin`, "package.json"), "utf8"),
+      );
+      expect(pkg.version).toBe(rootVersion);
+    }
+  });
+
+  test(
+    "record shape is identical across the claude/codex/cursor installers",
+    async () => {
+      const rootVersion = JSON.parse(await fs.readFile(path.join(REPO_ROOT, "package.json"), "utf8")).version;
+      for (const host of ["claude", "codex", "cursor"]) {
+        const res = spawnSync(
+          "bash",
+          [path.join(REPO_ROOT, "apps", `${host}-plugin`, "install.sh"), "--user"],
+          {
+            encoding: "utf8",
+            cwd: REPO_ROOT,
+            timeout: TEST_TIMEOUT,
+            // SKIP pins claude/codex to the file route — a real host CLI on a
+            // dev box must never be invoked from a test.
+            env: { ...process.env, HOME: home, MASSA_AI_SKIP_PLUGIN_REGISTRY: "1" },
+          },
+        );
+        expect(res.status).toBe(0);
+        const state = await readState(path.join(home, ".config", "massa-ai", "install-state.json"));
+        const plugin = state.platforms[host].plugin!;
+        expect(Object.keys(plugin).sort()).toEqual(["installedAt", "version"]);
+        expect(plugin.version).toBe(rootVersion);
+        expect(plugin.installedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+        await fs.rm(path.join(home, ".config"), { recursive: true, force: true });
+      }
+    },
+    TEST_TIMEOUT,
+  );
+});
+
 describe("install-state v2 plugin-version round-trip (PAI-06)", () => {
   let home: string;
   let mockBin: string;

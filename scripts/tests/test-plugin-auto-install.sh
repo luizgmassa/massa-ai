@@ -26,7 +26,15 @@ source "${SCRIPT_DIR}/lib/installer-test-helpers.sh"
 source "${PROJECT_ROOT}/scripts/lib/installer-shared.sh"
 
 ROOT="$(mktemp -d "${TMPDIR:-/tmp}/massa-ai-pai.XXXXXX")"
-trap 'rm -rf "$ROOT"' EXIT
+# 2.10 moves the real opencode dist aside to force its build-missing path;
+# restore_dist is a no-op unless that move happened, and the EXIT trap makes
+# the restore interruption-safe (other suites need dist present).
+DIST_BAK=""
+restore_dist() {
+  [ -n "$DIST_BAK" ] && [ -f "$DIST_BAK" ] && mv "$DIST_BAK" "$PROJECT_ROOT/apps/opencode-plugin/dist/index.js"
+  DIST_BAK=""
+}
+trap 'restore_dist; rm -rf "$ROOT"' EXIT
 
 # Absolute runner path: survives the scrubbed PATH used by detection cases.
 RUNNER="$(command -v node || command -v bun)"
@@ -305,7 +313,14 @@ echo "2.10 OpenCode detected without a build fails; other hosts processed (PAI-1
 H="$ROOT/m210"
 mkdir -p "$H/.claude" "$H/.codex" "$H/.cursor" "$H/.config/opencode"
 MOCK_ALL="$ROOT/mock-all"; make_mock_agents "$MOCK_ALL" claude codex cursor-agent opencode >/dev/null
+# The build-missing premise must hold whether or not dist exists in this
+# checkout (CI may not have built): move it aside, restored by the EXIT trap.
+if [ -f "$PROJECT_ROOT/apps/opencode-plugin/dist/index.js" ]; then
+  DIST_BAK="$ROOT/dist-index.js.bak"
+  mv "$PROJECT_ROOT/apps/opencode-plugin/dist/index.js" "$DIST_BAK"
+fi
 OUT="$(PATH="$MOCK_ALL:$SAFE_PATH" bash "$PROJECT_ROOT/scripts/install-harness.sh" --plugins --target "$H" --yes 2>&1)"; RC=$?
+restore_dist
 assert_eq "opencode build-missing → exit 1" "$RC" "1"
 assert_contains "documented build error" "$OUT" "plugin bundle not found"
 assert_contains "failure names the installer" "$OUT" "opencode-plugin/install.sh failed (exit 1)"
@@ -341,5 +356,184 @@ assert_eq "missing installer → exit 0 (warn-and-continue)" "$RC" "0"
 assert_contains "missing installer warning" "$OUT" "cursor plugin installer not found"
 assert_eq "remaining detected host still installed" "$(called_hosts)" "claude "
 make_plugin_stub cursor
+
+# ================================================================
+echo ""
+echo "Section 3: plugin installer version records (PAI-03/04/05/07, AC-3/11/15/16)"
+# ================================================================
+# The REAL claude/codex/cursor installers against a scratch HOME, driven
+# through the REAL harness. MASSA_AI_SKIP_PLUGIN_REGISTRY=1 pins claude/codex
+# to their file route so no host CLI is ever invoked (a dev box may have a
+# real one — the registry commands would write outside the scratch HOME).
+# OpenCode's happy path lives in apps/opencode-plugin/__tests__ (dist fixture).
+
+REAL_VERSION="$(installer_bundle_version "$PROJECT_ROOT/package.json")"
+ISO_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'
+
+state_plugin_field() { # state_plugin_field STATE_FILE HOST FIELD → plugin.<field> or ""
+  "$RUNNER" - "$1" "$2" "$3" <<'NODE'
+const fs = require("fs");
+const [, , file, host, field] = process.argv;
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  const rec = data && data.platforms && data.platforms[host];
+  process.stdout.write(rec && rec.plugin && rec.plugin[field] ? String(rec.plugin[field]) : "");
+} catch { process.stdout.write(""); }
+NODE
+}
+
+state_platform_field() { # state_platform_field STATE_FILE HOST FIELD → platforms[host].<field> or ""
+  "$RUNNER" - "$1" "$2" "$3" <<'NODE'
+const fs = require("fs");
+const [, , file, host, field] = process.argv;
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  const rec = data && data.platforms && data.platforms[host];
+  process.stdout.write(rec && rec[field] ? String(rec[field]) : "");
+} catch { process.stdout.write(""); }
+NODE
+}
+
+state_has_platform() { # state_has_platform STATE_FILE HOST → "1" | "0"
+  "$RUNNER" - "$1" "$2" <<'NODE'
+const fs = require("fs");
+const [, , file, host] = process.argv;
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  process.stdout.write(data && data.platforms && data.platforms[host] ? "1" : "0");
+} catch { process.stdout.write("0"); }
+NODE
+}
+
+run_harness() { # run_harness HOME [extra args...] → OUT, RC
+  local home="$1"; shift
+  OUT="$(MASSA_AI_SKIP_PLUGIN_REGISTRY=1 PATH="$SAFE_PATH" \
+    bash "$PROJECT_ROOT/scripts/install-harness.sh" --plugins --target "$home" --yes "$@" 2>&1)"
+  RC=$?
+}
+
+seed_older_version() { # seed_older_version STATE_FILE — rewrite every plugin version to 0.0.1
+  "$RUNNER" - "$1" <<'NODE'
+const fs = require("fs");
+const [, , file] = process.argv;
+const data = JSON.parse(fs.readFileSync(file, "utf8"));
+for (const rec of Object.values(data.platforms || {})) {
+  if (rec && rec.plugin) rec.plugin.version = "0.0.1";
+}
+fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+NODE
+}
+
+for host in claude codex cursor; do
+  cfg_dir="$(installer_host_config_dir "$host")"
+  case "$host" in
+    claude) hooks_file=".claude/settings.json" ;;
+    codex)  hooks_file=".codex/hooks.json" ;;
+    cursor) hooks_file=".cursor/hooks.json" ;;
+  esac
+
+  echo ""
+  echo "3.x/$host install → record → skip-current → upgrade → uninstall"
+  H="$ROOT/e2e-$host"; mkdir -p "$H/$cfg_dir"
+  STATE="$H/.config/massa-ai/install-state.json"
+
+  # (a) PAI-03/AC-3: a successful install records version + ISO-8601 timestamp
+  run_harness "$H"
+  assert_eq "$host install → exit 0" "$RC" "0"
+  assert_eq "$host recorded version == bundle version" \
+    "$(state_plugin_field "$STATE" "$host" version)" "$REAL_VERSION"
+  INSTALLED_AT="$(state_plugin_field "$STATE" "$host" installedAt)"
+  printf '%s' "$INSTALLED_AT" | grep -Eq "$ISO_RE"
+  check "$host recorded installedAt is ISO-8601 UTC" "$?"
+  assert_contains "$host install log line" "$OUT" "install ${host}@${REAL_VERSION}"
+
+  # (b) PAI-05/AC-4: a same-version re-run skips and writes nothing in the host dir
+  FP_BEFORE="$(tree_fingerprint "$H/$cfg_dir")"
+  run_harness "$H"
+  assert_eq "$host re-run → exit 0" "$RC" "0"
+  assert_contains "$host re-run skips at same version" "$OUT" "skip ${host}: already at ${REAL_VERSION}"
+  assert_eq "$host re-run left the host config dir untouched" "$(tree_fingerprint "$H/$cfg_dir")" "$FP_BEFORE"
+
+  # (c) PAI-04/AC-5: an older recorded version upgrades and updates the record
+  seed_older_version "$STATE"
+  run_harness "$H"
+  assert_eq "$host upgrade → exit 0" "$RC" "0"
+  assert_contains "$host upgrade log line" "$OUT" "upgrade ${host}: 0.0.1 → ${REAL_VERSION}"
+  assert_eq "$host record updated after upgrade" \
+    "$(state_plugin_field "$STATE" "$host" version)" "$REAL_VERSION"
+
+  # (d) PAI-07/AC-11/AC-15a: the plugin's own --uninstall removes the record;
+  # a plugin-owned platform keeps the whole-record delete (clean slate)
+  OUT="$(MASSA_AI_SKIP_PLUGIN_REGISTRY=1 PATH="$SAFE_PATH" HOME="$H" \
+    bash "$PROJECT_ROOT/apps/${host}-plugin/install.sh" --uninstall 2>&1)"; RC=$?
+  assert_eq "$host plugin --uninstall → exit 0" "$RC" "0"
+  assert_eq "$host plugin-owned record fully removed" "$(state_has_platform "$STATE" "$host")" "0"
+
+  # (e) AC-15b: any other owner loses only the plugin subfield
+  mkdir -p "$(dirname "$STATE")"
+  cat > "$STATE" <<JSON
+{ "version": 2, "repository": "/x",
+  "platforms": { "$host": { "root": "$H/$cfg_dir", "skills": ["massa-ai"], "skillsOwner": "repo",
+    "plugin": { "version": "1.2.3", "installedAt": "2026-01-01T00:00:00Z" } } } }
+JSON
+  OUT="$(MASSA_AI_SKIP_PLUGIN_REGISTRY=1 PATH="$SAFE_PATH" HOME="$H" \
+    bash "$PROJECT_ROOT/apps/${host}-plugin/install.sh" --uninstall 2>&1)"; RC=$?
+  assert_eq "$host repo-owned --uninstall → exit 0" "$RC" "0"
+  assert_eq "$host record survives (repo-owned)" "$(state_has_platform "$STATE" "$host")" "1"
+  assert_eq "$host plugin subfield removed" "$(state_plugin_field "$STATE" "$host" version)" ""
+  assert_eq "$host skillsOwner survives" "$(state_platform_field "$STATE" "$host" skillsOwner)" "repo"
+  assert_contains "$host skills list survives" "$(state_platform_field "$STATE" "$host" skills)" "massa-ai"
+  assert_eq "$host root survives" "$(state_platform_field "$STATE" "$host" root)" "$H/$cfg_dir"
+
+  # (f) AC-16: a failure after the state write records NO plugin version
+  H2="$ROOT/e2e-fail-$host"; mkdir -p "$H2/$cfg_dir" "$H2/$(dirname "$hooks_file")"
+  mkdir -p "$H2/$hooks_file"   # the hooks target as a DIRECTORY → the merge must fail
+  STATE2="$H2/.config/massa-ai/install-state.json"
+  OUT="$(MASSA_AI_SKIP_PLUGIN_REGISTRY=1 PATH="$SAFE_PATH" HOME="$H2" \
+    bash "$PROJECT_ROOT/apps/${host}-plugin/install.sh" --user 2>&1)"; RC=$?
+  assert_ne "$host failed install → non-zero exit" "$RC" "0"
+  assert_eq "$host failed install records no plugin version" \
+    "$(state_plugin_field "$STATE2" "$host" version)" ""
+done
+
+echo ""
+echo "3.2 corrupt state: harness warns, treats unknown, self-heals on success (AC-8)"
+H="$ROOT/e2e-corrupt"; mkdir -p "$H/.cursor" "$H/.config/massa-ai"
+printf '{not json' > "$H/.config/massa-ai/install-state.json"
+STATE="$H/.config/massa-ai/install-state.json"
+run_harness "$H"
+assert_eq "corrupt state → exit 0" "$RC" "0"
+assert_contains "corrupt state → one warning" "$OUT" "unparseable"
+assert_eq "corrupt state → install proceeds" "$(state_has_platform "$STATE" cursor)" "1"
+assert_eq "corrupt state → valid record written" "$(state_plugin_field "$STATE" cursor version)" "$REAL_VERSION"
+
+echo ""
+echo "3.3 harness --uninstall removes the record too (PAI-07, AC-11)"
+H="$ROOT/e2e-h-uninstall"; mkdir -p "$H/.cursor"
+STATE="$H/.config/massa-ai/install-state.json"
+run_harness "$H"
+assert_eq "harness install → record present" "$(state_has_platform "$STATE" cursor)" "1"
+run_harness "$H" --uninstall
+assert_eq "harness --uninstall → exit 0" "$RC" "0"
+assert_eq "harness --uninstall → record gone" "$(state_has_platform "$STATE" cursor)" "0"
+
+echo ""
+echo "3.4 record-write failure warns but never fails the install (design C4)"
+H="$ROOT/e2e-record-fail"; mkdir -p "$H/.cursor" "$H/.config/massa-ai"
+STATE="$H/.config/massa-ai/install-state.json"
+# Repo-owned state makes install_bundled_skills a no-op, so the record write
+# is the ONLY state write of the run — a read-only state file then fails just
+# that write.
+cat > "$STATE" <<JSON
+{ "version": 2, "repository": "/x",
+  "platforms": { "cursor": { "root": "$H/.cursor", "skills": ["massa-ai"], "skillsOwner": "repo" } } }
+JSON
+chmod a-w "$STATE"
+OUT="$(PATH="$SAFE_PATH" HOME="$H" bash "$PROJECT_ROOT/apps/cursor-plugin/install.sh" --user 2>&1)"; RC=$?
+chmod u+w "$STATE"
+assert_eq "record-write failure → install still exits 0" "$RC" "0"
+assert_contains "record-write failure warns" "$OUT" "could not record the plugin version"
+assert_eq "record-write failure leaves no version record" \
+  "$(state_plugin_field "$STATE" cursor version)" ""
 
 summary "plugin-auto-install"
