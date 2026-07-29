@@ -7,11 +7,35 @@ name: Coverage
 # Only its arithmetic was covered, by scripts/__tests__/check-coverage.test.ts.
 # This workflow gives it CI reach.
 #
-# BLOCKING BY DESIGN — no `continue-on-error`. A gate that reports and never
-# enforces is the exact failure mode this repo already rejected once, when
-# oxlint's firing rules were kept at `error` rather than downgraded to `warn`.
-# If this proves unstable the correct response is to fix the instability, not to
-# add `continue-on-error` — that would recreate the defect this workflow closes.
+# NO `continue-on-error` — this workflow reports failure honestly. A gate that
+# reports and never enforces is the exact failure mode this repo already
+# rejected once, when oxlint's firing rules were kept at `error` rather than
+# downgraded to `warn`. If this proves unstable the correct response is to fix
+# the instability, not to add `continue-on-error` — that would recreate the
+# defect this workflow closes.
+#
+# THAT IS ONLY HALF OF BLOCKING, AND THIS HEADER USED TO CLAIM OTHERWISE.
+# Omitting `continue-on-error` makes the *check* red. It does not make a red
+# check *stop a merge*. Merge enforcement is decided by the `main` branch
+# ruleset's `required_status_checks` list — a repository setting, invisible from
+# this file and not versioned with it. This workflow shipped with the header
+# reading "BLOCKING BY DESIGN" while `coverage` was absent from that list, so
+# for its first run it reported and enforced nothing: a gate that reports and
+# never enforces, inside the deliverable written to prevent exactly that.
+#
+# `coverage` was added to the required list during PR #42's close-out. It is not
+# self-healing — a rename of this workflow's job id, or a ruleset edit, silently
+# un-blocks it again with no diff anywhere in this repository. Verify the live
+# setting rather than trusting this comment:
+#
+#   gh api repos/luizgmassa/massa-ai/rules/branches/main \
+#     --jq '[.[] | select(.type=="required_status_checks")
+#            | .parameters.required_status_checks[].context]'
+#
+# The context string is the job id below (`coverage`), NOT the `name:` above
+# (`Coverage`). Updating the ruleset goes through PUT (full replace) — PATCH
+# returns 404 on that route rather than 405, which reads like a permissions
+# problem and is not one.
 #
 # WHY IT IS NOT A JOB INSIDE ci.yml. release.yml triggers on
 # `workflow_run: workflows: [CI]`, so anything added to CI extends the chain that

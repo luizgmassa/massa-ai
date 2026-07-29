@@ -215,13 +215,32 @@ the literal **`127.0.0.1`**, not `localhost`, which every other job in `ci.yml` 
 (`ci.yml:13`). The port mapping must be **5433**, not the `5432:5432` the existing services use
 (`ci.yml:23,159`). And the database name is `massa_ai_test`, not `massa_ai`. Copy the service
 block from `ci.yml:15-23` and change all three.
-**AC-2**: It is **blocking** — no `continue-on-error`. A gate that reports and never enforces is
+**AC-2**: It carries no `continue-on-error`. A gate that reports and never enforces is
 the exact failure mode this repo already rejected once, when oxlint's 15 firing rules were kept
 at `error` rather than downgraded to `warn`.
+
+**AC-2 was necessary and not sufficient, and the gap was found on the PR — see AC-5.** As
+originally written this criterion said "It is **blocking** — no `continue-on-error`", which
+equates a workflow-file property with a repository setting. Omitting `continue-on-error` only
+makes the *check* red. Whether a red check can *stop a merge* is decided by the branch ruleset's
+required-status-checks list, which is invisible from the workflow file. T4 satisfied AC-2 in full
+and the gate still could not block anything.
+
 **AC-3**: It does not run inside `ci.yml` and therefore does not extend the `workflow_run` chain
 that `release.yml` keys off. Releases must continue to fire on CI alone.
 **AC-4**: `CLAUDE.md`'s "CI gates" section names the new workflow, and the count of separate
 workflows stated there is corrected.
+**AC-5** (added during PR close-out): the check context `coverage` appears in the `main` branch
+ruleset's `required_status_checks` list. Verify against the live setting, not against the
+workflow file:
+
+```bash
+gh api repos/luizgmassa/massa-ai/rules/branches/main \
+  --jq '[.[] | select(.type=="required_status_checks")
+         | .parameters.required_status_checks[].context]'
+```
+
+The context string is the **job id** (`coverage`), not the workflow `name:` (`Coverage`).
 
 ### SEN-03 — No test run reads the developer's real configuration
 

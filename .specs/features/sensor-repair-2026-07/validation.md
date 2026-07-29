@@ -76,3 +76,68 @@ No other discrepancies found. Checked hard enough to be confident on: all four "
 - **No fresh, integrated `test:coverage` ×2 run has been recorded against the *final* tree** (i.e., after T6a/b/c/d, the auth-probe fix, and the coverage-validator fix all landed together). T3's own discipline — "once is not evidence for a budget that already flapped" — was applied to the architecture-map seam in isolation, but the last full-gate confirmation predates `fcf5a02` (the last commit, itself a reaction to a floor regression `ee07326` caused). This session did not re-run the full gate (prohibited), so whether the fully-integrated tree still clears 90% everywhere is not independently confirmed post-`fcf5a02`.
 - **SEN-02's actual CI behavior is unproven** — the workflow is well-formed by static reading and one negative-case predicate check, but has never executed in GitHub Actions.
 - **Branch is unpushed, no PR exists.** All of the above documentation gaps are trivially fixable with one more commit before opening the PR; none require touching source or tests.
+
+---
+
+## Addendum — PR close-out (2026-07-29)
+
+**Authorship, stated first because it changes how this section should be read.** Everything above
+was written by an independent verification agent (author ≠ verifier). This addendum was **not**.
+It was written by the agent that authored the T10 fix and applied the ruleset change, so it is a
+record of what happened, **not** independent verification of it. It does not upgrade any verdict
+above. A future verifier should treat the claims here as needing the same scrutiny as the
+implementation claims they accompany.
+
+The verifier could not have seen either finding below: this file predates the PR, so there was no
+CI run to read and no live branch ruleset to query.
+
+### Two residual risks resolved, both exactly as predicted
+
+The residual-risk section above was right on both counts, and the wording is worth keeping:
+
+> **SEN-02's actual CI behavior is unproven** — the workflow is well-formed by static reading and
+> one negative-case predicate check, but has never executed in GitHub Actions.
+
+It executed, and it failed. `Coverage` run `30417371974` went red on a **pre-existing** assertion
+(`cc985905`, 2026-07-13) that no port map can satisfy — `inet_server_port()` reports the
+container-internal 5432, not the host-mapped 5433. Static reading could not have caught it; only
+execution could. Full mechanism, sensors and the second finding it exposed (this file was the
+single `DEDICATED_DB` outlier of thirteen) are in `tasks.md` **T10**.
+
+> **No fresh, integrated `test:coverage` ×2 run has been recorded against the *final* tree.**
+
+Now recorded, in CI rather than locally: run `30418495440` on `6533900` — `[coverage] PASS — every
+measured source file is at or above 90%`, 314 files, **9** documented exclusions, **0** failing
+tests. A second run followed automatically on the merge commit `33efc82`. Note this supersedes the
+concern in a stronger form than a local re-run would have: CI has no developer config, so it is the
+reproducible floor the gate was specified to enforce.
+
+### One finding the verifier had no way to reach: SEN-02 AC-2 was unsatisfiable as written
+
+The verifier checked `no continue-on-error` and found it present — correctly, because that is what
+AC-2 said. But `continue-on-error` governs only whether the **check** goes red. Whether a red check
+can **stop a merge** is the branch ruleset's `required_status_checks` list, a repository setting
+that is not in the repository. Queried on the open PR, `coverage` was absent; the workflow's own
+header claimed `BLOCKING BY DESIGN`. Added during close-out, after the check went green. Recorded
+as **AC-5** in `spec.md`, with the mechanism in `tasks.md` T4 and the workflow header corrected.
+
+**This is a gap in the acceptance criterion, not in the verification.** A verifier reading AC-2
+literally would pass a gate that blocks nothing, every time. The generalisable form is in
+`tasks.md`'s closing note: a gate's enabling condition is part of the gate.
+
+### Verdict changes
+
+| Req | Was | Now | Why |
+| --- | --- | --- | --- |
+| SEN-02 | **PARTIAL** | **VERIFIED** | AC-1 met by run `30418495440`; AC-5 added and met. Both were unobservable when this file was written |
+
+All other verdicts stand unchanged. The four documentation discrepancies listed above were fixed
+before the PR opened, as that section anticipated.
+
+### What is still owed, unchanged by this addendum
+
+- The **bounded-corpus caveat** on T6's needles numbers stands exactly as written. Nothing here
+  re-measures retrieval, and no floor, needle query or needle content was touched.
+- A **full-corpus needles baseline** is still owed for a number comparable to the floors.
+- The **cross-package turbo concurrency** hazard against one database is still unfixed and still
+  has no task.

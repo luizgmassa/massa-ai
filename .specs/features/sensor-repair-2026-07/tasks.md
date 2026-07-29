@@ -283,7 +283,49 @@ gate exits **0** locally, twice. `test:scripts` **616 pass / 0 fail**, so
 
 **Not verifiable locally**: AC-1's green run on the PR itself. Confirm on the PR before merge.
 
-**Tests**: none (CI config) · **Gate**: green run on the PR itself (pending push)
+**AC-1 is now MET** — `Coverage` run `30418495440`, sha `6533900`, **success**:
+`[coverage] PASS — every measured source file is at or above 90%`, 314 files measured,
+**9** documented exclusions (unchanged), **0** failing tests. It took two runs; the first
+(`30417371974`) was red for a defect this task uncovered rather than caused — see T10.
+
+**REOPENED, then closed: AC-2 was necessary and not sufficient.** This task recorded
+"no `continue-on-error`" as satisfying *blocking*, and that is a category error the whole
+feature exists to catch. `continue-on-error` governs whether the **check** goes red. Whether a
+red check can **stop a merge** is the branch ruleset's `required_status_checks` list — a
+repository setting, invisible from the workflow file and not versioned with it. Measured on the
+open PR:
+
+```bash
+gh api repos/luizgmassa/massa-ai/rules/branches/main \
+  --jq '[.[] | select(.type=="required_status_checks")
+         | .parameters.required_status_checks[].context]'
+# ["build","mcp","validate",
+#  "Structural native tests (darwin-arm64)","Structural native tests (linux-x64)"]
+```
+
+`coverage` **absent**. The workflow's own header read `BLOCKING BY DESIGN` and
+`Coverage must be able to fail a merge` while it could do neither — a gate that reports and
+never enforces, inside the deliverable written to prevent exactly that. It is the same defect
+shape as the six unplanned repairs, found in the fix rather than in the subject.
+
+Closed during close-out, **after** the check went green (adding it first would have blocked the
+PR that fixes it). New live value:
+
+```
+["build","mcp","validate",
+ "Structural native tests (darwin-arm64)","Structural native tests (linux-x64)","coverage"]
+```
+
+Two traps for whoever touches this again. The context string is the **job id** (`coverage`), not
+the workflow `name:` (`Coverage`). And the update endpoint is **PUT** (full replace) —
+`PATCH /repos/{owner}/{repo}/rulesets/{id}` returns **404**, not 405, which reads exactly like a
+missing permission and is not one; the token had `repo` scope and `admin: true` throughout. The
+full ruleset was diffed before and after: only `required_status_checks` changed, and the
+`DeployKey` bypass that `release.yml` depends on is intact.
+
+Recorded as **AC-5** in `spec.md`, and the workflow header is corrected.
+
+**Tests**: none (CI config) · **Gate**: green run on the PR itself — **PASS**, run `30418495440`
 **Commit**: `ci: run the coverage gate on its own blocking workflow`
 
 ---
@@ -870,6 +912,13 @@ pins that omitting the filter behaves as `true`, matching the schema's documente
       SEN-02 is PARTIAL for the reason T4 already recorded: AC-1's green run on the PR is not
       observable without a PR. Not a defect.
 
+      **Both halves of that PARTIAL are now closed, and the verifier could not have seen either.**
+      `validation.md` was written before the PR existed, so it had no CI run to read and no live
+      ruleset to query. AC-1 is met by run `30418495440`; the previously-unstated AC-5 (the
+      ruleset entry) was found on the PR and closed during close-out. See T10 and the AC-5 note in
+      T4. The verdict stands as written for the state it was written against — the gap was in what
+      was observable at the time, not in the verification.
+
       **It found 4 discrepancies, all documentation state, none in code. All are now fixed:**
 
       | # | Finding | Resolution |
@@ -885,10 +934,82 @@ pins that omitting the filter behaves as `true`, matching the schema's documente
       recorded in the decision cell and the commits cited (`27dda6c` / `5e018e5` / `d5b5813`)
 
 **Not verifiable locally, carried to the PR**: SEN-02 AC-1 — the `Coverage` workflow's green run on
-the PR itself.
+the PR itself. **Resolved**: red on the first run (`30417371974`, one failing test → T10), green on
+the second (`30418495440`). PR #42 merged as `33efc82`, a merge commit preserving all 21 commits.
 
 **Tests**: full gate · **Gate**: all of the above
 **Commit**: `docs: record the sensor-repair changes and close PR-A`
+
+---
+
+### T10 / SEN-02: A port assertion that can never hold behind a Docker port map — **DONE**
+
+**Unplanned, and the seventh of its kind.** Found by the first CI run of the very gate T4 shipped.
+`Coverage` run `30417371974` failed with `[coverage] unit(s) did not complete cleanly:
+packages/core` and two files below the floor — `handoff-repository-pg.ts` **61.38%**,
+`proposal-repository-pg.ts` **71.60%**.
+
+**One failing test in the entire run** (`grep -c '(fail)'` over the run log → **1**), so nothing
+was hiding behind it. `packages/core/src/__tests__/handoff-proposal-pg.test.ts`'s `beforeAll`:
+
+```
+  {
+    "database_name": "massa_ai_test",
+-   "server_port": 5433,
++   "server_port": 5432,
+  }
+```
+
+**Mechanism.** The suite asserted `inet_server_port() === 5433`. That function reports the port
+PostgreSQL is bound to **inside the container**, which is 5432; the 5433 in `DATABASE_URL` is a
+host-side mapping (`coverage.yml` maps `5433:5432`) and the server has no knowledge of it. The
+assertion cannot hold behind *any* Docker port map. It passes locally only because this host's
+5433 PostgreSQL is a **native** install, where host port and bound port coincide — measured:
+`lsof -nP -iTCP:5433 -sTCP:LISTEN` shows `postgres`, not `docker`.
+
+**Not caused by this PR, and not merely inherited either.** `git blame` puts the assertion at
+`cc985905`, **2026-07-13**; only the database name moved, in the `4feca2d3` rename of 2026-07-23.
+`git diff origin/main..HEAD` over the file was empty. What is new is that the suite is gated
+`describe.skipIf(!DEDICATED_DB)` on a `127.0.0.1:5433/massa_ai_test` URL shape that **only
+`coverage.yml` — T4's own deliverable — ever produces**. So it had never executed in CI at any
+point in its life. The seventh instance of this feature's thesis: a sensor that was never running.
+
+**The fix asserts what a client can observe.** `inet_server_port()` dropped;
+`current_database() === "massa_ai_test"` kept, which is the load-bearing half — the development
+database is named `massa_ai`, so the name check alone still refuses it. The CI log confirms
+`database_name` was already matching, so exactly one half was wrong.
+
+**A second finding, made while resolving it: this file was the fork.** The close-out brief
+proposed adding the shared dedicated-DB predicate here and flagged a possible tautology. Measured
+instead: **13** files under `packages/core/src/__tests__` define `DEDICATED_DB`. **Twelve** are
+byte-identical mirrors of `isDedicatedDatabase()` from `scripts/check-coverage.ts`. This one
+hand-rolled a `new URL()` variant that omitted the `MASSA_AI_DEDICATED` half entirely — so it was
+neither the shared case nor a tautology, but the single outlier. Brought in line with the other
+twelve. `scripts/` is not a workspace package and cannot be imported from `packages/core`, so the
+shape is mirrored with a comment naming the source — the third option the spec owner allowed,
+and the one the other twelve already use.
+
+- [x] Discriminating sensor: `inet_server_port` has **zero** executable references repo-wide
+      (2 remaining hits are the comment explaining the removal)
+- [x] Suite runs **13 pass / 0 fail** against the local dedicated database — and *runs*, rather
+      than skipping; a skipped suite also exits 0, which is this feature's whole subject
+- [x] Discriminating sensor for the predicate change: with `MASSA_AI_DEDICATED` unset the suite
+      now **skips** (0 pass / 15 skip). Before the change it would have **run**, because the old
+      predicate ignored that variable
+- [x] Pointed at the development database (`5432/massa_ai`) it **skips**
+- [x] CI: **13 pass / 0 fail** in run `30418495440` — it genuinely executed, not skipped
+- [x] Gate green with **no exclusion added** — still `9 documented exclusions`, floor untouched
+
+**A local coverage run cannot discriminate this fix, and was not run as if it could.** The local
+5433 is native, so the old assertion passes there too; a green local gate would have been evidence
+of nothing. The discriminating evidence is the CI run, and it is cited above.
+
+The 15-skip / 13-pass discrepancy was measured rather than waved off: the file declares **13**
+`test(` calls, and bun counts the 2 nested `describe` blocks as skip entries. Reporting artifact,
+not lost coverage.
+
+**Tests**: existing suite · **Gate**: `Coverage` run `30418495440` — **PASS**
+**Commit**: `6533900` — `fix(test): assert the dedicated database by name, not by server port`
 
 ---
 
@@ -901,7 +1022,7 @@ the PR itself.
 | 3 — retrieval sensor | T5 → T6 → T7 | Independent of 1/2; **start early**, T7 is the long pole |
 | 4 — behavior + close | T8, T9 | T8 anytime; T9 last |
 
-**9 tasks planned; 15 executed.** The six unplanned ones were not scope creep — each was a blocker
+**9 tasks planned; 16 executed.** The seven unplanned ones were not scope creep — each was a blocker
 discovered by trying to use the previous fix, and each was offered to the spec owner with its cost
 before being taken:
 
@@ -913,7 +1034,22 @@ before being taken:
 | T6d | bounding the corpus | index **succeeded over 0 files** in 181 ms |
 | e2e auth probe | every E2E suite gated on `OLLAMA_UP` | suite **skipped**, reported `0 pass / 2 skip / 0 fail` |
 | coverage | the coverage gate | validators covered only in **subprocesses** |
+| T10 | the coverage gate's first CI run | suite **had never executed in CI**; assertion unsatisfiable behind any port map |
 
-**Not one of the six failed loudly.** They aborted, skipped, or reported success over an empty
+**Not one of the seven failed loudly.** They aborted, skipped, or reported success over an empty
 result — the same defect class SEN-01..04 exist to remove, found inside the tooling meant to measure
 it. That is the strongest evidence this feature produced, and none of it was in the plan.
+
+**And the plan's own deliverable had the defect too.** T4 shipped a workflow whose header said
+`BLOCKING BY DESIGN` while `coverage` was absent from the branch ruleset's required-status-checks
+list, so it could report and could not enforce. That is the eighth instance and the sharpest one,
+because it was written *by* this feature rather than found by it: satisfying the acceptance
+criterion as literally written (`no continue-on-error`) produced a gate that blocked nothing. The
+criterion, not the implementation, was the defect. Recorded as SEN-02 AC-5.
+
+**The recurring shape, stated once.** In every one of the eight, the artifact reported success
+while measuring nothing — and in six of them the *reason* was that some execution precondition was
+silently unmet: an env var, a config field, a URL shape, a required-checks entry. None of those
+preconditions lives next to the thing it gates. The generalisable lesson is not "test the tests"
+but: **a gate's enabling condition is part of the gate, and must be asserted somewhere that fails
+loudly when it drifts.**
