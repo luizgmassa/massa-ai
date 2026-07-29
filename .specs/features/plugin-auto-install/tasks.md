@@ -92,16 +92,16 @@ T5 → T6
 - **MCP/skill question**: massa-ai MCP unregistered this session (skipped);
   no external library → Context7 skipped. Answer: NONE/NONE.
 - **Done when**:
-  - [ ] `installer_host_binaries` mirrors `platform_executables` exactly:
+  - [x] `installer_host_binaries` mirrors `platform_executables` exactly:
         cursor → `cursor-agent cursor`; claude/codex/opencode → single name
         (Plan Challenge C-2)
-  - [ ] `installer_host_detected` returns 0+signal for dir-only, binary-only
+  - [x] `installer_host_detected` returns 0+signal for dir-only, binary-only
         (incl. cursor via `cursor-agent` only on PATH), both; 1+empty for
         neither; unknown host → config-dir helper returns 2
-  - [ ] `installer_plugin_versions` emits `host⇥version` on valid state; empty+exit 0 on missing file; one stderr warning+empty+exit 0 on corrupt JSON
-  - [ ] `installer_compare_versions` table: equal→0, older→-1, newer→1,
+  - [x] `installer_plugin_versions` emits `host⇥version` on valid state; empty+exit 0 on missing file; one stderr warning+empty+exit 0 on corrupt JSON
+  - [x] `installer_compare_versions` table: equal→0, older→-1, newer→1,
         empty/non-numeric→-1, pre-release row (`1.9.1-rc1` vs `1.9.1` → -1)
-  - [ ] `bash -n` clean; focused assertions pass (inline in T3's suite file scaffold or a scratch assertion block executed in the task)
+  - [x] `bash -n` clean; focused assertions pass (inline in T3's suite file scaffold or a scratch assertion block executed in the task)
 - **Tests**: shell integration (helpers exercised through assertions; full branch coverage lands with T3's suite — helpers have no harness to call them before T3, so T1 ships focused assertions for every branch)
 - **Gate**: quick
 - **Commit**: `feat(installer): host detection + version gate helpers`
