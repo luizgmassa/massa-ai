@@ -78,23 +78,24 @@ export function isValidUserId(userId: string): boolean {
  * Sanitize file path (prevent directory traversal)
  *
  * @param filePath - Untrusted relative path from a tool caller.
- * @returns Path with every `../` / `..\` segment removed and no leading
- *   slashes. Repeated until fixpoint, so overlapping tokens cannot smuggle a
- *   traversal segment through a single pass.
+ * @returns Path rebuilt from its non-`..` segments joined with `/`, with no
+ *   leading slash. Segment filtering — not token replacement — so no
+ *   overlapping-token trick (`....//`, `..\/`) can smuggle a parent reference
+ *   through, and separators normalize to `/`.
  */
-// Why: single-pass removal was bypassable — "....//etc/passwd" collapsed to
-//      "../etc/passwd" after one replace (CodeQL
-//      js/incomplete-multi-character-sanitization, SEC-4, alert #21). The
-//      read_file tool's checkPathContainment still blocked escapes, but this
-//      layer must not rely on downstream defense-in-depth.
+// Why: replacement-based sanitizers are bypassable twice over — single-pass
+//      removal left "....//etc/passwd" -> "../etc/passwd" (CodeQL
+//      js/incomplete-multi-character-sanitization, SEC-4, alert #21), and a
+//      regex fixpoint loop still reads as "may contain ../" to the analyzer.
+//      Splitting into segments and dropping every literal ".." segment is
+//      strictly stronger and statically obvious.
 // Impacts: MCP read_file path handling (read_file.ts).
 // Test: bun test packages/shared/src/__tests__/sanitizer.test.ts -t sanitizeFilePath
 export function sanitizeFilePath(filePath: string): string {
-  let sanitized = filePath;
-  while (sanitized.includes("../") || sanitized.includes("..\\")) {
-    sanitized = sanitized.replace(/\.\.\//g, "").replace(/\.\.\\/g, "");
-  }
-  return sanitized.replace(/^\/+/, ""); // Remove leading slashes
+  return filePath
+    .split(/[/\\]+/)
+    .filter((segment) => segment !== ".." && segment !== "")
+    .join("/");
 }
 
 /**

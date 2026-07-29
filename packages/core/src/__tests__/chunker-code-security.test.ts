@@ -51,4 +51,21 @@ describe("netBraceDelta block-comment stripping", () => {
     expect(netBraceDelta("}")).toBe(-1);
     expect(netBraceDelta("{}")).toBe(0);
   });
+
+  it("ignores braces inside string, template, and regex literals", () => {
+    expect(netBraceDelta('const s = "}{"; if (a) {')).toBe(1);
+    expect(netBraceDelta("const s = '}{'; if (a) {")).toBe(1);
+    expect(netBraceDelta("const t = `}{`; if (a) {")).toBe(1);
+    expect(netBraceDelta("const re = /}/; if (x) {")).toBe(1);
+    expect(netBraceDelta("const re = /\\{/g; }")).toBe(-1);
+  });
+
+  it("ignores everything after a line comment", () => {
+    expect(netBraceDelta("code // } {")).toBe(0);
+    expect(netBraceDelta('const s = "http://x"; if (a) {')).toBe(1);
+  });
+
+  it("honors escaped quotes inside strings", () => {
+    expect(netBraceDelta('const s = "a\\"{"; }')).toBe(-1);
+  });
 });

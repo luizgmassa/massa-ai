@@ -166,48 +166,64 @@ export function findCodeBoundaries(lines: string[]): CodeBoundary[] {
 }
 
 /**
- * Remove closed block-comment spans from a single line in one pass.
+ * Count `{` minus `}` on one line, ignoring braces inside comments, string
+ * literals, template literals, and regex literals.
  *
  * @param line - One source line (multi-line block state is tracked by callers).
- * @returns The line with every closed block-comment span removed; an
- *   unterminated `/*` and everything after it is kept verbatim, matching the
- *   old regex's behavior of only stripping closed pairs.
+ * @returns Net brace delta: openers positive, closers negative.
  */
-// Why: the previous `/\/\*.*?\*\//g` replace was quadratic (CodeQL
-//      js/polynomial-redos, SEC-3, alert #27 — measured ~17x slowdown for 4x
-//      input on "/*" + "a/*"*n). Minified single-line files made that a real
-//      indexing stall. A single left-to-right scan is O(n) with identical
-//      output: indexOf finds the same earliest close the lazy quantifier did.
-// Impacts: netBraceDelta; brace counting for every chunked code file.
+// Why: the original strip-then-count chain ran five regexes over the line,
+//      two of them quadratic (CodeQL js/polynomial-redos — SEC-3 alert #27
+//      for the lazy block-comment pattern, plus two PR-time alerts on the
+//      string-literal and line-comment patterns). Minified single-line files
+//      made that a real indexing stall. This single left-to-right scan is
+//      O(n) and strictly more correct: the old chain mis-parsed lines whose
+//      strings contained "//" or "/*". Regex literals keep the old
+//      (linear, unflagged) pre-strip so braces inside /…/ bodies don't count.
+// Impacts: brace counting for every chunked code file.
 // Test: bun test packages/core/src/__tests__/chunker-code-security.test.ts
-function stripInlineBlockComments(line: string): string {
-  let out = "";
+export function netBraceDelta(line: string): number {
+  const text = line.replace(/\/(?:\\.|[^/\\\n])+\/[gimsuy]*/g, '""');
+  let delta = 0;
   let i = 0;
-  while (i < line.length) {
-    if (line.charCodeAt(i) === 47 /* / */ && line.charCodeAt(i + 1) === 42 /* * */) {
-      const end = line.indexOf("*/", i + 2);
+  const n = text.length;
+  while (i < n) {
+    const code = text.charCodeAt(i);
+    const next = text.charCodeAt(i + 1);
+    // Line comment: nothing after it can hold a countable brace.
+    if (code === 47 && next === 47) break;
+    // Block comment closed on this line: skip the span. An unterminated
+    // opener is treated as ordinary text, matching the old regex's behavior
+    // of only stripping closed pairs.
+    if (code === 47 && next === 42) {
+      const end = text.indexOf("*/", i + 2);
       if (end === -1) {
-        // Unterminated opener: the old regex left it untouched, so keep the rest.
-        out += line.slice(i);
-        break;
+        i++;
+        continue;
       }
       i = end + 2;
       continue;
     }
-    out += line[i];
+    // String/template literal: skip to the matching quote, honoring escapes.
+    if (code === 39 || code === 34 || code === 96) {
+      const quote = code;
+      i++;
+      while (i < n) {
+        const inner = text.charCodeAt(i);
+        if (inner === 92) {
+          i += 2;
+          continue;
+        }
+        i++;
+        if (inner === quote) break;
+      }
+      continue;
+    }
+    if (code === 123) delta++;
+    else if (code === 125) delta--;
     i++;
   }
-  return out;
-}
-
-export function netBraceDelta(line: string): number {
-  const stripped = stripInlineBlockComments(line)
-    .replace(/\/\/.*$/, "")
-    .replace(/'(?:\\.|[^'\\])*'/g, "''")
-    .replace(/"(?:\\.|[^"\\])*"/g, '""')
-    .replace(/`(?:\\.|[^`\\])*`/g, "``")
-    .replace(/\/(?:\\.|[^/\\\n])+\/[gimsuy]*/g, "//");
-  return (stripped.match(/\{/g) || []).length - (stripped.match(/\}/g) || []).length;
+  return delta;
 }
 
 export function extractFileImports(content: string, ext: string): string | undefined {

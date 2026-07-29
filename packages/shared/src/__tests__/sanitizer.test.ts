@@ -134,8 +134,8 @@ describe("sanitizeFilePath", () => {
     expect(sanitizeFilePath("a/../../b")).toBe("a/b");
   });
 
-  test("removes ..\\ traversals", () => {
-    expect(sanitizeFilePath("..\\etc\\passwd")).toBe("etc\\passwd");
+  test("removes ..\\ traversals and normalizes separators", () => {
+    expect(sanitizeFilePath("..\\etc\\passwd")).toBe("etc/passwd");
   });
 
   test("removes leading slashes", () => {
@@ -148,23 +148,21 @@ describe("sanitizeFilePath", () => {
   });
 
   // SEC-4 regression (CodeQL js/incomplete-multi-character-sanitization,
-  // alert #21): single-pass removal left a live "../" behind for overlapping
-  // tokens. These cases failed before the fixpoint loop.
-  test("removes overlapping traversal tokens until fixpoint", () => {
-    expect(sanitizeFilePath("....//etc/passwd")).toBe("etc/passwd");
-    expect(sanitizeFilePath("....//....//etc/passwd")).toBe("etc/passwd");
-    // 3-dot groups collapse into a benign literal segment ("....etc" is a
-    // valid directory name, not a `..` parent reference) — the invariant is
-    // that no "../" survives, asserted for all shapes below.
-    expect(sanitizeFilePath("..../..../etc/passwd")).toBe("....etc/passwd");
-    expect(sanitizeFilePath("....\\\\etc\\\\passwd")).toBe("etc\\\\passwd");
+  // alert #21): replacement-based sanitizing was bypassable by overlapping
+  // tokens. Segment filtering drops every literal ".." segment; multi-dot
+  // groups like "...." are benign literal names, not parent references.
+  test("drops every parent-reference segment", () => {
+    expect(sanitizeFilePath("....//etc/passwd")).toBe("..../etc/passwd");
+    expect(sanitizeFilePath("....//....//etc/passwd")).toBe("..../..../etc/passwd");
+    expect(sanitizeFilePath("..../..../etc/passwd")).toBe("..../..../etc/passwd");
+    expect(sanitizeFilePath("....\\\\etc\\\\passwd")).toBe("..../etc/passwd");
+    expect(sanitizeFilePath("foo/..")).toBe("foo");
   });
 
-  test("never returns a residual traversal segment", () => {
-    for (const crafted of ["....//", "..../", "....\\\\", "..\\/..\\/", "x/....//y"]) {
-      const out = sanitizeFilePath(crafted);
-      expect(out).not.toContain("../");
-      expect(out).not.toContain("..\\");
+  test("never returns a parent-reference segment", () => {
+    for (const crafted of ["....//", "..../", "....\\\\", "..\\/..\\/", "x/....//y", "foo/.."]) {
+      const segments = sanitizeFilePath(crafted).split("/");
+      expect(segments).not.toContain("..");
     }
   });
 });
