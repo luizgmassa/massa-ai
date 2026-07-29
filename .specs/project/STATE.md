@@ -5,19 +5,29 @@
 - projectId: `massa-ai`
 - workflowSessionId: `spec-sensor-repair-2026-07`
 - workflow: spec-driven (Medium — Specify + Tasks + Execute; Design inline)
-- feature: `sensor-repair-2026-07` — **Executed 2026-07-28. All 9 planned tasks plus 6 unplanned
-  ones are DONE; full gate green. Branch `fix/sensor-repair`, not pushed, no PR yet.**
-- base: `origin/main` @ `a6216cd` (v1.9.0)
+- feature: `sensor-repair-2026-07` — **COMPLETE AND MERGED 2026-07-29. All 9 planned tasks plus 7
+  unplanned ones are DONE; every requirement VERIFIED.** PR #42 merged as `33efc82` (merge commit,
+  21 commits preserved). Release chain left to fire on its own.
+- base: `origin/main` @ `a6216cd` (v1.9.0) → merged to `main`, releasing **v1.9.1** (patch: all
+  `[Unreleased]` entries are `### Fixed`)
 - Artifacts: `.specs/features/sensor-repair-2026-07/{spec.md,design.md,tasks.md,validation.md}`
-- **Six unplanned repairs, each a blocker discovered by trying to use the previous fix.** T6a (a
+- **Seven unplanned repairs, each a blocker discovered by trying to use the previous fix.** T6a (a
   full index aborting on a same-name/different-kind declaration), T6b (`security.allowedExtensions`
   never propagated from user config), T6c (`capturePolicy` validated then never consulted), T6d (a
   one-element brace glob matching literally, so a single-extension allow-list indexed nothing), the
   e2e availability probe sending no API key under mandatory auth (every E2E suite silently
-  skipping), and in-process coverage for two config validators only ever exercised in subprocesses.
-  **None of the six failed loudly** — they aborted, skipped, or reported success over an empty
-  result. That is the same defect class SEN-01..04 exist to remove, found inside the tooling that
-  was supposed to measure it. Full mechanism in `design.md`, Fourth and Fifth forks.
+  skipping), in-process coverage for two config validators only ever exercised in subprocesses, and
+  **T10** (a `inet_server_port()` assertion no Docker port map can satisfy, in a suite that had
+  never executed in CI). **None of the seven failed loudly** — they aborted, skipped, or reported
+  success over an empty result. That is the same defect class SEN-01..04 exist to remove, found
+  inside the tooling that was supposed to measure it. Full mechanism in `design.md`, Fourth and
+  Fifth forks, and `tasks.md` T10.
+- **The eighth instance was in this feature's own deliverable.** T4 shipped `coverage.yml` with a
+  header reading `BLOCKING BY DESIGN` while the `coverage` check was absent from the `main` branch
+  ruleset's required-status-checks list — so it reported and enforced nothing. Satisfying SEN-02
+  AC-2 exactly as written (`no continue-on-error`) produced a gate that could not block a merge.
+  The criterion was the defect. Closed as **SEN-02 AC-5**; `coverage` is now in the required list.
+  **A gate's enabling condition is part of the gate.**
 - scope: 5 requirements — SEN-01 (reset the coverage gate's dedicated DB), SEN-02 (wire
   `test:coverage` into its own blocking CI workflow), SEN-03 (scratch `XDG_CONFIG_HOME` in the
   shared test runner), SEN-04 (content-anchor the needles fixture; make a stale needle a hard

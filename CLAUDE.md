@@ -387,8 +387,27 @@ pins npm to 11.14.1 explicitly before install.
 Three separate workflows sit outside `ci.yml`, plus the release pair below — five files in
 `.github/workflows/` besides `ci.yml` itself.
 
-- **`coverage.yml`** — `bun run test:coverage`, the 90%-per-file floor. **Blocking, no
-  `continue-on-error`**, on push to `main` and every PR. It is outside `ci.yml` on purpose:
+- **`coverage.yml`** — `bun run test:coverage`, the 90%-per-file floor. No `continue-on-error`,
+  on push to `main` and every PR. **Blocking takes two things, and only one of them is in this
+  repository.** Omitting `continue-on-error` makes the check go red; it does not make a red check
+  stop a merge. That is the `main` branch ruleset's `required_status_checks` list, a repo setting
+  with no diff anywhere here. This workflow shipped claiming `BLOCKING BY DESIGN` while `coverage`
+  was absent from that list, and blocked nothing until it was added. Verify the live value, and
+  note the context is the **job id** (`coverage`), not the workflow `name:` (`Coverage`):
+
+  ```bash
+  gh api repos/luizgmassa/massa-ai/rules/branches/main \
+    --jq '[.[] | select(.type=="required_status_checks")
+           | .parameters.required_status_checks[].context]'
+  ```
+
+  Updating that ruleset goes through **PUT** (full replace) — `PATCH` on the same route returns
+  **404**, not 405, which reads exactly like a missing permission and is not one. Send the whole
+  object (`name`, `target`, `enforcement`, `bypass_actors`, `conditions`, `rules`) and diff before
+  against after; the `DeployKey` bypass entry is what lets `release.yml` push the bump commit past
+  the ruleset, so dropping it breaks releases silently.
+
+  It is outside `ci.yml` on purpose:
   `release.yml` triggers on `workflow_run: workflows: [CI]`, keyed by workflow **name**, so a
   job added to CI would extend the chain that cuts a release. Coverage must be able to fail a
   merge without touching that chain — never rename this workflow to `CI`. Its own
