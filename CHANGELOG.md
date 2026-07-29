@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The search subsystem's first capability module is extracted, and the split is now measured rather than asserted.**
+  `rlm-fusion.ts` becomes `result-fusion.ts`: `fuseResults` and `generateScoreExplanation` take no
+  dependency record at all. The only facade member either ever read was `RRF_K`, the literal `60`,
+  now a module constant — so the module has never heard of `ContextualSearchRLM`, which is the
+  property `scripts/search-hub-metric.ts` measures. Foreign modules reading the facade drop from
+  **6 to 5**. Deepest foreign reach stays at **14** and the gate still fails, both expected: the
+  maximum is set by `rlm-search.ts` and cannot move until that file is split. Three of the four
+  frozen needle anchors live in this file and travelled byte-identical — resolution is by content,
+  so moving an anchor is safe and reflowing one is a hard gate failure.
+
+- **Before-baselines are frozen to committed fixtures instead of measured against the working tree.**
+  The previous sensors recorded their before-state as unit tests that scan the live directory, which
+  holds only until the refactor those baselines exist to police begins — one extraction reddened five
+  of them, and at the target state the scanned set is empty by design. Updating the pins per task
+  would have turned a before-record into an after-record tracking whatever the change produced,
+  leaving the final comparison with no referent. `scripts/capture-facade-baseline.ts` writes the
+  matrix, fan-in/fan-out and anchor records once and refuses to run when the measured subject has
+  moved; the suites assert that attestation, so a silent re-capture fails loudly instead of
+  relocating the reference. Scoped to the nine figures that actually change — assertions about
+  untouched directories, and those written as floors rather than pins, still measure the live tree.
+
+- **The frozen-anchor check now pins anchor text, not anchor paths.** It asserted that four needles
+  resolved to two named files, which is the opposite of the constraint it enforces: anchors are
+  resolved by content, so moving one between files is explicitly legal and only reformatting is
+  not. The path pin therefore failed on the permitted operation and caught nothing the uniqueness
+  check above it did not already catch.
+
 - **The shipped skills now carry their implementation obligations in the references every workflow already loads, instead of re-stating them per workflow.** Six updates (SWU-01..06) consolidate onto the two load-line references, so the rules cannot drift out of sync with the workflows that inherit them. `references/code-annotation.md` §3 now excludes data/domain models — ORM and persistence entities, schema-mapped classes, repository entities, and behaviorless value objects — from unit testing, because their behavior lives at the repository/service seam, not in the fields; the exclusion is named by kind and language so it cannot be read as "skip tests on anything called a model" and does not weaken test-every-changed-path for code that has behavior. `references/implementation-delivery.md` makes worktree isolation mandatory for every implementation task with no size exemption. The commit, spec-driven, and ticket workflows were tightened so a Jira Phase/Wave maps to one Task with per-Task sub-tasks, branch names follow the Phase/Wave, and each Task is one `[KEY]`-prefixed commit, with the three prefix sites (branch, commit, PR) cross-linked rather than duplicated.
 
 - **spec-driven now enforces the target repository's own rules and requires dependency injection per task and per phase.** A new `references/repo-rules-discovery.md` defines how the workflow discovers and loads a target repo's AI-harness rule files (`.claude/`, `.cursor/`, `.cursorrules`, and the repo's module/unit-test/testing-area conventions) before implementation, enforces conformance, and records `repo-rules: none present` rather than fabricating rules when none exist. Independently (DI-01), `references/spec-driven/tasks.md` and `references/spec-driven/execute.md` now require dependency injection at both the per-task and per-phase granularity. Both are inherited through the existing load lines; no workflow body was duplicated, and the four host skill bundles (claude, codex, cursor, opencode) were regenerated from the single source.
