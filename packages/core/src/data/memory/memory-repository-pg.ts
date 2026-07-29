@@ -9,7 +9,7 @@
  * Raw-SQL paths work correctly — both in the API server and in bun:test.
  */
 
-import { logger, MemoryType } from "@massa-ai/shared";
+import { logger, MemoryLevel, MemoryType } from "@massa-ai/shared";
 import { Prisma } from "../../generated/prisma/index.js";
 import { getPrismaClient } from "../../services/query/prisma-client.js";
 import { getProjectIdentityAliasResolver } from "../../services/project-identity/alias-resolver.js";
@@ -230,6 +230,13 @@ export class MemoryRepositoryPg {
       conditions.push(Prisma.sql`type = ANY(${filters.types}::text[])`);
     }
 
+    // `SearchFilters` has declared `includePersistent` as a required field all
+    // along while this method ignored it — the same unmet promise the MCP
+    // `search_memories` schema made. Honoured here too so the type stops lying.
+    if (filters.includePersistent === false) {
+      conditions.push(Prisma.sql`level <> ${MemoryLevel.PERSISTENT}`);
+    }
+
     const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
 
     const rows = await this.prisma.$queryRaw<RawMemory[]>`
@@ -262,6 +269,14 @@ export class MemoryRepositoryPg {
       agentId?: string;
       minImportance?: number;
       types?: MemoryType[];
+      /**
+       * When `false`, L0 (`MemoryLevel.PERSISTENT`) rows are excluded. Applied
+       * in SQL rather than after the fact because the caller asks for a
+       * candidate pool (`limit * 3`) and then re-ranks it — dropping rows after
+       * `LIMIT` would silently shrink that pool instead of filling it with
+       * eligible rows.
+       */
+      includePersistent?: boolean;
     },
   ): Promise<MemoryRow[]> {
     // Match the PostgreSQL FTS input contract: punctuation is a separator, and a
@@ -292,6 +307,8 @@ export class MemoryRepositoryPg {
     if (filters?.minImportance != null) conditions.push(Prisma.sql`importance >= ${filters.minImportance}`);
     if (filters?.types && filters.types.length > 0)
       conditions.push(Prisma.sql`type = ANY(${filters.types}::text[])`);
+    if (filters?.includePersistent === false)
+      conditions.push(Prisma.sql`level <> ${MemoryLevel.PERSISTENT}`);
 
     const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}
       AND NOT EXISTS (

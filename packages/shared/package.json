@@ -28,7 +28,7 @@
   },
   "scripts": {
     "build": "rm -f tsconfig.tsbuildinfo && tsc",
-    "test": "bun test",
+    "test": "MASSA_AI_LLM_ENABLED=false bun test",
     "clean": "rm -rf dist"
   },
   "dependencies": {

@@ -241,6 +241,45 @@ describe.skipIf(!DEDICATED_DB)("MemoryRepositoryPg — coverage", () => {
     expect(results.map((r) => r.id)).toContain(id);
   });
 
+  // BEH-01. "Persistent" is L0 — `MemoryLevel.PERSISTENT` — which is the only
+  // concrete meaning the codebase gives the word; there is no `persistent`
+  // column. Both rows are inserted with the same content token so the filter,
+  // not the query, is what separates them.
+  test("fullTextSearch excludes L0 memories when includePersistent is false", async () => {
+    const persistentId = await insert("lvl-persistent", "tiered recall", [], {
+      level: MemoryLevel.PERSISTENT,
+    });
+    const userId = await insert("lvl-user", "tiered recall", [], {
+      level: MemoryLevel.USER,
+    });
+
+    const withPersistent = await repo.fullTextSearch("tiered", 10, {
+      projectId,
+      minImportance: 0,
+      includePersistent: true,
+    });
+    expect(withPersistent.map((r) => r.id)).toContain(persistentId);
+    expect(withPersistent.map((r) => r.id)).toContain(userId);
+
+    const withoutPersistent = await repo.fullTextSearch("tiered", 10, {
+      projectId,
+      minImportance: 0,
+      includePersistent: false,
+    });
+    // The discriminating pair: the L0 row disappears, the non-L0 row survives.
+    // An assertion on the L0 row alone could also pass by returning nothing.
+    expect(withoutPersistent.map((r) => r.id)).not.toContain(persistentId);
+    expect(withoutPersistent.map((r) => r.id)).toContain(userId);
+
+    // Omitting the filter must behave as `true`, not as `false` — the schema
+    // documents `default: true` and callers rely on it.
+    const omitted = await repo.fullTextSearch("tiered", 10, {
+      projectId,
+      minImportance: 0,
+    });
+    expect(omitted.map((r) => r.id)).toContain(persistentId);
+  });
+
   test("fullTextSearch escapes ILIKE special chars", async () => {
     const id = await insert("escape", "100% reliable", []);
     const results = await repo.fullTextSearch("100%", 10, {

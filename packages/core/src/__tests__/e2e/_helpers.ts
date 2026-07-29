@@ -253,8 +253,15 @@ export async function probeAvailability(): Promise<Availability> {
   let EMBEDDING_MODEL: string | undefined;
 
   if (API_UP) {
+    // These two endpoints are NOT in the API's PUBLIC_PATHS list, so under
+    // AD-011 ("the Tools API never serves an anonymous request") they answer
+    // 401 unless the key is sent. Probing them bare made `ollama.available`
+    // undefined, `OLLAMA_UP` false, and every suite gated on it skip silently
+    // — reporting "2 skip / 0 fail", which reads like a pass. The auth probe
+    // below stays keyless on purpose: its whole job is to observe the 401.
     try {
       const ollama = await fetch(`${API}/api/v1/system/ollama`, {
+        headers: apiHeaders(),
         signal: AbortSignal.timeout(4000),
       }).then((r) => r.json() as Promise<any>);
       OLLAMA_UP = !!ollama?.available;
@@ -264,6 +271,7 @@ export async function probeAvailability(): Promise<Availability> {
     }
     try {
       const info = await fetch(`${API}/api/v1/system/info`, {
+        headers: apiHeaders(),
         signal: AbortSignal.timeout(4000),
       }).then((r) => r.json() as Promise<any>);
       BACKEND = resolveBackendAttestation(

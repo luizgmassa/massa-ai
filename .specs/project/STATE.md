@@ -1,16 +1,95 @@
 # massa-ai Spec State
 
-## Current — Audit Remediation 2026-07
+## Current — Sensor Repair 2026-07
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-sensor-repair-2026-07`
+- workflow: spec-driven (Medium — Specify + Tasks + Execute; Design inline)
+- feature: `sensor-repair-2026-07` — **Executed 2026-07-28. All 9 planned tasks plus 6 unplanned
+  ones are DONE; full gate green. Branch `fix/sensor-repair`, not pushed, no PR yet.**
+- base: `origin/main` @ `a6216cd` (v1.9.0)
+- Artifacts: `.specs/features/sensor-repair-2026-07/{spec.md,design.md,tasks.md,validation.md}`
+- **Six unplanned repairs, each a blocker discovered by trying to use the previous fix.** T6a (a
+  full index aborting on a same-name/different-kind declaration), T6b (`security.allowedExtensions`
+  never propagated from user config), T6c (`capturePolicy` validated then never consulted), T6d (a
+  one-element brace glob matching literally, so a single-extension allow-list indexed nothing), the
+  e2e availability probe sending no API key under mandatory auth (every E2E suite silently
+  skipping), and in-process coverage for two config validators only ever exercised in subprocesses.
+  **None of the six failed loudly** — they aborted, skipped, or reported success over an empty
+  result. That is the same defect class SEN-01..04 exist to remove, found inside the tooling that
+  was supposed to measure it. Full mechanism in `design.md`, Fourth and Fifth forks.
+- scope: 5 requirements — SEN-01 (reset the coverage gate's dedicated DB), SEN-02 (wire
+  `test:coverage` into its own blocking CI workflow), SEN-03 (scratch `XDG_CONFIG_HOME` in the
+  shared test runner), SEN-04 (content-anchor the needles fixture; make a stale needle a hard
+  failure), BEH-01 (honour `includePersistent`). One PR.
+- Why it exists and why it is first: it is the four sensors that
+  `core-layering-god-module-split` will be judged by, and all four are currently unreliable. That
+  refactor is behavior-preserving, so its only proof is the instruments.
+- **Headline finding (new, not in the carried-forward list — nobody had looked).** The needles
+  retrieval gate is not a sensor that might miss a regression; as built it is a sensor that
+  manufactures one. `benchmarks/needles/scorer.ts:94-104` scores a hit only on
+  `filePath` equality **and** line-range intersection, and `benchmarks/needles/run.ts:233-236`
+  skips a missing target with a `[warn]` and scores it zero. 7 of the 14 needles sit in
+  `services/search/`, 4 of them in the `rlm-*` files the refactor renames. Moving them caps
+  `hit@1` at 7/14 = 0.50 against a 0.5 floor and `MRR` at 0.50 against a **0.65** floor — a
+  guaranteed failure independent of retrieval quality. R-01 in the downstream spec had this
+  exactly backwards.
+- Spec-owner decisions closed 2026-07-28:
+  - SEN-01: truncate tables at gate start, keep schema and migrations. Guarded by the *existing*
+    `assertDedicatedDatabase()`, not a second condition — two conditions drift apart, one cannot.
+  - SEN-02: its own `coverage.yml` on the `needles-gate.yml` precedent, **blocking** (no
+    `continue-on-error`), deliberately outside `ci.yml` so it does not extend the `workflow_run`
+    chain `release.yml` keys off.
+  - SEN-03: scratch `XDG_CONFIG_HOME` in `scripts/lib/run-tests-isolated.ts`, mirroring what
+    `check-coverage.ts:402` already does. **Not** 75 new isolation groups — that would take core
+    from 126 forked processes to ~180 on a sequential runner and break T20's pinned invariant.
+  - SEN-04: content-anchor the fixture, before any refactor commit. The loud-failure requirement
+    matters more than the anchoring: the silent skip is what made the gate untrustworthy.
+  - BEH-01: implement the option. Deliberately isolated here so neither PR-B nor PR-C — both
+    behavior-preserving — carries a behavior change.
+- Plan Challenge: **full gate**, mode `red_team`, `massa-ai-plan-critic`, `serious_findings:
+  revise_plan`. Returned `escalate_to_full: true`. **4 findings, all independently verified
+  against source by the main agent before incorporation, all folded into acceptance criteria.**
+  The critic's own framing of the shared failure shape is worth keeping: *the author verified the
+  mechanism that was named, not every mechanism that reaches the same symptom.*
+  1. **SEN-03 does not close the leak it claims to.** `packages/shared/src/env.ts:33-34`
+     dotenv-loads the nearest `.env` walking up from cwd, independently of `XDG_CONFIG_HOME`, and
+     `config/index.ts:575` resolves `envBool("MASSA_AI_LLM_ENABLED", …)` with **env winning over
+     `config.json`**. A repo-root `.env` setting it true bypasses the scratch config dir entirely.
+     Latent in this checkout (no `.env` present), which is why it would have been found the hard
+     way. → new **AC-6**: the runner also neutralizes `MASSA_AI_LLM_*` in the child env.
+  2. **The needles fixture has three consumers, not two.**
+     `packages/core/src/__tests__/e2e/14.needles.test.ts:119-133` replicates `intersects` and
+     `findRank` verbatim against the same JSON. With the 7 `services/search/` targets moved its
+     `hit@5` caps at 0.50 against its own **0.64** floor (`:302`). Gated behind
+     `describe.skipIf(!READY)` (`:236`), so lower blast radius than graded, not exempt. → new
+     **AC-7**.
+  3. **SEN-01 would desync Prisma.** `_prisma_migrations` sits in the same `public` schema, so
+     "truncate every table in the schema" empties the applied-migration bookkeeping while leaving
+     all 24 migrations' DDL applied; the next `migrate deploy` replays non-idempotent
+     `ALTER TABLE ADD COLUMN` and fails. → new **AC-2** (exclude it by name, enumerate tables) and
+     **AC-2a** (`prisma migrate status` reports up-to-date).
+  4. **`packages/core/package.json`'s `"./controllers"` exports subpath** is published npm surface
+     that retiring the layer would strand. Zero consumers, so cheap to remove — but not to ignore.
+     → new **GMS-01 AC-6** downstream.
+  Also raised and accepted: anchor-resolution span drift and anchor uniqueness (→ **AC-8**,
+  **AC-9**), and **R-08** — PR-C bundles a 3-4 file controllers move with a 12-file
+  `data → services` cleanup under one label.
+  Not accepted: nothing. The critic refuted no claim the main agent had verified; the needles
+  arithmetic was independently confirmed by both.
+
+## Previous — Audit Remediation 2026-07
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-audit-remediation-2026-07`
 - workflow: spec-driven (Large — Specify + Design + Tasks + full Plan Challenge + Execute)
-- feature: `audit-remediation-2026-07` — **COMPLETE. PR1 merged and released as v1.8.0;
-  PR2 execute complete on `feat/audit-remediation-debt`, independently validated.**
+- feature: `audit-remediation-2026-07` — **COMPLETE. PR1 merged as `af16ea2`, released v1.8.0;
+  PR2 merged as `ac89d0f`, released v1.9.0. Both independently validated.**
 - worktree (PR1): `/Users/luizmassa/Projects/massa-ai-wt-audit-remediation`; branch
   `fix/audit-remediation-security-and-bugs` off `origin/main` @ `3a25cc6` (v1.7.1)
 - worktree (PR2): `/Users/luizmassa/Projects/massa-ai-wt-audit-remediation-debt`; branch
-  `feat/audit-remediation-debt` off `origin/main` @ `c992ae9` (v1.8.0). Not pushed; no PR open.
+  `feat/audit-remediation-debt` off `origin/main` @ `c992ae9` (v1.8.0). **Merged as `ac89d0f`
+  (PR #41) and released as v1.9.0; worktree and branch are gone.**
 - scope: 17 requirements (SEC-01..06, BUG-01..06, DEBT-01..05) across 22 tasks and 2 PRs
 - Artifacts: `.specs/features/audit-remediation-2026-07/{spec,design,tasks}.md`
 - Origin: knowledge-graph analysis at `17ee708` (1847 nodes / 4226 edges) plus two verification
@@ -548,6 +627,8 @@
 | AD-009 | active (T5) | D5 Cypher subset deferral formally removed — structural graph traversal covers use cases. | `docs/adr/0001-remove-d5-cypher-subset.md` |
 | AD-010 | active (audit-remediation-2026-07 T16/T17) | **This project has exactly one environment-variable prefix: `MASSA_AI_`.** The ten `RLM_LLM_*` vars are hard-renamed to `MASSA_AI_LLM_*` with **no dual-read** — the old names are removed, not deprecated, and setting one has no effect. This **supersedes** the compatibility boundary recorded in `repo-rename-massa-ai` (spec R3.4 / design "explicitly excluded") and `project-identity-rename` ("retained subsystem names … are intentional compatibility boundaries"), both of which are annotated as superseded rather than rewritten. Rationale: `RLM_` names no subsystem that still exists under that name — it is a residual of the pre-rename project identity, so the "subsystem namespace" justification no longer describes anything. A second live prefix also costs a permanent tax on `turbo.json`'s `passThroughEnv`, which today lists only 4 of the 10 vars, so six of them already arrive `undefined` under `bun run test` — a silent bug that a rename without the passThroughEnv completion would have preserved under a new name. Rejected alternatives: (a) **dual-read with deprecation warning** — rejected because it doubles the resolution surface permanently and the repo has no released consumer contract on these vars (they are developer/runtime knobs documented in `.env.example`, not a published API); (b) **leave `RLM_LLM_*` alone** — rejected because it is the last identity residual and keeps two prefixes in every doc and config example; (c) **config.json key migration** — not needed: the config-file keys are already prefix-free, so no config migration ships. Breaking change: yes, announced in `CHANGELOG.md` under `### Changed` at T22. | `packages/shared/src/config/index.ts`, `packages/shared/src/env.ts`, `turbo.json` `passThroughEnv` (all 10 listed), `.env.example`, `packages/core/src/services/memory/llm-client.ts` |
 | AD-011 | active (audit-remediation-2026-07 T3/T15) | **The Tools API never serves an anonymous request.** A key is always present — by `MASSA_AI_API_KEY`, by `security.apiKey` in `config.json`, or by first-start provisioning. The no-key pass-through is deleted, not made configurable: there is no supported way to run the API open. Startup fails non-zero only when no key exists *and* the config file is unwritable. The bind address stays `0.0.0.0` (AS-05) precisely because exposure is now closed by authentication rather than by address, so Docker port mapping keeps working unmodified. Public paths are a fixed, tested list (`/health`, `/swagger`, `/swagger/json`, `/ui`, `/ui/`) matched by prefix, with a decoy-path test proving `/uixyz` is not exempt. | `apps/tools-api/src/middleware/auth.ts` (`initAuth`, `isPublicPath`), `src/startup-config.ts` (`initAuthOrExit`), `packages/shared/src/config/api-key.ts` (`resolveApiKey`), commits `41b2f90` / `976370f` |
+| AD-012 | proposed (core-layering-god-module-split AS-01, closed 2026-07-28; **not yet implemented**) | **The `controllers/` layer is retired. `packages/core` is `tools → services (some of which orchestrate) → data`, enforced by a CI import-direction check.** The four-layer contract stated in `src/index.ts` and `CLAUDE.md` was never adopted: 31 tools, 6 controllers, and `tools → services` 34× against `tools → controllers` 6×. Only **3 of the 6** controllers hold what the contract claims for them — `MemoryController.store` publishes a domain event and fires two background side-effects (`memory-controller.ts:164-171,184-186`), `SearchController.searchProject` emits `search:completed`/`search:reranked` (`search-controller.ts:239-250,282-295`), `ContextController` composes two controllers plus a graph service, compressor and metrics singleton (`context-controller.ts:120-171`). The other three do not: `GraphController` is a validate→call-one-service→reshape wrapper that `tools/trace_path.ts:161` duplicates, `ExecutorController.execute`/`executeFile` are 1:1 wraps whose only addition is error mapping, and `index.ts` is a barrel. Those 3 move into `services/` as named orchestrators, following the precedent **already in the tree**: `WebController` lives at `services/web/web-controller.ts` and both transports instantiate it. `ExecutorController` keeps its exported symbol name because `apps/tools-api/src/routes/executor.ts:13` and `apps/mcp-client/src/embedded-api-client.ts:43` import it directly from the root barrel — it is public surface despite its directory. Rejected alternatives: (a) **adopt controllers for all 31 tools** — rejected on evidence, it is ~7-9 genuinely new orchestration controllers plus ~11 pure pass-throughs written as ceremony, for 34 import rewrites; (b) **keep controllers optional and only fix import direction** — rejected because it leaves "controller" naming nothing precise while `WebController` already contradicts it. Note the layer contract's dominant violation is elsewhere entirely: **24 of the 36 backward imports are `data → services`**, mostly `getPrismaClient`, and are unrelated to this decision. Breaking change: no — the published MCP/REST surface binds to Tool classes, and the one directly-imported controller keeps its name. | `packages/core/src/{index.ts,controllers/,services/}`, `packages/core/package.json` `"./controllers"` exports subpath, `CLAUDE.md` Architecture section |
+| AD-013 | active (sensor-repair-2026-07 SEN-04, implemented 2026-07-28, commits `27dda6c` / `5e018e5` / `d5b5813`) | **A retrieval-benchmark needle is identified by content, not by file position, and an unresolvable needle is a hard failure.** The needles gate scores a hit only on `filePath` equality **and** line-range intersection within `lineTolerance` (5) — `benchmarks/needles/scorer.ts:94-104`, replicated verbatim in `benchmarks/needles/run.ts:85-96` and again in `packages/core/src/__tests__/e2e/14.needles.test.ts:119-133`. `run.ts:233-236` skips a missing target with a `[warn]` and scores the needle **zero**, and `scorer.ts:111,124,135` average that zero over the full needle count rather than dropping it. The consequence is not a weak sensor but an inverted one: 7 of 14 needles sit in `services/search/`, so any refactor that moves them caps `MRR` at 0.50 against a **0.65** floor — a guaranteed failure independent of retrieval quality, indistinguishable from a real regression. Positional pinning is the root defect, not the filename: with `lineTolerance` at 5, a span that moves more than 5 lines inside a file of the same name breaks its needle too. Rejected alternatives: (a) **baseline then mechanically re-point the fixture after the refactor** — rejected because the sensor would be edited by the change it validates, and a re-point landing on subtly different code hides exactly the regression the gate exists to catch; (b) **drop the needles clause and rely on characterization tests** — rejected because it leaves retrieval quality with no sensor at all across the riskiest change in the backlog. The loud-failure half matters more than the anchoring half: a silent skip is what made the gate untrustworthy. **Implemented.** Needles carry a unique code `anchor` plus signed `startOffset`/`endOffset`; `{anchor, endAnchor}` was measured unbuildable (only 3 of 11 needles have both boundaries on a repo-wide-unique code line; N03 ends on a blank line and N13 starts on one) — see `design.md`, Second fork. Resolution runs before any embedding, so a stale fixture costs seconds, not a wrong number. Three consumers became one: `resolve.ts` owns `intersects`/`findRank`. The predicted failure was confirmed by measurement, not reasoning — the gate had been red since `56c84d1` because N07/N08/N09 pointed past EOF of an 81-line file, and repairing the *instrument* alone took MRR from 0.569 to 0.736 with no retrieval code, chunker parameter or floor touched. `scorer.ts` keeps a positional path for external corpora (`sicad`) whose sources are not in this repo; the pass/fail gate `run.ts` does not. | `benchmarks/needles/{resolve.ts,run.ts,scorer.ts,fixtures/massa-ai.json}`, `packages/core/src/__tests__/e2e/{14.needles.test.ts,_helpers.ts}`, `scripts/__tests__/needle-resolution.test.ts` |
 
 ---
 

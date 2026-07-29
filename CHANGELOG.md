@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Indexing no longer aborts when one file declares the same name twice with different
+  kinds.** `let total` in one block and `const total` in another — or `class X` alongside
+  `interface X`, which is ordinary TypeScript declaration merging — made the whole index
+  fail with `fqn_identity_collision`, discarding every file in the run. Measured on this
+  repository: the abort came after all 1219 files had been discovered and parsed, roughly
+  four seconds in, so the visible symptom was a project that simply never became
+  searchable. The uniqueness check that decides whether a symbol gets the simple
+  `file#name` identity or a disambiguated one was counting names per `(file, name, kind)`
+  while the identity it protects is keyed on `(file, name)` alone; two declarations
+  differing only in kind therefore each believed themselves unique and both claimed the
+  same identity. Same-name/same-kind declarations were already disambiguated correctly and
+  are unaffected. Symbols that do not share a name keep the identity they had.
+
+- **An allow-list with exactly one file extension no longer matches nothing.** The three
+  file scanners built a single combined glob, `**/*{.ts,.js,…}`. A brace expansion with one
+  alternative is not an alternation — it is matched literally — so a one-extension allow-list
+  found zero files and indexing reported success over an empty corpus. Measured: a bounded
+  index completed in 181 ms over 0 files. This was unreachable while the extension list was
+  always the 33 built-in defaults, and became reachable with the `security.allowedExtensions`
+  fix below; a single-language project is exactly the case where someone sets one extension.
+
+- **`capturePolicy` in `config.json` now actually reaches indexing.** The block was parsed,
+  bounds-checked and `denyUnknownFields`-validated at config load, and then never consulted:
+  `applyCapturePolicy` had no caller anywhere in the product, so a configured policy narrowed
+  nothing. Discovery now applies it after the `.gitignore` merge, which is the composition
+  `ignore-patterns.ts` has documented since the policy was introduced. With no policy
+  configured the built-in `DEFAULT_POLICY` applies and its `Drop` set mirrors the default
+  ignores, so a default install discovers exactly the same files as before. `Keep` cannot
+  resurrect a path `.gitignore` excludes — the two layers compose with AND, and the ignore
+  layer runs first. Only `Drop` excludes; `MetadataOnly` files are still discovered.
+
+- **`security.allowedExtensions` in `config.json` now actually narrows what gets indexed.**
+  Setting the key had no effect whatsoever: the assembled config hardcoded the built-in
+  default list and never read the value, and the user-facing config type did not declare
+  the field at all — so the value was parsed, then discarded. The indexer, the search index
+  scanner and the MCP upload collector all read the assembled value, so every consumer saw
+  the defaults no matter what the file said. Omitting the key still yields the same 33
+  default extensions, so installs that never set it are unaffected. An **empty array is now
+  rejected at config load** rather than honoured: it would match no files, and indexing
+  would report success over an empty corpus. Entries must be dot-prefixed (`.ts`, not `ts`).
+
+- **`search_memories` honours `includePersistent`.** The option has been advertised in the
+  published MCP tool schema — and forwarded from the tool to the controller — while
+  nothing ever read it, so a caller passing `false` silently received persistent memories
+  anyway. It now excludes L0 (`MemoryLevel.PERSISTENT`) memories: the level assigned to
+  orchestrator decisions and criticals, and the one the bootstrap seed writes. The
+  published schema is unchanged; this makes the existing advertisement true rather than
+  altering it. **Callers passing `includePersistent: false` today will see a smaller
+  result set.** The default remains `true`, so callers that omit it are unaffected.
+
 ## [1.9.0] - 2026-07-28
 
 ### Changed

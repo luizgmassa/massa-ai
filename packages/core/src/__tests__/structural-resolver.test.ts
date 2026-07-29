@@ -958,7 +958,14 @@ describeNative("TS/JS structural resolver", () => {
     expect(session.resolveFqn(result.candidates[0]!.fqn)).toMatchObject({ found: true });
   });
 
-  test("fails session construction on a generation identity collision", () => {
+  // `class Same` + `interface Same` is TypeScript declaration merging — legal
+  // source. It used to abort the entire index with `fqn_identity_collision`,
+  // because the uniqueness count was keyed on `(file, qualifiedName, kind)`
+  // while the FQN it guards is `file#name`: each declaration sat alone in its
+  // kind group, each was classified `unique`, and both claimed `src/main.ts#Same`.
+  // Same-name/same-kind never had this problem — it shared a group and
+  // disambiguated. See `declarationGroupKey` in resolver.ts.
+  test("disambiguates same-name different-kind declarations instead of aborting", () => {
     const document = {
       file: "src/main.ts",
       language: "TypeScript",
@@ -970,11 +977,69 @@ describeNative("TS/JS structural resolver", () => {
         edges: [],
       },
     };
-    expect(() => new StructuralResolverSession(
+
+    const definitions = buildStructuralResolverDefinitions([document]);
+    expect(definitions.map((item) => item.identity.overload)).toEqual(["overloaded", "overloaded"]);
+
+    const session = new StructuralResolverSession(
       [document],
       { knownFiles: ["src/main.ts"] },
       new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER]),
-    )).toThrow("fqn_identity_collision");
+    );
+
+    // Both keep an identity, and the two identities are distinct — the point of
+    // the repair is not merely "does not throw" but "each declaration is still
+    // addressable".
+    const identities = session.identitiesFor("src/main.ts");
+    expect(identities).toHaveLength(2);
+    const fqns = identities.map((item) => item.fqn);
+    expect(new Set(fqns).size).toBe(2);
+    // Neither may claim the bare `file#name` form; that is the shape that collided.
+    expect(fqns.every((fqn) => fqn !== "src/main.ts#Same")).toBe(true);
+    expect(fqns.every((fqn) => session.resolveFqn(fqn).found)).toBe(true);
+  });
+
+  // Discriminating sensor for the repair. A same-name/same-kind pair was ALREADY
+  // handled before the fix, so a test using one cannot tell the two states
+  // apart. Only a different-kind pair can, and this asserts the kind-free group
+  // key directly: restore `\0${symbol.kind}` to `declarationGroupKey` and the
+  // counts below drop to 1, `overload` reverts to "unique", and the session
+  // throws again.
+  test("counts a name as claimed once per file regardless of declaration kind", () => {
+    const document = {
+      file: "src/merged.ts",
+      language: "TypeScript",
+      dialect: "typescript",
+      resolverVersion: "1.0.0",
+      structure: {
+        symbols: [
+          symbol("total", "total", { kind: "variable" }),
+          symbol("total", "total", { kind: "constant" }),
+          symbol("solo", "solo", { kind: "function" }),
+        ],
+        imports: [],
+        edges: [],
+      },
+    };
+
+    const definitions = buildStructuralResolverDefinitions([document]);
+    const byKind = new Map(definitions.map((item) => [item.identity.kind, item.identity]));
+
+    // The contested name is overloaded on BOTH sides, not just the later one.
+    expect(byKind.get("variable")!.overload).toBe("overloaded");
+    expect(byKind.get("constant")!.overload).toBe("overloaded");
+    // An uncontested name in the same file keeps the simple FQN — the repair
+    // widens the group key, it does not disable the legacy shape.
+    expect(byKind.get("function")!.overload).toBe("unique");
+
+    const session = new StructuralResolverSession(
+      [document],
+      { knownFiles: ["src/merged.ts"] },
+      new StructuralResolverRegistry([TYPESCRIPT_LANGUAGE_RESOLVER]),
+    );
+    const fqns = session.identitiesFor("src/merged.ts").map((item) => item.fqn);
+    expect(fqns).toContain("src/merged.ts#solo");
+    expect(new Set(fqns).size).toBe(3);
   });
 
   test("does not propagate exported-class visibility to a percent-encoded private member", () => {

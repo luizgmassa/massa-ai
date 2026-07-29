@@ -23,6 +23,27 @@ const ignore = (ignoreModule as unknown as { default: typeof ignoreModule }).def
 
 export const DEFAULT_EXTENSIONS = [".ts", ".js", ".tsx", ".jsx", ".dart", ".py", ".kt", ".kts"];
 
+/**
+ * Build the glob for an extension allow-list.
+ *
+ * The obvious spelling — a single combined `**​/*{.ts,.js,…}` — has a trap: a
+ * brace expansion with exactly ONE alternative is not an alternation. `glob`
+ * matches `**​/*{.ts}` literally, against files whose names actually end in the
+ * five characters `{.ts}`, so a one-extension allow-list silently matches
+ * nothing and indexing reports success over an empty corpus.
+ *
+ * That was unreachable while the list was hardcoded to the 33 built-in
+ * defaults. Making `security.allowedExtensions` user-settable reaches it, and
+ * a one-language project is exactly when someone would set it.
+ *
+ * Returning one pattern per extension sidesteps brace semantics entirely.
+ * `glob` accepts the array directly and still performs a single traversal, so
+ * the reason the combined form existed is preserved.
+ */
+export function buildExtensionGlob(extensions: readonly string[]): string[] {
+  return extensions.map((ext) => `**/*${ext}`);
+}
+
 export const DEFAULT_IGNORES = [
   // `**/` prefix required so these match anywhere in the tree (not just root).
   "**/node_modules/**",
@@ -99,6 +120,20 @@ export function _resetCapturePolicyCacheForTesting(): void {
  */
 export function applyCapturePolicy(filePath: string): Disposition {
   return applyPolicy(filePath, getActivePolicy());
+}
+
+/**
+ * The active policy object, for callers that must derive a *variant* of it
+ * rather than ask about one path at a time.
+ *
+ * `DiscoverStage` needs this because its `includeTests` option strips the
+ * test/benchmark globs out of `DEFAULT_IGNORES` for one run. The policy layer
+ * carries the same globs, so without the same treatment it would silently
+ * re-drop every test file and neutralize the option. Returning the policy lets
+ * the caller apply that transformation once per run instead of per path.
+ */
+export function getActiveCapturePolicy(): Policy {
+  return getActivePolicy();
 }
 
 /**

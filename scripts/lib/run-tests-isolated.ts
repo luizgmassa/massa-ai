@@ -27,8 +27,86 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
+import { mkdtempSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
+
+/**
+ * Env keys the child must not inherit from the developer's shell (SEN-03).
+ *
+ * A unit test that constructs a subject without pinning its seams can reach a
+ * real LLM provider, because the config layer resolves `llm.enabled` from the
+ * developer's own machine. Measured cost: 42030 ms cold / 690 ms warm against
+ * `bunfig.toml`'s 5 s per-test budget. It passes on a warm model and hangs on a
+ * cold one, so it reads as flakiness, and CI never sees it because CI has no
+ * config file and no `.env`.
+ */
+const LLM_ENV_PREFIX = "MASSA_AI_LLM_";
+
+/**
+ * Escape hatches, deliberately explicit rather than inferred.
+ *
+ * `MASSA_AI_TEST_CONFIG_HOME` exists because `XDG_CONFIG_HOME` cannot tell us
+ * what we need to know. A caller that set it on purpose (`check-coverage.ts`
+ * points it at its own scratch dir) is indistinguishable from a Linux shell
+ * that exports it to the real `~/.config` — and honouring the second would
+ * reopen the exact leak this closes. So the intent gets its own variable.
+ */
+const CONFIG_HOME_OVERRIDE = "MASSA_AI_TEST_CONFIG_HOME";
+const ALLOW_LLM_ENV = "MASSA_AI_TEST_ALLOW_LLM";
+
+/**
+ * Build the environment a test child runs under.
+ *
+ * Two independent leak paths reach the same symptom, and closing only the
+ * first — which is what "point it at a scratch config dir" does on its own —
+ * leaves the second wide open:
+ *
+ *  1. `config.json`, resolved under `CONFIG_DIR`, which derives from
+ *     `XDG_CONFIG_HOME`. Closed by pointing that at a scratch directory.
+ *  2. `.env`. `packages/shared/src/env.ts` dotenv-loads the nearest `.env`
+ *     walking up from cwd, entirely independently of `XDG_CONFIG_HOME`, and
+ *     `packages/shared/src/config/index.ts` resolves
+ *     `envBool("MASSA_AI_LLM_ENABLED", fileConfig.llm?.enabled ?? false)` —
+ *     **env wins over `config.json`**. A repo-root `.env` setting it true
+ *     sails straight past a scratch config dir, which is never consulted
+ *     because the env var already decided.
+ *
+ * Exported for direct unit testing: the whole point is that its behaviour is
+ * asserted rather than inferred from a passing suite.
+ */
+export function buildChildEnv(
+  parentEnv: NodeJS.ProcessEnv,
+  scratchConfigHome: string,
+): NodeJS.ProcessEnv {
+  const child: NodeJS.ProcessEnv = { ...parentEnv };
+
+  child.XDG_CONFIG_HOME = parentEnv[CONFIG_HOME_OVERRIDE] ?? scratchConfigHome;
+
+  if (parentEnv[ALLOW_LLM_ENV] !== "1") {
+    for (const key of Object.keys(child)) {
+      if (key.startsWith(LLM_ENV_PREFIX)) delete child[key];
+    }
+    // Deleting is not enough on its own, and this is the whole trap.
+    //
+    // Bun auto-loads `.env` in the child *before* any user code runs, and an
+    // absent key is exactly what that repopulates — so stripping
+    // `MASSA_AI_LLM_ENABLED` and stopping there hands the child the very value
+    // we removed. An explicitly assigned value survives, because an inherited
+    // env var outranks Bun's `.env` load. Proven by probe, not assumed:
+    //   key absent  -> `.env` wins, value comes back
+    //   key = false -> assignment wins, `.env` is ignored
+    //
+    // Only the gate needs pinning. With `enabled` false, nothing reads the
+    // other nine, so they stay deleted rather than being assigned empty
+    // strings — an empty `MASSA_AI_LLM_MODEL` would be a worse lie than an
+    // absent one.
+    child.MASSA_AI_LLM_ENABLED = "false";
+  }
+
+  return child;
+}
 
 /** One unit of execution: a label for reporting and the files to run in it. */
 export interface TestGroup {
@@ -204,6 +282,13 @@ export async function runIsolatedTests(options: RunnerOptions): Promise<void> {
     console.log(`[test-isolation] coverage -> ${coverage.directory} (one subdir per group)`);
   }
 
+  // One scratch config dir per invocation, shared by every group: the children
+  // are sequential, so a per-group dir would only re-provision an API key each
+  // time without isolating anything further.
+  const scratchConfigHome = mkdtempSync(path.join(os.tmpdir(), "massa-ai-test-config-"));
+  const childEnv = buildChildEnv(process.env, scratchConfigHome);
+  console.log(`[test-isolation] XDG_CONFIG_HOME=${childEnv.XDG_CONFIG_HOME} (scratch)`);
+
   let activeChild: ChildProcess | undefined;
   let forwardedSignal: NodeJS.Signals | undefined;
   const handledSignals: NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
@@ -237,7 +322,7 @@ export async function runIsolatedTests(options: RunnerOptions): Promise<void> {
     return new Promise((resolve, reject) => {
       activeChild = spawn(process.execPath, ["test", ...coverageArguments, ...files], {
         cwd: packageRoot,
-        env: process.env,
+        env: childEnv,
         stdio: "inherit",
       });
       activeChild.once("error", reject);

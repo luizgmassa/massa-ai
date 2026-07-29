@@ -15,7 +15,7 @@ import path from "path";
 import { glob } from "glob";
 import { randomUUID } from "node:crypto";
 import { smartChunk } from "./smart-chunker.js";
-import { loadProjectIgnore } from "./ignore-patterns.js";
+import { buildExtensionGlob, loadProjectIgnore } from "./ignore-patterns.js";
 import { IndexManager } from "./index-manager.js";
 import { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
 import { getVectorStore } from "../../data/vector/vector-store-factory.js";
@@ -143,7 +143,7 @@ export async function _indexProjectInternalImpl(
     const ig = await loadGitignoreImpl(projectPath);
 
     // Find all relevant files
-    const files = await globAsync(`**/*{${allowedExtensions.join(",")}}`, {
+    const files = await globAsync(buildExtensionGlob(allowedExtensions), {
       cwd: projectPath,
       absolute: true,
       nodir: true,

@@ -138,6 +138,10 @@ export interface MassaAiConfig {
     // no cross-origin request is permitted at all — the previous behavior
     // reflected any Origin back with credentials enabled.
     corsOrigins?: string[];
+    // Dot-prefixed file extensions the indexer and search scanners consider.
+    // Omit to use DEFAULT_ALLOWED_EXTENSIONS; an empty array is rejected at
+    // load time because it would silently index nothing.
+    allowedExtensions?: string[];
   };
   // NOTE: `scheduler` is intentionally NOT a config key — it is env-driven
   // (MASSA_AI_SCHEDULER_ENABLED + job-stale/reaper env vars). Do not add it.

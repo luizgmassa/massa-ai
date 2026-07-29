@@ -34,13 +34,15 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { smartChunk, type ChunkerConfig, type Chunk } from "../../packages/core/src/services/search/smart-chunker.ts";
+import {
+  resolveNeedles,
+  findRank,
+  NeedleResolutionError,
+  type NeedleExpected,
+  type ResolvedSpan,
+} from "./resolve.ts";
 
 // ── Types (mirror fixtures/massa-ai.json + scorer.ts) ───────────────────
-interface NeedleExpected {
-  filePath: string;
-  lineStart: number;
-  lineEnd: number;
-}
 interface Needle {
   id: string;
   category: string;
@@ -53,7 +55,13 @@ interface Dataset {
   projectId: string;
   version: string;
   description: string;
-  scoring: { topK: number; hitAtK: number[]; lineTolerance: number; notes: string };
+  scoring: {
+    topK: number;
+    hitAtK: number[];
+    lineTolerance: number;
+    notes: string;
+    staleNeedles?: string[];
+  };
   needles: Needle[];
 }
 interface Hit {
@@ -76,24 +84,8 @@ interface ResultsFile {
   results: RawResult[];
 }
 
-// ── Scoring (verbatim semantics from benchmarks/needles/scorer.ts) ─────────
-function intersects(a: [number, number], b: [number, number], tol: number): boolean {
-  const aStart = a[0] - tol;
-  const aEnd = a[1] + tol;
-  return !(aEnd < b[0] || aStart > b[1]);
-}
-function findRank(needle: Needle, hits: Hit[], tol: number): { rank: number | null; hit: Hit | null } {
-  for (let i = 0; i < hits.length; i++) {
-    const h = hits[i];
-    if (
-      h.filePath === needle.expected.filePath &&
-      intersects([h.lineStart, h.lineEnd], [needle.expected.lineStart, needle.expected.lineEnd], tol)
-    ) {
-      return { rank: i + 1, hit: h };
-    }
-  }
-  return { rank: null, hit: null };
-}
+// Scoring comes from ./resolve.ts — one copy, shared with scorer.ts and the
+// e2e suite. This file used to carry its own transcription of it.
 
 // ── Embedding (Ollama /api/embeddings, bounded-parallel pool) ─────────────
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? "http://localhost:11434";
@@ -224,16 +216,53 @@ async function main() {
   }
   if (args.addFileContext !== undefined) cfgOverride.addFileContext = args.addFileContext === "true";
 
+  // ── Resolve every needle to a concrete span BEFORE anything else (SEN-04).
+  //
+  // A stale fixture used to degrade into a plausible wrong number: a missing
+  // file printed `[warn] … skipping` and continued, and a span past EOF printed
+  // nothing at all. Both averaged in as a zero, indistinguishable from a real
+  // retrieval regression. Resolution now fails the run instead, before a single
+  // embedding is computed, so a stale fixture costs seconds rather than a
+  // wrong number nobody can tell is wrong.
+  let resolvedNeedles;
+  try {
+    resolvedNeedles = resolveNeedles(dataset.needles, repoRoot, {
+      staleNeedles: dataset.scoring.staleNeedles,
+    });
+  } catch (err) {
+    if (err instanceof NeedleResolutionError) {
+      console.error(`\n[needle-resolution] ${err.code}\n${err.message}\n`);
+      process.exit(1);
+    }
+    throw err;
+  }
+
+  const spans = new Map<string, ResolvedSpan>(
+    resolvedNeedles.map((r) => [r.needle.id, r.resolved]),
+  );
+  const grandfathered = resolvedNeedles.filter((r) => r.positional).map((r) => r.needle.id);
+  if (grandfathered.length > 0) {
+    console.error(
+      `\n[needle-resolution] ${grandfathered.length} needle(s) still carry a legacy positional ` +
+        `target and are exempt from anchor resolution: ${grandfathered.join(", ")}.\n` +
+        `  Their scores are NOT trustworthy. This exemption is temporary by construction — ` +
+        `see scoring.staleNeedlesNote in the fixture.`,
+    );
+  }
+
   // Collect the set of source files referenced by needles, chunk each once.
-  const files = Array.from(new Set(dataset.needles.map((n) => n.expected.filePath)));
+  const files = Array.from(new Set(resolvedNeedles.map((r) => r.resolved.filePath)));
   type ChunkRec = { filePath: string; lineStart: number; lineEnd: number; content: string };
   const allChunks: ChunkRec[] = [];
   const chunkStats: Record<string, { chunks: number; avgLines: number; avgChars: number }> = {};
   for (const rel of files) {
     const abs = resolve(repoRoot, rel);
     if (!existsSync(abs)) {
-      console.error(`[warn] needle file missing, skipping: ${rel}`);
-      continue;
+      // Unreachable via resolution, which verifies existence for both the
+      // anchored and the grandfathered path. Kept as a hard failure rather than
+      // a skip: the skip is what made this gate untrustworthy.
+      console.error(`[needle-resolution] NEEDLE_FILE_MISSING: ${rel}`);
+      process.exit(1);
     }
     const content = readFileSync(abs, "utf8");
     const chunks: Chunk[] = smartChunk(content, rel, cfgOverride);
@@ -279,7 +308,7 @@ async function main() {
   const topK = dataset.scoring.topK;
   const perNeedle: Array<{
     id: string; difficulty: string; query: string;
-    rank: number | null; topHit: Hit | null; expected: NeedleExpected;
+    rank: number | null; topHit: Hit | null; expected: ResolvedSpan;
     reciprocalRank: number; empty: boolean;
   }> = [];
   const rawResults: RawResult[] = [];
@@ -305,14 +334,15 @@ async function main() {
     }));
     const empty = hits.length === 0;
     if (empty) emptyNeedles.push(needle.id);
-    const { rank } = findRank(needle, hits, tol);
+    const expectedSpan = spans.get(needle.id)!;
+    const { rank } = findRank(expectedSpan, hits, tol);
     perNeedle.push({
       id: needle.id,
       difficulty: needle.difficulty,
       query: needle.query,
       rank,
       topHit: hits[0] ?? null,
-      expected: needle.expected,
+      expected: expectedSpan,
       reciprocalRank: rank ? 1 / rank : 0,
       empty,
     });

@@ -349,7 +349,7 @@ export const MAX_IGNORE_PATTERNS = 1_024;
  * pure module's `validatePolicy` remains the authoritative validator for
  * direct callers; this is the config-load-time gate.
  */
-function validateCapturePolicyConfig(
+export function validateCapturePolicyConfig(
   raw: unknown,
 ): {
   rules: Array<{ pattern: string; disposition: "Keep" | "Drop" | "MetadataOnly" }>;
@@ -395,6 +395,34 @@ function validateCapturePolicyConfig(
     ...(p.maxMatchWork !== undefined && { maxMatchWork: p.maxMatchWork as number }),
     ...(p.maxIgnorePatterns !== undefined && { maxIgnorePatterns: p.maxIgnorePatterns as number }),
   };
+}
+
+/**
+ * Validate a `security.allowedExtensions` config block at load time.
+ *
+ * Rejects an empty array rather than honouring it. An empty allow-list is
+ * syntactically fine and semantically catastrophic — the glob in
+ * `discover.ts` would match nothing, so indexing would report success over
+ * zero files. That is the silent-zero failure this repo keeps paying for;
+ * a typo here fails at config load instead.
+ */
+export function validateAllowedExtensionsConfig(raw: unknown): string[] {
+  if (!Array.isArray(raw)) {
+    throw new TypeError("security.allowedExtensions must be an array of strings");
+  }
+  if (raw.length === 0) {
+    throw new TypeError(
+      "security.allowedExtensions must not be empty — an empty allow-list indexes nothing; omit the key to use the defaults",
+    );
+  }
+  for (const ext of raw) {
+    if (typeof ext !== "string" || !ext.startsWith(".") || ext.length < 2) {
+      throw new TypeError(
+        `security.allowedExtensions[] must be dot-prefixed extensions (got ${JSON.stringify(ext)})`,
+      );
+    }
+  }
+  return [...(raw as string[])];
 }
 
 /**
@@ -793,7 +821,17 @@ export const defaultConfig: ServerConfig = {
     sanitizeInputs: process.env.SANITIZE_INPUTS !== "false",
     maxIndexSize: 100000, // max files to index
     maxFileSize: 1024 * 1024, // 1MB per file
-    allowedExtensions: [...DEFAULT_ALLOWED_EXTENSIONS],
+    // `DEFAULT_ALLOWED_EXTENSIONS`' own doc comment has always promised that
+    // "User config (`security.allowedExtensions`) overrides this at runtime".
+    // It did not: this key was hardcoded to the default, and the user-facing
+    // `MassaAiConfig.security` block did not even declare the field, so a
+    // value set in config.json was read by `loadConfigSafe` and then dropped
+    // here. `discover.ts` reads the assembled value, so the whole override
+    // path was inert. Wired to `fileConfig` the same way `corsOrigins` below
+    // already is.
+    allowedExtensions: fileConfig.security?.allowedExtensions
+      ? validateAllowedExtensionsConfig(fileConfig.security.allowedExtensions)
+      : [...DEFAULT_ALLOWED_EXTENSIONS],
     excludePatterns: [
       "node_modules/**",
       ".git/**",

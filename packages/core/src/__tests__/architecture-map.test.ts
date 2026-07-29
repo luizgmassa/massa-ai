@@ -16,7 +16,7 @@
  * full-repo index (mirrors typed-edges.test.ts).
  */
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
 import { describeNative } from "./_helpers/native-skip.js";
 import {
   runLouvain,
@@ -429,6 +429,55 @@ import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
 import { getSymbolRepository } from "../data/symbol/symbol-repository-factory.js";
 import { WorkspaceManager } from "../services/workspace/workspace-manager.js";
 
+/**
+ * Deterministic embedding seam (SEN-01 AC-3).
+ *
+ * Without this the ETL's two `getVectorStore()` call sites — `pipeline.ts:219`
+ * on `forceReindex` and `stages/load.ts:344` per file — construct a real
+ * `PostgresVectorStore`, whose `ensureInitialized()` calls
+ * `getEmbeddingDimensions()` and so runs live embedding-provider
+ * auto-selection. On a machine with a local Ollama that reloads an evicted
+ * `qwen3-embedding:8b`, and the file's wall clock stops being a property of
+ * this fixture.
+ *
+ * Measured across three full `test:coverage` runs, splitting provider init from
+ * the rest of the file:
+ *
+ *   | run       | provider init | whole file | file − provider |
+ *   |-----------|---------------|------------|-----------------|
+ *   | with reset|     3.29 s    |   5.23 s   |     1.94 s      |
+ *   | no reset  |     2.80 s    |   3.68 s   |     0.88 s      |
+ *   | with reset|   117.46 s    | 119.47 s   |     2.01 s      |
+ *
+ * The test's own cost is flat at 0.9–2.0 s; 100% of the variance is the
+ * provider. This is the omission `CLAUDE.md` documents — "the test is missing a
+ * seam, not a timeout" — and the identical fix applied in `rlm-admin.test.ts`
+ * and `contextual-search-rlm-coverage.test.ts`.
+ *
+ * It does not weaken what this file asserts. Every assertion below reads the
+ * symbol graph — packages, entryPoints, hotspots, communities, layers, routes,
+ * topCentralFiles — which `symbolGraphService.getProjectMap` serves from the
+ * real Postgres symbol repository, populated by real tree-sitter structural
+ * parsing. No assertion touches a vector, a similarity score, or a chunk
+ * embedding. Only the vector sink is faked; discover, parse, resolve and symbol
+ * persistence all still run for real.
+ *
+ * The faked surface is exactly what the ETL exercises: `deleteByProject`
+ * (`pipeline.ts:222`, reached because these tests pass `forceReindex: true`),
+ * `addDocuments` (`stages/load.ts:344`), and the `getCollection`/`getStats`
+ * pair the best-effort search-admission marker uses (`pipeline.ts:506` →
+ * `IndexManager.saveIndexMetadata`). The marker write is already wrapped in a
+ * non-fatal try/catch; satisfying it keeps the run free of a misleading warn.
+ */
+mock.module("../data/vector/vector-store-factory.js", () => ({
+  getVectorStore: async () => ({
+    addDocuments: async () => {},
+    deleteByProject: async () => {},
+    getCollection: async () => ({ add: async () => {} }),
+    getStats: async () => ({ embeddingDimensions: 768 }),
+  }),
+}));
+
 const TEST_PROJECT = "p4d4-arch-map";
 
 /**
@@ -564,23 +613,35 @@ describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
     // Each of the three tests in this block indexes a fixture repo through the
     // real native tree-sitter pipeline into Postgres, then queries back over it.
     //
-    // Its cost is a function of how much is already in the shared test database,
-    // not of the fixture. Measured on the same command and the same file: 24 pass
-    // in **1213 ms** against a fresh-ish database, **16.59 s** against the state
-    // `bun run test:coverage` leaves behind, and over **120 s** when run partway
-    // through that gate, after ~100 earlier groups have written to it.
+    // The budget was `300_000` and the comment here used to explain it as
+    // accumulated shared-database state: 24 pass in 1213 ms against a fresh
+    // database, 16.59 s against the state `test:coverage` leaves behind, over
+    // 120 s partway through that gate. It ruled out contention — the runner is
+    // strictly sequential — and concluded accumulation.
     //
-    // This is NOT contention — `scripts/lib/run-tests-isolated.ts` runs groups
-    // strictly sequentially (`for … await runGroup`), one child process at a
-    // time. It is accumulation.
+    // That conclusion was wrong, and the reasoning is why: it excluded
+    // contention and then asserted accumulation without testing the third
+    // option `CLAUDE.md` names as the commoner cause. Decomposing three full
+    // gate runs into provider-init versus the rest put the file's own cost flat
+    // at 0.9–2.0 s while provider init swung 2.80 s → 117.46 s. All of the
+    // variance was Ollama reloading an evicted `qwen3-embedding:8b`, none of it
+    // the database. A `60_000` budget set from that misreading failed on the
+    // very next run at 119.47 s.
     //
-    // The budget is therefore a stopgap and is honest about being one: it will
-    // drift again as the test database grows. The real fix is for the gate to
-    // start from a known database state, the same way it already starts from a
-    // scratch `XDG_CONFIG_HOME` — see `scripts/check-coverage.ts`. That is a
-    // destructive operation on a developer's database and was not taken
-    // unilaterally.
-  }, 300_000);
+    // With the `getVectorStore` seam above, no provider is ever constructed.
+    // Measured on this machine against the dedicated test database, under the
+    // developer's real config with a live Ollama available:
+    //
+    //     24 pass, 0 fail —   895 ms  plain
+    //     24 pass, 0 fail —  1008 ms  under `--coverage` (1.13× instrumentation)
+    //
+    // `30_000` is chosen against two anchors rather than as a round number. It
+    // sits above the largest historical reading that was never decomposed
+    // (16.59 s), so genuine accumulation cannot make it flap; and below the
+    // smallest documented cold-provider load (42030 ms, `CLAUDE.md`), so
+    // deleting the seam above makes this test fail rather than merely slow down.
+    // That is the property a budget is for. Raise it only with a measurement.
+  }, 30_000);
 
   test("routes surfaced from http_call edges (fetch('/api/items'))", async () => {
     const dir = await makeTempProject(FIXTURE);
@@ -598,7 +659,7 @@ describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
-  }, 300_000);
+  }, 30_000);
 
   test("architecture failure never breaks the base response (defensive)", async () => {
     // Even if the env is broken, getProjectMap must either return null (no
@@ -615,5 +676,5 @@ describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
-  }, 300_000);
+  }, 30_000);
 });

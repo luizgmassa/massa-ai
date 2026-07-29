@@ -47,6 +47,48 @@
  * against a `CONFIG_DIR` frozen at first import, and 75 files under
  * `packages/core/src/__tests__` import `@massa-ai/shared`.
  *
+ * ## Why this truncates the dedicated database first (SEN-01)
+ *
+ * The scratch config dir above makes the numbers independent of the machine.
+ * It does nothing about the database, which carries every previous run's rows
+ * into the next one. `resetDedicatedDatabase` below empties the data tables
+ * before the first suite starts, so each gate run begins where CI begins: an
+ * empty database. It truncates rows only — schema and Prisma's migration
+ * history survive, and the gate never re-runs migrations.
+ *
+ * What it buys, measured rather than assumed:
+ *
+ *   - A known starting state, which is the same argument as the scratch config
+ *     dir: the floor this enforces should be the floor CI can reproduce, and CI
+ *     always starts empty.
+ *   - `postgres-vector-store.integration.test.ts` asserts on absolute row counts
+ *     and goes from 8 failures to 6 across the same gate run when the database
+ *     starts clean. (The remaining 6 are contamination from *other suites in the
+ *     same run*, which a reset at gate start cannot reach.)
+ *
+ * What it does NOT buy, contrary to how SEN-01 was originally specified: it does
+ * not stabilise `architecture-map.test.ts`'s timing. That was the stated reason
+ * for the `300_000` stopgap those cases carried, and the diagnosis was wrong.
+ * Measured across three full gate runs, with and without this reset:
+ *
+ *   | run          | provider init | whole file | file - provider |
+ *   |--------------|---------------|------------|-----------------|
+ *   | with reset   |      3.29 s   |    5.23 s  |        1.94 s   |
+ *   | no reset     |      2.80 s   |    3.68 s  |        0.88 s   |
+ *   | with reset   |    117.46 s   |  119.47 s  |        2.01 s   |
+ *
+ * The test's own cost is flat at 0.9-2.0 s. Every second of the variance is
+ * Ollama reloading an evicted `qwen3-embedding:8b` during embedding-provider
+ * auto-selection. The original evidence — "the isolation runner is strictly
+ * sequential, so this is accumulation, not contention" — ruled out contention
+ * and then asserted accumulation without testing the third option, which the
+ * repo's own CLAUDE.md names as the commoner cause of exactly this symptom.
+ *
+ * The cost of this reset is roughly 38 s per gate run, because it also empties
+ * the embedding cache. That is the right trade: a warm cache skips the provider
+ * path entirely, which changes *which code paths execute* and therefore what
+ * coverage measures. CI never has one.
+ *
  * ## `packages/core` merges 122 lcov files for 126 groups — expected
  *
  * Bun writes `lcov.info` only when a run's coverage record set is non-empty. A
@@ -75,6 +117,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { Client } from "pg";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "..");
 
@@ -345,6 +388,27 @@ export function isMeasuredSource(relativePath: string): boolean {
 }
 
 /**
+ * The single definition of "this database is scratch".
+ *
+ * Two call sites need it: the run gate below, and `resetDedicatedDatabase`,
+ * which truncates. Writing the reset its own condition would be the usual way
+ * a destructive operation ends up pointed at a database nobody designated as
+ * disposable — the two conditions agree on the day they are written and drift
+ * apart on some later day. One predicate cannot drift from itself.
+ *
+ * It takes `env` explicitly so the refusal path is testable without mutating
+ * the process environment out from under a parallel test file.
+ */
+export function isDedicatedDatabase(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return (
+    env.MASSA_AI_DEDICATED === "1" &&
+    /127\.0\.0\.1:5433\/massa_ai_test(?:\?|$)/.test(env.DATABASE_URL ?? "")
+  );
+}
+
+/**
  * 50 of core's suites are wrapped in `describe.skipIf(!DEDICATED_DB)`, which
  * requires `MASSA_AI_DEDICATED=1` **and** a `DATABASE_URL` pointing at the
  * dedicated `127.0.0.1:5433/massa_ai_test` instance. Without both, those suites
@@ -358,11 +422,8 @@ export function isMeasuredSource(relativePath: string): boolean {
  */
 function assertDedicatedDatabase(): void {
   const databaseUrl = process.env.DATABASE_URL ?? "";
-  const dedicated =
-    process.env.MASSA_AI_DEDICATED === "1" &&
-    /127\.0\.0\.1:5433\/massa_ai_test(?:\?|$)/.test(databaseUrl);
 
-  if (dedicated) return;
+  if (isDedicatedDatabase()) return;
 
   console.error(
     [
@@ -382,6 +443,103 @@ function assertDedicatedDatabase(): void {
   process.exit(2);
 }
 
+/**
+ * Tables the reset must never empty, by name.
+ *
+ * `_prisma_migrations` is Prisma's applied-migration bookkeeping and it lives in
+ * the same `public` schema as every data table. The obvious implementation —
+ * truncate the schema — therefore empties it while leaving all 24 migrations'
+ * DDL applied, and the next `prisma migrate deploy` replays non-idempotent
+ * `ALTER TABLE ADD COLUMN` against columns that already exist and fails. The
+ * database looks fine until the next migration, which is the worst time to find
+ * out.
+ */
+export const TRUNCATION_EXCLUSIONS: ReadonlyArray<string> = ["_prisma_migrations"];
+
+/**
+ * Which of the schema's tables the reset truncates.
+ *
+ * The table list is read from the catalog at run time rather than hardcoded.
+ * A hardcoded list goes stale the first time a migration adds a table, and a
+ * reset that quietly stops resetting one table is the same defect as the
+ * accumulated state this exists to remove — it would just take longer to
+ * notice. The exclusion is the part that is hardcoded, because it is the part
+ * that must not drift.
+ */
+export function selectTruncationTargets(tableNames: readonly string[]): string[] {
+  return tableNames.filter((name) => !TRUNCATION_EXCLUSIONS.includes(name));
+}
+
+/** `-1` when the table is absent — a database that was never migrated. */
+async function countMigrationRows(client: Client, present: readonly string[]): Promise<number> {
+  if (!present.includes("_prisma_migrations")) return -1;
+  const { rows } = await client.query<{ count: string }>(
+    'SELECT count(*)::text AS count FROM "public"."_prisma_migrations"',
+  );
+  return Number(rows[0]?.count ?? "0");
+}
+
+/**
+ * Empty the dedicated database's data tables before any suite runs.
+ *
+ * Why it is safe here and nowhere else: it refuses unless `isDedicatedDatabase`
+ * holds — the same predicate that already refuses to run the gate at all.
+ * Requiring `MASSA_AI_DEDICATED=1` *and* the exact `127.0.0.1:5433/massa_ai_test`
+ * URL means the developer has already designated that database as disposable.
+ * The refusal is a throw rather than a `process.exit`, so a caller that reaches
+ * it by mistake gets a stack trace instead of a silent status code.
+ *
+ * `CASCADE` follows foreign keys out of the listed set, so leaving
+ * `_prisma_migrations` off the list is not on its own proof that it survived.
+ * The row count is read before and after and compared, which turns the
+ * exclusion into something checked on every run rather than something checked
+ * once by hand with `prisma migrate status`.
+ */
+export async function resetDedicatedDatabase(
+  env: Record<string, string | undefined> = process.env,
+): Promise<void> {
+  if (!isDedicatedDatabase(env)) {
+    throw new Error(
+      "[coverage] refusing to truncate: DATABASE_URL is not the dedicated test database. " +
+        "Requires MASSA_AI_DEDICATED=1 and a DATABASE_URL on 127.0.0.1:5433/massa_ai_test.",
+    );
+  }
+
+  const client = new Client({ connectionString: env.DATABASE_URL });
+  await client.connect();
+  try {
+    const { rows } = await client.query<{ tablename: string }>(
+      "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename",
+    );
+    const present = rows.map((row) => row.tablename);
+    const targets = selectTruncationTargets(present);
+
+    if (targets.length === 0) {
+      console.log("[coverage] reset: no data tables in public — nothing to truncate");
+      return;
+    }
+
+    const before = await countMigrationRows(client, present);
+    const quoted = targets.map((name) => `"public"."${name.replace(/"/g, '""')}"`).join(", ");
+    await client.query(`TRUNCATE TABLE ${quoted} RESTART IDENTITY CASCADE`);
+    const after = await countMigrationRows(client, present);
+
+    if (before !== after) {
+      throw new Error(
+        `[coverage] the reset emptied Prisma's migration history (${before} rows -> ${after}). ` +
+          "The next `prisma migrate deploy` would replay non-idempotent DDL and fail. Aborting.",
+      );
+    }
+
+    console.log(
+      `[coverage] reset: truncated ${targets.length} data table(s); ` +
+        `${TRUNCATION_EXCLUSIONS.join(", ")} intact at ${after} row(s)`,
+    );
+  } finally {
+    await client.end();
+  }
+}
+
 async function main(): Promise<void> {
   assertDedicatedDatabase();
   const only = process.argv.slice(2).filter((argument) => !argument.startsWith("-"));
@@ -393,13 +551,28 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
+  // After the unit filter, so a mistyped unit name exits without having
+  // truncated anything. Before the first suite, because the point is that every
+  // suite below starts from the same database state.
+  await resetDedicatedDatabase();
+
   const merged = new Map<string, FileCoverage>();
   const failedUnits: string[] = [];
 
   // See the header: an empty scratch config dir is CI's state, and it is what
   // makes these numbers a property of the tree rather than of this machine.
+  //
+  // `MASSA_AI_TEST_CONFIG_HOME` is how this composes with the isolated runner
+  // rather than fighting it. That runner also mints a scratch config dir, and
+  // it cannot tell a deliberate `XDG_CONFIG_HOME` from a Linux shell exporting
+  // the real `~/.config` — so intent travels in its own variable, and this dir
+  // wins for every child the runner spawns underneath us.
   const configHome = fs.mkdtempSync(path.join(os.tmpdir(), "massa-ai-coverage-"));
-  const childEnv = { ...process.env, XDG_CONFIG_HOME: configHome };
+  const childEnv = {
+    ...process.env,
+    XDG_CONFIG_HOME: configHome,
+    MASSA_AI_TEST_CONFIG_HOME: configHome,
+  };
   console.log(`[coverage] XDG_CONFIG_HOME=${configHome} (scratch; the real user config is not read)`);
 
   for (const unit of units) {

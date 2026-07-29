@@ -53,6 +53,11 @@ import {
   ensureSharedIndex,
   PROJECT_PATH,
 } from "./_helpers";
+import {
+  resolveNeedles,
+  findRank,
+  type ResolvedSpan,
+} from "../../../../../benchmarks/needles/resolve.ts";
 
 // ── Gating ────────────────────────────────────────────────────────────────
 // Two-stage gate: RUN_E2E + API up + Ollama up (search needs embeddings).
@@ -89,10 +94,16 @@ const FIXTURE_PATH = path.join(
   "benchmarks/needles/fixtures/massa-ai.json",
 );
 
+// The fixture's own shape. `expected` is a content anchor plus signed line
+// offsets — never a physical position — and the concrete span comes from
+// `resolveNeedles` against the working tree.
 interface NeedleExpected {
-  filePath: string;
-  lineStart: number;
-  lineEnd: number;
+  anchor?: string;
+  startOffset?: number;
+  endOffset?: number;
+  filePath?: string;
+  lineStart?: number;
+  lineEnd?: number;
 }
 interface Needle {
   id: string;
@@ -106,7 +117,7 @@ interface Dataset {
   projectId: string;
   version: string;
   description: string;
-  scoring: { topK: number; hitAtK: number[]; lineTolerance: number; notes: string };
+  scoring: { topK: number; hitAtK: number[]; lineTolerance: number; notes: string; staleNeedles?: string[] };
   needles: Needle[];
 }
 interface Hit {
@@ -116,26 +127,15 @@ interface Hit {
   score: number;
 }
 
-/** Replicates scorer.ts#intersects with ±tol on each side of range a. */
-function intersects(a: [number, number], b: [number, number], tol: number): boolean {
-  const aStart = a[0] - tol;
-  const aEnd = a[1] + tol;
-  return !(aEnd < b[0] || aStart > b[1]);
-}
-
-/** Replicates scorer.ts#findRank: first hit matching filePath + line intersect. */
-function findRank(needle: Needle, hits: Hit[], tol: number): { rank: number | null; hit: Hit | null } {
-  for (let i = 0; i < hits.length; i++) {
-    const h = hits[i];
-    if (
-      h.filePath === needle.expected.filePath &&
-      intersects([h.lineStart, h.lineEnd], [needle.expected.lineStart, needle.expected.lineEnd], tol)
-    ) {
-      return { rank: i + 1, hit: h };
-    }
-  }
-  return { rank: null, hit: null };
-}
+// `intersects` and `findRank` used to be transcribed here, verbatim, from
+// scorer.ts — a third copy of the same predicate reading the same fixture. That
+// is why this file is in scope for the anchoring work at all: repairing run.ts
+// and scorer.ts while leaving this one positionally pinned would let a later
+// refactor break it invisibly. With the 7 `services/search/` targets moved, its
+// hit@5 caps at 7/14 = 0.50 against its own 0.64 floor below.
+//
+// It now consumes the shared resolver, so there is exactly one predicate and one
+// definition of where a needle points.
 
 interface SweepResult {
   hitAt1: number;
@@ -149,7 +149,7 @@ interface SweepResult {
     query: string;
     rank: number | null;
     topHit: Hit | null;
-    expected: NeedleExpected;
+    expected: ResolvedSpan;
     reciprocalRank: number;
     empty: boolean;
   }>;
@@ -161,6 +161,15 @@ async function runSweep(pid: string, dataset: Dataset): Promise<SweepResult> {
   const tol = dataset.scoring.lineTolerance;
   const perNeedle: SweepResult["perNeedle"] = [];
   const emptyNeedles: string[] = [];
+
+  // Resolve every needle by content before the sweep. A stale fixture throws
+  // here — loudly, and before any search is issued — instead of quietly scoring
+  // zeros that are indistinguishable from a retrieval regression.
+  const spans = new Map<string, ResolvedSpan>(
+    resolveNeedles(dataset.needles, PROJECT_PATH, {
+      staleNeedles: dataset.scoring.staleNeedles,
+    }).map((r) => [r.needle.id, r.resolved]),
+  );
 
   for (const needle of dataset.needles) {
     const r = await postLong<any>(
@@ -182,14 +191,15 @@ async function runSweep(pid: string, dataset: Dataset): Promise<SweepResult> {
     }));
     const empty = hits.length === 0;
     if (empty) emptyNeedles.push(needle.id);
-    const { rank } = findRank(needle, hits, tol);
+    const expectedSpan = spans.get(needle.id)!;
+    const { rank } = findRank(expectedSpan, hits, tol);
     perNeedle.push({
       id: needle.id,
       difficulty: needle.difficulty,
       query: needle.query,
       rank,
       topHit: hits[0] ?? null,
-      expected: needle.expected,
+      expected: expectedSpan,
       reciprocalRank: rank ? 1 / rank : 0,
       empty,
     });

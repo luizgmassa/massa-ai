@@ -384,9 +384,23 @@ Every job runs against a real `pgvector/pgvector:pg17` service with
 `DATABASE_URL=postgresql://massa_ai:massa_ai_password@localhost:5432/massa_ai`, and CI
 pins npm to 11.14.1 explicitly before install.
 
-Separate workflows: `needles-gate.yml` (retrieval floors — `bun run bench:needles:gate`,
-`NEEDLE_FLOOR_HIT1=0.5 NEEDLE_FLOOR_MRR=0.65`), `skills.yml` — which only validates
-`SKILL.md` frontmatter, it runs no tests — plus the release pair below.
+Three separate workflows sit outside `ci.yml`, plus the release pair below — five files in
+`.github/workflows/` besides `ci.yml` itself.
+
+- **`coverage.yml`** — `bun run test:coverage`, the 90%-per-file floor. **Blocking, no
+  `continue-on-error`**, on push to `main` and every PR. It is outside `ci.yml` on purpose:
+  `release.yml` triggers on `workflow_run: workflows: [CI]`, keyed by workflow **name**, so a
+  job added to CI would extend the chain that cuts a release. Coverage must be able to fail a
+  merge without touching that chain — never rename this workflow to `CI`. Its own
+  `pgvector/pgvector:pg17` service differs from every other job in three ways that
+  `isDedicatedDatabase()` enforces via `/127\.0\.0\.1:5433\/massa_ai_test(?:\?|$)/`: literal
+  **`127.0.0.1`** (not `localhost`), port **5433**, database **`massa_ai_test`**. It also sets
+  `RUN_POSTGRES_TESTS=1` — ten-plus core suites gate on it, and without it they skip and the
+  gate reports phantom below-floor files instead of the truth.
+- **`needles-gate.yml`** — retrieval floors, `bun run bench:needles:gate`
+  (`NEEDLE_FLOOR_HIT1=0.5 NEEDLE_FLOOR_MRR=0.65`). `workflow_dispatch`-only and
+  `continue-on-error: true`; it never blocks a merge.
+- **`skills.yml`** — validates `SKILL.md` frontmatter only. It runs no tests.
 
 ### Releasing and CHANGELOG authoring
 

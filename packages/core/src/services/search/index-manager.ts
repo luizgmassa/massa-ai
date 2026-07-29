@@ -12,7 +12,7 @@ import path from "path";
 import { glob } from "glob";
 import { logger, config, DEFAULT_ALLOWED_EXTENSIONS } from "@massa-ai/shared";
 import type { IVectorStore } from "@massa-ai/shared";
-import { loadProjectIgnore } from "./ignore-patterns.js";
+import { buildExtensionGlob, loadProjectIgnore } from "./ignore-patterns.js";
 import { getProjectIdentityAliasResolver } from "../project-identity/alias-resolver.js";
 
 const globAsync = glob;
@@ -254,13 +254,14 @@ export class IndexManager {
       const allowedExtensions =
         securityConfig.allowedExtensions || DEFAULT_ALLOWED_EXTENSIONS;
 
-      // Single combined glob pattern (avoids N separate directory traversals)
-      const combinedPattern = `**/*{${allowedExtensions.join(",")}}`;
+      // One pattern per extension in a single glob call — still one traversal,
+      // and immune to the single-alternative brace trap (see buildExtensionGlob).
+      const patterns = buildExtensionGlob(allowedExtensions);
 
       // Load .gitignore rules
       const ig = await this.loadGitignore(projectPath);
 
-      const matches = await globAsync(combinedPattern, {
+      const matches = await globAsync(patterns, {
         cwd: projectPath,
         nodir: true,
         dot: false,

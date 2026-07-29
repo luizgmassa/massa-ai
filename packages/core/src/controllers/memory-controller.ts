@@ -271,13 +271,14 @@ export class MemoryController {
       types,
       minImportance = 0.3,
       limit = 10,
-      // Accepted but not yet honoured: `search_memories` declares
-      // `includePersistent` in its tool schema (tools/search_memories.ts:61) and
-      // forwards it here, but nothing below ever reads it, so setting it has no
-      // effect. Kept destructured and renamed rather than deleted, so the gap
-      // stays visible at the site instead of looking like the option was never
-      // passed. Closing it is a behavior decision, not a lint fix.
-      includePersistent: _includePersistent = true,
+      // `false` excludes L0 memories — `MemoryLevel.PERSISTENT`, the level
+      // `memory-service.determineLevel` assigns to orchestrator decisions and
+      // criticals, and the one `bootstrap-service` writes. That is the only
+      // concrete notion of "persistent" this codebase has; there is no
+      // `persistent` column. The tool schema
+      // (tools/search_memories.ts:61) advertised this option and nothing read
+      // it, so callers passing `false` silently received persistent results.
+      includePersistent = true,
       includeRelated = false,
     } = input;
 
@@ -301,6 +302,7 @@ export class MemoryController {
       agentId,
       minImportance,
       types,
+      includePersistent,
     });
 
     logger.info("FTS search completed", {
