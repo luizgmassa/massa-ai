@@ -2,7 +2,7 @@
  * Sanitizer unit tests.
  * Mocks ../config/index to control security.sanitizeInputs / maxInputLength.
  * Covers: sanitizeInput (on/off, HTML/control chars, length), FTS5 query,
- * email/userId validation, file-path traversal, JSON validation.
+ * userId validation, file-path traversal, JSON validation.
  */
 
 import { describe, test, expect, beforeEach, mock } from "bun:test";
@@ -30,7 +30,6 @@ mock.module("../config/index.js", () => ({
 import {
   sanitizeInput,
   sanitizeFTS5Query,
-  isValidEmail,
   isValidUserId,
   sanitizeFilePath,
   isValidJSON,
@@ -106,24 +105,6 @@ describe("sanitizeFTS5Query", () => {
   });
 });
 
-describe("isValidEmail", () => {
-  test("valid emails", () => {
-    expect(isValidEmail("a@b.co")).toBe(true);
-    expect(isValidEmail("user.name+tag@sub.example.com")).toBe(true);
-    expect(isValidEmail("x@y.io")).toBe(true);
-  });
-
-  test("invalid emails", () => {
-    expect(isValidEmail("")).toBe(false);
-    expect(isValidEmail("noatsign")).toBe(false);
-    expect(isValidEmail("a@")).toBe(false);
-    expect(isValidEmail("@b.co")).toBe(false);
-    expect(isValidEmail("a@b")).toBe(false);
-    expect(isValidEmail("a b@c.co")).toBe(false); // space
-    expect(isValidEmail("a@b.c")).toBe(true); // single-char TLD passes basic regex
-  });
-});
-
 describe("isValidUserId", () => {
   test("valid user IDs", () => {
     expect(isValidUserId("abc123")).toBe(true);
@@ -164,6 +145,27 @@ describe("sanitizeFilePath", () => {
 
   test("preserves normal relative paths", () => {
     expect(sanitizeFilePath("foo/bar/baz.ts")).toBe("foo/bar/baz.ts");
+  });
+
+  // SEC-4 regression (CodeQL js/incomplete-multi-character-sanitization,
+  // alert #21): single-pass removal left a live "../" behind for overlapping
+  // tokens. These cases failed before the fixpoint loop.
+  test("removes overlapping traversal tokens until fixpoint", () => {
+    expect(sanitizeFilePath("....//etc/passwd")).toBe("etc/passwd");
+    expect(sanitizeFilePath("....//....//etc/passwd")).toBe("etc/passwd");
+    // 3-dot groups collapse into a benign literal segment ("....etc" is a
+    // valid directory name, not a `..` parent reference) — the invariant is
+    // that no "../" survives, asserted for all shapes below.
+    expect(sanitizeFilePath("..../..../etc/passwd")).toBe("....etc/passwd");
+    expect(sanitizeFilePath("....\\\\etc\\\\passwd")).toBe("etc\\\\passwd");
+  });
+
+  test("never returns a residual traversal segment", () => {
+    for (const crafted of ["....//", "..../", "....\\\\", "..\\/..\\/", "x/....//y"]) {
+      const out = sanitizeFilePath(crafted);
+      expect(out).not.toContain("../");
+      expect(out).not.toContain("..\\");
+    }
   });
 });
 

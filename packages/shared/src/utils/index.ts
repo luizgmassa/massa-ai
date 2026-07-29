@@ -6,7 +6,6 @@ export { logger, Logger, LogLevel } from './logger.js';
 export { 
   sanitizeInput, 
   sanitizeFTS5Query,
-  isValidEmail,
   isValidUserId,
   sanitizeFilePath,
   isValidJSON

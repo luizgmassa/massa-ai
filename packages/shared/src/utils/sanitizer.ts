@@ -66,14 +66,6 @@ export function sanitizeFTS5Query(query: string): string {
 }
 
 /**
- * Validate email format (basic)
- */
-export function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
-
-/**
  * Validate user ID format
  */
 export function isValidUserId(userId: string): boolean {
@@ -84,13 +76,25 @@ export function isValidUserId(userId: string): boolean {
 
 /**
  * Sanitize file path (prevent directory traversal)
+ *
+ * @param filePath - Untrusted relative path from a tool caller.
+ * @returns Path with every `../` / `..\` segment removed and no leading
+ *   slashes. Repeated until fixpoint, so overlapping tokens cannot smuggle a
+ *   traversal segment through a single pass.
  */
+// Why: single-pass removal was bypassable — "....//etc/passwd" collapsed to
+//      "../etc/passwd" after one replace (CodeQL
+//      js/incomplete-multi-character-sanitization, SEC-4, alert #21). The
+//      read_file tool's checkPathContainment still blocked escapes, but this
+//      layer must not rely on downstream defense-in-depth.
+// Impacts: MCP read_file path handling (read_file.ts).
+// Test: bun test packages/shared/src/__tests__/sanitizer.test.ts -t sanitizeFilePath
 export function sanitizeFilePath(filePath: string): string {
-  // Remove ../ and ..\
-  return filePath
-    .replace(/\.\.\//g, '')
-    .replace(/\.\.\\/g, '')
-    .replace(/^\/+/, ''); // Remove leading slashes
+  let sanitized = filePath;
+  while (sanitized.includes("../") || sanitized.includes("..\\")) {
+    sanitized = sanitized.replace(/\.\.\//g, "").replace(/\.\.\\/g, "");
+  }
+  return sanitized.replace(/^\/+/, ""); // Remove leading slashes
 }
 
 /**
