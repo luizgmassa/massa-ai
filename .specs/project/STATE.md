@@ -232,7 +232,7 @@ Also update the feature block above: **Phase 0 is done, remaining Execute is ~21
 
 ---
 
-## Current — Plugin Auto-Install
+## Previous — Plugin Auto-Install
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-plugin-auto-install`
