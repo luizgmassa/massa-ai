@@ -349,7 +349,7 @@ export const MAX_IGNORE_PATTERNS = 1_024;
  * pure module's `validatePolicy` remains the authoritative validator for
  * direct callers; this is the config-load-time gate.
  */
-function validateCapturePolicyConfig(
+export function validateCapturePolicyConfig(
   raw: unknown,
 ): {
   rules: Array<{ pattern: string; disposition: "Keep" | "Drop" | "MetadataOnly" }>;
@@ -406,7 +406,7 @@ function validateCapturePolicyConfig(
  * zero files. That is the silent-zero failure this repo keeps paying for;
  * a typo here fails at config load instead.
  */
-function validateAllowedExtensionsConfig(raw: unknown): string[] {
+export function validateAllowedExtensionsConfig(raw: unknown): string[] {
   if (!Array.isArray(raw)) {
     throw new TypeError("security.allowedExtensions must be an array of strings");
   }
