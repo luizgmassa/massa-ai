@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The shipped skills now carry their implementation obligations in the references every workflow already loads, instead of re-stating them per workflow.** Six updates (SWU-01..06) consolidate onto the two load-line references, so the rules cannot drift out of sync with the workflows that inherit them. `references/code-annotation.md` §3 now excludes data/domain models — ORM and persistence entities, schema-mapped classes, repository entities, and behaviorless value objects — from unit testing, because their behavior lives at the repository/service seam, not in the fields; the exclusion is named by kind and language so it cannot be read as "skip tests on anything called a model" and does not weaken test-every-changed-path for code that has behavior. `references/implementation-delivery.md` makes worktree isolation mandatory for every implementation task with no size exemption. The commit, spec-driven, and ticket workflows were tightened so a Jira Phase/Wave maps to one Task with per-Task sub-tasks, branch names follow the Phase/Wave, and each Task is one `[KEY]`-prefixed commit, with the three prefix sites (branch, commit, PR) cross-linked rather than duplicated.
+
+- **spec-driven now enforces the target repository's own rules and requires dependency injection per task and per phase.** A new `references/repo-rules-discovery.md` defines how the workflow discovers and loads a target repo's AI-harness rule files (`.claude/`, `.cursor/`, `.cursorrules`, and the repo's module/unit-test/testing-area conventions) before implementation, enforces conformance, and records `repo-rules: none present` rather than fabricating rules when none exist. Independently (DI-01), `references/spec-driven/tasks.md` and `references/spec-driven/execute.md` now require dependency injection at both the per-task and per-phase granularity. Both are inherited through the existing load lines; no workflow body was duplicated, and the four host skill bundles (claude, codex, cursor, opencode) were regenerated from the single source.
+
 ## [1.9.2] - 2026-07-29
 
 ### Fixed
