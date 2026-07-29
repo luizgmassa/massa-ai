@@ -18,7 +18,14 @@ import ignoreModule from "ignore";
 import { config, logger } from "@massa-ai/shared";
 import { getSymbolRepository } from "../../../data/symbol/symbol-repository-factory.js";
 import type { EtlStageContext, DiscoveredFile } from "../stage-context.js";
-import { DEFAULT_EXTENSIONS, DEFAULT_IGNORES, loadProjectIgnore } from "../../search/ignore-patterns.js";
+import {
+  DEFAULT_EXTENSIONS,
+  DEFAULT_IGNORES,
+  getActiveCapturePolicy,
+  loadProjectIgnore,
+} from "../../search/ignore-patterns.js";
+import { applyPolicy } from "../../search/capture-policy.js";
+import type { Policy } from "../../search/capture-policy-interfaces.js";
 
 const ignore = (ignoreModule as unknown as { default: typeof ignoreModule }).default ?? ignoreModule;
 
@@ -71,7 +78,9 @@ export class DiscoverStage {
       timestamp: Date.now(),
     });
 
-    const ig = await this.loadIgnore(ctx.projectPath, opts.includeTests ?? false);
+    const includeTests = opts.includeTests ?? false;
+    const ig = await this.loadIgnore(ctx.projectPath, includeTests);
+    const policy = this.loadPolicy(includeTests);
     const allowedExts: string[] =
       (config.get("security") as Record<string, unknown>).allowedExtensions as string[] ??
       DEFAULT_EXTENSIONS;
@@ -88,10 +97,20 @@ export class DiscoverStage {
         dot: false,
         absolute: false,
       });
-      // Ensure paths are relative (ignore library requires relative paths)
+      // Ensure paths are relative (ignore library requires relative paths).
+      //
+      // AD-W5-015 composition: the `.gitignore` + DEFAULT_IGNORES merge runs
+      // FIRST, then the configured capture policy. `ignore-patterns.ts` has
+      // documented this pair as "a path is indexed iff `!ig.ignores(path) &&
+      // applyCapturePolicy(path) !== 'Drop'`" since the policy was added, but
+      // nothing performed the second half — `applyCapturePolicy` had no
+      // production caller, so `capturePolicy` was validated at config load and
+      // then never consulted. With no policy configured the pure module's
+      // DEFAULT_POLICY applies, and its Drop set mirrors DEFAULT_IGNORES, so a
+      // default install discovers exactly the same files as before.
       relPaths = found
         .map((p) => (path.isAbsolute(p) ? path.relative(ctx.projectPath, p) : p))
-        .filter((p) => !ig.ignores(p));
+        .filter((p) => !ig.ignores(p) && applyPolicy(p, policy) !== "Drop");
     }
 
     // ── Wave 5 FR-10: FileCursor resume. If a cursor from a previous run
@@ -219,6 +238,31 @@ export class DiscoverStage {
    * indexed but everything else (build artifacts, locks, generated, etc.)
    * stays ignored. This does NOT mutate loadProjectIgnore.
    */
+  /**
+   * Build the capture policy for this run, mirroring {@link loadIgnore}.
+   *
+   * `includeTests` has to reach BOTH layers or it reaches neither. The
+   * ignore layer strips TEST_IGNORE_PATTERNS from DEFAULT_IGNORES; the policy
+   * layer carries the same globs as `Drop` rules, so leaving it alone lets it
+   * re-drop every test file and silently neutralize the option. That is not
+   * hypothetical — it is what `etl-stages-coverage.test.ts`'s includeTests
+   * case caught the moment the policy was first wired in.
+   *
+   * Only `Drop` rules matching a test glob are removed. A user policy that
+   * drops something else keeps doing so, and a `Keep` rule on the same pattern
+   * is left alone because it was already not excluding anything.
+   */
+  private loadPolicy(includeTests: boolean): Policy {
+    const policy = getActiveCapturePolicy();
+    if (!includeTests) return policy;
+    return {
+      ...policy,
+      rules: policy.rules.filter(
+        (rule) => !(rule.disposition === "Drop" && TEST_IGNORE_PATTERNS.has(rule.pattern)),
+      ),
+    };
+  }
+
   private async loadIgnore(projectPath: string, includeTests: boolean): Promise<Ignore> {
     if (!includeTests) return loadProjectIgnore(projectPath);
 

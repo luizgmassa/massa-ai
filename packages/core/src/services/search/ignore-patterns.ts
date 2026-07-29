@@ -102,6 +102,20 @@ export function applyCapturePolicy(filePath: string): Disposition {
 }
 
 /**
+ * The active policy object, for callers that must derive a *variant* of it
+ * rather than ask about one path at a time.
+ *
+ * `DiscoverStage` needs this because its `includeTests` option strips the
+ * test/benchmark globs out of `DEFAULT_IGNORES` for one run. The policy layer
+ * carries the same globs, so without the same treatment it would silently
+ * re-drop every test file and neutralize the option. Returning the policy lets
+ * the caller apply that transformation once per run instead of per path.
+ */
+export function getActiveCapturePolicy(): Policy {
+  return getActivePolicy();
+}
+
+/**
  * Load .gitignore rules merged with default ignores.
  *
  * Wave 5 AD-W5-015: the `.gitignore` merge runs BEFORE `applyPolicy`. This

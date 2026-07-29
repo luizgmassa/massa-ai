@@ -22,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same identity. Same-name/same-kind declarations were already disambiguated correctly and
   are unaffected. Symbols that do not share a name keep the identity they had.
 
+- **`capturePolicy` in `config.json` now actually reaches indexing.** The block was parsed,
+  bounds-checked and `denyUnknownFields`-validated at config load, and then never consulted:
+  `applyCapturePolicy` had no caller anywhere in the product, so a configured policy narrowed
+  nothing. Discovery now applies it after the `.gitignore` merge, which is the composition
+  `ignore-patterns.ts` has documented since the policy was introduced. With no policy
+  configured the built-in `DEFAULT_POLICY` applies and its `Drop` set mirrors the default
+  ignores, so a default install discovers exactly the same files as before. `Keep` cannot
+  resurrect a path `.gitignore` excludes — the two layers compose with AND, and the ignore
+  layer runs first. Only `Drop` excludes; `MetadataOnly` files are still discovered.
+
 - **`security.allowedExtensions` in `config.json` now actually narrows what gets indexed.**
   Setting the key had no effect whatsoever: the assembled config hardcoded the built-in
   default list and never read the value, and the user-facing config type did not declare
