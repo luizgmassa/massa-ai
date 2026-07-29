@@ -223,8 +223,8 @@ T5 → T6
 - **Requirement**: all (user-visible behavior change); CHANGELOG merge gate
 - **MCP/skill question**: NONE/NONE.
 - **Done when**:
-  - [ ] entries accurate against implemented behavior (no overclaim)
-  - [ ] Gate: build (`lint && type-check && test:scripts && test:plugins`)
+  - [x] entries accurate against implemented behavior (no overclaim)
+  - [x] Gate: build (`lint && type-check && test:scripts && test:plugins`)
 - **Tests**: none (artifact check)
 - **Gate**: build
 - **Commit**: `docs(installer): plugin auto-install behavior + changelog`
@@ -243,11 +243,39 @@ T5 → T6
 - **Requirement**: validation prep for the independent verification-agent
 - **MCP/skill question**: NONE/NONE.
 - **Done when**:
-  - [ ] `bun run lint && bun run type-check && bun run test:scripts && bun run test:plugins` all green in tracked state, pass counts recorded
-  - [ ] 4/4 mutants killed, evidence recorded
+  - [x] `bun run lint && bun run type-check && bun run test:scripts && bun run test:plugins` all green in tracked state, pass counts recorded
+  - [x] 4/4 mutants killed, evidence recorded
 - **Tests**: none (sensor execution)
 - **Gate**: build
 - **Commit**: `test(installer): discrimination sensor evidence for plugin auto-install` (or fold into T5 commit if evidence-only — decide at Execute)
+- **Execute evidence (2026-07-29, worktree @ f9fbc81)**:
+  - Aggregate gate, tracked state: lint clean; type-check 6/6; `test:scripts`
+    TS 637 pass + 3 pre-existing env failures (`verify-tree-sitter-grammars`
+    native suites, verified red at HEAD via stash in T2 — recorded, not fixed);
+    shell loop run separately (`for f in scripts/tests/*.sh; do bash "$f" ||
+    exit 1; done`) 21/21 green; `test:plugins` 96/96.
+  - Sensor 1 (delete C4 `record_plugin_version` call, claude `:618`): suite red,
+    RC=1 — exactly the 6 claude record assertions (`recorded version == bundle`,
+    `installedAt ISO-8601`, `re-run skips at same version`, `config dir
+    untouched`, `upgrade log line`, `record updated after upgrade`); codex/cursor
+    chains green. Reverted.
+  - Sensor 2 (record call moved to just after `install_bundled_skills`, before
+    the hooks merge — the C-1 shape): suite red, RC=1 — exactly 3.x(f)
+    `claude failed install records no plugin version` (got `1.9.1`, want ``);
+    all other assertions green. Confirms the permanent AC-16 test kills a
+    record-inside-`install_bundled_skills` mutant. Reverted.
+  - Sensor 3 (drop C5 write-side re-attach, `install-skills.sh:803-805`):
+    `install-state-plugin-version.test.ts` red — 2 round-trip cases
+    (`--apply` preserves plugin subfield; `--uninstall` keeps record
+    byte-identical), both `Received: undefined`. Reverted.
+  - Sensor 4 (ungated marketplace resolution — plan-grep condition removed,
+    `install-harness.sh:267`): suite red, RC=1 — exactly 2.12
+    `0 detected hosts → no marketplace dir` (unexpected
+    `.config/massa-ai/marketplace`). Confirms the permanent R6 test kills an
+    ungated-marketplace mutant. Reverted.
+  - Post-revert: `git status` clean (tree == f9fbc81);
+    `test-plugin-auto-install.sh` RC=0; `install-state-plugin-version.test.ts`
+    6/6 pass.
 
 ---
 
