@@ -6,9 +6,10 @@
 - workflowSessionId: `spec-core-layering-god-module-split`
 - workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
 - feature: `core-layering-god-module-split` — **Specify, Design and Tasks COMPLETE 2026-07-29.
-  `tasks.md` revised and APPROVED after an independent Plan Challenge on that file; Execute
-  authorised and IN PROGRESS on `refactor/search-facade-split`. Session boundary: stop at the end
-  of Phase 0 (T0–T5).**
+  `tasks.md` revised and APPROVED after an independent Plan Challenge on that file. Execute
+  IN PROGRESS on `refactor/search-facade-split`: Phase 0 (T0–T5) COMPLETE 2026-07-29 and stopped
+  at its planned session boundary. Next action: review Phase 0, then T6.** Artifacts added this
+  phase: `validation.md` (before-record, no verdict) and `needles-before.json`.
 - base: `main` @ `ce26f28` (v1.9.1). Branch `refactor/search-facade-split` cut from it.
   Dependency `sensor-repair-2026-07` (PR-A) satisfied.
 - Artifacts: `.specs/features/core-layering-god-module-split/{spec.md,design.md,tasks.md}`
@@ -64,7 +65,62 @@ C1 AS-02 tense · C2 `~16` denominator → 23 · **C3 needles cost 90 min → ~2
 fixture clause is obsolete, replaced by FROZEN-ANCHOR · C5 R-08 premise · C6 R-03 falsifier ·
 C7 `data → services` is 24 edges / 14 files.
 
-### Execute — Phase 0 in progress
+### Execute — Phase 0 COMPLETE (2026-07-29), stopped at the session boundary
+
+**T0–T5 are committed; T6 is not started.** That stop is the plan's, not an interruption: Phase 0
+locks every before/after measurement — G-HUB, the needles baseline, the characterization record —
+and none can be taken retroactively once a structural commit lands. It is the one review point
+Phase 1 cannot be re-done without.
+
+| # | commit | deliverable |
+| --- | --- | --- |
+| T0 | `ab80e62` | `search-hub-metric.ts` + 13 tests, `.specs/` artifacts |
+| T1 | `3dee676` | `search-facade-matrix.ts` + 20 tests (D1) |
+| T2 | `8fd3983` | `search-facade-metrics.ts` + 18 tests (D3) |
+| T3 | `e359115` | `check-frozen-anchors.ts` + 9 tests |
+| T4 | `0129207` | needles baseline + `needles-diff.ts` + 17 tests |
+| T5 | `06bde32` | `check-characterization.ts` + 14 tests, `validation.md` |
+
+Gates at `06bde32`: `lint` 0 · `type-check` 0 · `test:scripts` **725 pass / 0 fail across 39
+files** · `check-frozen-anchors` exit 0 (14/14 unique) · `check-characterization` exit 0 (3/3 at
+floor) · characterization net **160** across 7 suites · G-HUB exit 1 at reach **14** · needles
+gate PASS at hit@1 **0.6429** / MRR **0.7357** · PATCHABLE **16 across 3 files** · exclusions **9**.
+
+The before-record is `validation.md`. **It carries no verdict** — that is T20's, by a fresh
+verifier. Two spec corrections were added to `design.md` §10 for T19: **C8** (the dynamic
+importers are `packages/core/src/scripts/{beir,symbol}-benchmark.ts` at `:259`/`:214`; the cited
+`scripts/…:258`/`:213` paths do not exist) and **C9** (§5.1 names two dynamic `controllers`
+importers; there is one — measured 22 deep + 1 barrel + 1 dynamic = 24).
+
+**The recurring defect of this phase, three times in one session: a measurement whose reading was
+an artifact of the state it was taken in.** T2's suite was verified at 17 pass / 0 fail while its
+own files were *untracked*, and it enumerates `git ls-files` — staging them moved fan-in to 27 and
+turned 3 of its own tests red. The same shape then moved the mention-only count twice more as
+later tooling landed, which is why that count is now a floor plus a partition invariant rather
+than an exact pin. **A measurement script has to be verified in the tracked state it ships in.**
+`design.md` §13 already recorded the method being wrong four times with two defects cancelling;
+this is the same family and it is not exhausted.
+
+Two further findings recorded rather than corrected. **"Each anchor appears exactly once
+repo-wide" was already false** — each of the four appears 4–6 times across tracked files and is
+unique only inside `resolve.ts`'s `.ts`/`.tsx` corpus, which is the scope the real gate uses.
+And **LATE-BIND's site count now has four values from four methods** (77 prose / 82 table / a
+third from direct measurement / 91 here): the spread is the finding, so the sensor is the
+per-suite pass count, which is exact.
+
+`benchmarks/needles/run.ts` was changed at T4 to record each needle's `rank` and resolved
+`expected` span into its report. Without it, comparing an old report against a post-rename tree
+resolves anchors to their new homes, matches nothing in the old hit lists, and reads as a miss on
+every needle — a total collapse manufactured entirely by the measurement. The baseline is
+committed at `.specs/features/core-layering-god-module-split/needles-before.json` because
+`benchmarks/needles/reports/` is gitignored and a baseline that does not survive a fresh checkout
+cannot be T17's referent.
+
+**Open for the reviewer:** the `[Unreleased]` CHANGELOG entry sits under `### Changed`, which cuts
+a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
+unilaterally — it is a release-semantics decision.
+
+### Execute — Phase 0, the plan revisions that preceded it
 
 `tasks.md` was **not approvable as written**. An independent `massa-ai-plan-critic` was run against
 it (the file had never been challenged; `design.md` §13's gate predates it) and returned nine
@@ -98,7 +154,11 @@ constraint; both replace a hand-tabulated count with the per-suite pass counts, 
 Estimate revised **~22 h → ~25 h**. Baselines re-measured at `ce26f28`: hub-metric reach **14**,
 largest file **592**, `lint` **0**, coverage exclusions **9**, `scripts/__tests__` **602 pass /
 0 fail**, characterization net **160** across 7 suites, 4 frozen anchors present exactly once,
-`:3333` free.
+`:3333` free. All still reproduce at `06bde32` except `scripts/__tests__`, which is **725 pass /
+0 fail across 39 files** after Phase 0 added six suites.
+
+Also update the feature block above: **Phase 0 is done, remaining Execute is ~21 h** (Phase 1
+~17.5 h, Phase 2 ~3.5 h).
 
 ---
 

@@ -7,6 +7,9 @@
 - **Status**: written 2026-07-29 against `main` @ `ce26f28`; **revised 2026-07-29** after an
   independent Plan Challenge on this file (see [Plan Challenge — tasks](#plan-challenge--tasks)).
   Approved. Execute authorised; branch `refactor/search-facade-split` cut from `ce26f28`.
+  **Phase 0 (T0–T5) COMPLETE 2026-07-29** — see
+  [Phase 0 — executed](#phase-0--executed). Stopped at the session boundary as planned; T6 not
+  started.
 
 **One atomic commit per task. Each carries its own discriminating sensor.** No task is done because
 it looks done; the sensor decides.
@@ -96,7 +99,72 @@ No structural commit may land before Phase 0 is complete. G-HUB and the needles 
 > **T4 cost correction.** `spec.md` GMS-05 AC-4 note 3 says *"Each observation costs roughly 90
 > minutes and a local Ollama"* and tells you to budget it. **That figure is wrong** — 90 min is
 > `needles-gate.yml`'s 2-core CI estimate carried into a local-cost table. Measured locally:
-> **~2 minutes.** Budget the runs accordingly; this is spec correction C3.
+> **~2 minutes.** Budget the runs accordingly; this is spec correction C3. **Confirmed at T4:
+> the full gate run took well under two minutes** on the 8-file corpus.
+
+---
+
+## Phase 0 — executed
+
+Complete 2026-07-29. Six commits, one per task, on `refactor/search-facade-split`.
+
+| # | commit | deliverable | sensor observed |
+| --- | --- | --- | --- |
+| T0 | `ab80e62` | `scripts/search-hub-metric.ts` + 13 tests, and the `.specs/` artifacts | real exit **1** on today's tree |
+| T1 | `3dee676` | `scripts/search-facade-matrix.ts` + 20 tests (D1) | fixture pins; 3 defects each reintroduced and observed red |
+| T2 | `8fd3983` | `scripts/search-facade-metrics.ts` + 18 tests (D3) | fan-in 24/26, fan-out 19; self-count defect observed red |
+| T3 | `e359115` | `scripts/check-frozen-anchors.ts` + 9 tests | reflow → exit 1; verbatim move → exit 0 |
+| T4 | `0129207` | needles baseline + `scripts/needles-diff.ts` + 17 tests | rank 1→4 → exit 1; gate PASS at MRR 0.7357 |
+| T5 | `06bde32` | `scripts/check-characterization.ts` + 14 tests, `validation.md` | hollowed real block → red on both floors |
+
+Final gate readings: `lint` 0 · `type-check` 0 · `test:scripts` **725 pass / 0 fail across 39
+files**, exit 0 · `check-frozen-anchors` exit 0 (14/14 unique) · `check-characterization` exit 0
+(3/3 at floor) · characterization net **160** across 7 suites · G-HUB exit 1 at reach **14** ·
+PATCHABLE **16 across 3 files** · coverage exclusions **9**.
+
+The full before-record is `validation.md`. It carries no verdict; that is T20's.
+
+### What Phase 0 changed in the plan
+
+Five things a later reader should not mistake for drift.
+
+1. **T2's "17 pass / 0 fail" was an artifact of the state it was measured in.** The suite was
+   verified while its own two files were **untracked**, and the tool enumerates `git ls-files`,
+   so the corpus tests were blind to their own source. Staging them moved fan-in to **27** and
+   turned 3 of its own tests red — the fixture pasted the facade's real dynamic-import specifier
+   verbatim, and a regex over comment-stripped source cannot see through a template literal.
+   **Any measurement script in this repository has to be verified in the tracked state it will
+   ship in**, not the state it was written in. It cost the same defect three times in one
+   session (T2's fan-in, then the mention-only count twice more).
+2. **T3 reuses `benchmarks/needles/resolve.ts` rather than implementing the check.** PR-A
+   already made 0-match and >1-match hard failures (AC-8/AC-9). A second implementation is the
+   drift surface this repo keeps paying for, and a pre-flight gate that can disagree with the
+   gate it stands in for is worse than none. The anchors are **read from the fixture, never
+   listed** — `resolve.ts` scans every `.ts`/`.tsx` under the root, so a checker holding its own
+   copy of the four strings would make all four ambiguous and fail on its own existence.
+3. **"Each anchor appears exactly once repo-wide" was already false** when written. Each of the
+   four appears 4–6 times across tracked files: once in source, once in the fixture that defines
+   it, 2–4 times in `.specs/` prose. It is true only inside `resolve.ts`'s `.ts`/`.tsx` corpus,
+   which is the scope the real gate uses. Same shape as T15's sensor, found independently.
+4. **T4 required a change to `benchmarks/needles/run.ts`.** Reports recorded only hits, so rank
+   had to be recomputed against a tree — and after PR-B renames `rlm-fusion.ts` that resolves the
+   anchor to its new home, matches nothing in the old hit list, and reads as a miss on every
+   needle. A before/after diff would have shown a total collapse manufactured entirely by the
+   measurement. `run.ts` now records `rank` and the resolved `expected` span. The baseline lives
+   in `.specs/features/…/needles-before.json`, not `benchmarks/needles/reports/`, which is
+   gitignored — a baseline that does not survive a fresh checkout cannot be T17's referent.
+5. **T5's guard lives in `scripts/__tests__`, not `packages/core/src/__tests__`.** Core's
+   isolated-group count is pinned at **126** by PR2's T20; a new file there would make it 127.
+   Its blocks are located **by symbol, not by path**, so PR-B's rename does not force an edit to
+   the guard — editing a guard during the refactor it polices is the same motion as weakening
+   it, and indistinguishable from it in a diff.
+
+### Flake seen once, attributed, not chased
+
+`scripts/tests/test-setup-wizard-db-selection.sh` → `not ok - migrations fail closed` failed on
+one of three consecutive `bun run test:scripts` runs. All 20 shell suites pass standalone; the
+other two aggregate runs were clean. It touches no path Phase 0 changed. Recorded per the
+standing instruction — if it returns, attribute before debugging.
 
 ---
 
@@ -117,8 +185,11 @@ it is cheapest and `searchImpl` (455 LOC, 13 members) lands last, when everythin
 | **T13** | search surfaces | `rlm-search.ts` → `hybrid-search.ts` | `keywordSearch`, `vectorStore`, `searchCache`, `analytics`, `queryUnderstanding` → `HybridSearchDeps` | `rlm-search.test.ts` (**31** cases) + `search-dependency-outage` + `search-filter-overfetch` + `search-ranking-regression` pass counts | **5.5 h** |
 | **T14** | root → composition root | `contextual-search-rlm.ts` | assemble narrow deps **per call**; state fields stay public (§4.3.1) | **G-HUB**: `bun scripts/search-hub-metric.ts packages/core/src/services/search` exits **0** | 2 h |
 
-**Every task in Phase 1 additionally runs:** `bun run lint`, `bun run type-check`, the frozen-anchor
-check, and `git diff --name-only` reviewed against PR-C-BOUNDARY and AC-3.
+**Every task in Phase 1 additionally runs:** `bun run lint`, `bun run type-check`,
+`bun scripts/check-frozen-anchors.ts`, `bun scripts/check-characterization.ts`, and
+`git diff --name-only` reviewed against PR-C-BOUNDARY and AC-3. The two checks are sub-second
+and both are path-independent, so neither needs editing as files move — if either goes red the
+task is wrong, not the check.
 
 ### `ensureInitializedImpl` — the export that had no destination
 
@@ -204,12 +275,23 @@ bun run test:plugins
 bun run bench:needles:gate   # ~2 min, needs local Ollama. NOT 90 min.
 bun scripts/search-hub-metric.ts packages/core/src/services/search   # exit 0 = G-HUB pass
 
+# Phase 0 sensors — sub-second, run on every Phase 1 commit
+bun scripts/check-frozen-anchors.ts        # exit 0 = all 14 needle anchors still unique
+bun scripts/check-characterization.ts      # exit 0 = the 3 guarded blocks still at floor
+
+# T17: rerun the gate with a fresh label, then compare per-needle rank
+NEEDLE_FLOOR_HIT1=0.5 NEEDLE_FLOOR_MRR=0.65 bun benchmarks/needles/run.ts --label pr-b-after
+bun scripts/needles-diff.ts \
+  .specs/features/core-layering-god-module-split/needles-before.json \
+  benchmarks/needles/reports/massa-ai-pr-b-after-results.json   # exit 0 = no rank regression
+
 DATABASE_URL=postgresql://massa_ai:massa_ai_password@127.0.0.1:5433/massa_ai_test \
   MASSA_AI_DEDICATED=1 RUN_POSTGRES_TESTS=1 bun run test:coverage
 ```
 
 **Assert pass counts, never exit status.** `bun test` exits 0 when everything skips. Known-good
-baselines: `test:scripts` **602 pass / 0 fail** across 28 files in `scripts/__tests__` (the
+baselines: `test:scripts` **725 pass / 0 fail across 39 files** at the end of Phase 0 (`06bde32`);
+it was **602 across 28** at `ce26f28`, before T0–T5 added six suites (the
 `__zzz_crash_*_probe` "1 suite crashed" line is a deliberate fixture exercising the runner's
 ZERO-LOSS guard — pre-existing, not a failure). `mcp-client` is **95 pass / 0 fail in 4.34 s** only
 with the API stopped; verify with `lsof -nP -iTCP:3333 -sTCP:LISTEN`, not `pgrep`.

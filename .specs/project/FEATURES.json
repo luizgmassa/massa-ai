@@ -616,7 +616,8 @@
         "sensor-repair-2026-07"
       ],
       "design": ".specs/features/core-layering-god-module-split/design.md",
-      "tasks": ".specs/features/core-layering-god-module-split/tasks.md"
+      "tasks": ".specs/features/core-layering-god-module-split/tasks.md",
+      "validation": ".specs/features/core-layering-god-module-split/validation.md"
     },
     {
       "slug": "sensor-repair-2026-07",

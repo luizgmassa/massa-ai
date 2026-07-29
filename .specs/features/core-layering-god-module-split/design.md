@@ -856,6 +856,12 @@ fixture asserting a known non-trivial count.
 | C5 | R-08 | Rule of thumb **applied and passed** (0.5× on files-touched, 2.3× on files-moved-vs-edited; both under 3×). Its **premise** is corrected: *"3-4 files"* for the controllers side is ~an order of magnitude low. Recorded as insufficient on its own — the group is two problems, not one (§5.2). Status → *deferred to PR-C Design with a named precondition*. |
 | C6 | R-03 | Status stays Open (PR-B has not shipped) but gains the falsifier: G-HUB, calibrated on M14 — `maxForeignReach` **1 → 14** and `members` **26 → 24** while host LOC fell 1668 → 463 (§3). Note the direction: M14 did **not** widen the type; it redistributed reach. |
 | C7 | Evidence table | Add: `data → services` is 24 edges across **14** files (spec says 12 for the `getPrismaClient` subset alone — that part is correct and confirmed at 12). |
+| C8 | §7 and `spec.md`, dynamic importers | The two dynamic importers are cited as `scripts/beir-benchmark.ts:258` and `scripts/symbol-benchmark.ts:213`, recorded as *"both, confirmed"*. **Neither path exists.** They are `packages/core/src/scripts/{beir,symbol}-benchmark.ts` at `:259` and `:214`. The count is right — 24 + 2 = 26 — and the citation was never checked against the filesystem. Measured by D3 at T2, which pins the real paths in a test. |
+| C9 | §5.1, controllers importers | §5.1 names **two** dynamic `controllers` importers. There is **one** (`production-wiring.ts`); `search-session-hook.ts:21` is a plain static import. Measured: 6 members, **22 deep + 1 barrel (`src/index.ts`) + 1 dynamic = 24** outside importers, against §5.1's "~30" and "between 22 and 30" and `spec.md`'s "3-4 files". Settles the range rather than narrowing it. |
+
+Both C8 and C9 are provenance errors: the counts hold, the citations behind them were never
+verified against the tree. Found at T2 and recorded here rather than fixed in place, so T19
+applies them to `spec.md` as one reviewed change.
 
 ---
 
