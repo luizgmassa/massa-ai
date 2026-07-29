@@ -11,6 +11,7 @@ Resolve inputs in this order:
    - `epic-tickets`: create a new Epic and standard child issues.
    - `epic-tickets-subtasks`: create a new Epic, standard child issues, and sub-tasks.
    - `tickets-subtasks`: create standard issues and optional sub-tasks without creating an Epic. Ask for an existing Epic key only when the user wants those standard issues attached and Jira supports that relationship.
+   - A phased source (spec-driven `tasks.md` organized into Phases/Waves, or a TDD implementation PR-group table) selects the **phased mapping** under `tickets-subtasks`: one standard Task per Phase/Wave, one sub-task per Task inside the phase. See `templates-and-quality.md` → Phased Decomposition.
 3. **Ticket template source**: ask whether to use a Jira reference issue, an explicitly supplied local file or pasted template, or the built-in templates. A Jira reference may be supplied as a key or URL.
 4. **Definition of Ready and Definition of Done**: ask whether the user wants to provide either source. Accept Jira or Confluence content through Atlassian MCP, explicitly supplied local files, or pasted text. Use built-in checklists when omitted.
 5. **Jira-required choices**: after metadata inspection, ask only for unresolved issue types, priorities, components, labels, ownership, versions, or custom fields that are required by Jira or material to the user's intent.

@@ -29,11 +29,13 @@ human chose to merge it".
 
 ### Stage 1 — worktree isolation is mandatory
 
-Every implementation task runs in its own git worktree. There is **no size
-exemption**: a one-line typo fix is isolated exactly like a twelve-file feature.
-The reason is that the exemption, not the ceremony, is what costs time —
-"this one is too small to isolate" is the judgment call that puts half-finished
-work on a shared branch.
+Every implementation task runs in its own git worktree. **Mandatory worktree
+creation is the rule, not a preference:** a one-line typo fix is isolated
+exactly like a twelve-file feature. There is **no size exemption**. The reason
+is that the exemption, not the ceremony, is what costs time — "this one is too
+small to isolate" is the judgment call that puts half-finished work on a shared
+branch. Worktree creation happens **before the first repository mutation**, not
+after implementation.
 
 The only two legal skip reasons:
 
@@ -48,6 +50,17 @@ no `node_modules`, no `dist`, and no `.env`. A gate that fails only because the
 worktree was never provisioned is an environment failure; say so rather than
 reporting it as a code failure.
 
+**Phased work — one branch per Phase/Wave.** When the work is phased (sourced
+from `workflows/ticket.md`, a spec-driven `tasks.md` with Phases/Waves, or a TDD
+PR-group table), create **one branch per Phase/Wave**, not one branch per task
+and not one branch for the whole feature. Name the branch with the phase's Jira
+Task key, e.g. `feat/<PHASE-KEY>-<slug>` (so `feat/SA-100-phase-1-search-split`
+for phase SA-100). The phase key comes from `workflows/ticket.md` or the user.
+Each Task inside the phase is then one atomic commit on that branch, prefixed
+with its own sub-task key — the commit contract is owned by
+`workflows/commit.md`; do not restate it here. Non-phased work keeps the
+`<type>/<slug>` branch shape unchanged.
+
 ### Stage 2 — one commit per task
 
 Commit message content, staging rules, audit-report exclusions, and Jira
@@ -55,6 +68,16 @@ prefixes are owned by `workflows/commit.md`. Do not restate them here; invoke
 that workflow. This reference owns only the cadence: **one atomic commit per
 completed task, after its gate passes.** Never batch tasks into one commit and
 never commit a task whose gate is red.
+
+### Stage 4 — propose carries the phase key prefix
+
+The PR/MR is created with `gh pr create --base <base> --title <t> --body <b>`.
+For **phased work**, the PR title and body include the Phase/Wave Jira Task key
+prefix, matching the branch naming (the branch is named with that phase key per
+Stage 1). Source the key from the branch; do not ask the user again. Example
+title: `[SA-100] Phase 1: search facade split`. The per-task commit prefixes on
+the branch are owned by `workflows/commit.md`; this stage owns only the PR-level
+phase prefix. Non-phased work keeps the existing PR title behavior unchanged.
 
 ### Stage 7 — merge is never automatic
 
