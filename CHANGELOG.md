@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Plugin bundles now auto-detect hosts and upgrade only on version change.** The
-  harness plugin phase (the root `install.sh` menus, `scripts/setup-local-first.sh`,
-  `scripts/install-harness.sh --plugins`) detects each agent host — its config dir
+  harness plugin phase (the root `install.sh` `k)` harness menu,
+  `scripts/setup-local-first.sh`, `scripts/install-harness.sh --plugins`) detects each agent host — its config dir
   exists or its binary is on `PATH` — and installs only detected hosts; absent hosts
   produce one skip log line and no filesystem writes. Every successful plugin install
   records the bundle version and an ISO-8601 timestamp in

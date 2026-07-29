@@ -203,10 +203,11 @@ plus `"plugin": ["@massa-ai/opencode-plugin"]` remains a supported alternative.
 
 Or pick the `p` option from the root `bash install.sh` post-install menu, which
 offers all four plugin choices plus an "All four" shortcut. The `k` option in
-the same menu installs skills and MCP registration without any plugin bundle.
+the same menu opens the harness sub-menu: skills only, MCP registration only,
+everything including plugin bundles, or a dry-run preview.
 
 When the plugin bundles are installed through the harness — the root `install.sh`
-menus, `scripts/setup-local-first.sh`, or `bash scripts/install-harness.sh
+`k)` harness menu, `scripts/setup-local-first.sh`, or `bash scripts/install-harness.sh
 --plugins` — the plugin phase **detects which hosts are present** (the host's
 config dir exists, or its binary is on `PATH`) and installs only those; absent
 hosts produce one skip log line and no filesystem writes. Every successful
@@ -639,7 +640,8 @@ bash apps/opencode-plugin/install.sh --user   # 6 in-process lifecycle handlers
 
 Or pick the `p` option from the root `bash install.sh` post-install menu, which
 offers all four plugin choices plus an "All four" shortcut. The `k` option in
-the same menu installs skills and MCP registration without any plugin bundle. See
+the same menu opens the harness sub-menu (skills only, MCP only, everything
+including plugin bundles, or a dry-run preview). See
 [§Integration](#integration) for per-plugin details.
 
 ### What each hook captures
