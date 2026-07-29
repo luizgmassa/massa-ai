@@ -1,6 +1,6 @@
 {
   "name": "@massa-ai/claude-plugin",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "description": "massa-ai plugin for Claude Code — semantic code search, durable memory, symbol graph, and context compression",
   "files": [
     "agents",
