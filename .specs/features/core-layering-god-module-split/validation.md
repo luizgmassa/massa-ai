@@ -262,8 +262,14 @@ behavior-preserving, over and above the four-branch equivalence being readable b
 
 ## 11. Known-flaky, attributed, not chased
 
-Three, all observed during PR #44. None was fixed, and none should be until it reproduces
-deterministically — each will get another roll on every Phase 1 push.
+Four, all observed during PR #44. One was fixed (2, below); the rest should not be until they
+reproduce deterministically — each gets another roll on every Phase 1 push.
+
+**Three of the four are red for a reason their name does not say**, which is the same family as
+§10's instrument defects and is worth reading as a group: a suite green because it could not see
+its own untracked files, a timeout measuring the runner rather than the code, and a check called
+`coverage` that never ran the coverage gate. In each case the label was answerable and the
+answer was about something else.
 
 1. **`scripts/tests/test-setup-wizard-db-selection.sh` → `not ok - migrations fail closed`.**
    Failed once in three consecutive local `bun run test:scripts` runs, and once more in a later
@@ -301,10 +307,30 @@ deterministically — each will get another roll on every Phase 1 push.
    not PR-B's to close*: cross-package turbo concurrency against one database. Pre-existing, CI
    equally exposed, still no task, and nowhere near this diff.
 
+4. **`coverage` reported FAILURE without running the coverage gate.** The job died at its fifth
+   step, `Setup Node (node-gyp build helper)`, on `actions/setup-node` failing to fetch the
+   `.node-version` pin: `Resolved .node-version as 25.9.0` → `Not found in manifest. Falling back
+   to download directly from Node`. `Install dependencies`, `Build` and **`Coverage gate`** were
+   all `skipped`. Nothing was measured and nothing was below floor. Passed on re-run with no code
+   change, the same step succeeding.
+
+   Recorded because the failure is maximally misleading: a required check named `coverage` going
+   red reads as "a file dropped below 90%", and the honest reading is "Node could not be
+   downloaded". **Check which step failed before believing what a job's name implies.** Node
+   25.9.0 exists in this repo only as the node-gyp build helper; if the manifest miss recurs, the
+   question is whether that pin is reliably fetchable, but one occurrence does not establish it.
+
 **GitHub Advanced Security's job failure is not in this list.** Its failing step is literally
 named `Processing Request (Linux)` on both the pre-fix and post-fix commits — GitHub's own
 scanning infrastructure, and `github-advanced-security` is not in `main`'s required-checks list.
 The `CodeQL` check is separate and is green.
+
+### CI state at the end of Phase 0
+
+All six required checks green at `76f6709`, plus `CodeQL` and all seven `Analyze (*)` jobs.
+Four flakes were seen across five runs; three needed a re-run and one needed a real fix. That
+ratio is itself worth carrying into Phase 1 — a red on this repo's CI is more often a runner
+than a regression, and the cost of assuming otherwise is chasing a phantom.
 
 ## 12. What Phase 0 does **not** establish
 
