@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The graph-neighbor search stream is now a standalone capability module.** `buildGraphStream`
+  moves out of `rlm-synapse.ts` into `graph-stream.ts` and drops the facade parameter it never
+  used. It was the one delegate that already read zero members off `ContextualSearchRLM`, so the
+  parameter was pure ceremony from the earlier split — carrying it forward is what made the file
+  look like a rename rather than an extraction. The body moved byte-identical; the only behavioural
+  surface that changes is the argument list, and the module no longer references the search facade
+  at all. Functions in the search directory that still take the facade drop from **14 to 13**.
+
+  Deepest foreign reach stays at **14** and the hub gate still fails, both expected and unchanged
+  from the previous release: the maximum is set by `rlm-search.ts` and cannot move until that file
+  is split. The count of modules reading the facade also stays at **5** — `rlm-synapse.ts` keeps
+  two members through its remaining two functions, and only sheds the last of them two extractions
+  from now.
+
 ## [1.11.0] - 2026-07-29
 
 ### Changed

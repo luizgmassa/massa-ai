@@ -3,28 +3,56 @@
 ## Active — Core Layering and God-Module Split (PR-B), Phase 1 started
 
 **Feature**: `core-layering-god-module-split` · branch
-`refactor/search-facade-split-phase-1`, cut from `main` @ `d628464`.
-**Phase 0 is merged and released (PR #44, v1.9.2). T6a and T6 are committed and green; T7 is not
-started.** Working tree clean. Nothing is pushed — the branch is local only.
+`refactor/search-facade-split-phase-1b`, cut from `main` @ `5247ecb` (v1.11.0),
+worktree `../massa-ai-wt-facade-phase-1b`.
+**T6a and T6 are merged and released; T7 is committed and green; T8 is not started.**
+Working tree clean. Nothing is pushed — the branch is local only.
+
+**Read the branch note before anything else.** T6a and T6 landed in `main` via **PR #46, which was
+squashed, not merged** — R-04 was violated. None of its 8 commits are ancestors of `main`, the
+per-commit sensor evidence survives only in `.specs/`, and the old branch
+`refactor/search-facade-split-phase-1` is deleted. That is why this branch is `-1b` and not a
+resumption of the old name: reusing it would make the commit table below ambiguous against a
+history that no longer exists. `refactor/search-facade-split` (Phase 0's, `23e68b9`) still exists on
+the remote and is **not** this work. **This PR must be merged with a merge commit.**
 
 | # | commit | deliverable |
 | --- | --- | --- |
-| — | `569de25` | plan amendment: AC-3 retired, T6's sensor corrected |
-| T6a | `7996c2d` | `capture-facade-baseline.ts` + 3 frozen fixtures; 9 assertions re-pointed |
-| T6 | `f612e03` | `rlm-fusion.ts` → `result-fusion.ts` |
+| T6a/T6 | in `main` via #46 (squashed) | `capture-facade-baseline.ts` + 3 frozen fixtures; `rlm-fusion.ts` → `result-fusion.ts` |
+| T7 | this branch | `buildGraphStream` → `graph-stream.ts`, plus the sensor amendment |
 
-Gates at `f612e03`: `lint` 0 · `type-check` 0 · `test:scripts` **732 pass / 0 fail across 39
-files** · `check-frozen-anchors` exit 0 · `check-characterization` exit 0 · characterization net
-**160** · exclusions **9** · G-HUB exit 1, foreign modules **6 → 5**.
+Gates at T7: `lint` 0 · `type-check` 0 · `build` 0 · `test:scripts` **732 pass / 0 fail across 39
+files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
+characterization net **160** across 7 suites (26·41·31·21·25·7·9) · G-HUB exit 1, foreign modules
+**5**, reach **14** · D1 `delegateScope` **19 → 18**, facade-taking **14 → 13**.
 
 **Read before resuming**: `tasks.md` → *AC-3 vs GMS-03 AC-1*, *Phase 0's before-baselines were
-live-tree assertions*, *T6's sensor was unfirable*, then the Phase 1 table.
+live-tree assertions*, *T6's sensor was unfirable*, **the new *foreign-module count is not a
+per-task sensor either* section**, then the Phase 1 table.
 Then `STATE.md` → *Execute — Phase 1 STARTED*.
 
-**Next action: T7** (`buildGraphStream` → `graph-stream.ts`). It is **not** rename-only:
-`graph-stream-project-scope-pg.test.ts` passes `NO_RLM` at **3 call sites** plus its import, and
-the coverage suite has **2** forwarding assertions. Both are authorised under the amended AC-3.
-That file needs a live PostgreSQL and will not run in a plain `bun test`.
+**Next action: T8** (`applySynapseState` → `session-bias.ts`, `injectedDeps` → `SessionBiasDeps`).
+Its own GMS-03 AC-2 sensor (construct from an object literal, zero `mock.module` calls) is sound.
+Its D1 delta is facade-taking **13 → 12**; the hub-metric foreign-module count **does not move at
+T8** — it moves once, at T9. `rlm-synapse.ts` dies whole at T9.
+
+**Two T7 findings a resumer should not re-derive:**
+
+- **The foreign-module count is not a per-task sensor** — it moves once across T7+T8+T9, at T9.
+  This was the *correction* applied at T6, and it inherited the defect it corrected. Measured
+  before/after in `tasks.md`. T7's and T8's sensor is the D1 matrix delta instead.
+- **`tsc` cannot see `this.`-prefixed infinite recursion in these delegates.** The capability
+  modules share a name *and*, once the facade parameter is dropped, an *arity* with the facade
+  methods that call them. Substituting `return this.buildGraphStream(…)` type-checks clean
+  (`bunx tsc --noEmit -p packages/core/tsconfig.json` exits **0**) while the coverage suite goes
+  **39 pass / 2 fail**. Every remaining delegate move needs that runtime mutation, not a type-check.
+
+**`rlm-synapse.test.ts` was deliberately left untouched at T7**, so its sensor stays exactly **26**
+and T7 stays inside AC-3's bound. Consequence: its header comment and the
+`describe("rlm-synapse — buildGraphStream")` block now name a function that lives in
+`graph-stream.ts`. The tests themselves are correct — they drive `rlm.buildGraphStream`, the facade
+method, which still exists. **Registered as a T15 site**; T20's verifier must not read the stale
+name as evidence the move did not happen.
 
 **Two things a resumer must not re-derive the hard way:**
 
@@ -45,8 +73,16 @@ does not close GMS-04 AC-3** for those 320 `rlm-` occurrences — T20's verifier
 explicitly. The 18 authorised signature-tracking test edits must be told to it too, or they read as
 the AC-3 violation they are not.
 
-**Rebase note**: `origin/main` is `7c20d47` (`chore(release): v1.9.2`), one release-only commit
-ahead of this branch's base. Merge must be a merge commit, not a squash (R-04).
+**Rebase note**: this branch is cut from `origin/main` @ `5247ecb` and is current with it.
+Merge must be a merge commit, not a squash (R-04) — see the branch note above for what a squash
+already cost once.
+
+**CHANGELOG**: `[Unreleased]` was empty at branch time (T6's entry was promoted into `[1.11.0]`),
+so there is no auto-merge corruption to look for yet. Once `main` cuts another release, verify
+**both** directions positionally after any merge — that this branch's entry is in `[Unreleased]`
+**and** absent from the released section, and that the released section is byte-identical to its
+published form. Asserting only that the old entry survived is the asymmetric check that missed it
+last time.
 
 ---
 

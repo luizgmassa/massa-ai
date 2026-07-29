@@ -4,7 +4,7 @@
  *
  * `memory_edges` (prisma/schema.prisma:335) carries no `project_id`, so
  * `GraphStorePg.bfsNeighbors` walks edges globally. Before the guard,
- * `buildGraphStreamImpl` resolved every neighbor row and checked only
+ * `buildGraphStream` resolved every neighbor row and checked only
  * `deleted_at`, so a single cross-project edge published another project's
  * memory content into project A's result set.
  *
@@ -20,8 +20,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "crypto";
 import { SearchSource, type SearchResult } from "@massa-ai/shared";
-import { buildGraphStreamImpl } from "../services/search/rlm-synapse.js";
-import type { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js";
+import { buildGraphStream } from "../services/search/graph-stream.js";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
 const DEDICATED_DB =
@@ -31,9 +30,6 @@ const DEDICATED_DB =
 const TEST_PREFIX = "t10-graph-scope-";
 const PROJECT_A = `${TEST_PREFIX}project-a`;
 const PROJECT_B = `${TEST_PREFIX}project-b`;
-
-/** `buildGraphStreamImpl` never dereferences its first parameter (`_rlm`). */
-const NO_RLM = null as unknown as ContextualSearchRLM;
 
 let prisma: any;
 let ids: Record<string, string>;
@@ -100,8 +96,7 @@ describe.skipIf(!DEDICATED_DB)("buildGraphStream — project scoping (BUG-02)", 
   afterAll(cleanup);
 
   test("excludes the cross-project neighbor and keeps the same-project one", async () => {
-    const stream = await buildGraphStreamImpl(
-      NO_RLM,
+    const stream = await buildGraphStream(
       [[seedHit(ids.seedA)]],
       10,
       PROJECT_A,
@@ -119,8 +114,7 @@ describe.skipIf(!DEDICATED_DB)("buildGraphStream — project scoping (BUG-02)", 
     const seedB = await createMemory("seed-b", PROJECT_B, "project B seed memory");
     await createEdge(seedB, ids.neighborB);
 
-    const stream = await buildGraphStreamImpl(
-      NO_RLM,
+    const stream = await buildGraphStream(
       [[{ ...seedHit(seedB), metadata: { projectId: PROJECT_A } }]],
       10,
       PROJECT_A,
@@ -130,8 +124,7 @@ describe.skipIf(!DEDICATED_DB)("buildGraphStream — project scoping (BUG-02)", 
   }, 30_000);
 
   test("applies no project filter when the caller supplies no projectId", async () => {
-    const stream = await buildGraphStreamImpl(
-      NO_RLM,
+    const stream = await buildGraphStream(
       [[seedHit(ids.seedA)]],
       10,
       undefined,

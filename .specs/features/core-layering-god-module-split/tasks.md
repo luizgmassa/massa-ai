@@ -177,9 +177,9 @@ it is cheapest and `searchImpl` (455 LOC, 13 members) lands last, when everythin
 | --- | --- | --- | --- | --- | --- |
 | **T6a** | **freeze Phase 0's before-baselines** — `scripts/capture-facade-baseline.ts` + three committed fixtures; re-point 9 assertions. Unplanned; see [the section below](#phase-0s-before-baselines-were-live-tree-assertions). | — | — | three mutants observed red first: a dropped delegate row, a whitespace-reflowed anchor, and a forced re-capture over a changed subject. Then: the three suites green **both** at base **and** with T6 applied — the second is the whole point | 1 h |
 | **T6** | `fuseResults`, `generateScoreExplanation` | `rlm-fusion.ts` → `result-fusion.ts` | `RRF_K` → module const. **No deps parameter at all.** **Also updates two files the original row missed**: the re-export at `rlm-search.ts:498-501` (`export { fuseResultsImpl, generateScoreExplanationImpl } from "./rlm-fusion.js"`) and the import block at `contextual-search-rlm.ts:52-53`, which reaches these two symbols **through `rlm-search.js`, not directly**. | **hub-metric foreign modules 6 → 5** (*not* reach — see the correction below); frozen-anchor check (3 of the 4 live here); `rlm-search.test.ts` **31** + characterization **21** + coverage **41** pass counts | 1.5 h |
-| **T7** | `buildGraphStream` | `rlm-synapse.ts` → `graph-stream.ts` | none — it already reads **zero** facade members, but its signature still *takes* one (the deliberately-unused `_rlm`), and dropping it is what makes the file `graph-stream.ts` rather than a rename | `rlm-synapse.test.ts` pass count = **26** (the "14" in the first draft is the `buildGraphStream` describe block, not the file total); `graph-stream-project-scope-pg.test.ts` imports it directly, needs a live DB, and passes `NO_RLM` at **3 call sites** — it is **not** rename-only, see the AC-3 section | 1 h |
-| **T8** | `applySynapseState` | `rlm-synapse.ts` → `session-bias.ts` | `injectedDeps` → `SessionBiasDeps {sessionRegistry, synapseManager}` | **GMS-03 AC-2 sensor**: a new unit test constructs it from an object literal with **zero** `mock.module` calls | 1.5 h |
-| **T9** | `correctQuery` | `rlm-synapse.ts` → **`hybrid-search.ts`** (§4.1/§4.2). The first draft said "folded into the query module", which names nothing — and `query-understanding.ts` is a real, unrelated file in the same directory that an executor could plausibly pick. | `keywordSearch` → `HybridSearchDeps` | `rlm-synapse.test.ts` correctQuery cases (5) pass unmodified | 45 m |
+| **T7** | `buildGraphStream` | `rlm-synapse.ts` → `graph-stream.ts` | none — it already reads **zero** facade members, but its signature still *takes* one (the deliberately-unused `_rlm`), and dropping it is what makes the file `graph-stream.ts` rather than a rename | **D1 `delegateScope`: 19 → 18 rows, facade-taking 14 → 13, scoped LOC 1310 → 1186**, and `buildGraphStream` reappears in `all` with `facadeParam: null`. **Not** the foreign-module count — it cannot move here; see the correction below. Plus invariance: `rlm-synapse.test.ts` **26** (the "14" in the first draft is the `buildGraphStream` describe block, not the file total) and coverage **41**; and a runtime mutation pair, since `tsc` is blind to `this.`-prefixed recursion. `graph-stream-project-scope-pg.test.ts` imports it directly, needs a live DB, and passes `NO_RLM` at **3 call sites** — it is **not** rename-only, see the AC-3 section | 1 h |
+| **T8** | `applySynapseState` | `rlm-synapse.ts` → `session-bias.ts` | `injectedDeps` → `SessionBiasDeps {sessionRegistry, synapseManager}` | **GMS-03 AC-2 sensor**: a new unit test constructs it from an object literal with **zero** `mock.module` calls. Plus **D1 facade-taking 13 → 12** and `rlm-synapse.ts`'s hub-metric reach **2 → 1**. The foreign-module count still does not move here — see below | 1.5 h |
+| **T9** | `correctQuery` | `rlm-synapse.ts` → **`hybrid-search.ts`** (§4.1/§4.2). The first draft said "folded into the query module", which names nothing — and `query-understanding.ts` is a real, unrelated file in the same directory that an executor could plausibly pick. | `keywordSearch` → `HybridSearchDeps` | `rlm-synapse.test.ts` correctQuery cases (5) pass unmodified. **This is where the hub-metric foreign-module count moves, 5 → 4** — `rlm-synapse.ts` reads its last facade member here and leaves the foreign set | 45 m |
 | **T10** | indexing surfaces **and `ensureInitializedImpl`** | `rlm-indexing.ts` → `project-indexer.ts`; **`ensureInitializedImpl`'s body → `ContextualSearchRLM.ensureInitialized()`** | `indexManager`, `symbolRepo`, `keywordSearch`, `vectorStore`, `searchCache` → `IndexerDeps` | **LATE-BIND sensor**: `rlm-indexing.test.ts` pass count = **25**. Any drop means stubs stopped taking effect. **Plus**: `git grep -n 'ensureInitializedImpl' -- packages/core/src` returns nothing outside tests. | 3.5 h |
 | **T11** | `IndexManager` injection seam (**F4**) | **`contextual-search-rlm.ts`** — re-pointed. The first draft named `rlm-indexing.ts:586`, which is *inside* `ensureInitializedImpl` and no longer exists after T10. | the one dependency that cannot be injected today; add the `injectedDeps.indexManager` field | default to today's direct construction; a parity test proves behavior identical when nothing is injected — **plus one positive test that an injected stub `IndexManager` is actually read**, since the parity test alone exercises only the default path and cannot fail on a seam that is wired but never consulted | 1.5 h |
 | **T12** | admin surfaces | `rlm-admin.ts` → `index-admin.ts` | six stores + `fileFilterCache` | `rlm-admin.test.ts` (**7** cases) + the 4 `fileFilterCache` assignment sites | 1.5 h |
@@ -302,9 +302,56 @@ maximum. Measured, before and after T6: reach **14 → 14**, foreign modules **6
 
 Taken literally the row would have reported T6 as failed while it succeeded, and the same is true
 of T7–T12: **reach cannot fall until T13 rewrites `rlm-search.ts`, and G-HUB cannot go green until
-T14.** The per-task sensor is the foreign-module count; G-HUB's exit status is T14's gate and
-nobody else's. Recorded because a sensor that reports failure on an axis its task does not touch is
-the same defect class Phase 0 found four times, pointing the other way.
+T14.** G-HUB's exit status is T14's gate and nobody else's. Recorded because a sensor that reports
+failure on an axis its task does not touch is the same defect class Phase 0 found four times,
+pointing the other way.
+
+The replacement offered here — *"the per-task sensor is the foreign-module count"* — is itself
+wrong for T7 and T8. See the next section; the correction inherited the defect it was correcting.
+
+### The foreign-module count is not a per-task sensor either — it moves once, at T9
+
+Fourth plan defect, found at **T7** the same way as the previous three: by measuring rather than by
+reading. It is the *correction* to T6's unfirable sensor that is wrong, which is why it survived a
+plan challenge — the sentence above replaced one unfirable sensor with another on the same axis.
+
+**Mechanism**, read out of `scripts/search-hub-metric.ts:137-146`: a file counts as a foreign module
+only when it **dereferences** a binding annotated `: ContextualSearchRLM`. `buildGraphStreamImpl`'s
+`_rlm` is never dereferenced, so it contributes **zero** members and its departure cannot change the
+count. `rlm-synapse.ts`'s two members come entirely from the two functions T7 does not touch:
+`applySynapseStateImpl` → `rlm.injectedDeps`, `correctQueryImpl` → `rlm.keywordSearch`.
+
+Measured by scratch simulation before any edit, then confirmed against the live tree at T7:
+
+| state | foreign modules | `rlm-synapse.ts` members read |
+| --- | --- | --- |
+| base (T6 landed) | 5 | 2 — `injectedDeps`, `keywordSearch` |
+| + T7 | **5** | 2 — `perModule` byte-identical |
+| + T8 | **5** | 1 — `keywordSearch` |
+| + T9 | **4** | — drops out of the foreign set |
+
+So the count moves **once across T7+T8+T9, and it moves at T9.** Attributing a decrement to T7 or
+T8 would report a correct task as failed, exactly as T6's row would have.
+
+**Resolution (spec-owner, 2026-07-29): T7's and T8's sensor is the D1 matrix delta**, measured by
+`scripts/search-facade-matrix.ts` — shipped at T1, no new tooling, and the frozen
+`facade-matrix-before.json` is untouched and remains T17/T20's referent. It reads the axis these
+tasks actually move: how many functions still take the facade at all. T9 keeps the foreign-module
+count, which does fire there.
+
+Note what the T7 row's *original* sensor was — `rlm-synapse.test.ts` = 26. That number holds whether
+or not T7 happened, because those tests drive `rlm.buildGraphStream` through the facade, which
+survives the move. It is an **invariance** check, not a discriminating one. Both kinds are kept and
+labelled: the invariance counts prove nothing broke, the D1 delta proves the extraction occurred.
+
+**A third sensor was added at T7 and belongs to every task that moves a delegate.** The capability
+modules deliberately share a name with the facade methods that call them (§4.3, and the import
+comment in `contextual-search-rlm.ts`), and after the facade parameter is dropped they also share an
+**arity**. `tsc` therefore cannot distinguish a correct delegation from `this.`-prefixed infinite
+recursion — measured at T7: with `return this.buildGraphStream(…)` substituted, `bunx tsc --noEmit
+-p packages/core/tsconfig.json` **exits 0**, while the coverage suite goes **39 pass / 2 fail**.
+Dropping the trailing argument gives the same 39/2. Prove the seam at runtime; type-check is
+structurally blind to it.
 
 ### `ensureInitializedImpl` — the export that had no destination
 

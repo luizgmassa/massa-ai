@@ -72,7 +72,7 @@ mock.module("@massa-ai/shared", () => {
 // ── Forwarding-contract mocks (M14 facade delegation) ───────────────────────
 //
 // indexFileImpl / searchImpl / applySynapseStateImpl / correctQueryImpl /
-// buildGraphStreamImpl / fuseResults / generateScoreExplanation /
+// buildGraphStream / fuseResults / generateScoreExplanation /
 // addContextToResultsImpl / extractPreviewImpl / calculateAvgScoreImpl /
 // runWithIndexLock / _indexProjectInternalImpl / ensureFreshIndexImpl /
 // checkSearchAdmissionImpl are replaced with spies below so the describe
@@ -155,12 +155,20 @@ mock.module("../services/search/result-fusion.js", () => ({
 
 const applySynapseStateImplMock = mock(async () => [] as SearchResult[]);
 const correctQueryImplMock = mock(async (): Promise<string | null> => null);
-const buildGraphStreamImplMock = mock(async () => [] as SearchResult[]);
 
 mock.module("../services/search/rlm-synapse.js", () => ({
   applySynapseStateImpl: applySynapseStateImplMock,
   correctQueryImpl: correctQueryImplMock,
-  buildGraphStreamImpl: buildGraphStreamImplMock,
+}));
+
+// PR-B T7: buildGraphStream moved to its own capability module and lost the
+// facade parameter (GMS-03 AC-1) — it was the one delegate that already read
+// zero facade members, so `_rlm` was pure ceremony. Same reason as the T6
+// block above: mocking it means naming the new module.
+const buildGraphStreamMock = mock(async () => [] as SearchResult[]);
+
+mock.module("../services/search/graph-stream.js", () => ({
+  buildGraphStream: buildGraphStreamMock,
 }));
 
 import { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js";
@@ -182,7 +190,7 @@ beforeEach(() => {
   calculateAvgScoreImplMock.mockClear();
   applySynapseStateImplMock.mockClear();
   correctQueryImplMock.mockClear();
-  buildGraphStreamImplMock.mockClear();
+  buildGraphStreamMock.mockClear();
   (loadProjectIgnore as unknown as ReturnType<typeof mock>).mockClear?.();
 });
 
@@ -639,12 +647,11 @@ describe("ContextualSearchRLM.buildGraphStream (instance delegate)", () => {
     const resultSets = [[makeResult("g1")]];
     const reportFn = () => {};
     const sentinelReturn = [makeResult("g2")];
-    buildGraphStreamImplMock.mockImplementationOnce(async () => sentinelReturn);
+    buildGraphStreamMock.mockImplementationOnce(async () => sentinelReturn);
 
     const result = await rlm.buildGraphStream(resultSets, 15, "proj-graph", reportFn);
 
-    expect(buildGraphStreamImplMock).toHaveBeenCalledWith(
-      rlm,
+    expect(buildGraphStreamMock).toHaveBeenCalledWith(
       resultSets,
       15,
       "proj-graph",
@@ -656,10 +663,9 @@ describe("ContextualSearchRLM.buildGraphStream (instance delegate)", () => {
   test("projectId and reportDegradation omitted → forwarded as undefined", async () => {
     const rlm = makeRlm();
     const resultSets = [[makeResult("g3")]];
-    buildGraphStreamImplMock.mockImplementationOnce(async () => []);
+    buildGraphStreamMock.mockImplementationOnce(async () => []);
     await rlm.buildGraphStream(resultSets, 5);
-    expect(buildGraphStreamImplMock).toHaveBeenLastCalledWith(
-      rlm,
+    expect(buildGraphStreamMock).toHaveBeenLastCalledWith(
       resultSets,
       5,
       undefined,

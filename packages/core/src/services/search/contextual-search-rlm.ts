@@ -45,7 +45,6 @@ import {
 import {
   applySynapseStateImpl,
   correctQueryImpl,
-  buildGraphStreamImpl,
 } from "./rlm-synapse.js";
 import {
   searchImpl,
@@ -54,11 +53,14 @@ import {
   calculateAvgScoreImpl,
   filterByPatternsImpl,
 } from "./rlm-search.js";
-// Capability module (design.md §4.1). These share a name with the class
+// Capability modules (design.md §4.1). These share a name with the class
 // methods that delegate to them — the shape §4.3 sketches. Class members are
 // not in lexical scope, so a bare call inside a method body resolves to the
-// module import, not to itself.
+// module import, not to itself. Same arity too, so `tsc` cannot tell a correct
+// delegation from a `this.`-prefixed infinite recursion; the coverage suite's
+// forwarding tests are what prove it at runtime.
 import { fuseResults, generateScoreExplanation } from "./result-fusion.js";
+import { buildGraphStream } from "./graph-stream.js";
 import type {
   SearchDegradation,
   SearchDegradationReporter,
@@ -339,8 +341,7 @@ export class ContextualSearchRLM {
     projectId?: string,
     reportDegradation?: SearchDegradationReporter,
   ): Promise<SearchResult[]> {
-    return buildGraphStreamImpl(
-      this,
+    return buildGraphStream(
       resultSets,
       maxResults,
       projectId,
