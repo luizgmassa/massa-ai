@@ -116,6 +116,17 @@ describe("facadeParamOf", () => {
   test("does not match a type that merely shares a prefix", () => {
     expect(facadeParamOf("x: ContextualSearchRLMBuilder", DEFAULT_FACADE)).toBeNull();
   });
+
+  // CodeQL: regex constructed from a command-line argument (`--type`). Left
+  // unescaped, "a+b" as a regex means "one or more `a` then `b`" and would
+  // match "aaab"; "x.y" means "x, any character, y" and would match "xzy".
+  // Escaped, both must match only their own exact text.
+  test("regression: a type containing regex metacharacters is matched literally, not as a pattern", () => {
+    expect(facadeParamOf("x: aaab", "a+b")).toBeNull();
+    expect(facadeParamOf("x: a+b", "a+b")).toBe("x");
+    expect(facadeParamOf("y: xzy", "x.y")).toBeNull();
+    expect(facadeParamOf("y: x.y", "x.y")).toBe("y");
+  });
 });
 
 describe("measureSource", () => {

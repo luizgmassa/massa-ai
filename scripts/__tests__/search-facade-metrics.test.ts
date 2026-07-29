@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   importSpecifiers,
+  isBarrelSpecifier,
   measure,
   measureDirectory,
   specifierMatches,
@@ -120,6 +121,33 @@ describe("specifierMatches", () => {
 
   test("does not match a different module with a shared prefix", () => {
     expect(specifierMatches("./contextual-search-rlm-coverage.js", FACADE)).toBe(false);
+  });
+});
+
+describe("isBarrelSpecifier", () => {
+  test("matches the directory itself and its /index, at any depth", () => {
+    expect(isBarrelSpecifier("../controllers", "controllers")).toBe(true);
+    expect(isBarrelSpecifier("../controllers/index", "controllers")).toBe(true);
+    expect(isBarrelSpecifier("controllers", "controllers")).toBe(true);
+  });
+
+  test("does not match a specifier that merely contains leaf as a substring", () => {
+    expect(isBarrelSpecifier("../somecontrollers", "controllers")).toBe(false);
+  });
+
+  // CodeQL: regex constructed from a command-line argument (`--dir`'s
+  // basename). Left unescaped, "a+b" as a regex means "one or more `a` then
+  // `b`" and would match "../aaab"; "x.y" means "x, any character, y" and
+  // would match "../xzy". Plain string comparison matches only the exact text.
+  test("regression: a leaf containing regex metacharacters is matched literally, not as a pattern", () => {
+    expect(isBarrelSpecifier("../aaab", "a+b")).toBe(false);
+    expect(isBarrelSpecifier("../a+b", "a+b")).toBe(true);
+    expect(isBarrelSpecifier("../a+b/index", "a+b")).toBe(true);
+  });
+
+  test("regression: a dot in leaf is matched literally, not as any-character", () => {
+    expect(isBarrelSpecifier("../xzy", "x.y")).toBe(false);
+    expect(isBarrelSpecifier("../x.y", "x.y")).toBe(true);
   });
 });
 

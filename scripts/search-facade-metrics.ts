@@ -170,12 +170,31 @@ export interface DirectoryReading {
  * see what it costs, instead of arguing about a single number whose method is
  * unstated.
  */
+/**
+ * Does `specifier` reference `leaf` itself — a barrel import like
+ * `../controllers` or `../controllers/index` — rather than a file inside it?
+ *
+ * `leaf` reaches here as the basename of `--dir` on the command line
+ * (`measureDirectory`, below), so this is plain string comparison rather than
+ * a constructed `RegExp`: a directory named `a+b` must be matched literally,
+ * not interpreted as "one or more `a` then `b`".
+ */
+export function isBarrelSpecifier(specifier: string, leaf: string): boolean {
+  const stripped = specifier.replace(/\.(ts|js)$/, "");
+  return (
+    stripped === leaf ||
+    stripped.endsWith(`/${leaf}`) ||
+    stripped === `${leaf}/index` ||
+    stripped.endsWith(`/${leaf}/index`)
+  );
+}
+
 export function measureDirectory(dir: string, files = trackedFiles()): DirectoryReading {
   const clean = dir.replace(/\/$/, "");
   const leaf = basename(clean);
   const members = files.filter((f) => f.startsWith(clean + "/"));
   const stems = new Set(members.map((f) => basename(f).replace(/\.(ts|tsx|js|mjs|cjs)$/, "")));
-  const isBarrel = (s: string): boolean => new RegExp(`(^|/)${leaf}(/index)?$`).test(s.replace(/\.(ts|js)$/, ""));
+  const isBarrel = (s: string): boolean => isBarrelSpecifier(s, leaf);
 
   const deep: string[] = [];
   const barrel: string[] = [];

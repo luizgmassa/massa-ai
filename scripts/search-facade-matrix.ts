@@ -98,9 +98,25 @@ export function findFunctions(src: string): Array<{ name: string; params: string
   return out;
 }
 
-/** The parameter in `params` annotated with `type`, or null. */
+/**
+ * Escape regex metacharacters so `s` can be interpolated into a `RegExp` and
+ * still match only itself, literally.
+ */
+export function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * The parameter in `params` annotated with `type`, or null.
+ *
+ * `type` reaches here from `--type` on the command line (`main`, below), so it
+ * is escaped before being interpolated: an unescaped value lets a caller
+ * change what the pattern matches rather than what it searches for — `a+b`,
+ * for instance, would stop meaning the literal type name and start meaning
+ * "one or more `a` then `b`".
+ */
 export function facadeParamOf(params: string, type: string): string | null {
-  const m = new RegExp(`([A-Za-z0-9_]+)\\s*:\\s*${type}\\b`).exec(params);
+  const m = new RegExp(`([A-Za-z0-9_]+)\\s*:\\s*${escapeRegExp(type)}\\b`).exec(params);
   return m ? m[1] : null;
 }
 
