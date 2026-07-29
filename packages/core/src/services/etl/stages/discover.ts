@@ -19,6 +19,7 @@ import { config, logger } from "@massa-ai/shared";
 import { getSymbolRepository } from "../../../data/symbol/symbol-repository-factory.js";
 import type { EtlStageContext, DiscoveredFile } from "../stage-context.js";
 import {
+  buildExtensionGlob,
   DEFAULT_EXTENSIONS,
   DEFAULT_IGNORES,
   getActiveCapturePolicy,
@@ -90,8 +91,7 @@ export class DiscoverStage {
     if (opts.filesToProcess && opts.filesToProcess.length > 0) {
       relPaths = opts.filesToProcess;
     } else {
-      const pattern = `**/*{${allowedExts.join(",")}}`;
-      const found = await glob(pattern, {
+      const found = await glob(buildExtensionGlob(allowedExts), {
         cwd: ctx.projectPath,
         nodir: true,
         dot: false,

@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { config } from "@massa-ai/shared";
 import {
+  buildExtensionGlob,
   loadProjectIgnore,
   applyCapturePolicy,
   DEFAULT_IGNORES,
@@ -162,5 +163,38 @@ describe("ignore-patterns — getActivePolicy with config-present path", () => {
     // Restore
     config.set("capturePolicy", ORIGINAL_CONFIG);
     _resetCapturePolicyCacheForTesting();
+  });
+});
+
+// A brace expansion with exactly ONE alternative is not an alternation — glob
+// matches `**/*{.ts}` literally, so a single-extension allow-list found nothing
+// and indexing reported success over an empty corpus. Unreachable while the
+// list was always the 33 built-in defaults; reachable now that
+// `security.allowedExtensions` is user-settable, and a one-language project is
+// exactly when someone sets it.
+describe("ignore-patterns — buildExtensionGlob", () => {
+  test("one extension yields a pattern with no brace expansion", () => {
+    expect(buildExtensionGlob([".ts"])).toEqual(["**/*.ts"]);
+  });
+
+  test("several extensions yield one pattern each, order preserved", () => {
+    expect(buildExtensionGlob([".ts", ".kt", ".md"])).toEqual([
+      "**/*.ts",
+      "**/*.kt",
+      "**/*.md",
+    ]);
+  });
+
+  test("no pattern contains a brace, at any list length", () => {
+    for (const list of [[".ts"], [".ts", ".js"], DEFAULT_EXTENSIONS]) {
+      for (const pattern of buildExtensionGlob(list)) {
+        expect(pattern).not.toContain("{");
+        expect(pattern).not.toContain("}");
+      }
+    }
+  });
+
+  test("an empty list yields no patterns rather than a match-everything glob", () => {
+    expect(buildExtensionGlob([])).toEqual([]);
   });
 });

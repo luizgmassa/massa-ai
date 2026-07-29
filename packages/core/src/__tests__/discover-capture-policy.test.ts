@@ -178,3 +178,41 @@ describe("DiscoverStage — capture policy composition", () => {
     expect(await discover(dir)).toContain("src/notes.md");
   }, 30_000);
 });
+
+/**
+ * The other half of bounding discovery. `security.allowedExtensions` became
+ * user-settable, which reached a latent trap in how the glob was built: a
+ * brace expansion with one alternative is matched literally, so a
+ * single-extension allow-list discovered nothing and the run reported success
+ * over an empty corpus. Measured, not hypothesised — a real bounded index
+ * completed in 181 ms over 0 files.
+ */
+describe("DiscoverStage — extension allow-list", () => {
+  const ORIGINAL_SECURITY = config.get("security");
+
+  afterEach(() => {
+    config.set("security", ORIGINAL_SECURITY);
+  });
+
+  function useExtensions(allowedExtensions: string[]) {
+    config.set("security", { ...ORIGINAL_SECURITY, allowedExtensions });
+  }
+
+  test("a single-extension allow-list still discovers matching files", async () => {
+    const dir = await makeProjectDir(FIXTURE);
+    useExtensions([".ts"]);
+    expect(await discover(dir)).toEqual(["src/keep.ts"]);
+  }, 30_000);
+
+  test("a multi-extension allow-list keeps working", async () => {
+    const dir = await makeProjectDir(FIXTURE);
+    useExtensions([".ts", ".md"]);
+    expect(await discover(dir)).toEqual(["src/keep.ts", "src/notes.md"]);
+  }, 30_000);
+
+  test("an extension outside the list is not discovered", async () => {
+    const dir = await makeProjectDir(FIXTURE);
+    useExtensions([".md"]);
+    expect(await discover(dir)).toEqual(["src/notes.md"]);
+  }, 30_000);
+});

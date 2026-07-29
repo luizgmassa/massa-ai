@@ -23,6 +23,27 @@ const ignore = (ignoreModule as unknown as { default: typeof ignoreModule }).def
 
 export const DEFAULT_EXTENSIONS = [".ts", ".js", ".tsx", ".jsx", ".dart", ".py", ".kt", ".kts"];
 
+/**
+ * Build the glob for an extension allow-list.
+ *
+ * The obvious spelling — a single combined `**​/*{.ts,.js,…}` — has a trap: a
+ * brace expansion with exactly ONE alternative is not an alternation. `glob`
+ * matches `**​/*{.ts}` literally, against files whose names actually end in the
+ * five characters `{.ts}`, so a one-extension allow-list silently matches
+ * nothing and indexing reports success over an empty corpus.
+ *
+ * That was unreachable while the list was hardcoded to the 33 built-in
+ * defaults. Making `security.allowedExtensions` user-settable reaches it, and
+ * a one-language project is exactly when someone would set it.
+ *
+ * Returning one pattern per extension sidesteps brace semantics entirely.
+ * `glob` accepts the array directly and still performs a single traversal, so
+ * the reason the combined form existed is preserved.
+ */
+export function buildExtensionGlob(extensions: readonly string[]): string[] {
+  return extensions.map((ext) => `**/*${ext}`);
+}
+
 export const DEFAULT_IGNORES = [
   // `**/` prefix required so these match anywhere in the tree (not just root).
   "**/node_modules/**",

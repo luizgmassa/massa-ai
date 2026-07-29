@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same identity. Same-name/same-kind declarations were already disambiguated correctly and
   are unaffected. Symbols that do not share a name keep the identity they had.
 
+- **An allow-list with exactly one file extension no longer matches nothing.** The three
+  file scanners built a single combined glob, `**/*{.ts,.js,…}`. A brace expansion with one
+  alternative is not an alternation — it is matched literally — so a one-extension allow-list
+  found zero files and indexing reported success over an empty corpus. Measured: a bounded
+  index completed in 181 ms over 0 files. This was unreachable while the extension list was
+  always the 33 built-in defaults, and became reachable with the `security.allowedExtensions`
+  fix below; a single-language project is exactly the case where someone sets one extension.
+
 - **`capturePolicy` in `config.json` now actually reaches indexing.** The block was parsed,
   bounds-checked and `denyUnknownFields`-validated at config load, and then never consulted:
   `applyCapturePolicy` had no caller anywhere in the product, so a configured policy narrowed
