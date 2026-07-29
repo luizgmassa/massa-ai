@@ -120,58 +120,45 @@ the T10 fix). Read the authorship note before relying on it.
 
 ---
 
-## Active — Plugin Auto-Install, Execute T1–T6 done, validation dispatching
+## Inactive — Plugin Auto-Install COMPLETE, validated PASS
 
 **Feature**: `plugin-auto-install` · branch `feat/plugin-auto-install`, cut from
-`origin/main` @ `ce26f28` (v1.9.1). **Specify, Design, Tasks COMPLETE and APPROVED;
-Execute T1–T6 ALL DONE and committed (T5 docs `f9fbc81`; T6 evidence: aggregate
-gate green + 4/4 discrimination mutants killed and reverted). Independent
-validation is the only remaining step.**
+`origin/main` @ `ce26f28` (v1.9.1). **Specify, Design, Tasks, Execute (T1–T6), and
+independent validation ALL COMPLETE 2026-07-29. Verdict: PASS** (`.specs/features/
+plugin-auto-install/validation.md`). Branch is ready for PR/merge review — no
+remaining task work.
 
 **Worktree**: `/Users/luizmassa/Projects/massa-ai-wt-plugin-auto-install`
-**Commits**: `345e753` (Specify), `fd0dbc8` (Design + Tasks + Plan Challenge),
-`41bfda3` (T1), `c2ee9b0` (T2), `9c68012` (T3), `bb42849` (T4), `f9fbc81` (T5),
-T6 evidence commit, plus `docs(spec)` progress commits `1e68651`, `2afe20b`,
-`1c4a502`, `c1e025a`, `5dded42`.
+**Commits** (oldest→newest): `345e753` (Specify), `fd0dbc8` (Design + Tasks + Plan
+Challenge), `41bfda3` (T1), `c2ee9b0` (T2), `9c68012` (T3), `bb42849` (T4),
+`f9fbc81` (T5 docs), `cc132bc` (T6 sensor evidence), `ad9232b` (AC-13 reword,
+validation finding), `5438037` (README/CHANGELOG `k)` fix), `cba2159` (validation
+PASS), plus `docs(spec)` progress commits `1e68651`, `2afe20b`, `1c4a502`,
+`c1e025a`, `5dded42`, `a8e9aa5`.
 
-**Read before resuming**, in order:
+**Final gate (tracked state @ `5438037`)**: lint clean; type-check 6/6;
+`test:scripts` TS 637 pass + 3 pre-existing env failures
+(`verify-tree-sitter-grammars` native suites, red at HEAD — recorded, not fixed);
+shell loop 21/21 (run separately: `for f in scripts/tests/*.sh; do bash "$f" ||
+exit 1; done`); `test:plugins` 96/96.
 
-1. `.specs/project/STATE.md` — Current block (per-task status + gate counts).
-2. `.specs/features/plugin-auto-install/tasks.md` — T5/T6 definitions; T1–T4
-   done-when boxes all checked.
-3. `.specs/features/plugin-auto-install/spec.md` / `design.md` — only if a
-   decision needs re-checking; approach A is settled, do not re-litigate.
+**Validation loop**: 1 of 3 iterations used. Findings fixed: AC-13 reworded to
+harness routes (spec-internal conflict with PAI-08/goal 3 — `p)` menu is the
+deliberately un-gated manual surface), and the pre-existing README `k)`
+description corrected in both copies. Verifier session had no shell/write tools:
+static per-AC evidence is the verifier's; gate re-runs are the main agent's
+(recorded in validation.md as an accepted deviation).
 
-**Next actions, in order**:
+**If a next session resumes this repo**: no active feature. Check
+`.specs/project/STATE.md` — `core-layering-god-module-split` (PR-B) Execute is in
+progress on `refactor/search-facade-split` in the main checkout.
 
-1. **Validation** — dispatch a fresh `massa-ai-verification-agent` (author ≠
-   verifier) over the diff `ce26f28..HEAD` with spec.md's 16 ACs as source of
-   truth; it writes `.specs/features/plugin-auto-install/validation.md`.
-   Fix→re-verify loop capped at 3 iterations.
+**Environment notes (still true)**:
 
-**T5/T6 gate record (2026-07-29, @ f9fbc81)**: lint clean; type-check 6/6;
-`test:scripts` TS 637 pass + **3 pre-existing env failures**
-(`verify-tree-sitter-grammars` native suites, red at HEAD — verified by stash
-in T2; the `&&` chain short-circuits the shell loop, so it was run separately:
-`for f in scripts/tests/*.sh; do bash "$f" || exit 1; done` — 21/21 green);
-`test:plugins` 96/96. Sensors: 4/4 mutants killed (record-call delete → PAI-03
-red; record-before-hooks-merge → 3.x(f) AC-16 red; dropped C5 re-attach →
-round-trip red ×2; ungated marketplace → 2.12 R6 red), each observed in scratch
-state and reverted; post-revert tree clean and suites green.
-
-**Environment notes (discovered during Execute)**:
-
-- `apps/opencode-plugin/dist/` is build output — `bun run build` was run this
-  session (5/5 packages); rebuild if the worktree is reprovisioned, else
-  `test:plugins` fails 17/94 on missing dist.
-- Suite 2.10 (AC-12) moves `dist/index.js` aside mid-test and restores it via
-  an EXIT trap — do not be surprised by the temporary move.
-- `test-setup-wizard-db-selection.sh` flaked once under the full loop
-  ("migrations fail closed"), green standalone — same class as the load flakes
-  recorded in STATE.md history; do not chase.
-
-**Skipped sensors this session**: massa-ai MCP tools unregistered (no
-recall/remember, no Synapse, no checkpoints); Context7 not registered.
-Graceful degradation recorded; nothing blocked.
+- `apps/opencode-plugin/dist/` is build output — rebuild with `bun run build` if
+  the worktree is reprovisioned, else `test:plugins` fails on missing dist.
+- Suite 2.10 moves `dist/index.js` aside mid-test and restores it via EXIT trap.
+- massa-ai MCP tools were unregistered all session (no recall/remember/Synapse) —
+  graceful degradation; nothing blocked.
 
 **Machine state**: tools-api stopped (port 3333 free). No DB needed.
