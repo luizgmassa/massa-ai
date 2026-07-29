@@ -208,7 +208,7 @@ of it and a checker carrying its own copy would fail on its own existence.
 | --- | --- |
 | `bun run lint` | exit 0 |
 | `bun run type-check` | exit 0 |
-| `bun run test:scripts` | 725 pass / 0 fail across 39 files, exit 0 |
+| `bun run test:scripts` | 730 pass / 0 fail across 39 files, exit 0 |
 | `bun scripts/check-frozen-anchors.ts` | exit 0, 14/14 unique |
 | `bun scripts/check-characterization.ts` | exit 0, 3/3 at floor |
 | `check-coverage.ts` EXCLUSIONS | **9** (AC-2 requires this stays 9) |
@@ -238,13 +238,64 @@ in — and both would have produced a confidently wrong number rather than an er
    2–4 times in `.specs/` prose quoting it. It is true only in `resolve.ts`'s corpus of `.ts`
    and `.tsx` sources, which is the scope that matters and is the one the real gate uses.
 
+## 10a. A third instrument defect, found by CodeQL on PR #44
+
+Both D1 and D3 built a `RegExp` by interpolating a **command-line argument** unescaped
+(`js/regex-injection`, alerts 29 and 30):
+
+- `search-facade-matrix.ts` — `--type` interpolated into `` `([A-Za-z0-9_]+)\s*:\s*${type}\b` ``
+- `search-facade-metrics.ts` — `basename(--dir)` interpolated into `` `(^|/)${leaf}(/index)?$` ``
+
+A directory or type named `a+b` stops meaning the literal name and starts meaning "one or more
+`a` then `b`". Same family as §10's other two: the instrument silently measuring something other
+than what it was asked to.
+
+Fixed at `9c6916e`. D3's needed no pattern at all — "does this specifier end with `<leaf>` or
+`<leaf>/index`" is what `===`/`endsWith` say directly — so the dynamic regex is gone, extracted
+as `isBarrelSpecifier()`. D1's genuinely needs a pattern (it captures the identifier *preceding*
+the type name), so its argument is escaped through a new `escapeRegExp()`. Both carry regression
+tests proving a metacharacter-laden value is matched literally.
+
+**All three load-bearing figures are byte-identical across the fix** — fan-in 24/26, fan-out 19;
+controllers 6/22/1/1; D1 21/15/6/1550/23 — which is the evidence the rewrite is
+behavior-preserving, over and above the four-branch equivalence being readable by eye.
+
 ## 11. Known-flaky, attributed, not chased
 
-`scripts/tests/test-setup-wizard-db-selection.sh` → `not ok - migrations fail closed` failed
-once in three consecutive `bun run test:scripts` runs. All 20 shell suites pass standalone; the
-other two aggregate runs were clean at 694 and 711 pass / 0 fail. It touches no path Phase 0
-changed. Attributed and recorded rather than debugged, per the standing instruction — if it
-returns, attribute before debugging.
+Three, all observed during PR #44. None was fixed, and none should be until it reproduces
+deterministically — each will get another roll on every Phase 1 push.
+
+1. **`scripts/tests/test-setup-wizard-db-selection.sh` → `not ok - migrations fail closed`.**
+   Failed once in three consecutive local `bun run test:scripts` runs, and once more in a later
+   session. All 20 shell suites pass standalone. It is a pure text assertion over
+   `setup-local-first.sh` with no database or Docker dependency, and the preceding suite was
+   confirmed to use `mktemp -d` with a cleanup trap, so it is not state leakage. Touches no path
+   Phase 0 changed.
+
+2. **`native Tree-sitter package contract > discriminates no-delete growth and bounds patched
+   100-cycle RSS` — `this test timed out after 5000ms`.** Failed CI's `build` job once. Three
+   observations on identical code: **5156.78 ms** (fail), **3790.74 ms** (pass, 75.8% of budget),
+   **4910.31 ms** (pass, 98.2%). It measures RSS over 100 parse cycles in a cold Bun child on a
+   2-core runner. Load-sensitive, not deterministic.
+
+   **Left alone deliberately.** The branch adds ~30 `spawnSync` Bun subprocesses ahead of it, so
+   this branch plausibly raised the odds — but a passing re-run is not a fix and must not be
+   presented as one, and a per-test budget applied to a test that has never failed twice would be
+   papering over an unmeasured base rate. The 4910 ms reading says the margin is thin; if it trips
+   again in Phase 1, that is the second data point, and *then* it earns an explicit budget with a
+   comment naming the mechanism. Never the global `bunfig.toml` 5 s, never fewer cycles.
+
+3. **`coverage` → `error: graph_generation_workspace_missing:p4d2-trace-path`** at
+   `graph-generation-repository-pg.ts:113` in `lockWorkspace`, failing
+   `trace_path > outbound traversal follows alpha → beta → gamma`. Passed on re-run, no code
+   change. This is the shared-test-database race already registered in `tasks.md` → *Open, and
+   not PR-B's to close*: cross-package turbo concurrency against one database. Pre-existing, CI
+   equally exposed, still no task, and nowhere near this diff.
+
+**GitHub Advanced Security's job failure is not in this list.** Its failing step is literally
+named `Processing Request (Linux)` on both the pre-fix and post-fix commits — GitHub's own
+scanning infrastructure, and `github-advanced-security` is not in `main`'s required-checks list.
+The `CodeQL` check is separate and is green.
 
 ## 12. What Phase 0 does **not** establish
 
