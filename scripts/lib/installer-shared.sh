@@ -180,6 +180,142 @@ installer_plugin_source_root() {
   echo "$dest"
 }
 
+# ── Host detection / bundle-version gating ───────────────────
+# Why: the harness plugin phase must install bundles only for hosts present on
+#      the machine and upgrade only when the bundle version changed (approach
+#      A — harness-gated; .specs/features/plugin-auto-install/design.md C1/C2).
+# Impacts: PAI-01 detection, PAI-03..06 version gating, AC-6/AC-8.
+# Test: bash scripts/tests/test-plugin-auto-install.sh
+
+# installer_host_config_dir <host>
+# Echoes the host's user config dir relative to home. Unknown host → return 2.
+installer_host_config_dir() {
+  case "$1" in
+    claude) echo ".claude" ;;
+    codex) echo ".codex" ;;
+    cursor) echo ".cursor" ;;
+    opencode) echo ".config/opencode" ;;
+    *) return 2 ;;
+  esac
+}
+
+# installer_host_binaries <host>
+# Echoes the binary name(s) to probe for <host>, one word per binary. Unknown
+# host → return 2. MUST mirror install-skills.sh's platform_executables
+# exactly (cursor → "cursor-agent cursor"): plugin detection and skills
+# detection must never disagree about the same machine.
+installer_host_binaries() {
+  case "$1" in
+    claude) echo "claude" ;;
+    codex) echo "codex" ;;
+    cursor) echo "cursor-agent cursor" ;;
+    opencode) echo "opencode" ;;
+    *) return 2 ;;
+  esac
+}
+
+# installer_host_detected <host> <target_home>
+# Returns 0 and echoes the detection signal (`dir` or `binary`) when
+# <target_home>/<config_dir> exists OR any binary from installer_host_binaries
+# is on PATH; returns 1 and echoes nothing otherwise. Unknown host → return 2.
+# The binary probe is a bare `command -v` (never runs the binary): detection
+# must be side-effect-free and sub-second — installer_host_cli_supports stays
+# the install-time probe. An empty <target_home> never dir-detects (detection
+# must not fabricate a home dir).
+installer_host_detected() {
+  local host="$1" target_home="$2"
+  local config_dir
+  config_dir="$(installer_host_config_dir "$host")" || return 2
+  if [ -n "$target_home" ] && [ -d "${target_home}/${config_dir}" ]; then
+    echo "dir"
+    return 0
+  fi
+  local binary
+  for binary in $(installer_host_binaries "$host"); do
+    if command -v "$binary" >/dev/null 2>&1; then
+      echo "binary"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# installer_bundle_version <package_json>
+# Echoes the top-level "version" of a package.json via sed — no runner needed,
+# so the harness can gate before runner-dependent work starts.
+installer_bundle_version() {
+  sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$1" | head -n 1
+}
+
+# installer_plugin_versions <runner> <state_file>
+# Tolerant reader: emits "host<TAB>version" per platform with a recorded
+# plugin version. Missing file → empty output, exit 0. Unparseable file → one
+# stderr warning, empty output, exit 0 — the plugin path treats unknown as
+# "install once, then record" and self-heals on success (AC-8). The strict
+# skills reader in install-skills.sh is deliberately untouched.
+installer_plugin_versions() {
+  local runner="$1" state_file="$2"
+  [ -f "$state_file" ] || return 0
+  "$runner" - "$state_file" <<'NODE'
+const fs = require("fs");
+const [, , file] = process.argv;
+let raw = "";
+try { raw = fs.readFileSync(file, "utf8"); } catch { process.exit(0); }
+let data;
+try {
+  data = JSON.parse(raw);
+} catch {
+  console.error(`Warning: installer state at ${file} is unparseable; treating plugin versions as unknown`);
+  process.exit(0);
+}
+const platforms = data && typeof data === "object" && !Array.isArray(data) ? data.platforms : null;
+if (platforms && typeof platforms === "object" && !Array.isArray(platforms)) {
+  const out = [];
+  for (const [host, rec] of Object.entries(platforms)) {
+    const version =
+      rec && typeof rec === "object" && rec.plugin && typeof rec.plugin.version === "string"
+        ? rec.plugin.version
+        : "";
+    if (version) out.push(`${host}\t${version}`);
+  }
+  if (out.length) process.stdout.write(out.join("\n") + "\n");
+}
+NODE
+}
+
+# installer_compare_versions <runner> <a> <b>
+# Echoes -1, 0, or 1. Numeric dotted compare; identical strings are equal
+# first (a same-version record is always a no-op). Any empty or non-numeric
+# segment on either side means "unknown" and compares older (-1), so an
+# unknown recorded version upgrades once and is then recorded. A pre-release
+# suffix (1.9.1-rc1) has a non-numeric segment and therefore compares older
+# than the plain release — correct for this project's release-only tags.
+installer_compare_versions() {
+  local runner="$1" a="$2" b="$3"
+  "$runner" - "$a" "$b" <<'NODE'
+const [, , a, b] = process.argv;
+let result = -1;
+if (a === b) {
+  result = 0;
+} else {
+  const pa = a.split(".");
+  const pb = b.split(".");
+  const numeric = (parts) => parts.every((p) => /^[0-9]+$/.test(p));
+  if (numeric(pa) && numeric(pb)) {
+    result = 0;
+    const len = Math.max(pa.length, pb.length);
+    for (let i = 0; i < len; i++) {
+      const x = Number(pa[i] ?? "0");
+      const y = Number(pb[i] ?? "0");
+      if (x < y) { result = -1; break; }
+      if (x > y) { result = 1; break; }
+    }
+  }
+}
+process.stdout.write(`${result}\n`);
+NODE
+}
+
 # installer_consent_gate <target_home> <yes_flag> <exit_code> [label]
 # Refuses to write the real $HOME without --yes. A TTY gets an interactive
 # prompt; a non-TTY refuses outright. The exit code is a parameter because
