@@ -124,13 +124,13 @@ T5 → T6
   no plugin installers (T4).
 - **MCP/skill question**: NONE/NONE (same skipped sensors as T1).
 - **Done when**:
-  - [ ] seeded state with `plugin` subfield survives `install-skills.sh --apply` and `--uninstall` byte-identical in that subfield
-  - [ ] pre-feature v2 file (no `plugin`) round-trips unchanged — absent
+  - [x] seeded state with `plugin` subfield survives `install-skills.sh --apply` and `--uninstall` byte-identical in that subfield
+  - [x] pre-feature v2 file (no `plugin`) round-trips unchanged — absent
         subfield stays absent, never `{version: "", installedAt: ""}`
         (Plan Challenge inversion E)
-  - [ ] corrupt file still exits 2 with integration error (strictness preserved)
-  - [ ] existing suites `test-install-skills-*.sh` green
-  - [ ] Gate: `bun test scripts/__tests__/install-state-plugin-version.test.ts` — N tests pass (record count)
+  - [x] corrupt file still exits 2 with integration error (strictness preserved)
+  - [x] existing suites `test-install-skills-*.sh` green
+  - [x] Gate: `bun test scripts/__tests__/install-state-plugin-version.test.ts` — N tests pass (record count)
 - **Tests**: TS integration (matrix row 2)
 - **Gate**: quick → full (`bun run test:scripts` before commit)
 - **Commit**: `feat(installer): install-state v2 round-trips plugin version records`
