@@ -120,13 +120,16 @@ the T10 fix). Read the authorship note before relying on it.
 
 ---
 
-## Inactive — Plugin Auto-Install COMPLETE, validated PASS
+## Inactive — Plugin Auto-Install COMPLETE, validated PASS, PR #47 open + CI green
 
-**Feature**: `plugin-auto-install` · branch `feat/plugin-auto-install`, cut from
-`origin/main` @ `ce26f28` (v1.9.1). **Specify, Design, Tasks, Execute (T1–T6), and
+**Feature**: `plugin-auto-install` · branch `feat/plugin-auto-install`, rebased onto
+`origin/main` @ v1.11.0 and pushed. **Specify, Design, Tasks, Execute (T1–T6), and
 independent validation ALL COMPLETE 2026-07-29. Verdict: PASS** (`.specs/features/
-plugin-auto-install/validation.md`). Branch is ready for PR/merge review — no
-remaining task work.
+plugin-auto-install/validation.md`). **PR
+[#47](https://github.com/luizgmassa/massa-ai/pull/47) OPEN — 14 checks pass, 0 fail
+(`install-test` skips by workflow condition; first-pass green, zero fix pushes).
+DO NOT MERGE per user instruction — merge withheld for user review (merge to `main`
+auto-cuts a release).**
 
 **Worktree**: `/Users/luizmassa/Projects/massa-ai-wt-plugin-auto-install`
 **Commits** (oldest→newest): `345e753` (Specify), `fd0dbc8` (Design + Tasks + Plan
