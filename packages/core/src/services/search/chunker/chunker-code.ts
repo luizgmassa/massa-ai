@@ -165,9 +165,43 @@ export function findCodeBoundaries(lines: string[]): CodeBoundary[] {
   return boundaries;
 }
 
+/**
+ * Remove closed block-comment spans from a single line in one pass.
+ *
+ * @param line - One source line (multi-line block state is tracked by callers).
+ * @returns The line with every closed block-comment span removed; an
+ *   unterminated `/*` and everything after it is kept verbatim, matching the
+ *   old regex's behavior of only stripping closed pairs.
+ */
+// Why: the previous `/\/\*.*?\*\//g` replace was quadratic (CodeQL
+//      js/polynomial-redos, SEC-3, alert #27 — measured ~17x slowdown for 4x
+//      input on "/*" + "a/*"*n). Minified single-line files made that a real
+//      indexing stall. A single left-to-right scan is O(n) with identical
+//      output: indexOf finds the same earliest close the lazy quantifier did.
+// Impacts: netBraceDelta; brace counting for every chunked code file.
+// Test: bun test packages/core/src/__tests__/chunker-code-security.test.ts
+function stripInlineBlockComments(line: string): string {
+  let out = "";
+  let i = 0;
+  while (i < line.length) {
+    if (line.charCodeAt(i) === 47 /* / */ && line.charCodeAt(i + 1) === 42 /* * */) {
+      const end = line.indexOf("*/", i + 2);
+      if (end === -1) {
+        // Unterminated opener: the old regex left it untouched, so keep the rest.
+        out += line.slice(i);
+        break;
+      }
+      i = end + 2;
+      continue;
+    }
+    out += line[i];
+    i++;
+  }
+  return out;
+}
+
 export function netBraceDelta(line: string): number {
-  const stripped = line
-    .replace(/\/\*.*?\*\//g, "")
+  const stripped = stripInlineBlockComments(line)
     .replace(/\/\/.*$/, "")
     .replace(/'(?:\\.|[^'\\])*'/g, "''")
     .replace(/"(?:\\.|[^"\\])*"/g, '""')
