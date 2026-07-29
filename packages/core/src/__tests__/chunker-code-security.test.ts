@@ -46,6 +46,17 @@ describe("netBraceDelta block-comment stripping", () => {
     expect(elapsed).toBeLessThan(500);
   });
 
+  it("handles adversarial escaped-slash input in linear time", () => {
+    // CodeQL's second shape: many "\/" repetitions. Each unterminated regex
+    // scan used to rescan the remainder of the line (measured 1505ms at
+    // 50k); a failed scan proves no closing slash remains, so it runs once.
+    const adversarial = "/" + "a\\/".repeat(50_000);
+    const start = performance.now();
+    netBraceDelta(adversarial);
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(500);
+  });
+
   it("still counts braces outside comments correctly", () => {
     expect(netBraceDelta("if (a) {")).toBe(1);
     expect(netBraceDelta("}")).toBe(-1);

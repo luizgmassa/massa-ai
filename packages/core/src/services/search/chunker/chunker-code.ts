@@ -172,36 +172,92 @@ export function findCodeBoundaries(lines: string[]): CodeBoundary[] {
  * @param line - One source line (multi-line block state is tracked by callers).
  * @returns Net brace delta: openers positive, closers negative.
  */
-// Why: the original strip-then-count chain ran five regexes over the line,
-//      two of them quadratic (CodeQL js/polynomial-redos — SEC-3 alert #27
-//      for the lazy block-comment pattern, plus two PR-time alerts on the
-//      string-literal and line-comment patterns). Minified single-line files
-//      made that a real indexing stall. This single left-to-right scan is
-//      O(n) and strictly more correct: the old chain mis-parsed lines whose
-//      strings contained "//" or "/*". Regex literals keep the old
-//      (linear, unflagged) pre-strip so braces inside /…/ bodies don't count.
+// Why: the original strip-then-count chain ran five regexes over the line and
+//      CodeQL flagged every one of them as polynomial (SEC-3 alert #27 plus
+//      three PR-time alerts). Minified single-line files made that a real
+//      indexing stall. This single left-to-right scan is O(n) on every input
+//      shape and strictly more correct: the old chain mis-parsed lines whose
+//      strings contained "//" or "/*". Regex-vs-division uses the standard
+//      heuristic — a "/" opens a regex unless the previous significant token
+//      is an identifier/number/closing bracket that is not a regex-prefix
+//      keyword — which matches the old naive strip on well-formed code.
 // Impacts: brace counting for every chunked code file.
 // Test: bun test packages/core/src/__tests__/chunker-code-security.test.ts
+
+/** Keywords after which a "/" opens a regex literal rather than division. */
+const REGEX_PREFIX_KEYWORDS = new Set([
+  "return", "typeof", "case", "do", "else", "in", "of", "new",
+  "delete", "void", "throw", "yield", "await", "instanceof",
+]);
+
 export function netBraceDelta(line: string): number {
-  const text = line.replace(/\/(?:\\.|[^/\\\n])+\/[gimsuy]*/g, '""');
   let delta = 0;
   let i = 0;
-  const n = text.length;
+  const n = line.length;
+  let lastSig = -1; // char code of the previous significant (non-space) char
+  let word = ""; // trailing identifier chars, for the keyword heuristic
+  // A failed regex scan proves no unescaped "/" exists anywhere later in the
+  // line, so every subsequent regex attempt would also fail — attempting one
+  // per slash is the quadratic shape CodeQL flags. Scan at most once.
+  let regexPossible = true;
+
+  const opensRegex = (): boolean => {
+    if (lastSig === -1) return true;
+    const c = String.fromCharCode(lastSig);
+    if (/[\w)\]}'"`]/.test(c)) return REGEX_PREFIX_KEYWORDS.has(word);
+    return true;
+  };
+
   while (i < n) {
-    const code = text.charCodeAt(i);
-    const next = text.charCodeAt(i + 1);
+    const code = line.charCodeAt(i);
+    const next = line.charCodeAt(i + 1);
     // Line comment: nothing after it can hold a countable brace.
     if (code === 47 && next === 47) break;
     // Block comment closed on this line: skip the span. An unterminated
     // opener is treated as ordinary text, matching the old regex's behavior
     // of only stripping closed pairs.
     if (code === 47 && next === 42) {
-      const end = text.indexOf("*/", i + 2);
+      const end = line.indexOf("*/", i + 2);
       if (end === -1) {
+        lastSig = code;
+        word = "";
         i++;
         continue;
       }
       i = end + 2;
+      continue;
+    }
+    // Regex literal: skip to the unescaped closing slash plus flag chars. An
+    // unterminated slash is division/ordinary text — braces after it count,
+    // exactly as the old unmatched-regex fallback behaved.
+    if (code === 47 && regexPossible && opensRegex()) {
+      let j = i + 1;
+      let closed = false;
+      while (j < n) {
+        const inner = line.charCodeAt(j);
+        if (inner === 92) {
+          j += 2;
+          continue;
+        }
+        if (inner === 47) {
+          closed = true;
+          break;
+        }
+        if (inner === 10) break;
+        j++;
+      }
+      if (closed) {
+        j++;
+        while (j < n && /[a-z]/.test(line[j])) j++; // flags
+        lastSig = 47;
+        word = "";
+        i = j;
+        continue;
+      }
+      regexPossible = false;
+      lastSig = code;
+      word = "";
+      i++;
       continue;
     }
     // String/template literal: skip to the matching quote, honoring escapes.
@@ -209,7 +265,7 @@ export function netBraceDelta(line: string): number {
       const quote = code;
       i++;
       while (i < n) {
-        const inner = text.charCodeAt(i);
+        const inner = line.charCodeAt(i);
         if (inner === 92) {
           i += 2;
           continue;
@@ -217,10 +273,22 @@ export function netBraceDelta(line: string): number {
         i++;
         if (inner === quote) break;
       }
+      lastSig = quote;
+      word = "";
       continue;
     }
     if (code === 123) delta++;
     else if (code === 125) delta--;
+    if (code === 32 || code === 9) {
+      i++;
+      continue;
+    }
+    if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122) || (code >= 48 && code <= 57) || code === 95 || code === 36) {
+      word += line[i];
+    } else {
+      word = "";
+    }
+    lastSig = code;
     i++;
   }
   return delta;
