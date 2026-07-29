@@ -151,6 +151,8 @@ Group tasks into ordered phases. Each phase depends on the ones before it; tasks
 
 This keeps phase boundaries meaningful while letting the packing hit its target worker count.
 
+**No trailing wiring phase.** A phase whose purpose is DI, wiring, or integration of this feature's own components is prohibited — that work belongs in the task that introduces each component (see *Dependency Injection And Wiring Is Per-Task, Never a Separate Phase* below). Split phases at genuine dependency/cohesion seams, never to gather wiring into one place.
+
 ### 5. Validate Before Presenting (MANDATORY)
 
 Before showing tasks to the user, run ALL three pre-approval checks. These are NOT optional — they are gates. If any check fails, restructure the tasks and re-run until all pass.
@@ -427,6 +429,26 @@ Pick whichever option keeps tasks atomic and cohesive. The goal: no task produce
 
 ---
 
+## Dependency Injection And Wiring Is Per-Task, Never a Separate Phase
+
+Dependency injection, module/dependency wiring, container/service registration, and composition-root setup for a unit of code are done **inside the task (or its phase) that introduces that unit**. **Never collect wiring into a dedicated trailing "DI", "wiring", or "integration" phase.** A final phase whose purpose is "wire everything together" is the same defect class as deferring tests to a separate task (see *Resolving compilation dependencies* above): every intermediate task ships code that cannot build or run until a much later phase, so none of their gates actually prove the code works in context, and a failure or skip in the trailing phase strands all preceding work.
+
+This rule is the dependency-side twin of test co-location: tests live with the code that creates it, and so does its wiring.
+
+**Rule:** each task must leave the repository buildable and its own gate green against code whose dependencies are wired **by that task or an earlier one**. Code whose dependencies are not yet wired is incomplete — it is a gate failure, not a deferred item.
+
+**When a task introduces code that needs wiring, restructure rather than defer:**
+
+1. **Wire inline:** the task that creates the component/service also registers it, binds its dependencies, and adds it to the composition root or module it belongs to.
+2. **Merge backward:** if the wiring depends on a container or module a later task introduces, pull that container/module into this task so the code is wired and runnable now.
+3. **Merge forward:** only when wiring is genuinely shared across several components, fold the wiring into the earliest task where the wired unit becomes runnable — never into a phase whose only job is wiring.
+
+Pick whichever keeps tasks atomic and the repository green at every commit. The goal: no task produces code that cannot run until a later phase. If a unit cannot be wired in the task that creates it, the task or phase boundaries are wrong.
+
+**Phase-planning consequence:** the execution plan must not contain a phase whose stated purpose is DI, wiring, or integration of everything built earlier. "Integration" phases are allowed only when they integrate *externally* delivered components (a third-party service, another team's API) that were not available to earlier tasks — never as a catch-all for wiring this feature's own code. A phase that exists only to wire the feature's own components is a planning smell: redistribute its work into the tasks that own each component.
+
+---
+
 ## Tips
 
 - **Phases are ordered** — Each phase completes before the next; tasks run in order within a phase
@@ -486,6 +508,7 @@ Before sampling tests manually, prefer massa-ai tooling to read the codebase:
 
 - Keep tasks atomic enough to verify independently.
 - Order tasks so earlier tasks leave the repository buildable and testable.
+- **Dependency injection and wiring are per-task/per-phase.** The task that introduces a component wires it (registration, binding, composition root). Never defer wiring to a separate trailing "DI"/"wiring"/"integration" phase; a phase that only wires this feature's own code is a planning smell. See *Dependency Injection And Wiring Is Per-Task, Never a Separate Phase* above.
 - Do not create tasks that require hidden chat context; every task must point to the spec/design evidence it needs.
 - If a task reveals a missing requirement or design decision, stop and update the earlier artifact (`.specs/features/<slug>/spec.md` or `design.md`) before continuing.
 

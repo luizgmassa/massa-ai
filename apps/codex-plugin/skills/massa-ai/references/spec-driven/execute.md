@@ -67,6 +67,8 @@ If `tasks.md` exists, check dependencies. If using the inline plan, follow the o
 
 If blocked: "T3 depends on T2 which isn't done. Should I do T2 first?"
 
+**Wire dependencies in this task, not later.** The task that introduces a component also wires it — registration, binding, and composition-root/module setup are part of the task, never deferred to a trailing "DI" or "integration" phase. Code whose dependencies are not wired is incomplete and fails this task's gate; "wiring happens in a later phase" is not a valid state. See `references/spec-driven/tasks.md` → *Dependency Injection And Wiring Is Per-Task, Never a Separate Phase* for the planning-side rule and the restructure options (wire inline / merge backward / merge forward).
+
 ### 3. State Implementation Plan
 
 Before writing code:
