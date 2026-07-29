@@ -120,17 +120,19 @@ the T10 fix). Read the authorship note before relying on it.
 
 ---
 
-## Active — Plugin Auto-Install, Execute T1–T4 done, T5 mid-flight
+## Active — Plugin Auto-Install, Execute T1–T6 done, validation dispatching
 
 **Feature**: `plugin-auto-install` · branch `feat/plugin-auto-install`, cut from
 `origin/main` @ `ce26f28` (v1.9.1). **Specify, Design, Tasks COMPLETE and APPROVED;
-Execute T1–T4 DONE and committed. T5 (docs) edits written but UNCOMMITTED — build
-gate not yet run. T6 and independent validation not started.**
+Execute T1–T6 ALL DONE and committed (T5 docs `f9fbc81`; T6 evidence: aggregate
+gate green + 4/4 discrimination mutants killed and reverted). Independent
+validation is the only remaining step.**
 
 **Worktree**: `/Users/luizmassa/Projects/massa-ai-wt-plugin-auto-install`
 **Commits**: `345e753` (Specify), `fd0dbc8` (Design + Tasks + Plan Challenge),
-`41bfda3` (T1), `c2ee9b0` (T2), `9c68012` (T3), `bb42849` (T4), plus `docs(spec)`
-progress commits `1e68651`, `2afe20b`, `1c4a502`, `c1e025a`.
+`41bfda3` (T1), `c2ee9b0` (T2), `9c68012` (T3), `bb42849` (T4), `f9fbc81` (T5),
+T6 evidence commit, plus `docs(spec)` progress commits `1e68651`, `2afe20b`,
+`1c4a502`, `c1e025a`, `5dded42`.
 
 **Read before resuming**, in order:
 
@@ -140,38 +142,22 @@ progress commits `1e68651`, `2afe20b`, `1c4a502`, `c1e025a`.
 3. `.specs/features/plugin-auto-install/spec.md` / `design.md` — only if a
    decision needs re-checking; approach A is settled, do not re-litigate.
 
-**Uncommitted files (T5 work — review, gate, then commit)**:
-
-- `README.md` — Integration section: new paragraph on harness auto-detect +
-  version gating (after the `p`/`k` menu paragraph, ~:208).
-- `CLAUDE.md` — agent-harness paragraph: added the host-detected, version-gated
-  plugin-phase sentence (~:309).
-- `CHANGELOG.md` — `[Unreleased] → ### Added` entry (minor bump class).
-
 **Next actions, in order**:
 
-1. **T5 gate (build)**: `bun run lint && bun run type-check && bun run test:scripts
-   && bun run test:plugins`. Expected: lint/type-check clean; `test:scripts` TS
-   part 637 pass + **3 pre-existing env failures** (tree-sitter native suites in
-   `scripts/tests/verify-tree-sitter-*.test.ts`, red at HEAD — verified by stash
-   in T2; the `&&` chain then short-circuits the shell loop, so run it separately:
-   `for f in scripts/tests/*.sh; do bash "$f" || exit 1; done` — all green);
-   `test:plugins` 96/96. Then commit T5 as
-   `docs(installer): plugin auto-install behavior + changelog`.
-2. **T6** — aggregate gate in tracked state + the 4 design discrimination
-   sensors (each in scratch state, reverted after observation): (1) delete the
-   C4 `record_plugin_version` call → PAI-03 test red; (2) forced hooks-merge
-   failure after `install_bundled_skills` → no `plugin` subfield (already a
-   permanent test at suite 3.x(f) — sensor = confirm it kills a record-inside-
-   `install_bundled_skills` mutant); (3) drop C5 write-side re-attach in
-   `install-skills.sh` → round-trip test red; (4) harness with 0 detected hosts
-   → no `.config/massa-ai/marketplace/` dir (permanent test at suite 2.12 —
-   sensor = confirm it kills an ungated-marketplace mutant). Record evidence in
-   tasks.md + STATE.md. Commit per tasks.md decision (`test(installer): …` or
-   fold into T5).
-3. **Validation** — dispatch a fresh `massa-ai-verification-agent` (author ≠
-   verifier) over the diff `ce26f28..HEAD` with spec.md as source of truth;
-   it writes `.specs/features/plugin-auto-install/validation.md`.
+1. **Validation** — dispatch a fresh `massa-ai-verification-agent` (author ≠
+   verifier) over the diff `ce26f28..HEAD` with spec.md's 16 ACs as source of
+   truth; it writes `.specs/features/plugin-auto-install/validation.md`.
+   Fix→re-verify loop capped at 3 iterations.
+
+**T5/T6 gate record (2026-07-29, @ f9fbc81)**: lint clean; type-check 6/6;
+`test:scripts` TS 637 pass + **3 pre-existing env failures**
+(`verify-tree-sitter-grammars` native suites, red at HEAD — verified by stash
+in T2; the `&&` chain short-circuits the shell loop, so it was run separately:
+`for f in scripts/tests/*.sh; do bash "$f" || exit 1; done` — 21/21 green);
+`test:plugins` 96/96. Sensors: 4/4 mutants killed (record-call delete → PAI-03
+red; record-before-hooks-merge → 3.x(f) AC-16 red; dropped C5 re-attach →
+round-trip red ×2; ungated marketplace → 2.12 R6 red), each observed in scratch
+state and reverted; post-revert tree clean and suites green.
 
 **Environment notes (discovered during Execute)**:
 

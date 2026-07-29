@@ -239,14 +239,14 @@ Also update the feature block above: **Phase 0 is done, remaining Execute is ~21
 - workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
 - feature: `plugin-auto-install` — **Specify + Design + Tasks COMPLETE and APPROVED
   2026-07-29 (Plan Challenge: full gate, pre_mortem, 4 findings incorporated). Execute
-  IN PROGRESS: T1 `41bfda3`, T2 `c2ee9b0`, T3 `9c68012`, T4 `bb42849` all DONE and
-  committed (feature suite 174/174, plugins 96/96, TS parity 6/6, full TS 637 pass +
-  3 pre-existing env failures red at HEAD). T5 IN PROGRESS: README/CLAUDE.md/CHANGELOG
-  edits WRITTEN but UNCOMMITTED — build gate not yet run. Next action: run T5 build
-  gate (`bun run lint && bun run type-check && bun run test:scripts && bun run
-  test:plugins`), commit T5 (`docs(installer): plugin auto-install behavior +
-  changelog`), then T6 (aggregate gate + 4 discrimination sensors), then dispatch
-  fresh massa-ai-verification-agent → validation.md.**
+  T1–T6 ALL DONE and committed: T1 `41bfda3`, T2 `c2ee9b0`, T3 `9c68012`, T4 `bb42849`,
+  T5 `f9fbc81` (docs), T6 evidence commit (aggregate gate + 4/4 discrimination mutants
+  killed — record-call delete, record-before-hooks-merge, dropped C5 re-attach, ungated
+  marketplace; each observed red in scratch state and reverted). Gate counts: lint clean,
+  type-check 6/6, feature suite + shell 21/21, plugins 96/96, full TS 637 pass + 3
+  pre-existing env failures red at HEAD (`verify-tree-sitter-grammars` native suites).
+  Next action: dispatch fresh massa-ai-verification-agent (author ≠ verifier) over diff
+  `ce26f28..HEAD` against spec.md's 16 ACs → validation.md (fix→re-verify cap 3).**
 - worktree: `/Users/luizmassa/Projects/massa-ai-wt-plugin-auto-install`; branch
   `feat/plugin-auto-install` cut from `origin/main` @ `ce26f28` (v1.9.1)
 - scope: 10 requirements (PAI-01..10) — harness plugin phase detects the four agent hosts
