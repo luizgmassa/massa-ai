@@ -239,12 +239,14 @@ Also update the feature block above: **Phase 0 is done, remaining Execute is ~21
 - workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
 - feature: `plugin-auto-install` — **Specify + Design + Tasks COMPLETE and APPROVED
   2026-07-29 (Plan Challenge: full gate, pre_mortem, 4 findings incorporated). Execute
-  IN PROGRESS: T1 DONE (`41bfda3`, 45/45 helper assertions), T2 DONE (`c2ee9b0`, TS
-  suite 4/4, full TS 633 pass + 4 pre-existing env failures red at HEAD, all shell
-  suites green), T3 DONE (`9c68012`, suite 104/104 incl. detection matrix ×4, dry-run,
-  failure isolation, AC-12; CLI 34/34 + menu pins 14/14 unchanged), T4 DONE (`bb42849`,
-  suite 174/174 e2e ×3 hosts + opencode record cases, plugins 96/96, TS parity 6/6).
-  Next action: T5 (docs + CHANGELOG).**
+  IN PROGRESS: T1 `41bfda3`, T2 `c2ee9b0`, T3 `9c68012`, T4 `bb42849` all DONE and
+  committed (feature suite 174/174, plugins 96/96, TS parity 6/6, full TS 637 pass +
+  3 pre-existing env failures red at HEAD). T5 IN PROGRESS: README/CLAUDE.md/CHANGELOG
+  edits WRITTEN but UNCOMMITTED — build gate not yet run. Next action: run T5 build
+  gate (`bun run lint && bun run type-check && bun run test:scripts && bun run
+  test:plugins`), commit T5 (`docs(installer): plugin auto-install behavior +
+  changelog`), then T6 (aggregate gate + 4 discrimination sensors), then dispatch
+  fresh massa-ai-verification-agent → validation.md.**
 - worktree: `/Users/luizmassa/Projects/massa-ai-wt-plugin-auto-install`; branch
   `feat/plugin-auto-install` cut from `origin/main` @ `ce26f28` (v1.9.1)
 - scope: 10 requirements (PAI-01..10) — harness plugin phase detects the four agent hosts

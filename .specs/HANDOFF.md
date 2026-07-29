@@ -120,60 +120,72 @@ the T10 fix). Read the authorship note before relying on it.
 
 ---
 
-## Active — Plugin Auto-Install, plan approved, Execute not started
+## Active — Plugin Auto-Install, Execute T1–T4 done, T5 mid-flight
 
 **Feature**: `plugin-auto-install` · branch `feat/plugin-auto-install`, cut from
-`origin/main` @ `ce26f28` (v1.9.1). **Specify, Design, Tasks are COMPLETE and APPROVED;
-Execute (T1–T6) has NOT started.** Working tree clean; worktree provisioned
-(`bun install` done 2026-07-29).
+`origin/main` @ `ce26f28` (v1.9.1). **Specify, Design, Tasks COMPLETE and APPROVED;
+Execute T1–T4 DONE and committed. T5 (docs) edits written but UNCOMMITTED — build
+gate not yet run. T6 and independent validation not started.**
 
 **Worktree**: `/Users/luizmassa/Projects/massa-ai-wt-plugin-auto-install`
-**Commits**: `345e753` (Specify), `fd0dbc8` (Design + Tasks + Plan Challenge revisions).
+**Commits**: `345e753` (Specify), `fd0dbc8` (Design + Tasks + Plan Challenge),
+`41bfda3` (T1), `c2ee9b0` (T2), `9c68012` (T3), `bb42849` (T4), plus `docs(spec)`
+progress commits `1e68651`, `2afe20b`, `1c4a502`, `c1e025a`.
 
 **Read before resuming**, in order:
 
-1. `.specs/features/plugin-auto-install/spec.md` — 10 requirements (PAI-01..10), 16 ACs,
-   user decisions (auto-detect at install time, all four hosts, absent = skip+log,
-   auto-upgrade on version change) and the marketplace-copy assumption.
-2. `.specs/features/plugin-auto-install/design.md` — approach A (harness-gated), C1–C5,
-   risks R1–R9. **Approach was user-confirmed; do not re-litigate.**
-3. `.specs/features/plugin-auto-install/tasks.md` — 6 tasks, gates, Test Coverage Matrix,
-   and the *Plan Challenge — tasks* section (the four incorporated findings are
-   load-bearing: exit-0-only records, `cursor-agent cursor` binary parity, gated
-   marketplace resolution, AC-15 uninstall branch semantics).
+1. `.specs/project/STATE.md` — Current block (per-task status + gate counts).
+2. `.specs/features/plugin-auto-install/tasks.md` — T5/T6 definitions; T1–T4
+   done-when boxes all checked.
+3. `.specs/features/plugin-auto-install/spec.md` / `design.md` — only if a
+   decision needs re-checking; approach A is settled, do not re-litigate.
 
-**Plan Challenge done**: full gate, mode `pre_mortem`, `massa-ai-plan-critic`.
-Findings C-1..C-4 verified against source and incorporated into spec/design/tasks.
-Nothing is owed here.
+**Uncommitted files (T5 work — review, gate, then commit)**:
 
-**Next action**: **T1** — add `installer_host_config_dir`, `installer_host_binaries`,
-`installer_host_detected`, `installer_bundle_version`, `installer_plugin_versions`,
-`installer_compare_versions` to `scripts/lib/installer-shared.sh` (bash 3.2,
-function-only). `installer_host_binaries` MUST mirror
-`scripts/install-skills.sh:165-172` `platform_executables` (cursor → `cursor-agent cursor`).
+- `README.md` — Integration section: new paragraph on harness auto-detect +
+  version gating (after the `p`/`k` menu paragraph, ~:208).
+- `CLAUDE.md` — agent-harness paragraph: added the host-detected, version-gated
+  plugin-phase sentence (~:309).
+- `CHANGELOG.md` — `[Unreleased] → ### Added` entry (minor bump class).
 
-**Execution contract reminders**:
+**Next actions, in order**:
 
-- 6 tasks ≤ 8 → single batch, **inline execution, no sub-agent offer**.
-- One atomic commit per task, gate green before commit (user pre-authorized task commits).
-- Per-task commit gates: T1/T2 quick, T3/T4 full (`bun run test:scripts`), T5/T6 build
-  (`bun run lint && bun run type-check && bun run test:scripts && bun run test:plugins`).
-- After T6 (last task): fresh `massa-ai-verification-agent` runs automatically
-  (author ≠ verifier) and writes `.specs/features/plugin-auto-install/validation.md`.
-- `install.sh` menu strings are grep-pinned — do not reword.
-- New plugin record code adds **no** new `source installer-shared.sh` dependency in any
-  of the four plugin installers (inline heredoc ×4).
-- Root + four plugin `package.json` versions are asserted equal in T4's parity suite
-  (no PR gate runs `version:sync` — this is the only guard).
+1. **T5 gate (build)**: `bun run lint && bun run type-check && bun run test:scripts
+   && bun run test:plugins`. Expected: lint/type-check clean; `test:scripts` TS
+   part 637 pass + **3 pre-existing env failures** (tree-sitter native suites in
+   `scripts/tests/verify-tree-sitter-*.test.ts`, red at HEAD — verified by stash
+   in T2; the `&&` chain then short-circuits the shell loop, so run it separately:
+   `for f in scripts/tests/*.sh; do bash "$f" || exit 1; done` — all green);
+   `test:plugins` 96/96. Then commit T5 as
+   `docs(installer): plugin auto-install behavior + changelog`.
+2. **T6** — aggregate gate in tracked state + the 4 design discrimination
+   sensors (each in scratch state, reverted after observation): (1) delete the
+   C4 `record_plugin_version` call → PAI-03 test red; (2) forced hooks-merge
+   failure after `install_bundled_skills` → no `plugin` subfield (already a
+   permanent test at suite 3.x(f) — sensor = confirm it kills a record-inside-
+   `install_bundled_skills` mutant); (3) drop C5 write-side re-attach in
+   `install-skills.sh` → round-trip test red; (4) harness with 0 detected hosts
+   → no `.config/massa-ai/marketplace/` dir (permanent test at suite 2.12 —
+   sensor = confirm it kills an ungated-marketplace mutant). Record evidence in
+   tasks.md + STATE.md. Commit per tasks.md decision (`test(installer): …` or
+   fold into T5).
+3. **Validation** — dispatch a fresh `massa-ai-verification-agent` (author ≠
+   verifier) over the diff `ce26f28..HEAD` with spec.md as source of truth;
+   it writes `.specs/features/plugin-auto-install/validation.md`.
 
-**Skipped sensors this session**: massa-ai MCP tools unregistered (no recall/remember,
-no Synapse, no checkpoints); Context7 not registered. Graceful degradation recorded;
-nothing blocked.
+**Environment notes (discovered during Execute)**:
 
-**Side finding reported, out of scope (design R9)**: `apps/claude-plugin/install.sh:42-43`
-and `apps/codex-plugin/install.sh:41-42` `source "$REPO_ROOT/scripts/lib/installer-shared.sh"`
-unconditionally — a published tarball lacking `scripts/` would crash them. Pre-existing;
-not this feature's problem.
+- `apps/opencode-plugin/dist/` is build output — `bun run build` was run this
+  session (5/5 packages); rebuild if the worktree is reprovisioned, else
+  `test:plugins` fails 17/94 on missing dist.
+- Suite 2.10 (AC-12) moves `dist/index.js` aside mid-test and restores it via
+  an EXIT trap — do not be surprised by the temporary move.
+- `test-setup-wizard-db-selection.sh` flaked once under the full loop
+  ("migrations fail closed"), green standalone — same class as the load flakes
+  recorded in STATE.md history; do not chase.
 
-**Machine state**: tools-api stopped (port 3333 free). No DB needed — installer suites
-run against scratch HOME dirs only.
+**Skipped sensors this session**: massa-ai MCP tools unregistered (no
+recall/remember, no Synapse, no checkpoints); Context7 not registered.
+Graceful degradation recorded; nothing blocked.
+
+**Machine state**: tools-api stopped (port 3333 free). No DB needed.
