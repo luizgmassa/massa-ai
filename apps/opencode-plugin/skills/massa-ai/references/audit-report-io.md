@@ -29,6 +29,14 @@ audits/mobile-figma/<YYYY-MM-DD mobile-figma-audit.md>
 audits/maestro/<YYYY-MM-DD maestro-audit.md>
 ```
 
+Judge-with-debate evaluation reports use their own family (no `-audit` suffix — recorded
+deviation: these are evaluation-scored reports, not findings-shaped audits):
+
+```text
+audits/judge/<YYYY-MM-DD judge-with-debate judge-N.md>       (N = 1|2|3, one per judge)
+audits/judge/<YYYY-MM-DD judge-with-debate consensus.md>
+```
+
 Use the local current date. Create the required directory when missing. Do not silently overwrite a different run; ask the user or choose a deterministic suffix and state the deviation. Suffix rule: use `-2`, `-3`, etc. for same-day same-target collisions in one session; use `-<HHMMSS>` only when existing files do not reveal a stable sequence.
 
 ## Report Schema v2 Determinism
@@ -397,6 +405,105 @@ Verification Suggestion: <Maestro command, JUnit report check, artifact inspecti
 ```
 
 Only executable flow, fixture, setup/teardown, test-data, or directly scoped Maestro CI/report issues become `MST-*` findings. App bugs, product behavior gaps, backend defects, and unclear requirements must route to `debug`, `feature`, or `requirements-audit` instead of `maestro-fix`.
+
+## Judge With Debate Report Contracts
+
+Reports produced by `workflows/judge-with-debate.md`. This family is **evaluation-scored, not
+findings-shaped**: no `Findings` section, no severity/confidence finding IDs, and the
+finding-prefix table does not apply. The path shape deviates from the `<...-audit>` suffix
+convention (`audits/judge/<YYYY-MM-DD judge-with-debate ...>`) — deviation recorded here. No
+downstream fix-workflow consumes these reports today; execution-input selection rules are N/A.
+
+### Per-Judge Report — `audits/judge/<YYYY-MM-DD judge-with-debate judge-N.md>`
+
+Written by judge N at round 0; debate rounds **append** `## Debate Round {R}` sections
+(append-only). Required fields:
+
+```md
+# Judge N Evaluation — <target>
+
+Date: <YYYY-MM-DD>
+Workflow: judge-with-debate
+ProjectId: <projectId>
+WorkflowSessionId: <judge-with-debate-[entity]>
+Target: <evaluated artifact>
+Target Focus: <paths, task description>
+Scope: <artifact paths | diff | prompt-supplied artifact>
+Git Base: <sha/ref or n/a>
+Git Head: <sha/ref, working-tree, or n/a>
+Source Evidence Timestamp: <YYYY-MM-DD HH:MM local time, or unavailable>
+Judge: N (1|2|3)
+Model Requested: <slot pin: deepseek-v4-pro | minimax-m3 | GLM-5.2>
+Model Note: <fallback state or n/a>
+
+## Evaluation Specification
+<meta-judge YAML, embedded verbatim once>
+
+## Criterion Scores
+### <criterion id> — <score>/<scale.max> (weight <w>)
+Evidence: <exact quotes from the artifact>
+Justification: <text>
+
+## Weighted Overall: <score>
+
+## Strengths
+## Weaknesses
+
+## Verification/Test Fidelity Checklist
+| Item | Evidence |
+|---|---|
+| Deterministic sensor | <eval-spec YAML + artifact paths + quoted evidence, or not available with reason> |
+| Result | <pass, fail, not run, or not applicable> |
+| Coverage target | <criterion IDs scored> |
+| Validation assets protected | <none> |
+| Skipped-check reason | <none or allowed skipped-check reason> |
+| Execution handoff | <own file path + consensus file path> |
+
+## Debate Round {R}   (appended per round; absent when consensus at round 0)
+Disagreements (>1.0 gap): <criterion, own score, peer score>
+Defense: <quoted evidence>
+Challenges: <quoted counter-evidence>
+Revision decision: <held | revised old→new + why the evidence was compelling>
+```
+
+### Consensus Report — `audits/judge/<YYYY-MM-DD judge-with-debate consensus.md>`
+
+Written by the orchestrator from judge reply blocks (it never opens judge-N files). Required
+fields: the same freshness header (minus Judge/Model lines) plus:
+
+```md
+Rounds to consensus: <0..3>
+Diversity: <OK | DIVERSITY DEGRADED: <slots and actual models>>
+Local fallbacks: <none | judge-N local, reason>
+
+## Consensus Scores
+| Criterion | Judge 1 | Judge 2 | Judge 3 | Final (mean) |
+(+ overall row)
+
+## Consensus Strengths
+## Consensus Weaknesses
+(intersection of judge replies)
+
+## Debate Summary
+<initial disagreements and how each resolved, from reply revisions>
+
+## Final Recommendation
+<Pass | Fail | Needs Revision — justification tied to the scores>
+
+## Verification/Test Fidelity Checklist
+| Item | Evidence |
+|---|---|
+| Deterministic sensor | <protocol artifacts on disk (3 judge files) + reply blocks> |
+| Result | <pass | fail> |
+| Coverage target | <spec JD-01..09 behavior executed> |
+| Validation assets protected | <none> |
+| Skipped-check reason | <none or allowed skipped-check reason> |
+| Execution handoff | <all report paths> |
+```
+
+A **no-consensus report** uses the same shape with `Final Recommendation: NO CONSENSUS — human
+review required`, the per-judge table showing unresolved gaps, and the `Debate Summary` naming
+the criteria that never converged. A forced verdict is never emitted.
 
 ## Required Finding Fields
 
