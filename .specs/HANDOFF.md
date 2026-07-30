@@ -1,13 +1,50 @@
 # Handoff
 
-## Active — Core Layering and God-Module Split (PR-B), **T18 done, Phase 2 open**
+## Active — Core Layering and God-Module Split (PR-B), **T19 done, T20 is the only task left**
 
 **Feature**: `core-layering-god-module-split` · branch
 `refactor/search-facade-split-phase-1b`, cut from `main` @ `5247ecb` (v1.11.0),
 worktree `../massa-ai-wt-facade-phase-1b`.
-**T6a and T6 are merged and released; T7–T18 are committed and green. Phase 1 is closed and T15 has
-opened Phase 2.** Working tree clean. Nothing is pushed — the branch is local only, now fourteen
-commits deep.
+**T6a and T6 are merged and released; T7–T19 are committed and green. Phase 1 is closed, Phase 2 is
+open, and T20 — independent validation — is the only task left.** Working tree clean. Nothing is
+pushed — the branch is local only, now fifteen commits deep.
+
+**T19 is done, and it found the nineteenth plan defect: GMS-03 AC-3 fails on the shipped tree.**
+`design.md` §10's **C1–C12** are applied to `spec.md` in place, indexed there under *Design and
+Execute corrections*. AC-3 required fan-in **and fan-out** both lower; measured with one method at
+both commits against the **frozen** `d628464` baseline, fan-in falls 24 → 23 static and 26 → 25 with
+dynamic, and **fan-out rises 19 → 21**. The cause is exact rather than statistical — the facade sheds
+**4** `rlm-*` delegate imports and gains **6** capability-module imports, net +2 — so a decomposition
+cannot satisfy the criterion and requiring fan-out to fall is requiring the split not to happen.
+**Resolved as C12 on the C10/C11 precedent**: `maxForeignReach` **14 → 1** (exit 1 → 0) becomes the
+criterion, alongside D1 `delegateScope` **21 → 0**, facade-taking **15 → 0**, scoped LOC
+**1550 → 0** and fan-in; fan-out is **reported, not a floor**. Full record in `tasks.md` →
+*Nineteenth plan defect* and *T19 — executed*.
+
+**Three T19 results a resumer must not re-derive.**
+
+1. **T19's own sensor was non-discriminating, and the replacement's controls found a defect in
+   itself.** *"`design.md` §10 rows all struck"* reads the wrong artifact — measured at HEAD before
+   the first edit, **8** old-text occurrences in `spec.md` survive a commit that strikes all twelve.
+   The replacement is a per-correction pair (old absent **and** new present) plus a positional and a
+   row-count check; run against the pre-T19 file it fails **every** correction, which is the
+   discrimination the original could not give. Then the row-drop mutation printed `rows: 11 FAIL`
+   and **exited 0** — `fail=1` inside `$( )` is a subshell assignment and is lost. *Silence as a
+   failure mode, one level up, in the instrument rather than the subject.* Two further harness
+   defects preceded it (an empty `-F` pattern matching all 449 lines; a phrase straddling a markdown
+   wrap), both caught by the sensor failing on a subject that was verified correct first.
+2. **A handoff figure did not survive re-measurement and was about to enter `spec.md`.** C12's D1
+   numbers were drafted as `delegateScope 16 → 0` / facade-taking `11 → 0` from this file's own gate
+   board. Those are **T10's mid-refactor readings**. The frozen `facade-matrix-before.json` at
+   `d628464` gives **21 / 15 / 1550**. Both are consistent — T6a–T9 account for the difference — but
+   only one is the baseline AC-3 names. **Twelfth figure in this feature that did not reproduce.**
+   The frozen fixture is why it was caught.
+3. **The CHANGELOG question had precedent after all, and the briefing said it did not.** `353de59`
+   and `ba8d2bc` are both on this branch, both `docs(specs):`, both zero non-`.specs/` files and
+   zero `CHANGELOG.md`. **T19 adds no thirteenth entry**; `[Unreleased]` stays at 12 bullets under
+   `### Changed`, no new heading, and `STATE.md`'s open release-semantics item is untouched.
+
+---
 
 **T18 is done. The coverage gate is green on every file this work touches — and the row's own command
 had to be fixed before it would terminate, which is the eighteenth plan defect.** `bun run
@@ -474,18 +511,11 @@ rank.**
    written without their `.ts`, with the measurement in the comment, exactly as T15 resolved the same
    trap one level up. Its test file uses neutral fixtures (`alpha`, `beta`) for the same reason.
 
-**Next action: T19.** Then, in plan order:
-
-- **T19** — spec corrections **C1–C11**. The row said C1–C7, `design.md` §10 has held C1–C9 since
-  Design, **T15 added C10** for GMS-04 AC-3 and **T17 added C11** for GMS-05 AC-4 note 2. All are fixed
-  in place. Without C10 or C11, T20's verifier — which reads `spec.md` — checks the criterion **as
-  written**, finds it unsatisfiable, and marks it failed against a tree that satisfies what the
-  criterion meant. C11 is the sharper of the two: note 2 requires per-needle ranks to be *unchanged*,
-  and the shipped tree has one needle at 6 against a baseline of 5.
-- **T20** — independent validation, fresh verifier, author ≠ verifier.
+**Next action: T20 — independent validation, fresh verifier, author ≠ verifier.** It is the only task
+left. **T19 authored the spec corrections, so whoever ran T19 must not verify them.**
 
 **T20's briefing list, assembled here rather than left spread across three files.** The verifier must
-be told all ten, or each reads as a violation it is not:
+be told all eleven, or each reads as a violation it is not:
 
 1. **`.ua/` is out of scope for GMS-04 AC-3.** 320 occurrences across three tracked generated
    artifacts; regeneration deferred to after PR-C. **PR-B does not close AC-3 for them.**
@@ -535,6 +565,18 @@ be told all ten, or each reads as a violation it is not:
    slow run. Without `DATABASE_URL`, `MASSA_AI_EXECUTOR_SANDBOX=none` and a scratch
    `XDG_CONFIG_HOME`, `bun run test` fails on the harness rather than on the tree — that is a
    pre-existing documented condition (`CLAUDE.md`, *Running tests*), not a PR-B regression.
+11. **There are two AC-3s, both replaced, and the second one was replaced during T19 itself.**
+    Item 2 above is **GMS-04** AC-3 (the `rlm-` population), replaced by `check-stale-pointers.ts`.
+    **GMS-03** AC-3 is the other, and it required fan-in *and fan-out* both lower — which the shipped
+    tree **fails**: fan-out **19 → 21**. That is the nineteenth plan defect, resolved as **C12**, and
+    the criterion to check is now `maxForeignReach` on `ContextualSearchRLM` going **14 → 1** with
+    G-HUB exit **1 → 0**, together with D1 `delegateScope` **21 → 0**, facade-taking **15 → 0**,
+    scoped LOC **1550 → 0** and fan-in **24 → 23** / **26 → 25**. **Fan-out is reported, not a
+    floor** — a verifier running D3 will see 21 against a baseline of 19 and must not read it as a
+    regression. The cause is arithmetic: −4 `rlm-*` delegate imports, +6 capability-module imports.
+    **Use the frozen baselines** — `facade-matrix-before.json` and `facade-metrics-before.json`, both
+    captured at `d628464` — and not `HANDOFF.md`'s gate boards, which carry *mid-refactor* readings
+    (D1 16/11 at T10, not the base's 21/15). T19 nearly shipped the wrong pair from exactly there.
 
 **Read the branch note before anything else.** T6a and T6 landed in `main` via **PR #46, which was
 squashed, not merged** — R-04 was violated. None of its 8 commits are ancestors of `main`, the
@@ -559,7 +601,8 @@ the remote and is **not** this work. **This PR must be merged with a merge commi
 | T15 | `b9781df` | GMS-04 **AC-1 closed** by four `git mv` renames to `search-facade-{admin,indexing,hybrid,synapse}.test.ts`, 17 citations repointed, every stale description corrected; **AC-3's criterion replaced** by `scripts/check-stale-pointers.ts` + its 21-test suite; `design.md` §10 gains **C10**; **Phase 2 opens**; the twelfth, thirteenth and fourteenth plan defects |
 | T16 | `d23bb43` | **G-HUB and `check-stale-pointers` wired into the `build` job** — scope widened past the row on a reviewer decision, since the other two sensors were already enforced through their own suites; `fetch-depth: 0` on that job's checkout; `build` confirmed **already** in `main`'s required checks, so **no ruleset mutation**; the fifteenth and sixteenth plan defects |
 | T17 | `0179566` | needles after-run at the shipped tree (**both floors PASS**, hit@1 0.643, MRR 0.745), the per-needle diff (**exit 1**, `N05` 5 → 6) and its attribution to naming rather than retrieval; **sensor substituted** by `scripts/needles-rename-control.ts` + 17 tests, exit **0** with all 14 needles at baseline; `design.md` §10 gains **C11**; the seventeenth plan defect |
-| T18 | this commit | DEBT-02 coverage gate at the shipped tree — **exit 0**, 315 measured / 0 below / 9 exclusions, all **7** files this *work* touches present in `merged` and above floor (min `project-indexer.ts` **94.57%**); scope widened from the row's 6 to GMS-05 AC-2's 7, closing AC-2 without a spec correction; **the eighteenth plan defect** — the row's own command never terminates under an inherited live stdin — fixed in the command (`< /dev/null`) *and* in its subject (`fakeDialogs()` in `app-renderers.test.ts`, red first under `fakeDialogs(null)`), which is PR-B's only write outside `packages/core`/`scripts` |
+| T18 | `510a410` | DEBT-02 coverage gate at the shipped tree — **exit 0**, 315 measured / 0 below / 9 exclusions, all **7** files this *work* touches present in `merged` and above floor (min `project-indexer.ts` **94.57%**); scope widened from the row's 6 to GMS-05 AC-2's 7, closing AC-2 without a spec correction; **the eighteenth plan defect** — the row's own command never terminates under an inherited live stdin — fixed in the command (`< /dev/null`) *and* in its subject (`fakeDialogs()` in `app-renderers.test.ts`, red first under `fakeDialogs(null)`), which is PR-B's only write outside `packages/core`/`scripts` |
+| T19 | this commit | `design.md` §10 applied to `spec.md` — **C1–C12**, in place, indexed there under *Design and Execute corrections*; §10's rows **kept and marked applied**, not struck, so the rationale survives the summaries that point at it. **`design.md` §10 gains C12 — the nineteenth plan defect**: GMS-03 AC-3's *"fan-in **and fan-out** both lower"* **fails on the shipped tree** (fan-out 19 → 21, exact cause −4 `rlm-*` delegates +6 capability modules) and is replaced by `maxForeignReach` **14 → 1** plus D1 and fan-in, with fan-out demoted to reported context. **T19's own sensor was non-discriminating and was substituted** — *"§10 rows all struck"* reads the wrong artifact and is passed by a commit that leaves `spec.md` untouched (measured: 8 old-text occurrences survive it); replaced by a per-correction discriminating pair with three mutation controls, one of which found a subshell defect in the sensor itself. **No CHANGELOG entry** — specs-only, on the `353de59`/`ba8d2bc` precedent |
 
 Gates at T10: `lint` 0 · `type-check` 0 (6/6) · `build` 0 (5/5) · `test:scripts` **732 pass / 0 fail
 across 39 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
@@ -712,6 +755,32 @@ a file no group reports can never appear below the floor: `contextual-search-rlm
 measured-source **370 → 371**, `+1` — five modules added, four `rlm-*` removed; under
 `services/search` alone **28 → 29**. **T18 changes no product code, so PASS is a truth check on the
 tree, not proof T18 happened** — the only discriminating sensor in the commit is the new web-ui test.
+
+Gates at T19 — **T19 changes no `.ts` at all, so every structural figure is byte-identical to T18,
+which is the prediction; it was written down before the board was run and it held on every line**:
+`lint` exit **0** · `type-check` exit **0 (6/6)** · `check-frozen-anchors` exit 0 (**14** anchors) ·
+`check-characterization` exit 0 (**3/3**) · `check-stale-pointers` exit **0**, `0 broken`, pin **28**
+met exactly and **unmoved by this commit** — measured **staged**, and checked deliberately rather
+than assumed, because `.specs/` is in `EXCLUDED` (`scripts/check-stale-pointers.ts`) and this commit
+writes `rlm-*` and `search-facade-*` names into five `.specs/` files · **G-HUB exit 0**, every type
+≤ 3 foreign reach, every file ≤ 700 LOC · `test:scripts` **770 pass / 0 fail across 41 files**,
+exit 0 in 60 s, identical to T17 and T18 since nothing under `scripts/` moved · **new T19 sensor
+PASS**, all twelve corrections on both halves plus the positional and row-count checks · CHANGELOG
+**untouched and unstaged** — `[Unreleased]` still **12** bullets, still only a `### Changed` heading,
+released section still **974 lines**.
+
+**Two of those readings needed a control before they could be quoted, and that is the T19-specific
+warning.** `type-check` first returned **6/6 in 54 ms, "6 cached, 6 total", FULL TURBO** — a cache
+hit is an *invariance* statement (no input turbo hashes moved), not a fresh compile, so it was re-run
+with `--force`: **0 cached, 6 total, 4.62 s, exit 0**. And `lint` prints **nothing at all** on a clean
+run and returns in under a second, which is indistinguishable from a no-op; `bunx oxlint` against a
+known-bad file outside the repo returns **exit 1** with `no-dupe-keys`, which is what makes the repo's
+silent exit 0 a real pass. *Neither reading changed — both were unquotable until the control existed.*
+
+**`bun run test` was not re-run, deliberately.** The diff against `510a410` is **five `.md` files
+under `.specs/`** and nothing else; no test input moved, which the `type-check` full-cache hit
+independently demonstrates. T18's **11 successful / 11 total** stands. Do not read its absence here as
+a skipped gate — read it as an invariance claim with a stated basis.
 
 **Three things a resumer must not re-derive.**
 

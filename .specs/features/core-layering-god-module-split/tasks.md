@@ -6,13 +6,18 @@
   (FROZEN-ANCHOR), §5.4 (the PR-C boundary) before the first structural commit.
 - **Status**: written 2026-07-29 against `main` @ `ce26f28`; **revised 2026-07-29** after an
   independent Plan Challenge on this file (see [Plan Challenge — tasks](#plan-challenge--tasks)).
-  Approved. Execute authorised; branch `refactor/search-facade-split` cut from `ce26f28`.
-  **Phase 0 (T0–T5) is COMPLETE and Phase 1 (T6a–T14) is COMPLETE; T15 is next and must
-  re-enumerate its site list** — see
-  [Phase 0 — executed](#phase-0--executed) and [Phase 1 — executed](#phase-1--executed) for
-  per-task commits and observed sensors; those tables are authoritative for task state, not this
-  line. *(This line read "T6 not started" and had been false since T7; corrected at
-  T12 per the T11-boundary reviewer decision, in T12's own commit rather than as a docs commit.)*
+  Approved. Execute authorised. **The branch named on the Slug line above is Phase 0's and is not
+  this work** — T6a/T6 ran on `refactor/search-facade-split-phase-1`, which reached `main` through
+  the **squashed** PR #46 (R-04 violated) and is deleted; T7 onward lives on
+  **`refactor/search-facade-split-phase-1b`**, cut from `main` @ `5247ecb`.
+  **Phase 0 (T0–T5) and Phase 1 (T6a–T14) are COMPLETE; Phase 2 is open with T15–T19 executed and
+  T20 — independent validation — the only task left.** See
+  [Phase 0 — executed](#phase-0--executed), [Phase 1 — executed](#phase-1--executed) and the
+  per-task *executed* sections below for commits and observed sensors; those are authoritative for
+  task state, not this line. *(This line read "T6 not started" and had been false since T7;
+  corrected at T12 per the T11-boundary reviewer decision. It then read "T15 is next" and had been
+  false since T15; corrected at T19, again inside that task's own commit rather than as a separate
+  docs commit — the same precedent.)*
 
 **One atomic commit per task. Each carries its own discriminating sensor.** No task is done because
 it looks done; the sensor decides.
@@ -1516,7 +1521,7 @@ the F4 seam adds a field to `injectedDeps`, which is a root field, so the seam b
 | **T16** ✅ | wire G-HUB into CI — **done, and scoped wider than this row**, see *T16 — executed* below | add to the `build` job beside `verify-package-contents.ts` | ~~flip a threshold in a scratch branch → CI goes red~~ **unexecutable, see the fifteenth defect** — substituted by the three-part local equivalent recorded below, **and** confirm `build` is in `main`'s required checks: `gh api repos/luizgmassa/massa-ai/rules/branches/main --jq '[.[] \| select(.type=="required_status_checks") \| .parameters.required_status_checks[].context]'`. A job that goes red without being in that list blocks nothing — that is exactly how PR-A's `coverage.yml` shipped claiming `BLOCKING BY DESIGN` and enforced nothing (SEN-02 AC-5). **A gate's enabling condition is part of the gate.** | 1 h |
 | **T17** ✅ | needles after-run + comparison — **done, and its sensor was substituted**, see *T17 — executed* below | rerun the gate; per-needle rank diff vs T4's baseline. **A floor pass with three needles slipping 1→4 is a regression that passed** (GMS-05 AC-4 note 2) — that intent is unchanged and still enforced. | ~~the T4 diff script, exit 0~~ **unreachable on any PR that renames a file the corpus covers — the seventeenth defect.** `needles-diff.ts` exits **1** (`N05` rank 5 → 6) and the exit is produced by naming rather than by retrieval. Substituted by `scripts/needles-rename-control.ts` **exit 0**, alongside both floors passing | ~2 min + 30 m → **~3.5 h** |
 | **T18** ✅ | coverage gate — **done, and its command needed a fix before it would terminate**, see *T18 — executed* below | `DATABASE_URL=…5433/massa_ai_test MASSA_AI_DEDICATED=1 RUN_POSTGRES_TESTS=1 bun run test:coverage` **`< /dev/null`** — the redirect is load-bearing, not hygiene; without it the gate hangs forever in `apps/web-ui` (the eighteenth defect) | exclusions still **9** ✅ (and `check-coverage.ts` has **zero** diff on this branch, which is AC-2's *"no new exclusion"* closed structurally rather than by a count); no file this PR touches below floor ✅ — **scope widened from the row's 6 to AC-2's 7**, minimum **94.57%** (`project-indexer.ts`) | 30 m → **~1.5 h** |
-| **T19** | spec corrections ~~C1–C7~~ ~~C1–C10~~ **C1–C11** | apply `design.md` §10 to `spec.md`. **The range was stale by two before T15, short by one after it, and short by one again after T17**: §10 has held **C1–C9** since Design, T15 adds **C10** for GMS-04 AC-3 itself, and T17 adds **C11** for GMS-05 AC-4 note 2. Without C10 nothing in §10 owned AC-3 — C4 covers only AC-4's obsolete needles clause. Without C11 nothing owns note 2's *"per-needle ranks are unchanged"*, which the shipped tree does not satisfy and cannot. In both cases T20's verifier, which reads `spec.md`, checks the criterion **as written**, finds it unsatisfiable, and marks it failed against a tree that satisfies what the criterion meant | `design.md` §10 rows all struck | 45 m |
+| **T19** ✅ | spec corrections ~~C1–C7~~ ~~C1–C10~~ ~~C1–C11~~ **C1–C12** — **done**, see *T19 — executed* below | apply `design.md` §10 to `spec.md`. **The range was stale by two before T15, short by one after it, short by one again after T17, and short by one more found during T19 itself**: §10 has held **C1–C9** since Design, T15 adds **C10** for GMS-04 AC-3 itself, T17 adds **C11** for GMS-05 AC-4 note 2, and T19 adds **C12** for GMS-03 AC-3 — the nineteenth plan defect. Without C10 nothing in §10 owned AC-3 — C4 covers only AC-4's obsolete needles clause. Without C11 nothing owns note 2's *"per-needle ranks are unchanged"*, which the shipped tree does not satisfy and cannot. Without C12 nothing owns AC-3's *"fan-in **and fan-out** both lower"*, which the shipped tree **fails** — fan-out 19 → 21. In all three cases T20's verifier, which reads `spec.md`, checks the criterion **as written**, finds it unsatisfiable, and marks it failed against a tree that satisfies what the criterion meant | ~~`design.md` §10 rows all struck~~ **non-discriminating — replaced, see below.** Striking a row in `design.md` is an edit the executor controls and is passed by a commit that changes `spec.md` not at all; measured at HEAD, **8** old-text occurrences survive such a commit. Substituted by a **per-correction discriminating pair** — old text absent **and** new text present, neither half sufficient — plus a positional check and a row-count check, in *Gate check commands* | 45 m → **~2 h** |
 | **T20** | independent validation | fresh `verification-agent`, author ≠ verifier → `validation.md` | spec-anchored outcome check + discrimination sensor | — |
 
 ---
@@ -2165,6 +2170,141 @@ commit**, measured staged · **G-HUB exit 0**, every type ≤ 3 foreign reach, e
 `test:scripts` **770 pass / 0 fail across 41 files**, exit 0 — identical to T17, which is the
 prediction, since nothing under `scripts/` moved.
 
+### Nineteenth plan defect — GMS-03 AC-3 fails on the shipped tree, and no correction owned it
+
+Found at T19 by a scoped plan critic reading `spec.md` against the tree rather than by executing a
+row — **the first defect in this feature surfaced that way**, and the first that is a *live
+acceptance-criterion failure* rather than a wrong figure, an unsatisfiable criterion or a
+non-terminating command.
+
+AC-3 requires fan-in **and fan-out** both lower. Measured with **one method at both commits** — D3
+`search-facade-metrics.ts`, against the frozen `d628464` baseline in `facade-metrics-before.json`
+rather than a re-read of any live tree:
+
+| metric | before (`d628464`, frozen) | after (`510a410`) | |
+| --- | --- | --- | --- |
+| fan-in, static | 24 | 23 | falls |
+| fan-in, incl. dynamic | 26 | 25 | falls |
+| **fan-out, distinct specifiers** | **19** | **21** | **rises — AC-3 violated as written** |
+
+**The cause is the decomposition and it is exact, not statistical.** Diffing the two specifier sets:
+**4 removed** (`./rlm-admin.js`, `./rlm-indexing.js`, `./rlm-search.js`, `./rlm-synapse.js`) and
+**6 added** (`./graph-stream.js`, `./hybrid-search.js`, `./index-admin.js`, `./project-indexer.js`,
+`./result-fusion.js`, `./session-bias.js`) — net **+2**, which is 19 → 21 exactly. A split that
+replaces one delegate with N modules necessarily raises distinct-specifier fan-out, so requiring
+fan-out to fall is requiring the split not to happen.
+
+**Everything else moved decisively the right way**, each measured this session at both commits:
+
+| metric | script | before | after |
+| --- | --- | --- | --- |
+| `maxForeignReach` on `ContextualSearchRLM` | D2 | **14** (`rlm-search.ts`), exit 1 | **1** (`search-warmup.ts`), exit 0 |
+| foreign modules reading the facade | D2 | 6 | 1 |
+| `delegateScope` functions | D1 | 21 | **0** |
+| functions taking the facade | D1 | 15 | **0** |
+| LOC in that scope | D1 | 1550 | **0** |
+
+**Resolved (reviewer, 2026-07-30): add C12 — replace the criterion with the sensor, inside T19's own
+commit.** Exactly the C10/C11 precedent, and for the identical stated reason: a verifier checking the
+criterion literally marks it failed against a tree that satisfies what it meant. `maxForeignReach`
+becomes AC-3's criterion; fan-out is **reported, not a floor**. Two alternatives were put and
+rejected — accept-and-record, which ships PR-B with a red criterion the record itself calls
+attributed; and narrowing the fan-out metric to exclude sibling capability modules, which **edits a
+sensor during the refactor that sensor polices**, the move already rejected at T10 when rescoping the
+ceiling inside `search-hub-metric.ts` was proposed.
+
+*Why this generalises, and it sharpens C6.* R-03's failure mode is a **facade**, and **depth** of
+reach is what distinguishes one from a set of capability modules. Fan-out measures **breadth**, which
+a real split is supposed to increase. C6 already records the same asymmetry pointing the other way:
+across M14 a fan-in/fan-out reading called that split a success while G-HUB called it a failure.
+**The eleventh correction to inherit the defect it was correcting** — AC-3 was itself the rewrite of
+the unmeasurable 22/26 figures, and it pinned the counting *method* while leaving the *direction*
+claim unexamined. *A sensor's direction is part of the sensor, alongside its label and its alphabet.*
+
+### T19 — executed
+
+**Subject.** `design.md` §10's corrections **C1–C12** applied to `spec.md` in place, indexed there
+under *Design and Execute corrections (C1–C12)*; §10's rows kept and marked applied. **Write set is
+`.specs/` only** — no source, no CI, no CHANGELOG.
+
+**The CHANGELOG question was settled by measurement, not by precedent-absence.** The carried
+briefing said a specs-only task has no precedent because every prior task touched code or CI.
+**False:** `353de59` and `ba8d2bc` are both on this branch, both `docs(specs):`, both **zero**
+non-`.specs/` files and **zero** `CHANGELOG.md`. With `CONTRIBUTING.md`'s heading table mapping
+docs/chore-only to *no entry*, T19 adds **no thirteenth entry**. `[Unreleased]` stays at **12**
+bullets under `### Changed`, no new heading is created, and **`STATE.md`'s open release-semantics
+item is untouched**. The CI merge gate is satisfied at PR level because PR-B modifies `CHANGELOG.md`
+already; no `no-changelog` label is needed.
+
+**T19's own sensor was non-discriminating and was substituted — measured, not argued.** The row asked
+for *"`design.md` §10 rows all struck"*. That reads the wrong artifact: striking a row is an edit the
+executor controls, and a commit that strikes all twelve while changing `spec.md` not at all passes
+it. Measured at HEAD before the first edit, **8** old-text occurrences survive such a commit (C2 1,
+C3 1, C8 2+2, C10 1, C11 1). By T7's vocabulary that is an invariance check. The replacement is a
+**per-correction discriminating pair** — old text **absent** *and* new text **present**, neither half
+sufficient — plus a positional check that fan-out is named as reported rather than as a pass
+condition, and a row-count check on the index. Command in *Gate check commands*.
+
+**Controls, and the strongest one is the pre-T19 file.** Run against `git show HEAD:…/spec.md`, the
+sensor fails **every** correction on both halves, plus the positional and row-count checks. That is
+the discrimination the original sensor could not provide, stated as a reading rather than an
+argument. Three further mutations, each verified applied by blob hash before its reading was believed
+and each applied to a `/tmp` copy so the subject was never edited (confirmed byte-identical
+afterwards):
+
+| mutation | reading |
+| --- | --- |
+| **half-application** — C10's new criterion deleted, old text *not* restored | **FAIL**, `old-absent ok / new-present FAIL` — proves old-absent alone is insufficient |
+| **index-row drop** — one C row removed from the index | **FAIL**, `rows: 11` |
+| **fan-out re-promoted** — C12 present but its *"reported, not a floor"* qualifier deleted | **FAIL** on the positional check — the citation-swap shape T14 closed structurally |
+
+**The row-drop mutation found a defect in the sensor itself, and that is why the control exists.**
+On its first run it printed `rows: 11 FAIL` and **exited 0**: the `fail=1` assignment sat inside a
+`$( )` command substitution, which is a subshell, so it never reached the parent. A reader checking
+exit status alone would have read a detected violation as green — *silence as a failure mode*, one
+level up, in the instrument rather than the subject. Fixed before any reading was quoted; all three
+mutations then exit 1.
+
+**Two harness defects preceded it, both caught by the sensor failing on a correct subject** — the
+discipline being that a guard firing on your own work is a claim to check, not to accommodate. An
+empty `-F` pattern for the two add-only corrections (C7, C9) matched **449** lines, exactly the
+file's line count; and C1's assertion straddled a markdown line wrap, which a line-oriented `grep`
+cannot see. The subject was verified correct in both cases before the harness was touched. The
+sensor is now whole-file and whitespace-normalised, which also makes it **reflow-proof** — the right
+property for a task whose whole content is reflowing prose.
+
+**C7 was applied with its metric named, and its stated method has a blind spot.** The figure
+reproduces exactly at `a6216cd`: `git grep -nE 'from "(\.\./)+services/'` over
+`packages/core/src/data/**/*.ts` gives **24 matching lines**, **24** unique (data-file →
+service-module) edges, **14** distinct files, **6** target modules, and the `getPrismaClient` subset
+at **12** — confirming both halves of C7 including its "correct, confirmed at 12". But the pattern
+anchors on a **double quote**; quote-agnostic it is **26 / 16 / 7**. The two extra sites are
+`data/vector/base-vector-store.ts:14` and `data/vector/postgres-vector-store.ts:26`, both
+single-quoted, both present at `a6216cd` and unchanged at the shipped tree — **neither is a PR-B
+regression**, and both belong to GMS-01, which PR-C owns. Recorded in `spec.md` rather than
+corrected, since correcting a GMS-01 figure is not PR-B's to do. *A plan critic raised this and its
+figures did not reproduce — it reported 25 edges and 15 files and named one of the two sites; the
+mechanism was real and every number was wrong. **Sixth earned keep, and the sixth time the rule
+"keep the finding, re-run the number" has paid.***
+
+**C4 was widened by two sites on the same rule.** Its sentence says *"the three non-source mention
+sites"*; T15 found five, adding `architecture-map.test.ts:454-455` and `search-controller.test.ts:3`.
+Correcting a count inside the sentence C4 already rewrites is T10's rule, not a scope change.
+
+**A figure inherited from the handoff did not survive re-measurement, and it was about to enter
+`spec.md`.** The C12 proposal carried D1 as `delegateScope 16 → 0` and `facade-taking 11 → 0`, taken
+from `HANDOFF.md`'s gate board. Those are **T10's mid-refactor readings**, not base-to-shipped. The
+frozen `facade-matrix-before.json` at `d628464` gives **21 / 15 / 1550**. The two are consistent —
+T6a/T6/T7/T8/T9 account for 21 → 16 and 15 → 11 — but only one of them is the baseline AC-3 names.
+**Twelfth figure in this feature that did not reproduce when re-measured**, and the frozen fixture is
+why it was caught: a before-baseline that cannot drift is worth more than one that is merely
+recorded.
+
+**Gates**: predicted entirely invariant before running, and confirmed — `.specs/` sits in
+`check-stale-pointers`' `EXCLUDED`, and `.md` files are invisible to `check-frozen-anchors`
+(`resolve.ts` scans only `.ts`/`.tsx`) and to G-HUB (`readdirSync` under `services/search`). Nothing
+under `packages/core`, `scripts/` or `apps/` moved. Readings in `HANDOFF.md` under *Gates at T19*.
+
 ## Gate check commands
 
 **Since T16, all four sensors are enforced in CI — but by two different routes, and the difference
@@ -2242,6 +2382,63 @@ DATABASE_URL=postgresql://massa_ai:massa_ai_password@127.0.0.1:5433/massa_ai_tes
 # and can never be below the floor. To assert a specific file was measured,
 # re-derive from the per-unit lcov left under `packages/*/coverage/` and
 # `apps/*/coverage/` using the gate's own exported parseLcov/mergeInto/linePercent.
+```
+
+### T19's sensor — the spec-correction discriminating pair
+
+**Not a committed script, deliberately.** A new file under the repo root joins both
+`check-stale-pointers`' corpus and `resolveNeedles`' anchor scan — the pin trap that has fired three
+times in this feature — and T19's write set is `.specs/` only. So it lives here, and the cost is
+stated rather than hidden: **it is not in CI.** T20 runs it by hand.
+
+Three properties are load-bearing and each was established by a control, not by reading:
+
+- **Whole-file and whitespace-normalised, not line-oriented.** Markdown wraps and T19 reflows;
+  a line-oriented `grep -F` cannot see an assertion that straddles a wrap, and reports that fact
+  about itself as a fact about the subject. It did, on C1, before this was fixed.
+- **"No old text" is an explicit `-` sentinel.** An empty `-F` pattern matches *every* line — 449 of
+  449 on this file. Same class as the leading-dash trap: an unvalidated pattern silently inverts the
+  reading.
+- **`fail=1` never runs inside `$( )`.** A subshell assignment is lost, and the script then prints
+  `FAIL` while exiting 0. Caught by the row-drop mutation; a positive control is the only thing that
+  sees it.
+
+```bash
+# Exit 0 = all twelve corrections applied. Verify it discriminates before quoting it:
+#   T19_SUBJECT=<(git show HEAD~1:.specs/features/core-layering-god-module-split/spec.md)
+# must FAIL every correction. A sensor with no observed red is not a sensor.
+S=${T19_SUBJECT:-.specs/features/core-layering-god-module-split/spec.md}
+NORM=$(tr '\n' ' ' < "$S" | tr -s ' '); fail=0
+have() { case "$NORM" in *"$1"*) return 0;; *) return 1;; esac; }
+chk() { # tag | old (must be ABSENT; "-" = add-only) | new (must be PRESENT)
+  local vo vn
+  if [ "$2" = "-" ]; then vo="n/a "; elif have "$2"; then vo=FAIL; fail=1; else vo="ok  "; fi
+  if have "$3"; then vn="ok  "; else vn=FAIL; fail=1; fi
+  printf '  %-4s old-absent %s  new-present %s\n' "$1" "$vo" "$vn"; }
+
+chk C1  "assumptions closed 2026-07-28; Design in progress"       "Execute in progress"
+chk C2  "13 of ~16 facade members"                                 "**13 of 23** facade members"
+chk C3  "roughly 90 minutes and a local Ollama"                    "roughly 2 minutes locally"
+chk C4  "The three non-source mention sites are updated"           "FROZEN-ANCHOR"
+chk C5  "Open — resolve in Design"                                 "Rule of thumb applied and passed at T19"
+chk C6  "AC-3's committed measurement script is the check"         "calibrated on M14"
+chk C7  "-"                                                        "24 edges across 14 files"
+chk C8a "\`scripts/beir-benchmark.ts:258\`"                        "packages/core/src/scripts/beir-benchmark.ts:259"
+chk C8b "\`scripts/symbol-benchmark.ts:213\`"                      "packages/core/src/scripts/symbol-benchmark.ts:214"
+chk C9  "-"                                                        "there is **one**"
+chk C10 "\`rg 'rlm-'\` returns only CHANGELOG and \`.specs/\` history." "check-stale-pointers.ts\` exits 0"
+chk C11 "evidence is that per-needle ranks are unchanged"          "needles-rename-control.ts\` exiting 0"
+chk C12 "fan-in and fan-out are both lower after the change"       "reported, not a floor"
+
+# Positional: fan-out must be named as reported, NOT as a pass condition. Asserting
+# only that C12 "appears somewhere" is passed by a replacement that re-promotes it.
+have "Fan-out is reported and is deliberately not a pass condition" || fail=1
+
+# Row count. NOTE: the assignment must sit OUTSIDE $( ) — see above.
+rows=$(awk '/^\| # \| Amends \| Kind \|/{f=1;next} f&&/^\| C/{c++} f&&/^$/{if(f)exit} END{print c+0}' "$S")
+if [ "$rows" -ne 12 ]; then fail=1; fi
+echo "rows: $rows"; [ "$fail" -eq 0 ] && echo "T19 SENSOR: PASS" || echo "T19 SENSOR: FAIL"
+exit $fail
 ```
 
 **Assert pass counts, never exit status.** `bun test` exits 0 when everything skips. Known-good

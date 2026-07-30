@@ -145,7 +145,7 @@ cannot be T17's referent.
 a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
 unilaterally — it is a release-semantics decision.
 
-### Execute — Phase 1 COMPLETE and T18 done (2026-07-30), T6a–T18 committed, T19 next
+### Execute — Phase 1 COMPLETE and T19 done (2026-07-30), T6a–T19 committed, **T20 is the only task left**
 
 **Two branches, and the first one is gone.** T6a and T6 were executed on
 `refactor/search-facade-split-phase-1` (cut from `d628464`) and reached `main` through **PR #46,
@@ -171,7 +171,8 @@ with a merge commit.**
 | T12 | `484e61a` | four admin surfaces → `index-admin.ts` with `IndexAdminDeps`; **`rlm-admin.ts` deleted whole**; `index-admin-late-bind.test.ts` red under five mutation shapes |
 | T13 | `1090504` | five search surfaces → `hybrid-search.ts` with an 8-key `HybridSearchDeps`; **`rlm-search.ts` deleted whole** — the last of the five delegates; `hybrid-search-late-bind.test.ts` widened to 4 tests, red under six shapes; **G-HUB exit 1 → 0** |
 | — | `ba8d2bc` | plan amendment: T14's sensor corrected — the tenth plan defect |
-| T14 | on `-1b` | the root's final cleanup — ten stale `Visibility relaxed` notes replaced per group (§4.3 for the nine methods, §4.3.1 for the one field), the T13 hand-off block retired; **Phase 1 closes**; the eleventh plan defect |
+| T14 | `e4e38bd` | the root's final cleanup — ten stale `Visibility relaxed` notes replaced per group (§4.3 for the nine methods, §4.3.1 for the one field), the T13 hand-off block retired; **Phase 1 closes**; the eleventh plan defect |
+| T15–T19 | see `HANDOFF.md` | **`HANDOFF.md`'s commit table is canonical and runs to T19.** This table stopped at T14 and carried `on -1b` in place of a sha until T19 corrected both. It is not extended here on purpose: two copies of the same table is what drifted, and one of them was wrong for five tasks. |
 
 † unreachable — squashed into `main` by #46. Nothing is pushed from `-1b`; it is local only.
 
@@ -600,6 +601,28 @@ correcting.**
     is *fix the subject, not the gate*. Observed red first: `fakeDialogs(null)` — exactly what
     un-stubbed `prompt()` returns at EOF — gives **55 pass / 1 fail**. Side effect worth keeping:
     `app.js` **93.56% → 95.34%**.
+19. **GMS-03 AC-3 fails on the shipped tree, and no correction owned it** (T19, found by a scoped
+    plan critic reading `spec.md` against the tree rather than by executing a row — **the first
+    defect here surfaced that way**, and the first that is a *live acceptance-criterion failure*
+    rather than a wrong figure, an unsatisfiable criterion or a non-terminating command). AC-3
+    requires fan-in **and fan-out** both lower. Measured with one method at both commits, against the
+    **frozen** `d628464` baseline in `facade-metrics-before.json` rather than a re-read of any live
+    tree: fan-in **24 → 23** static and **26 → 25** with dynamic, fan-out **19 → 21**. The cause is
+    exact, not statistical — diffing the specifier sets gives **4 removed** (`rlm-admin`,
+    `rlm-indexing`, `rlm-search`, `rlm-synapse`) and **6 added** (`graph-stream`, `hybrid-search`,
+    `index-admin`, `project-indexer`, `result-fusion`, `session-bias`), net **+2**. A split that
+    replaces one delegate with N modules necessarily raises distinct-specifier fan-out, **so
+    requiring fan-out to fall is requiring the split not to happen.** Everything AC-3 exists to
+    detect moved the right way: `maxForeignReach` **14 → 1** with G-HUB exit **1 → 0**, foreign
+    modules **6 → 1**, D1 `delegateScope` **21 → 0**, facade-taking **15 → 0**, scoped LOC
+    **1550 → 0**. **Resolved (reviewer, 2026-07-30): add C12 — replace the criterion with the
+    sensor, inside T19's own commit**, on the C10/C11 precedent and for the identical reason.
+    Accept-and-record was put and rejected (ships PR-B with a red criterion); so was narrowing the
+    fan-out metric, which **edits a sensor during the refactor that sensor polices** — already
+    rejected at T10. *The eleventh correction to inherit the defect it was correcting*: AC-3 was
+    itself the rewrite of the unmeasurable 22/26 figures, and it pinned the counting **method** while
+    leaving the **direction** claim unexamined. **A sensor's direction is part of the sensor**,
+    alongside its label (ninth–eleventh defects) and its alphabet (fourteenth).
 
 **The discriminating evidence is M3b**, and it is the only reading proving (c) was a live gap rather
 than a theoretical one: on a tree carrying a broken `search-facade-*` citation, the pre-T15 `rlm`-only
@@ -671,13 +694,35 @@ live), so this gate blocks; CI has nonetheless never run on this branch. T18 cha
 so PASS is a **truth check on the tree**, not proof T18 happened — the one discriminating sensor in
 the commit is the new web-ui test from defect 18.
 
-**Next: T19 — C1–C11, not C1–C7**, then T20.
-`design.md` §10 gained **C10** at T15 because no row owned GMS-04 AC-3, and **C11** at T17 because no
-row owned GMS-05 AC-4 note 2's *"per-needle ranks are unchanged"* — which the shipped tree does not
-satisfy and cannot. T20's verifier reads `spec.md`; without either row it checks the criterion as
-written, finds it unsatisfiable and marks it failed. T20's full **eight**-item briefing list is
-assembled in `HANDOFF.md` under *Next action* — the seventh is T16's two departures and the eighth is
-T17's substituted sensor, both of which a verifier will otherwise read as violations.
+**T19 is done, and it shipped C1–C12 rather than the C1–C11 it was scoped to.** `design.md` §10 is
+applied to `spec.md` in place and indexed there under *Design and Execute corrections (C1–C12)*;
+§10's rows are **kept and marked applied**, not struck, because `spec.md` carries only one-line
+summaries and deleting the rationale would leave them pointing at nothing. The range grew four times:
+§10 held **C1–C9** from Design, **C10** arrived at T15 (no row owned GMS-04 AC-3), **C11** at T17 (no
+row owned GMS-05 AC-4 note 2), and **C12** during T19 itself (no row owned GMS-03 AC-3 — defect 19
+above). All four share one shape: T20's verifier reads `spec.md`, and against the criterion as
+written it marks a passing tree failed.
+
+**Three T19 results worth carrying.** *(1)* **T19's own sensor was non-discriminating.** *"`design.md`
+§10 rows all struck"* reads the wrong artifact — measured before the first edit, **8** old-text
+occurrences in `spec.md` survive a commit that strikes all twelve. Replaced by a per-correction
+discriminating pair (old absent **and** new present), a positional check and a row count; against the
+pre-T19 file it fails **every** correction. Its own row-drop control then caught it printing
+`rows: 11 FAIL` while **exiting 0** — `fail=1` inside `$( )` is a subshell assignment and is lost.
+*Silence as a failure mode, in the instrument rather than the subject.* *(2)* **A gate-board figure
+did not survive re-measurement**: C12's D1 numbers were drafted as `16 → 0` / `11 → 0` from
+`HANDOFF.md`, which are **T10 mid-refactor** readings; the frozen `facade-matrix-before.json` at
+`d628464` gives **21 / 15 / 1550**. Twelfth figure in this feature that did not reproduce, and the
+frozen fixture is why it was caught. *(3)* **No CHANGELOG entry** — the briefing said a specs-only
+task had no precedent; `353de59` and `ba8d2bc` are both exactly that and both touch zero
+`CHANGELOG.md`. `[Unreleased]` stays at **12** bullets under `### Changed`, **no new heading**, so
+the open release-semantics item at the top of this file is untouched.
+
+**Next: T20 — independent validation, fresh verifier, author ≠ verifier.** It is the only task left,
+and **whoever ran T19 must not verify it.** T20's full **eleven**-item briefing list is assembled in
+`HANDOFF.md` under *Next action* — the seventh is T16's two departures, the eighth T17's substituted
+sensor, the ninth and tenth T18's out-of-row write and its `< /dev/null` requirement, and the
+**eleventh is new: there are two AC-3s**, both replaced, and GMS-03's was replaced during T19 itself.
 
 **T6 alone surfaced three plan defects, two needing a spec-owner decision.** All three are the
 `ensureInitializedImpl` class — a consequence `design.md` settled in substance and never wrote into
