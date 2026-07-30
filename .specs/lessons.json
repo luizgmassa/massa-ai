@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 6,
+  "next_id": 7,
   "lessons": [
     {
       "id": "L-001",
@@ -99,6 +99,29 @@
       "created": "2026-07-22T23:54:13Z",
       "last_seen": "2026-07-22T23:54:13Z",
       "confidence": 0.62
+    },
+    {
+      "id": "L-006",
+      "key": "gate_fail::codeql pr check treats a flagged pattern on any diff touched line as a new alert even when the pattern is unchanged and only moved security fixes that refactor flagged regex code must expect the gate to re fire on the branch and must eliminate the pattern class not just the originally flagged instance",
+      "text": "CodeQL PR check treats a flagged pattern on any diff-touched line as a NEW alert, even when the pattern is unchanged and only moved. Security fixes that refactor flagged regex code must expect the gate to re-fire on the branch and must eliminate the pattern class, not just the originally flagged instance.",
+      "signal": "gate_fail",
+      "scope": "",
+      "status": "candidate",
+      "features": [
+        "security-code-scanning-closeout"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "PR #48 CodeQL check, runs 90715511426/90719305396"
+      ],
+      "created": "2026-07-29T22:26:30Z",
+      "last_seen": "2026-07-29T22:26:30Z",
+      "project": "massa-ai",
+      "session": "security-fix-code-scanning",
+      "workflow": "security-fix",
+      "entity": "code-scanning",
+      "confidence": 0.53
     }
   ]
 }
