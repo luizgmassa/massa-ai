@@ -1,12 +1,11 @@
 ---
-name: massa-ai-documentation-agent
 description: Engineering documentation agent. Generate README, ADR, RFC, changelog, KDoc, and architecture documentation. Default read-only; writes only doc files when explicitly scoped with a disjoint write set. Triggers when a workflow needs documentation artifacts. Never modifies implementation.
 mode: all
 model: opencode-go/deepseek-v4-pro
 reasoningEffort: max
 permission: { edit: allow, bash: allow }
-metadata: { massa-ai-owned: true }
 ---
+<!-- massa-ai-owned: true -->
 # Documentation Agent Skill
 
 ## Mission

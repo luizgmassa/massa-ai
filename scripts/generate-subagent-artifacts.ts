@@ -16,6 +16,15 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { tmpdir } from "os";
+import {
+  loadRegistry,
+  profileFlagFrom,
+  resolveTier,
+  selectProfile,
+  type Host as RegistryHost,
+  type Registry,
+  type Resolved,
+} from "./lib/model-profiles.ts";
 
 // ── Paths ───────────────────────────────────────────────────────────────────
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -60,70 +69,14 @@ const WRITE_AGENTS: ReadonlySet<SpecialistName> = new Set<SpecialistName>([
   "documentation-agent",
 ]);
 
-// ── Model-pinning tables (spec, PINNED, NOT advisory) ───────────────────────
-// Claude aliases + effort: high (spec Claude table)
-const AGENT_MODELS_CLAUDE: Record<SpecialistName, "haiku" | "sonnet" | "opus"> = {
-  investigator: "haiku",
-  "context-curator": "haiku",
-  "documentation-agent": "haiku",
-  "requirements-analyst": "sonnet",
-  planner: "opus",
-  builder: "sonnet",
-  reviewer: "sonnet",
-  "verification-agent": "sonnet",
-  "test-engineer": "sonnet",
-  "audit-specialist": "sonnet",
-  "mobile-specialist": "sonnet",
-  "architecture-specialist": "opus",
-  "plan-critic": "opus",
-  "furps-analyst": "sonnet",
-  navigator: "sonnet",
-};
-
-// Codex IDs + model_reasoning_effort = "high" (spec Codex table)
-const AGENT_MODELS_CODEX: Record<SpecialistName, string> = {
-  investigator: "gpt-5.4-mini",
-  "context-curator": "gpt-5.4-mini",
-  "documentation-agent": "gpt-5.4-mini",
-  "requirements-analyst": "gpt-5.6-terra",
-  planner: "gpt-5.6-sol",
-  builder: "gpt-5.6-terra",
-  reviewer: "gpt-5.6-terra",
-  "verification-agent": "gpt-5.6-terra",
-  "test-engineer": "gpt-5.6-terra",
-  "audit-specialist": "gpt-5.6-terra",
-  "mobile-specialist": "gpt-5.6-terra",
-  "architecture-specialist": "gpt-5.6-sol",
-  "plan-critic": "gpt-5.6-sol",
-  "furps-analyst": "gpt-5.6-terra",
-  navigator: "gpt-5.4-mini",
-};
-
-// OpenCode ids + reasoningEffort: max (spec OpenCode table). OpenCode resolves
-// `model` as `<provider>/<model-id>` and silently falls back to the session
-// default on anything else — the charter's human-readable model_hint
-// ("DeepSeek V4 Pro") is not resolvable, so OpenCode pins ids like the other
-// two hosts. The tier split matches the charter hints.
-const AGENT_MODELS_OPENCODE: Record<SpecialistName, string> = {
-  investigator: "opencode-go/deepseek-v4-pro",
-  "context-curator": "opencode-go/deepseek-v4-pro",
-  "documentation-agent": "opencode-go/deepseek-v4-pro",
-  "requirements-analyst": "opencode-go/deepseek-v4-pro",
-  planner: "opencode-go/glm-5.2",
-  builder: "opencode-go/glm-5.2",
-  reviewer: "opencode-go/glm-5.2",
-  "verification-agent": "opencode-go/glm-5.2",
-  "test-engineer": "opencode-go/glm-5.2",
-  "audit-specialist": "opencode-go/glm-5.2",
-  "mobile-specialist": "opencode-go/glm-5.2",
-  "architecture-specialist": "opencode-go/minimax-m3",
-  "plan-critic": "opencode-go/minimax-m3",
-  "furps-analyst": "opencode-go/glm-5.2",
-  navigator: "opencode-go/deepseek-v4-pro",
-};
-
-// Cursor uses charter metadata.model_hint verbatim + reasoningEffort: max.
-// (Resolved at parse time from each charter's frontmatter.)
+// ── Model + effort resolution ───────────────────────────────────────────────
+// The three hard-coded per-host model tables that used to live here are gone.
+// Every model and effort value now comes from `skills/model-profiles.json`,
+// resolved as (charter tier) x host x profile. See
+// .specs/features/model-profile-registry/design.md.
+//
+// The emitters below own only HOST SYNTAX: which key name a host uses, and how it
+// spells "inherit". They never know what a profile is.
 
 // ── Permission -> tools mapping (spec permission mapping) ───────────────────
 // Navigator precedent (apps/claude-plugin/agents/massa-ai-navigator.md) uses
@@ -278,62 +231,86 @@ export async function loadAllCharters(): Promise<Charter[]> {
 
 // ── Per-host emitters ───────────────────────────────────────────────────────
 
-export function emitClaude(c: Charter): string {
+/**
+ * Claude Code. Documented plugin-agent fields include name, description, model, effort,
+ * tools. `model` accepts an alias, a full id, or `inherit` (which is also the default).
+ * https://code.claude.com/docs/en/sub-agents.md
+ *
+ * CLA-04: omit hooks/mcpServers/permissionMode — rejected on plugin-shipped agents.
+ */
+export function emitClaude(c: Charter, m: Resolved): string {
   const agentName = `massa-ai-${c.name}`;
   const toolsJson = JSON.stringify(toolsFor(c.name));
-  const model = AGENT_MODELS_CLAUDE[c.name];
-  // CLA-04: omit hooks/mcpServers/permissionMode (blocked on plugin-shipped agents)
-  const fm = [
+  const lines = [
     "---",
     `name: ${agentName}`,
     `description: ${c.description}`,
     `tools: ${toolsJson}`,
-    `model: ${model}`,
-    `effort: high`,
-    "---",
-    "",
-  ].join("\n");
-  return fm + c.body + "\n";
+    `model: ${m.model ?? "inherit"}`,
+  ];
+  if (m.effort !== null) lines.push(`effort: ${m.effort}`);
+  lines.push("---", "");
+  return lines.join("\n") + c.body + "\n";
 }
 
-export function emitCursor(c: Charter): string {
+/**
+ * Cursor. Its subagent frontmatter is exactly five fields — name, description, model,
+ * readonly, is_background — and NOTHING else.
+ * https://cursor.com/docs/subagents.md
+ *
+ * Two keys this emitter used to write are not in that schema and never took effect:
+ *   - `tools`: Cursor has no tool allowlist for markdown subagents. `readonly: true` is
+ *     the documented permission mechanism, so that is what a read-only charter gets.
+ *   - `reasoningEffort`: not a Cursor key. Effort is a bracket parameter on a pinned model
+ *     id (`claude-opus-5[effort=high]`), which is only expressible when a model is pinned.
+ *
+ * `model` takes an id, not a display name, so the old `model: DeepSeek V4 Pro` could never
+ * resolve — and Cursor's catalog contains no DeepSeek or MiniMax entry at all. The registry
+ * therefore pins nothing for Cursor and this emits the documented default, `inherit`.
+ * `readonly` is omitted for writers because `false` is already its default.
+ */
+export function emitCursor(c: Charter, m: Resolved): string {
   const agentName = `massa-ai-${c.name}`;
-  const toolsJson = JSON.stringify(toolsFor(c.name));
-  // CRS-08: model = charter hint verbatim; reasoningEffort: max (pass-through)
-  const fm = [
-    "---",
-    `name: ${agentName}`,
-    `description: ${c.description}`,
-    `tools: ${toolsJson}`,
-    `model: ${c.modelHint}`,
-    `reasoningEffort: max`,
-    "---",
-    "",
-  ].join("\n");
-  return fm + c.body + "\n";
+  const model =
+    m.model === null ? "inherit" : m.effort === null ? m.model : `${m.model}[effort=${m.effort}]`;
+  const lines = ["---", `name: ${agentName}`, `description: ${c.description}`, `model: ${model}`];
+  if (!WRITE_AGENTS.has(c.name)) lines.push(`readonly: true`);
+  lines.push("---", "");
+  return lines.join("\n") + c.body + "\n";
 }
 
 export function escapeTomlTripleQuote(s: string): string {
   return s.replace(/"""/g, '\\"\\"\\"');
 }
 
-export function emitCodex(c: Charter): string {
+/**
+ * Codex. All six keys below are documented agent-TOML keys, and `sandbox_mode` is the
+ * documented per-agent read-only mechanism (Codex has no `tools` key at any layer).
+ * https://learn.chatgpt.com/docs/agent-configuration/subagents
+ *
+ * Note the effort enum here is `minimal|low|medium|high|xhigh` — Codex has no `max`.
+ * Omitting `model` / `model_reasoning_effort` means "inherit from the parent session",
+ * which is how a null registry value is spelled on this host.
+ */
+export function emitCodex(c: Charter, m: Resolved): string {
   const agentName = `massa-ai-${c.name}`;
   const isWrite = WRITE_AGENTS.has(c.name);
   const sandboxMode = isWrite ? "workspace-write" : "read-only";
-  const model = AGENT_MODELS_CODEX[c.name];
   const bodyEscaped = escapeTomlTripleQuote(c.body);
-  // CDX-07: top comment `# massa-ai-owned` for scoped uninstall
+  // CDX-07: top comment `# massa-ai-owned` for scoped uninstall. This is a real TOML
+  // comment and is greped by apps/codex-plugin/install.sh — it stays.
   const lines = [
     "# massa-ai-owned",
     `name = "${agentName}"`,
     `description = ${tomlQuoted(c.description)}`,
-    `model = "${model}"`,
-    `model_reasoning_effort = "high"`,
+  ];
+  if (m.model !== null) lines.push(`model = "${m.model}"`);
+  if (m.effort !== null) lines.push(`model_reasoning_effort = "${m.effort}"`);
+  lines.push(
     `sandbox_mode = "${sandboxMode}"`,
     `developer_instructions = """${bodyEscaped}"""`,
-    "",
-  ];
+    ""
+  );
   return lines.join("\n");
 }
 
@@ -342,8 +319,34 @@ export function tomlQuoted(s: string): string {
   return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
-export function emitOpenCode(c: Charter): string {
-  const agentName = `massa-ai-${c.name}`;
+/**
+ * Marker that scopes `massa-ai-config agents uninstall`. It lives in the BODY, not the
+ * frontmatter — see emitOpenCode.
+ */
+export const OPENCODE_OWNED_MARKER = "<!-- massa-ai-owned: true -->";
+
+/**
+ * OpenCode. https://opencode.ai/docs/agents/
+ *
+ * Two keys this emitter used to write are not OpenCode keys, and OpenCode does not ignore
+ * unknown keys — it forwards them to the model provider as model options:
+ * "Any other options you specify in your agent configuration will be passed through
+ * directly to the provider as model options."
+ *
+ *   - `name`: not a frontmatter key at all. "The markdown file name becomes the agent
+ *     name." The file is already massa-ai-<n>.md, so dropping this is behaviour-preserving.
+ *   - `metadata`: not a key either. But it is NOT dead — the literal substring
+ *     "massa-ai-owned: true" scopes `agents uninstall` in
+ *     apps/opencode-plugin/src/config-cli.ts, which installs real file copies (the
+ *     install.sh path installs symlinks and scopes by filename instead). Deleting it would
+ *     make uninstall match zero files and orphan 15 installed agents.
+ *
+ * So the marker MOVES to the first body line as a markdown comment. It is then body text
+ * rather than a model option, while still containing the substring config-cli greps — which
+ * also keeps uninstall working against agent files an older version installed in the
+ * frontmatter form. No config-cli change needed.
+ */
+export function emitOpenCode(c: Charter, m: Resolved): string {
   const isWrite = WRITE_AGENTS.has(c.name);
   // OPC-07: permission per-agent bash mapping
   const bashOverride = OPENCODE_BASH_OVERRIDE[c.name];
@@ -355,45 +358,74 @@ export function emitOpenCode(c: Charter): string {
   } else {
     permissionBlock = `{ edit: deny, bash: deny }`;
   }
-  // OPC-07: metadata ownership marker (hosts ignore unknown frontmatter)
-  const fm = [
+  const lines = [
     "---",
-    `name: ${agentName}`,
     `description: ${c.description}`,
     // `all` (not `subagent`): OpenCode's Tab switcher lists primary/all agents
     // only, so `subagent` made the 12 specialists unselectable by hand. `all`
     // keeps auto-delegation and @-mention while adding manual selection.
     `mode: all`,
-    `model: ${AGENT_MODELS_OPENCODE[c.name]}`,
-    `reasoningEffort: max`,
-    `permission: ${permissionBlock}`,
-    `metadata: { massa-ai-owned: true }`,
-    "---",
-    "",
-  ].join("\n");
-  return fm + c.body + "\n";
+  ];
+  if (m.model !== null) lines.push(`model: ${m.model}`);
+  if (m.effort !== null) lines.push(`reasoningEffort: ${m.effort}`);
+  lines.push(`permission: ${permissionBlock}`, "---", "");
+  return lines.join("\n") + OPENCODE_OWNED_MARKER + "\n" + c.body + "\n";
 }
 
 // ── Emit-all + check ────────────────────────────────────────────────────────
-export async function emitAll(targetDirs: Record<Host, string>): Promise<void> {
+export interface EmitOptions {
+  /** Pre-loaded registry; loaded from disk when omitted. */
+  readonly registry?: Registry;
+  /** `--profile=<name>`. Overrides the env var and each host's default. */
+  readonly profileFlag?: string | null;
+  /** Injected for tests; defaults to process.env. */
+  readonly env?: Record<string, string | undefined>;
+}
+
+/** Which profile each host resolves against, after the full precedence chain. */
+export function profilesPerHost(
+  registry: Registry,
+  opts: EmitOptions = {}
+): Record<Host, string> {
+  const out = {} as Record<Host, string>;
+  for (const host of Object.keys(HOST_DIRS) as Host[]) {
+    out[host] = selectProfile(registry, host as RegistryHost, {
+      flag: opts.profileFlag ?? null,
+      env: opts.env,
+    });
+  }
+  return out;
+}
+
+export async function emitAll(
+  targetDirs: Record<Host, string>,
+  opts: EmitOptions = {}
+): Promise<Record<Host, string>> {
   const charters = await loadAllCharters();
+  const registry = opts.registry ?? loadRegistry();
+  const profiles = profilesPerHost(registry, opts);
   for (const [host, dir] of Object.entries(targetDirs) as [Host, string][]) {
     await fs.mkdir(dir, { recursive: true });
+    const profile = profiles[host];
     for (const c of charters) {
+      // Resolution is (charter tier) x host x profile. A tier the profile does not
+      // define, or a profile that does not support this host, throws by design.
+      const resolved = resolveTier(registry, host as RegistryHost, profile, c.modelTier);
       const ext = host === "codex" ? "toml" : "md";
       const fileName = `massa-ai-${c.name}.${ext}`;
       const filePath = path.join(dir, fileName);
       const content =
         host === "claude"
-          ? emitClaude(c)
+          ? emitClaude(c, resolved)
           : host === "codex"
-            ? emitCodex(c)
+            ? emitCodex(c, resolved)
             : host === "cursor"
-              ? emitCursor(c)
-              : emitOpenCode(c);
+              ? emitCursor(c, resolved)
+              : emitOpenCode(c, resolved);
       await fs.writeFile(filePath, content, "utf8");
     }
   }
+  return profiles;
 }
 
 export async function diffHost(
@@ -428,7 +460,7 @@ export async function diffHost(
   return diffs;
 }
 
-export async function runCheck(): Promise<number> {
+export async function runCheck(opts: EmitOptions = {}): Promise<number> {
   // Emit to a temp dir, diff against checked-in dirs.
   const tmp = await fs.mkdtemp(path.join(tmpdir(), "massa-ai-gen-"));
   try {
@@ -438,7 +470,7 @@ export async function runCheck(): Promise<number> {
       cursor: path.join(tmp, "cursor"),
       opencode: path.join(tmp, "opencode"),
     };
-    await emitAll(tmpDirs);
+    await emitAll(tmpDirs, opts);
     let drift = false;
     for (const host of Object.keys(HOST_DIRS) as Host[]) {
       const diffs = await diffHost(tmpDirs[host], HOST_DIRS[host], host);
@@ -468,16 +500,23 @@ export async function runCheck(): Promise<number> {
 // ── Main ─────────────────────────────────────────────────────────────────────
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
   const args = argv;
+  const opts: EmitOptions = { profileFlag: profileFlagFrom(args) };
   const check = args.includes("--check");
   if (check) {
-    return runCheck();
+    return runCheck(opts);
   }
-  await emitAll(HOST_DIRS);
+  const profiles = await emitAll(HOST_DIRS, opts);
   const hostCount = Object.keys(HOST_DIRS).length;
   const total = SPECIALIST_NAMES.length * hostCount;
   console.log(
     `Emitted ${total} agent files (${SPECIALIST_NAMES.length} x ${hostCount} hosts).`
   );
+  // Always report the resolved profile per host. Silence here would make a
+  // --profile typo or a stray MASSA_AI_MODEL_PROFILE indistinguishable from a
+  // normal run, and the whole point of the registry is that model choice is legible.
+  for (const [host, profile] of Object.entries(profiles)) {
+    console.log(`  ${host.padEnd(9)} profile: ${profile}`);
+  }
   return 0;
 }
 

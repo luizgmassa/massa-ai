@@ -1,9 +1,8 @@
 ---
 name: massa-ai-furps-analyst
 description: Read-only FURPS+ dimension analyst. Analyze exactly one FURPS+ dimension (F, U, R, P, S, or X) of a PRD or ADR against its checklist section and return structured refinement findings. Triggers when the furps-refinement workflow fans out per-dimension analysis. Never analyzes other dimensions, never writes files, never mutates Atlassian issues.
-tools: ["Read","Grep","Glob","Bash"]
-model: GLM-5.2
-reasoningEffort: max
+model: inherit
+readonly: true
 ---
 # FURPS-Analyst Agent Skill
 

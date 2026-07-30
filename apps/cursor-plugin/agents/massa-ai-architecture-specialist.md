@@ -1,9 +1,8 @@
 ---
 name: massa-ai-architecture-specialist
 description: Read-only architecture guidance agent. Evaluate architecture, suggest boundaries, recommend abstractions, evaluate trade-offs, and suggest modularization. Folds the existing domain-mapper, coupling-auditor, and deepening-architect roles into one specialist. Triggers when a workflow needs architectural guidance before or during design. Never implements or rewrites code.
-tools: ["Read","Grep","Glob","Bash"]
-model: MiniMax M3
-reasoningEffort: max
+model: inherit
+readonly: true
 ---
 # Architecture Specialist Agent Skill
 

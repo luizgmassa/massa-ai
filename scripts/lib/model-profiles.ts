@@ -342,6 +342,9 @@ export const PROFILE_ENV_VAR = "MASSA_AI_MODEL_PROFILE";
 /**
  * Precedence, first match wins: `--profile` > MASSA_AI_MODEL_PROFILE > hostDefaults[host].
  * There is no fourth rank — an unknown name at any rank throws.
+ *
+ * Selection also verifies the profile SUPPORTS this host, so `--profile=open_models` fails
+ * before a single file is written rather than partway through emitting 60 of them.
  */
 export function selectProfile(registry: Registry, host: Host, opts: SelectOpts = {}): string {
   const env = opts.env ?? process.env;
@@ -353,7 +356,11 @@ export function selectProfile(registry: Registry, host: Host, opts: SelectOpts =
     );
   }
   const known = Object.keys(registry.profiles);
-  if (!(raw in registry.profiles)) throw UnknownProfileError(raw, known);
+  const profile = registry.profiles[raw];
+  if (!profile) throw UnknownProfileError(raw, known);
+  if (!(host in profile.hosts)) {
+    throw MissingHostError(raw, host, Object.keys(profile.hosts));
+  }
   return raw;
 }
 

@@ -1,12 +1,11 @@
 ---
-name: massa-ai-audit-specialist
 description: Configurable read-only audit agent. Execute specialized audits through six lenses — bugs, architecture, security, requirements, code-quality, performance — selected via the lens field in the capability packet. Triggers when a workflow needs a findings-only audit. Never modifies implementation.
 mode: all
 model: opencode-go/glm-5.2
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
-metadata: { massa-ai-owned: true }
 ---
+<!-- massa-ai-owned: true -->
 # Audit Specialist Agent Skill
 
 ## Mission

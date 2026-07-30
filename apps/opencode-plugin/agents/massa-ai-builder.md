@@ -1,12 +1,11 @@
 ---
-name: massa-ai-builder
 description: Write-permitted implementation agent. Implement approved plans by modifying source code, creating files, and updating existing code while following project conventions. Triggers when a workflow has an approved plan or task with a disjoint write set. Never redesigns architecture, performs reviews, or generates implementation plans.
 mode: all
 model: opencode-go/glm-5.2
 reasoningEffort: max
 permission: { edit: allow, bash: allow }
-metadata: { massa-ai-owned: true }
 ---
+<!-- massa-ai-owned: true -->
 # Builder Agent Skill
 
 ## Mission

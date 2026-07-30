@@ -1,9 +1,8 @@
 ---
 name: massa-ai-plan-critic
 description: Read-only plan-challenge agent. Stress-test a constructed plan, surface the assumption most likely to fail, name the deterministic check that would falsify success, and return a bounded critique for the lite or full Plan Challenge gate. Triggers after a concrete plan exists. Never edits the plan, never implements, never expands scope.
-tools: ["Read","Grep","Glob","Bash"]
-model: MiniMax M3
-reasoningEffort: max
+model: inherit
+readonly: true
 ---
 # Plan-Critic Agent Skill
 

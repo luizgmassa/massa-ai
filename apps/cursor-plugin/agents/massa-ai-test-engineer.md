@@ -1,9 +1,7 @@
 ---
 name: massa-ai-test-engineer
 description: Testing strategy agent. Generate unit, integration, edge-case, negative-scenario, and acceptance-coverage test plans. Default read-only; writes only test files when explicitly scoped with a disjoint write set. Triggers when a workflow needs a test strategy or test plan. Focuses only on testing; no production code changes outside test files.
-tools: ["Read","Grep","Glob","Bash","Write","Edit"]
-model: GLM-5.2
-reasoningEffort: max
+model: inherit
 ---
 # Test Engineer Agent Skill
 

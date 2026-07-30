@@ -175,12 +175,22 @@ describe("model-profiles: the shipped registry", () => {
     const r = loadRegistry(REGISTRY_PATH);
     for (const name of ["open_models", "local_models"]) {
       expect(hostsSupportedBy(r, name)).toEqual(["opencode"]);
+      // resolveTier rejects the pairing...
       expectThrowsNamed(
         () => resolveTier(r, "claude", name, "light"),
         "MissingHostError",
         name,
         "claude",
       );
+      // ...and so does selectProfile, so a --profile=open_models run fails BEFORE any
+      // file is written rather than partway through emitting 60 of them.
+      expectThrowsNamed(
+        () => selectProfile(r, "claude", { flag: name, env: {} }),
+        "MissingHostError",
+        name,
+      );
+      // The supported host still resolves normally.
+      expect(selectProfile(r, "opencode", { flag: name, env: {} })).toBe(name);
     }
   });
 });

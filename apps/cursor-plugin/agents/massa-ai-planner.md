@@ -1,9 +1,8 @@
 ---
 name: massa-ai-planner
 description: Read-only planning agent. Transform engineering requests into implementation plans by breaking work into steps, identifying dependencies and risks, suggesting execution order, and producing an implementation strategy. Triggers when a workflow needs a plan before implementation. Never implements or reviews code.
-tools: ["Read","Grep","Glob","Bash"]
-model: GLM-5.2
-reasoningEffort: max
+model: inherit
+readonly: true
 ---
 # Planner Agent Skill
 

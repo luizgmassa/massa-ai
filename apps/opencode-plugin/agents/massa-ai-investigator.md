@@ -1,12 +1,11 @@
 ---
-name: massa-ai-investigator
 description: Read-only codebase investigation agent. Locate implementations, trace execution flow, identify dependencies, estimate change impact, and answer engineering questions. Triggers when a workflow needs to understand existing code before planning or implementing. Never modifies code, never generates implementation, never performs reviews.
 mode: all
 model: opencode-go/deepseek-v4-pro
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
-metadata: { massa-ai-owned: true }
 ---
+<!-- massa-ai-owned: true -->
 # Investigator Agent Skill
 
 ## Mission

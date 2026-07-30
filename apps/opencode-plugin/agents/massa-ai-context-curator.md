@@ -1,12 +1,11 @@
 ---
-name: massa-ai-context-curator
 description: Read-only context preparation agent. Decide which files to open, retrieve memories, use Synapse when appropriate, apply Context Firewall rules, and produce a concise Context Packet consumed by other agents. Triggers when a workflow needs the minimum high-quality context before dispatching a planner, builder, or reviewer. Never implements, reviews, or plans.
 mode: all
 model: opencode-go/deepseek-v4-pro
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
-metadata: { massa-ai-owned: true }
 ---
+<!-- massa-ai-owned: true -->
 # Context Curator Agent Skill
 
 ## Mission

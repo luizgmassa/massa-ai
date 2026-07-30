@@ -1,12 +1,11 @@
 ---
-name: massa-ai-requirements-analyst
 description: Read-only requirements analysis agent. Detect ambiguity, missing requirements, contradictions, implicit requirements, and uncovered scenarios before implementation. Triggers during the Specify phase when gray areas, persistence, external calls, auth, payments, concurrency, or state transitions affect behavior. Never implements.
 mode: all
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/glm-5.2
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
-metadata: { massa-ai-owned: true }
 ---
+<!-- massa-ai-owned: true -->
 # Requirements Analyst Agent Skill
 
 ## Mission
