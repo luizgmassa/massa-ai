@@ -6,7 +6,15 @@
 - workflowSessionId: `spec-model-profile-registry`
 - workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
 - feature: `model-profile-registry` — **Specify, Design, Tasks COMPLETE 2026-07-30.
-  Execute NOT STARTED. Next action: present the sub-agent offer (9 tasks > 1 batch), then T1.**
+  Execute IN PROGRESS: T1–T6 and T8 COMMITTED and green. Only T7 (docs) and T9 (independent
+  validation) remain. Next action: T7. Per-task scope, commit hashes and gate commands are in
+  `.specs/features/model-profile-registry/tasks.md` — read that, not this file, for the task
+  contract.**
+- User chose inline execution over sub-agent batches (offer made and declined for T1–T8;
+  T9 still requires author ≠ verifier).
+- Seven profiles ship, not two: `balanced` (hostDefaults target), `cheap`, `heavy`, `work`,
+  `home`, `open_models`, `local_models`. The last two support OpenCode only, by design —
+  resolving them for another host is `MissingHostError`, never a silent inherit.
 - branch: `feat/model-profile-registry`, worktree `.claude/worktrees/model-profiles`,
   cut from `origin/main` @ `45daaa1`.
 - Artifacts: `.specs/features/model-profile-registry/{spec,design,tasks,fool}.md` +
@@ -37,9 +45,11 @@ right on Codex, verified by direct doc quote. The critic also graded "the OpenCo
 marker is dead" STRONG; that is **refuted** — `apps/opencode-plugin/src/config-cli.ts:248`
 reads it, so the marker moves to a body comment instead of being deleted.
 
-**Baseline that must not regress:** `bun run test:scripts` = 733 pass / 1 skip / 4 fail. The 4
-are pre-existing tree-sitter native/packaging contracts needing a built `dist/`. Gate is *zero
-new failures*, not a green suite.
+**Gate (corrected during Execute):** with all five packages built, `test:scripts` = **832 pass
+/ 0 fail** and `test:plugins` = **96 pass / 0 fail**, both exit 0. The "4 pre-existing
+failures" recorded during Specify were an unbuilt-worktree artefact, not real defects — see
+`spec.md` §8 for the four measured build states and why a *partial* build moves the failure
+instead of reducing it. Build before measuring anything.
 
 **Open / residual:** Cursor tier values are `inherit` — no portable Cursor model ID exists for
 the pinned models, and `cursor-agent` is not installed here, so the hard-error-vs-fallback

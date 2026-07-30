@@ -24,17 +24,49 @@ only, not schema.
 
 ## Task list
 
-| # | Task | Files | Behaviour change |
-| --- | --- | --- | --- |
-| T1 | Registry + resolver + resolver unit tests | +3 | none (no consumer) |
-| T2 | Charters gain `metadata.model_tier` additively | 15 + 1 + 1 | none |
-| T3 | All four emitters resolve from registry; Cursor + OpenCode conformance; parity test rewritten | ~6 + 60 regenerated | **yes — the whole of `spec.md` §4** |
-| T4 | Remove now-unused `model_hint`; tighten validators | 15 + 3 + 60 regenerated | none |
-| T5 | OpenCode `config-cli` uninstall coverage (D8/D9) | 1 | none |
-| T6 | `scripts/verify-model-ids.ts` (MPR-R12) | +2 | none |
-| T7 | Docs: `FEATURES.md`, `CLAUDE.md`, `CHANGELOG.md` + doc-drift test | 3 + 1 | none |
-| T8 | `turbo.json` passThroughEnv += `MASSA_AI_MODEL_PROFILE` (D6) | 1 | none |
-| T9 | Independent validation (verification-agent) | +1 | none |
+| # | Task | Files | Behaviour change | Status |
+| --- | --- | --- | --- | --- |
+| T1 | Registry + resolver + resolver unit tests | +3 | none (no consumer) | **DONE** `d256d09` |
+| T2 | Charters gain `metadata.model_tier` additively | 15 + 1 + 1 | none | **DONE** `f9944d9` |
+| T3 | All four emitters resolve from registry; Cursor + OpenCode conformance; parity test rewritten | ~6 + 60 regenerated | **yes — the whole of `spec.md` §4** | **DONE** `17102f2` |
+| T4 | Remove now-unused `model_hint`; tighten validators | 15 + 3 + 60 regenerated | none | **DONE** `e714fe9` |
+| T5 | OpenCode `config-cli` uninstall coverage (D8/D9) | 1 | none | **DONE** `0be5a30` |
+| T6 | `scripts/verify-model-ids.ts` (MPR-R12) | +2 | none | **DONE** `ce326be` |
+| T7 | Docs: `FEATURES.md`, `CLAUDE.md`, `CHANGELOG.md` + doc-drift test | 3 + 1 | none | **TODO** |
+| T8 | `turbo.json` passThroughEnv += `MASSA_AI_MODEL_PROFILE` (D6) | 1 | none | **DONE** `0be5a30` |
+| T9 | Independent validation (verification-agent) | +1 | none | **TODO** |
+
+## Remaining work — T7 and T9 only
+
+### T7 scope, precisely
+
+1. **`FEATURES.md` §"Model pinning" (currently lines ~357-460)** — delete the four 15-row
+   per-host tables **and all four rationale columns** (`design.md` §7 explains why they are
+   deleted rather than consolidated). Replace with: one role→tier table generated from the
+   charters; one tier→model table per profile; the per-host key/format/effort reference from
+   `spec.md` §7 with its source URLs; the Cursor `inherit` limitation and the
+   `cursor-agent models` discovery path.
+   Also update `FEATURES.md:351` and `:353`, which still describe the OLD per-host
+   frontmatter key lists (`:353` still names `metadata` for OpenCode).
+2. **`subagent-parity.test.ts` lines ~450-470** — the pre-existing DOC-06 test asserts
+   `FEATURES.md` contains literal model names (`haiku`, `gpt-5.6-terra`,
+   `model_reasoning_effort = "high"`). It must become the MPR-R11 doc-drift test: assert the
+   generated role→tier table matches the charters, and that it is the file's only
+   role-keyed model table. These are the last model literals outside the registry and the
+   frozen fixture.
+3. **`CLAUDE.md`** — registry pointer in the agent-harness section, plus the
+   `CLAUDE_CODE_SUBAGENT_MODEL` caveat from `spec.md` §5 (setting it to a real model
+   silently defeats every registry pin on Claude, because it outranks frontmatter).
+4. **`CHANGELOG.md`** `[Unreleased]` → `### Changed` (minor bump). Must name **three**
+   defect classes, per `design.md` §7 — the third (OpenCode forwarding `name`/`metadata` to
+   the provider as model options) is easy to under-report as hygiene.
+5. Regenerate both artifact sets if any charter changes; re-run the gates below.
+
+### T9 scope
+
+Dispatch `massa-ai-verification-agent` (author ≠ verifier) per `references/agent-orchestration.md`
+and `references/spec-driven/validate.md`. Writes `validation.md`. Verify against `spec.md`
+MPR-R1..R12 acceptance criteria and the `spec.md` §4 enumerated change list.
 
 **Sub-agent offer (spec-driven §95):** 9 tasks exceeds the ~8-task single-batch budget, so the
 offer applies. Recommendation is to decline: T3 is the bulk of the risk and is one indivisible
@@ -181,17 +213,41 @@ Dispatch `massa-ai-verification-agent` (author ≠ verifier). Writes `validation
 
 ## Gate Check Commands
 
+**Build first, or every reading is wrong.** See `spec.md` §8 — an unbuilt worktree reports 4
+failures in `test:scripts` and 26 in `test:plugins`, none of them real, and a *partial* build
+moves the failure rather than reducing it (4 → 5 meant progress).
+
 ```bash
-bun run scripts/generate-subagent-artifacts.ts --check
-bun run scripts/generate-skill-artifacts.ts --check
-bun run test:scripts        # baseline 733 pass / 1 skip / 4 fail — no NEW failures
-bun run test:plugins
-bun run lint
-bun scripts/verify-model-ids.ts   # advisory
+# one-time per worktree; five packages
+for p in packages/shared packages/core apps/tools-api apps/mcp-client apps/opencode-plugin; do
+  (cd "$p" && bun run build) || break
+done
+
+bun run scripts/generate-subagent-artifacts.ts --check   # "No drift"
+bun run scripts/generate-skill-artifacts.ts --check      # "No drift"
+bun run test:scripts        # 832 pass / 0 fail, exit 0
+bun run test:plugins        # 96 pass / 0 fail, exit 0
+bun run lint                # oxlint, exit 0
+bun run verify:model-ids    # advisory; opencode 11/11, codex SKIPPED
 ```
 
-`bun run type-check` and `bun run build` are not gates here: no `packages/*` or `apps/*` source
-type surface changes except `apps/opencode-plugin` tests, which `test:plugins` covers.
+Last measured green at `ce326be` (T6) with all five packages built.
+
+`bun run type-check` and root `bun run build` are not gates here: no `packages/*` or `apps/*`
+source type surface changes except `apps/opencode-plugin` tests, which `test:plugins` covers.
+
+## Verification notes carried forward
+
+- Never trust a pipeline's `$?` — `cmd | tail; echo $?` reports `tail`'s status. Redirect to a
+  file and check the exit code directly. This produced one false "lint passed" during Execute.
+- `git grep` reads the **index**, so unstaged edits are invisible to it. `git add` before
+  citing any grep count as evidence. This produced one false "15 charters still name a model".
+- Prove a guard fires before trusting its silence. oxlint prints nothing on success, which is
+  indistinguishable from not running; a deliberate duplicate-declaration probe confirmed it
+  reports and exits 1.
+- The `skills.yml` tier check must not use `sed -n '/"tiers"/,/]/p'` (the range swallows 165
+  lines of profile bodies) or `grep -q <(...)` (silently no-match under zsh). Committed form
+  is a POSIX two-stage pipeline over the single `"tiers"` line, failing closed.
 
 ## MCP / skill question (spec-driven §94)
 

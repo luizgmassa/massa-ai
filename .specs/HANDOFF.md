@@ -1,6 +1,37 @@
 # Handoff
 
-## Active — Core Layering and God-Module Split (PR-B), Phase 1 started
+## Active — Model Profile Registry, Execute in progress (T7 + T9 remain)
+
+- **projectId** `massa-ai` · **workflowSessionId** `spec-model-profile-registry`
+- **branch** `feat/model-profile-registry` · **worktree** `.claude/worktrees/model-profiles`
+- **base** `origin/main` @ `45daaa1` · **head** `ce326be` · working tree clean
+- Nothing pushed, no PR, **no CHANGELOG entry yet** (the CI merge gate fails a PR without one —
+  T7 owns it).
+
+**Read `.specs/features/model-profile-registry/tasks.md` first** — it is the task contract:
+per-task status with commit hashes, the precise T7 and T9 scope, the gate commands, and the
+verification notes carried forward. Then `spec.md` (MPR-R1..R12 + ACs, §4 enumerated behaviour
+changes, §7 per-host evidence, §8 the corrected baseline), `design.md` (§2.1 why the registry
+holds no agent list, §4 per-host emitter diffs, §6 mutation kill-list, §8 risks D1–D9), and
+`fool.md` (Plan Challenge adjudication, including where the critic was wrong).
+
+Each of the seven commits carries its own rationale and gate evidence in its body. Read the
+commit, not a summary of it.
+
+**Open, deliberately:**
+
+- Cursor ships `model: inherit`. Accepted risk with a recorded reason (`spec.md` §7) and a
+  **skipped sensor** — `cursor-agent` is not installed here, so the hard-error-vs-fallback
+  question is unresolved. Do not close it by guessing a slug.
+- Codex IDs are SKIPPED by `verify:model-ids` (docs-only model list). Expected.
+- `CLAUDE_CODE_SUBAGENT_MODEL` outranks frontmatter and so defeats every registry pin on
+  Claude (`spec.md` §5). Documentation-only; not fixable in code. T7 owns it.
+
+**Build all five packages before believing any test number** — `tasks.md` → Gate Check
+Commands. massa-ai MCP tools were not registered in the session that produced this work; all
+state came from `.specs/` and source reads.
+
+## Previous — Core Layering and God-Module Split (PR-B), Phase 1 started
 
 **Feature**: `core-layering-god-module-split` · branch
 `refactor/search-facade-split-phase-1`, cut from `main` @ `d628464`.
