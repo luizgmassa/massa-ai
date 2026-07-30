@@ -55,9 +55,6 @@ Generate engineering documentation artifacts (README, ADR, RFC, changelog, KDoc,
 - Synapse: none (documentation is not a repeated-search task).
 - References: `references/adr-authoring.md`, `references/rfc/`.
 
-## Model Hint
-DeepSeek V4 Pro (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - Stale-reference scan passes (no dead links to removed files).
 - Doc format matches the project ADR/RFC template.

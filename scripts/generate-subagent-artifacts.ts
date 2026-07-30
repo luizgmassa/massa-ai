@@ -118,11 +118,6 @@ export interface Charter {
    * The charter owns this because the tier is a property of the agent's job.
    */
   modelTier: string;
-  /**
-   * DEPRECATED, removed in T4. Literal model name from `metadata.model_hint`,
-   * historically consumed verbatim by the Cursor emitter. Superseded by `modelTier`.
-   */
-  modelHint: string;
   permission: Permission;
   body: string;
 }
@@ -167,7 +162,7 @@ export function parseSimpleYaml(text: string): Record<string, unknown> {
       continue;
     }
     // Nested mapping (e.g. metadata: block). Only one level of nesting is
-    // used by the charters (metadata.model_hint / metadata.permission).
+    // used by the charters (metadata.model_tier / metadata.permission).
     const nested: Record<string, unknown> = {};
     i++;
     while (i < lines.length) {
@@ -199,7 +194,6 @@ export async function loadCharter(name: SpecialistName): Promise<Charter> {
   const raw = await fs.readFile(file, "utf8");
   const { frontmatter, body } = parseFrontmatter(raw);
   const metadata = (frontmatter.metadata ?? {}) as Record<string, unknown>;
-  const modelHint = String(metadata.model_hint ?? "");
   const modelTier = String(metadata.model_tier ?? "");
   const permissionRaw = String(metadata.permission ?? "read-only");
   const permission: Permission =
@@ -208,9 +202,6 @@ export async function loadCharter(name: SpecialistName): Promise<Charter> {
   if (!description) {
     throw new Error(`charter ${name} missing description`);
   }
-  if (!modelHint) {
-    throw new Error(`charter ${name} missing metadata.model_hint`);
-  }
   // Never default a tier. A charter with no tier must stop the build, because a
   // silent default would ship some other model to users without anyone noticing.
   if (!modelTier) {
@@ -218,7 +209,16 @@ export async function loadCharter(name: SpecialistName): Promise<Charter> {
       `charter ${name} missing metadata.model_tier (expected one of the tiers in skills/model-profiles.json)`
     );
   }
-  return { name, description, modelTier, modelHint, permission, body };
+  // A charter must not name a model. That is the drift this registry removes: the old
+  // `metadata.model_hint` was a literal model name that Cursor consumed verbatim, and it
+  // could disagree with the generator's own tables. Fail loudly if one reappears.
+  if (metadata.model_hint !== undefined) {
+    throw new Error(
+      `charter ${name} still declares metadata.model_hint. Charters declare a tier ` +
+        `(metadata.model_tier), never a model name — see skills/model-profiles.json.`
+    );
+  }
+  return { name, description, modelTier, permission, body };
 }
 
 export async function loadAllCharters(): Promise<Charter[]> {

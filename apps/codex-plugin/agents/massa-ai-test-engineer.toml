@@ -54,9 +54,6 @@ Generate a testing strategy that covers unit, integration, edge cases, negative 
 - Synapse: none (test planning is not a repeated-search task).
 - References: `references/verification-ladder.md`, `references/code-annotation.md`, `references/root-cause-scripts.md`.
 
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - Every acceptance criterion maps to at least one test case.
 - Edge cases and negative scenarios are enumerated.

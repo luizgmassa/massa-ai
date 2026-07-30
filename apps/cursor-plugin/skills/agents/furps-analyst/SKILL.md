@@ -5,7 +5,6 @@ license: MIT
 metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
-  model_hint: GLM-5.2
   model_tier: standard
   permission: read-only
 ---
@@ -62,9 +61,6 @@ Analyze exactly one FURPS+ dimension of a PRD or ADR against its checklist secti
 - Massa-ai Memory: suggest durable memories only when a reusable refinement pattern is discovered; the main agent persists.
 - Synapse: own ephemeral session when >= 2 searches are expected, per `references/synapse-policy.md`.
 - References: `references/furps/checklist.md`, `references/furps/report-contract.md`, `references/furps/intake.md`, `references/agent-orchestration.md`.
-
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Source-location proof (quote plus section) for every `covered`/`partial` claim.

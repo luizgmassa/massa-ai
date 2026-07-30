@@ -53,9 +53,6 @@ Transform an engineering request into a structured implementation plan.
 - Synapse: none (planning is not a repeated-search task).
 - References: `references/agent-orchestration.md`, `references/subagent-design.md`.
 
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - Every step in the plan references a concrete file, module, or task.
 - Every risk has a mitigation or accepted-risk note.

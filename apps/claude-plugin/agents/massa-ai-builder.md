@@ -56,9 +56,6 @@ Implement an approved plan or task by modifying source code with a disjoint writ
 - Synapse: none (implementation is not a repeated-search task).
 - References: `references/agent-orchestration.md`, `references/naming-standards.md`, `references/code-annotation.md`, `references/root-cause-scripts.md`.
 
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - Verification commands from the plan pass (tests, build, typecheck, lint).
 - Diff stays within the assigned write set.

@@ -62,9 +62,6 @@ The user's codebase is **already indexed** by massa-ai. The first move on any qu
 - Massa-ai Memory: suggest durable navigation facts (entry points, ownership boundaries) only when reusable; the main agent persists.
 - References: `references/mcp-tools.md`, `references/codebase-investigation.md`, `references/synapse-policy.md`, `references/context-firewall.md`.
 
-## Model Hint
-DeepSeek V4 Pro (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - Every claim carries a `path:line` or symbol pointer.
 - Index-derived claims carry freshness evidence, or are labeled reduced-confidence.

@@ -58,8 +58,14 @@ jobs:
             case "$skill" in
               skills/agents/*)
                 # Charter-only fields consumed by scripts/generate-subagent-artifacts.ts
-                if ! grep -q "^  model_hint:" "$skill"; then
-                  echo "Error: Missing 'metadata.model_hint' in $skill"
+                #
+                # A charter must NOT name a model. metadata.model_hint was a literal model
+                # name that could disagree with the generator's tables and with FEATURES.md;
+                # it is replaced by metadata.model_tier, resolved through
+                # skills/model-profiles.json. Reject its reappearance.
+                if grep -q "^  model_hint:" "$skill"; then
+                  echo "Error: '$skill' declares metadata.model_hint, which is removed."
+                  echo "       Charters declare metadata.model_tier; models live in skills/model-profiles.json."
                   exit 1
                 fi
                 # metadata.model_tier is the charter's capability tier. It must be one of

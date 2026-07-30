@@ -5,7 +5,6 @@ license: MIT
 metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
-  model_hint: GLM-5.2
   model_tier: standard
   permission: read-only
 ---
@@ -57,9 +56,6 @@ Centralize Verification Ladder logic and validate that a task's output meets its
 - Massa-ai Memory: suggest durable verification-recipe memories only when a sensor pattern is reusable; main agent persists.
 - Synapse: none (verification is not a repeated-search task).
 - References: `references/verification-ladder.md`, `references/evidence-gate.md`.
-
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Every acceptance criterion has a PASS/FAIL verdict with evidence.

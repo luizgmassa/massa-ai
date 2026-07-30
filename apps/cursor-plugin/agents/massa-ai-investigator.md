@@ -56,9 +56,6 @@ Read and understand the codebase to answer engineering questions without modifyi
 - Synapse: own ephemeral session per `references/synapse-policy.md`; pass `synapseSessionId` on every `search`.
 - References: `references/codebase-investigation.md`, `references/agent-orchestration.md`, `references/synapse-policy.md`.
 
-## Model Hint
-DeepSeek V4 Pro (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - Source-backed evidence for every claim (`path:line`).
 - Dependency references confirmed via `get_references` or equivalent.

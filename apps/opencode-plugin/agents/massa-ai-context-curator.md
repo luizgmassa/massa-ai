@@ -57,9 +57,6 @@ Prepare the minimum high-quality Context Packet required for another agent to do
 - Synapse: own ephemeral session per `references/synapse-policy.md`; pass `synapseSessionId` on every `search`.
 - References: `references/context-firewall.md`, `references/synapse-policy.md`, `references/mcp-tools.md`.
 
-## Model Hint
-DeepSeek V4 Pro (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - Every file in the Context Packet exists (`test -f`).
 - Every reference in the packet exists in the symlinked skill tree.

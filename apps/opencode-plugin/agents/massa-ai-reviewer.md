@@ -56,9 +56,6 @@ Review implementation quality by analyzing the diff and flagging bugs, regressio
 - Synapse: none (review is not a repeated-search task).
 - References: `references/agent-orchestration.md`.
 
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - Every finding has a `path:line` pointer.
 - Static checks (lint, typecheck) run when available.

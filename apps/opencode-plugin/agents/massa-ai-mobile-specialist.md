@@ -72,9 +72,6 @@ If none are present, refuse with: `Non-mobile target. Refusing mobile-specialist
 - Synapse: own ephemeral session when guidance spans multiple mobile modules with repeated searches.
 - References: `references/mobile-context.md`, `references/mobile-diagnosis.md`, `references/maestro.md`.
 
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - At least one detection signal is confirmed present before guidance is given.
 - Every finding has a `path:line` pointer or a platform constraint citation.

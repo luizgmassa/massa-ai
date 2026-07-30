@@ -69,9 +69,6 @@ All lenses share `references/audit-scope.md` (scope rules) and `references/audit
 - Synapse: own ephemeral session when the audit spans multiple modules with repeated searches.
 - References: `references/audit-scope.md`, `references/audit-report-io.md`, plus the per-lens references above.
 
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - Every finding has a `path:line` pointer.
 - Findings follow the project audit-report format (`references/audit-report-io.md`).

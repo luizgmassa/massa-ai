@@ -66,10 +66,10 @@ describe("parseSimpleYaml", () => {
   test("parses a single-level nested mapping (metadata block)", () => {
     const y = parseSimpleYaml([
       "metadata:",
-      "  model_hint: GLM-5.2",
+      "  model_tier: standard",
       "  permission: write",
     ].join("\n")) as { metadata: Record<string, unknown> };
-    expect(y.metadata.model_hint).toBe("GLM-5.2");
+    expect(y.metadata.model_tier).toBe("standard");
     expect(y.metadata.permission).toBe("write");
   });
 });
@@ -93,7 +93,6 @@ function charter(partial: Partial<Charter> & { name: Charter["name"] }): Charter
   return {
     description: "A charter",
     modelTier: "standard",
-    modelHint: "GLM-5.2",
     permission: "read-only",
     body: "Do the thing.",
     ...partial,

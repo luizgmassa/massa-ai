@@ -5,7 +5,6 @@ license: MIT
 metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
-  model_hint: DeepSeek V4 Pro
   model_tier: light
   permission: read-only
 ---
@@ -61,9 +60,6 @@ Read and understand the codebase to answer engineering questions without modifyi
 - Massa-ai Memory: suggest durable architecture/dependency memories only when useful; main agent persists.
 - Synapse: own ephemeral session per `references/synapse-policy.md`; pass `synapseSessionId` on every `search`.
 - References: `references/codebase-investigation.md`, `references/agent-orchestration.md`, `references/synapse-policy.md`.
-
-## Model Hint
-DeepSeek V4 Pro (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Source-backed evidence for every claim (`path:line`).

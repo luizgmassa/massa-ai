@@ -5,7 +5,6 @@ license: MIT
 metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
-  model_hint: GLM-5.2
   model_tier: deep
   permission: read-only
 ---
@@ -58,9 +57,6 @@ Transform an engineering request into a structured implementation plan.
 - Massa-ai Memory: suggest durable decision memories only when the plan locks a strategy; main agent persists.
 - Synapse: none (planning is not a repeated-search task).
 - References: `references/agent-orchestration.md`, `references/subagent-design.md`.
-
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Every step in the plan references a concrete file, module, or task.

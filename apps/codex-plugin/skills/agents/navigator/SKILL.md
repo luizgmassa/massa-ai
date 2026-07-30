@@ -5,7 +5,6 @@ license: MIT
 metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
-  model_hint: DeepSeek V4 Pro
   model_tier: light
   permission: read-only
   tools: mcp-index
@@ -68,9 +67,6 @@ The user's codebase is **already indexed** by massa-ai. The first move on any qu
 - Context Firewall: summarize search output; return only `path:line` pointers and findings.
 - Massa-ai Memory: suggest durable navigation facts (entry points, ownership boundaries) only when reusable; the main agent persists.
 - References: `references/mcp-tools.md`, `references/codebase-investigation.md`, `references/synapse-policy.md`, `references/context-firewall.md`.
-
-## Model Hint
-DeepSeek V4 Pro (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Every claim carries a `path:line` or symbol pointer.

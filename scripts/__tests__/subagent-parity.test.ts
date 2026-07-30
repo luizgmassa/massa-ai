@@ -16,6 +16,7 @@ import { promises as fs, readFileSync } from "fs";
 import path from "path";
 import toml from "toml";
 import {
+  HOST_EFFORT_ENUM,
   loadRegistry,
   resolveTier,
   selectProfile,
@@ -238,7 +239,8 @@ describe("subagent parity — Claude model + effort pin (CLA-10)", () => {
   });
 
   test("effort is a value Claude documents", async () => {
-    const legal = new Set(["low", "medium", "high", "xhigh", "max"]);
+    // Enum imported, not restated — a second copy could disagree with the resolver.
+    const legal = new Set(HOST_EFFORT_ENUM.claude!);
     for (const name of SPECIALIST_NAMES) {
       const fm = parseMdFrontmatter(await readAgentMd("claude-plugin", name));
       if (fm.effort !== undefined) expect(legal.has(fm.effort)).toBe(true);
@@ -286,13 +288,15 @@ describe("subagent parity — Codex model + effort pin (CDX-10)", () => {
   });
 
   test("effort is a value Codex documents — note it has no 'max'", async () => {
-    const legal = new Set(["minimal", "low", "medium", "high", "xhigh"]);
+    const legal = new Set(HOST_EFFORT_ENUM.codex!);
     for (const name of SPECIALIST_NAMES) {
       const parsed = toml.parse(await readAgentToml(name)) as Record<string, unknown>;
       const effort = parsed.model_reasoning_effort as string | undefined;
       if (effort !== undefined) {
         expect(legal.has(effort)).toBe(true);
-        expect(effort).not.toBe("max");
+        // Codex genuinely has no "max" level, unlike Claude — the asymmetry that makes
+        // a single shared effort enum wrong.
+        expect(HOST_EFFORT_ENUM.codex).not.toContain("max");
       }
     }
   });
