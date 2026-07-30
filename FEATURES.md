@@ -349,117 +349,143 @@ Workflows dispatch these agents under their **host-registered** names, prefixed 
 | --- | --- | --- | --- |
 | Claude Code | `apps/claude-plugin/agents/massa-ai-*.md` → installed to `~/.claude/agents/` | `.md` (YAML frontmatter: `name`, `description`, `tools`, `model`, `effort`) | Name prefix `massa-ai-` (uninstall excludes `massa-ai-navigator.md` by name — R1) |
 | Codex | `apps/codex-plugin/agents/massa-ai-*.toml` → installed to `~/.codex/agents/` (OUTSIDE plugin dir) | `.toml` (`name`, `description`, `model`, `model_reasoning_effort`, `sandbox_mode`, `developer_instructions`) | `# massa-ai-owned` top comment |
-| Cursor | `apps/cursor-plugin/agents/massa-ai-*.md` → bundled in plugin `agents/` dir | `.md` (same shape as Claude) | Name prefix `massa-ai-` (removed with plugin dir) |
-| OpenCode | `apps/opencode-plugin/agents/massa-ai-*.md` → installed to `~/.config/opencode/agents/` (shipped IN the npm package, installed outside the plugin dir) | `.md` (`description`, `mode: all`, `model`, `reasoningEffort`, `permission`, `metadata`) | `metadata: { massa-ai-owned: true }` frontmatter |
+| Cursor | `apps/cursor-plugin/agents/massa-ai-*.md` → bundled in plugin `agents/` dir | `.md` (YAML frontmatter: `name`, `description`, `model`, `readonly` — Cursor's entire documented schema; **no** `tools`, **no** `reasoningEffort`) | Name prefix `massa-ai-` (removed with plugin dir) |
+| OpenCode | `apps/opencode-plugin/agents/massa-ai-*.md` → installed to `~/.config/opencode/agents/` (shipped IN the npm package, installed outside the plugin dir) | `.md` (`description`, `mode: all`, `model`, `reasoningEffort`, `permission` — **no** `name`, **no** `metadata`) | `<!-- massa-ai-owned: true -->` as the first body line |
 
 > Codex and OpenCode agents are *installed* outside the plugin dir because their host discovery loads agents from a shared config-root directory, not from the plugin bundle. They are still **shipped inside** their npm package — OpenCode's `files` declares `agents/*.md`, and until the package-contents gate landed those 15 charters were silently missing from every published tarball, because the publish job has no `actions/checkout` and the build artifact never uploaded `agents/`. The in-file ownership marker enables scoped uninstall that preserves user agents (R3).
 
-### Model pinning (PINNED per agent per host, NOT advisory)
+### Model pinning (one registry, resolved at build time)
 
-The `model` frontmatter field is PINNED per agent per host. The generator emits these exact values; a parity test asserts them.
+Model and effort are still **pinned per agent per host** — nothing is advisory. What changed is
+where the pin comes from: `skills/model-profiles.json` is the only hand-authored place in this
+repo that names a model or an effort level for any agent on any host. Every shipped value is
+resolved from it at generate time and asserted by `scripts/__tests__/subagent-parity.test.ts`.
 
-#### Claude Code (model aliases + `effort: high`)
+Resolution takes exactly three inputs:
 
-Every Claude Code agent sets `effort: high` in addition to its pinned `model`.
+```
+charter metadata.model_tier   +   host   +   profile   →   { model, effort }
+(skills/agents/<n>/SKILL.md)                                (skills/model-profiles.json)
+```
 
-| Agent | Model | Why |
+The registry deliberately holds **no agent list**. A role's tier is a property of that role's
+job, so it lives beside the charter that defines the job — adding a sixteenth specialist is one
+new charter directory carrying a `model_tier`, with no registry, generator, doc, or test edit.
+
+#### Profile selection (per host, first match wins)
+
+| Rank | Source | Notes |
 | --- | --- | --- |
-| investigator | haiku | Fast repository exploration, symbol lookup, dependency tracing, file discovery. |
-| context-curator | haiku | Reading many files, summarizing, filtering, building Context Packets. |
-| documentation-agent | haiku | README, KDoc, changelogs, ADR formatting don't need frontier reasoning. |
-| requirements-analyst | sonnet | Needs to detect ambiguity and infer missing requirements. |
-| planner | opus | One of the highest-leverage places to spend tokens. |
-| builder | sonnet | "Everyday coding" workload Sonnet is intended for. |
-| reviewer | sonnet | Strong balance of code understanding and cost. |
-| verification-agent | sonnet | Systematic reasoning without Opus-level cost. |
-| test-engineer | sonnet | Excellent for generating tests and edge cases. |
-| audit-specialist | sonnet | Most audits don't justify Opus unless architectural. |
-| mobile-specialist | sonnet | Android/iOS implementation is primarily coding work. |
-| architecture-specialist | opus | Large-scale design, trade-offs, migrations, RFC guidance. |
-| plan-critic | opus | Adversarial critique of a plan is the other highest-leverage token spend. |
-| furps-analyst | sonnet | Checklist-driven document analysis per FURPS+ dimension. |
-| navigator | sonnet | Index-first lookups with cited answers; no frontier reasoning needed. |
+| 1 | `--profile=<name>` passed to the generator | wins over everything |
+| 2 | `MASSA_AI_MODEL_PROFILE` | must stay listed in `turbo.json` → `tasks.test.passThroughEnv`, or it arrives `undefined` under `bun run test` while working under a bare `bun test` |
+| 3 | registry `hostDefaults[<host>]` | the auto-select-by-host path |
 
-#### Codex (model IDs + `model_reasoning_effort = "high"`)
+There is no rank 4. An unknown profile name at any rank is a hard error: a typo'd
+`--profile=chaep` fails loudly instead of silently shipping the default. Resolution is
+**build-time**, because no host resolves a per-agent model from an env var — so switching
+profiles means regenerating:
 
-Every Codex agent TOML sets `model_reasoning_effort = "high"` in addition to its pinned `model`.
+```bash
+bun run scripts/generate-subagent-artifacts.ts --profile=<name>
+```
 
-| Agent | Model | Why |
-| --- | --- | --- |
-| investigator | gpt-5.4-mini | Fast repository exploration, symbol lookup, dependency tracing, file discovery. |
-| context-curator | gpt-5.4-mini | Reading many files, summarizing, filtering, building Context Packets. |
-| documentation-agent | gpt-5.4-mini | README, KDoc, changelogs, ADR formatting don't need frontier reasoning. |
-| requirements-analyst | gpt-5.6-terra | Needs to detect ambiguity and infer missing requirements. |
-| planner | gpt-5.6-sol | One of the highest-leverage places to spend tokens. |
-| builder | gpt-5.6-terra | "Everyday coding" workload GPT-5.6 Terra is intended for. |
-| reviewer | gpt-5.6-terra | Strong balance of code understanding and cost. |
-| verification-agent | gpt-5.6-terra | Systematic reasoning without Opus-level cost. |
-| test-engineer | gpt-5.6-terra | Excellent for generating tests and edge cases. |
-| audit-specialist | gpt-5.6-terra | Most audits don't justify Opus unless architectural. |
-| mobile-specialist | gpt-5.6-terra | Android/iOS implementation is primarily coding work. |
-| architecture-specialist | gpt-5.6-sol | Large-scale design, trade-offs, migrations, RFC guidance. |
-| plan-critic | gpt-5.6-sol | Adversarial critique of a plan is the other highest-leverage token spend. |
-| furps-analyst | gpt-5.6-terra | Checklist-driven document analysis per FURPS+ dimension. |
-| navigator | gpt-5.4-mini | Index-first lookups with cited answers; no frontier reasoning needed. |
+The profile set is open data: adding, renaming, or removing a profile is a registry edit and
+nothing else. No TypeScript type, enum, or doc table enumerates profile names — which is why
+this document names none of them and points at the registry instead. Read
+`skills/model-profiles.json` for the profiles that ship, each with its own `description`.
 
-#### Cursor (charter `metadata.model_hint` verbatim + `reasoningEffort: max`)
+#### Role → tier
 
-Every Cursor agent sets `reasoningEffort: max` in frontmatter (pass-through; field-name unverified — Cursor subagent docs returned 404; harmless if ignored). Cursor resolves the model by name; if unavailable, the host falls back.
+Derived from each charter's `metadata.model_tier`. A doc-drift test asserts this table matches
+the charters and is the only role-keyed model table in this file.
 
-| Agent | Model (verbatim from charter) | Charter hint |
-| --- | --- | --- |
-| investigator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
-| context-curator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
-| documentation-agent | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
-| requirements-analyst | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
-| planner | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| builder | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| reviewer | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| verification-agent | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| test-engineer | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| audit-specialist | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| mobile-specialist | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| architecture-specialist | MiniMax M3 | `metadata.model_hint: MiniMax M3` |
-| plan-critic | MiniMax M3 | `metadata.model_hint: MiniMax M3` |
-| furps-analyst | GLM-5.2 | `metadata.model_hint: GLM-5.2` |
-| navigator | DeepSeek V4 Pro | `metadata.model_hint: DeepSeek V4 Pro` |
+| Agent | Tier |
+| --- | --- |
+| investigator | light |
+| planner | deep |
+| builder | standard |
+| reviewer | standard |
+| context-curator | light |
+| verification-agent | standard |
+| requirements-analyst | standard |
+| architecture-specialist | deep |
+| test-engineer | standard |
+| documentation-agent | light |
+| audit-specialist | standard |
+| mobile-specialist | standard |
+| plan-critic | deep |
+| furps-analyst | standard |
+| navigator | light |
 
-#### OpenCode (pinned `provider/model-id` + `mode: all` + `reasoningEffort: max`)
+Each role's *reason* for its tier lives once, in its own charter's prose. The four per-host
+rationale columns this section used to carry were deleted rather than consolidated: a rationale
+that exists once cannot disagree with itself, and the duplicated ones already did — `navigator`
+shipped the sentence "no frontier reasoning needed" beside a standard-tier model on one host and
+a light-tier model on another, in this very file.
 
-Every OpenCode agent sets `reasoningEffort: max` in frontmatter (pass-through to the provider; honoring is provider-dependent for DeepSeek/GLM/MiniMax).
+#### What each host actually reads
 
-Every OpenCode agent sets `mode: all`. OpenCode's Tab switcher lists `primary` and `all` agents only, so the previous `mode: subagent` made the 12 specialists impossible to select by hand. `all` keeps auto-delegation and `@`-mention and adds manual selection.
+Only keys a host documents are emitted. A per-host allowed-key test fails if an undocumented one
+reappears, and the effort column below is compared against the resolver's own enums rather than
+restated independently.
 
-`model` is a pinned `provider/model-id`, **not** the charter's human-readable `metadata.model_hint`: OpenCode resolves only that form and silently falls back to the invoking primary agent's model on anything else. The tiers below mirror the charter hints.
+| Host | Model key + format | Effort mechanism | Accepted effort values | Source |
+| --- | --- | --- | --- | --- |
+| Claude Code | `model:` — a model alias, a full model ID, or `inherit` | `effort:` key | `low` `medium` `high` `xhigh` `max` | [sub-agents](https://code.claude.com/docs/en/sub-agents.md) |
+| Codex | `model =` — a bare model slug | `model_reasoning_effort =` key | `minimal` `low` `medium` `high` `xhigh` | [config-reference](https://learn.chatgpt.com/docs/config-file/config-reference) |
+| Cursor | `model:` — `inherit` or a model **ID**, with optional bracket parameters | bracket parameter on the model value; there is no effort key | *(none — must be unset)* | [subagents](https://cursor.com/docs/subagents.md) |
+| OpenCode | `model:` — `provider/model-id` | `reasoningEffort` — generic provider pass-through | any non-empty string | [agents](https://opencode.ai/docs/agents/) |
 
-| Agent | Model (pinned) | Charter hint (tier source) |
-| --- | --- | --- |
-| investigator | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
-| context-curator | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
-| documentation-agent | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
-| requirements-analyst | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
-| planner | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
-| builder | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
-| reviewer | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
-| verification-agent | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
-| test-engineer | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
-| audit-specialist | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
-| mobile-specialist | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
-| architecture-specialist | `opencode-go/minimax-m3` | `metadata.model_hint: MiniMax M3` |
-| plan-critic | `opencode-go/minimax-m3` | `metadata.model_hint: MiniMax M3` |
-| furps-analyst | `opencode-go/glm-5.2` | `metadata.model_hint: GLM-5.2` |
-| navigator | `opencode-go/deepseek-v4-pro` | `metadata.model_hint: DeepSeek V4 Pro` |
+Codex has no `max` level, unlike Claude — the asymmetry that makes a single shared effort enum
+wrong. OpenCode's column is a deliberate hole: the mechanism is documented, but its docs name no
+value enum for every provider, so narrowing it would be a behaviour change with no evidence
+behind it.
 
-> The `opencode-go/` provider carries all three tiers. A user without it configured gets OpenCode's documented fallback to the primary agent's model — the same degrade the unresolvable hint caused, except no longer silently for everyone.
+Two hosts reject more than they ignore. Cursor's schema is exactly `name`, `description`,
+`model`, `readonly`, `is_background` — `readonly: true` is its only permission mechanism, and
+there is no `tools` allowlist. OpenCode forwards **unrecognized frontmatter keys to the model
+provider as model options**, which is why `name` and `metadata` had to leave OpenCode's
+frontmatter. The ownership marker inside `metadata` was not deleted, it **moved** to a body
+comment: `massa-ai-config agents uninstall` scopes by that literal substring, so removing it
+would have matched zero files and orphaned 15 installed agents.
 
-### Effort pinning (per host)
+Every OpenCode agent also sets `mode: all`, which is not a model decision but is easy to
+mistake for one. OpenCode's Tab switcher lists `primary` and `all` agents only, so the earlier
+`mode: subagent` made the 12 specialists impossible to select by hand. `all` keeps
+auto-delegation and `@`-mention and adds manual selection.
 
-| Host | Effort field | Value |
-| --- | --- | --- |
-| Claude Code | `effort` | `high` |
-| Codex | `model_reasoning_effort` | `"high"` |
-| Cursor | `reasoningEffort` | `max` (pass-through) |
-| OpenCode | `reasoningEffort` | `max` (pass-through; provider-honoring is host behavior) |
+#### Cursor ships `model: inherit`, deliberately
+
+Cursor publishes no display-name→ID mapping, and its catalog contains no entry at all for two of
+the three models this repo used to pin there. IDs are discoverable only at runtime:
+
+```bash
+cursor-agent models          # also: cursor-agent --list-models, or /models in-session
+```
+
+Until those IDs are read off a real CLI, every Cursor tier resolves to `inherit` — the field's
+documented default, and correct under either reading of Cursor's unresolvable-model behaviour:
+it avoids a hard error, and it is also what a silent fallback would fall back to. Restoring
+Cursor differentiation is a one-line-per-tier registry change with no code change.
+
+#### `CLAUDE_CODE_SUBAGENT_MODEL` outranks every pin on Claude
+
+Setting it to a real model **silently defeats every registry pin on Claude Code** — it overrides
+both the per-invocation `model` parameter and the subagent definition's `model` frontmatter. Set
+it to `inherit` to restore normal resolution. Codex's `agents.default_subagent_model` is the
+opposite, a fallback the agent file wins against. Neither knob is per-agent, so neither can
+express a profile; that asymmetry is why resolution is build-time.
+
+#### Verifying that the registry's model IDs resolve
+
+```bash
+bun run verify:model-ids
+```
+
+Probes each locally installed harness CLI, reports per-ID resolve/miss, exits non-zero on a miss,
+and **skips an absent CLI with a named reason** rather than passing vacuously. Advisory and
+opt-in: CI has no harness CLI installed, so making it a blocking gate there would either fail
+always or pass vacuously.
 
 ### Permission mapping (read-only vs write)
 
@@ -469,19 +495,22 @@ Write-permitted agents: `builder`, `test-engineer`, `documentation-agent` (the l
 | --- | --- | --- |
 | Claude Code | `tools: ["Read","Grep","Glob","Bash"]` (no Write/Edit) | `tools: ["Read","Grep","Glob","Bash","Write","Edit"]` |
 | Codex | `sandbox_mode = "read-only"` | `sandbox_mode = "workspace-write"` |
-| Cursor | Same `tools` as Claude | Same `tools` as Claude |
+| Cursor | `readonly: true` | `readonly` omitted (`false` is the documented default) |
 | OpenCode | `permission: { edit: deny, bash: deny }` (strict), `{ edit: deny, bash: { "*": "ask" } }` (planner — inspection-capable), or `{ edit: deny, bash: { "pwd": "allow", "*": "deny" } }` (navigator — index-first) | `permission: { edit: allow, bash: allow }` |
 
-`navigator` is the one charter with a non-default tool set: `tools: ["mcp__massa-ai__*","Read","Grep","Glob","Bash(pwd)"]` on Claude/Cursor, declared in the generator's `AGENT_TOOLS_OVERRIDE`.
+`navigator` is the one charter with a non-default tool set: `tools: ["mcp__massa-ai__*","Read","Grep","Glob","Bash(pwd)"]`, declared in the generator's `AGENT_TOOLS_OVERRIDE`. It reaches Claude only — Cursor has no `tools` key, so its read-only agents carry `readonly: true` instead, and OpenCode expresses the same intent through `permission`.
 
 ### Generator + parity contract
 
-- **Generator:** `scripts/generate-subagent-artifacts.ts` reads `skills/agents/*/SKILL.md` (16 charters), emits 64 files (16 × 4 hosts) into `apps/*/agents/`. Run via `bun run scripts/generate-subagent-artifacts.ts`. Outputs checked into git.
+- **Generator:** `scripts/generate-subagent-artifacts.ts` reads `skills/agents/*/SKILL.md` (15 charters) plus `skills/model-profiles.json`, and emits 60 files (15 × 4 hosts) into `apps/*/agents/`. Run via `bun run scripts/generate-subagent-artifacts.ts`, optionally `--profile=<name>`. Outputs checked into git.
+- **Resolver:** `scripts/lib/model-profiles.ts` loads and validates the registry, selects the profile, and resolves `tier → {model, effort}`. It reports **every** registry violation in one throw, and has no dependency outside `node:fs`/`node:path` so it runs in the deterministic gate. Covered by `scripts/__tests__/model-profiles.test.ts`.
 - **Drift gate:** `bun run scripts/generate-subagent-artifacts.ts --check` emits to a temp dir and diffs against checked-in files. Exit non-zero on drift.
-- **Parity test:** `scripts/__tests__/subagent-parity.test.ts` runs the drift gate + asserts model/effort/permission pinning, name-collision-free, exact 16 per host, Codex TOML round-trip + owned marker, and FEATURES.md ↔ spec table byte-parity (DOC-06).
+- **Parity test:** `scripts/__tests__/subagent-parity.test.ts` runs the drift gate + asserts registry-derived model/effort/permission pinning, name-collision-free, exact 15 per host, per-host allowed-key conformance with the defining doc URL cited, Codex TOML round-trip + owned marker, the OpenCode body marker, and a frozen-baseline diff against `origin/main`'s artifacts that must contain exactly the pin changes the spec authorises. It also carries the doc-drift test for this file's role→tier table.
 - **Harness integrity:** `scripts/__tests__/skills-harness-integrity.test.ts` asserts every workflow `Dispatch:` block names an agent that exists in all four host dirs, every role in `references/agent-orchestration.md` has a real charter, and charter permission matches the shipped artifact.
 
-**Spec:** `.specs/features/subagent-skills-plugin-parity/`
+**Spec:** `.specs/features/subagent-skills-plugin-parity/` (the specialists and the four host
+bundles) and `.specs/features/model-profile-registry/` (the model/effort registry, per-host
+schema conformance, and profile selection).
 
 ---
 

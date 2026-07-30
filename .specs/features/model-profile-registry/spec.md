@@ -83,7 +83,7 @@ host actually supports. Profiles are open data, and each harness CLI auto-select
 | **MPR-R8** | The three drifted roles are normalized to one tier each, chosen by the rationale `FEATURES.md` already states: `navigator` → light ("no frontier reasoning needed"), `requirements-analyst` → standard ("detect ambiguity, infer missing requirements"), `planner` → deep ("highest-leverage place to spend tokens"). | Exactly the enumerated pin changes in §4 occur; every other pin is byte-identical to `main`. Proven by a scripted before/after diff against a **frozen copy** of `main`'s artifacts, not the live tree. |
 | **MPR-R9** | Each host emitter emits only frontmatter keys that host documents as supported, in that host's documented format, for model, effort, and permission. | Per-host allowed-key test: parse every generated artifact, assert its key set is a subset of the documented set for that host, with the source URL cited in the test. Fails if an undocumented key reappears. |
 | **MPR-R10** | One registry `effort` value renders into each host's own syntax. | Claude `effort: <v>`; Codex `model_reasoning_effort = "<v>"`; Cursor bracket parameter on the model value; OpenCode per its documented mechanism. Each asserted against a documented value enum, not a free string. |
-| **MPR-R11** | Model documentation is factored the same way the policy is — one generated role→tier table, plus one small table per profile. The four duplicated per-host rationale columns are **deleted**, not consolidated. | `FEATURES.md` contains no per-host 15-row model table and no per-host rationale column; each role's reason lives once, in its own charter prose. A doc-drift test asserts the generated role→tier table matches the charters and is the file's only role-keyed model table. Structural, not assertional: a rationale that exists once cannot disagree with itself, which is what §1 P1 shows a compared-but-duplicated one can. |
+| **MPR-R11** | Model documentation is factored the same way the policy is — one generated role→tier table, plus a pointer to the registry for the `tier → {model, effort}` mapping. The four duplicated per-host rationale columns are **deleted**, not consolidated. **AMENDED during T7** (see §9): this clause originally read "plus one small table per profile", which cannot be satisfied without breaking MPR-R3. | `FEATURES.md` contains no per-host 15-row model table and no per-host rationale column; each role's reason lives once, in its own charter prose. A doc-drift test asserts the generated role→tier table matches the charters and is the file's only role-keyed model table. Structural, not assertional: a rationale that exists once cannot disagree with itself, which is what §1 P1 shows a compared-but-duplicated one can. |
 | **MPR-R12** | Every model ID in the registry is checkable against the harness CLI that must resolve it, without guessing. | `bun scripts/verify-model-ids.ts` probes each locally installed harness CLI, reports per-ID resolve/miss, exits non-zero on a miss, and **skips absent CLIs with a named reason** rather than passing vacuously. Proven by the OpenCode probe already run in §7. Advisory/opt-in — not wired into the blocking CI gate, because CI has no harness CLIs installed. |
 
 ## 4. Enumerated behavior changes
@@ -282,3 +282,46 @@ Two things this cost, worth recording so the next person does not repeat them:
 Execute's real gate is therefore **`test:scripts` green (832/0) and `test:plugins` green
 (96/0), with all five packages built** — a strictly stronger claim than the one this spec
 originally set.
+
+## 9. Recorded divergences
+
+### MPR-R11's per-profile tables conflict with MPR-R3, and MPR-R3 wins (T7)
+
+MPR-R11 asked `FEATURES.md` for "one small table per profile". MPR-R3's acceptance criteria
+forbid exactly that: *"no TypeScript type, enum, test fixture, or **doc table** enumerates
+profile names"* and *"`grep` finds no hard-coded profile-name literal outside the registry and
+its own tests"*. Adding, renaming, or removing a profile must be a registry edit and nothing
+else — a per-profile doc table makes it a registry edit **plus** a doc edit, which is the
+duplication this feature exists to remove, one layer out.
+
+The conflict was invisible at Design time because only two profiles were seeded. The registry
+now ships **seven**, two of them deliberately single-host (`open_models`, `local_models`), so
+the literal reading would put 84 hand-copied model facts into `FEATURES.md` — more than the 64
+rows it deletes, and guarded by nothing.
+
+Resolved in favour of MPR-R3, the structural requirement. `FEATURES.md` documents the
+*mechanism* — resolution inputs, selection precedence, per-host key/format/effort schema with
+source URLs — plus the generated role→tier table, and points at `skills/model-profiles.json`
+for the values. It names **no profile**, so the MPR-R3 grep stays clean. MPR-R11's acceptance
+criteria are unchanged and fully met: no per-host 15-row table, no rationale column, and a
+doc-drift test asserting the role→tier table matches the charters and is the file's only
+role-keyed model table.
+
+The doc-drift test is stronger than the AC requires, because a doc pointing at a registry can
+still drift from it. It also asserts that **no registry model ID appears anywhere in
+`FEATURES.md`** and that the per-host effort column equals `HOST_EFFORT_ENUM` from the
+resolver rather than a second copy of it. Both directions were mutation-proven during T7: a
+wrong tier row, a second role-keyed table, a reinstated `Why` column, a leaked model literal, a
+drifted effort enum, and a dropped source URL each fail, and all six revert clean.
+
+**Also corrected in T7, beyond the enumerated scope** — pre-existing factual errors in the
+same paragraphs, each a statement about the subject T7 rewrites:
+
+| Location | Was | Now |
+| --- | --- | --- |
+| `FEATURES.md` "File locations" — Cursor row | "same shape as Claude" | Cursor's four emitted keys, `tools`/`reasoningEffort` called out as absent |
+| `FEATURES.md` "File locations" — OpenCode row | lists `metadata`; marker described as frontmatter | `metadata` gone; marker is the first body line |
+| `FEATURES.md` "Permission mapping" — Cursor row | "Same `tools` as Claude" | `readonly: true` / omitted |
+| `FEATURES.md` navigator tools note | "on Claude/Cursor" | Claude only; Cursor uses `readonly`, OpenCode `permission` |
+| `FEATURES.md` generator bullet | "16 charters", "64 files (16 × 4 hosts)" | 15 charters, 60 files — the parity test has asserted 15 per host all along |
+| `CLAUDE.md` agent-harness | "16 sub-agent specialists" ×2 | 15 |

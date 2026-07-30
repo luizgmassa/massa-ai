@@ -4,10 +4,15 @@
  * Asserts the 15 specialist agent files shipped across 4 hosts are byte-identical
  * to generator output (drift gate), correctly pinned per spec (model + effort +
  * permission), collision-free against host built-ins, exactly 15 per host, and
- * that Codex TOML parses with the # massa-ai-owned marker. FEATURES.md table
- * parity (DOC-06) is gated on the subagent section existing (lands in T10).
+ * that Codex TOML parses with the # massa-ai-owned marker.
+ *
+ * Model and effort expectations come from `skills/model-profiles.json` plus each
+ * charter's tier, checked against a frozen copy of origin/main's artifacts. The
+ * FEATURES.md check is now doc-drift in the MPR-R11 direction: the doc must match the
+ * charters and must NOT restate a model value. It used to assert the opposite.
  *
  * Spec: .specs/features/subagent-skills-plugin-parity/spec.md
+ *       .specs/features/model-profile-registry/spec.md (MPR-R8..R11)
  */
 
 import { describe, test, expect } from "bun:test";
@@ -445,33 +450,125 @@ describe("subagent parity — OpenCode permission + owned marker (OPC-07)", () =
   });
 });
 
-describe("subagent parity — FEATURES.md table parity (DOC-06, gated on T10)", () => {
-  test("FEATURES.md subagent section 4 model-pinning tables byte-match spec (when section exists)", async () => {
-    const featuresPath = path.join(REPO_ROOT, "FEATURES.md");
-    const features = await fs.readFile(featuresPath, "utf8");
-    // Gate: only assert if the subagent section exists (T10 lands later).
-    if (!features.includes("Subagent Skills (15 Specialists)")) {
-      console.log("  [gated] FEATURES.md subagent section not yet present — skip DOC-06 sub-check");
-      return;
+// ── MPR-R11: FEATURES.md is factored the same way the policy is ─────────────
+//
+// This replaces the old DOC-06 check, which asserted the OPPOSITE: that FEATURES.md
+// contained the literal model names of all four per-host tables. Those tables are the
+// duplication MPR-R1/R11 remove, so the test that pinned them had to invert, not relax.
+// What makes this discriminating rather than decorative: it fails both ways — if the doc
+// stops matching the charters, AND if any model literal or a second role-keyed table
+// reappears anywhere in the file.
+
+/** Split a markdown file into its tables: header cells + data rows of cells. */
+function markdownTables(md: string): { header: string[]; rows: string[][] }[] {
+  const cells = (line: string) =>
+    line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+  const isRow = (l: string) => /^\s*\|.*\|\s*$/.test(l);
+  const isDivider = (l: string) => /^\s*\|[\s:|-]+\|\s*$/.test(l);
+
+  const out: { header: string[]; rows: string[][] }[] = [];
+  const lines = md.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    if (!isRow(lines[i]!) || !isRow(lines[i + 1] ?? "") || !isDivider(lines[i + 1]!)) continue;
+    const header = cells(lines[i]!);
+    const rows: string[][] = [];
+    let j = i + 2;
+    for (; j < lines.length && isRow(lines[j]!) && !isDivider(lines[j]!); j++) {
+      rows.push(cells(lines[j]!));
     }
-    // Assert the 4 model-pinning tables are present (byte-parity verified by
-    // checking key model values appear in the FEATURES.md subagent section).
-    const section = features.split("Subagent Skills (15 Specialists)")[1] ?? "";
-    // Claude table
-    expect(section).toContain("haiku");
-    expect(section).toContain("sonnet");
-    expect(section).toContain("opus");
-    expect(section).toContain("effort: high");
-    // Codex table
-    expect(section).toContain("gpt-5.4-mini");
-    expect(section).toContain("gpt-5.6-terra");
-    expect(section).toContain("gpt-5.6-sol");
-    expect(section).toContain('model_reasoning_effort = "high"');
-    // Cursor/OpenCode table
-    expect(section).toContain("DeepSeek V4 Pro");
-    expect(section).toContain("GLM-5.2");
-    expect(section).toContain("MiniMax M3");
-    expect(section).toContain("reasoningEffort: max");
+    out.push({ header, rows });
+    i = j - 1;
+  }
+  return out;
+}
+
+/** Backticked tokens inside one table cell, e.g. "`low` `medium`" -> ["low","medium"]. */
+function backticked(cell: string): string[] {
+  return [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1]!);
+}
+
+describe("subagent parity — FEATURES.md doc-drift (MPR-R11)", () => {
+  const FEATURES = readFileSync(path.join(REPO_ROOT, "FEATURES.md"), "utf8");
+  const TABLES = markdownTables(FEATURES);
+
+  test("the role -> tier table matches the charters exactly", () => {
+    const roleTier = TABLES.filter(
+      (t) => t.header[0] === "Agent" && t.header[1] === "Tier",
+    );
+    expect(roleTier.length).toBe(1);
+
+    const documented = new Map(roleTier[0]!.rows.map((r) => [r[0]!, r[1]!]));
+    const charters = new Map(SPECIALIST_NAMES.map((n) => [n as string, tierOf(n)]));
+    // Compared as maps: a row order change is not drift, a wrong tier is.
+    expect([...documented.entries()].sort()).toEqual([...charters.entries()].sort());
+  });
+
+  test("it is the ONLY role-keyed table in the file", () => {
+    // Kills the design.md section 6 mutation "reintroduce a per-host rationale column":
+    // any second table keyed by agent name — with a model column, a rationale column, or
+    // anything else — fails here regardless of what its other columns hold.
+    const roleKeyed = TABLES.filter(
+      (t) => t.rows.filter((r) => (SPECIALIST_NAMES as readonly string[]).includes(r[0]!)).length >= 8,
+    );
+    expect(roleKeyed.length).toBe(1);
+    expect(roleKeyed[0]!.header).toEqual(["Agent", "Tier"]);
+  });
+
+  test("no per-host rationale column survives anywhere in the file", () => {
+    // The four deleted columns were headed "Why" (Claude/Codex) and "Charter hint"
+    // (Cursor/OpenCode). A rationale that exists once cannot disagree with itself.
+    for (const t of TABLES) {
+      expect(t.header).not.toContain("Why");
+      expect(t.header.some((h) => h.startsWith("Charter hint"))).toBe(false);
+    }
+  });
+
+  test("no registry model ID appears in FEATURES.md at all", () => {
+    // The registry is the only hand-authored place naming a model (MPR-R1). Docs that
+    // restate a model value are exactly how the four tables drifted apart.
+    const ids = new Set<string>();
+    for (const profile of Object.values(REGISTRY.profiles)) {
+      for (const tiers of Object.values(profile.hosts)) {
+        for (const resolved of Object.values(tiers)) {
+          if (resolved.model !== null) ids.add(resolved.model);
+        }
+      }
+    }
+    expect(ids.size).toBeGreaterThan(0);
+    const leaked = [...ids].filter((id) => FEATURES.includes(id));
+    expect(leaked).toEqual([]);
+  });
+
+  test("the per-host effort column matches the resolver's enums, not a second copy", () => {
+    const hostTable = TABLES.filter(
+      (t) => t.header[0] === "Host" && t.header[3] === "Accepted effort values",
+    );
+    expect(hostTable.length).toBe(1);
+
+    const byLabel: Record<string, RegistryHost> = {
+      "Claude Code": "claude",
+      Codex: "codex",
+      Cursor: "cursor",
+      OpenCode: "opencode",
+    };
+    const seen = new Set<RegistryHost>();
+    for (const row of hostTable[0]!.rows) {
+      const host = byLabel[row[0]!];
+      expect(host).toBeDefined();
+      seen.add(host!);
+      const documented = backticked(row[3]!);
+      const enumeration = HOST_EFFORT_ENUM[host!];
+      if (enumeration === null) {
+        // OpenCode: documented mechanism, deliberately no value enum. Must say so, and
+        // must not smuggle in a made-up list.
+        expect(documented).toEqual([]);
+        expect(row[3]).toContain("any non-empty string");
+      } else {
+        expect(documented).toEqual([...enumeration]);
+      }
+      expect(row[4]).toMatch(/https:\/\//); // every row cites the doc that defines it
+    }
+    expect([...seen].sort()).toEqual(["claude", "codex", "cursor", "opencode"]);
   });
 });
 // ── MPR-R9: every emitted key is one the host documents ─────────────────────
