@@ -1515,7 +1515,7 @@ the F4 seam adds a field to `injectedDeps`, which is a root field, so the seam b
 | **T15** ✅ | GMS-04 non-source sites — **done**, see *T15 — executed* below | `docs/ONBOARDING.md:147,148,177` (incl. the layer-4 tour entry) and `CLAUDE.md:157` — **plus two the first draft missed**: `packages/core/src/__tests__/architecture-map.test.ts:454-455` and `search-controller.test.ts:3`, both **comments** citing test files this PR renames. **The needles fixture is NOT a site** — PR-A content-anchored all 14 needles and removed every `filePath` (spec correction C4). | **scoped sensor** — see below | 45 m |
 | **T16** ✅ | wire G-HUB into CI — **done, and scoped wider than this row**, see *T16 — executed* below | add to the `build` job beside `verify-package-contents.ts` | ~~flip a threshold in a scratch branch → CI goes red~~ **unexecutable, see the fifteenth defect** — substituted by the three-part local equivalent recorded below, **and** confirm `build` is in `main`'s required checks: `gh api repos/luizgmassa/massa-ai/rules/branches/main --jq '[.[] \| select(.type=="required_status_checks") \| .parameters.required_status_checks[].context]'`. A job that goes red without being in that list blocks nothing — that is exactly how PR-A's `coverage.yml` shipped claiming `BLOCKING BY DESIGN` and enforced nothing (SEN-02 AC-5). **A gate's enabling condition is part of the gate.** | 1 h |
 | **T17** ✅ | needles after-run + comparison — **done, and its sensor was substituted**, see *T17 — executed* below | rerun the gate; per-needle rank diff vs T4's baseline. **A floor pass with three needles slipping 1→4 is a regression that passed** (GMS-05 AC-4 note 2) — that intent is unchanged and still enforced. | ~~the T4 diff script, exit 0~~ **unreachable on any PR that renames a file the corpus covers — the seventeenth defect.** `needles-diff.ts` exits **1** (`N05` rank 5 → 6) and the exit is produced by naming rather than by retrieval. Substituted by `scripts/needles-rename-control.ts` **exit 0**, alongside both floors passing | ~2 min + 30 m → **~3.5 h** |
-| **T18** | coverage gate | `DATABASE_URL=…5433/massa_ai_test MASSA_AI_DEDICATED=1 RUN_POSTGRES_TESTS=1 bun run test:coverage` | exclusions still **9**; no file this PR touches below floor | 30 m |
+| **T18** ✅ | coverage gate — **done, and its command needed a fix before it would terminate**, see *T18 — executed* below | `DATABASE_URL=…5433/massa_ai_test MASSA_AI_DEDICATED=1 RUN_POSTGRES_TESTS=1 bun run test:coverage` **`< /dev/null`** — the redirect is load-bearing, not hygiene; without it the gate hangs forever in `apps/web-ui` (the eighteenth defect) | exclusions still **9** ✅ (and `check-coverage.ts` has **zero** diff on this branch, which is AC-2's *"no new exclusion"* closed structurally rather than by a count); no file this PR touches below floor ✅ — **scope widened from the row's 6 to AC-2's 7**, minimum **94.57%** (`project-indexer.ts`) | 30 m → **~1.5 h** |
 | **T19** | spec corrections ~~C1–C7~~ ~~C1–C10~~ **C1–C11** | apply `design.md` §10 to `spec.md`. **The range was stale by two before T15, short by one after it, and short by one again after T17**: §10 has held **C1–C9** since Design, T15 adds **C10** for GMS-04 AC-3 itself, and T17 adds **C11** for GMS-05 AC-4 note 2. Without C10 nothing in §10 owned AC-3 — C4 covers only AC-4's obsolete needles clause. Without C11 nothing owns note 2's *"per-needle ranks are unchanged"*, which the shipped tree does not satisfy and cannot. In both cases T20's verifier, which reads `spec.md`, checks the criterion **as written**, finds it unsatisfiable, and marks it failed against a tree that satisfies what the criterion meant | `design.md` §10 rows all struck | 45 m |
 | **T20** | independent validation | fresh `verification-agent`, author ≠ verifier → `validation.md` | spec-anchored outcome check + discrimination sensor | — |
 
@@ -1911,6 +1911,54 @@ police an effect of that cause.**
 > form — the same perturbation moving one rank instead of fourteen — was never in view, and no gate
 > saw it until it fired.
 
+### Eighteenth plan defect: T18's command does not terminate under an automated runner
+
+Found at **T18**, by running the row exactly as written and watching it produce nothing for six
+minutes. **Not a correction inheriting its own defect** — the first defect in this feature that is
+neither a wrong figure nor an unsatisfiable criterion, but a command that cannot complete in the
+environment the task is executed in. Its class is the fifteenth's (*a sensor that is unexecutable
+here*), narrowed: this one is unexecutable only when stdin is a live pipe that never delivers, which
+is exactly what an agent, a CI-less script runner, or any `bash -c` under a supervisor hands it.
+
+**The route is exact, and it is one line of a package this PR does not touch.**
+`apps/web-ui/src/static/app.js:838` — `const newContent = prompt("Edit memory content:", "")`. Bun
+implements `prompt()`, `confirm()` and `alert()` as **stdin readers**. `app-renderers.test.ts`'s
+`makeFakeDom` returns a *stable child for any selector* (`querySelectorAll: () => childCache`,
+ignoring its argument), so `bindEvents` registers the `memory-edit` and `memory-delete` click
+handlers on that child alongside every other handler — and the test *"fires captured event handlers
+… to cover callbacks"* then fires all of them. The gate prints `Edit memory content: []` and stops.
+
+**Measured, both directions, and the discrimination is the point:**
+
+| stdin | result |
+| --- | --- |
+| `< /dev/null` | `apps/web-ui` **113 pass / 0 fail in ~2 s**, exit 0 |
+| an open pipe that never delivers | still running when killed at **46 s**; last output `Edit memory content: []` |
+
+Per-suite, under a live stdin: **`app-renderers.test.ts` is the only one of the six that hangs**; the
+other five complete in ~1 s each. No per-test timeout applies — `bunfig.toml`'s 5 s budget does not
+reach a block inside a handler the test invoked synchronously — so the failure mode is an infinite
+hang, not a red test.
+
+**Why no gate saw it.** `apps/web-ui` has **zero** lines of diff in `5247ecb..HEAD`, and
+`coverage.yml` is green on `main` through `6d5dc6b`. Under a GitHub Actions step stdin is at EOF, so
+`prompt()` returns `null`, `handleMemoryEdit` early-returns at `app.js:839`, and the suite passes.
+**The same EOF is why `app.js:840-848` was never covered in any environment** — the PUT after the
+prompt was unreachable in CI and unreachable-by-hang locally.
+
+**Resolution (reviewer, 2026-07-30): record it as a defect, fix the command, and fix the test at its
+source.** All three, because each closes a different hole — the defect entry is what T20 reads, the
+`< /dev/null` is what makes the row reproducible, and the stub is what stops the next suite that
+fires those handlers from re-hanging. The subject was fixed, not the gate: `app-renderers.test.ts`
+now installs recording `prompt`/`confirm`/`alert` stubs (`fakeDialogs`) restored in `afterEach`,
+which is the same motion as T17's *fix the file, not the pin*.
+
+*What generalises:* every prior defect in this feature was found by reading a number. **This one
+produced no number at all** — the failure mode of an unexecutable command is silence, and silence
+reads identically to "still working". The rule it earns is that a gate command with no output
+budget needs a liveness expectation before it is run: T18's whole-gate wall clock is **2 m 14 s**,
+so six minutes of nothing was already six times over budget when it was still being waited on.
+
 ### T17 — executed
 
 **Subject.** The needles after-run at the shipped tree, its per-needle rank diff against T4's frozen
@@ -1995,6 +2043,128 @@ HISTORICAL 28 / BROKEN 0`, pin met exactly and **unmoved by this commit**, measu
 files staged · **G-HUB exit 0**, `maxFileLoc` **696** against 700 — every structural figure identical
 to T16, which is the prediction, since T17 moves no source.
 
+### T18 — executed
+
+**Subject.** The DEBT-02 coverage gate at the shipped tree, per-file for every file this work
+touches, plus the eighteenth defect's fix. **No source under `packages/core` was touched**; the only
+diff is `apps/web-ui/src/__tests__/app-renderers.test.ts`.
+
+**Preconditions re-measured rather than inherited**, since the handoff's were session-local:
+tree clean at `0179566`; postgres LISTENing on **127.0.0.1:5433**; port 3333 free; Ollama up;
+dedicated DB migration state **23 on disk / 23 applied / 0 unfinished / 0 missing** — note
+`CLAUDE.md` says *24 migrations* and is stale by one, which is a doc divergence a T20 verifier could
+otherwise read as a half-migrated database.
+
+**`coverage` is in `main`'s required checks, measured live rather than inherited.** `gh api …/rules/branches/main`
+returns `["build","mcp","validate","Structural native tests (darwin-arm64)","Structural native tests (linux-x64)","coverage"]`.
+`CLAUDE.md`'s warning describes the state *before* it was added; the enabling condition now holds, so
+a red coverage check blocks a merge and T18 is a real gate. **The branch base `5247ecb` has no
+coverage run at all** — it is the `[skip ci]` release commit — so the usable before-baseline is
+`fb8a3ed` one commit earlier, green, and **CI has never measured this branch**.
+
+**Predicted on paper before the gate was run, and the prediction was falsified on ordering.** All six
+extracted modules are `mock.module`'d inside `contextual-search-rlm-coverage.test.ts` (`:126`, `:162`,
+`:179`, `:189`, `:199`) — the suite that covered those bodies before the split — and four are mocked
+again by their own `*-late-bind.test.ts`. From that topology `index-admin.ts` was predicted highest
+risk (234 LOC, its only direct importer mocks it, 7 facade tests behind it). **It measures 100.00%.**
+The two lowest are the two largest files. **Executable-line count predicted the ordering; mock
+topology did not** — the `search-facade-*` characterization suites execute the real bodies through
+the facade, so the mock is real and costs nothing. The one prediction that held is the pattern-level
+one: `fb8a3ed` had already extracted `result-fusion.ts` under the identical mock shape and passed.
+
+**Readings.**
+
+| reading | result |
+| --- | --- |
+| `bun run test:coverage < /dev/null` | exit **0** · `floor 90% line · 315 source files measured · 9 documented exclusions` · `PASS` · **2 m 14 s** |
+| suite health across the run | **169** `N fail` lines, **every one zero**; no unit reported `suite exited` or `no lcov.info` |
+| lcov merged | **165** files — 129 core / 25 tools-api / 8 mcp-client / 1 shared / 1 web-ui / 1 opencode-plugin |
+| `EXCLUSIONS.length` | **9**, read by importing `check-coverage.ts` rather than counting entries by eye |
+| `scripts/check-coverage.ts` diff on this branch | **0 lines** — AC-2's *"no new exclusion added"* closed structurally, not by a count that could match while an entry was swapped |
+
+**Per file, and presence is asserted before percentage** — this is the part the gate itself cannot
+tell you. `below` is populated by iterating `merged` (`check-coverage.ts:618-626`), and a file no
+group reports never enters `merged`, is never counted in `measured`, and therefore **can never appear
+below the floor**. Absence from the failure list is not evidence of a pass. Re-derived through the
+gate's own exported `parseLcov` / `mergeInto` / `linePercent`:
+
+| file | present | executable | covered | line % |
+| --- | --- | --- | --- | --- |
+| `contextual-search-rlm.ts` | yes | 221 | 221 | **100.00** |
+| `index-admin.ts` | yes | 80 | 80 | **100.00** |
+| `session-bias.ts` | yes | 49 | 49 | **100.00** |
+| `graph-stream.ts` | yes | 91 | 90 | 98.90 |
+| `result-fusion.ts` | yes | 168 | 164 | 97.62 |
+| `hybrid-search.ts` | yes | 426 | 407 | 95.54 |
+| `project-indexer.ts` | yes | 350 | 331 | **94.57** ← minimum, 4.57 points of headroom |
+
+That independent recomputation reproduces the gate's own verdict exactly — **315 measured / 0 below /
+9 exclusions** — which is what makes it a check rather than a second opinion.
+
+**The scope was widened from the row's to the criterion's, and the widening is what closes AC-2.**
+The T18 row says *"no file **this PR** touches"*; GMS-05 AC-2 says *"every file **this work**
+touches"*. They differ by `result-fusion.ts`, which **T6 delivered** — a row of this feature's own
+commit table (*T6 · in `main` via #46 · `rlm-fusion.ts` → `result-fusion.ts`*) — and which is
+therefore inside AC-2 and outside the branch diff, because #46 was squashed into `main` before this
+branch was cut. That gap is a downstream consequence of the R-04 violation, not a new one. It
+measures **97.62%**, so reporting all seven closes AC-2 on its own wording and **no spec correction
+is owed**; T19's C1–C11 range is unchanged. Found by a scoped plan critic; its mechanism held and its
+premise was measured before it was acted on, which is what kept it from becoming a C12.
+
+**The corpus moved by exactly PR-B's delta, which is the invariance statement available here.**
+Tracked measured-source files (the gate's own `isMeasuredSource` over `git ls-tree`): **370 → 371**,
+`+1` — five modules added (`graph-stream`, `hybrid-search`, `index-admin`, `project-indexer`,
+`session-bias`), four `rlm-*` removed. Under `services/search` alone, **28 → 29**.
+
+**What this reading proves, stated plainly: T18 changes no product code, so a PASS is a truth check
+on the tree, not a discriminating sensor that T18 happened.** Same shape as T14, T16 and T17. The
+only discriminating sensor in this commit is the new web-ui test, below.
+
+**The eighteenth defect's fix, and it was observed red first.**
+`apps/web-ui/src/__tests__/app-renderers.test.ts` gains `fakeDialogs()` — recording `prompt` /
+`confirm` / `alert` stubs restored in the existing `afterEach` — installed in the handler-firing
+test, plus one new test, *"drives the write-mode dialog handlers through to their requests"*, which
+asserts the PUT and DELETE each handler issues **after** its dialog. The old test asserted only that
+the app root still existed, and passed just as happily when `prompt()` returned `null` at EOF and
+`handleMemoryEdit` bailed one line later.
+
+| check | result |
+| --- | --- |
+| suite under a live non-delivering stdin, after the fix | **completes in ~1 s**, 56 pass / 0 fail (was: still running at 46 s) |
+| **mutation** — `fakeDialogs(null)`, i.e. exactly what un-stubbed `prompt()` returns at EOF | **55 pass / 1 fail**, red at `expect(put).toBeDefined()`; mutation verified applied by blob hash before the reading was believed, restored byte-identical after |
+| `apps/web-ui` package | **113 → 114 pass / 0 fail across 6 files** — `+1`, exactly the new test |
+| `app.js` line coverage, web-ui unit alone, before vs after | **93.56% → 95.34%** (683 → **696** of 730) — `+13` lines, the post-dialog bodies that were unreachable in *every* environment |
+
+**Ledger — one authorised test edit, and it is not an AC-3 charge.** GMS-05 AC-3 bounds
+*signature-tracking* edits, and this file tracks no signature: it is an `apps/web-ui` suite, adds a
+test and strengthens an existing one, and weakens, skips or deletes nothing. `test(` count **55 →
+56**, `expect()` **98 → 101**, no `skip`. The 19-edit AC-3 budget is **unmoved**. It does widen
+PR-B's write set into a package no task row named, on an explicit reviewer decision — recorded here
+rather than absorbed.
+
+**What this task does not establish.**
+
+1. **A local PASS is not CI's PASS, and the gap is mechanical, not hypothetical.**
+   `embeddings/config.ts:183,185` reads `OLLAMA_BASE_URL || "http://localhost:11434"` and gives
+   Ollama `priority: 1` whenever `EMBEDDING_PROVIDER` is unset — **both env-driven**, so the gate's
+   scratch `XDG_CONFIG_HOME`, which does neutralise every `config.json`-driven LLM branch, does not
+   reach this one. `coverage.yml` sets no provider env and runs no Ollama service. **Bounded by
+   measurement on the passing run: `ollama-ok` = 0** — no successful live embed call happened; the
+   only provider tags in the log are error/fallback/fixture shapes. The mechanism can bite a future
+   run; it did not affect this one.
+2. **CI's `coverage` job has still never run on this branch**, which is local and unpushed. The
+   authoritative gate reading arrives at PR time.
+3. **The `apps/web-ui` fix is not itself under a CI gate that would catch a regression of the hang.**
+   A future suite that fires those handlers without stubbing will hang, and a hang is not a red
+   test. Nothing here changes that; only this one file is protected.
+
+**Gates**: `lint` 0 · `type-check` 0 (6/6) · `check-frozen-anchors` exit 0 (14 anchors — checked
+deliberately, since the edited `.ts` joins `resolveNeedles`' scan) · `check-characterization` exit 0
+(3/3) · `check-stale-pointers` exit **0**, `0 broken`, pin **28** met exactly and **unmoved by this
+commit**, measured staged · **G-HUB exit 0**, every type ≤ 3 foreign reach, every file ≤ 700 LOC ·
+`test:scripts` **770 pass / 0 fail across 41 files**, exit 0 — identical to T17, which is the
+prediction, since nothing under `scripts/` moved.
+
 ## Gate check commands
 
 **Since T16, all four sensors are enforced in CI — but by two different routes, and the difference
@@ -2052,8 +2222,26 @@ bun scripts/needles-rename-control.ts \
   .specs/features/core-layering-god-module-split/needles-before.json \
   benchmarks/needles/reports/massa-ai-pr-b-after-results.json   # exit 0
 
+# T18. The `< /dev/null` is LOAD-BEARING, not hygiene — without it this never
+# returns. `apps/web-ui/src/__tests__/app-renderers.test.ts` fires the click
+# handlers `bindEvents` registered, which include `memory-edit` ->
+# `app.js:838` `prompt("Edit memory content:", "")`. Bun's prompt/confirm/alert
+# read stdin, so under any inherited live stdin the gate prints
+# `Edit memory content: []` and hangs forever — no per-test timeout applies,
+# because the block is inside a handler the test called synchronously.
+# Measured: `</dev/null` -> web-ui 114 pass/0 fail in ~2 s; open pipe -> still
+# running at 46 s. CI never sees it (stdin at EOF makes prompt() return null).
+# Whole-gate wall clock is ~2 m 15 s — treat silence past that as the hang, not
+# as progress. See the eighteenth plan defect.
 DATABASE_URL=postgresql://massa_ai:massa_ai_password@127.0.0.1:5433/massa_ai_test \
-  MASSA_AI_DEDICATED=1 RUN_POSTGRES_TESTS=1 bun run test:coverage
+  MASSA_AI_DEDICATED=1 RUN_POSTGRES_TESTS=1 bun run test:coverage < /dev/null
+
+# The gate prints only an aggregate count and the BELOW-floor list. Absence from
+# that list is NOT proof a file passed: `below` is built by iterating `merged`
+# (check-coverage.ts:618-626), so a file no group reports never enters `merged`
+# and can never be below the floor. To assert a specific file was measured,
+# re-derive from the per-unit lcov left under `packages/*/coverage/` and
+# `apps/*/coverage/` using the gate's own exported parseLcov/mergeInto/linePercent.
 ```
 
 **Assert pass counts, never exit status.** `bun test` exits 0 when everything skips. Known-good

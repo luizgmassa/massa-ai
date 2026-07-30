@@ -258,6 +258,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   full index, so it is evidence that this refactor changed no ranking, not a statement about retrieval
   quality overall.
 
+- **The web UI's edit and delete dialogs are now covered by tests, and the coverage gate no longer
+  hangs.** Running the coverage gate would stop dead and never return. The cause was a browser dialog:
+  the web UI asks for confirmation before editing or deleting a memory, and one test fires every click
+  handler the app registers — including those two. Outside a browser those dialog calls read from
+  standard input, so the gate sat waiting for a keypress that was never coming. Under continuous
+  integration input is closed, the dialog returns nothing at all, and the handler gave up one line
+  later, so nobody ever saw either the hang or the gap it was hiding.
+
+  The tests now supply their own answers to those dialogs, which both removes the dependency on
+  standard input and, for the first time, exercises what happens *after* someone confirms — the update
+  and delete requests the app sends. That code had never run under test in any environment. Line
+  coverage of the web UI's application script rises from **93.56% to 95.34%**, and the suite that used
+  to hang indefinitely now finishes in about a second.
+
+  Every source file this work touches is at or above the 90% coverage floor, with no new exemption
+  added: the lowest is the project-indexing module at **94.57%**, and the six other modules extracted
+  over this series sit between 95.54% and 100%.
+
 ## [1.11.0] - 2026-07-29
 
 ### Changed

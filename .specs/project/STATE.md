@@ -145,7 +145,7 @@ cannot be T17's referent.
 a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
 unilaterally — it is a release-semantics decision.
 
-### Execute — Phase 1 COMPLETE and T17 done (2026-07-30), T6a–T17 committed, T18 next
+### Execute — Phase 1 COMPLETE and T18 done (2026-07-30), T6a–T18 committed, T19 next
 
 **Two branches, and the first one is gone.** T6a and T6 were executed on
 `refactor/search-facade-split-phase-1` (cut from `d628464`) and reached `main` through **PR #46,
@@ -582,6 +582,24 @@ correcting.**
     catastrophic form of this same mechanism and closed only that half.* **A sensor cannot exempt a
     cause and then police an effect of that cause** — `needles-diff.ts:31-37` exempts score drift
     from a rename by name, then calls rank the invariant.
+18. **T18's command does not terminate under an automated runner** (T18, found by running the row as
+    written and watching it produce nothing for six minutes). **The first defect here that is neither
+    a wrong figure nor an unsatisfiable criterion**, and the first whose symptom is *silence* rather
+    than a number — an unexecutable command looks exactly like one still working.
+    `apps/web-ui/src/static/app.js:838` calls `prompt("Edit memory content:", "")`; Bun implements
+    `prompt`/`confirm`/`alert` as **stdin readers**, and `app-renderers.test.ts`'s fake DOM returns a
+    stable child for *any* selector, so `bindEvents` registers the `memory-edit` handler on it and the
+    test that fires captured click handlers reaches it. Measured both directions: `< /dev/null` →
+    `apps/web-ui` **113 pass / 0 fail in ~2 s**; an open pipe that never delivers → **still running at
+    46 s**, last output `Edit memory content: []`. **No per-test timeout applies** — the block is
+    inside a handler the test invoked synchronously. CI never saw it because stdin at EOF makes
+    `prompt()` return `null`; that same EOF is why `app.js:840-848` was uncovered in *every*
+    environment. `apps/web-ui` has **zero** diff on this branch, so this is neither PR-B's defect nor
+    a regression. **Resolved (reviewer, 2026-07-30): all three of record it, fix the command, fix the
+    test** — `< /dev/null` in the gate block, and `fakeDialogs()` recording stubs in the suite, which
+    is *fix the subject, not the gate*. Observed red first: `fakeDialogs(null)` — exactly what
+    un-stubbed `prompt()` returns at EOF — gives **55 pass / 1 fail**. Side effect worth keeping:
+    `app.js` **93.56% → 95.34%**.
 
 **The discriminating evidence is M3b**, and it is the only reading proving (c) was a live gap rather
 than a theoretical one: on a tree carrying a broken `search-facade-*` citation, the pre-T15 `rlm`-only
@@ -633,8 +651,27 @@ chunker is told, and exits **0** with all 14 needles at baseline. Its identity p
 the shipped report before its control pass is believed, or it aborts. **No change to retrieval logic
 moved a rank.**
 
-**Next: T18** (dedicated DB on `127.0.0.1:5433/massa_ai_test` plus `RUN_POSTGRES_TESTS=1`),
-**T19 — now C1–C11, not C1–C7**, and T20.
+**T18 is done, and the gate is green on every file this work touches — but the reading that matters
+is the one the gate cannot give you.** `bun run test:coverage` exits **0**: `floor 90% line · 315
+source files measured · 9 documented exclusions · PASS`, in **2 m 14 s**, with all 169 `N fail` lines
+at zero. Both halves of GMS-05 AC-2 hold, and the second holds *structurally* —
+`scripts/check-coverage.ts` has **zero** diff on this branch, so no exclusion could have been added
+or swapped. The gate prints only an aggregate and a below-floor list, and **absence from that list is
+not evidence of a pass**: `below` is built by iterating `merged`, so a file no group reports never
+enters `merged` and can never be below the floor. Re-derived through the gate's own `parseLcov` /
+`mergeInto` / `linePercent`, all seven are **present**: `contextual-search-rlm` `index-admin`
+`session-bias` **100.00%**, `graph-stream` 98.90, `result-fusion` 97.62, `hybrid-search` 95.54,
+`project-indexer` **94.57** — and that recomputation reproduces 315 / 0 / 9 exactly. **Scope widened
+from the row's 6 to AC-2's 7**: the row says *this PR*, AC-2 says *this work*, and they differ by
+`result-fusion.ts`, which T6 delivered through the squashed #46. It measures 97.62%, so **no spec
+correction is owed and T19's C1–C11 range is unchanged.** The paper prediction was **falsified on
+ordering** — `index-admin` was predicted riskiest from mock topology and is 100.00%; executable-line
+count predicted it, mock topology did not. `coverage` **is** in `main`'s required checks (measured
+live), so this gate blocks; CI has nonetheless never run on this branch. T18 changes no product code,
+so PASS is a **truth check on the tree**, not proof T18 happened — the one discriminating sensor in
+the commit is the new web-ui test from defect 18.
+
+**Next: T19 — C1–C11, not C1–C7**, then T20.
 `design.md` §10 gained **C10** at T15 because no row owned GMS-04 AC-3, and **C11** at T17 because no
 row owned GMS-05 AC-4 note 2's *"per-needle ranks are unchanged"* — which the shipped tree does not
 satisfy and cannot. T20's verifier reads `spec.md`; without either row it checks the criterion as

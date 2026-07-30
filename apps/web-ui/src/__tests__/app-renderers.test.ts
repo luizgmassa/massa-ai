@@ -387,10 +387,16 @@ function makeFakeDom() {
 describe("startApp", () => {
   const origFetch = globalThis.fetch;
   const origLocation = (globalThis as any).location;
+  const origPrompt = (globalThis as any).prompt;
+  const origConfirm = (globalThis as any).confirm;
+  const origAlert = (globalThis as any).alert;
   afterEach(() => {
     globalThis.fetch = origFetch;
     if (origLocation) (globalThis as any).location = origLocation;
     else delete (globalThis as any).location;
+    (globalThis as any).prompt = origPrompt;
+    (globalThis as any).confirm = origConfirm;
+    (globalThis as any).alert = origAlert;
   });
 
   function fakeJsonFetch(responder: (url: string) => unknown) {
@@ -398,6 +404,63 @@ describe("startApp", () => {
       headers: { get: () => "application/json" },
       json: async () => responder(String(url)),
     })) as unknown as typeof fetch;
+  }
+
+  /** Same as `fakeJsonFetch`, but records every (url, method, body) it is handed. */
+  function recordingJsonFetch(responder: (url: string) => unknown) {
+    const calls: Array<{ url: string; method: string; body?: string }> = [];
+    globalThis.fetch = (async (url: string, init?: any) => {
+      calls.push({ url: String(url), method: init?.method ?? "GET", body: init?.body });
+      return {
+        headers: { get: () => "application/json" },
+        json: async () => responder(String(url)),
+      };
+    }) as unknown as typeof fetch;
+    return calls;
+  }
+
+  /**
+   * Replace the three blocking dialog globals, and record what they were asked.
+   *
+   * `app.js`'s write-mode handlers call `prompt()` (memory edit), `confirm()`
+   * (memory delete) and `alert()` (every failure path). Bun implements all three
+   * as **stdin readers**, and `makeFakeDom`'s `querySelectorAll` returns its
+   * stable child for *any* selector — so `bindEvents` registers the
+   * `memory-edit` / `memory-delete` click handlers on it and any test that fires
+   * that child's click handlers reaches them.
+   *
+   * Measured, both directions, on this file: with stdin an open pipe that never
+   * delivers, the suite prints `Edit memory content: []` and hangs (still
+   * running when killed at 46 s); with stdin closed it is 113 pass / 0 fail in
+   * ~2 s. That is why `bun run test:coverage` never terminated under an
+   * automated runner that inherits a live stdin — one hung web-ui suite blocks
+   * the whole gate, and no per-test timeout applies because the block is inside
+   * a handler the test invoked synchronously.
+   *
+   * CI never saw it: with stdin at EOF `prompt()` returns `null`, so
+   * `handleMemoryEdit` early-returns and the suite passes. That is also why
+   * `app.js:840-848` was never covered — the PUT after the prompt was
+   * unreachable in every environment. Stubbing here removes the stdin
+   * dependency *and* makes that branch executable.
+   */
+  function fakeDialogs(promptAnswer: string | null = "edited content") {
+    const dialogs = {
+      prompts: [] as string[],
+      confirms: [] as string[],
+      alerts: [] as string[],
+    };
+    (globalThis as any).prompt = (message?: string) => {
+      dialogs.prompts.push(String(message ?? ""));
+      return promptAnswer;
+    };
+    (globalThis as any).confirm = (message?: string) => {
+      dialogs.confirms.push(String(message ?? ""));
+      return true;
+    };
+    (globalThis as any).alert = (message?: string) => {
+      dialogs.alerts.push(String(message ?? ""));
+    };
+    return dialogs;
   }
 
   it("returns early when no document", () => {
@@ -498,6 +561,10 @@ describe("startApp", () => {
 
   it("fires captured event handlers (nav, theme, project, filters) to cover callbacks", async () => {
     const { doc, elements } = makeFakeDom();
+    // Not optional: the click handlers fired below include `memory-edit` and
+    // `memory-delete`, which call the stdin-reading `prompt()` / `confirm()`.
+    // Without this the suite blocks forever on any live stdin. See `fakeDialogs`.
+    fakeDialogs();
     (globalThis as any).location = { hash: "#/memory" };
     fakeJsonFetch((url) => {
       if (url.includes("/memory/list")) return { data: { memories: [{ id: "m1", type: "code", level: 1, importance: 0.5, content: "hi" }], total: 1, limit: 50, offset: 0 } };
@@ -537,6 +604,46 @@ describe("startApp", () => {
 
     await new Promise((r) => setTimeout(r, 80));
     expect(doc.getElementById("app")).toBeDefined();
+  });
+
+  /**
+   * The sensor for the dialog stubs, and it discriminates in the direction that
+   * matters. The test above fires the same handlers but asserts only that the
+   * app root still exists — it passed just as happily when `prompt()` returned
+   * `null` at stdin EOF and `handleMemoryEdit` bailed out one line later. This
+   * one asserts the request each handler is supposed to issue *after* its
+   * dialog, so it goes red if the write-mode round trip stops happening,
+   * including if someone restores the un-stubbed `prompt` and the answer
+   * becomes `null` again.
+   */
+  it("drives the write-mode dialog handlers through to their requests", async () => {
+    const { doc, elements } = makeFakeDom();
+    const dialogs = fakeDialogs("edited content");
+    (globalThis as any).location = { hash: "#/memory" };
+    const calls = recordingJsonFetch((url) => {
+      if (url.includes("/memory/list")) return { data: { memories: [{ id: "m1", type: "code", level: 1, importance: 0.5, content: "hi" }], total: 1, limit: 50, offset: 0 } };
+      if (url.includes("/project/list")) return { data: { projects: [{ projectId: "p1" }] } };
+      return { data: {} };
+    });
+    startApp({ document: doc, base: "" });
+    await new Promise((r) => setTimeout(r, 60));
+
+    const child = elements["app"].querySelectorAll("x")[0];
+    for (const h of child._handlers.click ?? []) h();
+    await new Promise((r) => setTimeout(r, 80));
+
+    expect(dialogs.prompts).toContain("Edit memory content:");
+    expect(dialogs.confirms.some((m) => m.includes("Delete this memory?"))).toBe(true);
+
+    const put = calls.find((c) => c.method === "PUT" && c.url.includes("/api/v1/memory/fake-id"));
+    expect(put).toBeDefined();
+    expect(put?.body).toContain("edited content");
+
+    const del = calls.find((c) => c.method === "DELETE" && c.url.includes("/api/v1/memory/fake-id"));
+    expect(del).toBeDefined();
+
+    // Nothing failed, so no failure path ran.
+    expect(dialogs.alerts).toEqual([]);
   });
 
   it("SSE subscribes to /api/v1/events when EventSource is available", async () => {

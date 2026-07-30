@@ -1,13 +1,23 @@
 # Handoff
 
-## Active — Core Layering and God-Module Split (PR-B), **T17 done, Phase 2 open**
+## Active — Core Layering and God-Module Split (PR-B), **T18 done, Phase 2 open**
 
 **Feature**: `core-layering-god-module-split` · branch
 `refactor/search-facade-split-phase-1b`, cut from `main` @ `5247ecb` (v1.11.0),
 worktree `../massa-ai-wt-facade-phase-1b`.
-**T6a and T6 are merged and released; T7–T17 are committed and green. Phase 1 is closed and T15 has
-opened Phase 2.** Working tree clean. Nothing is pushed — the branch is local only, now thirteen
+**T6a and T6 are merged and released; T7–T18 are committed and green. Phase 1 is closed and T15 has
+opened Phase 2.** Working tree clean. Nothing is pushed — the branch is local only, now fourteen
 commits deep.
+
+**T18 is done. The coverage gate is green on every file this work touches — and the row's own command
+had to be fixed before it would terminate, which is the eighteenth plan defect.** `bun run
+test:coverage < /dev/null` exits **0** at 315 measured / 0 below floor / 9 exclusions, and all seven
+files (the row's six **plus `result-fusion.ts`**, which GMS-05 AC-2's *"this work"* reaches and the
+row's *"this PR"* does not) are **present in the merged set** and above floor, minimum
+`project-indexer.ts` at **94.57%**. Presence is the load-bearing half: the gate reports only
+below-floor files, and a file no group reports never enters the merge, so *absence from the failure
+list is not evidence of a pass*. Full readings under **Gates at T18** below — read those rather than
+re-running a 2 m 15 s gate to re-derive them.
 
 **A commit-trailer question was settled at T17, and the premise it was raised on did not reproduce.**
 It was put as *"`d23bb43` carries a `Co-Authored-By` trailer; the other eleven commits do not"*, so
@@ -464,11 +474,8 @@ rank.**
    written without their `.ts`, with the measurement in the comment, exactly as T15 resolved the same
    trap one level up. Its test file uses neutral fixtures (`alpha`, `beta`) for the same reason.
 
-**Next action: T18.** Then, in plan order:
+**Next action: T19.** Then, in plan order:
 
-- **T18** — coverage gate. Needs the **dedicated** database (`127.0.0.1`, port **5433**, database
-  `massa_ai_test`) and `RUN_POSTGRES_TESTS=1`; without the latter, ten-plus core suites skip and the
-  gate reports phantom below-floor files instead of the truth. See `CLAUDE.md` → `coverage.yml`.
 - **T19** — spec corrections **C1–C11**. The row said C1–C7, `design.md` §10 has held C1–C9 since
   Design, **T15 added C10** for GMS-04 AC-3 and **T17 added C11** for GMS-05 AC-4 note 2. All are fixed
   in place. Without C10 or C11, T20's verifier — which reads `spec.md` — checks the criterion **as
@@ -478,7 +485,7 @@ rank.**
 - **T20** — independent validation, fresh verifier, author ≠ verifier.
 
 **T20's briefing list, assembled here rather than left spread across three files.** The verifier must
-be told all eight, or each reads as a violation it is not:
+be told all ten, or each reads as a violation it is not:
 
 1. **`.ua/` is out of scope for GMS-04 AC-3.** 320 occurrences across three tracked generated
    artifacts; regeneration deferred to after PR-C. **PR-B does not close AC-3 for them.**
@@ -515,6 +522,20 @@ be told all eight, or each reads as a violation it is not:
    script is **not** in CI and cannot be: it needs a local Ollama and an 8B model, the same reason
    `needles-gate.yml` is `workflow_dispatch`-only. Its 17 unit tests *do* run in `test:scripts`.
 
+9. **PR-B writes one file outside `packages/core` and `scripts/`, and it is a test in a package no
+   task row names.** `apps/web-ui/src/__tests__/app-renderers.test.ts` — the eighteenth defect's fix,
+   on an explicit reviewer decision. It is **not** an AC-3 charge: AC-3 bounds *signature-tracking*
+   edits and this file tracks no signature, weakens nothing, skips nothing, deletes nothing. `test(`
+   **55 → 56**, `expect()` **98 → 101**, and the **19-edit AC-3 budget is unmoved**. A verifier
+   diffing PR-B's write set against the task rows will find this file unaccounted for; it is
+   accounted for here and in `tasks.md` → *T18 — executed*.
+10. **`bun run test:coverage` must be run with `< /dev/null`, and `bun run test` needs three env
+   vars.** Without the redirect the coverage gate hangs forever inside `apps/web-ui` — the
+   eighteenth defect; the failure mode is silence, not a red test, and a verifier will read it as a
+   slow run. Without `DATABASE_URL`, `MASSA_AI_EXECUTOR_SANDBOX=none` and a scratch
+   `XDG_CONFIG_HOME`, `bun run test` fails on the harness rather than on the tree — that is a
+   pre-existing documented condition (`CLAUDE.md`, *Running tests*), not a PR-B regression.
+
 **Read the branch note before anything else.** T6a and T6 landed in `main` via **PR #46, which was
 squashed, not merged** — R-04 was violated. None of its 8 commits are ancestors of `main`, the
 per-commit sensor evidence survives only in `.specs/`, and the old branch
@@ -537,7 +558,8 @@ the remote and is **not** this work. **This PR must be merged with a merge commi
 | T14 | `e4e38bd` | the root's final cleanup — ten stale `Visibility relaxed` notes replaced per group (§4.3 for the nine methods, §4.3.1 for the one field), the T13 hand-off block retired; **Phase 1 closes**; the eleventh plan defect |
 | T15 | `b9781df` | GMS-04 **AC-1 closed** by four `git mv` renames to `search-facade-{admin,indexing,hybrid,synapse}.test.ts`, 17 citations repointed, every stale description corrected; **AC-3's criterion replaced** by `scripts/check-stale-pointers.ts` + its 21-test suite; `design.md` §10 gains **C10**; **Phase 2 opens**; the twelfth, thirteenth and fourteenth plan defects |
 | T16 | `d23bb43` | **G-HUB and `check-stale-pointers` wired into the `build` job** — scope widened past the row on a reviewer decision, since the other two sensors were already enforced through their own suites; `fetch-depth: 0` on that job's checkout; `build` confirmed **already** in `main`'s required checks, so **no ruleset mutation**; the fifteenth and sixteenth plan defects |
-| T17 | this commit | needles after-run at the shipped tree (**both floors PASS**, hit@1 0.643, MRR 0.745), the per-needle diff (**exit 1**, `N05` 5 → 6) and its attribution to naming rather than retrieval; **sensor substituted** by `scripts/needles-rename-control.ts` + 17 tests, exit **0** with all 14 needles at baseline; `design.md` §10 gains **C11**; the seventeenth plan defect |
+| T17 | `0179566` | needles after-run at the shipped tree (**both floors PASS**, hit@1 0.643, MRR 0.745), the per-needle diff (**exit 1**, `N05` 5 → 6) and its attribution to naming rather than retrieval; **sensor substituted** by `scripts/needles-rename-control.ts` + 17 tests, exit **0** with all 14 needles at baseline; `design.md` §10 gains **C11**; the seventeenth plan defect |
+| T18 | this commit | DEBT-02 coverage gate at the shipped tree — **exit 0**, 315 measured / 0 below / 9 exclusions, all **7** files this *work* touches present in `merged` and above floor (min `project-indexer.ts` **94.57%**); scope widened from the row's 6 to GMS-05 AC-2's 7, closing AC-2 without a spec correction; **the eighteenth plan defect** — the row's own command never terminates under an inherited live stdin — fixed in the command (`< /dev/null`) *and* in its subject (`fakeDialogs()` in `app-renderers.test.ts`, red first under `fakeDialogs(null)`), which is PR-B's only write outside `packages/core`/`scripts` |
 
 Gates at T10: `lint` 0 · `type-check` 0 (6/6) · `build` 0 (5/5) · `test:scripts` **732 pass / 0 fail
 across 39 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
@@ -664,6 +686,65 @@ faithful on all 14, `N05` restored to **@5** and `N06` to **@3**. Determinism wa
 any delta was attributed and not by re-running the same command: **11 of 14** needles reproduce their
 top score to 4 dp across runs taken on different days, and the 3 that differ are exactly the needles
 whose top hit lies in a file PR-B changed.
+
+Gates at T18 — **T18 changes no source under `packages/core`, so every structural figure is
+byte-identical to T17, which is the prediction**: `lint` 0 · `type-check` 0 (6/6) ·
+`check-frozen-anchors` exit 0 (14 anchors — checked deliberately, since the edited `.ts` joins
+`resolveNeedles`' scan) · `check-characterization` exit 0 (3/3) · `check-stale-pointers` exit **0**,
+`0 broken`, pin **28** met exactly and **unmoved by this commit**, measured staged · **G-HUB exit
+0**, every type ≤ 3 foreign reach, every file ≤ 700 LOC · `test:scripts` **770 pass / 0 fail across
+41 files**, exit 0, identical to T17 since nothing under `scripts/` moved · `bun run test` **11
+successful / 11 total** (needs `DATABASE_URL` on 5432, `MASSA_AI_EXECUTOR_SANDBOX=none` and a scratch
+`XDG_CONFIG_HOME` — the documented `mcp-client` workaround; without them it fails on the harness,
+not on the tree) · `apps/web-ui` **113 → 114 pass / 0 fail across 6 files**, `+1` exactly the new test.
+
+**T18's own readings.** `bun run test:coverage < /dev/null` exit **0** — `floor 90% line · 315 source
+files measured · 9 documented exclusions · PASS`, **2 m 14 s**, 169 `N fail` lines all zero, 165 lcov
+files merged (129/25/8/1/1/1). `EXCLUSIONS.length` **9**, read by importing the gate rather than
+counting entries by eye, and `scripts/check-coverage.ts` has **zero** diff on this branch — AC-2's
+*"no new exclusion"* closed structurally, not by a count that could match while an entry was swapped.
+Per-file, **presence asserted before percentage**, because `below` is built by iterating `merged` and
+a file no group reports can never appear below the floor: `contextual-search-rlm` 221/221
+**100.00%** · `index-admin` 80/80 **100.00%** · `session-bias` 49/49 **100.00%** · `graph-stream`
+90/91 98.90% · `result-fusion` 164/168 97.62% · `hybrid-search` 407/426 95.54% · `project-indexer`
+331/350 **94.57%**. That independent recomputation, through the gate's own exported
+`parseLcov`/`mergeInto`/`linePercent`, reproduces **315 / 0 / 9** exactly. Corpus delta: tracked
+measured-source **370 → 371**, `+1` — five modules added, four `rlm-*` removed; under
+`services/search` alone **28 → 29**. **T18 changes no product code, so PASS is a truth check on the
+tree, not proof T18 happened** — the only discriminating sensor in the commit is the new web-ui test.
+
+**Three things a resumer must not re-derive.**
+
+1. **The paper prediction was falsified on ordering, and the falsification is the useful part.** All
+   six extracted modules are `mock.module`'d in `contextual-search-rlm-coverage.test.ts`
+   (`:126,162,179,189,199`) — the suite that covered those bodies before the split — and four again
+   by their own `*-late-bind.test.ts`. From that topology `index-admin.ts` was predicted riskiest
+   (234 LOC, only direct importer mocks it, 7 facade tests behind it). **It is 100.00%.** The
+   `search-facade-*` characterization suites execute the real bodies through the facade, so the mock
+   costs nothing. **Executable-line count predicted the ordering; mock topology did not.**
+2. **The *this PR* / *this work* gap is closed by measurement, not by a correction.** The T18 row
+   scopes to the branch diff (6 files); GMS-05 AC-2 says *every file this work touches*, which
+   includes `result-fusion.ts` — T6's deliverable, in `main` through the squashed #46, hence outside
+   the diff. A scoped plan critic raised it and proposed a **C12**; the premise was measured before
+   the question was asked and it is **97.62%**, so reporting all seven closes AC-2 on its own
+   wording. **No C12 — T19 stays C1–C11.** The gap is a downstream consequence of the R-04 violation,
+   not a new one. *Fifth earned keep for a scoped critic, and the second time measuring its premise
+   turned a proposed spec change into a one-line reporting widening.*
+3. **A local PASS is not CI's PASS — real mechanism, bounded on this run.**
+   `embeddings/config.ts:183,185` takes `OLLAMA_BASE_URL || localhost:11434` and gives Ollama
+   `priority: 1` whenever `EMBEDDING_PROVIDER` is unset. **Both env-driven**, so the gate's scratch
+   `XDG_CONFIG_HOME` — which does neutralise every `config.json`-driven LLM branch, and is argued in
+   the gate's own header as making the numbers a property of the tree — **does not reach this one**,
+   and `coverage.yml` configures no provider at all. Measured on the passing run: **`ollama-ok` = 0**,
+   no successful live embed call; every provider tag in the log is an error/fallback/fixture shape.
+   Also measured live: `coverage` **is** in `main`'s required checks, so a red gate blocks — and the
+   branch base `5247ecb` has **no** coverage run at all (it is the `[skip ci]` release commit), which
+   makes `fb8a3ed` the before-baseline and this **the first coverage reading PR-B has ever had**.
+
+> **`CLAUDE.md` says 24 Prisma migrations; the tree has 23.** Measured against the dedicated database
+> at T18: 23 on disk, 23 applied, 0 unfinished, 0 missing. Harmless in itself, but a verifier reading
+> the gate's `_prisma_migrations intact at 23 row(s)` against that sentence will conclude the database
+> is half-migrated. Not fixed here — `CLAUDE.md` is outside PR-B's write set.
 
 > **Name the metric on the characterization net.** The seventh suite in `26·41·31·21·25·7·9` is
 > `concurrent-indexing` at **9**, not `session-bias` at **10** — `session-bias` is tracked separately
