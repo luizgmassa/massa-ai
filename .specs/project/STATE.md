@@ -1,6 +1,44 @@
 # massa-ai Spec State
 
-## Current — Skills / Workflows Updates + spec-driven DI rule
+## Current — Judge With Debate (spec-driven, VALIDATED PASS, PR #50 open + CI green)
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-judge-with-debate`
+- workflow: spec-driven (Large — all phases complete)
+- feature: `judge-with-debate` — **COMPLETE 2026-07-30, independently validated PASS**
+  (`.specs/features/judge-with-debate/validation.md`: 12/12 ACs, 5/5 edge cases, 4/4
+  discrimination sensors executed + killed, gate 773 pass / 0 fail / 41 files, No drift ×2;
+  accepted deviation: verifier env had no shell/write — sensor executions + file persistence by
+  main agent, per plugin-auto-install precedent). Branch `feat/judge-with-debate`, worktree
+  `../massa-ai-wt-judge-with-debate`. **PR
+  [#50](https://github.com/luizgmassa/massa-ai/pull/50) OPEN — CI green: 14 pass / 0 fail /
+  `install-test` skips by workflow condition. One repair iteration used (cap 3): first run red on
+  `build` + `coverage` — the 15→17 registry change missed the four plugin install-test rosters,
+  both shell installer advisories, the opencode config-cli help, and README/FEATURES/marketplace
+  copy (the local final gate runs `test:scripts`; that roster surface is `test:plugins`, which
+  only CI runs). Fixed in `e190b43`, re-run green. DO NOT MERGE per user instruction — merge
+  auto-cuts a release; CHANGELOG entry sits under `### Added` → minor bump. Optional: user-gated
+  live protocol smoke run; if declined, record candidate lesson (protocol =
+  user-gated-smoke-only, validation.md Addendum item 6).**
+- Plan Challenge: pre_mortem, 5 findings (2C/2H/1M) all verified + incorporated (tasks.md).
+- Final gate @ T10: lint 0 · type-check 6/6 · `test:scripts` **772 pass / 0 fail across 41
+  files** · both generators `--check` No drift. Baseline corrected: true pre-feature state was
+  737/2 (both environmental — crash probe + unbuilt dist).
+- Execute divergence (unplanned, gate-discovered): three registration spots missed by quick
+  gates and caught by the full gate — `validate-repository.test.ts` third roster,
+  `workflow-harness-contract.test.ts` workflow count 35→36 + read-only complement 19→20, intake
+  line in the new workflow. Fixed in one repair commit; full gate is the sensor that works.
+- scope: 12 requirements (JD-01..12) — port of NeoLabHQ `judge-with-debate` pattern: meta-judge
+  eval-spec YAML (once, verbatim) + 3 independent judges + ≤3 debate rounds + consensus
+  (0.5 overall / 1.0 criterion). Two new charters (`meta-judge`, `judge`; registry 15→17),
+  workflow `workflows/judge-with-debate.md` + router entry, reports under `audits/judge/`.
+- User decisions locked: full protocol; model-diversity advisory per dispatch (meta kimi-k3,
+  J1 deepseek-v4-pro, J2 minimax-m3, J3 GLM-5.2 — as given, unverified) with loud host-default
+  fallback; generic artifacts; standalone only; audit-report-io storage; consensus file saved.
+- Next action: user decides merge (auto-cuts minor release) + whether to run the optional live
+  protocol smoke; if declined, record the candidate lesson via `lessons.py`.
+
+## Previous — Skills / Workflows Updates + spec-driven DI rule
 
 - projectId: `massa-ai`
 - Two related harness-text features consolidated on one branch for one PR; both independently

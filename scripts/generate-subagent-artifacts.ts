@@ -46,6 +46,8 @@ const SPECIALIST_NAMES = [
   "plan-critic",
   "furps-analyst",
   "navigator",
+  "meta-judge",
+  "judge",
 ] as const;
 type SpecialistName = (typeof SPECIALIST_NAMES)[number];
 
@@ -78,6 +80,8 @@ const AGENT_MODELS_CLAUDE: Record<SpecialistName, "haiku" | "sonnet" | "opus"> =
   "plan-critic": "opus",
   "furps-analyst": "sonnet",
   navigator: "sonnet",
+  "meta-judge": "opus",
+  judge: "opus",
 };
 
 // Codex IDs + model_reasoning_effort = "high" (spec Codex table)
@@ -97,6 +101,8 @@ const AGENT_MODELS_CODEX: Record<SpecialistName, string> = {
   "plan-critic": "gpt-5.6-sol",
   "furps-analyst": "gpt-5.6-terra",
   navigator: "gpt-5.4-mini",
+  "meta-judge": "gpt-5.6-sol",
+  judge: "gpt-5.6-sol",
 };
 
 // OpenCode ids + reasoningEffort: max (spec OpenCode table). OpenCode resolves
@@ -120,6 +126,8 @@ const AGENT_MODELS_OPENCODE: Record<SpecialistName, string> = {
   "plan-critic": "opencode-go/minimax-m3",
   "furps-analyst": "opencode-go/glm-5.2",
   navigator: "opencode-go/deepseek-v4-pro",
+  "meta-judge": "opencode-go/kimi-k3",
+  judge: "opencode-go/deepseek-v4-pro",
 };
 
 // Cursor uses charter metadata.model_hint verbatim + reasoningEffort: max.

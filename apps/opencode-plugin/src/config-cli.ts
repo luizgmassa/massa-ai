@@ -36,8 +36,8 @@ Commands:
     --model <name>    Model name
     --base-url <url>  Base URL (for ollama)
 
-  agents            Manage the 15 subagent specialist definitions
-    agents install [--user|--project]   Write 12 agent .md files
+  agents            Manage the 17 subagent specialist definitions
+    agents install [--user|--project]   Write 17 agent .md files
     agents uninstall [--user|--project] Remove only massa-ai-owned agents
 
 Examples:

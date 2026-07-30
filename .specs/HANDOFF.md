@@ -1,6 +1,39 @@
 # Handoff
 
-## Active — Core Layering and God-Module Split (PR-B), Phase 1 started
+## Active — Judge With Debate VALIDATED PASS, PR #50 open + CI green
+
+**Feature**: `judge-with-debate` · branch `feat/judge-with-debate`, worktree
+`../massa-ai-wt-judge-with-debate` (from `origin/main` @ v1.12.1). **ALL TASKS COMPLETE
+2026-07-30. Independent validation PASS** (`.specs/features/judge-with-debate/validation.md` —
+read the Addendum first: verifier had no shell/write; sensor executions + file persistence are
+the main agent's, recorded as accepted deviation).
+**Final gate: lint 0 · type-check 6/6 · test:scripts 773 pass / 0 fail across 41 files · both
+generators `--check` No drift.** 4/4 discrimination sensors executed + killed.
+**Delivery (implementation-delivery stages 3–7) DONE 2026-07-30:**
+
+- Branch pushed; PR [#50](https://github.com/luizgmassa/massa-ai/pull/50) OPEN, base `main`.
+- First CI run **red** on `build` + `coverage`: the 15→17 registry change missed the four plugin
+  install-test rosters (`agents-install.test.ts`, claude/codex/cursor `install.test.ts`), both
+  shell installer advisories (`install.sh`, `scripts/install-agents.sh`), the opencode config-cli
+  help text, and README/FEATURES/marketplace copy. Root cause: the local final gate runs
+  `test:scripts`; that roster surface is covered by `test:plugins`, which only CI ran.
+  **Repair iteration 1 of 3**: `e190b43` flips all stale 15→17 (rosters gain `meta-judge` +
+  `judge`, both read-only — `WRITE_AGENTS` untouched). Local re-gates: `test:plugins` 96/96,
+  `test:scripts` 773/0, lint 0. Second CI run **green: 14 pass / 0 fail** (`install-test` skips
+  by workflow condition; `mcp` ran and passed on the green run).
+
+**Remaining, in order:**
+1. **STOP — merge only on explicit user approval** (merge auto-cuts a release; CHANGELOG entry
+   sits under `### Added` → minor bump).
+2. Optional user-gated live protocol smoke (run the real debate on a small artifact). If
+   declined: record candidate lesson via `lessons.py` — protocol behavior is
+   user-gated-smoke-only (validation.md Addendum item 6, tasks.md T11 lesson note).
+3. Main checkout also carries PR-B (`core-layering-god-module-split`) Execute on
+   `refactor/search-facade-split-phase-1` — untouched by this feature.
+
+---
+
+## Previous — Core Layering and God-Module Split (PR-B), Phase 1 started
 
 **Feature**: `core-layering-god-module-split` · branch
 `refactor/search-facade-split-phase-1`, cut from `main` @ `d628464`.

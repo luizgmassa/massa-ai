@@ -19,7 +19,7 @@ Check `.specs/project/STATE.md` for the current active feature and `.specs/proje
 - `massa-ai/` — workflow router; MCP tool contracts and Synapse lifecycle live in
   its `references/mcp-tools.md` and `references/synapse-policy.md`
 - `persona-router/` — persona selection
-- `AGENTS.md` (under `skills/`) — sub-agent registry: 15 reusable specialist
+- `AGENTS.md` (under `skills/`) — sub-agent registry: 17 reusable specialist
   agents, plus the canonical policy bootstrap block
 
 #### Sub-Agent Skills (invocable by any workflow)
