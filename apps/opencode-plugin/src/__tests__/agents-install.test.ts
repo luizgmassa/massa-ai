@@ -104,7 +104,7 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
     expect(res.stdout).toContain("15 subagent specialists");
   });
 
-  test("OPC-07: each installed agent has mode: all + metadata massa-ai-owned: true", async () => {
+  test("OPC-07: each installed agent has mode: all + the ownership marker", async () => {
     runCli(["agents", "install", "--user"], {
       HOME: tmp,
       XDG_CONFIG_HOME: xdgConfig,
@@ -116,8 +116,72 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
         "utf8",
       );
       expect(content).toContain("mode: all");
+      // The literal substring this CLI's uninstall greps for (config-cli.ts).
       expect(content).toContain("massa-ai-owned: true");
     }
+  });
+
+  // D8: the marker moved out of frontmatter into the body, because OpenCode forwards
+  // unrecognized frontmatter keys to the model provider as model options. Uninstall
+  // scoping must survive that move.
+  test("D8: the ownership marker is in the BODY, never in the frontmatter block", async () => {
+    runCli(["agents", "install", "--user"], {
+      HOME: tmp,
+      XDG_CONFIG_HOME: xdgConfig,
+    });
+    const agentsDir = path.join(xdgConfig, "opencode/agents");
+    for (const name of SPECIALIST_NAMES) {
+      const content = await fs.readFile(
+        path.join(agentsDir, `massa-ai-${name}.md`),
+        "utf8",
+      );
+      const fmBlock = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(content)![1]!;
+      expect(fmBlock).not.toContain("massa-ai-owned");
+      expect(fmBlock).not.toContain("metadata:");
+      const body = content.split(/^---\r?\n/m)[2] ?? "";
+      expect(body.split(/\r?\n/)[0]).toBe("<!-- massa-ai-owned: true -->");
+    }
+  });
+
+  // D9: an agent installed by an OLDER version carries the marker in frontmatter.
+  // The substring match is unchanged, so uninstall must still remove both forms --
+  // otherwise upgrading would silently orphan whatever the previous version installed.
+  test("D9: uninstall removes BOTH the old frontmatter-marker form and the new body form", async () => {
+    const agentsDir = path.join(xdgConfig, "opencode/agents");
+    runCli(["agents", "install", "--user"], {
+      HOME: tmp,
+      XDG_CONFIG_HOME: xdgConfig,
+    });
+
+    // Simulate a file left behind by a pre-registry install: marker in frontmatter.
+    const oldForm = path.join(agentsDir, "massa-ai-legacy-shape.md");
+    await fs.writeFile(
+      oldForm,
+      "---\nname: massa-ai-legacy-shape\ndescription: old\nmode: all\n" +
+        "metadata: { massa-ai-owned: true }\n---\nbody\n",
+    );
+    // And a user agent with no marker at all, which must survive.
+    const userAgent = path.join(agentsDir, "massa-ai-lookalike.md");
+    await fs.writeFile(
+      userAgent,
+      "---\nname: massa-ai-lookalike\ndescription: user's own\nmode: all\n---\nbody\n",
+    );
+
+    const res = runCli(["agents", "uninstall", "--user"], {
+      HOME: tmp,
+      XDG_CONFIG_HOME: xdgConfig,
+    });
+    expect(res.exitCode).toBe(0);
+
+    // new body-marker form removed
+    for (const name of SPECIALIST_NAMES) {
+      expect(await pathExists(path.join(agentsDir, `massa-ai-${name}.md`))).toBe(false);
+    }
+    // old frontmatter-marker form removed too
+    expect(await pathExists(oldForm)).toBe(false);
+    // an unmarked file matching the name prefix is NOT removed -- the marker, not the
+    // filename, is what authorises deletion on this path.
+    expect(await pathExists(userAgent)).toBe(true);
   });
 
   test("OPC-02: read-only agents have edit: deny; write agents have edit: allow", async () => {
