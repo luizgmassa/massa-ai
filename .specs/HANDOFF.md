@@ -654,6 +654,24 @@ looks exactly like "no merges happened" — is **20**: the 18 PR-B/docs commits 
 commits (`b7cb5a2`, `c7e1452`). Still entirely local; about to be pushed a second time to the
 already-open PR #53.
 
+**Update: `main` moved a third time — `7425241`, `chore(release): v1.15.0`, releasing #52's
+Added/Fixed content — merged as `99bcba5`, and the merge itself created a real defect this time
+despite reporting zero textual conflicts.** `git merge` auto-completed (`ort` strategy, no conflict
+markers) because the release commit's two-line diff — insert `## [1.15.0]` right after
+`[Unreleased]`, drop the blank line before old `## [1.14.0]` — applies at anchors unrelated to
+where this branch's own `### Changed` section sits. The result was still wrong: this branch's 12
+bullets, positioned between main's `### Added` and `### Fixed`, got swept underneath the new
+`## [1.15.0]` heading along with them, leaving `[Unreleased]` **empty**. Same failure shape #52's
+own history describes (a merge with no conflict marker is not evidence the merge is correct) and
+`CLAUDE.md` documents as silent and downstream. **Caught by re-reading the merged file structure,
+not by any gate** — none of the sensors this feature runs check changelog placement. Fixed in
+`916540e`: the `### Changed` section moved back under a fresh `[Unreleased]`, ahead of `[1.15.0]`.
+Re-verified structurally (12 bullets under `[Unreleased]`, 1148-line released section from
+`[1.15.0]`) and by gate (`check-frozen-anchors`/`check-characterization`/`search-hub-metric`
+byte-identical; `lint`/`type-check`/`build` green; `test:scripts` **961/47**, unchanged — this
+cycle touched no test file). **Commit count is now 23** (`git rev-list --count origin/main..HEAD`),
+three merge commits deep. About to be pushed a third time.
+
 **The briefing list T20 was given, kept because PR-C inherits most of it.** Each of these reads as a
 violation if a reader does not know it:
 

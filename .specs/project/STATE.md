@@ -958,6 +958,17 @@ default simplification hides merge commits from an unqualified listing): 20** �
 plus one more merge commit and one more `origin/main` advance. Still local; pushing a second time
 next.
 
+**Update: `main` moved a third time — `7425241` (`chore(release): v1.15.0`) — merged as `99bcba5`
+with zero textual conflicts, and the zero-conflict merge was itself wrong.** The release commit's
+diff (insert `## [1.15.0]`, drop one blank line) applied at anchors that do not know about this
+branch's own `### Changed` section, so the auto-merge swept this branch's 12 still-unreleased
+bullets under the new `## [1.15.0]` heading, leaving `[Unreleased]` empty — the same silent,
+downstream failure shape `CLAUDE.md` documents, caught by re-reading structure rather than by any
+gate. Fixed in `916540e` (moved back under a fresh `[Unreleased]`); re-verified structurally and by
+the full gate board, all still green (`test:scripts` 961/47, unchanged). **Commit count is now 23**
+(`git rev-list --count origin/main..HEAD`). Full detail in `HANDOFF.md`'s *Next action* addendum.
+Still local; pushing a third time next.
+
 **T6 alone surfaced three plan defects, two needing a spec-owner decision.** All three are the
 `ensureInitializedImpl` class — a consequence `design.md` settled in substance and never wrote into
 the constraint it contradicts. Full record in `tasks.md`.
