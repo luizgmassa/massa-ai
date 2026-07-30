@@ -264,10 +264,13 @@ export function emitClaude(c: Charter, m: Resolved): string {
  *   - `reasoningEffort`: not a Cursor key. Effort is a bracket parameter on a pinned model
  *     id (`claude-opus-5[effort=high]`), which is only expressible when a model is pinned.
  *
- * `model` takes an id, not a display name, so the old `model: DeepSeek V4 Pro` could never
- * resolve — and Cursor's catalog contains no DeepSeek or MiniMax entry at all. The registry
- * therefore pins nothing for Cursor and this emits the documented default, `inherit`.
- * `readonly` is omitted for writers because `false` is already its default.
+ * `model` takes an id, not a display name, so the human-readable names this emitter used to
+ * copy out of the charters could never resolve — and two of the three were absent from
+ * Cursor's catalog entirely, usable only as per-machine BYOK entries. The registry therefore
+ * pins nothing for Cursor and this emits the documented default, `inherit`; the retired
+ * values are recorded in the frozen baseline fixture and in `spec.md` §1, which are the
+ * places allowed to name a model. `readonly` is omitted for writers because `false` is
+ * already its default.
  */
 export function emitCursor(c: Charter, m: Resolved): string {
   const agentName = `massa-ai-${c.name}`;
