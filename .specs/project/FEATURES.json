@@ -669,7 +669,7 @@
     },
     {
       "slug": "model-profile-registry",
-      "title": "Model Profile Registry \u2014 central tier/profile registry for agent and workflow model selection across four harness CLIs",
+      "title": "Model Profile Registry — central tier/profile registry for agent and workflow model selection across four harness CLIs",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -683,7 +683,15 @@
       "tasks": ".specs/features/model-profile-registry/tasks.md",
       "fool": ".specs/features/model-profile-registry/fool.md",
       "validation": ".specs/features/model-profile-registry/validation.md"
+    },
+    {
+      "slug": "skills-directive-dedup",
+      "title": "skills/ directive dedup — single-source restatements, fix drift, and the four correctness defects the duplication was hiding",
+      "status": "in_progress",
+      "workflow": "spec-driven",
+      "branch": "refactor/skills-directive-dedup",
+      "notes": "T1-T5 of 12 committed and green at ed1028e; T6-T12 not started. Not pushed, no PR. See .specs/HANDOFF.md."
     }
   ],
-  "active_feature": "model-profile-registry"
+  "active_feature": "skills-directive-dedup"
 }

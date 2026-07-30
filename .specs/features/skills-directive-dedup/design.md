@@ -79,16 +79,28 @@ renumbered the remainder, and left the larger duplicate untouched: optimizing fo
 the instrument detects rather than for the defect. §1 of `spec.md` states that
 limitation and this design then failed to apply it to itself.
 
-T7 must therefore choose explicitly and record the choice:
+**Decision (user, this session): `references/mcp-tools.md` owns the whole eleven-item
+procedure end to end; `SKILL.md` keeps a single load-and-follow line.** This shrinks the
+always-loaded router by ~11 lines and puts retrieval order beside the tool schemas its
+steps name. The rejected alternative was keeping it inline and deleting `mcp-tools.md`'s
+copy.
 
-- **extract the whole procedure** — `mcp-tools.md` owns retrieval order end to end, and
-  `SKILL.md` keeps a single load-and-follow line; or
-- **keep it inline and delete `mcp-tools.md`'s copy** — the router's stated scope
-  already includes retrieval, and it is always loaded while `mcp-tools.md` is not.
+**The risk was stated and accepted, and T7 must mitigate it rather than inherit it.**
+`mcp-tools.md` is loaded conditionally ("Load only when a selected workflow asks for
+them"). A workflow that never loads it would then have no retrieval order at all — which
+is the same shape as the defect SDD-03 exists to fix, where `design.md` pointed at a file
+that never contained the rule.
 
-The second is likelier correct on progressive-disclosure grounds, since a rule the
-router needs on every task should not sit behind a conditional load. Either way the
-eleven items end up in one place. Four of eleven is not an option.
+Two conditions on T7, both non-optional:
+
+1. `SKILL.md`'s replacement is a **mandatory load instruction in the Retrieval section
+   body**, not a row in the "load only when asked" reference table. The distinction is
+   the whole mitigation: a table row is a menu entry, a body line is an instruction.
+2. A guard asserts `SKILL.md` names `references/mcp-tools.md` in its retrieval section
+   **and** that the eleven-item list occurs in exactly one file under `skills/`.
+   Presence alone is not enough — SDD-03's broken pointer named a file that existed.
+
+Four of eleven is not an option under either choice.
 
 ## D4 — Audit-family extraction (SDD-06) extends `audit-scope.md`, adds no file
 
