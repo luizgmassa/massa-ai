@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`skills/` duplication and reachability now ship as a committed regression gate.**
+  `scripts/skills-duplication-metric.ts` measures shingled line duplication across every
+  `skills/` Markdown file (`duplicatedLines` is the total footprint, `excessLines` is the
+  removable figure — `length × (copies - 1)` — and the two are now reported and tested
+  separately after an earlier draft conflated them) and `scripts/skills-reference-graph.ts`
+  resolves every `skills/` file against the rest of the repository to flag orphaned or
+  weakly-referenced files. Both ship with unit tests reached by `bun run test:scripts`, and
+  `excessLines` carries a ceiling assertion so future duplication growth fails the gate
+  instead of accumulating silently; a snapshot-equality assertion was rejected because it
+  would go red on any unrelated edit.
+
+### Fixed
+
+- **`skills/AGENTS.md`'s Agent Table hand-named a model per specialist in a second location**,
+  already stale for two roles and unresolvable or profile-ambiguous for two more —
+  `skills/model-profiles.json` is the only place that should name a model or effort level
+  for any agent on any host. The "Model hint" column is removed in favor of a pointer to the
+  charter's own `metadata.model_tier`, and a scripted, mutation-demonstrated scan now bans
+  any model display name or model ID from that file.
+- **Three citations across two shipped Maestro reference files pointed at one developer's
+  home directory** (`references/maestro.md`, `references/maestro/fact-ledger.md`, one
+  instance named as a tier of the fact ledger's evidence taxonomy), unreachable for any
+  other developer, CI runner, or session, and copied verbatim into all four
+  `apps/*-plugin/skills/` bundles. The coverage-checklist rule is rewritten to a reachable
+  location instead of being dropped, and a repo-wide scan now fails on any `/Users/` or
+  `/home/` path under `skills/`.
+- **`references/agent-orchestration.md`'s Roles table omitted `judge` and `meta-judge`**
+  for a full release cycle, invisible to the existing guard because it validated only the
+  charter paths already mentioned there. Both charters are now documented, and a new
+  coverage test asserts every directory under `skills/agents/` has a Roles table entry.
+- **The sub-agent roster guard could not match the string it existed to ban.** It rejected
+  the literal patterns `16 subagent`, `16 [Ss]pecialist`, and `16 reusable sub-agent`, but
+  the hyphenated `16 sub-agent specialists` in `docs/ONBOARDING.md` defeated all three while
+  `CLAUDE.md` separately still read "15" — both passed the guard. It now rejects any count
+  other than 17 in that shape, with an explicit historical allowlist for legitimate
+  past-tense narration, and all four stale counts found by scanning
+  (`CLAUDE.md`, `docs/ONBOARDING.md`, `FEATURES.md`, `.claude-plugin/marketplace.json`) are
+  corrected.
+
+
 ## [1.14.0] - 2026-07-30
 
 ### Changed
@@ -80,47 +122,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   That affects the **fallback** only — the workflow requests per-slot models at dispatch time
   where the host supports it, and names the degraded case `DIVERSITY DEGRADED` per its own
   contract.
-
-### Added
-
-- **`skills/` duplication and reachability now ship as a committed regression gate.**
-  `scripts/skills-duplication-metric.ts` measures shingled line duplication across every
-  `skills/` Markdown file (`duplicatedLines` is the total footprint, `excessLines` is the
-  removable figure — `length × (copies - 1)` — and the two are now reported and tested
-  separately after an earlier draft conflated them) and `scripts/skills-reference-graph.ts`
-  resolves every `skills/` file against the rest of the repository to flag orphaned or
-  weakly-referenced files. Both ship with unit tests reached by `bun run test:scripts`, and
-  `excessLines` carries a ceiling assertion so future duplication growth fails the gate
-  instead of accumulating silently; a snapshot-equality assertion was rejected because it
-  would go red on any unrelated edit.
-
-### Fixed
-
-- **`skills/AGENTS.md`'s Agent Table hand-named a model per specialist in a second location**,
-  already stale for two roles and unresolvable or profile-ambiguous for two more —
-  `skills/model-profiles.json` is the only place that should name a model or effort level
-  for any agent on any host. The "Model hint" column is removed in favor of a pointer to the
-  charter's own `metadata.model_tier`, and a scripted, mutation-demonstrated scan now bans
-  any model display name or model ID from that file.
-- **Three citations across two shipped Maestro reference files pointed at one developer's
-  home directory** (`references/maestro.md`, `references/maestro/fact-ledger.md`, one
-  instance named as a tier of the fact ledger's evidence taxonomy), unreachable for any
-  other developer, CI runner, or session, and copied verbatim into all four
-  `apps/*-plugin/skills/` bundles. The coverage-checklist rule is rewritten to a reachable
-  location instead of being dropped, and a repo-wide scan now fails on any `/Users/` or
-  `/home/` path under `skills/`.
-- **`references/agent-orchestration.md`'s Roles table omitted `judge` and `meta-judge`**
-  for a full release cycle, invisible to the existing guard because it validated only the
-  charter paths already mentioned there. Both charters are now documented, and a new
-  coverage test asserts every directory under `skills/agents/` has a Roles table entry.
-- **The sub-agent roster guard could not match the string it existed to ban.** It rejected
-  the literal patterns `16 subagent`, `16 [Ss]pecialist`, and `16 reusable sub-agent`, but
-  the hyphenated `16 sub-agent specialists` in `docs/ONBOARDING.md` defeated all three while
-  `CLAUDE.md` separately still read "15" — both passed the guard. It now rejects any count
-  other than 17 in that shape, with an explicit historical allowlist for legitimate
-  past-tense narration, and all four stale counts found by scanning
-  (`CLAUDE.md`, `docs/ONBOARDING.md`, `FEATURES.md`, `.claude-plugin/marketplace.json`) are
-  corrected.
 
 ## [1.13.0] - 2026-07-30
 
