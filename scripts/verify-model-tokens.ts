@@ -191,6 +191,31 @@ export function collectTargets(root = REPO_ROOT): readonly Target[] {
   const gen = "scripts/generate-subagent-artifacts.ts";
   if (existsSync(path.join(root, gen))) out.push({ file: gen, content: read(gen) });
 
+  // 5. the sub-agent registry.
+  //
+  // No mirrored copies: `generate-skill-artifacts.ts` bundles
+  // `skills/{massa-ai,persona-router,agents}/` into each host, but NOT
+  // `skills/AGENTS.md` — that file is the source of the bootstrap block
+  // `install-skills.sh` writes to `<host>/AGENTS.md` at install time. Adding
+  // `apps/*/skills/AGENTS.md` here would be four silently-inert paths, which is
+  // the shape of coverage gap this entry exists to close.
+  //
+  // Added by .specs/features/skills-directive-dedup/ (SDD-01). This scan was
+  // written against the four surfaces MPR-R1 enumerated, and `skills/AGENTS.md`
+  // was not among them — so while every charter was policed, the registry that
+  // documents those charters carried a hand-authored "Model hint" column naming
+  // a model per agent, for an unstated host. It was already wrong for `planner`
+  // and `requirements-analyst`, two of the three roles whose tiers MPR
+  // normalized, and named models for `judge`/`meta-judge` that no profile
+  // resolves. Every gate stayed green throughout.
+  //
+  // The lesson is about the surface list, not the matcher: the matcher would
+  // have caught all four the moment it was pointed at the file.
+  const registry = "skills/AGENTS.md";
+  if (existsSync(path.join(root, registry))) {
+    out.push({ file: registry, content: read(registry) });
+  }
+
   return out;
 }
 

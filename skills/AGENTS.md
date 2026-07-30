@@ -339,25 +339,31 @@ Agents summarize verbose output. They never return raw logs, diffs, snapshots, o
 
 Dispatch each agent as `massa-ai-<Name>`.
 
-| Name | Purpose | Permission | Model hint | Trigger | Charter |
-|---|---|---|---|---|---|
-| investigator | Read and understand the codebase | read-only | DeepSeek V4 Pro | Locate implementations, trace flow, estimate impact | `skills/agents/investigator/SKILL.md` |
-| planner | Transform requests into implementation plans | read-only | GLM-5.2 | Break work into steps, identify risks, order execution | `skills/agents/planner/SKILL.md` |
-| builder | Implement approved plans | write | GLM-5.2 | Modify source code with a disjoint write set | `skills/agents/builder/SKILL.md` |
-| reviewer | Review implementation quality | read-only | GLM-5.2 | Analyze diffs for bugs, regressions, smells | `skills/agents/reviewer/SKILL.md` |
-| context-curator | Prepare the minimum high-quality Context Packet | read-only | DeepSeek V4 Pro | Decide files to open, retrieve memories, apply firewall | `skills/agents/context-curator/SKILL.md` |
-| verification-agent | Centralize Verification Ladder logic | read-only | GLM-5.2 | Validate outputs, choose verification level | `skills/agents/verification-agent/SKILL.md` |
-| requirements-analyst | Analyze requirements before implementation | read-only | DeepSeek V4 Pro | Detect ambiguity, gaps, contradictions, implicit needs | `skills/agents/requirements-analyst/SKILL.md` |
-| architecture-specialist | Provide architectural guidance | read-only | MiniMax M3 | Evaluate architecture, suggest boundaries, trade-offs | `skills/agents/architecture-specialist/SKILL.md` |
-| test-engineer | Generate testing strategy | read-only (test-write when scoped) | GLM-5.2 | Unit, integration, edge cases, acceptance coverage | `skills/agents/test-engineer/SKILL.md` |
-| documentation-agent | Generate engineering documentation | read-only (doc-write when scoped) | DeepSeek V4 Pro | README, ADR, RFC, changelog, KDoc | `skills/agents/documentation-agent/SKILL.md` |
-| audit-specialist | Execute specialized audits through configurable lenses | read-only | GLM-5.2 | One of: bugs, architecture, security, requirements, code-quality, performance | `skills/agents/audit-specialist/SKILL.md` |
-| mobile-specialist | Provide mobile-specific expertise (conditional) | read-only | GLM-5.2 | Mobile-related project detected (Android/iOS/KMP) | `skills/agents/mobile-specialist/SKILL.md` |
-| plan-critic | Challenge a constructed plan (lite or full Plan Challenge gate) | read-only | MiniMax M3 | A concrete plan exists; standing policy exception to the dispatch triggers | `skills/agents/plan-critic/SKILL.md` |
-| furps-analyst | Analyze one FURPS+ dimension of a PRD/ADR | read-only | GLM-5.2 | `furps-refinement` fans out per-dimension analysis | `skills/agents/furps-analyst/SKILL.md` |
-| navigator | Navigate an indexed codebase index-first | read-only | DeepSeek V4 Pro | "where is X", "who calls Y" against a fresh massa-ai index | `skills/agents/navigator/SKILL.md` |
-| meta-judge | Author the evaluation specification YAML a debate panel scores against (once per evaluation) | read-only | kimi-k3 | `judge-with-debate` opens an evaluation | `skills/agents/meta-judge/SKILL.md` |
-| judge | Score an artifact against the evaluation specification with quoted evidence; debate to consensus | read-only | deepseek-v4-pro (per-slot diversity assigned by the workflow at dispatch) | `judge-with-debate` dispatches the 3-judge panel or a debate round | `skills/agents/judge/SKILL.md` |
+This table names no model. Each agent's model is resolved at build time from its
+charter's `metadata.model_tier` plus the host and the selected profile in
+`skills/model-profiles.json`, which is the only hand-authored place that names a model
+or an effort level for any host. Read the tier from the charter; a second copy here
+would drift, and did.
+
+| Name | Purpose | Permission | Trigger | Charter |
+|---|---|---|---|---|
+| investigator | Read and understand the codebase | read-only | Locate implementations, trace flow, estimate impact | `skills/agents/investigator/SKILL.md` |
+| planner | Transform requests into implementation plans | read-only | Break work into steps, identify risks, order execution | `skills/agents/planner/SKILL.md` |
+| builder | Implement approved plans | write | Modify source code with a disjoint write set | `skills/agents/builder/SKILL.md` |
+| reviewer | Review implementation quality | read-only | Analyze diffs for bugs, regressions, smells | `skills/agents/reviewer/SKILL.md` |
+| context-curator | Prepare the minimum high-quality Context Packet | read-only | Decide files to open, retrieve memories, apply firewall | `skills/agents/context-curator/SKILL.md` |
+| verification-agent | Centralize Verification Ladder logic | read-only | Validate outputs, choose verification level | `skills/agents/verification-agent/SKILL.md` |
+| requirements-analyst | Analyze requirements before implementation | read-only | Detect ambiguity, gaps, contradictions, implicit needs | `skills/agents/requirements-analyst/SKILL.md` |
+| architecture-specialist | Provide architectural guidance | read-only | Evaluate architecture, suggest boundaries, trade-offs | `skills/agents/architecture-specialist/SKILL.md` |
+| test-engineer | Generate testing strategy | read-only (test-write when scoped) | Unit, integration, edge cases, acceptance coverage | `skills/agents/test-engineer/SKILL.md` |
+| documentation-agent | Generate engineering documentation | read-only (doc-write when scoped) | README, ADR, RFC, changelog, KDoc | `skills/agents/documentation-agent/SKILL.md` |
+| audit-specialist | Execute specialized audits through configurable lenses | read-only | One of: bugs, architecture, security, requirements, code-quality, performance | `skills/agents/audit-specialist/SKILL.md` |
+| mobile-specialist | Provide mobile-specific expertise (conditional) | read-only | Mobile-related project detected (Android/iOS/KMP) | `skills/agents/mobile-specialist/SKILL.md` |
+| plan-critic | Challenge a constructed plan (lite or full Plan Challenge gate) | read-only | A concrete plan exists; standing policy exception to the dispatch triggers | `skills/agents/plan-critic/SKILL.md` |
+| furps-analyst | Analyze one FURPS+ dimension of a PRD/ADR | read-only | `furps-refinement` fans out per-dimension analysis | `skills/agents/furps-analyst/SKILL.md` |
+| navigator | Navigate an indexed codebase index-first | read-only | "where is X", "who calls Y" against a fresh massa-ai index | `skills/agents/navigator/SKILL.md` |
+| meta-judge | Author the evaluation specification YAML a debate panel scores against (once per evaluation) | read-only | `judge-with-debate` opens an evaluation | `skills/agents/meta-judge/SKILL.md` |
+| judge | Score an artifact against the evaluation specification with quoted evidence; debate to consensus | read-only | `judge-with-debate` dispatches the 3-judge panel or a debate round | `skills/agents/judge/SKILL.md` |
 
 ## Mapping — New Agents ↔ Existing Roles
 
@@ -388,7 +394,7 @@ The symlinked massa-ai skill defines the roles in `references/agent-orchestratio
 1. Create `skills/agents/<name>/SKILL.md` from the charter template (see any existing agent skill), including `metadata.model_tier` (a tier declared in `skills/model-profiles.json`, never a model name) and `metadata.permission`. Its `## Restrictions` section must carry both persona-boundary lines verbatim — the self-routing ban (`never load the massa-ai or persona-router routers, and never open a personas/ prompt file`) and the precedence line (`a persona supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict`). `scripts/__tests__/skills-harness-integrity.test.ts` enumerates charters from disk and is section-scoped, so a new charter missing either line fails the gate.
 2. Add one row to the Agent Table above.
 3. Add one row to the Mapping table if it maps to an existing role.
-4. Add `<name>` to `SPECIALIST_NAMES` plus the two model-pinning tables in `scripts/generate-subagent-artifacts.ts`, then run it to regenerate the host artifacts.
+4. Add `<name>` to `SPECIALIST_NAMES` in `scripts/generate-subagent-artifacts.ts`, then run it to regenerate the host artifacts. There are no model tables to edit — the generator resolves the model from the charter's `metadata.model_tier` through `skills/model-profiles.json`.
 5. Add `<name>` to the roster in `scripts/__tests__/subagent-parity.test.ts` and run `bun run test:scripts`.
 
 Steps 4-5 are enforced: the parity test fails on generator drift and `scripts/__tests__/skills-harness-integrity.test.ts` fails if a workflow dispatches an agent with no shipped artifact.

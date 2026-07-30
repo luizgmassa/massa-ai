@@ -50,7 +50,7 @@ describe("model-token scan — the token list is derived, never typed (MPR-R1)",
 });
 
 describe("model-token scan — surface coverage (MPR-R1)", () => {
-  test("all four enumerated surfaces are actually reached", () => {
+  test("all five enumerated surfaces are actually reached", () => {
     const files = TARGETS.map((t) => t.file);
     expect(files.some((f) => /^skills\/agents\/[^/]+\/SKILL\.md$/.test(f))).toBe(true);
     expect(
@@ -59,8 +59,31 @@ describe("model-token scan — surface coverage (MPR-R1)", () => {
     expect(files.some((f) => /^apps\/[a-z]+-plugin\/agents\/.+\.md$/.test(f))).toBe(true);
     expect(files.some((f) => /^apps\/codex-plugin\/agents\/.+\.toml$/.test(f))).toBe(true);
     expect(files).toContain("scripts/generate-subagent-artifacts.ts");
-    // 17 charters + 68 mirrored + 68 generated + the generator.
-    expect(TARGETS.length).toBe(154);
+    expect(files).toContain("skills/AGENTS.md");
+    // 17 charters + 68 mirrored + 68 generated + the generator + the registry.
+    expect(TARGETS.length).toBe(155);
+  });
+
+  test("the sub-agent registry is scanned (SDD-01)", () => {
+    // This surface was absent while the other four were policed, so
+    // skills/AGENTS.md carried a hand-authored per-agent model column that went
+    // stale for two roles with every gate green. Asserted by name because a
+    // count alone would let a future edit swap this surface for another.
+    const registry = TARGETS.find((t) => t.file === "skills/AGENTS.md");
+    expect(registry).toBeDefined();
+    expect(registry!.content).toContain("Agent Table");
+  });
+
+  test("the registry surface would have caught the defect that motivated it", () => {
+    // Discrimination against the real historical content, not a synthetic one:
+    // the pre-fix table named a model in each of its 17 rows.
+    const prefix = [
+      "| Name | Purpose | Permission | Model hint | Trigger | Charter |",
+      "| planner | Transform requests into plans | read-only | GLM-5.2 | ... | `skills/agents/planner/SKILL.md` |",
+      "| navigator | Navigate an indexed codebase | read-only | DeepSeek V4 Pro | ... | `x` |",
+    ].join("\n");
+    const hits = scan([{ file: "skills/AGENTS.md", content: prefix }], TOKENS);
+    expect(hits.length).toBeGreaterThanOrEqual(2);
   });
 
   test("the declared MPR-R1 exception is out of scope, not silently matched", () => {
