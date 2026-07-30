@@ -228,7 +228,7 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
     expect(afterSecond).toBe(afterFirst);
   });
 
-  // ── T3: 15 subagent specialists (CLA-01, CLA-02, CLA-05, CLA-06, DOC-01) ──
+  // ── T3: 17 subagent specialists (CLA-01, CLA-02, CLA-05, CLA-06, DOC-01) ──
   const SPECIALIST_NAMES = [
     "investigator",
     "planner",
@@ -245,21 +245,23 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
     "plan-critic",
     "furps-analyst",
     "navigator",
+    "meta-judge",
+    "judge",
   ];
 
-  test("CLA-01/DOC-01: user-scope install copies 15 subagent specialists + prints summary line", async () => {
+  test("CLA-01/DOC-01: user-scope install copies 17 subagent specialists + prints summary line", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
-    // 15 specialist agent files at ~/.claude/agents/massa-ai-<name>.md
+    // 17 specialist agent files at ~/.claude/agents/massa-ai-<name>.md
     for (const name of SPECIALIST_NAMES) {
       expect(
         await pathExists(path.join(tmp, `.claude/agents/massa-ai-${name}.md`)),
       ).toBe(true);
     }
 
-    // Install output mentions the 15 subagent specialists (DOC-01)
-    expect(res.stdout).toContain("15 subagent specialists");
+    // Install output mentions the 17 subagent specialists (DOC-01)
+    expect(res.stdout).toContain("17 subagent specialists");
   });
 
   test("CLA-02: read-only agents lack Write/Edit; write agents include them", async () => {
@@ -291,7 +293,7 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
 
   test("CLA-05: uninstall removes every massa-ai-owned specialist, preserves user agents", async () => {
     runInstall(["--user"], { HOME: tmp });
-    // Sanity: all 15 specialists present before uninstall
+    // Sanity: all 17 specialists present before uninstall
     for (const name of SPECIALIST_NAMES) {
       expect(
         await pathExists(path.join(tmp, `.claude/agents/massa-ai-${name}.md`)),

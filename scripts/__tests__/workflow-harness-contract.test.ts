@@ -368,10 +368,10 @@ describe("roster: nothing still advertises 16 specialists", () => {
     expect(hits).toEqual([]);
   });
 
-  test("the shell installers advertise 15", async () => {
+  test("the shell installers advertise 17", async () => {
     for (const rel of ["install.sh", "scripts/install-agents.sh"]) {
       const body = await fs.readFile(path.join(REPO_ROOT, rel), "utf8");
-      expect(body).toContain("15 subagent specialists");
+      expect(body).toContain("17 subagent specialists");
     }
   });
 });

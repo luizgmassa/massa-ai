@@ -273,7 +273,7 @@ bash apps/cursor-plugin/install.sh --uninstall
 
 ### OpenCode plugin (`apps/opencode-plugin/`)
 
-**What it bundles:** 14 in-process tools (search, remember, recall, index, compress, optimized_context, read, index_status, analytics, list_projects, search_definitions, get_references, go_to_definition) + 6 in-process lifecycle handlers. It is published as `@massa-ai/opencode-plugin`, and unlike the other three it registers its tools in-process rather than over MCP. All four plugins are now published npm packages (`@massa-ai/{claude,codex,cursor,opencode}-plugin`), each shipping its own copy of the `massa-ai` and `persona-router` skills plus the 15 agent charters, so a registry install needs no repository checkout.
+**What it bundles:** 14 in-process tools (search, remember, recall, index, compress, optimized_context, read, index_status, analytics, list_projects, search_definitions, get_references, go_to_definition) + 6 in-process lifecycle handlers. It is published as `@massa-ai/opencode-plugin`, and unlike the other three it registers its tools in-process rather than over MCP. All four plugins are now published npm packages (`@massa-ai/{claude,codex,cursor,opencode}-plugin`), each shipping its own copy of the `massa-ai` and `persona-router` skills plus the 17 agent charters, so a registry install needs no repository checkout.
 
 **Hook events (in-process, 6 lifecycle handlers):** `session.created`, `tool.execute.after`, `experimental.session.compacting`, `shell.env`, `event`, `dispose` — all registered in-process by the plugin. No external hooks file needed.
 
@@ -333,11 +333,11 @@ Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/p
 
 ---
 
-## Subagent Skills (15 Specialists)
+## Subagent Skills (17 Specialists)
 
-**What:** massa-ai defines 15 reusable sub-agent specialists in `skills/agents/*/SKILL.md` (charter files). These ship as host-native subagent definitions across all four plugins so the massa-ai workflow router's delegation model works inside Claude Code, Codex, Cursor, and OpenCode.
+**What:** massa-ai defines 17 reusable sub-agent specialists in `skills/agents/*/SKILL.md` (charter files). These ship as host-native subagent definitions across all four plugins so the massa-ai workflow router's delegation model works inside Claude Code, Codex, Cursor, and OpenCode.
 
-**The 15 specialists:** investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist, plan-critic, furps-analyst, navigator.
+**The 17 specialists:** investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist, plan-critic, furps-analyst, navigator, meta-judge, judge.
 
 Workflows dispatch these agents under their **host-registered** names, prefixed `massa-ai-` (for example `massa-ai-investigator`). The bare charter name is the registry key, not the dispatch name.
 
@@ -352,7 +352,7 @@ Workflows dispatch these agents under their **host-registered** names, prefixed 
 | Cursor | `apps/cursor-plugin/agents/massa-ai-*.md` → bundled in plugin `agents/` dir | `.md` (same shape as Claude) | Name prefix `massa-ai-` (removed with plugin dir) |
 | OpenCode | `apps/opencode-plugin/agents/massa-ai-*.md` → installed to `~/.config/opencode/agents/` (shipped IN the npm package, installed outside the plugin dir) | `.md` (`description`, `mode: all`, `model`, `reasoningEffort`, `permission`, `metadata`) | `metadata: { massa-ai-owned: true }` frontmatter |
 
-> Codex and OpenCode agents are *installed* outside the plugin dir because their host discovery loads agents from a shared config-root directory, not from the plugin bundle. They are still **shipped inside** their npm package — OpenCode's `files` declares `agents/*.md`, and until the package-contents gate landed those 15 charters were silently missing from every published tarball, because the publish job has no `actions/checkout` and the build artifact never uploaded `agents/`. The in-file ownership marker enables scoped uninstall that preserves user agents (R3).
+> Codex and OpenCode agents are *installed* outside the plugin dir because their host discovery loads agents from a shared config-root directory, not from the plugin bundle. They are still **shipped inside** their npm package — OpenCode's `files` declares `agents/*.md`, and until the package-contents gate landed those 17 charters were silently missing from every published tarball, because the publish job has no `actions/checkout` and the build artifact never uploaded `agents/`. The in-file ownership marker enables scoped uninstall that preserves user agents (R3).
 
 ### Model pinning (PINNED per agent per host, NOT advisory)
 
@@ -1348,7 +1348,7 @@ Ported from the old repo's Python test suite to TypeScript/bun test:
 | `scripts/tests/test-install-agents-claude-hooks.sh` | 15 | Plugin hooks, permissions, and user keys survive an MCP write into the shared `settings.json` |
 | `scripts/tests/test-install-harness-cli.sh` | 25 | Step selection, ordering, verbatim argv forwarding to the sub-installers, exit-code propagation |
 | `scripts/tests/test-mcp-single-writer.sh` | 36 | Regression guard: no plugin ships or copies an MCP file, all three delegate, exactly one registration after (re)install |
-| `scripts/__tests__/subagent-parity.test.ts` | 17 | Drift gate, exact-15-per-host, name-collision, model+effort pinning (Claude/Codex/Cursor/OpenCode), permission boundary, Codex TOML round-trip+marker, OpenCode permission+marker, FEATURES.md table parity |
+| `scripts/__tests__/subagent-parity.test.ts` | 17 | Drift gate, exact-17-per-host, name-collision, model+effort pinning (Claude/Codex/Cursor/OpenCode), permission boundary, Codex TOML round-trip+marker, OpenCode permission+marker, FEATURES.md table parity |
 
 Run everything (TypeScript suites plus every `scripts/tests/*.sh` suite) with `bun run test:scripts` — the same command CI runs.
 
