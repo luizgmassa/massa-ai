@@ -189,8 +189,15 @@ export function unquoteScalar(s: string): string {
 }
 
 // ── Charter loader ──────────────────────────────────────────────────────────
-export async function loadCharter(name: SpecialistName): Promise<Charter> {
-  const file = path.join(SKILLS_DIR, "agents", name, "SKILL.md");
+/** Where charters live. A parameter only so the throws below can be tested against the
+ *  real loader instead of a re-implementation of it — production always uses the default. */
+export const CHARTERS_DIR = path.join(SKILLS_DIR, "agents");
+
+export async function loadCharter(
+  name: SpecialistName,
+  chartersDir: string = CHARTERS_DIR
+): Promise<Charter> {
+  const file = path.join(chartersDir, name, "SKILL.md");
   const raw = await fs.readFile(file, "utf8");
   const { frontmatter, body } = parseFrontmatter(raw);
   const metadata = (frontmatter.metadata ?? {}) as Record<string, unknown>;

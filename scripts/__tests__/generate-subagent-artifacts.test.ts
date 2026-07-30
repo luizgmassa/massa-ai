@@ -290,22 +290,57 @@ describe("loadCharter / loadAllCharters (repo charters)", () => {
     }
   });
 
-  test("loadCharter throws rather than defaulting when model_tier is absent", async () => {
-    // A silent default here would ship a different model to users with nothing to notice.
+  /**
+   * Write one charter into a throwaway charters dir and load it with the REAL loader.
+   *
+   * The previous version of these tests stripped a field from raw text, called
+   * `parseFrontmatter` directly, and asserted the field was undefined — it never called
+   * `loadCharter` and never asserted a throw, so it stayed green against a loader that
+   * silently defaulted the tier. Found by T9's independent validation (gap 2); the guard
+   * itself was correct, only its test was decorative.
+   */
+  async function loadFromTemp(transform: (raw: string) => string): Promise<Charter> {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-charter-"));
     try {
       const raw = await fs.readFile(
         path.join(REPO_ROOT, "skills/agents/investigator/SKILL.md"),
         "utf8"
       );
-      const stripped = raw.replace(/^ {2}model_tier:.*$\n/m, "");
-      expect(stripped).not.toContain("model_tier");
-      const { frontmatter } = parseFrontmatter(stripped);
-      const md = frontmatter.metadata as Record<string, unknown>;
-      expect(md.model_tier).toBeUndefined();
+      await fs.mkdir(path.join(tmp, "investigator"), { recursive: true });
+      await fs.writeFile(path.join(tmp, "investigator", "SKILL.md"), transform(raw));
+      return await loadCharter("investigator", tmp);
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
+  }
+
+  test("the temp-charter harness itself round-trips an unmodified charter", async () => {
+    // Without this, a broken harness would make every throw-assertion below pass for the
+    // wrong reason — a thrown ENOENT is still a thrown error.
+    const c = await loadFromTemp((raw) => raw);
+    expect(c.name).toBe("investigator");
+    expect(loadRegistry().tiers).toContain(c.modelTier);
+  });
+
+  test("loadCharter throws rather than defaulting when model_tier is absent", async () => {
+    // A silent default here would ship a different model to users with nothing to notice.
+    await expect(
+      loadFromTemp((raw) => raw.replace(/^ {2}model_tier:.*$\n/m, ""))
+    ).rejects.toThrow(/missing metadata\.model_tier/);
+  });
+
+  test("loadCharter throws when the retired model_hint reappears", async () => {
+    // The charter must declare a tier, never a model (MPR-R6). `model_hint` was a literal
+    // model name Cursor consumed verbatim, free to disagree with the generator's tables.
+    await expect(
+      loadFromTemp((raw) => raw.replace(/^ {2}model_tier:.*$/m, "$&\n  model_hint: Some Model"))
+    ).rejects.toThrow(/still declares metadata\.model_hint/);
+  });
+
+  test("loadCharter throws on a charter with no description", async () => {
+    await expect(
+      loadFromTemp((raw) => raw.replace(/^description:.*$\n/m, ""))
+    ).rejects.toThrow(/missing description/);
   });
 
   test("loadAllCharters loads exactly the 15 specialists", async () => {
