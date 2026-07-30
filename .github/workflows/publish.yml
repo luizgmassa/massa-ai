@@ -24,6 +24,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # SEC-1 (code-scanning #2): the only job in this workflow that lacked an
+    # explicit grant. Build + artifact upload needs read-only checkout; the
+    # publish jobs below keep their own elevated permissions blocks.
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

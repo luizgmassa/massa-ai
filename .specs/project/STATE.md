@@ -1,6 +1,114 @@
 # massa-ai Spec State
 
-## Current — Skills / Workflows Updates + spec-driven DI rule
+## Current — Model Profile Registry
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-model-profile-registry`
+- workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
+- feature: `model-profile-registry` — **COMPLETE 2026-07-30. Specify, Design, Tasks,
+  Execute (T1–T13) and independent validation ALL DONE. Verdict: PASS at `af79151`
+  (`.specs/features/model-profile-registry/validation.md`). PR
+  [#51](https://github.com/luizgmassa/massa-ai/pull/51) OPEN against `main`, driving CI to
+  green. Per-task scope, commit hashes, amendments A1–A5 and gate commands are in
+  `.specs/features/model-profile-registry/tasks.md` — read that, not this file, for the task
+  contract.**
+- **Merge note:** `origin/main` advanced two commits past this branch's base while the PR was
+  being prepared (PR #50 `judge-with-debate` merged, released `v1.13.0` — see the Previous
+  entry below). Merged `origin/main` into this branch (not rebased) and migrated the two new
+  charters it added (`judge`, `meta-judge`, still on the retired `metadata.model_hint`) to
+  `metadata.model_tier: deep`, matching their original Claude/Codex pins.
+- Validation took **two** of the three permitted fix loops. Iteration 0 was a **FAIL** with
+  three gaps: MPR-R1's scripted model-token scan did not exist (a model name in charter prose
+  propagated to 9 sites with every gate green), the test named as killing the
+  `loadCharter`-defaults-a-tier mutation never called `loadCharter`, and `design.md`/`tasks.md`
+  still carried the 39-fact/two-profile design-time figures. Closed by T10, T11, T12. Iteration
+  1 passed with a residual — the scan matched per line, so a display name split across a line
+  wrap slipped through, realistic here because prose wraps at ~95 columns. Closed by T13.
+  Iteration 2 is the final PASS.
+- User chose inline execution over sub-agent batches (offer made and declined for T1–T8;
+  T9 still requires author ≠ verifier).
+- Seven profiles ship, not two: `balanced` (hostDefaults target), `cheap`, `heavy`, `work`,
+  `home`, `open_models`, `local_models`. The last two support OpenCode only, by design —
+  resolving them for another host is `MissingHostError`, never a silent inherit.
+- branch: `feat/model-profile-registry`, worktree `.claude/worktrees/model-profiles`,
+  cut from `origin/main` @ `45daaa1`.
+- Artifacts: `.specs/features/model-profile-registry/{spec,design,tasks,fool,validation}.md` +
+  `fixtures/baseline-main.json`. `spec.md` §9 records the divergences; `tasks.md` records
+  amendments A1–A5 and the accepted known limitation.
+
+**Problem, measured:** 304 model facts across 6 surfaces, 184 hand-authored. Three of fifteen
+roles hold contradictory tiers across the four hosts. The Cursor emitter has never worked
+(display name where an ID is required, plus two keys Cursor does not define). OpenCode sends
+`name` and `metadata` to the model provider as bogus model options on every subagent
+invocation, under its documented unknown-key pass-through rule.
+
+**Design:** charters own their own tier (`metadata.model_tier`); `skills/model-profiles.json`
+owns `tiers` / `hostDefaults` / `workflowTiers` / `profiles.<name>.<host>.<tier> → {model,
+effort}` and contains **no agent list**; `scripts/lib/model-profiles.ts` resolves with total,
+fail-loud functions; per-host emitters own host syntax only. Profile precedence
+`--profile` > `MASSA_AI_MODEL_PROFILE` > `hostDefaults[host]`. **81** hand-authored facts down
+from 184 — and they express seven profiles where the 184 expressed one. The marginal figure is
+the real one: a new full profile is 12 entries, a host-specific one is 3.
+
+**Decisions taken with the user:** factored tier registry over a flat cross-product; open
+profile set; workflow keys supported with no consumer; `model_hint` → `model_tier`; fix all
+three defect classes on all four hosts; normalize the 3 drifted roles by their documented
+rationale (`navigator`→light, `requirements-analyst`→standard, `planner`→deep).
+
+**Plan Challenge:** full gate, `evidence_audit` mode, `massa-ai-plan-critic`. 6 of 8 evidence
+claims STRONG on independent re-fetch. Four findings adjudicated in `fool.md`; three upheld,
+one (`CLAUDE_CODE_SUBAGENT_MODEL` precedence) partially — the critic was wrong on Claude,
+right on Codex, verified by direct doc quote. The critic also graded "the OpenCode ownership
+marker is dead" STRONG; that is **refuted** — `apps/opencode-plugin/src/config-cli.ts:248`
+reads it, so the marker moves to a body comment instead of being deleted.
+
+**Gate (corrected during Execute):** with all five packages built, `test:scripts` = **857 pass
+/ 0 fail** at `af79151` and `test:plugins` = **96 pass / 0 fail**, both exit 0. The count moved
+832 → 836 (T7) → 850 (T10) → 853 (T11) → 857 (T13). The "4 pre-existing
+failures" recorded during Specify were an unbuilt-worktree artefact, not real defects — see
+`spec.md` §8 for the four measured build states and why a *partial* build moves the failure
+instead of reducing it. Build before measuring anything.
+
+**Open / residual:** `verify-model-tokens.ts` can false-fire on ordinary English use of the
+three bare Claude aliases (two poetry forms and the Latin for "a great work"). Dormant — no
+charter triggers it. Narrowing it was **declined**: gating those tokens on an adjacent `model`
+context word would trade a loud false positive for a silent false negative on a real duplicated
+fact. Recorded in the script's docblock so the next person rewords rather than weakens it.
+Cursor tier values are `inherit` — no portable Cursor model ID exists for
+the pinned models, and `cursor-agent` is not installed here, so the hard-error-vs-fallback
+falsifier is a **skipped sensor with reason**. massa-ai MCP server not registered this session;
+all state came from `.specs/` and source reads.
+
+## Previous — Judge With Debate (spec-driven, VALIDATED PASS, merged and released v1.13.0)
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-judge-with-debate`
+- workflow: spec-driven (Large — all phases complete)
+- feature: `judge-with-debate` — **COMPLETE 2026-07-30, independently validated PASS**
+  (`.specs/features/judge-with-debate/validation.md`: 12/12 ACs, 5/5 edge cases, 4/4
+  discrimination sensors executed + killed, gate 773 pass / 0 fail / 41 files, No drift ×2;
+  accepted deviation: verifier env had no shell/write — sensor executions + file persistence by
+  main agent, per plugin-auto-install precedent). Branch `feat/judge-with-debate`. PR
+  [#50](https://github.com/luizgmassa/massa-ai/pull/50) went green after one repair iteration
+  (stale 15→17 rosters in the plugin install-test surface, which only `test:plugins` covers),
+  merged, and released as `v1.13.0`.
+- Plan Challenge: pre_mortem, 5 findings (2C/2H/1M) all verified + incorporated (tasks.md).
+- Final gate @ T10: lint 0 · type-check 6/6 · `test:scripts` **772 pass / 0 fail across 41
+  files** · both generators `--check` No drift. Baseline corrected: true pre-feature state was
+  737/2 (both environmental — crash probe + unbuilt dist).
+- Execute divergence (unplanned, gate-discovered): three registration spots missed by quick
+  gates and caught by the full gate — `validate-repository.test.ts` third roster,
+  `workflow-harness-contract.test.ts` workflow count 35→36 + read-only complement 19→20, intake
+  line in the new workflow. Fixed in one repair commit; full gate is the sensor that works.
+- scope: 12 requirements (JD-01..12) — port of NeoLabHQ `judge-with-debate` pattern: meta-judge
+  eval-spec YAML (once, verbatim) + 3 independent judges + ≤3 debate rounds + consensus
+  (0.5 overall / 1.0 criterion). Two new charters (`meta-judge`, `judge`; registry 15→17),
+  workflow `workflows/judge-with-debate.md` + router entry, reports under `audits/judge/`.
+- User decisions locked: full protocol; model-diversity advisory per dispatch (meta kimi-k3,
+  J1 deepseek-v4-pro, J2 minimax-m3, J3 GLM-5.2 — as given, unverified) with loud host-default
+  fallback; generic artifacts; standalone only; audit-report-io storage; consensus file saved.
+
+## Previous — Skills / Workflows Updates + spec-driven DI rule
 
 - projectId: `massa-ai`
 - Two related harness-text features consolidated on one branch for one PR; both independently
@@ -814,8 +922,36 @@ Also update the feature block above: **Phase 0 is done, remaining Execute is ~21
 
 ---
 
-## Previous — Sensor Repair 2026-07
+## Previous — Plugin Auto-Install
 
+- projectId: `massa-ai`
+- workflowSessionId: `spec-plugin-auto-install`
+- workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
+- feature: `plugin-auto-install` — **COMPLETE 2026-07-29, independently validated PASS,
+  PR [#47](https://github.com/luizgmassa/massa-ai/pull/47) OPEN with CI green (14 pass /
+  0 fail / install-test skips by condition). DO NOT MERGE per user instruction.**
+  Specify + Design + Tasks approved (Plan Challenge: full gate, pre_mortem, 4 findings
+  incorporated). Execute T1–T6 all DONE: T1, T2, T3, T4, T5 (docs), T6 (aggregate gate +
+  4/4 discrimination mutants killed and reverted). Independent verification-agent PASS
+  (`.specs/features/plugin-auto-install/validation.md`): PAI-01..10 + AC-1..16 VERIFIED
+  (AC-13 under corrected text), docs fixed in one loop iteration. Branch rebased onto
+  `origin/main` @ v1.11.0 (conflicts in FEATURES.json/STATE.md/HANDOFF.md/CHANGELOG.md
+  resolved union-style; registry closed out). Post-rebase gate: lint clean, type-check
+  6/6, TS 735 pass + 3 pre-existing env failures red at HEAD
+  (`verify-tree-sitter-grammars`), shell 21/21, plugins 96/96.
+- worktree: `/Users/luizmassa/Projects/massa-ai-wt-plugin-auto-install`; branch
+  `feat/plugin-auto-install` cut from `origin/main` @ `ce26f28` (v1.9.1)
+- scope: 10 requirements (PAI-01..10) — harness plugin phase detects the four agent hosts
+  (config dir OR PATH binary), skips absent hosts with one log line, records bundle version
+  per platform in `install-state.json` (v2-compatible extension), no-ops at same version,
+  upgrades on version change, never downgrades, isolates per-host failures
+- Artifacts: `.specs/features/plugin-auto-install/spec.md`
+- User decisions: trigger = install-time auto-detect (not npm postinstall); all four hosts;
+  absent host = skip + log; re-run = auto-upgrade on version change
+- Note: `core-layering-god-module-split` (PR-B) Execute is in progress on
+  `refactor/search-facade-split` in the main checkout — untouched by this feature.
+
+## Previous — Sensor Repair 2026-07
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-sensor-repair-2026-07`

@@ -16,6 +16,7 @@
 
 import {
   getSessionRegistry,
+  newSynapseSessionId,
   DEFAULT_BUFFER_CONFIG,
   buildPrefetchPlan,
   DEFAULT_PREFETCH_CONFIG,
@@ -41,7 +42,9 @@ function serializeSession(s: ReturnType<ReturnType<typeof getSessionRegistry>["g
 }
 
 function newSessionId(): string {
-  return `syn_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  // SEC-2 (CodeQL js/insecure-randomness, alert #11): delegate to the shared
+  // CSPRNG-backed helper — the old Math.random() suffix was guessable.
+  return newSynapseSessionId();
 }
 
 export const synapseRoutes = new Elysia({ prefix: "/api/v1/synapse" })

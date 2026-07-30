@@ -5,7 +5,7 @@ license: MIT
 metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
-  model_hint: GLM-5.2
+  model_tier: standard
   permission: read-only
 ---
 
@@ -74,9 +74,6 @@ If none are present, refuse with: `Non-mobile target. Refusing mobile-specialist
 - Massa-ai Memory: suggest durable mobile-decision memories only when a platform constraint or lifecycle pattern is established; main agent persists.
 - Synapse: own ephemeral session when guidance spans multiple mobile modules with repeated searches.
 - References: `references/mobile-context.md`, `references/mobile-diagnosis.md`, `references/maestro.md`.
-
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - At least one detection signal is confirmed present before guidance is given.

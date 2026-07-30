@@ -1,7 +1,7 @@
 /**
  * generate-subagent-artifacts.ts — unit tests for the emitter + parser layer.
  *
- * The generator is the single source of truth for the 15 specialist agent files
+ * The generator is the single source of truth for the 17 specialist agent files
  * across 4 hosts. We test the pure emitters + YAML/TOML helpers directly, drive
  * the real charter loader against the repo charters, and exercise the drift-gate
  * (runCheck) + diffHost edge cases in-process so the CLI shell isn't the only
@@ -28,9 +28,12 @@ import {
   diffHost,
   runCheck,
   main,
+  profilesPerHost,
+  OPENCODE_OWNED_MARKER,
   type Charter,
   type Host,
 } from "../generate-subagent-artifacts";
+import { loadRegistry, PROFILE_ENV_VAR, type Resolved } from "../lib/model-profiles.ts";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 
@@ -63,10 +66,10 @@ describe("parseSimpleYaml", () => {
   test("parses a single-level nested mapping (metadata block)", () => {
     const y = parseSimpleYaml([
       "metadata:",
-      "  model_hint: GLM-5.2",
+      "  model_tier: standard",
       "  permission: write",
     ].join("\n")) as { metadata: Record<string, unknown> };
-    expect(y.metadata.model_hint).toBe("GLM-5.2");
+    expect(y.metadata.model_tier).toBe("standard");
     expect(y.metadata.permission).toBe("write");
   });
 });
@@ -89,16 +92,21 @@ describe("parseFrontmatter", () => {
 function charter(partial: Partial<Charter> & { name: Charter["name"] }): Charter {
   return {
     description: "A charter",
-    modelHint: "GLM-5.2",
+    modelTier: "standard",
     permission: "read-only",
     body: "Do the thing.",
     ...partial,
   };
 }
 
+/** A resolved {model, effort} pair, as the registry would hand one to an emitter. */
+function resolved(model: string | null, effort: string | null): Resolved {
+  return { model, effort };
+}
+
 describe("emitClaude", () => {
-  test("read-only agent gets Read/Grep/Glob/Bash only + effort: high", () => {
-    const out = emitClaude(charter({ name: "investigator" }));
+  test("read-only agent gets Read/Grep/Glob/Bash only, model + effort from the resolver", () => {
+    const out = emitClaude(charter({ name: "investigator" }), resolved("haiku", "high"));
     expect(out).toContain("name: massa-ai-investigator");
     expect(out).toContain('"Read","Grep","Glob","Bash"');
     expect(out).not.toContain("Write");
@@ -108,45 +116,111 @@ describe("emitClaude", () => {
   });
 
   test("write agent (builder) gets Write + Edit", () => {
-    const out = emitClaude(charter({ name: "builder" }));
+    const out = emitClaude(charter({ name: "builder" }), resolved("sonnet", "high"));
     expect(out).toContain('"Write"');
     expect(out).toContain('"Edit"');
     expect(out).toContain("model: sonnet");
   });
+
+  test("the emitter renders whatever the resolver returns — it holds no model table", () => {
+    const out = emitClaude(charter({ name: "investigator" }), resolved("fable", "xhigh"));
+    expect(out).toContain("model: fable");
+    expect(out).toContain("effort: xhigh");
+  });
+
+  test("null model becomes the documented `inherit`; null effort omits the key", () => {
+    const out = emitClaude(charter({ name: "investigator" }), resolved(null, null));
+    expect(out).toContain("model: inherit");
+    expect(out).not.toContain("effort:");
+  });
 });
 
 describe("emitCursor", () => {
-  test("emits model = charter hint verbatim + reasoningEffort: max", () => {
-    const out = emitCursor(charter({ name: "investigator", modelHint: "DeepSeek V4 Pro" }));
-    expect(out).toContain("model: DeepSeek V4 Pro");
-    expect(out).toContain("reasoningEffort: max");
+  // Cursor's documented frontmatter is exactly name/description/model/readonly/is_background.
+  // https://cursor.com/docs/subagents.md
+  test("emits ONLY documented keys — no tools, no reasoningEffort", () => {
+    const out = emitCursor(charter({ name: "investigator" }), resolved(null, null));
     expect(out).toContain("name: massa-ai-investigator");
+    expect(out).toContain("model: inherit");
+    expect(out).not.toContain("tools:");
+    expect(out).not.toContain("reasoningEffort");
+  });
+
+  test("read-only charter gets readonly: true — Cursor's only permission mechanism", () => {
+    const out = emitCursor(charter({ name: "investigator" }), resolved(null, null));
+    expect(out).toContain("readonly: true");
+  });
+
+  test("write charter omits readonly (false is already the documented default)", () => {
+    const out = emitCursor(charter({ name: "builder" }), resolved(null, null));
+    expect(out).not.toContain("readonly");
+  });
+
+  test("a pinned id carries effort as a bracket parameter, not a separate key", () => {
+    const out = emitCursor(charter({ name: "investigator" }), resolved("claude-opus-5", "high"));
+    expect(out).toContain("model: claude-opus-5[effort=high]");
+    expect(out).not.toContain("reasoningEffort");
+  });
+
+  test("a pinned id with no effort emits the bare id", () => {
+    const out = emitCursor(charter({ name: "investigator" }), resolved("composer-2", null));
+    expect(out).toContain("model: composer-2");
+    expect(out).not.toContain("[effort");
   });
 });
 
 describe("emitOpenCode", () => {
-  test("write agent -> edit: allow, bash: allow + owned marker", () => {
-    const out = emitOpenCode(charter({ name: "builder" }));
+  test("write agent -> edit: allow, bash: allow", () => {
+    const out = emitOpenCode(charter({ name: "builder" }), resolved("opencode-go/glm-5.2", "max"));
     expect(out).toContain("edit: allow");
     expect(out).toContain("bash: allow");
-    expect(out).toContain("massa-ai-owned: true");
     // `all`, not `subagent` — OpenCode's Tab switcher lists primary/all only.
     expect(out).toContain("mode: all");
-    // Model must be a resolvable provider/model-id, not the charter's
-    // human-readable hint (which OpenCode silently ignores).
-    expect(out).toMatch(/^model: [a-z0-9-]+\/[a-z0-9.-]+$/m);
+    expect(out).toMatch(/^model: [a-z0-9-]+\/[a-z0-9.:-]+$/m);
   });
 
   test("planner (inspection-capable) -> edit: deny, bash ask", () => {
-    const out = emitOpenCode(charter({ name: "planner" }));
+    const out = emitOpenCode(charter({ name: "planner" }), resolved("opencode-go/minimax-m3", "max"));
     expect(out).toContain("edit: deny");
     expect(out).toContain('bash: { "*": "ask" }');
   });
 
   test("strict read-only agent -> edit: deny, bash: deny", () => {
-    const out = emitOpenCode(charter({ name: "investigator" }));
+    const out = emitOpenCode(charter({ name: "investigator" }), resolved("opencode-go/deepseek-v4-pro", "max"));
     expect(out).toContain("edit: deny");
     expect(out).toContain("bash: deny");
+  });
+
+  // OpenCode forwards unrecognized frontmatter keys to the model provider as model
+  // options, so `name` and `metadata` were being sent as bogus options on every call.
+  // https://opencode.ai/docs/agents/
+  test("emits NO name key — the agent name is the filename", () => {
+    const out = emitOpenCode(charter({ name: "investigator" }), resolved("p/m", "max"));
+    const fm = /^---\n([\s\S]*?)\n---/.exec(out)![1]!;
+    expect(fm).not.toMatch(/^name:/m);
+  });
+
+  test("emits NO metadata key in frontmatter, but keeps the ownership marker in the body", () => {
+    const out = emitOpenCode(charter({ name: "investigator" }), resolved("p/m", "max"));
+    const fm = /^---\n([\s\S]*?)\n---/.exec(out)![1]!;
+    expect(fm).not.toMatch(/^metadata:/m);
+    // config-cli.ts scopes `agents uninstall` on this literal substring.
+    expect(out).toContain("massa-ai-owned: true");
+    expect(out).toContain(OPENCODE_OWNED_MARKER);
+  });
+
+  test("the ownership marker is the FIRST body line, so uninstall scoping survives", () => {
+    const out = emitOpenCode(charter({ name: "investigator" }), resolved("p/m", "max"));
+    const body = out.split("---\n")[2] ?? "";
+    expect(body.split("\n")[0]).toBe(OPENCODE_OWNED_MARKER);
+  });
+
+  test("null model/effort omit both keys — OpenCode inherits from the invoking agent", () => {
+    const out = emitOpenCode(charter({ name: "investigator" }), resolved(null, null));
+    const fm = /^---\n([\s\S]*?)\n---/.exec(out)![1]!;
+    expect(fm).not.toMatch(/^model:/m);
+    expect(fm).not.toMatch(/^reasoningEffort:/m);
+    expect(fm).toContain("mode: all");
   });
 });
 
@@ -162,10 +236,11 @@ describe("emitCodex + TOML helpers", () => {
   });
 
   test("read-only codex agent -> sandbox read-only + massa-ai-owned header", () => {
-    const out = emitCodex(charter({ name: "investigator" }));
+    const out = emitCodex(charter({ name: "investigator" }), resolved("gpt-5.4-mini", "high"));
     expect(out.split("\n")[0]).toBe("# massa-ai-owned");
     expect(out).toContain('name = "massa-ai-investigator"');
     expect(out).toContain('sandbox_mode = "read-only"');
+    expect(out).toContain('model = "gpt-5.4-mini"');
     expect(out).toContain('model_reasoning_effort = "high"');
     expect(out).toContain('developer_instructions = """');
     // round-trips through a real TOML parser
@@ -174,38 +249,111 @@ describe("emitCodex + TOML helpers", () => {
   });
 
   test("write codex agent (builder) -> sandbox workspace-write", () => {
-    const out = emitCodex(charter({ name: "builder" }));
+    const out = emitCodex(charter({ name: "builder" }), resolved("gpt-5.6-terra", "high"));
     expect(out).toContain('sandbox_mode = "workspace-write"');
     expect(out).toContain('model = "gpt-5.6-terra"');
   });
 
   test("body containing a triple-quote is escaped so the TOML still parses", () => {
-    const out = emitCodex(charter({ name: "investigator", body: 'code """ here' }));
+    const out = emitCodex(
+      charter({ name: "investigator", body: 'code """ here' }),
+      resolved("gpt-5.4-mini", "high")
+    );
     expect(() => toml.parse(out)).not.toThrow();
+  });
+
+  test("null model/effort omit both keys — Codex inherits from the parent session", () => {
+    const out = emitCodex(charter({ name: "investigator" }), resolved(null, null));
+    expect(out).not.toContain("model =");
+    expect(out).not.toContain("model_reasoning_effort");
+    // still a valid agent TOML
+    expect(() => toml.parse(out)).not.toThrow();
+    expect(out).toContain('sandbox_mode = "read-only"');
   });
 });
 
 // ── Real charter loading ────────────────────────────────────────────────────
 
 describe("loadCharter / loadAllCharters (repo charters)", () => {
-  test("loadCharter reads investigator with description + model_hint", async () => {
+  test("loadCharter reads investigator with description + model_tier", async () => {
     const c = await loadCharter("investigator");
     expect(c.name).toBe("investigator");
     expect(c.description.length).toBeGreaterThan(0);
-    expect(c.modelHint.length).toBeGreaterThan(0);
+    expect(c.modelTier).toBe("light");
   });
 
-  test("loadAllCharters loads exactly the 15 specialists", async () => {
+  test("every repo charter declares a tier the registry recognizes", async () => {
     const all = await loadAllCharters();
-    expect(all.length).toBe(15);
-    expect(new Set(all.map((c) => c.name)).size).toBe(15);
+    const registry = loadRegistry();
+    for (const c of all) {
+      expect(registry.tiers).toContain(c.modelTier);
+    }
+  });
+
+  /**
+   * Write one charter into a throwaway charters dir and load it with the REAL loader.
+   *
+   * The previous version of these tests stripped a field from raw text, called
+   * `parseFrontmatter` directly, and asserted the field was undefined — it never called
+   * `loadCharter` and never asserted a throw, so it stayed green against a loader that
+   * silently defaulted the tier. Found by T9's independent validation (gap 2); the guard
+   * itself was correct, only its test was decorative.
+   */
+  async function loadFromTemp(transform: (raw: string) => string): Promise<Charter> {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-charter-"));
+    try {
+      const raw = await fs.readFile(
+        path.join(REPO_ROOT, "skills/agents/investigator/SKILL.md"),
+        "utf8"
+      );
+      await fs.mkdir(path.join(tmp, "investigator"), { recursive: true });
+      await fs.writeFile(path.join(tmp, "investigator", "SKILL.md"), transform(raw));
+      return await loadCharter("investigator", tmp);
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true });
+    }
+  }
+
+  test("the temp-charter harness itself round-trips an unmodified charter", async () => {
+    // Without this, a broken harness would make every throw-assertion below pass for the
+    // wrong reason — a thrown ENOENT is still a thrown error.
+    const c = await loadFromTemp((raw) => raw);
+    expect(c.name).toBe("investigator");
+    expect(loadRegistry().tiers).toContain(c.modelTier);
+  });
+
+  test("loadCharter throws rather than defaulting when model_tier is absent", async () => {
+    // A silent default here would ship a different model to users with nothing to notice.
+    await expect(
+      loadFromTemp((raw) => raw.replace(/^ {2}model_tier:.*$\n/m, ""))
+    ).rejects.toThrow(/missing metadata\.model_tier/);
+  });
+
+  test("loadCharter throws when the retired model_hint reappears", async () => {
+    // The charter must declare a tier, never a model (MPR-R6). `model_hint` was a literal
+    // model name Cursor consumed verbatim, free to disagree with the generator's tables.
+    await expect(
+      loadFromTemp((raw) => raw.replace(/^ {2}model_tier:.*$/m, "$&\n  model_hint: Some Model"))
+    ).rejects.toThrow(/still declares metadata\.model_hint/);
+  });
+
+  test("loadCharter throws on a charter with no description", async () => {
+    await expect(
+      loadFromTemp((raw) => raw.replace(/^description:.*$\n/m, ""))
+    ).rejects.toThrow(/missing description/);
+  });
+
+  test("loadAllCharters loads exactly the 17 specialists", async () => {
+    const all = await loadAllCharters();
+    expect(all.length).toBe(17);
+    expect(new Set(all.map((c) => c.name)).size).toBe(17);
   });
 });
 
 // ── emitAll + drift gate ────────────────────────────────────────────────────
 
 describe("emitAll + diffHost", () => {
-  test("emitAll writes 15 files per host (60 total) into a temp tree", async () => {
+  test("emitAll writes 17 files per host (68 total) into a temp tree", async () => {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
     try {
       const dirs: Record<Host, string> = {
@@ -218,7 +366,7 @@ describe("emitAll + diffHost", () => {
       for (const host of ["claude", "codex", "cursor", "opencode"] as Host[]) {
         const ext = host === "codex" ? "toml" : "md";
         const files = (await fs.readdir(dirs[host])).filter((f) => f.endsWith(`.${ext}`));
-        expect(files.length).toBe(15);
+        expect(files.length).toBe(17);
       }
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
@@ -290,5 +438,78 @@ describe("runCheck / main drift gate", () => {
   test("main(['--check']) exits 0 (parity with the parity-test subprocess gate)", async () => {
     const code = await main(["--check"]);
     expect(code).toBe(0);
+  });
+});
+
+// ── Profile selection through the generator (MPR-R4) ────────────────────────
+
+describe("generator profile selection", () => {
+  const registry = loadRegistry();
+
+  test("with no flag and no env, every host uses its registry default", () => {
+    const p = profilesPerHost(registry, { env: {} });
+    for (const host of ["claude", "codex", "cursor", "opencode"] as Host[]) {
+      expect(p[host]).toBe(registry.hostDefaults[host]);
+    }
+  });
+
+  test("--profile overrides every host at once", () => {
+    const p = profilesPerHost(registry, { profileFlag: "cheap", env: {} });
+    for (const host of ["claude", "codex", "cursor", "opencode"] as Host[]) {
+      expect(p[host]).toBe("cheap");
+    }
+  });
+
+  test("MASSA_AI_MODEL_PROFILE applies when no flag is given", () => {
+    const p = profilesPerHost(registry, { env: { [PROFILE_ENV_VAR]: "heavy" } });
+    expect(p.claude).toBe("heavy");
+  });
+
+  test("the flag wins over the env var", () => {
+    const p = profilesPerHost(registry, {
+      profileFlag: "cheap",
+      env: { [PROFILE_ENV_VAR]: "heavy" },
+    });
+    expect(p.claude).toBe("cheap");
+  });
+
+  test("an unknown profile throws instead of silently emitting the default", () => {
+    expect(() => profilesPerHost(registry, { profileFlag: "chaep", env: {} })).toThrow(
+      /unknown profile/
+    );
+  });
+
+  test("selecting a host-specific profile for an unsupported host throws", () => {
+    // open_models supports OpenCode only; claude must not silently inherit.
+    expect(() => profilesPerHost(registry, { profileFlag: "open_models", env: {} })).toThrow(
+      /does not support host "claude"/
+    );
+  });
+
+  test("a different profile actually changes the emitted bytes", async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
+    try {
+      const dirsFor = (sub: string): Record<Host, string> => ({
+        claude: path.join(tmp, sub, "claude"),
+        codex: path.join(tmp, sub, "codex"),
+        cursor: path.join(tmp, sub, "cursor"),
+        opencode: path.join(tmp, sub, "opencode"),
+      });
+      await emitAll(dirsFor("a"), { env: {} });
+      await emitAll(dirsFor("b"), { profileFlag: "heavy", env: {} });
+      const a = await fs.readFile(
+        path.join(dirsFor("a").claude, "massa-ai-investigator.md"),
+        "utf8"
+      );
+      const b = await fs.readFile(
+        path.join(dirsFor("b").claude, "massa-ai-investigator.md"),
+        "utf8"
+      );
+      expect(a).toContain("model: haiku"); // balanced, light tier
+      expect(b).toContain("model: sonnet"); // heavy, light tier
+      expect(a).not.toBe(b);
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true });
+    }
   });
 });

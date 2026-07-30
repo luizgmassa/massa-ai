@@ -58,9 +58,6 @@ Analyze exactly one FURPS+ dimension of a PRD or ADR against its checklist secti
 - Synapse: own ephemeral session when >= 2 searches are expected, per `references/synapse-policy.md`.
 - References: `references/furps/checklist.md`, `references/furps/report-contract.md`, `references/furps/intake.md`, `references/agent-orchestration.md`.
 
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - Source-location proof (quote plus section) for every `covered`/`partial` claim.
 - Absent-claim detection for every `missing` claim.

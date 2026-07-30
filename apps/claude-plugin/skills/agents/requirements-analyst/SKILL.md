@@ -5,7 +5,7 @@ license: MIT
 metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
-  model_hint: DeepSeek V4 Pro
+  model_tier: standard
   permission: read-only
 ---
 
@@ -56,9 +56,6 @@ Analyze requirements before implementation to surface ambiguity, gaps, contradic
 - Massa-ai Memory: suggest durable requirement-decision memories only when an implicit requirement is accepted as an assumption; main agent persists.
 - Synapse: none (analysis is not a repeated-search task).
 - References: `references/spec-driven/specify.md`, `references/furps/`.
-
-## Model Hint
-DeepSeek V4 Pro (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Every finding cites a requirement ID or spec section.

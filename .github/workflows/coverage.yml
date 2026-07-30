@@ -54,6 +54,11 @@ on:
   pull_request:
     branches: [main]
 
+# SEC-1 (code-scanning #4): least-privilege GITHUB_TOKEN — the gate only checks
+# out and runs the coverage suite.
+permissions:
+  contents: read
+
 concurrency:
   # A superseded PR revision's coverage run has no value; cancel it. Never cancel
   # on main, where the run is the post-merge record for that commit.

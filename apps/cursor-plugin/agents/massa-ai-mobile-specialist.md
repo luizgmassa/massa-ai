@@ -1,9 +1,8 @@
 ---
 name: massa-ai-mobile-specialist
 description: Conditional mobile expertise agent. Provide Android, Kotlin, Compose, KMP, Swift, iOS, Gradle, CocoaPods, performance, lifecycle, and offline-sync guidance. Invoked only when the workflow detects a mobile-related project. Read-only. Triggers on mobile detection signals; refuses non-mobile targets.
-tools: ["Read","Grep","Glob","Bash"]
-model: GLM-5.2
-reasoningEffort: max
+model: inherit
+readonly: true
 ---
 # Mobile Specialist Agent Skill
 
@@ -70,9 +69,6 @@ If none are present, refuse with: `Non-mobile target. Refusing mobile-specialist
 - Massa-ai Memory: suggest durable mobile-decision memories only when a platform constraint or lifecycle pattern is established; main agent persists.
 - Synapse: own ephemeral session when guidance spans multiple mobile modules with repeated searches.
 - References: `references/mobile-context.md`, `references/mobile-diagnosis.md`, `references/maestro.md`.
-
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - At least one detection signal is confirmed present before guidance is given.

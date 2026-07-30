@@ -277,7 +277,7 @@ Thumbs.db
 
 # Sub-Agent Registry
 
-Single registry for the 15 reusable sub-agent skills in this repo. Workflows remain the orchestrators; these agents are single-purpose specialists any workflow can invoke via the host's task/subagent tool.
+Single registry for the 17 reusable sub-agent skills in this repo. Workflows remain the orchestrators; these agents are single-purpose specialists any workflow can invoke via the host's task/subagent tool.
 
 **Dispatch names are prefixed.** A charter at `skills/agents/<role>/SKILL.md` is registered by every host as `massa-ai-<role>`. Dispatch `massa-ai-investigator`, not `investigator`; the bare name is the registry key only. See `massa-ai/references/agent-orchestration.md` -> Name Resolution for the convention and for the fallback when a named agent is unavailable.
 
@@ -292,6 +292,8 @@ Workflow (orchestrator)
   ├─ dispatch massa-ai-context-curator     (read-only: build Context Packet)
   ├─ dispatch massa-ai-planner             (read-only: produce plan)
   ├─ dispatch massa-ai-plan-critic         (read-only: challenge the plan)
+  ├─ dispatch massa-ai-meta-judge          (read-only: author evaluation specification, once per evaluation)
+  ├─ dispatch massa-ai-judge               (read-only: score + debate against the specification, 3 per panel)
   ├─ dispatch massa-ai-builder             (write: implement approved task, disjoint write set)
   ├─ dispatch massa-ai-reviewer            (read-only: review diff)
   ├─ dispatch massa-ai-verification-agent  (read-only: run Verification Ladder)
@@ -354,6 +356,8 @@ Dispatch each agent as `massa-ai-<Name>`.
 | plan-critic | Challenge a constructed plan (lite or full Plan Challenge gate) | read-only | MiniMax M3 | A concrete plan exists; standing policy exception to the dispatch triggers | `skills/agents/plan-critic/SKILL.md` |
 | furps-analyst | Analyze one FURPS+ dimension of a PRD/ADR | read-only | GLM-5.2 | `furps-refinement` fans out per-dimension analysis | `skills/agents/furps-analyst/SKILL.md` |
 | navigator | Navigate an indexed codebase index-first | read-only | DeepSeek V4 Pro | "where is X", "who calls Y" against a fresh massa-ai index | `skills/agents/navigator/SKILL.md` |
+| meta-judge | Author the evaluation specification YAML a debate panel scores against (once per evaluation) | read-only | kimi-k3 | `judge-with-debate` opens an evaluation | `skills/agents/meta-judge/SKILL.md` |
+| judge | Score an artifact against the evaluation specification with quoted evidence; debate to consensus | read-only | deepseek-v4-pro (per-slot diversity assigned by the workflow at dispatch) | `judge-with-debate` dispatches the 3-judge panel or a debate round | `skills/agents/judge/SKILL.md` |
 
 ## Mapping — New Agents ↔ Existing Roles
 
@@ -376,10 +380,12 @@ The symlinked massa-ai skill defines the roles in `references/agent-orchestratio
 | plan-critic | `plan-critic` | Identical capability; the former charter-less role now has a charter. |
 | furps-analyst | `furps-analyst` | Identical capability; charter sourced from `references/furps/analyst-role.md`. |
 | navigator | — | Pre-existing Claude/Cursor index-first agent, now charter-governed and shipped to all four hosts. |
+| meta-judge | — | New capability (evaluation-specification author for debate panels). |
+| judge | — | New capability (debate-panel evaluator; quoted-evidence scoring, append-only debate rounds). |
 
 ## How to Add an Agent
 
-1. Create `skills/agents/<name>/SKILL.md` from the charter template (see any existing agent skill), including `metadata.model_hint` and `metadata.permission`. Its `## Restrictions` section must carry both persona-boundary lines verbatim — the self-routing ban (`never load the massa-ai or persona-router routers, and never open a personas/ prompt file`) and the precedence line (`a persona supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict`). `scripts/__tests__/skills-harness-integrity.test.ts` enumerates charters from disk and is section-scoped, so a new charter missing either line fails the gate.
+1. Create `skills/agents/<name>/SKILL.md` from the charter template (see any existing agent skill), including `metadata.model_tier` (a tier declared in `skills/model-profiles.json`, never a model name) and `metadata.permission`. Its `## Restrictions` section must carry both persona-boundary lines verbatim — the self-routing ban (`never load the massa-ai or persona-router routers, and never open a personas/ prompt file`) and the precedence line (`a persona supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict`). `scripts/__tests__/skills-harness-integrity.test.ts` enumerates charters from disk and is section-scoped, so a new charter missing either line fails the gate.
 2. Add one row to the Agent Table above.
 3. Add one row to the Mapping table if it maps to an existing role.
 4. Add `<name>` to `SPECIALIST_NAMES` plus the two model-pinning tables in `scripts/generate-subagent-artifacts.ts`, then run it to regenerate the host artifacts.
@@ -402,4 +408,4 @@ All agents integrate these concepts (documented per-agent in each charter):
 - **References**: agents point to the relevant massa-ai reference files by name.
 - **Lessons**: agents surface reusable failures for lesson distillation.
 
-<!-- validator anchors: 15 agents | mapping table | capability packet | output contract -->
+<!-- validator anchors: 17 agents | mapping table | capability packet | output contract -->

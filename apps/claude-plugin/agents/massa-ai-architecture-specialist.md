@@ -54,9 +54,6 @@ Provide architectural guidance by evaluating structure, suggesting boundaries, a
 - Synapse: own ephemeral session when evaluation spans multiple modules with repeated searches.
 - References: `references/architecture-lenses.md`, `references/architecture-domain-lens.md`, `references/architecture-coupling-lens.md`, `references/architecture-deepening-lens.md`.
 
-## Model Hint
-MiniMax M3 (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - Every finding has a `path:line` or metric pointer.
 - Trade-offs name at least two alternatives.

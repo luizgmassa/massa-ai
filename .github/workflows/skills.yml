@@ -15,6 +15,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# SEC-1 (code-scanning #5/#7): least-privilege GITHUB_TOKEN — checkout + greps
+# only, nothing here writes to the repository.
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -53,8 +58,38 @@ jobs:
             case "$skill" in
               skills/agents/*)
                 # Charter-only fields consumed by scripts/generate-subagent-artifacts.ts
-                if ! grep -q "^  model_hint:" "$skill"; then
-                  echo "Error: Missing 'metadata.model_hint' in $skill"
+                #
+                # A charter must NOT name a model. metadata.model_hint was a literal model
+                # name that could disagree with the generator's tables and with FEATURES.md;
+                # it is replaced by metadata.model_tier, resolved through
+                # skills/model-profiles.json. Reject its reappearance.
+                if grep -q "^  model_hint:" "$skill"; then
+                  echo "Error: '$skill' declares metadata.model_hint, which is removed."
+                  echo "       Charters declare metadata.model_tier; models live in skills/model-profiles.json."
+                  exit 1
+                fi
+                # metadata.model_tier is the charter's capability tier. It must be one of
+                # the tiers declared in skills/model-profiles.json, which is the single
+                # source for what a tier resolves to per host. Checked against that file
+                # rather than a hard-coded list, so adding a tier stays a one-file change.
+                #
+                # Deliberately a two-stage pipeline over the single `"tiers"` line, not a
+                # `sed` range and not a process substitution:
+                #   - `sed -n '/"tiers"/,/]/p'` reads the range's OPENING line as its start,
+                #     then hunts for the next `]` on a LATER line — swallowing every profile
+                #     body (165 lines here) and matching a tier name anywhere inside it.
+                #   - `grep -q pattern <(...)` is shell-dependent; it silently reports no
+                #     match under zsh while working under bash.
+                # This form is POSIX, matches only the declaration, and fails CLOSED: if the
+                # tiers array is ever reformatted across lines it rejects valid tiers rather
+                # than accepting invalid ones.
+                tier="$(sed -n 's/^  model_tier: *\([A-Za-z0-9_-]*\).*$/\1/p' "$skill" | head -n1)"
+                if [ -z "$tier" ]; then
+                  echo "Error: Missing 'metadata.model_tier' in $skill"
+                  exit 1
+                fi
+                if ! grep -m1 '"tiers"' skills/model-profiles.json | grep -q "\"$tier\""; then
+                  echo "Error: 'metadata.model_tier: $tier' in $skill is not a tier declared in skills/model-profiles.json"
                   exit 1
                 fi
                 if ! grep -qE "^  permission: (read-only|write)$" "$skill"; then

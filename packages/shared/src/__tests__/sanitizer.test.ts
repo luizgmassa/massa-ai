@@ -2,7 +2,7 @@
  * Sanitizer unit tests.
  * Mocks ../config/index to control security.sanitizeInputs / maxInputLength.
  * Covers: sanitizeInput (on/off, HTML/control chars, length), FTS5 query,
- * email/userId validation, file-path traversal, JSON validation.
+ * userId validation, file-path traversal, JSON validation.
  */
 
 import { describe, test, expect, beforeEach, mock } from "bun:test";
@@ -30,7 +30,6 @@ mock.module("../config/index.js", () => ({
 import {
   sanitizeInput,
   sanitizeFTS5Query,
-  isValidEmail,
   isValidUserId,
   sanitizeFilePath,
   isValidJSON,
@@ -106,24 +105,6 @@ describe("sanitizeFTS5Query", () => {
   });
 });
 
-describe("isValidEmail", () => {
-  test("valid emails", () => {
-    expect(isValidEmail("a@b.co")).toBe(true);
-    expect(isValidEmail("user.name+tag@sub.example.com")).toBe(true);
-    expect(isValidEmail("x@y.io")).toBe(true);
-  });
-
-  test("invalid emails", () => {
-    expect(isValidEmail("")).toBe(false);
-    expect(isValidEmail("noatsign")).toBe(false);
-    expect(isValidEmail("a@")).toBe(false);
-    expect(isValidEmail("@b.co")).toBe(false);
-    expect(isValidEmail("a@b")).toBe(false);
-    expect(isValidEmail("a b@c.co")).toBe(false); // space
-    expect(isValidEmail("a@b.c")).toBe(true); // single-char TLD passes basic regex
-  });
-});
-
 describe("isValidUserId", () => {
   test("valid user IDs", () => {
     expect(isValidUserId("abc123")).toBe(true);
@@ -153,8 +134,8 @@ describe("sanitizeFilePath", () => {
     expect(sanitizeFilePath("a/../../b")).toBe("a/b");
   });
 
-  test("removes ..\\ traversals", () => {
-    expect(sanitizeFilePath("..\\etc\\passwd")).toBe("etc\\passwd");
+  test("removes ..\\ traversals and normalizes separators", () => {
+    expect(sanitizeFilePath("..\\etc\\passwd")).toBe("etc/passwd");
   });
 
   test("removes leading slashes", () => {
@@ -164,6 +145,25 @@ describe("sanitizeFilePath", () => {
 
   test("preserves normal relative paths", () => {
     expect(sanitizeFilePath("foo/bar/baz.ts")).toBe("foo/bar/baz.ts");
+  });
+
+  // SEC-4 regression (CodeQL js/incomplete-multi-character-sanitization,
+  // alert #21): replacement-based sanitizing was bypassable by overlapping
+  // tokens. Segment filtering drops every literal ".." segment; multi-dot
+  // groups like "...." are benign literal names, not parent references.
+  test("drops every parent-reference segment", () => {
+    expect(sanitizeFilePath("....//etc/passwd")).toBe("..../etc/passwd");
+    expect(sanitizeFilePath("....//....//etc/passwd")).toBe("..../..../etc/passwd");
+    expect(sanitizeFilePath("..../..../etc/passwd")).toBe("..../..../etc/passwd");
+    expect(sanitizeFilePath("....\\\\etc\\\\passwd")).toBe("..../etc/passwd");
+    expect(sanitizeFilePath("foo/..")).toBe("foo");
+  });
+
+  test("never returns a parent-reference segment", () => {
+    for (const crafted of ["....//", "..../", "....\\\\", "..\\/..\\/", "x/....//y", "foo/.."]) {
+      const segments = sanitizeFilePath(crafted).split("/");
+      expect(segments).not.toContain("..");
+    }
   });
 });
 

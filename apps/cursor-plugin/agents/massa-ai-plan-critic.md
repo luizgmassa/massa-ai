@@ -1,9 +1,8 @@
 ---
 name: massa-ai-plan-critic
 description: Read-only plan-challenge agent. Stress-test a constructed plan, surface the assumption most likely to fail, name the deterministic check that would falsify success, and return a bounded critique for the lite or full Plan Challenge gate. Triggers after a concrete plan exists. Never edits the plan, never implements, never expands scope.
-tools: ["Read","Grep","Glob","Bash"]
-model: MiniMax M3
-reasoningEffort: max
+model: inherit
+readonly: true
 ---
 # Plan-Critic Agent Skill
 
@@ -76,9 +75,6 @@ Never receives full conversation context.
 - Massa-ai Memory: suggest durable memories only for reusable failure modes or rejected approaches; the main agent persists.
 - Policy: the main agent owns mode selection, synthesis, plan revision, and the Evidence Gate; this agent owns the critique only.
 - References: `references/agent-orchestration.md`, `references/the-fool/`, `references/verification-ladder.md`.
-
-## Model Hint
-MiniMax M3 (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Every challenge ties to a plan section plus a concrete evidence gap or falsifiable check.

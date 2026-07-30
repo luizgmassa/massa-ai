@@ -32,6 +32,8 @@ cp "$HARNESS" "$SHADOW/scripts/install-harness.sh"
 cp "${PROJECT_ROOT}/scripts/banner.sh" "$SHADOW/scripts/banner.sh"
 cp "${PROJECT_ROOT}/scripts/lib/installer-shared.sh" "$SHADOW/scripts/lib/installer-shared.sh"
 mkdir -p "$SHADOW/skills/demo" && printf -- '---\nname: demo\n---\n' > "$SHADOW/skills/demo/SKILL.md"
+# The plugin phase reads the bundle version from the repo root package.json.
+printf '{\n  "name": "shadow",\n  "version": "0.0.0"\n}\n' > "$SHADOW/package.json"
 
 ARGV_LOG="$ROOT/argv.log"
 make_stub() { # make_stub PATH LABEL [EXIT_CODE]
@@ -53,6 +55,11 @@ logged() { cut -d'|' -f1 "$ARGV_LOG" | tr '\n' ' '; }
 argv_for() { grep "^$1|" "$ARGV_LOG" | head -n1 | cut -d'|' -f2-; }
 
 H="$ROOT/home"; mkdir -p "$H"
+# The plugin phase is host-detected (PAI-01): a host's installer runs only
+# when its config dir exists or its binary is on PATH. Seeding all four config
+# dirs keeps scenarios 3/4/5/8c deterministic on any machine (a dev box may
+# have real host binaries on PATH; CI has none).
+mkdir -p "$H/.claude" "$H/.codex" "$H/.cursor" "$H/.config/opencode"
 
 echo "Scenario 1: --skills runs only the skills installer"
 harness --skills --target "$H" --yes >/dev/null

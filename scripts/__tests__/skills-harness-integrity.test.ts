@@ -16,7 +16,7 @@
  *      matched the tree.
  *   6. Charter <-> artifact permission — charters said `read-only` while the
  *      shipped artifact granted Write/Edit.
- *   7. Persona <-> sub-agent boundary — the persona layer and the 15 charters
+ *   7. Persona <-> sub-agent boundary — the persona layer and the 17 charters
  *      shared no stated contract: no Capability Packet copy mentioned persona,
  *      no charter forbade self-routing or self-reading one, and persona-router's
  *      Stop Conditions read as an absolute ban on subagents rather than a bound
@@ -428,7 +428,7 @@ describe("charter permission matches the shipped artifact", () => {
 
 // ── 7. Persona <-> sub-agent boundary (PAB) ────────────────────────────────
 //
-// Personas (skills/persona-router/ + skills/massa-ai/personas/) and the 15
+// Personas (skills/persona-router/ + skills/massa-ai/personas/) and the 17
 // charters are different layers with no shared contract before this feature.
 // Requirement IDs below are from
 // .specs/features/persona-agent-boundary/spec.md.

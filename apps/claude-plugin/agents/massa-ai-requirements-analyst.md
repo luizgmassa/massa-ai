@@ -53,9 +53,6 @@ Analyze requirements before implementation to surface ambiguity, gaps, contradic
 - Synapse: none (analysis is not a repeated-search task).
 - References: `references/spec-driven/specify.md`, `references/furps/`.
 
-## Model Hint
-DeepSeek V4 Pro (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - Every finding cites a requirement ID or spec section.
 - Every implicit requirement is flagged for user acceptance or recorded as an assumption.

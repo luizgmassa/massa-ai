@@ -66,14 +66,6 @@ export function sanitizeFTS5Query(query: string): string {
 }
 
 /**
- * Validate email format (basic)
- */
-export function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
-
-/**
  * Validate user ID format
  */
 export function isValidUserId(userId: string): boolean {
@@ -84,13 +76,26 @@ export function isValidUserId(userId: string): boolean {
 
 /**
  * Sanitize file path (prevent directory traversal)
+ *
+ * @param filePath - Untrusted relative path from a tool caller.
+ * @returns Path rebuilt from its non-`..` segments joined with `/`, with no
+ *   leading slash. Segment filtering — not token replacement — so no
+ *   overlapping-token trick (`....//`, `..\/`) can smuggle a parent reference
+ *   through, and separators normalize to `/`.
  */
+// Why: replacement-based sanitizers are bypassable twice over — single-pass
+//      removal left "....//etc/passwd" -> "../etc/passwd" (CodeQL
+//      js/incomplete-multi-character-sanitization, SEC-4, alert #21), and a
+//      regex fixpoint loop still reads as "may contain ../" to the analyzer.
+//      Splitting into segments and dropping every literal ".." segment is
+//      strictly stronger and statically obvious.
+// Impacts: MCP read_file path handling (read_file.ts).
+// Test: bun test packages/shared/src/__tests__/sanitizer.test.ts -t sanitizeFilePath
 export function sanitizeFilePath(filePath: string): string {
-  // Remove ../ and ..\
   return filePath
-    .replace(/\.\.\//g, '')
-    .replace(/\.\.\\/g, '')
-    .replace(/^\/+/, ''); // Remove leading slashes
+    .split(/[/\\]+/)
+    .filter((segment) => segment !== ".." && segment !== "")
+    .join("/");
 }
 
 /**

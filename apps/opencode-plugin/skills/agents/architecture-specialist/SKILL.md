@@ -5,7 +5,7 @@ license: MIT
 metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
-  model_hint: MiniMax M3
+  model_tier: deep
   permission: read-only
 ---
 
@@ -57,9 +57,6 @@ Provide architectural guidance by evaluating structure, suggesting boundaries, a
 - Massa-ai Memory: suggest durable architecture-decision memories only when a boundary or abstraction is recommended; main agent persists.
 - Synapse: own ephemeral session when evaluation spans multiple modules with repeated searches.
 - References: `references/architecture-lenses.md`, `references/architecture-domain-lens.md`, `references/architecture-coupling-lens.md`, `references/architecture-deepening-lens.md`.
-
-## Model Hint
-MiniMax M3 (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Every finding has a `path:line` or metric pointer.

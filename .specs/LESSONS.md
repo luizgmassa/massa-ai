@@ -44,6 +44,27 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: packages/core/src/__tests__/llm-client-json-schema.test.ts:62-69 (packages/core)
 - last seen: 2026-07-22T23:54:13Z
 
+### L-006 - CodeQL PR check treats a flagged pattern on any diff-touched line as a NEW alert, even when the pattern is unchanged and only moved. Security fixes that refactor flagged regex code must expect the gate to re-fire on the branch and must eliminate the pattern class, not just the originally flagged instance.
+- signal: `gate_fail` | recurrence: 1 feature(s) | harmful: 0 | confidence: 0.53
+- features: security-code-scanning-closeout
+- context: project=massa-ai session=security-fix-code-scanning workflow=security-fix entity=code-scanning
+- evidence: PR #48 CodeQL check, runs 90715511426/90719305396
+- last seen: 2026-07-29T22:26:30Z
+
+### L-007 - A registry-count change (15→17 specialists) shipped green under test:scripts but CI went red: the four plugin install-test rosters + shell installer advisories + config-cli help + README/FEATURES/marketplace copy are covered by test:plugins, which the local spec-driven final gate did not run. When a feature changes a shared cardinality, run test:plugins (or any surface asserting the count) before the local final gate, not after CI.
+- signal: `gate_fail` | recurrence: 1 feature(s) | scope: `scripts/__tests__:apps/*/install.test.ts` | harmful: 0 | confidence: 0.62
+- features: judge-with-debate
+- context: project=massa-ai session=spec-judge-with-debate workflow=spec-driven entity=judge-with-debate
+- evidence: PR #50 build/coverage red, repair e190b43 (scripts/__tests__:apps/*/install.test.ts)
+- last seen: 2026-07-30T12:25:12Z
+
+### L-008 - Live multi-agent protocol behavior (judge-with-debate meta-judge spec plus 3 judges plus consensus) is user-gated smoke only: no CI sensor can execute a prose workflow, so acceptance rests on charter and workflow file integrity plus discrimination sensors, not runtime evidence.
+- signal: `spec_precision_gap` | recurrence: 1 feature(s) | scope: `workflows/judge-with-debate.md:audits/judge` | harmful: 0 | confidence: 0.62
+- features: judge-with-debate
+- context: project=massa-ai session=spec-judge-with-debate workflow=spec-driven entity=judge-with-debate
+- evidence: validation.md Addendum item 6 (workflows/judge-with-debate.md:audits/judge)
+- last seen: 2026-07-30T12:26:06Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

@@ -22,7 +22,7 @@
  */
 
 import { logger } from "@massa-ai/shared";
-import { getSessionRegistry } from "../synapse/session/index.js";
+import { getSessionRegistry, newSynapseSessionId } from "../synapse/session/index.js";
 import { DEFAULT_BUFFER_CONFIG } from "../synapse/buffer/index.js";
 import { SearchController } from "../../controllers/search-controller.js";
 import type { SearchSource } from "@massa-ai/shared";
@@ -111,7 +111,7 @@ export class TaskEnvelopeService {
     const registry = getSessionRegistry();
     let sessionId: string;
     try {
-      sessionId = `syn_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+      sessionId = newSynapseSessionId();
       registry.create({
         sessionId,
         agentId: input.agentId,

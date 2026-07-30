@@ -5,7 +5,7 @@ license: MIT
 metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
-  model_hint: GLM-5.2
+  model_tier: standard
   permission: read-only
 ---
 
@@ -72,9 +72,6 @@ All lenses share `references/audit-scope.md` (scope rules) and `references/audit
 - Massa-ai Memory: suggest durable audit-pattern memories only when a lens reveals a recurring issue class; main agent persists.
 - Synapse: own ephemeral session when the audit spans multiple modules with repeated searches.
 - References: `references/audit-scope.md`, `references/audit-report-io.md`, plus the per-lens references above.
-
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Every finding has a `path:line` pointer.

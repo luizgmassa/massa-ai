@@ -1,9 +1,8 @@
 ---
 name: massa-ai-investigator
 description: Read-only codebase investigation agent. Locate implementations, trace execution flow, identify dependencies, estimate change impact, and answer engineering questions. Triggers when a workflow needs to understand existing code before planning or implementing. Never modifies code, never generates implementation, never performs reviews.
-tools: ["Read","Grep","Glob","Bash"]
-model: DeepSeek V4 Pro
-reasoningEffort: max
+model: inherit
+readonly: true
 ---
 # Investigator Agent Skill
 
@@ -56,9 +55,6 @@ Read and understand the codebase to answer engineering questions without modifyi
 - Massa-ai Memory: suggest durable architecture/dependency memories only when useful; main agent persists.
 - Synapse: own ephemeral session per `references/synapse-policy.md`; pass `synapseSessionId` on every `search`.
 - References: `references/codebase-investigation.md`, `references/agent-orchestration.md`, `references/synapse-policy.md`.
-
-## Model Hint
-DeepSeek V4 Pro (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Source-backed evidence for every claim (`path:line`).
