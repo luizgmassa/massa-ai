@@ -6,6 +6,7 @@ metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
   model_hint: GLM-5.2
+  model_tier: standard
   permission: write
 ---
 

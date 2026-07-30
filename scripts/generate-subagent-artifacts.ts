@@ -159,6 +159,16 @@ export type Permission = "read-only" | "write";
 export interface Charter {
   name: SpecialistName;
   description: string;
+  /**
+   * Capability tier from `metadata.model_tier`, resolved against
+   * `skills/model-profiles.json` to a concrete `{model, effort}` per host.
+   * The charter owns this because the tier is a property of the agent's job.
+   */
+  modelTier: string;
+  /**
+   * DEPRECATED, removed in T4. Literal model name from `metadata.model_hint`,
+   * historically consumed verbatim by the Cursor emitter. Superseded by `modelTier`.
+   */
   modelHint: string;
   permission: Permission;
   body: string;
@@ -237,6 +247,7 @@ export async function loadCharter(name: SpecialistName): Promise<Charter> {
   const { frontmatter, body } = parseFrontmatter(raw);
   const metadata = (frontmatter.metadata ?? {}) as Record<string, unknown>;
   const modelHint = String(metadata.model_hint ?? "");
+  const modelTier = String(metadata.model_tier ?? "");
   const permissionRaw = String(metadata.permission ?? "read-only");
   const permission: Permission =
     permissionRaw === "write" ? "write" : "read-only";
@@ -247,7 +258,14 @@ export async function loadCharter(name: SpecialistName): Promise<Charter> {
   if (!modelHint) {
     throw new Error(`charter ${name} missing metadata.model_hint`);
   }
-  return { name, description, modelHint, permission, body };
+  // Never default a tier. A charter with no tier must stop the build, because a
+  // silent default would ship some other model to users without anyone noticing.
+  if (!modelTier) {
+    throw new Error(
+      `charter ${name} missing metadata.model_tier (expected one of the tiers in skills/model-profiles.json)`
+    );
+  }
+  return { name, description, modelTier, modelHint, permission, body };
 }
 
 export async function loadAllCharters(): Promise<Charter[]> {

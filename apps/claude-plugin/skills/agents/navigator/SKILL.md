@@ -6,6 +6,7 @@ metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
   model_hint: DeepSeek V4 Pro
+  model_tier: light
   permission: read-only
   tools: mcp-index
 ---
