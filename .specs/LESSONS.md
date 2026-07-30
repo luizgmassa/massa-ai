@@ -44,6 +44,13 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: packages/core/src/__tests__/llm-client-json-schema.test.ts:62-69 (packages/core)
 - last seen: 2026-07-22T23:54:13Z
 
+### L-006 - CodeQL PR check treats a flagged pattern on any diff-touched line as a NEW alert, even when the pattern is unchanged and only moved. Security fixes that refactor flagged regex code must expect the gate to re-fire on the branch and must eliminate the pattern class, not just the originally flagged instance.
+- signal: `gate_fail` | recurrence: 1 feature(s) | harmful: 0 | confidence: 0.53
+- features: security-code-scanning-closeout
+- context: project=massa-ai session=security-fix-code-scanning workflow=security-fix entity=code-scanning
+- evidence: PR #48 CodeQL check, runs 90715511426/90719305396
+- last seen: 2026-07-29T22:26:30Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.
