@@ -1,13 +1,48 @@
 # Handoff
 
-## Active — Core Layering and God-Module Split (PR-B), **T19 done, T20 is the only task left**
+## Active — Core Layering and God-Module Split (PR-B), **T20 done — all 20 tasks complete, cleared to merge**
 
 **Feature**: `core-layering-god-module-split` · branch
 `refactor/search-facade-split-phase-1b`, cut from `main` @ `5247ecb` (v1.11.0),
 worktree `../massa-ai-wt-facade-phase-1b`.
-**T6a and T6 are merged and released; T7–T19 are committed and green. Phase 1 is closed, Phase 2 is
-open, and T20 — independent validation — is the only task left.** Working tree clean. Nothing is
-pushed — the branch is local only, now fifteen commits deep.
+**T6a and T6 are merged and released; T7–T20 are committed and green. All 20 tasks are complete.**
+Working tree clean. Nothing is pushed — the branch is local only, sixteen commits deep.
+
+**T20 is done and PR-B is cleared to merge.** A fresh `verification-agent`, author ≠ verifier, took
+every GMS-03 / GMS-04 / GMS-05 criterion **as amended by C1–C12** and re-derived rather than
+inherited: all four structural sensors at both the frozen `d628464` base (through a temporary
+worktree) and HEAD; `lint`, forced `type-check`, `build`, full `bun run test` **11/11**,
+`test:scripts` **770/0 across 41**, `test:plugins` **94/0**; the live needles gate
+(**hit@1 0.643 / MRR 0.745**, both floors PASS), `needles-diff` exit **1** with `N05` @5→@6 as
+attributed, and `needles-rename-control` exit **0**; and per-file coverage recomputed from raw lcov
+through the gate's own helpers, matching T18 byte for byte. **Every criterion PASS.** Full record in
+`validation.md` Part II. **The merge must be `--no-ff` — a merge commit, not a squash (R-04).**
+
+**Three things from T20 a resumer must not re-derive.**
+
+1. **It was asked to argue C12 was a criterion relaxed to fit a result, and it rejected its own
+   steelman on measured facts.** The strongest form of the objection is kept in `validation.md` §14
+   because it is partly right: C10 and C11 rest on impossibilities that hold for *any* tree, while
+   C12's holds for *the six-module decomposition this PR chose*. What defeats it is that collapsing
+   those modules to keep fan-out flat would re-violate GMS-03 AC-1 and AC-2 and likely breach
+   G-HUB's 700-LOC ceiling (two files already at 696 and 685), and that **G-HUB was calibrated
+   before any Phase 1 code existed**, specifically against M14 — where fan-in/fan-out stayed flat
+   while reach went 1 → 14. Fan-in/fan-out was *already known to be gameable by this exact kind of
+   split* before PR-B began. **Endorsed, with the process finding kept rather than dissolved.**
+2. **One genuinely new finding, correctly attributed: `bun run test:coverage` exited 1 in the
+   verifier's environment, twice.** `embedded-api-client-endpoints.test.ts` → `POST
+   web/fetch_and_index` at **20334 ms** against a 15000 ms budget, alongside a sibling parsing a
+   5563-file corpus. **Not PR-B's** — that file has **zero diff** against base, re-confirmed, and the
+   coverage *measurement* printed identically to T18 with all seven per-file figures reproducing.
+   It is a **second instance** of the known concurrency class and a **different test** from the one
+   `CLAUDE.md` documents (`routes without 404`, `:143`), so it is recorded separately rather than
+   folded in.
+3. **Two figures in T18's record were wrong, found while re-measuring T20's own claims.** `test(`
+   55 → 56 names an identifier the file never uses (it declares with `it(`; that grep returns **0**),
+   and `expect()` 98 → 101 should be **95 → 101**, a delta of +6. T20 flagged the second and
+   mis-explained it as a comment-stripped count — comment-stripping lowers both sides and 101 matches
+   raw exactly. **Seventh time a critic's mechanism held while its explanation did not.** Corrected
+   in place; neither changes a verdict.
 
 **T19 is done, and it found the nineteenth plan defect: GMS-03 AC-3 fails on the shipped tree.**
 `design.md` §10's **C1–C12** are applied to `spec.md` in place, indexed there under *Design and
@@ -511,11 +546,25 @@ rank.**
    written without their `.ts`, with the measurement in the comment, exactly as T15 resolved the same
    trap one level up. Its test file uses neutral fixtures (`alpha`, `beta`) for the same reason.
 
-**Next action: T20 — independent validation, fresh verifier, author ≠ verifier.** It is the only task
-left. **T19 authored the spec corrections, so whoever ran T19 must not verify them.**
+**Next action: merge PR-B.** All 20 tasks are complete and T20 cleared it. The branch is local and
+unpushed, sixteen commits deep.
 
-**T20's briefing list, assembled here rather than left spread across three files.** The verifier must
-be told all eleven, or each reads as a violation it is not:
+```bash
+git push -u origin refactor/search-facade-split-phase-1b
+gh pr create --base main --title 'refactor(core): PR-B — split the search facade into capability modules'
+# then, and this is the load-bearing part:
+gh pr merge --merge          # --merge = merge commit. NEVER --squash (R-04).
+```
+
+**Two things to carry into the merge.** CI has **never run on this branch**, so the authoritative
+gate reading arrives at PR time; and the `mcp-client` coverage flake in T20's finding 1 may
+reproduce there — if it does it is **not** a reason to block, but it deserves its own note, since it
+is a second instance of a class `CLAUDE.md` documents for a different test. **Never write the skip-ci
+marker literally in the PR body** — a squash folds every commit body into the merge message, and that
+is what killed v1.3.0; PR #29 skipped CI merely by *explaining* the marker in prose.
+
+**The briefing list T20 was given, kept because PR-C inherits most of it.** Each of these reads as a
+violation if a reader does not know it:
 
 1. **`.ua/` is out of scope for GMS-04 AC-3.** 320 occurrences across three tracked generated
    artifacts; regeneration deferred to after PR-C. **PR-B does not close AC-3 for them.**
@@ -555,8 +604,10 @@ be told all eleven, or each reads as a violation it is not:
 9. **PR-B writes one file outside `packages/core` and `scripts/`, and it is a test in a package no
    task row names.** `apps/web-ui/src/__tests__/app-renderers.test.ts` — the eighteenth defect's fix,
    on an explicit reviewer decision. It is **not** an AC-3 charge: AC-3 bounds *signature-tracking*
-   edits and this file tracks no signature, weakens nothing, skips nothing, deletes nothing. `test(`
-   **55 → 56**, `expect()` **98 → 101**, and the **19-edit AC-3 budget is unmoved**. A verifier
+   edits and this file tracks no signature, weakens nothing, skips nothing, deletes nothing. Test
+   count **55 → 56**, `expect(` **95 → 101**, and the **19-edit AC-3 budget is unmoved**. *(Both
+   corrected at T20 — this said "`test(` 55 → 56, `expect()` 98 → 101". The file uses **`it(`**, not
+   `test(`, so that grep returns 0; and the `expect(` before-value is 95, a delta of +6.)* A verifier
    diffing PR-B's write set against the task rows will find this file unaccounted for; it is
    accounted for here and in `tasks.md` → *T18 — executed*.
 10. **`bun run test:coverage` must be run with `< /dev/null`, and `bun run test` needs three env
@@ -602,7 +653,8 @@ the remote and is **not** this work. **This PR must be merged with a merge commi
 | T16 | `d23bb43` | **G-HUB and `check-stale-pointers` wired into the `build` job** — scope widened past the row on a reviewer decision, since the other two sensors were already enforced through their own suites; `fetch-depth: 0` on that job's checkout; `build` confirmed **already** in `main`'s required checks, so **no ruleset mutation**; the fifteenth and sixteenth plan defects |
 | T17 | `0179566` | needles after-run at the shipped tree (**both floors PASS**, hit@1 0.643, MRR 0.745), the per-needle diff (**exit 1**, `N05` 5 → 6) and its attribution to naming rather than retrieval; **sensor substituted** by `scripts/needles-rename-control.ts` + 17 tests, exit **0** with all 14 needles at baseline; `design.md` §10 gains **C11**; the seventeenth plan defect |
 | T18 | `510a410` | DEBT-02 coverage gate at the shipped tree — **exit 0**, 315 measured / 0 below / 9 exclusions, all **7** files this *work* touches present in `merged` and above floor (min `project-indexer.ts` **94.57%**); scope widened from the row's 6 to GMS-05 AC-2's 7, closing AC-2 without a spec correction; **the eighteenth plan defect** — the row's own command never terminates under an inherited live stdin — fixed in the command (`< /dev/null`) *and* in its subject (`fakeDialogs()` in `app-renderers.test.ts`, red first under `fakeDialogs(null)`), which is PR-B's only write outside `packages/core`/`scripts` |
-| T19 | this commit | `design.md` §10 applied to `spec.md` — **C1–C12**, in place, indexed there under *Design and Execute corrections*; §10's rows **kept and marked applied**, not struck, so the rationale survives the summaries that point at it. **`design.md` §10 gains C12 — the nineteenth plan defect**: GMS-03 AC-3's *"fan-in **and fan-out** both lower"* **fails on the shipped tree** (fan-out 19 → 21, exact cause −4 `rlm-*` delegates +6 capability modules) and is replaced by `maxForeignReach` **14 → 1** plus D1 and fan-in, with fan-out demoted to reported context. **T19's own sensor was non-discriminating and was substituted** — *"§10 rows all struck"* reads the wrong artifact and is passed by a commit that leaves `spec.md` untouched (measured: 8 old-text occurrences survive it); replaced by a per-correction discriminating pair with three mutation controls, one of which found a subshell defect in the sensor itself. **No CHANGELOG entry** — specs-only, on the `353de59`/`ba8d2bc` precedent |
+| T19 | `b4f21a9` | `design.md` §10 applied to `spec.md` — **C1–C12**, in place, indexed there under *Design and Execute corrections*; §10's rows **kept and marked applied**, not struck, so the rationale survives the summaries that point at it. **`design.md` §10 gains C12 — the nineteenth plan defect**: GMS-03 AC-3's *"fan-in **and fan-out** both lower"* **fails on the shipped tree** (fan-out 19 → 21, exact cause −4 `rlm-*` delegates +6 capability modules) and is replaced by `maxForeignReach` **14 → 1** plus D1 and fan-in, with fan-out demoted to reported context. **T19's own sensor was non-discriminating and was substituted** — *"§10 rows all struck"* reads the wrong artifact and is passed by a commit that leaves `spec.md` untouched (measured: 8 old-text occurrences survive it); replaced by a per-correction discriminating pair with three mutation controls, one of which found a subshell defect in the sensor itself. **No CHANGELOG entry** — specs-only, on the `353de59`/`ba8d2bc` precedent |
+| T20 | this commit | **independent validation — every GMS-03/04/05 criterion PASS as amended by C1–C12**, re-derived from raw data by a fresh verifier at `b4f21a9`, author ≠ verifier; `validation.md` gains **Part II** (§13–§17). C12 survived an adversarial pass that was told to argue it was a criterion relaxed to fit a result. One new finding — a **second instance** of the known `mcp-client` concurrency flake, in a file with zero diff, taking `test:coverage`'s *wrapper* to exit 1 while the measurement itself reproduced exactly. **Two wrong figures in T18's record corrected** (`it(` not `test(`; `expect(` 95 not 98). **PR-B cleared to merge — `--no-ff`, R-04** |
 
 Gates at T10: `lint` 0 · `type-check` 0 (6/6) · `build` 0 (5/5) · `test:scripts` **732 pass / 0 fail
 across 39 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·

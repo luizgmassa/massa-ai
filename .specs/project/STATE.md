@@ -145,7 +145,7 @@ cannot be T17's referent.
 a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
 unilaterally — it is a release-semantics decision.
 
-### Execute — Phase 1 COMPLETE and T19 done (2026-07-30), T6a–T19 committed, **T20 is the only task left**
+### Execute — COMPLETE (2026-07-30). T6a–T20 committed, every criterion validated, **PR-B cleared to merge**
 
 **Two branches, and the first one is gone.** T6a and T6 were executed on
 `refactor/search-facade-split-phase-1` (cut from `d628464`) and reached `main` through **PR #46,
@@ -718,11 +718,29 @@ task had no precedent; `353de59` and `ba8d2bc` are both exactly that and both to
 `CHANGELOG.md`. `[Unreleased]` stays at **12** bullets under `### Changed`, **no new heading**, so
 the open release-semantics item at the top of this file is untouched.
 
-**Next: T20 — independent validation, fresh verifier, author ≠ verifier.** It is the only task left,
-and **whoever ran T19 must not verify it.** T20's full **eleven**-item briefing list is assembled in
-`HANDOFF.md` under *Next action* — the seventh is T16's two departures, the eighth T17's substituted
-sensor, the ninth and tenth T18's out-of-row write and its `< /dev/null` requirement, and the
-**eleventh is new: there are two AC-3s**, both replaced, and GMS-03's was replaced during T19 itself.
+**T20 is done and Execute is complete. Every GMS-03 / GMS-04 / GMS-05 criterion PASSes** as amended
+by C1–C12, checked by a fresh `verification-agent` at `b4f21a9` with author ≠ verifier, which
+re-derived from raw data rather than reading these files: all four structural sensors at both the
+frozen `d628464` base and HEAD, every gate re-run live (including the needles trio against a real
+Ollama), and per-file coverage recomputed from raw lcov. `validation.md` gains **Part II**.
+
+**It was told to argue C12 was a criterion relaxed to fit a result, and it rejected its own
+steelman on measured facts** — collapsing the six capability modules to hold fan-out flat would
+re-violate GMS-03 AC-1/AC-2 and likely breach G-HUB's 700-LOC ceiling, and G-HUB was **calibrated
+before any Phase 1 code existed**, against M14, where fan-in/fan-out stayed flat while reach went
+1 → 14. The objection's strongest form is kept in `validation.md` §14 rather than dissolved, because
+part of it stands: C10 and C11 rest on impossibilities that hold for *any* tree; C12's holds for the
+decomposition this PR chose.
+
+**Its one finding worth carrying past PR-B is about this record's format.** *"C12 was authored and
+resolved in the same commit as the work it excuses, with no independent party at the time."* The
+reviewer did adjudicate it live — but the convention **`Resolved (reviewer, <date>)` does not let a
+later reader tell that apart from an executor asserting approval**. That ambiguity is the real
+defect, it is in the format rather than in any single decision, and PR-C and PR-D inherit it.
+
+**Next: merge PR-B — `--no-ff`, a merge commit, never a squash (R-04).** The branch is local and
+unpushed, sixteen commits deep, and **CI has never run on it**, so the authoritative gate reading
+arrives at PR time. Commands and the two merge-time cautions are in `HANDOFF.md` under *Next action*.
 
 **T6 alone surfaced three plan defects, two needing a spec-owner decision.** All three are the
 `ensureInitializedImpl` class — a consequence `design.md` settled in substance and never wrote into

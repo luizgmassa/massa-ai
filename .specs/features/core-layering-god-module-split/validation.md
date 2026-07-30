@@ -1,12 +1,15 @@
 # Core Layering and God-Module Split — Validation (PR-B)
 
-- **Slug**: `core-layering-god-module-split` · **PR-B** · branch `refactor/search-facade-split`
+- **Slug**: `core-layering-god-module-split` · **PR-B** · branch
+  `refactor/search-facade-split-phase-1b` (Phase 0 ran on `refactor/search-facade-split`; the name
+  on this line was that branch's, corrected at T20)
 - **Requirements**: GMS-03, GMS-04 · validated by GMS-05
-- **Status**: **Phase 0 characterization record only.** This is the *before* half of a
-  before/after measurement. It carries no PASS/FAIL verdict for PR-B and must not be read as
-  one — the verdict is T20's, written by a fresh verification agent with author ≠ verifier.
+- **Status**: **Two parts.** §1–§12 are the **Phase 0 characterization record** — the *before* half
+  of a before/after measurement, carrying no PASS/FAIL verdict. **§13 onward is T20's verdict**,
+  taken by a fresh verification agent at HEAD `b4f21a9`, author ≠ verifier.
+  **PR-B is cleared to merge — as a merge commit, not a squash (R-04).**
 
-Every figure below was measured in the Execute session at `0129207`, under a scratch
+Every figure in §1–§12 was measured in the Execute session at `0129207`, under a scratch
 `XDG_CONFIG_HOME`, and reproduces unless the row says otherwise. Figures carried from
 `design.md` that did **not** reproduce are called out rather than quietly corrected.
 
@@ -341,3 +344,118 @@ than a regression, and the cost of assuming otherwise is chasing a phantom.
   a miss.
 - No full-corpus needles baseline exists.
 - Spec corrections C1–C9 are recorded in `design.md` §10 and are applied at T19, not here.
+
+---
+
+# Part II — T20 independent validation
+
+**Verifier**: fresh `massa-ai-verification-agent`, author ≠ verifier — it authored none of T7–T19
+and none of the spec corrections. **Subject**: HEAD `b4f21a9`, branch
+`refactor/search-facade-split-phase-1b`, base `main` @ `5247ecb`, 15 commits, local and unpushed.
+**Scope**: GMS-03, GMS-04, GMS-05 only; `packages/core/src/controllers/` and `tools/read_file.ts`
+confirmed at zero diff, so GMS-01/02 and AS-06 are untouched as AS-05 requires.
+
+**It re-derived rather than inherited.** All four structural sensors at both the frozen base
+(through a temporary worktree at `d628464`) and HEAD; `lint`, forced `type-check`, `build`, the full
+`bun run test`, `test:scripts`, `test:plugins`; the live needles gate, `needles-diff` and
+`needles-rename-control` against a real Ollama; and per-file coverage recomputed from raw lcov
+through the gate's own exported helpers.
+
+## 13. Criteria, as amended by C1–C12
+
+| Req | AC | Verdict | Proves the work happened, or only that nothing broke? |
+| --- | --- | --- | --- |
+| GMS-03 | AC-1 — no `*Impl` takes the facade first | **PASS** | **Proves it** — the pattern does not exist to check |
+| GMS-03 | AC-2 — a capability constructs without mocking five factories | **PASS** | Proves it |
+| GMS-03 | AC-3 *(as amended, C12)* | **PASS** | Discriminating: G-HUB was calibrated at Design against M14, a known facade-in-disguise |
+| GMS-04 | AC-1 — no `rlm-*` filename under `packages/core/src` | **PASS** | Proves it |
+| GMS-04 | AC-2 — importers updated in the same commit, no re-export husk | **PASS** | Proves it — all six capability files are 99–685 LOC, not one-line re-exports |
+| GMS-04 | AC-3 *(as amended, C10)* | **PASS** | Discriminating for pointer classification; **does not** cover `.ua/` or bare-word mentions |
+| GMS-04 | AC-4 *(as amended, C4)* | **PASS** | Proves it — the needles fixture carries zero `filePath` pins |
+| GMS-05 | AC-1 — characterization before and after | **PASS by record** | **Not independently re-verifiable** — the *before* state no longer exists to measure |
+| GMS-05 | AC-2 — coverage floor, no new exclusion | **PASS** | Proves it — recomputed from raw lcov, not copied |
+| GMS-05 | AC-3 — no test weakened, skipped or deleted | **PASS** | Proves it |
+| GMS-05 | AC-4 *(notes as amended, C3/C11)* | **PASS**, re-run live | Proves it |
+
+Re-derived at both commits: `maxForeignReach` **14 → 1** with exit **1 → 0**, foreign modules
+**6 → 1**, D1 `delegateScope` **21 → 0**, facade-taking **15 → 0**, scoped LOC **1550 → 0**, D3
+fan-in **24 → 23** / **26 → 25**, fan-out **19 → 21** with the specifier diff (−4 `rlm-*`, +6
+capability modules) reproducing the table in `spec.md` exactly. Coverage per file, recomputed
+independently: `contextual-search-rlm` `index-admin` `session-bias` **100.00**, `graph-stream`
+98.90, `result-fusion` 97.62, `hybrid-search` 95.54, `project-indexer` **94.57** — matching T18's
+record byte for byte, with `check-coverage.ts` at zero diff and `EXCLUSIONS.length === 9` read by
+import. Live gates: `test` **11/11**, `test:scripts` **770/0 across 41 files**, `test:plugins`
+**94/0**, needles **hit@1 0.643 / MRR 0.745** both floors PASS, `needles-diff` exit **1** with
+`N05` @5→@6 as expected and attributed, `needles-rename-control` exit **0**.
+
+## 14. The C12 judgement — the question T20 existed to answer
+
+The verifier was asked to argue, as strongly as it could, that C12 is a criterion relaxed to fit a
+result rather than a criterion corrected on its own terms. Its steelman, kept here because the
+strongest form of the objection is the useful part:
+
+1. C10 and C11 amend criteria unsatisfiable for **any** tree; C12's impossibility is
+   **design-choice-dependent** — true for the six-module decomposition this PR chose, and no
+   alternative topology was tried.
+2. C12 was proposed, argued and resolved **inside T19's own commit**, by the same lineage that
+   wrote the code being judged.
+3. Fan-out is the very axis R-03 exists to police, demoted at exactly the moment it disagrees.
+
+**Rejected on measured facts, not on argument.** All six added modules are real, independently
+tested capabilities; collapsing them to hold fan-out flat would directly re-violate GMS-03 AC-1 and
+AC-2 and would likely breach G-HUB's 700-LOC ceiling, which two files already sit at 696 and 685
+against. G-HUB was **designed and calibrated before any Phase 1 code existed**, specifically against
+M14's failure mode — fan-in/fan-out flat while reach went 1 → 14 — so fan-in/fan-out was *already
+known, before PR-B began*, to be gameable by exactly this kind of split. And AC-3 was already
+provisional: `spec.md`'s own Evidence Corrections record that the original 22/26 figures were
+unmeasurable and that AC-3 was rewritten pre-Execute to pin the counting method. C12 is the second
+amendment to an already-amended criterion, not the first crack in a solid one.
+
+**Endorsed — with a process finding kept rather than dissolved.** C12 rests on a
+design-choice-dependent impossibility where C10 and C11 rest on structural ones, and it was resolved
+in the same commit as the work it excuses. The arithmetic and the metric substitution both hold
+under independent re-derivation; the governance shape is worth carrying into PR-C and PR-D.
+
+## 15. Findings
+
+| # | severity | finding | disposition |
+| --- | --- | --- | --- |
+| 1 | low | **`bun run test:coverage` exited 1 in the verifier's environment**, twice — `embedded-api-client-endpoints.test.ts` → `POST web/fetch_and_index` at **20334 ms** against a 15000 ms budget, while a sibling in the same isolated batch parsed a 5563-file corpus concurrently | **Not PR-B's.** That file has **zero diff** against base (re-confirmed). The coverage *measurement* printed identically to T18 — `315 measured / 9 exclusions` — and all seven per-file figures reproduce. **It is a second instance of a known class**, and a *different test* from the one `CLAUDE.md` documents (`routes without 404`, `:143`), so it is recorded here rather than folded into that entry |
+| 2 | medium (process) | **C12 was authored and resolved in the same commit as the work it excuses**, with no independent party at the time | Carried forward to PR-C/PR-D. The record convention *"Resolved (reviewer, …)"* does not let a later reader distinguish a reviewer who adjudicated live from an executor asserting approval — that ambiguity is the actual defect, and it is in the **format**, not in this decision |
+| 3 | low | `CLAUDE.md` says **24** Prisma migrations; the tree has **23** | Pre-existing, outside PR-B's write set, already on the record. Fix in its own change |
+| 4 | info | GMS-05 AC-1's hollowed-block control, and the internal mutation tables of T19's sensor / `check-frozen-anchors` / `check-stale-pointers`, were **not re-run** by the verifier | Disclosed, not hidden. It ran the base+control pair for T19's sensor (shipped **PASS 12/12**, pre-T19 control **FAIL on all 13 checks, rows=0**), which establishes discrimination without mutating a tree it was told not to write to |
+
+**Two figures in T18's record are wrong, found while re-measuring the verifier's own claims.** It
+noticed the second and mis-explained it as a comment-stripped count; stripping comments would lower
+both sides, and the after-value matches raw exactly.
+
+| record | measured | note |
+| --- | --- | --- |
+| `test(` **55 → 56** | the file uses **`it(`** exclusively — `grep -c 'test('` returns **0** | the count is right, the identifier named is not |
+| `expect()` **98 → 101** | **95 → 101** | lines and occurrences agree at both ends, so this is not a metric ambiguity; the delta is **+6**, not +3 |
+
+Neither changes a verdict: `app-renderers.test.ts` still only gains tests and assertions, weakens
+nothing, skips nothing, and the 19-edit GMS-05 AC-3 budget is unmoved. Corrected in place at T20.
+
+## 16. What PR-B does not establish
+
+- **`.ua/` regeneration** — GMS-04 AC-3 is not closed for the **320** `rlm-` occurrences in three
+  tracked generated artifacts. Deferred past PR-C, and PR-B does not claim otherwise.
+- **Bare-word `rlm-` mentions** carrying no file extension are outside `check-stale-pointers.ts` by
+  design. A clean gate reading must not be read as covering them.
+- **A full-corpus needles baseline** still does not exist. The 8-file / 14-needle corpus is the right
+  instrument for this PR and is **not** a statement about retrieval quality repo-wide.
+- **CI has never run on this branch.** It is local and unpushed. The live local reruns above are the
+  closest available substitute; the authoritative reading arrives at PR time.
+- **A clean local `test:coverage` wrapper exit** was not obtained in the verifier's session — see
+  finding 1. Read the coverage evidence as *"measurement confirmed exactly, wrapper exit code
+  environment-flaky"*, not as a clean rerun.
+
+## 17. Verdict
+
+**PR-B may be merged.** Every GMS-03 / GMS-04 / GMS-05 criterion, read as amended by C1–C12, is met
+under independent re-derivation from raw data rather than from `tasks.md` or `HANDOFF.md`.
+
+**The merge must be a merge commit, not a squash (R-04).** The same defect already cost this feature
+its T6a/T6 history once, through PR #46; a squash here would repeat it on the remainder of the same
+PR. Use `--no-ff`.

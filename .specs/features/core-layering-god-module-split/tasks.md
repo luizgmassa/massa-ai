@@ -1522,7 +1522,7 @@ the F4 seam adds a field to `injectedDeps`, which is a root field, so the seam b
 | **T17** ✅ | needles after-run + comparison — **done, and its sensor was substituted**, see *T17 — executed* below | rerun the gate; per-needle rank diff vs T4's baseline. **A floor pass with three needles slipping 1→4 is a regression that passed** (GMS-05 AC-4 note 2) — that intent is unchanged and still enforced. | ~~the T4 diff script, exit 0~~ **unreachable on any PR that renames a file the corpus covers — the seventeenth defect.** `needles-diff.ts` exits **1** (`N05` rank 5 → 6) and the exit is produced by naming rather than by retrieval. Substituted by `scripts/needles-rename-control.ts` **exit 0**, alongside both floors passing | ~2 min + 30 m → **~3.5 h** |
 | **T18** ✅ | coverage gate — **done, and its command needed a fix before it would terminate**, see *T18 — executed* below | `DATABASE_URL=…5433/massa_ai_test MASSA_AI_DEDICATED=1 RUN_POSTGRES_TESTS=1 bun run test:coverage` **`< /dev/null`** — the redirect is load-bearing, not hygiene; without it the gate hangs forever in `apps/web-ui` (the eighteenth defect) | exclusions still **9** ✅ (and `check-coverage.ts` has **zero** diff on this branch, which is AC-2's *"no new exclusion"* closed structurally rather than by a count); no file this PR touches below floor ✅ — **scope widened from the row's 6 to AC-2's 7**, minimum **94.57%** (`project-indexer.ts`) | 30 m → **~1.5 h** |
 | **T19** ✅ | spec corrections ~~C1–C7~~ ~~C1–C10~~ ~~C1–C11~~ **C1–C12** — **done**, see *T19 — executed* below | apply `design.md` §10 to `spec.md`. **The range was stale by two before T15, short by one after it, short by one again after T17, and short by one more found during T19 itself**: §10 has held **C1–C9** since Design, T15 adds **C10** for GMS-04 AC-3 itself, T17 adds **C11** for GMS-05 AC-4 note 2, and T19 adds **C12** for GMS-03 AC-3 — the nineteenth plan defect. Without C10 nothing in §10 owned AC-3 — C4 covers only AC-4's obsolete needles clause. Without C11 nothing owns note 2's *"per-needle ranks are unchanged"*, which the shipped tree does not satisfy and cannot. Without C12 nothing owns AC-3's *"fan-in **and fan-out** both lower"*, which the shipped tree **fails** — fan-out 19 → 21. In all three cases T20's verifier, which reads `spec.md`, checks the criterion **as written**, finds it unsatisfiable, and marks it failed against a tree that satisfies what the criterion meant | ~~`design.md` §10 rows all struck~~ **non-discriminating — replaced, see below.** Striking a row in `design.md` is an edit the executor controls and is passed by a commit that changes `spec.md` not at all; measured at HEAD, **8** old-text occurrences survive such a commit. Substituted by a **per-correction discriminating pair** — old text absent **and** new text present, neither half sufficient — plus a positional check and a row-count check, in *Gate check commands* | 45 m → **~2 h** |
-| **T20** | independent validation | fresh `verification-agent`, author ≠ verifier → `validation.md` | spec-anchored outcome check + discrimination sensor | — |
+| **T20** ✅ | independent validation — **done, every criterion PASS**, see *T20 — executed* below | fresh `verification-agent`, author ≠ verifier → `validation.md` **Part II** (§13–§17). It re-derived rather than inherited: all four structural sensors at both the frozen `d628464` base and HEAD, every gate re-run live including the needles trio against a real Ollama, and per-file coverage recomputed from raw lcov | spec-anchored outcome check ✅ + discrimination sensor ✅ — T19's own sensor was run **with its control**: shipped `spec.md` **PASS 12/12**, pre-T19 `spec.md` **FAIL on all 13 checks, rows=0**. **PR-B cleared to merge, `--no-ff`** | — |
 
 ---
 
@@ -2142,8 +2142,15 @@ the app root still existed, and passed just as happily when `prompt()` returned 
 
 **Ledger — one authorised test edit, and it is not an AC-3 charge.** GMS-05 AC-3 bounds
 *signature-tracking* edits, and this file tracks no signature: it is an `apps/web-ui` suite, adds a
-test and strengthens an existing one, and weakens, skips or deletes nothing. `test(` count **55 →
-56**, `expect()` **98 → 101**, no `skip`. The 19-edit AC-3 budget is **unmoved**. It does widen
+test and strengthens an existing one, and weakens, skips or deletes nothing. Test count **55 → 56**
+and `expect(` **95 → 101**, no `skip`. *(Both figures corrected at T20. This read "`test(` count
+55 → 56, `expect()` 98 → 101": the file declares its tests with **`it(`**, never `test(`, so
+`grep -c 'test('` returns **0** rather than 55 — the number was right and the identifier named was
+not; and the `expect(` before-value is **95**, making the delta **+6**, not +3. Lines and
+occurrences agree at both ends, so this was not a metric ambiguity. Found while re-measuring T20's
+own report, which flagged the second and mis-explained it as a comment-stripped count — stripping
+comments lowers both sides, and 101 matches the raw count exactly.)* The 19-edit AC-3 budget is
+**unmoved** and neither correction changes a verdict. It does widen
 PR-B's write set into a package no task row named, on an explicit reviewer decision — recorded here
 rather than absorbed.
 
@@ -2304,6 +2311,47 @@ recorded.
 `check-stale-pointers`' `EXCLUDED`, and `.md` files are invisible to `check-frozen-anchors`
 (`resolve.ts` scans only `.ts`/`.tsx`) and to G-HUB (`readdirSync` under `services/search`). Nothing
 under `packages/core`, `scripts/` or `apps/` moved. Readings in `HANDOFF.md` under *Gates at T19*.
+
+### T20 — executed
+
+**Subject.** Independent validation by a fresh `massa-ai-verification-agent` at `b4f21a9`, author ≠
+verifier — it authored none of T7–T19 and none of the spec corrections. Full report in
+`validation.md` **Part II** (§13–§17); only what does not belong there is recorded here.
+
+**Every GMS-03 / GMS-04 / GMS-05 criterion PASS**, read as amended by C1–C12. It re-derived rather
+than inherited — all four structural sensors at both the frozen `d628464` base (through a temporary
+worktree) and HEAD; `lint`, forced `type-check`, `build`, `bun run test` **11/11**, `test:scripts`
+**770/0 across 41**, `test:plugins` **94/0**; the live needles trio; and per-file coverage
+recomputed from raw lcov through the gate's own exported helpers, matching T18 byte for byte.
+
+**The C12 judgement is the reason T20 existed, and the steelman it rejected is kept.** Told to argue
+as hard as it could that C12 was a criterion relaxed to fit a result, it produced the strongest form
+of the objection — C10 and C11 rest on impossibilities holding for *any* tree, while C12's holds for
+*the decomposition this PR chose*, and no alternative topology was tried — then rejected it on facts
+it measured: collapsing the six modules to hold fan-out flat would re-violate GMS-03 AC-1 and AC-2
+and likely breach G-HUB's 700-LOC ceiling, and **G-HUB was calibrated before any Phase 1 code
+existed**, against M14, where fan-in/fan-out stayed flat while reach went 1 → 14. Fan-in/fan-out was
+*already known to be gameable by this exact kind of split* before PR-B began.
+
+**Its medium finding is a governance one and it is about the record's format, not this decision.**
+*"C12 was authored and resolved in the same commit as the work it excuses, with no independent party
+at the time."* The reviewer did adjudicate it live, before it was written — but **the convention
+`Resolved (reviewer, <date>)` does not let a later reader distinguish that from an executor
+asserting approval**, which is exactly why the verifier could not tell. That ambiguity is worth
+fixing in PR-C and PR-D, and it is the one thing T20 surfaced that no earlier task did.
+
+**Two figures in T18's record were wrong**, found while re-measuring T20's own claims rather than by
+T20 itself. Corrected in *T18 — executed* above and in `HANDOFF.md`. T20 flagged the second and
+**mis-explained** it as a comment-stripped count; stripping comments lowers both sides and the
+after-value matches raw exactly. *Seventh consecutive critic whose mechanism held while at least one
+figure or explanation did not — the rule that catches these is to keep the finding and re-run the
+number.*
+
+**What T20 deliberately did not run, disclosed rather than hidden**: GMS-05 AC-1's hollowed-block
+control, and the internal mutation tables of T19's sensor, `check-frozen-anchors` and
+`check-stale-pointers`. Re-running them means mutating tracked files in a worktree it was told not to
+write to. For T19's sensor it ran the base+control pair instead — shipped **PASS 12/12**, pre-T19
+**FAIL on all 13 checks, rows=0** — which establishes discrimination without a mutation.
 
 ## Gate check commands
 
