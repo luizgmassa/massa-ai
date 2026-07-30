@@ -6,7 +6,7 @@ Use this small index from `workflows/maestro/maestro.md`, `workflows/maestro/mae
 
 Load `references/maestro/fact-ledger.md` before making any normative Maestro claim. Every Maestro claim must be tagged as `official-doc`, `live-help`, `repo-convention`, or `excluded/unverified`.
 
-Use `/Users/luizmassa/Downloads/questions.md` only as a coverage checklist. If a checklist item is not supported by official Maestro docs, live CLI help, or repository convention, quarantine it as `excluded/unverified`.
+Use a user-supplied coverage checklist, when the user provides one, only as a coverage checklist. If a checklist item is not supported by official Maestro docs, live CLI help, or repository convention, quarantine it as `excluded/unverified`.
 
 Official source anchors:
 

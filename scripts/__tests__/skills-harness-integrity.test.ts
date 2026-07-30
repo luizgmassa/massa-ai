@@ -172,22 +172,58 @@ describe("dispatch resolution: every Dispatch: block names a shipped agent", () 
 // ── 2. No phantom roles (P0-2) ─────────────────────────────────────────────
 
 describe("no phantom roles: every orchestration role has a real charter", () => {
-  test("agent-orchestration.md Roles table charter paths all resolve", async () => {
+  // agent-orchestration.md used to carry a partial roster: a 12-row table, a
+  // 7-item bullet list, and a prose mapping paragraph, all naming the same
+  // agents. Table membership tracked the commit that added each agent and no
+  // property of the agent -- not permission, not dispatch usage, not whether it
+  // had a legacy name. `judge` and `meta-judge` were absent for a whole release
+  // because the guard here asserted that mentioned charter paths RESOLVE, which
+  // an unmentioned charter cannot fail.
+  //
+  // The roster now lives once, in skills/AGENTS.md's Agent Table, guarded by
+  // "every charter is registered in skills/AGENTS.md and in the generator"
+  // below. This file keeps only the legacy role vocabulary, which lives nowhere
+  // else. See .specs/features/skills-directive-dedup/.
+  test("agent-orchestration.md carries no second roster", async () => {
     const content = await read(AGENT_ORCHESTRATION);
     const charterPaths = [
       ...content.matchAll(/`(skills\/agents\/[a-z-]+\/SKILL\.md)`/g),
     ].map((m) => m[1]!);
-    expect(charterPaths.length).toBeGreaterThanOrEqual(10);
-    const missing: string[] = [];
-    for (const rel of new Set(charterPaths)) {
-      if (!(await exists(path.join(REPO_ROOT, rel)))) missing.push(rel);
-    }
-    expect(missing).toEqual([]);
+    expect(charterPaths).toEqual([]);
+  });
+
+  test("agent-orchestration.md points at the one roster", async () => {
+    const content = await read(AGENT_ORCHESTRATION);
+    expect(content).toContain("skills/AGENTS.md");
+    expect(content).toMatch(/roster lives in one place/i);
+  });
+
+  test("every legacy role maps to an agent that exists", async () => {
+    // The legacy column is this file's own content, so it needs its own check:
+    // a rename that retires an agent must not leave a legacy alias pointing at
+    // nothing.
+    const content = await read(AGENT_ORCHESTRATION);
+    const mapped = [...content.matchAll(/\|\s*`massa-ai-([a-z-]+)`\s*\|/g)].map((m) => m[1]!);
+    expect(mapped.length).toBeGreaterThanOrEqual(5);
+    const names = new Set(await charterNames());
+    expect(mapped.filter((n) => !names.has(n))).toEqual([]);
   });
 
   test("no role is documented as charter-less", async () => {
     const content = await read(AGENT_ORCHESTRATION);
     expect(content).not.toContain("role-based (no charter)");
+  });
+
+  // Roster coverage is asserted against skills/AGENTS.md -- the one place it
+  // lives -- by "every charter is registered in skills/AGENTS.md and in the
+  // generator" below. An earlier fix instead added a coverage check against
+  // agent-orchestration.md, which closed the symptom while preserving the
+  // two-roster split that caused it; the split is now gone, so the check is
+  // replaced by the negative assertion above.
+  test("the roster guard enumerated a real charter list", async () => {
+    // Guard the guard: an empty charter list makes every coverage check here
+    // vacuous, including the AGENTS.md one below.
+    expect((await charterNames()).length).toBeGreaterThanOrEqual(17);
   });
 
   test("every charter is registered in skills/AGENTS.md and in the generator", async () => {
@@ -686,5 +722,60 @@ describe("dispatch persona emission: every Dispatch block emits the optional per
     // requires >=20 blocks repo-wide; this parser must agree.
     expect(total).toBeGreaterThanOrEqual(20);
     expect(missing).toEqual([]);
+  });
+});
+
+// ── 9. Portability of shipped harness prose ────────────────────────────────
+//
+// Everything under skills/ is copied byte-identically into four
+// apps/*-plugin/skills/ bundles and published to npm. A path from one
+// developer's home directory therefore ships to every user, and resolves for
+// none of them.
+//
+// `references/maestro.md` and `references/maestro/fact-ledger.md` cited
+// `/Users/<name>/Downloads/questions.md` in three places -- once as a named
+// tier of the fact ledger's evidence taxonomy, so an agent was told to
+// quarantine claims as `excluded/unverified` unless they appeared in a file it
+// could not open. See .specs/features/skills-directive-dedup/spec.md SDD-02.
+//
+// This scans the whole tree rather than pinning the three known sites: fixing
+// three occurrences leaves the fourth.
+
+describe("portability: no shipped harness file names a developer's machine", () => {
+  /** Absolute home-directory paths on macOS and Linux respectively. */
+  const HOME_PATH = /\/(?:Users|home)\/[A-Za-z0-9._-]+\//;
+
+  test("no file under skills/ contains an absolute home-directory path", async () => {
+    const offenders: string[] = [];
+    for (const file of await skillMarkdownFiles()) {
+      const content = await read(file);
+      content.split(/\r?\n/).forEach((line, i) => {
+        if (HOME_PATH.test(line)) {
+          offenders.push(`${path.relative(REPO_ROOT, file)}:${i + 1}: ${line.trim().slice(0, 100)}`);
+        }
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("the Maestro coverage-checklist rule survived the path removal", async () => {
+    // Absence of the path must not be reachable by deleting the rule. Both
+    // files still have to instruct the agent on how to treat a checklist.
+    const index = await read(
+      path.join(SKILLS_DIR, "massa-ai", "references", "maestro.md"),
+    );
+    const ledger = await read(
+      path.join(SKILLS_DIR, "massa-ai", "references", "maestro", "fact-ledger.md"),
+    );
+    for (const body of [index, ledger]) {
+      expect(body).toMatch(/coverage checklist/i);
+    }
+    expect(ledger).toMatch(/excluded\/unverified/);
+    expect(index).toMatch(/excluded\/unverified/);
+  });
+
+  test("the scan actually enumerated the tree", async () => {
+    // Guard the guard: a mis-rooted walk finds no files and no offenders.
+    expect((await skillMarkdownFiles()).length).toBeGreaterThan(100);
   });
 });

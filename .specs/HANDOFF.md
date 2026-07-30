@@ -1083,6 +1083,100 @@ that, where a patch would not. Do **not** move these entries to `### Fixed`.
 
 ---
 
+## Previous — skills/ directive dedup (T1–T5 of 12 done, stopped by user instruction)
+
+- **projectId** `massa-ai` · **workflowSessionId** `spec-skills-directive-dedup`
+- **branch** `refactor/skills-directive-dedup` · **worktree** `.claude/worktrees/skills-dedup`
+- **base** `origin/main` @ `6d5dc6b` · **head** `ed1028e` · working tree clean, every gate green.
+- **Not pushed. No PR.** Stopping was the user's instruction, not a blocker.
+
+Read `.specs/features/skills-directive-dedup/{spec,design,tasks}.md` before resuming.
+They are canonical; this entry is the pointer.
+
+Specify, Design, Tasks: **done**. Plan Challenge: **done** (full gate, `evidence_audit`,
+`massa-ai-plan-critic`) — but see amendment **A0**: it ran *concurrently with Execute*,
+not before it. Execute: **T1–T5 of 12**. Independent validation (T12): **not run**.
+
+| Task | Commit | State |
+| --- | --- | --- |
+| T1 metric + reference graph + 20 tests | `b11c9bf` | done |
+| T2 absolute home path out of Maestro prose | `bc47359` | done |
+| T3 model names out of `skills/AGENTS.md` | `99afd3a` | done |
+| T4 every charter documented in orchestration | `dd09cc1` | done |
+| T5 roster guard generalized + 4 stale counts | `bc5a76a` | done |
+| plan-challenge amendments A0–A8 | `ed1028e` | done |
+| T6 Knowledge Verification Chain → one owner | — | **not started** |
+| T7 pointer replacements P1–P4, P6; P5 re-scoped | — | **not started** |
+| T8 audit-family → `audit-scope.md` | — | **not started** |
+| T9 ceiling + orphan assertion | — | **not started** |
+| T10 regenerate 4 bundles | — | after T6–T8 |
+| T11 CHANGELOG `[Unreleased]` | — | **not started; CI fails a PR without it** |
+| T12 independent verification-agent | — | **not started** |
+
+### Measured at head
+
+`test:scripts` **922 pass / 0 fail** across 45 files (baseline 892/44) · `test:plugins`
+**96/0** · `lint` 0 · both generators `--check` **No drift** · `verify-model-tokens.ts`
+OK (155 files, 29 tokens) · duplication window=4 duplicatedLines 535, excessLines
+**313 — unchanged** · reachability 151 files, **orphans 0**.
+
+`excessLines` has not moved because T6–T8 *are* the dedup and none has run. T1–T5 are
+correctness fixes and were never going to move it.
+
+### Resume checklist
+
+1. `cd .claude/worktrees/skills-dedup && bun install && bun run build` **before measuring
+   anything** — an unbuilt worktree moves failures rather than reducing them.
+2. Read `tasks.md` → Amendments **A0–A8** first. A6 withdraws P5 as originally written;
+   `design.md` §D3 carries the replacement decision and its two non-optional conditions.
+3. Start at T6.
+
+### Decisions taken with the user — do not reopen
+
+- **Scope tier B**: single-source + fix drift + collapse the audit/fix family
+  scaffolding. Not tier C — no file is deleted or merged and no pinned count changes.
+- **The metric ships** as a committed ceiling gate, not analysis-only.
+- **T7/P5**: `references/mcp-tools.md` owns the eleven-item retrieval procedure;
+  `SKILL.md` keeps one load-and-follow line. The conditional-load risk was stated and
+  accepted; `design.md` §D3 records the two mitigations T7 must implement.
+
+### Open risks
+
+- **T7's accepted risk is this feature's own defect shape.** `mcp-tools.md` is
+  conditionally loaded, so moving retrieval order there can reproduce SDD-03 exactly.
+  Mitigation is a body-level mandatory load line **plus** a guard asserting both the
+  pointer and single-sourcing. If T7 cannot satisfy both, stop and re-ask.
+- **One unexplained flaky failure.** The T5 gate reported 921/1 once and the commit was
+  made through it — a violation of the execution contract. It did not reproduce across
+  four subsequent full runs, and the failing test could not be identified because the
+  output had been reduced to counts. If it recurs, capture the full run; likeliest
+  suspects are `lint-gate.test.ts` (mutates the tree in a subprocess) and the new roster
+  scan (reads every tracked file).
+- **Ceiling not yet set.** `skills-duplication-metric.test.ts` carries
+  `EXCESS_CEILING = 313`, the **pre-cleanup** value. T9 must lower it to the post-cleanup
+  measurement or the gate enforces nothing.
+- `excessLines` is pre-pointer-cost (A7); net reduction lands below 313.
+
+### What this feature turned out to be about
+
+The request was to remove unnecessary and duplicated directions. Measurement refuted both
+halves: nothing under `skills/` is unreachable, and removable literal duplication is 313
+lines of 12,639 (2.5%), much of it **deliberately mandated** by
+`skills-harness-integrity.test.ts` — a subagent receives only its charter, so a pointer
+would resolve to a file not in context and the duplicate *is* the contract.
+
+What the audit found instead were four correctness defects the duplication was hiding,
+each shipping to users through four npm-published plugin bundles, each invisible to a
+fully green suite:
+
+1. A second hand-authored model-naming site, already wrong for two roles.
+2. One developer's home-directory path used as a named evidence tier.
+3. Two charters absent from the orchestration reference for a whole release.
+4. A roster guard that could not match the one string it was written to ban.
+
+Every one had a guard nearby that did not cover it. Three were fixed by correcting the
+**direction** or **surface** of an existing gate rather than by adding a new one.
+
 ## Previous — Model Profile Registry, validated PASS, PR open, driving CI to green
 
 - **projectId** `massa-ai` · **workflowSessionId** `spec-model-profile-registry`
