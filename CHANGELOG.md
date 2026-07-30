@@ -41,6 +41,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the facade stays at **5** — all three expected and all three unchanged, for the same reason as
   above. What does move is `rlm-synapse.ts`, from two facade members to one.
 
+- **Fuzzy query correction moves into the hybrid-search module, and the Synapse delegate file is
+  gone.** `correctQuery` leaves `rlm-synapse.ts` for the new `hybrid-search.ts` and trades the search
+  facade for `HybridSearchDeps` — at this stage the one collaborator it reads, the keyword store. It
+  was never Synapse code: it corrects query typos against the keyword store's vocabulary and its only
+  caller is the search path, so it sat beside the session delegates purely by accident of an earlier
+  split. With it gone `rlm-synapse.ts` has no exports left and is **deleted**. The three functions
+  that shared that file shared no state at all, which is why it decomposed into three modules rather
+  than moving as one.
+
+  Behaviour is unchanged, including the case where the keyword store is missing: the dependency
+  record carries the live field rather than a pre-resolved copy, so an unconfigured store still fails
+  exactly where it did before. Functions in the search directory that still take the facade drop from
+  **12 to 11**.
+
+  **The number of modules reading the search facade finally drops, 5 to 4.** This is the extraction
+  where the last outside reader of that file's facade state goes away. Deepest foreign reach stays at
+  **14** and the hub gate still fails — both are set by `rlm-search.ts`, and neither can move until
+  that file is split, which is the last step of this work.
+
+  Query correction also gained a regression test for a property subtler than the move itself. The
+  facade builds each capability module's dependency record **per call**, which is what lets a test
+  replace a collaborator after construction and have it honoured. Memoising that record would leave
+  every existing test green while silently ignoring the replacement, because every test to date sets
+  its collaborator up before the first call. There is now a test that swaps a collaborator *between*
+  two calls and asserts each call saw its own — the one shape the previous suites could not
+  distinguish.
+
 ## [1.11.0] - 2026-07-29
 
 ### Changed

@@ -145,7 +145,7 @@ cannot be T17's referent.
 a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
 unilaterally — it is a release-semantics decision.
 
-### Execute — Phase 1 STARTED (2026-07-29), T6a–T8 done, T9 next
+### Execute — Phase 1 STARTED (2026-07-29), T6a–T9 done, T10 next
 
 **Two branches, and the first one is gone.** T6a and T6 were executed on
 `refactor/search-facade-split-phase-1` (cut from `d628464`) and reached `main` through **PR #46,
@@ -164,7 +164,8 @@ with a merge commit.**
 | T6a | `7996c2d` † | `capture-facade-baseline.ts` + 3 frozen fixtures; 9 assertions re-pointed |
 | T6 | `f612e03` † | `rlm-fusion.ts` → `result-fusion.ts` |
 | T7 | `3e46eae` | `buildGraphStream` → `graph-stream.ts`, plus the sensor amendment |
-| T8 | on `-1b` | `applySynapseState` → `session-bias.ts` with `SessionBiasDeps`; the AC-2 and LATE-BIND sensors |
+| T8 | `29ea8b9` | `applySynapseState` → `session-bias.ts` with `SessionBiasDeps`; the AC-2 and LATE-BIND sensors |
+| T9 | on `-1b` | `correctQuery` → `hybrid-search.ts` with `HybridSearchDeps`; **`rlm-synapse.ts` deleted whole**; a second LATE-BIND sensor |
 
 † unreachable — squashed into `main` by #46. Nothing is pushed from `-1b`; it is local only.
 
@@ -176,7 +177,17 @@ exit 1, 25 files, foreign modules **5**, reach **14** (both expected until T13/T
 synapse **2 → 1** · D1 `delegateScope` **18 → 17**, facade-taking **13 → 12**, scoped LOC
 **1186 → 1132**.
 
-**T7 and T8 surfaced a fourth and fifth plan defect, same class as T6's three.**
+Gates at T9: `lint` 0 · `type-check` 0 · `build` 0 · `test:scripts` **732 pass / 0 fail across 39
+files**, exit 0 · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
+characterization net **160** unchanged across 7 suites, every suite individually unchanged ·
+`search-synapse-integration` **5/0** · `session-bias` **10/0** · `session-bias-late-bind` **3/0** ·
+`search-ranking-regression` **2/0** · new `hybrid-search-late-bind` **3/0** · coverage exclusions
+**9** · G-HUB exit 1, 25 files, **foreign modules 5 → 4** (the predicted move, now spent), reach
+**14**, members **23**, `perModule` `{csr 5, admin 7, indexing 11, search 14, warmup 1}` — synapse
+gone, `csr` **4 → 5** and expected · D1 `delegateScope` **17 → 16**, facade-taking **12 → 11**,
+scoped LOC **1132 → 1108**.
+
+**T7, T8 and T9 surfaced a fourth, fifth and sixth plan defect, same class as T6's three.**
 
 4. **The foreign-module count is not a per-task sensor either** (T7) — and this one is the
    *correction* to T6's unfirable sensor inheriting the defect it corrected. A file counts as foreign
@@ -190,21 +201,38 @@ synapse **2 → 1** · D1 `delegateScope` **18 → 17**, facade-taking **13 → 
    detect. Measured on the finished code: capturing the deps record instead of assembling it per call
    leaves `tsc` at 0, the characterization net at **160/0**, and T8's own AC-2 sensor at 10/0.
    **Resolved: a dedicated 3-test sensor in its own file** — separate because AC-3 pins the coverage
-   file at 41 tests — observed **2/1 red** under the mutation before being trusted. It self-heals from
-   T9 on, where `keywordSearch` has 10 assignment sites.
+   file at 41 tests — observed **2/1 red** under the mutation before being trusted. Its claim that
+   the ordinary sensor self-heals from T9 on is what defect 6 corrects.
+6. **LATE-BIND's ordinary sensor does not "come back" at T9** (T9) — it covers one violation shape of
+   two, and this defect is the *resolution* of defect 5 inheriting the flaw it fixed, exactly as
+   defect 4 did to defect 3. T8 reasoned from `keywordSearch`'s **10 post-construction assignment
+   sites**; that is not the quantity that governs detectability. Measured on the finished code: a
+   **construction** capture is caught loudly (`rlm-synapse` **21/5**, `search-ranking-regression`
+   **1/1**), a **first-call memo** is invisible (`tsc` 0, coverage **41/0**, `rlm-synapse` **26/0**,
+   `search-ranking-regression` **2/0**). All six call sites do construct → assign → call, so a memo
+   populates *after* the assignment and captures the correct value; detecting one needs a collaborator
+   to change **between two calls on one instance**, and that count is **zero**. **Resolved: a second
+   dedicated 3-test sensor**, `hybrid-search-late-bind.test.ts`, whose middle test creates exactly
+   that missing shape — observed **1/2 red** under the memo mutation, **1/2** under the construction
+   capture and **2/1** under a third-key leak. **T10, T12 and T13 must each run the memo mutation
+   against their own surface** rather than inherit the claim.
 
 Two refinements a resumer needs. **Which `this.`-recursion `tsc` can see depends on whether the
 module takes deps**: a deps-taking module is one argument wider, so the naive substitution is caught
 (`TS2554`), and the blind variant is recursion that *also drops the deps record* — that is the
-mutation to run at T9/T10/T12/T13. And **`toHaveBeenCalledWith` treats an undefined-valued key as
-absent** (`f({})` satisfies `toHaveBeenCalledWith({a: undefined})`, measured), so a deps-record
-assertion needs defined stubs or it proves nothing.
+mutation to run at T10/T12/T13. Both shapes were re-confirmed at T9: `this.correctQuery(query)` left
+`tsc` at 0 and coverage at 40/1, while `this.correctQuery(deps, query)` failed with
+`TS2554: Expected 1 arguments, but got 2`. And **`toHaveBeenCalledWith` treats an undefined-valued key
+as absent** (`f({})` satisfies `toHaveBeenCalledWith({a: undefined})`, measured), so a deps-record
+assertion needs defined stubs or it proves nothing — at T9 that meant assigning the *field*, because
+the constructor stores its argument in `injectedDeps` and only `ensureInitialized` bridges it across.
 
-**Next: T9** — `correctQuery` → `hybrid-search.ts` (**not** `query-understanding.ts`, a real
-unrelated file in the same directory), `keywordSearch` → `HybridSearchDeps`. It is where
-`rlm-synapse.ts` dies whole and where the foreign-module count finally moves **5 → 4**. AC-3 budget:
-**1** assertion. Take the planned review point after **T10**, and stop at **T14**, where G-HUB going
-green is the moment the split is proven.
+**Next: T10** — the largest Phase 1 task (3.5 h) and the planned review point. Indexing surfaces →
+`project-indexer.ts` with `IndexerDeps`, **plus** `ensureInitializedImpl`'s body becoming
+`ContextualSearchRLM.ensureInitialized()` so `rlm-indexing.ts` dies whole in one commit. AC-3 budget:
+**8** assertions. Sensor: `rlm-indexing.test.ts` **25**, plus `ensureInitializedImpl` absent from
+`packages/core/src` outside tests. Then stop at **T14**, where G-HUB going green is the moment the
+split is proven; T13 is budgeted 5.5 h and is most likely to overrun.
 
 **T6 alone surfaced three plan defects, two needing a spec-owner decision.** All three are the
 `ensureInitializedImpl` class — a consequence `design.md` settled in substance and never wrote into

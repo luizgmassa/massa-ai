@@ -204,7 +204,8 @@ be merged with a merge commit.**
 | T6a | in `main` via #46 | `capture-facade-baseline.ts` + 3 frozen fixtures; 9 assertions re-pointed | three mutants red first; suites green at base **and** with T6 applied |
 | T6 | in `main` via #46 | `rlm-fusion.ts` → `result-fusion.ts` | foreign modules **6 → 5** |
 | T7 | `3e46eae` | `buildGraphStream` → `graph-stream.ts` | D1 `delegateScope` **19 → 18**, facade-taking **14 → 13**, scoped LOC 1310 → 1186 |
-| T8 | this commit | `applySynapseState` → `session-bias.ts` with `SessionBiasDeps` | D1 facade-taking **13 → 12**, `delegateScope` **18 → 17**, scoped LOC **1186 → 1132**; `rlm-synapse.ts` hub reach **2 → 1**; foreign modules **5 → 5** as predicted; new AC-2 sensor 10/0 with **zero** `mock.module`; new LATE-BIND sensor 3/0, observed **2/1 red** under the capture mutation |
+| T8 | `29ea8b9` | `applySynapseState` → `session-bias.ts` with `SessionBiasDeps` | D1 facade-taking **13 → 12**, `delegateScope` **18 → 17**, scoped LOC **1186 → 1132**; `rlm-synapse.ts` hub reach **2 → 1**; foreign modules **5 → 5** as predicted; new AC-2 sensor 10/0 with **zero** `mock.module`; new LATE-BIND sensor 3/0, observed **2/1 red** under the capture mutation |
+| T9 | this commit | `correctQuery` → `hybrid-search.ts` with `HybridSearchDeps`; **`rlm-synapse.ts` deleted whole** | **foreign modules 5 → 4** — the one task where this is the right sensor, and it fired; `rlm-synapse.ts` leaves `perModule` entirely. D1 `delegateScope` **17 → 16**, facade-taking **12 → 11**, scoped LOC **1132 → 1108**; `correctQuery` reappears in `all` with `facadeParam: null`. Runtime mutation pair per the T8 refinement: the arity-identical recursion `this.correctQuery(query)` leaves `tsc` at **0** and takes coverage to **40/1**, while the naive `this.correctQuery(deps, query)` is caught (`TS2554: Expected 1 arguments, but got 2`). Invariance: `rlm-synapse.test.ts` **26** untouched, `rlm-search.test.ts` **31**, coverage **41**. New LATE-BIND sensor 3/0 — see the section below for why it was needed against T8's expectation |
 
 Gate readings at T8: `lint` 0 · `type-check` 0 · `build` 0 · `test:scripts` **732 pass / 0 fail
 across 39 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
@@ -213,6 +214,27 @@ characterization net **160** across 7 suites (26·41·31·21·25·7·9) · `sear
 `perModule {csr 4, admin 7, indexing 11, search 14, synapse 1, warmup 1}` · coverage EXCLUSIONS **9**
 (measured by importing the module — a regex over the array literal counts the `reason` strings and
 reports 19).
+
+Gate readings at T9: `lint` 0 · `type-check` 0 · `build` 0 · `test:scripts` **732 pass / 0 fail
+across 39 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
+characterization net **160** across 7 suites, every suite individually unchanged ·
+`search-synapse-integration` **5/0** · `session-bias` **10/0** · `session-bias-late-bind` **3/0** ·
+`search-ranking-regression` **2/0** · new `hybrid-search-late-bind` **3/0** · G-HUB exit **1**, 25
+files, foreign **5 → 4**, reach **14**, members **23**, largest `rlm-indexing.ts` 592 · coverage
+EXCLUSIONS **9** · D1 `delegateScope` **17 → 16**, facade-taking **12 → 11**, scoped LOC
+**1132 → 1108**.
+
+> **One `perModule` movement the plan did not predict, and it is not drift.**
+> `contextual-search-rlm.ts` goes **4 → 5**. `#hybridSearchDeps()` reads `this.keywordSearch`, and
+> that member was **not** previously read anywhere in the root's own class body — today's four are
+> `_indexProjectInternal`, `fileFilterCache`, `injectedDeps`, `queryUnderstanding`. T8 did not move
+> this number because `#sessionBiasDeps()` reads `this.injectedDeps`, which was already in the set.
+> **It has no bearing on G-HUB**: `foreign` excludes the declaring file
+> (`search-hub-metric.ts:150`), so the root's own reads never enter `maxForeignReach`. Expect the
+> same increment at T10, T12 and T13 as each deps helper reads fields the root did not read before,
+> and expect the figure to end high at T14 — a composition root reading its own fields is the
+> target state, not a regression. Predicted by scratch simulation before the edit and confirmed
+> against the live tree, per T7's practice.
 
 AC-3 verified mechanically on the one edited test file, over comment-stripped source: `test(`
 **39 → 39**, `describe(` **20 → 20**, `expect(` **71 → 71**, `toHaveBeenCalledWith` **14 → 14**,
@@ -264,7 +286,7 @@ that no longer exists, or re-point a `mock.module` specifier and the symbol name
 | T6 | 2 | `mock.module` split: `fuseResults`/`generateScoreExplanation` leave the `rlm-search.js` mock for a new `result-fusion.js` one |
 | T7 | 2 | **plus 3 call sites** in `graph-stream-project-scope-pg.test.ts`, which passes `NO_RLM` as the first argument — that file is **not** rename-only, contrary to §4.6 |
 | T8 | 2 | `mock.module` split: `applySynapseState` leaves the `rlm-synapse.js` mock for a new `session-bias.js` one, which keeps `correctQueryImpl` behind. **Plus a setup change in the same two tests, declared here so it is not read as drift:** each now passes two stub collaborators into `makeRlm(…)` so the asserted deps record has *defined* values. Measured reason — bun's `toHaveBeenCalledWith` treats an undefined-valued key as absent, so `f({})` satisfies `toHaveBeenCalledWith({a: undefined})`; asserting `{sessionRegistry: undefined, synapseManager: undefined}` would therefore also be satisfied by a facade that assembled `{}`. With defined values the check is exact on identity and extra keys still fail, so both assertions are **strictly stronger** than the `rlm` first argument they replace. Textual `expect(` sites unchanged at **71**, and bun's runtime tally unchanged at **75 expect() calls** — two different metrics, both pinned somewhere, so always say which |
-| T9 | 1 | — |
+| T9 | 1 | The `rlm-synapse.js` `mock.module` block is **deleted, not re-pointed** — `correctQueryImpl` was its last key and the module no longer exists — and replaced by a `hybrid-search.js` block, so the `mock.module` count stays at **16** rather than splitting to 17 as T6/T7/T8 each did. **Plus a setup change in the same test, declared here so it is not read as drift**, and it is the T8 pattern arriving by a different route: the stub must be *defined* for the record assertion to mean anything (the `toHaveBeenCalledWith` trap below), but `keywordSearch` is a **field**, not an `injectedDeps` read — the constructor stores its argument in `injectedDeps`, only `ensureInitialized` bridges it to the field, and `correctQuery` does not await it. So `makeRlm({keywordSearch})` would still yield an undefined-valued record; the stub is assigned as `(rlm as any).keywordSearch = …`, which is both the only way to get a defined record and this file's own established idiom (`:297`, `:333`, `:385`). Verified mechanically over comment-stripped source, before → after: `test(` **39 → 39**, `describe(` **20 → 20**, `expect(` **71 → 71**, `toHaveBeenCalledWith` **14 → 14**, `toHaveBeenLastCalledWith` **10 → 10**, `mock.module` **16 → 16**, skips/todos **0 → 0**, and zero occurrences of `toBeTruthy` / `toBeDefined` / `anything()` / `expect.any` in either state. Runtime **41 pass / 0 fail** and bun's **75 expect() calls**, both unchanged |
 | T10 | 8 | — |
 | T13 | 3 | — |
 | **total** | **18** | 3 `mock.module` targets re-pointed across 6 modules; ~14 mocked symbol names |
@@ -455,6 +477,55 @@ because AC-3's check column pins that file at exactly **41** tests. Adding to it
 sensor mid-refactor, which is indistinguishable from weakening it in a diff — the same reasoning that
 put T5's guard in `scripts/__tests__` and located its blocks by symbol rather than by path.
 
+### LATE-BIND's ordinary sensor does not "come back" at T9 — it covers one violation shape of two
+
+Sixth plan defect, found at **T9**, same class and same method as the previous five: by measuring
+rather than by reading. What it contradicts is the *resolution* of the fifth — the sentence in the
+section above reading *"It self-heals from T9 onward — `keywordSearch` has 10 post-construction
+assignment sites … so the ordinary sensor fires for every remaining task."* **That is half true, and
+the half that is false is the half T8's own dedicated sensor was built to catch.**
+
+**Measured at T9 on the finished code**, two LATE-BIND violations run separately:
+
+| violation shape | `tsc` | coverage | `rlm-synapse` | `search-ranking-regression` |
+| --- | --- | --- | --- | --- |
+| record captured at **construction** | 0 | 40 / 1 | **21 / 5** | **1 / 1** |
+| record **memoised on first call** | 0 | **41 / 0** | **26 / 0** | **2 / 0** |
+
+The existing suites catch the first shape loudly and are **completely blind to the second**.
+
+**Mechanism — the assignment-site count is not the quantity that governs detectability.** All six
+sites that reach `correctQuery` (`rlm-synapse.test.ts`'s five cases and
+`search-ranking-regression.test.ts:37`) do *construct → assign field → call*. A first-call memo
+populates **after** the assignment and therefore captures the correct value; the stub is never made
+ineffective. Detecting a memo requires a collaborator to **change between two calls on one
+instance**, and the number of tests doing that is **zero**. Ten assignment sites and zero
+interleaved re-assignments are different counts, and §4.3.1's table records the former.
+
+So the constraint as literally worded — *"never capture them at construction"* — **is** sensored at
+T9 by the existing pass counts. The memoised shape is not, and memoising a per-call helper is the
+more natural mistake of the two, because it reads as an optimisation rather than a change.
+
+**Resolution (spec-owner, 2026-07-29): a dedicated sensor, mirroring T8's.**
+`packages/core/src/__tests__/hybrid-search-late-bind.test.ts` — **3 tests**, spying on
+`hybrid-search.js`. Separate file for the same reason as T8's: AC-3 pins the coverage file at
+exactly **41** tests, and `session-bias-late-bind.test.ts` stays untouched at **3** rather than
+being extended, because editing a guard added in the previous commit is the motion this repository
+treats as indistinguishable from weakening one.
+
+Its second test is the one that closes the measured gap and the one nothing else in the repository
+performs: **assign the field, call, re-assign the field, call**, then assert the two records carry
+the two different stubs by identity. Observed red before being trusted — **1 pass / 2 fail** under
+the memoised mutation, the same **1 / 2** under the construction capture, and **2 pass / 1 fail**
+under a third-key leak, which fires test 3.
+
+**This propagates, and is now recorded as unverified rather than inherited.** The same section's
+*"T10's members 18/7/4/4, T12's and T13's likewise"* reasons from the same wrong quantity. **T10,
+T12 and T13 must each run the memo mutation against their own surface** and record the reading;
+none of them may cite the assignment-site count as evidence that the ordinary sensor covers them.
+That is the whole finding generalised: a sensor claim has to name the shape it detects, not the
+population it counts.
+
 ### `ensureInitializedImpl` — the export that had no destination
 
 `rlm-indexing.ts` exports **7** functions. `design.md` §4.1's `project-indexer.ts` row names six of
@@ -511,6 +582,31 @@ nine that survive the rename:
 The `.ua/` files are generated understand-anything artifacts, tracked since `3a25cc6` and not
 gitignored. **320 occurrences in generated output that no rename can reach.** The criterion could
 never have gone green as written.
+
+> **The enumeration above is frozen at `ce26f28` and Phase 1 has grown it — re-enumerate at T15,
+> do not work from this list.** Found at T9. Every extraction so far adds a *provenance comment*
+> naming the file the body moved out of (`result-fusion.ts`, `graph-stream.ts`, `session-bias.ts`,
+> `hybrid-search.ts` all carry "byte-preserved from `rlm-<x>.ts`"), and the new sensor files cite
+> the suites they were measured against. Measured after T9: **27** tracked files carry `rlm-`
+> outside `CHANGELOG.md` / `.specs/` / `.ua/`, against the 19 recorded at `ce26f28`.
+>
+> They fall into **two classes T15 must not conflate**, because only one of them is a stale
+> reference:
+>
+> 1. **References to `rlm-*.test.ts`** — those test files *survive* PR-B and their rename is T15's
+>    own decision, so these are consistent until T15 decides otherwise. Sites include
+>    `session-bias.test.ts:8,20`, `contextual-search-rlm.ts:333`,
+>    `hybrid-search-late-bind.test.ts:12,20`, plus `rlm-synapse.test.ts`'s own four.
+> 2. **References to a deleted `rlm-*.ts` source** — legitimate historical provenance (git still
+>    has the file) but pointing at a path that no longer resolves. After T9 that is
+>    `docs/ONBOARDING.md:148`, `graph-stream.ts:11`, `session-bias.ts:20`,
+>    `hybrid-search.ts:11,15,24`, `contextual-search-rlm-coverage.test.ts:158`.
+>
+> Both classes are in scope for T15's *sensor* (zero hits outside the three excluded paths), so
+> both must be swept — but class 1 is a rename decision and class 2 is a comment correction, and
+> reporting them as one number hides that. **Not fixed at T9**: `docs/ONBOARDING.md` and the two
+> sibling capability modules are outside T9's write set, and editing them here would put a
+> documentation sweep inside a commit whose sensor evidence is about one extraction.
 
 **Resolution (spec-owner, 2026-07-29):**
 

@@ -42,7 +42,6 @@ import {
   ensureInitializedImpl,
   type IndexProjectOptions,
 } from "./rlm-indexing.js";
-import { correctQueryImpl } from "./rlm-synapse.js";
 import {
   searchImpl,
   addContextToResultsImpl,
@@ -59,6 +58,7 @@ import {
 import { fuseResults, generateScoreExplanation } from "./result-fusion.js";
 import { buildGraphStream } from "./graph-stream.js";
 import { applySynapseState, type SessionBiasDeps } from "./session-bias.js";
+import { correctQuery, type HybridSearchDeps } from "./hybrid-search.js";
 import type {
   SearchDegradation,
   SearchDegradationReporter,
@@ -76,7 +76,7 @@ import {
 export class ContextualSearchRLM {
   // NOTE (M14 Phase 3): fields below were `private`. Relaxed to `public`
   // (modifier dropped) so the extracted delegate modules in rlm-indexing.ts /
-  // rlm-synapse.ts / rlm-search.ts / rlm-admin.ts can read them via the passed
+  // rlm-search.ts / rlm-admin.ts can read them via the passed
   // `rlm` parameter. Runtime-identical; type-surface only. See design.md
   // "Encapsulation decision (accepted cost)".
   keywordSearch!: Awaited<ReturnType<typeof getKeywordSearch>>;
@@ -325,9 +325,27 @@ export class ContextualSearchRLM {
    * unavailable. Only words of length >= 3 are considered (shorter tokens
    * can't be reliably corrected).
    */
+  /**
+   * Assemble hybrid-search.ts's narrow deps record — per call, from whatever
+   * the fields hold right now (LATE-BIND, design.md §4.3.1). Never hoist this to
+   * a constructor-time capture: `keywordSearch` has 10 post-construction
+   * assignment sites, six of which reach `correctQuery` directly
+   * (`rlm-synapse.test.ts`'s five cases and `search-ranking-regression.test.ts:37`),
+   * and a capture would leave every one of them stubbing a field nothing reads.
+   *
+   * It reads the **field**, not `injectedDeps.keywordSearch`. That is not
+   * interchangeable: `ensureInitialized` is what bridges the seam to the field,
+   * `correctQuery` does not await it, and those six sites assign the field
+   * directly. Reading the seam instead would break all six. Contrast
+   * `#sessionBiasDeps()` below, whose originals genuinely read `injectedDeps`.
+   */
+  #hybridSearchDeps(): HybridSearchDeps {
+    return { keywordSearch: this.keywordSearch };
+  }
+
   // Visibility relaxed from `private` so rlm-search.ts can call via rlm param.
   async correctQuery(query: string): Promise<string | null> {
-    return correctQueryImpl(this, query);
+    return correctQuery(this.#hybridSearchDeps(), query);
   }
 
   /**

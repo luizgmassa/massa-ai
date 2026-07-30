@@ -71,7 +71,7 @@ mock.module("@massa-ai/shared", () => {
 
 // ── Forwarding-contract mocks (M14 facade delegation) ───────────────────────
 //
-// indexFileImpl / searchImpl / applySynapseState / correctQueryImpl /
+// indexFileImpl / searchImpl / applySynapseState / correctQuery /
 // buildGraphStream / fuseResults / generateScoreExplanation /
 // addContextToResultsImpl / extractPreviewImpl / calculateAvgScoreImpl /
 // runWithIndexLock / _indexProjectInternalImpl / ensureFreshIndexImpl /
@@ -153,10 +153,15 @@ mock.module("../services/search/result-fusion.js", () => ({
   generateScoreExplanation: generateScoreExplanationMock,
 }));
 
-const correctQueryImplMock = mock(async (): Promise<string | null> => null);
+// PR-B T9: correctQuery moved to hybrid-search.ts and traded the facade
+// parameter for a narrow HybridSearchDeps record (GMS-03 AC-1). It was
+// rlm-synapse.ts's last export, so this block is not re-pointed — the old module
+// is gone, and its mock with it. Same reason as the T6/T7/T8 blocks: mocking it
+// means naming the new module.
+const correctQueryMock = mock(async (): Promise<string | null> => null);
 
-mock.module("../services/search/rlm-synapse.js", () => ({
-  correctQueryImpl: correctQueryImplMock,
+mock.module("../services/search/hybrid-search.js", () => ({
+  correctQuery: correctQueryMock,
 }));
 
 // PR-B T8: applySynapseState moved to its own capability module and traded the
@@ -196,7 +201,7 @@ beforeEach(() => {
   extractPreviewImplMock.mockClear();
   calculateAvgScoreImplMock.mockClear();
   applySynapseStateMock.mockClear();
-  correctQueryImplMock.mockClear();
+  correctQueryMock.mockClear();
   buildGraphStreamMock.mockClear();
   (loadProjectIgnore as unknown as ReturnType<typeof mock>).mockClear?.();
 });
@@ -650,13 +655,28 @@ describe("ContextualSearchRLM.applySynapseState (instance delegate)", () => {
 });
 
 describe("ContextualSearchRLM.correctQuery (instance delegate)", () => {
+  // PR-B T9: the asserted first argument is the narrow HybridSearchDeps record
+  // rather than `rlm` (GMS-03 AC-1). The stub is *defined* and assigned *after*
+  // construction, for two separate reasons. bun's `toHaveBeenCalledWith` treats
+  // an undefined-valued key as absent — measured: `f({})` satisfies
+  // `toHaveBeenCalledWith({a: undefined})` — so asserting
+  // `{keywordSearch: undefined}` would also be satisfied by a facade that
+  // assembled nothing. And `keywordSearch` is a *field*: the constructor stores
+  // its argument in `injectedDeps`, only `ensureInitialized` bridges that to the
+  // field, and `correctQuery` does not await it — so `makeRlm({keywordSearch})`
+  // would leave the record undefined-valued anyway. Assigning the field is both
+  // the only way to get a defined record here and the LATE-BIND shape the other
+  // six call sites use. Extra keys still fail, so this is strictly stronger than
+  // the `rlm` first argument it replaces.
   test("forwards query, returns impl result unchanged", async () => {
     const rlm = makeRlm();
-    correctQueryImplMock.mockImplementationOnce(async () => "corrected query");
+    const keywordSearch = { fuzzyCorrect: async (w: string) => w };
+    (rlm as any).keywordSearch = keywordSearch;
+    correctQueryMock.mockImplementationOnce(async () => "corrected query");
 
     const result = await rlm.correctQuery("origq");
 
-    expect(correctQueryImplMock).toHaveBeenCalledWith(rlm, "origq");
+    expect(correctQueryMock).toHaveBeenCalledWith({ keywordSearch }, "origq");
     expect(result).toBe("corrected query");
   });
 });

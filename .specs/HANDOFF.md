@@ -5,8 +5,16 @@
 **Feature**: `core-layering-god-module-split` · branch
 `refactor/search-facade-split-phase-1b`, cut from `main` @ `5247ecb` (v1.11.0),
 worktree `../massa-ai-wt-facade-phase-1b`.
-**T6a and T6 are merged and released; T7 and T8 are committed and green; T9 is not started.**
+**T6a and T6 are merged and released; T7, T8 and T9 are committed and green; T10 is not started.**
 Working tree clean. Nothing is pushed — the branch is local only.
+
+**Next action: T10** — the largest Phase 1 task (3.5 h) and the planned review point. It moves the
+indexing surfaces to `project-indexer.ts` with `IndexerDeps`, **and** absorbs `ensureInitializedImpl`:
+its body becomes the literal content of `ContextualSearchRLM.ensureInitialized()`, the export dies,
+and `rlm-indexing.ts` therefore dies whole in one commit rather than surviving as the one-function
+husk GMS-04 AC-1 forbids. AC-3 budget: **8** assertions. Sensor: `rlm-indexing.test.ts` pass count
+**25**, plus `git grep -n 'ensureInitializedImpl' -- packages/core/src` returning nothing outside
+tests. **T10 must also run the memo mutation itself** — see the T9 finding below.
 
 **Read the branch note before anything else.** T6a and T6 landed in `main` via **PR #46, which was
 squashed, not merged** — R-04 was violated. None of its 8 commits are ancestors of `main`, the
@@ -20,26 +28,39 @@ the remote and is **not** this work. **This PR must be merged with a merge commi
 | --- | --- | --- |
 | T6a/T6 | in `main` via #46 (squashed) | `capture-facade-baseline.ts` + 3 frozen fixtures; `rlm-fusion.ts` → `result-fusion.ts` |
 | T7 | `3e46eae` | `buildGraphStream` → `graph-stream.ts`, plus the sensor amendment |
-| T8 | this branch | `applySynapseState` → `session-bias.ts` with `SessionBiasDeps`; the AC-2 and LATE-BIND sensors |
+| T8 | `29ea8b9` | `applySynapseState` → `session-bias.ts` with `SessionBiasDeps`; the AC-2 and LATE-BIND sensors |
+| T9 | this branch | `correctQuery` → `hybrid-search.ts` with `HybridSearchDeps`; **`rlm-synapse.ts` deleted whole**; a second LATE-BIND sensor |
 
-Gates at T8: `lint` 0 · `type-check` 0 · `build` 0 · `test:scripts` **732 pass / 0 fail across 39
+Gates at T9: `lint` 0 · `type-check` 0 · `build` 0 · `test:scripts` **732 pass / 0 fail across 39
 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
-characterization net **160** across 7 suites (26·41·31·21·25·7·9) · `search-synapse-integration`
-**5/0** · new `session-bias` **10/0** · new `session-bias-late-bind` **3/0** · G-HUB exit 1, 25
-files, foreign modules **5**, reach **14**, `perModule` synapse **1** · D1 `delegateScope`
-**18 → 17**, facade-taking **13 → 12**, scoped LOC **1186 → 1132** · EXCLUSIONS **9**.
+characterization net **160** across 7 suites (26·41·31·21·25·7·9), every suite individually
+unchanged · `search-synapse-integration` **5/0** · `session-bias` **10/0** ·
+`session-bias-late-bind` **3/0** · `search-ranking-regression` **2/0** · new
+`hybrid-search-late-bind` **3/0** · G-HUB exit 1, 25 files, **foreign modules 5 → 4**, reach **14**,
+members **23** · D1 `delegateScope` **17 → 16**, facade-taking **12 → 11**, scoped LOC
+**1132 → 1108** · EXCLUSIONS **9**.
 
 **Read before resuming**: `tasks.md` → *AC-3 vs GMS-03 AC-1*, *Phase 0's before-baselines were
 live-tree assertions*, *T6's sensor was unfirable*, *the foreign-module count is not a per-task
-sensor either*, **the new *LATE-BIND has no sensor at T8* section**, then the Phase 1 table and
-*Phase 1 — executed*.
+sensor either*, *LATE-BIND has no sensor at T8*, **the new *LATE-BIND's ordinary sensor does not
+"come back" at T9* section**, the `ensureInitializedImpl` section (T10 owns it), *T15's sensor,
+scoped* — including **the new note that its site list is frozen at `ce26f28` and Phase 1 has grown
+it to 27 files** — then the Phase 1 table and *Phase 1 — executed*.
 Then `STATE.md` → *Execute — Phase 1 STARTED*.
 
-**Next action: T9** (`correctQuery` → **`hybrid-search.ts`**, `keywordSearch` → `HybridSearchDeps`).
-Note the destination: **not** `query-understanding.ts`, which is a real unrelated file in the same
-directory that an executor could plausibly pick — the first draft said "the query module", which
-names nothing. **T9 is where `rlm-synapse.ts` dies whole**, and where the hub-metric foreign-module
-count finally moves, **5 → 4**. Its AC-3 budget is **1** assertion.
+**The T9 finding that changes how T10, T12 and T13 must sensor themselves.** T8 recorded that
+LATE-BIND self-heals from T9 because `keywordSearch` has 10 post-construction assignment sites.
+**Measured at T9: that reasoning uses the wrong quantity.** The existing suites catch a
+*construction* capture loudly (`rlm-synapse` 21/5, `search-ranking-regression` 1/1) and are
+**completely blind** to a *first-call memo* (`tsc` 0, coverage 41/0, `rlm-synapse` 26/0,
+`search-ranking-regression` 2/0). All six call sites do construct → assign → call, so a memo
+populates after the assignment and captures the correct value; detecting one needs a collaborator to
+**change between two calls on one instance**, and that count is **zero**. Closed by
+`hybrid-search-late-bind.test.ts` (3 tests, observed **1/2 red** under the memo mutation and again
+under the construction capture, **2/1** under a third-key leak). **T10/T12/T13 must each run the memo
+mutation against their own surface and record the reading** — none may cite the assignment-site count
+as evidence of coverage. `session-bias-late-bind.test.ts` was deliberately left untouched at 3 tests
+rather than extended.
 
 **Three T8 findings a resumer should not re-derive:**
 
@@ -61,16 +82,38 @@ count finally moves, **5 → 4**. Its AC-3 budget is **1** assertion.
   with no injected deps proves nothing about the record existing. Inject defined stubs; then extra
   keys still fail and the check is exact.
 
-**The foreign-module count is still not a per-task sensor** — T7 and T8 both left it at **5**,
-exactly as predicted, and it moves once, at T9. G-HUB exiting 1 remains correct until T14.
+**The foreign-module count moved at T9, exactly as predicted, and is spent.** Base 5, +T7 5, +T8 5,
+**+T9 4** — three consecutive predictions held to the number. `rlm-synapse.ts` has left `perModule`
+entirely. **It is not a sensor for T10–T13**: `rlm-indexing.ts`, `rlm-admin.ts` and `rlm-search.ts`
+each keep members until their own extraction lands, so the next decrements are T10's, T12's and
+T13's respectively, and **reach stays 14 until T13** because the maximum is `rlm-search.ts`'s.
+**G-HUB exiting 1 remains correct until T14.** The per-task sensor for T10/T12/T13 is the D1 matrix
+delta plus that task's own suite pass count.
 
-**`rlm-synapse.test.ts` was deliberately left untouched at T7 and T8**, so its sensor stays exactly
-**26** and both tasks stay inside AC-3's bound. Consequence: its header comment and two `describe`
-block names now cite functions that live in `graph-stream.ts` and `session-bias.ts`. The tests
-themselves are correct — they drive the surviving facade methods. **Registered as T15 sites**; T20's
-verifier must not read the stale names as evidence the moves did not happen. Note this is about the
-**test** file, which survives PR-B; the *source* `rlm-synapse.ts` is the one that dies at T9, when
-`correctQuery` leaves. The test file's own name is a T15 decision, not T9's.
+**One `perModule` figure moves in the other direction and it is expected**:
+`contextual-search-rlm.ts` **4 → 5** at T9, because `#hybridSearchDeps()` reads `this.keywordSearch`
+and nothing in the root's class body read that member before. The declaring file is excluded from
+`foreign` (`search-hub-metric.ts:150`), so it never touches `maxForeignReach`. Expect the same
+increment at T10/T12/T13 and a high final figure at T14 — a composition root reading its own fields
+is the target state.
+
+**`rlm-synapse.test.ts` was deliberately left untouched at T7, T8 and T9**, so its sensor stays
+exactly **26** and all three tasks stay inside AC-3's bound. Consequence: its header comment and all
+three `describe` block names now cite functions that live in `graph-stream.ts`, `session-bias.ts` and
+`hybrid-search.ts`. The tests themselves are correct — they drive the surviving facade methods, and
+its five `correctQuery` cases are now load-bearing LATE-BIND evidence for T9. **Registered as T15
+sites**; T20's verifier must not read the stale names as evidence the moves did not happen. The
+**source** `rlm-synapse.ts` is gone as of T9; the **test** file survives PR-B and its own name is a
+T15 decision.
+
+**T15's site list is frozen at `ce26f28` and Phase 1 has outgrown it — re-enumerate, do not work
+from it.** Measured after T9: **27** tracked files carry `rlm-` outside `CHANGELOG.md` / `.specs/` /
+`.ua/`, against the 19 recorded in the plan. Every extraction adds a provenance comment naming the
+file the body came from. Two classes, and T15 must not conflate them: references to `rlm-*.test.ts`
+(those files *survive*; renaming them is T15's own decision) versus references to a now-deleted
+`rlm-*.ts` source (`docs/ONBOARDING.md:148`, `graph-stream.ts:11`, `session-bias.ts:20`,
+`hybrid-search.ts:11,15,24`, `contextual-search-rlm-coverage.test.ts:158`). Full breakdown in
+`tasks.md` under *T15's sensor, scoped*.
 
 **Two things a resumer must not re-derive the hard way:**
 
