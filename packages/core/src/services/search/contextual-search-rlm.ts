@@ -69,11 +69,12 @@ import type {
   SearchDegradationReporter,
 } from "./search-diagnostics.js";
 import {
-  clearProjectIndexImpl,
-  getProjectStatsImpl,
-  warmupCacheImpl,
-  getAnalyticsImpl,
-} from "./rlm-admin.js";
+  clearProjectIndex,
+  getProjectStats,
+  warmupCache,
+  getAnalytics,
+  type IndexAdminDeps,
+} from "./index-admin.js";
 
 /**
  * ContextualSearchRLM - Main contextual search service
@@ -81,20 +82,24 @@ import {
 export class ContextualSearchRLM {
   // NOTE (M14 Phase 3): fields below were `private`. Relaxed to `public`
   // (modifier dropped) so the extracted delegate modules in
-  // rlm-search.ts / rlm-admin.ts can read them via the passed
-  // `rlm` parameter. Runtime-identical; type-surface only. See design.md
+  // rlm-search.ts can read them via the passed `rlm` parameter.
+  // Runtime-identical; type-surface only. See design.md
   // "Encapsulation decision (accepted cost)".
   //
-  // PR-B T10 dropped rlm-indexing.ts from that list — project-indexer.ts reads
-  // these through `IndexerDeps`, never off the instance. By T14 no reader is
-  // left and the whole note goes with them.
+  // PR-B T10 dropped rlm-indexing.ts from that list and T12 dropped
+  // rlm-admin.ts — both read these through their deps records now, never off the
+  // instance. rlm-search.ts is the last reader; by T14 the note goes with it. The
+  // fields stay public regardless (design.md §4.3.1, the ~80 stub sites).
   keywordSearch!: Awaited<ReturnType<typeof getKeywordSearch>>;
   vectorStore!: Awaited<ReturnType<typeof getVectorStore>>;
   indexManager!: IndexManager;
   searchCache!: Awaited<ReturnType<typeof getSearchCache>>;
   analytics!: Awaited<ReturnType<typeof getSearchAnalytics>>;
   symbolRepo!: Awaited<ReturnType<typeof getSymbolRepository>>;
-  // Visibility relaxed from `private` so rlm-admin.ts can read via rlm param.
+  // Was relaxed from `private` so rlm-admin.ts could read it via the rlm param.
+  // T12 removed that reader: index-admin.ts takes it through `IndexAdminDeps`.
+  // Still public because 4 test sites assign it post-construction
+  // (contextual-search-rlm-coverage.test.ts:343,354; rlm-admin.test.ts:85,96).
   fileFilterCache: FileFilterCache;
   /** Phase 2: query understanding (LLM rewrite + HyDE). Default-off, silent-degrade. */
   // Visibility relaxed from `private` so rlm-search.ts can read via rlm param.
@@ -602,10 +607,33 @@ export class ContextualSearchRLM {
   }
 
   /**
+   * Assemble index-admin.ts's narrow deps record — per call, from current field
+   * values (LATE-BIND, design.md §4.3.1). Never hoist to a constructor capture or
+   * a first-call memo. Property reads only: `getAnalytics` does not await init, so
+   * on a fresh facade these are all `undefined`, and a dereference here would
+   * redden a path the original never reached. `search` is an arrow wrapper for the
+   * same call-time-dispatch reason as `#indexerDeps()`'s two. Measurements for
+   * both, and the 7 stub sites that make `search` load-bearing, live on
+   * `IndexAdminDeps` in index-admin.ts — kept there so this file stays under
+   * G-HUB's 700-line ceiling (685 after T12).
+   */
+  #indexAdminDeps(): IndexAdminDeps {
+    return {
+      vectorStore: this.vectorStore,
+      keywordSearch: this.keywordSearch,
+      searchCache: this.searchCache,
+      fileFilterCache: this.fileFilterCache,
+      analytics: this.analytics,
+      search: (query, projectId, options) => this.search(query, projectId, options),
+    };
+  }
+
+  /**
    * Clear project index
    */
   async clearProjectIndex(projectId: string): Promise<{ deleted: number }> {
-    return clearProjectIndexImpl(this, projectId);
+    await this.ensureInitialized();
+    return clearProjectIndex(this.#indexAdminDeps(), projectId);
   }
 
   /**
@@ -615,7 +643,8 @@ export class ContextualSearchRLM {
     totalDocuments: number;
     totalSize: number;
   }> {
-    return getProjectStatsImpl(this, projectId);
+    await this.ensureInitialized();
+    return getProjectStats(this.#indexAdminDeps(), projectId);
   }
 
   /**
@@ -628,13 +657,18 @@ export class ContextualSearchRLM {
     _projectPath: string,
     customQueries?: string[],
   ): Promise<{ queriesWarmed: number; errors: number }> {
-    return warmupCacheImpl(this, projectId, _projectPath, customQueries);
+    await this.ensureInitialized();
+    return warmupCache(this.#indexAdminDeps(), projectId, _projectPath, customQueries);
   }
 
   /**
    * Get analytics instance for querying metrics
    */
+  // No `await this.ensureInitialized()` — the original never had one, so adding
+  // it would be a behavior change. That makes this T12's blind-recursion mutation
+  // subject: the only delegate with no `await` ahead of it, so it overflows the
+  // stack at once instead of starving the macrotask queue as T10's did.
   getAnalytics(): SearchAnalytics | SearchAnalyticsPg {
-    return getAnalyticsImpl(this);
+    return getAnalytics(this.#indexAdminDeps());
   }
 }

@@ -145,7 +145,7 @@ cannot be T17's referent.
 a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
 unilaterally — it is a release-semantics decision.
 
-### Execute — Phase 1 STARTED (2026-07-29), T6a–T11 done, T12 next
+### Execute — Phase 1 STARTED (2026-07-29), T6a–T12 done, T13 next
 
 **Two branches, and the first one is gone.** T6a and T6 were executed on
 `refactor/search-facade-split-phase-1` (cut from `d628464`) and reached `main` through **PR #46,
@@ -167,7 +167,8 @@ with a merge commit.**
 | T8 | `29ea8b9` | `applySynapseState` → `session-bias.ts` with `SessionBiasDeps`; the AC-2 and LATE-BIND sensors |
 | T9 | `2664008` | `correctQuery` → `hybrid-search.ts` with `HybridSearchDeps`; **`rlm-synapse.ts` deleted whole**; a second LATE-BIND sensor |
 | T10 | `b9d444d` | six indexing surfaces → `project-indexer.ts` with `IndexerDeps`; `ensureInitializedImpl` absorbed into the root; **`rlm-indexing.ts` deleted whole**; a third LATE-BIND sensor |
-| T11 | on `-1b` | `injectedDeps.indexManager` — the F4 seam, the only *added* seam in PR-B; `index-manager-seam.test.ts` red under three violation shapes |
+| T11 | `23470ce` | `injectedDeps.indexManager` — the F4 seam, the only *added* seam in PR-B; `index-manager-seam.test.ts` red under three violation shapes |
+| T12 | on `-1b` | four admin surfaces → `index-admin.ts` with `IndexAdminDeps`; **`rlm-admin.ts` deleted whole**; `index-admin-late-bind.test.ts` red under five mutation shapes |
 
 † unreachable — squashed into `main` by #46. Nothing is pushed from `-1b`; it is local only.
 
@@ -309,12 +310,77 @@ extension to PATCHABLE's measured footprint** — `rlm-indexing.test.ts` stubs `
 them; both are exercised through `ensureFreshIndex` / `_indexProjectInternal`, which is why
 `IndexerDeps` carries them as per-call arrow wrappers. Full record in `tasks.md`.
 
-**Next: T11** — the `IndexManager` injection seam (F4), 1.5 h. **Its site moved with T10**: it is
-`this.indexManager = new IndexManager(this.vectorStore)` inside `ensureInitialized()` in
-`contextual-search-rlm.ts`, not `rlm-indexing.ts:586` (deleted) and not `project-indexer.ts`, which
-imports `IndexManager` as a type only. Needs the parity test plus the positive
-injected-stub-is-read assertion. Then **T12**, **T13**, and stop at **T14**, where G-HUB going green
-is the moment the split is proven; T13 is budgeted 5.5 h and is most likely to overrun.
+Gates at T12 — **every structural prediction held to the number**: `lint` 0 · `type-check` 0 (6/6) ·
+`build` 0 (5/5) · `test:scripts` **732 pass / 0 fail across 39 files**, exit 0 ·
+`check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) · characterization net
+**160** across 7 suites, every suite individually unchanged · `search-synapse-integration` **5/0** ·
+`session-bias` **10/0** · `session-bias-late-bind` **3/0** · `hybrid-search-late-bind` **3/0** ·
+`project-indexer-late-bind` **4/0** · `index-manager-seam` **3/0** · `search-ranking-regression`
+**2/0** · new `index-admin-late-bind` **4/0** · coverage exclusions **9** · G-HUB exit 1, 25 files,
+**foreign modules 3 → 2**, reach **14** by `rlm-search.ts`, members **23**, `perModule {csr 15,
+search 14, warmup 1}` — `rlm-admin.ts` gone, `csr` **14 → 15** and predicted — exactly **one** type
+above the ceiling, and **`maxFileLoc` 641 → 675 against a 700 ceiling** · D1 `delegateScope`
+**9 → 5**, facade-taking **6 → 2**, scoped LOC **626 → 524**, all three predicted to the number ·
+AC-3 budget **0**, spent **0** · T15's `rlm-` count **29 → 30**.
+
+**T12 surfaced an eighth plan defect, and it contradicts the *resolution* of the seventh — the fourth
+time in this feature a correction has inherited the defect it was correcting.**
+
+8. **The seventh defect's T12 sites do not fire, and one of them cannot be narrowed at all** (T12).
+   The seventh defect's enumeration, the T12 row and `HANDOFF.md` all predicted that
+   `fileFilterCache: FileFilterCache` and any `SearchAnalytics`/`SearchAnalyticsPg` field "**will**
+   fire" because they are *required* record fields rather than T11's optional seam. **Measured: false
+   for both.** The analytics field cannot fire on three independent grounds — `SearchAnalytics` is an
+   alias re-export whose declaring line `stripNonCode` deletes, so it is **never declared** and never
+   appears in the metric's output; `SearchAnalyticsPg` only ever occurs after `| `, never in
+   `<name>:` position; and `getAnalytics` returns `deps.analytics` **whole**, never dereferencing it.
+   It also **must not** be narrowed: `Pick<>` there breaks `type-check`, because the value is returned
+   through the root's public `getAnalytics(): SearchAnalytics | SearchAnalyticsPg`, a 24-importer
+   surface — so the row's instruction was *unexecutable*, not merely unnecessary.
+   `fileFilterCache` **does** trip the mechanism (foreign 0 → 1, reach 0 → **1**) but **1 ≤ the
+   ceiling of 3**, so it yields no second violation, unlike `IndexManager` at reach 4. **Resolved
+   inside T12's own write set** on T10's precedent: keep the `Pick<>` as honest typing per §4.4,
+   record it as *not* a fired sensor, and correct the T12 and T13 rows in the same commit. What
+   generalises: *"declared in the gated directory + required field"* is a **category**; whether the
+   annotation pattern captures a binding and whether the module dereferences it are the **mechanism**,
+   and they are two separate measurements. **T13's `queryUnderstanding` is the one site left where
+   both may hold** — §2.1 shows it dereferenced — so T13 measures both variants rather than inheriting.
+
+**Two more T12 findings that are not plan defects but change how T13 works.**
+
+- **A trap no task row names: G-HUB gates on `MAX_FILE_LOC` 700 as well as on reach.** Phase 1 moves
+  LOC out of the `rlm-*` files and *into* `contextual-search-rlm.ts`, which took the largest-file title
+  at T10 (641). T12 as first written pushed it to **685**; trimming prose into `index-admin.ts` (the
+  `IndexerDeps` precedent) brought it to **675**, leaving **25 lines**. T13 grows the root again.
+  Crossing 700 fails G-HUB on an axis unrelated to hub coupling and makes T14 unclosable for a reason
+  nothing names. Carried as a **sensor** on the T13 row.
+- **T10's blind-recursion rule is necessary but not sufficient, and T12's surface has no observable
+  subject.** T10 said use a delegate with no preceding `await`. `getAnalytics` is exactly that and
+  **hangs anyway** — `tsc` 0, then >60 s at ~98 % CPU with no throw, reproduced outside `bun test` in a
+  bare script with a `try/catch`, so it is not the runner's error formatting. The missing condition is
+  that the delegate be **`async`**; an async frame cannot be elided, which is why T9's and T10's
+  overflowed at once and read cleanly. A JavaScriptCore tail-call explanation was **tested and not
+  confirmed** and is recorded as unverified. **A hang is not blindness** — no such run reports green —
+  and the positive runtime evidence is the module spy's `toHaveBeenCalledTimes(2)`. The naive half is
+  caught statically (**TS2554**). T13 inherits both mechanisms; it must not budget time hunting a
+  subject.
+
+Also measured at T12: **`git grep -E` cannot express the PATCHABLE sweep and fails silently** — POSIX
+ERE has no `\s`, so `-E` returns zero matches and exit 1 where `-P` returns **7** (`rlm.search` stubbed
+at `rlm-admin.test.ts:124,137,148` and `contextual-search-rlm-coverage.test.ts:382,395,407,416`, all
+bare assignments, a **7-site extension** to PATCHABLE). Those 7 are also the only 7 `warmupCache` calls
+in the suite and all assign *before* they call, so a `.bind(this)` at assembly time is invisible to the
+entire pre-existing suite — hence the arrow wrapper and the new sensor's test 4. Seventh
+two-methods-two-answers in this feature: **name the flag, not just the tool**.
+
+**Next: T13** — search surfaces, `rlm-search.ts` → `hybrid-search.ts`, **5.5 h, the task most likely
+to overrun**: the highest-arity function in the matrix (`searchImpl`, 455 LOC, 13 members) and the only
+Phase 1 task wiring into four already-extracted siblings. Its row gained four things at T12: the
+`queryUnderstanding` two-variant measurement, the 25-line file-size headroom, the "do not hunt for a
+recursion subject" note, and its AC-3 budget of 3 now **enumerated** —
+`contextual-search-rlm-coverage.test.ts:647`, `:655`, `:844`. Still owed: the memo mutation against its
+own surface, the one-violation hub check, and widening `hybrid-search-late-bind.test.ts`'s third test
+from one key to five. Then stop at **T14**, where G-HUB going green is the moment the split is proven.
 
 **T6 alone surfaced three plan defects, two needing a spec-owner decision.** All three are the
 `ensureInitializedImpl` class — a consequence `design.md` settled in substance and never wrote into

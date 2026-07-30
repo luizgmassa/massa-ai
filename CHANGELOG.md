@@ -127,6 +127,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directory can move those numbers by itself; this field is optional, and that is what keeps it outside
   what the measurement looks at.
 
+- **Index administration is now a standalone capability module, and the admin delegate file is gone.**
+  Clearing a project's index, reading its statistics, warming the search cache and reaching the
+  analytics instance move out of `rlm-admin.ts` into the new `index-admin.ts` and trade the search
+  facade for `IndexAdminDeps` — the three stores they actually read, the file-filter cache, the
+  analytics instance, and a callback back into search. With them gone `rlm-admin.ts` has no exports
+  left and is **deleted**. Functions in the search directory that still take the facade drop from
+  **6 to 2**, and the amount of code inside that boundary drops from **626 to 524** lines.
+
+  Behaviour is unchanged, including the two details easiest to lose in a move like this. Lazy
+  initialisation still runs first for the three surfaces that always ran it, in the same order — it is
+  now the first statement of the service method instead of the first statement of the delegate, so the
+  fields the module reads are populated exactly as before. And the analytics accessor still does *not*
+  initialise, which is what it has always done; adding an await there would have been a behaviour
+  change dressed as a tidy-up.
+
+  Cache warmup is the first extracted surface that calls **back** into search, so its dependency record
+  carries a callback rather than a captured reference, and the callback re-reads the method each time it
+  runs. That is not a style preference: it is what keeps a substituted search implementation effective,
+  and the difference is invisible to every pre-existing test, because all of them substitute before they
+  call rather than between two calls. A test that swaps the implementation mid-flight now pins it.
+
+  The number of modules reading the search facade drops from **3 to 2**. Deepest foreign reach stays at
+  **14** and the hub gate still fails — both set by `rlm-search.ts`, and neither moves until that file
+  is split, which is the next step. One measurement note, because the previous two releases each carried
+  one and this one corrects them: the earlier finding that a dependency field typed with a class from the
+  same directory can move the gate by itself does **not** apply to either nominal field here. One of them
+  is not a distinct type at all but an alias re-export, so the measurement never sees it; and its value is
+  handed back through a public accessor, so narrowing it would break the published return type. Both were
+  measured rather than assumed, in both directions.
+
 ## [1.11.0] - 2026-07-29
 
 ### Changed
