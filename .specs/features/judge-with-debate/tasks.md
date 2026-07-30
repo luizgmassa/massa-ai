@@ -39,7 +39,15 @@ Guidelines found: repo `AGENTS.md` (Tech Stack: `bun test`, `bun run test:script
 | Full | After T9 (pre-close) | `bun run test:scripts` |
 | Build | T10 close-out | `bun run lint && bun run type-check && bun run test:scripts && bun scripts/generate-subagent-artifacts.ts --check && bun scripts/generate-skill-artifacts.ts --check` |
 
-Baseline (to capture at T0, evidence-or-zero): `test:scripts` pass/fail counts, both `--check` results, lint, type-check.
+Baseline (captured T0, 2026-07-29, worktree `../massa-ai-wt-judge-with-debate` @ origin/main + planning commit `1eb314f`, tracked state):
+
+- `bun run lint`: 0 errors
+- `bun run type-check`: 6/6 successful
+- `bun scripts/generate-subagent-artifacts.ts --check`: No drift
+- `bun scripts/generate-skill-artifacts.ts --check`: No drift
+- `bun run test:scripts`: **737 pass / 1 fail across 40 files** — the 1 fail is the pre-existing
+  environmental `__zzz_crash_signal_probe` crash suite (documented environmental in STATE.md);
+  zero other failures. Zero-new-failures rule is measured against this.
 
 ---
 
