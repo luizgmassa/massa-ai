@@ -7,7 +7,7 @@ Use this before making Maestro claims. It defines source authority, fact tags, l
 1. `official-doc`: current official Maestro documentation, preferably `.md` pages under `https://docs.maestro.dev/`.
 2. `live-help`: successful local CLI transcript from the installed Maestro binary, including command, exit code, stdout, and stderr.
 3. `repo-convention`: current repository flows, config, CI, scripts, report paths, and existing naming/tag patterns.
-4. `excluded/unverified`: NotebookLM answers, `/Users/luizmassa/Downloads/questions.md`, blog posts, memory, or assumptions that are not confirmed by the first three sources.
+4. `excluded/unverified`: NotebookLM answers, a user-supplied coverage checklist, blog posts, memory, or assumptions that are not confirmed by the first three sources.
 
 If sources conflict, prefer `official-doc` for product behavior and `live-help` for installed CLI syntax. Mention version drift when `live-help` differs from docs.
 
@@ -39,7 +39,7 @@ If PATH cannot resolve `maestro`, mark local CLI validation blocked. If the bina
 
 ## Coverage Checklist Handling
 
-Use `/Users/luizmassa/Downloads/questions.md` as a checklist to ask "did we cover this surface?" Never cite it as source truth.
+When the user supplies a coverage checklist, use it to ask "did we cover this surface?" Never cite it as source truth, and never assume one exists — if the user supplied none, this section imposes no requirement.
 
 Checklist-only facts that must stay non-normative unless independently verified:
 

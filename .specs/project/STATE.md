@@ -1,6 +1,95 @@
 # massa-ai Spec State
 
-## Current — Model Profile Registry
+## Current — skills/ Directive Dedup (T1–T5 of 12, stopped at user instruction)
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-skills-directive-dedup`
+- workflow: spec-driven (Large — Specify + Design + Tasks + Plan Challenge + Execute)
+- feature: `skills-directive-dedup` — **Specify, Design, Tasks and the full Plan Challenge
+  are DONE. Execute is T1–T5 of 12; T6–T12 NOT STARTED. Independent validation NOT RUN.**
+  Branch `refactor/skills-directive-dedup`, worktree `.claude/worktrees/skills-dedup`, cut
+  from `origin/main` @ `6d5dc6b`. Head `ed1028e`, 6 commits, tree clean, every gate green.
+  **Not pushed, no PR** — stopping was the user's instruction. Read `.specs/HANDOFF.md`
+  and `.specs/features/skills-directive-dedup/{spec,design,tasks}.md` for the task
+  contract, not this file.
+
+**The brief's premise was refuted by measurement, and that is the headline.** The request
+was to remove unnecessary/duplicated agents, workflows and references. There are none to
+remove: `skills-reference-graph.ts` reports **0 orphans across 151 files**, and
+`skills-duplication-metric.ts` puts removable literal duplication at **313 lines of
+12,639 (2.5%)** at window=4. A large share of that is *deliberately mandated* —
+`skills-harness-integrity.test.ts` asserts the persona clause byte-identical across 3
+packet definitions and 22 dispatch blocks, and four fixed sentences in all 17 charters,
+because a subagent receives only its charter and a pointer would resolve to a file not in
+context. **The duplicate is the contract.**
+
+**What the audit found instead: four correctness defects the duplication was hiding**,
+each shipping to users through four npm-published plugin bundles, each invisible to a
+fully green suite. Every one had a guard nearby that did not cover it; three were closed
+by correcting the *direction* or *surface* of an existing gate rather than adding one.
+
+1. **`skills/AGENTS.md` was a second hand-authored model-naming site** (T3, `99afd3a`),
+   contradicting `model-profiles.json`'s own "THE only hand-authored place that names a
+   model", three lines below a step reading "never a model name". Stale for `planner`
+   (said GLM-5.2, resolves minimax-m3) and `requirements-analyst` (said DeepSeek V4 Pro,
+   resolves glm-5.2) — two of the three roles PR #51 renormalized. `navigator`, the third,
+   matches **only by luck**. `meta-judge`'s `kimi-k3` is profile-ambiguous rather than
+   stale: it is the `deep` model under `heavy`/`home`/`open_models`/`local_models`, so it
+   reads as correct to anyone on `heavy` and is wrong on the shipped default — worse than
+   plainly stale. **The gate already existed and was never pointed here**:
+   `verify-model-tokens.ts` policed four surfaces and `skills/AGENTS.md` was not one.
+   Replayed against the pre-fix file the unchanged matcher reports **17 hits**, one per
+   agent row.
+2. **A developer's home path shipped as a named evidence tier** (T2, `bc47359`).
+   `/Users/<name>/Downloads/questions.md` in `references/maestro.md` and
+   `references/maestro/fact-ledger.md`, 3 sites — one a tier of the fact ledger's
+   taxonomy, so agents were told to quarantine claims as `excluded/unverified` unless they
+   appeared in a file they could not open.
+3. **`judge` and `meta-judge` were absent from `agent-orchestration.md` for a whole
+   release** (T4, `dd09cc1`). The "no phantom roles" guard checks that mentioned paths
+   resolve — the opposite direction from coverage — and a charter never mentioned cannot
+   produce a dead link. Fixing the direction exposed five more, carried in prose by role
+   name rather than by the checkable charter path.
+4. **The roster guard could not match the string it was written to ban** (T5, `bc5a76a`).
+   It banned three literal spellings of "16"; `docs/ONBOARDING.md` read "16 **sub-agent**
+   specialists" and the hyphen defeated all three. Also found:
+   `.claude-plugin/marketplace.json` advertising **12** in the shipped Claude marketplace
+   description, `CLAUDE.md` at 15 twice, and `FEATURES.md` describing the registry as 12
+   while enumerating 12 of the 17 names.
+
+**Two process failures, recorded rather than hidden.** (A0) The full Plan Challenge gate
+ran **concurrently with Execute** instead of before it — the critic read files that
+changed between its own tool calls, so every amendment A1–A7 exists because the critique
+arrived after the commit it should have preceded. (Open risk) **One commit was made
+through a red gate** (921/1); it did not reproduce across four subsequent full runs and
+the failing test could not be named, because the output had been reduced to counts.
+
+**The plan critic's best finding: the plan fell into its own metric's blind spot.** P5
+extracted the four retrieval-list items shingling can prove identical between `SKILL.md`
+and `mcp-tools.md`, while items 1–6 and 11 of the *same numbered list* are paraphrase
+duplicates between the *same two files*. Four of eleven would split one procedure across
+two files and leave the larger duplicate. **P5 withdrawn (A6).** The user chose
+`mcp-tools.md` to own the whole list with `SKILL.md` keeping one load line, accepting the
+conditional-load risk; `design.md` §D3 records the two mitigations T7 must implement.
+
+**Decisions locked with the user:** scope tier B — single-source, fix drift, and collapse
+the audit/fix family scaffolding; **not** tier C, so no file is deleted or merged and no
+pinned count changes. The duplication metric **ships** as a committed ceiling gate.
+
+**Gate at `ed1028e`:** `test:scripts` **922 pass / 0 fail across 45 files** (baseline
+892/44), `test:plugins` 96/0, `lint` 0, both generators `--check` **No drift**,
+`verify-model-tokens.ts` OK across 155 files. `excessLines` still **313** — unmoved
+because T6–T8 *are* the dedup and none has run.
+
+**Open / residual:** `EXCESS_CEILING = 313` in `skills-duplication-metric.test.ts` is the
+pre-cleanup value and enforces nothing until T9 lowers it. `excessLines` is
+pre-pointer-cost, so net reduction lands below 313. T11 (CHANGELOG) is required before any
+PR — CI fails a PR without one. T7's accepted risk is this feature's own defect shape and
+must be mitigated, not inherited. massa-ai MCP server was not registered this session; all
+state came from `.specs/` files and source reads.
+
+
+## Previous — Model Profile Registry
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-model-profile-registry`
