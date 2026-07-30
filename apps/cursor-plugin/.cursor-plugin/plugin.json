@@ -1,5 +1,5 @@
 {
   "name": "massa-ai",
-  "version": "1.12.1",
+  "version": "1.13.0",
   "description": "massa-ai — semantic code search, memory, and context compression for Cursor"
 }
