@@ -45,9 +45,14 @@ Baseline (captured T0, 2026-07-29, worktree `../massa-ai-wt-judge-with-debate` @
 - `bun run type-check`: 6/6 successful
 - `bun scripts/generate-subagent-artifacts.ts --check`: No drift
 - `bun scripts/generate-skill-artifacts.ts --check`: No drift
-- `bun run test:scripts`: **737 pass / 1 fail across 40 files** — the 1 fail is the pre-existing
-  environmental `__zzz_crash_signal_probe` crash suite (documented environmental in STATE.md);
-  zero other failures. Zero-new-failures rule is measured against this.
+- `bun run test:scripts`: **737 pass / 1 fail across 40 files** as read from the output tail —
+  the 1 fail is the pre-existing environmental `__zzz_crash_signal_probe` crash suite.
+  **Correction (found at T9's full gate):** the tail read hid earlier-process output;
+  `verifyPackageContents` was also red at baseline because the fresh worktree had no
+  `apps/*/dist` (environmental, documented in HANDOFF; fixed by `bun run build`, not by any
+  code change). True baseline: 737 pass / **2 fail, both environmental**. Zero-new-failures is
+  measured against that. Post-fix full gate @ T9: **772 pass / 0 fail across 41 files** —
+  better than baseline on every count.
 
 ---
 

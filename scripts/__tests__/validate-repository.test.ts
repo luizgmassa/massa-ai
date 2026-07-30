@@ -710,9 +710,10 @@ describe("agents harness routing", () => {
     "architecture-specialist", "test-engineer", "documentation-agent",
     "audit-specialist", "mobile-specialist",
     "plan-critic", "furps-analyst", "navigator",
+    "meta-judge", "judge",
   ];
 
-  test("skills/agents/ exists with one subdir per agent (16)", async () => {
+  test("skills/agents/ exists with one subdir per agent (17)", async () => {
     expect(await fileExists(AGENTS_SUBDIR)).toBe(true);
     const entries = await fs.readdir(AGENTS_SUBDIR, { withFileTypes: true });
     const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();

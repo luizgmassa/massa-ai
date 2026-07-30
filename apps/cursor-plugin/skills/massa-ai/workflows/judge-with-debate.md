@@ -13,6 +13,10 @@ disagreements over **up to 3 rounds**; the panel converges on a consensus verdic
 honest no-consensus. Ported from the NeoLabHQ `judge-with-debate` pattern; this file is the
 canonical contract here — repository contracts win on any conflict with the base.
 
+Before the first substantive read, load `references/project-context.md` and run the
+project-context intake sweep for the target repository (the workspace holding the artifact
+under evaluation, which may differ from this repo).
+
 Report contracts (paths, schemas, fidelity checklist) live in
 `references/audit-report-io.md` → **Judge With Debate Report Contracts**. Dispatch contract,
 capability packet, output contract, Name Resolution, and feedback labels live in
