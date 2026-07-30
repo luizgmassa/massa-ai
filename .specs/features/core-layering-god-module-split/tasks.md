@@ -186,7 +186,7 @@ it is cheapest and `searchImpl` (455 LOC, 13 members) lands last, when everythin
 | **T11** | `IndexManager` injection seam (**F4**) | **`contextual-search-rlm.ts`** — re-pointed. The first draft named `rlm-indexing.ts:586`, which is *inside* `ensureInitializedImpl` and no longer exists after T10. | the one dependency that cannot be injected today; add the `injectedDeps.indexManager` field | default to today's direct construction; a parity test proves behavior identical when nothing is injected — **plus one positive test that an injected stub `IndexManager` is actually read**, since the parity test alone exercises only the default path and cannot fail on a seam that is wired but never consulted | 1.5 h |
 | **T12** | admin surfaces | `rlm-admin.ts` → `index-admin.ts` | ~~six stores~~ **three** stores (`vectorStore`, `keywordSearch`, `searchCache`) + `fileFilterCache` + `analytics` + the re-entrant `search` callback. **Narrow `fileFilterCache` with `Pick<>`; do NOT narrow the analytics field** — see [the eighth plan defect](#eighth-plan-defect-the-seventh-defects-t12-sites-do-not-fire-and-the-analytics-field-cannot-be-narrowed) | `rlm-admin.test.ts` (**7** cases) + the 4 `fileFilterCache` assignment sites. **Plus the T10 gate**: the hub metric reports exactly **one** type above the ceiling and it is `ContextualSearchRLM` — read the whole `types` array, not the `ContextualSearchRLM` row. **Plus the memo mutation, run against T12's own surface** (T9's finding; T10 measured it blind at the richest surface in the repo, so do not infer) — on a delegate with **no preceding `await`**, or it starves the event loop and hangs instead of failing at 5 s. *(Measured at T12: "no preceding `await`" is necessary and **not sufficient** — see the executed row.)* | 1.5 h |
 | **T13** | search surfaces | `rlm-search.ts` → `hybrid-search.ts` | `keywordSearch`, `vectorStore`, `searchCache`, `analytics`, `queryUnderstanding` → `HybridSearchDeps`. **`queryUnderstanding: QueryUnderstandingService` is the one genuinely open seventh-defect site left** — `QueryUnderstandingService` is declared in the gated directory, is a bare nominal type, and §2.1 shows `searchImpl` *dereferences* it. **Measure both variants by scratch simulation before choosing**, the way T12 did; do not inherit T12's answer, which was "does not fire" for reasons specific to its two fields. The analytics field carries T12's measured finding: it cannot fire and cannot be `Pick<>`-narrowed | `rlm-search.test.ts` (**31** cases) + `search-dependency-outage` + `search-filter-overfetch` + `search-ranking-regression` pass counts. **Plus the same three T10 additions as T12**: one-violation hub check, own memo mutation, mutation subject with no preceding `await` — **and read T12's refinement of that last one first, because on T12's surface no subject satisfied it**. ~~Also the point where `hybrid-search-late-bind.test.ts`'s third test must widen from one key to five.~~ **Wrong by three, and incomplete: measured at T13, the record is 8 keys, test 1 could not survive unchanged, and a test 4 was needed — see [the disposition of §2.1's thirteen](#t13--the-disposition-of-21s-thirteen).** **Plus a new hard one: `contextual-search-rlm.ts` is 675 LOC against G-HUB's `MAX_FILE_LOC` 700** — T12 left **25** lines of headroom and T13 grows the root again (`#hybridSearchDeps()` goes from 1 field to 5, plus hoisted `await`s on four more methods). Crossing 700 makes G-HUB exit 1 on a second, independent axis and T14 unclosable. Keep the prose on `HybridSearchDeps` in `hybrid-search.ts`, as T12 did | **5.5 h** |
-| **T14** | root → composition root | `contextual-search-rlm.ts` | ~~assemble narrow deps **per call**~~ — done incrementally at T8–T13; state fields stay public (§4.3.1). **Re-scoped at the T13 review point to the root's final cleanup**: the 10 `Visibility relaxed` comments that exist only for now-deleted `rlm-*.ts` readers, and the remaining stale provenance pointers | ~~**G-HUB** exits **0**~~ — **that fires at T13, and reading it here would be a gate already green before the task starts.** See [the ninth plan defect](#ninth-plan-defect-t14s-sensor-fires-at-t13). G-HUB exit 0 is demoted to an **invariance** check (T7's vocabulary). The **discriminating** sensor is `git grep -c 'Visibility relaxed' -- packages/core/src` **10 → 0** and `git grep -l 'rlm-search' -- packages/core/src` → empty, both observed non-zero before the edit | 2 h |
+| **T14** | root → composition root | `contextual-search-rlm.ts` | ~~assemble narrow deps **per call**~~ — done incrementally at T8–T13; state fields stay public (§4.3.1). **Re-scoped at the T13 review point to the root's final cleanup, then re-scoped again after measurement** — see [the tenth plan defect](#tenth-plan-defect-t14s-re-scoped-sensor-is-both-unsatisfiable-and-tautological). Subject is **11 sites in `contextual-search-rlm.ts`**: the 10 `Visibility relaxed` comments plus `:88`. **`:93` and `:184` must NOT be touched** — the first is T13's own record of the deletion, the second is class 1 and the only place in source recording PATCHABLE's evidence trail | ~~**G-HUB** exits **0**~~ (fires at T13 — ninth defect) and ~~`git grep -l 'rlm-search'` → empty~~ (**unsatisfiable — tenth defect**). G-HUB exit 0 and the D1 zeros are **invariance** checks (T7's vocabulary). The **discriminating** sensor is the **private-revert mutation**: reprivatise the ten members and `bunx tsc --noEmit -p packages/core/tsconfig.json` must report **exactly 1 × TS2341**, on `queryUnderstanding`, from `production-wiring.ts:51`. Plus two positive content checks, because a grep reaching 0 is satisfied by bare deletion: `git grep -c 'rlm-search.test.ts:156' -- …/contextual-search-rlm.ts` stays **1**, and the replacement block cites **§4.3 for the nine methods and §4.3.1 for the one field** | 2 h |
 
 **Every task in Phase 1 additionally runs:** `bun run lint`, `bun run type-check`,
 `bun scripts/check-frozen-anchors.ts`, `bun scripts/check-characterization.ts`, and
@@ -412,6 +412,73 @@ rule. They are historical the moment `rlm-search.ts` dies, but removing them her
 new sensor with them — and the root already carried a comment, written at T10, saying "by T14 the
 note goes with it". The rule and the exception are both recorded so a later reader does not read the
 omission as an oversight.
+
+### Tenth plan defect: T14's re-scoped sensor is both unsatisfiable and tautological
+
+Found at the **T13/T14 boundary**, before any T14 edit, by measuring the sensor rather than reading
+it. **It is the sixth time in this feature that a correction inherited the defect it was correcting,
+and the shortest-lived one yet: the defective text is the ninth defect's own resolution, written into
+this file during T13.** The executor wrote it from the reviewer's option text without measuring its
+scope — the same motion the previous nine punish.
+
+Two independent defects in one sensor, pointing opposite ways. Both reproduced by the executor and,
+separately, by a read-only `massa-ai-plan-critic` run against the T14 row.
+
+**(a) `git grep -l 'rlm-search' -- packages/core/src` → empty is unsatisfiable, and satisfying it
+would be wrong.** Measured: **31** matches across **9** files, of which T14 owns **11 lines in one
+file**. `rlm-search.test.ts` alone contributes nine — its header and eight `describe("rlm-search — …")`
+blocks — and *this document already says that file survives PR-B and its rename is T15's decision*
+(see [T13 and T15](#t13-and-t15--the-count-moves-back-to-29-and-it-is-the-first-decrement)). The
+sensor is scoped to a **population** (`packages/core/src`) when its subject is one file, and reaching
+it would require either silently widening the write set into `hybrid-search.ts` and four test files,
+or re-scoping the sensor mid-task — which is the motion this repository treats as indistinguishable
+from weakening one. **Exactly the shape of T15's AC-3** (*"`rg 'rlm-'` returns only CHANGELOG and
+`.specs/`"*, unsatisfiable because of 320 `.ua/` occurrences), found independently, one section apart.
+
+**(b) `'Visibility relaxed' 10 → 0` is a tautology.** It is satisfied by deleting the ten lines with
+no replacement — which the plan's own instruction forbids — because nothing in the sensor set checks
+for the **presence** of the replacement. Absence of a false statement is not presence of a true one.
+**The concrete violation it would hide**: an executor chasing (a) deletes
+`contextual-search-rlm.ts:184`, which cites `rlm-search.test.ts:156` as one of PATCHABLE's 16
+monkey-patch sites. That line is the only place in *source* recording that constraint's evidence
+trail, it is **class 1** (a pointer to a file that survives), and every proposed check — both greps,
+all pass counts, G-HUB, `maxFileLoc` — stays green whether or not it survives.
+
+**And the ten sites are not one group, which the replacement comment must not repeat.** Nine sit on
+public **methods**; one sits on the **field** `queryUnderstanding`. Their justifications differ, and
+neither is `rlm-search.ts` any more:
+
+| group | what actually keeps it public | what a revert costs |
+| --- | --- | --- |
+| `queryUnderstanding` (field, `:112`) | a **live production reader** — `services/project-identity/production-wiring.ts:51` | `tsc` **TS2341**, the only one |
+| the nine methods (`:448`–`:622`) | §4.3's *"the class keeps its 21 public methods"* — a published compatibility surface for 24 importers | **nothing any gate can see** |
+
+**Measured, mutation verified applied (10 markers, restore diffed clean):** reprivatising all ten
+gives `bunx tsc --noEmit -p packages/core/tsconfig.json` **exit 2 with exactly one TS2341**, on
+`queryUnderstanding`, and every runtime suite stays green — coverage **41/0**, `rlm-search` **31/0**,
+`rlm-admin` **7/0**, characterization **21/0**, `search-filter-overfetch` **10/0**.
+
+That one-versus-nine split is itself a finding, and it corrects a plan-critic claim rather than
+inheriting it. The critic reported that reprivatising the nine *"would be a loud `tsc` failure across
+dozens of call sites"*, citing real, typed, **uncast** calls (`contextual-search-rlm-coverage.test.ts:840`,
+`hybrid-search-late-bind.test.ts:124`, `rlm-synapse.test.ts:93`). The call sites are real; the
+consequence is not. **`packages/core/tsconfig.json` excludes `src/__tests__`** (`CLAUDE.md`), and
+`bun run type-check` covers four *other* packages — so no gate in this repository type-checks those
+calls. The nine are protected by a compatibility argument and by nothing mechanical, which is a
+sharper finding than the one reported, and the eighth time in this feature that two methods have given
+two answers. **Re-measure a delegate's figures with the project's own command.**
+
+**Resolution: the sensor is replaced, not relaxed, and the replacement is a mutation.** A grep can
+only witness absence; the private-revert witnesses that the *new* comment is true. T14's discriminating
+sensor is therefore `exactly 1 × TS2341 on queryUnderstanding` under the revert, plus two positive
+content checks (`rlm-search.test.ts:156` still cited exactly once; the replacement block naming §4.3
+for the nine and §4.3.1 for the one). The `rlm-search`-empty half is **struck**, and its subject is
+restated as 11 enumerated lines in one file.
+
+**The generalisable sentence, and it is the ninth defect's own lesson arriving one level up:** a
+sensor must be scoped to the *subject* the task changes, not to the *population* the subject lives in.
+The ninth defect was a sensor reading an axis its task did not move; the tenth is a sensor reading a
+population its task cannot clear. Both were written by correcting the previous one.
 
 ### T13 — the disposition of §2.1's thirteen
 

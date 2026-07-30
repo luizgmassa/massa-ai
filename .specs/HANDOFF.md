@@ -253,11 +253,29 @@ function. AC-3 budget was **0** and **0** was spent: no existing test file appea
 smaller: G-HUB and D1 are both spent at T13, so T14's subject narrows to the root's final cleanup and
 its sensor was re-scoped by the reviewer at this boundary (result 1 above). Concretely:
 
-1. **Its discriminating sensor is `git grep -c 'Visibility relaxed' -- packages/core/src` going
-   10 → 0**, plus `git grep -l 'rlm-search' -- packages/core/src` going empty. **Observe both non-zero
-   before the edit** — that is the whole point of the re-scope. G-HUB exit 0 and the D1 zeros are
-   **invariance** checks here, not discriminating ones (T7 drew that distinction; use its vocabulary).
-2. **T13 left those 10 comments deliberately** and the root says so in a comment. Do not read the
+1. **Read *Tenth plan defect: T14's re-scoped sensor is both unsatisfiable and tautological* in
+   `tasks.md` before anything else — the sensor this file
+   recorded during T13 is wrong in both halves, and it was written by the executor from the
+   reviewer's option text without measuring its scope.** `git grep -l 'rlm-search' --
+   packages/core/src` → empty is **unsatisfiable** (31 matches across 9 files; `rlm-search.test.ts`
+   alone contributes nine, and this plan already defers that file's rename to T15), and reaching it
+   would mean either widening the write set or re-scoping mid-task. `'Visibility relaxed' 10 → 0` is
+   a **tautology** — satisfied by bare deletion, because nothing checks that the replacement exists.
+   **Both defects reproduced independently by the executor and by a read-only plan critic.**
+2. **The replacement sensor is a mutation, not a grep**: reprivatise the ten members and
+   `bunx tsc --noEmit -p packages/core/tsconfig.json` must report **exactly 1 × TS2341**, on
+   `queryUnderstanding`, from `production-wiring.ts:51`. Measured, mutation verified applied, restore
+   diffed. Plus two positive content checks: `rlm-search.test.ts:156` still cited exactly once in the
+   root, and the replacement block naming **§4.3 for the nine methods, §4.3.1 for the one field**.
+3. **The ten sites are two groups, and the replacement comment must not merge them.** Nine are public
+   *methods* kept by §4.3's 21-public-method compatibility surface — reprivatising them is caught by
+   **nothing any gate can see**, because `packages/core/tsconfig.json` excludes `src/__tests__` and
+   `bun run type-check` covers four other packages. One is the field `queryUnderstanding`, kept by a
+   **live production reader** at `production-wiring.ts:51`. Neither reason is `rlm-search.ts`.
+4. **Subject is 11 lines in `contextual-search-rlm.ts`**: the 10 comments plus `:88`. **Do not touch
+   `:93`** (T13's own record of the deletion) **or `:184`** (class 1 — the only place in source
+   recording PATCHABLE's evidence trail; deleting it is the violation shape no proposed check caught).
+5. **T13 left those 10 comments deliberately** and the root says so in a comment. Do not read the
    omission as an oversight, and do not treat removing them as scope creep — it is T14's subject.
 3. **The root has 3 lines of headroom against `MAX_FILE_LOC` 700** (697), `hybrid-search.ts` has 14
    (686). T14 only removes lines, so it is safe — but do not add prose. Two unspent trims are recorded

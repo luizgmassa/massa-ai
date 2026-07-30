@@ -440,13 +440,40 @@ inherited the defect it was correcting.**
   specifier do not compose — so they are **merged**, taking `mock.module` **16 → 15**, the first time
   that count has moved down.
 
-**Next: T14, re-scoped** — the root's final cleanup, 2 h, no structural sensor should move at all
-(the T11 property). Discriminating sensor: `git grep -c 'Visibility relaxed' -- packages/core/src`
-**10 → 0** plus `git grep -l 'rlm-search' -- packages/core/src` going empty, both observed non-zero
-first. **T13 left those 10 comments deliberately** and says so in the root; that is T14's subject, not
-an oversight. The root has **3 lines** of headroom against `MAX_FILE_LOC` 700 and T14 only removes
-lines. Then Phase 1 is complete and Phase 2 (T15–T20) begins; **T15 must re-enumerate** — its list is
-frozen at 19 and the live count is 29.
+**A tenth plan defect was found at the T13/T14 boundary, and it is the sixth correction in this
+feature to inherit the defect it was correcting — the shortest-lived yet.**
+
+10. **T14's re-scoped sensor is both unsatisfiable and tautological** (T13/T14 boundary). The
+    defective text *is the ninth defect's own resolution*, written into `tasks.md` during T13 by the
+    executor from the reviewer's option text without measuring its scope. `git grep -l 'rlm-search'
+    -- packages/core/src` → empty **cannot pass**: 31 matches across 9 files, and `rlm-search.test.ts`
+    alone contributes nine — a file this same plan defers to T15. Reaching it would mean silently
+    widening the write set or re-scoping mid-task. Separately, `'Visibility relaxed' 10 → 0` is a
+    **tautology**: satisfied by bare deletion, because nothing checks the replacement exists. The
+    violation it hides is concrete — deleting `contextual-search-rlm.ts:184`, the only place in source
+    recording PATCHABLE's evidence trail, while every proposed check stays green. Both defects
+    reproduced independently by the executor and by a read-only plan critic.
+    **Resolved: the sensor is replaced by a mutation, not relaxed.** Reprivatise the ten members;
+    `tsc -p packages/core/tsconfig.json` must report **exactly 1 × TS2341**, on `queryUnderstanding`,
+    from `production-wiring.ts:51` — measured, mutation verified applied, restore diffed. Plus two
+    positive content checks. **The ten sites are two groups**: nine public *methods* held by §4.3's
+    compatibility surface, whose reprivatisation **no gate can see** (core's tsconfig excludes
+    `src/__tests__`; `type-check` covers four other packages), and one *field* held by a live
+    production reader. That split also corrects a plan-critic claim — it reported "a loud `tsc`
+    failure across dozens of call sites"; the call sites are real, the consequence is not.
+    **Eighth two-methods-two-answers in this feature; re-measure a delegate's figures with the
+    project's own command.**
+    Generalises: **a sensor must be scoped to the subject the task changes, not the population the
+    subject lives in.** The ninth defect read an axis its task did not move; the tenth reads a
+    population its task cannot clear.
+
+**Next: T14, re-scoped twice** — the root's final cleanup, 2 h, subject **11 lines in
+`contextual-search-rlm.ts`** (the 10 comments plus `:88`; **`:93` and `:184` must not be touched**).
+No structural sensor should move at all (the T11 property); G-HUB exit 0 and the D1 zeros are
+**invariance** checks. **T13 left those 10 comments deliberately** and says so in the root; that is
+T14's subject, not an oversight. The root has **3 lines** of headroom against `MAX_FILE_LOC` 700 and
+T14 only removes lines. Then Phase 1 is complete and Phase 2 (T15–T20) begins; **T15 must
+re-enumerate** — its list is frozen at 19 and the live count is 29.
 
 **T6 alone surfaced three plan defects, two needing a spec-owner decision.** All three are the
 `ensureInitializedImpl` class — a consequence `design.md` settled in substance and never wrote into
