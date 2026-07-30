@@ -946,6 +946,18 @@ commit (not sixteen — already stale by one pre-merge — and not seventeen eit
 never run on it**, so the authoritative gate reading still arrives at PR time. Commands are in
 `HANDOFF.md` under *Next action*.
 
+**Update: PR #53 opened, then `main` moved again (`47b957b`, #52) mid-first-CI-run — merged a
+second time as `c7e1452`.** The superseded first run had five of six required checks green; the
+sixth, `coverage`, failed on `packages/core`'s own isolated run (one explicit failing line,
+`trace_path > inbound traversal finds callers of gamma`, on code this branch never touches) —
+recorded as an observed, unconfirmed data point, not chased against a run that can no longer be
+re-verified. Full conflict-resolution and re-run detail is in `HANDOFF.md`'s *Next action*
+addendum. Gates all still green after the second merge (`test:scripts` now 961/47, up from
+930/46). **Correct commit count via `git rev-list --count origin/main..HEAD` (not `git log`, whose
+default simplification hides merge commits from an unqualified listing): 20** — the same eighteen
+plus one more merge commit and one more `origin/main` advance. Still local; pushing a second time
+next.
+
 **T6 alone surfaced three plan defects, two needing a spec-owner decision.** All three are the
 `ensureInitializedImpl` class — a consequence `design.md` settled in substance and never wrote into
 the constraint it contradicts. Full record in `tasks.md`.

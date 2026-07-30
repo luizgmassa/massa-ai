@@ -608,6 +608,52 @@ is a second instance of a class `CLAUDE.md` documents for a different test. **Ne
 marker literally in the PR body** — a squash folds every commit body into the merge message, and that
 is what killed v1.3.0; PR #29 skipped CI merely by *explaining* the marker in prose.
 
+**Update: PR opened as [#53](https://github.com/luizgmassa/massa-ai/pull/53), then `main` moved
+again before its first CI run finished — merged a second time.** The first push (after `b7cb5a2`)
+triggered PR #53's initial CI run: five of six required checks passed (`validate`, `build`, `mcp`,
+both `Structural native tests`); **`coverage` failed** at 3m26s with `[coverage] unit(s) did not
+complete cleanly: packages/core` and one explicit `(fail)` line, `trace_path > inbound traversal
+finds callers of gamma` — inside `packages/core`'s own isolated coverage run, not in anything
+`git diff` shows this branch touching (`trace_path`/symbol-graph code is untouched by PR-B). That
+run is now superseded by the second merge below, so this is recorded as an **observed, unconfirmed**
+data point to watch for recurrence, not a finding acted on — the mechanism was not chased further
+because the run it came from can no longer be re-verified against.
+
+`origin/main` advanced to `47b957b` (#52, `skills/` dedup gate + 4 harness correctness fixes) while
+PR #53's first run was still in flight. Merged a second time — `c7e1452`, parents `468c475` (this
+branch) and `47b957b`. Two files conflicted again, resolved the same way:
+
+- **`CHANGELOG.md`** — this time both sides had genuine unreleased content (neither has been
+  released since `v1.14.0`), so both were kept, ordered `### Added` / `### Changed` / `### Fixed`
+  per Keep a Changelog convention: main's one `Added` bullet (the skills duplication/reachability
+  gate), this branch's 12 `Changed` bullets (unmoved), main's 4 `Fixed` bullets. The **released**
+  section is unchanged at main's **1105 lines** — #52 shipped no release, so that figure from
+  earlier in this merge still holds; it did not move a second time.
+- **This file** — main's fresh `## Active — skills/ directive dedup (T1–T5 of 12, stopped by user
+  instruction)` is kept in full, demoted to `## Previous`, and inserted directly under this Active
+  section (most-recently-demoted first) — ahead of the `Previous — Model Profile Registry` entry,
+  which main did not touch again this round.
+
+`.github/workflows/ci.yml` and `CLAUDE.md` were **not** touched by `47b957b` at all this time — no
+auto-merge risk there. `packages/core/src/services/search/**` also has zero diff in `47b957b`, so
+the `chunker-code.ts` / `N07` frozen-anchor risk did not reopen.
+
+**Gates re-run a second time, before re-pushing — all still green.** `check-frozen-anchors` exit 0,
+14/14, `N07` unchanged at `chunker-code.ts:180-201`. `check-characterization` exit 0, 3/3.
+`check-stale-pointers` exit 0, 0 broken, 28 historical. `search-hub-metric` exit 0, G-HUB green,
+byte-identical table to the first merge's reading (expected — no search-directory diff). `lint` 0.
+`type-check` 6/6. `build` 5/5. `test:scripts` exit 0 — **961 pass / 0 fail across 47 files** (up
+from 930/46 after the first merge; #52 added one new test file,
+`skills-duplication-metric.test.ts`, plus assertions to three existing files, accounting for the
+delta).
+
+**The commit count moved a second time and "eighteen" above is now stale too.**
+`git rev-list --count origin/main..HEAD` — not plain `git log`, whose default history
+simplification silently drops both merge commits from an unqualified `--oneline` listing, which
+looks exactly like "no merges happened" — is **20**: the 18 PR-B/docs commits plus **both** merge
+commits (`b7cb5a2`, `c7e1452`). Still entirely local; about to be pushed a second time to the
+already-open PR #53.
+
 **The briefing list T20 was given, kept because PR-C inherits most of it.** Each of these reads as a
 violation if a reader does not know it:
 
