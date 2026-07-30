@@ -14,7 +14,7 @@
  * `tasks.md`, and it is the reason T11's row demands "one positive test that an
  * injected stub `IndexManager` is actually read" on top of parity. Measured
  * before writing this file: the repository's only assertion about this member is
- * `rlm-indexing.test.ts:201`'s `expect((rlm as any).indexManager).toBeDefined()`,
+ * `search-facade-indexing.test.ts:201`'s `expect((rlm as any).indexManager).toBeDefined()`,
  * which survives every seam defect except deleting the default construction
  * outright.
  *

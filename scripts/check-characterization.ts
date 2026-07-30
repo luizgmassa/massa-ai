@@ -25,7 +25,7 @@
  * ## Why blocks are found by symbol, not by path
  *
  * PR-B renames the files these blocks live in. A guard pinned to
- * `rlm-indexing.test.ts` would go red on the rename itself and would then be
+ * `search-facade-indexing.test.ts` would go red on the rename itself and would then be
  * "fixed" by editing the guard — which is the same motion as weakening it, and
  * indistinguishable from it in a diff. Locating the block by the symbol it
  * characterizes survives a rename and a move, and fails only on the thing that

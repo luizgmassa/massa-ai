@@ -5,7 +5,7 @@
  * onward" and that "T10's members 18/7/4/4 … likewise" make the ordinary sensor
  * sufficient. T9 showed the reasoning uses the wrong quantity and required T10,
  * T12 and T13 each to run the memo mutation against their own surface. T10 did.
- * `rlm-indexing.test.ts` holds 52 of the ~80 post-construction assignment sites
+ * `search-facade-indexing.test.ts` holds 52 of the ~80 post-construction assignment sites
  * — the richest LATE-BIND surface in the repository — and it is **still blind**:
  *
  * | violation                           | tsc | coverage | rlm-indexing | concurrent-indexing |
@@ -30,7 +30,7 @@
  * **It carries a fourth test the two earlier sensors do not need.** `IndexerDeps`
  * is the first deps record with *re-entrant* members: `indexFile` and
  * `indexProject` are the root's own methods, reached back through arrow wrappers,
- * and six sites in `rlm-indexing.test.ts` stub those two methods on the instance
+ * and six sites in `search-facade-indexing.test.ts` stub those two methods on the instance
  * (:335, :377, :402, :537, :572, :609). A fresh closure cannot be identity-checked,
  * so `contextual-search-rlm-coverage.test.ts` can only match them with
  * `expect.any(Function)`. Test 4 is what makes that acceptable: it proves the

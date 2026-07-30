@@ -1,13 +1,13 @@
 /**
- * Coverage test for ContextualSearchRLM delegate methods (lines 439-475).
+ * Coverage test for four thin instance-method delegates on ContextualSearchRLM.
+ * Located by symbol, not by line — the range it cited was ~180 lines stale.
  *
- * Targets the 4 thin-instance-method delegates that the rlm-*.test.ts files
- * test only through the impl functions directly, leaving the instance wrapper
- * lines uncovered:
- *   - filterByPatterns          (rlm-search.ts)
- *   - clearProjectIndex         (rlm-admin.ts)
- *   - getProjectStats           (rlm-admin.ts)
- *   - warmupCache               (rlm-admin.ts)
+ * The search-facade-*.test.ts suites drive the capability modules directly,
+ * which leaves these instance wrappers uncovered:
+ *   - filterByPatterns          (hybrid-search.ts)
+ *   - clearProjectIndex         (index-admin.ts)
+ *   - getProjectStats           (index-admin.ts)
+ *   - warmupCache               (index-admin.ts)
  *
  * Uses the injected-deps constructor seam so no factory calls are made, and
  * mocks the heavy infrastructure to stay in the shared process group.

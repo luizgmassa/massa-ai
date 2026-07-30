@@ -1,5 +1,5 @@
 /**
- * rlm-search delegate tests — searchImpl, addContextToResults, extractPreview,
+ * Search-facade hybrid-search tests — search, addContextToResults, extractPreview,
  * calculateAvgScore, filterByPatterns, generateScoreExplanation, fuseResults.
  *
  * Uses injected-deps + mock.module. Covers cache hit/miss, degradation paths,
@@ -121,7 +121,7 @@ function makeSearchInstance(
   } as any);
 }
 
-describe("rlm-search — search() cache hit", () => {
+describe("search-facade-hybrid — search() cache hit", () => {
   test("cache hit returns cached results (with synapse applied)", async () => {
     const cached = [makeResult("cached-1", 0.9)];
     const rlm = makeSearchInstance([], [], { cacheHit: cached });
@@ -138,7 +138,7 @@ describe("rlm-search — search() cache hit", () => {
   });
 });
 
-describe("rlm-search — search() edge cases", () => {
+describe("search-facade-hybrid — search() edge cases", () => {
   test("maxResults <= 0 returns []", async () => {
     const rlm = makeSearchInstance([makeResult("a")]);
     const results = await rlm.search("q", "p", { maxResults: 0 });
@@ -186,7 +186,7 @@ describe("rlm-search — search() edge cases", () => {
   });
 });
 
-describe("rlm-search — search() miss + fusion", () => {
+describe("search-facade-hybrid — search() miss + fusion", () => {
   test("vector + keyword results fuse via RRF", async () => {
     const rlm = makeSearchInstance(
       [makeResult("v1", 0.9), makeResult("v2", 0.7)],
@@ -343,7 +343,7 @@ function makeSearchInstanceWithQU(
   return rlm;
 }
 
-describe("rlm-search — query understanding path", () => {
+describe("search-facade-hybrid — query understanding path", () => {
   let originalSearch: any;
   beforeEach(() => {
     originalSearch = config.get("search");
@@ -405,7 +405,7 @@ describe("rlm-search — query understanding path", () => {
   });
 });
 
-describe("rlm-search — degradation callbacks", () => {
+describe("search-facade-hybrid — degradation callbacks", () => {
   let originalSearch: any;
   beforeEach(() => { originalSearch = config.get("search"); });
   afterEach(() => { config.set("search", originalSearch); });
@@ -433,7 +433,7 @@ describe("rlm-search — degradation callbacks", () => {
   });
 });
 
-describe("rlm-search — addContextToResults", () => {
+describe("search-facade-hybrid — addContextToResults", () => {
   test("adds highlights + context metadata when lineStart/lineEnd present", async () => {
     const rlm = new ContextualSearchRLM();
     const results: SearchResult[] = [{
@@ -453,7 +453,7 @@ describe("rlm-search — addContextToResults", () => {
   });
 });
 
-describe("rlm-search — generateScoreExplanation", () => {
+describe("search-facade-hybrid — generateScoreExplanation", () => {
   test("with both vector and keyword scores", () => {
     const rlm = new ContextualSearchRLM();
     const explanation = rlm.generateScoreExplanation(0.85, 0.016, 0.9, 0.6, 0, 1, 0);
@@ -481,7 +481,7 @@ describe("rlm-search — generateScoreExplanation", () => {
   });
 });
 
-describe("rlm-search — fuseResults with code query boost", () => {
+describe("search-facade-hybrid — fuseResults with code query boost", () => {
   test("code query keywords get boosted", () => {
     const rlm = new ContextualSearchRLM();
     const vector = [makeResult("v1", 0.9)];

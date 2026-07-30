@@ -5,7 +5,7 @@
  * AC-2 asks that a unit test of one capability module construct it without
  * mocking a stack of factory modules. Before T8 the only way to reach this
  * body was `new ContextualSearchRLM(...)`, which drags in seven factory mocks
- * (see rlm-synapse.test.ts:12-75) before the first `expect` runs. Now both
+ * (see search-facade-synapse.test.ts:12-75) before the first `expect` runs. Now both
  * collaborators arrive as an object literal in the `SessionBiasDeps` record,
  * so nothing is mocked and nothing is intercepted — `applySynapseState` is
  * called directly.
@@ -17,7 +17,7 @@
  *
  * These are behavior assertions over the real body, not forwarding spies: the
  * facade-forwarding contract is contextual-search-rlm-coverage.test.ts's job,
- * and the degrade-to-base paths are rlm-synapse.test.ts's through the facade.
+ * and the degrade-to-base paths are search-facade-synapse.test.ts's through the facade.
  * This file is what proves the body runs standalone.
  */
 

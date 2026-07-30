@@ -145,7 +145,7 @@ cannot be T17's referent.
 a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
 unilaterally — it is a release-semantics decision.
 
-### Execute — Phase 1 COMPLETE (2026-07-30), T6a–T14 done, T15 next and must re-enumerate
+### Execute — Phase 1 COMPLETE and T15 done (2026-07-30), T6a–T15 committed, T16 next and must be asked for
 
 **Two branches, and the first one is gone.** T6a and T6 were executed on
 `refactor/search-facade-split-phase-1` (cut from `d628464`) and reached `main` through **PR #46,
@@ -507,14 +507,81 @@ rewrite `:86-99` preserving `:92-94`'s provenance** — *"do not touch `:93`"* r
 authority being **T10's own rule** on correcting stale comments in a source file already in the write
 set. Final subject **24 lines**, one file, comments only, **+23 / −24**.
 
-**Next: T15 — GMS-04's non-source sites, 45 m. Phase 1 is closed; this opens Phase 2.** **T15 must
-re-enumerate**: its list is frozen at `ce26f28` at 19, was 29 after T13, and T14 removed no file from
-the set. Use `git grep -l -P` with explicit pathspec exclusions, everything staged — not the shell's
-`grep` (a ugrep shim honouring `.gitignore`, which independently returned 19), and **`-P` not `-E`**.
-Keep class 1 (`rlm-*.test.ts`, files that survive) separate from class 2 (deleted `rlm-*.ts` sources).
-AC-3 as written is unsatisfiable — 320 occurrences in tracked `.ua/` artifacts, deferred to after PR-C,
-so **PR-B does not close GMS-04 AC-3** for them. **Do not start T16 without asking**: it edits CI and
-needs the live `main` ruleset verified via `gh api`, a different risk class (SEN-02 AC-5).
+**Three more plan defects were found at T15, and the fourteenth is inside the sensor written to fix
+the twelfth. That is the ninth time in this feature that a correction inherited the defect it was
+correcting.**
+
+12. **AC-3's own 2026-07-29 correction is unsatisfiable too** (T15). Narrowing to *zero `rlm-` hits
+    outside `CHANGELOG.md` / `.specs/` / `.ua/`* cannot pass: ~35 provenance pointers name deleted
+    `rlm-*.ts` sources — six files carry nothing else, and every one was added **on purpose** — plus
+    `contextual-search-rlm-coverage.test.ts`'s own filename, which §6 keeps, and excluding it moves the
+    file count 29 → 29. **Second time this one criterion inherited its own defect.**
+    **Resolved (reviewer, 2026-07-30): stop measuring the population, measure the shape.** The counter
+    becomes `scripts/check-stale-pointers.ts`, classifying every path-shaped pointer as
+    `RESOLVES` / `HISTORICAL` / `BROKEN` against real git history and pinning the `HISTORICAL` count.
+    Over budget (45 m → ~2 h); accepted. *Generalises, extending the eleventh's sentence: the ninth read
+    an axis its task did not move, the tenth a population its task could not clear, the eleventh an axis
+    its task moves nothing on — and the twelfth a population whose floor was never zero, because the
+    plan had deliberately put things in it.*
+13. **The rename was framed as the executor's decision when the spec already mandated it** (T15).
+    `HANDOFF.md:325`, `:561` and `tasks.md` all called it *"T15's own decision"*; **GMS-04 AC-1 says
+    *"No source or test file under `packages/core/src` is named `rlm-*`"***. The plan relaxed an
+    acceptance criterion its own spec had fixed, and PR-B could have closed with `rlm-admin.test.ts` on
+    disk and AC-1 believed met. Only the **names** were the executor's call —
+    `search-facade-{admin,indexing,hybrid,synapse}`, chosen because these suites test the facade rather
+    than the capability modules, and collision-free against the `*-late-bind` files.
+    (`contextual-search-rlm*.ts` is **not** an AC-1 violation: `rlm-*` means *starts with*.)
+14. **The replacement sensor under-enforced in two directions** (T15), found by a scoped read-only plan
+    critic after its unit suite was already green, then re-measured. **(a)** `historical.length <=
+    HISTORICAL_FLOOR` is a **ceiling under a name that says floor** — it catches a stale citation being
+    added and is blind to a provenance comment being **deleted**, which is the thing the category exists
+    to protect. **(c)** the stem was the literal `rlm`, so the gate could not see the **17 citations
+    across 10 files T15's own rename minted**: green on exactly the failure its docblock claims to
+    catch, for the names the task had just created. **Resolved (reviewer, 2026-07-30): close (a) and
+    (c), record (b).** (a) becomes an exact pin, injected as a parameter so the gate's own tests can
+    exercise it; (c) becomes a `STEMS` list with `POINTER` **derived** from it. **(b)** stays open in
+    writing: `POINTER` needs a file extension, so bare-word mentions — `` `rlm-admin` ``, a
+    `describe("rlm-search — …")` title, an `rlm-*.test.ts` glob — are invisible; policing them would be
+    a banned-word list, a different sensor. Every such site was fixed by hand and **none is under a
+    gate.** *A sensor's alphabet is part of the sensor, alongside its label.*
+
+**The discriminating evidence is M3b**, and it is the only reading proving (c) was a live gap rather
+than a theoretical one: on a tree carrying a broken `search-facade-*` citation, the pre-T15 `rlm`-only
+pattern reports **PASS — 0 broken** while the shipped pattern reports **FAIL — 1 broken**. Two further
+mutations, each verified applied and each restore diffed: a citation reverted to its pre-rename name →
+HISTORICAL **29**, FAIL; a provenance comment deleted → HISTORICAL **27**, FAIL — the shape the old
+`<=` passed. Pristine is **`RESOLVES 32 / HISTORICAL 28 / BROKEN 0`**, exit 0.
+
+**A further T15 finding that invalidated every sensor figure until it was fixed: the gate was blind to
+itself.** It enumerates `git ls-files`, so while its own two files were untracked it never scanned
+them. Staging took it from **PASS `31/26/0`** to **FAIL `36/46/15`**; all 15 `BROKEN` were **fixture
+literals** in its own test file, which must use a real stem to exercise `POINTER` at all. Resolved
+narrowly — the **test file** joins `EXCLUDED` as fixtures-not-references, the **script does not**, so
+its two genuine citations of the deleted `rlm-search` are counted and the pin is **28** rather than 26.
+Two more `BROKEN` then appeared inside that new exclusion's own docblock, which had spelled the fixture
+names out in full: the same trap one level up, and it fired. **This is the Phase 0 lesson verbatim** —
+*verify any measurement script in the tracked state it ships in, never the state it was written in* —
+and it has now cost this feature twice. **Quote no figure from this gate that was not taken after
+`git add`.**
+
+**A separate T15 finding, not a plan defect: the line-count constraint was wider than the plan stated.**
+The plan named the four renamed suites. Measured — **and name the metric, since all three figures are
+quotable and different**: **11 line-anchored citation tokens** on **10 matching lines** across **6
+files**. Seven point into the renamed four; **four point into
+`contextual-search-rlm-coverage.test.ts`**, whose header T15 also rewrites and which the plan never
+flagged. All five targets were edited by in-place single-line substitution only —
+**162 / 647 / 520 / 389 / 936** lines before and after. A reflow would have invalidated those citations
+silently and **no gate would have seen it.** Same shape as T14's four-line undercount: a constraint
+enumerated over the files `git mv` touched missed the file that is edited but not moved.
+
+**Next: T16 — and it must not be started without an explicit go-ahead.** It edits CI and needs the live
+`main` ruleset verified via `gh api`, a different risk class (SEN-02 AC-5): a job that goes red without
+being in `required_status_checks` blocks nothing, which is how PR-A's `coverage.yml` shipped claiming
+`BLOCKING BY DESIGN` and enforced nothing. Then T17 (bounded-corpus caveat), T18 (dedicated DB on
+`127.0.0.1:5433/massa_ai_test` plus `RUN_POSTGRES_TESTS=1`), **T19 — now C1–C10, not C1–C7**, and T20.
+`design.md` §10 gained **C10** at T15 because no row owned GMS-04 AC-3 and T20's verifier reads
+`spec.md`; without it, it checks AC-3 as written, finds it unsatisfiable and marks it failed. T20's
+full six-item briefing list is assembled in `HANDOFF.md` under *Next action*.
 
 **T6 alone surfaced three plan defects, two needing a spec-owner decision.** All three are the
 `ensureInitializedImpl` class — a consequence `design.md` settled in substance and never wrote into

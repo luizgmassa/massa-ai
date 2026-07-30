@@ -1,13 +1,88 @@
 # Handoff
 
-## Active — Core Layering and God-Module Split (PR-B), **Phase 1 COMPLETE**
+## Active — Core Layering and God-Module Split (PR-B), **T15 done, Phase 2 open**
 
 **Feature**: `core-layering-god-module-split` · branch
 `refactor/search-facade-split-phase-1b`, cut from `main` @ `5247ecb` (v1.11.0),
 worktree `../massa-ai-wt-facade-phase-1b`.
-**T6a and T6 are merged and released; T7–T14 are committed and green. Phase 1 is closed. T15 is
-next and begins Phase 2.** Working tree clean. Nothing is pushed — the branch is local only, now ten
+**T6a and T6 are merged and released; T7–T15 are committed and green. Phase 1 is closed and T15 has
+opened Phase 2.** Working tree clean. Nothing is pushed — the branch is local only, now eleven
 commits deep.
+
+---
+
+**T15 is done. GMS-04 AC-1 is closed by four `git mv` renames, and AC-3's criterion is replaced
+rather than met** — it was unsatisfiable twice, which is the twelfth plan defect. The four suites are
+now `search-facade-{admin,indexing,hybrid,synapse}.test.ts`; 17 citations were repointed; every stale
+*description* was corrected while every *provenance* comment was kept, because those are the record.
+AC-3's counter is replaced by `scripts/check-stale-pointers.ts`, whose header docblock is the
+canonical rationale — **read it rather than re-deriving any of this.**
+
+**Four T15 results a resumer must not re-derive. Two are plan defects, and one of those is in the
+sensor written to fix the other.**
+
+1. **Twelfth plan defect: AC-3's own correction was unsatisfiable too.** The 2026-07-29 narrowing to
+   *zero `rlm-` hits outside `CHANGELOG.md` / `.specs/` / `.ua/`* cannot pass either: ~35 provenance
+   pointers name deleted `rlm-*.ts` sources (six files carry nothing else), and
+   `contextual-search-rlm-coverage.test.ts` carries `rlm-` in its own filename, which §6 keeps
+   deliberately — excluding it moves the file count 29 → 29. **Eighth time a correction inherited the
+   defect it was correcting; second time for this one criterion.** *Resolved (reviewer, 2026-07-30):
+   stop measuring the population, measure the shape.* Over budget (45 m → ~2 h); accepted.
+2. **Fourteenth plan defect: the replacement sensor under-enforced in two directions.** Found after
+   its unit suite was already green, by a scoped plan critic, then re-measured. **(a)** `historical.length
+   <= HISTORICAL_FLOOR` is a **ceiling under a name that says floor** — it catches a stale citation
+   being added and is blind to a provenance comment being **deleted**. **(c)** the stem was the literal
+   `rlm`, so the gate was blind to the **17 citations across 10 files T15's own rename minted** —
+   green on exactly the failure its docblock claims to catch, for the names the task had just created.
+   **Ninth correction to inherit the defect it was correcting.** *Resolved (reviewer, 2026-07-30):
+   close (a) and (c), record (b).* **(b)** is that `POINTER` needs a file extension, so bare-word
+   mentions — `` `rlm-admin` ``, a `describe("rlm-search — …")` title, an `rlm-*.test.ts` glob — are
+   invisible. Those were all fixed by hand and **none of them is under a gate**; do not quote this
+   sensor as though they were.
+3. **Thirteenth plan defect, and it corrects how the rename was framed.** `HANDOFF.md:325`, `:561` and
+   `tasks.md` all called renaming the four suites *"T15's own decision"*. **GMS-04 AC-1 already
+   mandated it** — *"No source or test file under `packages/core/src` is named `rlm-*`"*. The plan
+   relaxed an acceptance criterion its own spec had fixed, and a reader could have closed PR-B with
+   `rlm-admin.test.ts` on disk believing AC-1 met. Only the **names** were the executor's call.
+   (`contextual-search-rlm*.ts` is **not** an AC-1 violation — `rlm-*` means *starts with*.)
+4. **The line-count constraint was wider than the plan stated, and nothing would have caught a
+   breach.** The plan named the four renamed suites. Measured — **name the metric, all three are
+   quotable and different**: **11 line-anchored citation tokens** on **10 matching lines** across
+   **6 files**. Seven point into the renamed four; **four point into
+   `contextual-search-rlm-coverage.test.ts`**, whose header T15 also rewrites and which the plan never
+   flagged. Every edit in all five targets was an in-place single-line substitution;
+   **162 / 647 / 520 / 389 / 936** lines before and after. A reflow would have silently invalidated
+   those citations and **no gate would have seen it.** Same shape as T14's four-line subject
+   undercount: a constraint enumerated over the files `git mv` touched missed the file that is edited
+   but not moved.
+
+**The discriminating evidence is M3b.** Three mutations were run on the real tree, each verified
+*applied* before its reading was believed (backup rather than `git checkout`, since the tree was
+dirty; diff-vs-pristine; refuse-on-byte-identical; restore diffed; final reading confirmed identical
+to pristine): a citation reverted to its pre-rename name → HISTORICAL **29**, FAIL; a provenance
+comment **deleted** → HISTORICAL **27**, FAIL (the shape `<=` passed); a typo in a `search-facade-*`
+citation → BROKEN **1**, FAIL. **M3b judged that last tree by the pre-T15 `rlm`-only pattern and it
+reported `PASS — 0 broken`.** That is the only reading proving the widening was not cosmetic. *A
+sensor's alphabet is part of the sensor, alongside its label.*
+
+**A fifth result, and it invalidated every number above until it was fixed: the gate was blind to
+itself.** `check-stale-pointers.ts` enumerates `git ls-files`, so while its own two files were
+untracked it could not scan them. Staging took it from **PASS `31/26/0`** to **FAIL `36/46/15`** — all
+15 `BROKEN` being **fixture literals** in its own test file, which must use a real stem to exercise
+`POINTER` at all. Resolved narrowly: the **test file** joins `EXCLUDED` (fixtures, not references);
+the **script does not**, so its own two genuine citations of the deleted `rlm-search` count like
+anyone else's, and the pin is **28**, not 26. Two more `BROKEN` then surfaced inside that new
+exclusion's own docblock, which had spelled the fixture names out in full — the same trap one level
+up, and it fired. **This is the Phase 0 lesson verbatim** (*verify a measurement script in the tracked
+state it ships in*) and it has now cost this feature twice. **Any figure from this gate must be quoted
+from a run taken after `git add`.**
+
+**Three figure corrections folded in, each re-measured at `e4e38bd` rather than inherited.**
+`.ua/` is **320 occurrences**; `git grep -c` says 315 because it counts matching **lines**
+(`knowledge-graph.json` is 270 occurrences on 265 lines) — **do not "correct" the 320.** `tasks.md`'s
+29-file breakdown said *"ten other test files, six `services/search`"*; it is **9 and 7**, and the two
+errors cancelled, which is why the total still landed on 29. `tasks.md`'s T19 row scoped itself to
+**C1–C7** while `design.md` §10 has held **C1–C9** since Design — and T15 adds **C10**.
 
 ---
 
@@ -310,40 +385,50 @@ function. AC-3 budget was **0** and **0** was spent: no existing test file appea
 > is **per-group, at each group's site**, which is what makes the citation-swap shape unexpressible.
 > **No reviewer decision is open at the T14/T15 boundary.**
 
-**Next action: T15 — GMS-04's non-source sites. Phase 1 is closed; this opens Phase 2.** Budgeted
-45 m. Read *T15's sensor, scoped* in `tasks.md` before anything else, then *T13 and T15*. Concretely:
+**Next action: T16 — and it needs an explicit go-ahead before anyone starts it.** It wires G-HUB into
+CI and requires verifying the live `main` branch ruleset through `gh api` — a repo-settings change in
+a different risk class, and **SEN-02 AC-5 is the recorded reason it needs its own decision**: a job
+that goes red without being in `required_status_checks` blocks nothing, which is exactly how PR-A's
+`coverage.yml` shipped claiming `BLOCKING BY DESIGN` and enforced nothing. **A gate's enabling
+condition is part of the gate.** Note also that updating that ruleset goes through **PUT** (full
+replace) — `PATCH` returns 404, which reads like a missing permission and is not one — and that
+dropping the `DeployKey` bypass entry breaks `release.yml` silently.
 
-1. **Re-enumerate. Do not work from the plan's list.** It is frozen at `ce26f28` at **19** tracked
-   files; measured **29** after T13. T14 cut the root's `rlm-search` lines 13 → 4 but removed no file
-   from the set, so 29 is the number to re-confirm, not to assume. **Enumerate with `git grep -l -P`
-   and explicit pathspec exclusions** — never the shell's `grep`, which here is a ugrep shim honouring
-   `.gitignore` and independently produced 19 where the correct answer was 29. **`-P`, not `-E`**:
-   POSIX ERE has no `\s`, and the wrong flag returns zero matches with exit 1, which reads exactly like
-   a clean sweep. **Take the count with everything staged** — `git grep` enumerates tracked files only,
-   and the same command a minute before `git add` has been wrong twice.
-2. **Two classes, and T15 must not report them as one number.** Class 1 is a reference to an
-   `rlm-*.test.ts` file, which *survives* PR-B — renaming those suites is T15's own decision, so these
-   are consistent, not stale. Class 2 is a reference to a now-deleted `rlm-*.ts` source: legitimate
-   historical provenance pointing at a path that no longer resolves. After T14 the root's own three
-   are class 2 (`:91`, `:108`, `:446`) and its fourth (`:185`) is class 1.
-3. **The named sites**: `docs/ONBOARDING.md:147,148,177`, `CLAUDE.md:157`, and the two the first draft
-   missed — `architecture-map.test.ts:454-455` and `search-controller.test.ts:3`, both comments citing
-   test files this PR renames. **The needles fixture is NOT a site** (PR-A content-anchored all 14
-   needles; spec correction C4). Five stale `rlm-admin` mentions in
-   `contextual-search-rlm-coverage.test.ts` (`:8`, `:9`, `:10`, `:84-85`) were left to T15 by T12
-   deliberately.
-4. **The sensor is zero hits outside `CHANGELOG.md`, `.specs/` and `.ua/`, enumerated by a script over
-   `git ls-files`** so the count cannot depend on which `grep` is on PATH. **AC-3 as written is
-   unsatisfiable** — 320 `rlm-` occurrences live in three tracked generated `.ua/` artifacts, and
-   `.ua/` regeneration is deferred to after PR-C, so **PR-B does not close GMS-04 AC-3** for them and
-   must not claim to.
-5. **The two test-file comment corrections are explicitly authorised** and are the only test-file edits
-   in PR-B outside the 4 rename sites. **Finding a third is a signal to stop, not a chore** — and
-   T20's verifier has to be told all of this, or 19 authorised assertion changes in a PR claiming "no
-   test weakened" read as the violation they are not.
-6. **Do not start T16 without asking.** It edits CI and requires verifying the live `main` branch
-   ruleset through `gh api` — a repo-settings change in a different risk class, and SEN-02 AC-5 is the
-   recorded reason it needs its own decision.
+Then, in plan order:
+
+- **T17** — needles after-run and per-needle rank diff vs T4's baseline. **A floor pass with three
+  needles slipping 1 → 4 is a regression that passed** (GMS-05 AC-4 note 2). Its bounded-corpus caveat
+  is in *What a reader must not overclaim* below: T4/T17 use the 8-file benchmark corpus, and a
+  full-corpus baseline still does not exist. **Do not quote a bounded-corpus number as a full-corpus
+  one.**
+- **T18** — coverage gate. Needs the **dedicated** database (`127.0.0.1`, port **5433**, database
+  `massa_ai_test`) and `RUN_POSTGRES_TESTS=1`; without the latter, ten-plus core suites skip and the
+  gate reports phantom below-floor files instead of the truth. See `CLAUDE.md` → `coverage.yml`.
+- **T19** — spec corrections **C1–C10**. The row said C1–C7 and `design.md` §10 has held C1–C9 since
+  Design; **T15 added C10 for GMS-04 AC-3 itself**, which no row owned before. Both are fixed in place.
+  Without C10, T20's verifier — which reads `spec.md` — checks AC-3 **as written**, finds it
+  unsatisfiable, and marks it failed against a tree that satisfies what the criterion meant.
+- **T20** — independent validation, fresh verifier, author ≠ verifier.
+
+**T20's briefing list, assembled here rather than left spread across three files.** The verifier must
+be told all six, or each reads as a violation it is not:
+
+1. **`.ua/` is out of scope for GMS-04 AC-3.** 320 occurrences across three tracked generated
+   artifacts; regeneration deferred to after PR-C. **PR-B does not close AC-3 for them.**
+2. **AC-3 as written is replaced, not met** — see `design.md` §10 C10 and the twelfth defect. The
+   criterion to check is `scripts/check-stale-pointers.ts` exiting 0.
+3. **19 authorised signature-tracking test edits**, enumerated per task in `tasks.md`'s ledger. A PR
+   claiming "no test weakened" that contains 19 changed assertions is not a contradiction.
+4. **T15's test-file footprint is 11 files** — four AC-1 renames plus seven modified — against the
+   plan's *"the only test-file edits outside the 4 rename sites"*. Its AC-3 budget is nonetheless **0**
+   and 0 spent, because AC-3 bounds *signature-tracking* edits and T15 moves no signature. Every
+   `test(` / `expect(` / `skip` count is identical before and after in all eleven; the ledger row
+   carries the numbers.
+5. **What this repo's sensors do NOT cover**, stated so a green board is not over-read: bare-word
+   `rlm-` mentions are outside `check-stale-pointers.ts` by design (fourteenth defect, part b), and the
+   frozen baselines must not be regenerated — `capture-facade-baseline.ts` refuses off the base
+   subject, and `--force` moves T17/T20's referent instead of failing.
+6. **The needles corpus is bounded** — see T17 above.
 
 **Read the branch note before anything else.** T6a and T6 landed in `main` via **PR #46, which was
 squashed, not merged** — R-04 was violated. None of its 8 commits are ancestors of `main`, the
@@ -364,7 +449,8 @@ the remote and is **not** this work. **This PR must be merged with a merge commi
 | T12 | `484e61a` | four admin surfaces → `index-admin.ts` with `IndexAdminDeps`; **`rlm-admin.ts` deleted whole**; `index-admin-late-bind.test.ts`, red under five mutation shapes; the eighth plan defect |
 | T13 | `1090504` | five search surfaces → `hybrid-search.ts` with an 8-key `HybridSearchDeps`; **`rlm-search.ts` deleted whole** — the last delegate; `hybrid-search-late-bind.test.ts` widened to 4 tests, red under six shapes; **G-HUB exit 1 → 0**; the ninth plan defect |
 | — | `ba8d2bc` | plan amendment: T14's sensor corrected — the tenth plan defect |
-| T14 | this commit | the root's final cleanup — ten stale `Visibility relaxed` notes replaced per group (§4.3 for the nine methods, §4.3.1 for the one field), the T13 hand-off block retired; **Phase 1 closes**; the eleventh plan defect |
+| T14 | `e4e38bd` | the root's final cleanup — ten stale `Visibility relaxed` notes replaced per group (§4.3 for the nine methods, §4.3.1 for the one field), the T13 hand-off block retired; **Phase 1 closes**; the eleventh plan defect |
+| T15 | this commit | GMS-04 **AC-1 closed** by four `git mv` renames to `search-facade-{admin,indexing,hybrid,synapse}.test.ts`, 17 citations repointed, every stale description corrected; **AC-3's criterion replaced** by `scripts/check-stale-pointers.ts` + its 21-test suite; `design.md` §10 gains **C10**; **Phase 2 opens**; the twelfth, thirteenth and fourteenth plan defects |
 
 Gates at T10: `lint` 0 · `type-check` 0 (6/6) · `build` 0 (5/5) · `test:scripts` **732 pass / 0 fail
 across 39 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
@@ -437,6 +523,27 @@ private revert of all ten gives `tsc` exit 2, **exactly 1 `error TS` line, exact
 `rlm-search` in the root **13 → 4** · CHANGELOG released section still **974 lines, byte-identical to
 `353de59`**, all **eight** `[Unreleased]` entries present there and absent from the released section,
 positionally and per entry.
+
+Gates at T15 — **every structural figure byte-identical to T14, which is the prediction, because T15
+moves no code**: `lint` 0 · `type-check` 0 (6/6) · `check-frozen-anchors` exit 0 (14 anchors) ·
+`check-characterization` exit 0 (3/3) · **new `check-stale-pointers` exit 0** — `RESOLVES 32 /
+HISTORICAL 28 / BROKEN 0`, the pin met exactly, **measured with its own files staged** · **G-HUB exit 0**, 24 files, `ContextualSearchRLM`
+foreign **1**, reach **1** by `search-warmup.ts`, `maxFileLoc` **696** against 700 · `test:scripts`
+**753 pass / 0 fail across 40 files**, up from 732/39 by **exactly** the new
+`check-stale-pointers.test.ts` (21 tests in 1 file) — the delta is accounted for, not assumed ·
+characterization net **160** across 7 suites (26·41·31·21·25·7·9), every suite individually unchanged
+under its new name: `search-facade-admin` **7/0**, `search-facade-indexing` **25/0**,
+`search-facade-hybrid` **31/0**, `search-facade-synapse` **26/0**,
+`contextual-search-rlm-coverage` **41/0**, `contextual-search-rlm.characterization` **21/0**,
+`concurrent-indexing` **9/0** · `session-bias` **10/0** · line counts across the five
+line-cited files **162 / 647 / 520 / 389 / 936**, identical before and after · CHANGELOG released
+section still **974 lines, byte-identical to `353de59`**, all **nine** `[Unreleased]` entries present
+there and absent from the released section, positionally and per entry.
+
+> **Name the metric on the characterization net.** The seventh suite in `26·41·31·21·25·7·9` is
+> `concurrent-indexing` at **9**, not `session-bias` at **10** — `session-bias` is tracked separately
+> and has been since T8. A run that substitutes it reports **161** and looks like a regression in a
+> gate that has not moved. Cost one wrong reading at T15 before the suite list was checked.
 
 **Three suite baselines T13 had to measure because no prior record carried them**, and a sensor with
 no before-value reports nothing: `search-dependency-outage` **9/0**, `search-filter-overfetch`
@@ -558,7 +665,8 @@ new files staged** — `git grep` enumerates tracked files only, and the same co
 (the repo's `grep` is a ugrep shim), which is the same two-methods-two-answers failure this feature has
 now hit six times. Every extraction adds a provenance comment naming the
 file the body came from. Two classes, and T15 must not conflate them: references to `rlm-*.test.ts`
-(those files *survive*; renaming them is T15's own decision) versus references to a now-deleted
+(those files *survive* the extractions; ~~renaming them is T15's own decision~~ — **GMS-04 AC-1 mandates
+the rename and only the new names were the executor's call, the thirteenth plan defect**) versus references to a now-deleted
 `rlm-*.ts` source (`docs/ONBOARDING.md:148`, `graph-stream.ts:11`, `session-bias.ts:20`,
 `hybrid-search.ts:11,15,24`, `contextual-search-rlm-coverage.test.ts:158`). Full breakdown in
 `tasks.md` under *T15's sensor, scoped*.
@@ -579,8 +687,9 @@ moving T17/T20's referent.
 
 **Still open, unchanged from Phase 0**: `.ua/` regeneration is deferred to after PR-C, so **PR-B
 does not close GMS-04 AC-3** for those 320 `rlm-` occurrences — T20's verifier has to be told
-explicitly. The 18 authorised signature-tracking test edits must be told to it too, or they read as
-the AC-3 violation they are not.
+explicitly. The ~~18~~ **19** authorised signature-tracking test edits must be told to it too, or they
+read as the AC-3 violation they are not — **19 is the ledger's own total** (`tasks.md`, *AC-3 at T13*);
+this line said 18 and was stale from T13 onward. The full briefing list is under *Next action* above.
 
 **Rebase note**: this branch is cut from `origin/main` @ `5247ecb` and is current with it.
 Merge must be a merge commit, not a squash (R-04) — see the branch note above for what a squash

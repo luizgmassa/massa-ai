@@ -858,10 +858,18 @@ fixture asserting a known non-trivial count.
 | C7 | Evidence table | Add: `data → services` is 24 edges across **14** files (spec says 12 for the `getPrismaClient` subset alone — that part is correct and confirmed at 12). |
 | C8 | §7 and `spec.md`, dynamic importers | The two dynamic importers are cited as `scripts/beir-benchmark.ts:258` and `scripts/symbol-benchmark.ts:213`, recorded as *"both, confirmed"*. **Neither path exists.** They are `packages/core/src/scripts/{beir,symbol}-benchmark.ts` at `:259` and `:214`. The count is right — 24 + 2 = 26 — and the citation was never checked against the filesystem. Measured by D3 at T2, which pins the real paths in a test. |
 | C9 | §5.1, controllers importers | §5.1 names **two** dynamic `controllers` importers. There is **one** (`production-wiring.ts`); `search-session-hook.ts:21` is a plain static import. Measured: 6 members, **22 deep + 1 barrel (`src/index.ts`) + 1 dynamic = 24** outside importers, against §5.1's "~30" and "between 22 and 30" and `spec.md`'s "3-4 files". Settles the range rather than narrowing it. |
+| C10 | GMS-04 AC-3 | *"`rg 'rlm-'` returns only CHANGELOG and `.specs/` history"* is **unsatisfiable, and was corrected twice before it was replaced**. Phase 0 measured **320** occurrences in three tracked, generated `.ua/` artifacts whose regeneration is deferred past PR-C; the 2026-07-29 narrowing to *"zero hits outside `CHANGELOG.md` / `.specs/` / `.ua/`"* was measured unsatisfiable again at T15, because every extraction deliberately added a provenance comment naming its deleted `rlm-*.ts` source (six files carry nothing else), and because `contextual-search-rlm-coverage.test.ts` carries `rlm-` in its own filename, which §6 keeps on purpose. **Replace the criterion with the sensor**: `scripts/check-stale-pointers.ts` exits 0 when no `rlm-*` or `search-facade-*` pointer is `BROKEN` **and** the `HISTORICAL` count sits exactly on its pin. Counting a string measures a *population*; the requirement was always about a *pointer that misleads a reader*. Added at T15 — see `tasks.md` → *Twelfth plan defect* and *Fourteenth plan defect*. |
 
 Both C8 and C9 are provenance errors: the counts hold, the citations behind them were never
 verified against the tree. Found at T2 and recorded here rather than fixed in place, so T19
 applies them to `spec.md` as one reviewed change.
+
+**C10 was added at T15 and is the row T19 must not skip.** Nothing in this section owned GMS-04 AC-3
+before it — C4 covers only AC-4's obsolete needles clause — and T20's verifier reads `spec.md`. As
+things stood it would have checked AC-3 **as written**, found the criterion unsatisfiable, and marked
+it failed against a tree that satisfies the requirement the criterion was trying to express. The T19
+row in `tasks.md` also scoped itself to *C1–C7* while this section has held **C1–C9** since Design;
+both are corrected there.
 
 ---
 

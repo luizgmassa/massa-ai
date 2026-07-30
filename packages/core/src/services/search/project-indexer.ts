@@ -101,7 +101,7 @@ export type SearchAdmissionResult = {
  * are the part design.md §4.1's "injected collaborators" column omitted** —
  * the same class of omission as `ensureInitializedImpl`, and §2.1 lists both
  * members, so §4.4's rule already places them here. They are load-bearing:
- * `rlm-indexing.test.ts` stubs `rlm.indexFile` at :377, :402, :537, :572, :609
+ * `search-facade-indexing.test.ts` stubs `rlm.indexFile` at :377, :402, :537, :572, :609
  * and `rlm.indexProject` at :335 — **6 instance-method stub sites** — and every
  * one is exercised *through* `ensureFreshIndex` or `indexProjectInternal`. A
  * module-local call would make all six silently ineffective while the suite

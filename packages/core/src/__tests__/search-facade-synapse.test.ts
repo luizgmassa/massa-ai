@@ -1,5 +1,5 @@
 /**
- * rlm-synapse delegate tests — applySynapseState, correctQuery, buildGraphStream.
+ * Search-facade synapse-surface tests — applySynapseState, correctQuery, buildGraphStream.
  *
  * Uses injected-deps + mock.module (same pattern as characterization test).
  */
@@ -86,7 +86,7 @@ function makeResult(id: string, score = 0.5): SearchResult {
   };
 }
 
-describe("rlm-synapse — applySynapseState", () => {
+describe("search-facade-synapse — applySynapseState", () => {
   test("no sessionId → returns base results unchanged", async () => {
     const rlm = new ContextualSearchRLM();
     const base = [makeResult("a"), makeResult("b")];
@@ -165,7 +165,7 @@ describe("rlm-synapse — applySynapseState", () => {
   });
 });
 
-describe("rlm-synapse — correctQuery", () => {
+describe("search-facade-synapse — correctQuery", () => {
   test("no fuzzyCorrect function → returns null", async () => {
     const rlm = new ContextualSearchRLM();
     (rlm as any).keywordSearch = {};
@@ -214,7 +214,7 @@ describe("rlm-synapse — correctQuery", () => {
   });
 });
 
-describe("rlm-synapse — buildGraphStream", () => {
+describe("search-facade-synapse — buildGraphStream", () => {
   beforeEach(() => {
     mockBfsNeighbors = () => [];
     mockFullTextSearch = async () => [];

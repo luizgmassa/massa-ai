@@ -18,7 +18,7 @@
  * of those reassigns exactly one field between the two calls
  * (`project-indexer-late-bind.test.ts:119-135` reassigns `indexManager` alone), so
  * a memo on any *other* field of the same record survives them. `IndexAdminDeps`
- * has five non-re-entrant fields and `rlm-admin.test.ts` already stubs two of
+ * has five non-re-entrant fields and `search-facade-admin.test.ts` already stubs two of
  * them post-construction (`fileFilterCache` :85,:96 and `analytics` :159), so this
  * file reassigns all five and asserts each by identity. Observed red under a memo
  * confined to a single field, which the one-field shape would have missed.
@@ -26,7 +26,7 @@
  * **Test 4 is the compensating control for a seam no pre-existing test can see.**
  * `IndexAdminDeps.search` is re-entrant — the root's own method, handed over as an
  * arrow wrapper. `rlm.search` is stubbed at 7 instance sites
- * (`rlm-admin.test.ts:124,137,148`;
+ * (`search-facade-admin.test.ts:124,137,148`;
  * `contextual-search-rlm-coverage.test.ts:382,395,407,416`), and those are also
  * the *only* 7 calls to `warmupCache` in the suite — every one of which assigns
  * before it calls. So a bare `search: this.search` reference or a `.bind(this)` at

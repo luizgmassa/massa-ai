@@ -199,6 +199,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compile error. Anyone later deciding whether a modifier can be narrowed needs to know which of the two
   they are holding.
 
+- **The four search test suites are renamed after what they test, and stale documentation that pointed at
+  deleted files is corrected.** `rlm-admin`, `rlm-indexing`, `rlm-search` and `rlm-synapse` become
+  `search-facade-admin`, `search-facade-indexing`, `search-facade-hybrid` and `search-facade-synapse`.
+  They drive the search facade rather than the capability modules the old names implied, and no file in
+  the package is named after a delegate that no longer exists. The onboarding guide's description of the
+  search layer was also several steps out of date — it described modules taking the facade instance as
+  their first argument, which this series replaced with narrow dependency records — and the coverage
+  suite's header cited a line range that had drifted by about a hundred and eighty lines.
+
+  No test was added, removed, skipped or relaxed: every suite runs the same case and assertion counts as
+  before, verified per file rather than in aggregate. Comments recording where a body originally moved
+  from are kept deliberately; they name deleted files on purpose, and a new check now fails if one of
+  them is removed as well as if a live reference goes stale.
+
 ## [1.11.0] - 2026-07-29
 
 ### Changed

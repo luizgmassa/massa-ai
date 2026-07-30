@@ -1,6 +1,6 @@
 /**
  * Unit tests for SearchController — covers the lines not exercised by
- * rlm-search.test.ts / search-tools-coverage.test.ts: private constructor
+ * search-facade-hybrid.test.ts / search-tools-coverage.test.ts: private constructor
  * + getInstance + getSearchEngine, handleAutoReindex, generatePreview edge
  * cases, filterByPatterns, applyBoost, rerank path, degradations, stale
  * warning, filter downgrades, and recommendation generation per response

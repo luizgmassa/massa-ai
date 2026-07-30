@@ -58,7 +58,7 @@ import type { getSearchCache } from "./cache-factory.js";
  *
  * It is load-bearing, and the sensor for it is new rather than pre-existing.
  * Measured: `rlm.search` is stubbed at **7 instance-method sites** —
- * `rlm-admin.test.ts:124,137,148` and
+ * `search-facade-admin.test.ts:124,137,148` and
  * `contextual-search-rlm-coverage.test.ts:382,395,407,416` — as bare assignments
  * with no `as any` cast, so the established PATCHABLE regex does not find them
  * (the same shape T10 registered for `indexFile`/`indexProject`, and `git grep

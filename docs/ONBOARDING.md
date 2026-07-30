@@ -141,13 +141,20 @@ The ETL run does not mutate the symbol graph in place. It builds a new versioned
 blue-green deployment applied to a database table. Readers never see a half-indexed graph.
 See `graph-generation-coordinator.ts` and `symbol-repo-generation.ts`.
 
-### 5. Facade-plus-extracted-functions
+### 5. Facade-plus-capability-modules
 
 `ContextualSearchRLM` is the busiest file in the service layer. Rather than let one class
-grow unbounded, its methods were mechanically extracted into `rlm-indexing.ts`,
-`rlm-search.ts`, `rlm-synapse.ts`, and `rlm-admin.ts` as plain functions taking the instance
-as an explicit first parameter — `doThing(rlm, args)` instead of `rlm.doThing(args)`. The
-public API is preserved; each concern gets its own file.
+grow unbounded, its methods were extracted into capability modules — `result-fusion.ts`,
+`graph-stream.ts`, `session-bias.ts`, `hybrid-search.ts`, `project-indexer.ts` and
+`index-admin.ts` — as plain functions taking a **narrow deps record** as their first
+parameter: `doThing(deps, args)`, not `doThing(rlm, args)`. Passing the facade itself hands
+every module the whole class back, which is the coupling the split exists to remove. The
+public API is preserved; the class stays as the composition root that assembles the records.
+
+Assemble a record **per call**, from whatever the fields hold right now. Hoisting it to a
+constructor-time capture compiles, type-checks and passes the whole suite, while the ~80 test
+sites that stub facade state *after* construction go on passing against the real collaborator.
+The `*-late-bind.test.ts` suites exist to catch exactly that.
 
 ### 6. Stdout belongs to the protocol
 
@@ -174,7 +181,7 @@ Thirteen steps, ordered the way a request actually flows. Each names the files t
 | 1 | **The Core Package Contract** — the product's own statement of its architecture; re-exports the four enforced layers as one import surface. Read first. | `packages/core/src/index.ts` |
 | 2 | **Tool Handlers** — 31 thin files, one per MCP tool. `search_project.ts` is representative: call the controller, serialize, done. | `tools/index.ts`, `tools/search_project.ts` |
 | 3 | **Controllers** — six orchestrators. `search-controller.ts` shows what orchestration means: admission preflight, optional auto-reindex, glob filtering, centrality boosting, optional LLM rerank. | `controllers/search-controller.ts` |
-| 4 | **The Search Facade** — hybrid vector + Postgres FTS with reciprocal-rank fusion, split across five tightly-coupled files. | `services/search/contextual-search-rlm.ts` + `rlm-*.ts` |
+| 4 | **The Search Facade** — hybrid vector + Postgres FTS with reciprocal-rank fusion. A composition root plus six capability modules, each taking a narrow deps record rather than the facade. | `services/search/contextual-search-rlm.ts` + `hybrid-search.ts`, `project-indexer.ts`, `index-admin.ts`, `session-bias.ts`, `graph-stream.ts`, `result-fusion.ts` |
 | 5 | **The ETL Indexing Pipeline** — `discover → parse → resolve → load`. Hash-skip unchanged files, tree-sitter parse, resolve FQNs, persist in per-batch transactions with deadlock retry. | `services/etl/pipeline.ts`, `stages/*.ts` |
 | 6 | **Symbol Graph & Blue-Green Generations** — go-to-definition, find-references, project map; generations flipped atomically. | `services/symbol/symbol-graph.service.ts`, `etl/graph-generation-coordinator.ts` |
 | 7 | **The PostgreSQL Data Layer** — the lazily-created `pg` pool and the Prisma singleton everything funnels through, plus the typed event bus. | `data/db-connection.ts`, `services/query/prisma-client.ts`, `services/events/event-bus.ts` |

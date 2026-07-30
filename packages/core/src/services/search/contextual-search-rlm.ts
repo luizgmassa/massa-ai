@@ -102,7 +102,7 @@ export class ContextualSearchRLM {
   // Was relaxed from `private` so rlm-admin.ts could read it via the rlm param.
   // T12 removed that reader: index-admin.ts takes it through `IndexAdminDeps`.
   // Still public because 4 test sites assign it post-construction
-  // (contextual-search-rlm-coverage.test.ts:343,354; rlm-admin.test.ts:85,96).
+  // (contextual-search-rlm-coverage.test.ts:343,354; search-facade-admin.test.ts:85,96).
   fileFilterCache: FileFilterCache;
   /** Phase 2: query understanding (LLM rewrite + HyDE). Default-off, silent-degrade. */
   // Was relaxed from `private` so rlm-search.ts could read it via the rlm
@@ -182,7 +182,7 @@ export class ContextualSearchRLM {
 
   // Delegate-preservation contract: stays a public patchable instance method,
   // because concurrent-indexing.test.ts:67, the characterization test and
-  // rlm-search.test.ts:156 monkey-patch `.ensureInitialized` on the instance and
+  // search-facade-hybrid.test.ts:156 monkey-patch `.ensureInitialized` on the instance and
   // every internal caller routes through `this.` (constraint PATCHABLE).
   //
   // PR-B T10: this body **is** the former `ensureInitializedImpl`, moved here
@@ -253,11 +253,11 @@ export class ContextualSearchRLM {
    * the fields hold right now (LATE-BIND, design.md §4.3.1). Never hoist this to
    * a constructor-time capture *or* a first-call memo: `initialized` has 25
    * post-construction assignment sites, `indexManager` 18, `symbolRepo` 7, and
-   * `rlm-indexing.test.ts` alone holds 52 of the ~80 — a capture would leave
+   * `search-facade-indexing.test.ts` alone holds 52 of the ~80 — a capture would leave
    * every one of them stubbing a field nothing reads.
    *
    * Property reads only, never a dereference. That is load-bearing:
-   * `rlm-indexing.test.ts:327-339` stubs `indexManager` and `searchCache` but
+   * `search-facade-indexing.test.ts:327-339` stubs `indexManager` and `searchCache` but
    * *not* `symbolRepo`, because the full-reindex branch returns before touching
    * it. Reading an undefined field into the record is fine; dereferencing one
    * here would turn that test red on a member the original never reached.
@@ -395,7 +395,7 @@ export class ContextualSearchRLM {
    */
   // Stays public: project-indexer.ts reaches it back through
   // `IndexerDeps.indexFile`, an arrow wrapper over `this.indexFile`, so the 5
-  // sites in rlm-indexing.test.ts that stub this method on the instance keep
+  // sites in search-facade-indexing.test.ts that stub this method on the instance keep
   // taking effect (LATE-BIND).
   //
   // It deliberately does **not** `await this.ensureInitialized()`. The original
