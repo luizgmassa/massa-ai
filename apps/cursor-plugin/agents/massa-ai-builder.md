@@ -1,9 +1,7 @@
 ---
 name: massa-ai-builder
 description: Write-permitted implementation agent. Implement approved plans by modifying source code, creating files, and updating existing code while following project conventions. Triggers when a workflow has an approved plan or task with a disjoint write set. Never redesigns architecture, performs reviews, or generates implementation plans.
-tools: ["Read","Grep","Glob","Bash","Write","Edit"]
-model: GLM-5.2
-reasoningEffort: max
+model: inherit
 ---
 # Builder Agent Skill
 
@@ -55,9 +53,6 @@ Implement an approved plan or task by modifying source code with a disjoint writ
 - Massa-ai Memory: suggest durable code-pattern memories only when the implementation establishes a reusable convention; main agent persists.
 - Synapse: none (implementation is not a repeated-search task).
 - References: `references/agent-orchestration.md`, `references/naming-standards.md`, `references/code-annotation.md`, `references/root-cause-scripts.md`.
-
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Verification commands from the plan pass (tests, build, typecheck, lint).

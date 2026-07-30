@@ -5,7 +5,7 @@ license: MIT
 metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
-  model_hint: GLM-5.2
+  model_tier: standard
   permission: write
 ---
 
@@ -59,9 +59,6 @@ Implement an approved plan or task by modifying source code with a disjoint writ
 - Massa-ai Memory: suggest durable code-pattern memories only when the implementation establishes a reusable convention; main agent persists.
 - Synapse: none (implementation is not a repeated-search task).
 - References: `references/agent-orchestration.md`, `references/naming-standards.md`, `references/code-annotation.md`, `references/root-cause-scripts.md`.
-
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Verification commands from the plan pass (tests, build, typecheck, lint).

@@ -79,11 +79,12 @@ next_step: <string>
 - References: `references/agent-orchestration.md`, `references/audit-report-io.md` (Judge With Debate Report Contracts).
 
 ## Model Hint
-deepseek-v4-pro (advisory charter default — the Judge-1 slot model). Per-slot diversity is
-assigned by the workflow at dispatch: Judge 1 `deepseek-v4-pro`, Judge 2 `minimax-m3`, Judge 3
-`GLM-5.2`. Hosts without dispatch-time model selection run this charter default for every slot;
-the orchestrator records that as `DIVERSITY DEGRADED` per the workflow contract. Fallback to the
-workflow's configured default model if the pinned model is unavailable.
+This charter's `metadata.model_tier` (`deep`) is the fallback every host runs when dispatch-time
+model selection is unavailable. The `judge-with-debate` workflow additionally requests per-slot
+model diversity at dispatch time on hosts that support it — `workflows/judge-with-debate.md` is
+the single source for the current slot assignments, not this file. When dispatch-time selection
+is unavailable, every slot runs the charter default and the orchestrator records
+`DIVERSITY DEGRADED` per the workflow contract.
 
 ## Validation Sensors
 - Every criterion score carries an exact quotation from the artifact.

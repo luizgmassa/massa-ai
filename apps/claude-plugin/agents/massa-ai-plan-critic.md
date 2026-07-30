@@ -77,9 +77,6 @@ Never receives full conversation context.
 - Policy: the main agent owns mode selection, synthesis, plan revision, and the Evidence Gate; this agent owns the critique only.
 - References: `references/agent-orchestration.md`, `references/the-fool/`, `references/verification-ladder.md`.
 
-## Model Hint
-MiniMax M3 (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - Every challenge ties to a plan section plus a concrete evidence gap or falsifiable check.
 - No challenge rests on missing conversation history that the packet intentionally excluded.

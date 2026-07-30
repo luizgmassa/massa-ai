@@ -666,7 +666,24 @@
       "design": ".specs/features/judge-with-debate/design.md",
       "tasks": ".specs/features/judge-with-debate/tasks.md",
       "validation": ".specs/features/judge-with-debate/validation.md"
+    },
+    {
+      "slug": "model-profile-registry",
+      "title": "Model Profile Registry \u2014 central tier/profile registry for agent and workflow model selection across four harness CLIs",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/model-profile-registry/spec.md",
+      "design": ".specs/features/model-profile-registry/design.md",
+      "tasks": ".specs/features/model-profile-registry/tasks.md",
+      "fool": ".specs/features/model-profile-registry/fool.md",
+      "validation": ".specs/features/model-profile-registry/validation.md"
     }
   ],
-  "active_feature": "judge-with-debate"
+  "active_feature": "model-profile-registry"
 }

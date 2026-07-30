@@ -385,7 +385,7 @@ The symlinked massa-ai skill defines the roles in `references/agent-orchestratio
 
 ## How to Add an Agent
 
-1. Create `skills/agents/<name>/SKILL.md` from the charter template (see any existing agent skill), including `metadata.model_hint` and `metadata.permission`. Its `## Restrictions` section must carry both persona-boundary lines verbatim — the self-routing ban (`never load the massa-ai or persona-router routers, and never open a personas/ prompt file`) and the precedence line (`a persona supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict`). `scripts/__tests__/skills-harness-integrity.test.ts` enumerates charters from disk and is section-scoped, so a new charter missing either line fails the gate.
+1. Create `skills/agents/<name>/SKILL.md` from the charter template (see any existing agent skill), including `metadata.model_tier` (a tier declared in `skills/model-profiles.json`, never a model name) and `metadata.permission`. Its `## Restrictions` section must carry both persona-boundary lines verbatim — the self-routing ban (`never load the massa-ai or persona-router routers, and never open a personas/ prompt file`) and the precedence line (`a persona supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict`). `scripts/__tests__/skills-harness-integrity.test.ts` enumerates charters from disk and is section-scoped, so a new charter missing either line fails the gate.
 2. Add one row to the Agent Table above.
 3. Add one row to the Mapping table if it maps to an existing role.
 4. Add `<name>` to `SPECIALIST_NAMES` plus the two model-pinning tables in `scripts/generate-subagent-artifacts.ts`, then run it to regenerate the host artifacts.

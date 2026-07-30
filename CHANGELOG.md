@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Model and effort for the 17 subagent specialists now resolve from one registry, and
+  three separate defects closed with it.** `skills/model-profiles.json` is the only
+  hand-authored place that names a model or an effort level for any agent on any host;
+  each charter declares a `metadata.model_tier` (replacing `metadata.model_hint`) and
+  `scripts/lib/model-profiles.ts` resolves `tier + host + profile → {model, effort}` at
+  generate time. Before this, 184 of 304 model facts were hand-copied across six surfaces,
+  and the four per-host tables in `generate-subagent-artifacts.ts`,
+  `subagent-parity.test.ts` and `FEATURES.md` could — and did — disagree.
+
+  Three shipping defects, not one cleanup:
+
+  1. **Cross-host tier drift on three roles, changing five shipped pins.** `navigator`,
+     `requirements-analyst` and `planner` each carried contradictory tiers across hosts.
+     The sharpest proof was inside `FEATURES.md` itself: `navigator`'s Claude and Codex
+     rationale cells held the *same sentence* — "no frontier reasoning needed" — beside a
+     standard-tier model on one host and a light-tier one on the other. Normalized to one
+     tier per role, so `navigator` drops to the light tier on Claude, `requirements-analyst`
+     rises to standard on OpenCode, and `planner` rises to deep on OpenCode.
+  2. **The Cursor emitter had never produced a valid agent file.** It emitted `tools` and
+     `reasoningEffort` — neither is a Cursor frontmatter key — plus a human-readable
+     display name in `model:` where Cursor requires a model **ID**, and no `readonly`, which
+     is Cursor's only documented permission mechanism. All 17 Cursor agents now emit only
+     Cursor's documented fields, with `readonly: true` on the 14 read-only charters.
+     `model:` is `inherit` on every tier: Cursor publishes no display-name→ID mapping and
+     its catalog lists no entry for two of the three models previously pinned there, so
+     `inherit` is the documented default rather than a guessed ID. `cursor-agent models` is
+     the discovery path, and restoring differentiation is a registry-only change.
+  3. **OpenCode was sending `name` and `metadata` to the model provider as bogus model
+     options on every subagent invocation.** OpenCode's documented rule forwards
+     unrecognized frontmatter keys to the provider as model options, so these were not
+     inert — this was live behaviour, not hygiene. `name:` is gone (OpenCode takes the agent
+     name from the filename, which already yields `massa-ai-<n>`), and the
+     `massa-ai-owned: true` ownership marker **moves** from frontmatter `metadata:` to a
+     `<!-- massa-ai-owned: true -->` body comment. It moves rather than being deleted
+     because `massa-ai-config agents uninstall` scopes by that literal substring: removing
+     it would have matched zero files, printed `removed 0`, and orphaned 17 installed
+     agents. The substring is unchanged, so uninstall also still matches agent files an
+     older version installed in the frontmatter form.
+
+  Profiles are open data: adding, renaming or removing one is a registry edit with no
+  TypeScript type, enum, or doc table to update. Selection is `--profile=<name>` >
+  `MASSA_AI_MODEL_PROFILE` > registry `hostDefaults[host]`, with no fourth rank — an
+  unknown name at any rank is a named error, never a silent fallback to a default model —
+  and `validateRegistry` reports every violation in one throw instead of one per run.
+  Resolution is build-time because no host resolves a per-agent model from an env var;
+  switching profiles means regenerating. One consequence is documented rather than worked
+  around: `CLAUDE_CODE_SUBAGENT_MODEL` set to a real model silently defeats every registry
+  pin on Claude, because it overrides frontmatter. `FEATURES.md` loses its four 17-row
+  per-host tables and all four rationale columns in favour of one role→tier table, guarded
+  by a doc-drift test; `bun run verify:model-ids` probes the installed harness CLIs for
+  unresolvable IDs and skips an absent CLI with a named reason instead of passing vacuously.
+
+  **Merge note:** `main` gained the `judge` and `meta-judge` charters (2 more specialists,
+  17 total) from a concurrently-merged PR while this branch was in review. Both still
+  declared `metadata.model_hint` under the retired convention; merging this branch onto
+  that state migrates them to `metadata.model_tier: deep` — matching their original
+  Claude/Codex pins (`opus` / `gpt-5.6-sol`, both this registry's `deep` tier) — and their
+  Cursor/OpenCode output now goes through the same emitter fixes as the other 15 (Cursor
+  `inherit` instead of the raw charter hint; OpenCode drops `name`/`metadata`).
+
+  That normalization **moves two more shipped model pins**, which is a behaviour change and not
+  bookkeeping: on OpenCode `judge` goes `opencode-go/deepseek-v4-pro` → `opencode-go/minimax-m3`
+  and `meta-judge` goes `opencode-go/kimi-k3` → `opencode-go/minimax-m3`. Both had the same
+  cross-host drift this release removes — `judge` shipped deep on Claude and Codex but light on
+  OpenCode. Note the side effect: `judge-with-debate` wants per-slot model *diversity*, and one
+  tier resolves to one model per host, so the two charter defaults now coincide on OpenCode.
+  That affects the **fallback** only — the workflow requests per-slot models at dispatch time
+  where the host supports it, and names the degraded case `DIVERSITY DEGRADED` per its own
+  contract.
+
 ## [1.13.0] - 2026-07-30
 
 ### Added

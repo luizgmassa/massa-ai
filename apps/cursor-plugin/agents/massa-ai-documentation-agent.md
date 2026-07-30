@@ -1,9 +1,7 @@
 ---
 name: massa-ai-documentation-agent
 description: Engineering documentation agent. Generate README, ADR, RFC, changelog, KDoc, and architecture documentation. Default read-only; writes only doc files when explicitly scoped with a disjoint write set. Triggers when a workflow needs documentation artifacts. Never modifies implementation.
-tools: ["Read","Grep","Glob","Bash","Write","Edit"]
-model: DeepSeek V4 Pro
-reasoningEffort: max
+model: inherit
 ---
 # Documentation Agent Skill
 
@@ -53,9 +51,6 @@ Generate engineering documentation artifacts (README, ADR, RFC, changelog, KDoc,
 - Massa-ai Memory: suggest durable doc-format memories only when a documentation convention is established; main agent persists.
 - Synapse: none (documentation is not a repeated-search task).
 - References: `references/adr-authoring.md`, `references/rfc/`.
-
-## Model Hint
-DeepSeek V4 Pro (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Stale-reference scan passes (no dead links to removed files).

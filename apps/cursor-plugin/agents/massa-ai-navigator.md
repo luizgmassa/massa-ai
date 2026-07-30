@@ -1,9 +1,8 @@
 ---
 name: massa-ai-navigator
 description: Code exploration specialist that leverages the massa-ai semantic index instead of brute-force file reads. Use when the user asks "where is X?", "how does Y work?", "who calls Z?", or for any question about an indexed codebase. Starts every investigation by consulting the massa-ai index (project map, definitions, references) before falling back to Read/Grep.
-tools: ["mcp__massa-ai__*","Read","Grep","Glob","Bash(pwd)"]
-model: DeepSeek V4 Pro
-reasoningEffort: max
+model: inherit
+readonly: true
 ---
 # Navigator Agent Skill
 
@@ -62,9 +61,6 @@ The user's codebase is **already indexed** by massa-ai. The first move on any qu
 - Context Firewall: summarize search output; return only `path:line` pointers and findings.
 - Massa-ai Memory: suggest durable navigation facts (entry points, ownership boundaries) only when reusable; the main agent persists.
 - References: `references/mcp-tools.md`, `references/codebase-investigation.md`, `references/synapse-policy.md`, `references/context-firewall.md`.
-
-## Model Hint
-DeepSeek V4 Pro (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Every claim carries a `path:line` or symbol pointer.

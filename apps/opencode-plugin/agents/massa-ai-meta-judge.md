@@ -1,12 +1,11 @@
 ---
-name: massa-ai-meta-judge
 description: Read-only evaluation-specification author for judge-with-debate. Generate the tailored rubric, criteria, weights, and checklists that a panel of judge agents uses to evaluate an artifact through independent analysis and multi-round debate. Runs exactly once per evaluation. Never scores the artifact, never edits the specification after emission.
 mode: all
-model: opencode-go/kimi-k3
+model: opencode-go/minimax-m3
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
-metadata: { massa-ai-owned: true }
 ---
+<!-- massa-ai-owned: true -->
 # Meta-Judge Agent Skill
 
 ## Mission
@@ -72,8 +71,11 @@ overall: weighted-mean
 - References: `references/agent-orchestration.md`, `references/audit-report-io.md` (Judge With Debate Report Contracts).
 
 ## Model Hint
-kimi-k3 (advisory). Fallback to the workflow's configured default model if unavailable; the
-fallback is recorded by the orchestrator as a diversity warning per the workflow contract.
+This charter's `metadata.model_tier` (`deep`) is the fallback every host runs when dispatch-time
+model selection is unavailable. The `judge-with-debate` workflow additionally requests a specific
+model for this slot at dispatch time on hosts that support it — `workflows/judge-with-debate.md`
+is the single source for the current assignment, not this file. When dispatch-time selection is
+unavailable, the orchestrator records a diversity warning per the workflow contract.
 
 ## Validation Sensors
 - Output parses as YAML; weights sum to 1.0 (±0.001); every criterion carries id, name, weight, scale (min 1, max 5), rubric anchors for 1/3/5, and a non-empty checklist.

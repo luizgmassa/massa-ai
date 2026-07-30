@@ -1,37 +1,86 @@
 # Handoff
 
-## Active — Judge With Debate VALIDATED PASS, PR #50 open + CI green
+## Active — Model Profile Registry, validated PASS, PR open, driving CI to green
 
-**Feature**: `judge-with-debate` · branch `feat/judge-with-debate`, worktree
-`../massa-ai-wt-judge-with-debate` (from `origin/main` @ v1.12.1). **ALL TASKS COMPLETE
-2026-07-30. Independent validation PASS** (`.specs/features/judge-with-debate/validation.md` —
-read the Addendum first: verifier had no shell/write; sensor executions + file persistence are
-the main agent's, recorded as accepted deviation).
-**Final gate: lint 0 · type-check 6/6 · test:scripts 773 pass / 0 fail across 41 files · both
-generators `--check` No drift.** 4/4 discrimination sensors executed + killed.
-**Delivery (implementation-delivery stages 3–7) DONE 2026-07-30:**
+- **projectId** `massa-ai` · **workflowSessionId** `spec-model-profile-registry`
+- **branch** `feat/model-profile-registry` · **worktree** `.claude/worktrees/model-profiles`
+- **base** `origin/main` @ `45daaa1` · **head** `281ac26` before the merge below · working
+  tree clean at each commit.
+- **Specify, Design, Tasks, Execute (T1–T13) and independent validation ALL COMPLETE.**
+  **Verdict: PASS** — `.specs/features/model-profile-registry/validation.md`.
+- **PR [#51](https://github.com/luizgmassa/massa-ai/pull/51) opened against `main`.**
+  `origin/main` had advanced two commits past this branch's base while the PR was being
+  prepared — PR #50 (`judge-with-debate`, see the entry below) merged and released as
+  v1.13.0, adding two new specialist charters (`judge`, `meta-judge`) that still declared
+  the retired `metadata.model_hint`. Merged `origin/main` into this branch (not rebased —
+  the 14 feature commits are cited by hash in `tasks.md`/`validation.md`) and migrated both
+  new charters to `metadata.model_tier: deep`, matching their original Claude/Codex pins
+  (`opus` / `gpt-5.6-sol`, both this registry's `deep` tier under the `balanced` profile).
+  Their Cursor/OpenCode output now goes through the same emitter fixes as the other 15.
 
-- Branch pushed; PR [#50](https://github.com/luizgmassa/massa-ai/pull/50) OPEN, base `main`.
-- First CI run **red** on `build` + `coverage`: the 15→17 registry change missed the four plugin
-  install-test rosters (`agents-install.test.ts`, claude/codex/cursor `install.test.ts`), both
-  shell installer advisories (`install.sh`, `scripts/install-agents.sh`), the opencode config-cli
-  help text, and README/FEATURES/marketplace copy. Root cause: the local final gate runs
-  `test:scripts`; that roster surface is covered by `test:plugins`, which only CI ran.
-  **Repair iteration 1 of 3**: `e190b43` flips all stale 15→17 (rosters gain `meta-judge` +
-  `judge`, both read-only — `WRITE_AGENTS` untouched). Local re-gates: `test:plugins` 96/96,
-  `test:scripts` 773/0, lint 0. Second CI run **green: 14 pass / 0 fail** (`install-test` skips
-  by workflow condition; `mcp` ran and passed on the green run).
+**Read `.specs/features/model-profile-registry/tasks.md` first** — it is the task contract:
+per-task status with commit hashes, the five recorded amendments A1–A5, the accepted known
+limitation, and the gate commands. Then `validation.md` (the single validation record — it
+replaces two earlier reports rather than appending to them), `spec.md` (MPR-R1..R12 + ACs,
+§4 enumerated behaviour changes, §7 per-host evidence, §8 the corrected baseline, §9 recorded
+divergences), `design.md`, and `fool.md`.
 
-**Remaining, in order:**
-1. **STOP — merge only on explicit user approval** (merge auto-cuts a release; CHANGELOG entry
-   sits under `### Added` → minor bump).
-2. Optional user-gated live protocol smoke (run the real debate on a small artifact). If
-   declined: record candidate lesson via `lessons.py` — protocol behavior is
-   user-gated-smoke-only (validation.md Addendum item 6, tasks.md T11 lesson note).
-3. Main checkout also carries PR-B (`core-layering-god-module-split`) Execute on
-   `refactor/search-facade-split-phase-1` — untouched by this feature.
+Each commit carries its own rationale and gate evidence in its body. Read the commit, not a
+summary of it.
+
+**Validation used two of the three permitted fix loops, and the first verdict was FAIL.**
+That matters more than the final PASS:
+
+- **Gap 1 — MPR-R1's central acceptance criterion had no mechanism at all.** A model name
+  typed into a charter's *prose* propagated into 1 charter + 4 mirrored charters + 4 generated
+  agent bodies while `test:scripts`, `lint` and both `--check` drift gates stayed green.
+  `loadCharter` rejects the retired `model_hint` KEY and the emitters only ever see a
+  resolved pair, so nothing could see it. Closed by T10's `scripts/verify-model-tokens.ts`.
+- **Gap 2 — a test named for a guard it never called.** "loadCharter throws rather than
+  defaulting" used `parseFrontmatter` and asserted a field was undefined. The `design.md` §6
+  mutation it was listed as killing survived it. Closed by T11.
+- **Gap 3** — `design.md` and `tasks.md` still carried the 39-fact / two-profile design-time
+  figures against a seven-profile registry. Closed by T12 as recorded amendments, not silent
+  rewrites.
+- **Iteration-1 residual** — the scan matched per *line*, so a display name split across a
+  line wrap slipped through. Realistic here, because prose wraps at ~95 columns. Closed by T13.
+
+**Open, deliberately — decided, not gaps:**
+
+- `verify-model-tokens.ts` can false-fire on ordinary English use of the three bare Claude
+  aliases (two poetry forms and the Latin for "a great work"). Dormant — no charter triggers
+  it. Narrowing it was **declined**: gating those tokens on an adjacent `model` context word
+  trades a loud, five-second-to-diagnose false positive for a *silent false negative* on a
+  real duplicated fact. If it fires on you, reword the sentence rather than weakening the
+  gate. The reason lives in the script's own docblock.
+- Cursor ships `model: inherit` on every tier. Accepted risk with a recorded reason
+  (`spec.md` §7) and a **skipped sensor** — `cursor-agent` is not installed here, so the
+  hard-error-vs-fallback question is unresolved. Do not close it by guessing a slug.
+- Codex IDs are SKIPPED by `verify:model-ids` (docs-only model list). Expected.
+- `CLAUDE_CODE_SUBAGENT_MODEL` outranks frontmatter and so defeats every registry pin on
+  Claude (`spec.md` §5). Documentation-only, not fixable in code. Documented by T7.
+
+**Build all five packages before believing any test number** — `tasks.md` → Gate Check
+Commands. Final green at `af79151`: `test:scripts` **857 pass / 0 fail**, `test:plugins`
+**96 pass / 0 fail**, both `--check` "No drift", `lint` 0, `verify:model-tokens` 0,
+`verify:model-ids` 0 with codex SKIPPED. massa-ai MCP tools were not registered in any
+session that produced this work; all state came from `.specs/` files and source reads.
 
 ---
+
+## Previous — Judge With Debate, VALIDATED PASS, merged and released as v1.13.0
+
+**Feature**: `judge-with-debate` · branch `feat/judge-with-debate` (from `origin/main` @
+v1.12.1). **ALL TASKS COMPLETE 2026-07-30. Independent validation PASS**
+(`.specs/features/judge-with-debate/validation.md` — read the Addendum first: verifier had
+no shell/write; sensor executions + file persistence are the main agent's, recorded as
+accepted deviation). **Final gate: lint 0 · type-check 6/6 · test:scripts 773 pass / 0 fail
+across 41 files · both generators `--check` No drift.** 4/4 discrimination sensors executed
++ killed. PR [#50](https://github.com/luizgmassa/massa-ai/pull/50) went green after one
+repair iteration (stale 15→17 rosters in the plugin install-test surface, which only
+`test:plugins` covers) and merged; released as `v1.13.0`. Main checkout also carries PR-B
+(`core-layering-god-module-split`) Execute on `refactor/search-facade-split-phase-1` —
+untouched by this feature.
 
 ## Previous — Core Layering and God-Module Split (PR-B), Phase 1 started
 

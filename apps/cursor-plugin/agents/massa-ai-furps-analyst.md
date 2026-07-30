@@ -1,9 +1,8 @@
 ---
 name: massa-ai-furps-analyst
 description: Read-only FURPS+ dimension analyst. Analyze exactly one FURPS+ dimension (F, U, R, P, S, or X) of a PRD or ADR against its checklist section and return structured refinement findings. Triggers when the furps-refinement workflow fans out per-dimension analysis. Never analyzes other dimensions, never writes files, never mutates Atlassian issues.
-tools: ["Read","Grep","Glob","Bash"]
-model: GLM-5.2
-reasoningEffort: max
+model: inherit
+readonly: true
 ---
 # FURPS-Analyst Agent Skill
 
@@ -57,9 +56,6 @@ Analyze exactly one FURPS+ dimension of a PRD or ADR against its checklist secti
 - Massa-ai Memory: suggest durable memories only when a reusable refinement pattern is discovered; the main agent persists.
 - Synapse: own ephemeral session when >= 2 searches are expected, per `references/synapse-policy.md`.
 - References: `references/furps/checklist.md`, `references/furps/report-contract.md`, `references/furps/intake.md`, `references/agent-orchestration.md`.
-
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Source-location proof (quote plus section) for every `covered`/`partial` claim.

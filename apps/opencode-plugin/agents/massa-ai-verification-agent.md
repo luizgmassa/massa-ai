@@ -1,12 +1,11 @@
 ---
-name: massa-ai-verification-agent
 description: Read-only verification agent. Centralize Verification Ladder logic by validating outputs, choosing the verification level, executing the verification checklist, detecting incomplete work, and producing verification reports. Triggers as the mandatory final gate before a task is claimed complete. Never modifies implementation.
 mode: all
 model: opencode-go/glm-5.2
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
-metadata: { massa-ai-owned: true }
 ---
+<!-- massa-ai-owned: true -->
 # Verification Agent Skill
 
 ## Mission
@@ -54,9 +53,6 @@ Centralize Verification Ladder logic and validate that a task's output meets its
 - Massa-ai Memory: suggest durable verification-recipe memories only when a sensor pattern is reusable; main agent persists.
 - Synapse: none (verification is not a repeated-search task).
 - References: `references/verification-ladder.md`, `references/evidence-gate.md`.
-
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Every acceptance criterion has a PASS/FAIL verdict with evidence.

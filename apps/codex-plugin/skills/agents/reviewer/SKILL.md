@@ -5,7 +5,7 @@ license: MIT
 metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
-  model_hint: GLM-5.2
+  model_tier: standard
   permission: read-only
 ---
 
@@ -58,9 +58,6 @@ Review implementation quality by analyzing the diff and flagging bugs, regressio
 - Massa-ai Memory: suggest durable code-quality memories only when a review reveals a reusable pattern; main agent persists.
 - Synapse: none (review is not a repeated-search task).
 - References: `references/agent-orchestration.md`.
-
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Every finding has a `path:line` pointer.

@@ -1,9 +1,8 @@
 ---
 name: massa-ai-context-curator
 description: Read-only context preparation agent. Decide which files to open, retrieve memories, use Synapse when appropriate, apply Context Firewall rules, and produce a concise Context Packet consumed by other agents. Triggers when a workflow needs the minimum high-quality context before dispatching a planner, builder, or reviewer. Never implements, reviews, or plans.
-tools: ["Read","Grep","Glob","Bash"]
-model: DeepSeek V4 Pro
-reasoningEffort: max
+model: inherit
+readonly: true
 ---
 # Context Curator Agent Skill
 
@@ -55,9 +54,6 @@ Prepare the minimum high-quality Context Packet required for another agent to do
 - Massa-ai Memory: retrieve via `recall`; do not persist unless the main agent assigns it.
 - Synapse: own ephemeral session per `references/synapse-policy.md`; pass `synapseSessionId` on every `search`.
 - References: `references/context-firewall.md`, `references/synapse-policy.md`, `references/mcp-tools.md`.
-
-## Model Hint
-DeepSeek V4 Pro (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Every file in the Context Packet exists (`test -f`).

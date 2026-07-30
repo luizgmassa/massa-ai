@@ -1,12 +1,11 @@
 ---
-name: massa-ai-audit-specialist
 description: Configurable read-only audit agent. Execute specialized audits through six lenses — bugs, architecture, security, requirements, code-quality, performance — selected via the lens field in the capability packet. Triggers when a workflow needs a findings-only audit. Never modifies implementation.
 mode: all
 model: opencode-go/glm-5.2
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
-metadata: { massa-ai-owned: true }
 ---
+<!-- massa-ai-owned: true -->
 # Audit Specialist Agent Skill
 
 ## Mission
@@ -70,9 +69,6 @@ All lenses share `references/audit-scope.md` (scope rules) and `references/audit
 - Massa-ai Memory: suggest durable audit-pattern memories only when a lens reveals a recurring issue class; main agent persists.
 - Synapse: own ephemeral session when the audit spans multiple modules with repeated searches.
 - References: `references/audit-scope.md`, `references/audit-report-io.md`, plus the per-lens references above.
-
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
 
 ## Validation Sensors
 - Every finding has a `path:line` pointer.

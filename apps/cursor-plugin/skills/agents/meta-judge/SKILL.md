@@ -5,7 +5,7 @@ license: MIT
 metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
-  model_hint: kimi-k3
+  model_tier: deep
   permission: read-only
 ---
 
@@ -74,8 +74,11 @@ overall: weighted-mean
 - References: `references/agent-orchestration.md`, `references/audit-report-io.md` (Judge With Debate Report Contracts).
 
 ## Model Hint
-kimi-k3 (advisory). Fallback to the workflow's configured default model if unavailable; the
-fallback is recorded by the orchestrator as a diversity warning per the workflow contract.
+This charter's `metadata.model_tier` (`deep`) is the fallback every host runs when dispatch-time
+model selection is unavailable. The `judge-with-debate` workflow additionally requests a specific
+model for this slot at dispatch time on hosts that support it — `workflows/judge-with-debate.md`
+is the single source for the current assignment, not this file. When dispatch-time selection is
+unavailable, the orchestrator records a diversity warning per the workflow contract.
 
 ## Validation Sensors
 - Output parses as YAML; weights sum to 1.0 (±0.001); every criterion carries id, name, weight, scale (min 1, max 5), rubric anchors for 1/3/5, and a non-empty checklist.

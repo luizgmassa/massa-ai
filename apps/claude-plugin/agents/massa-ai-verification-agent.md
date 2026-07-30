@@ -53,9 +53,6 @@ Centralize Verification Ladder logic and validate that a task's output meets its
 - Synapse: none (verification is not a repeated-search task).
 - References: `references/verification-ladder.md`, `references/evidence-gate.md`.
 
-## Model Hint
-GLM-5.2 (advisory). Fallback to the workflow's configured default model if unavailable.
-
 ## Validation Sensors
 - Every acceptance criterion has a PASS/FAIL verdict with evidence.
 - Skipped checks have a concrete reason.
