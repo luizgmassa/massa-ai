@@ -65,6 +65,20 @@ function. AC-3 budget was **0** and **0** was spent: no existing test file appea
    arrow wrappers**. A module-local call would compile, type-check, and make all six silently
    ineffective. The 16-site figure for the two named methods still reproduces exactly.
 
+> **Two reviewer decisions taken at the T11 boundary (2026-07-29), both binding on T12.**
+>
+> 1. **Stop at T11; T12 runs in a fresh session.** Not an interruption — T11 is committed, green and
+>    complete, and `.specs/` is current at `23470ce`. The reason is context budget, not scope: T12 needs
+>    `rlm-admin.ts`, its suite, the re-entrant `search` callback, two `Pick<>` narrowings, the memo
+>    mutation and the bare-assignment sweep, and starting it without room to finish risks an
+>    uncommitted partial extraction — the exact state one-atomic-commit-per-task exists to prevent.
+> 2. **T12 must also fix the stale Status line at `tasks.md:10-12`**, which still reads *"Phase 0
+>    (T0–T5) COMPLETE … T6 not started"* and has been false since T7. Fold the one-line correction into
+>    T12's own commit, the way T10 corrected stale comments in files already inside its write set —
+>    **not** as a separate docs commit, and not left to T19. Correct it to name T6a–T12 as executed and
+>    point at *Phase 1 — executed* for per-task state. It changes no behaviour and needs no sensor; it
+>    is in scope because T12 is already editing that file to add its own executed row.
+
 **Next action: T12** — indexing admin surfaces, `rlm-admin.ts` → `index-admin.ts`, 1.5 h. Four exports
 (125 LOC): `clearProjectIndexImpl`, `getProjectStatsImpl`, `warmupCacheImpl`, `getAnalyticsImpl`.
 **Read T12's row and the ordering fact it depends on before starting**: `warmupCacheImpl` reads
