@@ -88,11 +88,18 @@ jobs:
       # setup-bun is not, because that input only skips caching the bun *executable*.
       # The happy path pays nothing: `&&` short-circuits straight to `exit 0`, and a
       # command before the final `&&` of an AND-list is exempt from `set -e`.
+      #
+      # `rm -rf` itself is not exempt: it is a standalone statement, so a non-zero exit
+      # (run 30585845285, `Cannot find module './lib/interceptor/redirect'` — same undici
+      # corruption class as above, but this time the offending package survived deletion:
+      # `Directory not empty`) aborted the script under `-e` before the retry's own
+      # `bun install` ever ran, defeating the one thing this block exists to do. `|| true`
+      # makes the purge best-effort so the retry always gets its attempt.
       - name: Install dependencies
         run: |
           bun install --frozen-lockfile && exit 0
           echo "::warning::bun install failed — purging Bun's install cache and retrying once"
-          rm -rf ~/.bun/install/cache node_modules
+          rm -rf ~/.bun/install/cache node_modules || true
           bun install --frozen-lockfile --concurrent-scripts 1
 
       - name: Deploy Prisma migrations
@@ -331,7 +338,7 @@ jobs:
         run: |
           bun install --frozen-lockfile && exit 0
           echo "::warning::bun install failed — purging Bun's install cache and retrying once"
-          rm -rf ~/.bun/install/cache node_modules
+          rm -rf ~/.bun/install/cache node_modules || true
           bun install --frozen-lockfile --concurrent-scripts 1
 
       - name: Build workspace
@@ -375,7 +382,7 @@ jobs:
         run: |
           bun install --frozen-lockfile && exit 0
           echo "::warning::bun install failed — purging Bun's install cache and retrying once"
-          rm -rf ~/.bun/install/cache node_modules
+          rm -rf ~/.bun/install/cache node_modules || true
           bun install --frozen-lockfile --concurrent-scripts 1
 
       - name: Build workspace
