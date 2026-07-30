@@ -52,6 +52,16 @@ result diverged, with the reason.
 | A3 | `design.md` §2.1 fact count, §6 test row, this file's MPR-R2 row | 39 / two profiles was the design-time figure; 81 / seven profiles ships. The test asserts the factored *shape* against the live registry rather than a frozen literal, which is why it never went red on the change. |
 | A4 | `design.md` "Why two seeded profiles" | A `heavy` profile ships after all. Safe because MPR-R12's `verify-model-ids.ts` — itself added by the Plan Challenge — lets a tier be pointed at a probed id instead of a guessed one. |
 | A5 | T7 scope, item 1 | Consequence of A1. |
+| A6 | `spec.md` §4.1 (new), CHANGELOG merge note | `main` merged `judge-with-debate` and released v1.13.0 mid-review. Merging it in raises every 15 to 17 and moves **two more OpenCode pins** (`judge` and `meta-judge` → `opencode-go/minimax-m3`), which §4's tables cannot show because neither role existed at the frozen commit. Both are the MPR-R8 treatment applied to charters carrying the same cross-host drift. Disclosed rather than folded in silently — §4 claims completeness, so it needed the caveat. |
+
+**Open follow-up, deliberately not closed by this feature.** `workflows/judge-with-debate.md`
+holds per-slot model literals (lines 52, 53, 64) that `verify-model-tokens.ts` does not see:
+MPR-R1 enumerates four surfaces and workflow markdown is not one, and §5/MPR-R7 deliberately
+kept model information out of workflows. Pointing the scan's own matcher at the file confirms
+**3 lines would be flagged** if the surface were covered. Widening it is not a scan setting —
+it would go red on `main`'s content immediately, and whether per-slot diversity belongs in the
+registry is a `judge-with-debate` design decision. A three-tier registry cannot currently
+express "same capability, different model".
 
 ## Fix tasks from T9 — closed
 

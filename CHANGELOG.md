@@ -69,6 +69,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Cursor/OpenCode output now goes through the same emitter fixes as the other 15 (Cursor
   `inherit` instead of the raw charter hint; OpenCode drops `name`/`metadata`).
 
+  That normalization **moves two more shipped model pins**, which is a behaviour change and not
+  bookkeeping: on OpenCode `judge` goes `opencode-go/deepseek-v4-pro` → `opencode-go/minimax-m3`
+  and `meta-judge` goes `opencode-go/kimi-k3` → `opencode-go/minimax-m3`. Both had the same
+  cross-host drift this release removes — `judge` shipped deep on Claude and Codex but light on
+  OpenCode. Note the side effect: `judge-with-debate` wants per-slot model *diversity*, and one
+  tier resolves to one model per host, so the two charter defaults now coincide on OpenCode.
+  That affects the **fallback** only — the workflow requests per-slot models at dispatch time
+  where the host supports it, and names the degraded case `DIVERSITY DEGRADED` per its own
+  contract.
+
 ## [1.13.0] - 2026-07-30
 
 ### Added

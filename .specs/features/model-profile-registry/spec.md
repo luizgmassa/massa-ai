@@ -113,6 +113,44 @@ MPR-R9 additionally changes two hosts' emitted key sets. Claude and Codex are un
 Cursor keeps `name:` — it *is* a documented Cursor field, and dropping it would change agent
 identity from the frontmatter value to the filename stem.
 
+### 4.1 Post-merge addendum — two more pins, and a gap this feature does not close
+
+The tables above enumerate changes against the frozen base commit `45daaa1`, and remain exact
+against it. While this branch was in review, `main` merged `judge-with-debate` and released
+v1.13.0, adding the `judge` and `meta-judge` charters. Merging that in raises every count above
+from 15 to 17 and moves **two further OpenCode pins**, which the tables cannot show because
+neither role existed at the frozen commit:
+
+| Role | Host | Before (on `main`) | After | Reason |
+| --- | --- | --- | --- | --- |
+| `judge` | opencode | `opencode-go/deepseek-v4-pro` | `opencode-go/minimax-m3` | tier light → deep |
+| `meta-judge` | opencode | `opencode-go/kimi-k3` | `opencode-go/minimax-m3` | `kimi-k3` is the `heavy` profile's deep value; `balanced`'s is `minimax-m3` |
+
+Both are the MPR-R8 treatment applied to charters that had the same defect: `judge` shipped
+**deep** on Claude and Codex (`opus` / `gpt-5.6-sol`) and **light** on OpenCode, which is exactly
+the cross-host drift §1 P1 describes. Their Cursor values also move to `inherit` under the
+wholesale Cursor row above. The frozen-fixture test scopes itself to the 15 names the fixture
+has an opinion about; the two new roles are covered by the registry-derived assertions instead,
+which is the correct instrument for a role with no "before".
+
+**One consequence is worth stating rather than discovering later.** `judge-with-debate` wants
+per-slot *model diversity*, and a three-tier registry cannot express "same capability,
+different model" — one tier resolves to one model per host. On OpenCode the two charter
+defaults therefore collapse to the same value where `main` had them differ. This is a change
+to the **fallback** path only: `workflows/judge-with-debate.md` requests per-slot models at
+dispatch time on hosts that support it, and names the fallback outcome `DIVERSITY DEGRADED`
+per its own contract. The contract is intact; the fallback is less diverse than it was.
+
+**Known gap, deliberately not closed here.** Those per-slot models are model literals living in
+workflow markdown (`workflows/judge-with-debate.md:52,53,64`), outside the registry.
+`verify-model-tokens.ts` does not see them — MPR-R1 enumerates four surfaces and workflow
+markdown is not one, and MPR-R7 with §5 deliberately kept model information out of workflows to
+avoid adding context weight to every workflow load. Confirmed by pointing the scan's own matcher
+at the file: **3 lines would be flagged** if the surface were covered. Widening the scan is not
+this feature's call to make unilaterally — it would go red on `main`'s content the moment it
+landed, and whether those slot models belong in the registry (as a diversity dimension the tier
+model does not currently have) is a design decision for `judge-with-debate`, not a scan setting.
+
 ## 5. Out of scope
 
 - **Runtime model switching inside a live host session.** No host supports *per-agent*
