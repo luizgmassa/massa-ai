@@ -255,15 +255,30 @@ Plus the frozen-fixture diff proving §4 is the complete set of shipped changes.
 | `generate-skill-artifacts.ts --check` | `No drift` (exit 0) |
 | `bun run test:scripts` | **733 pass / 1 skip / 4 fail**, exit 1 |
 
-The 4 baseline failures are **not task-owned** and must still fail identically after this
-feature lands — they are the tree-sitter native/packaging contracts, which need a built
-`dist/` and packed artifacts that a fresh worktree does not have:
+**CORRECTED during Execute.** The 4 failures were **not** pre-existing defects — they were
+entirely an artefact of measuring in an unbuilt worktree, and the corrected gate is a fully
+green suite, not "zero new failures".
 
-```
-macOS arm64 packed Tree-sitter artifact contract > freezes publish-safe manifests and exact build tools
-native Tree-sitter package contract > imports real source and built dist entries in separate cold Bun processes
-native Tree-sitter package contract > guards every patched post-delete behavior in a cold child
-native Tree-sitter package contract > discriminates no-delete growth and bounds patched 100-cycle RSS
-```
+The original reading (733 pass / 1 skip / 4 fail) reproduced consistently across runs, which
+is exactly what made it look trustworthy. It was still wrong about the cause. A fresh
+worktree has no `dist/`, and five packages must be built before `test:scripts` is meaningful:
 
-Execute's gate is therefore *zero new failures against 733/1/4*, not a green suite.
+| State | `test:scripts` |
+| --- | --- |
+| fresh worktree, nothing built | 733 pass / 1 skip / **4 fail** |
+| after `packages/shared` + `apps/opencode-plugin` | 827 pass / **5 fail** — a *new* failure appears, because a partial build lets `verifyPackageContents` progress further before demanding the next missing `dist/` |
+| after `packages/core` too | 831 pass / **1 fail** |
+| after `apps/tools-api` + `apps/mcp-client` | **832 pass / 0 fail, exit 0** |
+
+Two things this cost, worth recording so the next person does not repeat them:
+
+1. A partial build is worse than none for measurement — it *moves* the failure rather than
+   reducing it, so a count that goes 4 → 5 can mean progress, not regression.
+2. `bun run test:plugins` has the same dependency: unbuilt it reports 19 failures in
+   `install.test.ts` (install.sh exits 1 without `dist/index.js`) plus 7 in
+   `agents-install.test.ts` (`config-cli` cannot resolve `@massa-ai/shared/config`). Built:
+   **96 pass / 0 fail**.
+
+Execute's real gate is therefore **`test:scripts` green (832/0) and `test:plugins` green
+(96/0), with all five packages built** — a strictly stronger claim than the one this spec
+originally set.
