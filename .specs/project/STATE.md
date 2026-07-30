@@ -1,6 +1,23 @@
 # massa-ai Spec State
 
-## Current — Skills / Workflows Updates + spec-driven DI rule
+## Current — Judge With Debate (spec-driven, Tasks approved pending Execute)
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-judge-with-debate`
+- workflow: spec-driven (Large — Specify + Design + Tasks + full Plan Challenge done; Execute pending)
+- feature: `judge-with-debate` — **Specify, Design (approach A user-confirmed), Tasks (12 tasks),
+  and full Plan Challenge COMPLETE 2026-07-29. Plan Challenge: pre_mortem, massa-ai-plan-critic,
+  5 findings (2C/2H/1M) all verified + incorporated. Awaiting Execute approval.**
+- scope: 12 requirements (JD-01..12) — port of NeoLabHQ `judge-with-debate` pattern: meta-judge
+  eval-spec YAML (once, verbatim) + 3 independent judges + ≤3 debate rounds + consensus
+  (0.5 overall / 1.0 criterion). Two new charters (`meta-judge`, `judge`; registry 15→17),
+  workflow `workflows/judge-with-debate.md` + router entry, reports under `audits/judge/`.
+- User decisions locked: full protocol; model-diversity advisory per dispatch (meta kimi-k3,
+  J1 deepseek-v4-pro, J2 minimax-m3, J3 GLM-5.2 — as given, unverified) with loud host-default
+  fallback; generic artifacts; standalone only; audit-report-io storage; consensus file saved.
+- Next action: user confirms spec → Design phase.
+
+## Previous — Skills / Workflows Updates + spec-driven DI rule
 
 - projectId: `massa-ai`
 - Two related harness-text features consolidated on one branch for one PR; both independently

@@ -1,6 +1,18 @@
 # Handoff
 
-## Active — Core Layering and God-Module Split (PR-B), Phase 1 started
+## Active — Judge With Debate, planning complete pending Execute approval
+
+**Feature**: `judge-with-debate` · no branch yet (worktree per SWU convention at Execute).
+**Specify + Design + Tasks + full Plan Challenge COMPLETE 2026-07-29; Execute awaits approval.**
+Artifacts: `.specs/features/judge-with-debate/{spec,design,tasks}.md`.
+Plan Challenge: pre_mortem, 5 findings (2C/2H/1M) all incorporated — see tasks.md → *Plan Challenge — tasks*.
+**Next action**: user approves tasks → create worktree/branch → T0 baseline.
+Note: main checkout also carries PR-B (`core-layering-god-module-split`) Execute on
+`refactor/search-facade-split-phase-1` — this feature must use its own worktree.
+
+---
+
+## Previous — Core Layering and God-Module Split (PR-B), Phase 1 started
 
 **Feature**: `core-layering-god-module-split` · branch
 `refactor/search-facade-split-phase-1`, cut from `main` @ `d628464`.
