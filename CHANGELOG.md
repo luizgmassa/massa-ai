@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-07-30
+
 ### Added
 
 - **`skills/` duplication and reachability now ship as a committed regression gate.**
@@ -47,7 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   past-tense narration, and all four stale counts found by scanning
   (`CLAUDE.md`, `docs/ONBOARDING.md`, `FEATURES.md`, `.claude-plugin/marketplace.json`) are
   corrected.
-
 
 ## [1.14.0] - 2026-07-30
 
