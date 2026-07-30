@@ -76,6 +76,13 @@ describe("judge-with-debate workflow contract markers", () => {
     });
   }
 
+  test("multi-occurrence load-bearing markers survive partial deletion (validation gap #1)", () => {
+    // Presence-only toContain cannot detect deleting ONE of N occurrences; pin the
+    // load-bearing sites (Step 0.5 rule + Step 5 report line) with a floor count.
+    const occurrences = text.match(/DIVERSITY DEGRADED/g) ?? [];
+    expect(occurrences.length).toBeGreaterThanOrEqual(2);
+  });
+
   test("parallel dispatch for the panel (JD-02)", () => {
     const parallel = text.match(/in parallel/g) ?? [];
     expect(parallel.length).toBeGreaterThanOrEqual(2);

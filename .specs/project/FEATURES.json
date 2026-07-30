@@ -654,17 +654,18 @@
     {
       "slug": "judge-with-debate",
       "title": "Judge With Debate — meta-judge eval spec + 3 model-diverse judges debating to consensus; standalone workflow + 2 new sub-agent charters",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
         "design": true,
         "tasks": true,
-        "execute": "in_progress"
+        "execute": true
       },
       "spec": ".specs/features/judge-with-debate/spec.md",
       "design": ".specs/features/judge-with-debate/design.md",
-      "tasks": ".specs/features/judge-with-debate/tasks.md"
+      "tasks": ".specs/features/judge-with-debate/tasks.md",
+      "validation": ".specs/features/judge-with-debate/validation.md"
     }
   ],
   "active_feature": "judge-with-debate"

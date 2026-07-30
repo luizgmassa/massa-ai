@@ -134,18 +134,18 @@ clobbering so that I can compare runs.
 
 | Requirement ID | Story | Phase | Status |
 | --- | --- | --- | --- |
-| JD-01 Meta-judge once, YAML verbatim, mandatory | P1 | Design | Pending |
-| JD-02 3 parallel independent judges, evidence-grounded reports | P1 | Design | Pending |
-| JD-03 Debate rounds ≤3, filesystem-only judge channel, append-only | P1 | Design | Pending |
-| JD-04 Consensus detection from replies (0.5 / 1.0 / explicit accept), skip-when-already-consensus | P1 | Design | Pending |
-| JD-05 Consensus report file + verdict reply | P1 | Design | Pending |
-| JD-06 No-consensus honest reporting, no forced verdict | P2 | Design | Pending |
-| JD-07 Dispatch failure → Name Resolution → Blocked under 3 judges; malformed YAML → 1 retry → Blocked; input validation before dispatch | P2 | Design | Pending |
-| JD-08 Model diversity advisory + loud fallback + DIVERSITY DEGRADED mark | P2 | Design | Pending |
-| JD-09 `audits/judge/` family, collision suffix, disjoint per-judge writes | P3 | Design | Pending |
-| JD-10 Two charters from template (read-only, persona-boundary lines verbatim, model_hint metadata) | P1 | Design | Pending |
-| JD-11 Registry + generator + parity/integrity registration (15→17 agents, tables, rosters, regenerated bundles) | P1 | Design | Pending |
-| JD-12 Workflow file + router table entry (explicit route: "judge", "judge-with-debate", "evaluate with debate") + conversation-feedback status lines | P1 | Design | Pending |
+| JD-01 Meta-judge once, YAML verbatim, mandatory | P1 | Design | Verified |
+| JD-02 3 parallel independent judges, evidence-grounded reports | P1 | Design | Verified |
+| JD-03 Debate rounds ≤3, filesystem-only judge channel, append-only | P1 | Design | Verified |
+| JD-04 Consensus detection from replies (0.5 / 1.0 / explicit accept), skip-when-already-consensus | P1 | Design | Verified |
+| JD-05 Consensus report file + verdict reply | P1 | Design | Verified |
+| JD-06 No-consensus honest reporting, no forced verdict | P2 | Design | Verified |
+| JD-07 Dispatch failure → Name Resolution → Blocked under 3 judges; malformed YAML → 1 retry → Blocked; input validation before dispatch | P2 | Design | Verified |
+| JD-08 Model diversity advisory + loud fallback + DIVERSITY DEGRADED mark | P2 | Design | Verified |
+| JD-09 `audits/judge/` family, collision suffix, disjoint per-judge writes | P3 | Design | Verified |
+| JD-10 Two charters from template (read-only, persona-boundary lines verbatim, model_hint metadata) | P1 | Design | Verified |
+| JD-11 Registry + generator + parity/integrity registration (15→17 agents, tables, rosters, regenerated bundles) | P1 | Design | Verified |
+| JD-12 Workflow file + router table entry (explicit route: "judge", "judge-with-debate", "evaluate with debate") + conversation-feedback status lines | P1 | Design | Verified |
 
 **Coverage:** 12 total, 12 mapped (Design pending), 0 unmapped.
 

@@ -1,13 +1,18 @@
 # massa-ai Spec State
 
-## Current — Judge With Debate (spec-driven, Execute T0–T10 done, validation pending)
+## Current — Judge With Debate (spec-driven, VALIDATED PASS, PR pending)
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-judge-with-debate`
-- workflow: spec-driven (Large — all phases; T11 independent validation pending)
-- feature: `judge-with-debate` — **Execute T0–T10 COMPLETE 2026-07-29 on worktree
-  `../massa-ai-wt-judge-with-debate`, branch `feat/judge-with-debate`. T11 (independent
-  verification-agent) is next.**
+- workflow: spec-driven (Large — all phases complete)
+- feature: `judge-with-debate` — **COMPLETE 2026-07-30, independently validated PASS**
+  (`.specs/features/judge-with-debate/validation.md`: 12/12 ACs, 5/5 edge cases, 4/4
+  discrimination sensors executed + killed, gate 773 pass / 0 fail / 41 files, No drift ×2;
+  accepted deviation: verifier env had no shell/write — sensor executions + file persistence by
+  main agent, per plugin-auto-install precedent). Branch `feat/judge-with-debate`, worktree
+  `../massa-ai-wt-judge-with-debate`. **Remaining: push + PR + CI watch; merge only on user
+  approval (merge to main auto-cuts a release). Optional: user-gated live protocol smoke run;
+  if declined, record candidate lesson (protocol = user-gated-smoke-only).**
 - Plan Challenge: pre_mortem, 5 findings (2C/2H/1M) all verified + incorporated (tasks.md).
 - Final gate @ T10: lint 0 · type-check 6/6 · `test:scripts` **772 pass / 0 fail across 41
   files** · both generators `--check` No drift. Baseline corrected: true pre-feature state was

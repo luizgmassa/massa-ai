@@ -1,22 +1,24 @@
 # Handoff
 
-## Active — Judge With Debate, T0–T10 complete, validation pending
+## Active — Judge With Debate VALIDATED PASS, PR pending
 
 **Feature**: `judge-with-debate` · branch `feat/judge-with-debate`, worktree
-`../massa-ai-wt-judge-with-debate` (from `origin/main` @ v1.12.1). **T0–T10 COMPLETE
-2026-07-29; T11 independent validation is the only remaining task.**
-Commits (oldest→newest): `1eb314f` planning artifacts, `d013e4d` T0 baseline, T1 meta-judge
-charter, T2 judge charter, T3 generator + 68 bundles, T4 parity mirrors, T5 registry,
-T6 integrity counts, T7 workflow + content test, T8 router + skill bundles, T9 audit-report-io
-family, repair commit (3rd roster + workflow counts + intake line), T10 changelog + state.
-**Gates @ T10: lint 0 · type-check 6/6 · test:scripts 772 pass / 0 fail (41 files) · both
-`--check` No drift.** Baseline corrected to 737/2 environmental.
-**Next action**: dispatch `massa-ai-verification-agent` per T11 (4 discrimination sensors:
-roster removal → parity red; persona-line strip → integrity red; router-row removal →
-dispatch-resolution red; workflow-marker corruption → content-test red). If the user declines a
-live protocol smoke run, record the candidate lesson (protocol = user-gated-smoke-only).
-Note: main checkout also carries PR-B (`core-layering-god-module-split`) Execute on
-`refactor/search-facade-split-phase-1` — untouched.
+`../massa-ai-wt-judge-with-debate` (from `origin/main` @ v1.12.1). **ALL TASKS COMPLETE
+2026-07-30. Independent validation PASS** (`.specs/features/judge-with-debate/validation.md` —
+read the Addendum first: verifier had no shell/write; sensor executions + file persistence are
+the main agent's, recorded as accepted deviation).
+**Final gate: lint 0 · type-check 6/6 · test:scripts 773 pass / 0 fail across 41 files · both
+generators `--check` No drift.** 4/4 discrimination sensors executed + killed.
+**Next actions, in order:**
+1. `git push -u origin feat/judge-with-debate` + `gh pr create --base main` (per
+   `references/implementation-delivery.md` stages 3-5), then `gh pr checks --watch`.
+2. Report PR URL + check list; **stop — merge only on explicit user approval** (merge auto-cuts
+   a release; CHANGELOG entry sits under `### Added` → minor bump).
+3. Optional user-gated live protocol smoke (run the real debate on a small artifact). If
+   declined: record candidate lesson via `lessons.py` — protocol behavior is
+   user-gated-smoke-only (validation.md Addendum item 6).
+4. Main checkout also carries PR-B (`core-layering-god-module-split`) Execute on
+   `refactor/search-facade-split-phase-1` — untouched by this feature.
 
 ---
 

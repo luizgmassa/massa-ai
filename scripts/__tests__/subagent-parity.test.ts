@@ -183,7 +183,7 @@ describe("subagent parity — drift gate (CLA-07/CDX-08/CRS-06/OPC-08)", () => {
   });
 });
 
-describe("subagent parity — exact 15 names per host (CLA-09/CRS-07/OPC-09)", () => {
+describe("subagent parity — exact 17 names per host (CLA-09/CRS-07/OPC-09)", () => {
   test("claude: exactly 17 specialist .md files with the registry names", async () => {
     const dir = path.join(REPO_ROOT, "apps/claude-plugin/agents");
     const files = (await fs.readdir(dir)).filter(
