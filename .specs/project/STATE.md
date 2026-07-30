@@ -282,7 +282,10 @@ with a merge commit.**
 | T14 | `e4e38bd` | the root's final cleanup — ten stale `Visibility relaxed` notes replaced per group (§4.3 for the nine methods, §4.3.1 for the one field), the T13 hand-off block retired; **Phase 1 closes**; the eleventh plan defect |
 | T15–T19 | see `HANDOFF.md` | **`HANDOFF.md`'s commit table is canonical and runs to T19.** This table stopped at T14 and carried `on -1b` in place of a sha until T19 corrected both. It is not extended here on purpose: two copies of the same table is what drifted, and one of them was wrong for five tasks. |
 
-† unreachable — squashed into `main` by #46. Nothing is pushed from `-1b`; it is local only.
+† unreachable — squashed into `main` by #46. **Post-merge update**: `-1b` itself is no longer
+unpushed or local-only — see *Next* below and `HANDOFF.md`'s *Next action*. This footnote's "local
+only" always meant the pre-`b7cb5a2` state; the squashed `-1` commits it marks unreachable stay
+unreachable regardless.
 
 Gates at T8: `lint` 0 · `type-check` 0 · `build` 0 · `test:scripts` **732 pass / 0 fail across 39
 files**, exit 0 · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
@@ -846,9 +849,13 @@ reviewer did adjudicate it live — but the convention **`Resolved (reviewer, <d
 later reader tell that apart from an executor asserting approval**. That ambiguity is the real
 defect, it is in the format rather than in any single decision, and PR-C and PR-D inherit it.
 
-**Next: merge PR-B — `--no-ff`, a merge commit, never a squash (R-04).** The branch is local and
-unpushed, sixteen commits deep, and **CI has never run on it**, so the authoritative gate reading
-arrives at PR time. Commands and the two merge-time cautions are in `HANDOFF.md` under *Next action*.
+**`origin/main` merged in as `b7cb5a2`** (real two-parent commit, not rebased — see `HANDOFF.md`'s
+*Next action* for the conflict resolutions and the post-merge gate re-run, all green). **Next: push
+and open the PR — merging is withheld for the user's call, not the executor's**, matching Plugin
+Auto-Install's precedent below. The branch is still local, eighteen commits deep counting the merge
+commit (not sixteen — already stale by one pre-merge — and not seventeen either), and **CI has
+never run on it**, so the authoritative gate reading still arrives at PR time. Commands are in
+`HANDOFF.md` under *Next action*.
 
 **T6 alone surfaced three plan defects, two needing a spec-owner decision.** All three are the
 `ensureInitializedImpl` class — a consequence `design.md` settled in substance and never wrote into

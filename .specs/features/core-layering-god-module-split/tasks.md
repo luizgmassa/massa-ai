@@ -2165,7 +2165,9 @@ rather than absorbed.
    only provider tags in the log are error/fallback/fixture shapes. The mechanism can bite a future
    run; it did not affect this one.
 2. **CI's `coverage` job has still never run on this branch**, which is local and unpushed. The
-   authoritative gate reading arrives at PR time.
+   authoritative gate reading arrives at PR time. *(Post-merge update: `origin/main` merged in as
+   `b7cb5a2` — still local and unpushed at that point, still true that CI has never run on it; see
+   `HANDOFF.md` → Next action for the push/PR step and the re-run gate figures.)*
 3. **The `apps/web-ui` fix is not itself under a CI gate that would catch a regression of the hang.**
    A future suite that fires those handlers without stubbing will hang, and a hang is not a red
    test. Nothing here changes that; only this one file is protected.

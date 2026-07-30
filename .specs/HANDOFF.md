@@ -6,7 +6,9 @@
 `refactor/search-facade-split-phase-1b`, cut from `main` @ `5247ecb` (v1.11.0),
 worktree `../massa-ai-wt-facade-phase-1b`.
 **T6a and T6 are merged and released; T7–T20 are committed and green. All 20 tasks are complete.**
-Working tree clean. Nothing is pushed — the branch is local only, sixteen commits deep.
+Working tree clean through T20 (`5749686`). **Post-merge update — see *Next action* below**: no
+longer unpushed, and the commit count is no longer sixteen (that figure itself lagged by one from
+`5749686` onward — seventeen is what T20 actually left).
 
 **T20 is done and PR-B is cleared to merge.** A fresh `verification-agent`, author ≠ verifier, took
 every GMS-03 / GMS-04 / GMS-05 criterion **as amended by C1–C12** and re-derived rather than
@@ -546,17 +548,60 @@ rank.**
    written without their `.ts`, with the measurement in the comment, exactly as T15 resolved the same
    trap one level up. Its test file uses neutral fixtures (`alpha`, `beta`) for the same reason.
 
-**Next action: merge PR-B.** All 20 tasks are complete and T20 cleared it. The branch is local and
-unpushed, sixteen commits deep.
+**Merge complete.** `git merge origin/main` (merged, not rebased — every branch sha above is
+unchanged) landed as `b7cb5a2`, a real two-parent commit: `5749686` (T20, this branch) and
+`9dc3944` (`origin/main`, `v1.14.0`). Two files conflicted and were resolved by hand:
+
+- **`CHANGELOG.md`** — kept this branch's 12 `### Changed` bullets under `[Unreleased]`, took
+  main's entire released section wholesale.
+- **This file** — kept this Active section verbatim (it already supersedes main's copy); main's
+  own current entry, `## Active — Model Profile Registry…`, is kept in full but demoted to
+  `## Previous`; main's separate, stale `## Previous — Core Layering… Phase 1 started` duplicate
+  (base-era text, predating T7) was dropped rather than kept alongside — it named no fact this
+  Active section does not already supersede, and keeping both would have put a "Phase 1 started"
+  heading directly over "T7–T20 done" body text or an orphaned heading with no body at all.
+
+Three more files touched by both sides auto-merged clean, verified rather than assumed:
+`.github/workflows/ci.yml` (T16's two build-job steps plus `fetch-depth: 0` survive, alongside
+main's new top-level `permissions:` block from its CodeQL close-out, #48), `CLAUDE.md` (T15's
+`rlm-admin` → `search-facade-admin` rename survives, alongside main's model-profile-registry and
+plugin-auto-install sections), and `.specs/project/STATE.md` (this feature's own section carried
+this branch's full T7–T20 text — diffed byte-for-byte against pre-merge `HEAD`, identical).
+
+**The CHANGELOG figure this feature cites eleven times (`974` lines, byte-identical to `353de59`)
+is now stale of the *current* tree by design, not by accident.** Every citation below (T11 through
+T20) was true **at the commit it named** and stays true as history — none of them are edited. As
+of `b7cb5a2` the released section is main's: **1105 lines**, topping at `## [1.14.0]`, carrying the
+four releases (`v1.12.0` through `v1.14.0`) that landed on `main` while this branch was in flight.
+This branch's own 12 `[Unreleased]` bullets sit unmoved on top of it, per the resolution above.
+
+**Gates re-run after the merge, before pushing — all green.** `check-frozen-anchors` exit 0, 14/14
+each resolving uniquely — including `N07-brace-counter-strip-strings`, whose line range moved
+**155–176 → 180–201** because main's CodeQL security commit (`657e0d7`, #48) rewrote
+`chunker-code.ts`'s comment/string stripping for a ReDoS fix; the anchor still resolved to exactly
+one location, so this did **not** go red, contrary to what it looked like it might do going in.
+`check-characterization` exit 0, 3/3. `check-stale-pointers` exit 0, 0 broken, 28 historical (pin
+holds, run after `git add`). `search-hub-metric` exit 0, G-HUB green (every type ≤ 3 foreign reach,
+every file ≤ 700 LOC). `lint` 0. `type-check` 6/6. `build` 5/5. `test:scripts` exit 0 — **930 pass /
+0 fail across 46 files**, not the 770/41 this feature measured before the merge: main's four
+releases brought 5 new test files (`install-state-plugin-version`, `judge-with-debate-workflow`,
+`model-profiles`, `verify-model-ids`, `verify-model-tokens`), which is the entire delta — measured,
+not assumed, by diffing added files between the two parents.
+
+**Next action: push and open the PR — do not merge it.** The branch is still local, no longer
+sixteen (already stale by one before this merge) or seventeen but **eighteen** commits deep with
+the merge commit counted, and about to be pushed.
 
 ```bash
 git push -u origin refactor/search-facade-split-phase-1b
 gh pr create --base main --title 'refactor(core): PR-B — split the search facade into capability modules'
-# then, and this is the load-bearing part:
-gh pr merge --merge          # --merge = merge commit. NEVER --squash (R-04).
+# Do NOT run `gh pr merge` here. CI has never run on this branch, so the authoritative gate
+# reading still arrives at PR time, and merging is the user's call once it is green and every
+# comment is handled — same convention as Plugin Auto-Install's "PR open, CI green, merge
+# withheld."
 ```
 
-**Two things to carry into the merge.** CI has **never run on this branch**, so the authoritative
+**Two things to carry into the PR.** CI has **never run on this branch**, so the authoritative
 gate reading arrives at PR time; and the `mcp-client` coverage flake in T20's finding 1 may
 reproduce there — if it does it is **not** a reason to block, but it deserves its own note, since it
 is a second instance of a class `CLAUDE.md` documents for a different test. **Never write the skip-ci
