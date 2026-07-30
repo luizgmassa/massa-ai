@@ -1217,7 +1217,7 @@ The repo ships repo-local skills plus a unified TypeScript installer that symlin
 
 1. **Bootstrap contract** (top, between `<!-- massa-ai:bootstrap:start -->` and `<!-- massa-ai:bootstrap:end -->` markers): the coding session startup contract that activates the skill stack — `caveman full` → `coding-guidelines` → `massa-ai` → `persona-router`. Includes the persona router policy, plan challenge policy, conversation feedback policy, RTK rules, indexing/context hygiene, and dedupe/lazy-load guardrails.
 
-2. **Sub-agent registry** (bottom): the 12 reusable sub-agent specialist registry (investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist) with capability packet and output contract definitions.
+2. **Sub-agent registry** (bottom): the 17 reusable sub-agent specialist registry (investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist, plan-critic, furps-analyst, navigator, meta-judge, judge) with capability packet and output contract definitions.
 
 The installer writes the bootstrap block into each tool's `AGENTS.md` using the same markers, replacing any existing block. The sub-agent registry is not written — it is consumed by workflows that dispatch agents.
 

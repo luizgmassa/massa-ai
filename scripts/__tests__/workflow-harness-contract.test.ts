@@ -345,27 +345,112 @@ describe("invariants: the references still encode the decisions that were made",
 
 // ── 6. Roster count ───────────────────────────────────────────────────────
 
-describe("roster: nothing still advertises 16 specialists", () => {
-  test("no tracked source, doc, or shell installer says 16 specialists", async () => {
-    const proc = Bun.spawn(
-      [
-        "git",
-        "grep",
-        "-l",
-        "-E",
-        "16 subagent|16 [Ss]pecialist|16 reusable sub-agent",
-        "--",
-        ".",
-        ":(exclude).specs",
-        ":(exclude)CHANGELOG.md",
-        ":(exclude)scripts/__tests__/workflow-harness-contract.test.ts",
-      ],
-      { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe" },
-    );
-    const hits = (await new Response(proc.stdout).text())
+describe("roster: nothing advertises a specialist count other than 17", () => {
+  /** The roster size every current-tense claim must agree with. */
+  const ROSTER = 17;
+
+  /**
+   * A count-shaped claim, matched within ONE line.
+   *
+   * The previous form was a `git grep -E` for three literal spellings of "16".
+   * It banned exactly the strings it was written against and nothing else, so
+   * `docs/ONBOARDING.md` sat at "16 sub-agent specialists" through a whole
+   * release: the hyphen in `sub-agent` defeated every alternative in the
+   * pattern. `CLAUDE.md` said 15 and `.claude-plugin/marketplace.json` said 12
+   * for the same reason — a guard against one wrong number cannot notice a
+   * different wrong number. See
+   * .specs/features/skills-directive-dedup/spec.md SDD-08.
+   *
+   * Line-scoped deliberately: a pattern allowing `\s+` between the digits and
+   * the noun matches across a newline and pairs an unrelated `command_count=0`
+   * with the word "specialist" forty lines later.
+   */
+  const COUNT_CLAIM = /(\d+)\s+(?:reusable\s+)?(?:sub-?agent\s+)?[Ss]pecialists?\b/;
+
+  /**
+   * Statements that narrate a PAST roster size and are correct as written.
+   *
+   * An allowlist rather than a cleverer regex: "is this sentence historical?"
+   * is a judgment a pattern cannot make, and encoding it as one would either
+   * leak real stale counts or fail on correct prose. Each entry is a decision
+   * with a reason, and a new one forces that decision to be made again.
+   */
+  const HISTORICAL = [
+    // OpenCode's `mode: subagent` behaviour, described as it was at the time.
+    "made the 12 specialists impossible to select by hand",
+    "made the 12 specialists unselectable by hand",
+    // The frozen parity baseline predates judge/meta-judge, by construction.
+    "only ever names the 15 specialists that existed there",
+  ];
+
+  const SELF = "scripts/__tests__/workflow-harness-contract.test.ts";
+
+  test(`no tracked source, doc, or installer claims a roster other than ${ROSTER}`, async () => {
+    const proc = Bun.spawn(["git", "ls-files"], {
+      cwd: REPO_ROOT,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const files = (await new Response(proc.stdout).text())
       .split("\n")
-      .filter(Boolean);
-    expect(hits).toEqual([]);
+      .filter(Boolean)
+      // .specs/ is historical record and CHANGELOG.md documents each change;
+      // this file carries the counts as assertion data.
+      .filter((f) => !f.startsWith(".specs/") && f !== "CHANGELOG.md" && f !== SELF);
+
+    const offenders: string[] = [];
+    for (const rel of files) {
+      let body: string;
+      try {
+        body = await fs.readFile(path.join(REPO_ROOT, rel), "utf8");
+      } catch {
+        continue; // binary or unreadable
+      }
+      body.split(/\r?\n/).forEach((line, i) => {
+        if (HISTORICAL.some((h) => line.includes(h))) return;
+        const m = COUNT_CLAIM.exec(line);
+        if (m && m[1] !== String(ROSTER)) {
+          offenders.push(`${rel}:${i + 1}: ${line.trim().slice(0, 100)}`);
+        }
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("the roster scan reads a real file list", async () => {
+    // Guard the guard: an empty list yields no offenders trivially.
+    const proc = Bun.spawn(["git", "ls-files"], {
+      cwd: REPO_ROOT,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const files = (await new Response(proc.stdout).text()).split("\n").filter(Boolean);
+    expect(files.length).toBeGreaterThan(500);
+  });
+
+  test("the scan fires on a wrong count in any spelling", () => {
+    // The three spellings the old literal pattern missed.
+    for (const text of [
+      "16 sub-agent specialists",
+      "15 specialists",
+      "12 subagent specialists",
+      "9 reusable sub-agent specialists",
+    ]) {
+      const m = COUNT_CLAIM.exec(text);
+      expect(m, `no match for ${text}`).not.toBeNull();
+      expect(m![1]).not.toBe(String(ROSTER));
+    }
+  });
+
+  test("a correct count in any spelling passes", () => {
+    for (const text of [
+      "17 specialists",
+      "17 subagent specialists",
+      "17 sub-agent specialists",
+      "17 reusable sub-agent specialists",
+    ]) {
+      expect(COUNT_CLAIM.exec(text)![1]).toBe(String(ROSTER));
+    }
   });
 
   test("the shell installers advertise 17", async () => {
