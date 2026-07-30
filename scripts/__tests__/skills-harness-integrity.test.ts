@@ -688,3 +688,58 @@ describe("dispatch persona emission: every Dispatch block emits the optional per
     expect(missing).toEqual([]);
   });
 });
+
+// ── 9. Portability of shipped harness prose ────────────────────────────────
+//
+// Everything under skills/ is copied byte-identically into four
+// apps/*-plugin/skills/ bundles and published to npm. A path from one
+// developer's home directory therefore ships to every user, and resolves for
+// none of them.
+//
+// `references/maestro.md` and `references/maestro/fact-ledger.md` cited
+// `/Users/<name>/Downloads/questions.md` in three places -- once as a named
+// tier of the fact ledger's evidence taxonomy, so an agent was told to
+// quarantine claims as `excluded/unverified` unless they appeared in a file it
+// could not open. See .specs/features/skills-directive-dedup/spec.md SDD-02.
+//
+// This scans the whole tree rather than pinning the three known sites: fixing
+// three occurrences leaves the fourth.
+
+describe("portability: no shipped harness file names a developer's machine", () => {
+  /** Absolute home-directory paths on macOS and Linux respectively. */
+  const HOME_PATH = /\/(?:Users|home)\/[A-Za-z0-9._-]+\//;
+
+  test("no file under skills/ contains an absolute home-directory path", async () => {
+    const offenders: string[] = [];
+    for (const file of await skillMarkdownFiles()) {
+      const content = await read(file);
+      content.split(/\r?\n/).forEach((line, i) => {
+        if (HOME_PATH.test(line)) {
+          offenders.push(`${path.relative(REPO_ROOT, file)}:${i + 1}: ${line.trim().slice(0, 100)}`);
+        }
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("the Maestro coverage-checklist rule survived the path removal", async () => {
+    // Absence of the path must not be reachable by deleting the rule. Both
+    // files still have to instruct the agent on how to treat a checklist.
+    const index = await read(
+      path.join(SKILLS_DIR, "massa-ai", "references", "maestro.md"),
+    );
+    const ledger = await read(
+      path.join(SKILLS_DIR, "massa-ai", "references", "maestro", "fact-ledger.md"),
+    );
+    for (const body of [index, ledger]) {
+      expect(body).toMatch(/coverage checklist/i);
+    }
+    expect(ledger).toMatch(/excluded\/unverified/);
+    expect(index).toMatch(/excluded\/unverified/);
+  });
+
+  test("the scan actually enumerated the tree", async () => {
+    // Guard the guard: a mis-rooted walk finds no files and no offenders.
+    expect((await skillMarkdownFiles()).length).toBeGreaterThan(100);
+  });
+});
