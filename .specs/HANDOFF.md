@@ -5,15 +5,38 @@
 **Feature**: `core-layering-god-module-split` · branch
 `refactor/search-facade-split-phase-1b`, cut from `main` @ `5247ecb` (v1.11.0),
 worktree `../massa-ai-wt-facade-phase-1b`.
-**T6a and T6 are merged and released; T7, T8, T9 and T10 are committed and green; T11 is not
-started.** Working tree clean. Nothing is pushed — the branch is local only.
+**T6a and T6 are merged and released; T7, T8, T9, T10 and T11 are committed and green; T12 is not
+started.** Working tree clean. Nothing is pushed — the branch is local only, now five commits deep.
 
-**T10 is done, and it is the planned review point.** `rlm-indexing.ts` is deleted whole: six surfaces
-moved to `project-indexer.ts` behind `IndexerDeps`, and `ensureInitializedImpl`'s body is now the
-content of `ContextualSearchRLM.ensureInitialized()`. All 8 authorised assertions used, no more.
-Sensors fired as predicted — foreign modules **4 → 3**, D1 `delegateScope` **16 → 9**, facade-taking
-**11 → 6**, scoped LOC **1108 → 626** — every one predicted before the edit and confirmed to the
-number.
+**T11 is done — the F4 `IndexManager` seam, the only *added* seam in PR-B.**
+`injectedDeps.indexManager` exists, the constructor's mirror type carries it, and
+`ensureInitialized` reads `injected.indexManager ?? new IndexManager(this.vectorStore)`. **It is the
+first Phase 1 task whose plan row survived execution unamended** — no eighth plan defect. Every
+prediction held: **no structural sensor moved at all** (D1 9/6/626 unchanged, G-HUB `perModule`
+byte-identical, `IndexManager` foreign 0 → 0 and reach 0 → 0), because T11 adds a field and moves no
+function. AC-3 budget was **0** and **0** was spent: no existing test file appears in the diff.
+
+**Two T11 results a resumer should not re-derive.**
+
+- **Three violation shapes, all three red on the new sensor, and `tsc` blind to all three.** The plan
+  named two (seam never consulted; default path deleted). A third — **seam correct but hoisted above
+  the `Promise.all`**, so the default construction captures an unresolved `this.vectorStore` — still
+  satisfies `instanceof IndexManager` and was surfaced by the plan critic, not the plan. It is why the
+  default-path test asserts *which* vector store the constructed manager holds. **Two of the three are
+  invisible to every pre-existing suite**: the repository's only prior assertion about this member was
+  `rlm-indexing.test.ts:201`'s `toBeDefined()`, which catches the second shape (**24/1**) and neither
+  other. That is plan-challenge finding 7 discharged by measurement instead of argument.
+- **`indexManager?: IndexManager` does *not* fire T10's seventh defect, and the `?` is why.**
+  `search-hub-metric.ts:139`'s pattern is `([A-Za-z0-9_]+)\s*:\s*<Type>\b` and `\s*` cannot match `?`,
+  so an **optional** field is never captured as a binding — the same route by which the existing
+  `indexManager!: IndexManager` at `contextual-search-rlm.ts:93` has always escaped it. Independently
+  moot anyway: `perModule` only gains an entry on a *dereference*, and that file has no
+  `indexManager.<member>` — only `this.indexManager`, attributed to `ContextualSearchRLM`. Both routes
+  **measured**, not reasoned. **The T10 `Pick<>` decision does not apply here and must not be applied
+  by analogy**: the seam's value lands in the public field `indexManager!: IndexManager`, so a `Pick<>`
+  seam would need a cast to be assignable. **Residual risk: a later edit dropping the `?`**, or
+  restyling the record into `IndexerDeps`' required-field shape — nothing fails until T14's gate. The
+  field carries a comment saying so.
 
 **Two findings from T10 that a resumer must not re-derive, and one open question for the reviewer.**
 
@@ -42,12 +65,17 @@ number.
    arrow wrappers**. A module-local call would compile, type-check, and make all six silently
    ineffective. The 16-site figure for the two named methods still reproduces exactly.
 
-**Next action: T11** — the `IndexManager` injection seam (F4), 1.5 h. **Its site moved**: it is
-`this.indexManager = new IndexManager(this.vectorStore)` inside `ensureInitialized()` in
-`contextual-search-rlm.ts`, not `rlm-indexing.ts:586` (gone) and not `project-indexer.ts`, which
-imports `IndexManager` as a **type only**. Needs the parity test *plus* the positive
-injected-stub-is-read assertion (plan-critic finding 7). Then **T12**, **T13** (5.5 h, most likely to
-overrun), and stop at **T14** where G-HUB going green proves the split.
+**Next action: T12** — indexing admin surfaces, `rlm-admin.ts` → `index-admin.ts`, 1.5 h. Four exports
+(125 LOC): `clearProjectIndexImpl`, `getProjectStatsImpl`, `warmupCacheImpl`, `getAnalyticsImpl`.
+**Read T12's row and the ordering fact it depends on before starting**: `warmupCacheImpl` reads
+`search`, which does not exist in `hybrid-search.ts` until T13, and §12 item 4 orders index-admin
+first — so `IndexAdminDeps.search` is a **re-entrant callback through `this.search`** (T10's per-call
+arrow-wrapper pattern), not a reason to reorder the tasks. T12 must also: narrow `fileFilterCache` and
+any `SearchAnalytics`/`SearchAnalyticsPg` field with `Pick<>` (T10's seventh defect — these are
+*required* record fields, so unlike T11's optional seam they **will** fire); run the memo mutation
+against its own surface on a delegate with **no preceding `await`**; and sweep for bare
+`rlm.<method> =` as well as `(rlm as any).<method> =`. Then **T13** (5.5 h, most likely to overrun),
+and stop at **T14** where G-HUB going green proves the split.
 
 **Read the branch note before anything else.** T6a and T6 landed in `main` via **PR #46, which was
 squashed, not merged** — R-04 was violated. None of its 8 commits are ancestors of `main`, the
@@ -63,7 +91,8 @@ the remote and is **not** this work. **This PR must be merged with a merge commi
 | T7 | `3e46eae` | `buildGraphStream` → `graph-stream.ts`, plus the sensor amendment |
 | T8 | `29ea8b9` | `applySynapseState` → `session-bias.ts` with `SessionBiasDeps`; the AC-2 and LATE-BIND sensors |
 | T9 | `2664008` | `correctQuery` → `hybrid-search.ts` with `HybridSearchDeps`; **`rlm-synapse.ts` deleted whole**; a second LATE-BIND sensor |
-| T10 | this branch | six indexing surfaces → `project-indexer.ts` with `IndexerDeps`; `ensureInitializedImpl` absorbed into the root; **`rlm-indexing.ts` deleted whole**; a third LATE-BIND sensor |
+| T10 | `b9d444d` | six indexing surfaces → `project-indexer.ts` with `IndexerDeps`; `ensureInitializedImpl` absorbed into the root; **`rlm-indexing.ts` deleted whole**; a third LATE-BIND sensor |
+| T11 | this commit | `injectedDeps.indexManager` — the F4 seam (the only *added* seam in PR-B); `index-manager-seam.test.ts`, red under three violation shapes |
 
 Gates at T10: `lint` 0 · `type-check` 0 (6/6) · `build` 0 (5/5) · `test:scripts` **732 pass / 0 fail
 across 39 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
@@ -74,6 +103,19 @@ unchanged · `search-synapse-integration` **5/0** · `session-bias` **10/0** ·
 reach **14** by `rlm-search.ts`, members **23**, largest file now `project-indexer.ts` **641**,
 `perModule {csr 14, admin 7, search 14, warmup 1}` · D1 `delegateScope` **16 → 9**, facade-taking
 **11 → 6**, scoped LOC **1108 → 626** · EXCLUSIONS **9**.
+
+Gates at T11 — **every structural figure byte-identical to T10, which is the prediction**: `lint` 0 ·
+`type-check` 0 (6/6) · `build` 0 (5/5) · `test:scripts` **732 pass / 0 fail across 39 files** ·
+`check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) · characterization net
+**160** across 7 suites (26·41·31·21·25·7·9), every suite individually unchanged ·
+`search-synapse-integration` **5/0** · `session-bias` **10/0** · `session-bias-late-bind` **3/0** ·
+`hybrid-search-late-bind` **3/0** · `project-indexer-late-bind` **4/0** ·
+`search-ranking-regression` **2/0** · new `index-manager-seam` **3/0** · G-HUB exit 1, 25 files,
+foreign **3**, reach **14** by `rlm-search.ts`, members **23**, `perModule {csr 14, admin 7, search 14,
+warmup 1}`, and **exactly one type above the ceiling** — the T10 seventh-defect check, run and passed ·
+D1 `delegateScope` **9**, facade-taking **6**, scoped LOC **626** · EXCLUSIONS **9** · CHANGELOG
+released section still **974 lines**, T11's entry in `[Unreleased]` under `### Changed` and absent from
+the released section, verified in both directions.
 
 **`perModule csr` went 5 → 14 and that is the target state, not drift.** The nine new members arrive
 from the absorbed `ensureInitialized` body, the three hoisted `await this.ensureInitialized()`
@@ -165,11 +207,15 @@ sites**; T20's verifier must not read the stale names as evidence the moves did 
 T15 decision.
 
 **T15's site list is frozen at `ce26f28` and Phase 1 has outgrown it — re-enumerate, do not work
-from it.** Measured after T10: **28** tracked files carry `rlm-` outside `CHANGELOG.md` / `.specs/` /
-`.ua/`, against the 19 recorded in the plan and 27 after T9 (`rlm-indexing.ts` left the set,
-`project-indexer.ts` entered it, and the new sensor file is the net `+1`). **Take the count with the
+from it.** Measured after T11: **29** tracked files carry `rlm-` outside `CHANGELOG.md` / `.specs/` /
+`.ua/`, against the 19 recorded in the plan, 27 after T9 and 28 after T10 (`rlm-indexing.ts` left the
+set, `project-indexer.ts` entered it, and each new sensor file is a `+1` — T11's
+`index-manager-seam.test.ts` cites `rlm-indexing.test.ts:201`, **class 1**). **Take the count with the
 new files staged** — `git grep` enumerates tracked files only, and the same command run before
-`git add` reported 27. Every extraction adds a provenance comment naming the
+`git add` reported 28. **Enumerate with `git grep` and explicit pathspec exclusions, never the shell's
+`grep`**: the plan critic independently measured this as **19** using a `grep` honouring `.gitignore`
+(the repo's `grep` is a ugrep shim), which is the same two-methods-two-answers failure this feature has
+now hit six times. Every extraction adds a provenance comment naming the
 file the body came from. Two classes, and T15 must not conflate them: references to `rlm-*.test.ts`
 (those files *survive*; renaming them is T15's own decision) versus references to a now-deleted
 `rlm-*.ts` source (`docs/ONBOARDING.md:148`, `graph-stream.ts:11`, `session-bias.ts:20`,

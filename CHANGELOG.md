@@ -102,6 +102,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   codebase has one. The field now names only the four methods it uses, which is both the accurate
   type and the reading the gate intends.
 
+- **The project index manager can now be supplied from outside the search service.** It was the one
+  collaborator with no injection point at all: every other dependency either arrives from a process
+  factory the service can be told to skip, or is handed in at construction, while the index manager was
+  built by direct construction inside lazy initialisation, with no field able to override it. Callers and
+  tests can now pass one in alongside the stores. Nothing else changes — supply no index manager and the
+  service constructs exactly what it constructed before, over the same vector store, at the same point in
+  initialisation. A service that has already initialised is left alone, as it was before.
+
+  This is the only dependency in this work that gains a *new* seam rather than having an existing one
+  moved, and it is the last piece of the service's own state that could be reached only by patching the
+  object after the fact.
+
+  The seam is pinned by a test asserting that a supplied index manager is the one actually used, not
+  merely that initialisation still succeeds. That distinction is the whole risk in a change like this: a
+  seam can be declared, typed and wired and still never be consulted, and a test exercising only the
+  default path passes either way. The default path is pinned separately, including which vector store the
+  constructed manager ends up holding — an ordering mistake would leave it holding nothing while still
+  producing an object of the right class.
+
+  Coupling measurements are unchanged in every direction: the same single violation, the same deepest
+  reach, the same set of functions taking the facade. This adds a field and moves no code. Worth saying
+  explicitly, because the previous step showed that a dependency field typed with a class from the same
+  directory can move those numbers by itself; this field is optional, and that is what keeps it outside
+  what the measurement looks at.
+
 ## [1.11.0] - 2026-07-29
 
 ### Changed

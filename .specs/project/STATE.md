@@ -145,7 +145,7 @@ cannot be T17's referent.
 a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
 unilaterally — it is a release-semantics decision.
 
-### Execute — Phase 1 STARTED (2026-07-29), T6a–T10 done, T11 next
+### Execute — Phase 1 STARTED (2026-07-29), T6a–T11 done, T12 next
 
 **Two branches, and the first one is gone.** T6a and T6 were executed on
 `refactor/search-facade-split-phase-1` (cut from `d628464`) and reached `main` through **PR #46,
@@ -166,7 +166,8 @@ with a merge commit.**
 | T7 | `3e46eae` | `buildGraphStream` → `graph-stream.ts`, plus the sensor amendment |
 | T8 | `29ea8b9` | `applySynapseState` → `session-bias.ts` with `SessionBiasDeps`; the AC-2 and LATE-BIND sensors |
 | T9 | `2664008` | `correctQuery` → `hybrid-search.ts` with `HybridSearchDeps`; **`rlm-synapse.ts` deleted whole**; a second LATE-BIND sensor |
-| T10 | on `-1b` | six indexing surfaces → `project-indexer.ts` with `IndexerDeps`; `ensureInitializedImpl` absorbed into the root; **`rlm-indexing.ts` deleted whole**; a third LATE-BIND sensor |
+| T10 | `b9d444d` | six indexing surfaces → `project-indexer.ts` with `IndexerDeps`; `ensureInitializedImpl` absorbed into the root; **`rlm-indexing.ts` deleted whole**; a third LATE-BIND sensor |
+| T11 | on `-1b` | `injectedDeps.indexManager` — the F4 seam, the only *added* seam in PR-B; `index-manager-seam.test.ts` red under three violation shapes |
 
 † unreachable — squashed into `main` by #46. Nothing is pushed from `-1b`; it is local only.
 
@@ -258,6 +259,40 @@ than a task row.**
    declared in that directory — so both tasks gain a sensor: the hub metric must report exactly **one**
    type above the ceiling, and it must be `ContextualSearchRLM`. Reading only the
    `ContextualSearchRLM` row, which is all T6–T9 needed, is what let this through for one measurement.
+
+Gates at T11 — **every structural figure byte-identical to T10, and that is the prediction, not a
+missed measurement**: `lint` 0 · `type-check` 0 (6/6) · `build` 0 (5/5) · `test:scripts` **732 pass /
+0 fail across 39 files**, exit 0 · `check-frozen-anchors` exit 0 (14/14) · `check-characterization`
+exit 0 (3/3) · characterization net **160** across 7 suites, every suite individually unchanged ·
+`search-synapse-integration` **5/0** · `session-bias` **10/0** · `session-bias-late-bind` **3/0** ·
+`hybrid-search-late-bind` **3/0** · `project-indexer-late-bind` **4/0** · `search-ranking-regression`
+**2/0** · new `index-manager-seam` **3/0** · coverage exclusions **9** · G-HUB exit 1, 25 files,
+foreign **3**, reach **14**, members **23**, `perModule {csr 14, admin 7, search 14, warmup 1}`, and
+**exactly one type above the ceiling** — T10's seventh-defect check, run and passed, with
+`IndexManager` at foreign **0 → 0** and reach **0 → 0** · D1 `delegateScope` **9**, facade-taking
+**6**, scoped LOC **626** — all three unmoved.
+
+**T11 produced no eighth plan defect — the first Phase 1 task whose row survived execution
+unamended.** That is evidence about *where* this plan's defects live rather than a claim it is now
+sound: **T11 is the only Phase 1 task that moves no function**, and all seven defects were consequences
+of a move. T12 and T13 move functions again and each carries a known trap already.
+
+Two T11 results that matter downstream:
+
+- **Three violation shapes, all red on the new sensor, `tsc` blind to all three, and two of them
+  invisible to the entire pre-existing suite.** The plan named two; the third — seam correct but
+  **hoisted above the `Promise.all`**, so the default construction captures an unresolved
+  `this.vectorStore` while still satisfying `instanceof` — came from the plan critic. The only prior
+  assertion about this member was `rlm-indexing.test.ts:201`'s `toBeDefined()`, which catches one shape
+  (**24/1**) and neither other. Plan-challenge finding 7, discharged by measurement.
+- **An optional record field does *not* fire the seventh defect, and the `?` is the whole reason.**
+  `search-hub-metric.ts:139`'s `([A-Za-z0-9_]+)\s*:\s*<Type>\b` cannot match across `?`, so
+  `indexManager?: IndexManager` is never captured as a binding — same route by which
+  `indexManager!: IndexManager` always escaped. Independently moot: `perModule` needs a *dereference*,
+  and the root has none. Both measured. **The `Pick<>` decision does not generalise to this field** —
+  its value lands in the public full-typed `indexManager` field, so narrowing would need a cast. T12's
+  and T13's fields are *required*, so they **will** fire and must still be narrowed. Residual risk is a
+  later edit dropping the `?`; nothing fails until T14.
    **Settled by the reviewer at the T10 review point: `Pick<>` per record is the pattern**, and
    rescoping the ceiling inside `search-hub-metric.ts` was rejected because it edits a sensor during
    the refactor that sensor polices. The accepted cost — narrowing hides a real four-method reach, and

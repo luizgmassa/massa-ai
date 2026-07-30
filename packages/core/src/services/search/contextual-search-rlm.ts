@@ -113,6 +113,26 @@ export class ContextualSearchRLM {
    * `ensureInitialized` skips the factory calls (which are process-wide
    * mock.module targets in the full test suite) and uses these instances
    * directly. Production callers pass nothing and resolve via factories.
+   *
+   * PR-B T11 adds `indexManager`, the F4 seam (design.md §2.3 F4, D-R5). It is
+   * the one collaborator that could not be injected at all before this commit:
+   * every other member arrives from a factory this record can pre-empt, while
+   * `IndexManager` was built by direct construction inside `ensureInitialized`
+   * with no field to override it. It is the only *added* seam in PR-B; every
+   * other task moves a seam that already existed.
+   *
+   * **Every field here must stay optional, and for `indexManager` that is a
+   * G-HUB precondition rather than a style choice.** `IndexManager` is declared
+   * inside this gated directory, and `search-hub-metric.ts:139`'s annotation
+   * pattern `([A-Za-z0-9_]+)\s*:\s*<Type>\b` does not distinguish an interface
+   * field declaration from a parameter — that is the seventh plan defect, which
+   * took `IndexManager`'s `maxForeignReach` from 0 to 4 when `IndexerDeps` typed
+   * the same collaborator with a bare colon. The `?` here is what keeps the
+   * binding uncaptured (`\s*` cannot match `?`, the same reason the field at
+   * `indexManager!: IndexManager` above is invisible). Measured at T11: this
+   * record leaves `IndexManager` at foreign 0 / reach 0. Dropping the `?` — or
+   * restyling this record to `IndexerDeps`' required-field shape — reopens that
+   * hole, and nothing fails until T14's gate.
    */
   readonly injectedDeps?: {
     keywordSearch?: Awaited<ReturnType<typeof getKeywordSearch>>;
@@ -120,16 +140,25 @@ export class ContextualSearchRLM {
     searchCache?: Awaited<ReturnType<typeof getSearchCache>>;
     analytics?: Awaited<ReturnType<typeof getSearchAnalytics>>;
     symbolRepo?: Awaited<ReturnType<typeof getSymbolRepository>>;
+    /** F4 (T11). Full `IndexManager`, not `Pick<>`: the value is assigned to the
+     *  public `indexManager` field, which design.md §4.3.1 keeps at the full type
+     *  for its 18 post-construction stub sites, so a narrowed seam would need a
+     *  cast to land there. The `?` is the G-HUB guard — see above. */
+    indexManager?: IndexManager;
     sessionRegistry?: Pick<SessionRegistry, "getAsync">;
     synapseManager?: Pick<SynapseManager, "process">;
   };
 
+  // Mirrors `injectedDeps` field-for-field, and the mirror is load-bearing: a
+  // field added to only one side makes the matching object literal fail excess
+  // property checking at every un-cast call site.
   constructor(deps?: {
     keywordSearch?: Awaited<ReturnType<typeof getKeywordSearch>>;
     vectorStore?: Awaited<ReturnType<typeof getVectorStore>>;
     searchCache?: Awaited<ReturnType<typeof getSearchCache>>;
     analytics?: Awaited<ReturnType<typeof getSearchAnalytics>>;
     symbolRepo?: Awaited<ReturnType<typeof getSymbolRepository>>;
+    indexManager?: IndexManager;
     sessionRegistry?: Pick<SessionRegistry, "getAsync">;
     synapseManager?: Pick<SynapseManager, "process">;
   }) {
@@ -189,7 +218,17 @@ export class ContextualSearchRLM {
       resolveSymbolRepo,
     ]);
 
-    this.indexManager = new IndexManager(this.vectorStore);
+    // F4 seam (T11). `??` rather than the ternary the five reads above use:
+    // those wrap in `Promise.resolve()` to enter the `Promise.all`, this one is
+    // synchronous. Nullish and truthy coincide for a class instance, so the two
+    // forms cannot differ on any input reachable here.
+    //
+    // Position is load-bearing, not incidental: this runs *after* the
+    // `Promise.all` above, so the default construction reads an already-resolved
+    // `this.vectorStore`. Hoisting it would hand `IndexManager` `undefined` while
+    // still satisfying an `instanceof` check — which is why the seam's sensor
+    // asserts the manager's own `vectorStore`, not just its class.
+    this.indexManager = injected.indexManager ?? new IndexManager(this.vectorStore);
     this.initialized = true;
     logger.info("ContextualSearchRLM initialized", {
       via: injected.vectorStore ? "injected-seam" : "factory",

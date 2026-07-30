@@ -207,6 +207,7 @@ be merged with a merge commit.**
 | T8 | `29ea8b9` | `applySynapseState` → `session-bias.ts` with `SessionBiasDeps` | D1 facade-taking **13 → 12**, `delegateScope` **18 → 17**, scoped LOC **1186 → 1132**; `rlm-synapse.ts` hub reach **2 → 1**; foreign modules **5 → 5** as predicted; new AC-2 sensor 10/0 with **zero** `mock.module`; new LATE-BIND sensor 3/0, observed **2/1 red** under the capture mutation |
 | T9 | `2664008` | `correctQuery` → `hybrid-search.ts` with `HybridSearchDeps`; **`rlm-synapse.ts` deleted whole** | **foreign modules 5 → 4** — the one task where this is the right sensor, and it fired; `rlm-synapse.ts` leaves `perModule` entirely. D1 `delegateScope` **17 → 16**, facade-taking **12 → 11**, scoped LOC **1132 → 1108**; `correctQuery` reappears in `all` with `facadeParam: null`. Runtime mutation pair per the T8 refinement: the arity-identical recursion `this.correctQuery(query)` leaves `tsc` at **0** and takes coverage to **40/1**, while the naive `this.correctQuery(deps, query)` is caught (`TS2554: Expected 1 arguments, but got 2`). Invariance: `rlm-synapse.test.ts` **26** untouched, `rlm-search.test.ts` **31**, coverage **41**. New LATE-BIND sensor 3/0 — see the section below for why it was needed against T8's expectation |
 | T10 | this commit | six indexing surfaces → `project-indexer.ts` with `IndexerDeps`; **`ensureInitializedImpl`'s body absorbed into `ContextualSearchRLM.ensureInitialized()`**; **`rlm-indexing.ts` deleted whole** | **foreign modules 4 → 3**, predicted by scratch simulation before the edit and confirmed exactly. D1 `delegateScope` **16 → 9**, facade-taking **11 → 6**, scoped LOC **1108 → 626** — all three predicted to the number; all six functions reappear in `all` with `facadeParam: null`. `git grep -n ensureInitializedImpl -- packages/core/src` returns **only comments** (0 code sites). Runtime mutation pair on `indexFile`: naive `this.indexFile(this.#indexerDeps(), …)` caught by `tsc` (**TS2554: Expected 3-4 arguments, but got 5**), blind `this.indexFile(filePath, …)` leaves `tsc` at **0** and takes coverage to **39/2** and `rlm-indexing` to **22/3**. Memo mutation run per the T9 finding and it is **blind** — see the section below. Invariance: `rlm-indexing.test.ts` **25**, `concurrent-indexing.test.ts` **9**, coverage **41 / 75 expect() calls**, characterization net **160**. New LATE-BIND sensor `project-indexer-late-bind.test.ts` **4/0**, observed **2/2 · 3/1 · 3/1** red under three mutations first. **Plus the seventh plan defect: `IndexManager` foreign reach 0 → 4** — caught, fixed inside the task, recorded below |
+| T11 | this commit | `injectedDeps.indexManager` — the F4 seam, the only *added* seam in PR-B | **Three violation shapes, each observed red before the sensor was trusted, and `tsc` blind to all three.** New `index-manager-seam.test.ts` **3/0** honest; **2/1** under each of: the seam never consulted, the default path deleted, and the seam correct but hoisted above the `Promise.all`. **Two of the three are invisible to every pre-existing suite** — see the section below; that is plan-critic finding 7 measured rather than asserted. Invariance, all unchanged: `rlm-indexing.test.ts` **25**, `concurrent-indexing.test.ts` **9**, coverage **41**, characterization net **160**. **No movement in any structural sensor**, as predicted: D1 `delegateScope` **9 → 9**, facade-taking **6 → 6**, scoped LOC **626 → 626**; G-HUB exit 1 with `perModule` byte-identical. **T10's seventh-defect gate run and passed**: exactly **one** type above the ceiling and it is `ContextualSearchRLM`; `IndexManager` foreign **0 → 0**, reach **0 → 0**, members **7 → 7**. AC-3 budget **0**, spent **0** — no existing test file appears in the diff at all |
 
 Gate readings at T8: `lint` 0 · `type-check` 0 · `build` 0 · `test:scripts` **732 pass / 0 fail
 across 39 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
@@ -302,6 +303,96 @@ The eight edited assertions are the `_indexProjectInternalImpl` / `ensureFreshIn
 > do. Same defect as Phase 0's item 1 and T2's fixture: a regex over raw source counts the prose that
 > documents the thing. Over stripped source the readings are **0 / 0 / false**.
 
+Gate readings at T11: `lint` 0 · `type-check` 0 (6/6) · `build` 0 (5/5) · `test:scripts` **732 pass /
+0 fail across 39 files**, exit 0 · `check-frozen-anchors` exit 0 (14/14) · `check-characterization`
+exit 0 (3/3) · characterization net **160** across 7 suites (26·41·31·21·25·7·9), every suite
+individually unchanged · `search-synapse-integration` **5/0** · `session-bias` **10/0** ·
+`session-bias-late-bind` **3/0** · `hybrid-search-late-bind` **3/0** · `project-indexer-late-bind`
+**4/0** · `search-ranking-regression` **2/0** · new `index-manager-seam` **3/0** · G-HUB exit **1**,
+25 files, foreign **3**, reach **14** by `rlm-search.ts`, members **23**, `perModule {csr 14, admin 7,
+search 14, warmup 1}` — **every figure byte-identical to T10** · coverage EXCLUSIONS **9** · D1
+`delegateScope` **9**, facade-taking **6**, scoped LOC **626** · CHANGELOG released section still
+**974 lines**, T11's entry present in `[Unreleased]` under `### Changed` and absent from the released
+section, checked in both directions.
+
+### T11 — the first Phase 1 task whose plan row survived execution unamended
+
+Seven plan defects preceded this one, and T11 produced no eighth. The row was executed as written and
+every prediction in it held: the field goes in `injectedDeps`, the default is today's direct
+construction, and no structural sensor moves. Worth recording, because it is evidence about *where*
+this plan's defects live rather than a claim that it is now sound — **T11 is the only Phase 1 task that
+moves no function**, and every one of the seven defects was a consequence of a move. T12 and T13 move
+functions again and each already carries a known trap.
+
+One **near miss** that was not a plan defect but would have left a sensor decorative. The plan named
+two violation shapes — seam never consulted (parity's complement) and default path deleted. It did not
+name a third: **the seam correct but constructed in the wrong position**, hoisted above the
+`Promise.all` so `new IndexManager(this.vectorStore)` captures an unresolved store. That shape still
+satisfies `instanceof IndexManager`, so it passes any test asserting only the class. It was surfaced by
+the read-only `massa-ai-plan-critic` run against T11's implementation plan before the first edit, and
+it is why the default-path test asserts *which* vector store the constructed manager holds rather than
+just its type. Measured: under that mutation the assertion fails with `Received: undefined` while the
+`instanceof` above it still passes — so the assertion is load-bearing, not ceremony.
+
+**The three shapes, each verified *applied* before its reading was believed** (a substitution that
+silently no-ops reports blindness that is not there — T10's lesson, mechanised here as a harness that
+diffs against a pristine copy, greps for an injected marker, and refuses to report if the file is
+byte-identical; the restore is diffed too):
+
+| violation shape | `tsc` | `index-manager-seam` | `rlm-indexing` | which assertion fired |
+| --- | --- | --- | --- | --- |
+| seam never consulted (unconditional construction) | 0 | **2/1** | 25/0 — blind | `toBe(injected)`, identity |
+| default path deleted (injected value only) | 0 | **2/1** | **24/1** | `instanceof` → `false` |
+| seam correct, hoisted above the `Promise.all` | 0 | **2/1** | 25/0 — blind | manager's `vectorStore` → `undefined` |
+
+**Two of the three are invisible to the entire pre-existing suite, and that is finding 7 discharged
+with a measurement instead of an argument.** The plan challenge predicted on principle that a parity
+test "exercises only the default path and cannot fail on a seam that is wired but never consulted".
+Measured here: the repository's *only* assertion about this member was
+`rlm-indexing.test.ts:201`'s `expect((rlm as any).indexManager).toBeDefined()`, which catches the
+second shape (hence **24/1**) and neither of the other two. `tsc` exits **0** on all three — the same
+structural blindness T7 found for `this.`-recursion, arriving on a different axis.
+
+### The `?` in `indexManager?: IndexManager` is a G-HUB guard, not a style choice
+
+T10's seventh defect enumerated the sites that will fire it: `FileFilterCache`,
+`SearchAnalytics`/`SearchAnalyticsPg` at T12, `QueryUnderstandingService` at T13 — all declared inside
+the gated directory. **`IndexManager` at T11 is a fourth such site, and it does *not* fire, for a
+reason worth writing down before someone "tidies" it.** `search-hub-metric.ts:139`'s pattern is
+`([A-Za-z0-9_]+)\s*:\s*<Type>\b`, and `\s*` cannot match `?` — so an **optional** field is never
+captured as a binding, exactly as the existing `indexManager!: IndexManager` at
+`contextual-search-rlm.ts:93` has always escaped it via `!`. A second, independent route makes it moot
+anyway: `perModule` only gains an entry when a *dereference* is found, and `contextual-search-rlm.ts`
+contains no `indexManager.<member>` — only `this.indexManager`, which is attributed to
+`ContextualSearchRLM`. That is the same mechanism by which `buildGraphStreamImpl`'s never-dereferenced
+`_rlm` contributed zero at T7.
+
+Both routes were **measured, not reasoned**: `IndexManager` reads foreign **0 → 0**, reach **0 → 0**,
+members **7 → 7**, and the whole `types` array still holds exactly one entry above the ceiling.
+Recorded because the narrowing decision settled at the T10 review point (`Pick<>` per record) does
+**not** apply here and should not be applied by analogy: the seam's value is assigned to the public
+field `indexManager!: IndexManager`, which `design.md` §4.3.1 keeps at the full type for its 18
+post-construction stub sites, so a `Pick<>` seam would not be assignable without a cast — a narrowing
+that buys nothing and costs type honesty. **The residual risk is a later edit dropping the `?`**, or
+restyling this record into `IndexerDeps`' required-field shape; nothing fails until T14's gate. The
+field carries a comment saying so, and this is its second record.
+
+### T11 and T15 — the count moves to 29, class 1
+
+`rlm-` in tracked files outside `CHANGELOG.md` / `.specs/` / `.ua/`: **28 → 29**, measured with the new
+file **staged** (`git grep` enumerates tracked files only; unstaged it reports 28 and would be wrong —
+the same trap T10 recorded). The `+1` is `index-manager-seam.test.ts`, which cites
+`rlm-indexing.test.ts:201` as the pre-existing assertion its second mutation overlaps. That is
+**class 1** — a reference to a `rlm-*.test.ts` file that *survives* PR-B, so it is consistent until
+T15 decides whether to rename those suites, not a stale pointer. Same class and same cause as T10's
+`project-indexer-late-bind.test.ts`: every new sensor file cites the suite it was measured against.
+
+> A cross-check worth keeping. The plan critic independently measured this count as **19**, against the
+> **29** measured here. The critic's number came from a `grep` honouring `.gitignore` — the repo's
+> `grep` is a ugrep shim, which is exactly why `tasks.md` specifies `git ls-files` / `git grep` with
+> explicit pathspec exclusions for anything load-bearing. Two methods, two answers, for the sixth time
+> in this feature. **Name the method or the number is not comparable.**
+
 ### AC-3 vs GMS-03 AC-1 — the "zero test edits" claim is false
 
 Found at **T6**, by executing T6 and measuring rather than by reading. Same class as the
@@ -342,6 +433,7 @@ that no longer exists, or re-point a `mock.module` specifier and the symbol name
 | T8 | 2 | `mock.module` split: `applySynapseState` leaves the `rlm-synapse.js` mock for a new `session-bias.js` one, which keeps `correctQueryImpl` behind. **Plus a setup change in the same two tests, declared here so it is not read as drift:** each now passes two stub collaborators into `makeRlm(…)` so the asserted deps record has *defined* values. Measured reason — bun's `toHaveBeenCalledWith` treats an undefined-valued key as absent, so `f({})` satisfies `toHaveBeenCalledWith({a: undefined})`; asserting `{sessionRegistry: undefined, synapseManager: undefined}` would therefore also be satisfied by a facade that assembled `{}`. With defined values the check is exact on identity and extra keys still fail, so both assertions are **strictly stronger** than the `rlm` first argument they replace. Textual `expect(` sites unchanged at **71**, and bun's runtime tally unchanged at **75 expect() calls** — two different metrics, both pinned somewhere, so always say which |
 | T9 | 1 | The `rlm-synapse.js` `mock.module` block is **deleted, not re-pointed** — `correctQueryImpl` was its last key and the module no longer exists — and replaced by a `hybrid-search.js` block, so the `mock.module` count stays at **16** rather than splitting to 17 as T6/T7/T8 each did. **Plus a setup change in the same test, declared here so it is not read as drift**, and it is the T8 pattern arriving by a different route: the stub must be *defined* for the record assertion to mean anything (the `toHaveBeenCalledWith` trap below), but `keywordSearch` is a **field**, not an `injectedDeps` read — the constructor stores its argument in `injectedDeps`, only `ensureInitialized` bridges it to the field, and `correctQuery` does not await it. So `makeRlm({keywordSearch})` would still yield an undefined-valued record; the stub is assigned as `(rlm as any).keywordSearch = …`, which is both the only way to get a defined record and this file's own established idiom (`:297`, `:333`, `:385`). Verified mechanically over comment-stripped source, before → after: `test(` **39 → 39**, `describe(` **20 → 20**, `expect(` **71 → 71**, `toHaveBeenCalledWith` **14 → 14**, `toHaveBeenLastCalledWith` **10 → 10**, `mock.module` **16 → 16**, skips/todos **0 → 0**, and zero occurrences of `toBeTruthy` / `toBeDefined` / `anything()` / `expect.any` in either state. Runtime **41 pass / 0 fail** and bun's **75 expect() calls**, both unchanged |
 | T10 | 8 | `mock.module` **re-pointed, not split** — `rlm-indexing.js` → `project-indexer.js`, five spied names losing their `Impl` suffix and `_indexProjectInternalImpl` → `indexProjectInternal`; count stays at **16**, same shape as T9. **Plus three changes declared here so they are not read as drift**: one named helper `indexerDeps(rlm)` holding the expected record, whose two re-entrant keys are the file's only `expect.any(Function)` (**0 → 2**) because a per-call closure cannot be identity-matched and the compensating identity check lives in `project-indexer-late-bind.test.ts` test 4; an `await rlm.ensureInitialized()` added to the two `indexFile` tests, because `indexFile` is the one surface whose original never initialised and an all-`undefined` record is unassertable under the `toHaveBeenCalledWith` trap; and four comment corrections naming symbols this commit deletes. Zero assertions added or removed — `expect(` **71 → 71** textual, **75** runtime |
+| T11 | **0**, and 0 spent | The only Phase 1 task whose diff contains **no existing test file at all**. It moves no signature, so there is nothing for a signature-tracking edit to track, and its sensor is a new file. Recorded rather than omitted so the ledger accounts for every task; the total is unchanged |
 | T13 | 3 | — |
 | **total** | **18** | 3 `mock.module` targets re-pointed across 6 modules; ~14 mocked symbol names |
 
