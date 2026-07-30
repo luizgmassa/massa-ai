@@ -190,6 +190,24 @@ describe("no phantom roles: every orchestration role has a real charter", () => 
     expect(content).not.toContain("role-based (no charter)");
   });
 
+  // The assertion above checks that every charter path MENTIONED in the file
+  // resolves on disk. That is the opposite direction from coverage, and it is
+  // why `judge` and `meta-judge` were absent from this file for a whole release
+  // without any gate noticing: a charter that is never mentioned cannot produce
+  // a dead link. See .specs/features/skills-directive-dedup/spec.md SDD-07.
+  test("every charter on disk is documented in agent-orchestration.md", async () => {
+    const content = await read(AGENT_ORCHESTRATION);
+    const missing = (await charterNames()).filter(
+      (name) => !content.includes(`skills/agents/${name}/SKILL.md`),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  test("the coverage check enumerated a real roster", async () => {
+    // Guard the guard: an empty charter list makes the check above vacuous.
+    expect((await charterNames()).length).toBeGreaterThanOrEqual(17);
+  });
+
   test("every charter is registered in skills/AGENTS.md and in the generator", async () => {
     const names = await charterNames();
     const registry = await read(path.join(SKILLS_DIR, "AGENTS.md"));

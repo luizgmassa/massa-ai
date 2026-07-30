@@ -91,11 +91,23 @@ Before adding a new reusable role, load `references/subagent-design.md` and writ
 | `audit-specialist` | `massa-ai-audit-specialist` | Findings-only audit through one selected `lens` | read-only | `skills/agents/audit-specialist/SKILL.md` |
 | `plan-critic` | `massa-ai-plan-critic` | Stress-test a constructed plan using The Fool mode and return bounded critique | read-only | `skills/agents/plan-critic/SKILL.md` |
 | `furps-analyst` | `massa-ai-furps-analyst` | Analyze one FURPS+ dimension of a PRD/ADR against the checklist and return structured findings | read-only | `skills/agents/furps-analyst/SKILL.md` |
+| `meta-judge` | `massa-ai-meta-judge` | Author the evaluation specification a debate panel scores against, once per evaluation | read-only | `skills/agents/meta-judge/SKILL.md` |
+| `judge` | `massa-ai-judge` | Score an artifact against that specification with quoted evidence, then debate to consensus | read-only | `skills/agents/judge/SKILL.md` |
 
-The remaining charters — `planner`, `reviewer`, `context-curator`,
-`requirements-analyst`, `test-engineer`, `documentation-agent`,
-`mobile-specialist` — follow the same `massa-ai-<role>` convention and are
-listed in the Agent Table of `skills/AGENTS.md`.
+`workflows/judge-with-debate.md` owns the panel's per-slot assignments; this
+table describes the roles, not which slot gets which model.
+
+The remaining charters follow the same `massa-ai-<role>` convention. Their
+purpose and trigger live once, in the Agent Table of `skills/AGENTS.md`; they
+are cited here by charter path so this file names every shipped role:
+
+- `skills/agents/planner/SKILL.md`
+- `skills/agents/reviewer/SKILL.md`
+- `skills/agents/context-curator/SKILL.md`
+- `skills/agents/requirements-analyst/SKILL.md`
+- `skills/agents/test-engineer/SKILL.md`
+- `skills/agents/documentation-agent/SKILL.md`
+- `skills/agents/mobile-specialist/SKILL.md`
 
 **Role mapping:** `investigator`→`investigator` (identical); `implementer`→`builder` (renamed); `verifier`→`verification-agent` (renamed, centralizes Verification Ladder); `domain-mapper`+`coupling-auditor`+`deepening-architect`→`architecture-specialist` (three roles folded into one specialist; the `lens` input field selects the sub-mode). Workflows dispatch the new agent names via named dispatch blocks; the old role names above are kept for traceability only.
 
