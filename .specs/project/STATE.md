@@ -145,7 +145,7 @@ cannot be T17's referent.
 a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
 unilaterally — it is a release-semantics decision.
 
-### Execute — Phase 1 STARTED (2026-07-29), T6a–T9 done, T10 next
+### Execute — Phase 1 STARTED (2026-07-29), T6a–T10 done, T11 next
 
 **Two branches, and the first one is gone.** T6a and T6 were executed on
 `refactor/search-facade-split-phase-1` (cut from `d628464`) and reached `main` through **PR #46,
@@ -165,7 +165,8 @@ with a merge commit.**
 | T6 | `f612e03` † | `rlm-fusion.ts` → `result-fusion.ts` |
 | T7 | `3e46eae` | `buildGraphStream` → `graph-stream.ts`, plus the sensor amendment |
 | T8 | `29ea8b9` | `applySynapseState` → `session-bias.ts` with `SessionBiasDeps`; the AC-2 and LATE-BIND sensors |
-| T9 | on `-1b` | `correctQuery` → `hybrid-search.ts` with `HybridSearchDeps`; **`rlm-synapse.ts` deleted whole**; a second LATE-BIND sensor |
+| T9 | `2664008` | `correctQuery` → `hybrid-search.ts` with `HybridSearchDeps`; **`rlm-synapse.ts` deleted whole**; a second LATE-BIND sensor |
+| T10 | on `-1b` | six indexing surfaces → `project-indexer.ts` with `IndexerDeps`; `ensureInitializedImpl` absorbed into the root; **`rlm-indexing.ts` deleted whole**; a third LATE-BIND sensor |
 
 † unreachable — squashed into `main` by #46. Nothing is pushed from `-1b`; it is local only.
 
@@ -227,12 +228,58 @@ as absent** (`f({})` satisfies `toHaveBeenCalledWith({a: undefined})`, measured)
 assertion needs defined stubs or it proves nothing — at T9 that meant assigning the *field*, because
 the constructor stores its argument in `injectedDeps` and only `ensureInitialized` bridges it across.
 
-**Next: T10** — the largest Phase 1 task (3.5 h) and the planned review point. Indexing surfaces →
-`project-indexer.ts` with `IndexerDeps`, **plus** `ensureInitializedImpl`'s body becoming
-`ContextualSearchRLM.ensureInitialized()` so `rlm-indexing.ts` dies whole in one commit. AC-3 budget:
-**8** assertions. Sensor: `rlm-indexing.test.ts` **25**, plus `ensureInitializedImpl` absent from
-`packages/core/src` outside tests. Then stop at **T14**, where G-HUB going green is the moment the
-split is proven; T13 is budgeted 5.5 h and is most likely to overrun.
+Gates at T10: `lint` 0 · `type-check` 0 (6/6) · `build` 0 (5/5) · `test:scripts` **732 pass / 0 fail
+across 39 files**, exit 0 · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0
+(3/3) · characterization net **160** across 7 suites, every suite individually unchanged ·
+`search-synapse-integration` **5/0** · `session-bias` **10/0** · `session-bias-late-bind` **3/0** ·
+`hybrid-search-late-bind` **3/0** · `search-ranking-regression` **2/0** · new
+`project-indexer-late-bind` **4/0** · coverage exclusions **9** · G-HUB exit 1, 25 files,
+**foreign modules 4 → 3** (predicted by scratch simulation, confirmed), reach **14** by
+`rlm-search.ts`, members **23**, largest file now `project-indexer.ts` **641** (700 ceiling
+untouched), `perModule {csr 14, admin 7, search 14, warmup 1}` — `rlm-indexing.ts` gone, `csr`
+**5 → 14** and predicted · D1 `delegateScope` **16 → 9**, facade-taking **11 → 6**, scoped LOC
+**1108 → 626**, all three predicted to the number.
+
+**T10 surfaced a seventh plan defect, and this one contradicts a claim about the *pattern* rather
+than a task row.**
+
+7. **The deps-record pattern is not G-HUB-neutral** (T10). `design.md` §3.4 records that the per-module
+   records have foreign reach 0 because they are declared in the module that reads them. **True of the
+   record type, false of the types its fields name.** `search-hub-metric.ts:139`'s annotation pattern
+   `([A-Za-z0-9_]+)\s*:\s*<Type>\b` does not distinguish an interface field declaration from a
+   parameter, so `IndexerDeps { indexManager: IndexManager }` attributed four
+   `deps.indexManager.<method>` reads to `IndexManager` and took its `maxForeignReach` from **0 to 4** —
+   **two** G-HUB violations where the tree had exactly one, which would have made T14's gate
+   unclosable and surfaced four commits later with three plausible causes. **Resolved inside T10**:
+   narrow the field to `Pick<IndexManager, …4 methods>`, which is the honest type as well as a
+   structural annotation. T6–T9 never hit it because their collaborators are either structural
+   (`Awaited<ReturnType<…>>`) or declared outside `services/search/`. **T12 and T13 will each hit it**
+   — `FileFilterCache`, `SearchAnalytics`/`SearchAnalyticsPg`, `QueryUnderstandingService` are all
+   declared in that directory — so both tasks gain a sensor: the hub metric must report exactly **one**
+   type above the ceiling, and it must be `ContextualSearchRLM`. Reading only the
+   `ContextualSearchRLM` row, which is all T6–T9 needed, is what let this through for one measurement.
+   **Settled by the reviewer at the T10 review point: `Pick<>` per record is the pattern**, and
+   rescoping the ceiling inside `search-hub-metric.ts` was rejected because it edits a sensor during
+   the refactor that sensor polices. The accepted cost — narrowing hides a real four-method reach, and
+   forgetting to narrow breaks T14 — is carried as a **sensor** on the T12/T13 rows, not as advice.
+
+**Two standing reviewer decisions were also closed at this review point**, so no later task re-raises
+them: the `Pick<>` pattern above, and **release semantics — `[Unreleased]` stays under `### Changed`
+and PR-B lands as a minor** (left open at T7, T8, T9 and T10). The module layout, exported symbols and
+file names are a public compatibility surface per `CLAUDE.md`, and PR-B deletes two modules outright.
+
+T10 also confirmed the T9 LATE-BIND finding at the best case available and registered a **6-site
+extension to PATCHABLE's measured footprint** — `rlm-indexing.test.ts` stubs `rlm.indexFile` and
+`rlm.indexProject` as bare assignments with no `as any` cast, so the established regex finds none of
+them; both are exercised through `ensureFreshIndex` / `_indexProjectInternal`, which is why
+`IndexerDeps` carries them as per-call arrow wrappers. Full record in `tasks.md`.
+
+**Next: T11** — the `IndexManager` injection seam (F4), 1.5 h. **Its site moved with T10**: it is
+`this.indexManager = new IndexManager(this.vectorStore)` inside `ensureInitialized()` in
+`contextual-search-rlm.ts`, not `rlm-indexing.ts:586` (deleted) and not `project-indexer.ts`, which
+imports `IndexManager` as a type only. Needs the parity test plus the positive
+injected-stub-is-read assertion. Then **T12**, **T13**, and stop at **T14**, where G-HUB going green
+is the moment the split is proven; T13 is budgeted 5.5 h and is most likely to overrun.
 
 **T6 alone surfaced three plan defects, two needing a spec-owner decision.** All three are the
 `ensureInitializedImpl` class — a consequence `design.md` settled in substance and never wrote into

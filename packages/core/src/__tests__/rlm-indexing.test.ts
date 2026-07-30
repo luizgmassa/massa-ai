@@ -111,7 +111,7 @@ mock.module("@massa-ai/shared", () => {
 });
 
 import { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js";
-import { runWithIndexLock } from "../services/search/rlm-indexing.js";
+import { runWithIndexLock } from "../services/search/project-indexer.js";
 
 // ── runWithIndexLock ────────────────────────────────────────────────────────
 

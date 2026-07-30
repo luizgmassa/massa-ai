@@ -68,6 +68,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   two calls and asserts each call saw its own — the one shape the previous suites could not
   distinguish.
 
+- **Project indexing is now a standalone capability module, and lazy initialisation moved into the
+  search service itself.** `rlm-indexing.ts` is gone. Its six indexing surfaces — full project index,
+  single-file index, freshness check, search-admission preflight, gitignore loading and the
+  per-project mutex — live in `project-indexer.ts` and take `IndexerDeps`, the five stores they
+  actually read plus the two operations they re-enter, instead of the whole search facade. The
+  seventh export, lazy initialisation, could not move anywhere: it reads eight members off the
+  service, so any capability module holding it would fail the coupling gate permanently. It is now
+  the body of `ContextualSearchRLM.ensureInitialized()`, which is why the old module could be deleted
+  outright rather than left behind as a single-function file. Functions in the search directory that
+  still take the facade drop from **11 to 6**, and the lines they cover from **1108 to 626** — the
+  largest single step of this work.
+
+  **Modules reading the search facade drop from 4 to 3.** Deepest foreign reach stays at **14** and
+  the gate still fails, both expected and unchanged: the maximum is set by `rlm-search.ts` and cannot
+  move until that file is split, which is the next-to-last step. Initialisation timing, ordering and
+  observable behaviour are unchanged — each public method still awaits initialisation first and only
+  then assembles its dependency record, so the fields the module reads are populated exactly as
+  before. Single-file indexing deliberately still does *not* initialise, because it never did; its
+  callers do.
+
+  Two properties are now pinned by tests that did not exist before, both of which the previous suites
+  could not distinguish from correct code. The dependency record is rebuilt on **every** call, so a
+  test that replaces a collaborator after construction is still honoured — and the two re-entrant
+  operations resolve through the live service on every invocation rather than being bound once, so
+  replacing one of *those* between calls is honoured too. The richest existing indexing suite, which
+  carries more than half of all such replacements in the codebase, stays green under a memoised
+  record; that is why the new test exists rather than relying on it.
+
+  One coupling measurement is worth recording because it is a property of the measurement rather than
+  of the code: typing a dependency-record field with a class declared in the same directory made the
+  gate attribute that module's method calls to the class, reporting a second violation where the
+  codebase has one. The field now names only the four methods it uses, which is both the accurate
+  type and the reading the gate intends.
+
 ## [1.11.0] - 2026-07-29
 
 ### Changed

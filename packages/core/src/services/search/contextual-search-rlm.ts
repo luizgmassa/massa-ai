@@ -18,7 +18,7 @@
  * - Embedding reuse across projects
  */
 
-import { SearchResult } from "@massa-ai/shared";
+import { SearchResult, logger } from "@massa-ai/shared";
 import { IndexManager } from "./index-manager.js";
 import { SearchAnalytics } from "./search-analytics.js";
 import type { SearchAnalyticsPg } from "./search-analytics-pg.js";
@@ -27,21 +27,16 @@ import { QueryUnderstandingService } from "./query-understanding.js";
 import type { SynapseManager } from "../synapse/synapse-manager.js";
 import type { SessionRegistry } from "../synapse/session/session-registry.js";
 import { assertParserReadyForIndexing } from "../structural/parser-readiness.js";
-import type { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
-import type { getVectorStore } from "../../data/vector/vector-store-factory.js";
-import type { getSearchCache } from "./cache-factory.js";
-import type { getSearchAnalytics } from "./analytics-factory.js";
-import type { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
-import {
-  runWithIndexLock,
-  _indexProjectInternalImpl,
-  ensureFreshIndexImpl,
-  indexFileImpl,
-  loadGitignoreImpl,
-  checkSearchAdmissionImpl,
-  ensureInitializedImpl,
-  type IndexProjectOptions,
-} from "./rlm-indexing.js";
+// PR-B T10: these five were `import type` while `ensureInitializedImpl` owned
+// the factory calls in rlm-indexing.ts. That body is now `ensureInitialized()`
+// below, so the root needs them as *values*. The five specifiers are unchanged,
+// which is what keeps every `mock.module("…-factory.js")` in the suite pointing
+// at the same resolved module it always did.
+import { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
+import { getVectorStore } from "../../data/vector/vector-store-factory.js";
+import { getSearchCache } from "./cache-factory.js";
+import { getSearchAnalytics } from "./analytics-factory.js";
+import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import {
   searchImpl,
   addContextToResultsImpl,
@@ -59,6 +54,16 @@ import { fuseResults, generateScoreExplanation } from "./result-fusion.js";
 import { buildGraphStream } from "./graph-stream.js";
 import { applySynapseState, type SessionBiasDeps } from "./session-bias.js";
 import { correctQuery, type HybridSearchDeps } from "./hybrid-search.js";
+import {
+  runWithIndexLock,
+  indexProjectInternal,
+  ensureFreshIndex,
+  indexFile,
+  loadGitignore,
+  checkSearchAdmission,
+  type IndexerDeps,
+  type IndexProjectOptions,
+} from "./project-indexer.js";
 import type {
   SearchDegradation,
   SearchDegradationReporter,
@@ -75,10 +80,14 @@ import {
  */
 export class ContextualSearchRLM {
   // NOTE (M14 Phase 3): fields below were `private`. Relaxed to `public`
-  // (modifier dropped) so the extracted delegate modules in rlm-indexing.ts /
+  // (modifier dropped) so the extracted delegate modules in
   // rlm-search.ts / rlm-admin.ts can read them via the passed
   // `rlm` parameter. Runtime-identical; type-surface only. See design.md
   // "Encapsulation decision (accepted cost)".
+  //
+  // PR-B T10 dropped rlm-indexing.ts from that list — project-indexer.ts reads
+  // these through `IndexerDeps`, never off the instance. By T14 no reader is
+  // left and the whole note goes with them.
   keywordSearch!: Awaited<ReturnType<typeof getKeywordSearch>>;
   vectorStore!: Awaited<ReturnType<typeof getVectorStore>>;
   indexManager!: IndexManager;
@@ -129,21 +138,103 @@ export class ContextualSearchRLM {
     this.injectedDeps = deps;
   }
 
-  // Delegate-preservation contract: stays an instance method (thin delegate
-  // to the module function) because concurrent-indexing.test.ts:67 and the
-  // characterization test monkey-patch `(inst as any).ensureInitialized` on
-  // the instance; routing through a module-local function would bypass that.
-  // Visibility relaxed from `private` to public-equivalent so rlm-indexing.ts
-  // can dispatch through `rlm.ensureInitialized()` (runtime-identical).
+  // Delegate-preservation contract: stays a public patchable instance method,
+  // because concurrent-indexing.test.ts:67, the characterization test and
+  // rlm-search.test.ts:156 monkey-patch `.ensureInitialized` on the instance and
+  // every internal caller routes through `this.` (constraint PATCHABLE).
+  //
+  // PR-B T10: this body **is** the former `ensureInitializedImpl`, moved here
+  // verbatim with `rlm.` → `this.` and the export deleted. It read 8 facade
+  // members and 8 > G-HUB's ceiling of 3, so no capability module could hold it
+  // without failing the gate permanently — design.md §4.5(b) decided lazy init
+  // stays in the root, §4.1's module table never recorded the consequence, and
+  // tasks.md T10 owns it. Absorbing it is what lets rlm-indexing.ts die whole in
+  // one commit instead of surviving as the one-function husk GMS-04 AC-1 forbids.
+  //
+  // It does exactly what it did: resolve the six factories, assign the six
+  // fields, set the flag. It does **not** construct capability modules — there
+  // are none to construct — so the 25 test sites that set `initialized = true`
+  // to skip it still skip only factory resolution, never wiring (§4.3.1).
   async ensureInitialized(): Promise<void> {
-    return ensureInitializedImpl(this);
+    if (this.initialized) return;
+
+    const injected = this.injectedDeps ?? {};
+    const resolveKeyword = injected.keywordSearch
+      ? Promise.resolve(injected.keywordSearch)
+      : getKeywordSearch();
+    const resolveVector = injected.vectorStore
+      ? Promise.resolve(injected.vectorStore)
+      : getVectorStore();
+    const resolveCache = injected.searchCache
+      ? Promise.resolve(injected.searchCache)
+      : getSearchCache();
+    const resolveAnalytics = injected.analytics
+      ? Promise.resolve(injected.analytics)
+      : getSearchAnalytics();
+    const resolveSymbolRepo = injected.symbolRepo
+      ? Promise.resolve(injected.symbolRepo)
+      : getSymbolRepository();
+
+    [
+      this.keywordSearch,
+      this.vectorStore,
+      this.searchCache,
+      this.analytics,
+      this.symbolRepo,
+    ] = await Promise.all([
+      resolveKeyword,
+      resolveVector,
+      resolveCache,
+      resolveAnalytics,
+      resolveSymbolRepo,
+    ]);
+
+    this.indexManager = new IndexManager(this.vectorStore);
+    this.initialized = true;
+    logger.info("ContextualSearchRLM initialized", {
+      via: injected.vectorStore ? "injected-seam" : "factory",
+    });
+  }
+
+  /**
+   * Assemble project-indexer.ts's narrow deps record — per call, from whatever
+   * the fields hold right now (LATE-BIND, design.md §4.3.1). Never hoist this to
+   * a constructor-time capture *or* a first-call memo: `initialized` has 25
+   * post-construction assignment sites, `indexManager` 18, `symbolRepo` 7, and
+   * `rlm-indexing.test.ts` alone holds 52 of the ~80 — a capture would leave
+   * every one of them stubbing a field nothing reads.
+   *
+   * Property reads only, never a dereference. That is load-bearing:
+   * `rlm-indexing.test.ts:327-339` stubs `indexManager` and `searchCache` but
+   * *not* `symbolRepo`, because the full-reindex branch returns before touching
+   * it. Reading an undefined field into the record is fine; dereferencing one
+   * here would turn that test red on a member the original never reached.
+   *
+   * `indexFile` and `indexProject` are arrow wrappers, not `.bind(this)` and not
+   * bare method references. Both alternatives resolve the method at *assembly*
+   * time; the arrow body re-reads `this.<method>` at *call* time, which is the
+   * only shape under which the 6 sites that stub those two methods on the
+   * instance stay effective. See project-indexer.ts's `IndexerDeps` doc.
+   */
+  #indexerDeps(): IndexerDeps {
+    return {
+      indexManager: this.indexManager,
+      symbolRepo: this.symbolRepo,
+      keywordSearch: this.keywordSearch,
+      vectorStore: this.vectorStore,
+      searchCache: this.searchCache,
+      indexFile: (filePath, projectId, projectRoot, centralityMap) =>
+        this.indexFile(filePath, projectId, projectRoot, centralityMap),
+      indexProject: (projectPath, projectId, options) =>
+        this.indexProject(projectPath, projectId, options),
+    };
   }
 
   /**
    * Load and parse .gitignore file (delegates to shared ignore-patterns module)
    */
   private loadGitignore(projectPath: string) {
-    return loadGitignoreImpl(projectPath);
+    return loadGitignore(projectPath);
   }
 
   /**
@@ -186,7 +277,8 @@ export class ContextualSearchRLM {
     chunksIndexed: number;
     errors: number;
   }> {
-    return _indexProjectInternalImpl(this, projectPath, projectId, options);
+    await this.ensureInitialized();
+    return indexProjectInternal(this.#indexerDeps(), projectPath, projectId, options);
   }
 
   /**
@@ -206,7 +298,8 @@ export class ContextualSearchRLM {
     deferred?: boolean;
     filesPending?: number;
   }> {
-    return ensureFreshIndexImpl(this, projectId, projectPath, options);
+    await this.ensureInitialized();
+    return ensureFreshIndex(this.#indexerDeps(), projectId, projectPath, options);
   }
 
   /**
@@ -235,7 +328,8 @@ export class ContextualSearchRLM {
       deletedFiles?: number;
     };
   }> {
-    return checkSearchAdmissionImpl(this, projectId, projectPath);
+    await this.ensureInitialized();
+    return checkSearchAdmission(this.#indexerDeps(), projectId, projectPath);
   }
 
   /**
@@ -247,15 +341,21 @@ export class ContextualSearchRLM {
    * - YAML: splits by document separators or top-level keys
    * - Code: splits by functions/classes with preceding comments
    */
-  // Visibility relaxed from `private` so rlm-indexing.ts can dispatch through
-  // `rlm.indexFile()` (runtime-identical; type-additive only).
+  // Stays public: project-indexer.ts reaches it back through
+  // `IndexerDeps.indexFile`, an arrow wrapper over `this.indexFile`, so the 5
+  // sites in rlm-indexing.test.ts that stub this method on the instance keep
+  // taking effect (LATE-BIND).
+  //
+  // It deliberately does **not** `await this.ensureInitialized()`. The original
+  // `indexFileImpl` never did either — its callers init first — and adding it
+  // here would be a behavior change, not a tidy-up.
   async indexFile(
     filePath: string,
     projectId: string,
     projectRoot: string,
     centralityMap?: Map<string, number>,
   ): Promise<{ chunks: number }> {
-    return indexFileImpl(this, filePath, projectId, projectRoot, centralityMap);
+    return indexFile(this.#indexerDeps(), filePath, projectId, projectRoot, centralityMap);
   }
 
   /**
