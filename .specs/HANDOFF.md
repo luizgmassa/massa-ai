@@ -1,13 +1,30 @@
 # Handoff
 
-## Active — Core Layering and God-Module Split (PR-B), **T16 done, Phase 2 open**
+## Active — Core Layering and God-Module Split (PR-B), **T17 done, Phase 2 open**
 
 **Feature**: `core-layering-god-module-split` · branch
 `refactor/search-facade-split-phase-1b`, cut from `main` @ `5247ecb` (v1.11.0),
 worktree `../massa-ai-wt-facade-phase-1b`.
-**T6a and T6 are merged and released; T7–T16 are committed and green. Phase 1 is closed and T15 has
-opened Phase 2.** Working tree clean. Nothing is pushed — the branch is local only, now twelve
+**T6a and T6 are merged and released; T7–T17 are committed and green. Phase 1 is closed and T15 has
+opened Phase 2.** Working tree clean. Nothing is pushed — the branch is local only, now thirteen
 commits deep.
+
+**A commit-trailer question was settled at T17, and the premise it was raised on did not reproduce.**
+It was put as *"`d23bb43` carries a `Co-Authored-By` trailer; the other eleven commits do not"*, so
+the choice looked like one amend. Measured across `5247ecb..HEAD` before acting on it: **8 of the 13
+carry the trailer and 5 do not** — present on `3e46eae`, `29ea8b9`, `b9d444d`, `23470ce`, `353de59`,
+`e4e38bd`, `b9781df`, `d23bb43`; absent from `2664008`, `484e61a`, `1090504`, `ba8d2bc` and T17's
+own. There is no single amend that converges it. **Reviewer decision — leave it alone**: do not
+amend, do not backfill. Rewriting eight commits would move shas this file, `STATE.md` and `tasks.md`
+all cite, to fix something with no reader impact. *Eleventh figure in this feature that did not
+reproduce when re-measured; the rule that catches these is to run the count before acting on it.*
+
+**A second carry-forward retired at T17 for the same reason: it was already fixed.** Sessions since
+T15 have carried *"`search-facade-admin.test.ts:24` still names `ensureInitializedImpl`, a symbol T10
+deleted — decide explicitly if you touch that file"*. Measured at `d23bb43`:
+`git grep -n ensureInitializedImpl -- packages/core/src/__tests__/search-facade-admin.test.ts`
+returns **nothing**. T15 rewrote that file's header when it renamed the suite, and the stale symbol
+went with it. **Stop carrying it.**
 
 ---
 
@@ -411,24 +428,57 @@ history reports `0 broken, historical exactly at its pin of 28` — the categori
 would have been red on every clean run. Fixed with `fetch-depth: 0` on the `build` checkout. **The first
 defect in this feature created during execution rather than inherited from the plan.**
 
-**Next action: T17.** Then, in plan order:
+**T17 is done, and its sensor did not hold — the seventeenth plan defect.** The row asks for
+`needles-diff.ts` exit 0. It exits **1**: `N05-centrality-rerank-bonus` goes rank **5 → 6** while both
+floors pass and MRR *rises* (0.7357 → **0.7452**). Attributed rather than accepted or dismissed, and
+the attribution is the deliverable.
 
-- **T17** — needles after-run and per-needle rank diff vs T4's baseline. **A floor pass with three
-  needles slipping 1 → 4 is a regression that passed** (GMS-05 AC-4 note 2). Its bounded-corpus caveat
-  is in *What a reader must not overclaim* below: T4/T17 use the 8-file benchmark corpus, and a
-  full-corpus baseline still does not exist. **Do not quote a bounded-corpus number as a full-corpus
-  one.**
+**The mechanism, measured.** `smart-chunker.ts:62-70` writes `// File: <path>` into every chunk before
+it is embedded, plus a `// Section: <label>` line whose label is the enclosing symbol and which is
+**repeated three more times** on any chunk of at least `REPEAT_MIN_LINES`. Rank is a function of the
+cosine score over that text, so renaming a file — or renaming a function inside it — perturbs every
+score in it. N05's own top score is **byte-identical** across the two runs (0.6712 → 0.6712); a rival
+chunk overtook it across a **0.0134** margin. The 2x2: old path + old body **+0.0134** → @5; new + new
+**−0.0030** → @6; old path + new body **+0.0044** → @5; new path + old body **+0.0068** → @5.
+**Neither change flips it alone and reverting either restores rank 5.** The body delta is three
+de-facading lines, which also rename the symbols the label derives from (`fuseResultsImpl` →
+`fuseResults`, `searchImpl` → `search`). Both conjuncts are naming; **no retrieval logic moved a
+rank.**
+
+**Three things a resumer must not re-derive.**
+
+1. **The first framing was wrong and a scoped plan critic caught it — its fourth earned keep.** The
+   claim was *"attributable to the filename and to nothing else"*; it is a **conjunction**, and the
+   2x2 already in hand said so. Its mechanism held, its figures were re-run rather than inherited, and
+   re-measuring found the label repeats **three** times beyond the `// Section:` line, which the critic
+   had not counted. **Keep a critic's finding, re-run its number** — that rule has now paid at T13,
+   T15, T16 and T17.
+2. **The confound was checked and there is none.** The baseline is at `ce26f28`, the branch base is
+   `5247ecb`, so the window is wider than T7–T16. Over the eight corpus files `git log ce26f28..HEAD`
+   returns exactly three commits — `fb8a3ed` (#46, PR-B's own T6a/T6), `2664008` (T9), `1090504` (T13).
+   **Every commit in the window is PR-B's.**
+3. **The pin trap fired on T17's own file, its third appearance in this feature.** The new script
+   derives predecessor names from the baseline report specifically so none is hardcoded — and then its
+   docblock spelled both out in full. Staging took `check-stale-pointers` from **PASS at 28** to
+   **FAIL — 0 broken, 30 historical**, both hits on one line. Fixed in the subject: the names are
+   written without their `.ts`, with the measurement in the comment, exactly as T15 resolved the same
+   trap one level up. Its test file uses neutral fixtures (`alpha`, `beta`) for the same reason.
+
+**Next action: T18.** Then, in plan order:
+
 - **T18** — coverage gate. Needs the **dedicated** database (`127.0.0.1`, port **5433**, database
   `massa_ai_test`) and `RUN_POSTGRES_TESTS=1`; without the latter, ten-plus core suites skip and the
   gate reports phantom below-floor files instead of the truth. See `CLAUDE.md` → `coverage.yml`.
-- **T19** — spec corrections **C1–C10**. The row said C1–C7 and `design.md` §10 has held C1–C9 since
-  Design; **T15 added C10 for GMS-04 AC-3 itself**, which no row owned before. Both are fixed in place.
-  Without C10, T20's verifier — which reads `spec.md` — checks AC-3 **as written**, finds it
-  unsatisfiable, and marks it failed against a tree that satisfies what the criterion meant.
+- **T19** — spec corrections **C1–C11**. The row said C1–C7, `design.md` §10 has held C1–C9 since
+  Design, **T15 added C10** for GMS-04 AC-3 and **T17 added C11** for GMS-05 AC-4 note 2. All are fixed
+  in place. Without C10 or C11, T20's verifier — which reads `spec.md` — checks the criterion **as
+  written**, finds it unsatisfiable, and marks it failed against a tree that satisfies what the
+  criterion meant. C11 is the sharper of the two: note 2 requires per-needle ranks to be *unchanged*,
+  and the shipped tree has one needle at 6 against a baseline of 5.
 - **T20** — independent validation, fresh verifier, author ≠ verifier.
 
 **T20's briefing list, assembled here rather than left spread across three files.** The verifier must
-be told all seven, or each reads as a violation it is not:
+be told all eight, or each reads as a violation it is not:
 
 1. **`.ua/` is out of scope for GMS-04 AC-3.** 320 occurrences across three tracked generated
    artifacts; regeneration deferred to after PR-C. **PR-B does not close AC-3 for them.**
@@ -445,7 +495,9 @@ be told all seven, or each reads as a violation it is not:
    `rlm-` mentions are outside `check-stale-pointers.ts` by design (fourteenth defect, part b), and the
    frozen baselines must not be regenerated — `capture-facade-baseline.ts` refuses off the base
    subject, and `--force` moves T17/T20's referent instead of failing.
-6. **The needles corpus is bounded** — see T17 above.
+6. **The needles corpus is bounded** — the 8 files the 14 needles resolve into, not the full index.
+   T4 and T17 both use it; a full-corpus baseline still does not exist. **Do not quote a
+   bounded-corpus number as a full-corpus one.**
 7. **T16 is wider than its row and its sensor was substituted**, both deliberate and both on the
    record. It gates `check-stale-pointers` as well as G-HUB, which the row does not ask for, and it
    modifies `actions/checkout` — a step no task row mentions — because the widened gate is unusable at
@@ -453,6 +505,15 @@ be told all seven, or each reads as a violation it is not:
    three-part local equivalent in `tasks.md` → *T16 — executed*. A verifier looking for "CI went red"
    will not find it, and should not read its absence as an unmet criterion without reading the
    fifteenth defect first.
+8. **T17's sensor was substituted too, and `needles-diff.ts` exits 1 on this tree by design.** A
+   verifier running the T17 row's command gets a non-zero exit and one needle at rank 6 against a
+   baseline of 5. **That is expected and attributed**, not an open regression: renaming a corpus file
+   changes the text the chunker embeds, and rank rides on it. The criterion to check is
+   `scripts/needles-rename-control.ts` exiting **0** — all 14 needles at baseline with the file path
+   held constant — together with both floors passing. See the seventeenth plan defect and
+   `design.md` §10 **C11**, which is what stops GMS-05 AC-4 note 2 being read as written. The new
+   script is **not** in CI and cannot be: it needs a local Ollama and an 8B model, the same reason
+   `needles-gate.yml` is `workflow_dispatch`-only. Its 17 unit tests *do* run in `test:scripts`.
 
 **Read the branch note before anything else.** T6a and T6 landed in `main` via **PR #46, which was
 squashed, not merged** — R-04 was violated. None of its 8 commits are ancestors of `main`, the
@@ -475,7 +536,8 @@ the remote and is **not** this work. **This PR must be merged with a merge commi
 | — | `ba8d2bc` | plan amendment: T14's sensor corrected — the tenth plan defect |
 | T14 | `e4e38bd` | the root's final cleanup — ten stale `Visibility relaxed` notes replaced per group (§4.3 for the nine methods, §4.3.1 for the one field), the T13 hand-off block retired; **Phase 1 closes**; the eleventh plan defect |
 | T15 | `b9781df` | GMS-04 **AC-1 closed** by four `git mv` renames to `search-facade-{admin,indexing,hybrid,synapse}.test.ts`, 17 citations repointed, every stale description corrected; **AC-3's criterion replaced** by `scripts/check-stale-pointers.ts` + its 21-test suite; `design.md` §10 gains **C10**; **Phase 2 opens**; the twelfth, thirteenth and fourteenth plan defects |
-| T16 | this commit | **G-HUB and `check-stale-pointers` wired into the `build` job** — scope widened past the row on a reviewer decision, since the other two sensors were already enforced through their own suites; `fetch-depth: 0` on that job's checkout; `build` confirmed **already** in `main`'s required checks, so **no ruleset mutation**; the fifteenth and sixteenth plan defects |
+| T16 | `d23bb43` | **G-HUB and `check-stale-pointers` wired into the `build` job** — scope widened past the row on a reviewer decision, since the other two sensors were already enforced through their own suites; `fetch-depth: 0` on that job's checkout; `build` confirmed **already** in `main`'s required checks, so **no ruleset mutation**; the fifteenth and sixteenth plan defects |
+| T17 | this commit | needles after-run at the shipped tree (**both floors PASS**, hit@1 0.643, MRR 0.745), the per-needle diff (**exit 1**, `N05` 5 → 6) and its attribution to naming rather than retrieval; **sensor substituted** by `scripts/needles-rename-control.ts` + 17 tests, exit **0** with all 14 needles at baseline; `design.md` §10 gains **C11**; the seventeenth plan defect |
 
 Gates at T10: `lint` 0 · `type-check` 0 (6/6) · `build` 0 (5/5) · `test:scripts` **732 pass / 0 fail
 across 39 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
@@ -581,6 +643,27 @@ lines, `--max-loc 1` → exit 1, and `check-stale-pointers` with one injected br
 held at 28** → exit 1 naming the site, restored byte-identical by `git hash-object`. The pin-held
 detail matters: the shallow-clone failure of the sixteenth defect is a *misconfiguration* going red, and
 that is not evidence a gate detects a *violation*.
+
+Gates at T17 — **T17 changes no source under `packages/core`, so every structural figure is
+byte-identical to T16, which is the prediction**: `lint` 0 · `type-check` 0 (6/6) ·
+`check-frozen-anchors` exit 0 (14 anchors — checked deliberately, because the new script and its
+suite are `.ts` files under the root and `resolveNeedles` scans every `.ts`/`.tsx` for anchor
+strings, so a fixture carrying one would have made that anchor ambiguous) ·
+`check-characterization` exit 0 (3/3) · `check-stale-pointers` exit **0**, `RESOLVES 32 /
+HISTORICAL 28 / BROKEN 0`, pin met exactly and **unmoved by this commit**, measured with the new
+files staged · **G-HUB exit 0**, `maxFileLoc` **696** against 700 · `test:scripts` **770 pass / 0
+fail across 41 files**, exit 0, up from 753/40 by **exactly** the new `needles-rename-control.test.ts`
+(17 tests in 1 file) — the delta is accounted for, not assumed, and the 753/40 before-figure was
+re-measured this session rather than inherited.
+
+**T17's own readings, and the middle one is the one a reader will misjudge**: needles gate exit **0**
+— hit@1 **0.643** ≥ 0.5 PASS, MRR **0.745** ≥ 0.65 PASS, and against the baseline hit@5 falls
+**0.9286 → 0.8571** while MRR rises **0.7357 → 0.7452** · `needles-diff.ts` exit **1**, `N05` **@5 →
+@6**, `N06` **@3 → @2**, the other twelve unmoved · `needles-rename-control.ts` exit **0**, pass A
+faithful on all 14, `N05` restored to **@5** and `N06` to **@3**. Determinism was established before
+any delta was attributed and not by re-running the same command: **11 of 14** needles reproduce their
+top score to 4 dp across runs taken on different days, and the 3 that differ are exactly the needles
+whose top hit lies in a file PR-B changed.
 
 > **Name the metric on the characterization net.** The seventh suite in `26·41·31·21·25·7·9` is
 > `concurrent-indexing` at **9**, not `session-bias` at **10** — `session-bias` is tracked separately

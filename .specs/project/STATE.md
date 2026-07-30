@@ -145,7 +145,7 @@ cannot be T17's referent.
 a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
 unilaterally — it is a release-semantics decision.
 
-### Execute — Phase 1 COMPLETE and T16 done (2026-07-30), T6a–T16 committed, T17 next
+### Execute — Phase 1 COMPLETE and T17 done (2026-07-30), T6a–T17 committed, T18 next
 
 **Two branches, and the first one is gone.** T6a and T6 were executed on
 `refactor/search-facade-split-phase-1` (cut from `d628464`) and reached `main` through **PR #46,
@@ -564,6 +564,24 @@ correcting.**
     would have made the gate green and meaningless. **Not specific to the mechanism**: routing the check
     through a `describe("the real repository")` block instead would depend on the same history and fail
     identically.
+17. **T17's sensor is unreachable on a PR that renames a file the needles corpus covers** (T17, found
+    by running the row as written and then attributing the result). The row asks for
+    `needles-diff.ts` exit 0; it exits **1**, `N05` rank **5 → 6**, while both floors pass and MRR
+    *rises*. `smart-chunker.ts:62-70` writes `// File: <path>` into every chunk before embedding plus
+    a symbol-derived `// Section:` label repeated three more times, and rank is a function of the
+    cosine score over that text — so renaming a file, or de-facading a symbol inside it, perturbs
+    every score in it. N05's own top score is **byte-identical** (0.6712) and a rival overtook it
+    across a **0.0134** margin. The 2x2 shows the flip needs the path change **and** the body change
+    together, and reverting **either** restores rank 5; both conjuncts are naming, so **no retrieval
+    logic moved a rank**. **Resolved (reviewer, 2026-07-30): substitute a controlled comparison,
+    commit it, leave `needles-diff.ts` alone** — relaxing it to tolerate a drop of 1 makes it green
+    and meaningless. `scripts/needles-rename-control.ts` re-ranks twice changing only the path the
+    chunker is told, deriving the map from the baseline report so PR-C needs no edit; exit **0**, all
+    14 needles at baseline, and its identity pass must reproduce the shipped report or it aborts.
+    *The tenth correction to inherit the defect it was correcting: Phase 0 finding 4 saw the
+    catastrophic form of this same mechanism and closed only that half.* **A sensor cannot exempt a
+    cause and then police an effect of that cause** — `needles-diff.ts:31-37` exempts score drift
+    from a rename by name, then calls rank the invariant.
 
 **The discriminating evidence is M3b**, and it is the only reading proving (c) was a live gap rather
 than a theoretical one: on a tree carrying a broken `search-facade-*` citation, the pre-T15 `rlm`-only
@@ -602,12 +620,27 @@ its **scope widened** to gate `check-stale-pointers` alongside G-HUB, since the 
 out to be enforced already through their own suites; and its **sensor was substituted** (fifteenth
 defect). Wiring the second gate is what exposed the sixteenth.
 
-**Next: T17** (bounded-corpus caveat), then T18 (dedicated DB on `127.0.0.1:5433/massa_ai_test` plus
-`RUN_POSTGRES_TESTS=1`), **T19 — now C1–C10, not C1–C7**, and T20.
-`design.md` §10 gained **C10** at T15 because no row owned GMS-04 AC-3 and T20's verifier reads
-`spec.md`; without it, it checks AC-3 as written, finds it unsatisfiable and marks it failed. T20's
-full **seven**-item briefing list is assembled in `HANDOFF.md` under *Next action* — the seventh is T16's
-two departures, which a verifier will otherwise read as violations.
+**T17 is done, and its sensor did not hold — the seventeenth plan defect.** The needles gate passes
+both floors (hit@1 **0.643**, MRR **0.745**, up from 0.7357) and `needles-diff.ts` exits **1**:
+`N05-centrality-rerank-bonus` goes rank **5 → 6**. Attributed rather than accepted or dismissed. The
+chunker embeds `// File: <path>` plus a symbol-derived `// Section:` label repeated three more times,
+so a rename perturbs every score in the renamed file; N05's own top score is **byte-identical**
+(0.6712 → 0.6712) and a rival overtook it across a **0.0134** margin. A 2x2 shows the flip needs the
+path change **and** the body change together — and the body delta is three de-facading lines, which
+also rename the symbols the label comes from. **Reverting either one restores rank 5.** Substituted
+sensor, committed: `scripts/needles-rename-control.ts` re-ranks twice changing only the path the
+chunker is told, and exits **0** with all 14 needles at baseline. Its identity pass must reproduce
+the shipped report before its control pass is believed, or it aborts. **No change to retrieval logic
+moved a rank.**
+
+**Next: T18** (dedicated DB on `127.0.0.1:5433/massa_ai_test` plus `RUN_POSTGRES_TESTS=1`),
+**T19 — now C1–C11, not C1–C7**, and T20.
+`design.md` §10 gained **C10** at T15 because no row owned GMS-04 AC-3, and **C11** at T17 because no
+row owned GMS-05 AC-4 note 2's *"per-needle ranks are unchanged"* — which the shipped tree does not
+satisfy and cannot. T20's verifier reads `spec.md`; without either row it checks the criterion as
+written, finds it unsatisfiable and marks it failed. T20's full **eight**-item briefing list is
+assembled in `HANDOFF.md` under *Next action* — the seventh is T16's two departures and the eighth is
+T17's substituted sensor, both of which a verifier will otherwise read as violations.
 
 **T6 alone surfaced three plan defects, two needing a spec-owner decision.** All three are the
 `ensureInitializedImpl` class — a consequence `design.md` settled in substance and never wrote into

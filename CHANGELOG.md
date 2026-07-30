@@ -231,6 +231,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checkout reports 28 broken pointers and no historical ones, where full history reports none broken
   and the historical count exactly on its pin. It would have failed every run on a clean tree.
 
+- **Retrieval quality is unchanged by this refactor, and proving it needed a new instrument because
+  the existing comparison cannot separate a rename from a regression.** The needle benchmark clears
+  both of its floors — hit@1 64.3% against a floor of 50%, MRR 0.745 against 0.65, the latter up from
+  0.7357 — but the per-needle comparison reports one needle moving from rank 5 to rank 6, which the
+  comparison tool treats as a regression and which it is not.
+
+  The cause is that the chunker writes the file's path into every chunk before that chunk is
+  embedded, along with the name of the enclosing symbol. Both are there to help retrieval and both
+  work. But it means renaming a file, or renaming a function inside it, changes the text being
+  embedded and therefore every similarity score in that file — without changing what the code does.
+  Two chunks that were 0.0134 apart ended up 0.0030 apart the other way, and swapped places. The
+  affected needle's own score did not move at all; something else moved past it.
+
+  So `needles-diff` reports a regression whenever a release renames a file the benchmark covers, and
+  will do so again for the next stage of this work. Rather than relax it — a comparison that tolerates
+  a rank drop stops detecting the thing it exists for — there is now a second tool that re-runs the
+  benchmark twice, changing only the path each file is labelled with, so the rename can be held
+  constant while everything else stays as shipped. Under it all fourteen needles sit at their original
+  rank. It refuses to report at all unless its first pass reproduces the real benchmark run exactly,
+  because a second implementation that can silently disagree with the tool it stands in for would be
+  worse than having none.
+
+  This runs locally against an embedding model and is not part of CI, for the same reason the needle
+  benchmark itself is not. The measurement covers the eight files the needles point into rather than a
+  full index, so it is evidence that this refactor changed no ranking, not a statement about retrieval
+  quality overall.
+
 ## [1.11.0] - 2026-07-29
 
 ### Changed

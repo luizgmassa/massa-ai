@@ -1514,9 +1514,9 @@ the F4 seam adds a field to `injectedDeps`, which is a root field, so the seam b
 | --- | --- | --- | --- | --- |
 | **T15** ✅ | GMS-04 non-source sites — **done**, see *T15 — executed* below | `docs/ONBOARDING.md:147,148,177` (incl. the layer-4 tour entry) and `CLAUDE.md:157` — **plus two the first draft missed**: `packages/core/src/__tests__/architecture-map.test.ts:454-455` and `search-controller.test.ts:3`, both **comments** citing test files this PR renames. **The needles fixture is NOT a site** — PR-A content-anchored all 14 needles and removed every `filePath` (spec correction C4). | **scoped sensor** — see below | 45 m |
 | **T16** ✅ | wire G-HUB into CI — **done, and scoped wider than this row**, see *T16 — executed* below | add to the `build` job beside `verify-package-contents.ts` | ~~flip a threshold in a scratch branch → CI goes red~~ **unexecutable, see the fifteenth defect** — substituted by the three-part local equivalent recorded below, **and** confirm `build` is in `main`'s required checks: `gh api repos/luizgmassa/massa-ai/rules/branches/main --jq '[.[] \| select(.type=="required_status_checks") \| .parameters.required_status_checks[].context]'`. A job that goes red without being in that list blocks nothing — that is exactly how PR-A's `coverage.yml` shipped claiming `BLOCKING BY DESIGN` and enforced nothing (SEN-02 AC-5). **A gate's enabling condition is part of the gate.** | 1 h |
-| **T17** | needles after-run + comparison | rerun the gate; per-needle rank diff vs T4's baseline. **A floor pass with three needles slipping 1→4 is a regression that passed** (GMS-05 AC-4 note 2). | the T4 diff script, exit 0 | ~2 min + 30 m |
+| **T17** ✅ | needles after-run + comparison — **done, and its sensor was substituted**, see *T17 — executed* below | rerun the gate; per-needle rank diff vs T4's baseline. **A floor pass with three needles slipping 1→4 is a regression that passed** (GMS-05 AC-4 note 2) — that intent is unchanged and still enforced. | ~~the T4 diff script, exit 0~~ **unreachable on any PR that renames a file the corpus covers — the seventeenth defect.** `needles-diff.ts` exits **1** (`N05` rank 5 → 6) and the exit is produced by naming rather than by retrieval. Substituted by `scripts/needles-rename-control.ts` **exit 0**, alongside both floors passing | ~2 min + 30 m → **~3.5 h** |
 | **T18** | coverage gate | `DATABASE_URL=…5433/massa_ai_test MASSA_AI_DEDICATED=1 RUN_POSTGRES_TESTS=1 bun run test:coverage` | exclusions still **9**; no file this PR touches below floor | 30 m |
-| **T19** | spec corrections ~~C1–C7~~ **C1–C10** | apply `design.md` §10 to `spec.md`. **The range was stale by two before T15 and short by one after it**: §10 has held **C1–C9** since Design, and T15 adds **C10** for GMS-04 AC-3 itself. Without C10 nothing in §10 owned AC-3 — C4 covers only AC-4's obsolete needles clause — so T20's verifier, which reads `spec.md`, would have checked AC-3 **as written**, found it unsatisfiable, and marked it failed | `design.md` §10 rows all struck | 45 m |
+| **T19** | spec corrections ~~C1–C7~~ ~~C1–C10~~ **C1–C11** | apply `design.md` §10 to `spec.md`. **The range was stale by two before T15, short by one after it, and short by one again after T17**: §10 has held **C1–C9** since Design, T15 adds **C10** for GMS-04 AC-3 itself, and T17 adds **C11** for GMS-05 AC-4 note 2. Without C10 nothing in §10 owned AC-3 — C4 covers only AC-4's obsolete needles clause. Without C11 nothing owns note 2's *"per-needle ranks are unchanged"*, which the shipped tree does not satisfy and cannot. In both cases T20's verifier, which reads `spec.md`, checks the criterion **as written**, finds it unsatisfiable, and marks it failed against a tree that satisfies what the criterion meant | `design.md` §10 rows all struck | 45 m |
 | **T20** | independent validation | fresh `verification-agent`, author ≠ verifier → `validation.md` | spec-anchored outcome check + discrimination sensor | — |
 
 ---
@@ -1844,6 +1844,157 @@ artifacts*, which is the row's "beside `verify-package-contents.ts`".
 > Now that G-HUB gates `build`, any five-line addition to that file turns the build red. That is the
 > gate working, not a defect — but it is a constraint PR-C inherits and the plan did not state.
 
+### Seventeenth plan defect: T17's sensor is unreachable on a PR that renames a file the corpus covers
+
+Found at **T17**, by running the row exactly as written and then attributing the result rather than
+accepting or dismissing it. **Tenth correction to inherit the defect it was correcting**, and the
+second defect in this feature created by a decision the plan took rather than by a figure it got
+wrong — here, the decision to require rank equality across a PR whose whole subject is renaming.
+
+The row's sensor is *"the T4 diff script, exit 0."* Run on the real reports it exits **1**:
+`N05-centrality-rerank-bonus` goes rank **5 → 6**. Both floors pass, and `MRR` even **rises**
+(0.7357 → 0.7452), so the aggregate says the opposite of the per-needle view — which is exactly the
+asymmetry GMS-05 AC-4 note 2 was written to expose, firing in the direction nobody wrote down.
+
+**The route is exact, and it is naming.** `smart-chunker.ts:62-70` prepends `// File: <relativePath>`
+to every chunk before it is embedded, plus a `// Section: <label>` line whose label is the enclosing
+symbol and which is **repeated three more times** for any chunk of at least `REPEAT_MIN_LINES`. Rank
+is a function of the cosine score over that text. So a rename perturbs every score in the renamed
+file, and where two adjacent chunks sit inside the perturbation they swap.
+
+**Measured, and the tell is that N05's own score never moved.** Its top hit is in `centrality.ts`,
+which PR-B does not touch, and its top score is byte-identical across the two runs — **0.6712 →
+0.6712**. What changed is the pair below it:
+
+| condition | chunk holding N05's target | the rival | margin | N05 |
+| --- | --- | --- | --- | --- |
+| old path + old body — **the baseline run** | 0.5954 | 0.5820 | **+0.0134** | **@5** |
+| new path + new body — **the shipped run** | 0.5867 | 0.5897 | **−0.0030** | **@6** |
+| old path + new body | 0.5922 | 0.5878 | +0.0044 | @5 |
+| new path + old body | 0.5891 | 0.5823 | +0.0068 | @5 |
+
+**Neither change flips it alone; reverting either one restores rank 5.** The two changes are the
+file path, and the body — and the body delta is itself naming: the fusion window's lines are
+**byte-identical** across the rename, while the search window differs in exactly **three** lines,
+all de-facading (`rlm.buildGraphStream(` → `deps.buildGraphStream(`, `rlm.fuseResults(` →
+`fuseResults(`, `rlm.filterByPatterns(` → `filterByPatterns(`). That same de-facading renames the
+symbols the chunker derives its label from — `fuseResultsImpl` → `fuseResults` and `searchImpl` →
+`search` — so the changed symbol name enters each rival chunk's embedded prefix **four times**.
+
+> **The first framing of this was wrong and a scoped plan critic caught it, which is its fourth
+> earned keep.** The claim was *"attributable to the filename and to nothing else"*. It is a
+> **conjunction**: the file path is one necessary conjunct, the symbol rename the other, and the 2x2
+> above says so directly — the same table that was already in hand when the overclaim was written.
+> The critic's mechanism held and its figures were re-run rather than inherited; re-measuring found
+> the label is repeated **three** times beyond the `// Section:` line, which the critic had not
+> counted. **The defensible claim is that no change to retrieval *logic* moved a rank — nothing in
+> the moved bodies changed except names.**
+
+**Resolution (reviewer, 2026-07-30): substitute a controlled comparison, commit it, and leave
+`needles-diff.ts` alone.** Editing the guard mid-refactor is the motion this feature has refused
+three times, and lowering it to "allow a drop of 1" would make it green and meaningless.
+`scripts/needles-rename-control.ts` re-ranks the current tree twice, changing only the string handed
+to `smartChunk` as the file's path, and the map comes from the baseline report rather than a
+hardcoded list — so PR-C, which moves the same directory again, needs no edit to it.
+
+*What generalises:* the ninth read an axis its task did not move, the tenth a population its task
+could not clear, the eleventh an axis its task moves nothing on, the twelfth a population whose floor
+was never zero — **and the seventeenth reads an invariant the task's own subject necessarily
+breaks.** `needles-diff.ts:31-37` exempts *score* drift from failure, and gives the right reason: "a
+rename changes them without changing retrieval quality." It then calls rank the invariant. Rank is a
+function of score, so the exemption does not reach it. **A sensor cannot exempt a cause and then
+police an effect of that cause.**
+
+> **Phase 0 saw the same mechanism and closed only its catastrophic half.** Finding 4 said that after
+> the rename an old report's hit list "matches nothing… and reads as a miss on every needle", and
+> fixed it by recording `rank` and `expected` at run time. That killed total collapse. The marginal
+> form — the same perturbation moving one rank instead of fourteen — was never in view, and no gate
+> saw it until it fired.
+
+### T17 — executed
+
+**Subject.** The needles after-run at the shipped tree, its per-needle rank diff against T4's frozen
+baseline, the attribution of the one rank that moved, and `scripts/needles-rename-control.ts` +
+17 tests as the substituted sensor. **No source under `packages/core` was touched.**
+
+**Preconditions re-measured rather than inherited**, since the handoff's were session-local: tree
+clean at `d23bb43`; Ollama up with `qwen3-embedding:8b` present; `check-frozen-anchors` exit 0 at
+14/14, so every anchor still resolves uniquely; `benchmarks/needles/reports/` empty of any
+`pr-b-after` report; `test:scripts` **753 pass / 0 fail across 40 files**, reproducing the T15/T16
+figure exactly.
+
+**The confound was checked before the run, and there is none.** The baseline was captured at
+`ce26f28` while this branch is cut from `5247ecb`, so the diff spans more than T7–T16. Over the eight
+corpus files, `git log ce26f28..HEAD` returns exactly **three** commits — `fb8a3ed` (#46, PR-B's own
+T6a/T6), `2664008` (T9) and `1090504` (T13). **Every commit in the window is PR-B's**, so the
+comparison measures this PR and nothing else. Six of the eight corpus files are unchanged; only the
+two renamed ones move.
+
+**Predicted on paper before a single embedding was computed, then confirmed:** 4 of 14 needle spans
+move — `N03`/`N04`/`N05` into `result-fusion.ts` and `N06` into `hybrid-search.ts`, which is exactly
+the four anchors §6.1 flagged as inside PR-B's blast radius — the corpus stays **8 files**, and
+`totalChunks` goes **87 → 90**.
+
+**Readings.**
+
+| reading | result |
+| --- | --- |
+| `run.ts --label pr-b-after`, floors on | exit **0** — hit@1 **0.643** ≥ 0.5 PASS, MRR **0.745** ≥ 0.65 PASS |
+| aggregate vs baseline | hit@1 0.6429 → 0.6429 · hit@3 0.8571 → 0.8571 · **hit@5 0.9286 → 0.8571** · hit@10 1 → 1 · **MRR 0.7357 → 0.7452** |
+| `needles-diff.ts` | exit **1** — `N05` **@5 → @6** REGRESSION, `N06` **@3 → @2** improved, the other 12 unmoved |
+| `needles-rename-control.ts` | exit **0** — pass A faithful, `N05` restored to **@5** and `N06` to **@3**, **0** needles below baseline |
+
+**No floor was edited and no needle content was touched.** `hit@5` falling while `MRR` rises is the
+whole point of the per-needle view and is recorded rather than smoothed.
+
+**Determinism was established before any delta was attributed, and not by re-running the same
+command.** 11 of the 14 needles reproduce their top score to 4 dp across two runs taken on different
+days; the 3 that differ — `N03`, `N04`, `N06` — are exactly the needles whose top hit lies in a file
+PR-B changed. A rank delta here is therefore signal, not noise.
+
+**The substituted sensor carries its own enabling condition, because this feature has now shipped two
+gates that measured nothing.** `needles-rename-control.ts` re-implements the ranking loop
+`benchmarks/needles/run.ts` owns, and Phase 0 finding 2 refused exactly that for
+`check-frozen-anchors.ts` on the grounds that a second implementation which can disagree with the
+gate it stands in for is worse than none. The mitigation is that **pass A must reproduce the shipped
+report rank for rank before pass B is believed**, and a mismatch **aborts** at exit 2 rather than
+degrading into a plausible wrong number. Observed faithful on all 14 needles. That check was run by
+hand first — a scratch harness with no path rewrite reproduced `N05@6` and `N06@2` — before it was
+made a precondition of the script's own output.
+
+**The pin trap fired on this task's own file, which is its third appearance in this feature.** The
+script's derivation was written to take predecessor names from the baseline report precisely so no
+predecessor would be hardcoded — and then the docblock explaining that decision spelled both of them
+out in full. Staging it took `check-stale-pointers` from **PASS at 28** to **FAIL — 0 broken, 30
+historical against a pin of 28**, both hits on one line. **Fixed in the subject, not the pin**: the
+two names are now written without their `.ts`, with the measurement in the comment, exactly as T15
+resolved the same trap one level up inside that gate's own exclusion docblock. Its test file uses
+neutral fixture names (`alpha`, `beta`) for the same reason, stated there.
+
+**What this task does not establish, stated so a green board is not over-read.**
+
+1. **The corpus is bounded** — the 8 files the 14 needles resolve into, not the full index. Fewer
+   competing chunks makes retrieval strictly easier. **A full-corpus baseline still does not exist**
+   and a bounded number must not be quoted as one.
+2. **`needles-rename-control.ts` is not a CI gate and cannot become one.** It needs a local Ollama
+   and an 8B embedding model — the same constraint that keeps `needles-gate.yml`
+   `workflow_dispatch`-only and `continue-on-error: true`. It is an evidence instrument, in the class
+   of this feature's mutation harnesses, and its 17 unit tests run in `test:scripts` while the
+   live-model comparison does not.
+3. **Its control label for one file is an approximation.** `hybrid-search.ts` was assembled from two
+   predecessors, and a whole-file label can only name one. The derivation picks whichever the
+   baseline recorded for that needle's own target span, which is right for `N06` and wrong for any
+   other span in that file. Recorded in the script's docblock too.
+4. **Pass B does not revert the symbol rename**, deliberately — that is a genuine code edit, not a
+   measurement artifact. So exit 0 means "no needle is below baseline once the path is controlled
+   for", not "the path was the sole cause".
+
+**Gates**: `lint` 0 · `type-check` 0 (6/6) · `check-frozen-anchors` exit 0 (14 anchors) ·
+`check-characterization` exit 0 (3/3) · `check-stale-pointers` exit **0**, `RESOLVES 32 /
+HISTORICAL 28 / BROKEN 0`, pin met exactly and **unmoved by this commit**, measured with the new
+files staged · **G-HUB exit 0**, `maxFileLoc` **696** against 700 — every structural figure identical
+to T16, which is the prediction, since T17 moves no source.
+
 ## Gate check commands
 
 **Since T16, all four sensors are enforced in CI — but by two different routes, and the difference
@@ -1880,11 +2031,26 @@ bun scripts/check-characterization.ts      # exit 0 = the 3 guarded blocks still
 # checkout pins `fetch-depth: 0` (sixteenth defect).
 bun scripts/check-stale-pointers.ts        # exit 0 = 0 BROKEN and HISTORICAL exactly on its pin
 
-# T17: rerun the gate with a fresh label, then compare per-needle rank
+# T17: rerun the gate with a fresh label, then compare per-needle rank. ~2 min,
+# needs a local Ollama with qwen3-embedding:8b. The report lands gitignored under
+# benchmarks/needles/reports/, so the BASELINE is the committed copy in .specs/.
 NEEDLE_FLOOR_HIT1=0.5 NEEDLE_FLOOR_MRR=0.65 bun benchmarks/needles/run.ts --label pr-b-after
+
+# This exits 1 on PR-B and that is EXPECTED, not a regression to chase: N05 goes
+# rank 5 -> 6 because renaming a corpus file changes the `// File:` header the
+# chunker embeds. Run it — the per-needle table is the evidence — but read the
+# seventeenth plan defect before quoting the exit code.
 bun scripts/needles-diff.ts \
   .specs/features/core-layering-god-module-split/needles-before.json \
-  benchmarks/needles/reports/massa-ai-pr-b-after-results.json   # exit 0 = no rank regression
+  benchmarks/needles/reports/massa-ai-pr-b-after-results.json   # exit 1 on PR-B, attributed
+
+# The substituted sensor (T17). Re-ranks twice, changing only the path the chunker
+# is told each file has. ~3.5 min: it embeds the corpus twice. Exit 0 = no needle
+# below its baseline rank once the path is controlled for. Exit 2 = its identity
+# pass disagreed with the report above, which means it is explaining nothing.
+bun scripts/needles-rename-control.ts \
+  .specs/features/core-layering-god-module-split/needles-before.json \
+  benchmarks/needles/reports/massa-ai-pr-b-after-results.json   # exit 0
 
 DATABASE_URL=postgresql://massa_ai:massa_ai_password@127.0.0.1:5433/massa_ai_test \
   MASSA_AI_DEDICATED=1 RUN_POSTGRES_TESTS=1 bun run test:coverage
