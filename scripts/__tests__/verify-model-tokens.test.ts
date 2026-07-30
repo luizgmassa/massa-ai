@@ -113,6 +113,42 @@ describe("model-token scan — it fires (discrimination)", () => {
     expect(hits.length).toBe(1);
   });
 
+  test("a display name split across a line wrap is a hit", () => {
+    // The commonest realistic miss, and the reason matching is whole-content rather than
+    // per-line: prose in this repo wraps at ~95 columns, so a multi-word display name is as
+    // likely to be typed across a break as on one line.
+    const [head, ...rest] = displayName.split(" ");
+    const hits = scan(
+      [{ file: "skills/agents/fake/SKILL.md", content: `prefer ${head}\n${rest.join(" ")} here` }],
+      TOKENS,
+    );
+    expect(hits.length).toBe(1);
+    expect(hits[0]!.token).toBe(displayName);
+  });
+
+  test("a separator paraphrase of a known id is a hit", () => {
+    // `glm 5.2` for `glm-5.2` is still a restatement of a registry fact.
+    const hyphenated = TOKENS.find((t) => t.includes("-") && !t.includes("/"))!;
+    const hits = scan(
+      [{ file: "f", content: hyphenated.replace("-", " ") }],
+      TOKENS,
+    );
+    expect(hits.length).toBe(1);
+  });
+
+  test("extra whitespace inside a display name does not hide it", () => {
+    const hits = scan([{ file: "f", content: displayName.replace(" ", "   ") }], TOKENS);
+    expect(hits.length).toBe(1);
+  });
+
+  test("a model name in NO registry and NO fixture is deliberately NOT a hit", () => {
+    // Scope, pinned on purpose so it is not "fixed" later by mistake. This gate checks for
+    // facts that DUPLICATE the registry. A string naming a model nothing resolves is a
+    // different problem, and the only honest token list is a derived one.
+    const hits = scan([{ file: "f", content: "runs on totally-made-up-model-9" }], TOKENS);
+    expect(hits).toEqual([]);
+  });
+
   test("a model name embedded in a longer identifier is NOT a hit", () => {
     // Boundary rule: `deepseek-v4-pro` must not fire inside `opencode-go/deepseek-v4-pro`
     // (the full id fires instead), and a token must not fire inside an unrelated word.

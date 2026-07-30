@@ -93,13 +93,30 @@ export function modelTokens(root = REPO_ROOT): readonly string[] {
  * Boundary chars that make a token part of a longer identifier rather than a mention.
  * `-` and `/` are included so `deepseek-v4-pro` does not fire inside
  * `opencode-go/deepseek-v4-pro` (the full id fires instead), and `.` so a version-suffixed
- * id is not split.
+ * id is not split. Whitespace is deliberately absent — see `tokenRegex`.
  */
 const EDGE = "A-Za-z0-9/.:_-";
 
+/**
+ * A token matches across separator and whitespace variation, and across a LINE BREAK.
+ *
+ * Matching each line against the literal token was the first version, and it missed the
+ * commonest realistic case in this repo: prose wraps at ~95 columns, so a multi-word display
+ * name is as likely to be typed `DeepSeek V4\nPro` as on one line. `-`, `_` and whitespace are
+ * therefore interchangeable separators inside a token, which also catches a name written with
+ * a space where the id has a hyphen — a paraphrase of a registry fact is still that fact.
+ *
+ * Deliberately NOT covered: a model name that appears nowhere in the registry or the frozen
+ * fixture, and homoglyph substitution. The first is out of scope by construction — this checks
+ * for facts that DUPLICATE the registry, and a string naming a model nothing resolves is a
+ * different problem. The second is evasion, and the failure mode here is a well-meaning
+ * engineer pasting a value, not someone hiding one.
+ */
 function tokenRegex(token: string): RegExp {
-  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?<![${EDGE}])${escaped}(?![${EDGE}])`, "i");
+  const escaped = token
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/[-_ ]+/g, "[-_\\s]+");
+  return new RegExp(`(?<![${EDGE}])${escaped}(?![${EDGE}])`, "gi");
 }
 
 /** Body of a generated `.md` artifact — everything after the frontmatter block. */
@@ -172,21 +189,22 @@ export function scan(
   targets: readonly Target[],
   tokens: readonly string[] = modelTokens(),
 ): readonly Hit[] {
-  const matchers = tokens.map((t) => [t, tokenRegex(t)] as const);
   const hits: Hit[] = [];
   for (const { file, content } of targets) {
-    const lines = content.split(/\r?\n/);
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]!;
-      for (const [token, re] of matchers) {
-        if (re.test(line)) {
-          hits.push({ file, line: i + 1, token, text: line.trim().slice(0, 120) });
-          break; // one hit per line is enough to fail; the token names the cause
-        }
+    // Whole-content matching, not per-line: a token may straddle a line break.
+    const seen = new Set<number>();
+    for (const token of tokens) {
+      const re = tokenRegex(token);
+      for (const m of content.matchAll(re)) {
+        const line = content.slice(0, m.index).split(/\r?\n/).length;
+        // Longest tokens run first, so a full id claims the line before its bare segment.
+        if (seen.has(line)) continue;
+        seen.add(line);
+        hits.push({ file, line, token, text: m[0].replace(/\s+/g, " ").slice(0, 120) });
       }
     }
   }
-  return hits;
+  return hits.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
 }
 
 export function main(argv: string[] = process.argv.slice(2)): number {
