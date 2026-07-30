@@ -1,6 +1,6 @@
 {
   "name": "massa-ai",
-  "version": "1.12.0",
+  "version": "1.12.1",
   "description": "massa-ai — semantic code search, durable memory, symbol graph, and context compression",
   "author": {
     "name": "Luiz Massa",
