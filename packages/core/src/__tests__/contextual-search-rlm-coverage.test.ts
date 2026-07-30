@@ -94,8 +94,8 @@ mock.module("@massa-ai/shared", () => {
 // structurally safe rather than safe by this comment's convention.
 const projectIndexerActual: typeof import("../services/search/project-indexer.js") =
   require("../services/search/project-indexer.js");
-const rlmSearchActual: typeof import("../services/search/rlm-search.js") =
-  require("../services/search/rlm-search.js");
+const hybridSearchActual: typeof import("../services/search/hybrid-search.js") =
+  require("../services/search/hybrid-search.js");
 
 const indexFileImplMock = mock(async () => ({ chunks: 0 }));
 const runWithIndexLockMock = mock(
@@ -143,36 +143,42 @@ const searchImplMock = mock(async () => [] as SearchResult[]);
 const addContextToResultsImplMock = mock(async () => [] as SearchResult[]);
 const extractPreviewImplMock = mock((): string => "");
 const calculateAvgScoreImplMock = mock((): number => 0);
+const correctQueryMock = mock(async (): Promise<string | null> => null);
 
-mock.module("../services/search/rlm-search.js", () => ({
-  ...rlmSearchActual,
-  searchImpl: searchImplMock,
-  addContextToResultsImpl: addContextToResultsImplMock,
-  extractPreviewImpl: extractPreviewImplMock,
-  calculateAvgScoreImpl: calculateAvgScoreImplMock,
+// PR-B T13: the five search surfaces moved to hybrid-search.ts, rlm-search.ts
+// died whole, and the four spied names lost their `Impl` suffix with the move.
+// This block and T9's `correctQuery` one are **merged, not re-pointed** — both
+// would now name `hybrid-search.js`, and two `mock.module` registrations on one
+// specifier do not compose: the later one replaces the module wholesale, so the
+// root's other five imports would resolve to `undefined`. That is why the
+// `mock.module` count goes 16 → **15** here, where T9's and T10's re-points held
+// it at 16. The local const names keep `Impl` deliberately; renaming them would
+// touch fourteen more lines of this AC-3-pinned file for no observable gain,
+// exactly as at T10.
+//
+// `filterByPatterns` stays spread from the real module for the reason the block
+// comment above gives: the describe blocks below assert its real pattern logic,
+// which is a strictly stronger proof than a spy would be.
+mock.module("../services/search/hybrid-search.js", () => ({
+  ...hybridSearchActual,
+  search: searchImplMock,
+  addContextToResults: addContextToResultsImplMock,
+  extractPreview: extractPreviewImplMock,
+  calculateAvgScore: calculateAvgScoreImplMock,
+  correctQuery: correctQueryMock,
 }));
 
 // PR-B T6: fuseResults / generateScoreExplanation moved out of rlm-search.ts's
 // re-export into their own capability module, and lost the facade parameter
-// (GMS-03 AC-1). Mocking them means naming the new module, so this block can
-// no longer ride along on the rlm-search.js one above.
+// (GMS-03 AC-1). Mocking them means naming the new module, so this block could
+// no longer ride along on the rlm-search.js one it used to sit beside — a block
+// T13 has since re-pointed to hybrid-search.js and merged with T9's.
 const fuseResultsMock = mock((): SearchResult[] => []);
 const generateScoreExplanationMock = mock((): unknown => ({}));
 
 mock.module("../services/search/result-fusion.js", () => ({
   fuseResults: fuseResultsMock,
   generateScoreExplanation: generateScoreExplanationMock,
-}));
-
-// PR-B T9: correctQuery moved to hybrid-search.ts and traded the facade
-// parameter for a narrow HybridSearchDeps record (GMS-03 AC-1). It was
-// rlm-synapse.ts's last export, so this block is not re-pointed — the old module
-// is gone, and its mock with it. Same reason as the T6/T7/T8 blocks: mocking it
-// means naming the new module.
-const correctQueryMock = mock(async (): Promise<string | null> => null);
-
-mock.module("../services/search/hybrid-search.js", () => ({
-  correctQuery: correctQueryMock,
 }));
 
 // PR-B T8: applySynapseState moved to its own capability module and traded the
@@ -263,6 +269,45 @@ function indexerDeps(rlm: ContextualSearchRLM) {
     searchCache: rlm.searchCache,
     indexFile: expect.any(Function),
     indexProject: expect.any(Function),
+  };
+}
+
+/**
+ * PR-B T13: the `HybridSearchDeps` record the root assembles per call, in place
+ * of the `rlm` first argument `searchImpl` used to take (GMS-03 AC-1). Named once
+ * so both signature-tracking assertions below stay a one-token substitution,
+ * exactly as `indexerDeps` is for T10's eight.
+ *
+ * The five stores are matched **by identity** off the subject, and no explicit
+ * init call is needed here — unlike T10's two `indexFile` cases. T13 hoists
+ * `await this.ensureInitialized()` into `search()` itself (it has to: this record
+ * snapshots the stores *by value*, so assembling before init would hand the
+ * module five `undefined`s), so `await rlm.search(…)` has populated the fields by
+ * the time the assertion reads them. That matters — bun's `toHaveBeenCalledWith`
+ * treats an undefined-valued expected key as absent, so a record of five
+ * `undefined`s would also be satisfied by a facade that assembled `{}`.
+ *
+ * The three callbacks are re-entrant seams the root supplies as arrow wrappers
+ * re-created on every assembly — the only shape under which the 6
+ * `buildGraphStream` and 6 `addContextToResults` instance-stub sites stay
+ * effective (LATE-BIND) — so a fresh closure is unnameable and
+ * `expect.any(Function)` is the tightest available check. With T10's two that
+ * makes **5** loose keys in this file, every one on a key that did not exist
+ * before, so nothing was relaxed: the key set is still exact in both directions
+ * (a missing or extra key fails, measured), and *dispatch* through these three is
+ * proved by identity in `hybrid-search-late-bind.test.ts` test 4 rather than left
+ * to this matcher.
+ */
+function hybridDeps(rlm: ContextualSearchRLM) {
+  return {
+    keywordSearch: rlm.keywordSearch,
+    vectorStore: rlm.vectorStore,
+    searchCache: rlm.searchCache,
+    analytics: rlm.analytics,
+    queryUnderstanding: rlm.queryUnderstanding,
+    buildGraphStream: expect.any(Function),
+    addContextToResults: expect.any(Function),
+    applySynapseState: expect.any(Function),
   };
 }
 
@@ -644,7 +689,7 @@ describe("ContextualSearchRLM.search (instance delegate)", () => {
 
     const result = await rlm.search("my query", "proj-s", options);
 
-    expect(searchImplMock).toHaveBeenCalledWith(rlm, "my query", "proj-s", options);
+    expect(searchImplMock).toHaveBeenCalledWith(hybridDeps(rlm), "my query", "proj-s", options);
     expect(result).toBe(sentinelResults);
   });
 
@@ -652,7 +697,7 @@ describe("ContextualSearchRLM.search (instance delegate)", () => {
     const rlm = makeRlm();
     searchImplMock.mockImplementationOnce(async () => []);
     await rlm.search("q2", "proj-s2");
-    expect(searchImplMock).toHaveBeenLastCalledWith(rlm, "q2", "proj-s2", {});
+    expect(searchImplMock).toHaveBeenLastCalledWith(hybridDeps(rlm), "q2", "proj-s2", {});
   });
 });
 
@@ -726,6 +771,19 @@ describe("ContextualSearchRLM.correctQuery (instance delegate)", () => {
   // the only way to get a defined record here and the LATE-BIND shape the other
   // six call sites use. Extra keys still fail, so this is strictly stronger than
   // the `rlm` first argument it replaces.
+  //
+  // **PR-B T13 — the fourth signature-tracking edit, and the one T12's
+  // enumeration could not have found.** That sweep looked for the *facade first
+  // argument* (`toHaveBeenCalledWith(rlm, …)`) and correctly returned three sites.
+  // This assertion lost its facade argument back at T9; what T13 changes is the
+  // *shape of the record* it asserts, as `HybridSearchDeps` widens from
+  // `correctQuery`'s one key to the eight `search` needs. So the budget is **4**,
+  // not 3, and the ledger total is 19 rather than 18. Nothing is relaxed — the
+  // one-token substitution to `hybridDeps(rlm)` keeps every defined key exact by
+  // identity and extra keys still fail. `correctQuery` deliberately still does not
+  // await init, so the four stores it never reads arrive `undefined` and bun
+  // treats those expected keys as absent; `keywordSearch` (assigned above) and
+  // `queryUnderstanding` (constructor-built) are the two it checks by identity.
   test("forwards query, returns impl result unchanged", async () => {
     const rlm = makeRlm();
     const keywordSearch = { fuzzyCorrect: async (w: string) => w };
@@ -734,7 +792,7 @@ describe("ContextualSearchRLM.correctQuery (instance delegate)", () => {
 
     const result = await rlm.correctQuery("origq");
 
-    expect(correctQueryMock).toHaveBeenCalledWith({ keywordSearch }, "origq");
+    expect(correctQueryMock).toHaveBeenCalledWith(hybridDeps(rlm), "origq");
     expect(result).toBe("corrected query");
   });
 });
@@ -841,7 +899,7 @@ describe("ContextualSearchRLM.addContextToResults (instance delegate)", () => {
 
     const result = await rlm.addContextToResults(results, "proj-ctx");
 
-    expect(addContextToResultsImplMock).toHaveBeenCalledWith(rlm, results, "proj-ctx");
+    expect(addContextToResultsImplMock).toHaveBeenCalledWith(results, "proj-ctx");
     expect(result).toBe(sentinelReturn);
   });
 });

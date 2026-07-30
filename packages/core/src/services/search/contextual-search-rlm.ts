@@ -37,13 +37,6 @@ import { getVectorStore } from "../../data/vector/vector-store-factory.js";
 import { getSearchCache } from "./cache-factory.js";
 import { getSearchAnalytics } from "./analytics-factory.js";
 import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
-import {
-  searchImpl,
-  addContextToResultsImpl,
-  extractPreviewImpl,
-  calculateAvgScoreImpl,
-  filterByPatternsImpl,
-} from "./rlm-search.js";
 // Capability modules (design.md §4.1). These share a name with the class
 // methods that delegate to them — the shape §4.3 sketches. Class members are
 // not in lexical scope, so a bare call inside a method body resolves to the
@@ -53,7 +46,15 @@ import {
 import { fuseResults, generateScoreExplanation } from "./result-fusion.js";
 import { buildGraphStream } from "./graph-stream.js";
 import { applySynapseState, type SessionBiasDeps } from "./session-bias.js";
-import { correctQuery, type HybridSearchDeps } from "./hybrid-search.js";
+import {
+  search,
+  correctQuery,
+  addContextToResults,
+  extractPreview,
+  calculateAvgScore,
+  filterByPatterns,
+  type HybridSearchDeps,
+} from "./hybrid-search.js";
 import {
   runWithIndexLock,
   indexProjectInternal,
@@ -64,9 +65,11 @@ import {
   type IndexerDeps,
   type IndexProjectOptions,
 } from "./project-indexer.js";
-import type {
-  SearchDegradation,
-  SearchDegradationReporter,
+import {
+  recordSearchFailure,
+  searchBackendUnavailable,
+  type SearchDegradation,
+  type SearchDegradationReporter,
 } from "./search-diagnostics.js";
 import {
   clearProjectIndex,
@@ -86,10 +89,14 @@ export class ContextualSearchRLM {
   // Runtime-identical; type-surface only. See design.md
   // "Encapsulation decision (accepted cost)".
   //
-  // PR-B T10 dropped rlm-indexing.ts from that list and T12 dropped
-  // rlm-admin.ts — both read these through their deps records now, never off the
-  // instance. rlm-search.ts is the last reader; by T14 the note goes with it. The
-  // fields stay public regardless (design.md §4.3.1, the ~80 stub sites).
+  // PR-B T10 dropped rlm-indexing.ts from that list, T12 dropped rlm-admin.ts,
+  // and T13 dropped rlm-search.ts — all three read these through their deps
+  // records now, never off the instance, and all three files are deleted. **No
+  // extracted module reads any of these fields any more**, so the "Visibility
+  // relaxed" notes below are historical as of this commit. Removing them is
+  // T14's, which owns the root's final cleanup and needs them as its
+  // discriminating sensor; leaving them here is deliberate, not an oversight.
+  // The fields stay public regardless (design.md §4.3.1, the ~80 stub sites).
   keywordSearch!: Awaited<ReturnType<typeof getKeywordSearch>>;
   vectorStore!: Awaited<ReturnType<typeof getVectorStore>>;
   indexManager!: IndexManager;
@@ -419,7 +426,19 @@ export class ContextualSearchRLM {
       onDegradations?: (degradations: readonly SearchDegradation[]) => void;
     } = {},
   ): Promise<SearchResult[]> {
-    return searchImpl(this, query, projectId, options);
+    // The hoist carries its wrapper. T10's and T12's delegates called
+    // `ensureInitialized` bare; `searchImpl` wrapped a failure in
+    // `searchBackendUnavailable(…)` and recorded it, so a bare hoist would drop
+    // both. The hoist itself is mandatory, not stylistic — the record snapshots
+    // five stores by value (measurements in tasks.md, T13).
+    try {
+      await this.ensureInitialized();
+    } catch (error) {
+      const failure = searchBackendUnavailable("search_initialization", error);
+      recordSearchFailure(failure, projectId);
+      throw failure;
+    }
+    return search(this.#hybridSearchDeps(), query, projectId, options);
   }
 
   /**
@@ -463,30 +482,33 @@ export class ContextualSearchRLM {
   }
 
   /**
-   * Fuzzy-correct each non-stopword query term via the keyword store's
-   * vocabulary. Returns the corrected query string (lowercased, space-joined),
-   * or null when no term corrects to a different word or fuzzyCorrect is
-   * unavailable. Only words of length >= 3 are considered (shorter tokens
-   * can't be reliably corrected).
-   */
-  /**
-   * Assemble hybrid-search.ts's narrow deps record — per call, from whatever
-   * the fields hold right now (LATE-BIND, design.md §4.3.1). Never hoist this to
-   * a constructor-time capture: `keywordSearch` has 10 post-construction
-   * assignment sites, six of which reach `correctQuery` directly
-   * (`rlm-synapse.test.ts`'s five cases and `search-ranking-regression.test.ts:37`),
-   * and a capture would leave every one of them stubbing a field nothing reads.
-   *
-   * It reads the **field**, not `injectedDeps.keywordSearch`. That is not
-   * interchangeable: `ensureInitialized` is what bridges the seam to the field,
-   * `correctQuery` does not await it, and those six sites assign the field
-   * directly. Reading the seam instead would break all six. Contrast
-   * `#sessionBiasDeps()` below, whose originals genuinely read `injectedDeps`.
+   * Assemble hybrid-search.ts's narrow deps record — per call, from current
+   * field values (LATE-BIND, design.md §4.3.1). Never hoist to a constructor
+   * capture or a first-call memo. Property reads only, and the stores read the
+   * **field**, not `injectedDeps.<store>` — contrast `#sessionBiasDeps()` above,
+   * whose originals genuinely read the seam. The three callbacks are arrow
+   * wrappers for the same call-time-dispatch reason as `#indexerDeps()`'s two.
+   * Where each of §2.1's thirteen members landed is on `HybridSearchDeps` in
+   * hybrid-search.ts and in tasks.md; both files sit under G-HUB's 700-line
+   * ceiling and T13 pushed each of them over it once.
    */
   #hybridSearchDeps(): HybridSearchDeps {
-    return { keywordSearch: this.keywordSearch };
+    return {
+      keywordSearch: this.keywordSearch,
+      vectorStore: this.vectorStore,
+      searchCache: this.searchCache,
+      analytics: this.analytics,
+      queryUnderstanding: this.queryUnderstanding,
+      buildGraphStream: (resultSets, maxResults, projectId, reportDegradation) =>
+        this.buildGraphStream(resultSets, maxResults, projectId, reportDegradation),
+      addContextToResults: (results, projectId) =>
+        this.addContextToResults(results, projectId),
+      applySynapseState: (baseResults, query, projectId, sessionId, reportDegradation) =>
+        this.applySynapseState(baseResults, query, projectId, sessionId, reportDegradation),
+    };
   }
 
+  /** Fuzzy-correct query terms against the keyword store's vocabulary; see hybrid-search.ts. */
   // Visibility relaxed from `private` so rlm-search.ts can call via rlm param.
   async correctQuery(query: string): Promise<string | null> {
     return correctQuery(this.#hybridSearchDeps(), query);
@@ -575,7 +597,7 @@ export class ContextualSearchRLM {
     results: SearchResult[],
     _projectId: string,
   ): Promise<SearchResult[]> {
-    return addContextToResultsImpl(this, results, _projectId);
+    return addContextToResults(results, _projectId);
   }
 
   /**
@@ -583,7 +605,7 @@ export class ContextualSearchRLM {
    */
   // Visibility relaxed from `private` so rlm-search.ts can call via rlm param.
   extractPreview(content: string, maxLines: number = 5): string {
-    return extractPreviewImpl(content, maxLines);
+    return extractPreview(content, maxLines);
   }
 
   /**
@@ -591,7 +613,7 @@ export class ContextualSearchRLM {
    */
   // Visibility relaxed from `private` so rlm-search.ts can call via rlm param.
   calculateAvgScore(results: SearchResult[]): number {
-    return calculateAvgScoreImpl(results);
+    return calculateAvgScore(results);
   }
 
   /**
@@ -603,7 +625,7 @@ export class ContextualSearchRLM {
     include?: string[],
     exclude?: string[],
   ): SearchResult[] {
-    return filterByPatternsImpl(results, include, exclude);
+    return filterByPatterns(results, include, exclude);
   }
 
   /**

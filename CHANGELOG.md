@@ -157,6 +157,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   handed back through a public accessor, so narrowing it would break the published return type. Both were
   measured rather than assumed, in both directions.
 
+- **Hybrid search is now a standalone capability module, the last search delegate file is gone, and the
+  coupling gate passes.** The search entry point itself — 455 lines and the widest of them all — moves out
+  of `rlm-search.ts` into `hybrid-search.ts`, along with result-context hydration, preview extraction,
+  average scoring and glob filtering. All five trade the search facade for `HybridSearchDeps`: the five
+  stores they read, plus three callbacks back into the service. With them gone `rlm-search.ts` has no
+  exports left and is **deleted**, and with it the last of the five delegate files the earlier split
+  produced. Functions in the search directory that still take the facade drop from **2 to 0**, and the
+  amount of code inside that boundary drops from **524 lines to none**.
+
+  **This is the step the whole series was for.** Deepest foreign reach — how many members of the search
+  service any one other module reaches into — drops from **14 to 1**, and the coupling gate goes from
+  failing to **passing**: no type in the directory is now read more than the ceiling of three members
+  deep. Both numbers were pinned by `rlm-search.ts` and could not move until it was split, which is why
+  every earlier step reported them unchanged.
+
+  Behaviour is unchanged, including three details that are easy to lose in a move this size. Lazy
+  initialisation still runs first, still converts a failure into the same service error and still records
+  it — the wrapper moved along with the call rather than being dropped for a bare await, which would have
+  surfaced a raw factory error instead. Result-context hydration and the graph-neighbour stream are
+  reached through callbacks that re-read the method each time they run, not through captured references,
+  which is what keeps a substituted implementation effective. And the query-understanding collaborator is
+  typed to the single method it uses, which is both the honest type and what keeps it out of the coupling
+  measurement.
+
+  Two files in the directory now sit close to the size ceiling the same gate enforces — 697 and 686 lines
+  against a limit of 700 — because this series has been moving code out of the delegate files and into
+  these two. The reasoning behind each decision lives in the project's own records rather than in the
+  source, for that reason.
+
 ## [1.11.0] - 2026-07-29
 
 ### Changed
