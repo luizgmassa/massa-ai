@@ -67,6 +67,11 @@ bracket parameter; an emitter never knows what a profile is.
 }
 ```
 
+> **Amended during Execute.** The sketch above shows the two profiles this document
+> designed. The registry as shipped carries **seven**, two of them deliberately
+> single-host. The schema is unchanged — only the seed data grew. See the amended
+> invariant 2 and fact count below, and `spec.md` §9.
+
 ### 2.1 Where a role's tier lives — exactly one place
 
 An earlier revision put the agent→tier map in **both** the registry (`roles.agents`) and the
@@ -88,14 +93,26 @@ charter with a `model_tier` — one edit, one file, and the generator discovers 
 `skills/agents/`, which it already does (`loadAllCharters`). Nothing enumerates the 15 names
 except `SPECIALIST_NAMES`, which stays as the ordering/registration list it already is.
 
-Fact count at seed: 15 charter tiers + (2 profiles × 4 hosts × 3 tiers) = **39**, against 184
-today — same total as the earlier shape, with no fact stated twice.
+Fact count at seed: 15 charter tiers + `Σ(hosts(p) × 3)` over the profiles that ship.
+**As designed** that was 2 profiles × 4 hosts × 3 tiers = **39**. **As shipped** it is
+5 full profiles × 4 hosts × 3 + 2 single-host profiles × 1 × 3 = 66, so **81** — against 184
+today, expressing seven profiles instead of one. The figure that matters is marginal, not
+total: a new full profile is 12 entries and a host-specific one is 3. `spec.md` §3 MPR-R2
+carries the shipped number; this paragraph is the design-time one.
 
 ### Invariants (MPR-R2, enforced by §3 validation)
 
 1. Every charter's `metadata.model_tier` is a member of `tiers`.
-2. Every profile defines **all four** hosts — no partial profiles. A profile is switchable
-   for the whole harness or it is invalid.
+2. **AMENDED during Execute.** As designed: "every profile defines all four hosts — no
+   partial profiles." As shipped: a profile may define a **subset** of hosts, and asking for
+   it on a host it does not define is `MissingHostError` at resolve time — a hard error, never
+   a silent inherit. The original rule would have forbidden `open_models` and `local_models`,
+   both of which are genuinely OpenCode-only: Claude Code resolves Anthropic models, Codex
+   resolves OpenAI models, and Cursor publishes no resolvable id for any open-weight catalog
+   entry, so a "full" version of either profile could only be filled with invented values.
+   Failing loudly on an unsupported (profile, host) pair is strictly stronger than refusing
+   to express the profile at all. Every host block that IS defined still defines every tier
+   (invariant 3), so nothing partial resolves.
 3. Every host block in every profile defines **every** tier in `tiers`.
 4. `hostDefaults` covers all four hosts and names only existing profiles.
 5. Every `workflowTiers` value is a member of `tiers`.
@@ -118,6 +135,15 @@ already shipping on that host today, collapsed across all three tiers.
 A `heavy` profile is deliberately **not** seeded: it would require inventing model choices,
 which is a cost decision and would ship IDs no source verifies. `README`/`FEATURES.md`
 document the shape so adding one is registry-only (MPR-R3).
+
+> **Amended during Execute.** Seven profiles ship, not two, and one of them *is* named
+> `heavy`. The reasoning above still holds and is what made it safe: `verify-model-ids.ts`
+> (MPR-R12, added by the Plan Challenge) probes the installed harness CLIs, so a tier can be
+> pointed at a real id instead of a guessed one — every OpenCode id in the shipped registry
+> resolved against `opencode` 1.18.9 before it was written down. The two single-host profiles
+> exist because the alternative was inventing values for the other three hosts, which is the
+> thing this section refuses to do. `FEATURES.md` documents the *mechanism* and names no
+> profile at all, because MPR-R3 forbids a doc table that enumerates them (`spec.md` §9).
 
 ---
 
@@ -313,7 +339,7 @@ truth in the charter, the exact defect being removed.
 
 | Group | Cases |
 | --- | --- |
-| Schema invariants | fact count = 39; partial profile rejected; missing tier rejected; `hostDefaults` completeness |
+| Schema invariants | fact count is factored, not a cross-product (asserted against the live registry, not a frozen literal); a partial profile resolves on the hosts it defines and throws `MissingHostError` on the others; missing tier rejected; `hostDefaults` completeness |
 | Selection (MPR-R4) | flag only; env only; both (flag wins); neither (hostDefaults); unknown at each rank throws |
 | Validation (MPR-R5) | one case per error class in §3; asserts error *name* and key path, not just "throws" |
 | Openness (MPR-R3) | inject a synthetic profile into an in-memory registry, resolve all 4 hosts × 3 tiers, zero source edits |
@@ -360,7 +386,13 @@ Mutations the suite must kill:
 `FEATURES.md` loses its four 15-row per-host tables (64 rows) and gains:
 
 - one **role → tier** table, 15 rows, generated from the charters' `metadata.model_tier`;
-- one small **tier → model** table per profile;
+- ~~one small **tier → model** table per profile~~ — **withdrawn during Execute.** A
+  per-profile doc table enumerates profile names, which MPR-R3's acceptance criteria forbid:
+  adding a profile must be a registry edit and nothing else. With seven profiles shipped it
+  would also mean 84 hand-copied model facts, more than the 64 rows this deletes. Replaced by
+  a pointer to `skills/model-profiles.json`, and the doc-drift test additionally asserts that
+  **no** registry model id appears in `FEATURES.md` at all. Full reasoning in `spec.md` §9;
+  adjudicated as legitimate by the independent verifier in `validation.md`;
 - the per-host key/format/effort reference from `spec.md` §7, with source URLs;
 - the Cursor `inherit` limitation and the `cursor-agent models` discovery path.
 

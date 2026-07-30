@@ -32,18 +32,38 @@ only, not schema.
 | T4 | Remove now-unused `model_hint`; tighten validators | 15 + 3 + 60 regenerated | none | **DONE** `e714fe9` |
 | T5 | OpenCode `config-cli` uninstall coverage (D8/D9) | 1 | none | **DONE** `0be5a30` |
 | T6 | `scripts/verify-model-ids.ts` (MPR-R12) | +2 | none | **DONE** `ce326be` |
-| T7 | Docs: `FEATURES.md`, `CLAUDE.md`, `CHANGELOG.md` + doc-drift test | 3 + 1 | none | **TODO** |
+| T7 | Docs: `FEATURES.md`, `CLAUDE.md`, `CHANGELOG.md` + doc-drift test | 3 + 1 | none | **DONE** `cb56fd0` |
 | T8 | `turbo.json` passThroughEnv += `MASSA_AI_MODEL_PROFILE` (D6) | 1 | none | **DONE** `0be5a30` |
-| T9 | Independent validation (verification-agent) | +1 | none | **TODO** |
+| T9 | Independent validation (verification-agent) | +1 | none | **DONE — FAIL, 3 gaps** |
+| T10 | MPR-R1 model-token scan + its unit test (T9 gap 1) | +2 + 2 | none | **DONE** `611f29e` |
+| T11 | `loadCharter` throw tests exercise `loadCharter` (T9 gap 2) | 2 | none | **DONE** `412c076` |
+| T12 | Amend `design.md`/`tasks.md` for the 7-profile registry (T9 gap 3) | 2 | none | **DONE** — this commit |
 
-## Remaining work — T7 and T9 only
+## Amendments during Execute
+
+Recorded rather than silently applied. Each is a place where the plan and the shipped
+result diverged, with the reason.
+
+| # | Where | Amendment |
+| --- | --- | --- |
+| A1 | `spec.md` MPR-R11 (see `spec.md` §9) | "one small table per profile" withdrawn — it enumerates profile names, which MPR-R3's ACs forbid. `FEATURES.md` names no profile and points at the registry. |
+| A2 | `design.md` §2 invariant 2 | "every profile defines all four hosts" relaxed: a profile may define a subset, and an unsupported (profile, host) pair is `MissingHostError` at resolve time. The original rule would have forbidden the two genuinely OpenCode-only profiles. |
+| A3 | `design.md` §2.1 fact count, §6 test row, this file's MPR-R2 row | 39 / two profiles was the design-time figure; 81 / seven profiles ships. The test asserts the factored *shape* against the live registry rather than a frozen literal, which is why it never went red on the change. |
+| A4 | `design.md` "Why two seeded profiles" | A `heavy` profile ships after all. Safe because MPR-R12's `verify-model-ids.ts` — itself added by the Plan Challenge — lets a tier be pointed at a probed id instead of a guessed one. |
+| A5 | T7 scope, item 1 | Consequence of A1. |
+
+## Fix tasks from T9 — closed
+
+T9's verdict was **FAIL** with three gaps. Read `validation.md` for the evidence; all three
+are closed by T10–T12 and re-verification is the remaining step (iteration 1 of the capped 3).
 
 ### T7 scope, precisely
 
 1. **`FEATURES.md` §"Model pinning" (currently lines ~357-460)** — delete the four 15-row
    per-host tables **and all four rationale columns** (`design.md` §7 explains why they are
    deleted rather than consolidated). Replace with: one role→tier table generated from the
-   charters; one tier→model table per profile; the per-host key/format/effort reference from
+   charters; ~~one tier→model table per profile~~ (**amendment A1** — withdrawn, it would
+   break MPR-R3; a registry pointer instead); the per-host key/format/effort reference from
    `spec.md` §7 with its source URLs; the Cursor `inherit` limitation and the
    `cursor-agent models` discovery path.
    Also update `FEATURES.md:351` and `:353`, which still describe the OLD per-host
@@ -173,10 +193,10 @@ skipped-no-cursor-agent) + its unit test.
 ## T7 — Documentation
 
 `FEATURES.md`: delete the four 15-row tables and all four rationale columns; add the generated
-role→tier table, a tier→model table per profile, the per-host key/format/effort reference with
-source URLs, and the Cursor `inherit` limitation. `CLAUDE.md`: registry pointer +
-`CLAUDE_CODE_SUBAGENT_MODEL` caveat. `CHANGELOG.md`: `### Changed` naming all **three** defect
-classes (`design.md` §7). Add the doc-drift test.
+role→tier table, a registry pointer for the tier→model mapping (**amendment A1**), the per-host
+key/format/effort reference with source URLs, and the Cursor `inherit` limitation. `CLAUDE.md`:
+registry pointer + `CLAUDE_CODE_SUBAGENT_MODEL` caveat. `CHANGELOG.md`: `### Changed` naming all
+**three** defect classes (`design.md` §7). Add the doc-drift test.
 
 **Gate** doc-drift test passes; `bun run test:scripts`.
 
@@ -190,6 +210,34 @@ classes (`design.md` §7). Add the doc-drift test.
 
 Dispatch `massa-ai-verification-agent` (author ≠ verifier). Writes `validation.md`.
 
+## T10 — MPR-R1 model-token scan
+
+`scripts/verify-model-tokens.ts` + `scripts/__tests__/verify-model-tokens.test.ts`. The token
+list is derived from the registry ∪ the frozen fixture, never typed. Only the BODY of a
+generated artifact is scanned — its emitted `model` assignment is the legitimate value.
+Scanning zero files exits 2, not 0.
+
+**Gate** `bun scripts/verify-model-tokens.ts` exit 0 on a clean tree, exit 1 with a model name
+in charter prose (both measured); `bun run test:scripts`.
+
+## T11 — Repair the decorative `loadCharter` tests
+
+`loadCharter` gains an optional charters-dir parameter so its throws can be exercised against
+the real function. Three error classes gain real coverage: missing `model_tier`, a reappearing
+`model_hint`, and a missing description. A harness self-check loads an unmodified charter
+first, so a broken harness cannot make the throw-assertions pass for the wrong reason.
+
+**Gate** the mutation `?? ""` → `?? "standard"` must turn the test red (measured; it was green
+before this task); `bun run test:scripts`.
+
+## T12 — Amend the plan documents
+
+`design.md` and this file carried the design-time figures (39 facts, two profiles, "every
+profile defines all four hosts") against a shipped seven-profile registry. Amendments A1–A5
+above; no code or test change.
+
+**Gate** documentation only — `bun run test:scripts` must be unchanged.
+
 ---
 
 ## Test Coverage Matrix
@@ -197,7 +245,7 @@ Dispatch `massa-ai-verification-agent` (author ≠ verifier). Writes `validation
 | Req | Test | Kind |
 | --- | --- | --- |
 | MPR-R1 | scripted model-token scan; 0 hits outside registry/generated/history | gate script |
-| MPR-R2 | fact count = 39; registry has no agent list | unit |
+| MPR-R2 | fact count is factored not cross-product, asserted against the live registry; registry has no agent list | unit |
 | MPR-R3 | synthetic profile resolves end-to-end, zero source edits | unit |
 | MPR-R4 | precedence table: flag / env / both / neither / unknown at each rank | unit |
 | MPR-R5 | one case per error class in `design.md` §3 + multi-error single throw | unit |
@@ -225,13 +273,18 @@ done
 
 bun run scripts/generate-subagent-artifacts.ts --check   # "No drift"
 bun run scripts/generate-skill-artifacts.ts --check      # "No drift"
-bun run test:scripts        # 832 pass / 0 fail, exit 0
+bun run test:scripts        # 853 pass / 0 fail, exit 0
 bun run test:plugins        # 96 pass / 0 fail, exit 0
 bun run lint                # oxlint, exit 0
-bun run verify:model-ids    # advisory; opencode 11/11, codex SKIPPED
+bun run verify:model-tokens # MPR-R1 gate; 136 files, 29 tokens, 0 hits, exit 0
+bun run verify:model-ids    # advisory; opencode 11/11, claude 3/3, codex SKIPPED
 ```
 
-Last measured green at `ce326be` (T6) with all five packages built.
+Last measured green at `412c076` (T11) with all five packages built. The `test:scripts` count
+moved 832 → 836 (T7's doc-drift tests) → 850 (T10) → 853 (T11); each step is accounted for in
+its own commit body. `verify:model-tokens` also runs inside `test:scripts` via its unit test,
+so it is a real gate without a new CI job — a new job under the `CI` workflow name would
+extend the `workflow_run` chain that cuts a release.
 
 `bun run type-check` and root `bun run build` are not gates here: no `packages/*` or `apps/*`
 source type surface changes except `apps/opencode-plugin` tests, which `test:plugins` covers.
