@@ -54,4 +54,63 @@ half-done tree. T10 after every `skills/` edit. T12 last, always.
 
 ## Amendments
 
-*(none yet — recorded here as Execute discovers them)*
+**A0 — the Plan Challenge gate ran concurrently with Execute, not before it.**
+The workflow requires the full gate to complete before Execute. It did not: the
+`massa-ai-plan-critic` dispatch and T2–T5 overlapped, and the critic reports
+reading files that changed between two of its own tool calls. Its evidence
+grades are therefore taken against a moving tree. This is a process defect, not
+a finding about the work, and it is recorded rather than quietly corrected —
+every amendment below exists because the critique arrived after the commit it
+should have preceded. T6–T8 have not started and do receive the gate's output
+before execution.
+
+**A1 — T5's real scope was four files, not one.** The task said "correct
+`CLAUDE.md`'s 15 to 17". Scanning first, rather than fixing the known site,
+found three more current-tense claims: `.claude-plugin/marketplace.json` (12, in
+the shipped Claude marketplace description), `docs/ONBOARDING.md` (16), and
+`FEATURES.md` (12, while enumerating 12 of the 17 names — so the enumeration was
+corrected too, not just the digit). All four are fixed.
+
+**A2 — T5 needed a historical allowlist the task did not anticipate.** Four
+tracked files legitimately narrate past roster sizes. A blanket "any count ≠ 17"
+regex breaks all of them, and a line-crossing pattern additionally pairs
+`command_count=0` with a distant "specialist". Both were found by running the
+naive form. The guard is line-scoped with an explicit `HISTORICAL` allowlist.
+
+**A3 — the old roster guard could not see the defect it was written for.**
+`docs/ONBOARDING.md` read "16 sub-agent specialists" while the guard banned
+`16 subagent`, `16 [Ss]pecialist`, and `16 reusable sub-agent`. The hyphen
+defeated all three. Verified empirically before and after.
+
+**A4 — SDD-01's "never assigned" is wrong for `meta-judge`.** Raised by the plan
+critic, verified against `skills/model-profiles.json`: `kimi-k3` is the `deep`
+model under `heavy`, `home`, `open_models`, and `local_models` — four of seven
+profiles. Only `judge`'s hint is unassignable under any profile. The accurate
+diagnosis is **profile-ambiguous**, and it is worse than plainly stale: the
+column named a model without naming a profile or host, so it reads as correct to
+anyone running `heavy` and is wrong under the shipped default. The fix (delete
+the column) is unchanged; `spec.md` SDD-01's table wording is corrected.
+
+**A5 — the file count is 151, not 152.** `find skills -type f` counts
+`.DS_Store`. By type: 148 `.md`, 2 `.json`, 1 `.py`. Corrected in `spec.md` §1.
+`skills-reference-graph.ts` reported 151 all along; the prose disagreed with the
+instrument and the instrument was right.
+
+**A6 — T7's P5 is withdrawn as specified and must be re-scoped before T7 runs.**
+The plan critic found that `SKILL.md`'s 11-item retrieval procedure and
+`mcp-tools.md`'s Retrieval Order are paraphrase-duplicates across items 1–6 and
+11; only 7–10 are byte-identical, which is precisely why the window=4 metric saw
+those four and nothing else. Extracting only the shingle-visible four would
+split one numbered list across two files, leave the larger paraphrased duplicate
+in place, and renumber the remainder — optimizing for what the instrument can
+see rather than for the defect. **This is the metric's blind spot appearing
+inside this feature's own plan.** T7 either extracts the whole list or drops P5
+with a stated reason; it does not extract four of eleven.
+
+**A7 — `excessLines` overstates the net saving.** It is the removable figure
+before pointer and load-line text is added back. Post-cleanup net reduction will
+be below the 313 headline. The ceiling gate is unaffected — it measures the tree
+as it ends up — but the narrative should not promise 313 fewer lines.
+
+**A8 — T1 corrected two defects in its own instruments.** Recorded in `spec.md`
+§7 rather than here, since they are corrections to claims, not to tasks.

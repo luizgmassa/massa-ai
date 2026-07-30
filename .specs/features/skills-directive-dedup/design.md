@@ -56,7 +56,7 @@ listed — the router's list is a load menu, not an inventory.
 | P2 | `workflows/the-fool.md:55-63` critique fields | `references/agent-orchestration.md:186-194` | `the-fool.md:49` |
 | P3 | `references/spec-driven/sub-agents.md:135-143` chat template | `references/spec-driven/validate.md:240-248` | `sub-agents.md:119,121` |
 | P4 | `SKILL.md:247-250` memory tags/types | `references/memory-policy.md:14,44-54` | `SKILL.md:75` |
-| P5 | `SKILL.md:221-224` retrieval steps 7-10 | `references/mcp-tools.md:151-154` | `SKILL.md:44` |
+| ~~P5~~ | ~~`SKILL.md:221-224` retrieval steps 7-10~~ | ~~`references/mcp-tools.md:151-154`~~ | **withdrawn — see below** |
 | P6 | `workflows/debug.md:68-74` Output Contract | `references/debug-diagnosis-loop.md:122-131` | `debug.md:12` |
 
 P6 carries the SDD-04 reconciliation: `debug.md`'s seventh bullet (`For mobile bugs: …`)
@@ -65,7 +65,30 @@ rule, and the seven-vs-six divergence is the whole reason this pair is a defect 
 than a cost.
 
 P4 must not touch `SKILL.md:60-62` — `validate-repository.test.ts:191-193` asserts that
-sentence and it is a different one from the tags list.
+sentence and it is a different one from the tags list. (The memory *types* sit at
+`:251-252`, one line past the cited range; the replacement covers both.)
+
+**P5 is withdrawn as originally scoped** (amendment A6). It proposed extracting items
+7-10 of `SKILL.md`'s eleven-item retrieval procedure because those four are the only
+ones the window=4 metric can prove byte-identical to `mcp-tools.md`. Items 1-6 and 11 of
+the *same numbered list* are paraphrase-duplicates between the *same two files* — which
+shingling cannot see, by construction.
+
+Taking the visible four would have split one numbered procedure across two files,
+renumbered the remainder, and left the larger duplicate untouched: optimizing for what
+the instrument detects rather than for the defect. §1 of `spec.md` states that
+limitation and this design then failed to apply it to itself.
+
+T7 must therefore choose explicitly and record the choice:
+
+- **extract the whole procedure** — `mcp-tools.md` owns retrieval order end to end, and
+  `SKILL.md` keeps a single load-and-follow line; or
+- **keep it inline and delete `mcp-tools.md`'s copy** — the router's stated scope
+  already includes retrieval, and it is always loaded while `mcp-tools.md` is not.
+
+The second is likelier correct on progressive-disclosure grounds, since a rule the
+router needs on every task should not sit behind a conditional load. Either way the
+eleven items end up in one place. Four of eleven is not an option.
 
 ## D4 — Audit-family extraction (SDD-06) extends `audit-scope.md`, adds no file
 

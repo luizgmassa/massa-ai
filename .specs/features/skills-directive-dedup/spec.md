@@ -14,7 +14,8 @@ in `skills/`". Two of that sentence's three premises did not survive measurement
 **Premise: there are unnecessary files to remove.** There are not.
 `scripts/skills-reference-graph.ts` resolves every `skills/` file against the whole repo
 (`skills/`, `scripts/`, `apps/`, `packages/`, `docs/`, `.specs/`, and the five root docs)
-and reports **0 orphans and 0 weakly-referenced files** across 152 files. Nothing under
+and reports **0 orphans and 0 weakly-referenced files** across 151 files (148 `.md`,
+2 `.json`, 1 `.py`; an earlier draft said 152, which counted `.DS_Store`). Nothing under
 `skills/` is unreachable. "Removing a file" here would mean retiring a capability, not
 deleting redundancy — and `workflow-harness-contract.test.ts:39` pins
 `EXPECTED_WORKFLOW_COUNT = 36`, so it is a deliberate decision with a 600-file blast
@@ -57,9 +58,16 @@ host. It is already wrong. Resolving each charter's `metadata.model_tier` agains
 | --- | --- | --- | --- | --- |
 | planner | `deep` | `opencode-go/minimax-m3` | `GLM-5.2` | stale |
 | requirements-analyst | `standard` | `opencode-go/glm-5.2` | `DeepSeek V4 Pro` | stale |
-| judge | `deep` | `opencode-go/minimax-m3` | `deepseek-v4-pro` | never assigned |
-| meta-judge | `deep` | `opencode-go/minimax-m3` | `kimi-k3` | never assigned |
+| judge | `deep` | `opencode-go/minimax-m3` | `deepseek-v4-pro` | no profile assigns it |
+| meta-judge | `deep` | `opencode-go/minimax-m3` | `kimi-k3` | profile-ambiguous |
 | other 13 | — | — | — | match |
+
+`meta-judge`'s row is the worst of the four, not the mildest. `kimi-k3` is the
+`deep` model under `heavy`, `home`, `open_models` and `local_models` — four of
+the seven profiles — and is wrong under the shipped default `balanced`. Because
+the column named a model without naming a profile or a host, that entry reads as
+correct to anyone running `heavy` and is silently wrong for everyone on the
+default. A plainly stale value announces itself; an unqualified one does not.
 
 The two stale rows are exactly two of the three roles PR #51 renormalized
 (`navigator`→light, `requirements-analyst`→standard, `planner`→deep); the column was
@@ -261,4 +269,26 @@ that would have caused damage.
    shared span is 4 lines.
 4. **`navigator`'s Model hint matching the registry is luck, not correctness.** It is
    one of the three roles PR #51 renormalized; its old and new tiers happen to resolve
-   to the same OpenCode model. It must not be read as evidence the column is maintained.
+   to the same OpenCode model. Independently confirmed by the plan critic against
+   `git diff 45daaa1 6d5dc6b`: the same retier moved navigator's *Claude* pin from
+   `sonnet` to `haiku` while its OpenCode value stayed put. It must not be read as
+   evidence the column was maintained.
+
+5. **The metric's own blind spot appeared inside this plan.** P5 was scoped to the four
+   lines the window=4 shingle metric could prove identical between `SKILL.md` and
+   `mcp-tools.md`. The plan critic found that items 1–6 and 11 of the same numbered
+   retrieval procedure are paraphrase-duplicates between the same two files — invisible
+   to shingling by construction, which is the limitation §1 states and the plan then
+   failed to apply to itself. Extracting the visible four would have split one list
+   across two files and left the larger duplicate. Recorded as amendment A6; P5 is
+   re-scoped before T7 runs.
+
+6. **Two defects in this feature's own instruments, both caught by writing a
+   discriminating test rather than by reading output.** The duplication metric's
+   docblock described counting occurrences "beyond the first" while the code counted
+   every copy, so the figure quoted as a saving was roughly double; `duplicatedLines`
+   and `excessLines` are now separate and the arithmetic has its own test. The
+   reachability scan accepted a bare container directory as a reference form, so the
+   string `references/` — present in nearly every workflow file — marked every reference
+   reachable; the reported 0 orphans survived the fix, but the reason for it did not.
+   Both outputs were stable and plausible throughout.
