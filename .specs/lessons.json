@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 7,
+  "next_id": 9,
   "lessons": [
     {
       "id": "L-001",
@@ -122,6 +122,52 @@
       "workflow": "security-fix",
       "entity": "code-scanning",
       "confidence": 0.53
+    },
+    {
+      "id": "L-007",
+      "key": "gate_fail::a registry count change 15 17 specialists shipped green under test scripts but ci went red the four plugin install test rosters shell installer advisories config cli help readme features marketplace copy are covered by test plugins which the local spec driven final gate did not run when a feature changes a shared cardinality run test plugins or any surface asserting the count before the local final gate not after ci",
+      "text": "A registry-count change (15→17 specialists) shipped green under test:scripts but CI went red: the four plugin install-test rosters + shell installer advisories + config-cli help + README/FEATURES/marketplace copy are covered by test:plugins, which the local spec-driven final gate did not run. When a feature changes a shared cardinality, run test:plugins (or any surface asserting the count) before the local final gate, not after CI.",
+      "signal": "gate_fail",
+      "scope": "scripts/__tests__:apps/*/install.test.ts",
+      "status": "candidate",
+      "features": [
+        "judge-with-debate"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "PR #50 build/coverage red, repair e190b43 (scripts/__tests__:apps/*/install.test.ts)"
+      ],
+      "created": "2026-07-30T12:25:12Z",
+      "last_seen": "2026-07-30T12:25:12Z",
+      "project": "massa-ai",
+      "session": "spec-judge-with-debate",
+      "workflow": "spec-driven",
+      "entity": "judge-with-debate",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-008",
+      "key": "spec_precision_gap::live multi agent protocol behavior judge with debate meta judge spec plus 3 judges plus consensus is user gated smoke only no ci sensor can execute a prose workflow so acceptance rests on charter and workflow file integrity plus discrimination sensors not runtime evidence",
+      "text": "Live multi-agent protocol behavior (judge-with-debate meta-judge spec plus 3 judges plus consensus) is user-gated smoke only: no CI sensor can execute a prose workflow, so acceptance rests on charter and workflow file integrity plus discrimination sensors, not runtime evidence.",
+      "signal": "spec_precision_gap",
+      "scope": "workflows/judge-with-debate.md:audits/judge",
+      "status": "candidate",
+      "features": [
+        "judge-with-debate"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "validation.md Addendum item 6 (workflows/judge-with-debate.md:audits/judge)"
+      ],
+      "created": "2026-07-30T12:26:06Z",
+      "last_seen": "2026-07-30T12:26:06Z",
+      "project": "massa-ai",
+      "session": "spec-judge-with-debate",
+      "workflow": "spec-driven",
+      "entity": "judge-with-debate",
+      "confidence": 0.62
     }
   ]
 }

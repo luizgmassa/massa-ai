@@ -59,8 +59,8 @@ describe("model-token scan — surface coverage (MPR-R1)", () => {
     expect(files.some((f) => /^apps\/[a-z]+-plugin\/agents\/.+\.md$/.test(f))).toBe(true);
     expect(files.some((f) => /^apps\/codex-plugin\/agents\/.+\.toml$/.test(f))).toBe(true);
     expect(files).toContain("scripts/generate-subagent-artifacts.ts");
-    // 15 charters + 60 mirrored + 60 generated + the generator.
-    expect(TARGETS.length).toBe(136);
+    // 17 charters + 68 mirrored + 68 generated + the generator.
+    expect(TARGETS.length).toBe(154);
   });
 
   test("the declared MPR-R1 exception is out of scope, not silently matched", () => {
@@ -161,7 +161,7 @@ describe("model-token scan — it fires (discrimination)", () => {
     // If this failed, the gate would be unusable: every generated artifact legitimately
     // carries its resolved value, which subagent-parity.test.ts already verifies.
     const generated = TARGETS.filter((t) => /^apps\/[a-z]+-plugin\/agents\//.test(t.file));
-    expect(generated.length).toBe(60);
+    expect(generated.length).toBe(68);
     for (const t of generated) {
       expect(t.content).not.toMatch(/^\s*model\s*[:=]/m);
     }

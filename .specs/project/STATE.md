@@ -7,10 +7,16 @@
 - workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
 - feature: `model-profile-registry` — **COMPLETE 2026-07-30. Specify, Design, Tasks,
   Execute (T1–T13) and independent validation ALL DONE. Verdict: PASS at `af79151`
-  (`.specs/features/model-profile-registry/validation.md`). Nothing pushed, no PR — the user
-  asked for neither. Per-task scope, commit hashes, amendments A1–A5 and gate commands are in
+  (`.specs/features/model-profile-registry/validation.md`). PR
+  [#51](https://github.com/luizgmassa/massa-ai/pull/51) OPEN against `main`, driving CI to
+  green. Per-task scope, commit hashes, amendments A1–A5 and gate commands are in
   `.specs/features/model-profile-registry/tasks.md` — read that, not this file, for the task
   contract.**
+- **Merge note:** `origin/main` advanced two commits past this branch's base while the PR was
+  being prepared (PR #50 `judge-with-debate` merged, released `v1.13.0` — see the Previous
+  entry below). Merged `origin/main` into this branch (not rebased) and migrated the two new
+  charters it added (`judge`, `meta-judge`, still on the retired `metadata.model_hint`) to
+  `metadata.model_tier: deep`, matching their original Claude/Codex pins.
 - Validation took **two** of the three permitted fix loops. Iteration 0 was a **FAIL** with
   three gaps: MPR-R1's scripted model-token scan did not exist (a model name in charter prose
   propagated to 9 sites with every gate green), the test named as killing the
@@ -72,6 +78,35 @@ Cursor tier values are `inherit` — no portable Cursor model ID exists for
 the pinned models, and `cursor-agent` is not installed here, so the hard-error-vs-fallback
 falsifier is a **skipped sensor with reason**. massa-ai MCP server not registered this session;
 all state came from `.specs/` and source reads.
+
+## Previous — Judge With Debate (spec-driven, VALIDATED PASS, merged and released v1.13.0)
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-judge-with-debate`
+- workflow: spec-driven (Large — all phases complete)
+- feature: `judge-with-debate` — **COMPLETE 2026-07-30, independently validated PASS**
+  (`.specs/features/judge-with-debate/validation.md`: 12/12 ACs, 5/5 edge cases, 4/4
+  discrimination sensors executed + killed, gate 773 pass / 0 fail / 41 files, No drift ×2;
+  accepted deviation: verifier env had no shell/write — sensor executions + file persistence by
+  main agent, per plugin-auto-install precedent). Branch `feat/judge-with-debate`. PR
+  [#50](https://github.com/luizgmassa/massa-ai/pull/50) went green after one repair iteration
+  (stale 15→17 rosters in the plugin install-test surface, which only `test:plugins` covers),
+  merged, and released as `v1.13.0`.
+- Plan Challenge: pre_mortem, 5 findings (2C/2H/1M) all verified + incorporated (tasks.md).
+- Final gate @ T10: lint 0 · type-check 6/6 · `test:scripts` **772 pass / 0 fail across 41
+  files** · both generators `--check` No drift. Baseline corrected: true pre-feature state was
+  737/2 (both environmental — crash probe + unbuilt dist).
+- Execute divergence (unplanned, gate-discovered): three registration spots missed by quick
+  gates and caught by the full gate — `validate-repository.test.ts` third roster,
+  `workflow-harness-contract.test.ts` workflow count 35→36 + read-only complement 19→20, intake
+  line in the new workflow. Fixed in one repair commit; full gate is the sensor that works.
+- scope: 12 requirements (JD-01..12) — port of NeoLabHQ `judge-with-debate` pattern: meta-judge
+  eval-spec YAML (once, verbatim) + 3 independent judges + ≤3 debate rounds + consensus
+  (0.5 overall / 1.0 criterion). Two new charters (`meta-judge`, `judge`; registry 15→17),
+  workflow `workflows/judge-with-debate.md` + router entry, reports under `audits/judge/`.
+- User decisions locked: full protocol; model-diversity advisory per dispatch (meta kimi-k3,
+  J1 deepseek-v4-pro, J2 minimax-m3, J3 GLM-5.2 — as given, unverified) with loud host-default
+  fallback; generic artifacts; standalone only; audit-report-io storage; consensus file saved.
 
 ## Previous — Skills / Workflows Updates + spec-driven DI rule
 

@@ -11,7 +11,7 @@
     {
       "name": "massa-ai",
       "source": "apps/cursor-plugin",
-      "description": "Semantic code search, memory, symbol graph, and context compression. 15 subagent specialists + 6 skills."
+      "description": "Semantic code search, memory, symbol graph, and context compression. 17 subagent specialists + 6 skills."
     }
   ]
 }

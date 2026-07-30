@@ -1,15 +1,22 @@
 # Handoff
 
-## Complete — Model Profile Registry, validated PASS, nothing pushed
+## Active — Model Profile Registry, validated PASS, PR open, driving CI to green
 
 - **projectId** `massa-ai` · **workflowSessionId** `spec-model-profile-registry`
 - **branch** `feat/model-profile-registry` · **worktree** `.claude/worktrees/model-profiles`
-- **base** `origin/main` @ `45daaa1` · **head** `af79151` · working tree clean
+- **base** `origin/main` @ `45daaa1` · **head** `281ac26` before the merge below · working
+  tree clean at each commit.
 - **Specify, Design, Tasks, Execute (T1–T13) and independent validation ALL COMPLETE.**
   **Verdict: PASS** — `.specs/features/model-profile-registry/validation.md`.
-- **Nothing pushed. No PR. Merge withheld** — the user asked for neither, and merging to
-  `main` auto-cuts a release. The CHANGELOG entry is written and sits under `### Changed`
-  (**minor** bump), so the CI merge gate is satisfied.
+- **PR [#51](https://github.com/luizgmassa/massa-ai/pull/51) opened against `main`.**
+  `origin/main` had advanced two commits past this branch's base while the PR was being
+  prepared — PR #50 (`judge-with-debate`, see the entry below) merged and released as
+  v1.13.0, adding two new specialist charters (`judge`, `meta-judge`) that still declared
+  the retired `metadata.model_hint`. Merged `origin/main` into this branch (not rebased —
+  the 14 feature commits are cited by hash in `tasks.md`/`validation.md`) and migrated both
+  new charters to `metadata.model_tier: deep`, matching their original Claude/Codex pins
+  (`opus` / `gpt-5.6-sol`, both this registry's `deep` tier under the `balanced` profile).
+  Their Cursor/OpenCode output now goes through the same emitter fixes as the other 15.
 
 **Read `.specs/features/model-profile-registry/tasks.md` first** — it is the task contract:
 per-task status with commit hashes, the five recorded amendments A1–A5, the accepted known
@@ -58,6 +65,22 @@ Commands. Final green at `af79151`: `test:scripts` **857 pass / 0 fail**, `test:
 **96 pass / 0 fail**, both `--check` "No drift", `lint` 0, `verify:model-tokens` 0,
 `verify:model-ids` 0 with codex SKIPPED. massa-ai MCP tools were not registered in any
 session that produced this work; all state came from `.specs/` files and source reads.
+
+---
+
+## Previous — Judge With Debate, VALIDATED PASS, merged and released as v1.13.0
+
+**Feature**: `judge-with-debate` · branch `feat/judge-with-debate` (from `origin/main` @
+v1.12.1). **ALL TASKS COMPLETE 2026-07-30. Independent validation PASS**
+(`.specs/features/judge-with-debate/validation.md` — read the Addendum first: verifier had
+no shell/write; sensor executions + file persistence are the main agent's, recorded as
+accepted deviation). **Final gate: lint 0 · type-check 6/6 · test:scripts 773 pass / 0 fail
+across 41 files · both generators `--check` No drift.** 4/4 discrimination sensors executed
++ killed. PR [#50](https://github.com/luizgmassa/massa-ai/pull/50) went green after one
+repair iteration (stale 15→17 rosters in the plugin install-test surface, which only
+`test:plugins` covers) and merged; released as `v1.13.0`. Main checkout also carries PR-B
+(`core-layering-god-module-split`) Execute on `refactor/search-facade-split-phase-1` —
+untouched by this feature.
 
 ## Previous — Core Layering and God-Module Split (PR-B), Phase 1 started
 

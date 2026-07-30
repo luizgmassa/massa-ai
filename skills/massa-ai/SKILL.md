@@ -145,6 +145,7 @@ current context already contains it.
 | `ticket` | draft and create Jira Epics, issues, and sub-tasks through Atlassian MCP | `workflows/ticket.md` |
 | `commit` | draft or create safe Conventional Commits with Jira branch prefixes and audit report exclusions | `workflows/commit.md` |
 | `the-fool` | direct challenge, red-team, pre-mortem, evidence audit | `workflows/the-fool.md` |
+| `judge-with-debate` | standalone multi-judge debate evaluation of user-supplied artifacts | `workflows/judge-with-debate.md` |
 | `furps-refinement` | FURPS+ refinement of a PRD and/or ADR before implementation, with The Fool pre-validation and DoR coverage | `workflows/refinement/furps-refinement.md` |
 | `general` | coding work with no more specific workflow | `workflows/general.md` |
 

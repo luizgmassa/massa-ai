@@ -1,9 +1,9 @@
 /**
  * Subagent parity test (T4).
  *
- * Asserts the 15 specialist agent files shipped across 4 hosts are byte-identical
+ * Asserts the 17 specialist agent files shipped across 4 hosts are byte-identical
  * to generator output (drift gate), correctly pinned per spec (model + effort +
- * permission), collision-free against host built-ins, exactly 15 per host, and
+ * permission), collision-free against host built-ins, exactly 17 per host, and
  * that Codex TOML parses with the # massa-ai-owned marker.
  *
  * Model and effort expectations come from `skills/model-profiles.json` plus each
@@ -47,6 +47,8 @@ const SPECIALIST_NAMES = [
   "plan-critic",
   "furps-analyst",
   "navigator",
+  "meta-judge",
+  "judge",
 ] as const;
 type SpecialistName = (typeof SPECIALIST_NAMES)[number];
 
@@ -181,39 +183,39 @@ describe("subagent parity — drift gate (CLA-07/CDX-08/CRS-06/OPC-08)", () => {
   });
 });
 
-describe("subagent parity — exact 15 names per host (CLA-09/CRS-07/OPC-09)", () => {
-  test("claude: exactly 15 specialist .md files with the registry names", async () => {
+describe("subagent parity — exact 17 names per host (CLA-09/CRS-07/OPC-09)", () => {
+  test("claude: exactly 17 specialist .md files with the registry names", async () => {
     const dir = path.join(REPO_ROOT, "apps/claude-plugin/agents");
     const files = (await fs.readdir(dir)).filter(
       (f) => f.startsWith("massa-ai-") && f.endsWith(".md"),
     );
-    expect(files.length).toBe(15);
+    expect(files.length).toBe(17);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("codex: exactly 15 specialist .toml files with the registry names", async () => {
+  test("codex: exactly 17 specialist .toml files with the registry names", async () => {
     const dir = path.join(REPO_ROOT, "apps/codex-plugin/agents");
     const files = (await fs.readdir(dir)).filter((f) => f.startsWith("massa-ai-") && f.endsWith(".toml"));
-    expect(files.length).toBe(15);
+    expect(files.length).toBe(17);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.toml$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("cursor: exactly 15 specialist .md files", async () => {
+  test("cursor: exactly 17 specialist .md files", async () => {
     const dir = path.join(REPO_ROOT, "apps/cursor-plugin/agents");
     const files = (await fs.readdir(dir)).filter(
       (f) => f.startsWith("massa-ai-") && f.endsWith(".md"),
     );
-    expect(files.length).toBe(15);
+    expect(files.length).toBe(17);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("opencode: exactly 15 specialist .md files", async () => {
+  test("opencode: exactly 17 specialist .md files", async () => {
     const dir = path.join(REPO_ROOT, "apps/opencode-plugin/agents");
     const files = (await fs.readdir(dir)).filter((f) => f.startsWith("massa-ai-") && f.endsWith(".md"));
-    expect(files.length).toBe(15);
+    expect(files.length).toBe(17);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
@@ -655,6 +657,13 @@ describe("subagent parity — frozen baseline diff (MPR-R8)", () => {
     "opencode/planner",
   ]);
 
+  // The fixture is frozen to the base commit (45daaa1) and must never be regenerated, so it
+  // only ever names the 15 specialists that existed there — `judge`/`meta-judge` landed later
+  // via a concurrently-merged PR and have no baseline entry. Diff only the names the fixture
+  // actually has an opinion about; the two new charters are covered by the registry-derived
+  // assertions above instead, which is the correct instrument for a role with no "before".
+  const BASELINE_NAMES = Object.keys(BASELINE.agents) as SpecialistName[];
+
   test("baseline fixture is pinned to a commit, not read from the live tree", () => {
     expect(BASELINE.baseCommit).toMatch(/^[0-9a-f]{40}$/);
     expect(Object.keys(BASELINE.agents).length).toBe(15);
@@ -662,7 +671,7 @@ describe("subagent parity — frozen baseline diff (MPR-R8)", () => {
 
   test("no model changed outside the enumerated set (cursor excepted wholesale)", async () => {
     const unexpected: string[] = [];
-    for (const name of SPECIALIST_NAMES) {
+    for (const name of BASELINE_NAMES) {
       for (const host of ["claude", "codex", "cursor", "opencode"] as const) {
         const before = BASELINE.agents[name]![host]!;
         const after =
@@ -680,7 +689,7 @@ describe("subagent parity — frozen baseline diff (MPR-R8)", () => {
   });
 
   test("Claude and Codex key sets are UNCHANGED from the baseline", async () => {
-    for (const name of SPECIALIST_NAMES) {
+    for (const name of BASELINE_NAMES) {
       const claudeFm = parseMdFrontmatter(await readAgentMd("claude-plugin", name));
       expect(Object.keys(claudeFm)).toEqual(BASELINE.agents[name]!.claude!.keys);
       const codexKeys = [

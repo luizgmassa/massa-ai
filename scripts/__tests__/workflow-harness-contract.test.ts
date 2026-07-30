@@ -36,7 +36,7 @@ const WORKFLOWS_DIR = path.join(SKILL_DIR, "workflows");
 const REFERENCES_DIR = path.join(SKILL_DIR, "references");
 
 /** Total workflow files expected after the overhaul removed three routes. */
-const EXPECTED_WORKFLOW_COUNT = 35;
+const EXPECTED_WORKFLOW_COUNT = 36;
 
 /**
  * The workflows that mutate the repository. These, and only these, carry the
@@ -251,9 +251,9 @@ describe("delivery scope: only mutating workflows carry the delivery contract", 
     expect(leaked).toEqual([]);
   });
 
-  test("the read-only complement is exactly 19 workflows", async () => {
+  test("the read-only complement is exactly 20 workflows", async () => {
     const all = await listWorkflows();
-    expect(all.length - IMPLEMENTATION_WORKFLOWS.length).toBe(19);
+    expect(all.length - IMPLEMENTATION_WORKFLOWS.length).toBe(20);
   });
 });
 
@@ -368,10 +368,10 @@ describe("roster: nothing still advertises 16 specialists", () => {
     expect(hits).toEqual([]);
   });
 
-  test("the shell installers advertise 15", async () => {
+  test("the shell installers advertise 17", async () => {
     for (const rel of ["install.sh", "scripts/install-agents.sh"]) {
       const body = await fs.readFile(path.join(REPO_ROOT, rel), "utf8");
-      expect(body).toContain("15 subagent specialists");
+      expect(body).toContain("17 subagent specialists");
     }
   });
 });

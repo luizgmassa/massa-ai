@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Model and effort for the 15 subagent specialists now resolve from one registry, and
+- **Model and effort for the 17 subagent specialists now resolve from one registry, and
   three separate defects closed with it.** `skills/model-profiles.json` is the only
   hand-authored place that names a model or an effort level for any agent on any host;
   each charter declares a `metadata.model_tier` (replacing `metadata.model_hint`) and
@@ -30,8 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2. **The Cursor emitter had never produced a valid agent file.** It emitted `tools` and
      `reasoningEffort` — neither is a Cursor frontmatter key — plus a human-readable
      display name in `model:` where Cursor requires a model **ID**, and no `readonly`, which
-     is Cursor's only documented permission mechanism. All 15 Cursor agents now emit only
-     Cursor's documented fields, with `readonly: true` on the 12 read-only charters.
+     is Cursor's only documented permission mechanism. All 17 Cursor agents now emit only
+     Cursor's documented fields, with `readonly: true` on the 14 read-only charters.
      `model:` is `inherit` on every tier: Cursor publishes no display-name→ID mapping and
      its catalog lists no entry for two of the three models previously pinned there, so
      `inherit` is the documented default rather than a guessed ID. `cursor-agent models` is
@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
      `massa-ai-owned: true` ownership marker **moves** from frontmatter `metadata:` to a
      `<!-- massa-ai-owned: true -->` body comment. It moves rather than being deleted
      because `massa-ai-config agents uninstall` scopes by that literal substring: removing
-     it would have matched zero files, printed `removed 0`, and orphaned 15 installed
+     it would have matched zero files, printed `removed 0`, and orphaned 17 installed
      agents. The substring is unchanged, so uninstall also still matches agent files an
      older version installed in the frontmatter form.
 
@@ -56,10 +56,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Resolution is build-time because no host resolves a per-agent model from an env var;
   switching profiles means regenerating. One consequence is documented rather than worked
   around: `CLAUDE_CODE_SUBAGENT_MODEL` set to a real model silently defeats every registry
-  pin on Claude, because it overrides frontmatter. `FEATURES.md` loses its four 15-row
+  pin on Claude, because it overrides frontmatter. `FEATURES.md` loses its four 17-row
   per-host tables and all four rationale columns in favour of one role→tier table, guarded
   by a doc-drift test; `bun run verify:model-ids` probes the installed harness CLIs for
   unresolvable IDs and skips an absent CLI with a named reason instead of passing vacuously.
+
+  **Merge note:** `main` gained the `judge` and `meta-judge` charters (2 more specialists,
+  17 total) from a concurrently-merged PR while this branch was in review. Both still
+  declared `metadata.model_hint` under the retired convention; merging this branch onto
+  that state migrates them to `metadata.model_tier: deep` — matching their original
+  Claude/Codex pins (`opus` / `gpt-5.6-sol`, both this registry's `deep` tier) — and their
+  Cursor/OpenCode output now goes through the same emitter fixes as the other 15 (Cursor
+  `inherit` instead of the raw charter hint; OpenCode drops `name`/`metadata`).
+
+## [1.13.0] - 2026-07-30
+
+### Added
+
+- **`judge-with-debate` workflow + `meta-judge` and `judge` sub-agents (17 specialists).** A new
+  standalone workflow evaluates a user-supplied artifact through multi-agent debate: a meta-judge
+  authors a tailored evaluation specification once (two-stage syntactic/semantic validation with a
+  single named retry), three independent judges score it with quoted evidence, and the panel
+  debates disagreements over up to 3 rounds until consensus (overall gap ≤ 0.5, every criterion
+  gap ≤ 1.0, explicit accept) or reports an honest no-consensus — never a forced verdict. Judges
+  communicate through the filesystem only; the orchestrator computes consensus from structured
+  reply blocks and never opens judge report files. Reports persist under the new
+  `audits/judge/` family in `audit-report-io.md` (per-judge + consensus contracts, fidelity
+  checklists). Per-slot model diversity (meta `kimi-k3`, J1 `deepseek-v4-pro`, J2 `minimax-m3`,
+  J3 `GLM-5.2`) is requested per dispatch; hosts without dispatch-time model selection run charter
+  defaults and the verdict is marked `DIVERSITY DEGRADED`, with a per-invocation capability probe
+  so diversity activates automatically when a host gains the capability. Both charters are
+  registered across all four plugin bundles (Claude `opus`, Codex `gpt-5.6-sol`, Cursor charter
+  hint, OpenCode `opencode-go/kimi-k3` + `opencode-go/deepseek-v4-pro`), enforced by a new
+  workflow prose-contract test and the existing integrity/parity/validate-repository gates.
 
 ## [1.12.1] - 2026-07-30
 
