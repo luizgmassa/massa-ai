@@ -7,21 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.15.0] - 2026-07-30
-
-### Added
-
-- **`skills/` duplication and reachability now ship as a committed regression gate.**
-  `scripts/skills-duplication-metric.ts` measures shingled line duplication across every
-  `skills/` Markdown file (`duplicatedLines` is the total footprint, `excessLines` is the
-  removable figure — `length × (copies - 1)` — and the two are now reported and tested
-  separately after an earlier draft conflated them) and `scripts/skills-reference-graph.ts`
-  resolves every `skills/` file against the rest of the repository to flag orphaned or
-  weakly-referenced files. Both ship with unit tests reached by `bun run test:scripts`, and
-  `excessLines` carries a ceiling assertion so future duplication growth fails the gate
-  instead of accumulating silently; a snapshot-equality assertion was rejected because it
-  would go red on any unrelated edit.
-
 ### Changed
 
 - **The graph-neighbor search stream is now a standalone capability module.** `buildGraphStream`
@@ -290,6 +275,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Every source file this work touches is at or above the 90% coverage floor, with no new exemption
   added: the lowest is the project-indexing module at **94.57%**, and the six other modules extracted
   over this series sit between 95.54% and 100%.
+
+## [1.15.0] - 2026-07-30
+
+### Added
+
+- **`skills/` duplication and reachability now ship as a committed regression gate.**
+  `scripts/skills-duplication-metric.ts` measures shingled line duplication across every
+  `skills/` Markdown file (`duplicatedLines` is the total footprint, `excessLines` is the
+  removable figure — `length × (copies - 1)` — and the two are now reported and tested
+  separately after an earlier draft conflated them) and `scripts/skills-reference-graph.ts`
+  resolves every `skills/` file against the rest of the repository to flag orphaned or
+  weakly-referenced files. Both ship with unit tests reached by `bun run test:scripts`, and
+  `excessLines` carries a ceiling assertion so future duplication growth fails the gate
+  instead of accumulating silently; a snapshot-equality assertion was rejected because it
+  would go red on any unrelated edit.
 
 ### Fixed
 
