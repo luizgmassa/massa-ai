@@ -186,6 +186,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   these two. The reasoning behind each decision lives in the project's own records rather than in the
   source, for that reason.
 
+- **The search service's own notes on why its surface is public are now accurate.** Ten comments inside
+  the service still explained nine public methods and one public field as a concession to a delegate file
+  that no longer exists — the previous step in this series deleted it. They are replaced by the two
+  reasons that actually hold: the class keeps its published method surface for the twenty-four modules
+  that import it, and the query-understanding field additionally has a live production reader, the one
+  that resolves cache-invalidation targets after a rename.
+
+  No behaviour, signature or exported name changes, and nothing leaves the public surface. It is worth a
+  line rather than silence because the two reasons are not interchangeable: tightening the nine methods
+  back to private is caught by no automated check in this repository, while tightening the field is a
+  compile error. Anyone later deciding whether a modifier can be narrowed needs to know which of the two
+  they are holding.
+
 ## [1.11.0] - 2026-07-29
 
 ### Changed

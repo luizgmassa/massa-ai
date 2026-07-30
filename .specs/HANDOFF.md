@@ -1,12 +1,67 @@
 # Handoff
 
-## Active — Core Layering and God-Module Split (PR-B), Phase 1 started
+## Active — Core Layering and God-Module Split (PR-B), **Phase 1 COMPLETE**
 
 **Feature**: `core-layering-god-module-split` · branch
 `refactor/search-facade-split-phase-1b`, cut from `main` @ `5247ecb` (v1.11.0),
 worktree `../massa-ai-wt-facade-phase-1b`.
-**T6a and T6 are merged and released; T7–T13 are committed and green; T14 is not started and has been
-re-scoped.** Working tree clean. Nothing is pushed — the branch is local only, now eight commits deep.
+**T6a and T6 are merged and released; T7–T14 are committed and green. Phase 1 is closed. T15 is
+next and begins Phase 2.** Working tree clean. Nothing is pushed — the branch is local only, now ten
+commits deep.
+
+---
+
+**T14 is done and Phase 1 is closed. It moved no structural sensor at all, which is the T11 property
+and this time was the entire point.** The ten stale `Visibility relaxed` notes are gone and the two
+reasons that actually hold are in their place: §4.3's 21-public-method compatibility surface for the
+nine methods, §4.3.1 plus a live production reader for the one field. One file, comments only,
+**+23 / −24**, `maxFileLoc` **697 → 696**. **G-HUB's output is byte-identical to the pre-edit run
+except that one number** — the sharpest statement of invariance available here. AC-3 budget **0**,
+spent **0**, the third task with no test file in its diff.
+
+**Four T14 results a resumer must not re-derive. The first is the eleventh plan defect and it is the
+third consecutive defect in this one task row.**
+
+1. **Eleventh plan defect: the private-revert is a *truth check*, not a discriminating sensor, and the
+   T14 row said otherwise.** Measured on **both** states, same harness (10 markers verified applied,
+   diff-vs-pristine 40 lines, refuse-on-byte-identical, restore diffed clean): `tsc` **exit 2, exactly
+   1 `error TS` line, exactly 1 TS2341**, at `production-wiring.ts(51,32)` — **identical before and
+   after**, because T14 edits only comments and the mutation edits only modifiers. By T7's vocabulary
+   that is an invariance check. Citing it as discriminating would have let T14 report a sensor an empty
+   commit also passes. **Resolved as a relabel plus one addition, not a scope change** — the set was
+   always sufficient. **Truth check**: the private revert. **Discriminating pair**: `Visibility
+   relaxed` 10 → 0 *and* the replacement comments present, neither half sufficient alone. **The pair
+   needed a positional check**, on a plan-critic finding: asserting only that both `§4.3` and `§4.3.1`
+   appear somewhere is passed by a replacement that **swaps them**, which is the "the ten sites are not
+   one group" violation. Closed structurally — each citation sits adjacent to the group it justifies,
+   so the field block at `:114` holds §4.3.1 and the nine-method block at `:456` holds §4.3 and **not**
+   §4.3.1, and a swap is no longer expressible without moving a comment past 340 lines of class body.
+   *Generalises, completing the ninth-and-tenth sentence: the ninth read an axis its task did not move,
+   the tenth a population its task could not clear, the eleventh an axis its task moves nothing on. A
+   sensor's label is part of the sensor.*
+2. **The recorded subject was four lines short, and the grep is why.** *"11 lines: the 10 comments plus
+   `:88`"* misses `:95-98`, which said the notes *"below are historical … Removing them is T14's …
+   leaving them here is deliberate"* — false the moment T14 removes them, and **containing no
+   `rlm-search` substring**, so the 13-line sweep that produced the enumeration could not see it. Short
+   by two more on the other side: `:86-88` is one sentence. **Reviewer decision (2026-07-30): rewrite
+   `:86-99`, preserving `:92-94`'s provenance** — *"do not touch `:93`"* read as preserve-the-record,
+   not literal-line immutability. The authority to widen at all is **T10's own rule** about correcting
+   stale comments in a source file already in the write set. Final subject **24 lines**. `:184` (now
+   `:185`) untouched, and `rlm-search` in the root goes **13 → 4**: `:91`/`:108`/`:446` provenance plus
+   `:185` PATCHABLE.
+3. **The replacement follows two precedents already in this file that the plan never cited.** T12
+   rewrote the `fileFilterCache` note at `:102-105` and T6 the `RRF_K` note at `:115-118` into the same
+   shape — past tense, who removed the reader, where it went, why the member stays public, with
+   evidence sites. T14 is the third application, not a new pattern. **A plan critic reported the
+   `RRF_K` note as dead-reference staleness in T14's scope; it is not** — past tense, names
+   `result-fusion.ts` as the current home, and `RRF_K` really is at `result-fusion.ts:19`. Left alone.
+   Ninth two-methods-two-answers here, and the **third figure this agent has got wrong**: keep its
+   findings, re-run its numbers.
+4. **A CHANGELOG anchor reported a miss and the miss was the anchor's.** Verifying eight entries by
+   substring, `"injection seam"` returned 0 in `[Unreleased]` — T11's bullet is worded *"can now be
+   supplied from outside the search service"*. The entry was there all along. Same failure mode as the
+   rest of this feature, pointing the other way: a mechanical check with a wrong *pattern* reports a
+   fact about itself as a fact about the subject. Settled by listing all eight bullet first-lines.
 
 ---
 
@@ -242,49 +297,53 @@ function. AC-3 budget was **0** and **0** was spent: no existing test file appea
 > missing when it was raised**: the same question was asked a third time at `queryUnderstanding`, the
 > mechanism *did* fire there, and the gate still did not move (reach 1, ceiling 3). So the pattern
 > across all three sites is consistent — narrow for honesty, and never quote the narrowing as a fired
-> sensor. **Ratify or reverse now.**
+> sensor. ~~**Ratify or reverse now.**~~ **Ratified at the T13/T14 boundary (2026-07-30).** No task
+> re-raises it.
 >
-> **A second decision is open at this boundary and it is new: the ninth plan defect's resolution.**
-> T14's sensor was re-scoped on a reviewer answer taken during T13 (see result 1 above). T13 was
-> committed on that basis. Nothing is irreversible — reversing it means T14 re-earns a discriminating
-> sensor from somewhere else, since G-HUB and D1 are both spent.
+> ~~**A second decision is open at this boundary and it is new: the ninth plan defect's resolution.**~~
+> **Also discharged at that boundary.** T14's sensor was re-scoped on a reviewer answer taken during
+> T13; the re-scope stands, and T14 executed against it. What the reviewer settled at the same time,
+> because T14's own measurement raised it: the eleventh defect is **an in-task correction, not a stop**
+> (the mutation-label relabel and the four-line subject undercount are both wording and scope, resolved
+> on the T10/T12 precedent of correcting the row inside the task's own commit — see T14 result 1 and 2
+> above); the subject **widens to `:86-99`** with `:92-94`'s provenance preserved; and the replacement
+> is **per-group, at each group's site**, which is what makes the citation-swap shape unexpressible.
+> **No reviewer decision is open at the T14/T15 boundary.**
 
-**Next action: T14 — and it is a different task from the one the plan wrote.** Budgeted 2 h and now
-smaller: G-HUB and D1 are both spent at T13, so T14's subject narrows to the root's final cleanup and
-its sensor was re-scoped by the reviewer at this boundary (result 1 above). Concretely:
+**Next action: T15 — GMS-04's non-source sites. Phase 1 is closed; this opens Phase 2.** Budgeted
+45 m. Read *T15's sensor, scoped* in `tasks.md` before anything else, then *T13 and T15*. Concretely:
 
-1. **Read *Tenth plan defect: T14's re-scoped sensor is both unsatisfiable and tautological* in
-   `tasks.md` before anything else — the sensor this file
-   recorded during T13 is wrong in both halves, and it was written by the executor from the
-   reviewer's option text without measuring its scope.** `git grep -l 'rlm-search' --
-   packages/core/src` → empty is **unsatisfiable** (31 matches across 9 files; `rlm-search.test.ts`
-   alone contributes nine, and this plan already defers that file's rename to T15), and reaching it
-   would mean either widening the write set or re-scoping mid-task. `'Visibility relaxed' 10 → 0` is
-   a **tautology** — satisfied by bare deletion, because nothing checks that the replacement exists.
-   **Both defects reproduced independently by the executor and by a read-only plan critic.**
-2. **The replacement sensor is a mutation, not a grep**: reprivatise the ten members and
-   `bunx tsc --noEmit -p packages/core/tsconfig.json` must report **exactly 1 × TS2341**, on
-   `queryUnderstanding`, from `production-wiring.ts:51`. Measured, mutation verified applied, restore
-   diffed. Plus two positive content checks: `rlm-search.test.ts:156` still cited exactly once in the
-   root, and the replacement block naming **§4.3 for the nine methods, §4.3.1 for the one field**.
-3. **The ten sites are two groups, and the replacement comment must not merge them.** Nine are public
-   *methods* kept by §4.3's 21-public-method compatibility surface — reprivatising them is caught by
-   **nothing any gate can see**, because `packages/core/tsconfig.json` excludes `src/__tests__` and
-   `bun run type-check` covers four other packages. One is the field `queryUnderstanding`, kept by a
-   **live production reader** at `production-wiring.ts:51`. Neither reason is `rlm-search.ts`.
-4. **Subject is 11 lines in `contextual-search-rlm.ts`**: the 10 comments plus `:88`. **Do not touch
-   `:93`** (T13's own record of the deletion) **or `:184`** (class 1 — the only place in source
-   recording PATCHABLE's evidence trail; deleting it is the violation shape no proposed check caught).
-5. **T13 left those 10 comments deliberately** and the root says so in a comment. Do not read the
-   omission as an oversight, and do not treat removing them as scope creep — it is T14's subject.
-3. **The root has 3 lines of headroom against `MAX_FILE_LOC` 700** (697), `hybrid-search.ts` has 14
-   (686). T14 only removes lines, so it is safe — but do not add prose. Two unspent trims are recorded
-   in `tasks.md` if a later task needs them.
-4. **No structural sensor should move at all** — the T11 property. If G-HUB, D1 or any pass count
-   changes, T14 is wrong, not the check.
-
-Then Phase 1 is complete and Phase 2 (T15–T20) begins. **T15 must re-enumerate its site list**: it is
-frozen at `ce26f28` at 19 and the live count is now **29** (see `tasks.md`, *T13 and T15*).
+1. **Re-enumerate. Do not work from the plan's list.** It is frozen at `ce26f28` at **19** tracked
+   files; measured **29** after T13. T14 cut the root's `rlm-search` lines 13 → 4 but removed no file
+   from the set, so 29 is the number to re-confirm, not to assume. **Enumerate with `git grep -l -P`
+   and explicit pathspec exclusions** — never the shell's `grep`, which here is a ugrep shim honouring
+   `.gitignore` and independently produced 19 where the correct answer was 29. **`-P`, not `-E`**:
+   POSIX ERE has no `\s`, and the wrong flag returns zero matches with exit 1, which reads exactly like
+   a clean sweep. **Take the count with everything staged** — `git grep` enumerates tracked files only,
+   and the same command a minute before `git add` has been wrong twice.
+2. **Two classes, and T15 must not report them as one number.** Class 1 is a reference to an
+   `rlm-*.test.ts` file, which *survives* PR-B — renaming those suites is T15's own decision, so these
+   are consistent, not stale. Class 2 is a reference to a now-deleted `rlm-*.ts` source: legitimate
+   historical provenance pointing at a path that no longer resolves. After T14 the root's own three
+   are class 2 (`:91`, `:108`, `:446`) and its fourth (`:185`) is class 1.
+3. **The named sites**: `docs/ONBOARDING.md:147,148,177`, `CLAUDE.md:157`, and the two the first draft
+   missed — `architecture-map.test.ts:454-455` and `search-controller.test.ts:3`, both comments citing
+   test files this PR renames. **The needles fixture is NOT a site** (PR-A content-anchored all 14
+   needles; spec correction C4). Five stale `rlm-admin` mentions in
+   `contextual-search-rlm-coverage.test.ts` (`:8`, `:9`, `:10`, `:84-85`) were left to T15 by T12
+   deliberately.
+4. **The sensor is zero hits outside `CHANGELOG.md`, `.specs/` and `.ua/`, enumerated by a script over
+   `git ls-files`** so the count cannot depend on which `grep` is on PATH. **AC-3 as written is
+   unsatisfiable** — 320 `rlm-` occurrences live in three tracked generated `.ua/` artifacts, and
+   `.ua/` regeneration is deferred to after PR-C, so **PR-B does not close GMS-04 AC-3** for them and
+   must not claim to.
+5. **The two test-file comment corrections are explicitly authorised** and are the only test-file edits
+   in PR-B outside the 4 rename sites. **Finding a third is a signal to stop, not a chore** — and
+   T20's verifier has to be told all of this, or 19 authorised assertion changes in a PR claiming "no
+   test weakened" read as the violation they are not.
+6. **Do not start T16 without asking.** It edits CI and requires verifying the live `main` branch
+   ruleset through `gh api` — a repo-settings change in a different risk class, and SEN-02 AC-5 is the
+   recorded reason it needs its own decision.
 
 **Read the branch note before anything else.** T6a and T6 landed in `main` via **PR #46, which was
 squashed, not merged** — R-04 was violated. None of its 8 commits are ancestors of `main`, the
@@ -303,7 +362,9 @@ the remote and is **not** this work. **This PR must be merged with a merge commi
 | T10 | `b9d444d` | six indexing surfaces → `project-indexer.ts` with `IndexerDeps`; `ensureInitializedImpl` absorbed into the root; **`rlm-indexing.ts` deleted whole**; a third LATE-BIND sensor |
 | T11 | `23470ce` | `injectedDeps.indexManager` — the F4 seam (the only *added* seam in PR-B); `index-manager-seam.test.ts`, red under three violation shapes |
 | T12 | `484e61a` | four admin surfaces → `index-admin.ts` with `IndexAdminDeps`; **`rlm-admin.ts` deleted whole**; `index-admin-late-bind.test.ts`, red under five mutation shapes; the eighth plan defect |
-| T13 | this commit | five search surfaces → `hybrid-search.ts` with an 8-key `HybridSearchDeps`; **`rlm-search.ts` deleted whole** — the last delegate; `hybrid-search-late-bind.test.ts` widened to 4 tests, red under six shapes; **G-HUB exit 1 → 0**; the ninth plan defect |
+| T13 | `1090504` | five search surfaces → `hybrid-search.ts` with an 8-key `HybridSearchDeps`; **`rlm-search.ts` deleted whole** — the last delegate; `hybrid-search-late-bind.test.ts` widened to 4 tests, red under six shapes; **G-HUB exit 1 → 0**; the ninth plan defect |
+| — | `ba8d2bc` | plan amendment: T14's sensor corrected — the tenth plan defect |
+| T14 | this commit | the root's final cleanup — ten stale `Visibility relaxed` notes replaced per group (§4.3 for the nine methods, §4.3.1 for the one field), the T13 hand-off block retired; **Phase 1 closes**; the eleventh plan defect |
 
 Gates at T10: `lint` 0 · `type-check` 0 (6/6) · `build` 0 (5/5) · `test:scripts` **732 pass / 0 fail
 across 39 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
@@ -357,6 +418,25 @@ individually unchanged · `search-synapse-integration` **5/0** · `session-bias`
 scoped LOC **524 → 0** · T15's `rlm-` count **30 → 29**, the first decrement · CHANGELOG released
 section still **974 lines, byte-identical to `353de59`**, all seven `[Unreleased]` entries verified
 present there and absent from the released section, positionally and per entry.
+
+Gates at T14 — **every figure identical to T13 except the one line T14 removes, which is the whole
+claim**: `lint` 0 · `type-check` 0 (6/6) · `build` 0 (5/5) · `test:scripts` **732 pass / 0 fail across
+39 files**, exit 0 · `check-frozen-anchors` exit 0 (14 anchors) · `check-characterization` exit 0 (3/3) ·
+characterization net **160** across 7 suites (26·41·31·21·25·7·9), every suite individually unchanged ·
+`session-bias` **10/0** · `session-bias-late-bind` **3/0** · `hybrid-search-late-bind` **4/0** ·
+`project-indexer-late-bind` **4/0** · `index-admin-late-bind` **4/0** · `index-manager-seam` **3/0** ·
+`search-ranking-regression` **2/0** · `search-dependency-outage` **9/0** · `search-filter-overfetch`
+**10/0** · `search-admission-preflight` **5/0** · `search-synapse-integration` **5/0** · **G-HUB exit
+0**, 24 files, foreign **1**, reach **1** by `search-warmup.ts`, members 18, `perModule {csr 18,
+warmup 1}`, zero types above the ceiling, `maxFileLoc` **697 → 696** against 700 — and the **G-HUB
+output is byte-identical to the pre-edit run except that number** · EXCLUSIONS **9** · D1
+`delegateScope` **0**, facade-taking **0**, scoped LOC **0** · discriminating pair: `Visibility
+relaxed` **10 → 0** *and* both replacement comments present, positionally checked · truth check: the
+private revert of all ten gives `tsc` exit 2, **exactly 1 `error TS` line, exactly 1 TS2341**, at
+`production-wiring.ts(51,32)`, **on both states** · guard: `rlm-search.test.ts:156` still cited **1**,
+`rlm-search` in the root **13 → 4** · CHANGELOG released section still **974 lines, byte-identical to
+`353de59`**, all **eight** `[Unreleased]` entries present there and absent from the released section,
+positionally and per entry.
 
 **Three suite baselines T13 had to measure because no prior record carried them**, and a sensor with
 no before-value reports nothing: `search-dependency-outage` **9/0**, `search-filter-overfetch`
@@ -506,7 +586,7 @@ the AC-3 violation they are not.
 Merge must be a merge commit, not a squash (R-04) — see the branch note above for what a squash
 already cost once.
 
-**CHANGELOG**: `[Unreleased]` now carries T7, T8, T9, T10, T11 and T12 under `### Changed`. Once `main` cuts
+**CHANGELOG**: `[Unreleased]` now carries all eight — T7 through T14 — under `### Changed`. Once `main` cuts
 another release, verify **both** directions positionally after any merge — that this branch's entries
 are in `[Unreleased]` **and** absent from the released section, and that the released section is
 byte-identical to its published form. Asserting only that the old entry survived is the asymmetric

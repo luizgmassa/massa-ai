@@ -83,20 +83,16 @@ import {
  * ContextualSearchRLM - Main contextual search service
  */
 export class ContextualSearchRLM {
-  // NOTE (M14 Phase 3): fields below were `private`. Relaxed to `public`
-  // (modifier dropped) so the extracted delegate modules in
-  // rlm-search.ts can read them via the passed `rlm` parameter.
-  // Runtime-identical; type-surface only. See design.md
-  // "Encapsulation decision (accepted cost)".
-  //
-  // PR-B T10 dropped rlm-indexing.ts from that list, T12 dropped rlm-admin.ts,
-  // and T13 dropped rlm-search.ts — all three read these through their deps
-  // records now, never off the instance, and all three files are deleted. **No
-  // extracted module reads any of these fields any more**, so the "Visibility
-  // relaxed" notes below are historical as of this commit. Removing them is
-  // T14's, which owns the root's final cleanup and needs them as its
-  // discriminating sensor; leaving them here is deliberate, not an oversight.
-  // The fields stay public regardless (design.md §4.3.1, the ~80 stub sites).
+  // NOTE (M14 Phase 3): the fields below were `private`, relaxed to `public`
+  // so the extracted delegate modules could read them off the instance via a
+  // passed `rlm` parameter (.specs/features/god-files-refactor/design.md,
+  // "Encapsulation decision (accepted cost)"). That reason is spent: PR-B T10
+  // dropped rlm-indexing.ts from that list, T12 dropped rlm-admin.ts and T13
+  // dropped rlm-search.ts — each reads what it needs through its own deps
+  // record, never off the instance, and all three files are deleted. **No
+  // extracted module reads any of these fields any more.** They stay public on
+  // their own merits — per field below, and per design.md §4.3.1: the ~80
+  // post-construction `(rlm as any).<member> = …` sites a `private` breaks.
   keywordSearch!: Awaited<ReturnType<typeof getKeywordSearch>>;
   vectorStore!: Awaited<ReturnType<typeof getVectorStore>>;
   indexManager!: IndexManager;
@@ -109,7 +105,12 @@ export class ContextualSearchRLM {
   // (contextual-search-rlm-coverage.test.ts:343,354; rlm-admin.test.ts:85,96).
   fileFilterCache: FileFilterCache;
   /** Phase 2: query understanding (LLM rewrite + HyDE). Default-off, silent-degrade. */
-  // Visibility relaxed from `private` so rlm-search.ts can read via rlm param.
+  // Was relaxed from `private` so rlm-search.ts could read it via the rlm
+  // param; T13 removed that reader — hybrid-search.ts takes it through
+  // `HybridSearchDeps`. Still public for two reasons: design.md §4.3.1's
+  // post-construction stub sites, and a live production reader at
+  // project-identity/production-wiring.ts:51 — the only one of these ten
+  // members a gate can see, since reprivatising it is TS2341.
   queryUnderstanding: QueryUnderstandingService;
   // RRF_K was a public field only so rlm-fusion.ts could read it off the
   // instance. It is the literal 60 and is now a module constant in
@@ -441,11 +442,17 @@ export class ContextualSearchRLM {
     return search(this.#hybridSearchDeps(), query, projectId, options);
   }
 
+  // The nine public methods from here to `filterByPatterns` all delegate to a
+  // capability module. They were relaxed from `private` so rlm-search.ts could
+  // call them via the rlm param; T13 removed that caller and deleted the file.
+  // They stay public under design.md §4.3, "the class keeps its 21 public
+  // methods", a compatibility surface for 24 importers — and under nothing
+  // mechanical: measured at T14, reprivatising all nine produces zero gate
+  // failures, because packages/core/tsconfig.json excludes src/__tests__.
   /**
    * Apply session state after the session-independent base result is cached.
    * Invalid and workspace-mismatched sessions return the exact base array.
    */
-  // Visibility relaxed from `private` so rlm-search.ts can call via rlm param.
   async applySynapseState(
     baseResults: SearchResult[],
     query: string,
@@ -509,7 +516,6 @@ export class ContextualSearchRLM {
   }
 
   /** Fuzzy-correct query terms against the keyword store's vocabulary; see hybrid-search.ts. */
-  // Visibility relaxed from `private` so rlm-search.ts can call via rlm param.
   async correctQuery(query: string): Promise<string | null> {
     return correctQuery(this.#hybridSearchDeps(), query);
   }
@@ -534,7 +540,6 @@ export class ContextualSearchRLM {
    * appends the stream when non-empty, so `resultSets.length` (and thus the
    * `search:reranked` streamCount) always reflects the real stream count.
    */
-  // Visibility relaxed from `private` so rlm-search.ts can call via rlm param.
   async buildGraphStream(
     resultSets: SearchResult[][],
     maxResults: number,
@@ -556,7 +561,6 @@ export class ContextualSearchRLM {
    * - Keywords get higher weight when query contains function/class names
    * - Exact matches in keyword results get additional boost
    */
-  // Visibility relaxed from `private` so rlm-search.ts can call via rlm param.
   fuseResults(
     resultSets: SearchResult[][],
     query: string,
@@ -568,7 +572,6 @@ export class ContextualSearchRLM {
   /**
    * Generate detailed score explanation
    */
-  // Visibility relaxed from `private` so rlm-search.ts (fuseResults) can call via rlm param.
   generateScoreExplanation(
     finalScore: number,
     rrfScore: number,
@@ -592,7 +595,6 @@ export class ContextualSearchRLM {
   /**
    * Add expanded context to results
    */
-  // Visibility relaxed from `private` so rlm-search.ts can call via rlm param.
   async addContextToResults(
     results: SearchResult[],
     _projectId: string,
@@ -603,7 +605,6 @@ export class ContextualSearchRLM {
   /**
    * Extract content preview (first lines)
    */
-  // Visibility relaxed from `private` so rlm-search.ts can call via rlm param.
   extractPreview(content: string, maxLines: number = 5): string {
     return extractPreview(content, maxLines);
   }
@@ -611,7 +612,6 @@ export class ContextualSearchRLM {
   /**
    * Calculate average score
    */
-  // Visibility relaxed from `private` so rlm-search.ts can call via rlm param.
   calculateAvgScore(results: SearchResult[]): number {
     return calculateAvgScore(results);
   }
@@ -619,7 +619,6 @@ export class ContextualSearchRLM {
   /**
    * Filter results by glob patterns
    */
-  // Visibility relaxed from `private` so rlm-search.ts can call via rlm param.
   filterByPatterns(
     results: SearchResult[],
     include?: string[],

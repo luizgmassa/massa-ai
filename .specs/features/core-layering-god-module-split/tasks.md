@@ -7,7 +7,8 @@
 - **Status**: written 2026-07-29 against `main` @ `ce26f28`; **revised 2026-07-29** after an
   independent Plan Challenge on this file (see [Plan Challenge — tasks](#plan-challenge--tasks)).
   Approved. Execute authorised; branch `refactor/search-facade-split` cut from `ce26f28`.
-  **Phase 0 (T0–T5) and Phase 1 T6a–T13 are COMPLETE; T14 is next, re-scoped** — see
+  **Phase 0 (T0–T5) is COMPLETE and Phase 1 (T6a–T14) is COMPLETE; T15 is next and must
+  re-enumerate its site list** — see
   [Phase 0 — executed](#phase-0--executed) and [Phase 1 — executed](#phase-1--executed) for
   per-task commits and observed sensors; those tables are authoritative for task state, not this
   line. *(This line read "T6 not started" and had been false since T7; corrected at
@@ -186,7 +187,7 @@ it is cheapest and `searchImpl` (455 LOC, 13 members) lands last, when everythin
 | **T11** | `IndexManager` injection seam (**F4**) | **`contextual-search-rlm.ts`** — re-pointed. The first draft named `rlm-indexing.ts:586`, which is *inside* `ensureInitializedImpl` and no longer exists after T10. | the one dependency that cannot be injected today; add the `injectedDeps.indexManager` field | default to today's direct construction; a parity test proves behavior identical when nothing is injected — **plus one positive test that an injected stub `IndexManager` is actually read**, since the parity test alone exercises only the default path and cannot fail on a seam that is wired but never consulted | 1.5 h |
 | **T12** | admin surfaces | `rlm-admin.ts` → `index-admin.ts` | ~~six stores~~ **three** stores (`vectorStore`, `keywordSearch`, `searchCache`) + `fileFilterCache` + `analytics` + the re-entrant `search` callback. **Narrow `fileFilterCache` with `Pick<>`; do NOT narrow the analytics field** — see [the eighth plan defect](#eighth-plan-defect-the-seventh-defects-t12-sites-do-not-fire-and-the-analytics-field-cannot-be-narrowed) | `rlm-admin.test.ts` (**7** cases) + the 4 `fileFilterCache` assignment sites. **Plus the T10 gate**: the hub metric reports exactly **one** type above the ceiling and it is `ContextualSearchRLM` — read the whole `types` array, not the `ContextualSearchRLM` row. **Plus the memo mutation, run against T12's own surface** (T9's finding; T10 measured it blind at the richest surface in the repo, so do not infer) — on a delegate with **no preceding `await`**, or it starves the event loop and hangs instead of failing at 5 s. *(Measured at T12: "no preceding `await`" is necessary and **not sufficient** — see the executed row.)* | 1.5 h |
 | **T13** | search surfaces | `rlm-search.ts` → `hybrid-search.ts` | `keywordSearch`, `vectorStore`, `searchCache`, `analytics`, `queryUnderstanding` → `HybridSearchDeps`. **`queryUnderstanding: QueryUnderstandingService` is the one genuinely open seventh-defect site left** — `QueryUnderstandingService` is declared in the gated directory, is a bare nominal type, and §2.1 shows `searchImpl` *dereferences* it. **Measure both variants by scratch simulation before choosing**, the way T12 did; do not inherit T12's answer, which was "does not fire" for reasons specific to its two fields. The analytics field carries T12's measured finding: it cannot fire and cannot be `Pick<>`-narrowed | `rlm-search.test.ts` (**31** cases) + `search-dependency-outage` + `search-filter-overfetch` + `search-ranking-regression` pass counts. **Plus the same three T10 additions as T12**: one-violation hub check, own memo mutation, mutation subject with no preceding `await` — **and read T12's refinement of that last one first, because on T12's surface no subject satisfied it**. ~~Also the point where `hybrid-search-late-bind.test.ts`'s third test must widen from one key to five.~~ **Wrong by three, and incomplete: measured at T13, the record is 8 keys, test 1 could not survive unchanged, and a test 4 was needed — see [the disposition of §2.1's thirteen](#t13--the-disposition-of-21s-thirteen).** **Plus a new hard one: `contextual-search-rlm.ts` is 675 LOC against G-HUB's `MAX_FILE_LOC` 700** — T12 left **25** lines of headroom and T13 grows the root again (`#hybridSearchDeps()` goes from 1 field to 5, plus hoisted `await`s on four more methods). Crossing 700 makes G-HUB exit 1 on a second, independent axis and T14 unclosable. Keep the prose on `HybridSearchDeps` in `hybrid-search.ts`, as T12 did | **5.5 h** |
-| **T14** | root → composition root | `contextual-search-rlm.ts` | ~~assemble narrow deps **per call**~~ — done incrementally at T8–T13; state fields stay public (§4.3.1). **Re-scoped at the T13 review point to the root's final cleanup, then re-scoped again after measurement** — see [the tenth plan defect](#tenth-plan-defect-t14s-re-scoped-sensor-is-both-unsatisfiable-and-tautological). Subject is **11 sites in `contextual-search-rlm.ts`**: the 10 `Visibility relaxed` comments plus `:88`. **`:93` and `:184` must NOT be touched** — the first is T13's own record of the deletion, the second is class 1 and the only place in source recording PATCHABLE's evidence trail | ~~**G-HUB** exits **0**~~ (fires at T13 — ninth defect) and ~~`git grep -l 'rlm-search'` → empty~~ (**unsatisfiable — tenth defect**). G-HUB exit 0 and the D1 zeros are **invariance** checks (T7's vocabulary). The **discriminating** sensor is the **private-revert mutation**: reprivatise the ten members and `bunx tsc --noEmit -p packages/core/tsconfig.json` must report **exactly 1 × TS2341**, on `queryUnderstanding`, from `production-wiring.ts:51`. Plus two positive content checks, because a grep reaching 0 is satisfied by bare deletion: `git grep -c 'rlm-search.test.ts:156' -- …/contextual-search-rlm.ts` stays **1**, and the replacement block cites **§4.3 for the nine methods and §4.3.1 for the one field** | 2 h |
+| **T14** | root → composition root | `contextual-search-rlm.ts` | ~~assemble narrow deps **per call**~~ — done incrementally at T8–T13; state fields stay public (§4.3.1). **Re-scoped at the T13 review point to the root's final cleanup, then re-scoped again after measurement** — see [the tenth plan defect](#tenth-plan-defect-t14s-re-scoped-sensor-is-both-unsatisfiable-and-tautological). Subject is **11 sites in `contextual-search-rlm.ts`**: the 10 `Visibility relaxed` comments plus `:88`. **`:93` and `:184` must NOT be touched** — the first is T13's own record of the deletion, the second is class 1 and the only place in source recording PATCHABLE's evidence trail | ~~**G-HUB** exits **0**~~ (fires at T13 — ninth defect) and ~~`git grep -l 'rlm-search'` → empty~~ (**unsatisfiable — tenth defect**). G-HUB exit 0 and the D1 zeros are **invariance** checks (T7's vocabulary). ~~The **discriminating** sensor is the **private-revert mutation**~~ — **corrected at T14, the eleventh defect: the private-revert is a *truth check*, invariant across this task's edit, and the discriminating sensor is the *pair* below.** The **truth check**: reprivatise the ten members and `bunx tsc --noEmit -p packages/core/tsconfig.json` must report **exactly 1 × TS2341**, on `queryUnderstanding`, from `production-wiring.ts:51`. The **discriminating pair**, neither half sufficient alone: `git grep -c 'Visibility relaxed' -- packages/core/src` **10 → 0** *and* the replacement comments citing **§4.3 for the nine methods and §4.3.1 for the one field**, checked **positionally** — the citation must sit adjacent to the group it justifies, or a swap passes. Plus one guard: `git grep -c 'rlm-search.test.ts:156' -- …/contextual-search-rlm.ts` stays **1** | 2 h |
 
 **Every task in Phase 1 additionally runs:** `bun run lint`, `bun run type-check`,
 `bun scripts/check-frozen-anchors.ts`, `bun scripts/check-characterization.ts`, and
@@ -213,6 +214,7 @@ be merged with a merge commit.**
 | T11 | `23470ce` | `injectedDeps.indexManager` — the F4 seam, the only *added* seam in PR-B | **Three violation shapes, each observed red before the sensor was trusted, and `tsc` blind to all three.** New `index-manager-seam.test.ts` **3/0** honest; **2/1** under each of: the seam never consulted, the default path deleted, and the seam correct but hoisted above the `Promise.all`. **Two of the three are invisible to every pre-existing suite** — see the section below; that is plan-critic finding 7 measured rather than asserted. Invariance, all unchanged: `rlm-indexing.test.ts` **25**, `concurrent-indexing.test.ts` **9**, coverage **41**, characterization net **160**. **No movement in any structural sensor**, as predicted: D1 `delegateScope` **9 → 9**, facade-taking **6 → 6**, scoped LOC **626 → 626**; G-HUB exit 1 with `perModule` byte-identical. **T10's seventh-defect gate run and passed**: exactly **one** type above the ceiling and it is `ContextualSearchRLM`; `IndexManager` foreign **0 → 0**, reach **0 → 0**, members **7 → 7**. AC-3 budget **0**, spent **0** — no existing test file appears in the diff at all |
 
 | T13 | this commit | five search surfaces → `hybrid-search.ts` with a widened `HybridSearchDeps`; **`rlm-search.ts` deleted whole** — the last of the five `rlm-*.ts` delegates; `hybrid-search-late-bind.test.ts` widened 3 → 4 tests | **G-HUB exit 1 → 0.** `ContextualSearchRLM` foreign **2 → 1**, reach **14 → 1** (`search-warmup.ts`), members **23 → 18**, `perModule {csr 18, warmup 1}`, **zero** types above the ceiling. `maxFileLoc` **675 → 697** against 700 — the T12 sensor fired twice during the task, at 701 and again at 728/702, and both were resolved by moving prose to `tasks.md`, not by moving the gate. D1 `delegateScope` **5 → 0**, facade-taking **2 → 0**, scoped LOC **524 → 0**, all terminal. `QueryUnderstandingService` 0/0 under the `Pick<>` — the two-variant simulation is the **eighth defect's open site, and it is the one that fires**: bare nominal reaches 1, under the ceiling. **Six mutations, each verified applied and each restore diffed** — memo **2/2**, construction capture **2/2**, ninth-key leak **3/1** (`tsc` **TS2353**), assembly-time `.bind(this)` **3/1**, module-local `addContextToResults` **4/0** on the new sensor but **30/1** on `rlm-search`; naive recursion caught (**TS2554: Expected 2-3 arguments**), blind recursion **hangs** (killed at 75 s) exactly as T12 predicted. **Two of the six are invisible to the entire pre-existing suite.** Invariance, all unchanged: characterization net **160** (26·41·31·21·25·7·9), coverage **41 / 75 expect() calls**, `search-dependency-outage` **9**, `search-filter-overfetch` **10**, `search-admission-preflight` **5**, `search-ranking-regression` **2**, `search-synapse-integration` **5**, the three earlier LATE-BIND sensors and `index-manager-seam` unmoved. AC-3 budget **3 → 4** and 4 spent. **Plus the ninth plan defect** (T14's sensor fires here) and a `mock.module` **collision** the plan never named, both below |
+| T14 | this commit | the root's final cleanup: the ten stale `Visibility relaxed` notes replaced by the two reasons that actually hold, and the T13 hand-off block at `:95-98` retired. **Phase 1 closes here.** | **Discriminating pair, both halves observed:** `Visibility relaxed` **10 → 0** *and* the two replacement comments present, checked **positionally** — the field block at `:114` cites §4.3.1, the nine-method block at `:456` cites §4.3 and **not** §4.3.1, so the citation-swap shape cannot pass. **Truth check:** the private revert of all ten gives `tsc` **exit 2, exactly 1 `error TS` line, exactly 1 TS2341**, at `production-wiring.ts(51,32)` — measured on **both** states and byte-identical, which is the eleventh defect below. Guard: `rlm-search.test.ts:156` still cited **1**; `rlm-search` lines in the root **13 → 4**, the four being `:91`/`:108`/`:446` provenance and `:185` PATCHABLE. Invariance, every figure unmoved: G-HUB **exit 0** and its output byte-identical to the pre-edit run **except the LOC it measures**, foreign **1**, reach **1** by `search-warmup.ts`, `perModule {csr 18, warmup 1}`, zero types above the ceiling, `maxFileLoc` **697 → 696**; D1 **0/0/0**; `lint` 0; `type-check` 0 (6/6); `build` 0 (5/5); `test:scripts` **732/0 across 39 files**; `check-frozen-anchors` 0 (14); `check-characterization` 0 (3/3); characterization net **160** (26·41·31·21·25·7·9); all eleven suite sensors unmoved. EXCLUSIONS **9**. AC-3 budget **0**, spent **0** — no test file in the diff, the third task with that property. **Plus the eleventh plan defect** and a **subject undercount**, both below |
 
 Gate readings at T8: `lint` 0 · `type-check` 0 · `build` 0 · `test:scripts` **732 pass / 0 fail
 across 39 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
@@ -356,6 +358,109 @@ T13's entry in `[Unreleased]` under `### Changed`, and all seven entries verifie
 > `search-admission-preflight` **5/0**. The T13 row names the first two as sensors without a figure,
 > and a sensor with no before-value cannot report anything. All three were taken against `484e61a`
 > under a scratch `XDG_CONFIG_HOME` before the first edit.
+
+Gate readings at T14 — **the T11 property, and this time it is the whole point**: `lint` exit 0 ·
+`type-check` exit 0 (6/6) · `build` exit 0 (5/5) · `test:scripts` **732 pass / 0 fail across 39
+files**, exit 0 · `check-frozen-anchors` exit 0 (14 anchors) · `check-characterization` exit 0 (3/3) ·
+characterization net **160** across 7 suites (26·41·31·21·25·7·9), every suite individually unchanged ·
+`session-bias` **10/0** · `session-bias-late-bind` **3/0** · `hybrid-search-late-bind` **4/0** ·
+`project-indexer-late-bind` **4/0** · `index-admin-late-bind` **4/0** · `index-manager-seam` **3/0** ·
+`search-ranking-regression` **2/0** · `search-dependency-outage` **9/0** · `search-filter-overfetch`
+**10/0** · `search-admission-preflight` **5/0** · `search-synapse-integration` **5/0** · **G-HUB exit
+0**, 24 files, foreign **1**, reach **1** by `search-warmup.ts`, members 18, `perModule {csr 18,
+warmup 1}`, zero types above the ceiling, `maxFileLoc` **697 → 696** against 700 — **the G-HUB output
+is byte-identical to the pre-edit run except that one number**, which is the sharpest available
+statement of the invariance · EXCLUSIONS **9** · D1 `delegateScope` **0**, facade-taking **0**, scoped
+LOC **0** · CHANGELOG released section still **974 lines and byte-identical to `353de59`**, and all
+**eight** `[Unreleased]` entries verified present there and absent from the released section,
+positionally and per entry.
+
+> **One anchor in that CHANGELOG sweep reported a miss and the miss was the anchor's.** Checking eight
+> entries by substring, `"injection seam"` returned 0 in `[Unreleased]` — T11's bullet is worded *"can
+> now be supplied from outside the search service"* and never uses the phrase. The entry was present
+> the whole time. Worth one line because the failure mode is the one this feature keeps paying for in
+> the other direction: a mechanical check whose *pattern* is wrong reports a fact about itself as a
+> fact about the subject. Confirmed by listing all eight bullet first-lines rather than trusting the
+> eight greps.
+
+### Eleventh plan defect: T14's private-revert is a truth check, not a discriminating sensor
+
+Found at **T14**, before the first edit, by predicting the reading on paper and then measuring it on
+both states — and it is the **seventh** time in this feature that a correction inherited the defect it
+was correcting. The defective text is the *tenth* defect's own resolution, exactly as the tenth was the
+ninth's.
+
+The tenth defect replaced an unsatisfiable grep with the private-revert mutation and wrote, in the T14
+row, *"The **discriminating** sensor is the **private-revert mutation**"*. **By T7's own vocabulary that
+label is wrong.** T14 edits only comments; the mutation edits only modifiers. The two do not intersect,
+so the mutation reads the same on a finished T14 and on an empty commit:
+
+| state | `tsc` | `error TS` lines | TS2341 | site |
+| --- | --- | --- | --- | --- |
+| before T14 (`ba8d2bc`) | exit 2 | **1** | **1** | `production-wiring.ts(51,32)` |
+| after T14 | exit 2 | **1** | **1** | `production-wiring.ts(51,32)` |
+
+Both runs harnessed identically (10 markers verified applied, diff-vs-pristine 40 lines,
+refuse-on-byte-identical, restore diffed clean, 0 residual markers). **An invariance check cited as a
+discriminating one is this repository's signature defect class** — an artifact reporting success while
+measuring nothing — and it would have let T14 report a sensor an empty commit also passes. That is the
+*third consecutive* defect in this one task row: the ninth was a sensor already green before the task,
+the tenth unsatisfiable and tautological, the eleventh invariant.
+
+**Resolution, and it is a relabel plus one addition, not a scope change.** The sensor *set* was always
+sufficient; only the labels were wrong, and one member needed strengthening.
+
+- **Truth check** — the private revert. It witnesses that the *new comment is true*: that the nine
+  methods are held by a compatibility argument no gate can see, and that `queryUnderstanding` is the
+  one member a gate can see. `tasks.md`'s own tenth-defect prose already assigned it that job
+  (*"witnesses that the new comment is true"*); the row's one-word label contradicted it.
+- **Discriminating pair** — `Visibility relaxed` 10 → 0 **and** the replacement comments present.
+  Neither half alone: the first is the tautology the tenth defect named, the second passes on a file
+  that still carries the false notes.
+- **The pair needed a positional check, on a plan-critic finding.** Asserting only that `§4.3` and
+  `§4.3.1` both appear somewhere is passed by a replacement that **swaps them** — citing §4.3.1 for the
+  nine methods and §4.3 for the field — which is precisely the *"the ten sites are not one group, which
+  the replacement comment must not repeat"* violation. Closed structurally rather than by a bolt-on
+  check: **each citation sits in the block adjacent to the group it justifies**, so the field block at
+  `:114` contains §4.3.1 and the nine-method block at `:456` contains §4.3 and **not** §4.3.1. A swap is
+  no longer expressible without moving a comment past 340 lines of class body.
+
+**What generalises, and it completes the ninth-and-tenth sentence:** the ninth defect read an axis its
+task did not move, the tenth read a population its task could not clear, and the eleventh reads an axis
+its task moves **nothing** on. All three were written while correcting the previous one. *A sensor's
+label is part of the sensor — say whether a reading proves the task happened or only that nothing
+broke, because the two are indistinguishable in a report and opposite in meaning.*
+
+### The subject was undercounted by four lines, and the grep is why
+
+Not a plan defect — no row claims the enumeration is exhaustive — but the T14 subject as recorded
+(*"11 lines: the 10 comments plus `:88`"*) is **short by the block at `:95-98`**, and the reason is
+mechanical: that block says the `Visibility relaxed` notes *"below are historical as of this commit.
+Removing them is T14's … leaving them here is deliberate, not an oversight"* — which goes false the
+moment T14 removes them, and which **contains no `rlm-search` substring**, so the 13-line
+`git grep 'rlm-search'` sweep that produced the enumeration could not see it. A subject enumerated by
+one pattern is exhaustive only for statements that pattern matches.
+
+Also short by two lines on the other side: `:86-88` is **one sentence**, so `:88` cannot be corrected in
+isolation without leaving a fragment.
+
+**Reviewer decision (2026-07-30, at the T13/T14 boundary): rewrite the header block `:86-99`, preserving
+`:92-94`'s provenance.** *"Do not touch `:93`"* is read as **preserve the record**, not literal-line
+immutability — the T10/T12/T13 provenance survives in meaning at `:89-92` of the new text, and `:184`
+(now `:185`) is untouched. The authority for widening at all is **T10's own recorded rule**: *"source
+files in the write set had their stale comments corrected … leaving them would mislead the next reader
+of code this commit changed."* Leaving `:95-98` would have left a false statement behind in the one task
+whose entire subject is false statements. Final subject: **24 lines**, one file, comments only,
+**+23 / −24**.
+
+**And the replacement follows two precedents already in this file, which the plan never cited.** T12
+rewrote the `fileFilterCache` note at `:106-109` and T6 the `RRF_K` note at `:114-117` into the same
+shape — past tense, who removed the reader, where it went, and why the member stays public with its
+evidence sites. T14 is the third application, not a new pattern. *(A read-only plan critic reported that
+`RRF_K` note as dead-reference staleness in scope for T14. It is not: it is past-tense, names
+`result-fusion.ts` as the current home, and `RRF_K` is really at `result-fusion.ts:19`. Left alone.
+**Ninth two-methods-two-answers in this feature, and the third figure this agent has got wrong** —
+keep its findings, re-run its numbers.)*
 
 ### Ninth plan defect: T14's sensor fires at T13, and the correction to T6's unfirable sensor is what caused it
 

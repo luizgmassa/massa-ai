@@ -145,7 +145,7 @@ cannot be T17's referent.
 a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
 unilaterally — it is a release-semantics decision.
 
-### Execute — Phase 1 STARTED (2026-07-29), T6a–T13 done, T14 next and re-scoped
+### Execute — Phase 1 COMPLETE (2026-07-30), T6a–T14 done, T15 next and must re-enumerate
 
 **Two branches, and the first one is gone.** T6a and T6 were executed on
 `refactor/search-facade-split-phase-1` (cut from `d628464`) and reached `main` through **PR #46,
@@ -169,7 +169,9 @@ with a merge commit.**
 | T10 | `b9d444d` | six indexing surfaces → `project-indexer.ts` with `IndexerDeps`; `ensureInitializedImpl` absorbed into the root; **`rlm-indexing.ts` deleted whole**; a third LATE-BIND sensor |
 | T11 | `23470ce` | `injectedDeps.indexManager` — the F4 seam, the only *added* seam in PR-B; `index-manager-seam.test.ts` red under three violation shapes |
 | T12 | `484e61a` | four admin surfaces → `index-admin.ts` with `IndexAdminDeps`; **`rlm-admin.ts` deleted whole**; `index-admin-late-bind.test.ts` red under five mutation shapes |
-| T13 | on `-1b` | five search surfaces → `hybrid-search.ts` with an 8-key `HybridSearchDeps`; **`rlm-search.ts` deleted whole** — the last of the five delegates; `hybrid-search-late-bind.test.ts` widened to 4 tests, red under six shapes; **G-HUB exit 1 → 0** |
+| T13 | `1090504` | five search surfaces → `hybrid-search.ts` with an 8-key `HybridSearchDeps`; **`rlm-search.ts` deleted whole** — the last of the five delegates; `hybrid-search-late-bind.test.ts` widened to 4 tests, red under six shapes; **G-HUB exit 1 → 0** |
+| — | `ba8d2bc` | plan amendment: T14's sensor corrected — the tenth plan defect |
+| T14 | on `-1b` | the root's final cleanup — ten stale `Visibility relaxed` notes replaced per group (§4.3 for the nine methods, §4.3.1 for the one field), the T13 hand-off block retired; **Phase 1 closes**; the eleventh plan defect |
 
 † unreachable — squashed into `main` by #46. Nothing is pushed from `-1b`; it is local only.
 
@@ -467,13 +469,52 @@ feature to inherit the defect it was correcting — the shortest-lived yet.**
     subject lives in.** The ninth defect read an axis its task did not move; the tenth reads a
     population its task cannot clear.
 
-**Next: T14, re-scoped twice** — the root's final cleanup, 2 h, subject **11 lines in
-`contextual-search-rlm.ts`** (the 10 comments plus `:88`; **`:93` and `:184` must not be touched**).
-No structural sensor should move at all (the T11 property); G-HUB exit 0 and the D1 zeros are
-**invariance** checks. **T13 left those 10 comments deliberately** and says so in the root; that is
-T14's subject, not an oversight. The root has **3 lines** of headroom against `MAX_FILE_LOC` 700 and
-T14 only removes lines. Then Phase 1 is complete and Phase 2 (T15–T20) begins; **T15 must
-re-enumerate** — its list is frozen at 19 and the live count is 29.
+**An eleventh plan defect was found at T14, before the first edit, and it is the seventh correction in
+this feature to inherit the defect it was correcting. The defective text is the tenth defect's own
+resolution, exactly as the tenth was the ninth's — and it is the third consecutive defect in this one
+task row.**
+
+11. **T14's private-revert is a truth check, not a discriminating sensor** (T14). The T14 row read
+    *"The **discriminating** sensor is the **private-revert mutation**"*. By T7's vocabulary that is
+    wrong: T14 edits only comments, the mutation edits only modifiers, so the two do not intersect.
+    Measured on **both** states under one harness (10 markers verified applied, diff-vs-pristine 40
+    lines, refuse-on-byte-identical, restore diffed clean): `tsc` **exit 2, exactly 1 `error TS` line,
+    exactly 1 TS2341**, at `production-wiring.ts(51,32)` — **identical before and after**. An invariance
+    check cited as a discriminating one is this repository's signature defect class, and it would have
+    let T14 report a sensor an empty commit also passes.
+    **Resolved as a relabel plus one addition, not a scope change**; the set was always sufficient.
+    **Truth check**: the private revert, which witnesses that the *new comment* is true — the job
+    `tasks.md`'s own tenth-defect prose already gave it, and which the row's one-word label
+    contradicted. **Discriminating pair**: `Visibility relaxed` 10 → 0 *and* the replacement comments
+    present; neither half alone, since the first is the tenth defect's tautology and the second passes
+    on a file still carrying the false notes. **The pair needed a positional check**, on a plan-critic
+    finding: asserting only that `§4.3` and `§4.3.1` both appear somewhere is passed by a replacement
+    that **swaps them**, which is the *"the ten sites are not one group"* violation. Closed structurally
+    — each citation sits adjacent to the group it justifies (`:114` §4.3.1, `:456` §4.3 and not §4.3.1),
+    so a swap is unexpressible without moving a comment past 340 lines of class body.
+    Generalises, completing the ninth-and-tenth sentence: **the ninth read an axis its task did not
+    move, the tenth a population its task could not clear, the eleventh an axis its task moves nothing
+    on. A sensor's label is part of the sensor** — say whether a reading proves the task happened or
+    only that nothing broke, because the two are indistinguishable in a report and opposite in meaning.
+
+**A separate T14 finding, not a plan defect: the subject was undercounted by four lines, and the grep is
+why.** *"11 lines: the 10 comments plus `:88`"* misses `:95-98`, which said the notes *"below are
+historical … Removing them is T14's … leaving them here is deliberate"* — false the moment T14 removes
+them, and **carrying no `rlm-search` substring**, so the 13-line sweep that produced the enumeration
+could not see it. A subject enumerated by one pattern is exhaustive only for statements that pattern
+matches. Short by two more on the other side: `:86-88` is one sentence. **Reviewer decision (2026-07-30):
+rewrite `:86-99` preserving `:92-94`'s provenance** — *"do not touch `:93`"* read as preserve-the-record,
+authority being **T10's own rule** on correcting stale comments in a source file already in the write
+set. Final subject **24 lines**, one file, comments only, **+23 / −24**.
+
+**Next: T15 — GMS-04's non-source sites, 45 m. Phase 1 is closed; this opens Phase 2.** **T15 must
+re-enumerate**: its list is frozen at `ce26f28` at 19, was 29 after T13, and T14 removed no file from
+the set. Use `git grep -l -P` with explicit pathspec exclusions, everything staged — not the shell's
+`grep` (a ugrep shim honouring `.gitignore`, which independently returned 19), and **`-P` not `-E`**.
+Keep class 1 (`rlm-*.test.ts`, files that survive) separate from class 2 (deleted `rlm-*.ts` sources).
+AC-3 as written is unsatisfiable — 320 occurrences in tracked `.ua/` artifacts, deferred to after PR-C,
+so **PR-B does not close GMS-04 AC-3** for them. **Do not start T16 without asking**: it edits CI and
+needs the live `main` ruleset verified via `gh api`, a different risk class (SEN-02 AC-5).
 
 **T6 alone surfaced three plan defects, two needing a spec-owner decision.** All three are the
 `ensureInitializedImpl` class — a consequence `design.md` settled in substance and never wrote into
