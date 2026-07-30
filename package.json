@@ -1,6 +1,6 @@
 {
   "name": "massa-ai",
-  "version": "1.12.0",
+  "version": "1.12.1",
   "private": true,
   "author": "luizgmassa",
   "description": "massa-ai - Ancient knowledge keeper for modern code. Semantic search with 98% token reduction",
