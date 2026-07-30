@@ -79,37 +79,31 @@ dispatch.
 
 Before adding a new reusable role, load `references/subagent-design.md` and write a bounded role charter. For one-off tasks, use an existing role plus the prompt contract below instead of inventing a new role.
 
-| Role | Host agent name | Use For | Read/Write | Charter |
-|---|---|---|---|---|
-| `investigator` | `massa-ai-investigator` | Trace code paths, find entry points, summarize current behavior | read-only | `skills/agents/investigator/SKILL.md` |
-| `navigator` | `massa-ai-navigator` | Answer "where is X / who calls Y" from the massa-ai index before reading files | read-only | `skills/agents/navigator/SKILL.md` |
-| `implementer` → `builder` | `massa-ai-builder` | Execute one atomic task with a disjoint write set | write | `skills/agents/builder/SKILL.md` |
-| `verifier` → `verification-agent` | `massa-ai-verification-agent` | Independently run sensors and inspect whether claims hold | read-only | `skills/agents/verification-agent/SKILL.md` |
-| `domain-mapper` → `architecture-specialist` | `massa-ai-architecture-specialist` | Identify subdomains, bounded contexts, language conflicts, cohesion | read-only | `skills/agents/architecture-specialist/SKILL.md` (lens: `domain`) |
-| `coupling-auditor` → `architecture-specialist` | `massa-ai-architecture-specialist` | Analyze strength, distance, volatility, and risky dependencies | read-only | `skills/agents/architecture-specialist/SKILL.md` (lens: `coupling`) |
-| `deepening-architect` → `architecture-specialist` | `massa-ai-architecture-specialist` | Find shallow modules and deepening opportunities | read-only | `skills/agents/architecture-specialist/SKILL.md` (lens: `deepening`) |
-| `audit-specialist` | `massa-ai-audit-specialist` | Findings-only audit through one selected `lens` | read-only | `skills/agents/audit-specialist/SKILL.md` |
-| `plan-critic` | `massa-ai-plan-critic` | Stress-test a constructed plan using The Fool mode and return bounded critique | read-only | `skills/agents/plan-critic/SKILL.md` |
-| `furps-analyst` | `massa-ai-furps-analyst` | Analyze one FURPS+ dimension of a PRD/ADR against the checklist and return structured findings | read-only | `skills/agents/furps-analyst/SKILL.md` |
-| `meta-judge` | `massa-ai-meta-judge` | Author the evaluation specification a debate panel scores against, once per evaluation | read-only | `skills/agents/meta-judge/SKILL.md` |
-| `judge` | `massa-ai-judge` | Score an artifact against that specification with quoted evidence, then debate to consensus | read-only | `skills/agents/judge/SKILL.md` |
+## Roles
 
-`workflows/judge-with-debate.md` owns the panel's per-slot assignments; this
-table describes the roles, not which slot gets which model.
+**The roster lives in one place: the Agent Table of `skills/AGENTS.md`**, which names
+every shipped specialist with its purpose, trigger, permission, and charter path. Do not
+restate it here. A second roster in this file is what let `judge` and `meta-judge` go
+undocumented for a whole release with every gate green — the guard checked that the
+charter paths *mentioned* here resolve, which a charter that is never mentioned cannot
+fail.
 
-The remaining charters follow the same `massa-ai-<role>` convention. Their
-purpose and trigger live once, in the Agent Table of `skills/AGENTS.md`; they
-are cited here by charter path so this file names every shipped role:
+This file owns dispatch mechanics. The one roster fact it owns is the **legacy role
+vocabulary**: names earlier workflows dispatched by, kept so an old reference still
+resolves to a current agent.
 
-- `skills/agents/planner/SKILL.md`
-- `skills/agents/reviewer/SKILL.md`
-- `skills/agents/context-curator/SKILL.md`
-- `skills/agents/requirements-analyst/SKILL.md`
-- `skills/agents/test-engineer/SKILL.md`
-- `skills/agents/documentation-agent/SKILL.md`
-- `skills/agents/mobile-specialist/SKILL.md`
+| Legacy role | Current agent | Note |
+|---|---|---|
+| `implementer` | `massa-ai-builder` | renamed |
+| `verifier` | `massa-ai-verification-agent` | renamed; also centralizes the Verification Ladder |
+| `domain-mapper` | `massa-ai-architecture-specialist` | folded in; `lens: domain` |
+| `coupling-auditor` | `massa-ai-architecture-specialist` | folded in; `lens: coupling` |
+| `deepening-architect` | `massa-ai-architecture-specialist` | folded in; `lens: deepening` |
 
-**Role mapping:** `investigator`→`investigator` (identical); `implementer`→`builder` (renamed); `verifier`→`verification-agent` (renamed, centralizes Verification Ladder); `domain-mapper`+`coupling-auditor`+`deepening-architect`→`architecture-specialist` (three roles folded into one specialist; the `lens` input field selects the sub-mode). Workflows dispatch the new agent names via named dispatch blocks; the old role names above are kept for traceability only.
+`investigator`, `plan-critic` and `furps-analyst` kept their own names; every other
+specialist is new and never had a legacy one. Workflows dispatch the current
+`massa-ai-<role>` name through a named dispatch block — the legacy column is traceability
+only, never a dispatch target.
 
 ## Capability Packet
 

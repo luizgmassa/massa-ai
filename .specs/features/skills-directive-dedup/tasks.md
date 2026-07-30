@@ -114,3 +114,43 @@ as it ends up — but the narrative should not promise 313 fewer lines.
 
 **A8 — T1 corrected two defects in its own instruments.** Recorded in `spec.md`
 §7 rather than here, since they are corrections to claims, not to tasks.
+
+**A9 — T4's fix closed the symptom and entrenched the cause; superseded.**
+Raised by the user, who asked why `agent-orchestration.md` treated some agents
+as table rows and others as a bullet list. There was no reason. Measured three
+ways, every candidate rule fails: not permission (`builder` writes and is in the
+table; `test-engineer` writes-when-scoped and was not), not dispatch usage
+(`furps-analyst`, `judge`, `meta-judge`, `navigator`, `plan-critic` sit in the
+table with **0** dispatch blocks, identical to all seven excluded), not legacy
+status (`audit-specialist`, `furps-analyst`, `navigator` have no legacy name and
+were in the table; `mobile-specialist` has none and was not).
+
+`git log -S` on each charter path settles it — **membership tracks the commit
+that added the agent, nothing else**:
+
+| wave | commit | agents |
+| --- | --- | --- |
+| 1 | `4feca2d` (v1.2.0) | investigator, builder, verification-agent, architecture-specialist |
+| 2 | `85f1ad3` (PR #27) | audit-specialist, plan-critic, furps-analyst, navigator |
+| 3 | `dd09cc1` (T4) | the seven bullets — never in this file before |
+
+T4 gave those seven checkable charter paths so the new coverage guard would
+pass, which **made presence cheap**: the guard was then satisfied by a bare
+bullet carrying no role name, no host agent name, no scope, no permission. The
+file also held the roster a third time, in the `Role mapping:` paragraph
+restating the table's own `→` column.
+
+**Resolved:** the roster lives once, in `skills/AGENTS.md`'s Agent Table, where
+the pre-existing guard at `skills-harness-integrity.test.ts:193-203` already
+enumerates charters from disk and requires each. `agent-orchestration.md` keeps
+only the legacy role vocabulary, which lives nowhere else, plus a pointer.
+
+T4's coverage test is **deleted, not weakened** — the defect class is gone by
+construction rather than guarded. Three assertions replace it: the file carries
+no charter paths at all (a negative structural check, so a second roster cannot
+reappear), it names the one roster, and every legacy alias resolves to a real
+charter. Both new checks are mutation-proven.
+
+The lesson generalizes past this file: **closing a coverage gap by adding
+entries to the surface that was incomplete can preserve the split that caused
+it.** Ask whether the surface should exist before making it complete.

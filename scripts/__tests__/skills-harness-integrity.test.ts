@@ -172,17 +172,41 @@ describe("dispatch resolution: every Dispatch: block names a shipped agent", () 
 // ── 2. No phantom roles (P0-2) ─────────────────────────────────────────────
 
 describe("no phantom roles: every orchestration role has a real charter", () => {
-  test("agent-orchestration.md Roles table charter paths all resolve", async () => {
+  // agent-orchestration.md used to carry a partial roster: a 12-row table, a
+  // 7-item bullet list, and a prose mapping paragraph, all naming the same
+  // agents. Table membership tracked the commit that added each agent and no
+  // property of the agent -- not permission, not dispatch usage, not whether it
+  // had a legacy name. `judge` and `meta-judge` were absent for a whole release
+  // because the guard here asserted that mentioned charter paths RESOLVE, which
+  // an unmentioned charter cannot fail.
+  //
+  // The roster now lives once, in skills/AGENTS.md's Agent Table, guarded by
+  // "every charter is registered in skills/AGENTS.md and in the generator"
+  // below. This file keeps only the legacy role vocabulary, which lives nowhere
+  // else. See .specs/features/skills-directive-dedup/.
+  test("agent-orchestration.md carries no second roster", async () => {
     const content = await read(AGENT_ORCHESTRATION);
     const charterPaths = [
       ...content.matchAll(/`(skills\/agents\/[a-z-]+\/SKILL\.md)`/g),
     ].map((m) => m[1]!);
-    expect(charterPaths.length).toBeGreaterThanOrEqual(10);
-    const missing: string[] = [];
-    for (const rel of new Set(charterPaths)) {
-      if (!(await exists(path.join(REPO_ROOT, rel)))) missing.push(rel);
-    }
-    expect(missing).toEqual([]);
+    expect(charterPaths).toEqual([]);
+  });
+
+  test("agent-orchestration.md points at the one roster", async () => {
+    const content = await read(AGENT_ORCHESTRATION);
+    expect(content).toContain("skills/AGENTS.md");
+    expect(content).toMatch(/roster lives in one place/i);
+  });
+
+  test("every legacy role maps to an agent that exists", async () => {
+    // The legacy column is this file's own content, so it needs its own check:
+    // a rename that retires an agent must not leave a legacy alias pointing at
+    // nothing.
+    const content = await read(AGENT_ORCHESTRATION);
+    const mapped = [...content.matchAll(/\|\s*`massa-ai-([a-z-]+)`\s*\|/g)].map((m) => m[1]!);
+    expect(mapped.length).toBeGreaterThanOrEqual(5);
+    const names = new Set(await charterNames());
+    expect(mapped.filter((n) => !names.has(n))).toEqual([]);
   });
 
   test("no role is documented as charter-less", async () => {
@@ -190,21 +214,15 @@ describe("no phantom roles: every orchestration role has a real charter", () => 
     expect(content).not.toContain("role-based (no charter)");
   });
 
-  // The assertion above checks that every charter path MENTIONED in the file
-  // resolves on disk. That is the opposite direction from coverage, and it is
-  // why `judge` and `meta-judge` were absent from this file for a whole release
-  // without any gate noticing: a charter that is never mentioned cannot produce
-  // a dead link. See .specs/features/skills-directive-dedup/spec.md SDD-07.
-  test("every charter on disk is documented in agent-orchestration.md", async () => {
-    const content = await read(AGENT_ORCHESTRATION);
-    const missing = (await charterNames()).filter(
-      (name) => !content.includes(`skills/agents/${name}/SKILL.md`),
-    );
-    expect(missing).toEqual([]);
-  });
-
-  test("the coverage check enumerated a real roster", async () => {
-    // Guard the guard: an empty charter list makes the check above vacuous.
+  // Roster coverage is asserted against skills/AGENTS.md -- the one place it
+  // lives -- by "every charter is registered in skills/AGENTS.md and in the
+  // generator" below. An earlier fix instead added a coverage check against
+  // agent-orchestration.md, which closed the symptom while preserving the
+  // two-roster split that caused it; the split is now gone, so the check is
+  // replaced by the negative assertion above.
+  test("the roster guard enumerated a real charter list", async () => {
+    // Guard the guard: an empty charter list makes every coverage check here
+    // vacuous, including the AGENTS.md one below.
     expect((await charterNames()).length).toBeGreaterThanOrEqual(17);
   });
 
