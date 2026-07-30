@@ -15,6 +15,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# SEC-1 (code-scanning #5/#7): least-privilege GITHUB_TOKEN — checkout + greps
+# only, nothing here writes to the repository.
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest

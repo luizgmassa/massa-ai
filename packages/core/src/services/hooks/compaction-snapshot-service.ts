@@ -236,12 +236,16 @@ function buildRetrievalCall(
   // The retrieval call references the session so the resuming agent can scope
   // its search. We provide BOTH a recall call (semantic) and a search call
   // (keyword) so the agent has options depending on what's available.
-  const queryArr = queries.map((q) => `"${q.replace(/"/g, '\\"')}"`).join(", ");
+  // SEC-6 (CodeQL js/incomplete-sanitization, alerts #15-#17): JSON.stringify
+  // quotes AND escapes backslashes; the previous manual `"` replace let a
+  // token containing `\"` break out of the intended quoting.
+  const primaryQuery = queries[0] ?? "";
+  const queryArr = queries.map((q) => JSON.stringify(q)).join(", ");
 
-  return `recall(query: ${queries[0] ? `"${queries[0].replace(/"/g, '\\"')}"` : '""'}, projectId: "${_projectId}", limit: 10)
-  // or: search(query: ${queries[0] ? `"${queries[0].replace(/"/g, '\\"')}"` : '""'}, projectId: "${_projectId}", maxResults: 5)
+  return `recall(query: ${JSON.stringify(primaryQuery)}, projectId: ${JSON.stringify(_projectId)}, limit: 10)
+  // or: search(query: ${JSON.stringify(primaryQuery)}, projectId: ${JSON.stringify(_projectId)}, maxResults: 5)
   // queries: [${queryArr}]
-  // sessionId: "${sessionId}"`;
+  // sessionId: ${JSON.stringify(sessionId)}`;
 }
 
 // ── Service ─────────────────────────────────────────────────────────────────

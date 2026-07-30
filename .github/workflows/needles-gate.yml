@@ -20,6 +20,11 @@ name: Needles Gate
 on:
   workflow_dispatch: {}
 
+# SEC-1 (code-scanning #3): least-privilege GITHUB_TOKEN — checkout, Ollama,
+# and a benchmark; nothing writes to the repository.
+permissions:
+  contents: read
+
 # Let an in-flight dispatched gate finish rather than racing a re-dispatch.
 concurrency:
   group: needles-${{ github.ref }}

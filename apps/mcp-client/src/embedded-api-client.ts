@@ -47,6 +47,7 @@ import {
   getAutoImproveJob,
   getBootstrapService,
   getSessionRegistry,
+  newSynapseSessionId,
   DEFAULT_BUFFER_CONFIG,
   DEFAULT_PREFETCH_CONFIG,
   buildPrefetchPlan,
@@ -942,7 +943,9 @@ export class EmbeddedApiClient implements ToolProxyApiClient {
 
   private async handleSynapseSession(body: Record<string, unknown>): Promise<unknown> {
     const registry = getSessionRegistry();
-    const sessionId = (body.sessionId as string) ?? `syn_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+    // SEC-2 (CodeQL js/insecure-randomness, alert #10): shared CSPRNG-backed
+    // helper replaces the guessable Math.random() suffix.
+    const sessionId = (body.sessionId as string) ?? newSynapseSessionId();
     const session = registry.create({
       sessionId,
       agentId: body.agentId as string,

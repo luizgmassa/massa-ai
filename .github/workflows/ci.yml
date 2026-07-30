@@ -6,6 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+# SEC-1 (code-scanning #1/#6/#8/#9): least-privilege GITHUB_TOKEN. Without an
+# explicit block every job inherits the repository default (write). `contents:
+# read` covers checkout/artifacts; `pull-requests: read` is what
+# dorny/paths-filter uses to diff PRs through the API. No job here writes to
+# the repo, so nothing else is granted.
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
