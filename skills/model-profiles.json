@@ -1,0 +1,188 @@
+{
+  "$comment": [
+    "Central model registry for the massa-ai agent harness. THE only hand-authored place",
+    "that names a model or an effort level for any host.",
+    "",
+    "SHAPE: this file deliberately contains NO agent list. Each agent's tier lives in its own",
+    "charter (skills/agents/<n>/SKILL.md -> metadata.model_tier), because the tier is a",
+    "property of that agent's job. Stating it here too would be two sources of truth for one",
+    "fact -- the exact defect this registry exists to remove.",
+    "",
+    "RESOLUTION: tier (from the charter) + host + profile -> {model, effort}.",
+    "PROFILE SELECTION: --profile=<name> > MASSA_AI_MODEL_PROFILE > hostDefaults[host].",
+    "An unknown profile, or a (profile, host) pair the profile does not support, is a hard",
+    "error. Nothing silently falls back to a default model.",
+    "",
+    "model: null means 'do not pin -- inherit'. Every host documents that semantic, but",
+    "spells it differently, so the emitters render it per host (see design.md section 4).",
+    "",
+    "Adding a profile is data-only: no TypeScript type, enum, or test enumerates these names.",
+    "See .specs/features/model-profile-registry/{spec,design}.md."
+  ],
+  "version": 1,
+
+  "tiers": ["light", "standard", "deep"],
+
+  "hostDefaults": {
+    "claude": "balanced",
+    "codex": "balanced",
+    "cursor": "balanced",
+    "opencode": "balanced"
+  },
+
+  "workflowTiers": {},
+
+  "profiles": {
+    "balanced": {
+      "description": "Default. Mixed-capability spread per host. Reproduces the pins shipped before the registry existed, with the three cross-host tier disagreements normalized.",
+      "hosts": {
+        "claude": {
+          "light": { "model": "haiku", "effort": "high" },
+          "standard": { "model": "sonnet", "effort": "high" },
+          "deep": { "model": "opus", "effort": "high" }
+        },
+        "codex": {
+          "light": { "model": "gpt-5.4-mini", "effort": "high" },
+          "standard": { "model": "gpt-5.6-terra", "effort": "high" },
+          "deep": { "model": "gpt-5.6-sol", "effort": "high" }
+        },
+        "cursor": {
+          "light": { "model": null, "effort": null },
+          "standard": { "model": null, "effort": null },
+          "deep": { "model": null, "effort": null }
+        },
+        "opencode": {
+          "light": { "model": "opencode-go/deepseek-v4-pro", "effort": "max" },
+          "standard": { "model": "opencode-go/glm-5.2", "effort": "max" },
+          "deep": { "model": "opencode-go/minimax-m3", "effort": "max" }
+        }
+      }
+    },
+
+    "cheap": {
+      "description": "Minimize cost. Lowest tier available per host, with reduced reasoning effort where the host supports an effort enum.",
+      "hosts": {
+        "claude": {
+          "light": { "model": "haiku", "effort": "low" },
+          "standard": { "model": "haiku", "effort": "medium" },
+          "deep": { "model": "sonnet", "effort": "high" }
+        },
+        "codex": {
+          "light": { "model": "gpt-5.4-mini", "effort": "low" },
+          "standard": { "model": "gpt-5.4-mini", "effort": "medium" },
+          "deep": { "model": "gpt-5.6-luna", "effort": "high" }
+        },
+        "cursor": {
+          "light": { "model": null, "effort": null },
+          "standard": { "model": null, "effort": null },
+          "deep": { "model": null, "effort": null }
+        },
+        "opencode": {
+          "light": { "model": "opencode-go/deepseek-v4-flash", "effort": "high" },
+          "standard": { "model": "opencode-go/glm-5.1", "effort": "high" },
+          "deep": { "model": "opencode-go/glm-5.2", "effort": "high" }
+        }
+      }
+    },
+
+    "heavy": {
+      "description": "Maximize capability. Top tier per host, highest effort the host's enum allows.",
+      "hosts": {
+        "claude": {
+          "light": { "model": "sonnet", "effort": "high" },
+          "standard": { "model": "opus", "effort": "high" },
+          "deep": { "model": "opus", "effort": "max" }
+        },
+        "codex": {
+          "light": { "model": "gpt-5.6-terra", "effort": "high" },
+          "standard": { "model": "gpt-5.6-sol", "effort": "high" },
+          "deep": { "model": "gpt-5.6-sol", "effort": "xhigh" }
+        },
+        "cursor": {
+          "light": { "model": null, "effort": null },
+          "standard": { "model": null, "effort": null },
+          "deep": { "model": null, "effort": null }
+        },
+        "opencode": {
+          "light": { "model": "opencode-go/glm-5.2", "effort": "max" },
+          "standard": { "model": "opencode-go/kimi-k3", "effort": "max" },
+          "deep": { "model": "opencode-go/kimi-k3", "effort": "max" }
+        }
+      }
+    },
+
+    "work": {
+      "description": "Subscription-backed frontier models. Assumes a paid seat on each host, so capability is preferred over per-token cost. OpenCode routes through the Z.ai coding plan.",
+      "hosts": {
+        "claude": {
+          "light": { "model": "sonnet", "effort": "high" },
+          "standard": { "model": "opus", "effort": "high" },
+          "deep": { "model": "opus", "effort": "high" }
+        },
+        "codex": {
+          "light": { "model": "gpt-5.6-terra", "effort": "high" },
+          "standard": { "model": "gpt-5.6-sol", "effort": "high" },
+          "deep": { "model": "gpt-5.6-sol", "effort": "high" }
+        },
+        "cursor": {
+          "light": { "model": null, "effort": null },
+          "standard": { "model": null, "effort": null },
+          "deep": { "model": null, "effort": null }
+        },
+        "opencode": {
+          "light": { "model": "zai-coding-plan/glm-5.1", "effort": "max" },
+          "standard": { "model": "zai-coding-plan/glm-5.2", "effort": "max" },
+          "deep": { "model": "zai-coding-plan/glm-5.2", "effort": "max" }
+        }
+      }
+    },
+
+    "home": {
+      "description": "Personal machine. Cheap for the mechanical tiers, capable where reasoning actually pays.",
+      "hosts": {
+        "claude": {
+          "light": { "model": "haiku", "effort": "high" },
+          "standard": { "model": "sonnet", "effort": "high" },
+          "deep": { "model": "sonnet", "effort": "max" }
+        },
+        "codex": {
+          "light": { "model": "gpt-5.4-mini", "effort": "high" },
+          "standard": { "model": "gpt-5.6-terra", "effort": "high" },
+          "deep": { "model": "gpt-5.6-terra", "effort": "xhigh" }
+        },
+        "cursor": {
+          "light": { "model": null, "effort": null },
+          "standard": { "model": null, "effort": null },
+          "deep": { "model": null, "effort": null }
+        },
+        "opencode": {
+          "light": { "model": "opencode-go/deepseek-v4-pro", "effort": "max" },
+          "standard": { "model": "opencode-go/glm-5.2", "effort": "max" },
+          "deep": { "model": "opencode-go/kimi-k3", "effort": "max" }
+        }
+      }
+    },
+
+    "open_models": {
+      "description": "Open-weight models only. OpenCode-only by design: Claude Code resolves Anthropic models, Codex resolves OpenAI models, and Cursor publishes no resolvable id for any open-weight catalog entry. Selecting this profile for another host is a hard error, not a silent inherit.",
+      "hosts": {
+        "opencode": {
+          "light": { "model": "opencode-go/deepseek-v4-pro", "effort": "max" },
+          "standard": { "model": "opencode-go/glm-5.2", "effort": "max" },
+          "deep": { "model": "opencode-go/kimi-k3", "effort": "max" }
+        }
+      }
+    },
+
+    "local_models": {
+      "description": "Ollama-routed models. NOTE: OpenCode exposes an 'ollama-cloud' provider, not a plain on-device 'ollama' provider -- these run on Ollama's hosted tier, not the local daemon. A truly on-device profile needs a custom provider entry in opencode.json and is deliberately not seeded here rather than faked. OpenCode-only for the same reason as open_models.",
+      "hosts": {
+        "opencode": {
+          "light": { "model": "ollama-cloud/gpt-oss:20b", "effort": "max" },
+          "standard": { "model": "ollama-cloud/gpt-oss:120b", "effort": "max" },
+          "deep": { "model": "ollama-cloud/kimi-k3", "effort": "max" }
+        }
+      }
+    }
+  }
+}
