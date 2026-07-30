@@ -650,7 +650,23 @@
       "design": ".specs/features/plugin-auto-install/design.md",
       "tasks": ".specs/features/plugin-auto-install/tasks.md",
       "validation": ".specs/features/plugin-auto-install/validation.md"
+    },
+    {
+      "slug": "model-profile-registry",
+      "title": "Model Profile Registry \u2014 central tier/profile registry for agent and workflow model selection across four harness CLIs",
+      "status": "in-progress",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": false
+      },
+      "spec": ".specs/features/model-profile-registry/spec.md",
+      "design": ".specs/features/model-profile-registry/design.md",
+      "tasks": ".specs/features/model-profile-registry/tasks.md",
+      "fool": ".specs/features/model-profile-registry/fool.md"
     }
   ],
-  "active_feature": "core-layering-god-module-split"
+  "active_feature": "model-profile-registry"
 }

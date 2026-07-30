@@ -1,6 +1,52 @@
 # massa-ai Spec State
 
-## Current — Skills / Workflows Updates + spec-driven DI rule
+## Current — Model Profile Registry
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-model-profile-registry`
+- workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
+- feature: `model-profile-registry` — **Specify, Design, Tasks COMPLETE 2026-07-30.
+  Execute NOT STARTED. Next action: present the sub-agent offer (9 tasks > 1 batch), then T1.**
+- branch: `feat/model-profile-registry`, worktree `.claude/worktrees/model-profiles`,
+  cut from `origin/main` @ `45daaa1`.
+- Artifacts: `.specs/features/model-profile-registry/{spec,design,tasks,fool}.md` +
+  `fixtures/baseline-main.json`.
+
+**Problem, measured:** 304 model facts across 6 surfaces, 184 hand-authored. Three of fifteen
+roles hold contradictory tiers across the four hosts. The Cursor emitter has never worked
+(display name where an ID is required, plus two keys Cursor does not define). OpenCode sends
+`name` and `metadata` to the model provider as bogus model options on every subagent
+invocation, under its documented unknown-key pass-through rule.
+
+**Design:** charters own their own tier (`metadata.model_tier`); `skills/model-profiles.json`
+owns `tiers` / `hostDefaults` / `workflowTiers` / `profiles.<name>.<host>.<tier> → {model,
+effort}` and contains **no agent list**; `scripts/lib/model-profiles.ts` resolves with total,
+fail-loud functions; per-host emitters own host syntax only. Profile precedence
+`--profile` > `MASSA_AI_MODEL_PROFILE` > `hostDefaults[host]`. 39 hand-authored facts, down
+from 184.
+
+**Decisions taken with the user:** factored tier registry over a flat cross-product; open
+profile set; workflow keys supported with no consumer; `model_hint` → `model_tier`; fix all
+three defect classes on all four hosts; normalize the 3 drifted roles by their documented
+rationale (`navigator`→light, `requirements-analyst`→standard, `planner`→deep).
+
+**Plan Challenge:** full gate, `evidence_audit` mode, `massa-ai-plan-critic`. 6 of 8 evidence
+claims STRONG on independent re-fetch. Four findings adjudicated in `fool.md`; three upheld,
+one (`CLAUDE_CODE_SUBAGENT_MODEL` precedence) partially — the critic was wrong on Claude,
+right on Codex, verified by direct doc quote. The critic also graded "the OpenCode ownership
+marker is dead" STRONG; that is **refuted** — `apps/opencode-plugin/src/config-cli.ts:248`
+reads it, so the marker moves to a body comment instead of being deleted.
+
+**Baseline that must not regress:** `bun run test:scripts` = 733 pass / 1 skip / 4 fail. The 4
+are pre-existing tree-sitter native/packaging contracts needing a built `dist/`. Gate is *zero
+new failures*, not a green suite.
+
+**Open / residual:** Cursor tier values are `inherit` — no portable Cursor model ID exists for
+the pinned models, and `cursor-agent` is not installed here, so the hard-error-vs-fallback
+falsifier is a **skipped sensor with reason**. massa-ai MCP server not registered this session;
+all state came from `.specs/` and source reads.
+
+## Previous — Skills / Workflows Updates + spec-driven DI rule
 
 - projectId: `massa-ai`
 - Two related harness-text features consolidated on one branch for one PR; both independently
