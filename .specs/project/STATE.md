@@ -145,7 +145,7 @@ cannot be T17's referent.
 a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
 unilaterally — it is a release-semantics decision.
 
-### Execute — Phase 1 COMPLETE and T15 done (2026-07-30), T6a–T15 committed, T16 next and must be asked for
+### Execute — Phase 1 COMPLETE and T16 done (2026-07-30), T6a–T16 committed, T17 next
 
 **Two branches, and the first one is gone.** T6a and T6 were executed on
 `refactor/search-facade-split-phase-1` (cut from `d628464`) and reached `main` through **PR #46,
@@ -544,6 +544,26 @@ correcting.**
     `describe("rlm-search — …")` title, an `rlm-*.test.ts` glob — are invisible; policing them would be
     a banned-word list, a different sensor. Every such site was fixed by hand and **none is under a
     gate.** *A sensor's alphabet is part of the sensor, alongside its label.*
+15. **T16's sensor names an observation this repository cannot produce** (T16, found before the first
+    edit by reading the triggers instead of assuming them). The row asks for *"flip a threshold in a
+    scratch branch → CI goes red"*; `ci.yml` fires only on `push`/`pull_request` to `main`, so a pushed
+    scratch branch raises no run. **Resolved (reviewer, 2026-07-30): substitute the three-part local
+    equivalent and label it as a substitution** — required-check membership, no failure suppression, and
+    non-zero exit on a genuine violation. **No red CI run was observed and the record says so.** A side
+    finding improves the mutation: `--max-reach` / `--max-loc` are already CLI flags, so the flip needs
+    no source edit at all.
+16. **The widened gate fails on a clean tree, and only in CI** (T16) — **the first defect in this feature
+    created by a decision taken during execution rather than inherited from the plan**, surfaced by a
+    scoped read-only plan critic and then re-measured rather than believed. `check-stale-pointers`
+    separates HISTORICAL from BROKEN via `git log --all --name-only`; `actions/checkout@v4` carried no
+    `with:` block, so `fetch-depth` defaulted to **1**. At the same commit, depth as the only variable:
+    depth 1 → `FAIL — 28 broken, 0 historical`; full history → `PASS — 0 broken, historical exactly at
+    its pin of 28`. **The categories invert wholesale.** *A checker reporting a fact about its own
+    environment as a fact about the subject* — the fourth instance in this feature. **Resolved:
+    `fetch-depth: 0` on the `build` checkout**, fixing the subject rather than lowering the pin, which
+    would have made the gate green and meaningless. **Not specific to the mechanism**: routing the check
+    through a `describe("the real repository")` block instead would depend on the same history and fail
+    identically.
 
 **The discriminating evidence is M3b**, and it is the only reading proving (c) was a live gap rather
 than a theoretical one: on a tree carrying a broken `search-facade-*` citation, the pre-T15 `rlm`-only
@@ -574,14 +594,20 @@ flagged. All five targets were edited by in-place single-line substitution only 
 silently and **no gate would have seen it.** Same shape as T14's four-line undercount: a constraint
 enumerated over the files `git mv` touched missed the file that is edited but not moved.
 
-**Next: T16 — and it must not be started without an explicit go-ahead.** It edits CI and needs the live
-`main` ruleset verified via `gh api`, a different risk class (SEN-02 AC-5): a job that goes red without
-being in `required_status_checks` blocks nothing, which is how PR-A's `coverage.yml` shipped claiming
-`BLOCKING BY DESIGN` and enforced nothing. Then T17 (bounded-corpus caveat), T18 (dedicated DB on
-`127.0.0.1:5433/massa_ai_test` plus `RUN_POSTGRES_TESTS=1`), **T19 — now C1–C10, not C1–C7**, and T20.
+**T16 is done, and the half that made it a different risk class never happened.** `build` was **already**
+in `main`'s `required_status_checks` (measured live; ruleset `19462721`), so **no ruleset was mutated** —
+the PUT-not-PATCH and DeployKey-bypass traps stayed out of play, and SEN-02 AC-5's enabling condition is
+recorded as measured rather than assumed. Two deliberate departures from the row, both on the record:
+its **scope widened** to gate `check-stale-pointers` alongside G-HUB, since the other two sensors turned
+out to be enforced already through their own suites; and its **sensor was substituted** (fifteenth
+defect). Wiring the second gate is what exposed the sixteenth.
+
+**Next: T17** (bounded-corpus caveat), then T18 (dedicated DB on `127.0.0.1:5433/massa_ai_test` plus
+`RUN_POSTGRES_TESTS=1`), **T19 — now C1–C10, not C1–C7**, and T20.
 `design.md` §10 gained **C10** at T15 because no row owned GMS-04 AC-3 and T20's verifier reads
 `spec.md`; without it, it checks AC-3 as written, finds it unsatisfiable and marks it failed. T20's
-full six-item briefing list is assembled in `HANDOFF.md` under *Next action*.
+full **seven**-item briefing list is assembled in `HANDOFF.md` under *Next action* — the seventh is T16's
+two departures, which a verifier will otherwise read as violations.
 
 **T6 alone surfaced three plan defects, two needing a spec-owner decision.** All three are the
 `ensureInitializedImpl` class — a consequence `design.md` settled in substance and never wrote into

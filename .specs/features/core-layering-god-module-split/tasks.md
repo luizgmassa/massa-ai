@@ -1513,7 +1513,7 @@ the F4 seam adds a field to `injectedDeps`, which is a root field, so the seam b
 | # | task | detail | sensor | cost |
 | --- | --- | --- | --- | --- |
 | **T15** ✅ | GMS-04 non-source sites — **done**, see *T15 — executed* below | `docs/ONBOARDING.md:147,148,177` (incl. the layer-4 tour entry) and `CLAUDE.md:157` — **plus two the first draft missed**: `packages/core/src/__tests__/architecture-map.test.ts:454-455` and `search-controller.test.ts:3`, both **comments** citing test files this PR renames. **The needles fixture is NOT a site** — PR-A content-anchored all 14 needles and removed every `filePath` (spec correction C4). | **scoped sensor** — see below | 45 m |
-| **T16** | wire G-HUB into CI | add to the `build` job beside `verify-package-contents.ts` | flip a threshold in a scratch branch → CI goes red, **and** confirm `build` is in `main`'s required checks: `gh api repos/luizgmassa/massa-ai/rules/branches/main --jq '[.[] \| select(.type=="required_status_checks") \| .parameters.required_status_checks[].context]'`. A job that goes red without being in that list blocks nothing — that is exactly how PR-A's `coverage.yml` shipped claiming `BLOCKING BY DESIGN` and enforced nothing (SEN-02 AC-5). **A gate's enabling condition is part of the gate.** | 1 h |
+| **T16** ✅ | wire G-HUB into CI — **done, and scoped wider than this row**, see *T16 — executed* below | add to the `build` job beside `verify-package-contents.ts` | ~~flip a threshold in a scratch branch → CI goes red~~ **unexecutable, see the fifteenth defect** — substituted by the three-part local equivalent recorded below, **and** confirm `build` is in `main`'s required checks: `gh api repos/luizgmassa/massa-ai/rules/branches/main --jq '[.[] \| select(.type=="required_status_checks") \| .parameters.required_status_checks[].context]'`. A job that goes red without being in that list blocks nothing — that is exactly how PR-A's `coverage.yml` shipped claiming `BLOCKING BY DESIGN` and enforced nothing (SEN-02 AC-5). **A gate's enabling condition is part of the gate.** | 1 h |
 | **T17** | needles after-run + comparison | rerun the gate; per-needle rank diff vs T4's baseline. **A floor pass with three needles slipping 1→4 is a regression that passed** (GMS-05 AC-4 note 2). | the T4 diff script, exit 0 | ~2 min + 30 m |
 | **T18** | coverage gate | `DATABASE_URL=…5433/massa_ai_test MASSA_AI_DEDICATED=1 RUN_POSTGRES_TESTS=1 bun run test:coverage` | exclusions still **9**; no file this PR touches below floor | 30 m |
 | **T19** | spec corrections ~~C1–C7~~ **C1–C10** | apply `design.md` §10 to `spec.md`. **The range was stale by two before T15 and short by one after it**: §10 has held **C1–C9** since Design, and T15 adds **C10** for GMS-04 AC-3 itself. Without C10 nothing in §10 owned AC-3 — C4 covers only AC-4's obsolete needles clause — so T20's verifier, which reads `spec.md`, would have checked AC-3 **as written**, found it unsatisfiable, and marked it failed | `design.md` §10 rows all struck | 45 m |
@@ -1712,7 +1712,147 @@ on one line. Every edit inside all five targets was an in-place single-line subs
 silently and **no gate would have seen it** — same shape as T14's four-line subject undercount, a
 constraint enumerated over the files `git mv` touched missing the file that is edited but not moved.
 
+### Fifteenth plan defect: T16's sensor names an observation this repository's triggers cannot produce
+
+Found at **T16**, before the first edit, by reading the triggers rather than assuming them. The row's
+sensor is *"flip a threshold in a **scratch branch** → CI goes red."* `ci.yml` fires on
+`push: branches: [main]` and `pull_request: branches: [main]` and nothing else, so **a pushed scratch
+branch raises no CI run at all** — there is no red to observe. Producing one needs a throwaway PR
+against `main`, which also fires the full matrix and the CHANGELOG merge gate, whose failure would sit
+in the same log as the signal being measured.
+
+**Resolution (reviewer, 2026-07-30): substitute the three-part local equivalent and say so.** The three
+parts are recorded under *T16 — executed*. They are not the same evidence as a red CI run and the record
+must not imply they are. What they do establish is the half that actually shipped broken in PR-A — the
+enabling condition — which is what SEN-02 AC-5 was written for.
+
+> **The mutation route also changed, and for the better.** The row assumes flipping a threshold is a
+> source edit. `--max-reach` and `--max-loc` are already CLI arguments (`search-hub-metric.ts:196`), so
+> the flip needs no source edit, no commit and no revert. Prefer the flag.
+
+### Sixteenth plan defect: the widened scope's gate fails on a clean tree, and only in CI
+
+**The first defect in this feature created by a decision taken during execution rather than inherited
+from the plan text**, and it was caught before the edit landed by a scoped plan-critic, then re-measured
+rather than believed. T16's row scopes to G-HUB alone; the reviewer widened it to `check-stale-pointers`
+(see *T16 — executed*). That widening is what introduced this.
+
+`check-stale-pointers` separates HISTORICAL from BROKEN by asking `git log --all --pretty=format:
+--name-only` whether a path was ever recorded (`everKnownPaths`, `:172-178`), and `categorise`
+(`:191-194`) falls through to **BROKEN** when the answer is no. `actions/checkout@v4` at `ci.yml:32`
+carried **no `with:` block at all**, so `fetch-depth` defaulted to **1** — a log holding exactly one
+commit. Measured at `b9781df` with depth as the sole variable, via `file://` clones because `--depth` is
+silently ignored on a plain local path:
+
+| checkout depth | `.git/shallow` | commits | reading | exit |
+| --- | --- | --- | --- | --- |
+| 1 (the default) | present | **1** | `FAIL — 28 broken, 0 historical against a pin of 28` | **1** |
+| 0 (full) | absent | **488** | `PASS — 0 broken, historical exactly at its pin of 28` | **0** |
+
+The categories invert wholesale. The gate would have gone red on **every** run against a clean tree —
+a checker reporting a fact about its own environment as a fact about the subject, which is the defect
+class this whole feature is about, now for the fourth time.
+
+**Resolution: `fetch-depth: 0` on the `build` job's checkout, with the measurement in the comment.**
+Fixing the subject, not the gate: lowering the pin to 0 would have made it green and meaningless. Cost
+is one 8.2 MB / 488-commit fetch. No `fetch-depth` appears in any of the **11** `actions/checkout` uses
+across the six workflows, so this is a new pattern in the repo and is commented as such.
+
+> **Not specific to the wiring mechanism.** Routing the check through a `describe("the real
+> repository")` block in its unit suite — the shape `check-frozen-anchors` and `check-characterization`
+> already use — depends on the same git history and fails identically. The fix is required by the
+> decision to gate this check at all, not by the choice of a `ci.yml` step.
+
+### T16 — executed
+
+**Subject.** Two steps added to the `build` job of `.github/workflows/ci.yml` between *Verify package
+contents* and *Verify skill-bundle artifacts*, plus `fetch-depth: 0` on that job's checkout.
+
+**The premise was checked before it was acted on, and it split the four sensors two ways — not the way
+the briefing predicted.** The question was whether each sensor's `scripts/__tests__` suite, which CI
+does run via `test:scripts` (`ci.yml:138`), already exercises the script *against the repository* rather
+than only against fixtures:
+
+| sensor | runs against the real tree in CI? | evidence |
+| --- | --- | --- |
+| `search-hub-metric` | **no** — scratch only | imports pure functions; only `mkdtempSync`; no `REPO_ROOT` and no `packages/core` anywhere in the file |
+| `check-stale-pointers` | **no** — scratch only | only `mkdtempSync`; no `REPO_ROOT`. The prediction, now measured |
+| `check-frozen-anchors` | **yes, already gated** | `:63` `runCli(["--json"])` with **no `--root`**; `:68` asserts `status === 0` |
+| `check-characterization` | **yes, already gated** | `:17` `checkGuards(REPO_ROOT)`; `:20` asserts `failures` is `[]` |
+
+So T16 closes a real gap, and the briefing's *"three other sensors are equally absent from CI"* was
+wrong: **one** other sensor shared the gap. Two were enforced already, through a route that looks like
+a unit test from the outside. *"Has a test"* and *"gates the repository"* are different properties and
+this feature has now confused them once.
+
+**Scope decision (reviewer, 2026-07-30): wire both.** The row scopes to G-HUB; `check-stale-pointers`
+is wired too, deliberately and on the record, not by drift. Its pin of **28** therefore becomes a gate
+PR-C must maintain across a directory it moves again — accepted, because a check that reports and never
+enforces is the thing SEN-02 exists to prevent.
+
+**The enabling condition, measured live rather than assumed.** `main`'s required status checks are
+`["build","mcp","validate","Structural native tests (darwin-arm64)","Structural native tests
+(linux-x64)","coverage"]` — ruleset id `19462721`, *Main - Restrictions*, target `branch`, enforcement
+`active`. **`build` is already in the list**, so a step added to it enforces the moment it lands. **No
+ruleset mutation was performed**, and the PUT-not-PATCH and DeployKey-bypass traps in `CLAUDE.md` never
+came into play. Half of SEN-02 AC-5 was satisfied before this task began.
+
+**The three-part local equivalent, substituted for the red CI run** (fifteenth defect), each part
+measured this session:
+
+1. **The job is required.** `build` is in the list above.
+2. **The steps cannot fail silently.** Both are bare `run:` steps, and `continue-on-error` is absent
+   from the **entire** `ci.yml` — established from the parsed YAML (`Bun.YAML.parse`, 19 build steps,
+   zero `continue-on-error`), not from a grep that could return empty on error.
+3. **The scripts exit non-zero on a genuine violation**, per the mutation table below.
+
+Part 3 is the one worth stating precisely: a red run caused by a *misconfiguration* is not evidence
+that a gate detects a *violation*, and the shallow-clone failure above is the former.
+
+**Mutation table — every reading on the real tree, at the tracked state, restoration verified
+byte-identical by `git hash-object` before and after:**
+
+| gate | mutation | reading | exit |
+| --- | --- | --- | --- |
+| G-HUB | none | `PASS — every type <= 3 foreign reach, every file <= 700 LOC` | **0** |
+| G-HUB | `--max-reach 0` | 6 × `FAIL — … (max 0)`, deepest `SearchDegradation` 3 deep by `hybrid-search.ts` | **1** |
+| G-HUB | `--max-loc 1` | `FAIL — contextual-search-rlm.ts is 696 LOC (max 1)` | **1** |
+| stale-pointers | none | `PASS — 0 broken, historical exactly at its pin of 28` | **0** |
+| stale-pointers | one broken pointer injected, **pin held at 28** | `FAIL — 1 broken, 28 historical against a pin of 28`, site named | **1** |
+
+**Three traps encoded in the step comments, each found by measurement:**
+
+- **The directory is a required positional.** `bun scripts/search-hub-metric.ts` with no argument exits
+  **2** with a usage line. That fails the job while measuring nothing, and in a CI log it is
+  indistinguishable from a working gate. The briefing's *"exit 0 unmutated, exit 1 mutated"* figures
+  only reproduce with the directory supplied; re-running rather than citing is what caught it.
+- **`--json` is deliberately not used.** On a pass the script appends a non-JSON banner to **stdout**
+  (`console.log`, `:216`); both FAIL branches go to **stderr** (`:220`, `:225`). Actions interleaves
+  both, so the failure reason stays visible without it.
+- **`ci.yml` is inside the stale-pointer corpus.** It is not in `EXCLUDED` (`:94-99`), so any
+  `POINTER`-matching token written into these comments would itself move the pin. The comments name no
+  `rlm-*` or `search-facade-*` file for that reason. Verified after `git add` with exit-code
+  discrimination — `rc=1` is no-match, `rc>=2` would be a tool error, and `|| echo none` cannot tell
+  them apart.
+
+**Gates**: `check-stale-pointers` exit **0**, pin **28**, unmoved by this commit · **G-HUB exit 0**,
+`maxFileLoc` **696** against 700 · `ci.yml` parses, **19** build steps, `continue-on-error` **none** ·
+step order `Build` → *Verify package contents* → **G-HUB** → **stale pointers** → *Verify skill-bundle
+artifacts*, which is the row's "beside `verify-package-contents.ts`".
+
+> **Headroom worth carrying into PR-C:** `contextual-search-rlm.ts` is **696 LOC against a 700 cap**.
+> Now that G-HUB gates `build`, any five-line addition to that file turns the build red. That is the
+> gate working, not a defect — but it is a constraint PR-C inherits and the plan did not state.
+
 ## Gate check commands
+
+**Since T16, all four sensors are enforced in CI — but by two different routes, and the difference
+matters when one of them goes red.** `check-frozen-anchors` and `check-characterization` are enforced
+by their own `scripts/__tests__` suites, which run the real script against the real tree and reach CI
+through `test:scripts`. `search-hub-metric` and `check-stale-pointers` are enforced by explicit steps
+in the `build` job, because their suites use scratch directories only. All four land in the same
+required check (`build`); a failure in the first pair surfaces as a **test** failure, in the second
+pair as a **step** failure.
 
 ```bash
 bun run lint                 # oxlint, root, correctness at error
@@ -1722,14 +1862,22 @@ bun run test                 # turbo — STOP any tools-api on :3333 first
 bun run test:scripts         # includes the new hub-metric suite
 bun run test:plugins
 bun run bench:needles:gate   # ~2 min, needs local Ollama. NOT 90 min.
+# CI step since T16. The directory is a REQUIRED positional — with no argument this
+# exits 2 on a usage error, which fails a job while measuring nothing. Not `--json`:
+# on a pass the script appends a non-JSON banner to stdout, so `--json` parses only
+# when the gate is already red.
 bun scripts/search-hub-metric.ts packages/core/src/services/search   # exit 0 = G-HUB pass
 
 # Phase 0 sensors — sub-second, run on every Phase 1 commit
 bun scripts/check-frozen-anchors.ts        # exit 0 = all 14 needle anchors still unique
 bun scripts/check-characterization.ts      # exit 0 = the 3 guarded blocks still at floor
 
-# GMS-04 AC-3's replacement (T15). Run it AFTER `git add` — it enumerates
-# `git ls-files`, so an untracked file is invisible to it and the reading is wrong.
+# GMS-04 AC-3's replacement (T15), a CI step since T16. Run it AFTER `git add` — it
+# enumerates `git ls-files`, so an untracked file is invisible to it and the reading is
+# wrong. It also needs FULL git history: it asks `git log --all` whether a path ever
+# existed, so under a shallow clone every historical pointer reads as BROKEN and it
+# reports `28 broken, 0 historical` on a clean tree. That is why the `build` job's
+# checkout pins `fetch-depth: 0` (sixteenth defect).
 bun scripts/check-stale-pointers.ts        # exit 0 = 0 BROKEN and HISTORICAL exactly on its pin
 
 # T17: rerun the gate with a fresh label, then compare per-needle rank

@@ -213,6 +213,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from are kept deliberately; they name deleted files on purpose, and a new check now fails if one of
   them is removed as well as if a live reference goes stale.
 
+- **Two structural checks that existed but enforced nothing now run in CI.** The search-facade hub
+  metric and the stale-pointer check were both written with unit suites and both passed on demand,
+  but neither ran against the repository in any workflow, so a violation could merge unnoticed. Both
+  are now steps in the `build` job, beside the existing package-contents and skill-bundle gates.
+  `build` was already a required status check, so they enforce from the moment they land — no branch
+  protection change was needed, and that was measured rather than assumed.
+
+  Two other checks in the same family, the frozen-anchor and characterization guards, turned out to
+  be enforced already: their unit suites run the real script against the real tree, and that suite
+  runs in CI. They needed no wiring. The distinction is worth recording because "has a test" and
+  "gates the repository" looked identical from the outside and were not.
+
+  The checkout step for that job now fetches full history. The stale-pointer check separates a
+  deliberate historical reference from a broken one by asking whether git ever recorded the path, and
+  the default single-commit checkout cannot answer that: measured at the same commit, a shallow
+  checkout reports 28 broken pointers and no historical ones, where full history reports none broken
+  and the historical count exactly on its pin. It would have failed every run on a clean tree.
+
 ## [1.11.0] - 2026-07-29
 
 ### Changed

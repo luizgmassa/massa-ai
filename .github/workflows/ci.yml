@@ -30,6 +30,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Load-bearing for the stale-pointer gate below, which asks
+          # `git log --all --name-only` whether a path ever existed in order to
+          # tell a deliberate historical reference from a broken one. The action
+          # defaults to fetch-depth: 1, where that log holds exactly one commit,
+          # so every historical pointer falls through to BROKEN and the gate goes
+          # red on a clean tree. Measured at b9781df with depth as the only
+          # variable: depth 1 reports "28 broken, 0 historical", full history
+          # reports "0 broken, historical exactly at its pin of 28". Costs one
+          # 8.2 MB / 488-commit fetch. No other job in any workflow needs it.
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -98,6 +109,27 @@ jobs:
       # Must run after Build: it packs each package's real dist/ output.
       - name: Verify package contents (publish artifact parity)
         run: bun scripts/verify-package-contents.ts
+
+      # GMS-01/G-HUB. The facade's hub metric: no declared type may be read more
+      # than MAX_FOREIGN_REACH members deep from another file, and no file may
+      # exceed MAX_FILE_LOC. Both thresholds are the script's committed defaults,
+      # so tightening one is a source edit and shows up in review.
+      #
+      # The directory is a REQUIRED positional. Omitting it exits 2 with a usage
+      # error — which fails the job while measuring nothing, and reads in the log
+      # exactly like a working gate — so it is spelled out rather than defaulted.
+      # Deliberately not `--json`: on a pass the script appends a non-JSON banner
+      # to stdout, so the JSON form parses only when the gate is already red.
+      - name: Verify search facade hub metric (G-HUB)
+        run: bun scripts/search-hub-metric.ts packages/core/src/services/search
+
+      # GMS-04 AC-3. Classifies every path-shaped pointer at a renamed module as
+      # RESOLVES, HISTORICAL or BROKEN. Broken must be 0 and historical must sit
+      # exactly on its pin, so a newly dangling pointer and a silently dropped
+      # historical one both fail here. Requires full git history — see the
+      # fetch-depth note on the checkout step above.
+      - name: Verify no stale module pointers (GMS-04 AC-3)
+        run: bun scripts/check-stale-pointers.ts
 
       # PDO-06/07. Same drift-gate shape as the subagent-artifact check
       # (scripts/generate-subagent-artifacts.ts --check, exercised via

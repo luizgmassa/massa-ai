@@ -1,12 +1,12 @@
 # Handoff
 
-## Active — Core Layering and God-Module Split (PR-B), **T15 done, Phase 2 open**
+## Active — Core Layering and God-Module Split (PR-B), **T16 done, Phase 2 open**
 
 **Feature**: `core-layering-god-module-split` · branch
 `refactor/search-facade-split-phase-1b`, cut from `main` @ `5247ecb` (v1.11.0),
 worktree `../massa-ai-wt-facade-phase-1b`.
-**T6a and T6 are merged and released; T7–T15 are committed and green. Phase 1 is closed and T15 has
-opened Phase 2.** Working tree clean. Nothing is pushed — the branch is local only, now eleven
+**T6a and T6 are merged and released; T7–T16 are committed and green. Phase 1 is closed and T15 has
+opened Phase 2.** Working tree clean. Nothing is pushed — the branch is local only, now twelve
 commits deep.
 
 ---
@@ -385,16 +385,33 @@ function. AC-3 budget was **0** and **0** was spent: no existing test file appea
 > is **per-group, at each group's site**, which is what makes the citation-swap shape unexpressible.
 > **No reviewer decision is open at the T14/T15 boundary.**
 
-**Next action: T16 — and it needs an explicit go-ahead before anyone starts it.** It wires G-HUB into
-CI and requires verifying the live `main` branch ruleset through `gh api` — a repo-settings change in
-a different risk class, and **SEN-02 AC-5 is the recorded reason it needs its own decision**: a job
-that goes red without being in `required_status_checks` blocks nothing, which is exactly how PR-A's
-`coverage.yml` shipped claiming `BLOCKING BY DESIGN` and enforced nothing. **A gate's enabling
-condition is part of the gate.** Note also that updating that ruleset goes through **PUT** (full
-replace) — `PATCH` returns 404, which reads like a missing permission and is not one — and that
-dropping the `DeployKey` bypass entry breaks `release.yml` silently.
+**T16 is done, and the risky half of it never happened.** `build` was **already** in `main`'s
+`required_status_checks` — measured live, ruleset `19462721`, *Main - Restrictions* — so **no ruleset
+mutation was performed** and the PUT-not-PATCH and DeployKey-bypass traps never came into play. Half of
+SEN-02 AC-5 was satisfied before the task began; it is now recorded as measured rather than assumed.
 
-Then, in plan order:
+Two things about T16 a reader will otherwise misread:
+
+- **Its scope was deliberately widened past its row.** The row says G-HUB alone. `check-stale-pointers`
+  was wired too, on a reviewer decision. Its pin of **28** is now a gate PR-C must maintain across a
+  directory it moves again. The other two sensors — `check-frozen-anchors` and `check-characterization`
+  — needed nothing: their unit suites already run the real script against the real tree inside
+  `test:scripts`, which `build` runs. The briefing's "three other sensors are equally absent" was wrong;
+  **one** was.
+- **Its sensor was substituted, and the substitution is not the same evidence.** *"Flip a threshold in a
+  scratch branch → CI goes red"* is unexecutable here: `ci.yml` triggers only on push-to-`main` and
+  PR-into-`main`, so a scratch branch produces no run. That is the **fifteenth** plan defect. The
+  three-part local equivalent used instead is recorded in `tasks.md` → *T16 — executed*. **No red CI run
+  was observed.**
+
+**The sixteenth plan defect came out of that widening and is the one to carry forward**: `actions/checkout@v4`
+defaulted to `fetch-depth: 1`, and `check-stale-pointers` reads `git log --all` to tell a historical
+reference from a broken one. At the same commit, depth 1 reports `28 broken, 0 historical` and full
+history reports `0 broken, historical exactly at its pin of 28` — the categories invert, and the gate
+would have been red on every clean run. Fixed with `fetch-depth: 0` on the `build` checkout. **The first
+defect in this feature created during execution rather than inherited from the plan.**
+
+**Next action: T17.** Then, in plan order:
 
 - **T17** — needles after-run and per-needle rank diff vs T4's baseline. **A floor pass with three
   needles slipping 1 → 4 is a regression that passed** (GMS-05 AC-4 note 2). Its bounded-corpus caveat
@@ -411,7 +428,7 @@ Then, in plan order:
 - **T20** — independent validation, fresh verifier, author ≠ verifier.
 
 **T20's briefing list, assembled here rather than left spread across three files.** The verifier must
-be told all six, or each reads as a violation it is not:
+be told all seven, or each reads as a violation it is not:
 
 1. **`.ua/` is out of scope for GMS-04 AC-3.** 320 occurrences across three tracked generated
    artifacts; regeneration deferred to after PR-C. **PR-B does not close AC-3 for them.**
@@ -429,6 +446,13 @@ be told all six, or each reads as a violation it is not:
    frozen baselines must not be regenerated — `capture-facade-baseline.ts` refuses off the base
    subject, and `--force` moves T17/T20's referent instead of failing.
 6. **The needles corpus is bounded** — see T17 above.
+7. **T16 is wider than its row and its sensor was substituted**, both deliberate and both on the
+   record. It gates `check-stale-pointers` as well as G-HUB, which the row does not ask for, and it
+   modifies `actions/checkout` — a step no task row mentions — because the widened gate is unusable at
+   the default fetch depth (sixteenth defect). **No red CI run was ever observed**; the evidence is the
+   three-part local equivalent in `tasks.md` → *T16 — executed*. A verifier looking for "CI went red"
+   will not find it, and should not read its absence as an unmet criterion without reading the
+   fifteenth defect first.
 
 **Read the branch note before anything else.** T6a and T6 landed in `main` via **PR #46, which was
 squashed, not merged** — R-04 was violated. None of its 8 commits are ancestors of `main`, the
@@ -450,7 +474,8 @@ the remote and is **not** this work. **This PR must be merged with a merge commi
 | T13 | `1090504` | five search surfaces → `hybrid-search.ts` with an 8-key `HybridSearchDeps`; **`rlm-search.ts` deleted whole** — the last delegate; `hybrid-search-late-bind.test.ts` widened to 4 tests, red under six shapes; **G-HUB exit 1 → 0**; the ninth plan defect |
 | — | `ba8d2bc` | plan amendment: T14's sensor corrected — the tenth plan defect |
 | T14 | `e4e38bd` | the root's final cleanup — ten stale `Visibility relaxed` notes replaced per group (§4.3 for the nine methods, §4.3.1 for the one field), the T13 hand-off block retired; **Phase 1 closes**; the eleventh plan defect |
-| T15 | this commit | GMS-04 **AC-1 closed** by four `git mv` renames to `search-facade-{admin,indexing,hybrid,synapse}.test.ts`, 17 citations repointed, every stale description corrected; **AC-3's criterion replaced** by `scripts/check-stale-pointers.ts` + its 21-test suite; `design.md` §10 gains **C10**; **Phase 2 opens**; the twelfth, thirteenth and fourteenth plan defects |
+| T15 | `b9781df` | GMS-04 **AC-1 closed** by four `git mv` renames to `search-facade-{admin,indexing,hybrid,synapse}.test.ts`, 17 citations repointed, every stale description corrected; **AC-3's criterion replaced** by `scripts/check-stale-pointers.ts` + its 21-test suite; `design.md` §10 gains **C10**; **Phase 2 opens**; the twelfth, thirteenth and fourteenth plan defects |
+| T16 | this commit | **G-HUB and `check-stale-pointers` wired into the `build` job** — scope widened past the row on a reviewer decision, since the other two sensors were already enforced through their own suites; `fetch-depth: 0` on that job's checkout; `build` confirmed **already** in `main`'s required checks, so **no ruleset mutation**; the fifteenth and sixteenth plan defects |
 
 Gates at T10: `lint` 0 · `type-check` 0 (6/6) · `build` 0 (5/5) · `test:scripts` **732 pass / 0 fail
 across 39 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
@@ -539,6 +564,23 @@ under its new name: `search-facade-admin` **7/0**, `search-facade-indexing` **25
 line-cited files **162 / 647 / 520 / 389 / 936**, identical before and after · CHANGELOG released
 section still **974 lines, byte-identical to `353de59`**, all **nine** `[Unreleased]` entries present
 there and absent from the released section, positionally and per entry.
+
+Gates at T16 — **T16 changes no source, so every structural figure is byte-identical to T15, which is
+the prediction**: `check-stale-pointers` exit **0**, `0 broken`, pin **28** met exactly and **unmoved by
+this commit** — checked deliberately, because `.github/workflows/ci.yml` is **not** in `EXCLUDED` and a
+step comment naming an `rlm-*` or `search-facade-*` file would have moved it · **G-HUB exit 0**,
+`maxFileLoc` **696** against 700 · `ci.yml` parses under `Bun.YAML.parse`, **19** build steps,
+`continue-on-error` **absent from the whole file** · step order `Build` → *Verify package contents* →
+**G-HUB** → **stale pointers** → *Verify skill-bundle artifacts*.
+
+**Sensor evidence, and its shape is not the one the row asked for.** Three parts, each measured:
+`build` is in `main`'s required checks (live `gh api`, ruleset `19462721`); both new steps are bare
+`run:` with no failure suppression (from the parsed YAML, not a grep that returns empty on error); and
+both scripts exit non-zero on a **genuine** violation — G-HUB `--max-reach 0` → exit 1 with six FAIL
+lines, `--max-loc 1` → exit 1, and `check-stale-pointers` with one injected broken pointer and **the pin
+held at 28** → exit 1 naming the site, restored byte-identical by `git hash-object`. The pin-held
+detail matters: the shallow-clone failure of the sixteenth defect is a *misconfiguration* going red, and
+that is not evidence a gate detects a *violation*.
 
 > **Name the metric on the characterization net.** The seventh suite in `26·41·31·21·25·7·9` is
 > `concurrent-indexing` at **9**, not `session-bias` at **10** — `session-bias` is tracked separately
