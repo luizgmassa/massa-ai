@@ -5,11 +5,20 @@
 - projectId: `massa-ai`
 - workflowSessionId: `spec-model-profile-registry`
 - workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
-- feature: `model-profile-registry` — **Specify, Design, Tasks COMPLETE 2026-07-30.
-  Execute IN PROGRESS: T1–T6 and T8 COMMITTED and green. Only T7 (docs) and T9 (independent
-  validation) remain. Next action: T7. Per-task scope, commit hashes and gate commands are in
+- feature: `model-profile-registry` — **COMPLETE 2026-07-30. Specify, Design, Tasks,
+  Execute (T1–T13) and independent validation ALL DONE. Verdict: PASS at `af79151`
+  (`.specs/features/model-profile-registry/validation.md`). Nothing pushed, no PR — the user
+  asked for neither. Per-task scope, commit hashes, amendments A1–A5 and gate commands are in
   `.specs/features/model-profile-registry/tasks.md` — read that, not this file, for the task
   contract.**
+- Validation took **two** of the three permitted fix loops. Iteration 0 was a **FAIL** with
+  three gaps: MPR-R1's scripted model-token scan did not exist (a model name in charter prose
+  propagated to 9 sites with every gate green), the test named as killing the
+  `loadCharter`-defaults-a-tier mutation never called `loadCharter`, and `design.md`/`tasks.md`
+  still carried the 39-fact/two-profile design-time figures. Closed by T10, T11, T12. Iteration
+  1 passed with a residual — the scan matched per line, so a display name split across a line
+  wrap slipped through, realistic here because prose wraps at ~95 columns. Closed by T13.
+  Iteration 2 is the final PASS.
 - User chose inline execution over sub-agent batches (offer made and declined for T1–T8;
   T9 still requires author ≠ verifier).
 - Seven profiles ship, not two: `balanced` (hostDefaults target), `cheap`, `heavy`, `work`,
@@ -17,8 +26,9 @@
   resolving them for another host is `MissingHostError`, never a silent inherit.
 - branch: `feat/model-profile-registry`, worktree `.claude/worktrees/model-profiles`,
   cut from `origin/main` @ `45daaa1`.
-- Artifacts: `.specs/features/model-profile-registry/{spec,design,tasks,fool}.md` +
-  `fixtures/baseline-main.json`.
+- Artifacts: `.specs/features/model-profile-registry/{spec,design,tasks,fool,validation}.md` +
+  `fixtures/baseline-main.json`. `spec.md` §9 records the divergences; `tasks.md` records
+  amendments A1–A5 and the accepted known limitation.
 
 **Problem, measured:** 304 model facts across 6 surfaces, 184 hand-authored. Three of fifteen
 roles hold contradictory tiers across the four hosts. The Cursor emitter has never worked
@@ -30,8 +40,9 @@ invocation, under its documented unknown-key pass-through rule.
 owns `tiers` / `hostDefaults` / `workflowTiers` / `profiles.<name>.<host>.<tier> → {model,
 effort}` and contains **no agent list**; `scripts/lib/model-profiles.ts` resolves with total,
 fail-loud functions; per-host emitters own host syntax only. Profile precedence
-`--profile` > `MASSA_AI_MODEL_PROFILE` > `hostDefaults[host]`. 39 hand-authored facts, down
-from 184.
+`--profile` > `MASSA_AI_MODEL_PROFILE` > `hostDefaults[host]`. **81** hand-authored facts down
+from 184 — and they express seven profiles where the 184 expressed one. The marginal figure is
+the real one: a new full profile is 12 entries, a host-specific one is 3.
 
 **Decisions taken with the user:** factored tier registry over a flat cross-product; open
 profile set; workflow keys supported with no consumer; `model_hint` → `model_tier`; fix all
@@ -45,13 +56,19 @@ right on Codex, verified by direct doc quote. The critic also graded "the OpenCo
 marker is dead" STRONG; that is **refuted** — `apps/opencode-plugin/src/config-cli.ts:248`
 reads it, so the marker moves to a body comment instead of being deleted.
 
-**Gate (corrected during Execute):** with all five packages built, `test:scripts` = **832 pass
-/ 0 fail** and `test:plugins` = **96 pass / 0 fail**, both exit 0. The "4 pre-existing
+**Gate (corrected during Execute):** with all five packages built, `test:scripts` = **857 pass
+/ 0 fail** at `af79151` and `test:plugins` = **96 pass / 0 fail**, both exit 0. The count moved
+832 → 836 (T7) → 850 (T10) → 853 (T11) → 857 (T13). The "4 pre-existing
 failures" recorded during Specify were an unbuilt-worktree artefact, not real defects — see
 `spec.md` §8 for the four measured build states and why a *partial* build moves the failure
 instead of reducing it. Build before measuring anything.
 
-**Open / residual:** Cursor tier values are `inherit` — no portable Cursor model ID exists for
+**Open / residual:** `verify-model-tokens.ts` can false-fire on ordinary English use of the
+three bare Claude aliases (two poetry forms and the Latin for "a great work"). Dormant — no
+charter triggers it. Narrowing it was **declined**: gating those tokens on an adjacent `model`
+context word would trade a loud false positive for a silent false negative on a real duplicated
+fact. Recorded in the script's docblock so the next person rewords rather than weakens it.
+Cursor tier values are `inherit` — no portable Cursor model ID exists for
 the pinned models, and `cursor-agent` is not installed here, so the hard-error-vs-fallback
 falsifier is a **skipped sensor with reason**. massa-ai MCP server not registered this session;
 all state came from `.specs/` and source reads.

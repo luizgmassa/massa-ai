@@ -5,7 +5,8 @@
 - **projectId**: `massa-ai`
 - **Workflow**: spec-driven (Large — Specify + Design + Tasks + Execute)
 - **Branch / worktree**: `feat/model-profile-registry` @ `.claude/worktrees/model-profiles`, cut from `origin/main` @ `45daaa1`
-- **Status**: Specify
+- **Status**: COMPLETE — Execute (T1–T13) done, independently validated **PASS** at `af79151`
+  (`validation.md`). Not pushed, no PR.
 
 ---
 

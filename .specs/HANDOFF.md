@@ -1,35 +1,63 @@
 # Handoff
 
-## Active — Model Profile Registry, Execute in progress (T7 + T9 remain)
+## Complete — Model Profile Registry, validated PASS, nothing pushed
 
 - **projectId** `massa-ai` · **workflowSessionId** `spec-model-profile-registry`
 - **branch** `feat/model-profile-registry` · **worktree** `.claude/worktrees/model-profiles`
-- **base** `origin/main` @ `45daaa1` · **head** `ce326be` · working tree clean
-- Nothing pushed, no PR, **no CHANGELOG entry yet** (the CI merge gate fails a PR without one —
-  T7 owns it).
+- **base** `origin/main` @ `45daaa1` · **head** `af79151` · working tree clean
+- **Specify, Design, Tasks, Execute (T1–T13) and independent validation ALL COMPLETE.**
+  **Verdict: PASS** — `.specs/features/model-profile-registry/validation.md`.
+- **Nothing pushed. No PR. Merge withheld** — the user asked for neither, and merging to
+  `main` auto-cuts a release. The CHANGELOG entry is written and sits under `### Changed`
+  (**minor** bump), so the CI merge gate is satisfied.
 
 **Read `.specs/features/model-profile-registry/tasks.md` first** — it is the task contract:
-per-task status with commit hashes, the precise T7 and T9 scope, the gate commands, and the
-verification notes carried forward. Then `spec.md` (MPR-R1..R12 + ACs, §4 enumerated behaviour
-changes, §7 per-host evidence, §8 the corrected baseline), `design.md` (§2.1 why the registry
-holds no agent list, §4 per-host emitter diffs, §6 mutation kill-list, §8 risks D1–D9), and
-`fool.md` (Plan Challenge adjudication, including where the critic was wrong).
+per-task status with commit hashes, the five recorded amendments A1–A5, the accepted known
+limitation, and the gate commands. Then `validation.md` (the single validation record — it
+replaces two earlier reports rather than appending to them), `spec.md` (MPR-R1..R12 + ACs,
+§4 enumerated behaviour changes, §7 per-host evidence, §8 the corrected baseline, §9 recorded
+divergences), `design.md`, and `fool.md`.
 
-Each of the seven commits carries its own rationale and gate evidence in its body. Read the
-commit, not a summary of it.
+Each commit carries its own rationale and gate evidence in its body. Read the commit, not a
+summary of it.
 
-**Open, deliberately:**
+**Validation used two of the three permitted fix loops, and the first verdict was FAIL.**
+That matters more than the final PASS:
 
-- Cursor ships `model: inherit`. Accepted risk with a recorded reason (`spec.md` §7) and a
-  **skipped sensor** — `cursor-agent` is not installed here, so the hard-error-vs-fallback
-  question is unresolved. Do not close it by guessing a slug.
+- **Gap 1 — MPR-R1's central acceptance criterion had no mechanism at all.** A model name
+  typed into a charter's *prose* propagated into 1 charter + 4 mirrored charters + 4 generated
+  agent bodies while `test:scripts`, `lint` and both `--check` drift gates stayed green.
+  `loadCharter` rejects the retired `model_hint` KEY and the emitters only ever see a
+  resolved pair, so nothing could see it. Closed by T10's `scripts/verify-model-tokens.ts`.
+- **Gap 2 — a test named for a guard it never called.** "loadCharter throws rather than
+  defaulting" used `parseFrontmatter` and asserted a field was undefined. The `design.md` §6
+  mutation it was listed as killing survived it. Closed by T11.
+- **Gap 3** — `design.md` and `tasks.md` still carried the 39-fact / two-profile design-time
+  figures against a seven-profile registry. Closed by T12 as recorded amendments, not silent
+  rewrites.
+- **Iteration-1 residual** — the scan matched per *line*, so a display name split across a
+  line wrap slipped through. Realistic here, because prose wraps at ~95 columns. Closed by T13.
+
+**Open, deliberately — decided, not gaps:**
+
+- `verify-model-tokens.ts` can false-fire on ordinary English use of the three bare Claude
+  aliases (two poetry forms and the Latin for "a great work"). Dormant — no charter triggers
+  it. Narrowing it was **declined**: gating those tokens on an adjacent `model` context word
+  trades a loud, five-second-to-diagnose false positive for a *silent false negative* on a
+  real duplicated fact. If it fires on you, reword the sentence rather than weakening the
+  gate. The reason lives in the script's own docblock.
+- Cursor ships `model: inherit` on every tier. Accepted risk with a recorded reason
+  (`spec.md` §7) and a **skipped sensor** — `cursor-agent` is not installed here, so the
+  hard-error-vs-fallback question is unresolved. Do not close it by guessing a slug.
 - Codex IDs are SKIPPED by `verify:model-ids` (docs-only model list). Expected.
 - `CLAUDE_CODE_SUBAGENT_MODEL` outranks frontmatter and so defeats every registry pin on
-  Claude (`spec.md` §5). Documentation-only; not fixable in code. T7 owns it.
+  Claude (`spec.md` §5). Documentation-only, not fixable in code. Documented by T7.
 
 **Build all five packages before believing any test number** — `tasks.md` → Gate Check
-Commands. massa-ai MCP tools were not registered in the session that produced this work; all
-state came from `.specs/` and source reads.
+Commands. Final green at `af79151`: `test:scripts` **857 pass / 0 fail**, `test:plugins`
+**96 pass / 0 fail**, both `--check` "No drift", `lint` 0, `verify:model-tokens` 0,
+`verify:model-ids` 0 with codex SKIPPED. massa-ai MCP tools were not registered in any
+session that produced this work; all state came from `.specs/` files and source reads.
 
 ## Previous — Core Layering and God-Module Split (PR-B), Phase 1 started
 

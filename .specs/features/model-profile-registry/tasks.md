@@ -34,10 +34,11 @@ only, not schema.
 | T6 | `scripts/verify-model-ids.ts` (MPR-R12) | +2 | none | **DONE** `ce326be` |
 | T7 | Docs: `FEATURES.md`, `CLAUDE.md`, `CHANGELOG.md` + doc-drift test | 3 + 1 | none | **DONE** `cb56fd0` |
 | T8 | `turbo.json` passThroughEnv += `MASSA_AI_MODEL_PROFILE` (D6) | 1 | none | **DONE** `0be5a30` |
-| T9 | Independent validation (verification-agent) | +1 | none | **DONE — FAIL, 3 gaps** |
+| T9 | Independent validation (verification-agent) | +1 | none | **DONE — FAIL (3 gaps) → PASS @ `af79151`** |
 | T10 | MPR-R1 model-token scan + its unit test (T9 gap 1) | +2 + 2 | none | **DONE** `611f29e` |
 | T11 | `loadCharter` throw tests exercise `loadCharter` (T9 gap 2) | 2 | none | **DONE** `412c076` |
-| T12 | Amend `design.md`/`tasks.md` for the 7-profile registry (T9 gap 3) | 2 | none | **DONE** — this commit |
+| T12 | Amend `design.md`/`tasks.md` for the 7-profile registry (T9 gap 3) | 2 | none | **DONE** `fdbc8eb` |
+| T13 | Scan matches across a line wrap + separator swap (T9 iteration-1 residual) | 2 | none | **DONE** `af79151` |
 
 ## Amendments during Execute
 
@@ -54,8 +55,18 @@ result diverged, with the reason.
 
 ## Fix tasks from T9 — closed
 
-T9's verdict was **FAIL** with three gaps. Read `validation.md` for the evidence; all three
-are closed by T10–T12 and re-verification is the remaining step (iteration 1 of the capped 3).
+T9's first verdict was **FAIL** with three gaps; iteration 1 passed with one non-blocking
+residual, which T13 closed; iteration 2 is the final **PASS** at `af79151`. Two of the three
+fix loops the workflow allows were used. `validation.md` is the single record — it replaces
+the two earlier reports rather than appending to them, and carries the full sensor history.
+
+**Known limitation, accepted with a recorded reason.** `verify-model-tokens.ts` can false-fire
+on ordinary English use of the three bare Claude aliases (they are two poetry forms and the
+Latin for "a great work"). No charter triggers it today. The suggested narrowing — requiring
+those tokens to sit beside a `model` context word — was **declined**: it would trade a loud,
+five-second-to-diagnose false positive for a silent false *negative* on a real duplicated
+fact written without a context word. Recorded in the script's own docblock so the next person
+to hit it rewords the sentence instead of weakening the gate.
 
 ### T7 scope, precisely
 
@@ -273,15 +284,15 @@ done
 
 bun run scripts/generate-subagent-artifacts.ts --check   # "No drift"
 bun run scripts/generate-skill-artifacts.ts --check      # "No drift"
-bun run test:scripts        # 853 pass / 0 fail, exit 0
+bun run test:scripts        # 857 pass / 0 fail, exit 0
 bun run test:plugins        # 96 pass / 0 fail, exit 0
 bun run lint                # oxlint, exit 0
 bun run verify:model-tokens # MPR-R1 gate; 136 files, 29 tokens, 0 hits, exit 0
 bun run verify:model-ids    # advisory; opencode 11/11, claude 3/3, codex SKIPPED
 ```
 
-Last measured green at `412c076` (T11) with all five packages built. The `test:scripts` count
-moved 832 → 836 (T7's doc-drift tests) → 850 (T10) → 853 (T11); each step is accounted for in
+Last measured green at `af79151` (T13) with all five packages built. The `test:scripts` count
+moved 832 → 836 (T7's doc-drift tests) → 850 (T10) → 853 (T11) → 857 (T13); each step is accounted for in
 its own commit body. `verify:model-tokens` also runs inside `test:scripts` via its unit test,
 so it is a real gate without a new CI job — a new job under the `CI` workflow name would
 extend the `workflow_run` chain that cuts a release.

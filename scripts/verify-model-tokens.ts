@@ -111,6 +111,15 @@ const EDGE = "A-Za-z0-9/.:_-";
  * for facts that DUPLICATE the registry, and a string naming a model nothing resolves is a
  * different problem. The second is evasion, and the failure mode here is a well-meaning
  * engineer pasting a value, not someone hiding one.
+ *
+ * KNOWN FALSE POSITIVE, and why it is left alone. Three tokens are also ordinary English:
+ * Claude's bare aliases are two poetry forms and the Latin for "a great work". A charter that
+ * says "a magnum opus of clarity" or "summarize as a haiku" turns this gate red. If that
+ * happens to you, REWORD THE SENTENCE — do not narrow the match. Requiring those three tokens
+ * to sit next to a `model` context word trades this loud, five-second-to-diagnose false alarm
+ * for a silent false NEGATIVE: `use haiku for this agent` is a real duplicated fact and carries
+ * no context word, so the narrowed rule would stop catching exactly what this exists to catch.
+ * No charter triggers it today; it was found by the independent verifier probing for it.
  */
 function tokenRegex(token: string): RegExp {
   const escaped = token
