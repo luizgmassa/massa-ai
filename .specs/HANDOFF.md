@@ -672,6 +672,21 @@ byte-identical; `lint`/`type-check`/`build` green; `test:scripts` **961/47**, un
 cycle touched no test file). **Commit count is now 23** (`git rev-list --count origin/main..HEAD`),
 three merge commits deep. About to be pushed a third time.
 
+**PR #53's first real CI run failed `build`, and it is a genuine CI-infrastructure defect, not
+PR-B's.** `bun install` hit the tree-sitter/node-gyp/undici cache-corruption class `ci.yml`'s own
+comments already document two paragraphs above the retry block; this time the retry's own `rm -rf
+~/.bun/install/cache node_modules` hit `Directory not empty` and, being a standalone statement
+(not the non-final half of an `&&` list, unlike the `bun install` line right above it), its
+non-zero exit aborted the whole step under `set -e` **before the retry's `bun install` ever ran** —
+confirmed from the raw log: no second "bun install" banner appears between the `rm` error and the
+step's exit. `git blame` on the retry block: `64b6feba`, 2026-07-26, well before PR-B; this
+branch's own diff never touches `ci.yml`'s install steps. Fixed in `de2385f`: `|| true` on all
+three copies (build, both `Structural native tests` jobs) makes the purge best-effort. Every other
+required check passed on that same run — `validate`, both `Structural native tests`, and
+**`coverage`, cleanly, in 4m12s** — which is the strongest evidence yet that the earlier
+`trace_path` coverage failure (two runs ago) was the flake it was recorded as, not a recurring
+one: it has now not reproduced across two subsequent runs.
+
 **The briefing list T20 was given, kept because PR-C inherits most of it.** Each of these reads as a
 violation if a reader does not know it:
 
