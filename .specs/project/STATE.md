@@ -1,13 +1,21 @@
 # massa-ai Spec State
 
-## Current — Judge With Debate (spec-driven, Tasks approved pending Execute)
+## Current — Judge With Debate (spec-driven, Execute T0–T10 done, validation pending)
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-judge-with-debate`
-- workflow: spec-driven (Large — Specify + Design + Tasks + full Plan Challenge done; Execute pending)
-- feature: `judge-with-debate` — **Specify, Design (approach A user-confirmed), Tasks (12 tasks),
-  and full Plan Challenge COMPLETE 2026-07-29. Plan Challenge: pre_mortem, massa-ai-plan-critic,
-  5 findings (2C/2H/1M) all verified + incorporated. Awaiting Execute approval.**
+- workflow: spec-driven (Large — all phases; T11 independent validation pending)
+- feature: `judge-with-debate` — **Execute T0–T10 COMPLETE 2026-07-29 on worktree
+  `../massa-ai-wt-judge-with-debate`, branch `feat/judge-with-debate`. T11 (independent
+  verification-agent) is next.**
+- Plan Challenge: pre_mortem, 5 findings (2C/2H/1M) all verified + incorporated (tasks.md).
+- Final gate @ T10: lint 0 · type-check 6/6 · `test:scripts` **772 pass / 0 fail across 41
+  files** · both generators `--check` No drift. Baseline corrected: true pre-feature state was
+  737/2 (both environmental — crash probe + unbuilt dist).
+- Execute divergence (unplanned, gate-discovered): three registration spots missed by quick
+  gates and caught by the full gate — `validate-repository.test.ts` third roster,
+  `workflow-harness-contract.test.ts` workflow count 35→36 + read-only complement 19→20, intake
+  line in the new workflow. Fixed in one repair commit; full gate is the sensor that works.
 - scope: 12 requirements (JD-01..12) — port of NeoLabHQ `judge-with-debate` pattern: meta-judge
   eval-spec YAML (once, verbatim) + 3 independent judges + ≤3 debate rounds + consensus
   (0.5 overall / 1.0 criterion). Two new charters (`meta-judge`, `judge`; registry 15→17),

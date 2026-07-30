@@ -658,11 +658,13 @@
       "priority": "P1",
       "phases": {
         "specify": true,
-        "design": "pending",
-        "tasks": "pending",
-        "execute": "pending"
+        "design": true,
+        "tasks": true,
+        "execute": "in_progress"
       },
-      "spec": ".specs/features/judge-with-debate/spec.md"
+      "spec": ".specs/features/judge-with-debate/spec.md",
+      "design": ".specs/features/judge-with-debate/design.md",
+      "tasks": ".specs/features/judge-with-debate/tasks.md"
     }
   ],
   "active_feature": "judge-with-debate"

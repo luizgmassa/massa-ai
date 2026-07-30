@@ -1,14 +1,22 @@
 # Handoff
 
-## Active — Judge With Debate, planning complete pending Execute approval
+## Active — Judge With Debate, T0–T10 complete, validation pending
 
-**Feature**: `judge-with-debate` · no branch yet (worktree per SWU convention at Execute).
-**Specify + Design + Tasks + full Plan Challenge COMPLETE 2026-07-29; Execute awaits approval.**
-Artifacts: `.specs/features/judge-with-debate/{spec,design,tasks}.md`.
-Plan Challenge: pre_mortem, 5 findings (2C/2H/1M) all incorporated — see tasks.md → *Plan Challenge — tasks*.
-**Next action**: user approves tasks → create worktree/branch → T0 baseline.
+**Feature**: `judge-with-debate` · branch `feat/judge-with-debate`, worktree
+`../massa-ai-wt-judge-with-debate` (from `origin/main` @ v1.12.1). **T0–T10 COMPLETE
+2026-07-29; T11 independent validation is the only remaining task.**
+Commits (oldest→newest): `1eb314f` planning artifacts, `d013e4d` T0 baseline, T1 meta-judge
+charter, T2 judge charter, T3 generator + 68 bundles, T4 parity mirrors, T5 registry,
+T6 integrity counts, T7 workflow + content test, T8 router + skill bundles, T9 audit-report-io
+family, repair commit (3rd roster + workflow counts + intake line), T10 changelog + state.
+**Gates @ T10: lint 0 · type-check 6/6 · test:scripts 772 pass / 0 fail (41 files) · both
+`--check` No drift.** Baseline corrected to 737/2 environmental.
+**Next action**: dispatch `massa-ai-verification-agent` per T11 (4 discrimination sensors:
+roster removal → parity red; persona-line strip → integrity red; router-row removal →
+dispatch-resolution red; workflow-marker corruption → content-test red). If the user declines a
+live protocol smoke run, record the candidate lesson (protocol = user-gated-smoke-only).
 Note: main checkout also carries PR-B (`core-layering-god-module-split`) Execute on
-`refactor/search-facade-split-phase-1` — this feature must use its own worktree.
+`refactor/search-facade-split-phase-1` — untouched.
 
 ---
 

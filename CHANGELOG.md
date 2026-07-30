@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`judge-with-debate` workflow + `meta-judge` and `judge` sub-agents (17 specialists).** A new
+  standalone workflow evaluates a user-supplied artifact through multi-agent debate: a meta-judge
+  authors a tailored evaluation specification once (two-stage syntactic/semantic validation with a
+  single named retry), three independent judges score it with quoted evidence, and the panel
+  debates disagreements over up to 3 rounds until consensus (overall gap ≤ 0.5, every criterion
+  gap ≤ 1.0, explicit accept) or reports an honest no-consensus — never a forced verdict. Judges
+  communicate through the filesystem only; the orchestrator computes consensus from structured
+  reply blocks and never opens judge report files. Reports persist under the new
+  `audits/judge/` family in `audit-report-io.md` (per-judge + consensus contracts, fidelity
+  checklists). Per-slot model diversity (meta `kimi-k3`, J1 `deepseek-v4-pro`, J2 `minimax-m3`,
+  J3 `GLM-5.2`) is requested per dispatch; hosts without dispatch-time model selection run charter
+  defaults and the verdict is marked `DIVERSITY DEGRADED`, with a per-invocation capability probe
+  so diversity activates automatically when a host gains the capability. Both charters are
+  registered across all four plugin bundles (Claude `opus`, Codex `gpt-5.6-sol`, Cursor charter
+  hint, OpenCode `opencode-go/kimi-k3` + `opencode-go/deepseek-v4-pro`), enforced by a new
+  workflow prose-contract test and the existing integrity/parity/validate-repository gates.
+
 ## [1.12.1] - 2026-07-30
 
 ### Security
