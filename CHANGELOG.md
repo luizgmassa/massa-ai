@@ -23,6 +23,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   two members through its remaining two functions, and only sheds the last of them two extractions
   from now.
 
+- **Synapse session biasing is now a standalone capability module with an injectable dependency
+  record.** `applySynapseState` moves out of `rlm-synapse.ts` into `session-bias.ts` and trades the
+  search facade for `SessionBiasDeps` — the two collaborators it actually reads, `sessionRegistry`
+  and `synapseManager`, and nothing else. The practical gain is that the behaviour is now unit
+  testable from an object literal: reaching this body previously meant constructing the whole
+  search service, which intercepts seven factory modules before the first assertion runs. Functions
+  in the search directory that still take the facade drop from **13 to 12**, and the module reads
+  **zero** facade members.
+
+  Behaviour is unchanged, including one detail that is easy to lose in a move like this: the two
+  collaborators still fall back to their process factories *inside* the module rather than being
+  resolved by the caller, so a search with no session still touches neither factory. Resolving them
+  eagerly would have been the one way this extraction stopped being behaviour-preserving.
+
+  Deepest foreign reach stays at **14**, the hub gate still fails, and the number of modules reading
+  the facade stays at **5** — all three expected and all three unchanged, for the same reason as
+  above. What does move is `rlm-synapse.ts`, from two facade members to one.
+
 ## [1.11.0] - 2026-07-29
 
 ### Changed

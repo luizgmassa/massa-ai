@@ -5,7 +5,7 @@
 **Feature**: `core-layering-god-module-split` · branch
 `refactor/search-facade-split-phase-1b`, cut from `main` @ `5247ecb` (v1.11.0),
 worktree `../massa-ai-wt-facade-phase-1b`.
-**T6a and T6 are merged and released; T7 is committed and green; T8 is not started.**
+**T6a and T6 are merged and released; T7 and T8 are committed and green; T9 is not started.**
 Working tree clean. Nothing is pushed — the branch is local only.
 
 **Read the branch note before anything else.** T6a and T6 landed in `main` via **PR #46, which was
@@ -19,40 +19,58 @@ the remote and is **not** this work. **This PR must be merged with a merge commi
 | # | commit | deliverable |
 | --- | --- | --- |
 | T6a/T6 | in `main` via #46 (squashed) | `capture-facade-baseline.ts` + 3 frozen fixtures; `rlm-fusion.ts` → `result-fusion.ts` |
-| T7 | this branch | `buildGraphStream` → `graph-stream.ts`, plus the sensor amendment |
+| T7 | `3e46eae` | `buildGraphStream` → `graph-stream.ts`, plus the sensor amendment |
+| T8 | this branch | `applySynapseState` → `session-bias.ts` with `SessionBiasDeps`; the AC-2 and LATE-BIND sensors |
 
-Gates at T7: `lint` 0 · `type-check` 0 · `build` 0 · `test:scripts` **732 pass / 0 fail across 39
+Gates at T8: `lint` 0 · `type-check` 0 · `build` 0 · `test:scripts` **732 pass / 0 fail across 39
 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
-characterization net **160** across 7 suites (26·41·31·21·25·7·9) · G-HUB exit 1, foreign modules
-**5**, reach **14** · D1 `delegateScope` **19 → 18**, facade-taking **14 → 13**.
+characterization net **160** across 7 suites (26·41·31·21·25·7·9) · `search-synapse-integration`
+**5/0** · new `session-bias` **10/0** · new `session-bias-late-bind` **3/0** · G-HUB exit 1, 25
+files, foreign modules **5**, reach **14**, `perModule` synapse **1** · D1 `delegateScope`
+**18 → 17**, facade-taking **13 → 12**, scoped LOC **1186 → 1132** · EXCLUSIONS **9**.
 
 **Read before resuming**: `tasks.md` → *AC-3 vs GMS-03 AC-1*, *Phase 0's before-baselines were
-live-tree assertions*, *T6's sensor was unfirable*, **the new *foreign-module count is not a
-per-task sensor either* section**, then the Phase 1 table.
+live-tree assertions*, *T6's sensor was unfirable*, *the foreign-module count is not a per-task
+sensor either*, **the new *LATE-BIND has no sensor at T8* section**, then the Phase 1 table and
+*Phase 1 — executed*.
 Then `STATE.md` → *Execute — Phase 1 STARTED*.
 
-**Next action: T8** (`applySynapseState` → `session-bias.ts`, `injectedDeps` → `SessionBiasDeps`).
-Its own GMS-03 AC-2 sensor (construct from an object literal, zero `mock.module` calls) is sound.
-Its D1 delta is facade-taking **13 → 12**; the hub-metric foreign-module count **does not move at
-T8** — it moves once, at T9. `rlm-synapse.ts` dies whole at T9.
+**Next action: T9** (`correctQuery` → **`hybrid-search.ts`**, `keywordSearch` → `HybridSearchDeps`).
+Note the destination: **not** `query-understanding.ts`, which is a real unrelated file in the same
+directory that an executor could plausibly pick — the first draft said "the query module", which
+names nothing. **T9 is where `rlm-synapse.ts` dies whole**, and where the hub-metric foreign-module
+count finally moves, **5 → 4**. Its AC-3 budget is **1** assertion.
 
-**Two T7 findings a resumer should not re-derive:**
+**Three T8 findings a resumer should not re-derive:**
 
-- **The foreign-module count is not a per-task sensor** — it moves once across T7+T8+T9, at T9.
-  This was the *correction* applied at T6, and it inherited the defect it corrected. Measured
-  before/after in `tasks.md`. T7's and T8's sensor is the D1 matrix delta instead.
-- **`tsc` cannot see `this.`-prefixed infinite recursion in these delegates.** The capability
-  modules share a name *and*, once the facade parameter is dropped, an *arity* with the facade
-  methods that call them. Substituting `return this.buildGraphStream(…)` type-checks clean
-  (`bunx tsc --noEmit -p packages/core/tsconfig.json` exits **0**) while the coverage suite goes
-  **39 pass / 2 fail**. Every remaining delegate move needs that runtime mutation, not a type-check.
+- **LATE-BIND is not sensorable at T8, and now has a dedicated sensor.** `injectedDeps` is `readonly`
+  with **zero** post-construction assignment sites, so capturing the deps record instead of
+  assembling it per call passes `tsc`, the full **160/0** characterization net, and T8's own AC-2
+  sensor. Full measurement in `tasks.md`. Closed by
+  `packages/core/src/__tests__/session-bias-late-bind.test.ts` (3 tests, observed **2/1 red** under
+  the mutation). **From T9 on the ordinary sensor takes over** — `keywordSearch` has 10
+  post-construction assignment sites, so `rlm-search.test.ts`'s **31** and `rlm-synapse.test.ts`'s
+  **26** are load-bearing at T9 in a way they were not at T8.
+- **Which `this.`-recursion `tsc` can see depends on whether the module takes deps.** A deps-taking
+  module is one argument wider than its facade method, so the naive substitution is **caught**
+  (`TS2554: Expected 3-5 arguments, but got 6`). The blind variant is recursion that **also drops the
+  deps record** — arity-identical, `tsc` exit **0**, coverage **39 pass / 2 fail**. **That is the
+  mutation to run at T9/T10/T12/T13**, not T7's.
+- **`toHaveBeenCalledWith` treats an undefined-valued key as absent.** `f({})` satisfies
+  `toHaveBeenCalledWith({a: undefined})` — measured. So a deps-record assertion built from a facade
+  with no injected deps proves nothing about the record existing. Inject defined stubs; then extra
+  keys still fail and the check is exact.
 
-**`rlm-synapse.test.ts` was deliberately left untouched at T7**, so its sensor stays exactly **26**
-and T7 stays inside AC-3's bound. Consequence: its header comment and the
-`describe("rlm-synapse — buildGraphStream")` block now name a function that lives in
-`graph-stream.ts`. The tests themselves are correct — they drive `rlm.buildGraphStream`, the facade
-method, which still exists. **Registered as a T15 site**; T20's verifier must not read the stale
-name as evidence the move did not happen.
+**The foreign-module count is still not a per-task sensor** — T7 and T8 both left it at **5**,
+exactly as predicted, and it moves once, at T9. G-HUB exiting 1 remains correct until T14.
+
+**`rlm-synapse.test.ts` was deliberately left untouched at T7 and T8**, so its sensor stays exactly
+**26** and both tasks stay inside AC-3's bound. Consequence: its header comment and two `describe`
+block names now cite functions that live in `graph-stream.ts` and `session-bias.ts`. The tests
+themselves are correct — they drive the surviving facade methods. **Registered as T15 sites**; T20's
+verifier must not read the stale names as evidence the moves did not happen. Note this is about the
+**test** file, which survives PR-B; the *source* `rlm-synapse.ts` is the one that dies at T9, when
+`correctQuery` leaves. The test file's own name is a T15 decision, not T9's.
 
 **Two things a resumer must not re-derive the hard way:**
 

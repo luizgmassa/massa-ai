@@ -42,10 +42,7 @@ import {
   ensureInitializedImpl,
   type IndexProjectOptions,
 } from "./rlm-indexing.js";
-import {
-  applySynapseStateImpl,
-  correctQueryImpl,
-} from "./rlm-synapse.js";
+import { correctQueryImpl } from "./rlm-synapse.js";
 import {
   searchImpl,
   addContextToResultsImpl,
@@ -61,6 +58,7 @@ import {
 // forwarding tests are what prove it at runtime.
 import { fuseResults, generateScoreExplanation } from "./result-fusion.js";
 import { buildGraphStream } from "./graph-stream.js";
+import { applySynapseState, type SessionBiasDeps } from "./session-bias.js";
 import type {
   SearchDegradation,
   SearchDegradationReporter,
@@ -292,14 +290,32 @@ export class ContextualSearchRLM {
     sessionId?: string,
     reportDegradation?: SearchDegradationReporter,
   ): Promise<SearchResult[]> {
-    return applySynapseStateImpl(
-      this,
+    return applySynapseState(
+      this.#sessionBiasDeps(),
       baseResults,
       query,
       projectId,
       sessionId,
       reportDegradation,
     );
+  }
+
+  /**
+   * Assemble session-bias.ts's narrow deps record — per call, from whatever the
+   * fields hold right now (LATE-BIND, design.md §4.3.1). Never hoist this to a
+   * constructor-time capture: the ~80 test sites that stub facade state *after*
+   * construction would go on passing while exercising the real collaborator,
+   * which is this repository's signature defect class.
+   *
+   * Property reads only. Resolving the factory fallbacks here instead of inside
+   * the module would call both on every search, including the no-session calls
+   * that today touch neither.
+   */
+  #sessionBiasDeps(): SessionBiasDeps {
+    return {
+      sessionRegistry: this.injectedDeps?.sessionRegistry,
+      synapseManager: this.injectedDeps?.synapseManager,
+    };
   }
 
   /**

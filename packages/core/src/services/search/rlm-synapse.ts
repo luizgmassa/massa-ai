@@ -4,78 +4,16 @@
  * Extracted (M14 Phase 3, T3.2) from contextual-search-rlm.ts. Behavior is
  * byte-preserved: bodies moved verbatim with `this` → `rlm`.
  *
- * PR-B T7 moved `buildGraphStream` out to graph-stream.ts. It was the one
- * function here that read zero facade members, so its departure leaves this
- * file's foreign reach unchanged at 2 (`injectedDeps`, `keywordSearch`) —
- * those go at T8 and T9, and only then does this module stop reading the root.
+ * PR-B T7 moved `buildGraphStream` out to graph-stream.ts and T8 moved
+ * `applySynapseState` out to session-bias.ts. `correctQuery` is the last
+ * survivor and the only remaining reader of the root here — one member,
+ * `keywordSearch`. It leaves for hybrid-search.ts at T9, and that is the commit
+ * this file dies in; it is not the Synapse module the name still claims, since
+ * fuzzy query correction has nothing to do with Synapse (design.md §4.2).
  */
 
-import { SearchResult, logger } from "@massa-ai/shared";
-import { getSessionRegistry } from "../synapse/session/index.js";
-import { getSynapseManager } from "../synapse/index.js";
 import { extractQueryTerms } from "./lexical-search.js";
-import type { AgentSession } from "../synapse/types.js";
 import type { ContextualSearchRLM } from "./contextual-search-rlm.js";
-import type { SearchDegradationReporter } from "./search-diagnostics.js";
-
-/**
- * Apply session state after the session-independent base result is cached.
- * Invalid and workspace-mismatched sessions return the exact base array.
- */
-export async function applySynapseStateImpl(
-  rlm: ContextualSearchRLM,
-  baseResults: SearchResult[],
-  query: string,
-  projectId: string,
-  sessionId?: string,
-  reportDegradation?: SearchDegradationReporter,
-): Promise<SearchResult[]> {
-  if (!sessionId) return baseResults;
-
-  const registry = rlm.injectedDeps?.sessionRegistry ?? getSessionRegistry();
-  let session: AgentSession | null;
-  try {
-    session = await registry.getAsync(sessionId);
-  } catch (error) {
-    reportDegradation?.("SYNAPSE_UNAVAILABLE", "synapse_session_lookup");
-    logger.warn("Synapse session lookup failed — using stateless search", {
-      sessionId,
-      projectId,
-      error: (error as Error).message,
-    });
-    return baseResults;
-  }
-
-  if (!session || (session.workspaceId && session.workspaceId !== projectId)) {
-    return baseResults;
-  }
-
-  const synapseManager = rlm.injectedDeps?.synapseManager ?? getSynapseManager();
-  const allowBufferInjection = session.workspaceId === projectId;
-  let processed;
-  try {
-    processed = synapseManager.process(baseResults, query, {
-      session,
-      projectId,
-      allowBufferInjection,
-    });
-  } catch (error) {
-    reportDegradation?.("SYNAPSE_UNAVAILABLE", "synapse_processing");
-    logger.warn("Synapse processing failed — using stateless search", {
-      sessionId,
-      projectId,
-      error: (error as Error).message,
-    });
-    return baseResults;
-  }
-  const baseIds = new Set(baseResults.map((result) => result.id));
-
-  return processed.results.filter((result) => {
-    if (baseIds.has(result.id)) return true;
-    const metadata = result.metadata as Record<string, unknown> | undefined;
-    return allowBufferInjection && metadata?.projectId === projectId;
-  });
-}
 
 /**
  * Fuzzy-correct each non-stopword query term via the keyword store's

@@ -192,6 +192,40 @@ it is cheapest and `searchImpl` (455 LOC, 13 members) lands last, when everythin
 and both are path-independent, so neither needs editing as files move — if either goes red the
 task is wrong, not the check.
 
+## Phase 1 — executed
+
+T6a and T6 reached `main` through **PR #46, squashed rather than merged** — R-04 was violated, none
+of those 8 commits are ancestors of `main`, and their per-commit sensor evidence survives only here.
+T7 onward is on `refactor/search-facade-split-phase-1b`, cut from `5247ecb` (v1.11.0). **That PR must
+be merged with a merge commit.**
+
+| # | commit | deliverable | discriminating sensor observed |
+| --- | --- | --- | --- |
+| T6a | in `main` via #46 | `capture-facade-baseline.ts` + 3 frozen fixtures; 9 assertions re-pointed | three mutants red first; suites green at base **and** with T6 applied |
+| T6 | in `main` via #46 | `rlm-fusion.ts` → `result-fusion.ts` | foreign modules **6 → 5** |
+| T7 | `3e46eae` | `buildGraphStream` → `graph-stream.ts` | D1 `delegateScope` **19 → 18**, facade-taking **14 → 13**, scoped LOC 1310 → 1186 |
+| T8 | this commit | `applySynapseState` → `session-bias.ts` with `SessionBiasDeps` | D1 facade-taking **13 → 12**, `delegateScope` **18 → 17**, scoped LOC **1186 → 1132**; `rlm-synapse.ts` hub reach **2 → 1**; foreign modules **5 → 5** as predicted; new AC-2 sensor 10/0 with **zero** `mock.module`; new LATE-BIND sensor 3/0, observed **2/1 red** under the capture mutation |
+
+Gate readings at T8: `lint` 0 · `type-check` 0 · `build` 0 · `test:scripts` **732 pass / 0 fail
+across 39 files** · `check-frozen-anchors` exit 0 (14/14) · `check-characterization` exit 0 (3/3) ·
+characterization net **160** across 7 suites (26·41·31·21·25·7·9) · `search-synapse-integration`
+**5/0** · G-HUB exit **1**, 25 files, foreign **5**, reach **14**, largest `rlm-indexing.ts` 592,
+`perModule {csr 4, admin 7, indexing 11, search 14, synapse 1, warmup 1}` · coverage EXCLUSIONS **9**
+(measured by importing the module — a regex over the array literal counts the `reason` strings and
+reports 19).
+
+AC-3 verified mechanically on the one edited test file, over comment-stripped source: `test(`
+**39 → 39**, `describe(` **20 → 20**, `expect(` **71 → 71**, `toHaveBeenCalledWith` **14 → 14**,
+`toHaveBeenLastCalledWith` **10 → 10**, skips/todos **0 → 0**, `mock.module` **15 → 16** (the
+authorised split). Nothing deleted, nothing relaxed to a looser matcher, and the runtime count stays
+at **41 pass / 0 fail**.
+
+> **Strip comments before counting anything in a source file.** The first mechanical AC-2 check
+> reported `mock.module` **1**, `as any` **1** and an import of `contextual-search-rlm` in
+> `session-bias.test.ts` — all three were the file's own header comment *describing* what it does not
+> do. Same defect as Phase 0's item 1 and T2's fixture: a regex over raw source counts the prose that
+> documents the thing. Over stripped source the readings are **0 / 0 / false**.
+
 ### AC-3 vs GMS-03 AC-1 — the "zero test edits" claim is false
 
 Found at **T6**, by executing T6 and measuring rather than by reading. Same class as the
@@ -229,7 +263,7 @@ that no longer exists, or re-point a `mock.module` specifier and the symbol name
 | --- | --- | --- |
 | T6 | 2 | `mock.module` split: `fuseResults`/`generateScoreExplanation` leave the `rlm-search.js` mock for a new `result-fusion.js` one |
 | T7 | 2 | **plus 3 call sites** in `graph-stream-project-scope-pg.test.ts`, which passes `NO_RLM` as the first argument — that file is **not** rename-only, contrary to §4.6 |
-| T8 | 2 | — |
+| T8 | 2 | `mock.module` split: `applySynapseState` leaves the `rlm-synapse.js` mock for a new `session-bias.js` one, which keeps `correctQueryImpl` behind. **Plus a setup change in the same two tests, declared here so it is not read as drift:** each now passes two stub collaborators into `makeRlm(…)` so the asserted deps record has *defined* values. Measured reason — bun's `toHaveBeenCalledWith` treats an undefined-valued key as absent, so `f({})` satisfies `toHaveBeenCalledWith({a: undefined})`; asserting `{sessionRegistry: undefined, synapseManager: undefined}` would therefore also be satisfied by a facade that assembled `{}`. With defined values the check is exact on identity and extra keys still fail, so both assertions are **strictly stronger** than the `rlm` first argument they replace. Textual `expect(` sites unchanged at **71**, and bun's runtime tally unchanged at **75 expect() calls** — two different metrics, both pinned somewhere, so always say which |
 | T9 | 1 | — |
 | T10 | 8 | — |
 | T13 | 3 | — |
@@ -352,6 +386,74 @@ recursion — measured at T7: with `return this.buildGraphStream(…)` substitut
 -p packages/core/tsconfig.json` **exits 0**, while the coverage suite goes **39 pass / 2 fail**.
 Dropping the trailing argument gives the same 39/2. Prove the seam at runtime; type-check is
 structurally blind to it.
+
+> **Refined at T8 — which recursion is blind depends on whether the module takes deps.** T7's module
+> takes none, so its arity matched the facade method's exactly. A **deps-taking** module is one
+> argument wider, and the naive substitution is therefore *caught*: measured at T8, `return
+> this.applySynapseState(this.#sessionBiasDeps(), …)` fails with
+> `TS2554: Expected 3-5 arguments, but got 6`. The blind variant is recursion that **also drops the
+> deps record** — `return this.applySynapseState(baseResults, …)`, arity 5, identical to the facade
+> method: `tsc` **exits 0** and the coverage suite goes **39 pass / 2 fail**. That is the more likely
+> mistake, because omitting the deps record is the same edit as forgetting to add it. **The mutation
+> to run at T9, T10, T12 and T13 is this second shape, not T7's.** Dropping the trailing argument
+> still gives 39/2 unchanged.
+
+### LATE-BIND has no sensor at T8, and the gap is now closed by a dedicated one
+
+Fifth plan defect, found at **T8**, same class and same method as the previous four: by measuring
+rather than by reading. What it contradicts is not a task row this time but the standing constraint
+itself — LATE-BIND's `check` column reads *"`rlm-indexing.test.ts` pass **count** — the sensor, not
+the site count"*, and §4.3.1 says *"the existing suite is already a sensor for LATE-BIND … the 77
+sites detect it."* **Neither is true for T8's two members.**
+
+**Mechanism.** LATE-BIND is sensed by the ~80 sites that stub facade state *after* construction: a
+capability module that captured a collaborator would ignore them, and the pass count would drop.
+T8's members are `sessionRegistry` and `synapseManager`, reached through `injectedDeps` — which is
+declared `readonly` and has, by §4.3.1's own table, **zero** post-construction assignment sites. It
+is one of exactly two members in that table with zero, alongside `RRF_K`. There is no stub to make
+ineffective, so there is nothing for the pass counts to report.
+
+**Measured on the finished T8 code**, by hoisting `#sessionBiasDeps()`'s literal into a field
+captured on first call — the literal LATE-BIND violation:
+
+| gate | reading under the violation |
+| --- | --- |
+| `bunx tsc --noEmit -p packages/core/tsconfig.json` | exit **0** |
+| the seven characterization suites | **160 pass / 0 fail** — the full net, unchanged |
+| `search-synapse-integration.test.ts` | **5 pass / 0 fail** |
+| `session-bias.test.ts` (T8's own new AC-2 sensor) | **10 pass / 0 fail** |
+
+Nothing detected it. Note the third row: T8's *own* sensor cannot see this, because it calls the
+capability module directly and never goes through the facade — AC-2 and LATE-BIND sense different
+seams and neither substitutes for the other.
+
+**Why this could not be left as a recorded gap.** It self-heals from T9 onward — `keywordSearch` has
+10 post-construction assignment sites, T10's members 18/7/4/4, T12's and T13's likewise — so the
+ordinary sensor fires for every remaining task. But T8 is explicitly the task whose deps-record
+shape T9/T10/T12/T13 copy. An unsensored pattern at the point of copying is how the invariant
+regresses three commits later with every suite green, which is this repository's signature defect
+class and the reason PR-B exists.
+
+**Resolution (spec-owner, 2026-07-29): a dedicated sensor, in its own file.**
+`packages/core/src/__tests__/session-bias-late-bind.test.ts` — **3 tests**, spying on
+`session-bias.js` to observe the record the facade actually assembles, and asserting the observable
+form of *"assembled per call, from current fields"*:
+
+1. two calls receive **distinct** record objects with **equal** contents (this is the case that
+   fires — a capture hands both calls the same reference);
+2. two facades with different `injectedDeps` produce correspondingly different records, so the
+   contents are read from the field rather than fixed at module scope;
+3. `Object.keys(record)` is exactly `["sessionRegistry", "synapseManager"]` — a third field would be
+   the root leaking state back into a capability module by the one route G-HUB cannot see, since a
+   deps record is not a `: ContextualSearchRLM` dereference.
+
+**Observed red before being trusted**, per Phase 0's practice: under the capture mutation the file
+goes **2 pass / 1 fail** while `tsc` still exits 0.
+
+It is a **separate file** rather than two more cases in `contextual-search-rlm-coverage.test.ts`
+because AC-3's check column pins that file at exactly **41** tests. Adding to it would move a pinned
+sensor mid-refactor, which is indistinguishable from weakening it in a diff — the same reasoning that
+put T5's guard in `scripts/__tests__` and located its blocks by symbol rather than by path.
 
 ### `ensureInitializedImpl` — the export that had no destination
 

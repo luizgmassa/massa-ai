@@ -71,7 +71,7 @@ mock.module("@massa-ai/shared", () => {
 
 // ── Forwarding-contract mocks (M14 facade delegation) ───────────────────────
 //
-// indexFileImpl / searchImpl / applySynapseStateImpl / correctQueryImpl /
+// indexFileImpl / searchImpl / applySynapseState / correctQueryImpl /
 // buildGraphStream / fuseResults / generateScoreExplanation /
 // addContextToResultsImpl / extractPreviewImpl / calculateAvgScoreImpl /
 // runWithIndexLock / _indexProjectInternalImpl / ensureFreshIndexImpl /
@@ -153,12 +153,19 @@ mock.module("../services/search/result-fusion.js", () => ({
   generateScoreExplanation: generateScoreExplanationMock,
 }));
 
-const applySynapseStateImplMock = mock(async () => [] as SearchResult[]);
 const correctQueryImplMock = mock(async (): Promise<string | null> => null);
 
 mock.module("../services/search/rlm-synapse.js", () => ({
-  applySynapseStateImpl: applySynapseStateImplMock,
   correctQueryImpl: correctQueryImplMock,
+}));
+
+// PR-B T8: applySynapseState moved to its own capability module and traded the
+// facade parameter for a narrow SessionBiasDeps record (GMS-03 AC-1). Same
+// reason as the T6/T7 blocks above — mocking it means naming the new module.
+const applySynapseStateMock = mock(async () => [] as SearchResult[]);
+
+mock.module("../services/search/session-bias.js", () => ({
+  applySynapseState: applySynapseStateMock,
 }));
 
 // PR-B T7: buildGraphStream moved to its own capability module and lost the
@@ -188,7 +195,7 @@ beforeEach(() => {
   addContextToResultsImplMock.mockClear();
   extractPreviewImplMock.mockClear();
   calculateAvgScoreImplMock.mockClear();
-  applySynapseStateImplMock.mockClear();
+  applySynapseStateMock.mockClear();
   correctQueryImplMock.mockClear();
   buildGraphStreamMock.mockClear();
   (loadProjectIgnore as unknown as ReturnType<typeof mock>).mockClear?.();
@@ -587,12 +594,25 @@ describe("ContextualSearchRLM.search (instance delegate)", () => {
 });
 
 describe("ContextualSearchRLM.applySynapseState (instance delegate)", () => {
+  // PR-B T8: the facade argument is replaced by session-bias.ts's narrow
+  // SessionBiasDeps record (GMS-03 AC-1). Both assertions inject *defined*
+  // collaborators rather than asserting `{sessionRegistry: undefined,
+  // synapseManager: undefined}`, because bun's `toHaveBeenCalledWith` treats an
+  // undefined-valued key as absent — measured: `f({})` satisfies
+  // `toHaveBeenCalledWith({a: undefined})`. An all-undefined record would
+  // therefore also be satisfied by `{}`, i.e. by a facade that assembled
+  // nothing. With defined values the check is exact on identity, and extra keys
+  // still fail, so this is strictly stronger than the `rlm` first argument it
+  // replaces. LATE-BIND (design.md §4.3.1): the record must be built per call.
+  const sessionRegistry = { getAsync: async () => null };
+  const synapseManager = { process: () => ({ results: [] as SearchResult[] }) };
+
   test("forwards all args in order (baseResults, query, projectId, sessionId, reportDegradation); returns impl result unchanged", async () => {
-    const rlm = makeRlm();
+    const rlm = makeRlm({ sessionRegistry, synapseManager });
     const baseResults = [makeResult("b1")];
     const reportFn = () => {};
     const sentinelReturn = [makeResult("b2")];
-    applySynapseStateImplMock.mockImplementationOnce(async () => sentinelReturn);
+    applySynapseStateMock.mockImplementationOnce(async () => sentinelReturn);
 
     const result = await rlm.applySynapseState(
       baseResults,
@@ -602,8 +622,8 @@ describe("ContextualSearchRLM.applySynapseState (instance delegate)", () => {
       reportFn,
     );
 
-    expect(applySynapseStateImplMock).toHaveBeenCalledWith(
-      rlm,
+    expect(applySynapseStateMock).toHaveBeenCalledWith(
+      { sessionRegistry, synapseManager },
       baseResults,
       "q-syn",
       "proj-syn",
@@ -614,12 +634,12 @@ describe("ContextualSearchRLM.applySynapseState (instance delegate)", () => {
   });
 
   test("sessionId and reportDegradation omitted → forwarded as undefined", async () => {
-    const rlm = makeRlm();
+    const rlm = makeRlm({ sessionRegistry, synapseManager });
     const baseResults = [makeResult("b3")];
-    applySynapseStateImplMock.mockImplementationOnce(async () => baseResults);
+    applySynapseStateMock.mockImplementationOnce(async () => baseResults);
     await rlm.applySynapseState(baseResults, "q-syn2", "proj-syn2");
-    expect(applySynapseStateImplMock).toHaveBeenLastCalledWith(
-      rlm,
+    expect(applySynapseStateMock).toHaveBeenLastCalledWith(
+      { sessionRegistry, synapseManager },
       baseResults,
       "q-syn2",
       "proj-syn2",
