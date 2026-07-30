@@ -1,7 +1,7 @@
 /**
  * generate-subagent-artifacts.ts — unit tests for the emitter + parser layer.
  *
- * The generator is the single source of truth for the 15 specialist agent files
+ * The generator is the single source of truth for the 17 specialist agent files
  * across 4 hosts. We test the pure emitters + YAML/TOML helpers directly, drive
  * the real charter loader against the repo charters, and exercise the drift-gate
  * (runCheck) + diffHost edge cases in-process so the CLI shell isn't the only
@@ -195,17 +195,17 @@ describe("loadCharter / loadAllCharters (repo charters)", () => {
     expect(c.modelHint.length).toBeGreaterThan(0);
   });
 
-  test("loadAllCharters loads exactly the 15 specialists", async () => {
+  test("loadAllCharters loads exactly the 17 specialists", async () => {
     const all = await loadAllCharters();
-    expect(all.length).toBe(15);
-    expect(new Set(all.map((c) => c.name)).size).toBe(15);
+    expect(all.length).toBe(17);
+    expect(new Set(all.map((c) => c.name)).size).toBe(17);
   });
 });
 
 // ── emitAll + drift gate ────────────────────────────────────────────────────
 
 describe("emitAll + diffHost", () => {
-  test("emitAll writes 15 files per host (60 total) into a temp tree", async () => {
+  test("emitAll writes 17 files per host (68 total) into a temp tree", async () => {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
     try {
       const dirs: Record<Host, string> = {
@@ -218,7 +218,7 @@ describe("emitAll + diffHost", () => {
       for (const host of ["claude", "codex", "cursor", "opencode"] as Host[]) {
         const ext = host === "codex" ? "toml" : "md";
         const files = (await fs.readdir(dirs[host])).filter((f) => f.endsWith(`.${ext}`));
-        expect(files.length).toBe(15);
+        expect(files.length).toBe(17);
       }
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });

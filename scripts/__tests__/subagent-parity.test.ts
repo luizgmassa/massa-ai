@@ -1,9 +1,9 @@
 /**
  * Subagent parity test (T4).
  *
- * Asserts the 15 specialist agent files shipped across 4 hosts are byte-identical
+ * Asserts the 17 specialist agent files shipped across 4 hosts are byte-identical
  * to generator output (drift gate), correctly pinned per spec (model + effort +
- * permission), collision-free against host built-ins, exactly 15 per host, and
+ * permission), collision-free against host built-ins, exactly 17 per host, and
  * that Codex TOML parses with the # massa-ai-owned marker. FEATURES.md table
  * parity (DOC-06) is gated on the subagent section existing (lands in T10).
  *
@@ -35,6 +35,8 @@ const SPECIALIST_NAMES = [
   "plan-critic",
   "furps-analyst",
   "navigator",
+  "meta-judge",
+  "judge",
 ] as const;
 type SpecialistName = (typeof SPECIALIST_NAMES)[number];
 
@@ -61,6 +63,8 @@ const AGENT_MODELS_CLAUDE: Record<SpecialistName, string> = {
   "plan-critic": "opus",
   "furps-analyst": "sonnet",
   navigator: "sonnet",
+  "meta-judge": "opus",
+  judge: "opus",
 };
 
 const AGENT_MODELS_CODEX: Record<SpecialistName, string> = {
@@ -79,6 +83,8 @@ const AGENT_MODELS_CODEX: Record<SpecialistName, string> = {
   "plan-critic": "gpt-5.6-sol",
   "furps-analyst": "gpt-5.6-terra",
   navigator: "gpt-5.4-mini",
+  "meta-judge": "gpt-5.6-sol",
+  judge: "gpt-5.6-sol",
 };
 
 // Cursor/OpenCode: charter metadata.model_hint verbatim
@@ -98,6 +104,8 @@ const CHARTER_MODEL_HINTS: Record<SpecialistName, string> = {
   "plan-critic": "MiniMax M3",
   "furps-analyst": "GLM-5.2",
   navigator: "DeepSeek V4 Pro",
+  "meta-judge": "kimi-k3",
+  judge: "deepseek-v4-pro",
 };
 
 // OpenCode pins provider/model-id, NOT the charter hint: OpenCode resolves only
@@ -119,6 +127,8 @@ const OPENCODE_MODELS: Record<SpecialistName, string> = {
   "plan-critic": "opencode-go/minimax-m3",
   "furps-analyst": "opencode-go/glm-5.2",
   navigator: "opencode-go/deepseek-v4-pro",
+  "meta-judge": "opencode-go/kimi-k3",
+  judge: "opencode-go/deepseek-v4-pro",
 };
 
 // The shape OpenCode can actually resolve. This is the assertion that matters:
@@ -174,38 +184,38 @@ describe("subagent parity — drift gate (CLA-07/CDX-08/CRS-06/OPC-08)", () => {
 });
 
 describe("subagent parity — exact 15 names per host (CLA-09/CRS-07/OPC-09)", () => {
-  test("claude: exactly 15 specialist .md files with the registry names", async () => {
+  test("claude: exactly 17 specialist .md files with the registry names", async () => {
     const dir = path.join(REPO_ROOT, "apps/claude-plugin/agents");
     const files = (await fs.readdir(dir)).filter(
       (f) => f.startsWith("massa-ai-") && f.endsWith(".md"),
     );
-    expect(files.length).toBe(15);
+    expect(files.length).toBe(17);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("codex: exactly 15 specialist .toml files with the registry names", async () => {
+  test("codex: exactly 17 specialist .toml files with the registry names", async () => {
     const dir = path.join(REPO_ROOT, "apps/codex-plugin/agents");
     const files = (await fs.readdir(dir)).filter((f) => f.startsWith("massa-ai-") && f.endsWith(".toml"));
-    expect(files.length).toBe(15);
+    expect(files.length).toBe(17);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.toml$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("cursor: exactly 15 specialist .md files", async () => {
+  test("cursor: exactly 17 specialist .md files", async () => {
     const dir = path.join(REPO_ROOT, "apps/cursor-plugin/agents");
     const files = (await fs.readdir(dir)).filter(
       (f) => f.startsWith("massa-ai-") && f.endsWith(".md"),
     );
-    expect(files.length).toBe(15);
+    expect(files.length).toBe(17);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("opencode: exactly 15 specialist .md files", async () => {
+  test("opencode: exactly 17 specialist .md files", async () => {
     const dir = path.join(REPO_ROOT, "apps/opencode-plugin/agents");
     const files = (await fs.readdir(dir)).filter((f) => f.startsWith("massa-ai-") && f.endsWith(".md"));
-    expect(files.length).toBe(15);
+    expect(files.length).toBe(17);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
