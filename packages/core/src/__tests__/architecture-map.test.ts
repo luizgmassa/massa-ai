@@ -34,7 +34,7 @@ import {
   VALID_ARCHITECTURE_ASPECTS,
 } from "../services/symbol/architecture.js";
 import type { HttpEdgeLite } from "../services/symbol/architecture.js";
-import { ToolError } from "../tools/enum-validation.js";
+import { ToolError } from "../kernel/enum-validation.js";
 
 // ─── (1) Unit tests — pure functions ─────────────────────────────────────────
 

@@ -13,7 +13,7 @@
  *     test fails (validateEnum would return undefined as T).
  */
 import { describe, test, expect } from "bun:test";
-import { ToolError, validateEnum } from "../tools/enum-validation.js";
+import { ToolError, validateEnum } from "../kernel/enum-validation.js";
 import { validateGitRef } from "../services/symbol/git-ref-validation.js";
 
 describe("ToolError", () => {

@@ -9,7 +9,7 @@ import { IToolHandler, ToolResponse, TaskState, TaskStatus, CheckpointType } fro
 import { logger } from "@massa-ai/shared";
 import { CheckpointManager } from "../services/checkpoint/checkpoint-manager.js";
 import { serializeToolResponse } from "./serialize.js";
-import { validateEnum } from "./enum-validation.js";
+import { validateEnum } from "../kernel/enum-validation.js";
 
 interface CreateCheckpointParams {
   taskId: string;

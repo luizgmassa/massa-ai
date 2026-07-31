@@ -22,7 +22,7 @@
  */
 
 import { minimatch } from "minimatch";
-import { ToolError } from "../../tools/enum-validation.js";
+import { ToolError } from "../../kernel/enum-validation.js";
 
 /**
  * A downgrade record emitted when a contradictory pattern is reconciled.

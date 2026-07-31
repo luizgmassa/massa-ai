@@ -15,7 +15,7 @@
 import { IToolHandler, ToolResponse } from "@massa-ai/shared";
 import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
 import { serializeToolResponse } from "./serialize.js";
-import { ToolError } from "./enum-validation.js";
+import { ToolError } from "../kernel/enum-validation.js";
 import { VALID_ARCHITECTURE_ASPECTS } from "../services/symbol/architecture.js";
 
 interface GetArchitectureParams {

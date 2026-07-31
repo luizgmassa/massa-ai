@@ -12,7 +12,7 @@
  * tags, SHAs, ISO dates, and `origin/main`-style refs).
  */
 
-import { ToolError } from "../../tools/enum-validation.js";
+import { ToolError } from "../../kernel/enum-validation.js";
 
 const GIT_REF_PATTERN = /^[A-Za-z0-9._/+-]+$/;
 

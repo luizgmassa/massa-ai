@@ -22,7 +22,7 @@ import { IToolHandler, ToolResponse } from "@massa-ai/shared";
 import { impactAnalysisService } from "../services/symbol/impact-analysis.js";
 import type { ImpactScope } from "../services/symbol/impact-analysis.js";
 import { serializeToolResponse } from "./serialize.js";
-import { validateEnum, ToolError } from "./enum-validation.js";
+import { validateEnum, ToolError } from "../kernel/enum-validation.js";
 import { getActiveGeneration, assertGenerationNotStale } from "../services/symbol/active-generation.js";
 
 interface ImpactAnalysisParams {

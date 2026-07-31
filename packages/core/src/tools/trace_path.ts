@@ -21,7 +21,7 @@ import { IToolHandler, ToolResponse } from "@massa-ai/shared";
 import { tracePathService } from "../services/symbol/trace-path.js";
 import type { EdgeType } from "../services/symbol/symbol-graph.service.js";
 import { serializeToolResponse } from "./serialize.js";
-import { validateEnum, ToolError } from "./enum-validation.js";
+import { validateEnum, ToolError } from "../kernel/enum-validation.js";
 import { getActiveGeneration, assertGenerationNotStale } from "../services/symbol/active-generation.js";
 
 interface TracePathParams {

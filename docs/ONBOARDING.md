@@ -203,7 +203,7 @@ Key files per layer, ranked by coupling (in + out dependency edges).
 | Deg | File | Role |
 |---:|---|---|
 | 31 | `tools/serialize.ts` | Shared success-path serializer — field projection, TOON/JSON/tree encoding |
-| 21 | `tools/enum-validation.ts` | `validateEnum` + `ToolError`; replaces silent-fallback branches across nearly every handler |
+| 21 | `kernel/enum-validation.ts` | `validateEnum` + `ToolError`; replaces silent-fallback branches across nearly every handler |
 | 13 | `tools/index_project.ts` | Validates/canonicalizes target path, guards concurrent roots, kicks off indexing |
 | 12 | `tools/read_file.ts` | Compression, caching, symbol enrichment, multi-range selection, path safety |
 | 11 | `tools/trace_path.ts` | Traces the typed structural-edge graph from a seed symbol |

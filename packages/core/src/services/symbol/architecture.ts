@@ -14,7 +14,7 @@
 
 import type { Community } from "./communities.js";
 import { detectCycles, DEFAULT_CYCLE_EDGE_BUDGET } from "./cycle-detection.js";
-import { ToolError } from "../../tools/enum-validation.js";
+import { ToolError } from "../../kernel/enum-validation.js";
 
 // ─── Public result types ─────────────────────────────────────────────────────
 

@@ -10,7 +10,7 @@ import { ToolResponse } from "@massa-ai/shared";
 import { CodeCompressor } from "../services/compression/code-compressor.js";
 import { logger } from "@massa-ai/shared";
 import { estimateTokens } from "@massa-ai/shared";
-import { validateEnum } from "./enum-validation.js";
+import { validateEnum } from "../kernel/enum-validation.js";
 
 interface CompressContextParams {
   content: string;
