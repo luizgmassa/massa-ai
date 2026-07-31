@@ -7,7 +7,7 @@
   "vector store HNSW index initialization": [
     "packages/core/src/data/vector/postgres-vector-store.ts",
     "packages/core/src/data/vector/base-vector-store.ts",
-    "packages/core/src/data/vector/vector-store-factory.ts"
+    "packages/core/src/services/vector/vector-store-factory.ts"
   ],
   "how to fix ECONNREFUSED postgres connection": [
     "packages/core/src/kernel/prisma-client.ts",

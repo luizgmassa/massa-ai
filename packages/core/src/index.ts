@@ -28,7 +28,7 @@ export type {
   InsertMemoryInput,
   SearchFilters,
 } from "./data/memory/memory-repository-contract.js";
-export { getVectorStore, resetVectorStore } from "./data/vector/index.js";
+export { getVectorStore, resetVectorStore } from "./services/vector/vector-store-factory.js";
 export * from "./data/graph-generation/index.js";
 
 // M8 — audit-log attribution for destructive operations (who/when/what/scope/result)

@@ -33,7 +33,7 @@ import { assertParserReadyForIndexing } from "../structural/parser-readiness.js"
 // which is what keeps every `mock.module("…-factory.js")` in the suite pointing
 // at the same resolved module it always did.
 import { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
-import { getVectorStore } from "../../data/vector/vector-store-factory.js";
+import { getVectorStore } from "../vector/vector-store-factory.js";
 import { getSearchCache } from "./cache-factory.js";
 import { getSearchAnalytics } from "./analytics-factory.js";
 import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";

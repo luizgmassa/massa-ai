@@ -30,7 +30,7 @@ import { SearchAnalytics } from "./search-analytics.js";
 import type { SearchAnalyticsPg } from "./search-analytics-pg.js";
 import type { FileFilterCache } from "./file-filter-cache.js";
 import type { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
-import type { getVectorStore } from "../../data/vector/vector-store-factory.js";
+import type { getVectorStore } from "../vector/vector-store-factory.js";
 import type { getSearchCache } from "./cache-factory.js";
 
 // ── Deps ─────────────────────────────────────────────────────────────────────

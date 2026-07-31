@@ -152,9 +152,17 @@ XDG_CONFIG_HOME=$(mktemp -d) bun test <file>
 
 If that fixes it, the test is missing a seam, not a timeout. Pin `_setLlmEnabledForTesting(false)`,
 inject the subject's own LLM seam, or add the `mock.module` the file is missing — the recurring
-omission is `../data/vector/vector-store-factory.js`, without which `ensureInitialized`
-falls back to the real factory and runs live embedding-provider auto-selection. `dart-support`,
+omission is `../services/vector/vector-store-factory.js`, without which `ensureInitialized`
+reaches the real factory and runs live embedding-provider auto-selection. `dart-support`,
 `code-compressor` and `search-facade-admin` were all this, and were fixed rather than budgeted.
+
+**PR-C narrowed that failure mode rather than only moving its path.** A `BaseVectorStore`
+built without an `embeddingProviderFactory` now **throws** instead of quietly auto-selecting a
+live provider — the factory above is the only production construction site, and it is the only
+thing that injects one. So a test that constructs a store directly and embeds fails loudly and
+immediately rather than hanging on a cold model. Mocking the factory module is still the right
+seam when the subject calls `getVectorStore()`; passing `embeddingProviderFactory` explicitly is
+the right seam when it constructs a store itself.
 
 Genuinely slow tests are a separate class and do get budgets: `etl-cache-invalidation` measures
 **66 s** under `--coverage` instrumentation, and `architecture-map`'s `getProjectMap` cases need

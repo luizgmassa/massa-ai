@@ -5,7 +5,7 @@ const vectorBatches: unknown[][] = [];
 const keywordBatches: unknown[][] = [];
 const fingerprintWrites: unknown[] = [];
 
-mock.module("../data/vector/vector-store-factory.js", () => ({
+mock.module("../services/vector/vector-store-factory.js", () => ({
   getVectorStore: async () => ({
     addDocuments: async (documents: unknown[]) => {
       vectorBatches.push(documents);

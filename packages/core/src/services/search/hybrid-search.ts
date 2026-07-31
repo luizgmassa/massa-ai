@@ -24,7 +24,7 @@ import { eventBus } from "../events/event-bus.js";
 import { fuseResults } from "./result-fusion.js";
 import type { QueryUnderstandingService } from "./query-understanding.js";
 import type { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
-import type { getVectorStore } from "../../data/vector/vector-store-factory.js";
+import type { getVectorStore } from "../vector/vector-store-factory.js";
 import type { getSearchCache } from "./cache-factory.js";
 import type { getSearchAnalytics } from "./analytics-factory.js";
 import {

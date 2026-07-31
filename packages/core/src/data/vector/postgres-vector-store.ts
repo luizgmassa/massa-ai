@@ -21,6 +21,7 @@ import {
   ProjectInfo,
   SearchResult,
   SearchSource,
+  type VectorEmbeddingProviderFactory,
 } from '@massa-ai/shared';
 import { logger } from '@massa-ai/shared';
 import { installGuardOnTable } from '../../kernel/identity-guard-installer.js';
@@ -35,6 +36,15 @@ export interface PostgresConfig {
     efConstruction?: number;
     lists?: number;
   };
+  /**
+   * How this store builds its embedding provider (GMS-01 AC-4's inverted edge).
+   *
+   * Supplied by `services/vector/vector-store-factory.ts`, the one production
+   * construction site. A store built without it throws on first embedding use
+   * rather than reaching a provider this layer may not import — see
+   * `BaseVectorStore.getEmbeddingProvider`.
+   */
+  embeddingProviderFactory?: VectorEmbeddingProviderFactory;
 }
 
 export class PostgresVectorStore extends BaseVectorStore {
@@ -47,7 +57,11 @@ export class PostgresVectorStore extends BaseVectorStore {
   private bqEnabled = false;
 
   constructor(config: PostgresConfig) {
-    super();
+    super(
+      config.embeddingProviderFactory
+        ? { embeddingProviderFactory: config.embeddingProviderFactory }
+        : undefined,
+    );
     this.config = {
       poolSize: 10,
       indexType: 'hnsw',

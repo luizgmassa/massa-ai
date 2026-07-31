@@ -28,7 +28,7 @@ mock.module("../data/keyword/keyword-search-factory.js", () => ({
 // PostgresVectorStore and ran live embedding-provider auto-selection —
 // measured at ~13.4s cold, against bunfig.toml's 5s per-test budget. The three
 // warmupCache tests below are the ones that construct without deps.
-mock.module("../data/vector/vector-store-factory.js", () => ({
+mock.module("../services/vector/vector-store-factory.js", () => ({
   getVectorStore: mock(async () => ({
     search: async () => [],
     searchByEmbedding: async () => [],

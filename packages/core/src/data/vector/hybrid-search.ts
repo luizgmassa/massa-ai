@@ -8,7 +8,6 @@
 import { IHybridSearch } from '@massa-ai/shared';
 import { SearchResult, RetrievalOptions } from '@massa-ai/shared';
 import type { IVectorStore } from '@massa-ai/shared';
-import { getVectorStore } from './vector-store-factory.js';
 import { KeywordSearchPg } from '../keyword/keyword-search-pg.js';
 import { logger } from '@massa-ai/shared';
 
@@ -25,8 +24,14 @@ export class HybridSearch implements IHybridSearch {
   private vectorStore: Promise<IVectorStore>;
   private keywordSearch: KeywordSearchPg;
 
-  constructor() {
-    this.vectorStore = getVectorStore();
+  /**
+   * @param vectorStore the store to fuse against. Injected rather than resolved
+   *   here: the factory that resolves it is the vector subsystem's composition
+   *   root and lives in `services/vector/` (GMS-01 AC-4), so calling it from this
+   *   file would be a `data -> services` edge.
+   */
+  constructor(vectorStore: Promise<IVectorStore>) {
+    this.vectorStore = vectorStore;
     this.keywordSearch = new KeywordSearchPg();
 
     logger.info('Hybrid Search initialized');

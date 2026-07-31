@@ -24,7 +24,7 @@ import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory
 import { indexJobTracker } from "../jobs/index-job-tracker.js";
 import { getSearchCache } from "../search/cache-factory.js";
 import { IndexManager } from "../search/index-manager.js";
-import { getVectorStore } from "../../data/vector/vector-store-factory.js";
+import { getVectorStore } from "../vector/vector-store-factory.js";
 import { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
 import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 import type { EtlStageContext, EtlEvent, EtlResult, EtlStage } from "./stage-context.js";

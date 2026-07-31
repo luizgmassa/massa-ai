@@ -21,9 +21,17 @@ const DB_AVAILABLE = (process.env.DATABASE_URL ?? "").startsWith("postgres");
 const POSTGRES_URL = process.env.POSTGRES_TEST_URL || process.env.DATABASE_URL || "postgresql://test:test@localhost:5433/massa_ai_test";
 
 // These tests need real embeddings, so we don't mock the embedding service
-// Make sure OLLAMA_URL is set or embeddings are available
+// Make sure OLLAMA_URL is set or embeddings are available.
+//
+// PR-C T4: that intent is now stated in code rather than relied on implicitly.
+// `base-vector-store.ts` no longer imports `services/embeddings` — that was
+// GMS-01 AC-4's last `data -> services` edge — so a store built here gets no
+// provider unless one is passed. The factory below is the identical call the
+// base class used to make inline, so behaviour is unchanged; what changed is
+// that reaching a live provider is now a visible decision instead of a default.
 
 import { PostgresVectorStore } from "../data/vector/postgres-vector-store.js";
+import { createEmbeddingProvider } from "../services/embeddings/index.js";
 
 describe.skipIf(!DB_AVAILABLE)("PostgresVectorStore Integration", () => {
   let store: PostgresVectorStore;
@@ -34,6 +42,7 @@ describe.skipIf(!DB_AVAILABLE)("PostgresVectorStore Integration", () => {
       poolSize: 5,
       indexType: "hnsw",
       indexParams: { m: 16, efConstruction: 64 },
+      embeddingProviderFactory: () => createEmbeddingProvider({ cache: true }),
     });
   });
 

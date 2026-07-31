@@ -285,7 +285,7 @@ describe.skipIf(!DB_AVAILABLE)("EtlPipeline managed_runs lease (T13 / AC-7)", ()
     // `getVectorStore()`, which auto-selects an embedding provider (~13 s cold)
     // and races a `setTimeout`. Neither can finish once the clock is frozen, so
     // warm the cached singleton here, outside the fake-timer window.
-    const { getVectorStore } = await import("../data/vector/vector-store-factory.js");
+    const { getVectorStore } = await import("../services/vector/vector-store-factory.js");
     await getVectorStore();
 
     jest.useFakeTimers();

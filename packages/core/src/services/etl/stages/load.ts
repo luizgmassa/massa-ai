@@ -12,7 +12,7 @@
 
 import { logger } from "@massa-ai/shared";
 import { withDeadlockRetry } from "../../../data/with-deadlock-retry.js";
-import { getVectorStore } from "../../../data/vector/vector-store-factory.js";
+import { getVectorStore } from "../../vector/vector-store-factory.js";
 import { getKeywordSearch } from "../../../data/keyword/keyword-search-factory.js";
 import { getSymbolRepository } from "../../../data/symbol/symbol-repository-factory.js";
 import { ManagedRunRepositoryPg } from "../../../data/managed-runs/managed-run-repository-pg.js";

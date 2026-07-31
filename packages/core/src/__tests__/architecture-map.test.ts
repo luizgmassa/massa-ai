@@ -469,7 +469,7 @@ import { WorkspaceManager } from "../services/workspace/workspace-manager.js";
  * `IndexManager.saveIndexMetadata`). The marker write is already wrapped in a
  * non-fatal try/catch; satisfying it keeps the run free of a misleading warn.
  */
-mock.module("../data/vector/vector-store-factory.js", () => ({
+mock.module("../services/vector/vector-store-factory.js", () => ({
   getVectorStore: async () => ({
     addDocuments: async () => {},
     deleteByProject: async () => {},
