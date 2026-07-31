@@ -203,7 +203,8 @@ all state came from `.specs/` and source reads.
 - workflowSessionId: `spec-core-layering-controller-retirement`
 - workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
 - feature: `core-layering-controller-retirement` — **Specify COMPLETE and merged 2026-07-31.
-  Design DRAFTED, Plan Challenge gate pending. Tasks NOT STARTED. No code written.**
+  Design COMPLETE 2026-07-31 — full Plan Challenge gate run, five findings, three folded into the
+  plan (see below). Tasks NOT STARTED. No code written.**
 - **Design's three owed decisions are all delivered** (`design.md` §1, §4, §5), each with its
   rejected alternative recorded:
   1. **R-08's precondition → a kernel tier.** `data → kernel` legal, `data → services` illegal,
@@ -239,10 +240,13 @@ all state came from `.specs/` and source reads.
   produces `services → data`. The criterion's own direction hid the most-shared module in the tree.
 - **`services/embeddings/index.ts` is NOT admitted** — a barrel over 6 sibling modules. Its single
   edge is inverted via a constructor seam instead (the F4/T11 shape), so the allowlist stays empty.
-- base: `origin/main` @ `9df5608`. **Specify merged to `main` via #56** (merge commit); Design in
-  progress on `spec/pr-c-design`. The branch named here previously
+- base: `origin/main` @ `9df5608`. **Specify merged to `main` via #56** (merge commit); **Design
+  delivered via PR #57** from `spec/pr-c-design`. The branch named here previously
   (`spec/pr-c-controller-retirement`) is **not** what landed — see `HANDOFF.md`'s branch-name
   correction for the 44-second retarget race that orphaned #55.
+- **C13, C14, C15 and C16 are all owed back to the parent `core-layering-god-module-split/spec.md`**
+  in its *Design and Execute corrections* index, landing with the work. **None is written there
+  yet.**
 - Artifacts: `.specs/features/core-layering-controller-retirement/{spec,design}.md`
 - **Scope**: GMS-01 (all six ACs) + GMS-02 **AC-2 only**. `read_file.ts` (GMS-02 AC-1 + AS-06) is
   **PR-D**; `.ua/` regeneration is after PR-D.

@@ -1,12 +1,14 @@
 # Handoff
 
-## Active — Core Layering, Controller Retirement (PR-C), **Specify done; Design not started**
+## Active — Core Layering, Controller Retirement (PR-C), **Specify and Design done; Tasks not started**
 
 **Feature**: `core-layering-controller-retirement` · artifacts
 `.specs/features/core-layering-controller-retirement/{spec,design}.md`. **No code written.**
 
 **Specify is on `main`** — merged via **#56** (`9df5608`, merge commit), base `origin/main` @
-`9df5608`. Design is in progress on `spec/pr-c-design`.
+`9df5608`. **Design is complete** — `design.md`, delivered via PR **#57** from `spec/pr-c-design`.
+Read `design.md` for every decision below that is marked delivered; it is the only artifact that
+carries C14, C15 and C16.
 
 > **Branch-name correction.** Two earlier lines here named `spec/pr-c-controller-retirement` as
 > PR-C's branch. That branch was **not** what landed: #55 merged into
@@ -28,18 +30,40 @@ AC-2 stays in PR-C re-targeted at a handler PR-C actually touches. **Decided by 
 measured reason each was rejected. The amendment is **owed back** to the parent `spec.md`'s
 *Design and Execute corrections* index as C13 — a PR-C task, landing with the work, not ahead of it.
 
-**Three decisions Design owes before PR-C is sized**, each with its rejected alternative written
-down:
+**C13, C14, C15 and C16 are all owed back to the parent `spec.md`**, in that same in-place style,
+landing with the work. **None is written there yet.** C13 is above; C14 (`db-connection.ts` admitted
+to the kernel — AC-4's direction hid it), C15 (AC-4's referent → 26) and C16 (`POINTER`'s prefix
+assumption) are in `design.md` §2, §4 and §5. That index is how a reader tells an amended criterion
+from an original one, so a correction that never lands there is a correction that did not happen.
 
-1. **R-08's precondition** (`design.md` §5.3, still open) — do cross-cutting modules get a
+~~**Three decisions Design owes before PR-C is sized**~~ — **all three delivered**, each with its
+rejected alternative written down. Kept here as the record of what gated sizing; the answers live in
+`design.md` and are summarised per item below.
+
+1. ~~**R-08's precondition** (`design.md` §5.3, still open) — do cross-cutting modules get a
    shared/kernel tier, or enter the allowlist as accepted exceptions? GMS-01 AC-1's CI import check
-   **cannot be written** until this is answered.
-2. **The §4.2 sensor gap** — `check-stale-pointers`' `STEMS` is `["rlm", "search-facade"]`, so
+   **cannot be written** until this is answered.~~
+   **DELIVERED — `design.md` §1: a kernel tier.** Physical directory `packages/core/src/kernel/`,
+   membership by **path prefix** (not a specifier list, which would be the rejected allowlist
+   renamed), `data → kernel` legal and `data → services` illegal, **zero** allowlist entries.
+   Decided by the user, 2026-07-31; allowlist-only and hybrid rejected with reasons. **R-08 closes.**
+   Verifying it was implementable produced **C14** (`design.md` §2) — the tier was *not*
+   implementable as chosen until `data/db-connection.ts` was admitted.
+2. ~~**The §4.2 sensor gap** — `check-stale-pointers`' `STEMS` is `["rlm", "search-facade"]`, so
    `controller` is **not** watched. **61** controller-path pointers sit outside `EXCLUDED` and would
    strand while the gate still reports `0 broken, historical exactly at its pin of 28`. Base reading
-   must be frozen **before** the first structural commit.
-3. **The `data → services` metric** — AC-4 says **24**; the quote-agnostic sweep says **26**.
-   `spec.md` §3.B recommends adopting 26 and amending AC-4, but that is Design's call to record.
+   must be frozen **before** the first structural commit.~~
+   **DELIVERED — `design.md` §5, as C16, the twenty-second plan defect.** The obvious remedy
+   (append `"controller"` to `STEMS`) was **measured a no-op**: `POINTER` interpolates each stem as a
+   **prefix**, and every controller file is suffix-shaped — `controller-*.{ts,js}` matches **0**
+   tracked files, `*-controller.{ts,js}` matches **6**. Patched-gate output byte-identical to
+   baseline. Adopted instead: a **second alternation branch** in `POINTER` for suffix stems, prefix
+   branch untouched. The frozen-base-reading requirement above **still stands** and is now
+   `design.md` §5.3 property 1.
+3. ~~**The `data → services` metric** — AC-4 says **24**; the quote-agnostic sweep says **26**.
+   `spec.md` §3.B recommends adopting 26 and amending AC-4, but that is Design's call to record.~~
+   **DELIVERED — `design.md` §4, as C15: 26**, 16 files, 7 target modules. 24 is a property of a
+   double-quote-anchored pattern, not of the tree; the check must be written **quote-agnostic**.
 
 **Gates measured green at `00ed280`** and inherited: `check-stale-pointers` PASS (0 broken, pin
 **28** exact) · `search-hub-metric` PASS (`maxFileLoc` **696**/700 — **4 lines** of headroom) ·
@@ -49,7 +73,11 @@ down:
 in the last nine merges** — #45 through #52 were all squashed. The default merge button is squash, so
 `--no-ff` has to be chosen deliberately every time.
 
-**Next action: Design.** Deliver the three decisions above, in that order, before sizing.
+**Next action: Tasks** (`design.md` §9). Its first input is §6's three-phase shape plus the cut
+decision deliberately left open there. **Two steps must be sequenced first inside Tasks, because
+neither can be taken retroactively**: the `POINTER` reshape's **frozen base reading** (before any
+controller moves), and the **no-op control** proving the reshaped gate's count actually moves
+against an unchanged tree — the check §5.1's first decision skipped.
 
 ---
 
