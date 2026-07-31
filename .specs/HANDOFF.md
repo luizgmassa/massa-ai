@@ -3,8 +3,19 @@
 ## Active — Core Layering, Controller Retirement (PR-C), **Specify done; Design not started**
 
 **Feature**: `core-layering-controller-retirement` · artifacts
-`.specs/features/core-layering-controller-retirement/spec.md` · branch
-`spec/pr-c-controller-retirement`. **No code written.**
+`.specs/features/core-layering-controller-retirement/{spec,design}.md`. **No code written.**
+
+**Specify is on `main`** — merged via **#56** (`9df5608`, merge commit), base `origin/main` @
+`9df5608`. Design is in progress on `spec/pr-c-design`.
+
+> **Branch-name correction.** Two earlier lines here named `spec/pr-c-controller-retirement` as
+> PR-C's branch. That branch was **not** what landed: #55 merged into
+> `docs/pr-b-post-merge-record-corrections` rather than `main` — GitHub's auto-retarget lost a
+> 44-second race — so the Specify was re-landed from `spec/pr-c-controller-retirement-v2` as #56,
+> verified byte-identical (`spec.md` SHA-256 `328fac8e…99a` at both commits). **A stacked PR whose
+> base is a branch also gets no CI at all**, since `ci.yml` is `pull_request: branches: [main]`;
+> #55 merged without one gate reading and #56 ran all six required checks. Do not stack PR-C's
+> remaining PRs.
 
 **Requirements**: GMS-01 (all six ACs) + GMS-02 **AC-2 only** — both defined in the parent
 `core-layering-god-module-split/spec.md`, scoped and amended here.
