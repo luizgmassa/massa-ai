@@ -15,7 +15,7 @@
  */
 
 import { logger } from "@massa-ai/shared";
-import { getPrismaClient } from "../query/prisma-client.js";
+import { getPrismaClient } from "../../kernel/prisma-client.js";
 import type { MemoryRowWithEmbedding } from "../graph/types.js";
 
 // ── Public types ─────────────────────────────────────────────

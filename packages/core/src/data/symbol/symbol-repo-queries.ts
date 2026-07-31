@@ -12,7 +12,7 @@
  * class methods in symbol-repository-pg.ts become 1-line delegates.
  */
 
-import { getPrismaClient } from "../../services/query/prisma-client.js";
+import { getPrismaClient } from "../../kernel/prisma-client.js";
 import type {
   SymbolKind,
   SymbolFileRow,

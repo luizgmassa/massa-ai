@@ -30,7 +30,7 @@ describe.skipIf(!RUN)(
     let prisma: any;
 
     beforeAll(async () => {
-      const { getPrismaClient } = await import("../services/query/prisma-client.js");
+      const { getPrismaClient } = await import("../kernel/prisma-client.js");
       prisma = getPrismaClient();
       const repo = getSymbolRepository();
       await repo.upsertWorkspace({

@@ -1,7 +1,7 @@
 /** PostgreSQL implementation of the durable asynchronous HandoffStore contract. */
 
 import type { PrismaClient } from "../../generated/prisma/index.js";
-import { getPrismaClient } from "../../services/query/prisma-client.js";
+import { getPrismaClient } from "../../kernel/prisma-client.js";
 import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 import {
   searchBackendUnavailable,

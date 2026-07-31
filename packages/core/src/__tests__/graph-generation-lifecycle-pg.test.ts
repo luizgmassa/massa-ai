@@ -130,7 +130,7 @@ beforeAll(async () => {
 
   previousDatabaseUrl = process.env.DATABASE_URL;
   process.env.DATABASE_URL = databaseUrl;
-  const prisma = await import("../services/query/prisma-client.js");
+  const prisma = await import("../kernel/prisma-client.js");
   prisma._resetPrismaForTesting();
   const lifecycle = await import("../data/graph-generation/graph-generation-repository-pg.js");
   repository = lifecycle.GraphGenerationRepositoryPg.getInstance();
@@ -142,7 +142,7 @@ beforeEach(async () => {
 
 afterAll(async () => {
   if (!integrationRequested) return;
-  const { disconnectPrisma } = await import("../services/query/prisma-client.js");
+  const { disconnectPrisma } = await import("../kernel/prisma-client.js");
   await disconnectPrisma();
   await db?.end();
   if (admin && ownsDatabase) {

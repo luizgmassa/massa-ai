@@ -6,7 +6,7 @@
  */
 
 import { createHash } from "crypto";
-import { getPrismaClient } from "../query/prisma-client.js";
+import { getPrismaClient } from "../../kernel/prisma-client.js";
 import { logger } from "@massa-ai/shared";
 import type {
   EmbeddingCacheStats,

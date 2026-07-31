@@ -23,7 +23,7 @@ import path from "node:path";
 let capturedSql = "";
 let capturedParams: unknown[] = [];
 
-mock.module("../services/query/prisma-client.js", () => ({
+mock.module("../kernel/prisma-client.js", () => ({
   getPrismaClient: () => ({
     $queryRawUnsafe: async (sql: string, ...params: unknown[]) => {
       capturedSql = sql;

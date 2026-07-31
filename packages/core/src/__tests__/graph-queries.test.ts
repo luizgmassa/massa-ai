@@ -113,7 +113,7 @@ describe.skipIf(!DEDICATED_DB)("GraphQueries — traversal + path + hubs", () =>
   let queries: GraphQueries;
 
   beforeAll(async () => {
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     prisma = getPrismaClient();
     await cleanup();
   });

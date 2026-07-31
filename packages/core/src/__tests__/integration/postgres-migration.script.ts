@@ -2,7 +2,7 @@
  * Test PostgreSQL migration - verify all systems work
  */
 
-import { getPrismaClient } from '../../services/query/prisma-client.js';
+import { getPrismaClient } from '../../kernel/prisma-client.js';
 import { logger } from '@massa-ai/shared';
 import type { Prisma } from '../../generated/prisma/index.js';
 

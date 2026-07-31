@@ -21,7 +21,7 @@ import {
   setProjectIdentityAliasResolverForTests,
   type ProjectIdentityAliasResolver,
 } from "../kernel/alias-resolver.js";
-import { _resetPrismaForTesting } from "../services/query/prisma-client.js";
+import { _resetPrismaForTesting } from "../kernel/prisma-client.js";
 import { closeConnections } from "../kernel/db-connection.js";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
@@ -97,7 +97,7 @@ function renamingResolver(
 describe.skipIf(!DEDICATED_DB)("PgObservationStore — coverage", () => {
   beforeAll(async () => {
     pool = new Pool({ connectionString: databaseUrl });
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     prisma = getPrismaClient();
     await cleanup();
   });

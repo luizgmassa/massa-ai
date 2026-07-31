@@ -3,7 +3,7 @@
  * Test CRUD operations with PostgreSQL
  */
 
-import { getPrismaClient, disconnectPrisma } from "../../services/query/prisma-client.js";
+import { getPrismaClient, disconnectPrisma } from "../../kernel/prisma-client.js";
 import { logger } from "@massa-ai/shared";
 import { randomUUID } from "crypto";
 

@@ -4,7 +4,7 @@
  */
 
 import { logger } from "@massa-ai/shared";
-import { getPrismaClient, disconnectPrisma } from "../../services/query/prisma-client.js";
+import { getPrismaClient, disconnectPrisma } from "../../kernel/prisma-client.js";
 import { randomUUID } from "crypto";
 
 async function testMemoryStorage() {

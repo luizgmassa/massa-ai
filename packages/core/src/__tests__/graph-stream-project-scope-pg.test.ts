@@ -75,7 +75,7 @@ function seedHit(id: string): SearchResult {
 
 describe.skipIf(!DEDICATED_DB)("buildGraphStream — project scoping (BUG-02)", () => {
   beforeAll(async () => {
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     prisma = getPrismaClient();
     await cleanup();
   });

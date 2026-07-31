@@ -39,7 +39,7 @@ async function createMemory(label: string): Promise<string> {
 
 describe.skipIf(!DEDICATED_DB)("GraphStorePg — full method coverage", () => {
   beforeAll(async () => {
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     prisma = getPrismaClient();
     store = new GraphStorePg();
     await cleanup();

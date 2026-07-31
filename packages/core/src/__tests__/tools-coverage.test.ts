@@ -108,7 +108,7 @@ describe.skipIf(!DB_AVAILABLE)("CreateCheckpointTool", () => {
 
   beforeAll(async () => {
     if (!DB_AVAILABLE) return;
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     prisma = getPrismaClient();
   });
 
@@ -194,7 +194,7 @@ describe.skipIf(!DB_AVAILABLE)("RestoreCheckpointTool", () => {
 
   beforeAll(async () => {
     if (!DB_AVAILABLE) return;
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     prisma = getPrismaClient();
   });
 
@@ -251,7 +251,7 @@ describe.skipIf(!DB_AVAILABLE)("ListCheckpointsTool", () => {
 
   beforeAll(async () => {
     if (!DB_AVAILABLE) return;
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     prisma = getPrismaClient();
   });
 

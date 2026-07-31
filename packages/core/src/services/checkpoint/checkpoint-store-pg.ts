@@ -41,7 +41,7 @@ import {
   CheckpointType,
   logger,
 } from "@massa-ai/shared";
-import { getPrismaClient } from "../query/prisma-client.js";
+import { getPrismaClient } from "../../kernel/prisma-client.js";
 import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 import { Prisma } from "../../generated/prisma/index.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";

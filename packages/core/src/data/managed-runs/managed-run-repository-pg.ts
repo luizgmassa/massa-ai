@@ -34,7 +34,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { getPrismaClient } from "../../services/query/prisma-client.js";
+import { getPrismaClient } from "../../kernel/prisma-client.js";
 import type {
   AbortManagedRunOutcome,
   ActiveManagedRun,

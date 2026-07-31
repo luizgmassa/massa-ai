@@ -1,4 +1,4 @@
-import { getPrismaClient, disconnectPrisma } from '../../services/query/prisma-client.js';
+import { getPrismaClient, disconnectPrisma } from '../../kernel/prisma-client.js';
 
 const prisma = getPrismaClient();
 

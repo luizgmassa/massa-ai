@@ -345,7 +345,7 @@ export { workspaceManager, WorkspaceManager } from "./workspace/workspace-manage
 export type { WorkspaceRow, WorkspaceStatus } from "./workspace/workspace-manager.js";
 
 // Prisma lifecycle
-export { getPrismaClient, disconnectPrisma } from "./query/prisma-client.js";
+export { getPrismaClient, disconnectPrisma } from "../kernel/prisma-client.js";
 
 // Executor — polyglot sandbox + run-pool + intent progressive disclosure
 export {

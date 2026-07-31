@@ -115,7 +115,7 @@ beforeAll(async () => {
   for (const migration of migrations()) await db.query(migration);
   previousDatabaseUrl = process.env.DATABASE_URL;
   process.env.DATABASE_URL = databaseUrl;
-  const prisma = await import("../services/query/prisma-client.js");
+  const prisma = await import("../kernel/prisma-client.js");
   prisma._resetPrismaForTesting();
   const module = await import("../data/symbol/symbol-repository-pg.js");
   repository = module.SymbolRepositoryPg.getInstance() as unknown as Task12Repository;
@@ -125,7 +125,7 @@ beforeEach(async () => { if (requested) await resetFixture(); });
 
 afterAll(async () => {
   if (!requested) return;
-  const { disconnectPrisma } = await import("../services/query/prisma-client.js");
+  const { disconnectPrisma } = await import("../kernel/prisma-client.js");
   await disconnectPrisma();
   await db?.end();
   if (admin && ownsDatabase) {

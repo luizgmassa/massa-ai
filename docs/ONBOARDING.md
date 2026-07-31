@@ -184,7 +184,7 @@ Thirteen steps, ordered the way a request actually flows. Each names the files t
 | 4 | **The Search Facade** — hybrid vector + Postgres FTS with reciprocal-rank fusion. A composition root plus six capability modules, each taking a narrow deps record rather than the facade. | `services/search/contextual-search-rlm.ts` + `hybrid-search.ts`, `project-indexer.ts`, `index-admin.ts`, `session-bias.ts`, `graph-stream.ts`, `result-fusion.ts` |
 | 5 | **The ETL Indexing Pipeline** — `discover → parse → resolve → load`. Hash-skip unchanged files, tree-sitter parse, resolve FQNs, persist in per-batch transactions with deadlock retry. | `services/etl/pipeline.ts`, `stages/*.ts` |
 | 6 | **Symbol Graph & Blue-Green Generations** — go-to-definition, find-references, project map; generations flipped atomically. | `services/symbol/symbol-graph.service.ts`, `etl/graph-generation-coordinator.ts` |
-| 7 | **The PostgreSQL Data Layer** — the lazily-created `pg` pool and the Prisma singleton everything funnels through, plus the typed event bus. | `kernel/db-connection.ts`, `services/query/prisma-client.ts`, `services/events/event-bus.ts` |
+| 7 | **The PostgreSQL Data Layer** — the lazily-created `pg` pool and the Prisma singleton everything funnels through, plus the typed event bus. | `kernel/db-connection.ts`, `kernel/prisma-client.ts`, `services/events/event-bus.ts` |
 | 8 | **Synapse: Cross-Session Memory** — ~28 service files for scoring, inhibition, plasticity, metacognition, prefetch. Session state in Postgres with an in-memory mirror; working-memory buffer matches queries by Jaccard overlap. | `services/synapse/{index,types}.ts`, `session/session-store-pg.ts` |
 | 9 | **Graceful Degradation for LLM Features** — the shared client and three concrete instances of the fallback pattern. | `services/memory/llm-client.ts`, `bootstrap/`, `handoff/` |
 | 10 | **Shared Utilities** — the seam between core and its consumers; `env.ts` runs at startup for every entry point. | `packages/shared/src/{index,env}.ts` |
@@ -224,7 +224,7 @@ Key files per layer, ranked by coupling (in + out dependency edges).
 | Deg | File | Role |
 |---:|---|---|
 | 72 | `services/search/contextual-search-rlm.ts` | Central hybrid-search facade (vector + keyword, RRF); indexing, caching, Synapse integration |
-| 68 | `services/query/prisma-client.ts` | Lazily-constructed Prisma singleton — **the most depended-upon file in the codebase** |
+| 68 | `kernel/prisma-client.ts` | Lazily-constructed Prisma singleton — **the most depended-upon file in the codebase** |
 | 39 | `services/symbol/symbol-graph.service.ts` | Code navigation API: definitions, references, dependencies, project map |
 | 38 | `services/etl/pipeline.ts` | Singleton orchestrator for the 4-stage pipeline |
 | 38 | `services/events/event-bus.ts` | Typed EventEmitter singleton; decouples ETL writers from hooks/jobs/SSE listeners |
@@ -304,7 +304,7 @@ that rating meets high fan-in/fan-out.)
 
 **Highest-blast-radius files** (change these and everything downstream feels it):
 
-1. `services/query/prisma-client.ts` — **68 incoming**. Every repository funnels through it.
+1. `kernel/prisma-client.ts` — **68 incoming**. Every repository funnels through it.
 2. `services/events/event-bus.ts` — **38 incoming**. Decouples writers from listeners.
 3. `kernel/alias-resolver.ts` — **30 incoming**.
 4. `tools/serialize.ts` — **30 incoming**. Every tool response.

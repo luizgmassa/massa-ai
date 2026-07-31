@@ -63,7 +63,7 @@ afterAll(async () => {
 });
 
 async function cleanupProject(p: string): Promise<void> {
-  const { getPrismaClient } = await import("../services/query/prisma-client.js");
+  const { getPrismaClient } = await import("../kernel/prisma-client.js");
   await getPrismaClient().$executeRaw`DELETE FROM managed_runs WHERE project_id = ${p}`;
 }
 
@@ -190,7 +190,7 @@ describe.skipIf(!DB_AVAILABLE)("EtlPipeline managed_runs lease (T13 / AC-7)", ()
     const active = await repo.getActive(currentProjectId, "indexing");
     expect(active).toBeNull();
     // Row is aborted, not completed — reaper will clean up; a new begin() can acquire.
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     const row = await getPrismaClient().$queryRaw<Array<{ status: string }>>`
       SELECT status FROM managed_runs WHERE id = ${BigInt(lease.runId)}
     `;

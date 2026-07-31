@@ -7,7 +7,7 @@
  * here from symbol-repo-queries.ts to keep queries ≤500 LOC.
  */
 
-import { getPrismaClient } from "../../services/query/prisma-client.js";
+import { getPrismaClient } from "../../kernel/prisma-client.js";
 import { parseStructuralFqn } from "../../kernel/fqn-codec.js";
 import type {
   SymbolImport,

@@ -3,7 +3,7 @@
  * Test script to verify PostgreSQL connection via Prisma
  */
 
-import { getPrismaClient, disconnectPrisma } from "../../services/query/prisma-client.js";
+import { getPrismaClient, disconnectPrisma } from "../../kernel/prisma-client.js";
 import { logger } from "@massa-ai/shared";
 
 async function testConnection() {

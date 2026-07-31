@@ -187,7 +187,7 @@ describe("createProjectIdentityService", () => {
     if (!DB_AVAILABLE) return;
 
     // Seed a workspace for the source project so the planner finds it.
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     const prisma = getPrismaClient();
     await prisma.$executeRaw`
       INSERT INTO workspaces (project_id, project_path, display_name, status, updated_at)
@@ -217,7 +217,7 @@ describe("createProjectIdentityService", () => {
     const DB_AVAILABLE = (process.env.DATABASE_URL ?? "").startsWith("postgres");
     if (!DB_AVAILABLE) return;
 
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     const prisma = getPrismaClient();
     // Seed source workspace.
     await prisma.$executeRaw`

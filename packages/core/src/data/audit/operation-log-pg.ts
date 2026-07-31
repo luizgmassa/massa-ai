@@ -15,7 +15,7 @@
 
 import { logger } from "@massa-ai/shared";
 import type { PrismaClient } from "../../generated/prisma/index.js";
-import { getPrismaClient } from "../../services/query/prisma-client.js";
+import { getPrismaClient } from "../../kernel/prisma-client.js";
 import { UNKNOWN_ACTOR } from "./operation-log-contract.js";
 import type {
   OperationLogRepository,

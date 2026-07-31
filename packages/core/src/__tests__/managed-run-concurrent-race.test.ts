@@ -61,7 +61,7 @@ describe.skipIf(!DB_AVAILABLE)("ManagedRunRepository concurrent begin() (AC-22)"
       expect(winner).not.toBeNull();
       expect(active!.runId).toBe(winner);
     } finally {
-      const { getPrismaClient } = await import("../services/query/prisma-client.js");
+      const { getPrismaClient } = await import("../kernel/prisma-client.js");
       await getPrismaClient().$executeRaw`DELETE FROM managed_runs WHERE project_id = ${currentProjectId}`;
     }
   });
@@ -83,7 +83,7 @@ describe.skipIf(!DB_AVAILABLE)("ManagedRunRepository concurrent begin() (AC-22)"
         if (b.status === "busy") expect(b.activeRunId).toBe(winnerId);
       }
     } finally {
-      const { getPrismaClient } = await import("../services/query/prisma-client.js");
+      const { getPrismaClient } = await import("../kernel/prisma-client.js");
       await getPrismaClient().$executeRaw`DELETE FROM managed_runs WHERE project_id = ${currentProjectId}`;
     }
   });
@@ -108,7 +108,7 @@ describe.skipIf(!DB_AVAILABLE)("ManagedRunRepository concurrent begin() (AC-22)"
         expect(second.lease.runId).not.toBe(first.lease.runId);
       }
     } finally {
-      const { getPrismaClient } = await import("../services/query/prisma-client.js");
+      const { getPrismaClient } = await import("../kernel/prisma-client.js");
       await getPrismaClient().$executeRaw`DELETE FROM managed_runs WHERE project_id = ${currentProjectId}`;
     }
   });

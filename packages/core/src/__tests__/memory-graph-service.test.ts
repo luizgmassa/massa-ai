@@ -46,7 +46,7 @@ function restoreDeps() {
 
 describe.skipIf(!DEDICATED_DB)("MemoryGraphService — orchestration coverage", () => {
   beforeAll(async () => {
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     prisma = getPrismaClient();
     await cleanup();
     svc = MemoryGraphService.getInstance();

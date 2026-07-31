@@ -30,7 +30,7 @@ import {
   countEdgesByKind,
   resolveDefinitionFqn,
 } from "../data/symbol/symbol-repo-graph.js";
-import { _resetPrismaForTesting } from "../services/query/prisma-client.js";
+import { _resetPrismaForTesting } from "../kernel/prisma-client.js";
 import { closeConnections } from "../kernel/db-connection.js";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
@@ -172,7 +172,7 @@ async function cleanup(): Promise<void> {
 describe.skipIf(!DEDICATED_DB)("symbol-repo-graph — coverage", () => {
   beforeAll(async () => {
     pool = new Pool({ connectionString: databaseUrl });
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     getPrismaClient();
     await cleanup();
   });

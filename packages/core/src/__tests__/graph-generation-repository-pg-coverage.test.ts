@@ -25,7 +25,7 @@ let repository: GraphGenerationRepositoryPg;
 
 beforeAll(async () => {
   if (!DB_AVAILABLE) return;
-  const { getPrismaClient } = await import("../services/query/prisma-client.js");
+  const { getPrismaClient } = await import("../kernel/prisma-client.js");
   prisma = getPrismaClient();
   repository = GraphGenerationRepositoryPg.getInstance();
 });
