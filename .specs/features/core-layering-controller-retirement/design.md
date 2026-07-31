@@ -3,7 +3,9 @@
 - **Slug**: `core-layering-controller-retirement` · **PR-C**
 - **Specify**: `spec.md`, merged to `main` via **#56** (`9df5608`, merge commit)
 - **Base**: `origin/main` @ `9df5608`
-- **Status**: **Design — decisions recorded, sizing recorded. Tasks not started. No code written.**
+- **Status**: **Design complete.** Tasks complete (`tasks.md`, 20 tasks). **Execute complete** on
+  `spec/pr-c-execute`, pending T18's independent validation. This document's §3 roster and §5.2
+  snippet were both corrected during Execute — see C22, C23, C24 and C26 in the parent `spec.md`.
 
 Specify named three decisions Design owes before PR-C is sized, each with its rejected
 alternative. This document delivers all three, plus the defect found while verifying the first.
@@ -127,6 +129,15 @@ The tier works — but only once a module nobody counted is included.
 ## 3. The kernel roster
 
 **Admitted — 7 modules**, each a leaf after the moves below:
+
+> **The heading says 7 and the table has 6 rows, and the shipped kernel holds 11.** The missing
+> seventh is `prisma-client.ts`, which holds **12 of the 26** edges — more than twice any other
+> target — and is **C23**. `types.ts`, `schema-version.ts` and `registry.ts` joined at T2/T3
+> because §2 judged leaf-ness at each module's *current* location, so same-tier siblings read as
+> "none" — that is **C22**. `enum-validation.ts` arrived at T8 with AC-5. Shipped roster, measured
+> over `git ls-files`: `alias-resolver`, `db-connection`, `enum-validation`, `fqn-codec`,
+> `identity-guard-installer`, `lexical-search`, `prisma-client`, `registry`, `schema-version`,
+> `search-diagnostics`, `types`.
 
 | module | current home | edges it legalises | note |
 | --- | --- | --- | --- |
@@ -282,6 +293,11 @@ String.raw`(?<![\w-])(?:(?:${PREFIX_STEMS.join("|")})-[a-z0-9-]+?` +
 > | untouched baseline | 60 | 32 | 28 | **PASS** |
 > | **§5.2 as first published** | **0** | **0** | 28 | **FAIL — 0 historical against a pin of 28** |
 > | both segments tagged | 142 | 114 | 28 | **PASS** |
+>
+> **Narrowed at Execute — C26.** The corpus figure below is `142 / 114 / 28` for the gate *as T6
+> shipped it*. T10b gave it a path branch and a fifth `EXCLUDED` entry, narrowing the corpus to
+> **137 / 109 / 28**. **`HISTORICAL` is unchanged at 28** — none of the five removed entries was
+> ever historical, and the pin is the one figure the narrowing does not touch.
 >
 > The §3.2 no-op-control reading recorded in `tasks.md` (142 / 114 / 28) was taken with a
 > correctly-tagged patch; only the *published* snippet was wrong, so the reading stands and the

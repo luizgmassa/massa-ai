@@ -206,7 +206,9 @@ all state came from `.specs/` and source reads.
   Design COMPLETE 2026-07-31 — full Plan Challenge gate run, five findings, three folded into the
   plan (see below). Tasks COMPLETE 2026-07-31 — a second full Plan Challenge gate, four findings,
   all four confirmed by independent re-measurement. 20 tasks, three phases, 104 distinct files.
-  EXECUTE NOT STARTED. No code written.**
+  EXECUTE COMPLETE 2026-07-31 on `spec/pr-c-execute` — 20 tasks in four phases, each commit green
+  on its own. T18 (independent validation) outstanding. Fifteen further plan defects confirmed,
+  C13-C27, amended into the parent `spec.md` at T16.**
 - **Tasks resolved the two things Design left open**, each with its rejected alternatives recorded:
   1. **The cut → one PR, three phased commits.** Decided by the user, 2026-07-31. Three-PRs and
      two-PRs both rejected — reasons in `tasks.md` §1. Measured input: phases at **62 / 16 / 32**
@@ -215,7 +217,8 @@ all state came from `.specs/` and source reads.
      measured **zero** consumers of the `./controllers` subpath; `### Fixed`/patch rejected against
      PR-B's own precedent.
 - **Both non-retroactive steps are taken, at `bc9019b`, before any structural commit** — do not
-  re-take them. Frozen base **60 / 32 / 28 PASS**; no-op control **142 / 114 / 28**, so the reshape
+  re-take them. Frozen base **60 / 32 / 28 PASS**; no-op control **142 / 114 / 28** *(narrowed at
+  T10b to **137 / 109 / 28** by C26; HISTORICAL unchanged at 28)*, so the reshape
   moves the count by **+82** and is not a no-op. R-09's coverage is **59 of 61** — the two invisible
   pointers are `controllers/index.js` at `package.json:30` and `src/index.ts:18`, closed by AC-6 and
   AC-2 rather than by the gate.
