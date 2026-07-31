@@ -25,7 +25,7 @@ import { grammarArtifactKey } from "../services/structural/grammar-loaders.js";
 import {
   ProjectIdentityAliasResolver,
   setProjectIdentityAliasResolverForTests,
-} from "../services/project-identity/alias-resolver.js";
+} from "../kernel/alias-resolver.js";
 import type { ManagedRunLease } from "../data/managed-runs/managed-run-contract.js";
 
 const DB_AVAILABLE = /^(postgres|postgresql):/.test(process.env.DATABASE_URL ?? "");

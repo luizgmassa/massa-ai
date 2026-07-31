@@ -20,7 +20,7 @@ import {
   resetProjectIdentityAliasResolver,
   setProjectIdentityAliasResolverForTests,
   type ProjectIdentityAliasResolver,
-} from "../services/project-identity/alias-resolver.js";
+} from "../kernel/alias-resolver.js";
 import { _resetPrismaForTesting } from "../services/query/prisma-client.js";
 import { closeConnections } from "../kernel/db-connection.js";
 

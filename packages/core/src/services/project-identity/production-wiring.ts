@@ -13,7 +13,7 @@
  */
 
 import { eventBus } from "../events/event-bus.js";
-import { getProjectIdentityAliasResolver } from "./alias-resolver.js";
+import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 import type {
   ProjectIdentityChangedPayload,
   ProjectIdentityChangedPublisher,

@@ -2,7 +2,7 @@
 
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import { getPrismaClient } from "../../services/query/prisma-client.js";
-import { getProjectIdentityAliasResolver } from "../../services/project-identity/alias-resolver.js";
+import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 import {
   searchBackendUnavailable,
   storeCorruption,

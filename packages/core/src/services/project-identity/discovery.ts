@@ -9,7 +9,7 @@ import {
   payloadStorePolicies,
   type IdentityColumn,
   type PayloadStorePolicy,
-} from "./registry.js";
+} from "../../kernel/registry.js";
 
 export interface ProjectIdentityQueryResult<Row = Record<string, unknown>> {
   rows: Row[];

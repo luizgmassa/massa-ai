@@ -62,17 +62,17 @@ export {
   directStorePolicy,
   isKnownRegistryTable,
   payloadStorePolicies,
-} from "./registry.js";
-export type { DirectStorePolicy, IdentityColumn, PayloadStorePolicy } from "./registry.js";
+} from "../../kernel/registry.js";
+export type { DirectStorePolicy, IdentityColumn, PayloadStorePolicy } from "../../kernel/registry.js";
 export {
   installGuardOnTable,
   installProjectIdentityGuards,
   installProjectIdentityGuardsFromPool,
-} from "./identity-guard-installer.js";
+} from "../../kernel/identity-guard-installer.js";
 export type {
   IdentityGuardInstallerClient,
   ProjectIdentityGuardInstallReport,
-} from "./identity-guard-installer.js";
+} from "../../kernel/identity-guard-installer.js";
 export {
   EMPTY_INVALIDATION_REPORT,
   ProjectIdentityInvalidatorRegistry,
@@ -99,8 +99,8 @@ export {
   ProjectIdentityAliasResolver,
   getProjectIdentityAliasResolver,
   setProjectIdentityAliasResolverForTests,
-} from "./alias-resolver.js";
+} from "../../kernel/alias-resolver.js";
 export type {
   AliasResolverQuerier,
   ProjectIdentityAliasResolverOptions,
-} from "./alias-resolver.js";
+} from "../../kernel/alias-resolver.js";

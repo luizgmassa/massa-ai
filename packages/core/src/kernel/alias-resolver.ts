@@ -24,7 +24,7 @@
  */
 
 import { logger } from "@massa-ai/shared";
-import { getPgPool } from "../../kernel/db-connection.js";
+import { getPgPool } from "./db-connection.js";
 
 /** Minimal query surface (pg Pool/PoolClient both satisfy it). */
 export interface AliasResolverQuerier {

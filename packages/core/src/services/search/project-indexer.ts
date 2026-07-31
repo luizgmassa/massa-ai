@@ -36,7 +36,7 @@ import { glob } from "glob";
 import { randomUUID } from "node:crypto";
 import { smartChunk } from "./smart-chunker.js";
 import { buildExtensionGlob, loadProjectIgnore } from "./ignore-patterns.js";
-import { getProjectIdentityAliasResolver } from "../project-identity/alias-resolver.js";
+import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 import { ManagedRunRepositoryPg } from "../../data/managed-runs/managed-run-repository-pg.js";
 import type { ManagedRunLease } from "../../data/managed-runs/managed-run-contract.js";
 import type { IndexManager } from "./index-manager.js";

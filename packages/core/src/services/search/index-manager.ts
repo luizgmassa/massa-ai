@@ -13,7 +13,7 @@ import { glob } from "glob";
 import { logger, config, DEFAULT_ALLOWED_EXTENSIONS } from "@massa-ai/shared";
 import type { IVectorStore } from "@massa-ai/shared";
 import { buildExtensionGlob, loadProjectIgnore } from "./ignore-patterns.js";
-import { getProjectIdentityAliasResolver } from "../project-identity/alias-resolver.js";
+import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 
 const globAsync = glob;
 

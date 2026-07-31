@@ -26,7 +26,7 @@ import { getSearchCache } from "../search/cache-factory.js";
 import { IndexManager } from "../search/index-manager.js";
 import { getVectorStore } from "../../data/vector/vector-store-factory.js";
 import { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
-import { getProjectIdentityAliasResolver } from "../project-identity/alias-resolver.js";
+import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 import type { EtlStageContext, EtlEvent, EtlResult, EtlStage } from "./stage-context.js";
 import { assertParserReadyForIndexing } from "../structural/parser-readiness.js";
 import { StructuralEtlParseError } from "./stages/parse.js";

@@ -16,7 +16,7 @@ import {
 import { ProjectIdentityError } from "./errors.js";
 import { hashProjectIdentityRequest } from "./hash.js";
 import { parsePgArrayLiteral, toPgArrayLiteral } from "./pg-array-codec.js";
-import type { PayloadStorePolicy } from "./registry.js";
+import type { PayloadStorePolicy } from "../../kernel/registry.js";
 import {
   EMPTY_INVALIDATION_REPORT,
   ProjectIdentityInvalidatorRegistry,

@@ -228,7 +228,6 @@ Key files per layer, ranked by coupling (in + out dependency edges).
 | 39 | `services/symbol/symbol-graph.service.ts` | Code navigation API: definitions, references, dependencies, project map |
 | 38 | `services/etl/pipeline.ts` | Singleton orchestrator for the 4-stage pipeline |
 | 38 | `services/events/event-bus.ts` | Typed EventEmitter singleton; decouples ETL writers from hooks/jobs/SSE listeners |
-| 31 | `services/project-identity/alias-resolver.ts` | Canonical project-ID resolution for write paths the DB trigger cannot rewrite |
 | 26 | `services/structural/query-pack.ts` | One structural parse of one file → imports, symbols, call edges, syntax edges |
 | 24 | `services/memory/llm-client.ts` | Shared Ollama client with timeout enforcement and default-off gating |
 
@@ -249,6 +248,7 @@ checkable by path prefix rather than by a maintained list.
 
 | Deg | File | Role |
 |---:|---|---|
+| 31 | `kernel/alias-resolver.ts` | Canonical project-ID resolution for write paths the DB trigger cannot rewrite |
 | 18 | `kernel/db-connection.ts` | Shared `pg` pool sized from `DB_POOL_SIZE` |
 
 ### Shared Utility
@@ -306,7 +306,7 @@ that rating meets high fan-in/fan-out.)
 
 1. `services/query/prisma-client.ts` — **68 incoming**. Every repository funnels through it.
 2. `services/events/event-bus.ts` — **38 incoming**. Decouples writers from listeners.
-3. `services/project-identity/alias-resolver.ts` — **30 incoming**.
+3. `kernel/alias-resolver.ts` — **30 incoming**.
 4. `tools/serialize.ts` — **30 incoming**. Every tool response.
 
 ---

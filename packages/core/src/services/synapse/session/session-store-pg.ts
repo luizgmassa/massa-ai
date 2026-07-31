@@ -29,7 +29,7 @@
 
 import { logger } from "@massa-ai/shared";
 import { getPrismaClient } from "../../query/prisma-client.js";
-import { getProjectIdentityAliasResolver } from "../../project-identity/alias-resolver.js";
+import { getProjectIdentityAliasResolver } from "../../../kernel/alias-resolver.js";
 import type { PrismaClient } from "../../../generated/prisma/index.js";
 import type { AgentSession } from "../types.js";
 import {

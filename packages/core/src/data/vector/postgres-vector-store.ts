@@ -23,7 +23,7 @@ import {
   SearchSource,
 } from '@massa-ai/shared';
 import { logger } from '@massa-ai/shared';
-import { installGuardOnTable } from '../../services/project-identity/identity-guard-installer.js';
+import { installGuardOnTable } from '../../kernel/identity-guard-installer.js';
 import type { Pool, PoolConfig } from 'pg';
 
 export interface PostgresConfig {

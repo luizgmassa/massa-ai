@@ -28,7 +28,7 @@ if (URL) {
 import { getHookService, resetHookService } from "../services/hooks/hook-service.js";
 import { resetAttributionResolver, setAttributionResolverForTests, type AttributionResolverLike } from "../services/hooks/attribution-resolver.js";
 import { getObservationStore } from "../data/memory/observation-repository.js";
-import { resetProjectIdentityAliasResolver, setProjectIdentityAliasResolverForTests } from "../services/project-identity/alias-resolver.js";
+import { resetProjectIdentityAliasResolver, setProjectIdentityAliasResolverForTests } from "../kernel/alias-resolver.js";
 import { _resetPrismaForTesting } from "../services/query/prisma-client.js";
 import { closeConnections } from "../kernel/db-connection.js";
 

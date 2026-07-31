@@ -27,7 +27,7 @@ import { grammarArtifactKey } from "../services/structural/grammar-loaders.js";
 import {
   ProjectIdentityAliasResolver,
   setProjectIdentityAliasResolverForTests,
-} from "../services/project-identity/alias-resolver.js";
+} from "../kernel/alias-resolver.js";
 import type { ManagedRunLease, FileCursor } from "../data/managed-runs/managed-run-contract.js";
 import type { DiscoveredFile, ResolvedFile } from "../services/etl/stage-context.js";
 

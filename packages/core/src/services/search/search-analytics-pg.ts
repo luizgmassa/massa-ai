@@ -6,7 +6,7 @@
 
 import { logger } from "@massa-ai/shared";
 import { getPgPool } from "../../kernel/db-connection.js";
-import { installGuardOnTable } from "../project-identity/identity-guard-installer.js";
+import { installGuardOnTable } from "../../kernel/identity-guard-installer.js";
 import type { Pool } from "pg";
 
 export interface SearchEvent {
