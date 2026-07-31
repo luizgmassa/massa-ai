@@ -54,17 +54,29 @@ function check(files: Record<string, string>) {
 
 const S = `${CORE_SRC}`;
 
-describe("tierOf — the tier set is exactly {kernel, tools, controllers, services, data}", () => {
+describe("tierOf — the tier set is exactly {kernel, tools, services, data}", () => {
   test("classifies every tier by path prefix", () => {
     expect(tierOf(`${S}kernel/db-connection.ts`)).toBe("kernel");
     expect(tierOf(`${S}tools/search_project.ts`)).toBe("tools");
+    expect(tierOf(`${S}services/search/hybrid-search.ts`)).toBe("services");
+    expect(tierOf(`${S}data/vector/base-vector-store.ts`)).toBe("data");
+  });
+
+  test("controllers/ is UNTIERED — the retirement, asserted rather than assumed", () => {
+    // Until T15 this asserted `"controllers"`. The tier left `TIERS` with the
+    // directory (T13), so the same path is now untiered: unconstrained in both
+    // directions, like `models/`. Kept rather than deleted because it is the one
+    // assertion that fails if `controllers` is ever put back in the list, and
+    // because an empty rule row and a removed tier report identically on a tree
+    // that has no such files.
+    //
     // `controllers/index.ts` rather than a real `<x>-controller` filename: this is
     // a fixture, not a reference, and T6's reshaped `check-stale-pointers` POINTER
     // matches suffix-shaped controller names. Spelled realistically it became the
     // 83rd suffix-branch pointer against an expected 82.
-    expect(tierOf(`${S}controllers/index.ts`)).toBe("controllers");
-    expect(tierOf(`${S}services/search/hybrid-search.ts`)).toBe("services");
-    expect(tierOf(`${S}data/vector/base-vector-store.ts`)).toBe("data");
+    expect(tierOf(`${S}controllers/index.ts`)).toBeNull();
+    expect(tierOf(`${S}controllers/c.ts`)).toBeNull();
+    expect(TIERS as readonly string[]).not.toContain("controllers");
   });
 
   test("everything else under packages/core/src/ is UNTIERED", () => {
@@ -101,7 +113,6 @@ describe("kernel leaf-ness — observed red in every forbidden direction", () =>
 
   for (const [tier, spec] of [
     ["tools", "../tools/t.js"],
-    ["controllers", "../controllers/c.js"],
     ["services", "../services/s.js"],
     ["data", "../data/d.js"],
   ] as const) {
@@ -130,6 +141,100 @@ describe("kernel leaf-ness — observed red in every forbidden direction", () =>
       [`${S}generated/prisma/index.ts`]: "export const PrismaClient = 1;\n",
     });
     expect(r.violations).toHaveLength(0);
+  });
+
+  test("kernel -> controllers/ is legal now, and leaves the graph entirely", () => {
+    // The T15 boundary case. Before T15 this exact fixture was a violation. It is
+    // legal now not because the rule was relaxed but because the target is
+    // untiered — and `edgesExamined` of 0 is what tells the two apart. A rule
+    // merely deleted from the row would leave the edge counted and permitted.
+    const r = check(kernelImporting("../controllers/c.js"));
+    expect(r.violations).toHaveLength(0);
+    expect(r.edgesExamined).toBe(0);
+  });
+});
+
+/**
+ * Fixture names below are deliberately NOT spelled `<x>-controller.ts`, on the
+ * precedent already recorded above for `controllers/index.ts`.
+ *
+ * T10b gave `check-stale-pointers` a path branch that resolves a dot-relative
+ * citation against the directory of the file citing it. These fixtures write
+ * specifiers from the point of view of an imaginary `packages/core/src/tools/`
+ * file while physically living in `scripts/__tests__/`, so a suffix-shaped
+ * orchestrator name in a `../services/search/…` specifier here resolves under
+ * `scripts/` — a path that never existed, and the gate correctly calls it BROKEN.
+ * That is the same shape as the recorded `read_file` response fixture T10b had to
+ * EXCLUDE: **no resolution root can be right about a citing file that is
+ * imaginary.**
+ *
+ * Spelled realistically, the first draft of this block took the gate to
+ * `FAIL — 1 broken` and the corpus from 137 to 140; a first attempt at *this
+ * comment* re-broke it, because prose naming the offending specifier is itself a
+ * citation. Excluding this file would have been fixing the gate instead of the
+ * subject. The names are neutered instead, here and above, and the corpus reading
+ * stays a property of the tree.
+ */
+describe("services -> tools and data -> tools — T15's clauses, each observed red", () => {
+  test("services -> tools is a violation (AC-5's direction)", () => {
+    const r = check({
+      [`${S}services/search/filter-validation.ts`]:
+        'import { ToolError } from "../../tools/enum-validation.js";\nexport const x = ToolError;\n',
+      [`${S}tools/enum-validation.ts`]: "export const ToolError = 1;\n",
+    });
+    expect(r.violations).toHaveLength(1);
+    expect(r.violations[0]!.from).toBe("services");
+    expect(r.violations[0]!.to).toBe("tools");
+  });
+
+  test("services -> tools catches the type-only form too (C19's three edges)", () => {
+    // Three of the five edges T8b closed were `import type`. A pattern that only
+    // saw value imports would have reported this group clean while it grew.
+    const r = check({
+      [`${S}services/executor/orchestrator.ts`]:
+        'import type { ExecuteParams } from "../../tools/execute.js";\nexport type X = ExecuteParams;\n',
+      [`${S}tools/execute.ts`]: "export type ExecuteParams = { a: 1 };\n",
+    });
+    expect(r.violations).toHaveLength(1);
+    expect(r.violations[0]!.to).toBe("tools");
+  });
+
+  test("data -> tools is a violation", () => {
+    const r = check({
+      [`${S}data/vector/postgres-vector-store.ts`]:
+        'import { ToolError } from "../../tools/enum-validation.js";\nexport const x = ToolError;\n',
+      [`${S}tools/enum-validation.ts`]: "export const ToolError = 1;\n",
+    });
+    expect(r.violations).toHaveLength(1);
+    expect(r.violations[0]!.from).toBe("data");
+    expect(r.violations[0]!.to).toBe("tools");
+  });
+
+  test("tools -> services and tools -> kernel stay legal", () => {
+    const r = check({
+      [`${S}tools/search_project.ts`]:
+        'import { a } from "../services/search/orchestrator.js";\nimport { b } from "../kernel/enum-validation.js";\nexport const x = [a, b];\n',
+      [`${S}services/search/orchestrator.ts`]: "export const a = 1;\n",
+      [`${S}kernel/enum-validation.ts`]: "export const b = 1;\n",
+    });
+    expect(r.violations).toHaveLength(0);
+    expect(r.edgesExamined).toBe(2);
+  });
+
+  test("tools -> data is LEGAL — forward, and 3 of them exist on the real tree", () => {
+    // The discriminating case for T15, and the one a plausible tightening breaks.
+    // AC-3 defines backward as "the importing layer sits later than the imported
+    // layer"; `tools` is first, so nothing it imports is backward. Skipping
+    // `services/` is a thinness question (GMS-02), not a direction question, and
+    // `compact_snapshot.ts`, `create_checkpoint.ts` and `restore_checkpoint.ts`
+    // would all fail a check that conflated the two.
+    const r = check({
+      [`${S}tools/compact_snapshot.ts`]:
+        'import { getObservationStore } from "../data/memory/observation-repository.js";\nexport const x = getObservationStore;\n',
+      [`${S}data/memory/observation-repository.ts`]: "export const getObservationStore = 1;\n",
+    });
+    expect(r.violations).toHaveLength(0);
+    expect(r.edgesExamined).toBe(1);
   });
 });
 
@@ -254,6 +359,21 @@ describe("no allowlist — the property that keeps the check discriminating", ()
 
   test("FORBIDDEN covers every tier, so a new tier cannot be silently unruled", () => {
     for (const t of TIERS) expect(FORBIDDEN[t]).toBeDefined();
+  });
+
+  test("the rule table is exactly AC-1's backward set, pinned by value", () => {
+    // Declared order `tools -> services -> data`, kernel off the axis. Every
+    // backward pair present, nothing else. Pinned rather than described, because
+    // both failure modes are silent: a dropped clause stops policing an edge
+    // category, and an added one (`tools: ["data"]` is the tempting one) fails a
+    // tree that is correct.
+    expect(FORBIDDEN).toEqual({
+      kernel: ["tools", "services", "data"],
+      data: ["services", "tools"],
+      services: ["tools"],
+      tools: [],
+    });
+    expect(TIERS).toEqual(["kernel", "tools", "services", "data"]);
   });
 });
 

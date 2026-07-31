@@ -2,24 +2,47 @@
 /**
  * GMS-01 AC-1 — the core layer contract, enforced rather than asserted.
  *
- * PR-C, T5. This ships the **kernel rule**. T15 adds the controllers rule to the
- * same table once phase 3 has retired `controllers/`.
+ * PR-C: T5 shipped the kernel rule; **T15 completes the table** now that phase 3
+ * has retired `controllers/`, so this file enforces the whole of AC-1.
  *
  *     tools → services → data
  *              ↖      ↗
  *               kernel/
  *
- * Two clauses, both from design.md §1:
+ * AC-1's rule is *"zero imports that cross a layer in the disallowed direction"*,
+ * and AC-3 states the counting method: **backward = the importing layer sits later
+ * than the imported layer in the declared order**. Declared order is
+ * `tools → services → data`, with `kernel/` off the axis. That yields exactly four
+ * clauses, and they are the whole of `FORBIDDEN`:
  *
  *   1. **Kernel leaf-ness.** A file under `kernel/` may not import from `tools/`,
- *      `controllers/`, `services/` or `data/`. design.md §1 names the first three;
- *      `controllers/` is included because it is a tier until phase 3 and a
- *      `kernel → controllers` edge is the same defect. Measured at adoption: 0
- *      such edges either way, so the addition changes no reading — recorded so
- *      the widening is not mistaken for coverage it did not add.
+ *      `services/` or `data/` — design.md §1. Enforced, not asserted, or the first
+ *      `kernel → services` edge silently reintroduces the cycle C14 prevents.
  *   2. **`data → services` is illegal**, while `data → kernel` is legal. This is
  *      the rule the tier exists to make checkable, and the one AC-4's 26 edges
  *      were closed to satisfy.
+ *   3. **`services → tools` is illegal** — AC-5's direction. Closed by moving
+ *      `ToolError`/`validateEnum` into `kernel/` (T8) and repointing the five
+ *      edges the controllers would have brought with them (T8b, C19), so it lands
+ *      at **0** rather than at an allowlist.
+ *   4. **`data → tools` is illegal.** Backward by the same definition, and named
+ *      here because nothing measured it before: **0** on the tree at T15. It is a
+ *      real subject rather than a dead clause — 39 `data/` files and 30 `tools/`
+ *      files — and its red is observed in the suite rather than argued for.
+ *
+ * **`tools → data` is LEGAL and there are 3 of them.** It skips `services/` but it
+ * does not reverse, so it is not a backward edge and AC-1 does not forbid it.
+ * Recorded because "tools may only import services" is the plausible tightening,
+ * and it would fail this tree — `tools/compact_snapshot.ts`,
+ * `tools/create_checkpoint.ts` and `tools/restore_checkpoint.ts` reach `data/`
+ * directly. Thinness of handlers is GMS-02's requirement, not this check's.
+ *
+ * **`controllers/` is no longer a tier.** It left `TIERS` with the directory, so a
+ * path under `packages/core/src/controllers/` is now *untiered* — unconstrained in
+ * both directions, exactly like `models/` — rather than a tier with an empty rule
+ * row. Leaving it in the list would have been a subject that can never match: at
+ * T13 the directory count went to 0, and a clause over an empty population reads
+ * identically to a clause that is clean.
  *
  * **There is no allowlist, and that is the point.** design.md §1 chose a tier
  * over an allowlist because an allowlist stops the check discriminating: once
@@ -34,10 +57,11 @@
  * what grants membership. Keying off a list of module specifiers would be the
  * allowlist this design rejects, renamed.
  *
- * **The tier set is exactly `{kernel, tools, controllers, services, data}`.**
+ * **The tier set is exactly `{kernel, tools, services, data}`.**
  * Everything else under `packages/core/src/` is **untiered and unconstrained**,
  * the same way `@massa-ai/shared` and `pg` are: `generated/` (Prisma output),
- * `models/`, `scripts/`, `__tests__/`, `index.ts`. This is load-bearing, not
+ * `models/`, `scripts/`, `__tests__/`, `index.ts` — and, since T13,
+ * `controllers/` too, were anything ever to reappear there. This is load-bearing, not
  * tidiness — `kernel/prisma-client.ts` imports `../generated/prisma/index.js`,
  * and a check that treated every non-tier path as foreign would reject a legal
  * tree, failing the one module that closes 12 of AC-4's 26 edges.
@@ -52,23 +76,22 @@ import { dirname, relative, resolve } from "node:path";
 
 export const CORE_SRC = "packages/core/src/";
 
-/** The tier set. `controllers` leaves this list when phase 3 retires it (T15). */
-export const TIERS = ["kernel", "tools", "controllers", "services", "data"] as const;
+/** The tier set. `controllers` left it at T15, with the directory it named. */
+export const TIERS = ["kernel", "tools", "services", "data"] as const;
 export type Tier = (typeof TIERS)[number];
 
 /**
  * importer tier → tiers it may not import from.
  *
- * T15 fills `tools`/`controllers`/`services` with the controllers rule. They are
- * present and empty rather than absent so that the growth is a data edit, not a
- * logic edit.
+ * Every backward pair in the declared order is present; `tools` is first in that
+ * order, so it has nothing behind it and its row is empty by the rule rather than
+ * by omission. Growth here is a data edit, never a logic edit.
  */
 export const FORBIDDEN: Readonly<Record<Tier, readonly Tier[]>> = {
-  kernel: ["tools", "controllers", "services", "data"],
-  data: ["services"],
+  kernel: ["tools", "services", "data"],
+  data: ["services", "tools"],
+  services: ["tools"],
   tools: [],
-  controllers: [],
-  services: [],
 };
 
 const CODE = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
