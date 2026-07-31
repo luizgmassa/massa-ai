@@ -1,10 +1,32 @@
 # Handoff
 
-## Active — Core Layering and God-Module Split (PR-B), **T20 done — all 20 tasks complete, cleared to merge**
+## Active — Core Layering and God-Module Split (PR-B), **MERGED as #53 and RELEASED as v1.16.0**
+
+> **Post-merge status, 2026-07-31.** Everything below this block was written before the merge and
+> is kept as the pre-merge record. Where a statement below says the branch is unpushed, local, or
+> awaiting a merge decision, **this block supersedes it**. This section stays `Active` only because
+> PR-B's post-merge record corrections are still in flight; it becomes `Previous` when PR-C's
+> Specify opens its own section.
+>
+> - **Merged 2026-07-31T04:21:53Z as `fe1f30b`** — PR #53, `--no-ff`, **two parents**
+>   (`7425241` + `1c457fa`). **R-04 honored**; the #46 squash is not repeated.
+> - **Every sha this feature cites resolves.** All 21 — the 15 commit-table entries, `5749686`,
+>   the four post-merge fixes (`916540e`, `31a1ba4`, `de2385f`, `1c457fa`) and the `7425241`
+>   release parent — verified ancestors of `origin/main` by
+>   `git merge-base --is-ancestor <sha> origin/main`, 0 lost.
+> - **Released v1.16.0** — CI green on `fe1f30b`, `Release` run `30604400445` success (all 6 jobs),
+>   tag `v1.16.0` → `35fc469` `chore(release): v1.16.0`. Derived **minor** from 12 `### Changed`
+>   bullets, exactly as the D4 table predicts. `[Unreleased]` promoted to `[1.16.0] - 2026-07-31`.
+>   **8/8** publishable packages at `1.16.0` on **both** npmjs.org and GitHub Packages, verified by
+>   `npm view` and the Packages API rather than from the green check. Not a half-release.
+> - **PR #53 drew zero comments** — 0 issue comments, 0 review comments, 0 reviews, read through the
+>   API. Nothing was dismissed or silently absorbed.
+> - **Worktree `../massa-ai-wt-facade-phase-1b` no longer exists**; `git worktree list` shows only
+>   the main checkout. Nothing to prune. The remote branch still exists and is safe to delete.
 
 **Feature**: `core-layering-god-module-split` · branch
 `refactor/search-facade-split-phase-1b`, cut from `main` @ `5247ecb` (v1.11.0),
-worktree `../massa-ai-wt-facade-phase-1b`.
+worktree `../massa-ai-wt-facade-phase-1b` (**since removed** — see the post-merge block above).
 **T6a and T6 are merged and released; T7–T20 are committed and green. All 20 tasks are complete.**
 Working tree clean through T20 (`5749686`). **Post-merge update — see *Next action* below**: no
 longer unpushed, and the commit count is no longer sixteen (that figure itself lagged by one from
@@ -588,9 +610,16 @@ releases brought 5 new test files (`install-state-plugin-version`, `judge-with-d
 `model-profiles`, `verify-model-ids`, `verify-model-tokens`), which is the entire delta — measured,
 not assumed, by diffing added files between the two parents.
 
-**Next action: push and open the PR — do not merge it.** The branch is still local, no longer
-sixteen (already stale by one before this merge) or seventeen but **eighteen** commits deep with
-the merge commit counted, and about to be pushed.
+**~~Next action: push and open the PR — do not merge it.~~ DONE — superseded 2026-07-31.** The
+branch was pushed, PR #53 was opened, CI went green, and the user merged it `--no-ff` as `fe1f30b`;
+it then released as **v1.16.0**. See the post-merge block at the top of this section. **The real
+next action is PR-C — Specify.** The paragraph and recipe below are the pre-merge record, kept
+because the reasoning ("CI has never run on this branch") is what made the PR-time gate reading the
+authoritative one, and PR-C inherits that convention.
+
+*Pre-merge record:* the branch was still local, no longer sixteen (already stale by one before this
+merge) or seventeen but **eighteen** commits deep with the merge commit counted, and about to be
+pushed.
 
 ```bash
 git push -u origin refactor/search-facade-split-phase-1b
@@ -686,6 +715,36 @@ required check passed on that same run — `validate`, both `Structural native t
 **`coverage`, cleanly, in 4m12s** — which is the strongest evidence yet that the earlier
 `trace_path` coverage failure (two runs ago) was the flake it was recorded as, not a recurring
 one: it has now not reproduced across two subsequent runs.
+
+**`de2385f`'s `ci.yml` edit was audited post-merge and is not a gate weakening — recorded here
+because it will not look that way to a future reader.** A branch whose entire discipline is
+*fix the subject, not the gate* added `|| true` to CI. It is worth knowing exactly where, because
+a naive `grep -c -- '|| true' .github/workflows/ci.yml` returns **5**, not 3, and the extra two
+are not what they look like:
+
+| line | kind | origin | what it is |
+| --- | --- | --- | --- |
+| `:96` | **comment** | `de2385f` | inside the explanatory comment `de2385f` itself added — not code |
+| `:102` | code | `de2385f` | `rm -rf ~/.bun/install/cache node_modules \|\| true` — `build` job retry |
+| `:301` | code | **`4feca2d`, 2026-07-23** | `docker rm -f massa-ai-api 2>/dev/null \|\| true` — **pre-existing** container cleanup, not a gate, not in `de2385f`'s diff |
+| `:341` | code | `de2385f` | same `rm -rf`, `Structural native tests` job 1 |
+| `:385` | code | `de2385f` | same `rm -rf`, `Structural native tests` job 2 |
+
+So `de2385f`'s diff is **exactly three code lines**, all the same `rm -rf` purge inside a
+retry-*recovery* block that only executes after `bun install` has already failed once. The purge
+being best-effort cannot mask a failing gate; it can only stop a `Directory not empty` from
+aborting the step under `set -e` before the retry's `bun install` runs — which is precisely the
+defect it fixes. Four invariants confirm nothing else moved, all measured at `origin/main`:
+
+- **`continue-on-error` count across `ci.yml`: 0.** No job is allowed to fail softly.
+- **Both T16 gate steps are still bare `run:`** — `:140` `bun scripts/search-hub-metric.ts …` and
+  `:148` `bun scripts/check-stale-pointers.ts`. No `|| true`, no `2>/dev/null`, no
+  `continue-on-error`.
+- **`fetch-depth: 0` survives** at `:52` — `check-stale-pointers` needs full history, and CI's
+  default shallow checkout is what would silently invert it.
+- **The three retry lines pre-date PR-B.** `git blame` at `de2385f^` puts all three at
+  **`64b6feba`, 2026-07-26**, `fix(ci): retry bun install and make publish idempotent (#32)`.
+  PR-B's own diff never touches `ci.yml`'s install steps; it only made an existing block work.
 
 **The briefing list T20 was given, kept because PR-C inherits most of it.** Each of these reads as a
 violation if a reader does not know it:

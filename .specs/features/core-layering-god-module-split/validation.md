@@ -7,7 +7,11 @@
 - **Status**: **Two parts.** §1–§12 are the **Phase 0 characterization record** — the *before* half
   of a before/after measurement, carrying no PASS/FAIL verdict. **§13 onward is T20's verdict**,
   taken by a fresh verification agent at HEAD `b4f21a9`, author ≠ verifier.
-  **PR-B is cleared to merge — as a merge commit, not a squash (R-04).**
+  ~~**PR-B is cleared to merge — as a merge commit, not a squash (R-04).**~~
+- **Outcome (2026-07-31): MERGED and RELEASED.** PR #53 merged `--no-ff` as `fe1f30b`, **two
+  parents** — R-04 honored, and every sha this file cites is an ancestor of `origin/main`
+  (21/21 checked, 0 lost). Released as **v1.16.0**; 8/8 publishable packages on npmjs.org and
+  GitHub Packages. PR #53 drew **zero** comments, so no finding here was contested or dismissed.
 
 Every figure in §1–§12 was measured in the Execute session at `0129207`, under a scratch
 `XDG_CONFIG_HOME`, and reproduces unless the row says otherwise. Figures carried from
@@ -447,6 +451,12 @@ nothing, skips nothing, and the 19-edit GMS-05 AC-3 budget is unmoved. Corrected
   instrument for this PR and is **not** a statement about retrieval quality repo-wide.
 - **CI has never run on this branch.** It is local and unpushed. The live local reruns above are the
   closest available substitute; the authoritative reading arrives at PR time.
+  > **Superseded 2026-07-31.** True when T20 wrote it; false now. The branch was pushed, CI ran on
+  > PR #53, and the authoritative reading did arrive — green, after one genuine CI-infrastructure
+  > failure in `build` that was **not** PR-B's (`bun install` cache corruption, fixed in `de2385f`;
+  > audit in `HANDOFF.md`). Merged `--no-ff` as `fe1f30b`, released **v1.16.0**. The bullet is kept
+  > rather than rewritten because §16 is a statement about *what T20's verification established*,
+  > and T20 genuinely could not establish this one.
 - **A clean local `test:coverage` wrapper exit** was not obtained in the verifier's session — see
   finding 1. Read the coverage evidence as *"measurement confirmed exactly, wrapper exit code
   environment-flaky"*, not as a clean rerun.

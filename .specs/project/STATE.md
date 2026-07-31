@@ -217,9 +217,21 @@ all state came from `.specs/` and source reads.
 - Gates: `bun run test:scripts` zero new failures vs baseline (only pre-existing
   `topLevelEntries`/oxlint/`__zzz_crash_*` fails, all environmental). `type-check` not run in
   worktree (no `turbo`); zero `.ts` files changed.
-- Open for the reviewer: harness contract text ships as a real release across the four plugin
+- ~~Open for the reviewer: harness contract text ships as a real release across the four plugin
   bundles; `[Unreleased]` CHANGELOG entry to be added at merge. PR opened; **do not merge** per
-  user instruction — CI watch in progress.
+  user instruction — CI watch in progress.~~
+- **CLOSED — corrected 2026-07-31.** The entry above was stale for nearly two days. This work
+  merged as **PR #45**, `feat(skills): tighten impl/spec-driven/ticket/commit workflows + DI per
+  task/phase`, on **2026-07-29T17:45:07Z**, and released as **v1.10.0**. The `[Unreleased]` entry
+  was added on the branch (`1ee3a21`) before the merge, so the CHANGELOG gate was satisfied.
+  **It was squashed, not merged** — `c677d10` has a single parent (`7c20d47`), so the branch's own
+  commits are unreachable from `main` and the remote branch tip `1ee3a21` is **not** an ancestor of
+  `origin/main`. Any sha this section cites from that branch resolves only while the remote branch
+  survives.
+- **Do not confuse this with PR #52.** #52 is a *different* feature — `refactor/skills-directive-dedup`,
+  the `skills/` directive dedup gate (T1–T5 of 12), merged 2026-07-30T21:33:50Z as `47b957b`, whose
+  own record is `HANDOFF.md`'s *Previous — skills/ directive dedup*. Both are harness-text work with
+  similar names and both were squashed; conflating them is easy and was done once already.
 
 ## Previous — Core Layering and God-Module Split (PR-B)
 
@@ -338,11 +350,33 @@ committed at `.specs/features/core-layering-god-module-split/needles-before.json
 `benchmarks/needles/reports/` is gitignored and a baseline that does not survive a fresh checkout
 cannot be T17's referent.
 
-**Open for the reviewer:** the `[Unreleased]` CHANGELOG entry sits under `### Changed`, which cuts
-a **minor** release. If PR-B should land as a patch it must move to `### Fixed`. Not changed
-unilaterally — it is a release-semantics decision.
+**~~Open for the reviewer~~ — CLOSED 2026-07-31, and *how* it closed is the point.** The question
+was: the `[Unreleased]` entry sits under `### Changed`, which cuts a **minor** release; if PR-B
+should land as a patch it must move to `### Fixed`.
 
-### Execute — COMPLETE (2026-07-30). T6a–T20 committed, every criterion validated, **PR-B cleared to merge**
+**Settled by default, not by deliberation.** No one argued it. The user merged PR #53 with the 12
+`### Changed` bullets untouched, and the automatic release chain did the rest — `release.yml`
+derived **minor** from the D4 table and shipped **v1.16.0**. Recording it as *"Resolved"* would
+overstate what happened, which is the format defect `validation.md` §15 finding 2 names.
+
+- **Decided by:** the user, by the act of merging — not by a written adjudication. **PR #53 drew
+  zero comments** (0 issue, 0 review, 0 reviews, read through the API), so the question was never
+  raised on the PR at all. This entry is the first place the outcome is written down.
+- **Option rejected:** moving the section to `### Fixed` for a patch bump (which, from `main` at
+  1.15.0, would have cut **v1.15.1**). It was rejected **by not being taken**, not on merit. The
+  case for it was real — PR-B is behavior-preserving by construction, and GMS-05's whole apparatus
+  exists to prove exactly that, so `### Fixed` was defensible.
+- **The premise had also gone stale.** This item was written when `main` was **1.11.0**; `main`
+  reached **1.15.0** through four unrelated releases before the merge, so the version the choice
+  would have produced was not the one the item was written against.
+- **Consequence, on the record:** a behavior-preserving refactor cut a minor version. Nothing
+  breaks — but the next reader should know the semantics were inherited from the heading, not
+  chosen for the change.
+
+**For PR-C:** decide this *before* the merge, and write the decision down with the name of whoever
+made it and the option rejected. That is the one process finding PR-B hands forward.
+
+### Execute — COMPLETE. T6a–T20 committed, every criterion validated, **MERGED as #53 (`fe1f30b`, `--no-ff`) and RELEASED as v1.16.0 on 2026-07-31**
 
 **Two branches, and the first one is gone.** T6a and T6 were executed on
 `refactor/search-facade-split-phase-1` (cut from `d628464`) and reached `main` through **PR #46,
