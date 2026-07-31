@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`@massa-ai/core` no longer publishes a `./controllers` subpath, and `./services` now carries
+  the 17 symbols it used to.** `packages/core/src/controllers/` is retired: the five orchestrators
+  move into the `services/` subdirectory that already held each one's collaborators —
+  `MemoryController` → `services/memory/`, `SearchController` → `services/search/`,
+  `ContextController` → `services/context/`, `ExecutorController` → `services/executor/`,
+  `GraphController` → `services/symbol/` — **keeping every exported symbol name**.
+
+  Two published-surface changes, and only one of them is a removal. The
+  `@massa-ai/core/controllers` subpath is **gone**; it had **zero** consumers, in this repository
+  and in both transports, which import these classes from the root barrel instead. In exchange
+  `@massa-ai/core/services` **gains 17 symbols** — the five classes plus twelve of their input and
+  result types — because the old `controllers/index.ts` barrel was the only route by which they
+  reached `@massa-ai/core`'s root export, and deleting it without replacing that route would have
+  dropped published symbols silently. **Importing from the package root is unaffected**: all five
+  classes and all twelve types resolve exactly as before, verified against the built `dist/` rather
+  than against the source.
+
+  If you import from `@massa-ai/core/controllers`, switch to `@massa-ai/core` or
+  `@massa-ai/core/services`. Nothing else moves, and no behaviour changes: each module's code is
+  byte-identical across its move apart from its own import paths.
+
+  Note for readers of the tree rather than the package: `services/graph/` is the **memory-relation**
+  graph. The **symbol** graph, and the orchestrator fronting it, are in `services/symbol/`.
+
+- **`packages/core` gains a `kernel/` tier, and the layer contract is now enforced instead of
+  asserted.** Cross-cutting leaves move to `packages/core/src/kernel/` — `db-connection`,
+  `prisma-client`, `fqn-codec`, `alias-resolver`, `identity-guard-installer`, `search-diagnostics`,
+  `lexical-search`, `enum-validation` and three supporting modules, 11 in all. Membership is the
+  path prefix, granted by moving the file; **there is no allowlist**, deliberately, because an
+  allowlisted exception is indistinguishable from a new violation.
+
+  The contract is `tools → services → data` with `kernel/` off the axis, and
+  `scripts/check-core-layering.ts` now fails the build on any backward edge — `data → services`,
+  `data → tools`, `services → tools`, or a `kernel/` file importing any tier. It runs in CI. On the
+  released tree it reports **0 violations across 965 tier-to-tier edges in 895 tracked files**;
+  `data → services` was **26** before this work and `services → tools` **4**, both closed by moving
+  modules rather than by recording exceptions.
+
+  `ToolError` and `validateEnum` therefore no longer live in `tools/enum-validation.ts` — they are
+  in `kernel/enum-validation.ts`. Both are reachable from the package root as before.
+
+- **`BaseVectorStore` takes an embedding-provider factory instead of selecting one itself.** It is
+  an optional constructor option, and `getVectorStore()` — the only production construction site —
+  supplies `() => createEmbeddingProvider({ cache: true })`, so nothing changes for callers using
+  the factory.
+
+  What changes is the failure mode when it is *absent*. Provider selection stays lazy and memoised,
+  exactly as before — construction still does no work — but the first call to
+  `getEmbeddingProvider()` on a store built without a factory now **throws a named error** instead
+  of quietly auto-selecting a live provider. The practical effect is on tests that construct a
+  store directly and then embed: they fail immediately and say why, rather than hanging on a cold
+  model load.
+
 ## [1.16.0] - 2026-07-31
 
 ### Changed
