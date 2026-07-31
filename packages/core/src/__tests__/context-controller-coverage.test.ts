@@ -56,7 +56,7 @@ let graphGetReferencesStub: (projectId: string, query: string) => Promise<any[]>
 let sessionCacheCheckStub: (sessionId: string, key: string, content: string) => any =
   () => ({ status: "new", tokensSaved: 0 });
 
-mock.module("../controllers/search-controller.js", () => ({
+mock.module("../services/search/search-controller.js", () => ({
   SearchController: {
     getInstance: () => ({
       searchProject: (input: any) => searchProjectStub(input),
@@ -64,7 +64,7 @@ mock.module("../controllers/search-controller.js", () => ({
   },
 }));
 
-mock.module("../controllers/memory-controller.js", () => ({
+mock.module("../services/memory/memory-controller.js", () => ({
   MemoryController: {
     getInstance: () => ({
       search: (input: any) => memorySearchStub(input),
@@ -120,7 +120,7 @@ mock.module("@massa-ai/shared", () => {
 });
 
 // Import the REAL controller (and TokenMetrics so we can reset between tests).
-import { ContextController } from "../controllers/context-controller.js";
+import { ContextController } from "../services/context/context-controller.js";
 import { TokenMetrics } from "../services/metrics/token-metrics.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────

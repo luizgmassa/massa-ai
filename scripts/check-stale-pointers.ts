@@ -214,9 +214,30 @@ export interface Pointer {
  *
  * This re-verification is its own commit, carrying no file move, because the one
  * edit shape this pin exists to make visible is a re-baseline riding along with
- * the change it is supposed to police. **Phase 3 is when it will genuinely move**:
- * retiring the six controllers converts their citations out of RESOLVES, and that
- * re-pin must again be its own commit and must say which records moved and why.
+ * the change it is supposed to police.
+ *
+ * ## Corrected at T10 — the pin does not move in phase 3 either (C26)
+ *
+ * T7's paragraph here predicted *"phase 3 is when it will genuinely move:
+ * retiring the six controllers converts their citations out of RESOLVES"*.
+ * Measured after T10 moved three of them: **142 / 114 / 28, unchanged.**
+ *
+ * The prediction assumed a deletion. Phase 3 is a **move**, and `categorise`
+ * resolves a token against `liveBase` — a set of **basenames** — while `POINTER`
+ * captures no directory segment at all. So `search-controller` keeps RESOLVING
+ * from `services/search/` exactly as it did from `controllers/`, and the pin
+ * cannot move for a rename-free relocation. (That name is written without its
+ * extension for the reason `candidateNames`' docblock gives: spelled in full it
+ * would itself become the 143rd pointer in this very file.)
+ *
+ * The consequence is the part worth acting on: **31 path-shaped citations
+ * naming `controllers/<file>.ts` became wrong at T10 and this gate reported
+ * `PASS — 0 broken`.** That is R-09's own premise — *"61 controller pointers
+ * strand silently"* — reproducing against the remedy chosen to prevent it. The
+ * reshape closed the half of R-09 about tokens being *visible*; the half about
+ * a path being *correct* is outside what a basename check can decide. Those 31
+ * were repointed by hand at T10 (24) or deliberately left as recorded fixtures
+ * (7); no gate found them.
  */
 export const HISTORICAL_PINNED = 28;
 

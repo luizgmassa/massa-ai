@@ -14,15 +14,15 @@
  */
 
 import { logger, estimateTokens } from "@massa-ai/shared";
-import { SearchController } from "./search-controller.js";
-import { MemoryController } from "./memory-controller.js";
+import { SearchController } from "../search/search-controller.js";
+import { MemoryController } from "../memory/memory-controller.js";
 import {
   CodeCompressor,
   compressWithMetrics,
-} from "../services/compression/index.js";
-import { SessionFileCache } from "../services/context/session-file-cache.js";
-import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
-import { TokenMetrics } from "../services/metrics/token-metrics.js";
+} from "../compression/index.js";
+import { SessionFileCache } from "./session-file-cache.js";
+import { symbolGraphService } from "../symbol/symbol-graph.service.js";
+import { TokenMetrics } from "../metrics/token-metrics.js";
 
 // ── Types ────────────────────────────────────────────────────
 

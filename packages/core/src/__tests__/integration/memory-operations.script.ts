@@ -3,7 +3,7 @@
  * Test Memory operations with PostgreSQL
  */
 
-import { MemoryController } from "../../controllers/memory-controller.js";
+import { MemoryController } from "../../services/memory/memory-controller.js";
 import { logger, MemoryType } from "@massa-ai/shared";
 import { getPrismaClient, disconnectPrisma } from "../../kernel/prisma-client.js";
 

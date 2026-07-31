@@ -88,7 +88,7 @@ mock.module("../services/events/event-bus.js", () => ({
   eventBus: { publish: mock(() => {}) },
 }));
 
-import { SearchController } from "../controllers/search-controller.js";
+import { SearchController } from "../services/search/search-controller.js";
 
 function resetController() {
   (SearchController as any).instance = null;

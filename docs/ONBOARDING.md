@@ -180,7 +180,7 @@ Thirteen steps, ordered the way a request actually flows. Each names the files t
 |---|---|---|
 | 1 | **The Core Package Contract** — the product's own statement of its architecture; re-exports the four enforced layers as one import surface. Read first. | `packages/core/src/index.ts` |
 | 2 | **Tool Handlers** — 31 thin files, one per MCP tool. `search_project.ts` is representative: call the controller, serialize, done. | `tools/index.ts`, `tools/search_project.ts` |
-| 3 | **Controllers** — six orchestrators. `search-controller.ts` shows what orchestration means: admission preflight, optional auto-reindex, glob filtering, centrality boosting, optional LLM rerank. | `controllers/search-controller.ts` |
+| 3 | **Controllers** — six orchestrators. `search-controller.ts` shows what orchestration means: admission preflight, optional auto-reindex, glob filtering, centrality boosting, optional LLM rerank. | `services/search/search-controller.ts` |
 | 4 | **The Search Facade** — hybrid vector + Postgres FTS with reciprocal-rank fusion. A composition root plus six capability modules, each taking a narrow deps record rather than the facade. | `services/search/contextual-search-rlm.ts` + `hybrid-search.ts`, `project-indexer.ts`, `index-admin.ts`, `session-bias.ts`, `graph-stream.ts`, `result-fusion.ts` |
 | 5 | **The ETL Indexing Pipeline** — `discover → parse → resolve → load`. Hash-skip unchanged files, tree-sitter parse, resolve FQNs, persist in per-batch transactions with deadlock retry. | `services/etl/pipeline.ts`, `stages/*.ts` |
 | 6 | **Symbol Graph & Blue-Green Generations** — go-to-definition, find-references, project map; generations flipped atomically. | `services/symbol/symbol-graph.service.ts`, `etl/graph-generation-coordinator.ts` |
@@ -213,9 +213,9 @@ Key files per layer, ranked by coupling (in + out dependency edges).
 
 | Deg | File | Role |
 |---:|---|---|
-| 29 | `controllers/memory-controller.ts` | Composes memory repo, MemoryService, MemoryGraphService, salience judging, consolidation |
-| 20 | `controllers/search-controller.ts` | Admission preflight, auto-reindex, glob filter, centrality boost, LLM rerank |
-| 15 | `controllers/context-controller.ts` | The "optimized context" use case — composes search, memory, compression, file cache |
+| 29 | `services/memory/memory-controller.ts` | Composes memory repo, MemoryService, MemoryGraphService, salience judging, consolidation |
+| 20 | `services/search/search-controller.ts` | Admission preflight, auto-reindex, glob filter, centrality boost, LLM rerank |
+| 15 | `services/context/context-controller.ts` | The "optimized context" use case — composes search, memory, compression, file cache |
 | 10 | `controllers/executor-controller.ts` | Owns the singleton PolyglotExecutor for execute/execute_file/batch_execute |
 | 8 | `controllers/graph-controller.ts` | Fronts symbol-graph traversal (trace_path, impact_analysis) |
 
@@ -298,7 +298,7 @@ that rating meets high fan-in/fan-out.)
 | **31** | `data/symbol/symbol-repo-generation.ts` | Lease locking + transactional writes. Concurrency-sensitive. |
 | **31** | `data/symbol/symbol-repo-queries.ts` | Broad CRUD surface. |
 | **31** | `tools/serialize.ts` | Touched by nearly every tool handler — a bug here surfaces everywhere. |
-| **29** | `controllers/memory-controller.ts` | Composes five subsystems. |
+| **29** | `services/memory/memory-controller.ts` | Composes five subsystems. |
 | **26** | `apps/tools-api/src/index.ts` | Highest fan-out of any entry point; 26 one-hop dependencies. |
 | **24** | `services/memory/llm-client.ts` | The single gate all 11 LLM call sites pass through. |
 

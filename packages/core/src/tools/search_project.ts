@@ -2,12 +2,12 @@
  * Search Project Tool
  *
  * Thin MCP tool layer — validates input and delegates to SearchController.
- * All business logic lives in controllers/search-controller.ts.
+ * All business logic lives in services/search/search-controller.ts.
  */
 
 import { IToolHandler, ToolResponse } from "@massa-ai/shared";
 import { logger } from "@massa-ai/shared";
-import { SearchController } from "../controllers/search-controller.js";
+import { SearchController } from "../services/search/search-controller.js";
 import { serializeToolResponse } from "./serialize.js";
 import { SearchServiceError } from "../kernel/search-diagnostics.js";
 

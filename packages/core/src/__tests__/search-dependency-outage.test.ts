@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { SearchSource, type SearchResult } from "@massa-ai/shared";
 import { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js";
 import { SearchProjectTool } from "../tools/search_project.js";
-import { SearchController } from "../controllers/search-controller.js";
+import { SearchController } from "../services/search/search-controller.js";
 import { LocalHealthChecker } from "../services/health/local-health-checker.js";
 import {
   getSearchDiagnostics,

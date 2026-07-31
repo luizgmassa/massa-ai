@@ -13,7 +13,7 @@
 import { describe, expect, test } from "bun:test";
 import { TaskEnvelopeService } from "../services/synapse/task-envelope.js";
 import { getSessionRegistry, resetSessionRegistry } from "../services/synapse/session/index.js";
-import type { SearchController } from "../controllers/search-controller.js";
+import type { SearchController } from "../services/search/search-controller.js";
 
 function makeMockSearchController(opts: {
   results?: Array<{ id: string; filePath: string; score: number }>;

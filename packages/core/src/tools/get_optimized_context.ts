@@ -2,12 +2,12 @@
  * Get Optimized Context Tool
  *
  * Thin MCP tool layer — validates input and delegates to ContextController.
- * All business logic lives in controllers/context-controller.ts.
+ * All business logic lives in services/context/context-controller.ts.
  */
 
 import { IToolHandler, ToolResponse } from "@massa-ai/shared";
 import { logger } from "@massa-ai/shared";
-import { ContextController } from "../controllers/context-controller.js";
+import { ContextController } from "../services/context/context-controller.js";
 import { serializeToolResponse } from "./serialize.js";
 
 interface GetOptimizedContextParams {

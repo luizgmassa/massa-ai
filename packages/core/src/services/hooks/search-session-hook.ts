@@ -18,7 +18,7 @@
 import { logger, MemoryType } from "@massa-ai/shared";
 import { eventBus } from "../events/event-bus.js";
 import type { EventMap } from "../events/event-bus.js";
-import { MemoryController } from "../../controllers/memory-controller.js";
+import { MemoryController } from "../memory/memory-controller.js";
 
 const DEDUP_TTL_MS = 60_000;
 const MAX_DEDUP_ENTRIES = 500;

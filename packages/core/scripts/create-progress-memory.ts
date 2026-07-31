@@ -86,7 +86,7 @@ Logs confirmam migração:
 3. \`packages/core/src/data/memory/memory-repository-factory.ts\`
    - Factory retorna MemoryRepositoryPg
 
-4. \`packages/core/src/controllers/memory-controller.ts\`
+4. \`packages/core/src/services/memory/memory-controller.ts\`
    - Métodos store() e search() com await
    - Compatível com async repository
 

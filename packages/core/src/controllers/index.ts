@@ -5,25 +5,25 @@
  * services/data (domain logic + persistence).
  */
 
-export { MemoryController } from "./memory-controller.js";
+export { MemoryController } from "../services/memory/memory-controller.js";
 export type {
   StoreMemoryInput,
   StoreMemoryResult,
   SearchMemoryInput,
   SearchMemoryResult,
-} from "./memory-controller.js";
+} from "../services/memory/memory-controller.js";
 
-export { SearchController } from "./search-controller.js";
+export { SearchController } from "../services/search/search-controller.js";
 export type {
   ProjectSearchInput,
   ProjectSearchResult,
-} from "./search-controller.js";
+} from "../services/search/search-controller.js";
 
-export { ContextController } from "./context-controller.js";
+export { ContextController } from "../services/context/context-controller.js";
 export type {
   GetOptimizedContextInput,
   OptimizedContextResult,
-} from "./context-controller.js";
+} from "../services/context/context-controller.js";
 
 export { ExecutorController } from "./executor-controller.js";
 

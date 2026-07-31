@@ -240,7 +240,7 @@ if (removed) {
 
 ### 3. ContextController
 
-**Location**: `packages/core/src/controllers/context-controller.ts:319-326`
+**Location**: `packages/core/src/services/context/context-controller.ts:319-326`
 
 **When**: Automatically records full request metrics at the end of `getOptimizedContext()`
 
@@ -360,5 +360,5 @@ Potential additions (not yet implemented):
 
 - `SessionFileCache`: packages/core/src/services/context/session-file-cache.ts
 - `RedundancyFilter`: packages/core/src/services/memory/redundancy-filter.ts
-- `ContextController`: packages/core/src/controllers/context-controller.ts
+- `ContextController`: packages/core/src/services/context/context-controller.ts
 - `MetricsCollector`: packages/shared/dist/utils/metrics.js (for LLM usage tracking)

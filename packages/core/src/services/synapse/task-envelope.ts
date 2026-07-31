@@ -24,7 +24,7 @@
 import { logger } from "@massa-ai/shared";
 import { getSessionRegistry, newSynapseSessionId } from "../synapse/session/index.js";
 import { DEFAULT_BUFFER_CONFIG } from "../synapse/buffer/index.js";
-import { SearchController } from "../../controllers/search-controller.js";
+import { SearchController } from "../search/search-controller.js";
 import type { SearchSource } from "@massa-ai/shared";
 import { SearchSource as SearchSourceEnum } from "@massa-ai/shared";
 
