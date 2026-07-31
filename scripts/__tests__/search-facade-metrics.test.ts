@@ -5,7 +5,6 @@ import {
   importSpecifiers,
   isBarrelSpecifier,
   measure,
-  measureDirectory,
   specifierMatches,
   stripComments,
   trackedFiles,
@@ -237,22 +236,25 @@ describe("the real repository", () => {
     expect(r.fanInDynamic).not.toContain(SELF);
   });
 
-  // design.md §5.1 calls its own controllers importer count an
-  // order-of-magnitude statement pending this script, and puts it "between 22
-  // and 30" against spec.md's "3-4 files". Measured, the spread is entirely
-  // definitional and small.
-  test("settles §5.1: controllers has 6 members and 24 outside importers", () => {
-    const c = measureDirectory("packages/core/src/controllers", files);
-    expect(c.members).toHaveLength(6);
-    expect(c.deep).toHaveLength(22);
-    expect(c.barrel).toEqual(["packages/core/src/index.ts"]);
-    expect(c.dynamic).toEqual(["packages/core/src/services/project-identity/production-wiring.ts"]);
-    expect(c.deep.length + c.barrel.length + c.dynamic.length).toBe(24);
-  });
-
-  // design.md §5.1 names two dynamic controllers importers. There is one:
-  // search-session-hook.ts:21 is a plain static import.
-  test("there is exactly one dynamic controllers importer, not two", () => {
-    expect(measureDirectory("packages/core/src/controllers", files).dynamic).toHaveLength(1);
-  });
+  // ── Two tests removed at PR-C T10b, deliberately — C27 ────────────────────
+  //
+  // They settled `design.md` §5.1's controllers dispute by measuring the LIVE
+  // directory: 6 members, 22 deep + 1 barrel + 1 dynamic = 24 outside importers,
+  // and "exactly one dynamic importer, not two" — the second one §5.1 named is
+  // `search-session-hook`, which is a plain static import.
+  //
+  // PR-C retires that directory on purpose, so the subject stops existing. They
+  // went red the moment T10 relocated three orchestrators and stayed red,
+  // because T10's gate list did not include `test:scripts`; T9 ran it at 998
+  // pass and T10 did not run it at all.
+  //
+  // Deleted rather than re-pinned. Re-pinning would mean four successive edits
+  // — one per remaining move — each a re-baseline riding along with the change
+  // it measures, which is the one edit shape this feature keeps pins for. And
+  // the record does not depend on these tests: PR-C's `spec.md` §3 premises
+  // table carries the same 6 / 22 + 1 + 1 = 24 figures, re-derived at `00ed280`
+  // and marked reproducing, and §3.F names the single dynamic importer by path.
+  //
+  // A deletion that leaves no note is indistinguishable from an oversight,
+  // which is the reasoning T7 recorded for a re-pin that did not move.
 });

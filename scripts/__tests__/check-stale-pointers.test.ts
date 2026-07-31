@@ -5,11 +5,14 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import {
   POINTER,
+  PATH_PREFIX,
   PREFIX_STEMS,
   SUFFIX_STEMS,
   HISTORICAL_PINNED,
   candidateNames,
   categorise,
+  categorisePath,
+  pathCandidates,
   scan,
   report,
   trackedFiles,
@@ -191,6 +194,124 @@ describe("POINTER — the suffix branch for controller-shaped names", () => {
   });
 });
 
+// ── C26: the path branch (PR-C T10b) ────────────────────────────────────────
+//
+// The T6 reshape made a controller citation VISIBLE. It could not make it
+// CORRECT: `POINTER` captures no directory, `categorise` resolves a basename,
+// and a move keeps both. Measured at T10 — 31 citations wrong, gate green.
+describe("PATH_PREFIX — the directory segment beside a match", () => {
+  const pfx = (line: string, token: string) =>
+    line.slice(0, line.indexOf(token)).match(PATH_PREFIX)?.[0] ?? "";
+
+  test("captures a repo-anchored directory", () => {
+    expect(pfx("see controllers/memory-controller.ts", "memory-controller.ts")).toBe("controllers/");
+  });
+
+  test("captures a dot-relative specifier", () => {
+    expect(pfx('from "../controllers/graph-controller.js"', "graph-controller.js")).toBe(
+      "../controllers/",
+    );
+  });
+
+  test("a bare citation has no prefix, and that is not a failure", () => {
+    // Bare mentions are the majority of the corpus and stay on the basename
+    // branch. Requiring a directory would make this a banned-word list.
+    expect(pfx("see memory-controller.ts", "memory-controller.ts")).toBe("");
+  });
+
+  test("anchored at the end, so an earlier path on the line is not stolen", () => {
+    // Without the `$` this would capture `src/tools/`, judge the wrong path and
+    // report a fact about the regex as a fact about the tree.
+    expect(pfx("src/tools/x.ts delegates to memory-controller.ts", "memory-controller.ts")).toBe("");
+  });
+});
+
+describe("pathCandidates — the four resolution roots", () => {
+  test("all four roots are offered, in both NodeNext spellings", () => {
+    const c = pathCandidates("docs/ONBOARDING.md", "controllers/", "memory-controller.ts");
+    expect(c).toContain("controllers/memory-controller.ts");
+    expect(c).toContain("docs/controllers/memory-controller.ts");
+    expect(c).toContain("packages/core/src/controllers/memory-controller.ts");
+    expect(c).toContain("packages/core/controllers/memory-controller.ts");
+  });
+
+  test("a .js citation also offers the .ts on disk, at every root", () => {
+    const c = pathCandidates("a/b.md", "x/", "memory-controller.js");
+    expect(c).toContain("x/memory-controller.ts");
+    expect(c).toContain("packages/core/src/x/memory-controller.ts");
+  });
+
+  test("a dot-relative citation is normalised, and only the importer root reaches the real file", () => {
+    // The prediction that did not hold while writing this branch, kept as a
+    // test because reasoning about it produced the wrong answer twice. For a
+    // `../` citation the three repo-anchored roots do NOT converge on the
+    // importer's answer — each cancels one segment of its own base instead:
+    const c = pathCandidates("packages/core/src/tools/a.ts", "../controllers/", "x-controller.js");
+    expect(c).toEqual([
+      // repo-root: cannot rise above the root, so the `../` survives
+      "../controllers/x-controller.js",
+      "../controllers/x-controller.ts",
+      // importer-relative: the only root that lands on the real neighbour
+      "packages/core/src/controllers/x-controller.js",
+      "packages/core/src/controllers/x-controller.ts",
+      // core-src: `packages/core/src/` + `../` -> `packages/core/`
+      "packages/core/controllers/x-controller.js",
+      "packages/core/controllers/x-controller.ts",
+      // core-package: `packages/core/` + `../` -> `packages/`
+      "packages/controllers/x-controller.js",
+      "packages/controllers/x-controller.ts",
+    ]);
+    // Every candidate is normalised — a raw `..` segment would never match a
+    // `git ls-files` entry and the branch would silently resolve nothing.
+    expect(c.some((p) => p.includes("/../"))).toBe(false);
+  });
+});
+
+describe("categorisePath", () => {
+  const live = new Set(["packages/core/src/services/search/search-controller.ts"]);
+  const ever = new Set([
+    "packages/core/src/services/search/search-controller.ts",
+    "packages/core/src/controllers/search-controller.ts",
+  ]);
+
+  test("a citation of the new home RESOLVES", () => {
+    expect(
+      categorisePath("docs/x.md", "services/search/", "search-controller.ts", live, ever),
+    ).toBe("RESOLVES");
+  });
+
+  // The C26 case itself. Under `categorise` this same token is RESOLVES,
+  // because the basename is live at its new address.
+  test("a citation of the OLD home is HISTORICAL, where the basename check says RESOLVES", () => {
+    expect(categorisePath("docs/x.md", "controllers/", "search-controller.ts", live, ever)).toBe(
+      "HISTORICAL",
+    );
+    const liveBase = new Set(["search-controller.ts"]);
+    expect(categorise("search-controller.ts", liveBase, liveBase)).toBe("RESOLVES");
+  });
+
+  test("a directory that never existed is BROKEN", () => {
+    expect(categorisePath("docs/x.md", "orchestrators/", "search-controller.ts", live, ever)).toBe(
+      "BROKEN",
+    );
+  });
+
+  test("path resolution is a SUBSET of basename resolution, which is what makes this strictly stricter", () => {
+    // If a full path is tracked its basename necessarily is, so the branch can
+    // only ever move a token toward failure — it cannot manufacture a PASS.
+    // Asserted rather than assumed: "strictly stricter" says nothing about
+    // whether the new subject can match, and the first remedy for R-09 was
+    // strictly stricter and matched nothing at all.
+    const liveBase = new Set([...live].map((p) => p.slice(p.lastIndexOf("/") + 1)));
+    for (const prefix of ["services/search/", "controllers/", "orchestrators/"]) {
+      const byPath = categorisePath("docs/x.md", prefix, "search-controller.ts", live, ever);
+      const byBase = categorise("search-controller.ts", liveBase, liveBase);
+      expect(byBase).toBe("RESOLVES");
+      if (byPath === "RESOLVES") expect(byBase).toBe("RESOLVES");
+    }
+  });
+});
+
 describe("candidateNames — NodeNext specifiers", () => {
   test("a .js pointer also resolves against the .ts on disk", () => {
     expect(candidateNames("rlm-search.js")).toEqual(["rlm-search.js", "rlm-search.ts"]);
@@ -368,15 +489,108 @@ describe("scan and report over a real repo", () => {
     }
   });
 
-  test("EXCLUDED is the documented four and nothing else", () => {
+  test("EXCLUDED is the documented five and nothing else", () => {
     // The fourth is this very file. It holds fixture literals, not references —
     // and until it was staged the gate could not see itself at all, which took
-    // the real reading from PASS 31/26/0 to FAIL 36/46/15.
+    // the real reading from PASS 31/26/0 to FAIL 36/46/15. The fifth is the same
+    // class one directory over: recorded API responses whose string content is
+    // data. One of them carries a relative specifier written from the point of
+    // view of a file that does not exist, so no resolution root can be right
+    // about it and it is not repointable — see EXCLUDED's docblock.
     expect([...EXCLUDED]).toEqual([
       "CHANGELOG.md",
       ".specs/",
       ".ua/",
       "scripts/__tests__/check-stale-pointers.test.ts",
+      "packages/core/src/__tests__/test-seam/fixtures/",
     ]);
+  });
+
+  // ── C26, the shape the basename branch is structurally blind to ───────────
+  //
+  // Every RED above is a DELETION. Phase 3 of PR-C is a MOVE, and the two are
+  // not the same failure: after a move the basename is still live, so the token
+  // resolves and the gate passes while every citation of it is wrong. Measured
+  // on the real corpus at T10 — 31 wrong, `PASS — 0 broken`.
+  test("RED: a controller MOVED with its citation unrepointed — the basename branch calls this RESOLVES", () => {
+    const { root, cleanup } = repo(
+      {
+        "src/services/search/search-controller.ts": "// the new home\n",
+        "src/tools/search_project.ts": "// delegates to src/controllers/search-controller.ts\n",
+      },
+      { "src/controllers/search-controller.ts": "// the old home\n" },
+    );
+    try {
+      const found = scan(root);
+      expect(found.map((p) => p.category)).toEqual(["HISTORICAL"]);
+      expect(report(found, 0).ok).toBe(false);
+      // The half of the pair that makes this discriminating: judged as a bare
+      // basename against the same tree, this token is fine. The file it names
+      // really is there — at an address the citation does not give.
+      const liveBase = new Set(["search-controller.ts"]);
+      expect(categorise("search-controller.ts", liveBase, liveBase)).toBe("RESOLVES");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("RED: the same, written as a dot-relative specifier", () => {
+    // The commoner form in source: a NodeNext import whose importer did not move
+    // but whose target did. `.js` on the wire, `.ts` on disk, resolved relative
+    // to the citing file rather than to the repo root.
+    const { root, cleanup } = repo(
+      {
+        "src/services/search/search-controller.ts": "// the new home\n",
+        "src/tools/search_project.ts": 'import { X } from "../controllers/search-controller.js";\n',
+      },
+      { "src/controllers/search-controller.ts": "// the old home\n" },
+    );
+    try {
+      const found = scan(root);
+      expect(found.map((p) => p.category)).toEqual(["HISTORICAL"]);
+      expect(report(found, 0).ok).toBe(false);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("GREEN: the same move with the citation repointed passes", () => {
+    // The control, and it carries as much weight as the reds. A branch that
+    // failed every directory-carrying citation would pass both tests above and
+    // make the gate unsatisfiable the moment anything moved.
+    const { root, cleanup } = repo(
+      {
+        "src/services/search/search-controller.ts": "// the new home\n",
+        "src/tools/search_project.ts":
+          "// delegates to src/services/search/search-controller.ts\n",
+      },
+      { "src/controllers/search-controller.ts": "// the old home\n" },
+    );
+    try {
+      const found = scan(root);
+      expect(found.map((p) => p.category)).toEqual(["RESOLVES"]);
+      expect(report(found, 0).ok).toBe(true);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("GREEN: a bare citation of a moved file still passes, and that is deliberate", () => {
+    // A citation with no directory makes no claim about location, so a move
+    // cannot falsify it. Failing it would be a banned-word list, which this
+    // gate's header rules out by name.
+    const { root, cleanup } = repo(
+      {
+        "src/services/search/search-controller.ts": "// the new home\n",
+        "src/tools/search_project.ts": "// delegates to search-controller.ts\n",
+      },
+      { "src/controllers/search-controller.ts": "// the old home\n" },
+    );
+    try {
+      expect(scan(root).map((p) => p.category)).toEqual(["RESOLVES"]);
+      expect(report(scan(root), 0).ok).toBe(true);
+    } finally {
+      cleanup();
+    }
   });
 });

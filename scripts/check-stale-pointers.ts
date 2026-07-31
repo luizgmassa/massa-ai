@@ -32,6 +32,49 @@
  * | `HISTORICAL` | does not resolve, but the path existed somewhere in history | allowed, **counted**, and the count is pinned |
  * | `BROKEN`     | does not resolve and never existed | **always fails** |
  *
+ * ## Two resolution modes, one category set — PR-C T10b, and this is C26
+ *
+ * A token is categorised against a **basename** when it is cited bare, and
+ * against its **full path** when it is cited with a directory segment. Same
+ * three verdicts either way; only the thing being resolved differs.
+ *
+ * The path mode exists because the basename mode cannot see a **move**. T7's
+ * note on `HISTORICAL_PINNED` predicted the pin would move in PR-C phase 3
+ * "when the controllers are retired". It did not, and could not: `POINTER`
+ * captures no directory segment, so a citation naming the old directory keeps
+ * resolving from the new one — same basename, different home. Measured after
+ * PR-C T10 relocated three orchestrators: **31** path-shaped citations had
+ * become wrong and this gate reported `PASS — 0 broken, historical exactly at
+ * its pin of 28`. That is R-09's own premise — *"61 controller pointers strand
+ * silently"* — reproducing against the remedy adopted to prevent it. The T6
+ * reshape closed the half of R-09 about a token being **visible**; this closes
+ * the half about a path being **correct**.
+ *
+ * Path resolution tries four roots, because prose in this repo cites from all
+ * four and resolving only one would report a fact about the resolver:
+ *
+ * | root | base |
+ * |---|---|
+ * | repo-root | the citation as written |
+ * | importer-relative | `dirname()` of the citing file |
+ * | core-src | `packages/core/src/` |
+ * | core-package | `packages/core/` |
+ *
+ * Any root resolving is enough. **Path resolution is a subset of basename
+ * resolution** — if a full path is tracked, its basename necessarily is — so
+ * this branch is strictly stricter and cannot produce a false PASS. That says
+ * nothing about whether it can *match*, which is the trap the first remedy for
+ * R-09 fell into, so it was measured rather than claimed: at adoption **87** of
+ * the 142 pointers are path-shaped, **82** resolve, and **5** move. Both
+ * directions are observed red in this gate's suite.
+ *
+ * What it deliberately does **not** cover: a stem outside `PREFIX_STEMS` /
+ * `SUFFIX_STEMS`. The alphabet is unchanged, so C21's class — a citation of a
+ * moved module whose name carries no stem at all — is as uncovered as before
+ * and is not this gate's to close. Two of T10's 31 are in that class already:
+ * synthetic tier fixtures naming `controllers/c` and `controllers/index`, which
+ * match neither branch.
+ *
  * Pinning the `HISTORICAL` count is what makes this discriminating rather than
  * permissive. A rename whose citations are not updated turns each stale citation
  * into a new `HISTORICAL` entry, moving the count and failing the gate — which is
@@ -69,7 +112,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, dirname, join, normalize } from "node:path";
 
 /**
  * Repo-relative paths whose pointer-shaped content is out of scope, and why.
@@ -87,15 +130,46 @@ import { basename, join } from "node:path";
  * reason `POINTER`'s docblock gives — spelled in full they are `BROKEN` tokens
  * in a file this gate scans, which is the same trap one level up, and it fired.)
  *
- * Only the test file is excluded. **This script is not**, so its own prose stays
- * inside the corpus and its two genuine references to the deleted `rlm-search`
- * are counted in the pin like anyone else's.
+ * This script is **not** excluded, so its own prose stays inside the corpus and
+ * its two genuine references to the deleted `rlm-search` are counted in the pin
+ * like anyone else's.
+ *
+ * ## The fifth entry — PR-C T10b, and it is the same class as the fourth
+ *
+ * The recorded-response fixtures the test-seam suites import are **data**, not
+ * references: JSON whose string fields carry a synthesised search result, an
+ * impact-analysis payload, and a whole synthetic source file. They named a
+ * `controllers/` path, and while only basenames were resolved that read as
+ * `RESOLVES` — a wrong classification that happened to produce the right
+ * verdict, which is why it survived T6 unnoticed.
+ *
+ * The path branch made it decidable, and one of the three is decidable *only*
+ * as an exclusion. The synthetic file's content carries a relative specifier
+ * written from the point of view of a `tools/` handler that does not exist. A
+ * relative specifier resolves against the directory of the file citing it, and
+ * here the citing file is imaginary — so no resolution root can be right, and
+ * the token lands in `BROKEN`, which by design can never be pinned. It is not
+ * a stale pointer that wants repointing; repointing it to the orchestrator's
+ * real home does not resolve either, because the fixture is not where the
+ * fictional importer would live.
+ *
+ * That is `check-core-layering`'s C17 rule arriving here: *an import statement
+ * inside a string literal is fixture text, not an edge.* That gate masks string
+ * content to honour it. This one has no code to mask — the whole file is
+ * content — so the file is what gets excluded.
+ *
+ * **Consequence to carry, because T6's acceptance figure is quoted in four
+ * places:** the corpus total drops **142 -> 137** and `RESOLVES` **114 -> 109**.
+ * `HISTORICAL` is **unchanged at 28** — none of the five was ever historical.
+ * T6's reading was correct for the corpus it measured; this narrows the corpus
+ * and says why.
  */
 export const EXCLUDED = [
   "CHANGELOG.md", // release history; naming a deleted file is the point
   ".specs/", // the plan's own record of what moved where
   ".ua/", // generated understand-anything artifacts; regeneration deferred past PR-C
   "scripts/__tests__/check-stale-pointers.test.ts", // this gate's own fixtures, not references
+  "packages/core/src/__tests__/test-seam/fixtures/", // recorded responses; content, not references
 ] as const;
 
 /**
@@ -178,6 +252,8 @@ export interface Pointer {
   file: string;
   line: number;
   token: string;
+  /** The directory segment cited alongside the token, `""` for a bare citation. */
+  prefix: string;
   category: Category;
 }
 
@@ -216,28 +292,40 @@ export interface Pointer {
  * edit shape this pin exists to make visible is a re-baseline riding along with
  * the change it is supposed to police.
  *
- * ## Corrected at T10 — the pin does not move in phase 3 either (C26)
+ * Those totals are T6's corpus. T10b narrows it to **137 / 109 / 28** by
+ * excluding the recorded-response fixtures — see `EXCLUDED`'s fifth entry. The
+ * pin is the one figure the narrowing does not touch.
  *
- * T7's paragraph here predicted *"phase 3 is when it will genuinely move:
+ * ## Corrected at T10, remedied at T10b — C26
+ *
+ * T7's paragraph above predicted *"phase 3 is when it will genuinely move:
  * retiring the six controllers converts their citations out of RESOLVES"*.
- * Measured after T10 moved three of them: **142 / 114 / 28, unchanged.**
+ * Measured after T10 relocated three orchestrators: **142 / 114 / 28,
+ * unchanged.** The prediction assumed a **deletion**; phase 3 is a **move**,
+ * and a basename check cannot represent the difference. **31** path-shaped
+ * citations had become wrong and the gate reported `PASS — 0 broken`.
  *
- * The prediction assumed a deletion. Phase 3 is a **move**, and `categorise`
- * resolves a token against `liveBase` — a set of **basenames** — while `POINTER`
- * captures no directory segment at all. So `search-controller` keeps RESOLVING
- * from `services/search/` exactly as it did from `controllers/`, and the pin
- * cannot move for a rename-free relocation. (That name is written without its
- * extension for the reason `candidateNames`' docblock gives: spelled in full it
- * would itself become the 143rd pointer in this very file.)
+ * T10b closes that with the path branch this file's header describes, and the
+ * remedy was verified the only way a remedy for a silent failure can be —
+ * against the tree that failed silently. Both readings taken on one mutated
+ * corpus, T10's citation repoints reverted and nothing else touched:
  *
- * The consequence is the part worth acting on: **31 path-shaped citations
- * naming `controllers/<file>.ts` became wrong at T10 and this gate reported
- * `PASS — 0 broken`.** That is R-09's own premise — *"61 controller pointers
- * strand silently"* — reproducing against the remedy chosen to prevent it. The
- * reshape closed the half of R-09 about tokens being *visible*; the half about
- * a path being *correct* is outside what a basename check can decide. Those 31
- * were repointed by hand at T10 (24) or deliberately left as recorded fixtures
- * (7); no gate found them.
+ *   basename-only (as shipped at T10)   PASS — 0 broken, historical at 28
+ *   with the path branch                FAIL — 0 broken, **57** historical
+ *
+ * **+29** — the 24 prose citations T10 repointed by hand plus the 5 specifiers
+ * it counted as importers. The remaining 2 of the 31 are outside the stem
+ * alphabet and stay uncovered; the header says which and why.
+ *
+ * ## So why is this number still 28?
+ *
+ * Because on the tree T10b ships against, **no path citation is stale** — T10
+ * repointed its own. A pin that did not move is the correct outcome here and
+ * not an untouched line, exactly as at T7. What changed is that the number is
+ * now load-bearing for a move as well as for a deletion: **T11, T12 and T13
+ * each relocate a controller, and any citation of theirs left unrepointed
+ * becomes a HISTORICAL entry and fails this gate.** That is the enforcement
+ * R-09 asked for and did not get from the T6 reshape alone.
  */
 export const HISTORICAL_PINNED = 28;
 
@@ -278,10 +366,54 @@ export function categorise(token: string, live: Set<string>, ever: Set<string>):
   return names.some((n) => ever.has(n)) ? "HISTORICAL" : "BROKEN";
 }
 
+/**
+ * The directory segment written immediately left of a `POINTER` match.
+ *
+ * Anchored at the end (`$`) so it is the run of path characters *touching* the
+ * token, never an earlier path elsewhere on the line. `POINTER` itself is
+ * untouched — deliberately. Folding an optional prefix group into that pattern
+ * would put the C18 class back in play for no gain, and would silently change
+ * the corpus total that T6's acceptance figure pins.
+ */
+export const PATH_PREFIX = /(?:\.\.?\/)+$|[\w.@-]+(?:\/[\w.@-]+)*\/$/;
+
+/**
+ * Every full path a prefixed citation could reasonably mean, under the four
+ * roots named in this file's header, in both the `.js` and `.ts` spellings.
+ *
+ * More roots means more resolution means *fewer* failures, so the generosity
+ * here is in the safe direction: a citation this cannot resolve under any root
+ * is one no reader could follow either.
+ */
+export function pathCandidates(citingFile: string, prefix: string, token: string): string[] {
+  const cited = `${prefix}${token}`;
+  const roots = [
+    cited,
+    `${dirname(citingFile)}/${cited}`,
+    `packages/core/src/${cited}`,
+    `packages/core/${cited}`,
+  ];
+  return roots.flatMap((r) => candidateNames(normalize(r).replace(/^\.\//, "")));
+}
+
+/** `categorise`, resolving the whole path rather than the basename. */
+export function categorisePath(
+  citingFile: string,
+  prefix: string,
+  token: string,
+  live: Set<string>,
+  ever: Set<string>,
+): Category {
+  const paths = pathCandidates(citingFile, prefix, token);
+  if (paths.some((p) => live.has(p))) return "RESOLVES";
+  return paths.some((p) => ever.has(p)) ? "HISTORICAL" : "BROKEN";
+}
+
 export function scan(root: string, files = trackedFiles(root)): Pointer[] {
   const ever = everKnownPaths(root);
+  const live = new Set(git(["ls-files"], root).split("\n").filter(Boolean));
   // `.map(basename)` would hand the array index to basename's `ext` parameter.
-  const liveBase = new Set(git(["ls-files"], root).split("\n").filter(Boolean).map((p) => basename(p)));
+  const liveBase = new Set([...live].map((p) => basename(p)));
   const everBase = new Set([...ever].map((p) => basename(p)));
   const found: Pointer[] = [];
 
@@ -298,11 +430,17 @@ export function scan(root: string, files = trackedFiles(root)): Pointer[] {
     }
     source.split("\n").forEach((text, i) => {
       for (const m of text.matchAll(POINTER)) {
+        // A citation carrying a directory is judged on that directory; a bare
+        // one has none to judge, and demanding one would be a banned-word list.
+        const prefix = text.slice(0, m.index).match(PATH_PREFIX)?.[0] ?? "";
         found.push({
           file,
           line: i + 1,
           token: m[0],
-          category: categorise(m[0], liveBase, everBase),
+          prefix,
+          category: prefix
+            ? categorisePath(file, prefix, m[0], live, ever)
+            : categorise(m[0], liveBase, everBase),
         });
       }
     });
@@ -329,8 +467,11 @@ export function report(
   lines.push(`  HISTORICAL ${historical.length}  (pinned at ${pinned})`);
   lines.push(`  BROKEN     ${broken.length}`);
 
-  for (const p of historical) lines.push(`  historical  ${p.file}:${p.line}  ${p.token}`);
-  for (const p of broken) lines.push(`  BROKEN      ${p.file}:${p.line}  ${p.token}`);
+  // The citation is printed as written, prefix included: for a path-shaped one
+  // the directory IS the thing that went wrong, and a bare basename in this list
+  // would name a file that still exists and read as a false report.
+  for (const p of historical) lines.push(`  historical  ${p.file}:${p.line}  ${p.prefix}${p.token}`);
+  for (const p of broken) lines.push(`  BROKEN      ${p.file}:${p.line}  ${p.prefix}${p.token}`);
 
   const ok = broken.length === 0 && historical.length === pinned;
   lines.push(
