@@ -4,8 +4,8 @@
 - **Specify**: `spec.md`, merged via **#56** (`9df5608`)
 - **Design**: `design.md`, merged via **#57** (`bc9019b`, merge commit, two parents)
 - **Base**: `origin/main` @ `bc9019b`
-- **Status**: **Tasks — complete, full Plan Challenge gate run. Execute complete** on
-  `spec/pr-c-execute`, **21 commits**, pending T18's independent validation.
+- **Status**: **Tasks — complete, full Plan Challenge gate run. Execute complete and validated** on
+  `spec/pr-c-execute`, **22 commits**; **T18 PASS** (author ≠ verifier), `validation.md`.
 - **20 tasks**, three phases plus the record phase, **104** distinct files *as planned*.
   **Shipped at 222.** §1's table below is the planning estimate and is left as written, with the
   measured outcome recorded beside it — the divergence is the record, not an error to erase.

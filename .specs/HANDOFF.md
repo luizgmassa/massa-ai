@@ -1,11 +1,11 @@
 # Handoff
 
-## Active — Core Layering, Controller Retirement (PR-C), **Specify, Design, Tasks and Execute done; T18 validation outstanding**
+## Active — Core Layering, Controller Retirement (PR-C), **complete and validated; awaiting merge**
 
 **Feature**: `core-layering-controller-retirement` · artifacts
-`.specs/features/core-layering-controller-retirement/{spec,design,tasks}.md`. **Execute complete on
-`spec/pr-c-execute`** — 20 tasks, 21 commits, phases 1-4 all green on their own. T18 (independent
-validation, author != verifier) is the one outstanding task.
+`.specs/features/core-layering-controller-retirement/{spec,design,tasks}.md`. **Execute complete and validated on
+`spec/pr-c-execute`** — 20 tasks, 22 commits, phases 1-4 all green on their own. **T18 PASS**
+(author != verifier) — `validation.md`. Remaining: merge, `--no-ff` (R-04).
 
 **Specify is on `main`** — merged via **#56** (`9df5608`, merge commit), base `origin/main` @
 `9df5608`. **Design is complete** — `design.md`, delivered via PR **#57** from `spec/pr-c-design`.

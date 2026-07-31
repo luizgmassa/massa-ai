@@ -207,7 +207,8 @@ all state came from `.specs/` and source reads.
   plan (see below). Tasks COMPLETE 2026-07-31 — a second full Plan Challenge gate, four findings,
   all four confirmed by independent re-measurement. 20 tasks, three phases, 104 distinct files.
   EXECUTE COMPLETE 2026-07-31 on `spec/pr-c-execute` — 20 tasks in four phases, each commit green
-  on its own. T18 (independent validation) outstanding. Fifteen further plan defects confirmed,
+  on its own. **T18 independent validation PASS** (author != verifier), `validation.md`: all of
+  GMS-01 AC-1-AC-6 and GMS-02 AC-2 re-derived from raw data, 5 mutations, no surviving mutant. Fifteen further plan defects confirmed,
   C13-C27, amended into the parent `spec.md` at T16.**
 - **Tasks resolved the two things Design left open**, each with its rejected alternatives recorded:
   1. **The cut → one PR, three phased commits.** Decided by the user, 2026-07-31. Three-PRs and

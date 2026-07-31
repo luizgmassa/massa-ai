@@ -13,9 +13,9 @@
 - **Status**: **Specify complete**, merged to `main` via **#56** (`9df5608`). **Design complete** —
   `design.md`, delivered via PR **#57**; it carries C14 through C20, and answers all three
   preconditions this document left open (§3.B, §4.2, §5). **Tasks complete** — `tasks.md`, 20 tasks,
-  three phases, 104 distinct files, full Plan Challenge gate run. **Execute complete** — 20 of 20
-  tasks shipped on `spec/pr-c-execute` as three phased commit ranges plus phase 4; **T18 is the
-  independent validation gate and writes `validation.md`.** Phase sizing shipped at **163 / 32 / 47 / 3**
+  three phases, 104 distinct files, full Plan Challenge gate run. **Execute complete and validated** — 20 of
+  20 tasks shipped on `spec/pr-c-execute` as three phased commit ranges plus phase 4, and **T18
+  PASS** (author != verifier), recorded in `validation.md`. Phase sizing shipped at **163 / 32 / 47 / 3**
   against §1's planned 62 / 16 / 32, distinct union **222** against **104**, in **21** commits —
   every increment has a stated structural reason, indexed as C21-C27 in the parent `spec.md`.
 
