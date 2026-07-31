@@ -14,10 +14,8 @@
 // Tools
 export * from "./tools/index.js";
 
-// Controllers
-export * from "./controllers/index.js";
-
-// Services
+// Services — the five orchestrators are re-exported from this barrel too (T13),
+// so retiring `controllers/` changed no symbol on this surface.
 export * from "./services/index.js";
 
 // Data

@@ -24,6 +24,44 @@ export type {
   SearchFailureCode,
 } from "../kernel/search-diagnostics.js";
 
+// Orchestration — the five controllers AS-01 retired out of the old layer.
+//
+// PR-C T13. This block is the route by which 17 published symbols reach the
+// root barrel: `src/index.ts` re-exports this file wholesale, so listing them
+// here is what keeps `@massa-ai/core`'s surface unchanged across a retirement
+// that deletes the barrel they used to travel through. Before this, that route
+// was the only one they had, and deleting it would have dropped them silently —
+// both transports import from the root barrel, not by path.
+//
+// The `WebController` block further down is the precedent rather than the
+// exception: a controller exported from the services barrel, which is what all
+// five of these now are.
+export { MemoryController } from "./memory/memory-controller.js";
+export type {
+  StoreMemoryInput,
+  StoreMemoryResult,
+  SearchMemoryInput,
+  SearchMemoryResult,
+} from "./memory/memory-controller.js";
+
+export { SearchController } from "./search/search-controller.js";
+export type {
+  ProjectSearchInput,
+  ProjectSearchResult,
+} from "./search/search-controller.js";
+
+export { ContextController } from "./context/context-controller.js";
+export type {
+  GetOptimizedContextInput,
+  OptimizedContextResult,
+} from "./context/context-controller.js";
+
+export { ExecutorController } from "./executor/executor-controller.js";
+
+export { GraphController } from "./symbol/graph-controller.js";
+export type { TracePathInput, TracePathOutput } from "./symbol/graph-controller.js";
+export type { ImpactAnalysisInput, ImpactAnalysisOutput } from "./symbol/graph-controller.js";
+
 // Transactional project identity (M16 + M17)
 export * from "./project-identity/index.js";
 
