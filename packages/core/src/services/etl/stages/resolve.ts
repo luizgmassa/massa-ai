@@ -27,9 +27,9 @@ import { SYSTEMS_LANGUAGE_RESOLVER } from "../../structural/resolvers/systems.js
 import { MANAGED_LANGUAGE_RESOLVER } from "../../structural/resolvers/managed.js";
 import { FUNCTIONAL_LANGUAGE_RESOLVER } from "../../structural/resolvers/functional.js";
 import { DATA_DOCUMENT_LANGUAGE_RESOLVER } from "../../structural/resolvers/data-document.js";
-import { createStructuralIdentity, parseStructuralFqn, type StructuralIdentity } from "../../structural/fqn-codec.js";
+import { createStructuralIdentity, parseStructuralFqn, type StructuralIdentity } from "../../../kernel/fqn-codec.js";
 import { resolveStructuralLanguage } from "../../structural/language-manifest.js";
-import { STRUCTURAL_SYMBOL_KINDS, type StructuralSymbolKind } from "../../structural/types.js";
+import { STRUCTURAL_SYMBOL_KINDS, type StructuralSymbolKind } from "../../../kernel/types.js";
 import type {
   EtlStageContext,
   ParsedFile,

@@ -1,7 +1,7 @@
 import type {
   ParseDiagnostic,
   StructuralFailureKind,
-} from "./types.js";
+} from "../../kernel/types.js";
 
 export const MAX_STRUCTURAL_DIAGNOSTIC_DETAILS = 10;
 const MAX_DIAGNOSTIC_MESSAGE_LENGTH = 500;

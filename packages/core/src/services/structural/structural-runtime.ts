@@ -31,7 +31,7 @@ import type {
   ParseDiagnostic,
   StructuralFailureKind,
   StructuralParseOutcome,
-} from "./types.js";
+} from "../../kernel/types.js";
 import { executeStructuralQueryPack } from "./query-pack.js";
 import { SourceIndex } from "./source-span.js";
 
@@ -468,7 +468,7 @@ export class StructuralRuntime {
         };
       }
       const hostSlice = index.span(slice.startByte, slice.endByte);
-      const remap = <T extends { span: import("./types.js").SourceSpan }>(value: T): T => Object.freeze({ ...value, span: index.remapChildSpan(hostSlice, value.span) });
+      const remap = <T extends { span: import("../../kernel/types.js").SourceSpan }>(value: T): T => Object.freeze({ ...value, span: index.remapChildSpan(hostSlice, value.span) });
       symbols.push(...child.structure.symbols.map((symbol) => Object.freeze({
         ...remap(symbol), qualifiedName: `${slice.scope}.${symbol.qualifiedName}`,
         ...(symbol.selectionSpan ? { selectionSpan: index.remapChildSpan(hostSlice, symbol.selectionSpan) } : {}),

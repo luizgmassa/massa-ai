@@ -3,7 +3,7 @@ import { SourceIndex } from "./source-span.js";
 import type {
   NormalizedStructuralSymbol,
   StructuralSymbolKind,
-} from "./types.js";
+} from "../../kernel/types.js";
 import { SYMBOL_KINDS } from "./query-pack-registry.js";
 import type { StructuralQueryPack } from "./query-pack-registry.js";
 import {

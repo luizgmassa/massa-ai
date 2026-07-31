@@ -19,7 +19,7 @@
 import { SearchResult, logger, config } from "@massa-ai/shared";
 import { minimatch } from "minimatch";
 import { buildRewrittenFTSQuery } from "./query-understanding.js";
-import { applyProximityRerank, extractQueryTerms } from "./lexical-search.js";
+import { applyProximityRerank, extractQueryTerms } from "../../kernel/lexical-search.js";
 import { eventBus } from "../events/event-bus.js";
 import { fuseResults } from "./result-fusion.js";
 import type { QueryUnderstandingService } from "./query-understanding.js";
@@ -36,7 +36,7 @@ import {
   type SearchDegradation,
   type SearchDegradationCode,
   type SearchDegradationReporter,
-} from "./search-diagnostics.js";
+} from "../../kernel/search-diagnostics.js";
 
 // ── Deps ─────────────────────────────────────────────────────────────────────
 

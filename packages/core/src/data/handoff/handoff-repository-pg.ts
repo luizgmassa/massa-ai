@@ -6,7 +6,7 @@ import { getProjectIdentityAliasResolver } from "../../services/project-identity
 import {
   searchBackendUnavailable,
   storeCorruption,
-} from "../../services/search/search-diagnostics.js";
+} from "../../kernel/search-diagnostics.js";
 import {
   HANDOFF_STATUSES,
   type HandoffRecord,

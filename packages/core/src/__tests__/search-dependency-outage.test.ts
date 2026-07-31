@@ -10,7 +10,7 @@ import {
   resetSearchDiagnosticsForTests,
   SearchServiceError,
   type SearchDegradation,
-} from "../services/search/search-diagnostics.js";
+} from "../kernel/search-diagnostics.js";
 
 const HIT: SearchResult = {
   id: "vector-hit",

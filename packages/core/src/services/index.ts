@@ -16,13 +16,13 @@ export {
   resetSearchDiagnosticsForTests,
   searchBackendUnavailable,
   storeCorruption,
-} from "./search/search-diagnostics.js";
+} from "../kernel/search-diagnostics.js";
 export type {
   SearchDegradation,
   SearchDegradationCode,
   SearchDiagnostic,
   SearchFailureCode,
-} from "./search/search-diagnostics.js";
+} from "../kernel/search-diagnostics.js";
 
 // Transactional project identity (M16 + M17)
 export * from "./project-identity/index.js";
@@ -170,7 +170,7 @@ export type {
   SourceSpan,
   StructuralFailureKind,
   StructuralParseOutcome,
-} from "./structural/types.js";
+} from "../kernel/types.js";
 export { SourceIndex, deriveLegacyLineRange } from "./structural/source-span.js";
 export type { LegacyLineRange } from "./structural/source-span.js";
 export {
@@ -183,7 +183,7 @@ export {
   parseStructuralFqn,
   sha256SignatureDigest,
   structuralFqnDisplayName,
-} from "./structural/fqn-codec.js";
+} from "../kernel/fqn-codec.js";
 export {
   executeQueryPack,
   executeStructuralQueryPack,
@@ -218,7 +218,7 @@ export type {
   StructuralIdentityOverload,
   StructuralIdentityScope,
   StructuralSignatureInput,
-} from "./structural/fqn-codec.js";
+} from "../kernel/fqn-codec.js";
 export {
   StructuralResolverRegistry,
   StructuralResolverSession,

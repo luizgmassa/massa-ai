@@ -8,7 +8,7 @@ import path from "path";
 import {
   getSearchDiagnostics,
   type SearchDiagnostic,
-} from "../search/search-diagnostics.js";
+} from "../../kernel/search-diagnostics.js";
 
 export interface ServiceStatus { available: boolean; latency?: number; error?: string; details?: Record<string, unknown>; }
 export interface LocalHealthReport {

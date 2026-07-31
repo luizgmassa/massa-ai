@@ -9,7 +9,7 @@ import { IToolHandler, ToolResponse } from "@massa-ai/shared";
 import { logger } from "@massa-ai/shared";
 import { SearchController } from "../controllers/search-controller.js";
 import { serializeToolResponse } from "./serialize.js";
-import { SearchServiceError } from "../services/search/search-diagnostics.js";
+import { SearchServiceError } from "../kernel/search-diagnostics.js";
 
 interface SearchProjectParams {
   query: string;

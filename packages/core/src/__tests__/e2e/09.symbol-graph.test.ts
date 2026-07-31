@@ -22,7 +22,7 @@ import {
 } from "./_helpers";
 import { startMcp, mcpCall, requireTool, type McpHandle } from "./_mcp";
 import { POLYGLOT_EXPECTATIONS, inspectPolyglotFixture } from "./polyglot-fixture.js";
-import { parseStructuralFqn } from "../../services/structural/fqn-codec.js";
+import { parseStructuralFqn } from "../../kernel/fqn-codec.js";
 
 setDefaultTimeout(900_000);
 

@@ -8,7 +8,7 @@ import {
   parseStructuralFqn,
   structuralFqnDisplayName,
   type StructuralIdentityInput,
-} from "../services/structural/fqn-codec.js";
+} from "../kernel/fqn-codec.js";
 import {
   SourceIndex,
   deriveLegacyLineRange,

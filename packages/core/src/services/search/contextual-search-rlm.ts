@@ -70,7 +70,7 @@ import {
   searchBackendUnavailable,
   type SearchDegradation,
   type SearchDegradationReporter,
-} from "./search-diagnostics.js";
+} from "../../kernel/search-diagnostics.js";
 import {
   clearProjectIndex,
   getProjectStats,

@@ -13,7 +13,7 @@ import {
   sanitizeTrigramQuery,
   levenshtein,
   maxEditDistance,
-} from "../../services/search/lexical-search.js";
+} from "../../kernel/lexical-search.js";
 
 export class KeywordSearchPg {
   private pool: Pool | null = null;

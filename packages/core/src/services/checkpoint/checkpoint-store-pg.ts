@@ -52,7 +52,7 @@ import type {
   CreateCheckpointOptions,
   CheckpointStats,
 } from "./checkpoint-store.js";
-import { assertSchemaSupported } from "../structural/schema-version.js";
+import { assertSchemaSupported } from "../../kernel/schema-version.js";
 
 /**
  * Schema-ahead guard for checkpoint state. The `task_checkpoints.state_schema_version`

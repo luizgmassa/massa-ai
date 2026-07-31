@@ -10,7 +10,7 @@ import { logger, config } from "@massa-ai/shared";
 import { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js";
 import { eventBus } from "../services/events/event-bus.js";
 import { LLMJudgeReranker } from "../services/search/reranker.js";
-import type { SearchDegradation } from "../services/search/search-diagnostics.js";
+import type { SearchDegradation } from "../kernel/search-diagnostics.js";
 import { minimatch } from "minimatch";
 import { validateFilters } from "../services/search/filter-validation.js";
 import type { FilterDowngrade } from "../services/search/filter-validation.js";

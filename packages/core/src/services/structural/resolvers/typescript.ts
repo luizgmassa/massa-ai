@@ -4,7 +4,7 @@ import {
   normalizeStructuralFile,
   type StructuralFqnCandidate,
   type StructuralIdentity,
-} from "../fqn-codec.js";
+} from "../../../kernel/fqn-codec.js";
 import type {
   ResolvableDefinition,
   StructuralBuildMetadata,

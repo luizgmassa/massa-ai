@@ -18,7 +18,7 @@ import { smartChunk } from "../../search/smart-chunker.js";
 import { structuralRuntime, type StructuralRuntime } from "../../structural/structural-runtime.js";
 import { LANGUAGE_MANIFEST } from "../../structural/language-manifest.js";
 import { deriveLegacyLineRange } from "../../structural/source-span.js";
-import type { NormalizedStructure, ParseDiagnostic } from "../../structural/types.js";
+import type { NormalizedStructure, ParseDiagnostic } from "../../../kernel/types.js";
 import type {
   EtlStageContext,
   DiscoveredFile,

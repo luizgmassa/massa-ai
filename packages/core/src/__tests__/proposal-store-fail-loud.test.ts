@@ -4,7 +4,7 @@ import {
   type ProposalRecord,
 } from "../data/proposal/proposal-contract.js";
 import { PgProposalStore } from "../data/proposal/proposal-repository-pg.js";
-import { SearchServiceError } from "../services/search/search-diagnostics.js";
+import { SearchServiceError } from "../kernel/search-diagnostics.js";
 
 function proposal(overrides: Partial<ProposalRecord> = {}): ProposalRecord {
   return {

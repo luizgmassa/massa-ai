@@ -13,7 +13,7 @@ import { StructuralRuntime } from "../services/structural/structural-runtime.js"
 import { buildHeaderLanguageEvidence } from "../services/etl/pipeline.js";
 import { LANGUAGE_MANIFEST } from "../services/structural/language-manifest.js";
 import type { EtlStageContext, ParsedFile } from "../services/etl/stage-context.js";
-import type { NormalizedStructure, SourceSpan } from "../services/structural/types.js";
+import type { NormalizedStructure, SourceSpan } from "../kernel/types.js";
 
 const tempDirs: string[] = [];
 const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");

@@ -18,7 +18,7 @@ import {
   countAdjacentPairs,
   extractQueryTerms,
   applyProximityRerank,
-} from "../services/search/lexical-search.js";
+} from "../kernel/lexical-search.js";
 
 function result(
   id: string,

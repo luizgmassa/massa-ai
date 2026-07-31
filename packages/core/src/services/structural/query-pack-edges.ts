@@ -5,7 +5,7 @@ import type {
   NormalizedStructuralImport,
   StructuralEdgeKind,
   StructuralTarget,
-} from "./types.js";
+} from "../../kernel/types.js";
 import { StructuralQueryPack, QueryCapabilityContract, enabled } from "./query-pack-registry.js";
 import { text, frozenSpan, field, descendants, ancestor, unquote } from "./native-node-helpers.js";
 import { frozenBindings, importBindings, rustUseLeaves } from "./query-pack-captures.js";

@@ -5,7 +5,7 @@ import {
   type LoadedNativeGrammarSet,
 } from "./grammar-loaders.js";
 import { verifyNativeGrammarIntegrity } from "./grammar-integrity.js";
-import type { GrammarArtifact } from "./types.js";
+import type { GrammarArtifact } from "../../kernel/types.js";
 
 export type ParserReadinessStatus =
   | "pending"

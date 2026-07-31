@@ -3,9 +3,9 @@ import {
   assertCanonicalSignatureSupported,
   canonicalizeStructuralSignature,
   decodeCanonicalSignatureVersion,
-} from "../services/structural/fqn-codec.js";
-import { STRUCTURAL_FQN_SCHEMA_VERSION } from "../services/structural/types.js";
-import { SchemaAheadError } from "../services/structural/schema-version.js";
+} from "../kernel/fqn-codec.js";
+import { STRUCTURAL_FQN_SCHEMA_VERSION } from "../kernel/types.js";
+import { SchemaAheadError } from "../kernel/schema-version.js";
 
 const SAMPLE_INPUT = {
   language: "typescript",

@@ -26,7 +26,7 @@ import { getSynapseManager } from "../synapse/index.js";
 import type { AgentSession } from "../synapse/types.js";
 import type { SessionRegistry } from "../synapse/session/session-registry.js";
 import type { SynapseManager } from "../synapse/synapse-manager.js";
-import type { SearchDegradationReporter } from "./search-diagnostics.js";
+import type { SearchDegradationReporter } from "../../kernel/search-diagnostics.js";
 
 /**
  * The narrow dependency record for this module (design.md §4.4) — the two

@@ -26,7 +26,7 @@ import {
   StructuralRuntime,
   type StructuralQueryExecutor,
 } from "../services/structural/structural-runtime.js";
-import type { NormalizedStructure } from "../services/structural/types.js";
+import type { NormalizedStructure } from "../kernel/types.js";
 import { loadNativeGrammarSet } from "../services/structural/grammar-loaders.js";
 
 const EMPTY: NormalizedStructure = Object.freeze({

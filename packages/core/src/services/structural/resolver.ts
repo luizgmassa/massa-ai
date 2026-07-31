@@ -4,14 +4,14 @@ import type {
   SourceSpan,
   StructuralEdgeKind,
   StructuralTarget,
-} from "./types.js";
-import { StructuralFqnRegistry } from "./fqn-codec.js";
+} from "../../kernel/types.js";
+import { StructuralFqnRegistry } from "../../kernel/fqn-codec.js";
 import type {
   StructuralFqnResolution,
   StructuralFqnCandidate,
   StructuralIdentity,
   StructuralIdentityInput,
-} from "./fqn-codec.js";
+} from "../../kernel/fqn-codec.js";
 
 export interface StructuralResolverDefinition {
   identity: StructuralIdentityInput;

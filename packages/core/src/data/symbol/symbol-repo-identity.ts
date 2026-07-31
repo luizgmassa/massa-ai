@@ -9,7 +9,7 @@
 
 import { createHash } from "node:crypto";
 import { getPrismaClient } from "../../services/query/prisma-client.js";
-import { parseStructuralFqn } from "../../services/structural/fqn-codec.js";
+import { parseStructuralFqn } from "../../kernel/fqn-codec.js";
 import type { SymbolDefinition, SymbolReference } from "./symbol-repo-types.js";
 
 export type TransactionClient = Parameters<
