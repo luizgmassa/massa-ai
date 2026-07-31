@@ -202,10 +202,61 @@ all state came from `.specs/` and source reads.
 - projectId: `massa-ai`
 - workflowSessionId: `spec-core-layering-controller-retirement`
 - workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
-- feature: `core-layering-controller-retirement` — **Specify COMPLETE 2026-07-31. Design NOT
-  STARTED. No code written.**
-- base: `origin/main` @ `35fc469` (v1.16.0), branch `spec/pr-c-controller-retirement`
-- Artifacts: `.specs/features/core-layering-controller-retirement/spec.md`
+- feature: `core-layering-controller-retirement` — **Specify COMPLETE and merged 2026-07-31.
+  Design COMPLETE 2026-07-31 — full Plan Challenge gate run, five findings, three folded into the
+  plan (see below). Tasks NOT STARTED. No code written.**
+- **Design's three owed decisions are all delivered** (`design.md` §1, §4, §5), each with its
+  rejected alternative recorded:
+  1. **R-08's precondition → a kernel tier.** `data → kernel` legal, `data → services` illegal,
+     **zero** allowlist entries for the group. Decided by the user, 2026-07-31; allowlist-only and
+     hybrid both rejected, reasons in §1. **R-08 closes.**
+  2. **GMS-01 AC-4's referent → 26**, not 24 — **C15**. 24 is a property of a double-quote-anchored
+     pattern, not of the tree; the check must be written quote-agnostic.
+  3. **R-09 → give `POINTER` a second alternation branch for suffix-shaped stems.** Base reading
+     frozen before the first structural commit, re-pin as its own commit, both directions observed
+     red, **plus a no-op control** confirming the reshaped gate's count actually moves.
+- **C16 — the twenty-second plan defect, found by the Plan Challenge gate.** §5's *first* decision
+  was *"add `"controller"` to `STEMS`"*, argued as strictly stricter. **It is a measured no-op.**
+  `POINTER` interpolates the stem as a **prefix** (`<stem>-<rest>.ts`) and every controller file is
+  **suffix**-shaped: `controller-*.{ts,js}` matches **0** tracked files, `*-controller.{ts,js}`
+  matches **6**. Patched gate output is byte-identical to baseline. R-09 would have been recorded
+  closed over **zero** coverage of the 61 pointers it names. Found by *patching the checker and
+  running it* — the one thing the original decision never did. **A subject-list entry cannot repair
+  a positional assumption baked into a pattern.**
+- **Plan Challenge: full gate run 2026-07-31, five findings, three confirmed by independent
+  re-measurement and folded into §1–§6** (not appended): the §5 no-op; `db-connection`'s importer
+  count (**14** files / 9 non-test, not 12 — the original sweep's pathspec excluded
+  `packages/core/scripts/`, where a tracked file imports it by relative path and breaks on any
+  move); and the embeddings inversion, which mischaracterised T11's F4 seam as a replacement when
+  it is additive-with-default, and left **40** test constructions across 6 files plus **5**
+  `mock.module` sites unsized. Two further findings accepted: the kernel's physical path
+  (`packages/core/src/kernel/`, path-prefix rule) and the one-PR/question-free conflation, now
+  three independently-revertable phases with the cut decision deferred to Tasks.
+- **C14 — the twenty-first plan defect.** The kernel tier was **not implementable as chosen**:
+  `alias-resolver.ts` and `identity-guard-installer.ts` import `data/db-connection.js`, so
+  promoting them makes `data → kernel → data`. Rescued by admitting `data/db-connection.ts`
+  itself — 40 lines, zero relative imports, **7 of its 8 non-test importers are under `services/`**.
+  **GMS-01 AC-4 counts zero of its edges**, because AC-4 counts `data → services` and this module
+  produces `services → data`. The criterion's own direction hid the most-shared module in the tree.
+- **`services/embeddings/index.ts` is NOT admitted** — a barrel over 6 sibling modules. Its single
+  edge is inverted via a constructor seam instead (the F4/T11 shape), so the allowlist stays empty.
+- base: `origin/main` @ `9df5608`. **Specify merged to `main` via #56** (merge commit); **Design
+  delivered via PR #57** from `spec/pr-c-design`. The branch named here previously
+  (`spec/pr-c-controller-retirement`) is **not** what landed — see `HANDOFF.md`'s branch-name
+  correction for the 44-second retarget race that orphaned #55.
+- **C13 through C17 are all owed back to the parent `core-layering-god-module-split/spec.md`**
+  in its *Design and Execute corrections* index, landing with the work. **None is written there
+  yet.** That same commit must also fix the parent `spec.md`'s Status line, which still reads
+  *"Execute in progress (PR-B, T19 of 20)"* against a PR-B that merged as #53 and released v1.16.0.
+- **C17 — the twenty-fourth plan defect**, found by re-measuring `design.md`'s own figures rather
+  than inheriting them. §3 sized the embeddings seam at **40** vector-store constructions across
+  **6** test files; measured repo-wide it is **39** across **5**. The phantom sixth was
+  `scripts/__tests__/run-deterministic-coverage.test.ts:55`, where `new PostgresVectorStore()` is a
+  **string literal** inside `expect(classify(...))` — a different package, and unreachable by any
+  constructor change. **C16 mirrored**: C16's pattern could not see its subject, C17's saw a
+  non-subject. §2's repo-wide rule is what surfaced it and is now qualified — repo-wide **and**
+  excluding string-literal, comment and fixture matches.
+- Artifacts: `.specs/features/core-layering-controller-retirement/{spec,design}.md`
 - **Scope**: GMS-01 (all six ACs) + GMS-02 **AC-2 only**. `read_file.ts` (GMS-02 AC-1 + AS-06) is
   **PR-D**; `.ua/` regeneration is after PR-D.
 - **C13 — twentieth plan defect, found in Specify.** GMS-02 AC-1 named `tools/read_file.ts`, which

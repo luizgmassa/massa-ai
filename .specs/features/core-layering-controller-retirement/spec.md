@@ -10,7 +10,9 @@
   `--no-ff`, two parents), released **v1.16.0** on 2026-07-31. Its GMS-03/04/05 verdict is
   `core-layering-god-module-split/validation.md` Part II.
 - **Successor**: PR-D — `tools/read_file.ts` split (AS-06). **PR-C now hands it GMS-02 AC-1** (C13).
-- **Status**: **Specify — in progress.** Design not started. No code written.
+- **Status**: **Specify complete**, merged to `main` via **#56** (`9df5608`). **Design complete** —
+  `design.md`, delivered via PR **#57**; it carries C14 through C17, and answers all three
+  preconditions this document left open (§3.B, §4.2, §5). **Tasks not started. No code written.**
 
 ---
 
@@ -196,7 +198,10 @@ behaviors at or above floor. Both measured at `00ed280`.
 
 ## 5. R-08's precondition — the gate on Design, not on Specify
 
-`design.md` §5.3 is explicit and **still open**:
+`design.md` §5.3 (parent feature) is explicit, and was open at Specify time — **answered in Design**:
+`design.md` §1 gives the layer contract an explicit **kernel tier** at `packages/core/src/kernel/`,
+membership by path prefix, with **zero** allowlist entries. **R-08 closes.** The section below is
+kept as the record of the precondition as Specify stated it.
 
 > PR-C's Design must answer *"where do cross-cutting modules live under the AS-01 contract?"*
 > **before** it sizes itself.
@@ -239,7 +244,7 @@ data rather than from `tasks.md` or this file.
 | --- | --- | --- | --- |
 | R-04 | **A squash destroys the commit history.** PR-B lost T6a/T6 to a squash via #46 and had to be renamed `-1b` to keep its tables unambiguous. **Measured 2026-07-31: PR #53 is the only non-squash in the last nine merges — #45 through #52 were all squashed.** The repo's default merge button is squash. | PR-C **must** be merged `--no-ff`, chosen deliberately, stated in the PR body | **Open — highest-likelihood process risk** |
 | R-06 | The layering change breaks a transport | `ExecutorController` is imported directly by `apps/tools-api/src/routes/executor.ts` and `apps/mcp-client/src/embedded-api-client.ts`; AS-01 keeps its exported symbol name. `GraphController` is live via `routes/workspace.ts` — an earlier sweep called it dead and was wrong | Open |
-| R-08 | PR-C is two changes wearing one label | §5's precondition, answered in Design **before** sizing | **Deferred to Design with a named precondition** |
+| R-08 | PR-C is two changes wearing one label | §5's precondition, answered in Design **before** sizing | **Closed in Design** — `design.md` §1 (kernel tier) and §6. Its concern was never file count; it was that group B carried an unanswered contract question group A would silently absorb. Sizing landed as **three independently-revertable phases**, with the cut decision deferred to Tasks |
 | R-09 | **61 controller pointers strand silently** | §4.2 — a sensor decision owed in Design, with its base reading frozen before the first structural commit | **New, this document** |
 | R-10 | **The release semantics are settled by default again** | PR-B's were: `### Changed` cut a minor for a behavior-preserving refactor, decided by the act of merging with zero PR comments. **PR-C must choose its CHANGELOG heading deliberately, before merge, and write down who chose and what was rejected** | **New, this document** |
 | R-11 | `maxFileLoc` breaches 700 during the controller move | §4.3 — 4 lines of headroom; G-HUB must be run per structural commit, not once at the end | **New, this document** |
@@ -267,6 +272,17 @@ The rules that produced that hit rate, kept verbatim:
 
 ## 9. Next action
 
-**Design.** Its first deliverable is §5's precondition — the cross-cutting-module answer — followed
+~~**Design.** Its first deliverable is §5's precondition — the cross-cutting-module answer — followed
 by the §4.2 sensor decision and the §3.B metric decision. PR-C is **not** sized until all three are
-recorded, each with its rejected alternative.
+recorded, each with its rejected alternative.~~
+
+**DONE — `design.md`, all three recorded with their rejected alternatives**: §5's precondition → a
+**kernel tier** (§1, plus **C14**: the tier was not implementable until `data/db-connection.ts` was
+admitted); §4.2's sensor → a **`POINTER` reshape** (§5, **C16** — the obvious remedy of appending
+`"controller"` to `STEMS` was *measured* a no-op, because `POINTER` bakes in a prefix assumption and
+every controller file is suffix-shaped); §3.B's metric → **26** (§4, **C15**).
+
+**Next action: Tasks** — `design.md` §9. Two steps must be sequenced first inside it, because
+neither can be taken retroactively: the `POINTER` reshape's **frozen base reading** before any
+controller move, and the **no-op control** proving the reshaped gate's count actually moves against
+an unchanged tree.
