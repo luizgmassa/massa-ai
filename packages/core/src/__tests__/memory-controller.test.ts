@@ -95,7 +95,7 @@ mock.module("../services/events/event-bus.js", () => ({
 }));
 
 // Import AFTER mocks are registered.
-import { MemoryController } from "../controllers/memory-controller.js";
+import { MemoryController } from "../services/memory/memory-controller.js";
 
 function safeParse<T>(s: string, fallback: T): T {
   try { return JSON.parse(s) as T; } catch { return fallback; }

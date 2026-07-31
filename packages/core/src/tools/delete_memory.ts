@@ -8,7 +8,7 @@
 
 import { IToolHandler, ToolResponse } from "@massa-ai/shared";
 import { logger } from "@massa-ai/shared";
-import { MemoryController } from "../controllers/memory-controller.js";
+import { MemoryController } from "../services/memory/memory-controller.js";
 import { serializeToolResponse } from "./serialize.js";
 
 interface DeleteMemoryParams {

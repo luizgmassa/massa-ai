@@ -32,7 +32,7 @@ const mockStore = mock(async (_input: unknown) => ({
   type: "conversation" as any,
 }));
 
-mock.module("../controllers/memory-controller.js", () => ({
+mock.module("../services/memory/memory-controller.js", () => ({
   MemoryController: {
     getInstance: () => ({ store: mockStore }),
   },

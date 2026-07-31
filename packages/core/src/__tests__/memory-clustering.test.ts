@@ -19,7 +19,7 @@ let queryRawResult: any[] = [];
  */
 let queryRawCalls = 0;
 
-mock.module("../services/query/prisma-client.js", () => ({
+mock.module("../kernel/prisma-client.js", () => ({
   getPrismaClient: () => ({
     $queryRaw: () => {
       queryRawCalls += 1;

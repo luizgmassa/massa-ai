@@ -27,7 +27,7 @@ import { grammarArtifactKey } from "../services/structural/grammar-loaders.js";
 import {
   ProjectIdentityAliasResolver,
   setProjectIdentityAliasResolverForTests,
-} from "../services/project-identity/alias-resolver.js";
+} from "../kernel/alias-resolver.js";
 import type { ManagedRunLease, FileCursor } from "../data/managed-runs/managed-run-contract.js";
 import type { DiscoveredFile, ResolvedFile } from "../services/etl/stage-context.js";
 
@@ -84,7 +84,7 @@ afterAll(async () => {
 });
 
 async function cleanupProject(p: string): Promise<void> {
-  const { getPrismaClient } = await import("../services/query/prisma-client.js");
+  const { getPrismaClient } = await import("../kernel/prisma-client.js");
   await getPrismaClient().$executeRaw`DELETE FROM managed_runs WHERE project_id = ${p}`;
 }
 
@@ -315,7 +315,7 @@ describe.skipIf(!DB_AVAILABLE)("ETL idempotent import + FileCursor (T14 / AC-8 /
     // The first run should have left a cursor at a.ts (a's load committed, b crashed).
     // The lease is aborted (pipeline catch path), so getActive returns null;
     // query the row directly to inspect the persisted cursor.
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     const rowAfterCrash = await getPrismaClient().$queryRaw<Array<{ file_cursor: any; status: string }>>`
       SELECT file_cursor, status FROM managed_runs WHERE id = ${BigInt(lease.runId)}
     `;

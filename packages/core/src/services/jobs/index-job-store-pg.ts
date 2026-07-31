@@ -23,8 +23,8 @@
 
 import { logger } from "@massa-ai/shared";
 import { parsePositiveIntEnv } from "@massa-ai/shared/config";
-import { getPrismaClient } from "../../services/query/prisma-client.js";
-import { getProjectIdentityAliasResolver } from "../../services/project-identity/alias-resolver.js";
+import { getPrismaClient } from "../../kernel/prisma-client.js";
+import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 import type { PrismaClient } from "../../generated/prisma/index.js";
 import type { IndexJob } from "./index-job-tracker.js";
 import type { JobStore } from "./index-job-store-contract.js";

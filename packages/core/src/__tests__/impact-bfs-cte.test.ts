@@ -21,7 +21,7 @@ describe.skipIf(!RUN)("runBfsCteImpact — multi-source BFS CTE (T07 / FR-05 / A
   let prisma: any;
 
   beforeAll(async () => {
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     prisma = getPrismaClient();
     const repo = getSymbolRepository();
     await repo.upsertWorkspace({

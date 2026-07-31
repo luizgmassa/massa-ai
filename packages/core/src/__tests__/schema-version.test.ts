@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   SchemaAheadError,
   assertSchemaSupported,
-} from "../services/structural/schema-version.js";
+} from "../kernel/schema-version.js";
 
 describe("assertSchemaSupported", () => {
   describe("throws only on strictly-newer stored version", () => {

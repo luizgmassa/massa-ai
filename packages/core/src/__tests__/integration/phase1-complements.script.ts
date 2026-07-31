@@ -2,7 +2,7 @@
  * Test Phase 1 Complements: imported_names array + NOT NULL + indexes
  */
 
-import { getPrismaClient } from '../../services/query/prisma-client.js';
+import { getPrismaClient } from '../../kernel/prisma-client.js';
 import { logger } from '@massa-ai/shared';
 
 const prisma = getPrismaClient();

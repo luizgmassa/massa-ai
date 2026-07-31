@@ -6,9 +6,13 @@
 - **Workflow**: spec-driven (Specify → Design → Tasks → Execute)
 - **Sizing**: Large. Behavior-preserving structural refactor across the whole of `packages/core`,
   plus a filename rename.
-- **Status**: Specified; assumptions closed 2026-07-28; Design and Tasks complete; **Execute in
-  progress** (PR-B, T19 of 20). Twelve corrections were applied to this document at T19 — see
-  *Design and Execute corrections* below before trusting a criterion or a figure.
+- **Status**: Specified; assumptions closed 2026-07-28; Design and Tasks complete.
+  **PR-B complete** — merged as **#53** (`fe1f30b`, `--no-ff`), released **v1.16.0** on
+  2026-07-31. **PR-C** (`core-layering-controller-retirement`) **in Execute**; **PR-D**
+  (`tools/read_file.ts` — AS-06, and GMS-02 **AC-1** by C13) not started.
+  **Twenty-seven corrections** have been applied to this document — twelve at PR-B's T19
+  (C1–C12) and **fifteen at PR-C's T16 (C13–C27)** — see *Design and Execute corrections*
+  below before trusting a criterion or a figure.
 - **Depends on**: `sensor-repair-2026-07` (PR-A) must land and release first. Three of the gates
   this spec is validated by are unreliable until it does, and one — the needles gate — is
   *guaranteed* to report a false failure against this refactor. See the Evidence Corrections
@@ -80,6 +84,48 @@ split not to happen. Everything AC-3 exists to detect moved decisively the right
 **14 → 1**, `delegateScope` **21 → 0**, facade-taking **15 → 0**, scoped LOC **1550 → 0**, fan-in
 **24 → 23**. R-03's failure mode is a *facade*, and depth of reach is what tells one apart from a
 set of capability modules; fan-out counts breadth, which a real split is supposed to increase.
+
+## Design and Execute corrections (C13–C27) — applied at PR-C's T16
+
+**PR-C confirmed fifteen further plan defects**, taking the running total across this umbrella
+feature to **34**: nineteen in PR-B, of which twelve landed above as C1–C12, and these fifteen.
+They are applied **in place** at the criterion or figure each amends, in the same convention as
+the two tables above, and indexed here for the same reason — **PR-C's T18 verifier reads this
+document and must be able to tell an amended criterion from an original one.**
+
+The rationale for each lives once, in the artifact named in the last column:
+`core-layering-controller-retirement/{spec,design,tasks}.md` for C13–C20, and the commit that
+found it for C21–C27. It is not restated here, so there is one copy to drift.
+
+**Seven replace an acceptance criterion or a remedy rather than a figure** — C13, C16, C18, C19,
+C24, C26 and C27 all changed what would be *done*, not merely what was believed. Three of them
+(C16, C18, C26) are the same section failing three different ways: R-09's remedy was first a
+measured **no-op**, then as published a measured **regression**, then correct but resolving
+against basenames and so unable to tell a live citation from a stranded one.
+
+| # | Amends | Kind | What changed | Rationale in |
+| --- | --- | --- | --- | --- |
+| C13 | GMS-02 AC-1 | **criterion** | GMS-02 **splits across two PRs**. AC-1 (`read_file.ts` sheds non-schema logic) → **PR-D**, because AS-06 is an agreed decision that assigns that file there. AC-2 is **re-targeted** to a handler PR-C actually edits. The headline is closed by PR-C and PR-D jointly, by neither alone. | PR-C `spec.md` §2 |
+| C14 | AS-01 · the kernel tier | figure | The kernel tier is **not implementable** without `data/db-connection.ts`: two of the six cross-cutting modules import it, so promoting them alone yields `data → kernel → data`. **AC-4 counts zero of its edges**, because it produces `services → data` and AC-4 counts the reverse — the criterion's direction is what hid the most cross-cutting module in the tree. Importers **14**, not 12; one is `packages/core/scripts/create-3072d-table.ts`, outside `src/`. | PR-C `design.md` §2 |
+| C15 | GMS-01 AC-4 | figure | AC-4's referent **24 → 26** edges / **14 → 16** files. 24 is a property of a double-quote-anchored pattern rather than of the tree; both invisible edges are single-quoted, present at `a6216cd`, and neither is a PR-B regression. The check must be written quote-agnostic. | PR-C `design.md` §4 |
+| C16 | R-09's remedy | **criterion** | Adding `"controller"` to `check-stale-pointers`' `STEMS` is a **measured no-op** — output byte-identical. `POINTER` interpolates each stem as a **prefix**, and every controller file is suffix-shaped: `controller-*.{ts,js}` = **0** files, `*-controller.{ts,js}` = **6**. R-09 would have been recorded closed over zero coverage. Replaced by a second alternation branch. | PR-C `design.md` §5.1 |
+| C17 | `design.md` §3's own sizing | figure | Vector-store constructions **40 across 6 files → 39 across 5**. The sixth was `new PostgresVectorStore()` **inside a string literal** in another package, testing a pattern classifier. Going repo-wide fixed an undercount and added an overcount: a repo-wide sweep must also exclude string literals, comments and fixture text. | PR-C `design.md` §3 |
+| C18 | `design.md` §5.2's snippet | **criterion** | The published regex tags only the **first** of two concatenated template segments. Untagged, `\.` collapses to a wildcard and **`\b` becomes U+0008**, so the whole alternation matches nothing — and because it is one expression it **kills the untouched prefix branch too**: `0 / 0 / 28`, **FAIL**. A code snippet inside a spec is untested code. | PR-C `tasks.md` §3.2 |
+| C19 | GMS-01 AC-3 | **criterion** | `controllers/` carries **5** `→ tools/` imports of its own, and retiring the layer into `services/` **converts all five**, taking `services → tools` **4 → 9** across 3 symbols — including `validateEnum`, from the same file AC-5 empties. **AC-3 was owned by no task** while the kernel decision requires **zero** allowlist entries, so the five had neither a remover nor a place to be recorded. Closed **by removal** (T8b), not by exemption. | PR-C `design.md` §6 |
+| C20 | R-11 | figure | R-11 names the wrong metric. Simulated: `maxFileLoc` **696 → 696**, *unchanged* by the controller move; what moves is `ContextualSearchRLM`'s **`maxForeignReach` 1 → 3** against a ceiling of **3** — a PASS with zero margin, on the axis C12 had already made GMS-03 AC-3's criterion. | PR-C `design.md` §7 |
+| C21 | GMS-04 AC-3 · `check-stale-pointers` | figure | The gate reported `PASS — 0 broken` on a tree where a cited file **had already been deleted**. The blindness is in `STEMS`, not `EXCLUDED`, so no reshape of the exclusion list reaches it — and a moved module whose name carries no stem stays uncovered even after C16 and C26. | PR-C `376b19c`, `58772e7`, `9fe4545` |
+| C22 | `design.md` §2's leaf-ness table | figure | Leaf-ness was judged at each module's **current** location, so same-tier siblings read as "none" and three modules the promotion drags along went unnamed: `types.ts` and `schema-version.ts` (T2), `registry.ts` (T3). §2's own row for `fqn-codec` names both blocking edges in the same breath as marking it a leaf. | PR-C `2c61641`, `58772e7` |
+| C23 | `design.md` §3's roster | figure | `kernel/prisma-client.ts` is **absent from a six-row table headed "Admitted — 7 modules"**, and holds **12 of the 26** edges — more than twice any other target. T2b is a task the plan did not contain. `kernel/` ships with **11** modules against the roster's 6. | PR-C `9fe4545` |
+| C24 | `design.md` §3's embeddings seam | **criterion** | §3 asserts both *"defaults to today's `createEmbeddingProvider` call"* **and** *"the allowlist for this group is empty"*. Mutually exclusive: an optional seam whose default **is** today's call keeps the import it exists to remove. Resolved by **throwing** rather than defaulting — the composition root moved instead. | PR-C `35f2874` |
+| C25 | `tasks.md` §1's phase-2 sizing | figure | T8's write set is **18** importers, not 13. `validateEnum` has to move with `ToolError` — the file has two exports and no imports, so there is no partial move — and three `tools/` files appear **zero** times in `spec.md`, `design.md` or `tasks.md`. **13 is a correct count of the wrong population.** §1's phase-2 row also names no T8b file, and two of its three overlap rows are wrong. | PR-C `c2ebc56`, `57db658` |
+| C26 | R-09's remedy, again | **criterion** | The reshaped gate resolves a token against a set of **basenames**, so it can see a controller citation but **cannot tell whether that citation still points anywhere** — a repointed file and a stranded one read identically. Given the directory, it caught a real stale citation at T11 and again at T12, both of which the basename gate read as `PASS`. Corpus narrows **142 → 137** and RESOLVES **114 → 109**; **HISTORICAL is unchanged at 28**, so the pin the narrowing does not touch is the one figure four artifacts quote. | PR-C `a98f76d` |
+| C27 | `tasks.md` §4's gate lists | **criterion** | **T10 shipped a red `test:scripts`.** Two tests in `scripts/__tests__/search-facade-metrics.test.ts` settle a dispute by measuring the **live** `controllers/` directory, and went red the moment T10 relocated three orchestrators. **T10's gate list has eight entries and that suite is not among them** — T9 ran it at 998 pass, T10 did not run it at all. Found by running a gate the task in front of it did not require. | PR-C `a98f76d` |
+
+**C26 and C27 are the ones found latest, and both by exhausting a check rather than by reading.**
+C26 was found only because the remedy it corrects was patched and run against a mutated corpus —
+the same method that found C16 one phase earlier, in the identical section, which is now three
+remedies deep. C27 was found by running a suite outside the task's own gate list. Neither is
+visible from the document that contains it.
 
 ## Why this exists
 
@@ -233,12 +279,23 @@ currently clean, not that the restructuring achieved it.
 **AC-2**: `CLAUDE.md`'s Architecture section and `src/index.ts`'s header describe the same
 contract the check enforces, with no third description anywhere. Both currently describe the
 four-layer contract being retired, so both change in PR-C.
-**AC-3**: Each of the **36** backward imports and the **34** `tools → services` imports is either
+**AC-3** *(amended at PR-C's T16 — **C19**; the original counted **36** backward imports, which is
+correct only for the tree before AS-01 runs. `controllers/` carries **5** `→ tools/` imports of its
+own, and retiring the layer into `services/` converts all five, taking `services → tools` **4 → 9**.
+The criterion had **no owning task** while the kernel decision requires **zero** allowlist entries,
+so those five had neither a remover nor a place to be recorded. **Closed by removal, not by
+exemption** — all five repointed at PR-C's T8b, group C back to **0**, allowlist still empty)*: Each
+of the **36** backward imports and the **34** `tools → services` imports is either
 removed or explicitly recorded as accepted, with its reason, in the check's own allowlist. The
 counting method is stated with the number: backward = importing layer sits later than the imported
 layer in the declared order; `tools → services` = unique (tool-file → service-module) edges, which
 is 34 where the raw line count is 36.
-**AC-4**: The `data → services` group — **24 of the 36**, dominated by `getPrismaClient` from
+**AC-4** *(amended at PR-C's T16 — **C15**; the referent is **26 edges across 16 files**, not 24.
+The stated 24 is a property of a double-quote-anchored pattern rather than of the tree — the two it
+cannot see, `data/vector/base-vector-store.ts:14` and `data/vector/postgres-vector-store.ts:26`, are
+single-quoted, present at `a6216cd`, and neither is a PR-B regression. **The check must be written
+quote-agnostic**, and PR-C's is. Closed by mechanism: the group reads **0** at PR-C's T4)*: The
+`data → services` group — **24 of the 36**, dominated by `getPrismaClient` from
 `services/query/prisma-client.ts` across 12 files under `data/` — is addressed explicitly and
 separately from the controllers decision. It is the largest violation and it is unrelated to
 AS-01; resolving AS-01 while leaving this unnamed would produce a "true" contract with 24 accepted
@@ -259,9 +316,20 @@ is the check.
 
 No file under `packages/core/src/tools/` contains orchestration or domain logic.
 
-**AC-1**: `tools/read_file.ts` no longer holds logic that is not schema validation or delegation.
-**AC-2**: A representative tool handler's behavior is unchanged, proven by tests written **before**
-the move and passing unmodified after it.
+**AC-1** *(re-assigned at PR-C's T16 — **C13**; **owned by PR-D**, not PR-C. AS-06 is an agreed
+decision that assigns this file to PR-D *sequenced after PR-C*, on the ground that ~390 lines of
+extraction including a security-sensitive containment check is too much to ride along with the
+contract change; AS-05 sizes the two PRs the same way. As written, PR-C owned a requirement whose
+only concrete criterion is another PR's work — the same shape as C10, C11 and C12)*:
+`tools/read_file.ts` no longer holds logic that is not schema validation or delegation.
+**AC-2** *(re-targeted at PR-C's T16 — **C13**; the subject is a handler the governing PR actually
+edits, not `read_file.ts`. PR-C must edit **6** `tools/` files because they import `controllers/`,
+and under the original wording those edits would have shipped under no GMS-02 criterion at all.
+Closed at PR-C's T9, before the move rather than after it)*: A representative tool handler's
+behavior is unchanged, proven by tests written **before** the move and passing unmodified after it.
+
+**The GMS-02 headline — *no file under `tools/` contains orchestration or domain logic* — is closed
+by PR-C and PR-D jointly, by neither alone.** PR-D closes it.
 
 ### GMS-03 — The search facade's collaborators depend on capabilities, not on the facade
 

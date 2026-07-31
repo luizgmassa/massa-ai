@@ -36,12 +36,12 @@ import { glob } from "glob";
 import { randomUUID } from "node:crypto";
 import { smartChunk } from "./smart-chunker.js";
 import { buildExtensionGlob, loadProjectIgnore } from "./ignore-patterns.js";
-import { getProjectIdentityAliasResolver } from "../project-identity/alias-resolver.js";
+import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 import { ManagedRunRepositoryPg } from "../../data/managed-runs/managed-run-repository-pg.js";
 import type { ManagedRunLease } from "../../data/managed-runs/managed-run-contract.js";
 import type { IndexManager } from "./index-manager.js";
 import type { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
-import type { getVectorStore } from "../../data/vector/vector-store-factory.js";
+import type { getVectorStore } from "../vector/vector-store-factory.js";
 import type { getSearchCache } from "./cache-factory.js";
 import type { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 

@@ -8,7 +8,7 @@ import { IToolHandler } from "@massa-ai/shared";
 import { ToolResponse } from "@massa-ai/shared";
 import { getSearchAnalytics } from "../services/search/analytics-factory.js";
 import { logger } from "@massa-ai/shared";
-import { validateEnum } from "./enum-validation.js";
+import { validateEnum } from "../kernel/enum-validation.js";
 
 interface GetAnalyticsParams {
   type: "summary" | "project" | "query" | "cache" | "recent";

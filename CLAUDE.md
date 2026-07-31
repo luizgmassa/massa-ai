@@ -152,9 +152,17 @@ XDG_CONFIG_HOME=$(mktemp -d) bun test <file>
 
 If that fixes it, the test is missing a seam, not a timeout. Pin `_setLlmEnabledForTesting(false)`,
 inject the subject's own LLM seam, or add the `mock.module` the file is missing — the recurring
-omission is `../data/vector/vector-store-factory.js`, without which `ensureInitialized`
-falls back to the real factory and runs live embedding-provider auto-selection. `dart-support`,
+omission is `../services/vector/vector-store-factory.js`, without which `ensureInitialized`
+reaches the real factory and runs live embedding-provider auto-selection. `dart-support`,
 `code-compressor` and `search-facade-admin` were all this, and were fixed rather than budgeted.
+
+**PR-C narrowed that failure mode rather than only moving its path.** A `BaseVectorStore`
+built without an `embeddingProviderFactory` now **throws** instead of quietly auto-selecting a
+live provider — the factory above is the only production construction site, and it is the only
+thing that injects one. So a test that constructs a store directly and embeds fails loudly and
+immediately rather than hanging on a cold model. Mocking the factory module is still the right
+seam when the subject calls `getVectorStore()`; passing `embeddingProviderFactory` explicitly is
+the right seam when it constructs a store itself.
 
 Genuinely slow tests are a separate class and do get budgets: `etl-cache-invalidation` measures
 **66 s** under `--coverage` instrumentation, and `architecture-map`'s `getProjectMap` cases need
@@ -205,14 +213,32 @@ appearing to work under a direct `bun test`.
 
 `packages/core` is the whole product; everything in `apps/` is a transport or an install
 surface. Core is four layers, stated in `packages/core/src/index.ts` and enforced by
-directory:
+directory — `scripts/check-core-layering.ts`, which fails the build rather than reporting:
 
 ```
 tools/        thin MCP handlers — schema + delegation, no logic
-controllers/  orchestration — composes services, owns side-effects
-services/     domain logic — search, synapse, embeddings, graph, structural, memory, jobs
+services/     domain logic AND orchestration — search, synapse, embeddings, graph,
+              structural, memory, jobs, executor, context
 data/         persistence — PostgreSQL repositories, vector store, FTS, migrations
+kernel/       cross-cutting leaves — any tier may import kernel; kernel imports no tier
 ```
+
+Imports run one way, `tools → services → data`, so **`data → services` is a violation, not
+a shortcut**. `kernel/` is the answer to "this module is needed by two tiers": it is joined
+by `git mv`, membership being the path prefix `packages/core/src/kernel/`, and **there is no
+allowlist** — an allowlisted exception is indistinguishable from a new violation, which is
+the property the tier exists to preserve. It holds 11 modules.
+
+**`controllers/` was a fifth layer and is retired.** The five orchestrators moved into the
+`services/` subdirectory that already held their collaborators — `services/{memory,search,
+context,executor,symbol}/` — keeping their exported symbol names, and `@massa-ai/core`
+re-exports them through `./services/index.js`. The published `@massa-ai/core/controllers`
+subpath is gone; `./services` gained the 17 symbols it used to carry. Two names are a trap
+for a newcomer: `services/graph/` is the **memory-relation** graph, while the **symbol**
+graph and the controller fronting it live in `services/symbol/`.
+
+This section and `packages/core/src/index.ts`'s header are the only two descriptions of
+this contract. Do not add a third — `docs/ONBOARDING.md` cites them rather than restating.
 
 Repositories and services are reached through `get*()` factory functions with matching
 `reset*()` for tests (that `reset*` pairing is why those tests get isolated processes).

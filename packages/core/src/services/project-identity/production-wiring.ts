@@ -13,7 +13,7 @@
  */
 
 import { eventBus } from "../events/event-bus.js";
-import { getProjectIdentityAliasResolver } from "./alias-resolver.js";
+import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 import type {
   ProjectIdentityChangedPayload,
   ProjectIdentityChangedPublisher,
@@ -43,7 +43,7 @@ export type ProductionInvalidatorTargetResolver =
  */
 async function resolveServingTargets(): Promise<ProductionInvalidatorTargets> {
   const [{ SearchController }, { symbolGraphService }] = await Promise.all([
-    import("../../controllers/search-controller.js"),
+    import("../search/search-controller.js"),
     import("../symbol/symbol-graph.service.js"),
   ]);
   const engine = SearchController.getInstance().getSearchEngine();

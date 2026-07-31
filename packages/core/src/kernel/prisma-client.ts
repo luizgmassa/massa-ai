@@ -1,7 +1,7 @@
 /** Shared PostgreSQL Prisma client. */
 import { logger } from "@massa-ai/shared";
 import { requirePostgresDatabaseUrl } from "@massa-ai/shared/config";
-import { PrismaClient } from "../../generated/prisma/index.js";
+import { PrismaClient } from "../generated/prisma/index.js";
 
 let prismaInstance: PrismaClient | null = null;
 let prismaPool: import("pg").Pool | null = null;

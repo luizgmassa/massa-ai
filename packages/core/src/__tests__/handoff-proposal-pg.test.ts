@@ -74,7 +74,7 @@ async function cleanup(): Promise<void> {
 
 describe.skipIf(!DEDICATED_DB)("handoff/proposal PostgreSQL parity", () => {
   beforeAll(async () => {
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     prisma = getPrismaClient();
     // Assert only what a client can observe about the server it reached.
     //

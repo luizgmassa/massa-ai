@@ -10,16 +10,16 @@
  */
 
 import { logger, MemoryType, MemoryLevel } from "@massa-ai/shared";
-import { getMemoryRepository } from "../data/memory/memory-repository-factory.js";
-import type { MemoryRow } from "../data/memory/memory-repository.js";
+import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
+import type { MemoryRow } from "../../data/memory/memory-repository.js";
 import {
   MemoryService,
   type ScoredMemory,
-} from "../services/memory/memory-service.js";
-import { MemoryGraphService } from "../services/graph/memory-graph.service.js";
-import { memoryConsolidationJob } from "../services/jobs/memory-consolidation-job.js";
-import { getSalienceJudge } from "../services/memory/salience-judge.js";
-import { eventBus } from "../services/events/event-bus.js";
+} from "./memory-service.js";
+import { MemoryGraphService } from "../graph/memory-graph.service.js";
+import { memoryConsolidationJob } from "../jobs/memory-consolidation-job.js";
+import { getSalienceJudge } from "./salience-judge.js";
+import { eventBus } from "../events/event-bus.js";
 
 // ── Input / Output types ─────────────────────────────────────
 

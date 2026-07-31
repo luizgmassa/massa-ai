@@ -2,7 +2,7 @@
  * Test migration: FK constraints, array types, and JSON metadata
  */
 
-import { getPrismaClient } from '../../services/query/prisma-client.js';
+import { getPrismaClient } from '../../kernel/prisma-client.js';
 import { logger } from '@massa-ai/shared';
 
 const prisma = getPrismaClient();

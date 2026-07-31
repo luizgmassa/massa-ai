@@ -54,7 +54,7 @@ async function cleanup(): Promise<void> {
 
 describe.skipIf(!DEDICATED_DB)("MemoryRepositoryPg — coverage", () => {
   beforeAll(async () => {
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     prisma = getPrismaClient();
     (MemoryRepositoryPg as any).instance = null;
     repo = MemoryRepositoryPg.getInstance();

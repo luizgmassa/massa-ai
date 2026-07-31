@@ -4,7 +4,7 @@ import type {
   SymbolDefinition,
   SymbolRepositoryPg,
 } from "../../data/symbol/symbol-repository-pg.js";
-import { parseStructuralFqn } from "../structural/fqn-codec.js";
+import { parseStructuralFqn } from "../../kernel/fqn-codec.js";
 import type { SymbolIdentityResolution } from "@massa-ai/shared";
 
 export type DefinitionLookupResult =

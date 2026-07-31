@@ -12,21 +12,21 @@
  */
 
 import { logger } from "@massa-ai/shared";
-import { tracePathService } from "../services/symbol/trace-path.js";
+import { tracePathService } from "./trace-path.js";
 import type {
   TracePathResult,
   TraceDirection,
   TraceMode,
-} from "../services/symbol/trace-path.js";
-import type { EdgeType } from "../services/symbol/symbol-graph.service.js";
-import { impactAnalysisService } from "../services/symbol/impact-analysis.js";
+} from "./trace-path.js";
+import type { EdgeType } from "./symbol-graph.service.js";
+import { impactAnalysisService } from "./impact-analysis.js";
 import type {
   ImpactAnalysisOptions,
   ImpactAnalysisResult,
   ImpactScope,
-} from "../services/symbol/impact-analysis.js";
-import type { DefinitionLookupResult } from "../services/symbol/definition-lookup.js";
-import { toSymbolIdentityResolution } from "../services/symbol/definition-lookup.js";
+} from "./impact-analysis.js";
+import type { DefinitionLookupResult } from "./definition-lookup.js";
+import { toSymbolIdentityResolution } from "./definition-lookup.js";
 import type { SymbolIdentityResolution } from "@massa-ai/shared";
 
 export interface TracePathInput {

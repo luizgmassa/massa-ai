@@ -10,7 +10,7 @@ import {
 import type {
   NormalizedStructuralEdge,
   NormalizedStructure,
-} from "./types.js";
+} from "../../kernel/types.js";
 import type {
   StructuralQueryContext,
   StructuralQueryExecutor,

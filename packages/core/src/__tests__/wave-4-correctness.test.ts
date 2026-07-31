@@ -735,7 +735,7 @@ describe("GetReferencesTool — N4 total/shown/omitted", () => {
  * post-filter, post-rerank list BEFORE the final `.slice(0, maxResults)`.
  */
 import { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js";
-import { SearchController } from "../controllers/search-controller.js";
+import { SearchController } from "../services/search/search-controller.js";
 
 function makeSearchResult(id: string): { id: string; score: number; content: string; metadata: Record<string, unknown> } {
   return { id, score: 0.5, content: "x", metadata: { filePath: `src/${id}.ts`, lineStart: 1, lineEnd: 1, language: "ts" } };

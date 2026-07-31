@@ -7,7 +7,7 @@
  */
 
 import { describe, test, expect, afterEach } from "bun:test";
-import { getVectorStore, resetVectorStore } from "../data/vector/vector-store-factory.js";
+import { getVectorStore, resetVectorStore } from "../services/vector/vector-store-factory.js";
 import { PostgresVectorStore } from "../data/vector/postgres-vector-store.js";
 
 const DATABASE_URL = process.env.DATABASE_URL ?? "";

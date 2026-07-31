@@ -3,7 +3,7 @@ import {
   DefinitionLookupService,
   toSymbolIdentityResolution,
 } from "../services/symbol/definition-lookup.js";
-import { STRUCTURAL_SYMBOL_KINDS } from "../services/structural/types.js";
+import { STRUCTURAL_SYMBOL_KINDS } from "../kernel/types.js";
 import { SearchDefinitionsTool } from "../tools/search_definitions.js";
 import type { SymbolDefinition } from "../data/symbol/symbol-repository-pg.js";
 import { TracePathService } from "../services/symbol/trace-path.js";

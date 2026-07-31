@@ -1,4 +1,4 @@
-import type { SourcePoint, SourceSpan } from "./types.js";
+import type { SourcePoint, SourceSpan } from "../../kernel/types.js";
 
 export interface LegacyLineRange {
   /** One-based inclusive line containing the span start. */

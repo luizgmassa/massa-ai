@@ -2,12 +2,12 @@
  * Search Memories Tool
  *
  * Thin MCP tool layer — validates input and delegates to MemoryController.
- * All business logic lives in controllers/memory-controller.ts.
+ * All business logic lives in services/memory/memory-controller.ts.
  */
 
 import { IToolHandler, ToolResponse, MemoryType } from "@massa-ai/shared";
 import { logger } from "@massa-ai/shared";
-import { MemoryController } from "../controllers/memory-controller.js";
+import { MemoryController } from "../services/memory/memory-controller.js";
 import { serializeToolResponse } from "./serialize.js";
 
 interface SearchMemoriesParams {

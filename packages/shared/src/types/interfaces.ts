@@ -96,8 +96,44 @@ export interface ICompressor {
 }
 
 /**
+ * The embedding capability a vector store needs, and nothing more.
+ *
+ * GMS-01 AC-4. `data/vector/base-vector-store.ts` used to import both
+ * `createEmbeddingProvider` and `EmbeddingProvider` from
+ * `services/embeddings/index.js` — the last `data -> services` edge of the 26,
+ * and the one design.md §3 resolves by inverting rather than by promoting, since
+ * `services/embeddings/index.ts` is a barrel over six sibling modules and moving
+ * it is a subsystem move rather than a kernel admission.
+ *
+ * This is deliberately NOT the full `EmbeddingProvider` interface. That one
+ * carries `id`, `model`, `isAvailable()` and `getConfig(): EmbeddingProviderConfig`,
+ * and lifting it whole would drag `services/embeddings/config.ts` into shared —
+ * the same subsystem creep the inversion exists to avoid. Measured: `data/vector/`
+ * reads exactly three members, `dimensions`, `embedQuery` and `embedBatch`.
+ * The real provider satisfies this structurally, so nothing needs to declare it.
+ */
+export interface VectorEmbeddingProvider {
+  /** Embedding dimensions — drives pgvector column sizing. */
+  dimensions: number;
+  /** Embed a single text query. */
+  embedQuery(text: string): Promise<number[]>;
+  /** Embed multiple texts in batch. */
+  embedBatch(texts: string[]): Promise<number[][]>;
+}
+
+/**
+ * Deferred construction of a {@link VectorEmbeddingProvider}.
+ *
+ * Deferred on purpose: `base-vector-store.ts` assigns its provider into a
+ * memoised promise field on first use, not at construction time. Resolving
+ * eagerly would move provider auto-selection to construction and change when it
+ * happens — which is a behaviour change inside a behaviour-preserving refactor.
+ */
+export type VectorEmbeddingProviderFactory = () => Promise<VectorEmbeddingProvider>;
+
+/**
  * Vector Store Interface
- * 
+ *
  * Abstracts PostgreSQL + pgvector database operations.
  * Supports multiple backend implementations with consistent API.
  */

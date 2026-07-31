@@ -8,15 +8,11 @@
  */
 
 import type { ToolResponse, IToolHandler } from "@massa-ai/shared";
-import type { Language } from "../services/executor/runtime.js";
+import type { ExecuteFileParams } from "../services/executor/params.js";
 
-export interface ExecuteFileParams {
-  path: string;
-  language: Language;
-  code: string;
-  timeout?: number;
-  intent?: string;
-}
+// Declared beside the service that fulfils it (T8b); re-exported here because
+// `tools/index.ts` publishes it from this path.
+export type { ExecuteFileParams };
 
 export class ExecuteFileTool implements IToolHandler {
   name = "execute_file";

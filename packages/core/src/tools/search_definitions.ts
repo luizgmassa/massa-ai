@@ -12,7 +12,7 @@ import {
   ToolResponse,
 } from "@massa-ai/shared";
 import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
-import { validateEnum, ToolError } from "./enum-validation.js";
+import { validateEnum, ToolError } from "../kernel/enum-validation.js";
 import { getActiveGeneration, assertGenerationNotStale } from "../services/symbol/active-generation.js";
 
 interface SearchDefinitionsParams {

@@ -281,7 +281,7 @@ describe.skipIf(!API_AVAILABLE)("massa-ai API — real integration (using massa-
 
     test("go to definition for indexProject resolves to contextual-search-rlm.ts", async () => {
       const res = await get(
-        `/api/v1/symbol/definition?projectId=${PROJECT_ID}&symbolName=indexProject&fromFile=packages/core/src/controllers/search-controller.ts`
+        `/api/v1/symbol/definition?projectId=${PROJECT_ID}&symbolName=indexProject&fromFile=packages/core/src/services/search/search-controller.ts`
       );
 
       // Just verify the endpoint responds — symbol may not be indexed yet

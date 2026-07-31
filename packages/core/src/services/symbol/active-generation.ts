@@ -22,7 +22,7 @@
  * form for the other graph readers.
  */
 
-import { ToolError } from "../../tools/enum-validation.js";
+import { ToolError } from "../../kernel/enum-validation.js";
 import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 
 /**

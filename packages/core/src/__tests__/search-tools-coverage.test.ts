@@ -10,9 +10,9 @@ import { SearchProjectTool } from "../tools/search_project.js";
 import { SearchCodeTool } from "../tools/search_code.js";
 import { FetchAndIndexTool } from "../tools/fetch_and_index.js";
 import { GetOptimizedContextTool } from "../tools/get_optimized_context.js";
-import { SearchServiceError } from "../services/search/search-diagnostics.js";
+import { SearchServiceError } from "../kernel/search-diagnostics.js";
 
-mock.module("../controllers/search-controller.js", () => ({
+mock.module("../services/search/search-controller.js", () => ({
   SearchController: {
     getInstance: () => ({
       searchProject: async (p: any) => {
@@ -28,7 +28,7 @@ mock.module("../controllers/search-controller.js", () => ({
   },
 }));
 
-mock.module("../controllers/context-controller.js", () => ({
+mock.module("../services/context/context-controller.js", () => ({
   ContextController: {
     getInstance: () => ({
       getOptimizedContext: async (p: any) => {

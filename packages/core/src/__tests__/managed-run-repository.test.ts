@@ -45,7 +45,7 @@ afterAll(async () => {
 });
 
 async function cleanupProject(tx_projectId: string): Promise<void> {
-  const { getPrismaClient } = await import("../services/query/prisma-client.js");
+  const { getPrismaClient } = await import("../kernel/prisma-client.js");
   await getPrismaClient().$executeRaw`DELETE FROM managed_runs WHERE project_id = ${tx_projectId}`;
 }
 
@@ -73,7 +73,7 @@ describe.skipIf(!DB_AVAILABLE)("ManagedRunRepository (PostgreSQL)", () => {
     // so the assertion is robust to host/DB timezone skew (Prisma's pg
     // adapter returns timestamptz as a JS Date that may carry a session-TZ
     // offset; the same skew applies to a SELECT now() query).
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     const dbNowRows = await getPrismaClient().$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS now`;
     const dbNow = dbNowRows[0]!.now.getTime();
     const expiresAt = outcome.lease.leaseExpiresAt;

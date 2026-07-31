@@ -25,7 +25,7 @@ import {
   _resetSandboxWarningForTesting,
 } from "../services/executor/sandbox.js";
 import { PolyglotExecutor } from "../services/executor/executor.js";
-import { ExecutorController } from "../controllers/executor-controller.js";
+import { ExecutorController } from "../services/executor/executor-controller.js";
 
 const ORIGINAL_MODE = process.env.MASSA_AI_EXECUTOR_SANDBOX;
 

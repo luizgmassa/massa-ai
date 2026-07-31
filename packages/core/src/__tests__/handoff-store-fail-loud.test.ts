@@ -4,7 +4,7 @@ import {
   type HandoffRecord,
 } from "../data/handoff/handoff-contract.js";
 import { PgHandoffStore } from "../data/handoff/handoff-repository-pg.js";
-import { SearchServiceError } from "../services/search/search-diagnostics.js";
+import { SearchServiceError } from "../kernel/search-diagnostics.js";
 
 function handoff(overrides: Partial<HandoffRecord> = {}): HandoffRecord {
   return {

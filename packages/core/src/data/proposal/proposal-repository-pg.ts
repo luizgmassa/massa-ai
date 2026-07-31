@@ -1,12 +1,12 @@
 /** PostgreSQL implementation of the durable asynchronous ProposalStore contract. */
 
 import type { PrismaClient } from "../../generated/prisma/index.js";
-import { getPrismaClient } from "../../services/query/prisma-client.js";
-import { getProjectIdentityAliasResolver } from "../../services/project-identity/alias-resolver.js";
+import { getPrismaClient } from "../../kernel/prisma-client.js";
+import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 import {
   searchBackendUnavailable,
   storeCorruption,
-} from "../../services/search/search-diagnostics.js";
+} from "../../kernel/search-diagnostics.js";
 import {
   PROPOSAL_KINDS,
   PROPOSAL_STATUSES,

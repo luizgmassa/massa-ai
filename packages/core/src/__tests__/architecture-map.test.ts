@@ -34,7 +34,7 @@ import {
   VALID_ARCHITECTURE_ASPECTS,
 } from "../services/symbol/architecture.js";
 import type { HttpEdgeLite } from "../services/symbol/architecture.js";
-import { ToolError } from "../tools/enum-validation.js";
+import { ToolError } from "../kernel/enum-validation.js";
 
 // ─── (1) Unit tests — pure functions ─────────────────────────────────────────
 
@@ -469,7 +469,7 @@ import { WorkspaceManager } from "../services/workspace/workspace-manager.js";
  * `IndexManager.saveIndexMetadata`). The marker write is already wrapped in a
  * non-fatal try/catch; satisfying it keeps the run free of a misleading warn.
  */
-mock.module("../data/vector/vector-store-factory.js", () => ({
+mock.module("../services/vector/vector-store-factory.js", () => ({
   getVectorStore: async () => ({
     addDocuments: async () => {},
     deleteByProject: async () => {},

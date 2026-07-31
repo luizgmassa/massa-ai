@@ -39,7 +39,7 @@ mock.module("../data/symbol/symbol-repository-factory.js", () => ({
 }));
 
 import { getActiveGeneration, assertGenerationNotStale } from "../services/symbol/active-generation.js";
-import { ToolError } from "../tools/enum-validation.js";
+import { ToolError } from "../kernel/enum-validation.js";
 import { ImpactAnalysisTool } from "../tools/impact_analysis.js";
 import { TracePathTool } from "../tools/trace_path.js";
 import { GetReferencesTool } from "../tools/get_references.js";

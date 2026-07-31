@@ -263,7 +263,7 @@ describe.skipIf(!runIntegration)("owned PostgreSQL graph migration", () => {
       const previousDatabaseUrl = process.env.DATABASE_URL;
       process.env.DATABASE_URL = parsed.toString();
       const { SymbolRepositoryPg } = await import("../data/symbol/symbol-repository-pg.js");
-      const { disconnectPrisma, _resetPrismaForTesting } = await import("../services/query/prisma-client.js");
+      const { disconnectPrisma, _resetPrismaForTesting } = await import("../kernel/prisma-client.js");
       _resetPrismaForTesting();
       const repository = SymbolRepositoryPg.getInstance();
       try {

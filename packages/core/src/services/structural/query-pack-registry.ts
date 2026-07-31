@@ -3,7 +3,7 @@ import type {
   StructuralCapability,
   StructuralCapabilityRequirement,
   StructuralSymbolKind,
-} from "./types.js";
+} from "../../kernel/types.js";
 import {
   JAVASCRIPT_QUERY_PACK,
   TYPESCRIPT_QUERY_PACK,

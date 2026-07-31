@@ -10,9 +10,9 @@
  * `lockActiveGenerations` from here.
  */
 
-import { parseStructuralFqn, type StructuralFqnCandidate } from "../../services/structural/fqn-codec.js";
+import { parseStructuralFqn, type StructuralFqnCandidate } from "../../kernel/fqn-codec.js";
 import type { GraphGenerationLease } from "../graph-generation/graph-generation-contract.js";
-import { getPrismaClient } from "../../services/query/prisma-client.js";
+import { getPrismaClient } from "../../kernel/prisma-client.js";
 import type {
   SymbolDefinition,
   SymbolReference,

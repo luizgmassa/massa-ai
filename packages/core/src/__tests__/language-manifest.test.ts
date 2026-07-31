@@ -12,7 +12,7 @@ import {
   STRUCTURAL_EDGE_KINDS,
   STRUCTURAL_SYMBOL_KINDS,
   type NormalizedStructuralEdge,
-} from "../services/structural/types.js";
+} from "../kernel/types.js";
 
 const DATA_FLOW_EDGE_FIXTURE = {
   kind: "data_flow",

@@ -9,7 +9,7 @@ import { logger } from "@massa-ai/shared";
 import type { ProposalRecord } from "../../data/proposal/proposal-repository.js";
 import type { Observation } from "../../data/memory/observation-repository.js";
 import { eventBus } from "../events/event-bus.js";
-import { SearchServiceError } from "../search/search-diagnostics.js";
+import { SearchServiceError } from "../../kernel/search-diagnostics.js";
 import { detectPatterns } from "./auto-improve-patterns.js";
 import { enrichWithLlm } from "./auto-improve-llm.js";
 import { applyProposal, ApplyRejection } from "./auto-improve-apply.js";

@@ -7,7 +7,14 @@
  *     reused by P2-T2 web fetch).
  *   - `detectRuntimes` etc.: runtime detection (also exported for tests).
  *   - `intentSearch`: opt-in progressive disclosure for large outputs.
+ *   - `Execute*Params`: the request shapes callers hand in (T8b).
  */
+export type {
+  ExecuteParams,
+  ExecuteFileParams,
+  BatchExecuteParams,
+} from "./params.js";
+
 export { PolyglotExecutor } from "./executor.js";
 export type {
   ExecResult,

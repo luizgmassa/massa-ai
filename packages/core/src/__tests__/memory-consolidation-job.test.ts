@@ -22,7 +22,7 @@ mock.module("../services/graph/graph-store-factory.js", () => ({
   getGraphStore: () => mockGraphStore,
 }));
 
-mock.module("../services/query/prisma-client.js", () => ({
+mock.module("../kernel/prisma-client.js", () => ({
   getPrismaClient: () => ({
     $executeRaw: () => Promise.resolve(0),
   }),

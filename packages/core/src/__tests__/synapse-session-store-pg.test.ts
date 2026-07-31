@@ -54,7 +54,7 @@ async function cleanup(): Promise<void> {
 
 describe.skipIf(!(DEDICATED_DB && RUN_PG))("PgSynapseSessionStore — PostgreSQL parity", () => {
   beforeAll(async () => {
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     prisma = getPrismaClient();
     await cleanup();
   });

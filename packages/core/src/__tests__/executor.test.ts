@@ -37,7 +37,7 @@ import {
   INTENT_SEARCH_THRESHOLD,
   type DetectDeps,
 } from "../services/executor/index.js";
-import { ExecutorController } from "../controllers/executor-controller.js";
+import { ExecutorController } from "../services/executor/executor-controller.js";
 
 // Detect what's actually available once for the execution tests.
 const RUNTIMES = detectRuntimes();

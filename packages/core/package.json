@@ -24,10 +24,6 @@
     "./services": {
       "types": "./dist/services/index.d.ts",
       "default": "./dist/services/index.js"
-    },
-    "./controllers": {
-      "types": "./dist/controllers/index.d.ts",
-      "default": "./dist/controllers/index.js"
     }
   },
   "scripts": {

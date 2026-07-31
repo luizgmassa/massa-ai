@@ -15,7 +15,7 @@ import type {
   SourceSpan,
   StructuralEdgeKind,
   StructuralSymbolKind,
-} from "../structural/types.js";
+} from "../../kernel/types.js";
 import type { GraphGenerationLease } from "../../data/graph-generation/graph-generation-contract.js";
 import type { HeaderLanguageEvidence } from "../structural/language-manifest.js";
 import type { FileCursor, ManagedRunLease } from "../../data/managed-runs/managed-run-contract.js";

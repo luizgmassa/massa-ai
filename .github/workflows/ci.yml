@@ -139,6 +139,19 @@ jobs:
       - name: Verify search facade hub metric (G-HUB)
         run: bun scripts/search-hub-metric.ts packages/core/src/services/search
 
+      # GMS-01 AC-1. The core layer contract, enforced rather than asserted.
+      # Kernel rule (PR-C T5): a file under packages/core/src/kernel/ may import
+      # from no tier, and data/ may not import services/ while data/ -> kernel/
+      # stays legal. Membership is a path prefix — `git mv` grants it — and there
+      # is no allowlist, deliberately: an accepted exception makes a NEW edge of
+      # the same shape indistinguishable from the recorded ones.
+      #
+      # Reads a live edge count on a pass as well as a fail, because a check that
+      # resolved nothing also reports zero violations and the two must not look
+      # alike in the log. T15 adds the controllers rule to the same table.
+      - name: Verify core layer contract (GMS-01 AC-1)
+        run: bun scripts/check-core-layering.ts
+
       # GMS-04 AC-3. Classifies every path-shaped pointer at a renamed module as
       # RESOLVES, HISTORICAL or BROKEN. Broken must be 0 and historical must sit
       # exactly on its pin, so a newly dangling pointer and a silently dropped

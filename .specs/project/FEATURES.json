@@ -620,6 +620,28 @@
       "validation": ".specs/features/core-layering-god-module-split/validation.md"
     },
     {
+      "slug": "core-layering-controller-retirement",
+      "title": "Core layering — controller retirement (PR-C): kernel tier, controllers/ retired into services/, AC-1's import check shipped with the restructuring",
+      "status": "in_progress",
+      "priority": "P2",
+      "workflow": "spec-driven",
+      "branch": "spec/pr-c-execute",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/core-layering-controller-retirement/spec.md",
+      "design": ".specs/features/core-layering-controller-retirement/design.md",
+      "tasks": ".specs/features/core-layering-controller-retirement/tasks.md",
+      "depends_on": [
+        "core-layering-god-module-split"
+      ],
+      "notes": "PR-C of 4 under core-layering-god-module-split. Executes GMS-01 (all six ACs) and GMS-02 AC-2 only; GMS-02 AC-1 is PR-D's by C13. All 20 tasks shipped in 22 commits; T18 independent validation PASS (author != verifier), see validation.md. Awaiting merge.",
+      "validation": ".specs/features/core-layering-controller-retirement/validation.md"
+    },
+    {
       "slug": "sensor-repair-2026-07",
       "title": "Sensor repair 2026-07 — reset the coverage gate's database, wire it into CI, stop tests reading the real config, content-anchor the needles fixture, honour includePersistent",
       "status": "complete",

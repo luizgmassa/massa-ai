@@ -14,7 +14,7 @@ let queryRawResult: any[] = [];
 let executeRawCalls: any[] = [];
 let executeRawResults: number[] = [];
 
-mock.module("../services/query/prisma-client.js", () => ({
+mock.module("../kernel/prisma-client.js", () => ({
   getPrismaClient: () => ({
     $queryRaw: () => Promise.resolve(queryRawResult),
     $executeRaw: (sql: any) => {

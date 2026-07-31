@@ -54,8 +54,10 @@ looking for how that behavior is *exposed*, look in `apps/`.
 ## Architecture Layers
 
 Nine layers. The first four are `packages/core`'s internal decomposition and are
-**enforced by directory** — the repo states this contract in `packages/core/src/index.ts`
-and means it.
+**enforced by directory**. The contract itself is stated in exactly two places —
+`packages/core/src/index.ts`'s header and `CLAUDE.md`'s Architecture section — and
+enforced by `scripts/check-core-layering.ts`. What follows is the knowledge graph's
+inventory of that structure, not a third statement of it.
 
 ```
                     ┌─────────────────┐   ┌──────────────────┐
@@ -68,22 +70,30 @@ and means it.
    ╔════════════════════════════ packages/core ════════════════════════════╗
    ║   tools/  (31)        thin MCP handlers — schema + delegation only    ║
    ║      ▼                                                                ║
-   ║   controllers/ (6)    orchestration — composes services, side-effects ║
-   ║      ▼                                                                ║
-   ║   services/ (208)     domain logic — the bulk of the product          ║
+   ║   services/ (208)     domain logic AND orchestration — the bulk of it ║
    ║      ▼                                                                ║
    ║   data/    (49)       PostgreSQL repositories, vector store, FTS      ║
    ╚═══════════════════════════════════════════════════════════════════════╝
-                                        ▲
+        ▲                               ▲
+        │        kernel/ (11)  ─────────┘   cross-cutting leaves; imports no tier
+        │
               packages/shared (18) ─────┘   logger, config, env, types
 ```
+
+> **Hand-edited for PR-C, against generated output.** This guide is generated from the
+> knowledge graph at `17ee7083` and `.ua/` regeneration is out of scope until after PR-D,
+> so the retirement of `controllers/` and the arrival of `kernel/` are edited in by hand.
+> **The `kernel/` count of 11 is hand-measured over `git ls-files`; every other count on
+> this page is still the graph's at `17ee7083` and is not re-measured here.** Two of them
+> are known to have moved since (`tools/` is 30, `data/` + `models/` is 42) — left alone
+> deliberately, so that no row silently mixes two trees.
 
 | Layer | Files | What belongs here |
 |---|---:|---|
 | **Tool Handlers** (`core/src/tools/`) | 31 | One file per MCP tool. Deliberately thin: parse input, delegate, serialize output, **no business logic**. This discipline is what lets two very different transports expose one tool contract without duplicating logic. |
-| **Controllers** (`core/src/controllers/`) | 6 | Orchestration. Composes multiple services and owns side-effects. An *internal* orchestration layer — not an HTTP API layer, despite the name. |
-| **Service** (`core/src/services/`) | 208 | The dominant domain-logic layer: search, synapse, embeddings, graph, structural, memory, jobs, etl, scheduler, symbol, project-identity, hooks, executor, checkpoint, cache, web, workspace, metrics, handoff, events. Highest internal cohesion in the codebase. |
-| **Data** (`core/src/data/`, `core/src/models/`) | 49 | PostgreSQL/pgvector persistence — repositories, vector store, FTS — plus data-model types and the core barrel that declares the four-layer contract. |
+| **Kernel** (`core/src/kernel/`) | 11 | Cross-cutting leaves. A file here imports from **no** tier, which is what makes membership checkable by path prefix rather than by a maintained allowlist. Any tier may import it — including `data/`, which is how `data → services` became a violation instead of a necessity. |
+| **Service** (`core/src/services/`) | 208 | The dominant layer, and since PR-C the **orchestration** layer too: search, synapse, embeddings, graph, structural, memory, jobs, etl, scheduler, symbol, project-identity, hooks, executor, context, checkpoint, cache, web, workspace, metrics, handoff, events. The five retired controllers live in the subdirectory that already held each one's collaborators. Highest internal cohesion in the codebase. |
+| **Data** (`core/src/data/`, `core/src/models/`) | 49 | PostgreSQL/pgvector persistence — repositories, vector store, FTS — plus data-model types. |
 | **Test** (everywhere) | 371 | All test files. Kept as one cross-cutting layer because core's dominant test tree is **flat and unmirrored** (see below). |
 | **Shared Utility** (`packages/shared/src/`) | 18 | Cross-cutting logger, runtime config loader, env handling, shared types. Consumed by core *and* every transport. |
 | **REST API Transport** (`apps/tools-api/src/`) | 26 | Elysia server on :3333 — routes, middleware, startup/health wiring. Mounts the Web UI at `/ui`. |
@@ -178,13 +188,13 @@ Thirteen steps, ordered the way a request actually flows. Each names the files t
 
 | # | Step | Start here |
 |---|---|---|
-| 1 | **The Core Package Contract** — the product's own statement of its architecture; re-exports the four enforced layers as one import surface. Read first. | `packages/core/src/index.ts` |
-| 2 | **Tool Handlers** — 31 thin files, one per MCP tool. `search_project.ts` is representative: call the controller, serialize, done. | `tools/index.ts`, `tools/search_project.ts` |
-| 3 | **Controllers** — six orchestrators. `search-controller.ts` shows what orchestration means: admission preflight, optional auto-reindex, glob filtering, centrality boosting, optional LLM rerank. | `controllers/search-controller.ts` |
+| 1 | **The Core Package Contract** — the product's own statement of its architecture; re-exports the four enforced layers as one import surface — `kernel/` has no line of its own here, its symbols arriving through the services barrel. Read first, alongside `CLAUDE.md`'s Architecture section — together they are the whole contract. | `packages/core/src/index.ts` |
+| 2 | **Tool Handlers** — 31 thin files, one per MCP tool. `search_project.ts` is representative: call the orchestrator, serialize, done. | `tools/index.ts`, `tools/search_project.ts` |
+| 3 | **Orchestrators** — five of them, one per use case, living in `services/` beside the collaborators each composes. `search-controller.ts` shows what orchestration means: admission preflight, optional auto-reindex, glob filtering, centrality boosting, optional LLM rerank. | `services/search/search-controller.ts` |
 | 4 | **The Search Facade** — hybrid vector + Postgres FTS with reciprocal-rank fusion. A composition root plus six capability modules, each taking a narrow deps record rather than the facade. | `services/search/contextual-search-rlm.ts` + `hybrid-search.ts`, `project-indexer.ts`, `index-admin.ts`, `session-bias.ts`, `graph-stream.ts`, `result-fusion.ts` |
 | 5 | **The ETL Indexing Pipeline** — `discover → parse → resolve → load`. Hash-skip unchanged files, tree-sitter parse, resolve FQNs, persist in per-batch transactions with deadlock retry. | `services/etl/pipeline.ts`, `stages/*.ts` |
 | 6 | **Symbol Graph & Blue-Green Generations** — go-to-definition, find-references, project map; generations flipped atomically. | `services/symbol/symbol-graph.service.ts`, `etl/graph-generation-coordinator.ts` |
-| 7 | **The PostgreSQL Data Layer** — the lazily-created `pg` pool and the Prisma singleton everything funnels through, plus the typed event bus. | `data/db-connection.ts`, `services/query/prisma-client.ts`, `services/events/event-bus.ts` |
+| 7 | **The PostgreSQL Data Layer** — the lazily-created `pg` pool and the Prisma singleton everything funnels through, plus the typed event bus. | `kernel/db-connection.ts`, `kernel/prisma-client.ts`, `services/events/event-bus.ts` |
 | 8 | **Synapse: Cross-Session Memory** — ~28 service files for scoring, inhibition, plasticity, metacognition, prefetch. Session state in Postgres with an in-memory mirror; working-memory buffer matches queries by Jaccard overlap. | `services/synapse/{index,types}.ts`, `session/session-store-pg.ts` |
 | 9 | **Graceful Degradation for LLM Features** — the shared client and three concrete instances of the fallback pattern. | `services/memory/llm-client.ts`, `bootstrap/`, `handoff/` |
 | 10 | **Shared Utilities** — the seam between core and its consumers; `env.ts` runs at startup for every entry point. | `packages/shared/src/{index,env}.ts` |
@@ -203,32 +213,35 @@ Key files per layer, ranked by coupling (in + out dependency edges).
 | Deg | File | Role |
 |---:|---|---|
 | 31 | `tools/serialize.ts` | Shared success-path serializer — field projection, TOON/JSON/tree encoding |
-| 21 | `tools/enum-validation.ts` | `validateEnum` + `ToolError`; replaces silent-fallback branches across nearly every handler |
+| 21 | `kernel/enum-validation.ts` | `validateEnum` + `ToolError`; replaces silent-fallback branches across nearly every handler |
 | 13 | `tools/index_project.ts` | Validates/canonicalizes target path, guards concurrent roots, kicks off indexing |
 | 12 | `tools/read_file.ts` | Compression, caching, symbol enrichment, multi-range selection, path safety |
 | 11 | `tools/trace_path.ts` | Traces the typed structural-edge graph from a seed symbol |
 | 10 | `tools/search_project.ts` | The canonical thin handler — delegate + serialize |
 
-### Controllers
+### Orchestrators (inside Service)
+
+Not a layer of their own since PR-C. Each sits in the `services/` subdirectory that already
+held the collaborators it composes; `services/graph/` is the **memory-relation** graph, so
+the **symbol**-graph controller belongs to `services/symbol/`, one directory over.
 
 | Deg | File | Role |
 |---:|---|---|
-| 29 | `controllers/memory-controller.ts` | Composes memory repo, MemoryService, MemoryGraphService, salience judging, consolidation |
-| 20 | `controllers/search-controller.ts` | Admission preflight, auto-reindex, glob filter, centrality boost, LLM rerank |
-| 15 | `controllers/context-controller.ts` | The "optimized context" use case — composes search, memory, compression, file cache |
-| 10 | `controllers/executor-controller.ts` | Owns the singleton PolyglotExecutor for execute/execute_file/batch_execute |
-| 8 | `controllers/graph-controller.ts` | Fronts symbol-graph traversal (trace_path, impact_analysis) |
+| 29 | `services/memory/memory-controller.ts` | Composes memory repo, MemoryService, MemoryGraphService, salience judging, consolidation |
+| 20 | `services/search/search-controller.ts` | Admission preflight, auto-reindex, glob filter, centrality boost, LLM rerank |
+| 15 | `services/context/context-controller.ts` | The "optimized context" use case — composes search, memory, compression, file cache |
+| 10 | `services/executor/executor-controller.ts` | Owns the singleton PolyglotExecutor for execute/execute_file/batch_execute |
+| 8 | `services/symbol/graph-controller.ts` | Fronts symbol-graph traversal (trace_path, impact_analysis) |
 
 ### Service (largest layer — top by coupling)
 
 | Deg | File | Role |
 |---:|---|---|
 | 72 | `services/search/contextual-search-rlm.ts` | Central hybrid-search facade (vector + keyword, RRF); indexing, caching, Synapse integration |
-| 68 | `services/query/prisma-client.ts` | Lazily-constructed Prisma singleton — **the most depended-upon file in the codebase** |
+| 68 | `kernel/prisma-client.ts` | Lazily-constructed Prisma singleton — **the most depended-upon file in the codebase** |
 | 39 | `services/symbol/symbol-graph.service.ts` | Code navigation API: definitions, references, dependencies, project map |
 | 38 | `services/etl/pipeline.ts` | Singleton orchestrator for the 4-stage pipeline |
 | 38 | `services/events/event-bus.ts` | Typed EventEmitter singleton; decouples ETL writers from hooks/jobs/SSE listeners |
-| 31 | `services/project-identity/alias-resolver.ts` | Canonical project-ID resolution for write paths the DB trigger cannot rewrite |
 | 26 | `services/structural/query-pack.ts` | One structural parse of one file → imports, symbols, call edges, syntax edges |
 | 24 | `services/memory/llm-client.ts` | Shared Ollama client with timeout enforcement and default-off gating |
 
@@ -241,7 +254,16 @@ Key files per layer, ranked by coupling (in + out dependency edges).
 | 31 | `data/symbol/symbol-repo-queries.ts` | Workspace/file/definition/reference/import/centrality CRUD |
 | 27 | `data/symbol/symbol-repository-factory.ts` | Singleton factory; guards on a configured Postgres `DATABASE_URL` |
 | 21 | `data/symbol/symbol-repo-graph.ts` | Project map snapshots, BFS impact analysis, edge search, FQN resolution |
-| 18 | `data/db-connection.ts` | Shared `pg` pool sized from `DB_POOL_SIZE` |
+
+### Kernel
+
+Cross-cutting leaves. A file here imports from no tier, which is what makes membership
+checkable by path prefix rather than by a maintained list.
+
+| Deg | File | Role |
+|---:|---|---|
+| 31 | `kernel/alias-resolver.ts` | Canonical project-ID resolution for write paths the DB trigger cannot rewrite |
+| 18 | `kernel/db-connection.ts` | Shared `pg` pool sized from `DB_POOL_SIZE` |
 
 ### Shared Utility
 
@@ -290,15 +312,15 @@ that rating meets high fan-in/fan-out.)
 | **31** | `data/symbol/symbol-repo-generation.ts` | Lease locking + transactional writes. Concurrency-sensitive. |
 | **31** | `data/symbol/symbol-repo-queries.ts` | Broad CRUD surface. |
 | **31** | `tools/serialize.ts` | Touched by nearly every tool handler — a bug here surfaces everywhere. |
-| **29** | `controllers/memory-controller.ts` | Composes five subsystems. |
+| **29** | `services/memory/memory-controller.ts` | Composes five subsystems. |
 | **26** | `apps/tools-api/src/index.ts` | Highest fan-out of any entry point; 26 one-hop dependencies. |
 | **24** | `services/memory/llm-client.ts` | The single gate all 11 LLM call sites pass through. |
 
 **Highest-blast-radius files** (change these and everything downstream feels it):
 
-1. `services/query/prisma-client.ts` — **68 incoming**. Every repository funnels through it.
+1. `kernel/prisma-client.ts` — **68 incoming**. Every repository funnels through it.
 2. `services/events/event-bus.ts` — **38 incoming**. Decouples writers from listeners.
-3. `services/project-identity/alias-resolver.ts` — **30 incoming**.
+3. `kernel/alias-resolver.ts` — **30 incoming**.
 4. `tools/serialize.ts` — **30 incoming**. Every tool response.
 
 ---

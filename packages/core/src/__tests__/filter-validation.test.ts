@@ -18,7 +18,7 @@ import {
   DEFAULT_MAX_FILTER_PATTERNS,
 } from "../services/search/filter-validation.js";
 import type { FilterDowngrade, FilterValidationResult } from "../services/search/filter-validation.js";
-import { ToolError } from "../tools/enum-validation.js";
+import { ToolError } from "../kernel/enum-validation.js";
 
 describe("filter-validation (FR-18 / AC-15)", () => {
   // ── Cap (FR-18 / AC-15: "Search with 33+ patterns is rejected") ───────────

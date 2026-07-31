@@ -25,7 +25,7 @@ import { grammarArtifactKey } from "../services/structural/grammar-loaders.js";
 import {
   ProjectIdentityAliasResolver,
   setProjectIdentityAliasResolverForTests,
-} from "../services/project-identity/alias-resolver.js";
+} from "../kernel/alias-resolver.js";
 import type { ManagedRunLease } from "../data/managed-runs/managed-run-contract.js";
 
 const DB_AVAILABLE = /^(postgres|postgresql):/.test(process.env.DATABASE_URL ?? "");
@@ -63,7 +63,7 @@ afterAll(async () => {
 });
 
 async function cleanupProject(p: string): Promise<void> {
-  const { getPrismaClient } = await import("../services/query/prisma-client.js");
+  const { getPrismaClient } = await import("../kernel/prisma-client.js");
   await getPrismaClient().$executeRaw`DELETE FROM managed_runs WHERE project_id = ${p}`;
 }
 
@@ -190,7 +190,7 @@ describe.skipIf(!DB_AVAILABLE)("EtlPipeline managed_runs lease (T13 / AC-7)", ()
     const active = await repo.getActive(currentProjectId, "indexing");
     expect(active).toBeNull();
     // Row is aborted, not completed — reaper will clean up; a new begin() can acquire.
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     const row = await getPrismaClient().$queryRaw<Array<{ status: string }>>`
       SELECT status FROM managed_runs WHERE id = ${BigInt(lease.runId)}
     `;
@@ -285,7 +285,7 @@ describe.skipIf(!DB_AVAILABLE)("EtlPipeline managed_runs lease (T13 / AC-7)", ()
     // `getVectorStore()`, which auto-selects an embedding provider (~13 s cold)
     // and races a `setTimeout`. Neither can finish once the clock is frozen, so
     // warm the cached singleton here, outside the fake-timer window.
-    const { getVectorStore } = await import("../data/vector/vector-store-factory.js");
+    const { getVectorStore } = await import("../services/vector/vector-store-factory.js");
     await getVectorStore();
 
     jest.useFakeTimers();

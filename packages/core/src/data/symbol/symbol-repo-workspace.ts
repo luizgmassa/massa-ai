@@ -7,7 +7,7 @@
  * SQL — split out so the main queries module stays navigable.
  */
 
-import { getPrismaClient } from "../../services/query/prisma-client.js";
+import { getPrismaClient } from "../../kernel/prisma-client.js";
 import type {
   WorkspaceRow,
   WorkspaceStatus,

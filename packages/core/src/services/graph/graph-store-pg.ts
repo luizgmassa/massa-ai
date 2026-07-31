@@ -9,7 +9,7 @@
  * can return an `IGraphStore` without backend-specific dispatch.
  */
 
-import { getPrismaClient } from "../query/prisma-client.js";
+import { getPrismaClient } from "../../kernel/prisma-client.js";
 import {
   MemoryEdge,
   MemoryRelationType,

@@ -1,6 +1,6 @@
 /** PostgreSQL-backed duplicate detection and consolidation for memories. */
 import { logger } from "@massa-ai/shared";
-import { getPrismaClient } from "../query/prisma-client.js";
+import { getPrismaClient } from "../../kernel/prisma-client.js";
 import { TokenMetrics } from "../metrics/token-metrics.js";
 import type { MemoryRowWithEmbedding } from "../graph/types.js";
 

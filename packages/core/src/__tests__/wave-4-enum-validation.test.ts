@@ -13,7 +13,7 @@
  *     test fails (validateEnum would return undefined as T).
  */
 import { describe, test, expect } from "bun:test";
-import { ToolError, validateEnum } from "../tools/enum-validation.js";
+import { ToolError, validateEnum } from "../kernel/enum-validation.js";
 import { validateGitRef } from "../services/symbol/git-ref-validation.js";
 
 describe("ToolError", () => {
@@ -199,7 +199,7 @@ import { ListProjectsTool } from "../tools/list_projects.js";
 import { SearchDefinitionsTool } from "../tools/search_definitions.js";
 import { CreateCheckpointTool } from "../tools/create_checkpoint.js";
 import { CompressContextTool } from "../tools/compress_context.js";
-import { ExecutorController } from "../controllers/executor-controller.js";
+import { ExecutorController } from "../services/executor/executor-controller.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 /**

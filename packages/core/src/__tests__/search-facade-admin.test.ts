@@ -23,7 +23,7 @@ mock.restore();
 // provider and times out on a cold one, which is why it read as flakiness. This
 // is the identical omission fixed in `contextual-search-rlm-coverage.test.ts`
 // by commit `48d0f39`; see that file's header.
-mock.module("../data/vector/vector-store-factory.js", () => ({
+mock.module("../services/vector/vector-store-factory.js", () => ({
   getVectorStore: mock(async () => ({
     search: async () => [],
     searchByEmbedding: async () => [],

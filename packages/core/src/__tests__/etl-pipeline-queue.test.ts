@@ -5,7 +5,7 @@ import { indexJobTracker } from "../services/jobs/index-job-tracker.js";
 import { resetParserReadinessForTests } from "../services/structural/parser-readiness.js";
 import { LANGUAGE_MANIFEST } from "../services/structural/language-manifest.js";
 import { grammarArtifactKey } from "../services/structural/grammar-loaders.js";
-import { ProjectIdentityAliasResolver, setProjectIdentityAliasResolverForTests } from "../services/project-identity/alias-resolver.js";
+import { ProjectIdentityAliasResolver, setProjectIdentityAliasResolverForTests } from "../kernel/alias-resolver.js";
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
   let resolve!: () => void;

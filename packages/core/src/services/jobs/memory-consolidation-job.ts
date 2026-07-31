@@ -339,7 +339,7 @@ export class MemoryConsolidationJob {
     if (!isPg) return 0;
     try {
       // Lazy-import to avoid pulling prisma into the PostgreSQL path.
-      const { getPrismaClient } = await import("../query/prisma-client.js");
+      const { getPrismaClient } = await import("../../kernel/prisma-client.js");
       const prisma = getPrismaClient();
       const cutoff = new Date(now - DAY);
       const result = await prisma.$executeRaw`

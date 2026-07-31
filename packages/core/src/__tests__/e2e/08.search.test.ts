@@ -597,13 +597,13 @@ describe.skipIf(!READY)("T3 search & context", () => {
       // >100-line file triggers the slow LLM compress path (qwen3.5:9b), which
       // is exercised separately in F32. Here we want fast metadata + content.
       const r = await readFileApi({
-        filePath: "packages/core/src/controllers/search-controller.ts",
+        filePath: "packages/core/src/services/search/search-controller.ts",
         projectId: pid,
         compress: false,
       });
       expect(r?.success).toBe(true);
       const data = r?.data ?? {};
-      expect(data.filePath).toBe("packages/core/src/controllers/search-controller.ts");
+      expect(data.filePath).toBe("packages/core/src/services/search/search-controller.ts");
       expect(typeof data.content).toBe("string");
       expect((data.content as string).length).toBeGreaterThan(0);
       // metadata.symbols + metadata.imports present by default.
@@ -619,7 +619,7 @@ describe.skipIf(!READY)("T3 search & context", () => {
     "F31: lineStart/lineEnd range slice returns only those lines",
     async () => {
       const r = await readFileApi({
-        filePath: "packages/core/src/controllers/search-controller.ts",
+        filePath: "packages/core/src/services/search/search-controller.ts",
         projectId: pid,
         lineStart: 10,
         lineEnd: 14,
@@ -652,7 +652,7 @@ describe.skipIf(!READY)("T3 search & context", () => {
       try {
         r = await readFileApi(
           {
-            filePath: "packages/core/src/controllers/search-controller.ts", // 362 lines
+            filePath: "packages/core/src/services/search/search-controller.ts", // 362 lines
             projectId: pid,
             compress: true,
           },
@@ -682,7 +682,7 @@ describe.skipIf(!READY)("T3 search & context", () => {
     "F33: includeSymbols:false omits symbols metadata",
     async () => {
       const r = await readFileApi({
-        filePath: "packages/core/src/controllers/search-controller.ts",
+        filePath: "packages/core/src/services/search/search-controller.ts",
         projectId: pid,
         lineStart: 1,
         lineEnd: 5,
@@ -703,7 +703,7 @@ describe.skipIf(!READY)("T3 search & context", () => {
     async () => {
       const r = await httpGet<any>("/api/v1/symbol/snippet", {
         projectId: pid,
-        file: "packages/core/src/controllers/search-controller.ts",
+        file: "packages/core/src/services/search/search-controller.ts",
         lineStart: 1,
         lineEnd: 3,
       });
@@ -722,7 +722,7 @@ describe.skipIf(!READY)("T3 search & context", () => {
     async () => {
       const r = await httpGet<any>("/api/v1/symbol/snippet", {
         projectId: pid,
-        file: "packages/core/src/controllers/search-controller.ts",
+        file: "packages/core/src/services/search/search-controller.ts",
         lineEnd: 2,
       });
       expect(r?.success).toBe(true);
@@ -877,7 +877,7 @@ describe.skipIf(!READY)("T3 search & context", () => {
     // runtime route (apps/tools-api/src/routes/file.ts:33-59), so MCP clients
     // can reach offset/limit/format/targetRatio. This test asserts the four
     // params take effect at the contract level.
-    const filePath = "packages/core/src/controllers/search-controller.ts";
+    const filePath = "packages/core/src/services/search/search-controller.ts";
 
     // --- offset/limit: sub-range must correspond to that line window ---
     const sub = await readFileApi({
@@ -1052,7 +1052,7 @@ describe.skipIf(!READY)("T3 search & context", () => {
     "matrix: read_file equivalent on both transports",
     async () => {
       const args = {
-        filePath: "packages/core/src/controllers/search-controller.ts",
+        filePath: "packages/core/src/services/search/search-controller.ts",
         projectId: pid,
         lineStart: 1,
         lineEnd: 10,
@@ -1132,7 +1132,7 @@ describe.skipIf(!READY)("T3 search & context", () => {
     async () => {
       const args = {
         projectId: pid,
-        file: "packages/core/src/controllers/search-controller.ts",
+        file: "packages/core/src/services/search/search-controller.ts",
         lineStart: 1,
         lineEnd: 5,
       };

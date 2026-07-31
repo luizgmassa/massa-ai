@@ -14,7 +14,7 @@ import {
   setProjectIdentityAliasResolverForTests,
   type AliasResolverQuerier,
 } from "../services/project-identity/index.js";
-import { resetProjectIdentityAliasResolver } from "../services/project-identity/alias-resolver.js";
+import { resetProjectIdentityAliasResolver } from "../kernel/alias-resolver.js";
 
 class FakeQuerier implements AliasResolverQuerier {
   calls: string[] = [];

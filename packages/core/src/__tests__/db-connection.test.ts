@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { getDbConfig, getPgPool, closeConnections } from "../data/db-connection.js";
+import { getDbConfig, getPgPool, closeConnections } from "../kernel/db-connection.js";
 
 const DB_AVAILABLE = (process.env.DATABASE_URL ?? "").startsWith("postgres");
 

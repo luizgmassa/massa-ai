@@ -10,8 +10,15 @@
  * Implementations: PostgresVectorStore, PostgresVectorStore
  */
 
-import { IVectorStore, SearchResult, VectorDocument, VectorStoreStats, ProjectInfo } from '@massa-ai/shared';
-import { createEmbeddingProvider, EmbeddingProvider } from '../../services/embeddings/index.js';
+import {
+  IVectorStore,
+  SearchResult,
+  VectorDocument,
+  VectorStoreStats,
+  ProjectInfo,
+  type VectorEmbeddingProvider,
+  type VectorEmbeddingProviderFactory,
+} from '@massa-ai/shared';
 import { logger } from '@massa-ai/shared';
 
 /**
@@ -42,19 +49,55 @@ export abstract class BaseVectorStore implements IVectorStore {
    * - Thread B calls getEmbeddingProvider() → returns same promise
    * - Result: Single provider instance shared by all callers
    */
-  private embeddingProviderPromise: Promise<EmbeddingProvider> | null = null;
+  private embeddingProviderPromise: Promise<VectorEmbeddingProvider> | null = null;
+
+  /**
+   * How this store builds its embedding provider.
+   *
+   * GMS-01 AC-4's last edge, inverted. This file used to import
+   * `createEmbeddingProvider` from `services/embeddings/index.js` directly — the
+   * 26th and final `data -> services` edge. The composition that resolves it now
+   * lives at `services/vector/vector-store-factory.ts`, which may legally import
+   * both this subtree and `services/embeddings`, and passes the factory in.
+   *
+   * The factory stays a deferred thunk rather than a resolved provider: the field
+   * below is a lazily-assigned memoised promise, so provider auto-selection still
+   * happens on first embedding use and not at construction. Resolving eagerly
+   * would move *when* selection happens, which is a behaviour change inside a
+   * behaviour-preserving refactor (design.md §3).
+   */
+  private readonly embeddingProviderFactory?: VectorEmbeddingProviderFactory;
+
+  protected constructor(options?: { embeddingProviderFactory?: VectorEmbeddingProviderFactory }) {
+    this.embeddingProviderFactory = options?.embeddingProviderFactory;
+  }
 
   /**
    * Get or create the embedding provider (thread-safe lazy loading)
-   * 
+   *
    * This method ensures that only one embedding provider is created,
    * even when called concurrently from multiple contexts.
-   * 
+   *
+   * Throws when no factory was supplied. There is deliberately no fallback to a
+   * default provider: a default would have to be imported from
+   * `services/embeddings`, which is the edge this seam exists to remove. The
+   * throw is loud rather than degrading, and it is unreachable from production —
+   * the only production construction site is the factory named in the message,
+   * which always injects. It also closes the footgun CLAUDE.md documents, where a
+   * test constructing a store directly silently reached a live embedding provider.
+   *
    * @returns Promise that resolves to the shared embedding provider
    */
-  protected getEmbeddingProvider(): Promise<EmbeddingProvider> {
+  protected getEmbeddingProvider(): Promise<VectorEmbeddingProvider> {
     if (!this.embeddingProviderPromise) {
-      this.embeddingProviderPromise = createEmbeddingProvider({ cache: true });
+      if (!this.embeddingProviderFactory) {
+        throw new Error(
+          'BaseVectorStore: no embeddingProviderFactory was supplied. Construct this store ' +
+            'via services/vector/vector-store-factory.ts (getVectorStore), or pass an explicit ' +
+            'embeddingProviderFactory to the constructor.',
+        );
+      }
+      this.embeddingProviderPromise = this.embeddingProviderFactory();
     }
     return this.embeddingProviderPromise;
   }

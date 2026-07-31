@@ -8,19 +8,15 @@
  */
 
 import type { ToolResponse, IToolHandler } from "@massa-ai/shared";
+import type { BatchExecuteParams } from "../services/executor/params.js";
 
 export interface BatchCommand {
   command: string;
 }
 
-export interface BatchExecuteParams {
-  commands: string[];
-  queries?: string[];
-  timeout?: number;
-  concurrency?: number;
-  cwd?: string;
-  query_scope?: string;
-}
+// Declared beside the service that fulfils it (T8b); re-exported here because
+// `tools/index.ts` publishes it from this path.
+export type { BatchExecuteParams };
 
 export class BatchExecuteTool implements IToolHandler {
   name = "batch_execute";

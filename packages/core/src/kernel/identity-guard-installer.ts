@@ -1,4 +1,4 @@
-import { getPgPool } from "../../data/db-connection.js";
+import { getPgPool } from "./db-connection.js";
 import { STATIC_DIRECT_STORES } from "./registry.js";
 
 /**

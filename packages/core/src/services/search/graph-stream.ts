@@ -14,7 +14,7 @@
 import { SearchResult, logger } from "@massa-ai/shared";
 import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
 import { getGraphStore } from "../graph/graph-store-factory.js";
-import type { SearchDegradationReporter } from "./search-diagnostics.js";
+import type { SearchDegradationReporter } from "../../kernel/search-diagnostics.js";
 
 /**
  * Phase 7c: build the graph-neighbor RRF stream. BFS depth-2 over outgoing

@@ -73,7 +73,7 @@ mock.module("../events/event-bus.js", () => ({
 // Identity by default (what every pre-existing test in this file assumes);
 // the BUG-05 tests below swap in a retiring alias for their duration.
 let aliasResolve: (id: string) => Promise<string> = async (id) => id;
-mock.module("../services/project-identity/alias-resolver.js", () => ({
+mock.module("../kernel/alias-resolver.js", () => ({
   getProjectIdentityAliasResolver: () => ({
     resolve: (id: string) => aliasResolve(id),
   }),

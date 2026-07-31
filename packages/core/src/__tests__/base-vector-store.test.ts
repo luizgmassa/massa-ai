@@ -10,10 +10,11 @@
  * Integration tests with real embedding providers are separate.
  */
 
-import { describe, test, expect, mock, beforeEach } from "bun:test";
+import { describe, test, expect, beforeEach } from "bun:test";
 
-// Mock the embedding provider so tests don't require a running Ollama instance.
-// Provider factory is controlled per-test via `currentProviderFactory`.
+// Fake providers so tests don't require a running Ollama instance.
+// The active one is controlled per-test via `currentProviderFactory`, injected
+// into the subject through `TestableVectorStore`'s constructor below.
 const fakeProvider = {
   dimensions: 384,
   async embedQuery(content: string): Promise<number[]> {
@@ -29,9 +30,12 @@ const failingProvider = {
   async embedBatch(): Promise<number[][]> { throw new Error("batch failed"); },
 };
 let currentProviderFactory: () => Promise<unknown> = () => Promise.resolve(fakeProvider);
-mock.module("../services/embeddings/index.js", () => ({
-  createEmbeddingProvider: mock(() => currentProviderFactory()),
-}));
+
+// PR-C T4: there is deliberately no `mock.module("../services/embeddings/index.js")`
+// here any more. The subject stopped importing that module — it was GMS-01 AC-4's
+// last `data -> services` edge — so the mock intercepted nothing and would have
+// been the silent-no-op shape CLAUDE.md warns about: a `mock.module` on a path the
+// subject does not import does not throw, it just stops mocking.
 
 import { SearchResult, VectorDocument, VectorStoreStats, ProjectInfo, IVectorCollection } from "@massa-ai/shared";
 import { BaseVectorStore } from "../data/vector/base-vector-store.js";
@@ -41,6 +45,21 @@ import { BaseVectorStore } from "../data/vector/base-vector-store.js";
  * Exposes protected methods for testing
  */
 class TestableVectorStore extends BaseVectorStore {
+  /**
+   * PR-C T4: the provider arrives by constructor injection, not by module mock.
+   *
+   * `base-vector-store.ts` no longer imports `services/embeddings` at all — that
+   * was GMS-01 AC-4's last `data -> services` edge, and the composition that
+   * resolves it moved to `services/vector/vector-store-factory.ts`. The
+   * `mock.module` this file used to carry therefore intercepted nothing, so the
+   * same `currentProviderFactory` indirection is wired in here instead. Every
+   * `new TestableVectorStore()` call site below is unchanged, and per-test
+   * provider swapping works exactly as it did.
+   */
+  constructor() {
+    super({ embeddingProviderFactory: () => currentProviderFactory() as Promise<any> });
+  }
+
   // Track provider promise for race condition testing
   public getProviderPromise() {
     return (this as any).embeddingProviderPromise;

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js";
-import { SearchController } from "../controllers/search-controller.js";
+import { SearchController } from "../services/search/search-controller.js";
 import { SearchProjectTool } from "../tools/search_project.js";
 import { SearchCodeTool } from "../tools/search_code.js";
 

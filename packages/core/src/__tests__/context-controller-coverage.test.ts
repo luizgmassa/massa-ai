@@ -4,9 +4,15 @@
  * The existing context-controller.test.ts builds a FAKE instance and inlines
  * the helper logic, so it records 0% coverage on the real source. This file
  * imports the REAL ContextController via Bun's mock.module() to stub its
- * dependency chain (SearchController, MemoryController, CompressContextTool,
+ * dependency chain (SearchController, MemoryController, services/compression,
  * SessionFileCache, symbolGraphService) and then exercises every branch of
  * getOptimizedContext + the private helpers.
+ *
+ * The compression stub moved from `tools/compress_context` to
+ * `services/compression` at T8b, when the controller stopped reaching down into
+ * a tool handler. Stubbing the service — not just `CodeCompressor` — is what
+ * keeps this file off the live LLM path: a real `compress()` is 42 s on a cold
+ * model and 690 ms warm, which is the 5001 ms failure CLAUDE.md describes.
  *
  * NOTE: This file MUST be run in isolation (bun test <this-file>) because
  * Bun's mock.module is process-global and cannot be reset between files
@@ -34,10 +40,13 @@ let memorySearchStub: (input: any) => Promise<any> = async () => ({
   query: "",
   total: 0,
 });
+// Resolves with CompressionMetrics; REJECTS to exercise the degrade path.
 let compressorStub: (input: any) => Promise<any> = async () => ({
-  success: true,
-  data: { compressed: "" },
-  metadata: { compressionRatio: 0, tokensSaved: 0 },
+  compressed: "",
+  originalTokens: 0,
+  compressedTokens: 0,
+  tokensSaved: 0,
+  compressionRatio: 0,
 });
 let graphHasDataStub: (projectId: string) => Promise<boolean> = async () => false;
 let graphGoToDefinitionStub: (projectId: string, query: string) => Promise<any[]> = async () => [];
@@ -47,7 +56,7 @@ let graphGetReferencesStub: (projectId: string, query: string) => Promise<any[]>
 let sessionCacheCheckStub: (sessionId: string, key: string, content: string) => any =
   () => ({ status: "new", tokensSaved: 0 });
 
-mock.module("../controllers/search-controller.js", () => ({
+mock.module("../services/search/search-controller.js", () => ({
   SearchController: {
     getInstance: () => ({
       searchProject: (input: any) => searchProjectStub(input),
@@ -55,7 +64,7 @@ mock.module("../controllers/search-controller.js", () => ({
   },
 }));
 
-mock.module("../controllers/memory-controller.js", () => ({
+mock.module("../services/memory/memory-controller.js", () => ({
   MemoryController: {
     getInstance: () => ({
       search: (input: any) => memorySearchStub(input),
@@ -63,10 +72,14 @@ mock.module("../controllers/memory-controller.js", () => ({
   },
 }));
 
-mock.module("../tools/compress_context.js", () => ({
-  CompressContextTool: class {
-    handle(input: any) { return compressorStub(input); }
-  },
+mock.module("../services/compression/index.js", () => ({
+  CodeCompressor: class {},
+  compressWithMetrics: (
+    _compressor: unknown,
+    content: string,
+    strategy: string,
+    options: Record<string, unknown> = {},
+  ) => compressorStub({ content, strategy, ...options }),
 }));
 
 mock.module("../services/context/session-file-cache.js", () => ({
@@ -107,7 +120,7 @@ mock.module("@massa-ai/shared", () => {
 });
 
 // Import the REAL controller (and TokenMetrics so we can reset between tests).
-import { ContextController } from "../controllers/context-controller.js";
+import { ContextController } from "../services/context/context-controller.js";
 import { TokenMetrics } from "../services/metrics/token-metrics.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -159,9 +172,11 @@ function resetStubs(): void {
     total: 0,
   });
   compressorStub = async () => ({
-    success: true,
-    data: { compressed: "" },
-    metadata: { compressionRatio: 0, tokensSaved: 0 },
+    compressed: "",
+    originalTokens: 0,
+    compressedTokens: 0,
+    tokensSaved: 0,
+    compressionRatio: 0,
   });
   graphHasDataStub = async () => false;
   graphGoToDefinitionStub = async () => [];
@@ -608,9 +623,11 @@ describe("ContextController — getOptimizedContext coverage", () => {
     compressorStub = async (input: any) => {
       compressorCalled = true;
       return {
-        success: true,
-        data: { compressed: input.content.slice(0, 20) },
-        metadata: { compressionRatio: 0.5, tokensSaved: 400 },
+        compressed: input.content.slice(0, 20),
+        originalTokens: 800,
+        compressedTokens: 400,
+        tokensSaved: 400,
+        compressionRatio: 0.5,
       };
     };
     const ctrl = ContextController.getInstance();
@@ -626,11 +643,16 @@ describe("ContextController — getOptimizedContext coverage", () => {
     expect(result.compressionRatio).toBe(0.5);
   });
 
-  test("compression returns success=false → keeps raw context", async () => {
+  test("compression throws → keeps raw context", async () => {
     searchProjectStub = async () => ({
       results: [makeCodeResult("a", 0.9, "src/a.ts", "small content")],
     });
-    compressorStub = async () => ({ success: false, error: "compressor down" });
+    // Was `{success:false, error}` when this went through CompressContextTool's
+    // envelope. T8b removed the envelope, so failure is a rejection and the
+    // controller's own catch is what degrades. Same observable, one more branch.
+    compressorStub = async () => {
+      throw new Error("compressor down");
+    };
     const ctrl = ContextController.getInstance();
     const result = await ctrl.getOptimizedContext({
       query: "test",
@@ -643,11 +665,23 @@ describe("ContextController — getOptimizedContext coverage", () => {
     expect(result).toBeDefined();
   });
 
-  test("compression returns success=true but no data → keeps raw context", async () => {
+  // Was "success=true but no data". That state was reachable only from this
+  // mock: the tool's success branch always built a literal `data` object, so
+  // `resp.success && resp.data` could never be half-true. T8b removed the
+  // envelope and with it the unreachable half. Retargeted at the state that
+  // does survive — a call that resolves with nothing compressed — rather than
+  // deleted, so the branch keeps an owner.
+  test("compression resolves with empty output → pipeline still completes", async () => {
     searchProjectStub = async () => ({
       results: [makeCodeResult("a", 0.9, "src/a.ts", "small content")],
     });
-    compressorStub = async () => ({ success: true, data: undefined, metadata: {} });
+    compressorStub = async () => ({
+      compressed: "",
+      originalTokens: 0,
+      compressedTokens: 0,
+      tokensSaved: 0,
+      compressionRatio: 0,
+    });
     const ctrl = ContextController.getInstance();
     const result = await ctrl.getOptimizedContext({
       query: "test",

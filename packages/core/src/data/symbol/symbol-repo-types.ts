@@ -5,7 +5,7 @@
  * The barrel re-exports them so importers see no change.
  */
 
-import type { StructuralFqnCandidate } from "../../services/structural/fqn-codec.js";
+import type { StructuralFqnCandidate } from "../../kernel/fqn-codec.js";
 
 export type SymbolKind =
   | "module"

@@ -1,9 +1,11 @@
 # Handoff
 
-## Active — Core Layering, Controller Retirement (PR-C), **Specify, Design and Tasks done; Execute not started**
+## Active — Core Layering, Controller Retirement (PR-C), **complete and validated; awaiting merge**
 
 **Feature**: `core-layering-controller-retirement` · artifacts
-`.specs/features/core-layering-controller-retirement/{spec,design}.md`. **No code written.**
+`.specs/features/core-layering-controller-retirement/{spec,design,tasks}.md`. **Execute complete and validated on
+`spec/pr-c-execute`** — 20 tasks, 22 commits, phases 1-4 all green on their own. **T18 PASS**
+(author != verifier) — `validation.md`. Remaining: merge, `--no-ff` (R-04).
 
 **Specify is on `main`** — merged via **#56** (`9df5608`, merge commit), base `origin/main` @
 `9df5608`. **Design is complete** — `design.md`, delivered via PR **#57** from `spec/pr-c-design`.
@@ -86,6 +88,7 @@ commits**, user, 2026-07-31) and R-10's CHANGELOG heading chosen (**`### Changed
 **Both non-retroactive steps are already taken, at `bc9019b`, before any structural commit** —
 `tasks.md` §3 has the readings. Frozen base: **60 pointers / RESOLVES 32 / HISTORICAL 28, PASS**.
 No-op control: **142 / 114 / 28** — the reshape moves the count by **+82** and is not a no-op.
+**Narrowed at T10b to 137 / 109 / 28 (C26); HISTORICAL unchanged at 28.**
 Coverage is **59 of 61**, the two invisible ones being `controllers/index.js` at `package.json:30`
 (AC-6's subject) and `src/index.ts:18` (AC-2's subject); neither strands silently. **Do not re-take
 these** — they cannot be taken again once a controller moves.

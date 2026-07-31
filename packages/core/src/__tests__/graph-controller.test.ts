@@ -24,7 +24,7 @@ mock.module("../services/symbol/definition-lookup.js", () => ({
     r ? { status: r.status, fqn: r.definition?.id ?? r.query } : undefined,
 }));
 
-import { GraphController } from "../controllers/graph-controller.js";
+import { GraphController } from "../services/symbol/graph-controller.js";
 
 function resetController() {
   (GraphController as any).instance = null;

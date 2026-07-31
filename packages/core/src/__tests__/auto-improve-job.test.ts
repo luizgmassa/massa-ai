@@ -28,7 +28,7 @@ import {
 import type { InsertMemoryInput, UpdateMemoryPatch } from "../data/memory/memory-repository.js";
 import type { LlmSurface } from "../services/memory/consolidator.js";
 import { eventBus } from "../services/events/event-bus.js";
-import { SearchServiceError } from "../services/search/search-diagnostics.js";
+import { SearchServiceError } from "../kernel/search-diagnostics.js";
 
 // ── Fakes ────────────────────────────────────────────────────────────────────
 

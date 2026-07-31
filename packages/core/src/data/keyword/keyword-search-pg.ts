@@ -6,14 +6,14 @@
 
 import { SearchResult, SearchSource } from "@massa-ai/shared";
 import { logger } from "@massa-ai/shared";
-import { getPgPool } from "../db-connection.js";
-import { installGuardOnTable } from "../../services/project-identity/identity-guard-installer.js";
+import { getPgPool } from "../../kernel/db-connection.js";
+import { installGuardOnTable } from "../../kernel/identity-guard-installer.js";
 import type { Pool } from "pg";
 import {
   sanitizeTrigramQuery,
   levenshtein,
   maxEditDistance,
-} from "../../services/search/lexical-search.js";
+} from "../../kernel/lexical-search.js";
 
 export class KeywordSearchPg {
   private pool: Pool | null = null;

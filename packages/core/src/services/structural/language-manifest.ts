@@ -5,12 +5,12 @@ import type {
   StructuralCapability,
   StructuralCapabilityRequirement,
   StructuralLanguageResolution,
-} from "./types.js";
+} from "../../kernel/types.js";
 import {
   SOURCE_SPAN_SCHEMA_VERSION,
   STRUCTURAL_FQN_SCHEMA_VERSION,
   STRUCTURAL_TAXONOMY_VERSION,
-} from "./types.js";
+} from "../../kernel/types.js";
 
 export const LANGUAGE_MANIFEST_VERSION = "1.0.0";
 export const INITIAL_QUERY_PACK_VERSION = "1.0.0";

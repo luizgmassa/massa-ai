@@ -4,8 +4,11 @@
 - **Specify**: `spec.md`, merged via **#56** (`9df5608`)
 - **Design**: `design.md`, merged via **#57** (`bc9019b`, merge commit, two parents)
 - **Base**: `origin/main` @ `bc9019b`
-- **Status**: **Tasks — complete, full Plan Challenge gate run. Execute not started. No code written.**
-- **20 tasks**, three phases, **104** distinct files.
+- **Status**: **Tasks — complete, full Plan Challenge gate run. Execute complete and validated** on
+  `spec/pr-c-execute`, **22 commits**; **T18 PASS** (author ≠ verifier), `validation.md`.
+- **20 tasks**, three phases plus the record phase, **104** distinct files *as planned*.
+  **Shipped at 222.** §1's table below is the planning estimate and is left as written, with the
+  measured outcome recorded beside it — the divergence is the record, not an error to erase.
 
 Design left exactly one thing open (§6's cut decision) and named two steps that could not be taken
 retroactively (§9). This document resolves the first, **records the second as already taken**, and
@@ -30,6 +33,14 @@ sets only Tasks produces. Those sets are now measured, repo-wide over `git ls-fi
 | **sum** | **110** | |
 | **distinct union** | **104** | against **PR-B's 37**, which needed 20 tasks and surfaced 19 confirmed plan defects |
 
+> **Measured at merge — every row above is the estimate, and every row is low.** Shipped:
+> phase 1 **163**, phase 2 **32**, phase 3 **47**, phase 4 **3**; sum **245**, **distinct union
+> 222** against the planned 104. Phase 1's 2.6x is C22 and C23 (leaf-ness judged at each module's
+> current location; a roster missing the module holding 12 of the 26 edges), phase 2's 2x is C25
+> (a correct count of the wrong population, plus a T8b the table never sized), and phase 3 carries
+> T10b, a task the plan does not contain at all. **Nothing here is scope creep** — each increment
+> has a stated structural reason and a C-number in the parent `spec.md`.
+
 **The phases are not disjoint, and the sum is not the review surface.** Six files are touched by two
 phases — legitimate in a phased single PR, since a different import line is repointed in each pass,
 but a reviewer sizing per-phase diffs must not double-count them:
@@ -39,6 +50,12 @@ but a reviewer sizing per-phase diffs must not double-count them:
 | Phase 1 ∩ Phase 3 (**5**) | `production-wiring.ts`, `search-controller.ts`, `search_project.ts`, `search-dependency-outage.test.ts`, `search-tools-coverage.test.ts` |
 | Phase 2 ∩ Phase 3 (**1**) | `wave-4-enum-validation.test.ts` |
 | Phase 1 ∩ Phase 2 | none |
+
+> **Measured at merge: all three rows are wrong.** Phase 1 ∩ Phase 2 is **3**, not none — it was
+> true of phase 1 *as planned* (62 files) and false of phase 1 *as shipped* (163). Phase 1 ∩ Phase 3
+> is **13**, not 5. Phase 2 ∩ Phase 3 is **6**, not 1 — that row moved because T8b exists (C19).
+> The three files in the first row are `docs/ONBOARDING.md`, `architecture-map.test.ts` and
+> `check-core-layering.test.ts`.
 
 Per-module importer counts behind the 58, since §6's table counted only one of the six moved
 modules and said so:
@@ -132,7 +149,9 @@ prefix branch byte-identical, one added alternation — and run against the **un
   HISTORICAL 28  (pinned at 28)
 ```
 
-**The count moves: 60 → 142, RESOLVES 32 → 114, +82 pointers.** The reshape is not a no-op, which is
+**The count moves: 60 → 142, RESOLVES 32 → 114, +82 pointers.** *(Narrowed at T10b to **137 /
+109 / 28** by C26's path branch and its fifth `EXCLUDED` entry; **`HISTORICAL` unchanged at 28**.
+The reading below is the gate as T6 shipped it.)* The reshape is not a no-op, which is
 the one thing C16's rejected remedy could not show. **HISTORICAL correctly does not move** — the
 controllers still exist at this commit, so their citations `RESOLVE` rather than becoming historical.
 That is the expected reading, and reading a flat HISTORICAL as "the reshape did nothing" is the trap:
@@ -216,7 +235,7 @@ recording the `maxForeignReach` column** (R-11 as amended by C20).
 | --- | --- | --- | --- |
 | **T9** | **Characterization tests first**, on one of the 6 `tools/` handlers that import `controllers/` (`delete_memory`, `get_optimized_context`, `search_memories`, `search_project`, `store_memory`, `update_memory` — `spec.md` §3.E). Written **before** the move, must pass **unmodified** after it | 1 test file | **GMS-02 AC-2** |
 | **T10** | Move the 3 real orchestrators — `MemoryController`, `SearchController`, `ContextController` — into `services/`, keeping exported symbol names. **Requires T8b** or `ContextController` carries a live `→ tools/` edge in with it. **Record G-HUB's `maxForeignReach` after this commit**: it goes 1 → 3, exactly at the ceiling | 3 moved + importers | AS-01 |
-| **T11** | Fold `ExecutorController` into `services/executor/`, **keeping its exported symbol name** — `apps/tools-api/src/routes/executor.ts` and `apps/mcp-client/src/embedded-api-client.ts` import it directly (R-06). **Requires T8b** — it holds 4 of the 5 `→ tools/` edges | 1 moved + 2 transports | AS-01 |
+| **T11** | Fold `ExecutorController` into `services/executor/`, **keeping its exported symbol name** — `apps/tools-api/src/routes/executor.ts` and `apps/mcp-client/src/embedded-api-client.ts` import it directly (R-06). **Requires T8b** — it holds 4 of the 5 `→ tools/` edges | ~~1 moved + 2 transports~~ **1 moved + 4 test importers + 1 barrel + 1 citation = 7**. *Measured at T11: neither transport imports it "directly" — both take it from the root barrel (`@massa-ai/core`), which is what `spec.md` §3.D says and what C9 records, so **neither is in T11's write set**. What carries the symbol is `controllers/index.ts`, which this row does not name. A miscount inside a row, not an amendment owed to a merged artifact — so it takes no C-number.* | AS-01 |
 | **T12** | Move `GraphController` into `services/`. **Its `TracePathTool` divergence is left alone** — R-07, out of scope, unifying it is a behavior change inside a behavior-preserving PR. `GraphController` is **live** via `routes/workspace.ts`; an earlier sweep called it dead and was wrong | 1 moved + importers | AS-01 |
 | **T13** | Delete `controllers/index.ts` and the `export * from "./controllers/index.js"` at `src/index.ts:18`. Remove `package.json`'s `"./controllers"` exports subpath; verify with `npm pack --dry-run` that no listed path lacks a backing file | `package.json`, `src/index.ts` | **AC-6** |
 | **T14** | Contract text — `src/index.ts`'s header **and** `CLAUDE.md`'s Architecture section describe the kernel contract, **one description only, no third anywhere** | 2 files | **AC-2** |

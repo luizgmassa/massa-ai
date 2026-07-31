@@ -34,7 +34,7 @@ mock.module("../data/symbol/symbol-repository-factory.js", () => ({
 }));
 
 // Mock the vector store + keyword search factories.
-mock.module("../data/vector/vector-store-factory.js", () => ({
+mock.module("../services/vector/vector-store-factory.js", () => ({
   getVectorStore: async () => ({
     addDocuments: async () => {},
     deleteByProject: async () => {},

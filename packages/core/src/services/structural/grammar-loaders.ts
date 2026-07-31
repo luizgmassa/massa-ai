@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import type { GrammarArtifact } from "./types.js";
+import type { GrammarArtifact } from "../../kernel/types.js";
 import {
   STRUCTURAL_BUN_VERSION,
   TREE_SITTER_NATIVE_MODULE_ABI,

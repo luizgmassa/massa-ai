@@ -72,7 +72,7 @@ describe.skipIf(!(DB_AVAILABLE && RUN_POSTGRES_TESTS))(
     let prisma: { $executeRaw: Function; $queryRaw: Function } = null as any;
 
     beforeAll(async () => {
-      const { getPrismaClient } = await import("../services/query/prisma-client.js");
+      const { getPrismaClient } = await import("../kernel/prisma-client.js");
       prisma = getPrismaClient() as any;
     });
 

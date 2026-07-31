@@ -10,7 +10,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "crypto";
 import { MemoryLevel, MemoryType } from "@massa-ai/shared";
-import { MemoryController } from "../controllers/memory-controller.js";
+import { MemoryController } from "../services/memory/memory-controller.js";
 import { MemoryRepositoryPg } from "../data/memory/memory-repository-pg.js";
 import type { InsertMemoryInput } from "../data/memory/memory-repository.js";
 
@@ -56,7 +56,7 @@ async function cleanup(): Promise<void> {
 
 describe.skipIf(!DEDICATED_DB)("MemoryRepositoryPg — PostgreSQL CRUD/FTS parity", () => {
   beforeAll(async () => {
-    const { getPrismaClient } = await import("../services/query/prisma-client.js");
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
     prisma = getPrismaClient();
     (MemoryRepositoryPg as any).instance = null;
     repo = MemoryRepositoryPg.getInstance();
