@@ -24,10 +24,10 @@ import {
   getSandboxMode,
   type Language,
   type ExecResult,
+  type ExecuteParams,
+  type ExecuteFileParams,
+  type BatchExecuteParams,
 } from "../services/executor/index.js";
-import type { ExecuteParams } from "../tools/execute.js";
-import type { ExecuteFileParams } from "../tools/execute_file.js";
-import type { BatchExecuteParams } from "../tools/batch_execute.js";
 import { validateEnum } from "../kernel/enum-validation.js";
 
 /** The 10 languages supported by the Polyglot executor (N6). */

@@ -2,7 +2,7 @@
  * Context Controller
  *
  * Orchestration layer for the "optimized context" use case.
- * Composes SearchController + MemoryController + CompressContextTool
+ * Composes SearchController + MemoryController + services/compression
  * + SymbolGraphService to deliver token-efficient context to agents.
  *
  * Ranking pipeline (2 phases):
@@ -16,7 +16,10 @@
 import { logger, estimateTokens } from "@massa-ai/shared";
 import { SearchController } from "./search-controller.js";
 import { MemoryController } from "./memory-controller.js";
-import { CompressContextTool } from "../tools/compress_context.js";
+import {
+  CodeCompressor,
+  compressWithMetrics,
+} from "../services/compression/index.js";
 import { SessionFileCache } from "../services/context/session-file-cache.js";
 import { symbolGraphService } from "../services/symbol/symbol-graph.service.js";
 import { TokenMetrics } from "../services/metrics/token-metrics.js";
@@ -56,13 +59,13 @@ export class ContextController {
 
   private readonly searchCtrl: SearchController;
   private readonly memoryCtrl: MemoryController;
-  private readonly compressor: CompressContextTool;
+  private readonly compressor: CodeCompressor;
   private readonly sessionCache: SessionFileCache;
 
   private constructor() {
     this.searchCtrl = SearchController.getInstance();
     this.memoryCtrl = MemoryController.getInstance();
-    this.compressor = new CompressContextTool();
+    this.compressor = new CodeCompressor();
     this.sessionCache = SessionFileCache.getInstance();
   }
 
@@ -296,16 +299,24 @@ export class ContextController {
         maxTokens,
       });
 
-      const resp = await this.compressor.handle({
-        content: rawContext,
-        strategy: "code_structure",
-        targetRatio: 0.6,
-      });
-
-      if (resp.success && resp.data) {
-        finalContext = (resp.data as any).compressed;
-        compressionRatio = resp.metadata?.compressionRatio || 0;
-        tokensSaved = resp.metadata?.tokensSaved || 0;
+      // Failure degrades to the uncompressed context, which is what the
+      // `{success:false}` branch did when this went through CompressContextTool.
+      // The error log moved with it, so the observable stays the same (T8b).
+      try {
+        const metrics = await compressWithMetrics(
+          this.compressor,
+          rawContext,
+          "code_structure",
+          { targetRatio: 0.6 },
+        );
+        finalContext = metrics.compressed;
+        compressionRatio = metrics.compressionRatio || 0;
+        tokensSaved = metrics.tokensSaved || 0;
+      } catch (error) {
+        logger.error("Failed to compress context", error as Error, {
+          strategy: "code_structure",
+          contentLength: rawContext.length,
+        });
       }
     }
 
