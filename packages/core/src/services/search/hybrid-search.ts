@@ -1,17 +1,32 @@
 /**
- * rlm-search — search god-method + fusion + scoring + context delegates
- * for ContextualSearchRLM.
+ * hybrid-search — the hybrid retrieval capability (design.md §4.1).
  *
- * Extracted (M14 Phase 3, T3.3) from contextual-search-rlm.ts. Behavior is
- * byte-preserved: bodies moved verbatim with `this` → `rlm`.
+ * PR-B capability module, completed at T13. T9 created it with `correctQuery`
+ * alone; T13 moved `search`, `addContextToResults`, `extractPreview`,
+ * `calculateAvgScore` and `filterByPatterns` here, and `rlm-search.ts` dies whole
+ * in that commit — the fourth `rlm-*.ts` source to do so, and the last. This file
+ * has never heard of ContextualSearchRLM, which is what takes the root's foreign
+ * reach 14 → 1 and closes G-HUB (§3.4). `correctQuery` arrived from
+ * rlm-synapse.ts, not rlm-search.ts: it reads `keywordSearch`, the collaborator
+ * this module already owns, and its only caller is `search` (§4.2).
+ * `extractQueryTerms` / `applyProximityRerank` are *imported* from
+ * lexical-search.ts, never moved: that module carries a `data/` importer and is
+ * PR-C's to place (§5.4, PR-C-BOUNDARY). Behavior is byte-preserved from both
+ * sources — bodies verbatim, `rlm.<member>` rewritten per the disposition on
+ * `HybridSearchDeps` below and in full in tasks.md.
  */
 
 import { SearchResult, logger, config } from "@massa-ai/shared";
 import { minimatch } from "minimatch";
 import { buildRewrittenFTSQuery } from "./query-understanding.js";
-import { applyProximityRerank } from "./lexical-search.js";
+import { applyProximityRerank, extractQueryTerms } from "./lexical-search.js";
 import { eventBus } from "../events/event-bus.js";
-import type { ContextualSearchRLM } from "./contextual-search-rlm.js";
+import { fuseResults } from "./result-fusion.js";
+import type { QueryUnderstandingService } from "./query-understanding.js";
+import type { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
+import type { getVectorStore } from "../../data/vector/vector-store-factory.js";
+import type { getSearchCache } from "./cache-factory.js";
+import type { getSearchAnalytics } from "./analytics-factory.js";
 import {
   recordSearchDegradation,
   recordSearchFailure,
@@ -20,7 +35,69 @@ import {
   storeCorruption,
   type SearchDegradation,
   type SearchDegradationCode,
+  type SearchDegradationReporter,
 } from "./search-diagnostics.js";
+
+// ── Deps ─────────────────────────────────────────────────────────────────────
+
+/**
+ * The narrow dependency record for this module (design.md §4.4) — exactly the
+ * collaborators §2.1 shows these surfaces read, and nothing else. §2.1 records
+ * `searchImpl` reading **13** facade members, the highest arity in the matrix;
+ * each one's disposition was decided by measuring the instance-stub sites that
+ * reach it, not by reading §4.1's "injected collaborators" column, which names
+ * five and is a store list rather than a member list. **The disposition table,
+ * the stub-site counts, the sweep method and the two-variant `queryUnderstanding`
+ * simulation are in tasks.md, "T13 — the disposition of §2.1's thirteen".**
+ *
+ * Four invariants this file must keep, each with a measurement behind it there:
+ *
+ * 1. `queryUnderstanding` stays `Pick<>`-narrowed — honest typing per §4.4, and
+ *    **not** a fired sensor: bare nominal reaches 1, under the ceiling of 3.
+ * 2. The three callbacks stay **per-call arrow wrappers** — never `.bind(this)`,
+ *    never bare method references, both of which resolve at *assembly* time.
+ *    `buildGraphStream` and `addContextToResults` are each stubbed on the
+ *    instance at 6 sites; a module-local call disables all twelve silently.
+ * 3. `ensureInitialized` is **not** a member of this record, and `search` must
+ *    not call it. The root hoists it — carrying the `searchBackendUnavailable`
+ *    wrap `searchImpl` used to apply — because the five stores below are
+ *    snapshotted **by value**, so a record assembled before init holds five
+ *    `undefined`s. Measured: rlm-search 31 → 15/16 the other way round.
+ * 4. The five stores stay required and keep the root's own field types — their
+ *    originals were bare reads off definite-assigned fields with no fallback, so
+ *    an absent store must keep throwing exactly where it did.
+ *
+ * `hybrid-search-late-bind.test.ts` test 4 is the compensating control for
+ * invariant 2, and what makes the coverage file's three `expect.any(Function)`
+ * keys acceptable rather than a relaxation. `correctQuery` takes this whole
+ * record while reading one field of it — the `getAnalytics`/`IndexAdminDeps`
+ * shape from T12; §4.4's narrowness is a property of the *module*'s record, not
+ * of each surface's parameter list.
+ */
+export interface HybridSearchDeps {
+  keywordSearch: Awaited<ReturnType<typeof getKeywordSearch>>;
+  vectorStore: Awaited<ReturnType<typeof getVectorStore>>;
+  searchCache: Awaited<ReturnType<typeof getSearchCache>>;
+  analytics: Awaited<ReturnType<typeof getSearchAnalytics>>;
+  queryUnderstanding: Pick<QueryUnderstandingService, "understand">;
+  buildGraphStream: (
+    resultSets: SearchResult[][],
+    maxResults: number,
+    projectId?: string,
+    reportDegradation?: SearchDegradationReporter,
+  ) => Promise<SearchResult[]>;
+  addContextToResults: (
+    results: SearchResult[],
+    projectId: string,
+  ) => Promise<SearchResult[]>;
+  applySynapseState: (
+    baseResults: SearchResult[],
+    query: string,
+    projectId: string,
+    sessionId?: string,
+    reportDegradation?: SearchDegradationReporter,
+  ) => Promise<SearchResult[]>;
+}
 
 // ── search ───────────────────────────────────────────────────────────────────
 
@@ -36,19 +113,12 @@ export type SearchOptions = {
   onDegradations?: (degradations: readonly SearchDegradation[]) => void;
 };
 
-export async function searchImpl(
-  rlm: ContextualSearchRLM,
+export async function search(
+  deps: HybridSearchDeps,
   query: string,
   projectId: string,
   options: SearchOptions = {},
 ): Promise<SearchResult[]> {
-  try {
-    await rlm.ensureInitialized();
-  } catch (error) {
-    const failure = searchBackendUnavailable("search_initialization", error);
-    recordSearchFailure(failure, projectId);
-    throw failure;
-  }
   const maxResults = options.maxResults ?? 10;
   const minScore = options.minScore ?? 0.3;
   const explainScores = options.explainScores || false;
@@ -119,7 +189,7 @@ export async function searchImpl(
   };
   let cachedResults: SearchResult[] | null;
   try {
-    cachedResults = await rlm.searchCache.get(query, projectId, cacheOptions);
+    cachedResults = await deps.searchCache.get(query, projectId, cacheOptions);
   } catch (error) {
     const failure = searchBackendUnavailable("search_cache_read", error);
     recordSearchFailure(failure, projectId);
@@ -141,14 +211,14 @@ export async function searchImpl(
 
     // Track cache hit
     try {
-      rlm.analytics.trackSearch({
+      deps.analytics.trackSearch({
         timestamp: Date.now(),
         projectId,
         query,
         resultCount: cachedResults.length,
         duration,
         cacheHit: true,
-        score: rlm.calculateAvgScore(cachedResults),
+        score: calculateAvgScore(cachedResults),
       });
     } catch {
       degrade("SEARCH_ANALYTICS_UNAVAILABLE", "search_analytics");
@@ -162,7 +232,7 @@ export async function searchImpl(
       preciseMs: `${(endTime - startTime).toFixed(3)}ms`,
     });
     try {
-      return await rlm.applySynapseState(
+      return await deps.applySynapseState(
         cachedResults,
         query,
         projectId,
@@ -181,11 +251,11 @@ export async function searchImpl(
     // ── Phase 2: query understanding (default-off, explicit degradation) ──
     let resultSets: SearchResult[][] = [];
     let usedQueryUnderstanding = false;
-    let understood: Awaited<ReturnType<typeof rlm.queryUnderstanding.understand>> = null;
+    let understood: Awaited<ReturnType<typeof deps.queryUnderstanding.understand>> = null;
     try {
       const qu = config.get("search").queryUnderstanding;
       if (qu?.enabled && query.trim()) {
-        understood = await rlm.queryUnderstanding.understand(
+        understood = await deps.queryUnderstanding.understand(
           query,
           projectId,
         );
@@ -210,16 +280,16 @@ export async function searchImpl(
         degrade("SEARCH_AUDIT_UNAVAILABLE", "search_query_rewritten_event");
       }
       const rewrittenFTS = buildRewrittenFTSQuery(query, understood.keywords);
-      const vectorPromise = rlm.vectorStore
+      const vectorPromise = deps.vectorStore
         .search(query, retrievalLimit, projectId)
         .catch((error) => { throw searchBackendUnavailable("vector_search", error); });
       const keywordPromise = disableKeyword
         ? Promise.resolve([] as SearchResult[])
-        : rlm.keywordSearch
+        : deps.keywordSearch
             .searchWithFilter(rewrittenFTS, { projectId }, retrievalLimit)
             .catch((error) => { throw searchBackendUnavailable("keyword_search", error); });
       const hydePromise = understood.hydeVector
-        ? rlm.vectorStore
+        ? deps.vectorStore
             .searchByEmbedding(understood.hydeVector, retrievalLimit, projectId)
             .catch(() => {
               degrade("QUERY_UNDERSTANDING_UNAVAILABLE", "hyde_search");
@@ -246,18 +316,18 @@ export async function searchImpl(
       const fetchN = retrievalLimit;
       const [vectorResults, keywordResults, trigramResults] =
         await Promise.all([
-          rlm.vectorStore
+          deps.vectorStore
             .search(query, fetchN, projectId)
             .catch((error) => { throw searchBackendUnavailable("vector_search", error); }),
           disableKeyword
             ? Promise.resolve([] as SearchResult[])
-            : rlm.keywordSearch
+            : deps.keywordSearch
                 .searchWithFilter(query, { projectId }, fetchN)
                 .catch((error) => { throw searchBackendUnavailable("keyword_search", error); }),
           // Trigram stream (best-effort; [] when tokenizer unavailable).
-          disableKeyword || !rlm.keywordSearch.searchTrigram
+          disableKeyword || !deps.keywordSearch.searchTrigram
             ? Promise.resolve([] as SearchResult[])
-            : rlm.keywordSearch
+            : deps.keywordSearch
                 .searchTrigram!(query, { projectId }, fetchN)
                 .catch(() => {
                   degrade("TRIGRAM_UNAVAILABLE", "trigram_search");
@@ -279,24 +349,24 @@ export async function searchImpl(
       // add both as RRF streams. This recovers typos like "useEffct" →
       // "useEffect" that porter/trigram miss. Best-effort; skipped when no
       // correction applies or fuzzyCorrect is unavailable.
-      if (!disableKeyword && typeof rlm.keywordSearch.fuzzyCorrect === "function") {
+      if (!disableKeyword && typeof deps.keywordSearch.fuzzyCorrect === "function") {
         let corrected: string | null = null;
         try {
-          corrected = await rlm.correctQuery(query);
+          corrected = await correctQuery(deps, query);
         } catch {
           degrade("FUZZY_SEARCH_UNAVAILABLE", "fuzzy_correction");
         }
         if (corrected && corrected !== query.toLowerCase().trim()) {
           try {
             const [fuzzyKeyword, fuzzyTrigram] = await Promise.all([
-              rlm.keywordSearch
+              deps.keywordSearch
                 .searchWithFilter(corrected, { projectId }, fetchN)
                 .catch(() => {
                   degrade("FUZZY_SEARCH_UNAVAILABLE", "fuzzy_keyword_search");
                   return [] as SearchResult[];
                 }),
-              rlm.keywordSearch.searchTrigram
-                ? rlm.keywordSearch
+              deps.keywordSearch.searchTrigram
+                ? deps.keywordSearch
                     .searchTrigram!(corrected, { projectId }, fetchN)
                     .catch(() => {
                       degrade("FUZZY_SEARCH_UNAVAILABLE", "fuzzy_trigram_search");
@@ -326,7 +396,7 @@ export async function searchImpl(
     // the actual stream count). No graph-stream throw escapes this optional path.
     let graphStream: SearchResult[] = [];
     try {
-      graphStream = await rlm.buildGraphStream(
+      graphStream = await deps.buildGraphStream(
         resultSets,
         maxResults,
         projectId,
@@ -340,7 +410,7 @@ export async function searchImpl(
     }
 
     // Combine results using RRF (with score explanation if requested)
-    const fusedResults = rlm.fuseResults(resultSets, query, explainScores);
+    const fusedResults = fuseResults(resultSets, query, explainScores);
 
     // A2: proximity + title re-ranking pass (post-RRF, pre-filter). Stable
     // re-rank on top of RRF: boosts results whose title contains query terms
@@ -379,7 +449,7 @@ export async function searchImpl(
     let filteredByPattern = fusedReranked;
     if (includeFilters || excludeFilters) {
       const filterStartTime = performance.now();
-      filteredByPattern = rlm.filterByPatterns(
+      filteredByPattern = filterByPatterns(
         fusedReranked,
         includeFilters,
         excludeFilters,
@@ -432,14 +502,14 @@ export async function searchImpl(
     // Add context to results
     let withContext: SearchResult[];
     try {
-      withContext = await rlm.addContextToResults(filtered, projectId);
+      withContext = await deps.addContextToResults(filtered, projectId);
     } catch (error) {
       throw storeCorruption("search_result_hydration", error);
     }
 
     // Cache the results
     try {
-      await rlm.searchCache.set(query, projectId, withContext, cacheOptions);
+      await deps.searchCache.set(query, projectId, withContext, cacheOptions);
     } catch (error) {
       throw searchBackendUnavailable("search_cache_write", error);
     }
@@ -448,14 +518,14 @@ export async function searchImpl(
 
     // Track cache miss
     try {
-      rlm.analytics.trackSearch({
+      deps.analytics.trackSearch({
         timestamp: Date.now(),
         projectId,
         query,
         resultCount: withContext.length,
         duration,
         cacheHit: false,
-        score: rlm.calculateAvgScore(withContext),
+        score: calculateAvgScore(withContext),
       });
     } catch {
       degrade("SEARCH_ANALYTICS_UNAVAILABLE", "search_analytics");
@@ -464,12 +534,12 @@ export async function searchImpl(
     logger.info("Contextual search completed", {
       projectId,
       totalResults: withContext.length,
-      avgScore: rlm.calculateAvgScore(withContext),
+      avgScore: calculateAvgScore(withContext),
       duration,
     });
 
     try {
-      return await rlm.applySynapseState(
+      return await deps.applySynapseState(
         withContext,
         query,
         projectId,
@@ -492,10 +562,51 @@ export async function searchImpl(
   }
 }
 
+// ── correctQuery ─────────────────────────────────────────────────────────────
+
+/**
+ * Fuzzy-correct each non-stopword query term via the keyword store's
+ * vocabulary. Returns the corrected query string (lowercased, space-joined),
+ * or null when no term corrects to a different word or fuzzyCorrect is
+ * unavailable. Only words of length >= 3 are considered (shorter tokens
+ * can't be reliably corrected).
+ */
+export async function correctQuery(
+  deps: HybridSearchDeps,
+  query: string,
+): Promise<string | null> {
+  if (typeof deps.keywordSearch.fuzzyCorrect !== "function") return null;
+  const terms = extractQueryTerms(query).filter((w) => w.length >= 3);
+  // Vocabulary-nearest correction is reliable for identifier typo probes
+  // ("useEffct") but unsafe for natural-language sentences: ordinary
+  // Portuguese words were rewritten to unrelated English code tokens and
+  // added as an entire extra RRF stream.
+  if (terms.length !== 1) return null;
+  const corrected: string[] = [];
+  let changed = false;
+  for (const term of terms) {
+    const fix = await deps.keywordSearch.fuzzyCorrect!(term);
+    if (fix && fix !== term) {
+      corrected.push(fix);
+      changed = true;
+    } else {
+      corrected.push(term);
+    }
+  }
+  return changed ? corrected.join(" ") : null;
+}
+
 // ── addContextToResults ──────────────────────────────────────────────────────
 
-export async function addContextToResultsImpl(
-  rlm: ContextualSearchRLM,
+/**
+ * Takes **no deps record** (§4.4): §2.1 shows its only facade read was
+ * `extractPreview`, which now lives beside it here, so the honest parameter list
+ * is the data alone — the shape `fuseResults` and `buildGraphStream` already
+ * have. GMS-03 AC-1 is satisfied by the absent facade argument, not by a record.
+ * `search` still reaches it through `deps.addContextToResults` rather than
+ * calling it module-locally — see the 6 stub sites noted above.
+ */
+export async function addContextToResults(
   results: SearchResult[],
   _projectId: string,
 ): Promise<SearchResult[]> {
@@ -515,7 +626,7 @@ export async function addContextToResultsImpl(
             filePath,
             lineStart,
             lineEnd,
-            preview: rlm.extractPreview(result.content),
+            preview: extractPreview(result.content),
           },
         },
       };
@@ -527,7 +638,7 @@ export async function addContextToResultsImpl(
 
 // ── extractPreview ───────────────────────────────────────────────────────────
 
-export function extractPreviewImpl(content: string, maxLines: number = 5): string {
+export function extractPreview(content: string, maxLines: number = 5): string {
   const lines = content.split("\n");
   const preview = lines.slice(0, maxLines).join("\n");
   return lines.length > maxLines ? preview + "\n..." : preview;
@@ -535,7 +646,7 @@ export function extractPreviewImpl(content: string, maxLines: number = 5): strin
 
 // ── calculateAvgScore ────────────────────────────────────────────────────────
 
-export function calculateAvgScoreImpl(results: SearchResult[]): number {
+export function calculateAvgScore(results: SearchResult[]): number {
   if (results.length === 0) return 0;
   const sum = results.reduce((acc, r) => acc + r.score, 0);
   return sum / results.length;
@@ -543,7 +654,7 @@ export function calculateAvgScoreImpl(results: SearchResult[]): number {
 
 // ── filterByPatterns ─────────────────────────────────────────────────────────
 
-export function filterByPatternsImpl(
+export function filterByPatterns(
   results: SearchResult[],
   include?: string[],
   exclude?: string[],

@@ -1,6 +1,6 @@
 /**
- * rlm-admin delegate tests — clearProjectIndex, getProjectStats, warmupCache,
- * getAnalytics.
+ * Search-facade admin-surface tests — clearProjectIndex, getProjectStats,
+ * warmupCache, getAnalytics; the facade delegates all four to index-admin.ts.
  *
  * Uses the injected-deps constructor seam (same as
  * contextual-search-rlm.characterization.test.ts) so no factories are called.
@@ -15,7 +15,7 @@ mock.restore();
 
 // Mock heavy infrastructure (same set as characterization test).
 //
-// `vector-store-factory` is the one that bites. `ensureInitializedImpl` falls
+// `vector-store-factory` is the one that bites. `ensureInitialized` falls
 // back to the real factory for any dependency the subject did not receive, so
 // without this the two `warmupCache` tests that construct without deps built a
 // real PostgresVectorStore and ran live embedding-provider auto-selection —
@@ -75,7 +75,7 @@ function makeRlm(deps: Record<string, unknown> = {}): ContextualSearchRLM {
   return new ContextualSearchRLM(deps as any);
 }
 
-describe("rlm-admin — clearProjectIndex", () => {
+describe("search-facade-admin — clearProjectIndex", () => {
   test("deletes vector + keyword + caches, returns deleted count", async () => {
     const rlm = makeRlm({
       vectorStore: { deleteByProject: async () => 5 },
@@ -99,7 +99,7 @@ describe("rlm-admin — clearProjectIndex", () => {
   });
 });
 
-describe("rlm-admin — getProjectStats", () => {
+describe("search-facade-admin — getProjectStats", () => {
   test("returns vectorStore.getStats", async () => {
     const rlm = makeRlm({
       vectorStore: { getStats: async () => ({ totalDocuments: 10, totalSize: 500 }) },
@@ -109,7 +109,7 @@ describe("rlm-admin — getProjectStats", () => {
   });
 });
 
-describe("rlm-admin — warmupCache", () => {
+describe("search-facade-admin — warmupCache", () => {
   test("runs default queries and returns counts", async () => {
     let searchCalls = 0;
     const rlm = makeRlm({
@@ -152,7 +152,7 @@ describe("rlm-admin — warmupCache", () => {
   });
 });
 
-describe("rlm-admin — getAnalytics", () => {
+describe("search-facade-admin — getAnalytics", () => {
   test("returns the analytics instance", () => {
     const fakeAnalytics = { trackSearch: () => {} };
     const rlm = makeRlm({ analytics: fakeAnalytics });

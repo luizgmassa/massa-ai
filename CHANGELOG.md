@@ -7,6 +7,275 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The graph-neighbor search stream is now a standalone capability module.** `buildGraphStream`
+  moves out of `rlm-synapse.ts` into `graph-stream.ts` and drops the facade parameter it never
+  used. It was the one delegate that already read zero members off `ContextualSearchRLM`, so the
+  parameter was pure ceremony from the earlier split — carrying it forward is what made the file
+  look like a rename rather than an extraction. The body moved byte-identical; the only behavioural
+  surface that changes is the argument list, and the module no longer references the search facade
+  at all. Functions in the search directory that still take the facade drop from **14 to 13**.
+
+  Deepest foreign reach stays at **14** and the hub gate still fails, both expected and unchanged
+  from the previous release: the maximum is set by `rlm-search.ts` and cannot move until that file
+  is split. The count of modules reading the facade also stays at **5** — `rlm-synapse.ts` keeps
+  two members through its remaining two functions, and only sheds the last of them two extractions
+  from now.
+
+- **Synapse session biasing is now a standalone capability module with an injectable dependency
+  record.** `applySynapseState` moves out of `rlm-synapse.ts` into `session-bias.ts` and trades the
+  search facade for `SessionBiasDeps` — the two collaborators it actually reads, `sessionRegistry`
+  and `synapseManager`, and nothing else. The practical gain is that the behaviour is now unit
+  testable from an object literal: reaching this body previously meant constructing the whole
+  search service, which intercepts seven factory modules before the first assertion runs. Functions
+  in the search directory that still take the facade drop from **13 to 12**, and the module reads
+  **zero** facade members.
+
+  Behaviour is unchanged, including one detail that is easy to lose in a move like this: the two
+  collaborators still fall back to their process factories *inside* the module rather than being
+  resolved by the caller, so a search with no session still touches neither factory. Resolving them
+  eagerly would have been the one way this extraction stopped being behaviour-preserving.
+
+  Deepest foreign reach stays at **14**, the hub gate still fails, and the number of modules reading
+  the facade stays at **5** — all three expected and all three unchanged, for the same reason as
+  above. What does move is `rlm-synapse.ts`, from two facade members to one.
+
+- **Fuzzy query correction moves into the hybrid-search module, and the Synapse delegate file is
+  gone.** `correctQuery` leaves `rlm-synapse.ts` for the new `hybrid-search.ts` and trades the search
+  facade for `HybridSearchDeps` — at this stage the one collaborator it reads, the keyword store. It
+  was never Synapse code: it corrects query typos against the keyword store's vocabulary and its only
+  caller is the search path, so it sat beside the session delegates purely by accident of an earlier
+  split. With it gone `rlm-synapse.ts` has no exports left and is **deleted**. The three functions
+  that shared that file shared no state at all, which is why it decomposed into three modules rather
+  than moving as one.
+
+  Behaviour is unchanged, including the case where the keyword store is missing: the dependency
+  record carries the live field rather than a pre-resolved copy, so an unconfigured store still fails
+  exactly where it did before. Functions in the search directory that still take the facade drop from
+  **12 to 11**.
+
+  **The number of modules reading the search facade finally drops, 5 to 4.** This is the extraction
+  where the last outside reader of that file's facade state goes away. Deepest foreign reach stays at
+  **14** and the hub gate still fails — both are set by `rlm-search.ts`, and neither can move until
+  that file is split, which is the last step of this work.
+
+  Query correction also gained a regression test for a property subtler than the move itself. The
+  facade builds each capability module's dependency record **per call**, which is what lets a test
+  replace a collaborator after construction and have it honoured. Memoising that record would leave
+  every existing test green while silently ignoring the replacement, because every test to date sets
+  its collaborator up before the first call. There is now a test that swaps a collaborator *between*
+  two calls and asserts each call saw its own — the one shape the previous suites could not
+  distinguish.
+
+- **Project indexing is now a standalone capability module, and lazy initialisation moved into the
+  search service itself.** `rlm-indexing.ts` is gone. Its six indexing surfaces — full project index,
+  single-file index, freshness check, search-admission preflight, gitignore loading and the
+  per-project mutex — live in `project-indexer.ts` and take `IndexerDeps`, the five stores they
+  actually read plus the two operations they re-enter, instead of the whole search facade. The
+  seventh export, lazy initialisation, could not move anywhere: it reads eight members off the
+  service, so any capability module holding it would fail the coupling gate permanently. It is now
+  the body of `ContextualSearchRLM.ensureInitialized()`, which is why the old module could be deleted
+  outright rather than left behind as a single-function file. Functions in the search directory that
+  still take the facade drop from **11 to 6**, and the lines they cover from **1108 to 626** — the
+  largest single step of this work.
+
+  **Modules reading the search facade drop from 4 to 3.** Deepest foreign reach stays at **14** and
+  the gate still fails, both expected and unchanged: the maximum is set by `rlm-search.ts` and cannot
+  move until that file is split, which is the next-to-last step. Initialisation timing, ordering and
+  observable behaviour are unchanged — each public method still awaits initialisation first and only
+  then assembles its dependency record, so the fields the module reads are populated exactly as
+  before. Single-file indexing deliberately still does *not* initialise, because it never did; its
+  callers do.
+
+  Two properties are now pinned by tests that did not exist before, both of which the previous suites
+  could not distinguish from correct code. The dependency record is rebuilt on **every** call, so a
+  test that replaces a collaborator after construction is still honoured — and the two re-entrant
+  operations resolve through the live service on every invocation rather than being bound once, so
+  replacing one of *those* between calls is honoured too. The richest existing indexing suite, which
+  carries more than half of all such replacements in the codebase, stays green under a memoised
+  record; that is why the new test exists rather than relying on it.
+
+  One coupling measurement is worth recording because it is a property of the measurement rather than
+  of the code: typing a dependency-record field with a class declared in the same directory made the
+  gate attribute that module's method calls to the class, reporting a second violation where the
+  codebase has one. The field now names only the four methods it uses, which is both the accurate
+  type and the reading the gate intends.
+
+- **The project index manager can now be supplied from outside the search service.** It was the one
+  collaborator with no injection point at all: every other dependency either arrives from a process
+  factory the service can be told to skip, or is handed in at construction, while the index manager was
+  built by direct construction inside lazy initialisation, with no field able to override it. Callers and
+  tests can now pass one in alongside the stores. Nothing else changes — supply no index manager and the
+  service constructs exactly what it constructed before, over the same vector store, at the same point in
+  initialisation. A service that has already initialised is left alone, as it was before.
+
+  This is the only dependency in this work that gains a *new* seam rather than having an existing one
+  moved, and it is the last piece of the service's own state that could be reached only by patching the
+  object after the fact.
+
+  The seam is pinned by a test asserting that a supplied index manager is the one actually used, not
+  merely that initialisation still succeeds. That distinction is the whole risk in a change like this: a
+  seam can be declared, typed and wired and still never be consulted, and a test exercising only the
+  default path passes either way. The default path is pinned separately, including which vector store the
+  constructed manager ends up holding — an ordering mistake would leave it holding nothing while still
+  producing an object of the right class.
+
+  Coupling measurements are unchanged in every direction: the same single violation, the same deepest
+  reach, the same set of functions taking the facade. This adds a field and moves no code. Worth saying
+  explicitly, because the previous step showed that a dependency field typed with a class from the same
+  directory can move those numbers by itself; this field is optional, and that is what keeps it outside
+  what the measurement looks at.
+
+- **Index administration is now a standalone capability module, and the admin delegate file is gone.**
+  Clearing a project's index, reading its statistics, warming the search cache and reaching the
+  analytics instance move out of `rlm-admin.ts` into the new `index-admin.ts` and trade the search
+  facade for `IndexAdminDeps` — the three stores they actually read, the file-filter cache, the
+  analytics instance, and a callback back into search. With them gone `rlm-admin.ts` has no exports
+  left and is **deleted**. Functions in the search directory that still take the facade drop from
+  **6 to 2**, and the amount of code inside that boundary drops from **626 to 524** lines.
+
+  Behaviour is unchanged, including the two details easiest to lose in a move like this. Lazy
+  initialisation still runs first for the three surfaces that always ran it, in the same order — it is
+  now the first statement of the service method instead of the first statement of the delegate, so the
+  fields the module reads are populated exactly as before. And the analytics accessor still does *not*
+  initialise, which is what it has always done; adding an await there would have been a behaviour
+  change dressed as a tidy-up.
+
+  Cache warmup is the first extracted surface that calls **back** into search, so its dependency record
+  carries a callback rather than a captured reference, and the callback re-reads the method each time it
+  runs. That is not a style preference: it is what keeps a substituted search implementation effective,
+  and the difference is invisible to every pre-existing test, because all of them substitute before they
+  call rather than between two calls. A test that swaps the implementation mid-flight now pins it.
+
+  The number of modules reading the search facade drops from **3 to 2**. Deepest foreign reach stays at
+  **14** and the hub gate still fails — both set by `rlm-search.ts`, and neither moves until that file
+  is split, which is the next step. One measurement note, because the previous two releases each carried
+  one and this one corrects them: the earlier finding that a dependency field typed with a class from the
+  same directory can move the gate by itself does **not** apply to either nominal field here. One of them
+  is not a distinct type at all but an alias re-export, so the measurement never sees it; and its value is
+  handed back through a public accessor, so narrowing it would break the published return type. Both were
+  measured rather than assumed, in both directions.
+
+- **Hybrid search is now a standalone capability module, the last search delegate file is gone, and the
+  coupling gate passes.** The search entry point itself — 455 lines and the widest of them all — moves out
+  of `rlm-search.ts` into `hybrid-search.ts`, along with result-context hydration, preview extraction,
+  average scoring and glob filtering. All five trade the search facade for `HybridSearchDeps`: the five
+  stores they read, plus three callbacks back into the service. With them gone `rlm-search.ts` has no
+  exports left and is **deleted**, and with it the last of the five delegate files the earlier split
+  produced. Functions in the search directory that still take the facade drop from **2 to 0**, and the
+  amount of code inside that boundary drops from **524 lines to none**.
+
+  **This is the step the whole series was for.** Deepest foreign reach — how many members of the search
+  service any one other module reaches into — drops from **14 to 1**, and the coupling gate goes from
+  failing to **passing**: no type in the directory is now read more than the ceiling of three members
+  deep. Both numbers were pinned by `rlm-search.ts` and could not move until it was split, which is why
+  every earlier step reported them unchanged.
+
+  Behaviour is unchanged, including three details that are easy to lose in a move this size. Lazy
+  initialisation still runs first, still converts a failure into the same service error and still records
+  it — the wrapper moved along with the call rather than being dropped for a bare await, which would have
+  surfaced a raw factory error instead. Result-context hydration and the graph-neighbour stream are
+  reached through callbacks that re-read the method each time they run, not through captured references,
+  which is what keeps a substituted implementation effective. And the query-understanding collaborator is
+  typed to the single method it uses, which is both the honest type and what keeps it out of the coupling
+  measurement.
+
+  Two files in the directory now sit close to the size ceiling the same gate enforces — 697 and 686 lines
+  against a limit of 700 — because this series has been moving code out of the delegate files and into
+  these two. The reasoning behind each decision lives in the project's own records rather than in the
+  source, for that reason.
+
+- **The search service's own notes on why its surface is public are now accurate.** Ten comments inside
+  the service still explained nine public methods and one public field as a concession to a delegate file
+  that no longer exists — the previous step in this series deleted it. They are replaced by the two
+  reasons that actually hold: the class keeps its published method surface for the twenty-four modules
+  that import it, and the query-understanding field additionally has a live production reader, the one
+  that resolves cache-invalidation targets after a rename.
+
+  No behaviour, signature or exported name changes, and nothing leaves the public surface. It is worth a
+  line rather than silence because the two reasons are not interchangeable: tightening the nine methods
+  back to private is caught by no automated check in this repository, while tightening the field is a
+  compile error. Anyone later deciding whether a modifier can be narrowed needs to know which of the two
+  they are holding.
+
+- **The four search test suites are renamed after what they test, and stale documentation that pointed at
+  deleted files is corrected.** `rlm-admin`, `rlm-indexing`, `rlm-search` and `rlm-synapse` become
+  `search-facade-admin`, `search-facade-indexing`, `search-facade-hybrid` and `search-facade-synapse`.
+  They drive the search facade rather than the capability modules the old names implied, and no file in
+  the package is named after a delegate that no longer exists. The onboarding guide's description of the
+  search layer was also several steps out of date — it described modules taking the facade instance as
+  their first argument, which this series replaced with narrow dependency records — and the coverage
+  suite's header cited a line range that had drifted by about a hundred and eighty lines.
+
+  No test was added, removed, skipped or relaxed: every suite runs the same case and assertion counts as
+  before, verified per file rather than in aggregate. Comments recording where a body originally moved
+  from are kept deliberately; they name deleted files on purpose, and a new check now fails if one of
+  them is removed as well as if a live reference goes stale.
+
+- **Two structural checks that existed but enforced nothing now run in CI.** The search-facade hub
+  metric and the stale-pointer check were both written with unit suites and both passed on demand,
+  but neither ran against the repository in any workflow, so a violation could merge unnoticed. Both
+  are now steps in the `build` job, beside the existing package-contents and skill-bundle gates.
+  `build` was already a required status check, so they enforce from the moment they land — no branch
+  protection change was needed, and that was measured rather than assumed.
+
+  Two other checks in the same family, the frozen-anchor and characterization guards, turned out to
+  be enforced already: their unit suites run the real script against the real tree, and that suite
+  runs in CI. They needed no wiring. The distinction is worth recording because "has a test" and
+  "gates the repository" looked identical from the outside and were not.
+
+  The checkout step for that job now fetches full history. The stale-pointer check separates a
+  deliberate historical reference from a broken one by asking whether git ever recorded the path, and
+  the default single-commit checkout cannot answer that: measured at the same commit, a shallow
+  checkout reports 28 broken pointers and no historical ones, where full history reports none broken
+  and the historical count exactly on its pin. It would have failed every run on a clean tree.
+
+- **Retrieval quality is unchanged by this refactor, and proving it needed a new instrument because
+  the existing comparison cannot separate a rename from a regression.** The needle benchmark clears
+  both of its floors — hit@1 64.3% against a floor of 50%, MRR 0.745 against 0.65, the latter up from
+  0.7357 — but the per-needle comparison reports one needle moving from rank 5 to rank 6, which the
+  comparison tool treats as a regression and which it is not.
+
+  The cause is that the chunker writes the file's path into every chunk before that chunk is
+  embedded, along with the name of the enclosing symbol. Both are there to help retrieval and both
+  work. But it means renaming a file, or renaming a function inside it, changes the text being
+  embedded and therefore every similarity score in that file — without changing what the code does.
+  Two chunks that were 0.0134 apart ended up 0.0030 apart the other way, and swapped places. The
+  affected needle's own score did not move at all; something else moved past it.
+
+  So `needles-diff` reports a regression whenever a release renames a file the benchmark covers, and
+  will do so again for the next stage of this work. Rather than relax it — a comparison that tolerates
+  a rank drop stops detecting the thing it exists for — there is now a second tool that re-runs the
+  benchmark twice, changing only the path each file is labelled with, so the rename can be held
+  constant while everything else stays as shipped. Under it all fourteen needles sit at their original
+  rank. It refuses to report at all unless its first pass reproduces the real benchmark run exactly,
+  because a second implementation that can silently disagree with the tool it stands in for would be
+  worse than having none.
+
+  This runs locally against an embedding model and is not part of CI, for the same reason the needle
+  benchmark itself is not. The measurement covers the eight files the needles point into rather than a
+  full index, so it is evidence that this refactor changed no ranking, not a statement about retrieval
+  quality overall.
+
+- **The web UI's edit and delete dialogs are now covered by tests, and the coverage gate no longer
+  hangs.** Running the coverage gate would stop dead and never return. The cause was a browser dialog:
+  the web UI asks for confirmation before editing or deleting a memory, and one test fires every click
+  handler the app registers — including those two. Outside a browser those dialog calls read from
+  standard input, so the gate sat waiting for a keypress that was never coming. Under continuous
+  integration input is closed, the dialog returns nothing at all, and the handler gave up one line
+  later, so nobody ever saw either the hang or the gap it was hiding.
+
+  The tests now supply their own answers to those dialogs, which both removes the dependency on
+  standard input and, for the first time, exercises what happens *after* someone confirms — the update
+  and delete requests the app sends. That code had never run under test in any environment. Line
+  coverage of the web UI's application script rises from **93.56% to 95.34%**, and the suite that used
+  to hang indefinitely now finishes in about a second.
+
+  Every source file this work touches is at or above the 90% coverage floor, with no new exemption
+  added: the lowest is the project-indexing module at **94.57%**, and the six other modules extracted
+  over this series sit between 95.54% and 100%.
+
 ## [1.15.0] - 2026-07-30
 
 ### Added

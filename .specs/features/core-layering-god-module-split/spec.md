@@ -6,7 +6,9 @@
 - **Workflow**: spec-driven (Specify → Design → Tasks → Execute)
 - **Sizing**: Large. Behavior-preserving structural refactor across the whole of `packages/core`,
   plus a filename rename.
-- **Status**: Specified; assumptions closed 2026-07-28; Design in progress.
+- **Status**: Specified; assumptions closed 2026-07-28; Design and Tasks complete; **Execute in
+  progress** (PR-B, T19 of 20). Twelve corrections were applied to this document at T19 — see
+  *Design and Execute corrections* below before trusting a criterion or a figure.
 - **Depends on**: `sensor-repair-2026-07` (PR-A) must land and release first. Three of the gates
   this spec is validated by are unreliable until it does, and one — the needles gate — is
   *guaranteed* to report a false failure against this refactor. See the Evidence Corrections
@@ -41,6 +43,43 @@ Three findings surfaced during the same re-derivation that were not in the origi
   instantiated by both transports. The precedent for "an orchestrator that is not in
   `controllers/`" is therefore already set in the tree, which is evidence for AS-01's answer
   rather than against it.
+
+## Design and Execute corrections (C1–C12) — applied at T19
+
+`design.md` §10 accumulated corrections to this document from Design through Execute rather than
+editing it piecemeal, so they could land as **one reviewed change**. T19 is that change. Each is
+applied **in place** at the criterion or figure it amends, following the same convention as the
+Specify-era table above; this index exists because **T20's verifier reads this document and must be
+able to tell an amended criterion from an original one.** `design.md` §10 keeps the full rationale
+for each — it is not restated here, so there is one copy to drift.
+
+**Four of these replace an acceptance criterion rather than a figure** — C4, C10, C11 and C12. In
+every one the criterion as written is unsatisfiable *by any tree this PR could produce*, so a
+verifier checking it literally would mark it failed against a tree that satisfies what it meant.
+The intent is preserved in each case; only the instrument changes.
+
+| # | Amends | Kind | What changed |
+| --- | --- | --- | --- |
+| C1 | Status line · AS-02 | figure | `design.md` exists; AS-02's "Settled in `design.md`" was a forward reference in the past tense. **AS-02 stands.** |
+| C2 | Evidence — member matrix | figure | `13 of ~16` facade members → **13 of 23**. `~16` had no method behind it. Not the `~16 files` figure, which is different and correct. |
+| C3 | GMS-05 AC-4 note 3 | figure | ~90 minutes per observation → **~2 minutes locally**. 90 min was `needles-gate.yml`'s 2-core CI estimate. |
+| C4 | GMS-04 AC-4 | **criterion** | The needles-fixture clause is obsolete — PR-A content-anchored all 14 needles and removed every `filePath`. Replaced by **FROZEN-ANCHOR** (`design.md` §6.1), a hard failure rather than a silent zero. Site count also **3 → 5**. |
+| C5 | R-08 | figure | Rule of thumb **applied and passed** (0.5× / 2.3×, both under 3×) *and recorded as insufficient alone*. Status → **deferred to PR-C Design with a named precondition**. |
+| C6 | R-03 | figure | Gains its falsifier: **G-HUB, calibrated on M14** — reach 1 → 14, members 26 → 24, host LOC 1668 → 463. M14 redistributed reach rather than widening the type. |
+| C7 | Evidence table | figure | Adds `data → services` = **24 edges across 14 files**; the 12 elsewhere is the `getPrismaClient` subset and is correct. Records the double-quote blind spot (quote-agnostic: 26/16/7) for PR-C. |
+| C8 | GMS-03 AC-3 · Evidence | figure | The two dynamic importers are `packages/core/src/scripts/{beir,symbol}-benchmark.ts:259/:214`. **The cited `scripts/…:258/:213` paths do not exist.** Count was right; citation was never checked. |
+| C9 | R-08 | figure | `design.md` §5.1 named **two** dynamic `controllers` importers; there is **one**. Outside importers measured at **24**, settling §5.1's "~30" range. |
+| C10 | GMS-04 AC-3 | **criterion** | `rg 'rlm-'` returning only CHANGELOG and `.specs/` is unsatisfiable — and was narrowed once before being replaced. Replaced by **`check-stale-pointers.ts` exit 0** at its pin. Population → pointer. |
+| C11 | GMS-05 AC-4 note 2 | **criterion** | "per-needle ranks are unchanged" is unattainable for any PR renaming a corpus file. Replaced by **`needles-rename-control.ts` exit 0**, holding the file-path label constant. Intent unchanged. |
+| C12 | GMS-03 AC-3 | **criterion** | "fan-in **and fan-out** both lower" fails on the shipped tree: fan-out **19 → 21**. Replaced by **`maxForeignReach` 14 → 1** plus D1 and fan-in; fan-out demoted to reported context. Added at T19 — the nineteenth plan defect. |
+
+**C12 is the one added during T19 itself**, and it is worth stating why it is not special pleading.
+The facade sheds **4** `rlm-*` delegate imports and gains **6** capability-module imports, so
+fan-out rises by exactly the arithmetic of the decomposition; requiring it to fall would require the
+split not to happen. Everything AC-3 exists to detect moved decisively the right way — reach
+**14 → 1**, `delegateScope` **21 → 0**, facade-taking **15 → 0**, scoped LOC **1550 → 0**, fan-in
+**24 → 23**. R-03's failure mode is a *facade*, and depth of reach is what tells one apart from a
+set of capability modules; fan-out counts breadth, which a real split is supposed to increase.
 
 ## Why this exists
 
@@ -163,7 +202,7 @@ not arguing it during Execute.
 | ID | Question | Decision | Confirmed? |
 | --- | --- | --- | --- |
 | AS-01 | Is `controllers/` adopted for all 31 tools, or retired in favour of a contract that matches reality? | **Retire the layer.** Codify `tools → services (some of which orchestrate) → data`. Move the 3 real controllers (Memory, Search, Context) into `services/` as named orchestrators; fold `ExecutorController` into `services/executor/` keeping its exported symbol name so the two transports that import it directly do not break; resolve the `GraphController` / `TracePathTool` duplication. Follows the `WebController` precedent already in the tree. Adoption was rejected on evidence: it is ~7-9 genuinely new orchestration controllers plus ~11 pure pass-throughs written as ceremony. | **y** |
-| AS-02 | What replaces the `Impl(this, …)` delegation shape? | Capability modules owning only the state they use, with dependencies injected. Settled in `design.md` against the member→consumer matrix; the separable and shared members are already identified. | **y** |
+| AS-02 | What replaces the `Impl(this, …)` delegation shape? | Capability modules owning only the state they use, with dependencies injected. Settled in `design.md` against the member→consumer matrix; the separable and shared members are already identified. **Confirmed at T19 — C1**: this was a **forward reference written in the past tense** — `design.md` did not exist when the sentence was drafted. It does now (§2's matrix, §4.4's module shape), the matrix it cites was built, and its statistics reproduce by direct re-derivation (`design.md` §1). **AS-02 stands as written.** | **y** |
 | AS-03 | Does the `rlm-*` rename land in the same PR as the split, or after it? | **Same PR (PR-B).** The locked programme decision — rename exactly once, inside the change that already rewrites the files. Now near-free: 4 importers, not 40+. | **y** |
 | AS-04 | How is "behavior preserving" proven? | Characterization tests first, then the structural change, per the repo's own precedent. The existing net is smaller than it looks — see GMS-05 AC-1. | **y** |
 | AS-05 | One PR or several, and what is the intermediate state? | **Three PRs, plus a fourth for AS-06.** PR-A `sensor-repair-2026-07` (separate feature) → PR-B search split + rename → PR-C layering + CI import check → PR-D `read_file.ts`. Each independently shippable and revertable; every merge to `main` auto-cuts a release, so no PR may leave a contract holding nowhere. | **y** |
@@ -235,13 +274,34 @@ factory modules — the `48d0f39` failure mode is structurally impossible. Note 
 dependency the original draft missed: `ensureInitializedImpl` builds `IndexManager` by direct
 construction (`rlm-indexing.ts:586`), not through a `get*` factory, and `injectedDeps` has no
 field for it — so it is the one dependency that cannot be injected today.
-**AC-3**: `contextual-search-rlm.ts`'s fan-in and fan-out are both lower after the change than
-before, **measured by a script committed in PR-B and run at both commits**. The original 22 / 26
-figures do not reproduce and are not the baseline: at `a6216cd` fan-in is **24** counting static
-imports, **26** including the two dynamic `await import(...)` sites in `scripts/beir-benchmark.ts:258`
-and `scripts/symbol-benchmark.ts:213`, and fan-out is **19** distinct module specifiers. A
-before/after comparison is only meaningful once the counting method is executable rather than
-described, which is why the script is a deliverable and not a note.
+**AC-3** *(amended at T19 — C12; the original required fan-in **and fan-out** both lower, which the
+shipped tree does not satisfy and a decomposition cannot)*: `contextual-search-rlm.ts`'s **coupling**
+is lower after the change than before, **measured by scripts committed in PR-B and run at both
+commits** — the frozen baseline is `d628464`, recorded in `facade-matrix-before.json` and
+`facade-metrics-before.json` so it cannot drift with the tree:
+
+| metric | script | before (`d628464`) | after | direction |
+| --- | --- | --- | --- | --- |
+| `maxForeignReach` on `ContextualSearchRLM` | D2 `search-hub-metric.ts` | **14** (by `rlm-search.ts`), exit 1 | **1** (by `search-warmup.ts`), exit 0 | **falls — the criterion** |
+| foreign modules reading the facade | D2 | 6 | 1 | falls |
+| `delegateScope` functions | D1 `search-facade-matrix.ts` | 21 | **0** | falls |
+| functions taking the facade as a parameter | D1 | 15 | **0** | falls |
+| LOC inside that scope | D1 | 1550 | **0** | falls |
+| fan-in | D3 `search-facade-metrics.ts` | 24 static · 26 with dynamic | 23 · 25 | falls |
+| fan-out | D3 | 19 distinct specifiers | **21** | **rises — reported, not a floor** |
+
+**Fan-out is reported and is deliberately not a pass condition.** Measured cause: the facade sheds
+**4** `rlm-*` delegate imports and gains **6** capability-module imports, net **+2**. A decomposition
+that replaces one delegate with N modules necessarily raises distinct-specifier fan-out, so requiring
+it to fall would require the split not to happen. Read a rise here as evidence the split landed, and
+read `maxForeignReach` for the property AC-3 exists to protect — R-03's failure mode is a *facade*,
+and depth of reach is what distinguishes one from a set of capability modules. Two dynamic
+`await import(...)` sites are counted in fan-in throughout, at
+`packages/core/src/scripts/beir-benchmark.ts:259` and
+`packages/core/src/scripts/symbol-benchmark.ts:214` *(paths corrected at T19 — C8)*. The original
+22 / 26 figures do not reproduce and are not the baseline. A before/after comparison is only
+meaningful once the counting method is executable rather than described, which is why the scripts are
+deliverables and not notes.
 
 ### GMS-04 — `rlm-*` files are renamed exactly once
 
@@ -254,16 +314,37 @@ plus one test using `typeof import(...)` and `mock.module` targets
 **AC-1**: No source or test file under `packages/core/src` is named `rlm-*`.
 **AC-2**: Every importer is updated in the same commit as the rename; no compatibility re-export
 file is left behind.
-**AC-3**: `rg 'rlm-'` returns only CHANGELOG and `.specs/` history.
-**AC-4**: The three non-source mention sites are updated in the same commit: `docs/ONBOARDING.md`
-(3 places, including the layer-4 tour entry), `CLAUDE.md:157`, and — critically —
-`benchmarks/needles/fixtures/massa-ai.json`, which pins **4 needle targets** to
-`services/search/rlm-fusion.ts` and `services/search/rlm-search.ts` **by path**. Missing that
-fixture does not fail loudly: `benchmarks/needles/run.ts:233-236` skips a missing target with a
-`[warn]` and scores the needle zero, which is indistinguishable from a retrieval regression. PR-A
-(`sensor-repair-2026-07` SEN-04) converts that silent skip into a hard failure and content-anchors
-the fixture; **AC-4 assumes PR-A has landed.** If PR-B were somehow taken first, this criterion
-alone makes the needles gate unreadable for the entire refactor.
+**AC-3** *(amended at T19 — C10; the original was `rg 'rlm-'` returns only CHANGELOG and `.specs/`
+history, which is unsatisfiable and was narrowed once before it was replaced)*:
+**`bun scripts/check-stale-pointers.ts` exits 0** — no `rlm-*` or `search-facade-*` pointer is
+`BROKEN`, and the `HISTORICAL` count sits exactly on its pin (`HISTORICAL_PINNED = 28`). Counting the
+string measures a *population*; the requirement was always about *a pointer that misleads a reader*.
+The population cannot go to zero: **320** occurrences live in three tracked, generated `.ua/`
+artifacts whose regeneration is deferred past PR-C, every extraction deliberately carries a
+provenance comment naming the `rlm-*.ts` source it replaced (six files carry nothing else), and
+`contextual-search-rlm-coverage.test.ts` carries `rlm-` in its own filename because §6 keeps
+`contextual-search-rlm.ts` on purpose. Run the gate **after `git add`** — it enumerates
+`git ls-files`, so an untracked file is invisible to it — and with full history, since it asks
+`git log --all` whether a path ever existed. **Not under this gate, by design**: bare-word mentions
+carrying no file extension (`` `rlm-admin` ``, a `describe("rlm-search — …")` title, an
+`rlm-*.test.ts` glob). Do not read a green board as covering them.
+**AC-4** *(amended at T19 — C4; the needles-fixture clause below was obsolete, and the site count was
+short by two)*: The **five** non-source mention sites are updated in the same commit:
+`docs/ONBOARDING.md` (3 places, including the layer-4 tour entry), `CLAUDE.md:157`, and — found at
+T15, unnamed by the original — `packages/core/src/__tests__/architecture-map.test.ts:454-455` and
+`packages/core/src/__tests__/search-controller.test.ts:3`, both comments citing test files this PR
+renames.
+
+**`benchmarks/needles/fixtures/massa-ai.json` is no longer a site.** The original made it the
+critical one, because it pinned 4 needle targets to `services/search/rlm-fusion.ts` and
+`services/search/rlm-search.ts` **by path**, and `benchmarks/needles/run.ts` skipped a missing target
+with a `[warn]` and scored the needle zero — indistinguishable from a retrieval regression. PR-A
+(`sensor-repair-2026-07` SEN-04) landed first as AS-05 requires: it content-anchored all 14 needles,
+**removed every `filePath`**, and converted the silent skip into a hard failure. What replaces the
+clause is constraint **FROZEN-ANCHOR** (`design.md` §6.1): four of the fourteen anchors sit inside
+PR-B's blast radius **as content**, so moving those lines between files is safe but reflowing or
+rewording them is not. The check is `bun scripts/check-frozen-anchors.ts` exiting 0 with all 14
+anchors each resolving to exactly one location — a hard failure now, not a silent zero.
 
 ### GMS-05 — Behavior is preserved and proven so
 
@@ -296,12 +377,27 @@ is not satisfiable:
 1. **It requires PR-A.** With the positional fixture, moving the 7 `services/search/` needle
    targets caps `hit@1` at 7/14 = 0.50 and `MRR` at 0.50 against a 0.65 floor — a guaranteed
    failure independent of retrieval quality. The gate is readable only after SEN-04.
-2. **It is a before/after comparison, not a single run.** The floors are a backstop; the evidence
-   is that per-needle ranks are unchanged across the refactor. A run that clears the floor while
-   quietly losing three needles from rank 1 to rank 4 is a regression that passed.
-3. **Each observation costs roughly 90 minutes and a local Ollama.** `needles-gate.yml` is
-   `workflow_dispatch`-only and `continue-on-error: true` by design — qwen3-embedding:8b is ~60 s
-   per embed on a 2-core runner. Budget the runs into Tasks; do not discover this mid-Execute.
+2. **It is a before/after comparison, not a single run** *(amended at T19 — C11; the original made
+   the evidence "per-needle ranks are unchanged", which this PR does not satisfy and no PR renaming a
+   corpus file can)*. The floors are a backstop; the evidence is
+   **`bun scripts/needles-rename-control.ts` exiting 0** — no needle below its baseline rank **once
+   the file-path label is held at its baseline value**. The note's intent is unchanged and still
+   enforced: a run that clears the floor while quietly losing three needles from rank 1 to rank 4 is
+   a regression that passed. Only the claim that *raw* rank equality is achievable is corrected.
+   Why it is not: `smart-chunker.ts:62-70` prepends `// File: <relativePath>` to every chunk before
+   it is embedded, plus a `// Section: <label>` line — the enclosing symbol's name — repeated three
+   more times. Both are naming, both enter the embedded text, and rank is a function of the cosine
+   score computed over that text, so renaming a file or de-facading a symbol perturbs every score in
+   it and two adjacent chunks can swap. Measured at T17: `N05-centrality-rerank-bonus` went rank
+   **5 → 6** while its target chunk's own top score was *byte-identical*, because a rival overtook it
+   across a **0.0134** margin. **`scripts/needles-diff.ts` therefore exits 1 on this tree and that is
+   expected, not an open regression** — read the per-needle table it prints, not its exit code.
+3. **Each observation costs roughly 2 minutes locally and a local Ollama** *(amended at T19 — C3;
+   the original said ~90 minutes)*. 90 min is `needles-gate.yml`'s **2-core CI** estimate at ~60 s
+   per embed with qwen3-embedding:8b, which was carried into a local-cost table by mistake and
+   falsified in PR-A. The CI workflow stays `workflow_dispatch`-only and `continue-on-error: true`
+   for that reason; locally the runs are cheap. `needles-rename-control.ts` is the exception at
+   **~3.5 min**, because it embeds the corpus twice.
 
 ---
 
@@ -311,12 +407,12 @@ is not satisfiable:
 | --- | --- | --- | --- |
 | R-01 | A behavior-preserving refactor silently changes retrieval quality | **Restated — the original had it backwards.** The needles gate is not a sensor that might miss a regression; as built it is a sensor that manufactures one. 7 of 14 needles are pinned by `filePath` + line range into `services/search/`, and `run.ts:233-236` scores a moved target as zero behind a `[warn]`. Retired by PR-A (SEN-04); until then the refactor has **no** retrieval sensor at all. | Open — owned by PR-A |
 | R-02 | The refactor is validated against tests written after the change | Tests written from the new shape cannot detect that the old shape did something else. Sharpened by evidence: 24 of the facade's 41 existing tests are forwarding-only and will protect nothing once the wrapper they assert is removed. GMS-05 AC-1 owns this. | Open |
-| R-03 | Splitting again produces another facade | M14 already did one split that preserved fan-in/fan-out exactly. Repeating the same move is the default failure. GMS-03 AC-3's committed measurement script is the check that would catch it. | Open |
+| R-03 | Splitting again produces another facade | M14 already did one split that preserved fan-in/fan-out exactly. Repeating the same move is the default failure. GMS-03 AC-3's committed measurement scripts are the check that would catch it. **Falsifier added at T19 — C6: G-HUB (`search-hub-metric.ts`), calibrated on M14** — across M14 `maxForeignReach` went **1 → 14** and `members` **26 → 24** while host LOC fell **1668 → 463**. Note the direction: M14 did *not* widen the type, it **redistributed reach**, which is exactly why a fan-in/fan-out reading called that split a success and G-HUB calls it a failure. Depth of reach is the discriminator, and it is why C12 makes `maxForeignReach` AC-3's criterion and demotes fan-out to reported context. | Open — PR-B has not shipped |
 | R-04 | The intermediate state is unshippable | Merging to `main` with green CI auto-cuts and publishes a release. Every one of PR-A..PR-D must be independently shippable. AS-05's four-PR boundary is the mitigation. | Open |
 | R-05 | The `rlm-*` rename collides with in-flight work | **Retired.** Premised on 40+ importers; the measured figure is 4. A concurrent branch touching search conflicts in at most a handful of files. | Retired 2026-07-28 |
 | R-06 | The layering change breaks a transport | New. `ExecutorController` is imported directly by `apps/tools-api/src/routes/executor.ts:13,17` and `apps/mcp-client/src/embedded-api-client.ts:43`, so it is public surface despite living in `controllers/`. AS-01 keeps its exported symbol name for exactly this reason. `GraphController` is likewise live via `routes/workspace.ts:461,612` — an earlier sweep called it dead code and was wrong. | Open |
 | R-07 | The `GraphController` / `TracePathTool` divergence is fixed by accident | New. REST and embedded reach `trace_path`/`impact_analysis` through two implementations with separate parameter mapping. Any tidy-up that silently unifies them is a **behavior** change inside a behavior-preserving PR, and would be validatable as neither. It must be left alone here and fixed in its own change. | Open |
-| R-08 | **PR-C is two changes wearing one label** | Raised by the Plan Challenge critic and confirmed. "Retire the controllers layer" touches 3-4 files. GMS-01 AC-4's `data → services` group touches **24 edges across 12 files under `data/`**, is unrelated to AS-01, and carries its own risk. AS-05 sized PR-C on the controllers move alone. Design must either split it or state explicitly why one PR is right, with the file counts compared. The rule of thumb agreed: if the `data → services` work touches more than 3× the files the controllers move does, the single-PR framing is wrong. | Open — resolve in Design |
+| R-08 | **PR-C is two changes wearing one label** | Raised by the Plan Challenge critic and confirmed. **Rule of thumb applied and passed at T19 — C5**: 0.5× on files-touched and 2.3× on files-moved-vs-edited, both under the 3× agreed below — *and recorded as insufficient on its own*, because the group is two problems rather than one (`design.md` §5.2), so passing the ratio does not settle the framing. **Its premise is corrected — C9**: "Retire the controllers layer touches 3-4 files" is ~an order of magnitude low. Measured: 6 members and **22 deep + 1 barrel (`src/index.ts`) + 1 dynamic = 24** outside importers, against `design.md` §5.1's "~30" and "between 22 and 30" — which settles the range rather than narrowing it. §5.1 also named **two** dynamic `controllers` importers; there is **one** (`production-wiring.ts`), since `search-session-hook.ts:21` is a plain static import. Both figures are pinned by `scripts/__tests__/search-facade-metrics.test.ts`, not left as prose. GMS-01 AC-4's `data → services` group is **24 edges across 14 files under `data/`** (the "12 files" this row carried is the `getPrismaClient` subset, not the group — C7), is unrelated to AS-01, and carries its own risk. AS-05 sized PR-C on the controllers move alone. | **Deferred to PR-C Design with a named precondition** (`design.md` §5.3) |
 
 ---
 
@@ -331,7 +427,8 @@ that draft. Every number was read from current source, not inferred and not carr
 | tools 31 / controllers 6 / services 208 / data 41 | `find packages/core/src/<layer> -name '*.ts' \| wc -l` — unchanged, confirmed |
 | `tools → services` 34× vs `tools → controllers` 6× | `rg -n 'from "\.\./services'` over `tools/*.ts`, deduped to unique (tool-file → service-module) edges; raw line count is 36 **[re-derived — 34 confirmed, method corrected]** |
 | backward imports **36**, not 38: `data → services` 24, `controllers → tools` 5, `services → tools` 4, `services → controllers` 3 | `rg` for `from "(\.\./)+<layer>/"` plus dynamic `import(...)` across `services/`, `data/`, `controllers/`. One of the 3 `services → controllers` edges is dynamic (`services/project-identity/production-wiring.ts:46`) and is invisible to a static grep **[re-derived]** |
-| fan-in 24 static / 26 with dynamic; fan-out 19 distinct specifiers | `rg -l "from ['\"][^'\"]*contextual-search-rlm"` for fan-in, plus the two `await import(...)` sites in `scripts/beir-benchmark.ts:258` and `scripts/symbol-benchmark.ts:213`; `rg -o "from \"...\"" \| sort -u` for fan-out. A plain-string grep returns 37 files and overcounts — 13 are comments, fixture paths and `mock.module` targets **[re-derived — 22/26 does not reproduce]** |
+| `data → services` is **24 edges across 14 files**, over **6** target service modules | **Added at T19 — C7**, and the metric is named because three figures here are quotable and different: at `a6216cd`, `git grep -nE 'from "(\.\./)+services/'` over `packages/core/src/data/**/*.ts` returns **24 matching lines**, **24** unique (data-file → service-module) edges and **14** distinct files. The **12** this document cites elsewhere is the `getPrismaClient` subset alone and is **correct, re-confirmed at 12** — it is not the group total. **The stated method has a blind spot, found at T19 and left for PR-C**: the pattern anchors on a **double quote**, so a quote-agnostic sweep (`from ["'](\.\./)+services/`) returns **26 edges / 16 files / 7 modules**. The two extra sites are `data/vector/base-vector-store.ts:14` → `services/embeddings/index.js` and `data/vector/postgres-vector-store.ts:26` → `services/project-identity/identity-guard-installer.js`, both single-quoted, both present at `a6216cd` and unchanged at the shipped tree — so neither is a PR-B regression, and both belong to **GMS-01/PR-C**, which owns this group |
+| fan-in 24 static / 26 with dynamic; fan-out 19 distinct specifiers | `rg -l "from ['\"][^'\"]*contextual-search-rlm"` for fan-in, plus the two `await import(...)` sites — **`packages/core/src/scripts/beir-benchmark.ts:259` and `packages/core/src/scripts/symbol-benchmark.ts:214`, paths corrected at T19 (C8)**; `rg -o "from \"...\"" \| sort -u` for fan-out. A plain-string grep returns 37 files and overcounts — 13 are comments, fixture paths and `mock.module` targets **[re-derived — 22/26 does not reproduce]**. This row was cited as `scripts/{beir,symbol}-benchmark.ts:258/:213` and recorded as *"both, confirmed"*; **neither path exists** — the count was right (24 + 2 = 26) and the citation was never checked against the filesystem. The real paths and their line numbers are now pinned by `scripts/__tests__/search-facade-metrics.test.ts`, so this correction ships under `test:scripts` rather than as prose |
 | `rlm-*`: 4 static importers, ~16 files mentioning the name | `rg -l "from ['\"][^'\"]*rlm-(indexing\|search\|fusion\|synapse\|admin)"` and `rg -l 'rlm-' -g '!node_modules' -g '!.specs/**' -g '!CHANGELOG.md'` **[re-derived — "40+ importers" is wrong by ~an order of magnitude]** |
 | `rlm-*` LOC table | `wc -l` over `packages/core/src/services/search/{contextual-search-,}rlm-*.ts` — unchanged, confirmed |
 | 3 of 6 controllers hold real orchestration | read of all six; events at `memory-controller.ts:164-171,184-186` and `search-controller.ts:239-250,282-295`; composition at `context-controller.ts:120-171` **[new]** |
@@ -341,7 +438,7 @@ that draft. Every number was read from current source, not inferred and not carr
 | `WebController` lives in `services/` and both transports use it | `services/web/web-controller.ts`; `routes/web.ts:34-35`, `embedded-api-client.ts:61,195-196` **[new]** |
 | `read_file.ts` is ~55% domain logic (~390 of 707 lines) | full read, classified per section into schema / delegation / logic / presentation **[new]** |
 | `IndexManager` is the one non-injectable dependency | `rlm-indexing.ts:586` constructs it directly; `injectedDeps` (`contextual-search-rlm.ts:103-111`) has no field for it **[new]** |
-| `searchImpl` touches 13 of ~16 facade members; `ensureInitialized()` is called by 7 of 15 delegates; `RRF_K`, `fileFilterCache`, `queryUnderstanding` are each touched by exactly one | read of every `*Impl` body, tabulated as a member→consumer matrix **[new]** |
+| `searchImpl` touches **13 of 23** facade members; `ensureInitialized()` is called by 7 of 15 delegates; `RRF_K`, `fileFilterCache`, `queryUnderstanding` are each touched by exactly one | read of every `*Impl` body, tabulated as a member→consumer matrix **[new]** · **corrected at T19 — C2**: this read "13 of ~16". The class declares **11 state members and 21 methods**; the denominator is the **23 distinct members the delegates actually read**, and `~16` had no method behind it. Do not confuse this `~16` with the "~16 files mention the `rlm-` name" figure elsewhere in this document, which is a different metric and is correct |
 | facade tests: 41 total = 24 forwarding-only + 17 real behavior, covering 6 of 21 delegate surfaces | read of `__tests__/contextual-search-rlm-coverage.test.ts` **[new]** |
 | 14 needles; 7 in `services/search/`; 4 in `rlm-*` files | parsed `benchmarks/needles/fixtures/massa-ai.json` **[new]** |
 | needles scores a moved target as zero behind a `[warn]` | `benchmarks/needles/run.ts:233-236`; hit predicate at `benchmarks/needles/scorer.ts:94-104` **[new]** |

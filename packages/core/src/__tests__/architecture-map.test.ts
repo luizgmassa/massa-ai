@@ -451,7 +451,7 @@ import { WorkspaceManager } from "../services/workspace/workspace-manager.js";
  *
  * The test's own cost is flat at 0.9–2.0 s; 100% of the variance is the
  * provider. This is the omission `CLAUDE.md` documents — "the test is missing a
- * seam, not a timeout" — and the identical fix applied in `rlm-admin.test.ts`
+ * seam, not a timeout" — and the identical fix applied in `search-facade-admin.test.ts`
  * and `contextual-search-rlm-coverage.test.ts`.
  *
  * It does not weaken what this file asserts. Every assertion below reads the

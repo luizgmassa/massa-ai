@@ -1,6 +1,6 @@
 /**
- * rlm-indexing delegate tests — ensureInitialized, indexFile, ensureFreshIndex,
- * checkSearchAdmission, loadGitignore, runWithIndexLock.
+ * Search-facade indexing-surface tests — ensureInitialized, indexFile,
+ * ensureFreshIndex, checkSearchAdmission, loadGitignore, runWithIndexLock.
  *
  * Uses injected-deps + mock.module. Covers the indexing lifecycle paths
  * that the characterization test doesn't reach.
@@ -111,7 +111,7 @@ mock.module("@massa-ai/shared", () => {
 });
 
 import { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js";
-import { runWithIndexLock } from "../services/search/rlm-indexing.js";
+import { runWithIndexLock } from "../services/search/project-indexer.js";
 
 // ── runWithIndexLock ────────────────────────────────────────────────────────
 
@@ -458,8 +458,8 @@ describe("indexFile", () => {
 
 // ── BUG-05 / TASK-013: canonical project id before getCentrality ────────────
 //
-// `indexFileImpl` resolves the canonical project id at its own write seam
-// (rlm-indexing.ts:477), so chunks land under the canonical project. Both
+// `indexFile` resolves the canonical project id at its own write seam in
+// project-indexer.ts, so chunks land under the canonical project. Both
 // centrality loads ran with the CALLER's id. Hand them a retired alias and
 // getCentrality queried a project that no longer owns any symbol: an empty
 // map, and every chunk written with `centralityScore: 0` — silently, because
