@@ -1,6 +1,48 @@
 # Handoff
 
-## Active — Core Layering and God-Module Split (PR-B), **MERGED as #53 and RELEASED as v1.16.0**
+## Active — Core Layering, Controller Retirement (PR-C), **Specify done; Design not started**
+
+**Feature**: `core-layering-controller-retirement` · artifacts
+`.specs/features/core-layering-controller-retirement/spec.md` · branch
+`spec/pr-c-controller-retirement`. **No code written.**
+
+**Requirements**: GMS-01 (all six ACs) + GMS-02 **AC-2 only** — both defined in the parent
+`core-layering-god-module-split/spec.md`, scoped and amended here.
+
+**C13 — the twentieth plan defect, found in Specify.** GMS-02's only file-specific criterion (AC-1)
+names `tools/read_file.ts`, but **AS-06** (agreed `y`) assigns that file to **PR-D**, *after* PR-C.
+So PR-C owned a requirement it could not close. **Resolved by splitting GMS-02**: AC-1 → PR-D,
+AC-2 stays in PR-C re-targeted at a handler PR-C actually touches. **Decided by the user,
+2026-07-31**, from three presented options; the two rejected are named in `spec.md` §2 with the
+measured reason each was rejected. The amendment is **owed back** to the parent `spec.md`'s
+*Design and Execute corrections* index as C13 — a PR-C task, landing with the work, not ahead of it.
+
+**Three decisions Design owes before PR-C is sized**, each with its rejected alternative written
+down:
+
+1. **R-08's precondition** (`design.md` §5.3, still open) — do cross-cutting modules get a
+   shared/kernel tier, or enter the allowlist as accepted exceptions? GMS-01 AC-1's CI import check
+   **cannot be written** until this is answered.
+2. **The §4.2 sensor gap** — `check-stale-pointers`' `STEMS` is `["rlm", "search-facade"]`, so
+   `controller` is **not** watched. **61** controller-path pointers sit outside `EXCLUDED` and would
+   strand while the gate still reports `0 broken, historical exactly at its pin of 28`. Base reading
+   must be frozen **before** the first structural commit.
+3. **The `data → services` metric** — AC-4 says **24**; the quote-agnostic sweep says **26**.
+   `spec.md` §3.B recommends adopting 26 and amending AC-4, but that is Design's call to record.
+
+**Gates measured green at `00ed280`** and inherited: `check-stale-pointers` PASS (0 broken, pin
+**28** exact) · `search-hub-metric` PASS (`maxFileLoc` **696**/700 — **4 lines** of headroom) ·
+`check-frozen-anchors` 0 (14/14) · `check-characterization` 0 (3/3).
+
+**R-04 is the highest-likelihood process risk.** Measured 2026-07-31: **PR #53 is the only non-squash
+in the last nine merges** — #45 through #52 were all squashed. The default merge button is squash, so
+`--no-ff` has to be chosen deliberately every time.
+
+**Next action: Design.** Deliver the three decisions above, in that order, before sizing.
+
+---
+
+## Previous — Core Layering and God-Module Split (PR-B), **MERGED as #53 and RELEASED as v1.16.0**
 
 > **Post-merge status, 2026-07-31.** Everything below this block was written before the merge and
 > is kept as the pre-merge record. Where a statement below says the branch is unpushed, local, or

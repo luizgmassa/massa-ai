@@ -197,6 +197,35 @@ all state came from `.specs/` and source reads.
   J1 deepseek-v4-pro, J2 minimax-m3, J3 GLM-5.2 — as given, unverified) with loud host-default
   fallback; generic artifacts; standalone only; audit-report-io storage; consensus file saved.
 
+## Active — Core Layering, Controller Retirement (PR-C)
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-core-layering-controller-retirement`
+- workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
+- feature: `core-layering-controller-retirement` — **Specify COMPLETE 2026-07-31. Design NOT
+  STARTED. No code written.**
+- base: `origin/main` @ `35fc469` (v1.16.0), branch `spec/pr-c-controller-retirement`
+- Artifacts: `.specs/features/core-layering-controller-retirement/spec.md`
+- **Scope**: GMS-01 (all six ACs) + GMS-02 **AC-2 only**. `read_file.ts` (GMS-02 AC-1 + AS-06) is
+  **PR-D**; `.ua/` regeneration is after PR-D.
+- **C13 — twentieth plan defect, found in Specify.** GMS-02 AC-1 named `tools/read_file.ts`, which
+  AS-06 (agreed `y`) assigns to PR-D *after* PR-C. GMS-02 now splits: AC-1 → PR-D, AC-2 stays in
+  PR-C re-targeted at a handler PR-C touches. **Decided by the user, 2026-07-31**, from three
+  options; the two rejected are recorded in `spec.md` §2 with the measured reason each failed.
+  Amendment owed back to the parent `spec.md` as C13, landing with the work.
+- **Design owes three decisions before sizing**, each with its rejected alternative: R-08's
+  cross-cutting-module precondition (`design.md` §5.3 — blocks GMS-01 AC-1's check from being
+  written at all); the `controller`-stem sensor gap (**61** stranded pointers invisible to
+  `check-stale-pointers`); and the `data → services` metric (AC-4's **24** vs the quote-agnostic
+  **26**).
+- Gates at `00ed280`: `check-stale-pointers` PASS (0 broken, pin **28** exact) · `search-hub-metric`
+  PASS (`maxFileLoc` **696**/700) · `check-frozen-anchors` 0 (14/14) · `check-characterization`
+  0 (3/3).
+- **R-04 is the highest-likelihood process risk**: PR #53 is the only non-squash in the last nine
+  merges (#45–#52 all squashed). `--no-ff` must be chosen deliberately.
+- **R-10, new**: PR-C must choose its CHANGELOG heading **before** merge and record who chose and
+  what was rejected. PR-B's was settled by default — see this file's closed release-semantics item.
+
 ## Previous — Skills / Workflows Updates + spec-driven DI rule
 
 - projectId: `massa-ai`
