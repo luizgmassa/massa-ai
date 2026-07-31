@@ -263,9 +263,37 @@ existing prefix branch byte-identical:
 ```js
 // prefix stems: rlm-search.ts, search-facade-admin.test.ts
 // suffix stems: memory-controller.ts, search-controller.ts
+// Every concatenated segment MUST carry its own String.raw tag — see C18.
 String.raw`(?<![\w-])(?:(?:${PREFIX_STEMS.join("|")})-[a-z0-9-]+?` +
-          `|[a-z0-9-]+?-(?:${SUFFIX_STEMS.join("|")}))\.(?:test\.)?(?:ts|js)\b`
+  String.raw`|[a-z0-9-]+?-(?:${SUFFIX_STEMS.join("|")}))\.(?:test\.)?(?:ts|js)\b`
 ```
+
+> **C18 — the twenty-fifth plan defect, in this section's own code block.** As first published the
+> **second** segment carried no `String.raw` tag: `String.raw\`…\` + \`…\``. In an untagged template
+> `\.` is an identity escape (`.`, a wildcard) and **`\b` is the backspace control character
+> U+0008**, not the two characters `\` and `b`. The published snippet therefore compiles to a regex
+> that matches **nothing at all** — and because the alternation is one expression, it does not merely
+> fail to add suffix coverage, it **kills the untouched prefix branch too**.
+>
+> Measured, three ways, at `bc9019b`:
+>
+> | `POINTER` | pointers | RESOLVES | HISTORICAL | verdict |
+> | --- | --- | --- | --- | --- |
+> | untouched baseline | 60 | 32 | 28 | **PASS** |
+> | **§5.2 as first published** | **0** | **0** | 28 | **FAIL — 0 historical against a pin of 28** |
+> | both segments tagged | 142 | 114 | 28 | **PASS** |
+>
+> The §3.2 no-op-control reading recorded in `tasks.md` (142 / 114 / 28) was taken with a
+> correctly-tagged patch; only the *published* snippet was wrong, so the reading stands and the
+> artifact did not.
+>
+> **This section is now three remedies deep, and each failed differently.** §5.1's decision was a
+> measured **no-op**; this one, as published, was a measured **regression**; only the tagged form
+> works. Every one of the three looked right on the page. **Found by the Plan Challenge gate on
+> Tasks, by typing the snippet out and running it** — the identical method that found C16 one phase
+> earlier, in the identical section.
+>
+> **Owed back to the parent `spec.md`** alongside C13–C17.
 
 **Why this and not the two alternatives:**
 
@@ -305,7 +333,39 @@ R-08 asked whether PR-C is two changes wearing one label. With §1 settled it ca
 | --- | --- | --- |
 | **A. Controller retirement** | 6 members, **24** outside importers (22 deep + 1 barrel + 1 dynamic), `./controllers` subpath, `src/index.ts` header, `CLAUDE.md` Architecture section | none — AS-01 decided it |
 | **B. Kernel tier + `data → services`** | 7 kernel modules (1 moving out of `data/`), 26 edges, 1 edge inverted via a seam | **none remaining** — §1, §3, §4 closed them |
-| **C. `services → tools`** | 4 edges, one symbol (`ToolError`) | none — AC-5 calls it a move |
+| **C. `services → tools`** | **9 edges, 3 symbols** *(C19)* — 4 existing (`ToolError`) **plus 5 the controllers bring with them** | none — AC-5 is a move, and the 5 are repointed the same way |
+
+> **C19 — the twenty-sixth plan defect.** This row read *"4 edges, one symbol (`ToolError`)"*, which
+> is correct **only for the tree before group A runs**. `controllers/` holds **5** of its own
+> `→ tools/` imports, and the parent `spec.md`'s Evidence Corrections already counts them as their
+> own category — *"`controllers → tools` **5**"*. Retiring the layer into `services/` **converts all
+> five into `services → tools`**, so the group group A is supposed to leave alone in fact **grows
+> 4 → 9** the moment group A lands:
+>
+> | file (before the move) | kind | symbol |
+> | --- | --- | --- |
+> | `context-controller.ts:19` | **value** | `CompressContextTool` ← `tools/compress_context.js` |
+> | `executor-controller.ts:31` | **value** | `validateEnum` ← `tools/enum-validation.js` |
+> | `executor-controller.ts:28,29,30` | type-only | `ExecuteParams`, `ExecuteFileParams`, `BatchExecuteParams` |
+>
+> `validateEnum` is the sharp one: it lives in **the same file AC-5 relocates `ToolError` out of**,
+> so a task that moves only `ToolError` half-empties `tools/enum-validation.ts` and leaves the other
+> export sustaining a backward edge.
+>
+> **The criterion that should have caught this had no owner.** GMS-01 **AC-3** — *"each of the 36
+> backward imports … is either removed or explicitly recorded as accepted, with its reason, in the
+> check's own allowlist"* — was closed by **no task**, while §1's kernel decision requires **zero
+> allowlist entries**. So the five had neither a remover nor a place to be recorded.
+>
+> **Resolution: repoint all five, closing AC-3 by removal rather than exemption.** Decided by the
+> user, 2026-07-31. Allowlisting them was rejected — it is what AC-3 literally asks for, but §1
+> rejected the allowlist mechanism precisely because entries make the check stop discriminating, and
+> five entries in a contract advertised as having zero is the *"true contract with accepted
+> violations"* outcome AC-4 exists to prevent. Exempting only the three `import type` edges was also
+> rejected: it needs a type-only exemption written into AC-1's check as a contract rule, and PR-C
+> would be inventing that rule to avoid three one-line edits.
+>
+> **Owed back to the parent `spec.md`** alongside C13–C18.
 
 **All three groups are now question-free. R-08 → closed** — its concern was never file count, it
 was that group B carried an unanswered contract question group A would silently absorb, and that
@@ -357,7 +417,28 @@ resolved, because resolving it needs the per-task write sets Tasks produces.
 | --- | --- | --- |
 | R-12 | **`db-connection.ts` leaves `data/`** and is reachable from the published root barrel | Verify against `npm pack --dry-run` the same way AC-6 checks `./controllers`; keep the exported symbol name |
 | R-13 | The `embeddings` seam is an **added** seam, and PR-B's only added seam (F4) needed its own task and three observed violation shapes | Give it its own task with the same discipline; do not fold it into a move |
-| R-11 | `maxFileLoc` **696**/700 — 4 lines of headroom, and `SearchController` moves into `services/` | Run G-HUB per structural commit, not once at the end |
+| R-11 | **`maxForeignReach` 1 → 3 against a ceiling of 3** *(C20 — this row named the wrong metric)*. `maxFileLoc` is **696**/700 and the controller move **does not touch it**: `search-controller.ts` lands as a new 463-LOC file, not a merge into `contextual-search-rlm.ts` | Run G-HUB per structural commit, not once at the end — and read **`maxForeignReach`**, which is the axis with zero margin |
+
+> **C20 — the twenty-seventh plan defect.** R-11 cited `maxFileLoc` **696**/700 and *"4 lines of
+> headroom"* in the same breath as *"`SearchController` moves into `services/`"*, which reads as
+> cause and effect. It is not. Simulated at `bc9019b` by copying the controllers into a clone of
+> `services/search/` and running the real gate:
+>
+> | tree | `maxFileLoc` | `ContextualSearchRLM` foreign modules / **maxForeignReach** |
+> | --- | --- | --- |
+> | current | 696 | 1 / **1** (`search-warmup.ts`) |
+> | `+ search-controller.ts` | **696** | 2 / **3** (`search-controller.ts`) |
+> | `+ memory- and context-controller.ts` too | **696** | 2 / **3** — neither reads its members |
+>
+> `maxFileLoc` is **unchanged in every case**. The metric that actually moves is `maxForeignReach`,
+> **1 → 3**, landing **exactly on `MAX_FOREIGN_REACH = 3`** — a PASS with **zero** remaining margin,
+> where the metric the risk names keeps its four lines untouched.
+>
+> This matters beyond bookkeeping: G-HUB was calibrated on M14 specifically because **depth of reach**
+> is what distinguishes a real split from a facade, and C12 made `maxForeignReach` GMS-03 AC-3's
+> criterion for that reason. R-11 was watching the axis PR-B had already demoted.
+>
+> **Owed back to the parent `spec.md`** alongside C13–C19.
 | R-04 | Squash destroys history | PR #53 and #56 are the only non-squashes in the last eleven merges; `--no-ff` chosen deliberately |
 
 ---
