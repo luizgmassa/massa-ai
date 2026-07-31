@@ -1,14 +1,25 @@
 /**
  * @massa-ai/core - Lógica de negócio do massa-ai
  *
- * Contém tools, controllers, services, data e models
+ * Contém tools, services, data, kernel e models
  * independente do protocolo de transporte (MCP, HTTP, etc.)
  *
- * Architecture (4 layers):
- *   tools/        → Thin MCP handlers (schema + delegation)
- *   controllers/  → Orchestration (composes services, side-effects)
- *   services/     → Domain logic (scoring, embedding, graph)
- *   data/         → Persistence (PostgreSQL, FTS, migrations)
+ * Architecture (4 layers), enforced by directory — `scripts/check-core-layering.ts`:
+ *   tools/     → Thin MCP handlers (schema + delegation, no logic)
+ *   services/  → Domain logic AND orchestration (search, memory, graph, executor)
+ *   data/      → Persistence (PostgreSQL, vector store, FTS, migrations)
+ *   kernel/    → Cross-cutting leaves. Any tier may import kernel; kernel imports none.
+ *
+ * Imports run one way — tools → services → data — so `data → services` is a
+ * violation rather than a shortcut, and `kernel/` is what a module joins instead
+ * of becoming an allowlisted exception. There is no allowlist.
+ *
+ * `controllers/` was a fifth layer and is retired (PR-C): the five orchestrators
+ * moved into the `services/` directory that already held their collaborators,
+ * keeping their exported names, and are re-exported through `./services/index.js`.
+ *
+ * This header and `CLAUDE.md`'s Architecture section are the only two descriptions
+ * of this contract. Do not add a third.
  */
 
 // Tools

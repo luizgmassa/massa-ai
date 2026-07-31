@@ -54,8 +54,10 @@ looking for how that behavior is *exposed*, look in `apps/`.
 ## Architecture Layers
 
 Nine layers. The first four are `packages/core`'s internal decomposition and are
-**enforced by directory** — the repo states this contract in `packages/core/src/index.ts`
-and means it.
+**enforced by directory**. The contract itself is stated in exactly two places —
+`packages/core/src/index.ts`'s header and `CLAUDE.md`'s Architecture section — and
+enforced by `scripts/check-core-layering.ts`. What follows is the knowledge graph's
+inventory of that structure, not a third statement of it.
 
 ```
                     ┌─────────────────┐   ┌──────────────────┐
@@ -68,22 +70,30 @@ and means it.
    ╔════════════════════════════ packages/core ════════════════════════════╗
    ║   tools/  (31)        thin MCP handlers — schema + delegation only    ║
    ║      ▼                                                                ║
-   ║   controllers/ (6)    orchestration — composes services, side-effects ║
-   ║      ▼                                                                ║
-   ║   services/ (208)     domain logic — the bulk of the product          ║
+   ║   services/ (208)     domain logic AND orchestration — the bulk of it ║
    ║      ▼                                                                ║
    ║   data/    (49)       PostgreSQL repositories, vector store, FTS      ║
    ╚═══════════════════════════════════════════════════════════════════════╝
-                                        ▲
+        ▲                               ▲
+        │        kernel/ (11)  ─────────┘   cross-cutting leaves; imports no tier
+        │
               packages/shared (18) ─────┘   logger, config, env, types
 ```
+
+> **Hand-edited for PR-C, against generated output.** This guide is generated from the
+> knowledge graph at `17ee7083` and `.ua/` regeneration is out of scope until after PR-D,
+> so the retirement of `controllers/` and the arrival of `kernel/` are edited in by hand.
+> **The `kernel/` count of 11 is hand-measured over `git ls-files`; every other count on
+> this page is still the graph's at `17ee7083` and is not re-measured here.** Two of them
+> are known to have moved since (`tools/` is 30, `data/` + `models/` is 42) — left alone
+> deliberately, so that no row silently mixes two trees.
 
 | Layer | Files | What belongs here |
 |---|---:|---|
 | **Tool Handlers** (`core/src/tools/`) | 31 | One file per MCP tool. Deliberately thin: parse input, delegate, serialize output, **no business logic**. This discipline is what lets two very different transports expose one tool contract without duplicating logic. |
-| **Controllers** (`core/src/controllers/`) | 6 | Orchestration. Composes multiple services and owns side-effects. An *internal* orchestration layer — not an HTTP API layer, despite the name. |
-| **Service** (`core/src/services/`) | 208 | The dominant domain-logic layer: search, synapse, embeddings, graph, structural, memory, jobs, etl, scheduler, symbol, project-identity, hooks, executor, checkpoint, cache, web, workspace, metrics, handoff, events. Highest internal cohesion in the codebase. |
-| **Data** (`core/src/data/`, `core/src/models/`) | 49 | PostgreSQL/pgvector persistence — repositories, vector store, FTS — plus data-model types and the core barrel that declares the four-layer contract. |
+| **Kernel** (`core/src/kernel/`) | 11 | Cross-cutting leaves. A file here imports from **no** tier, which is what makes membership checkable by path prefix rather than by a maintained allowlist. Any tier may import it — including `data/`, which is how `data → services` became a violation instead of a necessity. |
+| **Service** (`core/src/services/`) | 208 | The dominant layer, and since PR-C the **orchestration** layer too: search, synapse, embeddings, graph, structural, memory, jobs, etl, scheduler, symbol, project-identity, hooks, executor, context, checkpoint, cache, web, workspace, metrics, handoff, events. The five retired controllers live in the subdirectory that already held each one's collaborators. Highest internal cohesion in the codebase. |
+| **Data** (`core/src/data/`, `core/src/models/`) | 49 | PostgreSQL/pgvector persistence — repositories, vector store, FTS — plus data-model types. |
 | **Test** (everywhere) | 371 | All test files. Kept as one cross-cutting layer because core's dominant test tree is **flat and unmirrored** (see below). |
 | **Shared Utility** (`packages/shared/src/`) | 18 | Cross-cutting logger, runtime config loader, env handling, shared types. Consumed by core *and* every transport. |
 | **REST API Transport** (`apps/tools-api/src/`) | 26 | Elysia server on :3333 — routes, middleware, startup/health wiring. Mounts the Web UI at `/ui`. |
@@ -178,9 +188,9 @@ Thirteen steps, ordered the way a request actually flows. Each names the files t
 
 | # | Step | Start here |
 |---|---|---|
-| 1 | **The Core Package Contract** — the product's own statement of its architecture; re-exports the four enforced layers as one import surface. Read first. | `packages/core/src/index.ts` |
-| 2 | **Tool Handlers** — 31 thin files, one per MCP tool. `search_project.ts` is representative: call the controller, serialize, done. | `tools/index.ts`, `tools/search_project.ts` |
-| 3 | **Controllers** — six orchestrators. `search-controller.ts` shows what orchestration means: admission preflight, optional auto-reindex, glob filtering, centrality boosting, optional LLM rerank. | `services/search/search-controller.ts` |
+| 1 | **The Core Package Contract** — the product's own statement of its architecture; re-exports the four enforced layers as one import surface — `kernel/` has no line of its own here, its symbols arriving through the services barrel. Read first, alongside `CLAUDE.md`'s Architecture section — together they are the whole contract. | `packages/core/src/index.ts` |
+| 2 | **Tool Handlers** — 31 thin files, one per MCP tool. `search_project.ts` is representative: call the orchestrator, serialize, done. | `tools/index.ts`, `tools/search_project.ts` |
+| 3 | **Orchestrators** — five of them, one per use case, living in `services/` beside the collaborators each composes. `search-controller.ts` shows what orchestration means: admission preflight, optional auto-reindex, glob filtering, centrality boosting, optional LLM rerank. | `services/search/search-controller.ts` |
 | 4 | **The Search Facade** — hybrid vector + Postgres FTS with reciprocal-rank fusion. A composition root plus six capability modules, each taking a narrow deps record rather than the facade. | `services/search/contextual-search-rlm.ts` + `hybrid-search.ts`, `project-indexer.ts`, `index-admin.ts`, `session-bias.ts`, `graph-stream.ts`, `result-fusion.ts` |
 | 5 | **The ETL Indexing Pipeline** — `discover → parse → resolve → load`. Hash-skip unchanged files, tree-sitter parse, resolve FQNs, persist in per-batch transactions with deadlock retry. | `services/etl/pipeline.ts`, `stages/*.ts` |
 | 6 | **Symbol Graph & Blue-Green Generations** — go-to-definition, find-references, project map; generations flipped atomically. | `services/symbol/symbol-graph.service.ts`, `etl/graph-generation-coordinator.ts` |
@@ -209,7 +219,11 @@ Key files per layer, ranked by coupling (in + out dependency edges).
 | 11 | `tools/trace_path.ts` | Traces the typed structural-edge graph from a seed symbol |
 | 10 | `tools/search_project.ts` | The canonical thin handler — delegate + serialize |
 
-### Controllers
+### Orchestrators (inside Service)
+
+Not a layer of their own since PR-C. Each sits in the `services/` subdirectory that already
+held the collaborators it composes; `services/graph/` is the **memory-relation** graph, so
+the **symbol**-graph controller belongs to `services/symbol/`, one directory over.
 
 | Deg | File | Role |
 |---:|---|---|
