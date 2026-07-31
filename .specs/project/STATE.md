@@ -204,7 +204,35 @@ all state came from `.specs/` and source reads.
 - workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
 - feature: `core-layering-controller-retirement` — **Specify COMPLETE and merged 2026-07-31.
   Design COMPLETE 2026-07-31 — full Plan Challenge gate run, five findings, three folded into the
-  plan (see below). Tasks NOT STARTED. No code written.**
+  plan (see below). Tasks COMPLETE 2026-07-31 — a second full Plan Challenge gate, four findings,
+  all four confirmed by independent re-measurement. 20 tasks, three phases, 104 distinct files.
+  EXECUTE NOT STARTED. No code written.**
+- **Tasks resolved the two things Design left open**, each with its rejected alternatives recorded:
+  1. **The cut → one PR, three phased commits.** Decided by the user, 2026-07-31. Three-PRs and
+     two-PRs both rejected — reasons in `tasks.md` §1. Measured input: phases at **62 / 16 / 32**
+     files, sum 110, **distinct union 104**, against PR-B's 37.
+  2. **R-10's CHANGELOG heading → `### Changed`, a minor.** `### Removed`/major rejected on the
+     measured **zero** consumers of the `./controllers` subpath; `### Fixed`/patch rejected against
+     PR-B's own precedent.
+- **Both non-retroactive steps are taken, at `bc9019b`, before any structural commit** — do not
+  re-take them. Frozen base **60 / 32 / 28 PASS**; no-op control **142 / 114 / 28**, so the reshape
+  moves the count by **+82** and is not a no-op. R-09's coverage is **59 of 61** — the two invisible
+  pointers are `controllers/index.js` at `package.json:30` and `src/index.ts:18`, closed by AC-6 and
+  AC-2 rather than by the gate.
+- **C18, C19, C20 — the twenty-fifth, -sixth and -seventh plan defects**, all found by the Plan
+  Challenge gate on Tasks, two of them in artifacts already merged to `main`, all corrected in the
+  Tasks PR:
+  - **C18** — `design.md` §5.2's code block was a **broken regex**. `String.raw` tagged only the
+    first of two concatenated segments, so `\.` became a wildcard and `\b` the backspace character
+    U+0008. Verbatim it takes the gate from `PASS 60/32/28` to **`FAIL 0/0/28`**, killing the
+    untouched prefix branch. §5.2 is now three remedies deep — no-op, then regression, then correct.
+  - **C19** — `controllers/` holds **5** `→ tools/` imports, so retiring the layer into `services/`
+    grows `services → tools` **4 → 9**. No task touched them and **AC-3 had no owner at all**.
+    Resolved by repointing all five (**T8b**, before T10/T11), closing AC-3 by removal.
+  - **C20** — R-11 named `maxFileLoc` 696/700, which the move **does not touch**. The metric that
+    moves is `maxForeignReach`, **1 → 3** against a ceiling of **3**.
+- **PR-C has no `FEATURES.json` entry** — #56 and #57 both skipped it; **T16b** adds one.
+  `active_feature: skills-directive-dedup` is **not** stale and must be left alone.
 - **Design's three owed decisions are all delivered** (`design.md` §1, §4, §5), each with its
   rejected alternative recorded:
   1. **R-08's precondition → a kernel tier.** `data → kernel` legal, `data → services` illegal,
@@ -244,7 +272,7 @@ all state came from `.specs/` and source reads.
   delivered via PR #57** from `spec/pr-c-design`. The branch named here previously
   (`spec/pr-c-controller-retirement`) is **not** what landed — see `HANDOFF.md`'s branch-name
   correction for the 44-second retarget race that orphaned #55.
-- **C13 through C17 are all owed back to the parent `core-layering-god-module-split/spec.md`**
+- **C13 through C20 are all owed back to the parent `core-layering-god-module-split/spec.md`**
   in its *Design and Execute corrections* index, landing with the work. **None is written there
   yet.** That same commit must also fix the parent `spec.md`'s Status line, which still reads
   *"Execute in progress (PR-B, T19 of 20)"* against a PR-B that merged as #53 and released v1.16.0.

@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, Controller Retirement (PR-C), **Specify and Design done; Tasks not started**
+## Active — Core Layering, Controller Retirement (PR-C), **Specify, Design and Tasks done; Execute not started**
 
 **Feature**: `core-layering-controller-retirement` · artifacts
 `.specs/features/core-layering-controller-retirement/{spec,design}.md`. **No code written.**
@@ -8,7 +8,7 @@
 **Specify is on `main`** — merged via **#56** (`9df5608`, merge commit), base `origin/main` @
 `9df5608`. **Design is complete** — `design.md`, delivered via PR **#57** from `spec/pr-c-design`.
 Read `design.md` for every decision below that is marked delivered; it is the only artifact that
-carries C14 through C17.
+carries C14 through C20.
 
 > **Branch-name correction.** Two earlier lines here named `spec/pr-c-controller-retirement` as
 > PR-C's branch. That branch was **not** what landed: #55 merged into
@@ -30,7 +30,7 @@ AC-2 stays in PR-C re-targeted at a handler PR-C actually touches. **Decided by 
 measured reason each was rejected. The amendment is **owed back** to the parent `spec.md`'s
 *Design and Execute corrections* index as C13 — a PR-C task, landing with the work, not ahead of it.
 
-**C13 through C17 are all owed back to the parent `spec.md`**, in that same in-place style, landing
+**C13 through C20 are all owed back to the parent `spec.md`**, in that same in-place style, landing
 with the work. **None is written there yet.** C13 is above; C14 (`db-connection.ts` admitted to the
 kernel — AC-4's direction hid it), C15 (AC-4's referent → 26), C16 (`POINTER`'s prefix assumption)
 and C17 (the embeddings seam's own sizing figure — **39 / 5**, not 40 / 6; the sixth file was a
@@ -79,11 +79,35 @@ rejected alternative written down. Kept here as the record of what gated sizing;
 in the last nine merges** — #45 through #52 were all squashed. The default merge button is squash, so
 `--no-ff` has to be chosen deliberately every time.
 
-**Next action: Tasks** (`design.md` §9). Its first input is §6's three-phase shape plus the cut
-decision deliberately left open there. **Two steps must be sequenced first inside Tasks, because
-neither can be taken retroactively**: the `POINTER` reshape's **frozen base reading** (before any
-controller moves), and the **no-op control** proving the reshaped gate's count actually moves
-against an unchanged tree — the check §5.1's first decision skipped.
+~~**Next action: Tasks** (`design.md` §9).~~ **DONE — `tasks.md`**, 20 tasks, three phases, **104**
+distinct files, full Plan Challenge gate run. §6's cut decision resolved (**one PR, three phased
+commits**, user, 2026-07-31) and R-10's CHANGELOG heading chosen (**`### Changed`**, minor).
+
+**Both non-retroactive steps are already taken, at `bc9019b`, before any structural commit** —
+`tasks.md` §3 has the readings. Frozen base: **60 pointers / RESOLVES 32 / HISTORICAL 28, PASS**.
+No-op control: **142 / 114 / 28** — the reshape moves the count by **+82** and is not a no-op.
+Coverage is **59 of 61**, the two invisible ones being `controllers/index.js` at `package.json:30`
+(AC-6's subject) and `src/index.ts:18` (AC-2's subject); neither strands silently. **Do not re-take
+these** — they cannot be taken again once a controller moves.
+
+**Three more plan defects, found by the Plan Challenge gate on Tasks, all corrected in the Tasks PR:**
+
+- **C18 — the twenty-fifth.** `design.md` §5.2's code block was a **broken regex**: `String.raw`
+  tagged only the first of two concatenated segments, so `\.` became a wildcard and `\b` the
+  backspace character U+0008. Typed verbatim it takes the gate from `PASS 60/32/28` to
+  **`FAIL 0/0/28`** — it kills the untouched prefix branch too. §5.2 is now three remedies deep and
+  each failed differently: a no-op, then a regression, then the tagged form that works.
+- **C19 — the twenty-sixth.** `controllers/` carries **5** `→ tools/` imports of its own, so retiring
+  the layer into `services/` grows `services → tools` from **4 to 9**. No task touched them, and
+  **AC-3 — the criterion that polices exactly this — was owned by no task at all** while the kernel
+  decision requires zero allowlist entries. Resolved by repointing all five (**T8b**), closing AC-3
+  by removal rather than exemption.
+- **C20 — the twenty-seventh.** R-11 named `maxFileLoc` **696**/700; the controller move **does not
+  touch it**. What moves is `maxForeignReach`, **1 → 3** against a ceiling of **3**. G-HUB per
+  structural commit still holds — read the reach column.
+
+**Next action: Execute, T0 → T1.** T0 is recorded; T1 is the first structural commit. Phase 1 first —
+kernel tier, no controller churn. **T8b must land before T10/T11**, or Phase 3 is not green on its own.
 
 ---
 

@@ -11,8 +11,10 @@
   `core-layering-god-module-split/validation.md` Part II.
 - **Successor**: PR-D — `tools/read_file.ts` split (AS-06). **PR-C now hands it GMS-02 AC-1** (C13).
 - **Status**: **Specify complete**, merged to `main` via **#56** (`9df5608`). **Design complete** —
-  `design.md`, delivered via PR **#57**; it carries C14 through C17, and answers all three
-  preconditions this document left open (§3.B, §4.2, §5). **Tasks not started. No code written.**
+  `design.md`, delivered via PR **#57**; it carries C14 through C20, and answers all three
+  preconditions this document left open (§3.B, §4.2, §5). **Tasks complete** — `tasks.md`, 20 tasks,
+  three phases, 104 distinct files, full Plan Challenge gate run. **Execute not started. No code
+  written.**
 
 ---
 
@@ -126,6 +128,15 @@ rejected option**, not a Specify fiat.
 symbol, `ToolError`, from `tools/enum-validation.ts` — `services/search/filter-validation.ts:25`,
 `services/symbol/active-generation.ts:25`, `services/symbol/architecture.ts:17`,
 `services/symbol/git-ref-validation.ts:15`. AC-5's framing holds.
+
+> **Amended — C19.** *"All four"* is true of the tree **before** the controllers move, and PR-C moves
+> them. `controllers/` carries **5** `→ tools/` imports of its own — the parent `spec.md` counts them
+> as their own category, *"`controllers → tools` **5**"* — and retiring the layer into `services/`
+> **converts all five into `services → tools`**, taking the group **4 → 9** across **3** symbols:
+> `CompressContextTool` (`context-controller.ts:19`, value), `validateEnum`
+> (`executor-controller.ts:31`, value, **from the same file AC-5 empties**) and three type-only
+> `Execute*Params` imports (`:28,29,30`). **All five are repointed**, closing **AC-3** by removal
+> rather than by an allowlist entry — see `design.md` §6 C19 for the two rejected alternatives.
 
 **D. The published subpath is safe to remove.** `packages/core/package.json:28-31` declares
 `"./controllers"` → `./dist/controllers/index.{d.ts,js}`. A repo-wide search for
@@ -247,7 +258,7 @@ data rather than from `tasks.md` or this file.
 | R-08 | PR-C is two changes wearing one label | §5's precondition, answered in Design **before** sizing | **Closed in Design** — `design.md` §1 (kernel tier) and §6. Its concern was never file count; it was that group B carried an unanswered contract question group A would silently absorb. Sizing landed as **three independently-revertable phases**, with the cut decision deferred to Tasks |
 | R-09 | **61 controller pointers strand silently** | §4.2 — a sensor decision owed in Design, with its base reading frozen before the first structural commit | **New, this document** |
 | R-10 | **The release semantics are settled by default again** | PR-B's were: `### Changed` cut a minor for a behavior-preserving refactor, decided by the act of merging with zero PR comments. **PR-C must choose its CHANGELOG heading deliberately, before merge, and write down who chose and what was rejected** | **New, this document** |
-| R-11 | `maxFileLoc` breaches 700 during the controller move | §4.3 — 4 lines of headroom; G-HUB must be run per structural commit, not once at the end | **New, this document** |
+| R-11 | ~~`maxFileLoc` breaches 700 during the controller move~~ **`maxForeignReach` breaches 3** — amended, **C20** | ~~§4.3 — 4 lines of headroom~~ Measured at `bc9019b`: the move leaves `maxFileLoc` at **696, unchanged** (`search-controller.ts` lands as a new 463-LOC file, not a merge). What moves is `ContextualSearchRLM`'s **`maxForeignReach`, 1 → 3** against `MAX_FOREIGN_REACH = 3` — PASS with **zero** margin. G-HUB per structural commit still holds; read the reach column, not the LOC column | **Amended — `design.md` §7 C20** |
 
 ---
 
