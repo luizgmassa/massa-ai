@@ -25,7 +25,7 @@ export type {
   OptimizedContextResult,
 } from "../services/context/context-controller.js";
 
-export { ExecutorController } from "./executor-controller.js";
+export { ExecutorController } from "../services/executor/executor-controller.js";
 
 export { GraphController } from "./graph-controller.js";
 export type { TracePathInput, TracePathOutput } from "./graph-controller.js";

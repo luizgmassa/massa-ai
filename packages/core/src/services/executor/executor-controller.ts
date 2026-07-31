@@ -27,8 +27,8 @@ import {
   type ExecuteParams,
   type ExecuteFileParams,
   type BatchExecuteParams,
-} from "../services/executor/index.js";
-import { validateEnum } from "../kernel/enum-validation.js";
+} from "./index.js";
+import { validateEnum } from "../../kernel/enum-validation.js";
 
 /** The 10 languages supported by the Polyglot executor (N6). */
 const EXECUTOR_LANGUAGES = [

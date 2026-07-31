@@ -199,7 +199,7 @@ import { ListProjectsTool } from "../tools/list_projects.js";
 import { SearchDefinitionsTool } from "../tools/search_definitions.js";
 import { CreateCheckpointTool } from "../tools/create_checkpoint.js";
 import { CompressContextTool } from "../tools/compress_context.js";
-import { ExecutorController } from "../controllers/executor-controller.js";
+import { ExecutorController } from "../services/executor/executor-controller.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 /**

@@ -12,7 +12,7 @@
 process.env.MASSA_AI_EXECUTOR_SANDBOX = "none";
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { ExecutorController } from "../controllers/executor-controller.js";
+import { ExecutorController } from "../services/executor/executor-controller.js";
 import type { ExecResult } from "../services/executor/index.js";
 
 // ── Fake executor ─────────────────────────────────────────────
