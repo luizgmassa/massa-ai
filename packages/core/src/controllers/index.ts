@@ -27,6 +27,6 @@ export type {
 
 export { ExecutorController } from "../services/executor/executor-controller.js";
 
-export { GraphController } from "./graph-controller.js";
-export type { TracePathInput, TracePathOutput } from "./graph-controller.js";
-export type { ImpactAnalysisInput, ImpactAnalysisOutput } from "./graph-controller.js";
+export { GraphController } from "../services/symbol/graph-controller.js";
+export type { TracePathInput, TracePathOutput } from "../services/symbol/graph-controller.js";
+export type { ImpactAnalysisInput, ImpactAnalysisOutput } from "../services/symbol/graph-controller.js";

@@ -217,7 +217,7 @@ Key files per layer, ranked by coupling (in + out dependency edges).
 | 20 | `services/search/search-controller.ts` | Admission preflight, auto-reindex, glob filter, centrality boost, LLM rerank |
 | 15 | `services/context/context-controller.ts` | The "optimized context" use case — composes search, memory, compression, file cache |
 | 10 | `services/executor/executor-controller.ts` | Owns the singleton PolyglotExecutor for execute/execute_file/batch_execute |
-| 8 | `controllers/graph-controller.ts` | Fronts symbol-graph traversal (trace_path, impact_analysis) |
+| 8 | `services/symbol/graph-controller.ts` | Fronts symbol-graph traversal (trace_path, impact_analysis) |
 
 ### Service (largest layer — top by coupling)
 
