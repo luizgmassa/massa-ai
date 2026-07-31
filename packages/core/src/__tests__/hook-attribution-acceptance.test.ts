@@ -30,7 +30,7 @@ import { resetAttributionResolver, setAttributionResolverForTests, type Attribut
 import { getObservationStore } from "../data/memory/observation-repository.js";
 import { resetProjectIdentityAliasResolver, setProjectIdentityAliasResolverForTests } from "../services/project-identity/alias-resolver.js";
 import { _resetPrismaForTesting } from "../services/query/prisma-client.js";
-import { closeConnections } from "../data/db-connection.js";
+import { closeConnections } from "../kernel/db-connection.js";
 
 type Row = Record<string, unknown>;
 

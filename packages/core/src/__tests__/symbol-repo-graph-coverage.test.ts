@@ -31,7 +31,7 @@ import {
   resolveDefinitionFqn,
 } from "../data/symbol/symbol-repo-graph.js";
 import { _resetPrismaForTesting } from "../services/query/prisma-client.js";
-import { closeConnections } from "../data/db-connection.js";
+import { closeConnections } from "../kernel/db-connection.js";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
 const DEDICATED_DB =

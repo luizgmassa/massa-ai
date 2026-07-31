@@ -9,7 +9,7 @@
  * best-effort publisher.
  */
 
-import { getPgPool } from "../../data/db-connection.js";
+import { getPgPool } from "../../kernel/db-connection.js";
 import {
   createProjectIdentityApplyService,
   type ProjectIdentityChangedPublisher,

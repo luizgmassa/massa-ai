@@ -26,7 +26,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { logger } from "@massa-ai/shared";
-import { getPgPool } from "../../data/db-connection.js";
+import { getPgPool } from "../../kernel/db-connection.js";
 import type { AttributionSource } from "../../data/memory/observation-contract.js";
 import { getProjectIdentityAliasResolver } from "../project-identity/alias-resolver.js";
 import { SessionPinStore } from "./session-pin-store.js";

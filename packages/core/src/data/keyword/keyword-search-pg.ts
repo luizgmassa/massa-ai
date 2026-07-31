@@ -6,7 +6,7 @@
 
 import { SearchResult, SearchSource } from "@massa-ai/shared";
 import { logger } from "@massa-ai/shared";
-import { getPgPool } from "../db-connection.js";
+import { getPgPool } from "../../kernel/db-connection.js";
 import { installGuardOnTable } from "../../services/project-identity/identity-guard-installer.js";
 import type { Pool } from "pg";
 import {

@@ -65,7 +65,7 @@ const poolHolder: {
   } | null;
 } = { pool: null };
 
-mock.module("../data/db-connection.js", () => ({
+mock.module("../kernel/db-connection.js", () => ({
   getPgPool: async () => {
     if (!poolHolder.pool) throw new Error("test pool not configured");
     return poolHolder.pool;

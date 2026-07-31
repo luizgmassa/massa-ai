@@ -184,7 +184,7 @@ Thirteen steps, ordered the way a request actually flows. Each names the files t
 | 4 | **The Search Facade** — hybrid vector + Postgres FTS with reciprocal-rank fusion. A composition root plus six capability modules, each taking a narrow deps record rather than the facade. | `services/search/contextual-search-rlm.ts` + `hybrid-search.ts`, `project-indexer.ts`, `index-admin.ts`, `session-bias.ts`, `graph-stream.ts`, `result-fusion.ts` |
 | 5 | **The ETL Indexing Pipeline** — `discover → parse → resolve → load`. Hash-skip unchanged files, tree-sitter parse, resolve FQNs, persist in per-batch transactions with deadlock retry. | `services/etl/pipeline.ts`, `stages/*.ts` |
 | 6 | **Symbol Graph & Blue-Green Generations** — go-to-definition, find-references, project map; generations flipped atomically. | `services/symbol/symbol-graph.service.ts`, `etl/graph-generation-coordinator.ts` |
-| 7 | **The PostgreSQL Data Layer** — the lazily-created `pg` pool and the Prisma singleton everything funnels through, plus the typed event bus. | `data/db-connection.ts`, `services/query/prisma-client.ts`, `services/events/event-bus.ts` |
+| 7 | **The PostgreSQL Data Layer** — the lazily-created `pg` pool and the Prisma singleton everything funnels through, plus the typed event bus. | `kernel/db-connection.ts`, `services/query/prisma-client.ts`, `services/events/event-bus.ts` |
 | 8 | **Synapse: Cross-Session Memory** — ~28 service files for scoring, inhibition, plasticity, metacognition, prefetch. Session state in Postgres with an in-memory mirror; working-memory buffer matches queries by Jaccard overlap. | `services/synapse/{index,types}.ts`, `session/session-store-pg.ts` |
 | 9 | **Graceful Degradation for LLM Features** — the shared client and three concrete instances of the fallback pattern. | `services/memory/llm-client.ts`, `bootstrap/`, `handoff/` |
 | 10 | **Shared Utilities** — the seam between core and its consumers; `env.ts` runs at startup for every entry point. | `packages/shared/src/{index,env}.ts` |
@@ -241,7 +241,15 @@ Key files per layer, ranked by coupling (in + out dependency edges).
 | 31 | `data/symbol/symbol-repo-queries.ts` | Workspace/file/definition/reference/import/centrality CRUD |
 | 27 | `data/symbol/symbol-repository-factory.ts` | Singleton factory; guards on a configured Postgres `DATABASE_URL` |
 | 21 | `data/symbol/symbol-repo-graph.ts` | Project map snapshots, BFS impact analysis, edge search, FQN resolution |
-| 18 | `data/db-connection.ts` | Shared `pg` pool sized from `DB_POOL_SIZE` |
+
+### Kernel
+
+Cross-cutting leaves. A file here imports from no tier, which is what makes membership
+checkable by path prefix rather than by a maintained list.
+
+| Deg | File | Role |
+|---:|---|---|
+| 18 | `kernel/db-connection.ts` | Shared `pg` pool sized from `DB_POOL_SIZE` |
 
 ### Shared Utility
 
