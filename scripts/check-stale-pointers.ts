@@ -196,6 +196,27 @@ export interface Pointer {
  * new comment names a file a reader cannot open. Down means one of those 26
  * records was deleted, which is the thing the category exists to protect. Lower
  * it when `.ua/` regeneration or PR-C genuinely removes one, and say which.
+ *
+ * ## Re-verified against the T6 reshape — PR-C T7, and it did not move
+ *
+ * T6 widened `POINTER` with a suffix branch, taking the corpus from **60** to
+ * **142** pointers. The pin **stays at 28**, and that is a measured result rather
+ * than an untouched line:
+ *
+ *   HISTORICAL  28  — 28 from the prefix branch, **0 from the suffix branch**
+ *   RESOLVES   114  — 32 prefix + 82 suffix
+ *   BROKEN       0
+ *
+ * All 82 newly-visible pointers RESOLVE, because the controllers still exist at
+ * this commit. That is the expected reading and also the trap: a flat HISTORICAL
+ * across a widening looks identical to a widening that did nothing, so the
+ * observable that had to move was the **total**, and it moved by exactly +82.
+ *
+ * This re-verification is its own commit, carrying no file move, because the one
+ * edit shape this pin exists to make visible is a re-baseline riding along with
+ * the change it is supposed to police. **Phase 3 is when it will genuinely move**:
+ * retiring the six controllers converts their citations out of RESOLVES, and that
+ * re-pin must again be its own commit and must say which records moved and why.
  */
 export const HISTORICAL_PINNED = 28;
 
