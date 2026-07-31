@@ -11,7 +11,7 @@
   `core-layering-god-module-split/validation.md` Part II.
 - **Successor**: PR-D — `tools/read_file.ts` split (AS-06). **PR-C now hands it GMS-02 AC-1** (C13).
 - **Status**: **Specify complete**, merged to `main` via **#56** (`9df5608`). **Design complete** —
-  `design.md`, delivered via PR **#57**; it carries C14, C15 and C16, and answers all three
+  `design.md`, delivered via PR **#57**; it carries C14 through C17, and answers all three
   preconditions this document left open (§3.B, §4.2, §5). **Tasks not started. No code written.**
 
 ---

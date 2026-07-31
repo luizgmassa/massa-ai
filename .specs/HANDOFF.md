@@ -8,7 +8,7 @@
 **Specify is on `main`** — merged via **#56** (`9df5608`, merge commit), base `origin/main` @
 `9df5608`. **Design is complete** — `design.md`, delivered via PR **#57** from `spec/pr-c-design`.
 Read `design.md` for every decision below that is marked delivered; it is the only artifact that
-carries C14, C15 and C16.
+carries C14 through C17.
 
 > **Branch-name correction.** Two earlier lines here named `spec/pr-c-controller-retirement` as
 > PR-C's branch. That branch was **not** what landed: #55 merged into
@@ -30,11 +30,17 @@ AC-2 stays in PR-C re-targeted at a handler PR-C actually touches. **Decided by 
 measured reason each was rejected. The amendment is **owed back** to the parent `spec.md`'s
 *Design and Execute corrections* index as C13 — a PR-C task, landing with the work, not ahead of it.
 
-**C13, C14, C15 and C16 are all owed back to the parent `spec.md`**, in that same in-place style,
-landing with the work. **None is written there yet.** C13 is above; C14 (`db-connection.ts` admitted
-to the kernel — AC-4's direction hid it), C15 (AC-4's referent → 26) and C16 (`POINTER`'s prefix
-assumption) are in `design.md` §2, §4 and §5. That index is how a reader tells an amended criterion
-from an original one, so a correction that never lands there is a correction that did not happen.
+**C13 through C17 are all owed back to the parent `spec.md`**, in that same in-place style, landing
+with the work. **None is written there yet.** C13 is above; C14 (`db-connection.ts` admitted to the
+kernel — AC-4's direction hid it), C15 (AC-4's referent → 26), C16 (`POINTER`'s prefix assumption)
+and C17 (the embeddings seam's own sizing figure — **39 / 5**, not 40 / 6; the sixth file was a
+string literal in `scripts/`) are in `design.md` §2, §4, §5 and §3. That index is how a reader tells
+an amended criterion from an original one, so a correction that never lands there is a correction
+that did not happen.
+
+**The parent `spec.md`'s own Status line is stale and is part of that same task**: it reads
+*"**Execute in progress** (PR-B, T19 of 20)"*, while PR-B is merged as #53 and released as v1.16.0.
+Fix it in the commit that lands C13–C17, not before — it is the same edit to the same file.
 
 ~~**Three decisions Design owes before PR-C is sized**~~ — **all three delivered**, each with its
 rejected alternative written down. Kept here as the record of what gated sizing; the answers live in

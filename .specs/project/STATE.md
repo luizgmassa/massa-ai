@@ -244,9 +244,18 @@ all state came from `.specs/` and source reads.
   delivered via PR #57** from `spec/pr-c-design`. The branch named here previously
   (`spec/pr-c-controller-retirement`) is **not** what landed — see `HANDOFF.md`'s branch-name
   correction for the 44-second retarget race that orphaned #55.
-- **C13, C14, C15 and C16 are all owed back to the parent `core-layering-god-module-split/spec.md`**
+- **C13 through C17 are all owed back to the parent `core-layering-god-module-split/spec.md`**
   in its *Design and Execute corrections* index, landing with the work. **None is written there
-  yet.**
+  yet.** That same commit must also fix the parent `spec.md`'s Status line, which still reads
+  *"Execute in progress (PR-B, T19 of 20)"* against a PR-B that merged as #53 and released v1.16.0.
+- **C17 — the twenty-fourth plan defect**, found by re-measuring `design.md`'s own figures rather
+  than inheriting them. §3 sized the embeddings seam at **40** vector-store constructions across
+  **6** test files; measured repo-wide it is **39** across **5**. The phantom sixth was
+  `scripts/__tests__/run-deterministic-coverage.test.ts:55`, where `new PostgresVectorStore()` is a
+  **string literal** inside `expect(classify(...))` — a different package, and unreachable by any
+  constructor change. **C16 mirrored**: C16's pattern could not see its subject, C17's saw a
+  non-subject. §2's repo-wide rule is what surfaced it and is now qualified — repo-wide **and**
+  excluding string-literal, comment and fixture matches.
 - Artifacts: `.specs/features/core-layering-controller-retirement/{spec,design}.md`
 - **Scope**: GMS-01 (all six ACs) + GMS-02 **AC-2 only**. `read_file.ts` (GMS-02 AC-1 + AS-06) is
   **PR-D**; `.ua/` regeneration is after PR-D.

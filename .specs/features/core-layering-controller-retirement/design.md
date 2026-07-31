@@ -160,12 +160,36 @@ test proving behavior identical when nothing is injected. The correct shape here
 replacement. That default path is what keeps it behavior-preserving.
 
 **Size, measured — none of it was named before.** `new (TestableVectorStore|PostgresVectorStore)(`
-appears **40** times across **6** test files (`base-vector-store.test.ts` carries the bulk), and
+appears **39** times across **5** test files, and
 **5** test files `mock.module` the embeddings path
 (`base-vector-store`, `embedding-failure-propagation`, `embedding-service`, `memory-service`,
 `relation-extractor`). Production surface is small — 1 subclass (`PostgresVectorStore`) and 1
 factory call site (`vector-store-factory.ts`) — but the **test** surface is the risk, and it is the
-same `mock.module` collision class T13 hit and the plan had not named.
+same `mock.module` collision class T13 hit and the plan had not named. The five, enumerated so the
+task's write set is not re-derived: `base-vector-store.test.ts` **25**,
+`postgres-vector-store.test.ts` **10**, `postgres-vector-store-extended.test.ts` **2**,
+`wave-4-sql-bounds.test.ts` **1**, `postgres-vector-store.integration.test.ts` **1** — all under
+`packages/core/src/__tests__/`.
+
+> **C17 — the twenty-fourth plan defect, and it is this section's own figure.** This paragraph read
+> **40 across 6 test files** until it was re-measured. The sixth file was
+> `scripts/__tests__/run-deterministic-coverage.test.ts:55`, where `new PostgresVectorStore()` sits
+> **inside a string literal** passed to `expect(classify(...))` — a test of the isolation runner's
+> *pattern classifier*, in a different package, that no constructor change can reach. It is not in
+> the seam's blast radius, and a task sized from the old figure would have sent someone into
+> `scripts/` looking for a call site that does not exist.
+>
+> **The shape is C16 mirrored.** C16's pattern could not see its subject; this one saw a
+> non-subject. Both are positional properties of a pattern rather than errors in its subject list,
+> and neither is visible without running the measurement against the real tree.
+>
+> Note what found it: **§2's own repo-wide rule.** A `packages/core/src`-scoped sweep returns 39/5
+> and would have been accidentally right. Going repo-wide is what surfaced the extra file — so the
+> rule stands, but it is **incomplete as stated**: a repo-wide sweep must also exclude matches
+> inside string literals, comments and fixture text. That is the same qualifier `spec.md` §4.1
+> property 3 already puts on `check-stale-pointers`' `EXCLUDED`, arrived at independently.
+>
+> **Owed back to the parent `spec.md`** alongside C13–C16.
 
 **This gets its own task with T11's discipline** — optional seam, default path retained, parity
 test, and violation shapes observed red — not a line folded into a move (R-13).
@@ -293,7 +317,7 @@ Challenge gate was right to attack this (§8, finding 5). Sizing, measured repo-
 | group | files touched (non-test) | test surface |
 | --- | --- | --- |
 | A. controllers | **9** importers + 6 members + barrel + `package.json` | 14 test files import `controllers/` |
-| B. kernel + `data → services` | 6 modules moved + **9** `db-connection` importers incl. one outside `src/` | **40** vector-store constructions / 6 files, **5** `mock.module` sites (§3) |
+| B. kernel + `data → services` | 6 modules moved + **9** `db-connection` importers incl. one outside `src/` | **39** vector-store constructions / **5** files, **5** `mock.module` sites (§3, as corrected by **C17**) |
 | C. `ToolError` | 4 edges | — |
 
 **The precedent is the number that matters.** PR-B was a *narrower* slice of the same umbrella
@@ -352,7 +376,7 @@ above; two are recorded as accepted.** Every figure below was re-derived before 
 | --- | --- | --- | --- |
 | 1 | **`STEMS + "controller"` is a measured no-op** — `POINTER` bakes in a prefix assumption; every controller file is suffix-shaped | **CONFIRMED.** Patched gate output byte-identical to baseline; `controller-*.{ts,js}` = **0** files, `*-controller.{ts,js}` = **6** | **§5 rewritten.** The twenty-second plan defect |
 | 2 | **`db-connection.ts` importer count incomplete** — misses `packages/core/scripts/create-3072d-table.ts` and a 5th test file | **CONFIRMED.** Repo-wide: **14** files, **9** non-test / 5 test, not 12 | **§2 corrected**, plus the repo-wide-measurement rule |
-| 3 | **The embeddings inversion mischaracterises T11 and is unsized** — T11's F4 was additive/optional, the proposal as worded was a replacement | **CONFIRMED.** `:57` is a lazy memoised promise, not constructor-time; **40** test constructions / 6 files, **5** `mock.module` sites | **§3 rewritten** |
+| 3 | **The embeddings inversion mischaracterises T11 and is unsized** — T11's F4 was additive/optional, the proposal as worded was a replacement | **CONFIRMED.** `:57` is a lazy memoised promise, not constructor-time. Its replacement sizing was **40** test constructions / 6 files — **itself wrong, corrected to 39 / 5 as C17** (§3): one match was a string literal in another package. **5** `mock.module` sites holds | **§3 rewritten, then corrected** |
 | 4 | **The kernel's physical path and the check's basis were never named** — a specifier list would be the rejected allowlist, renamed | **ACCEPTED as a real gap** | **§1 extended** — `packages/core/src/kernel/`, path-prefix rule, leaf-ness enforced not asserted |
 | 5 | **"Question-free" was conflated with "one PR"** | **ACCEPTED** | **§6 rewritten** — three revertable phases, cut decision deferred to Tasks with measured inputs |
 
