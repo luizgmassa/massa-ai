@@ -104,10 +104,32 @@ export const EXCLUDED = [
  * single source — `POINTER` is derived from it, so adding a stem cannot leave a
  * hand-written alternation behind to drift.
  */
-export const STEMS = ["rlm", "search-facade"] as const;
+export const PREFIX_STEMS = ["rlm", "search-facade"] as const;
 
 /**
- * A path-shaped token for one of `STEMS`. Deliberately does not match a glob such
+ * Stems that sit at the **end** of a filename, as every controller module does.
+ *
+ * Examples are written without their extensions throughout this docblock, for the
+ * same reason `candidateNames`' one is: spelled in full they would themselves be
+ * pointers in a file this gate scans, and the first draft of this comment pushed
+ * HISTORICAL from 28 to 29 and failed the gate on its own prose.
+ *
+ * R-09, and the twenty-second plan defect. The first remedy for the controller
+ * gap was "add `controller` to the stem list", which is strictly stricter and
+ * therefore could only find more — except that it found exactly nothing. The
+ * stem was interpolated as a **prefix**, `<stem>-<rest>`, and every real
+ * controller file is suffix-shaped. Measured over `git ls-files`: files shaped
+ * `controller-<rest>` = **0**, files shaped `<rest>-controller` = **6**. Patching
+ * the subject list and re-running produced a byte-identical report.
+ *
+ * **A subject-list entry cannot fix a positional assumption baked into the
+ * pattern**, which is why this is a second alternation branch and not a third
+ * entry above.
+ */
+export const SUFFIX_STEMS = ["controller"] as const;
+
+/**
+ * A path-shaped token for one of `PREFIX_STEMS` or `SUFFIX_STEMS`. Deliberately does not match a glob such
  * as `rlm-*.ts`, which names a set rather than a file and cannot dangle.
  *
  * The lookbehind is load-bearing and was found by measurement, not by reading:
@@ -126,7 +148,27 @@ export const STEMS = ["rlm", "search-facade"] as const;
  * segment: `search-facade-admin.test.ts` has two after the stem.
  */
 export const POINTER = new RegExp(
-  String.raw`(?<![\w-])(?:${STEMS.join("|")})-[a-z0-9-]+?\.(?:test\.)?(?:ts|js)\b`,
+  // Two branches, one shared extension tail. Examples are deliberately written
+  // without extensions — spelled in full they are pointers in a file this gate
+  // scans, and would move the HISTORICAL pin from this comment alone:
+  //   prefix stems: rlm-search, search-facade-admin
+  //   suffix stems: memory-controller, search-controller
+  //
+  // EVERY concatenated segment carries its own `String.raw` tag, and that is not
+  // style — it is C18, the twenty-fifth plan defect, which shipped to `main` in
+  // design.md §5.2. In an UNTAGGED template `\.` is an identity escape (a bare
+  // `.`, i.e. a wildcard) and `\b` is the backspace control character U+0008, not
+  // the two characters `\` and `b`. Because the alternation is one expression,
+  // dropping the second tag does not merely fail to add suffix coverage — it
+  // kills the untouched prefix branch too, taking this gate to
+  // `FAIL — 0 broken, 0 historical against a pin of 28`.
+  //
+  // The prefix branch body below is byte-identical to the pre-reshape pattern, so
+  // `rlm` and `search-facade` readings are unchanged BY CONSTRUCTION rather than
+  // by measurement. The new branch is a pure alternation addition: it can only
+  // add matches.
+  String.raw`(?<![\w-])(?:(?:${PREFIX_STEMS.join("|")})-[a-z0-9-]+?` +
+    String.raw`|[a-z0-9-]+?-(?:${SUFFIX_STEMS.join("|")}))\.(?:test\.)?(?:ts|js)\b`,
   "g",
 );
 
@@ -234,7 +276,10 @@ export function report(
   const broken = pointers.filter((p) => p.category === "BROKEN");
   const historical = pointers.filter((p) => p.category === "HISTORICAL");
   const resolves = pointers.filter((p) => p.category === "RESOLVES");
-  const stems = STEMS.map((s) => `${s}-*`).join(" / ");
+  const stems = [
+    ...PREFIX_STEMS.map((s) => `${s}-*`),
+    ...SUFFIX_STEMS.map((s) => `*-${s}`),
+  ].join(" / ");
   const lines: string[] = [];
 
   lines.push(`${pointers.length} ${stems} pointers in tracked files outside ${EXCLUDED.join(", ")}`);

@@ -58,7 +58,11 @@ describe("tierOf — the tier set is exactly {kernel, tools, controllers, servic
   test("classifies every tier by path prefix", () => {
     expect(tierOf(`${S}kernel/db-connection.ts`)).toBe("kernel");
     expect(tierOf(`${S}tools/search_project.ts`)).toBe("tools");
-    expect(tierOf(`${S}controllers/search-controller.ts`)).toBe("controllers");
+    // `controllers/index.ts` rather than a real `<x>-controller` filename: this is
+    // a fixture, not a reference, and T6's reshaped `check-stale-pointers` POINTER
+    // matches suffix-shaped controller names. Spelled realistically it became the
+    // 83rd suffix-branch pointer against an expected 82.
+    expect(tierOf(`${S}controllers/index.ts`)).toBe("controllers");
     expect(tierOf(`${S}services/search/hybrid-search.ts`)).toBe("services");
     expect(tierOf(`${S}data/vector/base-vector-store.ts`)).toBe("data");
   });

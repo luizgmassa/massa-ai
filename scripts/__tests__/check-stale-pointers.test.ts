@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import {
   POINTER,
-  STEMS,
+  PREFIX_STEMS,
+  SUFFIX_STEMS,
   HISTORICAL_PINNED,
   candidateNames,
   categorise,
@@ -78,9 +79,115 @@ describe("POINTER — what counts as a path-shaped reference", () => {
     expect(all("./contextual-search-facade-admin.js")).toEqual([]);
   });
 
-  test("STEMS is the documented two, and POINTER is derived from it", () => {
-    expect([...STEMS]).toEqual(["rlm", "search-facade"]);
-    for (const stem of STEMS) expect(POINTER.source).toContain(stem);
+  test("PREFIX_STEMS is the documented two, and POINTER is derived from it", () => {
+    expect([...PREFIX_STEMS]).toEqual(["rlm", "search-facade"]);
+    for (const stem of PREFIX_STEMS) expect(POINTER.source).toContain(stem);
+  });
+});
+
+// ── R-09: the suffix branch (PR-C T6) ───────────────────────────────────────
+//
+// The twenty-second plan defect was a gate that could not see the files it was
+// aimed at: the stem was interpolated as a PREFIX and every controller file is
+// suffix-shaped, so adding "controller" to the subject list produced a
+// byte-identical report. A subject-list entry cannot fix a positional assumption
+// baked into the pattern.
+describe("POINTER — the suffix branch for controller-shaped names", () => {
+  const all = (s: string) => [...s.matchAll(POINTER)].map((m) => m[0]);
+
+  test("SUFFIX_STEMS is the documented one, and POINTER is derived from it", () => {
+    expect([...SUFFIX_STEMS]).toEqual(["controller"]);
+    for (const stem of SUFFIX_STEMS) expect(POINTER.source).toContain(stem);
+  });
+
+  test("matches suffix-shaped controller pointers, source and test", () => {
+    expect(all("see memory-controller.ts and search-controller.test.ts")).toEqual([
+      "memory-controller.ts",
+      "search-controller.test.ts",
+    ]);
+  });
+
+  test("matches the .js spelling a NodeNext specifier uses", () => {
+    expect(all('from "../controllers/graph-controller.js"')).toEqual(["graph-controller.js"]);
+  });
+
+  test("the prefix shape it was originally aimed at does not exist and does not match", () => {
+    // `controller-<rest>` files: 0 over git ls-files. The old remedy matched this
+    // shape and nothing else, which is why it was a measured no-op.
+    expect(all("controller-memory.ts")).toEqual([]);
+  });
+
+  test("does not match a bare controller name with no extension", () => {
+    expect(all("the memory-controller module")).toEqual([]);
+  });
+
+  test("does not match a glob", () => {
+    expect(all("the six `*-controller.ts` files")).toEqual([]);
+  });
+
+  test("anchors at a path boundary, so a longer name is not a phantom", () => {
+    // The same class as the 14-false-positive bug on the prefix branch.
+    expect(all("context-controller-coverage.test.ts")).toEqual([]);
+  });
+
+  test("the barrel carries no stem and is deliberately invisible here", () => {
+    // §3.3: `controllers/index.ts` matches neither branch. It is covered by AC-6
+    // (the exports subpath) and AC-2 (a TS `export *` from a deleted path is a
+    // build failure), not by this gate. R-09 closes by three mechanisms, not one.
+    expect(all('export * from "./controllers/index.js"')).toEqual([]);
+  });
+
+  test("the prefix branch is unchanged by the addition", () => {
+    // §5.2's "strictly stricter" claim, asserted rather than assumed. The new
+    // branch is a pure alternation addition; it can only add matches.
+    expect(all("see rlm-search.ts and search-facade-admin.test.ts")).toEqual([
+      "rlm-search.ts",
+      "search-facade-admin.test.ts",
+    ]);
+  });
+
+  // C18 — the twenty-fifth plan defect, which shipped a regex to `main` that
+  // fails its own gate 0/0/28. This is the regression test for it.
+  test("an untagged concatenated segment kills the WHOLE pattern, not just its branch", () => {
+    const tagged = new RegExp(
+      String.raw`(?<![\w-])(?:(?:${PREFIX_STEMS.join("|")})-[a-z0-9-]+?` +
+        String.raw`|[a-z0-9-]+?-(?:${SUFFIX_STEMS.join("|")}))\.(?:test\.)?(?:ts|js)\b`,
+      "g",
+    );
+    // design.md §5.2 as first published: second segment untagged.
+    //
+    // The cooking is applied explicitly rather than by typing a bare template
+    // here, for a reason worth recording: oxlint's `no-useless-escape` flags
+    // `\.` inside an untagged template as a correctness error — it *detects this
+    // very defect*. So the literal form cannot sit in the tree without failing
+    // `bun run lint`, which `lint-gate.test.ts` asserts on a clean tree. Applying
+    // the transformation a template performs (`\.` -> `.`, `\b` -> U+0008) to the
+    // same raw source text reproduces the identical string, and says out loud
+    // what the defect actually is.
+    const asUntaggedTemplate = (raw: string) =>
+      raw.replace(/\\\./g, ".").replace(/\\b/g, "\u0008");
+    const untagged = new RegExp(
+      String.raw`(?<![\w-])(?:(?:${PREFIX_STEMS.join("|")})-[a-z0-9-]+?` +
+        asUntaggedTemplate(
+          String.raw`|[a-z0-9-]+?-(?:${SUFFIX_STEMS.join("|")}))\.(?:test\.)?(?:ts|js)\b`,
+        ),
+      "g",
+    );
+    expect(tagged.source).toBe(POINTER.source);
+
+    const corpus = "rlm-search.ts and memory-controller.ts";
+    expect([...corpus.matchAll(tagged)].map((m) => m[0])).toEqual([
+      "rlm-search.ts",
+      "memory-controller.ts",
+    ]);
+    // In an untagged template `\.` collapses to a wildcard and `\b` becomes the
+    // backspace character U+0008. The alternation is one expression, so the
+    // untouched PREFIX branch dies with it — the failure is total, not partial.
+    expect([...corpus.matchAll(untagged)].map((m) => m[0])).toEqual([]);
+    // The mechanism, named rather than inferred: in an untagged template the two
+    // source characters backslash-b collapse to the control character U+0008.
+    expect(untagged.source).toContain("\u0008");
+    expect(tagged.source).not.toContain("\u0008");
   });
 });
 
@@ -212,6 +319,53 @@ describe("scan and report over a real repo", () => {
 
   test("the shipped pin is the measured count, so the default gate is the real one", () => {
     expect(HISTORICAL_PINNED).toBe(28);
+  });
+
+  // §5.3 property 3 — both directions observed red, on the branch T6 adds. These
+  // are the two shapes phase 3 can actually produce, and neither was reachable
+  // before the reshape: the prefix-only pattern matched no controller filename at
+  // all, so this gate would have reported PASS through the entire retirement.
+  test("RED: a controller deleted without its citations repointed trips the pin", () => {
+    const { root, cleanup } = repo(
+      { "src/tools/search_project.ts": '// delegates to search-controller.ts\n' },
+      { "src/controllers/search-controller.ts": "// the retired orchestrator\n" },
+    );
+    try {
+      const found = scan(root);
+      expect(found.map((p) => p.category)).toEqual(["HISTORICAL"]);
+      expect(report(found, 0).ok).toBe(false);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("RED: a citation naming a controller that never existed is BROKEN", () => {
+    const { root, cleanup } = repo({
+      "src/tools/search_project.ts": "// delegates to serch-controller.ts\n",
+    });
+    try {
+      const r = report(scan(root), 0);
+      expect(r.ok).toBe(false);
+      expect(r.lines.join("\n")).toContain("BROKEN");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("GREEN: a controller citation that still resolves passes", () => {
+    // The discriminating control. A branch that flagged every controller-shaped
+    // token would fail every test above and still be useless.
+    const { root, cleanup } = repo({
+      "src/tools/search_project.ts": "// delegates to search-controller.ts\n",
+      "src/controllers/search-controller.ts": "// still here\n",
+    });
+    try {
+      const found = scan(root);
+      expect(found.map((p) => p.category)).toEqual(["RESOLVES"]);
+      expect(report(found, 0).ok).toBe(true);
+    } finally {
+      cleanup();
+    }
   });
 
   test("EXCLUDED is the documented four and nothing else", () => {
