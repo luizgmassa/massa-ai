@@ -441,7 +441,7 @@ flag after Phase 5.
 | --- | --- | --- | --- |
 | **T1** | **The four cache sites characterized, plus the rename pin.** New file, against the **public** surface only — not `tool.FILE_CACHE_MAX_ENTRIES` (§3.5 item 3). Covers `read_file.ts`'s two caches, `symbol-graph.service.ts`, `web-controller.ts`, `file-filter-cache.ts`. **AC-4 is a pin, not an assertion of correctness**: warm `projectRootCache`, run the rename path, read again, record what is served. Whichever answer it gives *is* the characterization. **If it shows a stale read, PR-D logs and does not fix it** (`spec.md` RFS-02 AC-4). **Two files** — AC-1's four-site characterization and AC-4's rename pin are different subjects and the pin needs the rename path | 2 new test files | **RFS-02 AC-1, AC-4** |
 | **T2** | **The three containment shapes.** New file, passing against **pre-extraction** code: (a) request `path.dirname(<project root>)` with a `projectId` — the `rel.startsWith("..")` vs `"../"` narrowing, which **no existing test targets** (`dirname` does not occur in the suite); (b) construct **once**, read under one env state, mutate `MASSA_AI_READ_FILE_ROOTS`, read again on the **same instance** — the call-time-vs-construction-time hoist all 7 existing tests are blind to; (c) ~~assert the returned `absolutePath` carries no literal `..` segment~~ → **assert the resolved path is still under the project root** and that the **content served** is the in-root file's, independent of containment — **amended by C37 (§10.2)**: `path.resolve` normalizes `..` away on every exit, so the original assertion passes identically with and without `sanitizeFilePath` and was proven to survive its own mutation. **AC-2: the teaching-error text at `:443-447` is unchanged, roots only, never a host path** — and the assertion is on the enumerated **set**, since the existing suite's *"root present"* + *"`/etc/passwd` absent"* pair stays green under a `$HOME` leak (§10.2) | 1 new test file | **RFS-06 AC-1, AC-2, AC-3** |
-| **T3** | **`handle()`'s presentation block characterized — authorship, not verification.** The fixture Design first cited for this is a **different tool's response** (`read-file-response.json`; 3 of 10 keys overlap and none of the moving ones). Pin `recommendations` — **0** assertions anywhere today — over all 5 push sites and their 4 literal strings, and pin `tokens` / `savingsPercent` / `compressionRatio`, today reachable only through `e2e/08.search` and a live PostgreSQL. **Unit-level, no database** | 1 new test file | **R-31**, GMS-05 AC-1 |
+| **T3** | **`handle()`'s presentation block characterized — authorship, not verification.** The fixture Design first cited for this is a **different tool's response** (`read-file-response.json`; 3 of 10 keys overlap and none of the moving ones). Pin `recommendations` — **0** assertions anywhere today — over ~~all 5 push sites~~ → **the 4 push sites** `:304`, `:318`, `:326`, `:333` **and their 4 strings** (2 plain literals, 2 template literals; `:282` is the initializer, not a push site — §3.4 and §8 finding 2 both carried the corrected figure while **this row did not**, §10.3). Pin `tokens` / `savingsPercent` / `compressionRatio`, ~~today reachable only through `e2e/08.search` and a live PostgreSQL~~ → **amended by C38 (§10.3)**: only `tokens` is e2e-reachable; `savingsPercent` **and** `compressionRatio` have **0** assertions anywhere, because the assertion `design.md` R-31 credits to `compressionRatio` belongs to `compress_context`. **Unit-level, no database** | 1 new test file | **R-31**, GMS-05 AC-1 |
 
 **Phase 0 leaves the tree structurally identical.** `check-core-layering` must read **965 / 896**
 unchanged, and `check-tools-thin` does not exist yet.
@@ -598,7 +598,7 @@ characterization corrected. All 3 revised this document.**
 | # | finding | severity | verdict on re-measurement | landed |
 | --- | --- | --- | --- | --- |
 | 1 | `executeIndexing` is not a pure function — it reads `this.contextualSearch`, and the write set treats T13 as mechanical while the structurally identical module 4→5 case got a full decision | high | **CONFIRMED.** `:306` is the **only** `this.` reference in `:254-351`; `contextualSearch` is a private field constructed at `:114` and `:306` is its sole reader | **§4.2**, a new decision with its rejected option; **T13** restated |
-| 2 | R-31's *"5 `recommendations.push` sites"* counts the array initializer. The internal tell — 5 sites, 4 literal strings — survived two prior gates | medium | **CONFIRMED.** `:282` is `recommendations: []`; the `.push(` calls are `:304`, `:318`, `:326`, `:333` = **4** | **T3** corrected; owed back to `design.md` R-31 (T20b) |
+| 2 | R-31's *"5 `recommendations.push` sites"* counts the array initializer. The internal tell — 5 sites, 4 literal strings — survived two prior gates | medium | **CONFIRMED.** `:282` is `recommendations: []`; the `.push(` calls are `:304`, `:318`, `:326`, `:333` = **4** | ~~**T3** corrected~~ → **§3.4 corrected; T3's own row was NOT**, and this landed column asserted otherwise until T3 ran (§10.3). Owed back to `design.md` R-31 (T20b) |
 | 3 | §3.5 item 5's eight LRU line citations are wrong, *"off by 1–2 lines, all in the same direction"* | low | **CONFIRMED in mechanism, corrected in characterization.** They are not uniformly short: measured, **6 are the eviction guard and 2 are a method declaration** (`read_file.ts:477` `evictOldest`, `l1-memory-cache.ts:188` `evictLRU`). The defect is a **mixed, unstated anchor**, not an off-by-one | **§3.5 item 5** now prints both anchors per site |
 
 **Evidence audit — ~70 figures re-derived with independent parsers. 5 do not reproduce. All 5
@@ -650,7 +650,8 @@ Tasks PR corrected it in place rather than deferring:
 | # | site | correction |
 | --- | --- | --- |
 | 1 | `design.md` §4.2, §7 group D, §6.6 property 2 | **C33** — `index_project.ts` is not *"closed by removal"* for clause 3; the `handle()` ceiling needs T14b |
-| 2 | `design.md` R-31 | **4** `recommendations.push` sites, not 5 — `:282` is the initializer |
+| 2 | `design.md` **`:930` and `:1042`** (R-31's prose *and* §11 item 4) | **4** `recommendations.push` sites, not 5 — `:282` is the initializer. **Both sites, not one**: T3 measured that the "five" figure is stated at two places in `design.md`, and this row named only R-31 (§10.3) |
+| 7 | `design.md` R-31's per-key table | **C38** — `compressionRatio` is **0** assertions, not ×1: the credited `e2e/08.search:556` is `compress_context`'s `metadata.compressionRatio`, a different tool and a different path. `tokens` is **2**, not ×1 (`:675`, `:676`), and both sit behind a `catch { return }`. Also *"only four suites exercise `ReadFileTool`"* — `apps/tools-api/src/routes/file.test.ts` predates `design.md` and names it, though it mocks the class wholesale (§10.3) |
 | 3 | `design.md` §5.1 module 8 | `executeIndexing` reads `this.contextualSearch` at `:306`; the module table presents it as free-standing |
 | 4 | `design.md` R-32 | **3** files shared between Phase 6 and Phase 7, not 1 |
 | 5 | `design.md` §7 group G | *"6 stale statements"* → **1**; RFS-05 AC-1's six were closed by the Specify commit |
@@ -958,3 +959,178 @@ only standalone. `test:scripts` exit **0**, 1018 pass / 0 fail across 48 files. 
 tracked files`.** Read it as **edges 965 unchanged; files 898 → 899** — C36's distinction, applied
 rather than rediscovered. Phase 0 adds no tier-to-tier edge; the population rises by the one tracked
 code file T2 adds.
+
+### 10.3 T3 — executed, 2026-08-01
+
+One new file, `packages/core/src/__tests__/read-file-presentation-characterization.test.ts` — **9
+cases in 1 describe, 46 assertions**, authored against the unmodified tree. **R-31 and GMS-05 AC-1
+close.** Unit-level, no database, no live LLM: **91 ms** standalone. **Phase 0 is complete.**
+
+#### C38 — the forty-third plan defect: R-31's per-key table credits another tool's assertion, and the field it credits has none
+
+`design.md` R-31's replacement table states, for the token-math segment `:285-322`:
+*"`tokens` ×1, `compressionRatio` ×1 — **both only `e2e/08.search`**"*. **Both figures are wrong,
+and one reverses the segment's verdict.**
+
+| field | R-31 | measured | why |
+| --- | --- | --- | --- |
+| `compressionRatio` | ×1, e2e-only | **0, anywhere** | the only `compressionRatio` assertion in `e2e/08.search.test.ts` is `:556`, inside test **F28**, which calls `compressContext(...)` and reads `r.metadata.compressionRatio`. `ReadFileTool` assigns it at the **top level** of `data` (`read_file.ts:303`) and never under `metadata` (`:275-280` carries only totalLines/language/symbols/imports). **Different tool, different path — it can never observe this field** |
+| `tokens` | ×1 | **2** | `e2e/08.search.test.ts:675` and `:676`, in F32. Neither has `.tokens` as its literal receiver — the field is read into plain consts at `:673-674` — and both sit **after** a `try/catch` whose `catch` does `return` (`:652-668`), so an LLM timeout **skips them silently** rather than failing |
+| `savingsPercent` | 0 | **0** | reproduces; zero occurrences in any tracked test file |
+| `recommendations` | 0 | **0** | reproduces; the 8 `expect(res.recommendations…)` hits in the tree are all `search-controller.test.ts`, a different subject |
+
+So the ❌ **unguarded** row is larger than R-31 states: `recommendations`, `savingsPercent` **and**
+`compressionRatio` all have **0** assertions anywhere. Only `tokens` has any, only through a
+live-PostgreSQL e2e suite, and only when the LLM path is fast enough to reach them.
+
+**This is R-31's own defect class a second time.** R-31 was rewritten because it cited **a different
+tool's fixture** (`read-file-response.json`) as evidence — *"the one artifact in this document that
+was cited as evidence without being opened"*. Its replacement table then credited **a different
+tool's assertion**. **Sixth time on this feature that a correction inherited the defect it was
+correcting**, and the second time inside R-31 specifically.
+
+**Recorded at author level, not put to the user**, on the C34/C35/C37 precedent: it **enlarges** T3's
+subject rather than changing it — more unguarded, not less — and R-31 plus GMS-05 AC-1 fix the
+answer. Owed back to `design.md` R-31 (**T20b**, §8.1 row 7). It is *not* owed to the parent
+`spec.md`: R-31 is a Design-introduced risk with no parent criterion behind it. Running total:
+**forty-three** plan defects.
+
+#### The population R-31 names is short, and the conclusion survives it
+
+R-31 says *"the only four suites that exercise `ReadFileTool`"*. Measured over all **413** tracked
+test files: `apps/tools-api/src/routes/file.test.ts` also names it and **predates `design.md`**
+(added `3acf3ae`, 2026-07-25, six days before the Design gate) — so the figure was already wrong
+when it was written, independently of the three suites T1 and T2 have since added. But it does
+`mock.module("@massa-ai/core")` with `ReadFileTool: class {…}` (`:11`, `:23`), replacing the class
+wholesale, exactly as `workspace.test.ts:31` does. **Both exercise route delegation and never reach
+this block**, so R-31's count is short while its conclusion is untouched. Recorded rather than
+escalated; folded into §8.1 row 7.
+
+#### §8 finding 2's *"landed"* column was false, and the correction it claims had no owner
+
+§8's evidence-audit row 2 records the 5-vs-4 push-site correction as *"**T3** corrected"*. Measured
+at HEAD before T3 ran, **three sites still stated five**:
+
+| site | text |
+| --- | --- |
+| `design.md:930` | *"The five `recommendations.push` sites (`:282`, `:304`, `:318`, `:326`, `:333`)"* |
+| `design.md:1042` | *"`recommendations` (0 assertions anywhere, 5 push sites, 4 literal strings)"* |
+| `tasks.md:444` — **T3's own row** | *"over all 5 push sites and their 4 literal strings"* |
+
+The correction reached **§3.4 only**. And §8.1 row 2 — T20b's list — named *"`design.md` R-31"*, one
+line item against **two** `design.md` sites, while `tasks.md:444` is outside that table's declared
+scope (*"Corrections owed to `design.md`"*) and therefore **had no scheduled owner at all**. That is
+PR-C's **C19** shape: a correction owned by nothing. All three are now struck-and-amended in place —
+T3's own row and §8's landed column here, the two `design.md` sites by T20b as widened.
+
+*The rule this earns: a landed-column entry is a claim about another part of the document, and it
+goes stale exactly like a status field. Verify it against the cited line, not against the intent.*
+
+#### The suite's discrimination, on the real tree
+
+Backed up to a scratch copy with SHA-256 byte-identity asserted on restore, refuse-on-anchor-not-found
+and refuse-on-byte-identical on every patch, **never `git checkout`**. **The six existing suites that
+exercise `ReadFileTool` were run under every mutation as well** — R-31's load-bearing premise is that
+they do *not* guard this block, and like RFS-06's it was inherited from the risk row and never
+measured. Harness `~/prd-exec-instruments/t3-mutations.ts`.
+
+| # | mutation | expected | new suite | existing 6 |
+| --- | --- | --- | --- | --- |
+| Q1 | `:325` usage-tip guard `&&` → `\|\|` | FAIL | **FAIL** 7p/2f | PASS 51p/0f |
+| Q2 | `:317` large-file tip `> 100` → `>= 100` | FAIL | **FAIL** 8p/1f | PASS 51p/0f |
+| Q3 | `:254` `shouldAutoCompress` `> 100` → `>= 100` | FAIL | **FAIL** 8p/1f | PASS 51p/0f |
+| Q4 | `:303` `compressionRatio` assignment deleted | FAIL | **FAIL** 8p/1f | PASS 51p/0f |
+| Q5 | `compressionRatio` also set on the else branch | FAIL | **FAIL** 7p/2f | PASS 51p/0f |
+| Q6 | `:301` `savingsPercent` `Math.round` → `Math.floor` | FAIL | **FAIL** 7p/2f | PASS 51p/0f |
+| Q7 | `:300` `saved: original - compressed` → `0` | FAIL | **FAIL** 8p/1f | PASS 51p/0f |
+| Q8 | `:324-336` usage-tip and symbol-tip blocks swapped | FAIL | **FAIL** 8p/1f | PASS 51p/0f |
+| Q9 | `:327` literal text `60%` → `50%` | FAIL | **FAIL** 6p/3f | PASS 51p/0f |
+| Q10 | `:292` `estimateTokens(selectedContent)` → `(content)` | FAIL | **FAIL** 7p/2f | PASS 51p/0f |
+| Q11 | `:332` `definitions > 0` → `>= 0` | FAIL | **FAIL** 8p/1f | PASS 51p/0f |
+| Q12 | comment-only edit (**inert control**) | PASS | **PASS** 9p/0f | PASS 51p/0f |
+
+**Every row landed as expected**, 1/1 file byte-identical afterwards, and the control's assertion
+count reproduced exactly (46) either side. **The existing six are blind to all eleven** — R-31
+asserted this for `recommendations` and never checked it, and it now holds for the token math and
+the branch boundaries too.
+
+**Two mutations are live only because a case was added for them, and that is the point of
+enumerating them 1:1 before authorship.** `> 100` → `>= 100` (Q2, Q3) differs from `> 100` at
+**exactly one** selection size, so with fixtures of 3 / 10 / 150 selected lines both mutations
+resolve to nothing and would have read as a gate that catches nothing. The exactly-100 case exists
+for them. Likewise Q6: at most fixture sizes `Math.round` and `Math.floor` agree — at the first
+fixture tried they were **both 98** — so the compressed output is sized to **480 chars → 120
+tokens** against a 920-token selection, where `round` gives **87** and `floor` gives **86**.
+*A mutation that resolves to nothing reads exactly like a sensor that cannot see it.*
+
+#### The Plan Challenge gate on T3 — two modes, and five findings changed the file before it was written
+
+Both lenses read-only; `git status --porcelain` checked after each returned rather than trusting the
+agents' own reports. Five pre-mortem/red-team findings, **all five accepted**:
+
+| # | finding | disposition |
+| --- | --- | --- |
+| 1 | cases 4 and 5 omit the explicit-range precondition case 1 states | **CONFIRMED.** `calculateRange` (`:503-506`) returns `{start:1, end:Infinity}` on any default read, so `:326` co-fires and an exact-array assertion would have been relaxed to `.toContain()` mid-authorship — R-26's failure mode exactly. Both cases now pass an explicit `lineStart`/`lineEnd` and assert exact array equality |
+| 2 | fixture line counts are not guaranteed at the >100 boundary | **CONFIRMED.** `"a\nb\n".split("\n")` has length 3, so a trailing newline silently moves a fixture across the branch. **Every case now pins `lineRange.actual.total` and `lineRange.selected`**, and `makeLines` joins without a trailing newline |
+| 3 | the 8 mutations were an unenumerated count | **CONFIRMED and acted on.** Enumerated 1:1 against the cases before authoring — which is what surfaced that Q2/Q3 and Q6 were dead at the first fixture sizes (above). Shipped as 11 + control |
+| 4 | `mock.module` survives T12 — verified rather than assumed | **CONFIRMED by scratch repro**: a mock registered from `__tests__/` binds an importer one directory deeper, because bun keys on resolved module identity, not on the literal specifier. R-28's failure mode is the *target* moving, not the *importer* |
+| 5 | no case proves the `try/catch` boundary survives the extraction | **CONFIRMED as a gap.** `:287`'s await is the only throwing call in the moved span, and after T12 it lives in module 7 while the catch stays in the handler. A ninth case was added: the mocked compressor rejects, and the response is `{success:false, error:"Failed to read file: compressor exploded"}` |
+
+**The evidence audit re-derived every figure and two did not reproduce, both in this packet's own
+statements rather than in the artifacts.** `savingsPercent` occurs **3** times in `read_file.ts`
+(`:301` assign, `:305` read inside the `:304` template, `:313` assign) — the two *assignment* sites
+were right and the occurrence list was short. And the `tokens` figure was restated from R-31 as ×1
+when it is **2**; the audit caught it inside the very finding correcting R-31's other figure.
+*Thirteenth time on this feature that a critic's mechanism held while a figure did not — this time
+the author's.*
+
+#### Gates, all six plus the layering gate
+
+`lint` exit **0** — and proven to bite rather than assumed: a duplicate-declaration probe appended to
+this very file produced `error: Identifier \`dupProbeT3\` has already been declared` and exit **1**,
+restored SHA-256-identical, lint back to 0. oxlint remains the only gate that sees this file at all
+(`packages/core/tsconfig.json` excludes `src/__tests__`). `type-check` **6/6, 0 cached** and `build`
+**5/5, 0 cached**, both forced — a replay is not a measurement. `test:scripts` exit **0**, 1018 pass
+/ 0 fail across 48 files. `test:plugins` exit **0**, 96 pass / 0 fail across 8 files.
+
+**`check-core-layering` after `git add`: `PASS — 0 violation(s) across 965 tier-to-tier edges in 900
+tracked files`.** Read it as **edges 965 unchanged; files 899 → 900** — C36's distinction.
+
+**`test` failed on its first run and the failure is not T3's — attributed by measurement, not by
+assertion.** `npx turbo run test --force` exited **1** at **10 of 11** tasks:
+`postgres-vector-store.integration.test.ts` red at *"connects to PostgreSQL successfully
+[**5001.38 ms**] — a beforeEach/afterEach hook timed out"*. Four readings settle it:
+
+1. `git diff main -- <file>` is **empty** — T3 does not touch it.
+2. Standalone against the real developer config: **16 pass / 0 fail, 1.88 s**.
+3. Standalone under `XDG_CONFIG_HOME=$(mktemp -d)`: **16 pass / 0 fail, 1.63 s**.
+4. The aggregate log shows `Auto-selecting embedding provider…` at `03:17:26.127` reaching
+   `[ollama] Provider ready (qwen3-embedding:8b)` at `03:17:32.037` — **5.9 s of cold model load**
+   inside a hook budgeted at the global 5 s.
+
+**The decisive reading is the re-run**: with the model warm, `npx turbo run test --force` is
+**11/11 tasks, 0 cached, exit 0**, 0 isolation FAILs. So this is the 5001 ms class `CLAUDE.md`
+documents — *"passes on a warm model and hangs on a cold one, and CI never sees it"* — in a file
+outside PR-D's write set, and **not** a fourth instance to be folded into the two already recorded.
+Both readings are kept; quoting only the green one would be the replay problem in another dress.
+
+The new suite is confirmed **inside** the aggregate as
+`[test-isolation] PASS: isolated (module mock)`, not only standalone. **Name the metric** for the
+isolation figure, because T1's *145* and T2's *367* are not the same measurement: this run is
+**180 isolated groups** counted as `[test-isolation] RUN` lines, which is ~361 lines when RUN and
+PASS are both counted.
+
+#### What T3 pins that no artifact named
+
+Three properties of the presentation block are characterized here that neither `spec.md`, `design.md`
+nor this document states, and each is a real constraint on T12's rewrite:
+
+1. **`:304` and `:318` are mutually exclusive**, being the two arms of one `if/else`, so **three is
+   the maximum number of recommendations any response can carry** — never four, which is the number
+   the strings suggest.
+2. **`compressionRatio` is absent, not zero, on the non-compress branch.** `:303` runs only inside
+   `if (shouldAutoCompress)`. A module 7 that initialises the key alongside `tokens` would be a
+   wire-shape change invisible to every existing test.
+3. **The token math is measured over the *numbered* text `extractLines` emits** (`:637-641`), not
+   over the raw file — 920 tokens against 620 for the same 150 lines. An extraction that computes
+   tokens before line-numbering changes every figure the caller sees.
