@@ -234,10 +234,15 @@ survived Specify, Design and Tasks unremarked.
 two kinds of cell — **counts** and **line spans** — and only the counts survive Phase 2.
 RFS-01 AC-3's own text records a *verdict* (`2 of 30` red), and C46's *"byte-identical"* was measured
 on `check-tools-thin`'s summary line, which carries counts. Measured at T7 through the gate's
-`--json`: the delegate is net **−3 lines** in `read_file.ts`, so **15 of 15** entries move (13 bodies
+`--json`: ~~the delegate is net **−3 lines** in `read_file.ts`~~ → **amended by C52 (§10.9): the
+delegate as SHIPPED is net +8 lines, `707 → 715`**, so **15 of 15** entries move (13 bodies
 + 2 state sites) while **every count holds** at 13 / 17 / 2 / 175 and 25 members; `index_project.ts`
-moves **0 of 3**. Five shift **+1** for the added import, seven shift **−3**, and `evictOldest` itself
-goes `:477-483` (7L) → `:478-480` (3L). **A verifier re-taking this reading against the shipped tree
+moves **0 of 3**. Five shift **+1** for the added import, ~~seven shift **−3**~~ → **seven shift
+`+8`**, and `evictOldest` itself goes `:477-483` (7L) → ~~`:478-480`~~ → **`:489-491`** (3L).
+**The struck figures were taken on a tree that was never committed** — the shape probe applied a
+minimal delegate (`+1` import, `−4` body) while the shipped commit also carries an 11-line docblock,
+`git show --stat ea59b04` = `+13/−5`. The re-measurement against the shipped tree is T8's, §10.9.
+**A verifier re-taking this reading against the shipped tree
 (§6 item 12, T25) must diff the counts and expect the spans to have moved** — T5's own record checked
 those spans cell by cell at 72 assertions / 0 mismatches, so an unexplained 15 would read as a defect.
 
@@ -500,14 +505,19 @@ unchanged, and `check-tools-thin` does not exist yet.
 | --- | --- | --- | --- |
 | **T6** | **`packages/core/src/services/cache/lru-evict.ts`** — an eviction **function** over `Map<K,V>`, not a cache class (AC-2), importing **nothing at all**. **AC-3's original property is gone**: `services/cache/` is not `kernel/`, so `check-core-layering`'s leaf-ness clause does not constrain it. The replacement is asserted by the module's own unit test, and that is a **real loss of CI enforcement**, recorded rather than glossed (R-29) — measured at T6, **total**: no mutation of the import property is visible to any characterization suite, before or after T7. **The signature is `(cache, maxRetained)`, a post-call bound, not `(cache, cap)` — amended by C44 (§10.7)**: `design.md` §5.1's phrasing does not determine the predicate, the five sites do not share one, and a single operator with each site passing its own literal cap is behavior-preserving at **neither** call position. Pre-insert callers pass `CAP - 1`, which is exact rather than a compromise, since `size > cap - 1` and `size >= cap` are the same predicate over integers | 1 new module + 1 new test | ~~**RFS-02 AC-2**, AC-3~~ → **RFS-02 AC-2 clause 1 ("an eviction function, not a cache class") and AC-3** — **amended by C47 (§10.7)**: AC-2's second clause, *"no site's TTL or read-promotion policy moves"*, cannot be closed by a module nothing calls; it is **T7's** |
 | **T7** | **Repoint the four sites** — `read_file.ts` (**3** call sites: `:169`, `:462`, `:570`, §3.5 item 6), `symbol-graph.service.ts:808`, `web-controller.ts:138`, `file-filter-cache.ts:82`. **No site's TTL or read-promotion moves.** T1's suites must pass **unmodified** — assert byte-identity by SHA-256 across the commit, on `validation.md` §1's evidence shape, not "the tests are green now". **Take the delegate shape — added by C46 (§10.7), and it is a frozen-base decision rather than a style one.** Keep `private evictOldest<K,V>(cache)` on `ReadFileTool` as a one-line call into the module; do **not** delete it and inline the three call sites. Measured: inline leaves `read-file.test.ts` at **6p/1f** until T8 lands **and** moves RFS-01 AC-3's frozen base mid-Phase-2 (`read_file.ts` 13 → **12** maximal bodies, 224 → **223** members examined), which §3.1's *"unchanged between T5 and T9"* guarantees only for the **file population**, not for the per-member table AC-3 froze. Delegate leaves both **byte-identical** — ~~in every respect~~ → **in every count, and in none of the spans (C50, §10.8)**: `read_file.ts` holds 13 / 17 / 2 / 175 and 25 members while **15 of 15** frozen entries shift, `evictOldest` itself `:477-483` → `:478-480`. **Pre-insert sites pass `CAP - 1`** and the two post-insert sites pass `CAP` (C44). **The delegate shape applies at `symbol-graph.service.ts` too — added by C48 (§10.8), and this row's `:808` citation is the `while` guard *inside* a private wrapper the row did not know existed.** `symbol-graph-service.test.ts:787-812` reaches `evictOldestProjectRoot` through a cast exactly as `read-file.test.ts` reaches `evictOldest`; inlining leaves it **48p/1f** with **no task owning the repoint**, since T8's write set is `read-file.test.ts` alone. `check-tools-thin` does not move at that site either way — the file is under `services/` — so the exposure is §1.1 and GMS-05 AC-3, not the frozen base. `web-controller.ts` has no wrapper and is inlined by necessity; `file-filter-cache.ts` keeps its own. **Its `logger.debug` at `:154` is dropped and priced in the site's docblock — decided by the user, 2026-08-01**, against keeping it behind a victim-naming wrapper | 4 files | **RFS-02 AC-1**, and **AC-2 clause 2** (*"no site's TTL or read-promotion policy moves"*) — reassigned here by **C47** |
-| **T8** | **Repoint `read-file.test.ts`'s eviction test** (~~`:264-272`~~ → **`:264-299`**, `describe` `:257-300`), which reaches four private members ~~and cannot survive T7 unmodified~~. **Both amended at T6 (§10.7).** The span: C34 measured `:264-299` at T1 and corrected only §10.1's prose, leaving this row wrong for five tasks — the fifth correction on this feature to land in one document and not in the row it is about. The clause: **falsified by measurement** — under T7's delegate shape (C46) the test passes **7p/0f/34x, byte-identical to baseline**, because ~~all four members it reaches~~ → **all three members it exercises (C51, §10.8: the cast at `:265-270` declares four; `projectRootCache` at `:267` has zero references in the body)** still exist. Confirmed at T7: byte-identical and green, `e8cf74c6881db255`. It survives T7 and is repointed here anyway, because Phase 3 removes its subject. **GMS-05 AC-3: repointed, not weakened, skipped or deleted** — the CAP+1 eviction and hot-key-promotion assertions must still run, against the module. ~~**It is also the only non-vacuous sensor for `fileCache` eviction until this task runs** (C45)~~ → **amended by C49 (§10.8): it is the only non-vacuous sensor for the `evictOldest` *method*, and no sensor at all for the *call sites*.** Measured across all 92 cases in the six eviction suites: deleting `read_file.ts:570` (`fileCache`) or `:169` (`projectRootCache`) leaves **92p/0f — nothing goes red**, because this test calls `tool.evictOldest(tool.fileCache)` directly and never drives `readFileWithCache`. **This task's subject widens to close that** — **decided by the user, 2026-08-01**, from three options; recording only and a new task T8c were rejected. Besides the repoint it must **drive `handle()` past the cap and drive `indexing:started`, asserting the cache is bounded** — call-site sensors for `:570` and `:169`, landing before **T10** moves `:570`'s call into `services/file-read/file-content-cache.ts` with nothing watching. Write set is still **1 file**; §5's task count is still **29** | 1 file | GMS-05 AC-3, **C49** |
-| **T8b** | **The two comments RFS-02 AC-4 requires corrected — `production-wiring.ts:67-68` and `invalidator-registry.ts:34-36`.** Both state the same false claim and the **named site cites the unnamed one as its authority**, so correcting only the named one leaves a reader who follows its own pointer at the uncorrected claim (**C35**, §10.1). Corrected to state what T1's pin measured: `CACHE_TTL` is enforced, `ROOT_CACHE_TTL` is **not**, and no invalidator id matches `read_file`. **Added by C35 at T1; this row was created at T4b** — C35 resolved the defect and named the task but never wrote a row for it, so for four tasks T8b existed only in §10.1's prose and was absent from §5 and from §1's write-set table (§10.5) | 2 files, comments only | **RFS-02 AC-4** |
+| **T8** | **Repoint `read-file.test.ts`'s eviction test** (~~`:264-272`~~ → **`:264-299`**, `describe` `:257-300`), which reaches four private members ~~and cannot survive T7 unmodified~~. **Both amended at T6 (§10.7).** The span: C34 measured `:264-299` at T1 and corrected only §10.1's prose, leaving this row wrong for five tasks — the fifth correction on this feature to land in one document and not in the row it is about. The clause: **falsified by measurement** — under T7's delegate shape (C46) the test passes **7p/0f/34x, byte-identical to baseline**, because ~~all four members it reaches~~ → **all three members it exercises (C51, §10.8: the cast at `:265-270` declares four; `projectRootCache` at `:267` has zero references in the body)** still exist. Confirmed at T7: byte-identical and green, `e8cf74c6881db255`. It survives T7 and is repointed here anyway, because Phase 3 removes its subject. **GMS-05 AC-3: repointed, not weakened, skipped or deleted** — the CAP+1 eviction and hot-key-promotion assertions must still run, against the module. ~~**It is also the only non-vacuous sensor for `fileCache` eviction until this task runs** (C45)~~ → **amended by C49 (§10.8): it is the only non-vacuous sensor for the `evictOldest` *method*, and no sensor at all for the *call sites*.** Measured across all 92 cases in the six eviction suites: deleting `read_file.ts:570` (`fileCache`) or `:169` (`projectRootCache`) leaves **92p/0f — nothing goes red**, because this test calls `tool.evictOldest(tool.fileCache)` directly and never drives `readFileWithCache`. **This task's subject widens to close that** — **decided by the user, 2026-08-01**, from three options; recording only and a new task T8c were rejected. Besides the repoint it must **drive `handle()` past the cap and drive `indexing:started`, asserting the cache is bounded** — call-site sensors for `:570` and `:169`, landing before **T10** moves `:570`'s call into `services/file-read/file-content-cache.ts` with nothing watching. Write set is still **1 file**; §5's task count is still **29**. **DONE at `HEAD` — §10.9.** The repoint
+landed as an **operator swap in place**, not a move onto a bare `Map`: the case still drives
+`ReadFileTool`'s own `fileCache` and still pins the cap against `FILE_CACHE_MAX_ENTRIES`, because
+`lru-evict.test.ts:60` and `:70` already assert both properties over a plain `Map` and a repoint onto
+one would have been a **duplicate of T6 and a deletion wearing a repoint's clothes** (Plan Challenge
+gate, §10.9 finding 3). Both sensors flip their site from `92p/0f` to `93p/1f` | 1 file | GMS-05 AC-3, **C49** |
+| **T8b** | ~~**The two comments RFS-02 AC-4 requires corrected**~~ → **five comment sites, three of them added by C52 (§10.9) — `production-wiring.ts:67-68` and `invalidator-registry.ts:34-36`.** Both state the same false claim and the **named site cites the unnamed one as its authority**, so correcting only the named one leaves a reader who follows its own pointer at the uncorrected claim (**C35**, §10.1). Corrected to state what T1's pin measured: `CACHE_TTL` is enforced, `ROOT_CACHE_TTL` is **not**, and no invalidator id matches `read_file`. **Added by C35 at T1; this row was created at T4b** — C35 resolved the defect and named the task but never wrote a row for it, so for four tasks T8b existed only in §10.1's prose and was absent from §5 and from §1's write-set table (§10.5). **Three further comment sites added by C52 (§10.9), decided by the user, 2026-08-01, from four options** — widening T8 to 4 files, a new task T8c and record-only were all rejected; this row was chosen because its charter already *is* comment correction, so *"comments only"* stays true and T8's write set stays at 1 file. All three were **added by T7 itself** and cite line numbers in their own file that T7's own commit falsified: `read_file.ts:484` (`:169, :462, :570` → **`:170`, `:463`, `:578`**), `symbol-graph.service.ts:812` (`:792` → **`:793`**), `file-filter-cache.ts:151` (`:51-53` → **`:52-54`**). **`read_file.ts`'s is de-numbered rather than renumbered** — T10 deletes `:578`'s call outright, so a renumber there would be falsified a third time; the other two files appear in **no** Phase 3–5 write set, so a plain renumber is stable | ~~2~~ → **5 files, comments only** | **RFS-02 AC-4**, **C52** |
 
 ### Phase 3 — the extraction, 490 of 707 lines
 
 | # | task | write set | closes |
 | --- | --- | --- | --- |
-| **T9** | **Modules 2 and 3** — `services/file-read/path-containment.ts` (`checkPathContainment` `:387-448` + `resolveFilePath` `:350-385`) and `services/file-read/project-root-cache.ts` (`getProjectRoot` `:450-470` + `projectRootCache` + `ROOT_CACHE_TTL` + the `eventBus` subscription `:162-171`). **Module 2 → module 3 is a real edge** — `:373` and `:415` both call `getProjectRoot` — one-directional, so no cycle, but module 2 cannot be constructed without module 3. T2's suite passes unmodified | 1 handler + 2 new modules + 2 new suites | RFS-06 AC-1 |
+| **T9** | **Modules 2 and 3** — `services/file-read/path-containment.ts` (`checkPathContainment` `:387-448` + `resolveFilePath` `:350-385`) and `services/file-read/project-root-cache.ts` (`getProjectRoot` `:450-470` + `projectRootCache` + `ROOT_CACHE_TTL` + the `eventBus` subscription `:162-171`). **Module 2 → module 3 is a real edge** — `:373` and `:415` both call `getProjectRoot` — one-directional, so no cycle, but module 2 cannot be constructed without module 3. T2's suite passes unmodified. **Write set gains `+ 1 test repoint` — added by C53 (§10.9), and it is C34's resolution one task earlier than C34 predicted.** This module takes `projectRootCache` **and** the `eventBus` subscription, so T8's new `indexing:started` call-site sensor — which seeds `tool.projectRootCache` through a cast — loses its subject **here**, not at T10. §1's overlap table scheduled the only Phase-3 touch of `read-file.test.ts` at T10 (C34's), so T9 as written lands a red suite owned by nothing — PR-C's **C19** class, and C48's *"a break owned by nothing"* verbatim. Author level on C34's own precedent: GMS-05 AC-3 fixes the answer and the only open question was which task carries one file | ~~1 handler + 2 new modules + 2 new suites~~ → **+ 1 test repoint** | RFS-06 AC-1 |
 | **T10** | **Modules 4 and 5** — `file-content-cache.ts` (`readFileWithCache` `:518-580` + `fileCache` + `CACHE_TTL` + `FILE_CACHE_MAX_ENTRIES` + `interface CachedFile`) and `file-metadata.ts` (`extractMetadata` `:582-628` + `detectLanguage` `:645-681` + `extractImports` `:683-706` + `interface FileMetadata`). **The 4 → 5 edge is a callback — §4.** Module 4 never names `SymbolGraphService` | 1 handler + 2 new modules + 2 new suites | — |
 | **T11** | **Module 6** — `line-range.ts` (`calculateRange` `:485-507` + `adjustRange` `:509-516` + `extractLines` `:630-643` + `interface ReadRange` + `MASSA_AI_READ_FILE_MAX_LINES` `:22-36` + **the N9 clipping `:235-249`**, which is 15 of `handle()`'s 98 non-delegation lines) | 1 handler + 1 new module + 1 new suite | — |
 | **T12** | **Module 7 and the handler's collapse** — `read-file.service.ts` takes `interface ReadFileParams`, the compression decision `:251-255`, result assembly `:257-283`, token math + recommendation `:285-322` and usage tips `:324-336`, and composes 2–6. **`handle()` goes 175 → ~15**; `read_file.ts` to **≤ 125** (N). **`serializeToolResponse` stays in the handler** (`:338`) — any `services/file-read/` module importing `tools/serialize.ts` is a `services → tools` edge and fails `check-core-layering` (RFS-03 AC-2). **`constructor(symbolGraph?: SymbolGraphService)` keeps its exact arity and parameter type** — 20 construction sites, both transports among them (`design.md` §3.2). **MCP `inputSchema` + REST `/file` response shape byte-identical.** **The four moving interfaces are invisible to consumers**: `read_file.ts` exports exactly one symbol (`ReadFileTool`, `:74`), so `ReadFileParams`, `FileMetadata`, `CachedFile` and `ReadRange` are module-local today, and `services/file-read/` is deliberately not re-exported from `services/index.ts` — the extraction adds **0** names to `@massa-ai/core`'s published surface. T3's suite passes unmodified | 1 handler + 1 new module + 1 new suite | **GMS-02 AC-1**, RFS-03 AC-2 |
@@ -763,8 +773,16 @@ members. It does so in **two** tests, with **different break phases**, and only 
 
 | test | span | privates reached (code lines only) | breaks at | owner |
 | --- | --- | --- | --- | --- |
-| *"inserting CAP+1 distinct keys evicts the oldest…"* | `:264-299` (describe `:257-300`) | `fileCache`, `projectRootCache`, `evictOldest`, `FILE_CACHE_MAX_ENTRIES` | **T7** — `evictOldest` leaves the class | **T8** |
+| *"inserting CAP+1 distinct keys evicts the oldest…"* | `:264-299` (describe `:257-300`) | `fileCache`, ~~`projectRootCache`~~, `evictOldest`, `FILE_CACHE_MAX_ENTRIES` | **T7** — `evictOldest` leaves the class | **T8** |
 | *"undefined-metadata entry: first hit re-extracts + persists…"* | `:316-366` (describe `:302-367`) | `extractMetadata`, `fileCache` | **T10** — `extractMetadata` → module 5, `fileCache` → module 4 | **none** |
+| **the two call-site sensors — added at T8 (C49)** | the new `describe` after the block above | `fileCache`, **`projectRootCache`**, `FILE_CACHE_MAX_ENTRIES` | **T9** for the `projectRootCache` one — module 3 takes both the Map and the `indexing:started` subscription; **T10** for the `fileCache` one | **T9** (**C53**, §10.9) |
+
+**Two amendments to this table, both landed at T8.** `projectRootCache` is struck from row 1 by
+**C51** (§10.8): the cast **declares** it and the body has **zero** references, so the row's
+break-phase analysis never had to consider it — which is exactly why row 3's earlier break went
+unseen until T8 made that reach live. And row 3 is new: **the moment T8 closes C49 it creates a
+private reach that dies one task sooner than any row here predicted.** *A table of which tests break
+when is falsified by the task that adds a test, not only by the task that moves a member.*
 
 The second also hardcodes `readFileWithCache`'s cache-key JSON at `:332-338`, which moves into
 module 4 with the Map it keys. **T10's write set reads *"1 handler + 2 new modules + 2 new suites"*
@@ -2221,12 +2239,20 @@ method and is false about the call site.**
 Measured per call site — delete one call, run **every** suite that could see it (the six above, 92
 cases, the repo's entire eviction surface):
 
-| call site deleted | all six suites | only sensor |
-| --- | --- | --- |
-| `read_file.ts:169` — `projectRootCache`, inside the `indexing:started` handler | **92p/0f — NO SENSOR** | none |
-| `read_file.ts:462` — `projectRootCache`, workspace lookup | 91p/1f | T1's oracle, `read_file projectRootCache` case |
-| `read_file.ts:570` — **`fileCache`** | **92p/0f — NO SENSOR** | none |
-| `symbol-graph.service.ts:792` | 91p/1f | T1's oracle, `symbol-graph projectRootCache` case |
+**Every line number in this table is PRE-T7 and the measurement it labels was taken POST-T7** — the
+shipped-tree column was added at T8 (**C52**, §10.9), because T25's row requires re-running this
+table on the real tree and the labels are off by one at all four sites:
+
+| call site deleted | shipped tree | all six suites | only sensor |
+| --- | --- | --- | --- |
+| `read_file.ts:169` — `projectRootCache`, inside the `indexing:started` handler | **`:170`** | **92p/0f — NO SENSOR** | none |
+| `read_file.ts:462` — `projectRootCache`, workspace lookup | **`:463`** | 91p/1f | T1's oracle, `read_file projectRootCache` case |
+| `read_file.ts:570` — **`fileCache`** | **`:578`** | **92p/0f — NO SENSOR** | none |
+| `symbol-graph.service.ts:792` | **`:793`** | 91p/1f | T1's oracle, `symbol-graph projectRootCache` case |
+
+**Both `NO SENSOR` readings reproduce exactly on the shipped tree at T8** before any T8 edit, and
+both flip to `93p/1f` after it — §10.9's before/after pair. The instrument itself was never wrong:
+`t7-callsite-sensors.ts` anchors on **text**, not line numbers, so only its labels were stale.
 
 **The mechanism is exact.** `read-file.test.ts:264-299` calls `tool.evictOldest(tool.fileCache)`
 **directly** through its cast; it never drives `readFileWithCache`. So it characterizes the *method*
@@ -2255,8 +2281,8 @@ C46 measured *"byte-identical"* from `check-tools-thin`'s **summary line**, whic
 §3.3's frozen base is a per-member table **with line spans**, and `design.md` §6.6 property 2 is why:
 *"every regex detector tried got the per-file verdict right and the per-member count wrong."*
 
-T7's delegate is net **−3 lines** in `read_file.ts` (+1 import, −4 method body). Measured through the
-gate's own `--json`, cell by cell:
+~~T7's delegate is net **−3 lines** in `read_file.ts` (+1 import, −4 method body).~~ → **amended by
+C52 (§10.9): net `+8`, `707 → 715`.** Measured through the gate's own `--json`, cell by cell:
 
 | | before | after |
 | --- | --- | --- |
@@ -2264,10 +2290,13 @@ gate's own `--json`, cell by cell:
 | spans moved | — | **15 of 15** |
 | `index_project.ts` spans moved | — | **0 of 3** |
 
+**Both rows of that table reproduce against the shipped tree** (T8 re-ran the gate's `--json`); only
+the per-entry deltas below were taken on the probe's tree rather than the committed one.
+
 Five entries shift **+1** (the import): both `ArrowFunction`s, `resolveFilePath`,
 `checkPathContainment`, `getProjectRoot`, and both `Map` state sites `:145-146` → `:146-147`.
-`evictOldest` itself goes **`:477-483` (7L) → `:478-480` (3L)** — the only length change. Seven shift
-**−3**: `calculateRange` through `extractImports`.
+`evictOldest` itself goes **`:477-483` (7L) → ~~`:478-480`~~ → `:489-491` (3L)** — the only length
+change. Seven shift ~~**−3**~~ → **`+8`**: `calculateRange` through `extractImports`.
 
 **RFS-01 AC-3 as written is untouched** — its text records *"`2 of 30` red (`read_file.ts`,
 `index_project.ts`)"*, a verdict, and the verdict does not move. **C46 is not wrong** — its subject
@@ -2436,3 +2465,193 @@ Running total: **fifty-six** plan defects.
 5. **A read-only critic must not run concurrently with a mutation harness on the same tree.** Its
    commands are individually honest and collectively time-inconsistent, and the resulting finding is
    indistinguishable from a tooling defect (gate finding 1).
+
+### 10.9 T8 — executed, 2026-08-01
+
+**GMS-05 AC-3 satisfied for `read-file.test.ts`, and C49 closed.** One file, three cases: the
+eviction characterization repointed at `services/cache/lru-evict.ts`, plus the two call-site sensors
+C49 found the repository had never had. **7p/34x → 9p/45x, 0 fail.** Two new plan defects
+(**C52–C53**, the fifty-seventh and fifty-eighth).
+
+**C49's closure is the before/after pair, not the green suite.** Same instrument
+(`t7-callsite-sensors.ts` — text-anchored, so T7's stale labels never affected it), same six suites,
+run immediately before and after the edit:
+
+| call site (shipped tree) | before T8 | after T8 | killing case |
+| --- | --- | --- | --- |
+| `read_file.ts:170` — `projectRootCache`, `indexing:started` | **92p/0f — NO SENSOR** | **93p/1f** | new — *"one indexing:started past a full projectRootCache evicts"* |
+| `read_file.ts:463` — `projectRootCache`, workspace lookup | 91p/1f | 93p/1f | T1's oracle |
+| `read_file.ts:578` — **`fileCache`** | **92p/0f — NO SENSOR** | **93p/1f** | new — *"one real read past a full fileCache evicts"* |
+| `symbol-graph.service.ts:793` | 91p/1f | 93p/1f | T1's oracle |
+
+Control 92p/0f → 94p/0f. Killing cases read **by name**, never by count (C45's lesson). All four
+sites now sensed; before T8 the repository sensed two.
+
+#### C52 — the fifty-seventh plan defect: T7's span figures were measured on a tree that was never committed
+
+C50 recorded the post-T7 span table from `t7-span-delta.ts`. That probe applies a **prospective
+minimal delegate** — `+1` import and a `−5/+1` body swap, net **−3**. The **shipped** commit also
+carries an 11-line docblock the probe never applied:
+
+```
+git show --stat ea59b04 -- packages/core/src/tools/read_file.ts
+  1 file changed, 13 insertions(+), 5 deletions(-)          →  net +8,  707 → 715
+```
+
+Re-measured against the shipped tree through the gate's own `--json`:
+
+| | C50 records | shipped |
+| --- | --- | --- |
+| net lines, `read_file.ts` | −3 | **+8** (`707 → 715`) |
+| seven entries shift | −3 | **+8** |
+| `evictOldest` | `:477-483` → `:478-480` | `:477-483` → **`:489-491`** |
+| five entries shift `+1`; 15 of 15 moved; counts 13 / 17 / 2 / 175 / 25; `index_project.ts` 0 of 3 | — | **all four confirmed** |
+
+**C50's headline is right and its arithmetic is not**, which is why it survived: the claim a verifier
+checks first (*"15 of 15 move, every count holds"*) reproduces exactly. Three cells below it do not.
+
+**Three consequences, and they are in three different artifacts.** (1) §3.3 and C50 itself, amended
+above. (2) **C49's and C48's own tables** cite four call-site lines that are pre-T7 — `:169`, `:462`,
+`:570`, `:792` — and **T25's row requires re-running C49's table on the real tree**, so a verifier
+finds every label off by one; the shipped column was added above rather than the labels rewritten,
+because the measurement was taken post-T7 and the frame is what was missing. (3) **Three source
+comments T7 itself added cite line numbers in their own file and were falsified by the commit that
+added them** — `read_file.ts:484`, `symbol-graph.service.ts:812`, `file-filter-cache.ts:151`.
+**Decided by the user from four options: fold into T8b** (widening T8 to 4 files, a new T8c, and
+record-only all rejected). `read_file.ts`'s is de-numbered rather than renumbered, because T10 deletes
+`:578`'s call and a renumber would go stale a third time.
+
+*C42, C39, C43, C50 and now C52 are one family, and C52 is the family applied to C50: **a correction
+can inherit the defect it corrects.** C50 was itself the finding that "byte-identical" must say which
+metric — and it stated its own replacement metric from an instrument whose tree differed from the
+one that shipped. Sixth correction on this feature to inherit the defect it was correcting.*
+
+**A figure withdrawn rather than shipped.** The author's first sweep classified a `:NNN` citation as
+self-referential when no path appeared **earlier on the same line**, and reported **59** repo-wide.
+The evidence-audit lens refuted it and estimated **~6**. A block-aware re-measurement returns **25**,
+and spot-checking shows it still cannot decide a bare `:NNN` in a docblock that does not re-name its
+subject. **Neither number is defensible and none is quoted.** What both parties reproduced
+independently and exactly is the only figure anything depends on: **5 citations inside the four
+T7-edited files, resolving to 3 comments in 3 files** — T8b's write set.
+
+#### C53 — the fifty-eighth: closing C49 creates a private reach that dies one task before C34's table predicted
+
+**Found by the red-team lens, confirmed against the artifacts rather than accepted on report.**
+T8's new `indexing:started` sensor must observe `projectRootCache`, and the only channel is the cast.
+But **T9's row moves `projectRootCache` *and* the `eventBus` subscription `:162-171` into module 3** —
+and §1's overlap table schedules the only Phase-3 touch of `read-file.test.ts` at **T10** (C34's
+repoint, for `extractMetadata` + `fileCache`). Measured: **no Phase-3 row names `read-file.test.ts`
+except T10's.** So T9 as written lands a commit where the sensor T8 just added throws, §1.1's
+per-phase-green obligation is false, and **no task owns the break** — C48's formulation verbatim.
+
+**Resolution: T9's write set gains `+ 1 test repoint`.** Author level on **C34's own precedent**,
+quoted: *"Recorded rather than put to the user because GMS-05 AC-3 already fixes the answer
+(repointed, not weakened, not skipped); the only open question was which task carries one file."*
+C34's table gains a third row, and row 1 loses `projectRootCache` to C51 in the same edit.
+
+*C34 enumerated which tests break at which phase. It was correct when written and is falsified by a
+task that **adds** a test rather than by one that moves a member — the break-phase table has to be
+re-derived by whatever changes the reaching set, in either direction.*
+
+#### The discrimination table, two columns
+
+Scratch-copy backup with SHA-256 byte-identity asserted on restore for both touched files,
+refuse-on-anchor-not-found, refuse-on-byte-identical, refuse-on-load-failure. **Never `git checkout`.**
+
+**Choosing column B, re-chosen rather than inherited.** T7 shipped no new test, so its column B was
+*"the suites that existed before PR-D"*. T8 **does** ship new cases, so that choice no longer names
+the premise. T8 rests on **C49** — that the tree *as of T7* had no sensor for two of the five sites —
+so column B is **the six eviction suites exactly as they stood at `HEAD`**, `read-file.test.ts` swapped
+back to its committed content. Column A is the same six with T8 applied.
+
+| # | mutation | A: with T8 | B: pre-T8 (`HEAD`) |
+| --- | --- | --- | --- |
+| M1a | **post-seed** repointed call passes `CAP`, not `CAP - 1` | FAIL 93p/1f | n/a — construct does not exist |
+| M1b | **seed-loop** repointed call passes `CAP` — inert **by position** | PASS 94p/0f | n/a — construct does not exist |
+| M2 | `read_file` `fileCache` call site deleted (`:578`) | FAIL 93p/1f | **PASS 92p/0f** |
+| M3 | `read_file` `projectRootCache` call site deleted (`:170`) | FAIL 93p/1f | **PASS 92p/0f** |
+| M4 | `read_file` `projectRootCache` call site deleted (`:463`) | FAIL 93p/1f | FAIL 91p/1f |
+| M5 | `evictOldest` delegate body emptied | FAIL 91p/**3f** | FAIL 90p/2f |
+| M6 | read-promotion removed in `readFileWithCache` | FAIL 93p/1f | FAIL 91p/1f |
+| M7 | comment-only edit at the delegate (**inert control**) | PASS 94p/0f | PASS 92p/0f |
+
+Expectation mismatches: **0**. Both controls hold at their own baselines (94p/0f, 92p/0f).
+**Column B misses 2 of 5 applicable mutations, and they are exactly M2 and M3** — the two sites C49
+named. That is T8's justification measured rather than argued.
+
+**M1a and M1b are one mutation split in two, and the split is the finding.** The first run mutated
+the **seed-loop** call and read `PASS 94p/0f`, which is indistinguishable from a repoint no test
+guards. It is a **dead mutation**: the seed loop runs at sizes 0…511, so no bound ≥ 511 can evict
+there, and only the post-seed call can cross the boundary. Re-anchored on the post-seed call it reads
+`FAIL 93p/1f`. **T6's recorded lesson recurring — the verdict column cannot show a dead subject**, so
+both positions are run and labelled rather than one being reported. The inertness is a property of
+the case as it stood **before** T8 too; T8 neither introduced nor removed it.
+
+**M5 kills three cases in column A and two in column B**, and the third is the new `fileCache`
+sensor — the one difference the neuter can see that the pre-T8 tree could not.
+
+#### Gates, all six plus both structural gates
+
+`lint` exit **0**, and proven to bite **on T8's own file** rather than assumed: a duplicate
+declaration appended to `read-file.test.ts` produced
+`packages/core/src/__tests__/read-file.test.ts:477:7: error: Identifier \`dupProbeT8\` has already been declared`
+and exit **1**; restored SHA-256-identical (`9d1664a8a03bd480…`), lint back to **0**. `type-check`
+**6/6, 0 cached** (forced). `build` **5/5, 0 cached** (forced), cache bypass confirmed executing —
+`cache bypass, force executing` for all five plus `✔ Generated Prisma Client (v7.8.0)`. `test` exit
+**0**, **11/11 tasks**, **5 cached and all five are `:build`**, `[test-isolation] PASS: all 147
+group(s)`. `test:scripts` exit **0**, **1114** pass / 0 fail across **49** files — T4b/T5/T6/T7's
+figure unchanged, as it must be for a commit adding no `scripts/` test. `test:plugins` exit **0**,
+**96** pass / 0 fail across 8 files.
+
+**`check-core-layering` after `git add`: `PASS — 0 violation(s) across 969 tier-to-tier edges in 904
+tracked files`.** Read it as **edges 969 → 969; files 904 → 904 — both unchanged.** T7 was the commit
+where the edge count moved (965 → 969); T8's new import is in `packages/core/src/__tests__/`, which is
+not a tier, so it adds **no** tier-to-tier edge. Recording `edgesExamined` rather than the pass bit is
+RFS-03 AC-1, and *"unchanged"* is a reading only because the figure is one that can move.
+
+**`check-tools-thin` after `git add`: counts byte-identical to T5's frozen base** — `2 of 30`, 224
+members examined, `read_file.ts` at 13 / 17 / 2 / 175 and `index_project.ts` at 3 / 3 / 0 / 128, exit
+**1**, the intended pre-Phase-5 state. T8 touches no file under `packages/core/src/tools/`, so the
+population cannot have moved. **Spans still differ from T5's transcription — 15 of 15, per C50 as
+corrected by C52 above** — and T8 does not change them.
+
+#### The Plan Challenge gate on T8 — two modes, and one finding rewrote the plan before it was written
+
+Mode selection reuses this feature's recorded route (`spec.md` §9.1, `design.md` §10). Per §10.7 gate
+finding 10 and §10.8 gate finding 1, **neither lens ran while a harness was running**, and the
+evidence-audit lens was handed C52's measurements to attack rather than asked to reproduce a tree.
+`git status --porcelain` and the SHA-256 of every file both were pointed at were checked after each
+returned: tree clean, all seven SHAs unchanged.
+
+| # | mode | finding | disposition |
+| --- | --- | --- | --- |
+| 1 | red-team | T8's new `projectRootCache` sensor loses its subject at **T9**, not T10; T9's row names no test repoint and §1's overlap table schedules none | **CONFIRMED** against the artifacts, not on report. Became **C53** |
+| 2 | red-team | the planned repoint onto a bare `Map` duplicates `lru-evict.test.ts:60`/`:70`/`:107` and severs the `ReadFileTool` link — a net loss dressed as a repoint | **CONFIRMED, and it changed the implementation.** Verified by reading T6's suite: `:60` *"names the survivors exactly"*, `:70` *"a promoted key survives"*, `:107` the parametrized `read_file (512)` pre/post agreement. The repoint shipped as an **operator swap in place** instead |
+| 3 | red-team | the `:170` sensor is vacuous if the published `projectId` collides with a seeded key — the handler's `delete` alone frees the slot, so the assertion holds with or without the eviction call | **CONFIRMED as a live hazard, C45's shape exactly.** Fixed by construction: disjoint key namespaces (`seeded-root-N` vs a `fresh-project-…` id), the precondition asserted rather than assumed, and **both** sensors assert an **exact** size rather than `toBeLessThanOrEqual` — C50's own record of `file-filter-cache.test.ts:94`'s upper bound letting M4 walk through |
+| 4 | red-team | `handle()` genuinely reaches `readFileWithCache` for an absolute temp path with no `projectId`; TTL cannot confound the sensor; the `CAP - 1` post-call bound is the correct predicate; no six-gate hazard | **ACCEPTED as confirmation**, and reported by the lens as a clean trace rather than omitted |
+| 5 | evidence audit | claims A–E re-derived independently — the `+13/−5` decomposition, `707 → 715`, `evictOldest :489-491`, the seven `+8` shifts, all counts, `index_project.ts` 0 of 3, and all three source-comment rows | **CONFIRMED — every figure reproduced**, at per-member granularity, with the degenerate-key trap explicitly refused. Third clean evidence-audit pass on this feature |
+| 6 | evidence audit | **C48's and C49's own tables carry four stale call-site citations** — the same root cause as C50, inside the section that discovered C50, and missed by the author's own audit of that section | **CONFIRMED and it widened C52.** Independently re-resolved against the shipped tree before acceptance. The tables gained a shipped-tree column rather than rewritten labels |
+| 7 | evidence audit | the author's *"59 self-referential citations"* does not reproduce; true count nearer **6** | **CONFIRMED IN MECHANISM, REJECTED AS STATED — and the author's replacement is no better.** Per-line classification *is* wrong for multi-line docblocks. But block-aware re-measurement returns **25**, not 6 and not 59, and still cannot decide a bare `:NNN` in a block that does not re-name its subject. **Twentieth time on this feature a critic's mechanism held while its conclusion did not.** The figure is withdrawn as unmeasurable rather than replaced; nothing depends on it |
+
+Running total: **fifty-eight** plan defects.
+
+#### What T8 pins that no artifact named
+
+1. **A correction can inherit the defect it corrects, at one remove.** C50 established that
+   *"byte-identical"* must say which metric; it then stated its own replacement metric from a probe
+   whose tree was not the shipped one (**C52**). The check that would have caught it is the one C50
+   itself prescribes — re-run the instrument against the committed tree, not the patched one.
+2. **A break-phase table is falsified by adding a test, not only by moving a member.** C34 enumerated
+   which tests break when and was correct when written; T8 closing C49 created a private reach that
+   dies at T9 (**C53**). Re-derive it whenever the reaching set changes in **either** direction.
+3. **A repoint onto a more general subject can be a deletion.** Moving the eviction assertions onto a
+   bare `Map` would have satisfied *"against the module"* while duplicating T6's suite and severing
+   the only thing that made the case belong to `ReadFileTool` (gate finding 2). **Ask what the case
+   asserts that its destination does not.**
+4. **An inert mutation and an unguarded subject read identically, and position is enough to cause
+   it.** The repointed case has two operator calls; only the post-seed one can cross the bound
+   (M1a/M1b). T6 recorded this for a dead *anchor*; here the anchor resolved and the **call position**
+   made it inert.
+5. **A stale label does not imply a stale instrument.** All four of C49's call-site line numbers were
+   wrong and its measurement was exactly right, because `t7-callsite-sensors.ts` anchors on text.
+   **Correct the frame, not the reading.**

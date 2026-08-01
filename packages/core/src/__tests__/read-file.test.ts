@@ -15,6 +15,7 @@ import path from "path";
 import os from "os";
 
 import { ReadFileTool } from "../tools/read_file.js";
+import { evictOldest } from "../services/cache/lru-evict.js";
 import { eventBus } from "../services/events/event-bus.js";
 import type { SymbolGraphService } from "../services/symbol/symbol-graph.service.js";
 
@@ -259,13 +260,30 @@ describe("ReadFileTool — fileCache LRU cap + promotion", () => {
   // survives. We drive this through the private fileCache directly via a cast,
   // since constructing CAP+1 real files is wasteful and the cap logic lives in
   // evictOldest() which is agnostic to the cache type.
+  //
+  // T8 REPOINT (GMS-05 AC-3 — repointed, not weakened, skipped or deleted).
+  // The operator is now services/cache/lru-evict.ts rather than the private
+  // ReadFileTool.evictOldest wrapper, which Phase 3's T12 deletes. Both
+  // assertions are unchanged: CAP+1 evicts the oldest, and a delete+set
+  // promoted hot key survives.
+  //
+  // It deliberately still drives ReadFileTool's OWN fileCache and pins the cap
+  // against the tool's own FILE_CACHE_MAX_ENTRIES. Repointing onto a bare Map
+  // instead would have made this case a duplicate of lru-evict.test.ts:60 and
+  // :70, which already assert both properties over a plain Map — that is a
+  // deletion wearing a repoint's clothes, not a repoint. The link to
+  // ReadFileTool is the whole reason this case exists here rather than there.
+  // T10 owns moving it when fileCache leaves the class (C34).
+  //
+  // The pre-insert bound is CAP - 1, not CAP: lru-evict's second parameter is a
+  // POST-CALL bound, so a pre-insert caller reserves the slot its pending set()
+  // takes. `size > CAP - 1` and `size >= CAP` are the same predicate over the
+  // integers, so the retained count is identical to the wrapper's (C44).
   const CAP = 512;
 
   test("inserting CAP+1 distinct keys evicts the oldest; a promoted hot key survives", () => {
     const tool = new ReadFileTool() as unknown as {
       fileCache: Map<string, unknown>;
-      projectRootCache: Map<string, unknown>;
-      evictOldest: <K, V>(cache: Map<K, V>) => void;
       FILE_CACHE_MAX_ENTRIES: number;
     };
 
@@ -273,7 +291,7 @@ describe("ReadFileTool — fileCache LRU cap + promotion", () => {
 
     // Seed CAP entries. The first-inserted is the eviction candidate.
     for (let i = 0; i < CAP; i++) {
-      tool.evictOldest(tool.fileCache);
+      evictOldest(tool.fileCache, CAP - 1);
       tool.fileCache.set(`key-${i}`, { content: `c${i}`, timestamp: Date.now() });
     }
     expect(tool.fileCache.size).toBe(CAP);
@@ -286,7 +304,7 @@ describe("ReadFileTool — fileCache LRU cap + promotion", () => {
 
     // Insert one more → evict oldest in insertion order. After the key-0
     // promotion, the oldest is now key-1.
-    tool.evictOldest(tool.fileCache);
+    evictOldest(tool.fileCache, CAP - 1);
     tool.fileCache.set(`key-${CAP}`, { content: `c${CAP}`, timestamp: Date.now() });
 
     expect(tool.fileCache.size).toBe(CAP);
@@ -296,6 +314,96 @@ describe("ReadFileTool — fileCache LRU cap + promotion", () => {
     expect(tool.fileCache.has("key-1")).toBe(false);
     // New key present.
     expect(tool.fileCache.has(`key-${CAP}`)).toBe(true);
+  });
+});
+
+// ── T8 / C49: call-site sensors for the two eviction calls nothing watched ───
+//
+// The case above characterizes the eviction OPERATOR. It calls it directly and
+// never drives readFileWithCache or the indexing:started subscription, so it is
+// blind to whether anything still CALLS eviction. Measured across all 92 cases
+// in the repo's six eviction suites: deleting read_file.ts's fileCache call
+// (:578 on the shipped tree) or its projectRootCache call inside the
+// indexing:started handler (:170) left 92 pass / 0 fail — no sensor anywhere.
+// The other three of the five repointed sites each had one.
+//
+// Both cases below seed the cache to CAP through the cast and then drive the
+// PRODUCTION path once, so the only thing standing between CAP and CAP+1 is the
+// call site itself. Each asserts an EXACT size rather than an upper bound:
+// file-filter-cache.test.ts:94's `toBeLessThanOrEqual` is the recorded example
+// of an upper bound letting an over-eviction mutation walk through, so the
+// victim and a survivor are named too.
+describe("ReadFileTool — eviction call sites are driven, not just the operator", () => {
+  let tmpDir: string;
+  let tmpFile: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "massa-ai-readfile-callsite-"));
+    tmpFile = path.join(tmpDir, "sample.ts");
+    fs.writeFileSync(tmpFile, "export const x = 1;\n");
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test("one real read past a full fileCache evicts — readFileWithCache's call site is live", async () => {
+    const tool = new ReadFileTool();
+    const priv = tool as unknown as {
+      fileCache: Map<string, unknown>;
+      FILE_CACHE_MAX_ENTRIES: number;
+    };
+    const CAP = priv.FILE_CACHE_MAX_ENTRIES;
+
+    // Seed to exactly CAP. These keys are bare strings; handle() composes its
+    // own key as a JSON blob (see the writeback test below), so the two key
+    // namespaces cannot collide and the real read is guaranteed a cache MISS.
+    for (let i = 0; i < CAP; i++) {
+      priv.fileCache.set(`seed-${i}`, { content: `c${i}`, timestamp: Date.now(), metadata: {} });
+    }
+    expect(priv.fileCache.size).toBe(CAP);
+
+    // One real read → readFileWithCache misses → evicts, then inserts.
+    const res = await tool.handle({ filePath: tmpFile, compress: false });
+    expect(res.success).toBe(true);
+
+    // Exact, not an upper bound: without the eviction call this is CAP + 1.
+    expect(priv.fileCache.size).toBe(CAP);
+    expect(priv.fileCache.has("seed-0")).toBe(false); // oldest evicted
+    expect(priv.fileCache.has("seed-1")).toBe(true); // and only the oldest
+  });
+
+  test("one indexing:started past a full projectRootCache evicts — the subscription's call site is live", () => {
+    const tool = new ReadFileTool();
+    const priv = tool as unknown as {
+      projectRootCache: Map<string, string>;
+      FILE_CACHE_MAX_ENTRIES: number;
+    };
+    const CAP = priv.FILE_CACHE_MAX_ENTRIES;
+
+    for (let i = 0; i < CAP; i++) priv.projectRootCache.set(`seeded-root-${i}`, `/tmp/root-${i}`);
+    expect(priv.projectRootCache.size).toBe(CAP);
+
+    // The handler deletes the incoming projectId BEFORE evicting. If that id
+    // were already cached, the delete alone would free a slot and the assertion
+    // below would hold with or without the eviction call — the same vacuity
+    // shape that made the operator case blind to its call sites. The id is
+    // therefore drawn from a namespace the seed loop cannot produce, and the
+    // precondition is asserted rather than assumed.
+    const freshProjectId = "fresh-project-outside-seed-namespace";
+    expect(priv.projectRootCache.has(freshProjectId)).toBe(false);
+
+    eventBus.publish("indexing:started", {
+      jobId: "job-cap-boundary",
+      projectId: freshProjectId,
+      projectPath: "/tmp/fresh-root",
+    });
+
+    // Exact, not an upper bound: without the eviction call this is CAP + 1.
+    expect(priv.projectRootCache.size).toBe(CAP);
+    expect(priv.projectRootCache.has("seeded-root-0")).toBe(false); // oldest evicted
+    expect(priv.projectRootCache.has("seeded-root-1")).toBe(true); // and only the oldest
+    expect(priv.projectRootCache.get(freshProjectId)).toBe("/tmp/fresh-root");
   });
 });
 
