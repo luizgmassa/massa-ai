@@ -219,7 +219,10 @@ all state came from `.specs/` and source reads.
   files**. Three user decisions with their rejected options: **one PR, eight phased commits**;
   artifacts *and* code on one branch (so the `no-changelog` label must **not** be used, since the PR
   edits `CHANGELOG.md`); **`### Changed` + `### Removed`**, both minor.
-- **Next action: Execute, T1.** T1–T3 are pure test authorship; nothing structural moves until T6.
+- feature: **Execute STARTED.** Tasks committed `4f1e8ad`; **T1 done `d0fbc92`** — record in
+  `tasks.md` §10.1, including **C34–C36** and the two plan amendments they forced (T10 gains a test
+  repoint; new task **T8b**). Six gates plus `check-core-layering` green at T1.
+- **Next action: Execute, T2.** T2–T3 are pure test authorship; nothing structural moves until T6.
   **T5 (the frozen base reading) cannot be taken until T4a writes the gate script** — the dependency
   `design.md` §11 does not state.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the

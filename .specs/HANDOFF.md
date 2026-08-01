@@ -33,9 +33,20 @@
 > **Six corrections are owed to `design.md` itself** (§8.1 → task **T20b**, PR-C's C18 precedent),
 > and **C28–C33** to the parent `spec.md` (T20). None is written in either yet.
 >
-> **Next action: Execute, T1.** T1–T3 are pure test authorship; nothing structural moves until T6.
-> **T5 cannot be taken until T4a writes the gate script** — the ordering dependency `design.md` §11
-> does not state — and must be taken before T9.
+> ~~**Next action: Execute, T1.**~~ **T1 DONE — `d0fbc92`**, and the Tasks work is committed as
+> `4f1e8ad`. **Its whole record is `tasks.md` §10.1** — three new plan defects (**C34–C36**, the
+> forty-first onward), the fifteen-row discrimination table, and RFS-02 AC-4's answer. Not restated
+> here.
+>
+> **Two plan amendments came out of it and are already written into §10.1**: **T10's write set gains
+> `+ 1 test repoint`** (C34), and there is a **new task T8b** in Phase 2 (C35). Neither went to the
+> user because GMS-05 AC-3 and AC-4 respectively fix the answer; re-decide only if you disagree.
+> **AC-4's pin found the stale read is real** — PR-D logs it and does not fix it, and the only
+> source change it earns is T8b's two comments.
+>
+> **Next action: Execute, T2.** T2 and T3 are still pure test authorship against the unmodified tree;
+> nothing structural moves until T6. **T5 cannot be taken until T4a writes the gate script** — the
+> ordering dependency `design.md` §11 does not state — and must be taken before T9.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
