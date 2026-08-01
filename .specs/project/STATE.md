@@ -215,11 +215,26 @@ all state came from `.specs/` and source reads.
   plus an existence assert in the gate's *test*; **N = 125**; `handle()` sheds all 98 of its
   non-delegation lines (extraction **490 of 707**, not 392); and the LRU lands in
   `services/cache/lru-evict.ts`, not `kernel/`.
-- **Next action: Tasks** — `design.md` §7's seven phases plus the cut decision left open there.
-  **Four** steps cannot be taken retroactively, not three: `design.md` §11 supersedes `spec.md` §10.
-- **Two full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
+- feature: **Tasks COMPLETE 2026-07-31** — `tasks.md`, **28 task rows, eight phases, 78 distinct
+  files**. Three user decisions with their rejected options: **one PR, eight phased commits**;
+  artifacts *and* code on one branch (so the `no-changelog` label must **not** be used, since the PR
+  edits `CHANGELOG.md`); **`### Changed` + `### Removed`**, both minor.
+- **Next action: Execute, T1.** T1–T3 are pure test authorship; nothing structural moves until T6.
+  **T5 (the frozen base reading) cannot be taken until T4a writes the gate script** — the dependency
+  `design.md` §11 does not state.
+- **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
-  confirmed, all twelve revising the document (`design.md` §10).
+  confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed
+  (`tasks.md` §8) — plus **eleven** corrections the sizing measurement produced before the gate ran
+  (`tasks.md` §3.5).
+- **C33 is the fortieth plan defect and the highest-consequence line in `tasks.md`.** Phase 4 as
+  designed **could not close the gate**: `index_project.ts`'s `handle()` is `:117-244` = **128
+  lines**, and all three spans Design extracts (`:39-44`, `:46-68`, `:254-351`) sit **outside** it,
+  so the `handle() ≤ 120` clause stayed red at **1 of 30** and T15 could not wire the gate into
+  `ci.yml` without failing a required check. Closed by a new task **T14b**, extracting the 45-line
+  managed-run lease block `:158-202`; `handle()` **128 → ~87**. Zero allowlist.
+- **Six corrections are owed to `design.md` itself** (`tasks.md` §8.1, task T20b), on PR-C's C18
+  precedent. **C28–C33** are owed to the parent `spec.md` (T20); none is written there yet.
 - **C28 through C32 and the parent's stale layer figures are owed back** to
   `core-layering-god-module-split/spec.md` (RFS-05 AC-2/AC-3), landing with the work. None is
   written there yet. C29 additionally amends the parent's own `~390 of 707` Evidence row.

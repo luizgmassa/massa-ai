@@ -1,9 +1,44 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Design complete**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Tasks complete**
+
+> **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, 28 task rows, eight phases, **78 distinct
+> files**. Everything below this block was written before Tasks and is kept as the record; where it
+> says *"Next action: Tasks"*, this block supersedes it.
+>
+> **Three user decisions, each with its rejected options** (`tasks.md` §1, §1.2, §2):
+> **one PR, eight phased commits** (two-PR at 52/29 and three-PR at 36/29/16 both rejected);
+> **artifacts and code on one branch** — so the `no-changelog` label must **not** be applied, the PR
+> edits `CHANGELOG.md` and the merge gate is satisfied by the entry itself; **`### Changed` +
+> `### Removed`**, and the premise PR-C supplied did not hold — `CONTRIBUTING.md` makes
+> `### Removed` a **minor**, identically to `### Changed`, so the two headings cost the same version
+> and the choice is about the accuracy of the record.
+>
+> **C33 — the fortieth plan defect, and the one that would have shipped.** Phase 4 as designed
+> **cannot close the gate**. `index_project.ts`'s `handle()` is `:117-244` = **128 lines**, and all
+> three spans Design extracts (`:39-44`, `:46-68`, `:254-351`) are **outside** it — only their
+> one-line call sites at `:130`/`:135`/`:205` are inside. So T13 and T14 remove **zero** lines from
+> `handle()`, the `≤ 120` clause `design.md` §6.2 chose *specifically to catch this file* stays red
+> at **1 of 30**, and T15 cannot wire the gate into `ci.yml` without failing `build`. **RFS-01 AC-1
+> and the GMS-02 headline do not close.** Resolved by a new task **T14b** — extract the 45-line
+> managed-run lease block `:158-202` into `services/indexing/`; `handle()` **128 → ~87**, zero
+> allowlist. **Decided by the user from three options**; raising the ceiling to 130 and shipping
+> only two clauses were both rejected with measured reasons.
+>
+> **Do not re-derive** `tasks.md` §3.5's eleven corrections or §8's eight gate findings — every
+> figure was measured at `d7091ac` and the non-reproducing ones were re-measured by a second party.
+> **Do not re-take** §4's two threading decisions; §4.2's rejected option is rejected for a subtler
+> reason than the obvious one, and the obvious one does not survive measurement.
+>
+> **Six corrections are owed to `design.md` itself** (§8.1 → task **T20b**, PR-C's C18 precedent),
+> and **C28–C33** to the parent `spec.md` (T20). None is written in either yet.
+>
+> **Next action: Execute, T1.** T1–T3 are pure test authorship; nothing structural moves until T6.
+> **T5 cannot be taken until T4a writes the gate script** — the ordering dependency `design.md` §11
+> does not state — and must be taken before T9.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
-`.specs/features/core-layering-read-file-split/{spec,design}.md`.
+`.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
 **Everything a resumer needs is in those two files** — `spec.md` carries scope §1, C28 §2,
 re-measured premises §3, the seven user decisions §4, requirements §5, logged-not-merged §6,
 Design's owed decisions §7, risks §8, the gate record §9.1, sequencing §10; `design.md` carries the
