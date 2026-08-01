@@ -440,7 +440,7 @@ flag after Phase 5.
 | # | task | write set | closes |
 | --- | --- | --- | --- |
 | **T1** | **The four cache sites characterized, plus the rename pin.** New file, against the **public** surface only — not `tool.FILE_CACHE_MAX_ENTRIES` (§3.5 item 3). Covers `read_file.ts`'s two caches, `symbol-graph.service.ts`, `web-controller.ts`, `file-filter-cache.ts`. **AC-4 is a pin, not an assertion of correctness**: warm `projectRootCache`, run the rename path, read again, record what is served. Whichever answer it gives *is* the characterization. **If it shows a stale read, PR-D logs and does not fix it** (`spec.md` RFS-02 AC-4). **Two files** — AC-1's four-site characterization and AC-4's rename pin are different subjects and the pin needs the rename path | 2 new test files | **RFS-02 AC-1, AC-4** |
-| **T2** | **The three containment shapes.** New file, passing against **pre-extraction** code: (a) request `path.dirname(<project root>)` with a `projectId` — the `rel.startsWith("..")` vs `"../"` narrowing, which **no existing test targets** (`dirname` does not occur in the suite); (b) construct **once**, read under one env state, mutate `MASSA_AI_READ_FILE_ROOTS`, read again on the **same instance** — the call-time-vs-construction-time hoist all 7 existing tests are blind to; (c) assert the returned `absolutePath` carries no literal `..` segment, independent of containment. **AC-2: the teaching-error text at `:443-447` is unchanged, roots only, never a host path** | 1 new test file | **RFS-06 AC-1, AC-2, AC-3** |
+| **T2** | **The three containment shapes.** New file, passing against **pre-extraction** code: (a) request `path.dirname(<project root>)` with a `projectId` — the `rel.startsWith("..")` vs `"../"` narrowing, which **no existing test targets** (`dirname` does not occur in the suite); (b) construct **once**, read under one env state, mutate `MASSA_AI_READ_FILE_ROOTS`, read again on the **same instance** — the call-time-vs-construction-time hoist all 7 existing tests are blind to; (c) ~~assert the returned `absolutePath` carries no literal `..` segment~~ → **assert the resolved path is still under the project root** and that the **content served** is the in-root file's, independent of containment — **amended by C37 (§10.2)**: `path.resolve` normalizes `..` away on every exit, so the original assertion passes identically with and without `sanitizeFilePath` and was proven to survive its own mutation. **AC-2: the teaching-error text at `:443-447` is unchanged, roots only, never a host path** — and the assertion is on the enumerated **set**, since the existing suite's *"root present"* + *"`/etc/passwd` absent"* pair stays green under a `$HOME` leak (§10.2) | 1 new test file | **RFS-06 AC-1, AC-2, AC-3** |
 | **T3** | **`handle()`'s presentation block characterized — authorship, not verification.** The fixture Design first cited for this is a **different tool's response** (`read-file-response.json`; 3 of 10 keys overlap and none of the moving ones). Pin `recommendations` — **0** assertions anywhere today — over all 5 push sites and their 4 literal strings, and pin `tokens` / `savingsPercent` / `compressionRatio`, today reachable only through `e2e/08.search` and a live PostgreSQL. **Unit-level, no database** | 1 new test file | **R-31**, GMS-05 AC-1 |
 
 **Phase 0 leaves the tree structurally identical.** `check-core-layering` must read **965 / 896**
@@ -520,7 +520,7 @@ certifies the rename while missing **all 12 production edges**, because they are
 | **T22** | **`CLAUDE.md` and `docs/ONBOARDING.md`.** `CLAUDE.md:43`'s *"24 migrations"* → **23**, **naming the metric** (24 counts `migration_lock.toml`; there are 23 migration directories and 23 tracked `migration.sql` — §3.5 item 10). `CLAUDE.md:567`'s *"five … skipping lines"* → **8** publishable packages, measured from every non-`private` `package.json`. `docs/ONBOARDING.md:83-87`'s deferral marker must say `.ua/` regeneration is **its own change after PR-D**, not point at a PR that will have merged (`spec.md` §4.4) | 2 files | **RFS-05 AC-5** |
 | **T23** | **The state files.** `HANDOFF.md`, `STATE.md`, `FEATURES.json` — PR-D `status: complete`, `phases.tasks: true`, `phases.execute: true`; parent `core-layering-god-module-split` to `complete`. **Do not touch `active_feature`** — it reads `skills-directive-dedup`, genuinely paused at T5 of 12 on the user's instruction, verified against `STATE.md`'s `## Current` for the **third** time. **Never `git add -A` under `.specs/`**: `.specs/reports/` is untracked on purpose and stays untracked; stage explicitly | 3 files | RFS-05 AC-1 |
 | **T24** | **CHANGELOG entry — `### Changed` **and** `### Removed`** (§2). **Never write the skip-ci marker literally**, in the commit message, a commit body or the PR body | 1 file | **RFS-04 AC-2** |
-| **T25** | **Independent validation — author ≠ verifier**, on PR-C's T18 and PR-B's T20 precedent. Re-derives every criterion from raw data rather than from this file. **Must re-take, not inherit**: T5's frozen reading against the shipped tree, Phase 6's resolver sweep, `check-core-layering`'s `edgesExamined` per structural commit, the `npm pack --dry-run`, and a **discrimination table** on the real tree — each subject backed up to a **scratch copy** with SHA-256 byte-identity asserted on restore. **Never `git checkout` to restore**: it restores to `HEAD`, not to pre-mutation state, and destroyed two files of uncommitted work at PR-C's T8b | 1 new file | GMS-02, RFS-01…RFS-06 |
+| **T25** | **Independent validation — author ≠ verifier**, on PR-C's T18 and PR-B's T20 precedent. Re-derives every criterion from raw data rather than from this file. **Must re-take, not inherit**: T5's frozen reading against the shipped tree, Phase 6's resolver sweep, `check-core-layering`'s `edgesExamined` per structural commit, the `npm pack --dry-run`, and a **discrimination table** on the real tree — each subject backed up to a **scratch copy** with SHA-256 byte-identity asserted on restore. **Never `git checkout` to restore**: it restores to `HEAD`, not to pre-mutation state, and destroyed two files of uncommitted work at PR-C's T8b. **Two open questions to answer rather than inherit, both amendments to criteria rather than to figures:** whether **C37**'s replacement predicate for RFS-06 shape (c) (§10.2) is the right reading of *"independent of containment"*, given the original clause was struck for being unfalsifiable; and whether AC-2's enumerated-**set** assertion is what *"roots only, never a host path"* requires, given the existing suite's presence/absence pair stays green under a `$HOME` leak | 1 new file | GMS-02, RFS-01…RFS-06 |
 
 ---
 
@@ -823,3 +823,138 @@ bun writes that summary to **stderr** on success as well as failure. Every run t
 `unparseable bun test output`. Had it defaulted to "no match → treat as pass", all fifteen rows
 would have read PASS and the table would have been worthless. *Silence is a failure mode, and the
 instrument is where it fires first.*
+
+### 10.2 T2 — executed, 2026-07-31
+
+One new file, `packages/core/src/__tests__/read-file-containment-shapes.test.ts` — **6 cases in 4
+describes, 31 assertions**, authored against the unmodified tree. RFS-06 **AC-1, AC-2 and AC-3 all
+close**; AC-3 is closed by shape (b) rather than by a test of its own, because the property it names
+(*"the env allowlist is still read at call time"*) has no witness other than a call-time observation.
+
+#### C37 — the forty-second plan defect: shape (c)'s prescribed assertion cannot fail
+
+`spec.md` §5 RFS-06 row 3 and this document's own **T2(c)** both specify the third test as
+*"assert the returned `absolutePath` carries no literal `..` segment, independent of containment."*
+**That assertion is vacuous.** `resolveFilePath` has exactly two non-null exits — `:370`
+`return path.resolve(filePath)` and `:379` `return path.resolve(root, cleaned)` — and `path.resolve`
+normalizes `..` away unconditionally. Measured over nine adversarial inputs (over-traversal,
+`....//`, backslash forms, absolute-input escape): **every result carried zero `..` segments,
+including the ones that resolved outside the root.**
+
+**Proven by execution, not by argument.** A probe suite written to the criterion's letter was run
+against the tree and then against **P3**, the mutation that drops `sanitizeFilePath` from
+`resolveFilePath`'s projectId branch:
+
+| | verdict |
+| --- | --- |
+| prescribed literal-`..` assertion, unmutated | **PASS** 1p/0f |
+| prescribed literal-`..` assertion, **under P3** | **PASS** 1p/0f — survives the mutation it exists to catch |
+
+So a T2 authored to the letter of the criterion would have read green while RFS-06 AC-1's claim
+that the three tests *"prove they hold today"* was **false for shape (c)**. This is **C21's class —
+a sensor reading PASS by not looking — inside the requirement written to close exactly that class**,
+and it is the fifth time on this feature that a correction inherited the defect it was correcting.
+It is also C33's shape one artifact down: a clause and the work meant to close it must act on the
+same lines, and here the clause and its subject did not overlap at all.
+
+**Resolution — the predicate is containment-relative, not lexical.** The test asserts the resolved
+path is still **under the project root** (`path.relative(root, absolutePath)` does not start with
+`..`), that it equals the sanitized resolution exactly, and that the **content served** is the
+in-root file's rather than the escaped one's. Measured: `escapes root: false` today, `true` under P3.
+*"Independent of containment"* is honoured literally — the escaped directory is put on
+`MASSA_AI_READ_FILE_ROOTS` so containment permits **both** candidate paths and cannot be what fails;
+a companion case reads the escaped file directly to prove the allowlist really admits it, so
+*"the read stayed in the root"* and *"the parent's file was unreadable anyway"* are not the same
+observation.
+
+**Recorded at author level, not put to the user**, on the C34/C35 precedent: RFS-06 AC-1 plus
+RFS-01 AC-4 (*"a new sensor is not quotable until it has failed on purpose"*) fix the answer, and
+only the replacement predicate was open. **The vacuous assertion is deliberately not written, and
+the file's header records why** — so the next reader does not re-add it believing it was forgotten.
+**Owed back to `spec.md` §5 RFS-06 row 3 and to T2's own row** (T20's write set covers the parent;
+the two PR-D-local edits land with the record). **Handed to T25 as a question rather than as a
+settled fact**, because it amends a criterion rather than a figure. Running total: **forty-two**
+plan defects.
+
+#### The Plan Challenge gate on T2 — two modes, eight findings
+
+Both lenses read-only; `git status --porcelain` checked after each returned rather than trusting the
+agents' own reports. **The evidence audit re-derived every span, quote and count in `spec.md` and
+`design.md` and none failed** — the first artifact on this feature with zero non-reproducing figures.
+`read_file.ts` is byte-identical across `f06b01d`, `d7091ac` and HEAD, so spans measured at either
+commit still hold. Five red-team findings changed the file before it was written:
+
+| # | finding | disposition |
+| --- | --- | --- |
+| 1 | shape (a) and shape (c) fixtures collide | **CONFIRMED and worse than reported.** `dirname(mkdtempSync(os.tmpdir(), …))` **is** `os.tmpdir()` — measured — so distinct roots do not separate them and shape (c)'s allowlist entry would *be* the directory shape (a) asserts is rejected. Fixed structurally: **a private container per shape**, `root = join(container, "ws")`, plus an in-test tripwire asserting the env is empty before shape (a) runs |
+| 2 | no `try/finally` discipline stated for the two env mutations | **CONFIRMED.** bun runs a file's tests sequentially in one process, so a throw leaks `MASSA_AI_READ_FILE_ROOTS` into the next test. `try/finally` per mutation **plus** an `afterEach` hard reset **plus** `beforeAll`/`afterAll` save-and-restore of the ambient value |
+| 3 | the live-LLM edge is `CodeCompressor`, not `vector-store-factory` | **CONFIRMED.** `llm.enabled: true`, `http://localhost:11434/v1` on this machine; `SymbolGraphService` is never constructed here so the vector path is never reached. Every `handle()` call passes **`compress: false`** and every fixture is one line |
+| 4 | the stated reason for shape (b)'s two directions is wrong | **CONFIRMED by simulation.** Direction A alone kills the construction hoist **and** the naive first-call memo; **direction B is what kills a sticky non-empty memo**. Both are kept — the rationale in the file is corrected, not the design |
+| 5 | `process.cwd()` must be read live | **CONFIRMED.** `/…/massa-ai` under a manual `bun test` from the repo root vs `/…/massa-ai/packages/core` under `bun run test`. A hardcoded root would pass one invocation and fail the other |
+
+**One finding the gate reported as duplication and it is not.** The audit noted that
+`read-file-containment.test.ts:95-128` already asserts `/path containment/i`, `/Valid roots/i`, both
+roots present and `not.toContain("/etc/passwd")`, and read AC-2's test as restating them. Those
+assert each root is **present** and that one hardcoded string is **absent** — neither establishes
+*"roots only, never a host path"*. **Measured: under P4, which leaks `$HOME` into the enumerated
+list, the existing suite stays PASS.** AC-2's test asserts the enumerated **set** equals exactly
+{project root, cwd} ∪ env roots, and that is what earns it its place.
+
+#### The suite's discrimination, on the real tree
+
+Backed up to scratch copies with SHA-256 byte-identity asserted on restore, refuse-on-anchor-not-found
+and refuse-on-byte-identical on every patch, **never `git checkout`**. **The existing 7-test suite was
+run under every mutation as well**, because RFS-06's load-bearing premise is that it does *not* kill
+these shapes — inherited from the requirement, never measured until now.
+
+| # | mutation | expected | new suite | existing suite |
+| --- | --- | --- | --- | --- |
+| P1 | `rel.startsWith("..")` → `startsWith("../")` | FAIL | **FAIL** 4p/2f | PASS 7p/0f |
+| P2 | env allowlist hoisted to construction time | FAIL | **FAIL** 5p/1f | PASS 7p/0f |
+| P3 | `sanitizeFilePath` dropped from `resolveFilePath` | FAIL | **FAIL** 5p/1f | PASS 7p/0f |
+| P4 | teaching error leaks `$HOME` into the root list | FAIL | **FAIL** 5p/1f | PASS 7p/0f |
+| P5 | comment-only edit (**inert control**) | PASS | **PASS** 6p/0f | PASS 7p/0f |
+
+**Every row landed as expected**, 1/1 files byte-identical afterwards, and the control's assertion
+count reproduced exactly (31) either side. **The existing suite is blind to all four** — RFS-06
+claimed this for shapes (a)–(c) and never checked it; P4 extends it to a shape RFS-06 never claimed.
+
+**Shape (a)'s discriminator is unique, and that is a property of path semantics rather than of the
+fixture.** `path.relative(root, target)` is the bare string `".."` for **exactly one** target,
+`path.dirname(root)`. A file in the parent gives `"../secret.txt"` and a prefix-named sibling gives
+`"../ws-evil/f.txt"`; both are rejected under either reading. Under P1 containment *allows* the
+parent and the failure becomes a generic read error on a directory, so the assertion is on the
+error's **shape** — the teaching error, and explicitly not `EISDIR`.
+
+#### Four hostile-precondition runs, and one assertion proven non-vacuous
+
+The deterministic falsifier the gate named, run rather than argued:
+
+| precondition | result |
+| --- | --- |
+| `XDG_CONFIG_HOME=$(mktemp -d)` — no developer config, `llm.enabled` absent | 6p/0f, **75 ms** |
+| `MASSA_AI_READ_FILE_ROOTS=/tmp:/var/folders` pre-set (simulated leak) | 6p/0f, 31 expects |
+| invoked from `packages/core/` rather than the repo root | 6p/0f |
+| repeat run | 6p/0f, 31 expects — identical |
+
+The second passing is only *correct* because `beforeAll` neutralizes the ambient value, which means
+shape (a)'s own tripwire never fired — **an assertion never observed red is the C37 class again**.
+Checked: with the `beforeAll` delete removed and the hostile env pre-set, the suite reads
+**5p/1f at `:160`**, restore byte-identical, back to 6p/0f.
+
+#### Gates, all six plus the layering gate
+
+`lint` exit **0** — and proven to bite rather than assumed: a duplicate-declaration probe appended to
+this very file produced `error: Identifier \`dupProbe\` has already been declared` and exit **1**,
+restored SHA-256-identical, lint back to 0. **oxlint is the only gate that sees this file at all** —
+`packages/core/tsconfig.json` excludes `src/__tests__`, so `tsc` structurally cannot type-check it.
+`type-check` **6/6, 0 cached** (forced — the unforced run reported 2 cached and a replay is not a
+measurement). `build` **5/5, 0 cached**. `test` **11/11 tasks, 0 cached, 367 isolation groups**, and
+the new suite confirmed *inside* it as `[test-isolation] PASS: isolated (module mock)` rather than
+only standalone. `test:scripts` exit **0**, 1018 pass / 0 fail across 48 files. `test:plugins` exit
+**0**, 96 pass / 0 fail across 8 files.
+
+**`check-core-layering` after `git add`: `PASS — 0 violation(s) across 965 tier-to-tier edges in 899
+tracked files`.** Read it as **edges 965 unchanged; files 898 → 899** — C36's distinction, applied
+rather than rediscovered. Phase 0 adds no tier-to-tier edge; the population rises by the one tracked
+code file T2 adds.
