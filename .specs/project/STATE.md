@@ -215,8 +215,9 @@ all state came from `.specs/` and source reads.
   plus an existence assert in the gate's *test*; **N = 125**; `handle()` sheds all 98 of its
   non-delegation lines (extraction **490 of 707**, not 392); and the LRU lands in
   `services/cache/lru-evict.ts`, not `kernel/`.
-- feature: **Tasks COMPLETE 2026-07-31** — `tasks.md`, **28 task rows, eight phases, 78 distinct
-  files**. Three user decisions with their rejected options: **one PR, eight phased commits**;
+- feature: **Tasks COMPLETE 2026-07-31** — `tasks.md`, ~~28 task rows~~ → **29 task rows**, eight
+  phases, ~~78~~ → **80 distinct files** (corrected in `tasks.md` at T4b, carried here at T5 — this
+  line and the T4b bullet below contradicted each other inside one file for two tasks). Three user decisions with their rejected options: **one PR, eight phased commits**;
   artifacts *and* code on one branch (so the `no-changelog` label must **not** be used, since the PR
   edits `CHANGELOG.md`); **`### Changed` + `### Removed`**, both minor.
 - feature: **Execute STARTED.** Tasks committed `4f1e8ad`; **T1 done `d0fbc92`** — record in
@@ -283,13 +284,48 @@ all state came from `.specs/` and source reads.
   **29 / 80**; §10.4's *"both task rows claim AC-1"* is **three**; and `design.md` §6.5's nine-case
   table is `declaresBody()`'s truth table, not `BodyFinding.kind`'s — **second figure in that table
   not to survive being re-run, after C39**.
-- ~~**Next action: Execute, T4b**~~ **Next action: Execute, T5** — RFS-01 AC-3's frozen base
-  reading, the fourth non-retroactive step and the first by dependency. Run the gate **after
-  `git add`** and transcribe `tasks.md` §3.3's table **per member with line spans**; it is a record
-  in `tasks.md`, **not a test**. Two T4b findings change what T5 writes: an arrow-property body
-  reports `name: "ArrowFunction"` rather than its member name, and the population line now reads
-  `27 declare an IToolHandler` without *"class"*. **T5 must precede T9.** Nothing structural moves
-  until T6.
+- **T5 done `9adee57`** — record in `tasks.md` §10.6. **RFS-01 AC-3 closes**, and **all four
+  non-retroactive steps are now taken**. The frozen base transcribed per member with spans:
+  `2 of 30`, 27 declare an `IToolHandler`, 3 do not, 224 members; `read_file.ts` 13 maximal / 17 raw
+  / 2 state / `handle()` 175, `index_project.ts` 3 / 3 / 0 / 128. R-37 verified — zero diff in
+  `packages/core/src/tools/` across the branch. `HANDOFF.md` predicted *"at least one"* arrow body
+  would report `ArrowFunction`; measured **two**, and neither is a class member (a module-level IIFE
+  and the constructor's `eventBus` callback), so *"13 per member"* is **11 methods + 2 anonymous
+  arrows** — the 11 being C29's corrected count exactly.
+- **C42 is the forty-seventh plan defect: `2 of 30` is a union.** Per clause the readings are
+  **2 / 1 / 2** — `index_project.ts` has **zero** `Map`/`Set` state, so clause 2 flags `read_file.ts`
+  alone. R-39 calls the third clause's value prospective for flagging no file the other two miss;
+  **clause 2's RED set is a strict subset of both** and nothing said so. Author level; owed to
+  `design.md` (T20b, §8.1 row 13), **not** to the parent.
+- **C43 is the forty-eighth: the span anchor is split per file and unstated.** `read_file.ts`'s cited
+  spans are comment-inclusive at all 8 sites with a comment; `index_project.ts`'s are
+  declaration-only at both, orphaning `executeIndexing`'s doc `:246-253` (**T13**, 8 lines) and the
+  managed-run lease's `:151-157` (**T14b**, 7 lines). **The second is gate-relevant** — that comment
+  is inside `handle()` `:117-244`, measured **including comment lines**, so T14b's `128 → ~87` lands
+  at **~94**. `design.md` §5.1's ~110 estimate is the tell: 106 comment-inclusive, 98
+  declaration-only. Both rows amended; **C33 does not move**. Owed to `design.md` (T20b, §8.1 row 14).
+- **T5's own measured result, and the one to carry forward: the frozen base is a claim about the
+  tree, not about the rule.** Seven gate copies with only `isViolation` patched, plus an inert
+  control and a byte-identical baseline copy — **deleting any one of the three clauses leaves the
+  entire report byte-identical**. T4b: 10 of 13 internal mutations invisible. T5: **3 of 3** at
+  whole-clause granularity. It does **not** falsify the per-member rationale, which is about the AST
+  enumerating correctly; AC-4's suite is the complementary sensor. R-40 already sends T25 per clause
+  — T5 adds that the per-clause reading **is not derivable from the default report**, only from
+  `--json` or a patched gate.
+- **Both Plan Challenge modes caught the same figure and it was the author's** — a carried `108` that
+  measures **106**, inherited from an instrument anchored at `handle()`'s closing brace whose control
+  had already failed once. The red-team's finding was sharper: **the author's span sweep was
+  structurally blind to T14b**, its population being *declared members* while task rows cite plain
+  code ranges. Re-run over all 26 cited spans. The critic's own figure for that comment was off by
+  one. **Transcription verified rather than proofread** — the fenced block byte-identical to the live
+  run, both tables parsed back out and checked cell by cell against `--json`, 72 assertions / 0
+  mismatches.
+- ~~**Next action: Execute, T5**~~ **Next action: Execute, T6** — `services/cache/lru-evict.ts`, an
+  eviction **function** over `Map<K,V>` importing nothing at all, plus its unit test. **Phase 2, and
+  the first task that moves code.** `tasks.md` §6 items 4–5: **T6 → T7 → T8 → T8b**, and Phase 2
+  entirely before Phase 3, because the LRU move is provable behavior-preserving only while both
+  `read_file.ts` caches still live in `read_file.ts`. T1's suites must pass **unmodified** across T7,
+  asserted by SHA-256. The six-gate battery applies again from T6.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed
@@ -301,8 +337,8 @@ all state came from `.specs/` and source reads.
   so the `handle() ≤ 120` clause stayed red at **1 of 30** and T15 could not wire the gate into
   `ci.yml` without failing a required check. Closed by a new task **T14b**, extracting the 45-line
   managed-run lease block `:158-202`; `handle()` **128 → ~87**. Zero allowlist.
-- **Six corrections are owed to `design.md` itself** (`tasks.md` §8.1, task T20b), on PR-C's C18
-  precedent. **C28–C33** are owed to the parent `spec.md` (T20); none is written there yet.
+- ~~**Six** corrections are owed to `design.md` itself~~ → **fourteen** (`tasks.md` §8.1, task
+  T20b), on PR-C's C18 precedent. *"Six" was last true at Design.* **C28–C33** are owed to the parent `spec.md` (T20); none is written there yet.
 - **C28 through C32 and the parent's stale layer figures are owed back** to
   `core-layering-god-module-split/spec.md` (RFS-05 AC-2/AC-3), landing with the work. None is
   written there yet. C29 additionally amends the parent's own `~390 of 707` Evidence row.

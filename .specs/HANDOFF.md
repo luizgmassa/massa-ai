@@ -2,9 +2,12 @@
 
 ## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — Phase 1 started**
 
-> **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, 28 task rows, eight phases, **78 distinct
-> files**. Everything below this block was written before Tasks and is kept as the record; where it
-> says *"Next action: Tasks"*, this block supersedes it.
+> **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
+> ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
+> the record; where it says *"Next action: Tasks"*, this block supersedes it.
+> *(The 28/78 pair was corrected in `tasks.md` at T4b and not here; T5 carried it across. **A
+> correction that lands in one document and not in the documents that assert the same figure is a
+> correction with no owner** — PR-C's C19 shape, fourth time on this feature.)*
 >
 > **Three user decisions, each with its rejected options** (`tasks.md` §1, §1.2, §2):
 > **one PR, eight phased commits** (two-PR at 52/29 and three-PR at 36/29/16 both rejected);
@@ -30,8 +33,9 @@
 > **Do not re-take** §4's two threading decisions; §4.2's rejected option is rejected for a subtler
 > reason than the obvious one, and the obvious one does not survive measurement.
 >
-> **Six corrections are owed to `design.md` itself** (§8.1 → task **T20b**, PR-C's C18 precedent),
-> and **C28–C33** to the parent `spec.md` (T20). None is written in either yet.
+> ~~**Six** corrections are owed to `design.md` itself~~ → **fourteen** (§8.1 → task **T20b**, PR-C's
+> C18 precedent), and **C28–C33** to the parent `spec.md` (T20). None is written in either yet.
+> *"Six" was last true at Design; §8.1 grew at T4b and again at T5.*
 >
 > ~~**Next action: Execute, T1.**~~ **T1 DONE — `d0fbc92`**, and the Tasks work is committed as
 > `4f1e8ad`. **Its whole record is `tasks.md` §10.1** — three new plan defects (**C34–C36**, the
@@ -212,12 +216,71 @@
 > discriminates at **exactly one** span, while the `}` form discriminates across the whole range.
 > Sized anywhere else, both are inert.
 >
-> **Next action: Execute, T5** — RFS-01 AC-3's frozen base reading, the fourth non-retroactive step
-> and the first by dependency. Run the gate **after `git add`** and transcribe `tasks.md` §3.3's
-> table **per member with line spans**; it is a record in `tasks.md`, **not a test**. Note two things
-> T4b measured that change what T5 writes: an **arrow-property body reports `name: "ArrowFunction"`**
-> rather than its member name, so at least one of `read_file.ts`'s 13 will read that way, and the
-> population line now says `27 declare an IToolHandler` without *"class"*. **T5 must precede T9.**
+> ~~**Next action: Execute, T5.**~~ **T5 DONE — `9adee57`. RFS-01 AC-3 closes.** Its record is
+> `tasks.md` §10.6 — the frozen base transcribed per member with spans, two new plan defects
+> (**C42**, **C43**), and the clause-deletion table. Not restated here. **All four non-retroactive
+> steps are now taken.**
+>
+> **The `2 of 30` is a union, and clause 2's own reading is `1` — C42, the forty-seventh.** §3.3 and
+> `design.md` §6.6 property 2 both state *"`2 of 30` on the body/`Map` clauses"*. Per clause the
+> readings are **2 / 1 / 2**: `index_project.ts` carries **zero** `Map`/`Set` state, so clause 2
+> flags `read_file.ts` alone. R-39 calls the *third* clause's value prospective because it flags no
+> file the other two miss; measured, **clause 2's RED set is a strict subset of both**, so the same
+> sentence is true of it and no artifact said so. Author level; owed to `design.md` (T20b, §8.1
+> row 13), **not** to the parent.
+>
+> **The span anchor is split per file, and one orphan is gate-relevant — C43, the forty-eighth.**
+> `read_file.ts`'s cited spans are **comment-inclusive** at all 8 sites carrying a comment;
+> `index_project.ts`'s are **declaration-only** at both, orphaning `executeIndexing`'s 8-line doc
+> `:246-253` (**T13**) and the managed-run lease's 7-line `// ── Wave 5 FR-09:` block `:151-157`
+> (**T14b**). The second matters to the gate: that comment sits **inside `handle()` `:117-244`**,
+> whose span is measured **including comment lines**, so T14b's planned `128 → ~87` lands at **~94**
+> and spends 7 of the 33 lines of margin its row prices. `design.md` §5.1's own **~110** LOC estimate
+> is the arithmetic tell — comment-inclusive **106**, declaration-only **98**. Both rows amended in
+> place; **C33's conclusion does not move**. Author level; owed to `design.md` (T20b, §8.1 row 14).
+>
+> **The result a resumer should carry forward: the frozen base is a claim about the tree, not about
+> the rule.** Seven copies of the gate with only `isViolation`'s body patched, an inert control, and
+> a baseline copy byte-identical to the shipped gate — **deleting any one of the three clauses leaves
+> the entire report byte-identical**, verdict, every span, every state site and the population line.
+> T4b found 10 of 13 *internal* mutations invisible to the live-tree run; this is **3 of 3** at
+> whole-clause granularity. It does **not** falsify §3.3's per-member rationale, which is about the
+> AST enumerating correctly and holds — AC-4's suite is the sensor that covers the rule, and the two
+> are complementary. R-40 already sends T25 to re-run per clause; what T5 adds is that **the
+> per-clause reading is not derivable from the default report at all**, because the report is
+> organised by file. It needs `--json` or a patched gate.
+>
+> **Both Plan Challenge modes independently caught the same figure, and it was the author's.**
+> *"§5.1's ~110 matches the comment-inclusive count 108"* → measured **106**. The 108 came from an
+> earlier instrument anchored at `:244` — **`handle()`'s own closing brace** — whose control had
+> already failed once and been rewritten; the figure was carried forward from the run that produced
+> it rather than re-derived. The red-team's finding was sharper still: **the author's span sweep was
+> structurally blind to T14b**, because its population was *declared members* (what
+> `ts.getLeadingCommentRanges` reaches from a declaration node) while the task rows cite **plain code
+> ranges**. Re-run over all **26** cited spans. Its own location for that comment was off by one
+> (`:150-156` stated, `:151-157` measured). *An anchor audit is only as complete as its definition of
+> the thing anchored.*
+>
+> **Transcription verified rather than proofread**, which is new here and worth keeping: the fenced
+> gate block diffs **byte-identical** against the live run, and both per-member tables are parsed
+> back out of `tasks.md` and checked **cell by cell** against the gate's `--json` — **72 assertions,
+> 0 mismatches**. Its first run reported `row count 0`, which was the parser and not the table.
+>
+> **Gates.** T5's write set is `.specs/`-only and this was measured rather than asserted, because one
+> check came back the other way first: `check-stale-pointers` **does** scan tracked files repo-wide
+> and `test:scripts` runs it — but `.specs/` is the **second entry in its `EXCLUDED` list**, and of
+> the 15 suites under `scripts/__tests__` naming `.specs/`, 13 name it only in prose and the 3 that
+> read files read another feature's frozen fixtures. `check-tools-thin` after `git add`
+> byte-identical, exit 1. `test:scripts` exit **0**, **1114** pass / 0 fail across **49** files —
+> T4b's figure unchanged, as it must be. The four prior pure-`.specs/` commits on this branch
+> recorded no gate battery either; the full six ran on the commits that added tracked code.
+>
+> **Next action: Execute, T6** — `services/cache/lru-evict.ts`, an eviction **function** over
+> `Map<K,V>` importing nothing at all, plus its unit test. **Phase 2, and the first task that moves
+> code.** Ordering is §6 items 4 and 5: **T6 → T7 → T8 → T8b**, and **Phase 2 entirely before Phase
+> 3** — the LRU move is provable behavior-preserving only while both `read_file.ts` caches are still
+> in `read_file.ts`. T1's suites must pass **unmodified** across T7, asserted by SHA-256, and T8b is
+> the row C35 minted at T1 that nothing wrote until T4b. From T6 the six-gate battery applies again.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
