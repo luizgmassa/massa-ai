@@ -224,6 +224,10 @@ all state came from `.specs/` and source reads.
   repoint; new task **T8b**). **T2 done `ee578b2`** — record in `tasks.md` §10.2. RFS-06 AC-1, AC-2
   and AC-3 all close. **T3 done `f2222d3`** — record in `tasks.md` §10.3. R-31 and GMS-05 AC-1
   close; **Phase 0 is complete**. Six gates plus `check-core-layering` green at all three.
+  **T4a done `180f7d2`** — record in `tasks.md` §10.4. `scripts/check-tools-thin.ts`, 524 lines,
+  three clauses over a TypeScript AST; **RFS-01 AC-2 and AC-6 close**, as does AC-1's
+  population-print clause (AC-1's *"exits 0"* and *"runs in CI"* conjuncts are **T15's**). Reads
+  `FAIL — 2 of 30` and exits **1**, which is the intended Phase 1 state. **Phase 1 is started.**
 - **C37 is the forty-second plan defect, and the first on this feature to amend a criterion rather
   than a figure.** RFS-06 shape (c)'s prescribed assertion — *"no literal `..` segment"* — is
   **vacuous**: `path.resolve` normalizes `..` away on every exit, and a probe written to the clause's
@@ -237,10 +241,24 @@ all state came from `.specs/` and source reads.
   sit behind a `catch { return }`. R-31 was rewritten for citing another tool's *fixture* and its
   replacement then credited another tool's *assertion*. Author level; owed to `design.md` (T20b,
   §8.1 row 7), **not** to the parent — R-31 has no parent criterion behind it.
-- **Next action: Execute, T4a** — `scripts/check-tools-thin.ts`, the first file of Phase 1.
-  Phase 0 is complete and nothing structural moves until T6. **T5 (the frozen base reading) cannot
-  be taken until T4a writes the gate script** — the dependency `design.md` §11 does not state — and
-  **T5 must precede T9**.
+- **C39 is the forty-fourth plan defect, and its tell was the document's own subtraction.**
+  `design.md` §6.5's two raw body figures are measured under **two different constructor
+  conventions** — `read_file.ts`'s **18** counts the constructor, `index_project.ts`'s **3** does
+  not, and 18 / 3 is a pair no single convention produces (17 / 3 exempt, 18 / 4 counted). The
+  named nested list is short by one: 13 plus the four named arrows is **17**, and the fifth item is
+  the constructor entry, not a nested arrow. **The maximal figures 13 and 3 are identical under
+  both conventions**, so RFS-01 AC-3's frozen base is untouched and no decision moves. Author
+  level; owed to `design.md` (T20b, §8.1 row 8), **not** to the parent — §6.5 is Design's own
+  instrument note with no criterion behind it.
+- ~~**Next action: Execute, T4a**~~ **Next action: Execute, T4b** —
+  `scripts/__tests__/check-tools-thin.test.ts`, closing **RFS-01 AC-4 and AC-5**. **Fixtures must
+  be synthetic** (`check-core-layering.test.ts`'s `mkdtemp` precedent, `design.md` §6.6 property 5):
+  `test:scripts` auto-discovers `scripts/__tests__/` and `ci.yml:200` runs it inside `build`, so a
+  live-tree `2 of 30` assertion goes red at Phase 3 and makes §1.1's per-phase-green promise false.
+  **T4b owes a multi-line-signature fixture specifically** — T4a measured that the `handle()`
+  full-span and body-block-only metrics are numerically identical across all 27 files, so today's
+  corpus **cannot falsify the metric choice** (`design.md` §6.4 item 4's class). Then **T5**, the
+  frozen base reading, which **must precede T9**. Nothing structural moves until T6.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed

@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — Phase 0 complete**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — Phase 1 started**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, 28 task rows, eight phases, **78 distinct
 > files**. Everything below this block was written before Tasks and is kept as the record; where it
@@ -104,12 +104,64 @@
 > visible in the aggregate log. **Warm re-run: 11/11 tasks, 0 cached, exit 0.** The 5001 ms class
 > `CLAUDE.md` documents; both readings are recorded rather than only the green one.
 >
-> **Next action: Execute, T4a** — `scripts/check-tools-thin.ts`, the first file of Phase 1 and the
-> three-clause gate over a TypeScript AST (never a regex, C32). Then T4b, then T5. **T5 cannot be
-> taken until T4a writes the gate script** — the ordering dependency `design.md` §11 does not state —
-> and must be taken before T9. **T4b's fixtures must be synthetic**: `test:scripts` auto-discovers
+> ~~**Next action: Execute, T4a.**~~ **T4a DONE — `180f7d2`. Phase 1 is started.** Its record is
+> `tasks.md` §10.4 — `scripts/check-tools-thin.ts`, 524 lines, three clauses over a TypeScript AST;
+> RFS-01 **AC-2 and AC-6 close**, as does AC-1's population-print clause. Reads
+> `FAIL — 2 of 30 file(s) over the rule; 27 declare an IToolHandler class, 3 do not; 224 members
+> examined` and exits **1**, which is the intended Phase 1 state — AC-1's *"exits 0"* and *"runs in
+> CI"* conjuncts are **T15's**, and both task rows already claim AC-1, so it is a split criterion
+> rather than a defect. Not restated here.
+>
+> **C39 is the forty-fourth plan defect and its tell was the document's own subtraction.**
+> `design.md` §6.5's two raw body figures use **two different constructor conventions** —
+> `read_file.ts`'s **18** counts the constructor, `index_project.ts`'s **3** does not, and **18 / 3
+> is a pair no single convention produces** (17 / 3 exempt, 18 / 4 counted). Its named nested list
+> is short by one: 13 plus the four named arrows is **17**, the fifth item being the constructor
+> entry, which is not a nested arrow. **The maximal figures 13 and 3 are identical under both
+> conventions**, so RFS-01 AC-3's frozen base is untouched. Author level on the C34/C35/C37/C38
+> precedent; owed to `design.md` (**T20b**, §8.1 row 8) and **not** to the parent. Re-decide only if
+> you disagree.
+>
+> **Three gate findings changed the file before it was written, and two were closed in code rather
+> than documented.** Clause 2 gains a **third** state site — the constructor is exempt from clause 1
+> *by kind*, so `private cache: unknown` plus `constructor() { this.cache = new Map(); }` declared no
+> body and carried no `Map` in its own declaration and passed all three clauses. `static {}` blocks
+> joined the body predicates. And `IToolHandler` is now resolved to its **local binding name**, so
+> `import { IToolHandler as H }` can no longer drop a handler out of the population silently — a
+> population that shrinks without an error is the exact defect this gate replaces. Measured **0**
+> occurrences of all three on the tree, so the base reading cannot have moved.
+>
+> **Three evidence-audit `high` verdicts were re-measured and all three rejected as stated.**
+> *"`6 of 30` does not reproduce"* — it is a **union** (2 body-RED ∪ 4 field-shape), and the critic
+> compared a subset count to it. *"`2 of 30` rests on an unstated scoping assumption"* — the scope is
+> stated in C32's rule box and §6.4 item 3, though its substance is kept: `serialize.ts` is 438 lines
+> with **11** bodies and the gate is blind to it, now named in the docblock as the largest blind
+> spot. *"`index_project.ts` is 4"* — that is the ctor-counted reading of a ctor-exempt rule, and it
+> is what surfaced C39 from the opposite end to the pre-mortem's finding 1. **Fourteenth time on this
+> feature that a critic's mechanism held while a figure did not.**
+>
+> **`bun run test` failed twice and it was not PR-D's — 48 orphaned busy-loops from another
+> project.** Disjoint failing sets across two runs, all failing files zero-diff against `main`, no
+> code importing the new script, Postgres measured at **259 ms** per round-trip reproducing a logged
+> `Inserted 100 docs in 22236ms`, and host **load average 209**. Cause: `~/Projects/massa-vault`'s
+> load-simulation script (`for i in $(seq 1 24); do (while :; do :; done) & done`) run twice, whose
+> trailing `kill $HOGS` never reaped them because `jobs -p` in a non-interactive `zsh -c` does not
+> capture backgrounded subshells. Reaped with the user's approval: zsh **56 → 8**, load **209 → 68**,
+> Postgres **259 ms → 22.9 ms**. **Run 3 clean: 11/11 tasks, 0 cached, exit 0, 1m00s** against 7m33s
+> on the identical tree. All three readings are kept. *A gate reading taken on a loaded host is not a
+> reading — and the load may not be yours.* **Unrelated but owed to the user: that script wraps its
+> work in `git stash -q` … `git stash pop -q` and died before the pop, so `massa-vault` may still
+> have a stashed working tree.** PR-D touched nothing there.
+>
+> **Next action: Execute, T4b** — `scripts/__tests__/check-tools-thin.test.ts`, closing **RFS-01
+> AC-4 and AC-5**. Then T5. **T4b's fixtures must be synthetic**: `test:scripts` auto-discovers
 > `scripts/__tests__/` and `ci.yml:200` runs it inside `build`, so a live-tree `2 of 30` assertion
-> goes red at Phase 3 and makes §1.1's per-phase-green promise false.
+> goes red at Phase 3 and makes §1.1's per-phase-green promise false. **T4b owes a
+> multi-line-signature fixture specifically** — T4a measured that `handle()`'s full-span and
+> body-block-only metrics are **numerically identical across all 27 files**, so today's corpus
+> *cannot falsify the metric choice*; that is `design.md` §6.4 item 4's class, and T4a's 18 shapes
+> were run against the shipped analyzer but are **not** a substitute for the suite. T5 must precede
+> **T9**.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
