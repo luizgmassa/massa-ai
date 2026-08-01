@@ -153,15 +153,71 @@
 > work in `git stash -q` … `git stash pop -q` and died before the pop, so `massa-vault` may still
 > have a stashed working tree.** PR-D touched nothing there.
 >
-> **Next action: Execute, T4b** — `scripts/__tests__/check-tools-thin.test.ts`, closing **RFS-01
-> AC-4 and AC-5**. Then T5. **T4b's fixtures must be synthetic**: `test:scripts` auto-discovers
-> `scripts/__tests__/` and `ci.yml:200` runs it inside `build`, so a live-tree `2 of 30` assertion
-> goes red at Phase 3 and makes §1.1's per-phase-green promise false. **T4b owes a
-> multi-line-signature fixture specifically** — T4a measured that `handle()`'s full-span and
-> body-block-only metrics are **numerically identical across all 27 files**, so today's corpus
-> *cannot falsify the metric choice*; that is `design.md` §6.4 item 4's class, and T4a's 18 shapes
-> were run against the shipped analyzer but are **not** a substitute for the suite. T5 must precede
-> **T9**.
+> ~~**Next action: Execute, T4b.**~~ **T4b DONE — `e0ebf17`.** Its record is `tasks.md` §10.5 —
+> RFS-01 **AC-4 and AC-5 both close**, 96 cases and 258 assertions, thirteen mutations of the gate
+> plus an inert control. Not restated here.
+>
+> **It shipped two files, not one, and the second is an amendment to T4a's gate.** AC-5 lists *"an
+> object-literal handler that is not a class"* among its evasion shapes and says in the same sentence
+> that omitting one would be C21's shape aimed forward. **Measured against the gate as T4a shipped
+> it, an object literal carrying a 200-line `handle()` *and* a module-level `Map` read PASS** —
+> `analyzeSource` returns early with no class to check, so neither clause is ever evaluated. Five of
+> six shapes caught; the sixth needed the population predicate to move. **C40**, the forty-fifth plan
+> defect, and C33's shape inside the task that closes the clause. **Decided by the user from three
+> options**; striking the shape from AC-5 and deferring to a new task were rejected. The widened
+> live-tree reading is **byte-identical** — `2 of 30`, 224 members, every span unchanged — so
+> **RFS-01 AC-3's frozen base is untouched** and T5 is unaffected. Only the population label lost the
+> word *"class"*, so T4a's quoted string is stale by one word and by no figure.
+>
+> **The Plan Challenge gate found a false positive in the widening itself, in code the author's own
+> probes had already validated.** Clause 2's module-level walk has no `handle()` exemption — a class
+> method's locals are never module-level statements, but an object literal puts `handle()`'s body
+> *inside* a `VariableStatement`. A `Map` built and consumed inside `handle()` read RED where the
+> class form reads PASS. All three author probes referenced an *outer* cache and could not have
+> caught it. Closed before authorship. *When a population widens, re-check every clause's exemption
+> against the new scope, not just the membership predicate.*
+>
+> **C41 is the forty-sixth and it strikes a criterion three documents had already contradicted.**
+> RFS-01 AC-4's *"a legal public method added must stay PASS"* is **falsified by C32**, which
+> replaced *"no private method"* with *"a declared function body"* — visibility is never consulted.
+> Measured **RED**. `design.md` §6.5 already listed a public method among C32's subsumed shapes,
+> §6.6 property 4 had substituted `serialize.ts` as the inert control **without striking anything**,
+> and T4b's own row listed *"public method"* as a shape it must assert RED. Amended in place with its
+> reason; **handed to T25 as a question** alongside C37's and AC-2's. Author level on the
+> C34/C35/C37/C38/C39 precedent. *A criterion superseded in substance does not strike itself, and a
+> document that quietly substitutes a different subject reads as agreement.*
+>
+> **The mutation table's second column is the result a resumer should carry forward.** The subject is
+> the gate, so there is no population of existing suites that could guard it — nothing else imports
+> it. What was measured instead: **ten of thirteen mutations of the rule are invisible to the
+> live-tree run, and the `2 of 30` verdict does not move under a single one of them**, not even the
+> three whose output changes. ***"The gate still reads `2 of 30`" is not evidence the rule is
+> intact*** — it is evidence about two files. That is R-40's concern one level further out than R-40
+> states, and AC-4 was the only thing that could establish it.
+>
+> **Three corrections landed that are not T4b's own work.** **T8b existed only in C35's prose for
+> four tasks** — no `§5` row, no write-set entry — so `§1`'s table was short by two files and the
+> Status line by one task: **28 / 78 → 29 / 80**, and the row now exists. `§10.4`'s *"both task rows
+> already claim AC-1"* is **three** (T4a, T14b, T15). And `design.md` §6.5's nine-case table is
+> `declaresBody()`'s truth table, **not** `BodyFinding.kind`'s — an arrow class property is flagged
+> as `ArrowFunction`, and the table omits `SetAccessor` entirely. **Second figure in that one table
+> not to survive being re-run, after C39.** The handoff figure claiming §5 enumerates 29 rows does
+> **not** reproduce — §5 had 28 and the 29 is the distinct-task total including T8b.
+>
+> **Two fixture lessons worth more than their size.** The first draft's five ceiling cases were **all
+> off by one and all green** — they asserted a wrong span, then a verdict consistent with it. The
+> `repeat(n)` offset is a property of the fixture's own shape (`n+2` in T4a's probes, `n+3` in the
+> suite's helper) and the figure was carried across shapes. And **the metric choice is falsifiable
+> only in a 4-line window** (full span 121–124); `design.md` §6.4 item 4's named `{` brace fixture
+> discriminates at **exactly one** span, while the `}` form discriminates across the whole range.
+> Sized anywhere else, both are inert.
+>
+> **Next action: Execute, T5** — RFS-01 AC-3's frozen base reading, the fourth non-retroactive step
+> and the first by dependency. Run the gate **after `git add`** and transcribe `tasks.md` §3.3's
+> table **per member with line spans**; it is a record in `tasks.md`, **not a test**. Note two things
+> T4b measured that change what T5 writes: an **arrow-property body reports `name: "ArrowFunction"`**
+> rather than its member name, so at least one of `read_file.ts`'s 13 will read that way, and the
+> population line now says `27 declare an IToolHandler` without *"class"*. **T5 must precede T9.**
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.

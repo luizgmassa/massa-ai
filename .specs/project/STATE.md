@@ -228,6 +228,11 @@ all state came from `.specs/` and source reads.
   three clauses over a TypeScript AST; **RFS-01 AC-2 and AC-6 close**, as does AC-1's
   population-print clause (AC-1's *"exits 0"* and *"runs in CI"* conjuncts are **T15's**). Reads
   `FAIL — 2 of 30` and exits **1**, which is the intended Phase 1 state. **Phase 1 is started.**
+  **T4b done `e0ebf17`** — record in `tasks.md` §10.5. `scripts/__tests__/check-tools-thin.test.ts`,
+  96 cases / 258 assertions, synthetic fixtures only; **RFS-01 AC-4 and AC-5 close**. It shipped
+  **two files**: AC-5 could not be closed against the gate as T4a shipped it, so the gate is amended
+  too (**524 → 614 lines**). Six gates plus `check-core-layering` green — `test:scripts` **1114 / 0
+  across 49 files**, edges **965 unchanged**, files 901 → 902.
 - **C37 is the forty-second plan defect, and the first on this feature to amend a criterion rather
   than a figure.** RFS-06 shape (c)'s prescribed assertion — *"no literal `..` segment"* — is
   **vacuous**: `path.resolve` normalizes `..` away on every exit, and a probe written to the clause's
@@ -250,15 +255,41 @@ all state came from `.specs/` and source reads.
   both conventions**, so RFS-01 AC-3's frozen base is untouched and no decision moves. Author
   level; owed to `design.md` (T20b, §8.1 row 8), **not** to the parent — §6.5 is Design's own
   instrument note with no criterion behind it.
-- ~~**Next action: Execute, T4a**~~ **Next action: Execute, T4b** —
-  `scripts/__tests__/check-tools-thin.test.ts`, closing **RFS-01 AC-4 and AC-5**. **Fixtures must
-  be synthetic** (`check-core-layering.test.ts`'s `mkdtemp` precedent, `design.md` §6.6 property 5):
-  `test:scripts` auto-discovers `scripts/__tests__/` and `ci.yml:200` runs it inside `build`, so a
-  live-tree `2 of 30` assertion goes red at Phase 3 and makes §1.1's per-phase-green promise false.
-  **T4b owes a multi-line-signature fixture specifically** — T4a measured that the `handle()`
-  full-span and body-block-only metrics are numerically identical across all 27 files, so today's
-  corpus **cannot falsify the metric choice** (`design.md` §6.4 item 4's class). Then **T5**, the
-  frozen base reading, which **must precede T9**. Nothing structural moves until T6.
+- **C40 is the forty-fifth plan defect: AC-5's sixth evasion shape was the one the gate could not
+  see.** RFS-01 AC-5 lists *"an object-literal handler that is not a class"* and says omitting one
+  would be C21's shape aimed forward. **Measured — an object literal with a 200-line `handle()` and
+  a module-level `Map` read PASS**, because `analyzeSource` returns early with no class to check.
+  Five of six caught; the sixth needed the population predicate to move, which is **C33's shape
+  inside the task that closes the clause**. **Decided by the user, 2026-08-01**, from three options;
+  the population now admits an object literal claiming the interface by annotation, `satisfies` or
+  `as`. The widened live-tree reading is **byte-identical**, so **AC-3's frozen base is untouched**.
+  The Plan Challenge gate then found a **false positive in the widening itself** — clause 2's
+  module-level walk has no `handle()` exemption, and an object literal puts `handle()`'s body inside
+  a `VariableStatement` — which the author's own three probes could not have caught, all having
+  referenced an *outer* cache.
+- **C41 is the forty-sixth, and it strikes a criterion three documents had already contradicted.**
+  RFS-01 AC-4's *"a legal public method added must stay PASS"* is **falsified by C32**: the
+  predicate is a declared body, so visibility is never consulted. Measured **RED**. `design.md`
+  §6.5 listed a public method among C32's subsumed shapes, §6.6 property 4 had substituted a
+  different inert control without striking anything, and T4b's own row listed *"public method"* as a
+  RED shape. Amended in place; **handed to T25 as a question** alongside C37's and AC-2's. Author
+  level on the C34/C35/C37/C38/C39 precedent.
+- **T4b's mutation table measured a premise nothing had tested: ten of thirteen mutations of the
+  rule are invisible to the live-tree run, and the `2 of 30` verdict moves under none of them.**
+  *"The gate still reads `2 of 30`"* is not evidence the rule is intact — R-40's concern one level
+  further out than R-40 states.
+- **Three corrections landed at T4b that are not its own work.** **T8b existed only in C35's prose
+  for four tasks** — no §5 row, no write-set entry — so the task/file totals were **28 / 78** and are
+  **29 / 80**; §10.4's *"both task rows claim AC-1"* is **three**; and `design.md` §6.5's nine-case
+  table is `declaresBody()`'s truth table, not `BodyFinding.kind`'s — **second figure in that table
+  not to survive being re-run, after C39**.
+- ~~**Next action: Execute, T4b**~~ **Next action: Execute, T5** — RFS-01 AC-3's frozen base
+  reading, the fourth non-retroactive step and the first by dependency. Run the gate **after
+  `git add`** and transcribe `tasks.md` §3.3's table **per member with line spans**; it is a record
+  in `tasks.md`, **not a test**. Two T4b findings change what T5 writes: an arrow-property body
+  reports `name: "ArrowFunction"` rather than its member name, and the population line now reads
+  `27 declare an IToolHandler` without *"class"*. **T5 must precede T9.** Nothing structural moves
+  until T6.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed
