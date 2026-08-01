@@ -7,8 +7,10 @@
 - **Base**: `main` @ `f06b01d` (the v1.17.0 release bump on PR-C's merge `2bea11e`)
 - **Status**: **Tasks complete**, 2026-07-31. **Full Plan Challenge gate run** (§7). Execute not
   started.
-- **28 task rows (T1–T25, with T4 split into T4a/T4b and two tasks the Plan Challenge gate
-  added — T14b and T20b), eight phases, 78 distinct files** as planned.
+- ~~28 task rows~~ → **29 task rows** (T1–T25, with T4 split into T4a/T4b, two tasks the Plan
+  Challenge gate added — T14b and T20b — and **T8b**, minted by C35 at T1 and given its §5 row at
+  T4b), **eight phases**, ~~78~~ → **80 distinct files**. *The 28/78 pair was accurate as planned and
+  went stale the moment Execute amended the plan; see §1's table and §10.5.*
   §1's table is the planning estimate;
   read it against **R-25** (PR-C planned 104 and shipped **222**, 2.1×) and leave it as written when
   the measured outcome diverges — the divergence is the record.
@@ -33,22 +35,30 @@ the per-task write sets only Tasks produces. Those sets are now measured, repo-w
 | --- | --- | --- | --- |
 | **0 — instrument before moving** | **5** | 5 | 4 new characterization suites + this document |
 | **1 — the gate** | **3** | 2 | `check-tools-thin.ts` + its unit suite + this document (T5's reading) |
-| **2 — LRU** | **7** | 2 | `services/cache/lru-evict.ts` + its unit test + **4** repointed sites + `read-file.test.ts` |
-| **3 — the extraction** | **13** | 12 | `read_file.ts` + **6** modules + **6** module suites |
+| **2 — LRU** | ~~7~~ → **9** | 2 | `services/cache/lru-evict.ts` + its unit test + **4** repointed sites + `read-file.test.ts` + **T8b's 2 comment sites** |
+| **3 — the extraction** | ~~13~~ → **14** | 12 | `read_file.ts` + **6** modules + **6** module suites + **C34's `read-file.test.ts` repoint** |
 | **4 — `index_project.ts`** | **9** | 6 | 1 handler + **3** modules + 3 module suites + **2** test repoints |
 | **5 — the gate goes green** | **1** | 0 | `.github/workflows/ci.yml` |
 | **6 — the rename** | **29** | 0 | **7** `git mv` + **19** external importers + **3** prose/fixture sites |
 | **7 — the record** | **16** | 1 | RFS-04's 5 + RFS-05's 9 + `design.md` (T20b) + `validation.md` |
-| **sum** | **83** | **28** | |
-| **distinct union** | **78** | | against PR-C's planned **104** and PR-B's **37** |
+| **sum** | ~~83~~ → **86** | **28** | |
+| **distinct union** | ~~78~~ → **80** | | against PR-C's planned **104** and PR-B's **37** |
 
-**The phases are not disjoint, and the sum is not the review surface.** Measured: **5** files are
-touched by two phases each, which is what takes 83 to 78.
+**Both figures are corrected at T4b (§10.5), and neither correction is T4b's own work** — they are
+the two amendments §10 recorded without carrying back into this table. **C35** minted T8b with two
+brand-new files (`production-wiring.ts`, `invalidator-registry.ts`), which appeared in no phase row;
+**C34** added `read-file.test.ts` to T10, a file Phase 2 already carried. So the sum rises by 3 and
+the union by 2 — C34's file is already inside the distinct set, and what it adds is a **sixth**
+overlap rather than a seventy-ninth file. *An execute-time amendment that adds a file is a claim
+about the planning table, and nothing was watching that table.*
+
+**The phases are not disjoint, and the sum is not the review surface.** Measured: ~~**5**~~ → **6**
+files are touched by two phases each, which is what takes ~~83 to 78~~ → **86 to 80**.
 
 | overlap | files |
 | --- | --- |
 | Phase 0 ∩ Phase 1 (**1**) | **this document** — created at Phase 0, and T5 writes the frozen reading into it. Reported by the Plan Challenge gate (§8, evidence finding 2); the first draft's per-phase rows omitted it and it self-cancelled in the union, which is how it survived a check that only verified the total |
-| Phase 2 ∩ Phase 3 (**1**) | `packages/core/src/tools/read_file.ts` — the LRU repoint, then the extraction |
+| Phase 2 ∩ Phase 3 (~~**1**~~ → **2**) | `packages/core/src/tools/read_file.ts` — the LRU repoint, then the extraction; and **`read-file.test.ts`** — T8's eviction repoint, then **C34**'s undefined-metadata repoint at T10 |
 | Phase 6 ∩ Phase 7 (**3**) | `scripts/check-coverage.ts`, `scripts/__tests__/check-coverage.test.ts`, `CLAUDE.md` |
 | Phase 6 ∩ Phases 0–5 | **none** — measured, and it is what made Phase 6 the cut candidate |
 
@@ -451,7 +461,7 @@ unchanged, and `check-tools-thin` does not exist yet.
 | # | task | write set | closes |
 | --- | --- | --- | --- |
 | **T4a** | **`scripts/check-tools-thin.ts`** — three clauses over a **TypeScript AST**, never a regex: no function body declared anywhere in a file declaring an `IToolHandler` class except inside `handle()`'s own; ~~no `Map`/`Set` instance **or module-level** state~~ → **no `Map`/`Set` state at any of *three* sites — class field, module level, and `this.x = new Map()` assignment** (§10.4): the constructor is exempt from clause 1 **by kind**, so `private cache: unknown` plus `constructor() { this.cache = new Map(); }` declares no body and carries no `Map` in its own declaration, and a two-site clause 2 passes it; `handle()` body ≤ **120**. **File-scoped, not class-scoped** (C32) — a class scope is defeated by a constructor-body closure, which is none of AC-5's six shapes. **Zero allowlist entries, no exemption parameter, no suppression flag** (AC-2). **Prints its examined population on a PASS** (AC-1), on `check-core-layering.ts:277-282`'s `edgesExamined` precedent — *"a check that resolved nothing also reports zero violations, and the two must not read the same."* **Docblock names what it does not certify** (AC-6): a delegating `handle()` reads identically whether its delegate is correct or subtly wrong | 1 new script | **RFS-01 AC-1, AC-2, AC-6** |
-| **T4b** | **`scripts/__tests__/check-tools-thin.test.ts`** — **synthetic fixtures only**, on `check-core-layering.test.ts`'s `mkdtemp` precedent, **never a live-tree count** (`design.md` §6.6 property 5): `bun test scripts/__tests__` auto-discovers and `ci.yml:200` runs it inside `build`, so a `2 of 30` assertion written here goes red at Phase 3 and makes §1.1's per-phase-green promise false. **Both directions observed red plus an inert control** (AC-4). **AC-5's fail shapes**: private method, public method, getter/setter, `static`, `#private`, arrow-function class property, module-level `const cache = new Map()`, object-literal handler, **the constructor-body closure**, and a `handle()` containing a string like `"unexpected token: {"` — the last because a careful and a naive brace counter are byte-identical on today's corpus, so the corpus **cannot falsify** a naive reimplementation. **Assert the nine member-kind classifications directly** so a `typescript` bump fails `test:scripts` rather than the gate (R-33) | 1 new test file | **RFS-01 AC-4, AC-5** |
+| **T4b** | **`scripts/__tests__/check-tools-thin.test.ts`** — **synthetic fixtures only**, on `check-core-layering.test.ts`'s `mkdtemp` precedent, **never a live-tree count** (`design.md` §6.6 property 5): `bun test scripts/__tests__` auto-discovers and `ci.yml:200` runs it inside `build`, so a `2 of 30` assertion written here goes red at Phase 3 and makes §1.1's per-phase-green promise false. **Both directions observed red plus an inert control** (AC-4) — ~~and a legal public method staying PASS~~ → **the inert control is a file declaring no handler**, `design.md` §6.6 property 4's subject, because a public method is **RED** under C32 (**C41**, §10.5). **AC-5's fail shapes**: private method, public method, getter/setter, `static`, `#private`, arrow-function class property, module-level `const cache = new Map()`, object-literal handler, **the constructor-body closure**, and a `handle()` containing a string like `"unexpected token: {"` — the last because a careful and a naive brace counter are byte-identical on today's corpus, so the corpus **cannot falsify** a naive reimplementation. **Assert the nine member-kind classifications directly** so a `typescript` bump fails `test:scripts` rather than the gate (R-33) — but **derive them by running the gate, not by transcribing `design.md` §6.5's table**, which is `declaresBody()`'s truth table and not `BodyFinding.kind`'s (**C40**, §10.5). ~~1 new test file~~ → **2 files**: the object-literal shape read **PASS** against the gate as shipped, so closing AC-5 needs `check-tools-thin.ts` too | 1 new test file **+ 1 gate amendment** | **RFS-01 AC-4, AC-5** |
 | **T5** | **RFS-01 AC-3's frozen base reading — the fourth non-retroactive step, first by dependency.** Run T4a's script after `git add`, record §3.3's table **per member with line spans** into this file. Not a test (§3.5 item 4, `design.md` §6.6 property 5) | this file | **RFS-01 AC-3** |
 
 ### Phase 2 — the LRU, behavior-preserving
@@ -461,6 +471,7 @@ unchanged, and `check-tools-thin` does not exist yet.
 | **T6** | **`packages/core/src/services/cache/lru-evict.ts`** — an eviction **function** over `Map<K,V>`, not a cache class (AC-2), importing **nothing at all**. **AC-3's original property is gone**: `services/cache/` is not `kernel/`, so `check-core-layering`'s leaf-ness clause does not constrain it. The replacement is asserted by the module's own unit test, and that is a **real loss of CI enforcement**, recorded rather than glossed (R-29) | 1 new module + 1 new test | **RFS-02 AC-2, AC-3** |
 | **T7** | **Repoint the four sites** — `read_file.ts` (**3** call sites: `:169`, `:462`, `:570`, §3.5 item 6), `symbol-graph.service.ts:808`, `web-controller.ts:138`, `file-filter-cache.ts:82`. **No site's TTL or read-promotion moves.** T1's suites must pass **unmodified** — assert byte-identity by SHA-256 across the commit, on `validation.md` §1's evidence shape, not "the tests are green now" | 4 files | **RFS-02 AC-1** |
 | **T8** | **Repoint `read-file.test.ts`'s eviction test** (`:264-272`), which reaches four private members and cannot survive T7 unmodified. **GMS-05 AC-3: repointed, not weakened, skipped or deleted** — the CAP+1 eviction and hot-key-promotion assertions must still run, against the module | 1 file | GMS-05 AC-3 |
+| **T8b** | **The two comments RFS-02 AC-4 requires corrected — `production-wiring.ts:67-68` and `invalidator-registry.ts:34-36`.** Both state the same false claim and the **named site cites the unnamed one as its authority**, so correcting only the named one leaves a reader who follows its own pointer at the uncorrected claim (**C35**, §10.1). Corrected to state what T1's pin measured: `CACHE_TTL` is enforced, `ROOT_CACHE_TTL` is **not**, and no invalidator id matches `read_file`. **Added by C35 at T1; this row was created at T4b** — C35 resolved the defect and named the task but never wrote a row for it, so for four tasks T8b existed only in §10.1's prose and was absent from §5 and from §1's write-set table (§10.5) | 2 files, comments only | **RFS-02 AC-4** |
 
 ### Phase 3 — the extraction, 490 of 707 lines
 
@@ -657,6 +668,11 @@ Tasks PR corrected it in place rather than deferring:
 | 5 | `design.md` §7 group G | *"6 stale statements"* → **1**; RFS-05 AC-1's six were closed by the Specify commit |
 | 6 | `design.md` §6.6 property 1 | the gate's own files are outside its population whether tracked or not; the stated mechanism does not apply |
 | 8 | `design.md` §6.5 (*"an AST walk that descends into nested arrows reports **18**"*) and §6.6 property 2 | **C39** — the raw body figures for the two RED files are measured under **two different constructor conventions**. `read_file.ts`'s **18** counts the constructor; `index_project.ts`'s **3** does not. Under one convention the pair is 18 / 4, under the other 17 / 3; **18 / 3 is a pair no single convention produces**. §6.5's named nested list is also short by one — 13 + the 4 named arrows is 17, and the fifth item is the constructor entry, which is not a nested arrow. **The maximal figures 13 and 3 are identical under both conventions**, so RFS-01 AC-3's frozen base is untouched (§10.4) |
+
+| 9 | `design.md` §6.5's rule box and §6.4 item 3 | **C40** — the rule box reads *"In a file declaring a class that implements `IToolHandler`"*, and §6.4 item 3 concludes from *"0 files declare a `handle(` without a class"* that the object-literal shape needs no handling. Measured at T4b: an object literal carrying a 200-line `handle()` **and** a module-level `Map` reads **PASS**, which is the disposition RFS-01 AC-5's own last sentence forbids. The population admits an object literal claiming the interface by annotation, `satisfies` or `as` (§10.5) |
+| 10 | `design.md` §6.6 property 4 | **C41** — it names `serialize.ts` as AC-4's inert control while `spec.md` AC-4 names *"a legal public method"*, and substitutes one for the other **without striking the clause it replaces**. The two are not the same subject: one is a file with no handler, the other a member of a green one, and only the first behaves as claimed (§10.5) |
+| 11 | `design.md` §6.5's nine-case table (`:775-785`) | **C40** — the table is the truth table of `declaresBody()` for the **member** node and is not a table of `BodyFinding.kind`; the two diverge for an arrow-function class property, whose flagged node is the nested `ArrowFunction`, reported as `kind: "ArrowFunction"` and **not** `PropertyDeclaration`. The table is also silent on `SetAccessor`, a distinct `ts.SyntaxKind` the gate handles. **Second figure in this table not to survive being re-run**, after C39 (§10.5) |
+| 12 | `design.md` §6.4 item 4 | **C40** — the named fixture, a `handle()` containing `"unexpected token: {"`, discriminates against a naive brace counter at **exactly one span** (120, where the counter overshoots to 121). The `}` form discriminates across the whole range above the ceiling. Sized wrong, the named fixture is inert — the mutation-resolves-to-nothing class this feature recorded at T3 (§10.5) |
 
 These are **T20b**.
 
@@ -1141,7 +1157,8 @@ nor this document states, and each is a real constraint on T12's rewrite:
 One new file, `scripts/check-tools-thin.ts` — **524 lines**, three clauses over a TypeScript AST,
 authored against the unmodified tree. **RFS-01 AC-2 and AC-6 close; AC-1's population-print clause
 closes.** AC-1's other two conjuncts — *"exits 0"* and *"runs in CI inside the `build` job"* — are
-**T15's**, and both task rows already claim AC-1, so this is a split criterion rather than a defect.
+**T15's**, and ~~both task rows~~ → **all three task rows that claim AC-1 — T4a, T14b and T15**
+(measured at T4b, §10.5) — already do, so this is a split criterion rather than a defect.
 At T4a the gate exits **1**, which is the point of it.
 
 The reading, deterministic across two runs (output byte-identical):
@@ -1303,3 +1320,257 @@ mechanism is host CPU starvation from an external process, the failures are not 
 LLM-reaching suites, and it does not reproduce once the host is idle. *A gate reading taken on a
 loaded host is not a reading — and the load may not be yours.*
 
+
+### 10.5 T4b — executed, 2026-08-01
+
+**Two files, not one.** `scripts/__tests__/check-tools-thin.test.ts` — **96 cases in 13 describes,
+258 assertions**, synthetic fixtures only — and an amendment to `scripts/check-tools-thin.ts`
+(**524 → 614 lines**), because AC-5 could not be closed against the gate as T4a shipped it.
+**RFS-01 AC-4 and AC-5 both close.** Unit-level, no database, no live LLM: **870 ms** standalone.
+
+#### C40 — the forty-fifth plan defect: AC-5's sixth evasion shape was the one the gate could not see
+
+`spec.md` RFS-01 AC-5 lists *"an object-literal handler that is not a class"* among six evasion
+shapes and says in the same sentence that leaving one out *"would be C21's shape (a gate reading
+PASS by not looking) aimed forward instead of back."* Measured against the shipped gate:
+
+| fixture | verdict |
+| --- | --- |
+| `export const tool: IToolHandler = { async handle() { …200 lines… } }` **plus** a module-level `new Map()` | **PASS** |
+| the same file with a sibling `function work() {}` | **PASS** |
+| every one of AC-5's other five shapes | RED |
+
+`analyzeSource` returns early when no class implements the interface, so **neither clause 1 nor
+clause 2 is ever evaluated** — the module-level `Map` is not merely unflagged, it is never collected.
+Five of six caught, and the sixth is the only one that needed the population predicate to move.
+
+**This is C33's shape in the task that closes the clause.** T4b's write set was *"1 new test file"*,
+so as scoped it could observe the gap and not close it — a clause and the work meant to close it not
+acting on the same lines, one artifact down from where C33 found it.
+
+**Resolution — the population is a class that implements the interface *or* an object literal that
+claims it. Decided by: the user, 2026-08-01**, from three options with measured consequences; the
+rejected two were striking the shape from AC-5 and recording it as a docblock blind spot, and
+deferring the widening to a new task before T15. `satisfies` and `as` are unwrapped alongside the
+annotation — **measured, both escape an annotation-only predicate**, and AC-5's words cover all three.
+
+**The frozen base is untouched, and that was measured rather than argued.** A patched copy run over
+the live tree is **byte-identical** to the shipped gate's: `2 of 30`, 27 declare / 3 do not, 224
+members, every body span and state site the same. Only the population *label* moved — `27 declare an
+IToolHandler class` → `27 declare an IToolHandler` — because the count is no longer class-only.
+T4a's quoted string is stale by that one word and no figure in it is.
+
+#### The widening's own defect, found by the Plan Challenge gate and not by the author's probe
+
+**A false positive, in the code the plan proposed to ship into a merge-blocking gate.** Clause 1
+carries an `insideHandle` exemption; clause 2's module-level half never needed one, because a class
+method's locals are never module-level statements. An object literal puts `handle()`'s own body
+*inside* a `VariableStatement`, so the same unconditional subtree walk flagged a `Map` built and
+consumed inside `handle()` — legal for a class, and therefore required to be legal here.
+
+| fixture | first widening | class equivalent |
+| --- | --- | --- |
+| local `Map` inside `handle()` | **RED** — `state: [{ tool, module, :2 }]` | PASS |
+
+Closed by scanning a handler object's properties **like class fields** and not scanning its
+declaration as module state. **The author's own 3-fixture validation could not have caught it**: all
+three object-literal probes referenced an *outer* cache and none constructed a local one. *When a
+population widens, re-check every clause's exemption against the new scope, not just the membership
+predicate — the exemption that was implicit in the narrower scope is the one that disappears.*
+
+#### C41 — the forty-sixth: RFS-01 AC-4's third clause is falsified by C32, and was silently replaced rather than struck
+
+AC-4 requires *"a legal public method added must stay PASS **while still being counted**."*
+**Measured: a public method reads RED** (`bodies=1`, `helper [MethodDeclaration]`). AC-4 was written
+against `spec.md` §4.1's *"no private method"*; **C32 replaced that predicate with "a declared
+function body"**, under which visibility is not consulted at all — `declaresBody()` tests node kind
+and nothing else.
+
+**Three documents already disagreed with the clause and none struck it.** `design.md` §6.5 lists
+*"a public method"* among the shapes C32's single clause subsumes; `design.md` §6.6 property 4 names
+a **different** inert control (`serialize.ts`, a file with no handler) without saying it is replacing
+anything; and `tasks.md` T4b's own row lists *"public method"* as a shape it must assert **RED**. So
+the row that closes AC-4 contradicted AC-4, and had done since Tasks.
+
+**Resolution: the struck clause is amended in place with its reason, and `serialize.ts`'s shape is
+the inert control** — a file declaring no handler, PASS **while still counted**, plus a comment-only
+edit that leaves the whole reading unchanged. Author level on the C34/C35/C37/C38/C39 precedent: C32
+is a recorded user decision and `design.md` §6.6 property 4 already supplied the replacement, so only
+the strike was open. **Handed to T25 as a question**, alongside C37's and AC-2's, because it amends a
+criterion rather than a figure. *A criterion superseded in substance by a later decision does not
+strike itself, and a document that quietly substitutes a different subject reads as agreement.*
+
+#### Three counts, three documents, and only one of them still said six
+
+AC-5's shape list was extended **in place in `design.md` three times** — §6.4 item 2 (*"Added to
+RFS-01 AC-5's fail-shape list"*), §6.4 item 4 (*"joins RFS-01 AC-5"*), §6.5 (*"That fixture is added
+to RFS-01 AC-5"*) — while `spec.md` still read *"All six"*, and `tasks.md` T4b enumerated **ten**.
+Three live documents, three counts, no amendment anywhere. Corrected in `spec.md` to **thirteen**
+declared-body shapes, which is what the suite asserts and counts in an assertion of its own.
+*"Added to X's list" written in the document that is not X is a correction with no owner* — PR-C's
+**C19** shape for the third time on this feature.
+
+#### `design.md` §6.5's nine-case table is not a `BodyFinding.kind` source, and C39 was the first warning
+
+R-33 requires the nine member-kind classifications asserted directly, so a `typescript` bump fails
+`test:scripts` rather than the gate. Transcribing the table would have shipped a wrong assertion:
+
+| shape | §6.5 states | measured (`typescript` 5.9.3) |
+| --- | --- | --- |
+| `private helper = async () => {…}` | `true  PropertyDeclaration  helper` | flagged node is the nested `ArrowFunction`; `kind: "ArrowFunction"`, `name: "ArrowFunction"` |
+| `set thing(v) {…}` | *absent from the table* | `SetAccessor` — a distinct kind the gate handles |
+
+The table is the truth table of `declaresBody()` for the **member** node; `BodyFinding.kind` is the
+kind of the node actually **flagged**, and the two diverge for any member whose body lives in a
+nested initializer. `PropertyDeclaration` has no `.body` at all. **Second figure in this one table
+not to survive being re-run** — C39 was the first, at T4a, on its raw-body count. All nine boolean
+verdicts reproduce; only the kind labels do not.
+
+A consequence worth recording for **T5**: an arrow-property body reports `name: "ArrowFunction"`,
+losing the member name, because the flagged node has none. The line span still identifies it, which
+is what AC-3's per-member baseline needs — pinned in the suite so it is a decision on the record
+rather than a surprise when the frozen reading is transcribed.
+
+#### The fixture that missed by one, and why it still passed
+
+The first draft's five ceiling cases were **all off by one and all green** — they asserted the wrong
+span and then asserted a verdict consistent with it. `"\n    void 0;".repeat(n)` yields a span of
+`n + 2` in the shape the T4a probes used and `n + 3` in the shape this suite's helper uses; the
+figure was carried across shapes. **The offset is a property of the fixture, not a constant.**
+Fixed by naming the helper for the span it produces, pinning that arithmetic in a test of its own,
+and re-asserting the achieved span in every boundary case before its verdict. T3 reached the same
+remedy from the other direction (`lineRange.actual.total` pinned per case).
+
+#### The metric choice, falsified off-corpus for the first time
+
+`design.md` §6.4 item 4's class, for clause 3's metric. T4a measured that the `handle()` **full-span**
+and **body-block-only** readings are numerically identical across all 27 live files, because every
+`handle()` in `tools/` opens its brace on the declaration line — *"not evidence the metric is robust;
+evidence the corpus cannot test it."* The fixture the corpus could not supply:
+
+| fixture | full span | body block | gate | a body-block reimplementation |
+| --- | --- | --- | --- | --- |
+| single-line signature, 120 | 120 | 120 | PASS | PASS — **delta 0**, today's corpus reproduced |
+| 5-line generic signature | 121 | 116 | **RED** | **PASS** |
+
+The discriminating window is full-span **121–124**; outside it both metrics agree, so the fixture is
+sized for the window deliberately. `design.md` §6.2's band `[113, 128)` was derived under the
+full-span reading, and this is the only place in the repository where that choice is observable.
+
+The same applies to the brace-in-a-string fixtures, and **the form `design.md` names is the narrow
+one**: a `{` inside `handle()` makes a naive counter overshoot by one, so it discriminates at
+**exactly one span** (AST 120 PASS / naive 121 RED). A `}` makes the counter close two lines in and
+report **2**, so it discriminates across the whole range above the ceiling (AST 121 RED / naive 2
+PASS). Both ship. Sized anywhere else the named one is inert — the mutation-resolves-to-nothing class
+recorded at T3, now in a fixture rather than a mutation.
+
+#### The suite's discrimination, and what the live tree cannot see
+
+Backed up to a scratch copy with SHA-256 byte-identity asserted on restore, refuse-on-anchor-not-found
+and refuse-on-byte-identical on every patch, **never `git checkout`**. Harness
+`~/prd-exec-instruments/t4b-mutations.ts`.
+
+**The second column is different from T2's and T3's, because the subject is the gate.** No population
+of existing suites could guard `check-tools-thin.ts` — nothing else imports it. The premise worth
+measuring instead is the one T4a's reading rests on: **can the live-tree run see these mutations?**
+
+| # | mutation | expected | suite | live-tree run |
+| --- | --- | --- | --- | --- |
+| R1 | `HANDLE_MAX_LINES` 120 → 130 | FAIL | **FAIL** 89p/7f | moved — ceiling only; still `2 of 30` |
+| R2 | clause 3 operator `>` → `>=` | FAIL | **FAIL** 93p/3f | **blind** |
+| R3 | `declaresBody` drops `GetAccessor` | FAIL | **FAIL** 93p/3f | **blind** |
+| R4 | `declaresBody` drops `SetAccessor` | FAIL | **FAIL** 93p/3f | **blind** |
+| R5 | `declaresBody` drops `ClassStaticBlockDeclaration` | FAIL | **FAIL** 93p/3f | **blind** |
+| R6 | `constructsState` stops descending | FAIL | **FAIL** 94p/2f | **blind** |
+| R7 | clause 2 loses its `this.x = new Map()` site | FAIL | **FAIL** 95p/1f | **blind** |
+| R8 | interface resolution reverts to a literal match | FAIL | **FAIL** 95p/1f | **blind** |
+| R9 | **C40 reverted** — object literals leave the population | FAIL | **FAIL** 88p/8f | **blind** |
+| R10 | **C40's `handle()` exemption dropped from clause 2** | FAIL | **FAIL** 94p/2f | **blind** |
+| R11 | `walk` descends unconditionally — maximal becomes raw | FAIL | **FAIL** 94p/2f | moved — 18 → 22 span lines; still `2 of 30` |
+| R12 | the population print loses its member count | FAIL | **FAIL** 94p/2f | moved — the print itself |
+| R13 | comment-only edit (**inert control**) | PASS | **PASS** 96p/0f | **blind** |
+
+**Every row landed as expected**, 1/1 file byte-identical afterwards, and the control's assertion
+count reproduced exactly (258) either side.
+
+**Ten of thirteen mutations are invisible to the live-tree run, and the `2 of 30` verdict does not
+move under a single one of them** — not even the three whose output changes. So *"the gate still
+reads `2 of 30`"* is not evidence the rule is intact; it is evidence about two files. **AC-4's
+requirement that a sensor fail on purpose was the only thing that could establish this, and it had
+never been measured** — T4a's 18 shapes ran against the analyzer and could not speak to the gate's
+own exports, its `git ls-files` path, or its report.
+
+#### Gates, all six plus the layering gate
+
+`lint` exit **0** — proven to bite rather than assumed: a duplicate-declaration probe appended to the
+new suite produced ``error: Identifier `dupProbeT4b` has already been declared`` and exit **1**,
+restored SHA-256-identical (`50db7877…`), lint back to 0. oxlint prints the single line `$ oxlint` on
+success, which is indistinguishable from a gate that did not run, and it remains **the only gate that
+sees either file** — the root `tsconfig.json` has `"include": []`, so `scripts/` is outside every
+`tsc` project. `type-check` **6/6, 0 cached** and `build` **5/5, 0 cached**, both forced.
+`test` **11/11 tasks, 0 cached, 0 isolation FAILs, exit 0, 1m01s**, 180 isolated groups, on a host at
+load **2.6**. `test:scripts` exit **0**, **1114** pass / 0 fail across **49** files — 1018 / 48 at
+T4a, so T4b adds one file and 96 tests. `test:plugins` exit **0**, **96** pass / 0 fail across 8.
+
+**`check-core-layering` after `git add`: `PASS — 0 violation(s) across 965 tier-to-tier edges in 902
+tracked files`.** Read as **edges 965 unchanged; files 901 → 902** — C36's distinction. T4b adds one
+tracked code file; the gate script was already tracked, and the widening imports nothing new.
+
+**R-36 re-verified rather than inherited**, the test file now existing where at T4a it did not: run
+through `check-coverage.ts`'s own `isMeasuredSource`, both `scripts/check-tools-thin.ts` and
+`scripts/__tests__/check-tools-thin.test.ts` return **`false`**. Neither carries coverage-gate
+pressure.
+
+#### The Plan Challenge gate on T4b — two modes, sixteen findings
+
+Both lenses read-only; `git status --porcelain` **and** the gate's SHA-256 checked after each returned
+rather than trusting the agents' own reports — `2c8cc7d6…4b4c`, matching T4a's recorded value.
+Mode selection reuses this feature's recorded route (`spec.md` §9.1, `design.md` §10): Architecture
+pre-mortem/red-team, plus Evidence Audit for the quantitative claims.
+
+**Pre-mortem / red-team — 5 findings. One changed code the plan had already validated.**
+
+| # | finding | disposition |
+| --- | --- | --- |
+| 1 | the widening false-positives a **local** `Map` inside an object-literal `handle()` | **CONFIRMED and it is the finding of this task.** Reproduced against the author's own prototype; the author's three object-literal probes all referenced an outer cache and could not have caught it. Closed in code before authorship |
+| 2 | the AC-5 object-literal gap needs a defect number, not a write-set note | **ACCEPTED** — C40 |
+| 3 | the AC-4/C32 contradiction needs a number tying the strike to its cause | **ACCEPTED** — C41 |
+| 4 | §6.5's nine-case table is not a safe literal source for `kind` | **CONFIRMED**, and the same finding arrived independently from the evidence audit |
+| 5 | exact-line-count fixtures have no construction discipline and the natural idiom misses by one | **CONFIRMED** — measured `repeat(118)` → span 120, and the first draft was off by one on all five |
+
+It also flagged, without measuring, that `satisfies IToolHandler` would escape an annotation-only
+predicate. **Measured: it does, and so does `as`.** Both are now unwrapped. *A critic's unmeasured
+aside is still a lead — the two shapes it named were the two the author had not thought to probe.*
+
+**Evidence audit — 19 claims re-derived with independent parsers. Six do not reproduce.** All six
+re-measured by the author and **all six confirmed**, which is the first pass on this feature where
+no audit finding was rejected. A1–A5 (the live reading, both per-file member counts, the ceiling
+operator, the 13-name export surface) all reproduce exactly.
+
+| # | figure | stated | measured |
+| --- | --- | --- | --- |
+| 1 | AC-4's public-method control | PASS | **RED** — C41 |
+| 2 | `design.md` §6.6 property 4 vs AC-4 | the same control | **two different subjects**, and only the `design.md` one behaves as claimed |
+| 3 | task rows claiming RFS-01 AC-1 | *"both task rows"* (§10.4) | **three** — T4a, T14b, T15. Corrected in §10.4 in place |
+| 4 | §6.5 nine-case table row 2 | `PropertyDeclaration` | **`ArrowFunction`** |
+| 5 | task rows / distinct files | 28 / 78 | **29 / 80** — T8b had no §5 row |
+| 6 | AC-5's shape count | 6 | **three documents, three counts** |
+
+**§5's row count is 28 and always was** — the enumeration is scripted in this record's own method,
+and the handoff figure that said §5 gives 29 does not reproduce. The 29 is the *distinct task* total
+**including** T8b, which is exactly the point: T8b was real, owned, and absent from the table a
+reader enumerates from. Its row now exists, and §1's write-set table carries its two files.
+
+**Fifteenth time on this feature that a critic's mechanism held while a figure did not** — this time
+the author's, twice: the carried-across fixture offset, and three object-literal probes that shared
+a blind spot. Running total: **forty-six** plan defects.
+
+#### What T4b pins that no artifact named
+
+1. **The `2 of 30` verdict is invariant under twelve real mutations of the rule.** A per-file count
+   is not a per-clause check, which is R-40's concern reaching one level further than R-40 states.
+2. **An arrow-property body loses its member name in the report**, so T5's per-member baseline will
+   record `ArrowFunction` with a span for at least one of `read_file.ts`'s 13.
+3. **The `handle()` metric is only falsifiable in a 4-line window** (full span 121–124) and nowhere
+   else, so a single badly-sized fixture would have left the choice unpinned exactly as the corpus
+   does.

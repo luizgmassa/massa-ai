@@ -8,10 +8,11 @@
  * before, during and after this refactor. This file is its replacement, and it
  * checks a different property — shape, not direction.
  *
- * Three clauses, over a file declaring a class that implements `IToolHandler`:
+ * Three clauses, over a file declaring a handler — a class that implements
+ * `IToolHandler`, or an object literal that claims the same contract (C40):
  *
  *   1. **No function body is declared anywhere except inside `handle()`'s own.**
- *   2. **No `Map`/`Set`/`WeakMap`/`WeakSet` state**, as a field of that class or
+ *   2. **No `Map`/`Set`/`WeakMap`/`WeakSet` state**, as a member of that handler or
  *      at module level.
  *   3. **`handle()` is at most `HANDLE_MAX_LINES` lines.**
  *
@@ -40,6 +41,37 @@
  * it**, which is what catches the arrow above. A module-level `function work(){}`
  * called from `handle()` is the same evasion one step further out, and the file
  * scope closes that too.
+ *
+ * ## Why an object literal is a handler too (C40)
+ *
+ * RFS-01 AC-5 lists *"an object-literal handler that is not a class"* among the
+ * evasion shapes, and says in the same breath that leaving one out would be C21's
+ * shape — a gate reading PASS by not looking — aimed forward instead of back. A
+ * class-only population does exactly that: measured, an object literal carrying a
+ * 200-line `handle()` **and** a module-level `Map` read PASS, because the walk
+ * returned early with no class to check. The population is therefore a class that
+ * implements the interface **or** an object literal that claims it.
+ *
+ * `satisfies` and `as` carry the same claim as an annotation and were measured to
+ * escape an annotation-only predicate, so all three forms are unwrapped:
+ *
+ *     export const tool: IToolHandler = { ... };
+ *     export const tool = { ... } satisfies IToolHandler;
+ *     export const tool = { ... } as IToolHandler;
+ *
+ * **The widening does not generalise clause 2's exemption on its own, and that is
+ * a live false positive rather than a theoretical one.** A class method's locals
+ * are never module-level statements, so clause 2's module walk could scan a whole
+ * `VariableStatement` subtree safely. An object literal puts the handler's own
+ * `handle()` body *inside* such a statement, so the same unconditional walk flags a
+ * `Map` constructed and consumed inside `handle()` — legal for a class, and it must
+ * be legal here. A handler object's properties are therefore scanned like class
+ * fields, and its declaration is not scanned as module state. *When a population
+ * widens, re-check every clause's exemption against the new scope, not just the
+ * membership predicate.*
+ *
+ * Measured on this tree: **0** object-literal handlers, and the widened reading is
+ * byte-identical to the class-only one, so RFS-01 AC-3's frozen base is untouched.
  *
  * ## Why an AST and never a regex (C32)
  *
@@ -98,12 +130,15 @@
  *     or subtly wrong.** This is C28 one level down: the gate proves the logic left
  *     `tools/`, never that it survived the move intact. That is what the extracted
  *     modules' own tests are for (RFS-02, RFS-06).
- *   - **A file under `tools/` with no `IToolHandler` class is not checked at all.**
+ *   - **A file under `tools/` that declares no handler is not checked at all.**
  *     That is the rule's scope, not an oversight — but the cost is concrete:
  *     `serialize.ts` is 438 lines and declares **11** function bodies and three
  *     `Map`/`Set` constructions, and every clause here is blind to it. `spec.md` §1
  *     rules it green on the merits as a shared helper; a future reader should know
- *     the gate is not what makes it so.
+ *     the gate is not what makes it so. C40 narrows this bullet without closing it:
+ *     an object literal that *claims* `IToolHandler` is now in the population, but
+ *     one that structurally quacks like a handler while claiming nothing is not.
+ *     Deciding that needs a type-checker, which C32 deliberately avoided.
  *   - **`handle()`'s ceiling says nothing about what it delegates to.** A 10-line
  *     `handle()` may call a 500-line service function. Line count is not depth.
  *   - **A body built from a string — `new Function(...)`, `eval` — has no AST node
@@ -166,14 +201,14 @@ export interface BodyFinding {
 /** One piece of `Map`/`Set` state, and where it was declared. */
 export interface StateFinding {
   name: string;
-  /** `field` on the handler class, `module` at file scope, `assignment` via `this.x = new Map()`. */
+  /** `field` on the handler, `module` at file scope, `assignment` via `this.x = new Map()`. */
   where: "field" | "module" | "assignment";
   line: number;
 }
 
 export interface FileReading {
   file: string;
-  /** `false` for a helper or barrel: no `IToolHandler` class, so no clause applies. */
+  /** `false` for a helper or barrel: no handler declared, so no clause applies. */
   isHandler: boolean;
   /** Maximal bodies outside `handle()` — the baseline's metric. */
   bodies: BodyFinding[];
@@ -275,9 +310,41 @@ export function analyzeSource(file: string, text: string): FileReading {
     ),
   );
 
+  // C40. An object literal that claims the interface is a handler too. `satisfies`
+  // and `as` state the same claim as an annotation and were both measured to escape
+  // an annotation-only predicate, so all three are unwrapped.
+  const namesInterface = (type: ts.TypeNode | undefined): boolean =>
+    !!type && new RegExp(`\\b${interfaceName}\\b`).test(type.getText(sf));
+  const handlerObjectOf = (
+    decl: ts.VariableDeclaration,
+  ): ts.ObjectLiteralExpression | undefined => {
+    if (!decl.initializer) return undefined;
+    let expr: ts.Expression = decl.initializer;
+    let claimed = namesInterface(decl.type);
+    while (
+      ts.isSatisfiesExpression(expr) ||
+      ts.isAsExpression(expr) ||
+      ts.isParenthesizedExpression(expr)
+    ) {
+      if (!ts.isParenthesizedExpression(expr) && namesInterface(expr.type)) claimed = true;
+      expr = expr.expression;
+    }
+    return claimed && ts.isObjectLiteralExpression(expr) ? expr : undefined;
+  };
+  const handlerObjects: ts.ObjectLiteralExpression[] = [];
+  const collectHandlerObjects = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node)) {
+      const obj = handlerObjectOf(node);
+      if (obj) handlerObjects.push(obj);
+    }
+    node.forEachChild(collectHandlerObjects);
+  };
+  sf.forEachChild(collectHandlerObjects);
+
   let membersExamined = 0;
   sf.forEachChild(() => membersExamined++);
   for (const cls of handlerClasses) membersExamined += cls.members.length;
+  for (const obj of handlerObjects) membersExamined += obj.properties.length;
 
   const empty: FileReading = {
     file,
@@ -289,11 +356,14 @@ export function analyzeSource(file: string, text: string): FileReading {
     aliasedInterface: aliased,
     membersExamined,
   };
-  if (handlerClasses.length === 0) return empty;
+  if (handlerClasses.length === 0 && handlerObjects.length === 0) return empty;
 
-  const handleNodes = handlerClasses.flatMap((cls) =>
-    cls.members.filter((m) => m.name?.getText(sf) === HANDLE),
-  );
+  const handleNodes: ts.Node[] = [
+    ...handlerClasses.flatMap((cls) => cls.members.filter((m) => m.name?.getText(sf) === HANDLE)),
+    ...handlerObjects.flatMap((obj) =>
+      obj.properties.filter((p) => p.name?.getText(sf) === HANDLE),
+    ),
+  ];
   const insideHandle = (node: ts.Node): boolean =>
     handleNodes.some((h) => node.getStart(sf) >= h.getStart(sf) && node.end <= h.end);
 
@@ -310,7 +380,7 @@ export function analyzeSource(file: string, text: string): FileReading {
     if (declaresBody(node)) {
       // Exempt by name: `handle()`'s own body, and everything nested in it, is the
       // one legal home for a body. Do not descend.
-      if (handleNodes.includes(node as ts.ClassElement) || insideHandle(node)) return;
+      if (handleNodes.includes(node) || insideHandle(node)) return;
       // Exempt by kind: the constructor's own body is legal, but a body declared
       // INSIDE it is C32's evasion, so keep descending.
       if (ts.isConstructorDeclaration(node)) {
@@ -355,9 +425,29 @@ export function analyzeSource(file: string, text: string): FileReading {
       }
     }
   }
+  // C40: a handler object's own properties are the analogue of class fields, so
+  // they are scanned like fields — and `handle`'s own body is exempt, exactly as it
+  // is for a class.
+  for (const obj of handlerObjects) {
+    for (const prop of obj.properties) {
+      if (prop.name?.getText(sf) === HANDLE) continue;
+      const init = ts.isPropertyAssignment(prop) ? prop.initializer : undefined;
+      if (init && constructsState(init, sf)) {
+        state.push({
+          name: prop.name?.getText(sf) ?? ts.SyntaxKind[prop.kind],
+          where: "field",
+          line: lineOf(prop.getStart(sf)),
+        });
+      }
+    }
+  }
   sf.forEachChild((node) => {
     if (!ts.isVariableStatement(node)) return;
     for (const decl of node.declarationList.declarations) {
+      // A handler object's declaration is NOT module state: its subtree contains
+      // `handle()`'s own body, and scanning it unconditionally flags a `Map` built
+      // and consumed inside `handle()` — legal for a class, so legal here.
+      if (handlerObjectOf(decl)) continue;
       const typeText = decl.type ? decl.type.getText(sf) : "";
       if (STATE_TYPE.test(typeText) || (decl.initializer && constructsState(decl.initializer, sf))) {
         state.push({ name: decl.name.getText(sf), where: "module", line: lineOf(decl.getStart(sf)) });
@@ -383,7 +473,7 @@ export function analyzeSource(file: string, text: string): FileReading {
   };
   sf.forEachChild(collectAssignments);
 
-  // Clause 3. The member's full span. A class with no `handle` reports 0 and is
+  // Clause 3. The member's full span. A handler with no `handle` reports 0 and is
   // caught by clause 1 instead, every body in it being outside a `handle()` that
   // does not exist.
   const handleNode = handleNodes[0];
@@ -433,7 +523,7 @@ export interface ScanResult {
   violations: FileReading[];
   /** Files in the population. Zero means the tree or the filter is wrong. */
   filesScanned: number;
-  /** Of those, files declaring an `IToolHandler` class. Zero means detection broke. */
+  /** Of those, files declaring a handler. Zero means detection broke. */
   handlerFiles: number;
   /** Class members plus top-level statements read. Zero means the walk broke. */
   membersExamined: number;
@@ -502,7 +592,7 @@ export function report(result: ScanResult): boolean {
   console.log(
     `\n[tools-thin] ${ok ? "PASS" : "FAIL"} — ${result.violations.length} of ` +
       `${result.filesScanned} file(s) over the rule; ${result.handlerFiles} declare an ` +
-      `${HANDLER_INTERFACE} class, ${result.filesScanned - result.handlerFiles} do not; ` +
+      `${HANDLER_INTERFACE}, ${result.filesScanned - result.handlerFiles} do not; ` +
       `${result.membersExamined} members examined; handle() ceiling ${HANDLE_MAX_LINES}`,
   );
   return ok;

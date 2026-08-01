@@ -381,16 +381,36 @@ new violation.
 **2 of 30 red** (`read_file.ts`, `index_project.ts`). It cannot be taken retroactively — G-HUB and
 PR-C's T0 are both precedent.
 **AC-4**: **Both directions observed red on purpose**, plus an **inert control** that moves nothing:
-a private method added to a currently-green handler must FAIL; a `Map` field added must FAIL; a
-legal public method added must stay PASS **while still being counted**. A new sensor is not
-quotable until it has failed on purpose.
+a private method added to a currently-green handler must FAIL; a `Map` field added must FAIL;
+~~a legal public method added must stay PASS **while still being counted**~~ → **a file declaring no
+handler — `serialize.ts`'s shape — must stay PASS while still being counted**, and a comment-only
+edit must leave the reading unchanged. A new sensor is not quotable until it has failed on purpose.
+**Amended by C41**, `tasks.md` §10.5, at Execute. The struck clause is **falsified by C32**: this
+criterion was written against the *"no private method"* predicate, and C32 replaced it with *"a
+declared function body"*, under which visibility is irrelevant and a public method is a violation.
+Measured — a public method reads **RED** — and `design.md` §6.5 lists *"a public method"* among the
+shapes C32's clause subsumes, while `design.md` §6.6 property 4 had already substituted
+`serialize.ts` as the control **without striking this clause**. Three documents against one clause;
+the structural requirement wins.
 **AC-5** *(added by the Plan Challenge gate)*: the fail-shape list also covers the **evasion shapes
 §3.A had to probe for**, since a rule stated over `private` and `Map`/`Set` says nothing about the
 ways the same thing is expressible: a getter, a `#private` field, a `static` member, an
 arrow-function class property, a `Map` assigned inside a method to an untyped field, and an
-object-literal handler that is not a class. **All six measured absent from `tools/` today** — which
+object-literal handler that is not a class. ~~**All six measured absent from `tools/` today**~~ →
+**thirteen shapes, all measured absent from `tools/` today** — which
 is why they are a *future* regrowth path rather than a present violation, and why leaving them out
 would be C21's shape (a gate reading PASS by not looking) aimed forward instead of back.
+**Amended by C40**, `tasks.md` §10.5, at Execute, in two ways. **The count**: `design.md` added three
+more shapes to this list in place (§6.4 item 2's module-level `Map`, §6.4 item 4's brace-in-a-string
+fixture, §6.5's constructor-body closure) without restating *"six"* here, and `tasks.md` T4b
+enumerates ten — so all three documents carried a different number and only this one still said six.
+The suite settles it at **thirteen** declared-body shapes plus the state and ceiling cases.
+**The sixth shape**: the object-literal handler was **measured PASS** against the gate as T4a shipped
+it — with a 200-line `handle()` *and* a module-level `Map` — because the walk returned early with no
+class to check. That is precisely the failure this clause's own last sentence forbids, so the gate's
+population was widened to admit an object literal that claims the interface by annotation,
+`satisfies` or `as`. The widened reading over the live tree is **byte-identical**, so AC-3's frozen
+base is untouched.
 **AC-6** *(added by the Plan Challenge gate)*: the script's docblock **names what it does not
 certify** — that a delegating `handle()` reads identically whether its delegate is correct or subtly
 wrong, so this gate is a *structural* check and carries no claim about the behavior of the extracted
