@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Tasks complete**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — Phase 0 complete**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, 28 task rows, eight phases, **78 distinct
 > files**. Everything below this block was written before Tasks and is kept as the record; where it
@@ -65,9 +65,51 @@
 > `os.tmpdir()`, so shape (a)'s rejected directory and shape (c)'s allowlist entry would have been
 > the same path under the existing suite's fixture convention.
 >
-> **Next action: Execute, T3.** Still pure test authorship against the unmodified tree; nothing
-> structural moves until T6. **T5 cannot be taken until T4a writes the gate script** — the ordering
-> dependency `design.md` §11 does not state — and must be taken before T9.
+> ~~**Next action: Execute, T3.**~~ **T3 DONE — `f2222d3`. Phase 0 is complete.** Its record is
+> `tasks.md` §10.3 — R-31 and GMS-05 AC-1 both close, 9 cases and 46 assertions, eleven mutations
+> plus an inert control, and the six existing `ReadFileTool` suites run under every one. Not
+> restated here.
+>
+> **C38 is the forty-third plan defect, and it enlarges T3's subject rather than changing it.**
+> `design.md` R-31's per-key table credits `compressionRatio` with an assertion that belongs to
+> **`compress_context`** — `e2e/08.search:556` is inside F28, calls `compressContext(...)` and reads
+> `metadata.compressionRatio`, while `ReadFileTool` assigns the field at the **top level** of `data`
+> and never under `metadata`. True figure **0**, not ×1. `tokens` is **2**, not ×1, and both
+> assertions sit behind a `catch { return }` that skips them silently on an LLM timeout. So
+> `recommendations`, `savingsPercent` **and** `compressionRatio` all have zero assertions anywhere.
+> **R-31 was rewritten because it cited another tool's *fixture* as evidence; its replacement table
+> then credited another tool's *assertion*** — sixth correction on this feature to inherit the defect
+> it was correcting. Author level on the C34/C35/C37 precedent; owed to `design.md` (**T20b**, §8.1
+> row 7) and **not** to the parent, because R-31 is a Design-introduced risk with no criterion behind
+> it. Re-decide only if you disagree.
+>
+> **§8 finding 2's *"landed: T3 corrected"* was false, and the correction it claimed had no owner.**
+> Three sites still said five push sites — `design.md:930`, `design.md:1042` and **T3's own row
+> `tasks.md:444`** — the correction having reached §3.4 only; and `tasks.md:444` sat outside §8.1's
+> declared scope (*"Corrections owed to `design.md`"*), so nothing was scheduled to fix it. PR-C's
+> **C19** shape. All struck and amended in place; T20b's row widened to name both `design.md` sites.
+> *A landed-column entry is a claim about another part of the document and goes stale exactly like a
+> status field — verify it against the cited line.*
+>
+> **Two things T3 measured that were previously only asserted.** R-31's premise that the existing
+> suites do not guard this block was inherited from the risk row and **never measured**; the six that
+> exercise `ReadFileTool` stay **PASS 51p/0f under all eleven mutations**. And *"the only four suites
+> that exercise `ReadFileTool`"* was already wrong when `design.md` was written —
+> `apps/tools-api/src/routes/file.test.ts` predates it by six days, though it mocks the class
+> wholesale, so the count is short while the conclusion holds.
+>
+> **`bun run test` exited 1 on its first run and it is not PR-D's** —
+> `postgres-vector-store.integration.test.ts`, 5001.38 ms hook timeout, zero diff against `main`,
+> 16/16 standalone under both the real and an empty config dir, with 5.9 s of cold Ollama model load
+> visible in the aggregate log. **Warm re-run: 11/11 tasks, 0 cached, exit 0.** The 5001 ms class
+> `CLAUDE.md` documents; both readings are recorded rather than only the green one.
+>
+> **Next action: Execute, T4a** — `scripts/check-tools-thin.ts`, the first file of Phase 1 and the
+> three-clause gate over a TypeScript AST (never a regex, C32). Then T4b, then T5. **T5 cannot be
+> taken until T4a writes the gate script** — the ordering dependency `design.md` §11 does not state —
+> and must be taken before T9. **T4b's fixtures must be synthetic**: `test:scripts` auto-discovers
+> `scripts/__tests__/` and `ci.yml:200` runs it inside `build`, so a live-tree `2 of 30` assertion
+> goes red at Phase 3 and makes §1.1's per-phase-green promise false.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
