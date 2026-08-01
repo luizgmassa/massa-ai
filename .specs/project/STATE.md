@@ -234,6 +234,26 @@ all state came from `.specs/` and source reads.
   **two files**: AC-5 could not be closed against the gate as T4a shipped it, so the gate is amended
   too (**524 → 614 lines**). Six gates plus `check-core-layering` green — `test:scripts` **1114 / 0
   across 49 files**, edges **965 unchanged**, files 901 → 902.
+  **T6 done** — record in `tasks.md` §10.7. `services/cache/lru-evict.ts` + its unit suite, 15 cases
+  / 43 assertions; **RFS-02 AC-3 closes and AC-2 closes in part** (C47 reassigns AC-2's second clause
+  to T7). **Phase 2 started, and it is the first task on this branch that moves code.** Four plan
+  defects (**C44–C47**). Six gates plus `check-core-layering` green — `test:scripts` **1114 / 0
+  across 49 files** unchanged, `test:plugins` 96 / 0, edges **965 unchanged**, files 902 → 904,
+  `check-tools-thin` **byte-identical to T5's frozen base**, and the new module measured at **100%
+  lines** against the 90% floor (R-36).
+- **C44–C47 are the forty-ninth to fifty-second plan defects; two of them change what a later task
+  does.** **C44** — `design.md` §5.1's *"a function taking `(cache, cap)`"* does not determine the
+  predicate and the five caches do not share one, so one operator with each site passing its own
+  literal cap is behavior-preserving at **neither** call position (measured, both directions). The
+  shipped contract is a post-call bound with pre-insert callers passing `CAP - 1`, exact because
+  `size > cap - 1` and `size >= cap` are the same predicate over integers. **C46** — T7's shape was
+  unfixed by any artifact and decides whether RFS-01 AC-3's frozen base **moves during Phase 2**:
+  inlining takes `read_file.ts` 13 → 12 maximal bodies and leaves `read-file.test.ts` red until T8,
+  while a one-line delegate leaves both byte-identical. **T7 takes the delegate shape**, and T8's
+  *"cannot survive T7 unmodified"* is struck as falsified. **C45** — T1's `fileCache` characterization
+  case does not discriminate eviction at all. **C47** — T6's row credited it with a criterion a module
+  with no call sites cannot close. All four author level on the C34/C35/C37/C38/C39/C41/C42/C43
+  precedent; **C44 owed to `design.md`** (T20b, §8.1 row 15), the other three internal to `tasks.md`.
 - **C37 is the forty-second plan defect, and the first on this feature to amend a criterion rather
   than a figure.** RFS-06 shape (c)'s prescribed assertion — *"no literal `..` segment"* — is
   **vacuous**: `path.resolve` normalizes `..` away on every exit, and a probe written to the clause's
@@ -320,12 +340,15 @@ all state came from `.specs/` and source reads.
   one. **Transcription verified rather than proofread** — the fenced block byte-identical to the live
   run, both tables parsed back out and checked cell by cell against `--json`, 72 assertions / 0
   mismatches.
-- ~~**Next action: Execute, T5**~~ **Next action: Execute, T6** — `services/cache/lru-evict.ts`, an
-  eviction **function** over `Map<K,V>` importing nothing at all, plus its unit test. **Phase 2, and
-  the first task that moves code.** `tasks.md` §6 items 4–5: **T6 → T7 → T8 → T8b**, and Phase 2
-  entirely before Phase 3, because the LRU move is provable behavior-preserving only while both
-  `read_file.ts` caches still live in `read_file.ts`. T1's suites must pass **unmodified** across T7,
-  asserted by SHA-256. The six-gate battery applies again from T6.
+- ~~**Next action: Execute, T5**~~ ~~**Execute, T6**~~ → **Next action: Execute, T7** — repoint the
+  four files / five caches at `services/cache/lru-evict.ts`. **Take the delegate shape (C46)**: keep
+  `ReadFileTool`'s `private evictOldest<K,V>(cache)` as a one-line call into the module rather than
+  deleting it and inlining, because inlining leaves `read-file.test.ts` red until T8 **and** moves
+  RFS-01 AC-3's frozen base mid-Phase-2. **Pre-insert sites pass `CAP - 1`, post-insert sites pass
+  `CAP` (C44).** `tasks.md` §6 items 4–5: **T7 → T8 → T8b**, and Phase 2 entirely before Phase 3,
+  because the LRU move is provable behavior-preserving only while both `read_file.ts` caches still
+  live in `read_file.ts`. T1's suites must pass **unmodified** across T7, asserted by SHA-256 — and
+  under the delegate shape `read-file.test.ts` is byte-identical and green as well.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed
@@ -337,8 +360,9 @@ all state came from `.specs/` and source reads.
   so the `handle() ≤ 120` clause stayed red at **1 of 30** and T15 could not wire the gate into
   `ci.yml` without failing a required check. Closed by a new task **T14b**, extracting the 45-line
   managed-run lease block `:158-202`; `handle()` **128 → ~87**. Zero allowlist.
-- ~~**Six** corrections are owed to `design.md` itself~~ → **fourteen** (`tasks.md` §8.1, task
-  T20b), on PR-C's C18 precedent. *"Six" was last true at Design.* **C28–C33** are owed to the parent `spec.md` (T20); none is written there yet.
+- ~~**Six** corrections are owed to `design.md` itself~~ → ~~fourteen~~ → **fifteen** (`tasks.md`
+  §8.1, task T20b), on PR-C's C18 precedent. *"Six" was last true at Design; §8.1 grew at T4b, T5 and
+  T6.* **C28–C33** are owed to the parent `spec.md` (T20); none is written there yet.
 - **C28 through C32 and the parent's stale layer figures are owed back** to
   `core-layering-god-module-split/spec.md` (RFS-05 AC-2/AC-3), landing with the work. None is
   written there yet. C29 additionally amends the parent's own `~390 of 707` Evidence row.

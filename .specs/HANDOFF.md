@@ -33,9 +33,9 @@
 > **Do not re-take** §4's two threading decisions; §4.2's rejected option is rejected for a subtler
 > reason than the obvious one, and the obvious one does not survive measurement.
 >
-> ~~**Six** corrections are owed to `design.md` itself~~ → **fourteen** (§8.1 → task **T20b**, PR-C's
-> C18 precedent), and **C28–C33** to the parent `spec.md` (T20). None is written in either yet.
-> *"Six" was last true at Design; §8.1 grew at T4b and again at T5.*
+> ~~**Six** corrections are owed to `design.md` itself~~ → ~~fourteen~~ → **fifteen** (§8.1 → task
+> **T20b**, PR-C's C18 precedent), and **C28–C33** to the parent `spec.md` (T20). None is written in
+> either yet. *"Six" was last true at Design; §8.1 grew at T4b, again at T5, and again at T6.*
 >
 > ~~**Next action: Execute, T1.**~~ **T1 DONE — `d0fbc92`**, and the Tasks work is committed as
 > `4f1e8ad`. **Its whole record is `tasks.md` §10.1** — three new plan defects (**C34–C36**, the
@@ -275,12 +275,68 @@
 > T4b's figure unchanged, as it must be. The four prior pure-`.specs/` commits on this branch
 > recorded no gate battery either; the full six ran on the commits that added tracked code.
 >
-> **Next action: Execute, T6** — `services/cache/lru-evict.ts`, an eviction **function** over
-> `Map<K,V>` importing nothing at all, plus its unit test. **Phase 2, and the first task that moves
-> code.** Ordering is §6 items 4 and 5: **T6 → T7 → T8 → T8b**, and **Phase 2 entirely before Phase
-> 3** — the LRU move is provable behavior-preserving only while both `read_file.ts` caches are still
-> in `read_file.ts`. T1's suites must pass **unmodified** across T7, asserted by SHA-256, and T8b is
-> the row C35 minted at T1 that nothing wrote until T4b. From T6 the six-gate battery applies again.
+> ~~**Next action: Execute, T6.**~~ **T6 DONE.** Its record is `tasks.md` §10.7 — `services/cache/lru-evict.ts`
+> plus its unit suite, 15 cases and 43 assertions, eight mutations with an inert control and a
+> two-column table. **RFS-02 AC-3 closes and AC-2 closes in part.** Four new plan defects
+> (**C44–C47**, the forty-ninth to fifty-second). Not restated here.
+>
+> **The module's signature was not the one `design.md` specified, and that was measured before the
+> plan was written.** §5.1 says *"a function taking `(cache, cap)`"*; the five caches do **not** share
+> a predicate — three evict pre-insert on `>=`, two post-insert on `>`. Three candidates were run as
+> **full prospective T7 repoints of all five caches** against T1's oracle: one operator with each site
+> passing its own literal cap fails in **both** directions (shared `>` → 3p/2f, shared `>=` → 3p/2f),
+> and only a **post-call bound** `(cache, maxRetained)` with pre-insert callers passing `CAP - 1`
+> reproduces the baseline 5p/0f/3115x. It is exact, not a compromise: `size > cap - 1` and
+> `size >= cap` are the same predicate over integers — the evidence-audit lens supplied that algebra,
+> and it is **stronger than the empirical result it was auditing** (**C44**).
+>
+> **C46 is the one a resumer must not skip, and it changes T7.** The red-team said T7 leaves a red
+> `test` commit until T8. Measured, that is true of **one of two T7 shapes nobody had distinguished**:
+> deleting `evictOldest` and inlining leaves `read-file.test.ts` at **6p/1f** *and* moves RFS-01 AC-3's
+> frozen base mid-Phase-2 (`read_file.ts` **13 → 12** maximal bodies, **224 → 223** members examined);
+> keeping it as a one-line **delegate** leaves both byte-identical. §3.1's *"unchanged between T5 and
+> T9"* is true of the **file population** under either shape and of the **per-member table AC-3 froze**
+> under only one — C36's distinction recurring where §3.1 relied on it. **T7 takes the delegate shape**,
+> and T8's *"cannot survive T7 unmodified"* is **struck as falsified** (measured 7p/0f/34x).
+> **Eighteenth time on this feature that a critic's mechanism held while its conclusion did not.**
+>
+> **C45: T1's `read_file · fileCache` characterization case does not discriminate eviction.** Neuter
+> `read_file.ts`'s `evictOldest` entirely and it still reads 1p/0f, while `projectRootCache` goes
+> 0p/1f — because the case offers `fc-1` re-reading `"V2"` as evidence of eviction and `fc-1`'s
+> *cached* value is `"V2"` too. **§10.1's own M8 row (`FAIL 4p/1f`) already contained this reading**:
+> a 1-of-2 kill on a mutation reaching two characterized caches is a statement about the one that
+> survived. The site is still covered today by `read-file.test.ts:264-299`, which is why C46 matters.
+>
+> **The result a resumer should carry forward is column B of the mutation table.** Nothing imports
+> the module yet, so "the existing suites stay green" would be vacuous; what was measured instead is
+> **how much of the module's contract survives being observed only through the call sites**. With the
+> prospective T7 repoint applied, **three of six module mutations are invisible to T1's oracle** —
+> the import property (AC-3's entire replacement for kernel leaf-ness), the `undefined` guard, and
+> **evict-more-than-one, which no call site exercises at all** because none grows a `Map` by more than
+> one per insert. *A shared module's contract is wider than the union of its callers.*
+>
+> **The harness shipped a dead mutation and the verdict column could not have shown it.** M3's first
+> form (`while` → `if`) orphaned a `break` and was a **syntax error**; the suite never loaded, reported
+> `0p/1f`, and the row read FAIL against the expectation FAIL with **0** mismatches. Caught by refusing
+> an anomalous shape, not by the verdict. Corrected, the row inverts to `PASS` in column B. Third
+> author-instrument defect on this feature; the harness now refuses on a load failure rather than
+> reporting a red.
+>
+> **Gates, all six plus the layering gate.** `lint` **0**, proven to bite on this file
+> (`lru-evict.ts:77:7`, exit 1, restored SHA-identical). `type-check` **6/6, 0 cached** forced;
+> `build` **5/5, 0 cached** forced. `test` exit **0**, 11/11 — **5 cached and all five are `:build`**,
+> every one of the 6 `:test` tasks executed. `test:scripts` **1114**/0 across 49. `test:plugins`
+> **96**/0. `check-core-layering`: **edges 965 unchanged, files 902 → 904**. `check-tools-thin`
+> **byte-identical to T5's frozen base**. Coverage for the new module measured directly: **100%
+> lines / 100% funcs** (R-36).
+>
+> **Next action: Execute, T7** — repoint the four files / five caches at the module, **delegate shape
+> per C46**, pre-insert sites passing `CAP - 1`. Then **T8 → T8b**, and **Phase 2 entirely before
+> Phase 3** (§6 items 4–5): the LRU move is provable behavior-preserving only while both
+> `read_file.ts` caches are still in `read_file.ts`. T1's suites must pass **unmodified** across T7,
+> asserted by SHA-256 — and under the delegate shape `read-file.test.ts` is byte-identical and green
+> too, which is a stronger claim than T7's row previously made. T8b is the row C35 minted at T1 that
+> nothing wrote until T4b.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
