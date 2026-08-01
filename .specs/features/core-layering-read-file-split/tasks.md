@@ -678,3 +678,148 @@ until T6. **T5 cannot be taken until T4a exists**, and must be taken before T9.
 - **Do re-derive** anything quoted from a gate — `check-tools-thin`, `check-core-layering`,
   `check-coverage`, G-HUB — because every one enumerates `git ls-files`, and `turbo` replays cached
   results unless forced. A background command's exit code is the wrapper's; read the task line.
+
+---
+
+## 10. Execute-time record
+
+Findings and readings produced by running the tasks, appended per task. §1–§9 are the plan; this
+section is what the plan met.
+
+### 10.1 T1 — executed, 2026-07-31
+
+Two new files, both against surfaces that survive Phases 2–3:
+`packages/core/src/__tests__/lru-eviction-characterization.test.ts` (RFS-02 AC-1, 5 cases,
+**3115** assertions) and `read-file-project-root-rename-pin.test.ts` (RFS-02 AC-4, 2 pins, **23**
+assertions).
+
+**Gates, all six, plus the layering gate.** `lint` exit **0** — and proven to bite rather than
+assumed, because oxlint prints **nothing at all** on a clean tree, which is indistinguishable from a
+gate that did not run; a deliberate duplicate-declaration probe produced
+`error: Identifier \`a\` has already been declared` and was removed. `type-check` **6/6**. `build`
+**5/5, 0 cached** — the unforced run was `FULL TURBO`, 5 of 5 replayed, and a replay is not a
+measurement. `test` **11/11 tasks, 0 cached, 145 isolation groups**, both new suites confirmed
+*inside* it under `[test-isolation] … (module mock)` rather than only standalone. `test:scripts`
+exit **0**. `test:plugins` **96 pass / 0 fail**.
+
+#### C34 — the forty-first plan defect: a second private-reaching test, owned by no task
+
+Measured over **435** tracked test files: exactly **one** reaches `ReadFileTool`'s 18 private
+members. It does so in **two** tests, with **different break phases**, and only one has an owner.
+
+| test | span | privates reached (code lines only) | breaks at | owner |
+| --- | --- | --- | --- | --- |
+| *"inserting CAP+1 distinct keys evicts the oldest…"* | `:264-299` (describe `:257-300`) | `fileCache`, `projectRootCache`, `evictOldest`, `FILE_CACHE_MAX_ENTRIES` | **T7** — `evictOldest` leaves the class | **T8** |
+| *"undefined-metadata entry: first hit re-extracts + persists…"* | `:316-366` (describe `:302-367`) | `extractMetadata`, `fileCache` | **T10** — `extractMetadata` → module 5, `fileCache` → module 4 | **none** |
+
+The second also hardcodes `readFileWithCache`'s cache-key JSON at `:332-338`, which moves into
+module 4 with the Map it keys. **T10's write set reads *"1 handler + 2 new modules + 2 new suites"*
+and names no test repoint**, so Phase 3 as planned lands a commit where `read-file.test.ts` throws —
+`tool.extractMetadata.bind(tool)` on a member that no longer exists — and §1.1's
+per-phase-green obligation is false. GMS-05 AC-3 forbids deleting or weakening it.
+
+**Resolution: T10's write set gains `+ 1 test repoint`** — T14's shape, not a new task. Recorded
+rather than put to the user because GMS-05 AC-3 already fixes the answer (repointed, not weakened,
+not skipped); the only open question was which task carries one file.
+
+**Two span citations corrected in the same breath.** §3.5 item 3 cites `:265-272` and T8's row
+`:264-272`; the test runs to `:299` and its private reach to `:298`. Both stop **27 lines** short of
+their own subject. That is **C33's class one artifact down** — a clause and the work meant to close
+it must be checked against the same lines, and here the file-level agreement (*"`read-file.test.ts`
+needs a repoint"*) again hid a span-level disagreement about **which part** of it and **when**.
+
+#### C35 — RFS-02 AC-4's comment correction names one site; there are two, and the named one points at the other
+
+`spec.md` RFS-02 AC-4 requires that `production-wiring.ts:67-68`'s comment *"is corrected to say
+what is actually true."* Measured, the same false claim is stated **twice**:
+
+| site | text |
+| --- | --- |
+| `production-wiring.ts:67-68` | *"L1MemoryCache and the read_file tool cache are deliberately absent: both are TTL-bounded and self-evict **(see invalidator-registry.ts)**"* |
+| `invalidator-registry.ts:34-36` | *"L1MemoryCache and the read_file tool cache are deliberately NOT registered: both are TTL-bounded, so a stale entry self-evicts within the TTL window without a per-project hook."* |
+
+The named site **cites the unnamed one as its authority**, so correcting only `production-wiring.ts`
+leaves a reader who follows its own pointer at the uncorrected claim. **Neither site is in any
+task's write set**, so AC-4's correction is owned by nothing — PR-C's **C19** shape.
+
+**Resolution: a new task T8b**, Phase 2, on the T14b/T20b precedent this document already set: both
+comments corrected to state what the pin measured. Phase 2 rather than Phase 7 because AC-4 is an
+RFS-02 criterion and Phase 2 is where the LRU work closes. Write set **2 files**, comments only.
+
+#### C36 — Phase 0's acceptance figure moves, and the half that carries the requirement does not
+
+§5 states *"`check-core-layering` must read **965 / 896** unchanged."* Measured after `git add` of
+T1's two files:
+
+```
+[core-layering] PASS — 0 violation(s) across 965 tier-to-tier edges in 898 tracked files
+```
+
+**`edgesExamined` — the figure RFS-03 AC-1 actually requires per structural commit — is unchanged at
+965**, which is the claim that matters: Phase 0 adds no tier-to-tier edge. The **896** is the gate's
+*population*, and it counts every tracked file its `CODE` regex admits, tests included, so it rises
+by exactly the number of tracked code files any phase adds. Phase 0 adds two.
+
+§3.5 item 4 already drew this distinction for `check-tools-thin` — whose population is filtered to
+`packages/core/src/tools/` and therefore genuinely does not move — and §5 then applied the
+tools-gate reasoning to the repo-wide gate. **Read the Phase 0 line as `edges 965 unchanged;
+files 896 → 898`.**
+
+#### RFS-02 AC-4 — the pin's answer: the stale read is real, and it is logged, not fixed
+
+`spec.md` §3.B left two readings open and said static reading could not choose. It is chosen:
+
+- **After a committed rename, `ReadFileTool` serves the pre-rename root.** Driven through the real
+  `createProductionProjectIdentityInvalidatorRegistry` via its own injection seam:
+  `symbol-graph-project-root` ran for **both** source and target and `SymbolGraphService`
+  re-resolved to the new root, while `ReadFileTool` kept serving the old one. **No invalidator id in
+  either the `invalidated` or the `failures` list matches `/read[-_]?file/i`.** The contrast is what
+  makes this a measurement rather than a vacuous pass — without it, "read_file served a stale root"
+  and "the registry no-opped" are the same observation.
+- **`CACHE_TTL` (60 s) is enforced and `ROOT_CACHE_TTL` (300 s) is not.** Past 60 s the content
+  re-reads from disk; past 300 s the project root still does not re-resolve. So §3.B's **reading 1**
+  holds: the constant at `read_file.ts:148` is dead and the comment over it is wrong.
+
+**PR-D logs this and does not fix it** — RFS-02 AC-4, parent `spec.md` Out of Scope, R-07's
+precedent. The only thing PR-D changes is the two comments (C35).
+
+#### §3.B's coincidence premise is now measured rather than argued
+
+T7 repoints `file-filter-cache.ts:82` — whose eviction is `min(createdAt)`, not insertion order — at
+a shared insertion-order function. §3.B argued the two coincide *"because entries are `set` exactly
+once and never re-inserted."* Argued in Specify, never run. Mutation **M5a** switches that site to
+insertion-order eviction and the characterization suite stays **PASS**; **M5b** adds read-promotion
+on top and it goes **FAIL**. So the premise holds, and the suite catches the one way T7 could break
+it.
+
+#### Both suites' discrimination, on the real tree
+
+Backed up to scratch copies with SHA-256 byte-identity asserted on restore, refuse-on-byte-identical
+on every patch, **never `git checkout`**. Ten mutations on the characterization suite and five on the
+pin; **every one landed as expected**, `4/4` and `3/3` files byte-identical afterwards, and the
+control's assertion count reproduced exactly (3115) either side.
+
+| # | mutation | expected | got |
+| --- | --- | --- | --- |
+| M1 | `read_file` `fileCache` read-promotion removed | FAIL | FAIL 4p/1f |
+| M2 | `read_file` `projectRootCache` read-promotion removed | FAIL | FAIL 4p/1f |
+| M3 | `symbol-graph` `projectRootCache` read-promotion removed | FAIL | FAIL 4p/1f |
+| M4 | `web-controller` read-promotion removed | FAIL | FAIL 4p/1f |
+| M5a | `file-filter-cache` eviction → insertion order (**control**) | PASS | PASS 5p/0f |
+| M5b | M5a **+** read-promotion — the naive unification | FAIL | FAIL 4p/1f |
+| M6 | `read_file` cap 512 → 256 | FAIL | FAIL 3p/2f |
+| M7 | `file-filter-cache` cap 50 → 40 | FAIL | FAIL 4p/1f |
+| M8 | `read_file` `evictOldest` neutered | FAIL | FAIL 4p/1f |
+| M9 | comment-only edit (**inert control**) | PASS | PASS 5p/0f |
+| N1 | `getProjectRoot` stops caching | FAIL | FAIL 0p/2f |
+| N2 | `CACHE_TTL` 60 s → 600 s (**positive control** — the suite can see a TTL expire) | FAIL | FAIL 1p/1f |
+| N3 | `symbolGraph.clearProjectRoot` neutered | FAIL | FAIL 1p/1f |
+| N4 | registry drops the `symbol-graph-project-root` registration | FAIL | FAIL 1p/1f |
+| N5 | comment-only edit (**inert control**) | PASS | PASS 2p/0f |
+
+**One harness defect, caught by the harness refusing rather than by a green run.** The first
+implementation read `bun test`'s summary with `execFileSync`, which returns **stdout only** — and
+bun writes that summary to **stderr** on success as well as failure. Every run threw
+`unparseable bun test output`. Had it defaulted to "no match → treat as pass", all fifteen rows
+would have read PASS and the table would have been worthless. *Silence is a failure mode, and the
+instrument is where it fires first.*
