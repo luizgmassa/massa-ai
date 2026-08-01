@@ -44,9 +44,30 @@
 > **AC-4's pin found the stale read is real** — PR-D logs it and does not fix it, and the only
 > source change it earns is T8b's two comments.
 >
-> **Next action: Execute, T2.** T2 and T3 are still pure test authorship against the unmodified tree;
-> nothing structural moves until T6. **T5 cannot be taken until T4a writes the gate script** — the
-> ordering dependency `design.md` §11 does not state — and must be taken before T9.
+> ~~**Next action: Execute, T2.**~~ **T2 DONE — `ee578b2`.** Its record is `tasks.md` §10.2 — RFS-06
+> AC-1, AC-2 and AC-3 all close, six cases and 31 assertions, five mutations plus the existing suite
+> run under each. Not restated here.
+>
+> **C37 is the forty-second plan defect and it amends a criterion, not a figure.** `spec.md` §5
+> RFS-06 row 3 and T2(c) both specified shape (c)'s test as *"assert the returned `absolutePath`
+> carries no literal `..` segment"* — **vacuous**, because `resolveFilePath`'s only two non-null
+> exits both return `path.resolve(...)`, which normalizes `..` away. **Proven by execution**: a probe
+> written to the clause's letter **passes under the very mutation it exists to catch**. Both clauses
+> are struck and amended in place with their reason; the replacement predicate is
+> containment-relative. **Taken at author level on the C34/C35 precedent — RFS-06 AC-1 and RFS-01
+> AC-4 fix the answer — and handed to T25 as a question**, alongside AC-2's enumerated-set reading.
+> Re-decide only if you disagree.
+>
+> **Two things T2 measured that were previously only asserted.** RFS-06's own premise — that the 7
+> existing containment tests do not kill these shapes — **was never measured until now**; they stay
+> PASS under all four real mutations, and under a fifth (`$HOME` leaked into the teaching error's
+> root list) that RFS-06 never claimed. And `dirname(mkdtempSync(os.tmpdir(), …))` **is**
+> `os.tmpdir()`, so shape (a)'s rejected directory and shape (c)'s allowlist entry would have been
+> the same path under the existing suite's fixture convention.
+>
+> **Next action: Execute, T3.** Still pure test authorship against the unmodified tree; nothing
+> structural moves until T6. **T5 cannot be taken until T4a writes the gate script** — the ordering
+> dependency `design.md` §11 does not state — and must be taken before T9.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.

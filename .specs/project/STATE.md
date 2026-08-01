@@ -221,8 +221,15 @@ all state came from `.specs/` and source reads.
   edits `CHANGELOG.md`); **`### Changed` + `### Removed`**, both minor.
 - feature: **Execute STARTED.** Tasks committed `4f1e8ad`; **T1 done `d0fbc92`** — record in
   `tasks.md` §10.1, including **C34–C36** and the two plan amendments they forced (T10 gains a test
-  repoint; new task **T8b**). Six gates plus `check-core-layering` green at T1.
-- **Next action: Execute, T2.** T2–T3 are pure test authorship; nothing structural moves until T6.
+  repoint; new task **T8b**). **T2 done `ee578b2`** — record in `tasks.md` §10.2. RFS-06 AC-1, AC-2
+  and AC-3 all close. Six gates plus `check-core-layering` green at both.
+- **C37 is the forty-second plan defect, and the first on this feature to amend a criterion rather
+  than a figure.** RFS-06 shape (c)'s prescribed assertion — *"no literal `..` segment"* — is
+  **vacuous**: `path.resolve` normalizes `..` away on every exit, and a probe written to the clause's
+  letter **passes under the very mutation it exists to catch**. Struck and amended in place in both
+  `spec.md` §5 and T2(c); replacement predicate is containment-relative. Author level on the C34/C35
+  precedent, **handed to T25 as a question**.
+- **Next action: Execute, T3.** Pure test authorship; nothing structural moves until T6.
   **T5 (the frozen base reading) cannot be taken until T4a writes the gate script** — the dependency
   `design.md` §11 does not state.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
