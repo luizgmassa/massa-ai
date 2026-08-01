@@ -5,8 +5,13 @@
 - **Specify**: `spec.md` (`a866537`, `183573c`) · **Design**: `design.md` (`d7091ac`) — both on
   `spec/pr-d-read-file-split`, **not yet on `main`**
 - **Base**: `main` @ `f06b01d` (the v1.17.0 release bump on PR-C's merge `2bea11e`)
-- **Status**: **Tasks complete**, 2026-07-31. **Full Plan Challenge gate run** (§7). Execute not
-  started.
+- **Status**: **Tasks complete**, 2026-07-31. **Full Plan Challenge gate run** (~~§7~~ → **§8**; §7
+  is *Risks*). ~~Execute not started.~~ → **Execute in progress — T1, T2, T3, T4a, T4b, T5 done**
+  (§10.1–§10.6), **6 of 29 rows**, 23 remain. *Both struck clauses were already false when T5 read
+  them and neither is T5's doing: the section pointer has been wrong since Tasks, and "Execute not
+  started" since T1. T4b edited the bullet immediately below this one to correct 28/78 → 29/80 and
+  left this line — a **status field and a section pointer in the same sentence**, both stale, in the
+  header a reader checks first (§10.6).*
 - ~~28 task rows~~ → **29 task rows** (T1–T25, with T4 split into T4a/T4b, two tasks the Plan
   Challenge gate added — T14b and T20b — and **T8b**, minted by C35 at T1 and given its §5 row at
   T4b), **eight phases**, ~~78~~ → **80 distinct files**. *The 28/78 pair was accurate as planned and
@@ -200,16 +205,30 @@ instrument works:
 | `tools/read_file.ts` | **13**, each with its line span | **2** (`fileCache`, `projectRootCache`) | **175** |
 | `tools/index_project.ts` | **3**, each with its line span | 0 | **128** |
 | the other 25 handlers | **0** | **0** | ≤ 113 |
-| `serialize.ts`, `serialize-interfaces.ts`, `index.ts` | n/a — no `IToolHandler` class | n/a | n/a |
+| `serialize.ts`, `serialize-interfaces.ts`, `index.ts` | n/a — no `IToolHandler` ~~class~~ | n/a | n/a |
 
 Population premises re-derived at `d7091ac`, all holding: **30** tracked files under
 `packages/core/src/tools/`, all `.ts`; **27** declare `handle()`; the same **27** name
-`IToolHandler`; **3** declare neither. Readings are `2 of 30` on the body/`Map` clauses and
-`2 of 27` on the `handle()` clause, **the same two files**, and the record must say that the third
-clause flags no file the other two miss — its value is prospective (`design.md` §6.6 property 2).
+`IToolHandler`; **3** declare neither. ~~Readings are `2 of 30` on the body/`Map` clauses and
+`2 of 27` on the `handle()` clause, **the same two files**~~ → **amended by C42 (§10.6)**: `2 of 30`
+is the **union of clauses 1 and 2**, not either one's reading. Per clause, measured at T5:
+**clause 1 → `2 of 30`, clause 2 → `1 of 30`** (`read_file.ts` only; `index_project.ts` has **0**
+state sites), **clause 3 → `2 of 27`**. The record must say that the third clause flags no file the
+other two miss — its value is prospective (`design.md` §6.6 property 2) — and, as T5 measured, **so
+does the second**: clause 2's RED set is a strict subset of clause 1's and clause 3's, and no
+artifact said so. The *"class"* strike above is C40's population widening; the gate's own label lost
+the word at T4b.
 
 **Name the metric**: the baseline counts **maximal** bodies — a body not contained in another
 flagged body. An AST walk descending into nested arrows reports **18** for `read_file.ts`, not 13.
+*(**17** under the ctor-exempt convention the gate ships — C39, §10.4. Both figures are raw; the
+maximal 13 is identical under either.)*
+
+**Name the anchor too, which no artifact did until T5 (C43, §10.6).** The gate's spans are
+**declaration-only**; the spans `design.md` §5.1 and §5's own task rows cite are **comment-inclusive
+for `read_file.ts` and declaration-only for `index_project.ts`**. The two conventions coincide at 16
+of the 26 cited spans because those members carry no preceding comment, which is why the split
+survived Specify, Design and Tasks unremarked.
 
 ### 3.4 What Phase 0's three suites must pin (T1–T3)
 
@@ -496,9 +515,9 @@ schema and `IToolHandler` members, so a materially smaller file means the schema
 
 | # | task | write set | closes |
 | --- | --- | --- | --- |
-| **T13** | **`executeIndexing` `:254-351` → `services/indexing/execute-indexing.ts`.** It is `private` and has **0** importers — the only occurrences outside the file are **5 non-code mentions** in `index-project-tool.test.ts` — a JSDoc line (`:4`), a `test()` **title string** (`:312`) and three `//` comments (`:313-315`) — so no test repoints for this move. *(The first draft said "three comments"; the gate corrected it, §8 evidence finding 3. The conclusion is unchanged and slightly stronger: none of the five is an import.)* **It is not a pure function: `:306` reads `this.contextualSearch`, the sole `this.` reference in the span. It takes a bound `warmupCache` callback — §4.2**, decided here because no artifact named the dependency | 1 handler + 1 new module + 1 new suite | GMS-02 headline |
+| **T13** | **`executeIndexing` ~~`:254-351`~~ → `:246-351` → `services/indexing/execute-indexing.ts`.** **Amended by C43 (§10.6)**: the cited span is declaration-only and leaves the member's own 8-line doc comment `:246-253` orphaned in `index_project.ts`, describing code that no longer lives there. `design.md` §5.1's own **~110** LOC estimate for this module is the tell — the comment-inclusive span is **106** and the declaration-only one **98**. Outside `handle()` either way, so **C33's conclusion does not move**. It is `private` and has **0** importers — the only occurrences outside the file are **5 non-code mentions** in `index-project-tool.test.ts` — a JSDoc line (`:4`), a `test()` **title string** (`:312`) and three `//` comments (`:313-315`) — so no test repoints for this move. *(The first draft said "three comments"; the gate corrected it, §8 evidence finding 3. The conclusion is unchanged and slightly stronger: none of the five is an import.)* **It is not a pure function: `:306` reads `this.contextualSearch`, the sole `this.` reference in the span. It takes a bound `warmupCache` callback — §4.2**, decided here because no artifact named the dependency | 1 handler + 1 new module + 1 new suite | GMS-02 headline |
 | **T14** | **The two module-level helpers C32's file scope surfaces → `services/project-identity/project-root-identity.ts`** — `canonicalizeProjectRoot` `:39-44` and `assertProjectRootReuse` `:46-68`. `spec.md` §4.2 names **1** body in this file; measured there are **3**. Both are already imported by name in `index-project-identity.test.ts` and `index-project-tool.test.ts`, so it is **2 import repoints and no test rewrite**. **Not a published-surface change**: `tools/index.ts` re-exports only `IndexProjectTool` (`:5`) and `ReadFileTool` (`:37`), so neither helper is on `@massa-ai/core/tools`. RFS-04's semver framing does not reach this task | 1 handler + 1 new module + 1 new suite + 2 test repoints | — |
-| **T14b** | **The managed-run lease acquisition `:158-202` → `services/indexing/`. Without this task the gate cannot reach `0 of 30` — C33, §3.6.** 45 lines: `eventId`, `ManagedRunRepositoryPg.getInstance()`, `begin()`, the `"busy"` branch, the `catch`, and the `lease` assignment. **The module returns a discriminated result and `handle()` maps it to a `ToolResponse`** — the two early returns at `:175-186` and `:198-201` are response *shaping* and stay in the handler, so no `services/` module imports `tools/serialize.ts` (RFS-03 AC-2). `handle()` **128 → ~87**, 33 lines under the ceiling. **Closed by removal, zero allowlist** — §4.2's own principle, and this block is managed-run orchestration by any reading, so it is on-requirement rather than scope creep. **Decided by: the user, 2026-07-31**, from three options with their measured consequences | 1 handler + 1 new module + 1 new suite | **RFS-01 AC-1**, GMS-02 headline |
+| **T14b** | **The managed-run lease acquisition ~~`:158-202`~~ → `:151-202` → `services/indexing/`. Without this task the gate cannot reach `0 of 30` — C33, §3.6.** **Amended by C43 (§10.6), and this one is gate-relevant rather than tidiness**: the cited span is statement-only and leaves the 7-line `// ── Wave 5 FR-09:` block `:151-157` behind — **inside `handle()` `:117-244`**, whose span the gate measures **including comment lines**. So the planned `128 → ~87` lands at **~94** if the comment stays, eating 7 of the 33 lines of margin this row prices. No artifact mentioned this comment at all. ~~45~~ → **52** lines: `eventId`, `ManagedRunRepositoryPg.getInstance()`, `begin()`, the `"busy"` branch, the `catch`, and the `lease` assignment. **The module returns a discriminated result and `handle()` maps it to a `ToolResponse`** — the two early returns at `:175-186` and `:198-201` are response *shaping* and stay in the handler, so no `services/` module imports `tools/serialize.ts` (RFS-03 AC-2). `handle()` **128 → ~87**, 33 lines under the ceiling. **Closed by removal, zero allowlist** — §4.2's own principle, and this block is managed-run orchestration by any reading, so it is on-requirement rather than scope creep. **Decided by: the user, 2026-07-31**, from three options with their measured consequences | 1 handler + 1 new module + 1 new suite | **RFS-01 AC-1**, GMS-02 headline |
 
 ### Phase 5 — the gate goes green and is wired
 
@@ -674,7 +693,11 @@ Tasks PR corrected it in place rather than deferring:
 | 11 | `design.md` §6.5's nine-case table (`:775-785`) | **C40** — the table is the truth table of `declaresBody()` for the **member** node and is not a table of `BodyFinding.kind`; the two diverge for an arrow-function class property, whose flagged node is the nested `ArrowFunction`, reported as `kind: "ArrowFunction"` and **not** `PropertyDeclaration`. The table is also silent on `SetAccessor`, a distinct `ts.SyntaxKind` the gate handles. **Second figure in this table not to survive being re-run**, after C39 (§10.5) |
 | 12 | `design.md` §6.4 item 4 | **C40** — the named fixture, a `handle()` containing `"unexpected token: {"`, discriminates against a naive brace counter at **exactly one span** (120, where the counter overshoots to 121). The `}` form discriminates across the whole range above the ceiling. Sized wrong, the named fixture is inert — the mutation-resolves-to-nothing class this feature recorded at T3 (§10.5) |
 
-These are **T20b**.
+| 13 | `design.md` §6.6 property 2 (`:810-813`) | **C42** — *"the reading is `2 of 30` on the body/`Map` clauses and `2 of 27` on the `handle()` clause"* states a **union** as if it were a per-clause reading. Measured at T5: clause 1 → `2 of 30`, clause 2 → **`1 of 30`** (`read_file.ts` only), clause 3 → `2 of 27`. `index_project.ts` carries **0** state sites. The property's own *"a third clause that flags no file the other two miss"* note therefore applies to the **second** clause as well, and it is stated only of the third (§10.6) |
+| 14 | `design.md` §5.1 module 8 (`:457`) and the module table's span convention | **C43** — the cited spans are **comment-inclusive for `read_file.ts` and declaration-only for `index_project.ts`**, unstated and mixed per file. Module 8's `executeIndexing` `:254-351` orphans its 8-line doc `:246-253`, and §5.1's own **~110** LOC estimate is the tell: comment-inclusive is **106**, declaration-only **98**. The same defect reaches `tasks.md`'s own T14b row, where the orphaned comment sits **inside** the `handle()` the ceiling measures (§10.6) |
+
+These are **T20b**. ~~Six~~ → **fourteen** corrections; the count in `HANDOFF.md` and `STATE.md` was
+last true at Design.
 
 ---
 
@@ -1574,3 +1597,283 @@ a blind spot. Running total: **forty-six** plan defects.
 3. **The `handle()` metric is only falsifiable in a 4-line window** (full span 121–124) and nowhere
    else, so a single badly-sized fixture would have left the choice unpinned exactly as the corpus
    does.
+
+### 10.6 T5 — executed, 2026-08-01
+
+**RFS-01 AC-3 closes.** One file, this one. **Not a test** (§3.5 item 4, `design.md` §6.6
+property 5) — the reading is a record; the gate's suite is T4b's.
+
+**The precondition is R-37, not the mechanism `design.md` §6.6 property 1 gives**, which §3.5 item 4
+already struck. Measured: `git diff main..HEAD -- packages/core/src/tools/` is **empty**, `git log`
+over the same path across the branch has **0** entries, and the directory holds **30** tracked files,
+all `.ts`. Staged anyway — the reading after `git add` is byte-identical to the reading before it,
+which is what §3.5 item 4 predicted and is recorded so the habit stays a habit rather than becoming
+a belief.
+
+#### The frozen base reading
+
+```
+VIOLATION  index_project.ts
+    body     :39-44 (6 lines)  canonicalizeProjectRoot  [FunctionDeclaration]
+    body     :46-68 (23 lines)  assertProjectRootReuse  [FunctionDeclaration]
+    body     :254-351 (98 lines)  executeIndexing  [MethodDeclaration]
+    handle() 128 lines  (ceiling 120)
+    -- maximal bodies 3, raw 3, state 0, handle() 128
+VIOLATION  read_file.ts
+    body     :33-36 (4 lines)  ArrowFunction  [ArrowFunction]
+    body     :167-171 (5 lines)  ArrowFunction  [ArrowFunction]
+    body     :368-385 (18 lines)  resolveFilePath  [MethodDeclaration]
+    body     :407-448 (42 lines)  checkPathContainment  [MethodDeclaration]
+    body     :450-470 (21 lines)  getProjectRoot  [MethodDeclaration]
+    body     :477-483 (7 lines)  evictOldest  [MethodDeclaration]
+    body     :485-507 (23 lines)  calculateRange  [MethodDeclaration]
+    body     :509-516 (8 lines)  adjustRange  [MethodDeclaration]
+    body     :518-580 (63 lines)  readFileWithCache  [MethodDeclaration]
+    body     :582-628 (47 lines)  extractMetadata  [MethodDeclaration]
+    body     :630-643 (14 lines)  extractLines  [MethodDeclaration]
+    body     :645-681 (37 lines)  detectLanguage  [MethodDeclaration]
+    body     :683-706 (24 lines)  extractImports  [MethodDeclaration]
+    state    :145  fileCache  [field]
+    state    :146  projectRootCache  [field]
+    handle() 175 lines  (ceiling 120)
+    -- maximal bodies 13, raw 17, state 2, handle() 175
+
+[tools-thin] FAIL — 2 of 30 file(s) over the rule; 27 declare an IToolHandler, 3 do not; 224 members examined; handle() ceiling 120
+```
+
+Exit **1** — the intended Phase 1 state; AC-1's *"exits 0"* is T15's. **Spans are
+declaration-only** (C43 below). The population line carries no *"class"*, C40's label change,
+which is the one word by which T4a's quoted string is stale.
+
+#### `read_file.ts` — per member
+
+**Two of the thirteen are not class members**, so *"per member"* decomposes as **11 methods + 2
+anonymous arrows** — and the 11 is exactly C29's corrected private-method count (13 → 11).
+
+| # | span | lines | name | kind |
+| --- | --- | --- | --- | --- |
+| 1 | `:33-36` | 4 | **`ArrowFunction`** — the **module-level** IIFE initializing `MASSA_AI_READ_FILE_MAX_LINES` | `ArrowFunction` |
+| 2 | `:167-171` | 5 | **`ArrowFunction`** — the `eventBus.subscribe("indexing:started", …)` callback, **inside the constructor body** | `ArrowFunction` |
+| 3 | `:368-385` | 18 | `resolveFilePath` | `MethodDeclaration` |
+| 4 | `:407-448` | 42 | `checkPathContainment` | `MethodDeclaration` |
+| 5 | `:450-470` | 21 | `getProjectRoot` | `MethodDeclaration` |
+| 6 | `:477-483` | 7 | `evictOldest` | `MethodDeclaration` |
+| 7 | `:485-507` | 23 | `calculateRange` | `MethodDeclaration` |
+| 8 | `:509-516` | 8 | `adjustRange` | `MethodDeclaration` |
+| 9 | `:518-580` | 63 | `readFileWithCache` | `MethodDeclaration` |
+| 10 | `:582-628` | 47 | `extractMetadata` | `MethodDeclaration` |
+| 11 | `:630-643` | 14 | `extractLines` | `MethodDeclaration` |
+| 12 | `:645-681` | 37 | `detectLanguage` | `MethodDeclaration` |
+| 13 | `:683-706` | 24 | `extractImports` | `MethodDeclaration` |
+
+**State**: `:145` `fileCache` `[field]`, `:146` `projectRootCache` `[field]` — both `[field]`, so
+the live tree exercises **one** of clause 2's three sites; the `module` and `assignment` sites are
+**0** and prospective, as T4a measured. **`handle()` `:174-348` = 175**, re-derived independently
+and matching the gate. **maximal 13 / raw 17** — the 4 nested arrows are `:423`, `:424`, `:440`
+inside `checkPathContainment` and one at `:638-641` inside `extractLines`.
+
+**The two anonymous bodies are the pin `HANDOFF.md` predicted and it predicted them short.** It said
+*"at least one of `read_file.ts`'s 13 will read `ArrowFunction`"*; measured, **two** do. The flagged
+node for a nested initializer has no name of its own, so **the span is the only identifier** — which
+is what AC-3's per-member baseline needs and why T4b pinned the behaviour in the suite rather than
+leaving it to be discovered here.
+
+#### `index_project.ts` — per member
+
+| # | span | lines | name | kind |
+| --- | --- | --- | --- | --- |
+| 1 | `:39-44` | 6 | `canonicalizeProjectRoot` | `FunctionDeclaration` |
+| 2 | `:46-68` | 23 | `assertProjectRootReuse` | `FunctionDeclaration` |
+| 3 | `:254-351` | 98 | `executeIndexing` | `MethodDeclaration` |
+
+**State**: none. **`handle()` `:117-244` = 128**, re-derived independently and matching the gate and
+§3.6. **maximal 3 / raw 3.** Two of the three are `FunctionDeclaration` at **module level**, which
+is C32's file scope doing the work `spec.md` §4.2's *"1 body"* did not see.
+
+#### The rest of the population
+
+| group | files | maximal bodies | state | `handle()` |
+| --- | --- | --- | --- | --- |
+| the other 25 handlers | 25 | **0** (max) | **0** (max) | **≤ 113**, max `impact_analysis.ts` at 113 |
+| declare no `IToolHandler` | 3 — `index.ts`, `serialize-interfaces.ts`, `serialize.ts` | n/a | n/a | n/a |
+
+Verified independently rather than read off the summary: all **27** handlers have `handleLines > 0`;
+the 3 non-handlers declare no `handle(` **and do not name `IToolHandler` at all**; **0** files import
+it under an alias; the per-file `membersExamined` sum to **224**. Every §3.3 figure reproduces.
+
+#### C42 — the forty-seventh plan defect: `2 of 30` is a union, and clause 2's own reading is `1`
+
+§3.3 and `design.md` §6.6 property 2 both state *"`2 of 30` on the body/`Map` clauses and `2 of 27`
+on the `handle()` clause, the same two files."* Derived per clause from the gate's own `--json`:
+
+| clause | RED | files |
+| --- | --- | --- |
+| 1 — a declared body outside `handle()` | **2 of 30** | `index_project.ts`, `read_file.ts` |
+| 2 — `Map`/`Set` state | **1 of 30** | `read_file.ts` **only** |
+| 3 — `handle()` > 120 | **2 of 27** | `index_project.ts`, `read_file.ts` |
+
+`index_project.ts` has **0** state sites, so the stated `2 of 30` is the **union of clauses 1 and 2**
+and neither clause's own reading. **The same union-vs-subset confusion the T4a evidence audit hit
+from the opposite end** — there a critic compared a subset count to the `6 of 30` union and was
+rejected; here the document does it to itself, and is right.
+
+**What it changes is R-39's scope, not a verdict.** R-39 names clause 3 as the clause whose value is
+prospective because it *"flags no file the other two miss"*. Measured, **clause 2's RED set is a
+strict subset of clause 1's and clause 3's**, so the same sentence is true of it and no artifact says
+so. Author level on the C34/C35/C37/C38/C39/C41 precedent — AC-3's own text records `2 of 30` and is
+untouched, and the replacement reading is named. Owed to `design.md` (**T20b**, §8.1 row 13); **not**
+owed to the parent, because §6.6 is Design's own property list with no criterion behind it.
+
+#### C43 — the forty-eighth: the span anchor is split per file, unstated, and it orphans two comments
+
+RFS-01 AC-3's base is a member-level **span** claim, so the anchor is load-bearing. Every span
+citation in the artifacts that points into either file — **26**, not the 14 the flagged members
+supply — checked against source:
+
+| citation | count | reading |
+| --- | --- | --- |
+| no preceding comment — the two conventions coincide | **16** | indistinguishable |
+| cited **comment-inclusive** | **8** | all in `read_file.ts` |
+| cited **declaration/statement-only, orphaning a comment** | **2** | both in `index_project.ts` |
+
+**The mix is per file, not per citation.** `read_file.ts`'s spans are comment-inclusive at all 8
+sites where a comment exists and orphan **none**; `index_project.ts`'s orphan at both sites where one
+exists and are comment-inclusive at **none**. The gate's own convention is uniformly
+declaration-only. Third instance on this feature of *the corpus cannot falsify the convention*
+(T4a's `handle()` full-span vs body-block, T4b's brace fixture) and the second of the **mixed
+unstated anchor** class (§8 pre-mortem finding 3, the LRU sites) — this time split cleanly by file,
+which is the mechanism: the two files' spans were measured in different passes.
+
+**The two orphans are both Phase 4, and one of them is gate-relevant.**
+
+| row | cited | orphaned comment | consequence |
+| --- | --- | --- | --- |
+| **T13** | `:254-351` | `:246-253`, 8 lines | outside `handle()`; a doc block left describing code that moved. **C33's conclusion does not move** — the span is outside `:117-244` under either convention |
+| **T14b** | `:158-202` | `:151-157`, 7 lines (`// ── Wave 5 FR-09: …`) | **inside `handle()` `:117-244`**, and the gate measures that span **including comment lines**. Leaving it puts the planned `128 → ~87` at **~94**, spending 7 of the 33 lines of margin the row prices |
+
+**No artifact mentions either comment.** `design.md` §5.1 module 8's own **~110** LOC estimate is the
+arithmetic tell, C39's shape a second time in the same table: comment-inclusive is **106**,
+declaration-only **98**. Both rows amended in §5 with their reason. Author level — the replacement
+spans are named, C33's decision is untouched, and moving a comment with the code it describes is the
+only reading any document supports. Owed to `design.md` (**T20b**, §8.1 row 14).
+
+**This finding was found twice and got its figures wrong both times before it was right**, which is
+worth more than the finding. The first sweep was scoped to **declared members**, the population
+`ts.getLeadingCommentRanges` reaches from a declaration node — so it saw `executeIndexing` and was
+structurally blind to T14b's `:158-202`, a plain statement range inside `handle()` that is not a
+member at all. *An anchor audit is only as complete as its definition of the thing anchored, and the
+task rows cite code ranges, not declarations.*
+
+#### What the frozen record can and cannot witness
+
+The premise T5 rests on, measured rather than inherited. Instruments: seven copies of the shipped
+gate with **only `isViolation`'s body patched**, plus a comment-only inert control — refuse-on-anchor-
+not-found and refuse-on-byte-identical on every patch, and **the baseline copy's output is
+byte-identical to the shipped gate's**, which is what makes the diffs readable. No repo file was
+mutated, so no restore was needed and `git checkout` was never a temptation.
+
+| variant | verdict line | full report | lines differing |
+| --- | --- | --- | --- |
+| comment-only (**inert control**) | same | identical | 0 |
+| clause 1 deleted | same | **identical** | 0 |
+| clause 2 deleted | same | **identical** | 0 |
+| clause 3 deleted | same | **identical** | 0 |
+| clause 1 only | same | identical | 0 |
+| clause 2 only | **`1 of 30`** | MOVED | 8 |
+| clause 3 only | same | identical | 0 |
+
+**Any one of the three clauses can be deleted outright and the entire report — verdict, every span,
+every state site, the population line — is byte-identical.** The mechanism is exact rather than
+statistical: `report()` prints every body, state site and `handle()` overage of every *violating*
+file regardless of which clause made it violate, and on a 2-file population each file is held in by
+more than one clause.
+
+**This does not falsify §3.3's reason for recording per member, and the first draft of this section
+said it did.** That reason is that the AST enumerates members and spans correctly where three regex
+detectors did not — which the independent re-derivation above confirms it does. What the table
+establishes is a **different and adjacent** limitation: the frozen base witnesses **the tree** — 16
+spans, 2 state sites, 2 `handle()` lengths, exactly what Phases 3 and 4 must move — and **does not
+witness the rule**, which is AC-4's job and T4b's. Two complementary sensors, neither substituting
+for the other. C42 and this table are two views of one measured fact and are recorded as such.
+
+**It extends T4b's result by one level rather than repeating it.** T4b mutated clause *internals* and
+found 10 of 13 invisible to the live-tree run; this deletes whole clauses and finds **3 of 3**
+invisible in the full report. R-40's mitigation already requires T25 to re-run the gate *per clause*;
+what this adds is the method and one fact that method needs — **the per-clause reading is not
+derivable from the default report at all.** It needs `--json` or a patched gate, because the report
+is organised by file and not by clause.
+
+#### Gates
+
+**T5's write set is `.specs/`-only and no gate's subject moves — measured, not asserted**, because
+the plan asserted it first and one of the checks came back the other way before it came back this
+way. `check-tools-thin`'s `TOOLS_DIR` filter and `check-core-layering`'s `CODE` regex both exclude
+`.md`; `lint` is oxlint over code; `type-check` / `build` / `test` are turbo over workspace packages
+and `.specs/` is not one; `test:plugins` reads `apps/*-plugin/__tests__` only.
+
+The one that needed measuring rather than reasoning: **`scripts/check-stale-pointers.ts` scans
+tracked files repo-wide and `test:scripts` runs it.** `.specs/` is the **second entry in its
+`EXCLUDED` list** — *"the plan's own record of what moved where"* — so it cannot see this file.
+Baseline confirmed anyway: `PASS — 0 broken, historical exactly at its pin of 28`, exit **0**. Of the
+15 suites under `scripts/__tests__` that name `.specs/`, **13 name it only in prose**; the 3 that
+read files read `core-layering-god-module-split`'s frozen fixtures or assert `STATE.md` **exists**.
+None reads this feature's directory.
+
+`check-tools-thin` re-run **after `git add`**: byte-identical to the reading above, exit 1.
+`test:scripts` re-run as the empirical backstop for the paragraph above — exit **0**, **1114** pass /
+0 fail across **49** files plus 8 shell scenarios, which is T4b's figure unchanged, as it must be for
+a commit that adds no test file. The summary was read from the log rather than inferred from the exit
+code: `bun test` writes it to **stderr** on success as well as failure, so *"no match → pass"* is a
+default this record refuses.
+
+**The transcription itself is verified, not proofread.** The gate output above is **byte-identical**
+to the live run — asserted by a script that parses the fenced block back out of this file and
+diffs it — and both per-member tables were parsed back out and checked **cell by cell** against the
+gate's own `--json`: **72 assertions, 0 mismatches**. That check is here because the failure this
+feature has repeated most is a document asserting something its own instrument did not say, and a
+frozen baseline is the artifact where that failure is least visible and most expensive. *Its first
+run reported `row count 0`, which was the parser and not the table — a sensor's red is a claim about
+the sensor until you have checked which.*
+
+**Precedent checked rather than assumed**: the four prior pure-`.specs/` commits on this branch
+(`7f2dc49`, `a68ce72`, `d604d31`, `35f9895`) recorded no gate battery; the full six ran on the
+commits that added tracked code (T1–T3, `180f7d2`, `e0ebf17`). T5 is in the first class.
+
+#### The Plan Challenge gate on T5 — two modes, six findings
+
+Both lenses read-only; `git status --porcelain` **and** the SHA-256 of all ten files they were
+pointed at were checked after each returned rather than trusting the agents' own reports — all ten
+`OK`, tree unchanged. Mode selection reuses this feature's recorded route (`spec.md` §9.1,
+`design.md` §10).
+
+**Both modes independently found the same defect, and it was the author's own carried figure.**
+*"§5.1's ~110 matches the comment-inclusive count **108**"* → measured **106** (`:246-351`). The 108
+came from an earlier instrument anchored at `:244` — which is **`handle()`'s own closing brace**, one
+line into the previous member — and that instrument's control had **already failed once** and been
+rewritten. The corrected figure was carried forward from the run that produced it rather than
+re-derived. *This is §10.5's fixture lesson verbatim, in the section auditing another document for
+exactly this class.* **Sixteenth time on this feature that a critic's mechanism held while a figure
+did not — and the seventeenth is in the same paragraph**: the red-team located T14b's orphaned
+comment at `:150-156`; measured, it is **`:151-157`**, `:150` being the blank line.
+
+| # | mode | finding | disposition |
+| --- | --- | --- | --- |
+| 1 | red-team | T14b's `:158-202` orphans a 7-line comment, and the author's sweep was structurally blind to it | **CONFIRMED and it is the finding of this task.** The sweep's population was declared members; task rows cite code ranges. Re-run over all **26** cited spans |
+| 2 | both | the `108` comment-inclusive figure | **CONFIRMED — 106.** Corrected before authorship |
+| 3 | red-team | Finding B's framing over-reads §3.3's stated rationale | **CONFIRMED.** The per-member rationale is about the AST enumerating correctly, which holds; the redundancy limitation is adjacent, not a falsification. Reframed above |
+| 4 | red-team | C42 and the clause-deletion table are two views of one fact | **ACCEPTED** — recorded as such rather than as two discoveries |
+| 5 | evidence audit | the 8-line diff is correct only when scoped to the tool's own stdout | **ACCEPTED** — it was; recorded for T25, which re-runs this instrument |
+| 6 | evidence audit | ~60 figures re-derived with an independent AST analyzer; every other one reproduces | **CONFIRMED**, including the per-clause table, all seven variants, the 16-row anchor classification, the population, R-37, and the two stale header clauses |
+
+Running total: **forty-eight** plan defects.
+
+#### What T5 pins that no artifact named
+
+1. **The frozen base is a claim about the tree, not about the rule.** Byte-invariant under deleting
+   any one of the three clauses. Pair it with AC-4's suite or it certifies less than it appears to.
+2. **Clause 2 is exercised by one file and one of its three sites.** `read_file.ts`, both `[field]`;
+   `module` and `assignment` are 0 and prospective. After Phase 3 clause 2 reads `0 of 30` having
+   never been about `index_project.ts` at all.
+3. **Two of `read_file.ts`'s thirteen bodies have no name in the report**, so the span is their only
+   identifier — and neither is a class member: one is module-level, one is inside the constructor.
+4. **The span anchor splits by file**, and the split is invisible at 16 of 26 citations.
