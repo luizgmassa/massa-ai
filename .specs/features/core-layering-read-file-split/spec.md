@@ -425,8 +425,20 @@ move, on GMS-02 AC-2's own evidence shape (`validation.md` §1: ancestry + SHA-2
 are green now").
 **AC-2**: The shared module is an **eviction function**, not a cache class. No site's TTL or
 read-promotion policy moves.
-**AC-3**: `kernel/lru-cache.ts` imports nothing relative — kernel leaf-ness is enforced by
-`check-core-layering.ts`'s clause 1, not asserted.
+**AC-3**: ~~`kernel/lru-cache.ts` imports nothing relative — kernel leaf-ness is enforced by
+`check-core-layering.ts`'s clause 1, not asserted.~~ → **`services/cache/lru-evict.ts` imports
+nothing at all, and that is asserted by the module's own unit test rather than enforced by any
+tier rule.** **Amended at T6** (`tasks.md` §10.7) on the C37/C41 precedent, because this clause
+names a module PR-D does not build and an enforcement mechanism it does not get. **C30**
+(`design.md` §5.2) moved the LRU out of `kernel/` — the tier's admission rule is *"serves ≥ 2
+tiers"*, kept by 11 of 11 shipped members, and this module serves `services/` alone after Phase 3 —
+and §5.2 recorded the consequence for this criterion **without striking it here**, so for three
+tasks the spec asserted a CI clause that could never run. *A criterion superseded in substance does
+not strike itself* (C41, verbatim, second occurrence). **The loss of enforcement is real and was
+measured at T6, not argued**: of six mutations of the shipped module, the added-import one is
+**invisible** to T1's characterization oracle even with T7's repoint applied, as are two others — no
+amount of exercising the call sites can see this property, so the unit test is not a weaker sensor
+than the kernel clause would have been, it is the **only** one. Recorded rather than glossed (R-29).
 **AC-4** *(added by the Plan Challenge gate — §3.B)*: `ReadFileTool.projectRootCache`'s behavior
 across a project rename/merge is **pinned by a test taken before the extraction**: warm the cache,
 run the rename path, read again, and record what is served. Whichever answer it gives is the

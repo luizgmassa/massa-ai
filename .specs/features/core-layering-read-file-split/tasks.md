@@ -487,9 +487,9 @@ unchanged, and `check-tools-thin` does not exist yet.
 
 | # | task | write set | closes |
 | --- | --- | --- | --- |
-| **T6** | **`packages/core/src/services/cache/lru-evict.ts`** — an eviction **function** over `Map<K,V>`, not a cache class (AC-2), importing **nothing at all**. **AC-3's original property is gone**: `services/cache/` is not `kernel/`, so `check-core-layering`'s leaf-ness clause does not constrain it. The replacement is asserted by the module's own unit test, and that is a **real loss of CI enforcement**, recorded rather than glossed (R-29) | 1 new module + 1 new test | **RFS-02 AC-2, AC-3** |
-| **T7** | **Repoint the four sites** — `read_file.ts` (**3** call sites: `:169`, `:462`, `:570`, §3.5 item 6), `symbol-graph.service.ts:808`, `web-controller.ts:138`, `file-filter-cache.ts:82`. **No site's TTL or read-promotion moves.** T1's suites must pass **unmodified** — assert byte-identity by SHA-256 across the commit, on `validation.md` §1's evidence shape, not "the tests are green now" | 4 files | **RFS-02 AC-1** |
-| **T8** | **Repoint `read-file.test.ts`'s eviction test** (`:264-272`), which reaches four private members and cannot survive T7 unmodified. **GMS-05 AC-3: repointed, not weakened, skipped or deleted** — the CAP+1 eviction and hot-key-promotion assertions must still run, against the module | 1 file | GMS-05 AC-3 |
+| **T6** | **`packages/core/src/services/cache/lru-evict.ts`** — an eviction **function** over `Map<K,V>`, not a cache class (AC-2), importing **nothing at all**. **AC-3's original property is gone**: `services/cache/` is not `kernel/`, so `check-core-layering`'s leaf-ness clause does not constrain it. The replacement is asserted by the module's own unit test, and that is a **real loss of CI enforcement**, recorded rather than glossed (R-29) — measured at T6, **total**: no mutation of the import property is visible to any characterization suite, before or after T7. **The signature is `(cache, maxRetained)`, a post-call bound, not `(cache, cap)` — amended by C44 (§10.7)**: `design.md` §5.1's phrasing does not determine the predicate, the five sites do not share one, and a single operator with each site passing its own literal cap is behavior-preserving at **neither** call position. Pre-insert callers pass `CAP - 1`, which is exact rather than a compromise, since `size > cap - 1` and `size >= cap` are the same predicate over integers | 1 new module + 1 new test | ~~**RFS-02 AC-2**, AC-3~~ → **RFS-02 AC-2 clause 1 ("an eviction function, not a cache class") and AC-3** — **amended by C47 (§10.7)**: AC-2's second clause, *"no site's TTL or read-promotion policy moves"*, cannot be closed by a module nothing calls; it is **T7's** |
+| **T7** | **Repoint the four sites** — `read_file.ts` (**3** call sites: `:169`, `:462`, `:570`, §3.5 item 6), `symbol-graph.service.ts:808`, `web-controller.ts:138`, `file-filter-cache.ts:82`. **No site's TTL or read-promotion moves.** T1's suites must pass **unmodified** — assert byte-identity by SHA-256 across the commit, on `validation.md` §1's evidence shape, not "the tests are green now". **Take the delegate shape — added by C46 (§10.7), and it is a frozen-base decision rather than a style one.** Keep `private evictOldest<K,V>(cache)` on `ReadFileTool` as a one-line call into the module; do **not** delete it and inline the three call sites. Measured: inline leaves `read-file.test.ts` at **6p/1f** until T8 lands **and** moves RFS-01 AC-3's frozen base mid-Phase-2 (`read_file.ts` 13 → **12** maximal bodies, 224 → **223** members examined), which §3.1's *"unchanged between T5 and T9"* guarantees only for the **file population**, not for the per-member table AC-3 froze. Delegate leaves both **byte-identical**. **Pre-insert sites pass `CAP - 1`** and the two post-insert sites pass `CAP` (C44) | 4 files | **RFS-02 AC-1**, and **AC-2 clause 2** (*"no site's TTL or read-promotion policy moves"*) — reassigned here by **C47** |
+| **T8** | **Repoint `read-file.test.ts`'s eviction test** (~~`:264-272`~~ → **`:264-299`**, `describe` `:257-300`), which reaches four private members ~~and cannot survive T7 unmodified~~. **Both amended at T6 (§10.7).** The span: C34 measured `:264-299` at T1 and corrected only §10.1's prose, leaving this row wrong for five tasks — the fifth correction on this feature to land in one document and not in the row it is about. The clause: **falsified by measurement** — under T7's delegate shape (C46) the test passes **7p/0f/34x, byte-identical to baseline**, because all four members it reaches still exist. It survives T7 and is repointed here anyway, because Phase 3 removes its subject. **GMS-05 AC-3: repointed, not weakened, skipped or deleted** — the CAP+1 eviction and hot-key-promotion assertions must still run, against the module. **It is also the only non-vacuous sensor for `fileCache` eviction until this task runs** (C45), so it must not be weakened in transit | 1 file | GMS-05 AC-3 |
 | **T8b** | **The two comments RFS-02 AC-4 requires corrected — `production-wiring.ts:67-68` and `invalidator-registry.ts:34-36`.** Both state the same false claim and the **named site cites the unnamed one as its authority**, so correcting only the named one leaves a reader who follows its own pointer at the uncorrected claim (**C35**, §10.1). Corrected to state what T1's pin measured: `CACHE_TTL` is enforced, `ROOT_CACHE_TTL` is **not**, and no invalidator id matches `read_file`. **Added by C35 at T1; this row was created at T4b** — C35 resolved the defect and named the task but never wrote a row for it, so for four tasks T8b existed only in §10.1's prose and was absent from §5 and from §1's write-set table (§10.5) | 2 files, comments only | **RFS-02 AC-4** |
 
 ### Phase 3 — the extraction, 490 of 707 lines
@@ -696,8 +696,10 @@ Tasks PR corrected it in place rather than deferring:
 | 13 | `design.md` §6.6 property 2 (`:810-813`) | **C42** — *"the reading is `2 of 30` on the body/`Map` clauses and `2 of 27` on the `handle()` clause"* states a **union** as if it were a per-clause reading. Measured at T5: clause 1 → `2 of 30`, clause 2 → **`1 of 30`** (`read_file.ts` only), clause 3 → `2 of 27`. `index_project.ts` carries **0** state sites. The property's own *"a third clause that flags no file the other two miss"* note therefore applies to the **second** clause as well, and it is stated only of the third (§10.6) |
 | 14 | `design.md` §5.1 module 8 (`:457`) and the module table's span convention | **C43** — the cited spans are **comment-inclusive for `read_file.ts` and declaration-only for `index_project.ts`**, unstated and mixed per file. Module 8's `executeIndexing` `:254-351` orphans its 8-line doc `:246-253`, and §5.1's own **~110** LOC estimate is the tell: comment-inclusive is **106**, declaration-only **98**. The same defect reaches `tasks.md`'s own T14b row, where the orphaned comment sits **inside** the `handle()` the ceiling measures (§10.6) |
 
-These are **T20b**. ~~Six~~ → **fourteen** corrections; the count in `HANDOFF.md` and `STATE.md` was
-last true at Design.
+| 15 | `design.md` §5.1 module 1 (`:450`) | **C44** — *"a function taking `(cache, cap)`"* does not determine the predicate, and the five sites do not share one: three evict pre-insert on `>=`, two post-insert on `>`. Measured at T6 against T1's oracle through a full prospective repoint: one operator with every site passing its own literal cap **fails in both directions** — shared `>` breaks the three pre-insert sites (3p/2f), shared `>=` breaks the two post-insert ones (3p/2f). The shipped contract is a **post-call bound** `(cache, maxRetained)`, with pre-insert callers passing `CAP - 1`; it is exact rather than a compromise, because `size > cap - 1` and `size >= cap` are the same predicate over integers. `spec.md` §3.B's *"retain the same number"* is a statement about five sites keeping their **own** operators, not about one they share (§10.7) |
+
+These are **T20b**. ~~Six~~ → ~~fourteen~~ → **fifteen** corrections; the count in `HANDOFF.md` and
+`STATE.md` was last true at Design.
 
 ---
 
@@ -1877,3 +1879,255 @@ Running total: **forty-eight** plan defects.
 3. **Two of `read_file.ts`'s thirteen bodies have no name in the report**, so the span is their only
    identifier — and neither is a class member: one is module-level, one is inside the constructor.
 4. **The span anchor splits by file**, and the split is invisible at 16 of 26 citations.
+
+### 10.7 T6 — executed, 2026-08-01
+
+**RFS-02 AC-2 closes in part and AC-3 closes.** Two new files, `packages/core/src/services/cache/lru-evict.ts`
+(one exported function, imports nothing) and `packages/core/src/__tests__/lru-evict.test.ts`
+(15 cases, 43 assertions). **Phase 2, and the first task on this branch that moves code.**
+
+Neither `services/cache/index.ts` nor `services/index.ts` is touched, so the extraction adds **0**
+names to `@massa-ai/core`'s published surface — `design.md` §5.1's stated principle for
+`services/file-read/`, applied to the one module that lands outside it. Verified rather than
+assumed: `services/index.ts:69` re-exports `L1MemoryCache` from `./cache/l1-memory-cache.js`
+**directly**, so `services/cache/index.ts` is not on the path to the published surface at all, and
+`services/embeddings/` already imports two `services/cache/` members by bypassing that same barrel.
+
+#### C44 — the forty-ninth plan defect: `(cache, cap)` is underdetermined, and both obvious readings are behavior-changing
+
+`design.md` §5.1 module 1 specifies the shared module as *"a function taking `(cache, cap)`"*. That
+phrasing does not determine the predicate, because **the five caches do not share one**:
+
+| site | position | predicate |
+| --- | --- | --- |
+| `read_file.ts` · `fileCache` | pre-insert | `while (size >= 512)` |
+| `read_file.ts` · `projectRootCache` | pre-insert | `while (size >= 512)` |
+| `symbol-graph.service.ts` | pre-insert | `while (size >= 512)` |
+| `web-controller.ts` | post-insert | `while (size > 512)` |
+| `file-filter-cache.ts` | post-insert | `if (size > 50)`, evict-one |
+
+`spec.md` §3.B establishes that pre-insert `>=` and post-insert `>` **retain the same number**. True,
+and it is the premise the whole unification rests on — but it holds only while each site keeps
+**both** its operator and its call position. Collapse them onto one operator with every site passing
+its own literal cap and the retained count moves, in **opposite directions** depending on which
+operator wins. Measured: three candidates, each a **full prospective T7 repoint of all five caches**,
+with T1's characterization suite as the oracle (baseline **5 pass / 0 fail / 3115 expect()**):
+
+| candidate | shared predicate | what each site passes | verdict | failing cases |
+| --- | --- | --- | --- | --- |
+| **A** *(adopted)* | `while (size > maxRetained)` | pre-insert `CAP - 1`, post-insert `CAP` | **PASS 5p/0f/3115x** — identical to baseline | — |
+| B | `while (size > cap)` | its own literal `CAP` | **FAIL 3p/2f/3111x** | `read_file · projectRootCache`, `symbol-graph` |
+| C | `while (size >= cap)` | its own literal `CAP` | **FAIL 3p/2f/3105x** | `web-controller`, `file-filter-cache` |
+
+**Resolution: the second parameter is a post-call bound, not "the cap".** The contract is
+`cache.size <= maxRetained` on return; pre-insert callers pass `CAP - 1` to reserve the slot the
+pending insert takes. This is not a compromise between the two readings — it is **exact**, because
+`size > cap - 1` and `size >= cap` are the same predicate over integers. That algebraic form was
+supplied by the evidence-audit lens and is **stronger than the empirical result it was auditing**:
+candidate A is a pure reformulation of every site, not a configuration that happened to pass a suite.
+
+Author level on the C34/C35/C37/C38/C39/C41/C42/C43 precedent — RFS-02 AC-1's byte-identity
+requirement and AC-2's *"no site's TTL or read-promotion policy moves"* jointly fix the answer, and
+the replacement is named and measured. Owed to `design.md` (**T20b**, §8.1 row 15); **not** owed to
+the parent, because §5.1's module table is Design's own decomposition with no criterion behind it.
+
+#### C45 — the fiftieth: T1's `fileCache` characterization case does not discriminate eviction
+
+Found by pulling on candidate B's result rather than by inspection. B disables correct eviction at
+all **three** pre-insert sites and only **two** cases went red. Measured directly — neuter
+`read_file.ts`'s `evictOldest` body entirely, which reaches **both** of that file's caches through
+the one private method:
+
+| case | unmutated | `read_file.evictOldest` neutered |
+| --- | --- | --- |
+| `read_file · fileCache` | 1p/0f | **1p/0f — unchanged** |
+| `read_file · projectRootCache` | 1p/0f | **0p/1f** |
+| `symbol-graph · projectRootCache` | 1p/0f | 1p/0f (its own separate method, untouched) |
+
+**The mechanism is exact.** The case offers `read("fc-1")` returning `"V2"` as its evidence that
+`fc-1` was evicted and re-read from disk. But `fc-1` was **inserted during the fill loop at `:156-158`,
+after the disk was rewritten to V2 at `:152`**, so its *cached* value is `"V2"` too. A cache hit and
+a fresh re-read are byte-identical, and the assertion cannot tell them apart. The only genuinely
+discriminating assertion left in that case is `fc-0` still replaying `"V1"`, which tests
+read-promotion survival and passes trivially when nothing is evicted at all.
+
+**§10.1's own mutation table already contained this reading and nobody read it that way.** M8
+(*"`read_file` `evictOldest` neutered"*) is recorded as **FAIL 4p/1f** — one failure, from a mutation
+that reaches two of the five characterized caches. The figure is correct; what was missing is that a
+1-of-2 kill on a 2-site mutation is a statement about the site that survived. *A mutation table's
+own arithmetic is evidence, and a row can be right while the count inside it goes unread.*
+
+**Consequence, and it is narrower than it first looks.** The pre-existing
+`read-file.test.ts:264-299` **does** characterize `fileCache` eviction non-vacuously — it asserts
+`fileCache.has("key-1")` is `false` against the private Map directly. So the site is covered today.
+What C45 establishes is that **RFS-02 AC-1's own suite is not what covers it**, which matters because
+that is the suite T7 must leave byte-identical and green, and because `read-file.test.ts` loses its
+subject at Phase 3. Owed back to §10.1's record; **not** a new task — T6's own suite carries the
+retained-count and victim-identity assertions directly on the function, where they survive Phases 3
+and 4.
+
+#### C46 — the fifty-first: T7's shape is unfixed, and it decides whether AC-3's frozen base moves during Phase 2
+
+**Found by the red-team lens, whose mechanism held and whose conclusion did not.** The finding was
+that T7 repoints `evictOldest` off `ReadFileTool`, so `read-file.test.ts:264-299` — which reaches
+`fileCache`, `projectRootCache`, `evictOldest` and `FILE_CACHE_MAX_ENTRIES` through a cast — throws,
+`bun run test` is red at T7's commit, and T8 must therefore be folded into T7. `tasks.md` T8's row
+asserts the same thing in the plan's own words: the test *"cannot survive T7 unmodified."*
+
+**Both are claims about a T7 shape that no artifact fixes.** Two are available, and only one had been
+considered. Measured:
+
+| T7 shape | `lru-eviction-characterization` | `read-file.test.ts` | `check-tools-thin` — `read_file.ts` | members examined |
+| --- | --- | --- | --- | --- |
+| *(baseline, unpatched)* | 5p/0f/3115x | **7p/0f/34x** | maximal **13**, raw 17, state 2, `handle()` 175 | **224** |
+| **delegate** — keep `private evictOldest<K,V>(cache)` as a one-line call into the module | 5p/0f/3115x | **7p/0f/34x** | **13 / 17 / 2 / 175 — byte-identical** | **224** |
+| **inline** — delete the method, call the module at `:169`, `:462`, `:570` | 5p/0f/3115x | **6p/1f/28x** | maximal **12**, raw **16**, state 2, `handle()` 175 | **223** |
+
+**The red-team's mechanism is confirmed and its conclusion is rejected as stated**: the red commit
+is a property of the inline shape, not of T7. **Eighteenth time on this feature that a critic's
+mechanism held while its figure or conclusion did not.**
+
+**What the measurement adds is sharper than the finding, and it is the reason this is C-numbered.**
+The inline shape **moves RFS-01 AC-3's frozen base during Phase 2**. `tasks.md` §3.1 argues it cannot:
+*"Phases 1 and 2 move no `tools/` file — Phase 2 edits `read_file.ts` but adds and removes none, so
+the population the reading describes is unchanged between T5 and T9."* That sentence is about the
+**30-file population**. AC-3's base is a **per-member** table (§3.3, *"per member, not per file"*), and
+deleting `evictOldest` takes it 13 → 12 maximal bodies and 224 → 223 members examined while leaving
+the file population untouched. **This is C36's distinction — population versus the figure that
+carries the requirement — recurring at the one place §3.1 relied on it.**
+
+**Resolution: T7 takes the delegate shape.** Under it every commit in Phase 2 is green, T1's suites
+are byte-identical *and* passing across T7, and T5's frozen base is untouched until T9 as §3.1
+promised. T8 still has its own work and GMS-05 AC-3 is still closed by it — the test is repointed at
+the module rather than left reaching a delegate. **T8's *"cannot survive T7 unmodified"* is struck as
+falsified**, and its span citation corrected (below). Author level: three criteria converge — §1.1's
+per-phase-green obligation, §3.1's frozen-base-unchanged-through-Phase-2 claim, and GMS-05 AC-3 —
+and the replacement is one line. Handed to **T25** as a question alongside C37's and AC-2's.
+
+#### C47 — the fifty-second: T6's row credits it with a criterion a module with no call sites cannot close
+
+`spec.md` RFS-02 AC-2 is two clauses: *"The shared module is an **eviction function**, not a cache
+class. **No site's TTL or read-promotion policy moves.**"* T6 ships a function that nothing calls, so
+it can close the first and **cannot** close the second — every site's policy is still exactly where
+T7 will find it. §5's T6 row credits **RFS-02 AC-2** whole. This is the RFS-03 AC-3 / PR-C **C19**
+class inverted: not a criterion owned by nothing, but a criterion owned by a task structurally unable
+to close it, which reads as closed the moment T6's commit lands. Amended in place: T6 closes **AC-2
+clause 1 and AC-3**, T7 closes **AC-2 clause 2** alongside AC-1.
+
+#### The suite's discrimination, two columns
+
+Backed up to scratch copies with SHA-256 byte-identity asserted on restore for all **6** files,
+refuse-on-anchor-not-found and refuse-on-byte-identical on every patch, **never `git checkout`**.
+Column A is T6's own suite against a mutated module. **Column B is the premise, not an inheritance**:
+nothing imports `lru-evict.ts` yet, so — exactly as at T4b, whose subject was also a brand-new file —
+there is no population of existing suites that could guard it, and *"the existing suites stay green"*
+would be a vacuous column. What is worth knowing, and what no artifact states, is **how much of the
+module's contract survives being observed only through the call sites**. So column B applies the
+prospective T7 delegate repoint and re-runs T1's oracle against the same mutation.
+
+| # | mutation | A: T6 suite | B: T1 oracle, via the T7 repoint |
+| --- | --- | --- | --- |
+| M1 | off-by-one, `>` → `>=` | FAIL 6p/9f | FAIL 0p/5f |
+| M2 | evicts the **newest** instead of the oldest | FAIL 7p/8f | FAIL 0p/5f |
+| M3 | evicts **exactly one** entry (`while` → `if`) | FAIL 12p/3f | **PASS 5p/0f** |
+| M4 | eviction neutered entirely | FAIL 7p/8f | FAIL 1p/4f |
+| M5 | the `undefined` guard dropped | FAIL 14p/1f | **PASS 5p/0f** |
+| M6 | a real import added — AC-3's replacement property, **observed red** (R-29) | FAIL 14p/1f | **PASS 5p/0f** |
+| M7 | comment-only edit (**inert control**) | PASS 15p/0f | PASS 5p/0f |
+| S1 | suite control: the AST walk's vacuity fixture loses a shape | FAIL 14p/1f | n/a |
+
+**Three of the six real module mutations are invisible to T1's oracle**, and the three are not
+arbitrary. **M6 is AC-3's entire replacement property** — the import-freedom that C30 traded kernel
+leaf-ness for — and no amount of exercising the call sites can see it. **M5** is the guard. **M3 is
+the most interesting**: evict-exactly-one is invisible because **no call site ever grows a `Map` by
+more than one per insert**, so the `while` loop's multi-eviction capability is unexercised by the
+entire live tree. That is T4b's result one file over (*"ten of thirteen mutations invisible to the
+live-tree run"*) and R-40's concern restated: **a shared module's contract is wider than the union of
+its callers, and only its own suite covers the difference.**
+
+#### The instrument shipped a dead mutation, and the verdict column could not have shown it
+
+M3's first form was the single patch `while` → `if`. That orphans the `break` inside a non-loop, so
+the module is a **syntax error** — `error: Cannot use "break" here` — and the suite reported
+**0 pass / 1 fail** because it never loaded. The row read **FAIL / FAIL**, my expectation for M3 was
+FAIL, and the harness's own mismatch counter printed **0**. *A mutation that fails to parse is
+indistinguishable from a mutation that was caught, by verdict alone.* It was caught only by refusing
+to accept an anomalous shape — `0p/1f` against a 15-case suite — rather than the expected verdict.
+
+Corrected to two patches (`while` → `if` **and** `break` → `return`), the row is **FAIL 12p/3f /
+PASS 5p/0f**, and the true result — that evict-one is invisible to every call site — is the opposite
+of what the dead row implied. The harness now **refuses** on `# Unhandled error between tests` or an
+`N error` line rather than reporting a verdict. This is the third author-instrument defect on this
+feature (after T1's stdout-only summary read and T5's `:244` anchor), and the second whose figure
+reached a table before being caught. *Print the population beside the verdict, and treat a
+load failure as a refusal rather than a red.*
+
+#### Gates, all six plus the layering gate
+
+`lint` exit **0**, and proven to bite **on this file** rather than assumed: a duplicate declaration
+appended to `lru-evict.ts` produced
+`packages/core/src/services/cache/lru-evict.ts:77:7: error: Identifier \`dupProbe\` has already been declared`
+and exit **1**; restored SHA-256-identical, lint back to **0**. `type-check` **6/6, 0 cached**
+(forced — the unforced run replays). `build` **5/5, 0 cached** (forced; `@massa-ai/core:build`
+confirmed `cache bypass, force executing` with `prisma generate` running, because a `Cached: 0` line
+is the claim and a 3-second wall clock is not). `test` exit **0**, **11/11 tasks** — **5 cached, and
+all five are `:build`** replaying from the forced build two minutes earlier, while **every one of the
+6 `:test` tasks executed** under `cache bypass, force executing`; the new suite confirmed *inside* the
+aggregate as `@massa-ai/core:test: src/__tests__/lru-evict.test.ts`, not only standalone.
+`test:scripts` exit **0**, **1114** pass / 0 fail across **49** files — T4b's and T5's figure
+unchanged, as it must be for a commit that adds no `scripts/` test. `test:plugins` exit **0**,
+**96** pass / 0 fail across 8 files.
+
+**`check-core-layering` after `git add`: `PASS — 0 violation(s) across 965 tier-to-tier edges in 904
+tracked files`.** Read it as **edges 965 unchanged; files 902 → 904** — C36's distinction applied
+rather than rediscovered. The module imports nothing, so it contributes no tier-to-tier edge; the
+population rises by the two tracked code files T6 adds.
+
+**`check-tools-thin` after `git add`: byte-identical to T5's frozen base** — `2 of 30`, 224 members
+examined, `read_file.ts` at 13 / 17 / 2 / 175 and `index_project.ts` at 3 / 3 / 0 / 128. T6 adds no
+file under `packages/core/src/tools/`, which is the real precondition R-37 names.
+
+**Coverage (R-36), measured for this file rather than deferred**: `lru-evict.ts` reads **100.00%
+funcs / 100.00% lines**. The `undefined`-key case is **not** what earns that — `scripts/check-coverage.ts:318`
+parses `DA:` records only and never `BRDA:`, so the guard's line counts as covered the moment it is
+evaluated by any case above. The case is kept because it states the guard's behavior, and the module
+says in a comment that it is not there for the floor.
+
+#### The Plan Challenge gate on T6 — two modes, ten findings
+
+Both lenses read-only; `git status --porcelain` **and** the SHA-256 of all **10** files they were
+pointed at were checked after each returned rather than trusting the agents' own reports — all ten
+`OK`, tree unchanged. Mode selection reuses this feature's recorded route (`spec.md` §9.1,
+`design.md` §10). **Both modes ran against a plan whose central premise had already been measured**,
+which is why the pre-mortem's findings are about consequences rather than about figures.
+
+| # | mode | finding | disposition |
+| --- | --- | --- | --- |
+| 1 | red-team | T7's commit is red on `test`; fold T8 into T7 | **CONFIRMED in mechanism, REJECTED as stated** — it is true of the inline shape and false of the delegate shape. Became **C46**, which is sharper than the finding: the shape also decides whether AC-3's frozen base moves |
+| 2 | red-team | the `fileCache` vacuity is real, and the ownership question is not "fix T1's test" | **CONFIRMED**, independently by the evidence-audit lens's own hand-trace. Became **C45**. Its added point — that `read-file.test.ts` covers the site non-vacuously — is measured and correct, and is what makes C46 load-bearing rather than tidy |
+| 3 | red-team | `tasks.md:492` cites `:264-272`; the test runs to `:299` | **CONFIRMED** — `:264` is the `test(`, `:299` the `});`. C34 recorded this at §10.1 and corrected only its own prose, so the row stayed wrong. **Fifth correction on this feature to land in one document and not in the row it is about.** Amended |
+| 4 | red-team | T6 cannot close RFS-02 AC-2's second clause | **CONFIRMED.** Became **C47** |
+| 5 | red-team | the new AST sensor has no observed red | **CONFIRMED and adopted** — M6 is that red, and S1 is a second one aimed at the vacuity fixture itself |
+| 6 | red-team | the `undefined` guard is dead code; the floor is line-only, so the case is not needed for it | **CONFIRMED** — verified `check-coverage.ts:318` reads `DA:` and there is no `BRDA` handling anywhere in the file. Kept as a behavior statement with the reason written in the module |
+| 7 | red-team | `file-filter-cache`'s insertion-order ≡ `createdAt`-order invariant is unstated and unenforced | **ACCEPTED** — named in the module's docblock as a blind spot on RFS-01 AC-6's precedent, with T1's M5b named as the only guard |
+| 8 | evidence audit | ~50 figures re-derived independently; **none** failed to reproduce, including all 16 LRU line citations, the 29/14 row counts and the layering gate's own three numbers | **CONFIRMED** — the first clean evidence-audit pass on this feature |
+| 9 | evidence audit | candidate A confirmed **by algebra** rather than by execution: `size > cap-1 ⟺ size >= cap` over integers | **ACCEPTED, and it is stronger than the empirical result it audited** — A is an exact reformulation of every site, not a configuration that happened to pass. Written into C44 and into the module's docblock |
+| 10 | evidence audit | the harness denied it reversible, SHA-verified `/tmp`-only writes, so candidates B and C were hand-traced rather than executed | **RECORDED as an environment fact, not a plan defect.** Its hand-traces agreed with the executed runs on every failing-case identity. *A read-only critic on this harness cannot run the scratch-copy mutation pattern this feature's own instruments depend on — brief it to trace, or expect a weaker column* |
+
+Running total: **fifty-two** plan defects.
+
+#### What T6 pins that no artifact named
+
+1. **A shared module's contract is wider than the union of its callers.** Three of six module
+   mutations are invisible to T1's oracle even with the repoint applied, and one of them —
+   evict-more-than-one — is unexercised by the live tree entirely, because no call site grows a `Map`
+   by more than one per insert.
+2. **`spec.md` §3.B's "they retain the same number" is a statement about five sites keeping their own
+   operators, not about a predicate they share.** Read as licence to pick one operator, it is false
+   in both directions.
+3. **RFS-02 AC-3's replacement property has exactly one sensor and it is a unit test.** No mutation of
+   the import property is visible to any characterization suite, before or after T7. R-29 called this
+   a real loss of enforcement; measured, it is total.
+4. **T7's shape is a frozen-base decision, not a style decision** — and §3.1's guarantee that the base
+   survives to T9 is true of the file population under either shape and true of the per-member table
+   under only one.
