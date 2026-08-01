@@ -651,7 +651,7 @@
       "branch": "spec/pr-d-read-file-split",
       "phases": {
         "specify": true,
-        "design": false,
+        "design": true,
         "tasks": false,
         "execute": false
       },
@@ -659,7 +659,8 @@
       "depends_on": [
         "core-layering-controller-retirement"
       ],
-      "notes": "PR-D of 4, the last. Closes GMS-02 AC-1 and the GMS-02 headline. C28 (28th correction, 35th plan defect): AS-06's stated sensor -- the CI import check PR-C shipped -- cannot discriminate the extraction, because check-core-layering.ts's FORBIDDEN.tools is empty by the declared order. PR-D therefore ships scripts/check-tools-thin.ts rather than inheriting a gate. Six local requirements RFS-01..RFS-06; RFS-06 is printed after RFS-02 deliberately, see spec.md section 5. Full Plan Challenge gate run at Specify: two modes, seven findings, all re-measured, six revised the document. Registered at Specify time rather than later -- PR-C's #56 skipped this file and needed T16b to repair it."
+      "notes": "PR-D of 4, the last. Closes GMS-02 AC-1 and the GMS-02 headline. Specify complete; DESIGN COMPLETE 2026-07-31 -- sized at six changes and nine new files under the 90% per-file coverage floor. Five decisions with rejected options: rename services/graph/ -> services/memory-graph/ (7 git mv, 19 importers, 28 import lines, 6 mock.module); delete the dangling check-coverage EXCLUSIONS entry and add an existence assert to the gate's TEST, not the gate; N = 125; handle() sheds all 98 of its non-delegation lines so the extraction is 490 of 707 (69.3%), not 392; and the shared LRU lands in services/cache/lru-evict.ts rather than kernel/, which stays at 11. Five corrections owed back to the parent spec.md: C28 (AS-06's named sensor cannot discriminate -- check-core-layering's FORBIDDEN.tools is empty by the declared order), C29, C30, C31, C32 -- the 35th through 39th plan defects across the umbrella. RFS-01's gate gains a third clause (handle() body <= 120, band [113,128) measured) and ships on a TypeScript AST rather than a regex, because 'no private method' is the wrong predicate: private run: (...) => ... is a function-typed FIELD in 4 files and a literal reading makes the frozen base 6 of 30 instead of 2. Two full Plan Challenge gates run; the Design one returned twelve findings across two modes, all twelve re-measured and confirmed, all twelve revising the document.",
+      "design": ".specs/features/core-layering-read-file-split/design.md"
     },
     {
       "slug": "sensor-repair-2026-07",

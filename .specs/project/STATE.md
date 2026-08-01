@@ -202,21 +202,27 @@ all state came from `.specs/` and source reads.
 - projectId: `massa-ai`
 - workflowSessionId: `spec-core-layering-read-file-split`
 - workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
-- feature: `core-layering-read-file-split` — **Specify COMPLETE 2026-07-31**, branch
-  `spec/pr-d-read-file-split`. **PR-D of 4, the last.** Registered in `FEATURES.json` at Specify
-  time (55 → 56), `active_feature` untouched and verified not stale for the second time.
-- Artifact: `.specs/features/core-layering-read-file-split/spec.md`. **It is the record** — scope,
-  the C28 defect, re-measured premises, seven user decisions with rejected options, six `RFS-*`
-  requirements, Design's three owed decisions, ten risks, and the Plan Challenge record. Nothing
-  from it is duplicated here, on the rule this file's own PR-B section learned the hard way: a
-  duplicated table drifted and was wrong for five tasks.
-- **Next action: Design** — `spec.md` §7 and §10. Not sized until §7's three decisions are recorded
-  with their rejected alternatives.
-- **Full Plan Challenge gate run at Specify**, two modes, seven findings, all seven independently
-  re-measured before acceptance, six revising the document — `spec.md` §9.1.
-- **C28 and the parent's stale layer figures are owed back** to
-  `core-layering-god-module-split/spec.md` (RFS-05 AC-2/AC-3), landing with the work. The parent's
-  Status line is corrected; the corrections-index entry is not written yet.
+- feature: `core-layering-read-file-split` — **Specify COMPLETE 2026-07-31. Design COMPLETE
+  2026-07-31.** Branch `spec/pr-d-read-file-split`. **PR-D of 4, the last.** Registered in
+  `FEATURES.json` at Specify time (55 → 56), `active_feature` untouched and verified not stale for
+  the second time.
+- Artifacts: `.specs/features/core-layering-read-file-split/{spec,design}.md`. **They are the
+  record** — nothing from them is duplicated here, on the rule this file's own PR-B section learned
+  the hard way: a duplicated table drifted and was wrong for five tasks.
+- **PR-D is sized: six changes, nine new files under the 90% per-file coverage floor** (`design.md`
+  §7). Five decisions taken with the user, each with its rejected options — the rename
+  `services/graph/` → `services/memory-graph/`; delete-not-repoint the dangling `EXCLUSIONS` entry
+  plus an existence assert in the gate's *test*; **N = 125**; `handle()` sheds all 98 of its
+  non-delegation lines (extraction **490 of 707**, not 392); and the LRU lands in
+  `services/cache/lru-evict.ts`, not `kernel/`.
+- **Next action: Tasks** — `design.md` §7's seven phases plus the cut decision left open there.
+  **Four** steps cannot be taken retroactively, not three: `design.md` §11 supersedes `spec.md` §10.
+- **Two full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
+  document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
+  confirmed, all twelve revising the document (`design.md` §10).
+- **C28 through C32 and the parent's stale layer figures are owed back** to
+  `core-layering-god-module-split/spec.md` (RFS-05 AC-2/AC-3), landing with the work. None is
+  written there yet. C29 additionally amends the parent's own `~390 of 707` Evidence row.
 
 ## Previous — Core Layering, Controller Retirement (PR-C) — MERGED #59, RELEASED v1.17.0
 

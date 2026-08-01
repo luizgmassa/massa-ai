@@ -1,28 +1,77 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Specify complete**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Design complete**
 
-**Feature**: `core-layering-read-file-split` · artifact
-`.specs/features/core-layering-read-file-split/spec.md` · branch `spec/pr-d-read-file-split`.
-**Everything a resumer needs is in that file** — scope §1, the defect §2, re-measured premises §3,
-the seven user decisions with their rejected options §4, requirements §5, logged-not-merged §6,
-Design's owed decisions §7, risks §8, the gate record §9.1, sequencing §10. Not restated here.
+**Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
+`.specs/features/core-layering-read-file-split/{spec,design}.md`.
+**Everything a resumer needs is in those two files** — `spec.md` carries scope §1, C28 §2,
+re-measured premises §3, the seven user decisions §4, requirements §5, logged-not-merged §6,
+Design's owed decisions §7, risks §8, the gate record §9.1, sequencing §10; `design.md` carries the
+five decisions Design took, C29–C32, the decomposition, the gate's rule, sizing and its own gate
+record. Not restated here.
 
-**Read `spec.md` §10 first.** Three steps cannot be taken retroactively and all three come before
-any extraction commit.
+**Read `design.md` §11 first**, not `spec.md` §10 — it supersedes it. **Four** steps cannot be taken
+retroactively now, not three: the fourth is R-31's `handle()` characterization, which the Plan
+Challenge gate found is *authorship*, not verification.
 
-**Next action: Design.** It is not sized until §7's three decisions are recorded with their
-rejected alternatives — PR-C's §9 precedent, where three such preconditions produced C14, C15
-and C16.
+~~**Next action: Design.**~~ **DONE — `design.md`, 2026-07-31**, 1046 lines. All three of §7's
+decisions recorded with their rejected alternatives, plus two more that measurement forced.
+**PR-D is sized: six changes, nine new files under the coverage floor** (`design.md` §7).
 
-**C28 is owed back to the parent `core-layering-god-module-split/spec.md`'s corrections index**
-(RFS-05 AC-2), landing with the work. The parent's Status line and its stale layer figures are
-flagged there already; the amendment itself is not written yet.
+**Five decisions, each with its rejected options** (`design.md` §1, §2, §3, §4, §5.2, §6):
 
-**Do not re-derive** the readings in `spec.md` §3, §3.A and §3.B — they were taken at `f06b01d`,
-five premises failed and are corrected in place, and §3.A records an instrument that was wrong
-before it was right. **Do re-derive** anything you intend to quote from a gate: both shipped gates
-enumerate `git ls-files`, so stage first.
+1. **§7.1 naming → rename `services/graph/` → `services/memory-graph/`.** 7 `git mv`, 19 importers,
+   28 import lines, 6 `mock.module`. Documenting-only was recommended by Design and **overridden by
+   the user**; renaming `services/symbol/` rejected at 32 / 90 / 10 and because `data/symbol/`
+   remains — the trap is **three** directories, not two.
+2. **§7.2 `EXCLUSIONS` → delete the dangling entry, and add an existence assert to the gate's
+   *test*.** Not an edit to the gate.
+3. **§7.3 → N = 125**, derived as 68 irreducible + 57 allowance. Deliberately not 120.
+4. **C29 → `handle()` sheds all 98 non-delegation lines.** Extraction **490 of 707 (69.3%)** for
+   group C, **502 (71.0%)** leaving the file.
+5. **C30 → the LRU lands in `services/cache/lru-evict.ts`, not `kernel/`.** `kernel/` stays at 11.
+
+**Four new plan defects, the thirty-sixth to thirty-ninth**, all owed back to the parent `spec.md`:
+**C29** (§3's "392 / 13 private methods" — 11 methods, components sum to 387, and it excludes 98
+lines inside `handle()`), **C30** (§4.3's kernel rationale falsified by the extraction it
+authorises), **C31** (§7.2's "four lines of test" is the *rejected* alternative's cost — measured 43
+insertions; and the pinning test is a pure string-shape predicate that cannot see a dangle),
+**C32** (*"no private method"* is the wrong predicate — `private run: (…) => …` is a function-typed
+**field** in 4 files, so a literal reading makes the base **6 of 30** and the rule unshippable).
+
+**Full Plan Challenge gate run, two modes, twelve findings, all twelve re-measured and confirmed,
+all twelve revising the document** — `design.md` §10. **Two of the four defects above came from
+attacking Design's own instruments**, and the gate then found three more figure errors of the same
+class in the document that recorded them.
+
+**Next action: Tasks.** Its first input is `design.md` §7's seven-phase shape plus the cut decision
+left open there — PR-C's precedent, where the same question was resolved only once the per-task
+write sets existed. Phase 6 (the rename) shares no file with Phases 0–5 and is the obvious cut
+candidate.
+
+**C28 through C32 are all owed back to the parent `core-layering-god-module-split/spec.md`'s
+corrections index** (RFS-05 AC-2), landing with the work, none written there yet. The parent's
+Status line and its stale layer figures are flagged there already. **C29 additionally amends the
+parent's own Evidence row** *"`read_file.ts` is ~55% domain logic (~390 of 707 lines)"* → **490 of
+707, 69.3%**, private methods 13 → 11.
+
+**Do not re-derive** the readings in `spec.md` §3, §3.A and §3.B — taken at `f06b01d`, five premises
+failed and are corrected in place. **Do not re-derive** `design.md`'s figures either: ~60 of them
+were independently re-derived by the evidence-audit pass and six were corrected in place (§10).
+**Do re-derive** anything you intend to quote from a gate: every shipped gate enumerates
+`git ls-files`, so stage first — and `check-tools-thin.ts` will too.
+
+**Three method rules this Design paid for**, all in `design.md` §0, §6.5 and §10:
+
+- **A fan-out figure must come from resolving specifiers, not matching them.** Three relative shapes
+  reach one directory (`../services/graph/`, `../graph/`, `./graph/`); a pattern anchored on any one
+  undercounts. The author's first sweep returned 6 importers against a true 19.
+- **An instrument robust enough for a verdict is not thereby robust enough for a baseline.** Three
+  regex detectors were written for the thinness rule; all three got `read_file.ts` and
+  `index_project.ts` RED and none got the per-member count right. The gate ships on a TypeScript AST.
+- **Sum every table's own rows and diff against its own stated total**, even when each row has been
+  verified against source. Two of the evidence audit's six findings were exactly that, in a document
+  whose individual spans were all exact.
 
 ---
 
