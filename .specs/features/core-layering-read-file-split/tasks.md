@@ -450,7 +450,7 @@ unchanged, and `check-tools-thin` does not exist yet.
 
 | # | task | write set | closes |
 | --- | --- | --- | --- |
-| **T4a** | **`scripts/check-tools-thin.ts`** — three clauses over a **TypeScript AST**, never a regex: no function body declared anywhere in a file declaring an `IToolHandler` class except inside `handle()`'s own; no `Map`/`Set` instance **or module-level** state; `handle()` body ≤ **120**. **File-scoped, not class-scoped** (C32) — a class scope is defeated by a constructor-body closure, which is none of AC-5's six shapes. **Zero allowlist entries, no exemption parameter, no suppression flag** (AC-2). **Prints its examined population on a PASS** (AC-1), on `check-core-layering.ts:277-282`'s `edgesExamined` precedent — *"a check that resolved nothing also reports zero violations, and the two must not read the same."* **Docblock names what it does not certify** (AC-6): a delegating `handle()` reads identically whether its delegate is correct or subtly wrong | 1 new script | **RFS-01 AC-1, AC-2, AC-6** |
+| **T4a** | **`scripts/check-tools-thin.ts`** — three clauses over a **TypeScript AST**, never a regex: no function body declared anywhere in a file declaring an `IToolHandler` class except inside `handle()`'s own; ~~no `Map`/`Set` instance **or module-level** state~~ → **no `Map`/`Set` state at any of *three* sites — class field, module level, and `this.x = new Map()` assignment** (§10.4): the constructor is exempt from clause 1 **by kind**, so `private cache: unknown` plus `constructor() { this.cache = new Map(); }` declares no body and carries no `Map` in its own declaration, and a two-site clause 2 passes it; `handle()` body ≤ **120**. **File-scoped, not class-scoped** (C32) — a class scope is defeated by a constructor-body closure, which is none of AC-5's six shapes. **Zero allowlist entries, no exemption parameter, no suppression flag** (AC-2). **Prints its examined population on a PASS** (AC-1), on `check-core-layering.ts:277-282`'s `edgesExamined` precedent — *"a check that resolved nothing also reports zero violations, and the two must not read the same."* **Docblock names what it does not certify** (AC-6): a delegating `handle()` reads identically whether its delegate is correct or subtly wrong | 1 new script | **RFS-01 AC-1, AC-2, AC-6** |
 | **T4b** | **`scripts/__tests__/check-tools-thin.test.ts`** — **synthetic fixtures only**, on `check-core-layering.test.ts`'s `mkdtemp` precedent, **never a live-tree count** (`design.md` §6.6 property 5): `bun test scripts/__tests__` auto-discovers and `ci.yml:200` runs it inside `build`, so a `2 of 30` assertion written here goes red at Phase 3 and makes §1.1's per-phase-green promise false. **Both directions observed red plus an inert control** (AC-4). **AC-5's fail shapes**: private method, public method, getter/setter, `static`, `#private`, arrow-function class property, module-level `const cache = new Map()`, object-literal handler, **the constructor-body closure**, and a `handle()` containing a string like `"unexpected token: {"` — the last because a careful and a naive brace counter are byte-identical on today's corpus, so the corpus **cannot falsify** a naive reimplementation. **Assert the nine member-kind classifications directly** so a `typescript` bump fails `test:scripts` rather than the gate (R-33) | 1 new test file | **RFS-01 AC-4, AC-5** |
 | **T5** | **RFS-01 AC-3's frozen base reading — the fourth non-retroactive step, first by dependency.** Run T4a's script after `git add`, record §3.3's table **per member with line spans** into this file. Not a test (§3.5 item 4, `design.md` §6.6 property 5) | this file | **RFS-01 AC-3** |
 
@@ -656,6 +656,7 @@ Tasks PR corrected it in place rather than deferring:
 | 4 | `design.md` R-32 | **3** files shared between Phase 6 and Phase 7, not 1 |
 | 5 | `design.md` §7 group G | *"6 stale statements"* → **1**; RFS-05 AC-1's six were closed by the Specify commit |
 | 6 | `design.md` §6.6 property 1 | the gate's own files are outside its population whether tracked or not; the stated mechanism does not apply |
+| 8 | `design.md` §6.5 (*"an AST walk that descends into nested arrows reports **18**"*) and §6.6 property 2 | **C39** — the raw body figures for the two RED files are measured under **two different constructor conventions**. `read_file.ts`'s **18** counts the constructor; `index_project.ts`'s **3** does not. Under one convention the pair is 18 / 4, under the other 17 / 3; **18 / 3 is a pair no single convention produces**. §6.5's named nested list is also short by one — 13 + the 4 named arrows is 17, and the fifth item is the constructor entry, which is not a nested arrow. **The maximal figures 13 and 3 are identical under both conventions**, so RFS-01 AC-3's frozen base is untouched (§10.4) |
 
 These are **T20b**.
 
@@ -1134,3 +1135,171 @@ nor this document states, and each is a real constraint on T12's rewrite:
 3. **The token math is measured over the *numbered* text `extractLines` emits** (`:637-641`), not
    over the raw file — 920 tokens against 620 for the same 150 lines. An extraction that computes
    tokens before line-numbering changes every figure the caller sees.
+
+### 10.4 T4a — executed, 2026-08-01
+
+One new file, `scripts/check-tools-thin.ts` — **524 lines**, three clauses over a TypeScript AST,
+authored against the unmodified tree. **RFS-01 AC-2 and AC-6 close; AC-1's population-print clause
+closes.** AC-1's other two conjuncts — *"exits 0"* and *"runs in CI inside the `build` job"* — are
+**T15's**, and both task rows already claim AC-1, so this is a split criterion rather than a defect.
+At T4a the gate exits **1**, which is the point of it.
+
+The reading, deterministic across two runs (output byte-identical):
+
+```
+[tools-thin] FAIL — 2 of 30 file(s) over the rule; 27 declare an IToolHandler class,
+3 do not; 224 members examined; handle() ceiling 120
+```
+
+`read_file.ts` **13 maximal / 17 raw / 2 state / handle() 175**; `index_project.ts`
+**3 / 3 / 0 / 128**. All 16 body spans reproduce `design.md` §6.5 byte-for-byte. **This is not yet
+T5's frozen reading** — T5 takes it after `git add` and transcribes §3.3's table.
+
+#### C39 — the forty-fourth plan defect: two raw figures, two constructor conventions
+
+`design.md` §6.5 states *"an AST walk that descends into nested arrows reports **18** for
+`read_file.ts` rather than 13"* and, for `index_project.ts`, **3**. Measured both ways:
+
+| | ctor **exempt** | ctor **counted** |
+| --- | --- | --- |
+| `read_file.ts` | maximal 13, raw **17** | maximal 13, raw **18** |
+| `index_project.ts` | maximal **3**, raw 3 | maximal **4**, raw 4 |
+
+**`18` and `3` is a pair no single convention produces.** §6.5's nine-case table fixes the
+convention — *"`true  Constructor  constructor  <- exempt by kind`"* — under which the figures are
+17 and 3; §6.5's own prose then quotes 18, which is the other one. The arithmetic tell was visible
+in the document and unresolved: 13 + the four named nested arrows (`:423`, `:424`, `:440`,
+`:638-641`) is **17, not 18**, and the fifth item is the **constructor entry**, which is not a
+nested arrow at all.
+
+**The maximal figures — 13 and 3, the only ones RFS-01 AC-3 records — are identical under both
+conventions**, so the frozen base is untouched and no decision moves. The defect is confined to the
+raw comparison figure and to a named list that is short by one. Owed to `design.md` (**T20b**,
+§8.1 row 8); **not** owed to the parent, because §6.5 is Design's own instrument note with no
+criterion behind it. Author level on the C34/C35/C37/C38 precedent. Running total: **forty-four**.
+
+*The rule this earns: when a document prints a metric under two conventions, the tell is its own
+subtraction. Both figures had been verified against source; neither had been verified against the
+other.*
+
+#### The Plan Challenge gate on T4a — two modes, eighteen findings
+
+Both lenses read-only; `git status --porcelain` checked after each returned rather than trusting the
+agents' own reports. Mode selection follows `spec.md` §9.1 and `design.md` §10 — Architecture
+(pre-mortem primary, red-team secondary) plus Evidence Audit for the quantitative claims.
+
+**Pre-mortem / red-team — 8 findings. Three changed the file before it was written.**
+
+| # | finding | disposition |
+| --- | --- | --- |
+| 1 | `/tmp/f1b.ts`, the prototype the plan cites as its own validation, computes **raw** not **maximal** | **CONFIRMED**, and already known to the author before the gate reported it. The shipped gate terminates recursion at a flagged body; the critic independently reproduced 13 with spans byte-identical to §6.5 |
+| 2 | **Clause 2 is evaded by moving construction into the constructor body** — `private cache; constructor(){ this.cache = new Map(); }` — and by a literal-wrapped initializer and a type alias | **CONFIRMED, and found independently by the author ~20 minutes earlier.** Closed in code: clause 2 gains a third site (`this.x = new Map()`) and its initializer test scans the **subtree** rather than the top node. Measured **0** hits on the tree, so the base reading cannot move. The type-alias variant needs a type checker, which C32 avoided — named in the docblock instead |
+| 3 | `new Function(string)` / `eval` has no AST node to flag | **CONFIRMED.** Docblock, no code — it forfeits type-checking, which is why it is recorded rather than defended against |
+| 4 | `ClassStaticBlockDeclaration` matches none of the seven body predicates | **CONFIRMED.** Added to the predicate list; the fixture reads RED |
+| 5 | A `private readonly EXTS = new Set([...])` lookup table reads RED though it is a constant, not state | **CONFIRMED, 0 today.** Accepted false positive, named in the docblock — and named *with its consequence*, since clause 2's module-level half flags the same constant hoisted out of the class, so such a table has no legal home in a handler file. That is deliberate, not accidental |
+| 6 | Heritage detection is a literal string match; `import { IToolHandler as H }` drops the file out of the population **silently** | **CONFIRMED, 0 today.** Closed in code rather than documented — the gate resolves the local binding name. A population that can shrink without an error is the exact defect this gate replaces |
+| 7 | The population print is observational, not self-checking | **ACCEPTED.** Docblock states it is a diffable record, so T25 compares it against the frozen base rather than only checking it is non-zero |
+| 8 | R-37's precondition (nothing changes the `tools/` population before T5) holds | **CONFIRMED** independently by the author |
+
+**Evidence audit — 10 claims re-derived with an independent parser. Seven reproduce; three
+`high` verdicts were re-measured by the author and all three rejected as stated.**
+
+| claim | verdict |
+| --- | --- |
+| *"`6 of 30` does not reproduce — broadened three ways, still exactly 4"* | **REJECTED.** `6` is the **union**: 2 body-RED ∪ 4 field-shape = 6, which is what §6.5 says (*"read_file, index_project, **and all four canonical thin handlers**"*). The critic measured the 4 correctly and compared a **subset** count to a **union** count. Measured: union = 6 |
+| *"`2 of 30` rests on an unstated scoping assumption; applied file-wide `serialize.ts` has 11 bodies"* | **REJECTED as stated** — C32's rule box and §6.4 item 3 both state the scope. **Substance accepted**: `serialize.ts` is 438 lines with **11** bodies and three `Map`/`Set` constructions and every clause is blind to it. Named in the docblock as the largest blind spot |
+| *"`index_project.ts` is 4 maximal bodies, not 3"* | **REJECTED as stated** — 4 is the ctor-counted reading and §6.5's table specifies ctor-exempt. **But it surfaced C39 above**, from the opposite direction to pre-mortem finding 1 |
+
+Two audit results kept as measured: the `handle()` full-span and body-block-only readings are
+**numerically identical for all 27** files, because every `handle()` in `tools/` puts its opening
+brace on the declaration line — so **the corpus cannot falsify the metric choice**, which is
+`design.md` §6.4 item 4's class and is why T4b owes a multi-line-signature fixture. And the ceiling
+enumeration 90–130 reproduces exactly.
+
+**Fourteenth time on this feature that a critic's mechanism held while a figure did not** — and the
+first time the same underlying defect was reached by both lenses from opposite ends.
+
+#### The gate's discrimination, 18 shapes, before its unit suite exists
+
+Run against the **shipped** `analyzeSource`, not the prototype. **18 ok / 0 wrong.** This is not
+T4b — AC-4 and AC-5 are its task and its fixtures are owed a real suite — but a gate is not
+quotable until it has failed on purpose, and quoting `2 of 30` required knowing the rule bites.
+
+| shape | expected | got |
+| --- | --- | --- |
+| canonical thin handler (`private run:` field) | PASS | **PASS** — the 4-vs-6 feasibility cliff avoided |
+| helper with no `IToolHandler` class | PASS (n/a) | **PASS** |
+| arrows **inside** `handle()` | PASS | **PASS** — not over-strict |
+| `handle()` span exactly **120** | PASS | **PASS** |
+| **C32 constructor-body closure** | RED | **RED** |
+| `this.x = new Map()`, untyped field | RED | **RED** |
+| literal-wrapped initializer `[new Map()]` | RED | **RED** |
+| module-level `const cache = new Map()` | RED | **RED** |
+| private method / getter / `static` / `#private` / arrow property | RED | **RED** (5 shapes) |
+| module-level `function work(){}` | RED | **RED** |
+| `static {}` block | RED | **RED** |
+| generic + multi-line signature — the two shapes that killed the regex detectors | RED | **RED** |
+| aliased `IToolHandler` import | RED | **RED**, population preserved |
+| `handle()` span **121** | RED | **RED** |
+
+**The ceiling operator is pinned at its exact boundary**, because `>` and `>=` differ at precisely
+one value and this feature has already recorded that rule once: spans of 118/119/**120** PASS and
+**121**/122 RED. Strict `>`, which is the reading `design.md` §6.2's band derivation used when it
+established that `index_project.ts` at exactly 128 is *not* `> 128`.
+
+#### Gates, all six plus the layering gate
+
+`lint` exit **0** — proven to bite rather than assumed: a duplicate-declaration probe appended to
+this very file produced ``error: Identifier `dupProbeT4a` has already been declared`` and exit
+**1**, restored from a scratch copy SHA-256-identical
+(`2c8cc7d6…4b4c` either side), lint back to 0. **oxlint is the only gate that sees this file at
+all** — the root `tsconfig.json` has `"include": []`, so `scripts/` is outside every `tsc` project.
+`type-check` **6/6, 0 cached** and `build` **5/5, 0 cached**, both forced. `test:scripts` exit
+**0**, **1018** pass / 0 fail across 48 files — unchanged, T4a adding no test file. `test:plugins`
+exit **0**, **96** pass / 0 fail across 8 files.
+
+**`check-core-layering` after `git add`: `PASS — 0 violation(s) across 965 tier-to-tier edges in
+901 tracked files`.** Read as **edges 965 unchanged; files 900 → 901** — C36's distinction applied.
+The gate imports only `typescript` and two node builtins, both bare specifiers, so it adds no
+tier-to-tier edge; `scripts/` is untiered in any case.
+
+**R-36 verified rather than inherited**: run through `check-coverage.ts`'s own `isMeasuredSource`,
+both `scripts/check-tools-thin.ts` and `scripts/__tests__/check-tools-thin.test.ts` return
+**`false`**. T4a and T4b carry no coverage-gate incentive pressure.
+
+#### `bun run test` failed twice and the cause was 48 orphaned busy-loops from another project
+
+**Attributed by measurement, and the attribution took seven readings because the first six were
+consistent with a defect.** Run 1: exit 1, 9/11 tasks, **3** isolation FAILs, 2m57s. Run 2: exit 1,
+10/11, **5** FAILs, 7m33s.
+
+1. The two failing sets are **disjoint** — zero overlap, and a different *package* failed each time
+   (`mcp-client`, then `core`). An unchanged tree failing differently twice is non-determinism.
+2. All failing files: `git diff main -- <file>` **empty**.
+3. `git grep -l check-tools-thin` returns the four `.specs/` planning documents and **the script
+   itself — zero code importers**. `bun run test` is turbo over workspace packages and never
+   reaches `scripts/`.
+4. Standalone, the run-2 files still failed, with `Inserted 100 docs in **22236ms**` in the log.
+5. **Postgres round-trip measured at 259 ms per connect+query** — which reproduces that 22.2 s
+   arithmetically. The database is 313 MB with 6 connections and no bloat, so it is not DB state.
+6. **Host load average 209.31**, 14% free memory, 1.87M pageouts.
+7. **56 `zsh` processes, 48 of them orphaned to launchd, in two batches of 24 with identical
+   elapsed times.** Their command line is a *deliberate* load simulation from an unrelated project:
+   `cd ~/Projects/massa-vault … for i in $(seq 1 24); do (while :; do :; done) & done`. Its
+   trailing `kill $HOGS` never reaped them — `jobs -p` in a non-interactive `zsh -c` did not capture
+   the backgrounded subshells — so 48 infinite busy-loops were spinning with no parent.
+
+Reaped with the user's explicit approval, matching on `ppid 1` **and** `massa-vault` **and** the
+busy-loop text so the 8 real login/tmux shells could not match. Result: zsh **56 → 8**, load
+**209 → 68**, Postgres **259 ms → 22.9 ms per round-trip (11×)**.
+
+**Run 3, clean host: `11/11 tasks, 0 cached, 0 isolation FAILs, exit 0, 1m00s`, 180 isolated
+groups.** The wall clock is its own corroboration — **7m33s → 1m00s on an identical tree**.
+
+**All three readings are kept.** Quoting only the green one would be the replay problem in another
+dress, and the two red ones are the evidence that the green one is a measurement rather than luck.
+This is **not** the 5001 ms class `CLAUDE.md` documents and **not** T3's cold-Ollama instance: the
+mechanism is host CPU starvation from an external process, the failures are not confined to
+LLM-reaching suites, and it does not reproduce once the host is idle. *A gate reading taken on a
+loaded host is not a reading — and the load may not be yours.*
+
