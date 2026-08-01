@@ -340,15 +340,52 @@ all state came from `.specs/` and source reads.
   one. **Transcription verified rather than proofread** — the fenced block byte-identical to the live
   run, both tables parsed back out and checked cell by cell against `--json`, 72 assertions / 0
   mismatches.
-- ~~**Next action: Execute, T5**~~ ~~**Execute, T6**~~ → **Next action: Execute, T7** — repoint the
-  four files / five caches at `services/cache/lru-evict.ts`. **Take the delegate shape (C46)**: keep
-  `ReadFileTool`'s `private evictOldest<K,V>(cache)` as a one-line call into the module rather than
-  deleting it and inlining, because inlining leaves `read-file.test.ts` red until T8 **and** moves
-  RFS-01 AC-3's frozen base mid-Phase-2. **Pre-insert sites pass `CAP - 1`, post-insert sites pass
-  `CAP` (C44).** `tasks.md` §6 items 4–5: **T7 → T8 → T8b**, and Phase 2 entirely before Phase 3,
-  because the LRU move is provable behavior-preserving only while both `read_file.ts` caches still
-  live in `read_file.ts`. T1's suites must pass **unmodified** across T7, asserted by SHA-256 — and
-  under the delegate shape `read-file.test.ts` is byte-identical and green as well.
+- **T7 done `ea59b04`** — record in `tasks.md` §10.8. Four files / five caches repointed at
+  `services/cache/lru-evict.ts`; **RFS-02 AC-1 closes and AC-2 clause 2 closes** where C47 reassigned
+  it. Delegate shape at both wrapper sites, pre-insert passing `CAP - 1` and post-insert `CAP`.
+  Evidence is byte-identity rather than greenness: **all six suites reaching any of the five caches
+  are SHA-256 identical to `HEAD`** and pass together at **92 / 0 / 3335 expect()**. Six gates plus
+  both structural gates green — `test:scripts` **1114 / 0 across 49** unchanged, `test:plugins`
+  96 / 0, `check-tools-thin` counts byte-identical to T5's base, and **edges 965 → 969 with files
+  904 unchanged**: the first commit on this branch where the edge count is the figure that moves,
+  the delta being exactly the four new imports. Four plan defects (**C48–C51**), running total
+  **fifty-six**.
+- **C48–C51 are the fifty-third to fifty-sixth; two change what a later task does.** **C48** — C46
+  fixed T7's shape for `read_file.ts` and is scoped to that file, while `symbol-graph.service.ts` has
+  the identical wrapper reached by a cast in `symbol-graph-service.test.ts`; `evictOldestProjectRoot`
+  has **0 occurrences anywhere under `.specs/`**, and inlining leaves that suite **48p/1f with no task
+  owning the repoint**. Delegate shape at both. **C49** — C45's *"the site is still covered today by
+  `read-file.test.ts:264-299`"* is true of the **method** and false of the **call site**: deleting
+  `read_file.ts:570` (`fileCache`) or `:169` leaves **all 92 cases green**, because that test calls
+  `evictOldest` directly and never drives `readFileWithCache`. Live for **T10**, which moves `:570`'s
+  call into a new module with nothing watching. **C50** — C46's *"byte-identical"* was measured on the
+  gate's summary line, which carries **counts**; §3.3's frozen base also carries **line spans**, and
+  the delegate moves **15 of 15** while every count holds. RFS-01 AC-3's own text records a verdict
+  and is untouched. **C51** — `read-file.test.ts`'s cast declares four private members and the body
+  exercises **three**; `projectRootCache` is type-only, which is the mechanism under half of C49.
+  C48, C50 and C51 author level on the C34…C47 precedent; **all owed to `tasks.md`'s own rows, so
+  §8.1 stays at fifteen** and §5 stays at **29 task rows**.
+- **Two user decisions at T7, each against named alternatives.** `file-filter-cache`'s
+  `logger.debug` at `:154` is **dropped and priced in the site's docblock** — keeping it behind a
+  victim-naming wrapper and not repointing the site at all were rejected; the shared function cannot
+  report a victim, the other four sites do not log, and the line had **0 assertions repo-wide**. And
+  **C49 is closed now by widening T8** rather than recorded-only or given a new task T8c: T8's write
+  set stays **1 file** and its subject gains call-site sensors for `:570` and `:169`.
+- **T7's discrimination table measured RFS-02 AC-1's own justification for the first time.** Column B
+  is the suites that existed **before** PR-D — the honest counterfactual — and it **misses 4 of 7**
+  mutations: both post-insert sites are entirely unsensed, and `file-filter-cache.test.ts:94` asserts
+  `toBeLessThanOrEqual`, an upper bound only, so over-eviction walks through. Every column-A FAIL is
+  `4p/1f` because **C45's vacuity covers the off-by-one too**, not only the neuter — confirmed by
+  reading the failing case name rather than the count.
+- ~~**Next action: Execute, T5**~~ ~~**Execute, T6**~~ ~~**Execute, T7**~~ → **Next action: Execute,
+  T8** — repoint `read-file.test.ts`'s eviction test (`:264-299`, `describe` `:257-300`) at the
+  module, **and close C49 in the same task**: drive `handle()` past the cap and drive
+  `indexing:started`, asserting the cache is bounded, so `read_file.ts:570` and `:169` gain the
+  sensors they have never had. **GMS-05 AC-3: repointed, not weakened, skipped or deleted.** The test
+  survives T7 byte-identical and green (`e8cf74c6881db255`), so this is a planned repoint rather than
+  a repair. Then **T8b**, and `tasks.md` §6 item 5 — **Phase 2 entirely before Phase 3**, because the
+  LRU move is provable behavior-preserving only while both `read_file.ts` caches still live in
+  `read_file.ts`.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed
