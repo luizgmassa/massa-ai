@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — Phase 2, T7 done**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — Phase 2, T8 done**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -413,15 +413,76 @@
 > The reverted-tree run is recorded as **confounded** — three prior runs had warmed the model — rather
 > than as evidence. Warm aggregate: **11/11, exit 0**.
 >
-> **Next action: Execute, T8** — repoint `read-file.test.ts`'s eviction test (`:264-299`, `describe`
-> `:257-300`) at the module, **and close C49 in the same task** per the user's decision: drive
-> `handle()` past the cap and drive `indexing:started`, asserting the cache is bounded, so `:570` and
-> `:169` gain the sensors they have never had. **GMS-05 AC-3 — repointed, not weakened, skipped or
-> deleted**; the CAP+1 eviction and hot-key-promotion assertions must still run, against the module.
-> The test survives T7 **byte-identical and green** (`e8cf74c6881db255`), so this is a planned repoint
-> rather than a repair. Then **T8b** — the row C35 minted at T1 that nothing wrote until T4b — and
-> **Phase 2 entirely before Phase 3** (§6 item 5): the LRU move is provable behavior-preserving only
-> while both `read_file.ts` caches are still in `read_file.ts`.
+> ~~**Next action: Execute, T8.**~~ **T8 DONE — `887350c`.** Its record is `tasks.md` §10.9 —
+> **GMS-05 AC-3 satisfied for `read-file.test.ts` and C49 closed**, 7p/34x → **9p/45x, 0 fail**, two
+> new plan defects (**C52–C53**), running total **fifty-eight**. Not restated here.
+>
+> **C49 closed on a before/after pair, not on a green suite.** Same instrument, same six suites,
+> either side of the edit: `read_file.ts:170` and `:578` go **92p/0f — NO SENSOR → 93p/1f**, each
+> killed by one of the two new cases, read **by name**. `:463` and `symbol-graph.service.ts:793` stay
+> sensed by T1's oracle. **All four call sites now sensed; before T8 the repository sensed two.**
+>
+> **The plan's repoint was wrong and the gate caught it before a line was written.** Repointing the
+> eviction assertions onto a bare `Map` would have satisfied *"against the module"* while duplicating
+> `lru-evict.test.ts:60`/`:70`/`:107` and severing the only thing making the case belong to
+> `ReadFileTool` — **a deletion wearing a repoint's clothes**. It shipped as an **operator swap in
+> place**: the case still drives `ReadFileTool`'s own `fileCache` and still pins the cap against
+> `FILE_CACHE_MAX_ENTRIES`. *Ask what a case asserts that its destination does not.*
+>
+> **C52 is the fifty-seventh, and it is C50's own lesson applied to C50.** C50's post-delegate span
+> table was measured on a tree **that was never committed** — the shape probe applies a minimal
+> delegate (`+1` import, `−4` body, net −3) while the shipped commit also carries an **11-line
+> docblock**: `git show --stat ea59b04` = `+13/−5`, `read_file.ts` **707 → 715**. So net is **+8**,
+> the seven lower entries shift **+8** not −3, and `evictOldest` lands at **`:489-491`** not
+> `:478-480`. **C50's headline reproduces exactly** — 15 of 15 spans move, every count holds at
+> 13 / 17 / 2 / 175 / 25, `index_project.ts` 0 of 3 — which is precisely why the arithmetic beneath it
+> survived four artifacts. *A correction can inherit the defect it corrects.*
+>
+> **C52's three consequences live in three different artifacts, and the second was the evidence
+> audit's.** §3.3 and C50 amended in place. **C48's and C49's own tables cite four pre-T7 call-site
+> lines** (`:169`, `:462`, `:570`, `:792`) — and T25's row *requires* re-running C49's table on the
+> real tree, so every label reads off by one; they gained a **shipped-tree column** rather than
+> rewritten labels, because the measurement was taken post-T7 and **the frame is what was missing**.
+> And **three source comments T7 itself added cite line numbers in their own file that its own commit
+> falsified**. *The instrument was never wrong — `t7-callsite-sensors.ts` anchors on text, so only its
+> labels were stale. Correct the frame, not the reading.*
+>
+> **C53 is the fifty-eighth: closing C49 creates a private reach that dies one task before C34's table
+> predicted.** T9 moves `projectRootCache` **and** the `eventBus` subscription `:162-171` into module
+> 3, while §1's overlap table schedules the only Phase-3 touch of `read-file.test.ts` at **T10**
+> (C34's). T9 as written lands a red suite **owned by nothing** — C48's formulation verbatim.
+> **T9's write set gains `+ 1 test repoint`**, author level on C34's own precedent, and C34's table
+> gains a third row while row 1 loses `projectRootCache` to C51. *A break-phase table is falsified by
+> a task that **adds** a test, not only by one that moves a member.*
+>
+> **A figure withdrawn rather than shipped, and both parties were wrong.** The repo-wide count of
+> self-referential `:NNN` comment citations: per-line said **59**, the evidence-audit lens refuted it
+> and said **~6**, block-aware re-measurement says **25** — and it still cannot decide a bare `:NNN`
+> in a docblock that does not re-name its subject. **Twentieth time on this feature a critic's
+> mechanism held while its conclusion did not**, and the author's replacement was no better. None is
+> quoted. What both reproduced exactly is the only load-bearing figure: **5 citations in the four
+> T7-edited files → 3 comments in 3 files.**
+>
+> **Column B was re-chosen, and the split of M1 is the result a resumer should carry.** T8 ships new
+> cases, so T7's *"suites that existed before PR-D"* no longer names the premise; column B is **the
+> six eviction suites exactly as they stood at `HEAD`**, and it **misses 2 of 5** applicable mutations
+> — exactly M2 and M3, the two sites C49 named. Expectation mismatches **0**. The first run read
+> `PASS` on M1 and that was a **dead mutation, not an unguarded repoint**: the case has two operator
+> calls and the seed loop runs at sizes 0…511, so no bound ≥ 511 can evict there. Re-anchored on the
+> post-seed call it reads `FAIL 93p/1f`. *T6 recorded this for a dead anchor; here the anchor resolved
+> and the **call position** made it inert. Print the position, not just the verdict.*
+>
+> **Next action: Execute, T8b** — now **5 files, comments only** by the user's decision from four
+> options (widening T8 to 4 files, a new task T8c, and record-only all rejected; T8's write set stays
+> **1 file**). RFS-02 AC-4's two — `production-wiring.ts:67-68` and `invalidator-registry.ts:34-36`,
+> both stating the same false claim, **the named one citing the unnamed one as its authority** (C35) —
+> corrected to what T1's pin measured: `CACHE_TTL` enforced, `ROOT_CACHE_TTL` **not**, no invalidator
+> id matching `read_file`. Plus C52's three: **`read_file.ts:484` de-numbered rather than renumbered**
+> (T10 deletes `:578`'s call, so a renumber goes stale a third time), `symbol-graph.service.ts:812`
+> `:792` → **`:793`**, `file-filter-cache.ts:151` `:51-53` → **`:52-54`** — those two files are in
+> **no** Phase 3–5 write set, so a plain renumber is stable there. Then **Phase 2 entirely before
+> Phase 3** (§6 item 5): the LRU move is provable behavior-preserving only while both `read_file.ts`
+> caches are still in `read_file.ts`.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.

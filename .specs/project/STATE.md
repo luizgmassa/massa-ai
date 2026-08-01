@@ -377,15 +377,60 @@ all state came from `.specs/` and source reads.
   `toBeLessThanOrEqual`, an upper bound only, so over-eviction walks through. Every column-A FAIL is
   `4p/1f` because **C45's vacuity covers the off-by-one too**, not only the neuter — confirmed by
   reading the failing case name rather than the count.
-- ~~**Next action: Execute, T5**~~ ~~**Execute, T6**~~ ~~**Execute, T7**~~ → **Next action: Execute,
-  T8** — repoint `read-file.test.ts`'s eviction test (`:264-299`, `describe` `:257-300`) at the
-  module, **and close C49 in the same task**: drive `handle()` past the cap and drive
-  `indexing:started`, asserting the cache is bounded, so `read_file.ts:570` and `:169` gain the
-  sensors they have never had. **GMS-05 AC-3: repointed, not weakened, skipped or deleted.** The test
-  survives T7 byte-identical and green (`e8cf74c6881db255`), so this is a planned repoint rather than
-  a repair. Then **T8b**, and `tasks.md` §6 item 5 — **Phase 2 entirely before Phase 3**, because the
-  LRU move is provable behavior-preserving only while both `read_file.ts` caches still live in
-  `read_file.ts`.
+- **T8 done `887350c`** — record in `tasks.md` §10.9. **GMS-05 AC-3 satisfied for
+  `read-file.test.ts`, and C49 closes.** One file, **7p/34x → 9p/45x, 0 fail**. C49's closure is a
+  **before/after pair**, not a green suite: on the shipped tree `read_file.ts:170` and `:578` read
+  **92p/0f — NO SENSOR** before the edit and **93p/1f** after, each killed by one of the two new
+  cases, read **by name**. All four call sites now sensed; before T8 the repository sensed two.
+  The repoint shipped as an **operator swap in place** rather than a move onto a bare `Map` — the
+  gate found `lru-evict.test.ts:60`/`:70`/`:107` already assert both properties over a plain `Map`,
+  so that move would have duplicated T6 and severed the `ReadFileTool` link. Six gates plus both
+  structural gates green — `test:scripts` **1114 / 0 across 49** unchanged, `test:plugins` 96 / 0,
+  **edges 969 → 969 and files 904 → 904, both unchanged** (T8's import lands in `__tests__/`, which
+  is not a tier), `check-tools-thin` counts byte-identical to T5's base. Two plan defects
+  (**C52–C53**), running total **fifty-eight**.
+- **C52–C53 are the fifty-seventh and fifty-eighth; both change what a later task does.** **C52** —
+  C50's post-delegate span table was measured on a tree that was **never committed**: the probe
+  applies a minimal delegate (net −3) while the shipped commit also carries an 11-line docblock
+  (`+13/−5`, `read_file.ts` **707 → 715**). So net is **+8**, seven entries shift **+8** not −3, and
+  `evictOldest` lands at **`:489-491`** not `:478-480`. **C50's headline reproduces exactly** — 15 of
+  15 spans move, every count holds — which is why the arithmetic under it survived. Three
+  consequences in three artifacts: §3.3 and C50 amended; **C48's and C49's own tables carry four
+  pre-T7 call-site citations** and gained a shipped-tree column, since T25 must re-run C49's table on
+  the real tree; and **three source comments T7 itself added cite line numbers in their own file that
+  its own commit falsified**. **C53** — closing C49 creates a private reach that dies **one task
+  before C34's break-phase table predicted**: T9 moves `projectRootCache` *and* the `eventBus`
+  subscription into module 3, while §1's overlap table schedules the only Phase-3 touch of
+  `read-file.test.ts` at T10, so T9 as written lands a red suite owned by nothing. **T9's write set
+  gains `+ 1 test repoint`**, author level on C34's own precedent. Both internal to `tasks.md`, so
+  **§8.1 stays at fifteen** and §5 stays at **29 task rows**.
+- **One user decision at T8, against three named alternatives.** C52's three false source comments
+  **fold into T8b**, taking it from 2 files to **5, comments only** — widening T8 to 4 files, a new
+  task T8c, and record-only were all rejected. T8's write set stays **1 file**. `read_file.ts`'s
+  comment is **de-numbered** rather than renumbered, because T10 deletes `:578`'s call outright and a
+  renumber would go stale a third time; the other two files are in **no** Phase 3–5 write set.
+- **A figure withdrawn rather than shipped.** The repo-wide count of self-referential `:NNN` comment
+  citations: per-line classification said **59**, the evidence-audit lens said **~6**, block-aware
+  re-measurement says **25**, and it still cannot decide a bare `:NNN` in a docblock that does not
+  re-name its subject. **None is defensible and none is quoted.** The only figure anything depends on
+  — **5 citations in the four T7-edited files → 3 comments in 3 files**, T8b's write set — was
+  reproduced exactly and independently by both parties.
+- **T8's discrimination table re-chose column B rather than inheriting it.** T7 shipped no new test,
+  so its column B was *"the suites that existed before PR-D"*; T8 **does** ship cases, so column B is
+  **the six eviction suites exactly as they stood at `HEAD`**. It **misses 2 of 5** applicable
+  mutations and they are **exactly the two sites C49 named**. Expectation mismatches **0**, both
+  controls hold. M1 was split into **M1a/M1b** after the first run read `PASS` on a **dead mutation**
+  — the repointed case has two operator calls and only the post-seed one can cross the bound, so the
+  seed-loop call is inert **by position**. T6's lesson recurring: the verdict column cannot show a
+  dead subject.
+- ~~**Next action: Execute, T5**~~ ~~**Execute, T6**~~ ~~**Execute, T7**~~ ~~**Execute, T8**~~ →
+  **Next action: Execute, T8b** — now **5 files, comments only**: RFS-02 AC-4's two
+  (`production-wiring.ts:67-68` and `invalidator-registry.ts:34-36`, both stating the same false
+  claim, the named one citing the unnamed one as its authority — C35) plus C52's three
+  (`read_file.ts:484` de-numbered; `symbol-graph.service.ts:812` `:792` → **`:793`**;
+  `file-filter-cache.ts:151` `:51-53` → **`:52-54`**). Then `tasks.md` §6 item 5 — **Phase 2 entirely
+  before Phase 3**, because the LRU move is provable behavior-preserving only while both
+  `read_file.ts` caches still live in `read_file.ts`.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed
