@@ -609,7 +609,7 @@
         "specify": true,
         "design": true,
         "tasks": true,
-        "execute": false
+        "execute": true
       },
       "spec": ".specs/features/core-layering-god-module-split/spec.md",
       "depends_on": [
@@ -617,12 +617,13 @@
       ],
       "design": ".specs/features/core-layering-god-module-split/design.md",
       "tasks": ".specs/features/core-layering-god-module-split/tasks.md",
+      "notes": "Umbrella over four PRs (AS-05). PR-A sensor-repair-2026-07 complete; PR-B merged #53, v1.16.0; PR-C core-layering-controller-retirement merged #59, v1.17.0; PR-D core-layering-read-file-split in Specify. phases.execute was false through PR-B and PR-C and is corrected here — Execute has happened twice. status stays in_progress until PR-D closes GMS-02's headline.",
       "validation": ".specs/features/core-layering-god-module-split/validation.md"
     },
     {
       "slug": "core-layering-controller-retirement",
       "title": "Core layering — controller retirement (PR-C): kernel tier, controllers/ retired into services/, AC-1's import check shipped with the restructuring",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P2",
       "workflow": "spec-driven",
       "branch": "spec/pr-c-execute",
@@ -638,8 +639,27 @@
       "depends_on": [
         "core-layering-god-module-split"
       ],
-      "notes": "PR-C of 4 under core-layering-god-module-split. Executes GMS-01 (all six ACs) and GMS-02 AC-2 only; GMS-02 AC-1 is PR-D's by C13. All 20 tasks shipped in 22 commits; T18 independent validation PASS (author != verifier), see validation.md. Awaiting merge.",
+      "notes": "PR-C of 4 under core-layering-god-module-split. Executed GMS-01 (all six ACs) and GMS-02 AC-2 only; GMS-02 AC-1 is PR-D's by C13. All 20 tasks shipped in 22 commits; T18 independent validation PASS (author != verifier), see validation.md. Merged as #59 (2bea11e, --no-ff, parents 450352b + 2ea4ebd) and released v1.17.0 on 2026-07-31.",
       "validation": ".specs/features/core-layering-controller-retirement/validation.md"
+    },
+    {
+      "slug": "core-layering-read-file-split",
+      "title": "Core layering — read_file.ts split (PR-D): GMS-02 AC-1 and its headline, a tools/ thinness gate that did not exist, and the deferrals PR-C could not price",
+      "status": "in_progress",
+      "priority": "P2",
+      "workflow": "spec-driven",
+      "branch": "spec/pr-d-read-file-split",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": false,
+        "execute": false
+      },
+      "spec": ".specs/features/core-layering-read-file-split/spec.md",
+      "depends_on": [
+        "core-layering-controller-retirement"
+      ],
+      "notes": "PR-D of 4, the last. Closes GMS-02 AC-1 and the GMS-02 headline. C28 (28th correction, 35th plan defect): AS-06's stated sensor -- the CI import check PR-C shipped -- cannot discriminate the extraction, because check-core-layering.ts's FORBIDDEN.tools is empty by the declared order. PR-D therefore ships scripts/check-tools-thin.ts rather than inheriting a gate. Six local requirements RFS-01..RFS-06; RFS-06 is printed after RFS-02 deliberately, see spec.md section 5. Full Plan Challenge gate run at Specify: two modes, seven findings, all re-measured, six revised the document. Registered at Specify time rather than later -- PR-C's #56 skipped this file and needed T16b to repair it."
     },
     {
       "slug": "sensor-repair-2026-07",

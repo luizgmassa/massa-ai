@@ -197,7 +197,33 @@ all state came from `.specs/` and source reads.
   J1 deepseek-v4-pro, J2 minimax-m3, J3 GLM-5.2 — as given, unverified) with loud host-default
   fallback; generic artifacts; standalone only; audit-report-io storage; consensus file saved.
 
-## Active — Core Layering, Controller Retirement (PR-C)
+## Active — Core Layering, `read_file.ts` Split (PR-D)
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-core-layering-read-file-split`
+- workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
+- feature: `core-layering-read-file-split` — **Specify COMPLETE 2026-07-31**, branch
+  `spec/pr-d-read-file-split`. **PR-D of 4, the last.** Registered in `FEATURES.json` at Specify
+  time (55 → 56), `active_feature` untouched and verified not stale for the second time.
+- Artifact: `.specs/features/core-layering-read-file-split/spec.md`. **It is the record** — scope,
+  the C28 defect, re-measured premises, seven user decisions with rejected options, six `RFS-*`
+  requirements, Design's three owed decisions, ten risks, and the Plan Challenge record. Nothing
+  from it is duplicated here, on the rule this file's own PR-B section learned the hard way: a
+  duplicated table drifted and was wrong for five tasks.
+- **Next action: Design** — `spec.md` §7 and §10. Not sized until §7's three decisions are recorded
+  with their rejected alternatives.
+- **Full Plan Challenge gate run at Specify**, two modes, seven findings, all seven independently
+  re-measured before acceptance, six revising the document — `spec.md` §9.1.
+- **C28 and the parent's stale layer figures are owed back** to
+  `core-layering-god-module-split/spec.md` (RFS-05 AC-2/AC-3), landing with the work. The parent's
+  Status line is corrected; the corrections-index entry is not written yet.
+
+## Previous — Core Layering, Controller Retirement (PR-C) — MERGED #59, RELEASED v1.17.0
+
+> **Merged 2026-07-31 as `2bea11e`, `--no-ff`, two parents (`450352b` + `2ea4ebd`); released
+> v1.17.0.** T18 PASS, `validation.md`. Everything below was written before the merge and is kept
+> as the pre-merge record; where it describes work as outstanding, this line supersedes it. The
+> four residual findings are `validation.md` §5.1–§5.4 and what was not verified is §6.
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-core-layering-controller-retirement`

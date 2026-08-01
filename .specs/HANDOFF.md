@@ -1,6 +1,44 @@
 # Handoff
 
-## Active — Core Layering, Controller Retirement (PR-C), **complete and validated; awaiting merge**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Specify complete**
+
+**Feature**: `core-layering-read-file-split` · artifact
+`.specs/features/core-layering-read-file-split/spec.md` · branch `spec/pr-d-read-file-split`.
+**Everything a resumer needs is in that file** — scope §1, the defect §2, re-measured premises §3,
+the seven user decisions with their rejected options §4, requirements §5, logged-not-merged §6,
+Design's owed decisions §7, risks §8, the gate record §9.1, sequencing §10. Not restated here.
+
+**Read `spec.md` §10 first.** Three steps cannot be taken retroactively and all three come before
+any extraction commit.
+
+**Next action: Design.** It is not sized until §7's three decisions are recorded with their
+rejected alternatives — PR-C's §9 precedent, where three such preconditions produced C14, C15
+and C16.
+
+**C28 is owed back to the parent `core-layering-god-module-split/spec.md`'s corrections index**
+(RFS-05 AC-2), landing with the work. The parent's Status line and its stale layer figures are
+flagged there already; the amendment itself is not written yet.
+
+**Do not re-derive** the readings in `spec.md` §3, §3.A and §3.B — they were taken at `f06b01d`,
+five premises failed and are corrected in place, and §3.A records an instrument that was wrong
+before it was right. **Do re-derive** anything you intend to quote from a gate: both shipped gates
+enumerate `git ls-files`, so stage first.
+
+---
+
+## Previous — Core Layering, Controller Retirement (PR-C), **MERGED as #59 and RELEASED as v1.17.0**
+
+> **Post-merge status, 2026-07-31.** Merged as `2bea11e`, `--no-ff`, two parents
+> (`450352b` + `2ea4ebd`) — **R-04 honored**. Released **v1.17.0**, verified against
+> `gh release list`, `npm view @massa-ai/core version` and root `package.json` rather than from a
+> green check. `CHANGELOG.md`'s `[1.17.0]` holds PR-C's `### Changed`; `[Unreleased]` is empty.
+> **Everything below this block was written before the merge and is kept as the pre-merge record**
+> — where it says the branch awaits a merge decision, this block supersedes it.
+>
+> Its four residual findings are `core-layering-controller-retirement/validation.md` §5.1–§5.4, and
+> §6 lists what T18 deliberately did **not** verify. Two of those are PR-D's and are scoped in
+> `core-layering-read-file-split/spec.md` §1; the rest are out of scope there, with their owners
+> named in the same table.
 
 **Feature**: `core-layering-controller-retirement` · artifacts
 `.specs/features/core-layering-controller-retirement/{spec,design,tasks}.md`. **Execute complete and validated on

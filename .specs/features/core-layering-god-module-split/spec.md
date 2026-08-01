@@ -8,11 +8,18 @@
   plus a filename rename.
 - **Status**: Specified; assumptions closed 2026-07-28; Design and Tasks complete.
   **PR-B complete** — merged as **#53** (`fe1f30b`, `--no-ff`), released **v1.16.0** on
-  2026-07-31. **PR-C** (`core-layering-controller-retirement`) **in Execute**; **PR-D**
-  (`tools/read_file.ts` — AS-06, and GMS-02 **AC-1** by C13) not started.
+  2026-07-31. **PR-C complete and validated** (`core-layering-controller-retirement`) — merged as
+  **#59** (`2bea11e`, `--no-ff`, parents `450352b` + `2ea4ebd`), released **v1.17.0** on
+  2026-07-31; **T18 PASS**, `core-layering-controller-retirement/validation.md`. **PR-D**
+  (`core-layering-read-file-split` — `tools/read_file.ts`, AS-06, and GMS-02 **AC-1** by C13) is
+  **in Specify**.
   **Twenty-seven corrections** have been applied to this document — twelve at PR-B's T19
   (C1–C12) and **fifteen at PR-C's T16 (C13–C27)** — see *Design and Execute corrections*
-  below before trusting a criterion or a figure.
+  below before trusting a criterion or a figure. **A twenty-eighth is owed and not yet written
+  here: C28, raised in PR-D's Specify** (`core-layering-read-file-split/spec.md` §2) — **AS-06's
+  stated sensor does not discriminate**. It lands with PR-D's work, not ahead of it, on the T16
+  precedent. Three of this document's four layer-size figures are also stale after PR-C
+  (**30 / 0 / 208 / 39**, plus `kernel/` **11**) and are corrected under the same task.
 - **Depends on**: `sensor-repair-2026-07` (PR-A) must land and release first. Three of the gates
   this spec is validated by are unreliable until it does, and one — the needles gate — is
   *guaranteed* to report a false failure against this refactor. See the Evidence Corrections
