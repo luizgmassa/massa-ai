@@ -13,6 +13,7 @@ import { IToolHandler, ToolResponse, estimateTokens, sanitizeFilePath } from "@m
 import { logger } from "@massa-ai/shared";
 import { CodeCompressor } from "../services/compression/code-compressor.js";
 import { serializeToolResponse } from "./serialize.js";
+import { evictOldest as evictOldestShared } from "../services/cache/lru-evict.js";
 import { eventBus } from "../services/events/event-bus.js";
 import { SymbolGraphService } from "../services/symbol/symbol-graph.service.js";
 import { workspaceManager } from "../services/workspace/workspace-manager.js";
@@ -473,13 +474,20 @@ export class ReadFileTool implements IToolHandler {
    * Evict the oldest (first-inserted) entries from a cache Map until it is
    * under FILE_CACHE_MAX_ENTRIES. Called BEFORE the new insert so the cap is
    * honored post-insert with a single iteration.
+   *
+   * Delegates to services/cache/lru-evict.ts, whose second parameter is a
+   * POST-CALL BOUND rather than the cap: a pre-insert caller passes CAP - 1 to
+   * reserve the slot the pending set() takes. `size > CAP - 1` and
+   * `size >= CAP` are the same predicate over the integers, so the retained
+   * count at all three call sites is unchanged.
+   *
+   * Kept as a one-line delegate rather than inlined at :169, :462 and :570.
+   * Deleting it would take this file from 13 maximal bodies to 12 and the
+   * gate's examined-member count from 224 to 223 while the extraction it
+   * exists to measure has not started yet.
    */
   private evictOldest<K, V>(cache: Map<K, V>): void {
-    while (cache.size >= this.FILE_CACHE_MAX_ENTRIES) {
-      const oldest = cache.keys().next().value;
-      if (oldest === undefined) break;
-      cache.delete(oldest);
-    }
+    evictOldestShared(cache, this.FILE_CACHE_MAX_ENTRIES - 1);
   }
 
   private calculateRange(params: ReadFileParams): ReadRange {

@@ -13,6 +13,7 @@
 
 import { minimatch } from "minimatch";
 import { logger } from "@massa-ai/shared";
+import { evictOldest as evictOldestShared } from "../cache/lru-evict.js";
 
 interface FilterCacheEntry {
   files: Set<string>;
@@ -136,23 +137,39 @@ export class FileFilterCache {
   }
 
   /**
-   * Evict oldest entry when cache is full
+   * Evict oldest entries until the cache is back under MAX_CACHE_SIZE.
+   *
+   * Called AFTER the insert, so it passes the cap itself rather than CAP - 1;
+   * services/cache/lru-evict.ts takes a post-call bound.
+   *
+   * TWO DELIBERATE CHANGES OF MECHANISM, BOTH BEHAVIOR-PRESERVING HERE.
+   *
+   * Victim selection was min(createdAt) and is now Map insertion order. They
+   * agree unconditionally at this site: every write to the Map either inserts
+   * fresh with the current Date.now(), or deletes without reordering the
+   * survivors. Nothing ever repositions a key without also giving it the
+   * newest createdAt — the TTL-expiry path at :51-53 deletes before the miss
+   * path re-inserts, so an expired-then-recomputed key moves to the end of
+   * insertion order and gets a new timestamp together. A read does NOT promote
+   * here (it only bumps accessCount), which is the axis this cache does not
+   * share with the other four and the reason the shared module is an eviction
+   * function rather than a cache class.
+   *
+   * Eviction count was exactly one and is now "until under the bound". The
+   * single call site is guarded by `size > MAX_CACHE_SIZE` immediately after a
+   * single insert, so the cache is never more than one entry over and both
+   * forms evict exactly one. They diverge only if MAX_CACHE_SIZE is lowered
+   * beneath an already-larger cache, which is unreachable — the field is
+   * readonly.
+   *
+   * ONE OBSERVABLE DROPPED, recorded rather than absorbed: this method used to
+   * emit logger.debug("Evicted oldest filter cache entry", { key }). Naming the
+   * victim is not something a shared eviction function can report, and the
+   * other four unified sites do not log at all. The line had no assertion
+   * anywhere in the repository.
    */
   private evictOldest(): void {
-    let oldestKey: string | null = null;
-    let oldestTime = Infinity;
-
-    for (const [key, entry] of this.cache.entries()) {
-      if (entry.createdAt < oldestTime) {
-        oldestTime = entry.createdAt;
-        oldestKey = key;
-      }
-    }
-
-    if (oldestKey) {
-      this.cache.delete(oldestKey);
-      logger.debug("Evicted oldest filter cache entry", { key: oldestKey });
-    }
+    evictOldestShared(this.cache, this.MAX_CACHE_SIZE);
   }
 
   /**
