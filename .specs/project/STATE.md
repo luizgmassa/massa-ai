@@ -604,14 +604,54 @@ all state came from `.specs/` and source reads.
   nothing at all. New module **100% lines / funcs**. Discrimination: 15 mutations, M6 **equivalent**
   and M14 **unreachable**, so the honest denominator is **12** — A kills 12/12, pre-existing 3/12, the
   first Phase-3 module where the new suite is discrimination rather than coverage.
-- ~~**Next action: Execute, T5**~~ ~~**Execute, T6**~~ ~~**Execute, T7**~~ ~~**Execute, T8**~~
-  ~~**Execute, T8b**~~ ~~**Execute, T9**~~ ~~**Execute, T10**~~ ~~**Execute, T11**~~ → **Next action:
-  Execute, T12 — the last task in Phase 3.** Module 7 and `handle()`'s collapse. Five things not to
-  miss: every span in its row is **pre-T7/T9/T10/T11** and must be re-derived from the AST; **it must
-  take the 4 → 5 wiring arrow** (C64), now measured as the only remaining body, or `0 of 30` is
-  unreachable; the C59 backlog is **T12 29** with a frame per row, plus the **nine** stale `:NNN` in
-  `test()` TITLE strings T8b left; **do not re-unify `LineRangeRequest` with `ReadFileParams`** (C66);
-  and `handle()` goes **165 → ~15** with `read_file.ts` to **≤ 125 but not below ~100** (R-30).
+- **T12 DONE — `83922db`. PHASE 3 IS COMPLETE.** Module 7 out:
+  `services/file-read/read-file.service.ts` + its suite. `read_file.ts` **315 → 124**, `handle()`
+  **165 → 27**, `check-tools-thin` **`1/1/0/165` → `0/0/0/27`** and the verdict **`2 of 30` → `1 of
+  30`** — the one file still red is `index_project.ts`, T14b's, exactly as C33 predicted. **Five new
+  plan defects (C71–C75), running total eighty.** Record is `tasks.md` §10.14. Write set **7** against
+  the row's **4**, one user decision covering all three growths; citation policy also the user's.
+- **C72 is the one not to skip, and `type-check` cannot see it.** `read-file.test.ts` reaches
+  `ReadFileTool`'s collaborators through **four erasing casts**; T12 moves those fields onto module 7,
+  so all four break at RUNTIME while `tsc` stays green — observed as **176p/4f** before repointing,
+  the four failing cases being exactly the four cast sites. §10.1's **C34 break-phase table tracks
+  MEMBERS and stops at T10**; every prior task moved a member, T12 moves the holder. *A break-phase
+  table is falsified by moving the container, not only the contents.*
+- **C74: the plan's stated mechanism was wrong and only the mutation harness said so.**
+  `readFileOptions` sits above `handle()`'s `try` to preserve the pre-T12 throw position — but
+  `handle(null)` rejects **either way**, because the catch dereferences `p.filePath`. The real
+  discriminating input is a throwing option accessor with a readable `filePath`. M14 survived column A
+  **twice**: first the pin was missing, then it was written without `await` and floated. *A pin can be
+  absent, vacuous, or aimed at the wrong input, and all three read identically in a green suite.*
+- **C71**: the row's four spans are **97 of `handle()`'s 165** lines and cannot produce its own
+  *`handle()` → ~15*; all five cited spans were stale. **C73**: R-30's *above 125 → logic was left
+  behind* cannot say what went over — the five sibling docblocks average **32.4** lines against a
+  budgeted **10**, and the first draft measured **131**, trimmed in prose not code; the reading is now
+  recorded decomposed. **C75**: module 7's own size is measured by **no** gate (`check-tools-thin` is
+  `tools/`-scoped, G-HUB runs on `services/search` alone) — recorded, not fixed.
+- **Citations: 46 swept, 7 adjudicated, 39 T12's, all in one file.** T12 is TERMINAL for
+  `read_file.ts`, so C62's null case is the default rather than a residue. **37 of 46** classify
+  differently under one BASE. Widening to `test()` TITLE strings moved **39 → 46**: measured **7**
+  citations on **5** lines, against the row's stated *nine* and its own enumeration of seven — with
+  two of its five line numbers stale. Verified by round trip: 26 pairs by content across 2 frames, 5
+  de-numberings in both directions, **0** residual.
+- **Gates.** `lint` **0**, proven to bite on a T12 file. `type-check` **6/6**, `build` **5/5**, both 0
+  cached forced. `test:scripts` **1115** unchanged (T12 adds no `scripts/` test); `test:plugins`
+  **96**/0. `check-core-layering` **edges 978 → 980, files 914 → 916**; `read_file.ts`'s own
+  `tools → services` count **7 → 2**. Module 7 **100% lines / funcs**. Discrimination: **15**
+  mutations, **no** equivalent or unreachable rows this time — A kills **15/15**, pre-existing
+  **9/15**, the six misses being the whole of `readFileOptions`' contract, the conditional-spread
+  shape and the call position. **`bun run test` exited 1 on its first run and it is not PR-D's** —
+  `mcp-client`'s `web/fetch_and_index` at 22780 ms, zero diff against `main`, **95p/0f standalone
+  under an empty config dir**; warm re-run 11/11 exit 0, core `all 150 group(s)`, unchanged for one
+  added file and the runner's classification read rather than assumed.
+- ~~**Next action: Execute, T5**~~ … ~~**Execute, T12**~~ → **Next action: Execute, T13 — Phase 4
+  opens.** `index_project.ts`, closed by removal. **T13, T14 and T14b may land in any order among
+  themselves** (`:39-68`, `:151-202`, `:246-351` are disjoint) but all three edit one file, and
+  **T15 comes after all three** (§6 item 8). **T14b is the one that matters**: without it `handle()`
+  stays at 128 against a ceiling of 120, the gate stays at `1 of 30` and T15 cannot wire it into
+  `ci.yml` (C33). Read `tasks.md` §5 Phase 4, §4.2's threading decision and §10.6's C43 — **every span
+  in those three rows is pre-Execute and must be re-derived from the AST**, as T9–T12 all had to, and
+  C43 already found two of them declaration-only where the gate measures comment-inclusive.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed

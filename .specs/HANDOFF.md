@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — Phase 3 OPEN, T11 done**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASE 3 COMPLETE, T12 done**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -34,8 +34,10 @@
 > reason than the obvious one, and the obvious one does not survive measurement.
 >
 > ~~**Six** corrections are owed to `design.md` itself~~ → ~~fourteen~~ → ~~fifteen~~ → ~~sixteen~~ →
-> **seventeen** (§8.1 → task **T20b**, PR-C's C18 precedent), and **C28–C33** to the parent `spec.md`
-> (T20). None is written in either yet. *"Six" was last true at Design; §8.1 grew at T4b, again at T5,
+> ~~seventeen~~ → **eighteen** (§8.1 → task **T20b**, PR-C's C18 precedent), and **C28–C33** to the
+> parent `spec.md` (T20). None is written in either yet. *Row 18 is **C71** — `design.md` §5.1 gives
+> module 7 five spans totalling 97 of `handle()`'s 165 lines, from which neither its own ≈120 LOC
+> estimate nor `tasks.md`'s `handle()` → ~15 is reachable.* *"Six" was last true at Design; §8.1 grew at T4b, again at T5,
 > again at T6, again at T9, and again at T11 — row 16 is §3.2's "20 construction sites", measured
 > **41**, a figure true when Design wrote it and falsified by PR-D's own Phase 0 suites; row 17 is
 > **C66**, §5.1 giving module 6 a parameter type it gives to module 7, which composes it.*
@@ -788,15 +790,85 @@
 > **module 6 adds zero edges, importing nothing at all** (module 1's property, asserted by an AST walk
 > in its own suite). New module **100% lines / 100% funcs** (R-36).
 >
-> **Next action: Execute, T12 — the last task in Phase 3.** Module 7 and `handle()`'s collapse. Five
-> things it must not miss: **every span in its row is pre-T7/pre-T9/pre-T10/pre-T11** and must be
-> re-derived from the AST, as T9, T10 and T11 all had to; **it must take the 4 → 5 wiring arrow**, now
-> measured as the only remaining body (C64), or `read_file.ts` cannot reach maximal 0 and RFS-01 AC-1
-> cannot read `0 of 30`; the C59 backlog attributes **T12 29** with a frame per row, plus the **nine
-> stale `:NNN` in `test()` TITLE strings** T8b deliberately left; **do not re-unify `LineRangeRequest`
-> with `ReadFileParams`** (C66), which would recreate the 6 → 7 edge; and `handle()` must go
-> **165 → ~15** against a ceiling of 120, with `read_file.ts` to **≤ 125** but **not below ~100**
-> (R-30 — a materially smaller file means the schema was altered).
+> ~~**Next action: Execute, T12.**~~ **T12 DONE — `83922db`. PHASE 3 IS COMPLETE.** Module 7 is out:
+> `services/file-read/read-file.service.ts` plus its suite; `read_file.ts` **315 → 124**, `handle()`
+> **165 → 27**, maximal/raw/state **`1 / 1 / 0` → `0 / 0 / 0`**, and `check-tools-thin` moves
+> **`2 of 30` → `1 of 30`**. Its record is `tasks.md` §10.14 — the AST span table, the 16-row
+> two-column discrimination table, and **five new plan defects (C71–C75, running total eighty)**. Not
+> restated here.
+>
+> **The one file still red is `index_project.ts`, and that is C33 coming true rather than a miss.**
+> Its `handle()` is 128 against a ceiling of 120; `0 of 30` is **T15's** reading and depends on
+> **T14b**. Phase 3's acceptance reading is closed for `read_file.ts`: 707 → 124 (band ≤ 125, not
+> below ~100), maximal 13 → 0, `Map` 2 → 0, `handle()` 175 → 27, all six modules present and imported,
+> schema byte-identical.
+>
+> **The write set was 7 against the row's 4, and both gate lenses reached that 7 independently.**
+> Three growths, one user decision: **C72** (`read-file.test.ts`), and one stale clause each in
+> `file-content-cache.ts` and `line-range.ts`. Citation policy was the user's too — renumber the 32
+> comment citations into `read-file.service.ts`, **de-number the 7 test titles**.
+>
+> **C72 is the one a resumer must not skip, because `type-check` is blind to it.**
+> `read-file.test.ts` reaches `ReadFileTool`'s collaborators through **four erasing casts**
+> (`as unknown as { … }`). T12 moves `fileContent`, `projectRoots` and `fileMetadata` onto module 7, so
+> all four break at **runtime** — measured **176p/4f with `tsc` green**, the four failing cases being
+> exactly the four cast sites, observed before repointing rather than predicted. §10.1's **C34
+> break-phase table assigns this file's breaks to T7/T8/T9/T10 and stops**: every prior task moved a
+> MEMBER, T12 moves the **holder**. *A table of which tests break when is falsified by a task that
+> moves the container, not only by one that moves the contents* — fourth break owned by nothing.
+>
+> **C74 changed the code after it was written, and only the mutation harness said so.**
+> `readFileOptions` is called above `handle()`'s `try` to preserve the pre-T12 throw position, and the
+> plan justified that with `handle(null)`. **Measured, `handle(null)` rejects with the reads on either
+> side** — the catch evaluates `p.filePath` for its log context and throws again out of the catch. The
+> real discriminating input is **a request whose option accessor throws while `filePath` reads fine**.
+> M14 survived column A **twice** before that surfaced: first the pin was simply missing, then it was
+> written as `expect(...).rejects.toThrow()` **without `await`** and floated. *A pin can be absent,
+> vacuous, or aimed at the wrong input, and all three read identically in a green suite.*
+>
+> **C73 is the red-team's, and its own figure did not survive — the twenty-seventh time.** `N = 125`'s
+> allowance budgets a **10**-line file docblock (`design.md` §3.1) while the five modules this feature
+> produced average **32.4**. Its predicted 147 assigned module 7's decision record to the handler; but
+> the first draft did measure **131**, six over, and was trimmed **in prose, not code**. The defect it
+> exposes is that R-30's *above 125 → logic was left behind* **cannot distinguish documentation overage
+> from logic overage**, so the acceptance reading is now recorded decomposed (docblock 9 / imports 5 /
+> class 6 / schema 62 / field+ctor 11 / `handle()` 27 / structure 4). **C71**: the row's four spans are
+> 97 of 165 lines and all five were stale. **C75**: module 7's size is measured by no gate — recorded.
+>
+> **Citations: 46 swept, 7 adjudicated, 39 T12's, every one in a single file.** T12 is **terminal** for
+> `read_file.ts`, so C62's null case is the default rather than a residue and the sweep partitions the
+> file into MOVES / STAYS / NO-OWNER. **37 of 46** classify differently under one BASE. Widening to
+> `test()` TITLE strings moved **39 → 46**: **7** citations on **5** lines, against the row's stated
+> *nine*, its own enumeration of *seven*, and two stale line numbers among its five. Two instrument
+> defects, both caught by the instruments' own refusals — an adjudication the subject rule pre-empts so
+> it can never fire, and a post-edit re-run whose **span partition passed while its anchors threw**.
+> *A structural check that cannot fail on the wrong tree is not a check.*
+>
+> **Gates, all six plus both structural gates.** `lint` **0**, proven to bite on a T12 file
+> (`read-file.service.ts:311:7`, exit 1, restored SHA-identical). `type-check` **6/6, 0 cached**;
+> `build` **5/5, 0 cached**, both forced. `test:scripts` **1115, unchanged** — T12 adds no `scripts/`
+> test, which is the only case where it must not move. `test:plugins` **96**/0. `check-core-layering`:
+> **edges 978 → 980, files 914 → 916**, and `read_file.ts`'s own `tools → services` count **7 → 2**,
+> the largest single-file drop of the extraction. New module **100% lines / 100% funcs** (R-36).
+> Discrimination: **15** mutations and **no equivalent or unreachable rows this time**, so the
+> denominator really is 15 — **A kills 15 of 15, the pre-existing suites 9 of 15**, the six misses being
+> the whole of `readFileOptions`' contract, the conditional-spread shape and the call position.
+> **`bun run test` exited 1 on its first run and it is not PR-D's**: `mcp-client`'s
+> `web/fetch_and_index` at **22780 ms**, zero diff against `main`, **95p/0f standalone under
+> `XDG_CONFIG_HOME=$(mktemp -d)`**. It failed at T9 and T10, did not at T11, and did again here — so
+> T11's clean reading was an absence, not a fix. **Warm re-run 11/11, exit 0**, 5 cached all `:build`,
+> core `all 150 group(s)`, **unchanged for one added file** and verified by reading the runner's
+> classification (`1 pure/shared, 0 stateful/isolated`) rather than assuming it.
+>
+> **Next action: Execute, T13 — Phase 4 opens.** `index_project.ts`, closed by removal. Ordering is §6
+> item 8: **T13, T14 and T14b may land in any order among themselves** — their spans `:39-68`,
+> `:151-202` and `:246-351` are disjoint — but all three edit the one file, and **T15 comes after all
+> three**. Four things not to miss: **T14b is load-bearing** (C33 — without it `handle()` stays 128
+> against a ceiling of 120 and T15 cannot wire the gate into `ci.yml`); **every span in those rows is
+> pre-Execute and must be re-derived from the AST**, as T9–T12 all had to; **C43 already found two of
+> them declaration-only where the gate measures comment-inclusive**, which is worth 7 of T14b's 33 lines
+> of margin; and §4.2's `warmupCache` threading decision is taken — do not re-take it, its rejected
+> option is rejected for a subtler reason than the obvious one.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
