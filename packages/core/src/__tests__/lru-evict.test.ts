@@ -35,7 +35,7 @@ import ts from "typescript";
 import { evictOldest } from "../services/cache/lru-evict.js";
 
 /** The caps the four repointed files pass at T7. Named, not invented. */
-const CAP_READ_FILE = 512; // read_file.ts       · FILE_CACHE_MAX_ENTRIES (both its Maps)
+const CAP_READ_FILE = 512; // file-content-cache.ts · FILE_CACHE_MAX_ENTRIES (T10)
 const CAP_SYMBOL_GRAPH = 512; // symbol-graph.service.ts · PROJECT_ROOT_CACHE_MAX_ENTRIES
 const CAP_WEB = 512; // web-controller.ts  · WEB_CACHE_MAX_ENTRIES
 const CAP_FILTER = 50; // file-filter-cache.ts · MAX_CACHE_SIZE

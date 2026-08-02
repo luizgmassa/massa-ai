@@ -26,7 +26,7 @@
  * site does NOT share with the others (`spec.md` §3.B's six-axis table):
  *
  *   | site                              | cap | evict     | read promotes? |
- *   | read_file.ts   · fileCache        | 512 | pre-set   | YES            |
+ *   | file-content-cache.ts (T10)      | 512 | pre-set   | YES            |
  *   | project-root-cache.ts (T9)       | 512 | pre-set   | YES            |
  *   | symbol-graph.service.ts           | 512 | pre-set   | YES            |
  *   | web-controller.ts                 | 512 | post-set  | YES            |
@@ -119,7 +119,8 @@ const CAP_512 = 512;
 const CAP_50 = 50;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Site 1 — tools/read_file.ts · fileCache
+// Site 1 — services/file-read/file-content-cache.ts · fileCache (T10 moved it
+// out of tools/read_file.ts; this case still drives it through ReadFileTool)
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // The cache key is JSON over {filePath, includeSymbols, includeImports,

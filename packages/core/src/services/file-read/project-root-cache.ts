@@ -35,9 +35,10 @@ export class ProjectRootCache {
    * GET via delete+set, and evict the oldest key on SET while over the cap.
    *
    * Before the extraction this bound was read from `ReadFileTool`'s own
-   * FILE_CACHE_MAX_ENTRIES, which is T10's to move and belongs to the file
-   * CONTENT cache. Both were 512 and neither ever read the other's value, so
-   * naming the bound here retains the same number at the same call positions.
+   * FILE_CACHE_MAX_ENTRIES, which belongs to the file CONTENT cache and which
+   * T10 moved to `file-content-cache.ts`. Both were 512 and neither ever read
+   * the other's value, so naming the bound here retains the same number at the
+   * same call positions.
    * Mirrors SymbolGraphService.PROJECT_ROOT_CACHE_MAX_ENTRIES.
    */
   private readonly PROJECT_ROOT_CACHE_MAX_ENTRIES = 512;

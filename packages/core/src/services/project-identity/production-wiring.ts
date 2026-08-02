@@ -69,8 +69,8 @@ async function resolveServingTargets(): Promise<ProductionInvalidatorTargets> {
  * is FALSE for read_file, and the authority is the measurement, not the
  * neighbouring comment in invalidator-registry.ts that this line used to cite.
  * Pinned by __tests__/read-file-project-root-rename-pin.test.ts (RFS-02 AC-4):
- * ReadFileTool.CACHE_TTL bounds the file CONTENT cache and IS enforced, while
- * ROOT_CACHE_TTL is declared and read nowhere, so projectRootCache is
+ * FileContentCache.CACHE_TTL bounds the file CONTENT cache and IS enforced,
+ * while ROOT_CACHE_TTL is declared and read nowhere, so projectRootCache is
  * LRU-bounded only. Driven across a committed rename, this registry clears
  * SymbolGraphService's cached root and ReadFileTool keeps serving the
  * PRE-rename one; no invalidator id below matches /read[-_]?file/i. That

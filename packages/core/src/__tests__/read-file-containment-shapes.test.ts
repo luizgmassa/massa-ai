@@ -228,8 +228,15 @@ describe("RFS-06 AC-3 shape (b) — MASSA_AI_READ_FILE_ROOTS is read per call", 
       // Direction B: set -> unset -> reject again, same instance. This is the
       // direction that kills a STICKY memo (recompute only while the cached
       // value is empty, freeze once non-empty), which direction A cannot see.
-      // Containment runs at handle():207, BEFORE readFileWithCache at :222, so
-      // the entry the previous read cached cannot satisfy this one.
+      // Containment runs in handle() BEFORE readFileWithCache, so the entry the
+      // previous read cached cannot satisfy this one. Deliberately unnumbered:
+      // this sentence used to cite both call sites by line, was exact against
+      // read_file.ts when written, and was falsified by T9 without any sweep
+      // noticing — T9's repoint of this file's OTHER citations removed the
+      // literal `read_file.ts` that its sweep keyed the subject on, dropping
+      // this file out of the very population that sweep read. Both call sites
+      // have since moved again (T10) and T12 collapses handle() around them,
+      // so a third pair of numbers would be falsified a third time.
       delete process.env[ENV];
       const deniedAgain = await read();
       expect(deniedAgain.success).toBe(false);

@@ -36,8 +36,8 @@ export const EMPTY_INVALIDATION_REPORT: ProjectIdentityInvalidationReport = Obje
  * entry self-evicts within the TTL window" — is FALSE for read_file's
  * projectRootCache. Measured by
  * __tests__/read-file-project-root-rename-pin.test.ts (RFS-02 AC-4):
- * ReadFileTool.CACHE_TTL bounds the file CONTENT cache and is enforced, while
- * ROOT_CACHE_TTL is declared and read nowhere, so that cache is LRU-bounded
+ * FileContentCache.CACHE_TTL bounds the file CONTENT cache and is enforced,
+ * while ROOT_CACHE_TTL is declared and read nowhere, so that cache is LRU-bounded
  * only and a committed rename leaves it serving the pre-rename root. Logged,
  * not fixed. production-wiring.ts composes this registry and states the same.
  */

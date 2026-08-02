@@ -13,12 +13,11 @@ import { IToolHandler, ToolResponse, estimateTokens } from "@massa-ai/shared";
 import { logger } from "@massa-ai/shared";
 import { CodeCompressor } from "../services/compression/code-compressor.js";
 import { serializeToolResponse } from "./serialize.js";
-import { evictOldest as evictOldestShared } from "../services/cache/lru-evict.js";
+import { FileContentCache } from "../services/file-read/file-content-cache.js";
+import { FileMetadataExtractor } from "../services/file-read/file-metadata.js";
 import { PathContainment } from "../services/file-read/path-containment.js";
 import { ProjectRootCache } from "../services/file-read/project-root-cache.js";
 import { SymbolGraphService } from "../services/symbol/symbol-graph.service.js";
-import fs from "fs/promises";
-import path from "path";
 
 /**
  * N9: per-read line ceiling on user-facing read_file output. Default 500;
@@ -54,22 +53,6 @@ interface ReadFileParams {
 interface ReadRange {
   start: number;
   end: number;
-}
-
-interface FileMetadata {
-  totalLines: number;
-  language?: string;
-  symbols?: {
-    definitions: number;
-    references: number;
-  };
-  imports?: string[];
-}
-
-interface CachedFile {
-  content: string;
-  timestamp: number;
-  metadata?: FileMetadata;
 }
 
 export class ReadFileTool implements IToolHandler {
@@ -145,16 +128,8 @@ export class ReadFileTool implements IToolHandler {
   private symbolGraph?: SymbolGraphService;
   private projectRoots: ProjectRootCache;
   private pathContainment: PathContainment;
-  private fileCache: Map<string, CachedFile> = new Map();
-  private readonly CACHE_TTL = 60000; // 1 minute
-  /**
-   * Maximum entries retained in each in-memory cache. Without a cap, an
-   * adversarial caller cycling distinct cache keys grows the map for the
-   * process lifetime. Map preserves INSERTION order in JS; we promote a key
-   * to most-recently-used on GET via delete+set, and evict the oldest key on
-   * SET while over the cap. Mirrors WebController's WEB_CACHE_MAX_ENTRIES.
-   */
-  private readonly FILE_CACHE_MAX_ENTRIES = 512;
+  private fileMetadata: FileMetadataExtractor;
+  private fileContent: FileContentCache;
 
   constructor(symbolGraph?: SymbolGraphService) {
     this.compressor = new CodeCompressor();
@@ -166,6 +141,29 @@ export class ReadFileTool implements IToolHandler {
     // subscription count and lifetime are unchanged by the move.
     this.projectRoots = new ProjectRootCache();
     this.pathContainment = new PathContainment(this.projectRoots);
+
+    // Same per-tool rule for the file CONTENT cache and its metadata extractor.
+    // The 4 -> 5 edge is a CALLBACK (services/file-read/file-content-cache.ts
+    // never names SymbolGraphService), and it is an arrow rather than a
+    // `.bind(...)`: `this.fileMetadata.extractMetadata` is re-resolved on every
+    // call, exactly as `this.extractMetadata` was before the move, so replacing
+    // the method on the instance is still observable from the cache's two call
+    // sites. A bound reference captured here would freeze the pre-replacement
+    // function and silently make that seam untestable.
+    //
+    // MEASURED COST, RECORDED RATHER THAN GLOSSED: this arrow is a function body
+    // inside the constructor, and the constructor is exempt from check-tools-thin
+    // clause 1 BY KIND — so the arrow is counted MAXIMAL rather than nested (the
+    // C39 asymmetry the gate's own suite pins synthetically). It is the only body
+    // this task ADDS to the file the gate measures, taking read_file.ts to
+    // maximal 5 where removing four methods alone would have left 4. It is
+    // transient: T12 moves this whole composition into module 7, where it is
+    // outside the gate's `tools/` population. RFS-01 AC-1 cannot read 0 of 30
+    // until it does.
+    this.fileMetadata = new FileMetadataExtractor(symbolGraph);
+    this.fileContent = new FileContentCache((content, filePath, options) =>
+      this.fileMetadata.extractMetadata(content, filePath, options),
+    );
   }
 
   async handle(params: unknown): Promise<ToolResponse> {
@@ -215,7 +213,7 @@ export class ReadFileTool implements IToolHandler {
       const range = this.calculateRange(p);
 
       // Read file with cache
-      const { content, metadata } = await this.readFileWithCache(filePath, {
+      const { content, metadata } = await this.fileContent.readFileWithCache(filePath, {
         includeSymbols,
         includeImports,
         projectId: p.projectId,
@@ -344,27 +342,6 @@ export class ReadFileTool implements IToolHandler {
     }
   }
 
-  /**
-   * Evict the oldest (first-inserted) entries from a cache Map until it is
-   * under FILE_CACHE_MAX_ENTRIES. Called BEFORE the new insert so the cap is
-   * honored post-insert with a single iteration.
-   *
-   * Delegates to services/cache/lru-evict.ts, whose second parameter is a
-   * POST-CALL BOUND rather than the cap: a pre-insert caller passes CAP - 1 to
-   * reserve the slot the pending set() takes. `size > CAP - 1` and
-   * `size >= CAP` are the same predicate over the integers, so the retained
-   * count at the call site is unchanged.
-   *
-   * ONE call site remains — readFileWithCache's. T9 took the other two out of
-   * this file together with projectRootCache; T10 takes this one into
-   * services/file-read/file-content-cache.ts, after which nothing calls this
-   * wrapper and T12 deletes it. Deliberately unnumbered: every line number
-   * written here has been falsified by the next task in this phase.
-   */
-  private evictOldest<K, V>(cache: Map<K, V>): void {
-    evictOldestShared(cache, this.FILE_CACHE_MAX_ENTRIES - 1);
-  }
-
   private calculateRange(params: ReadFileParams): ReadRange {
     // Priority: lineStart/lineEnd > offset/limit > entire file
     if (params.lineStart !== undefined && params.lineEnd !== undefined) {
@@ -398,118 +375,6 @@ export class ReadFileTool implements IToolHandler {
     return { start, end };
   }
 
-  private async readFileWithCache(
-    filePath: string,
-    options: {
-      includeSymbols: boolean;
-      includeImports: boolean;
-      projectId?: string;
-      relativePath?: string;
-    }
-  ): Promise<{ content: string; metadata: FileMetadata }> {
-    // Cache key MUST include every option that changes metadata extraction.
-    // Keying on filePath alone returned stale, options-baked metadata for a
-    // later read of the same file with different includeSymbols/includeImports/
-    // projectId/relativePath (the only e2e red — 08.search F33). Deliberately
-    // exclude offset/limit/lineStart/lineEnd/compress/targetRatio/format: those
-    // are applied AFTER the cache in handle(), and coalescing them across reads
-    // is the cache's purpose.
-    const cacheKey = JSON.stringify({
-      filePath,
-      includeSymbols: options.includeSymbols ?? false,
-      includeImports: options.includeImports ?? false,
-      projectId: options.projectId ?? null,
-      relativePath: options.relativePath ?? null,
-    });
-    const cached = this.fileCache.get(cacheKey);
-
-    // Check cache validity
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
-      logger.debug("File cache hit", { filePath });
-      // LRU touch: promote this key to most-recently-used so hot files survive
-      // eviction. delete+set reorders the key to the end (newest).
-      this.fileCache.delete(cacheKey);
-      this.fileCache.set(cacheKey, cached);
-
-      // Legacy/edge entries may have undefined metadata. Re-extract once and
-      // WRITE IT BACK into the cache entry so subsequent hits are served from
-      // cache instead of re-extracting on every request.
-      if (!cached.metadata) {
-        const metadata = await this.extractMetadata(cached.content, filePath, options);
-        this.fileCache.set(cacheKey, { ...cached, metadata });
-        return { content: cached.content, metadata };
-      }
-      return {
-        content: cached.content,
-        metadata: cached.metadata,
-      };
-    }
-
-    // Read file
-    const content = await fs.readFile(filePath, "utf-8");
-    const metadata = await this.extractMetadata(content, filePath, options);
-
-    // Update cache (evict oldest if at cap).
-    this.evictOldest(this.fileCache);
-    this.fileCache.set(cacheKey, {
-      content,
-      timestamp: Date.now(),
-      metadata,
-    });
-
-    logger.debug("File read and cached", { filePath });
-    
-    return { content, metadata };
-  }
-
-  private async extractMetadata(
-    content: string,
-    filePath: string,
-    options: {
-      includeSymbols: boolean;
-      includeImports: boolean;
-      projectId?: string;
-      relativePath?: string;
-    }
-  ): Promise<FileMetadata> {
-    const lines = content.split("\n");
-    const language = this.detectLanguage(filePath);
-    
-    const metadata: FileMetadata = {
-      totalLines: lines.length,
-      language,
-    };
-
-    // Extract imports if requested
-    if (options.includeImports && language) {
-      metadata.imports = this.extractImports(lines, language);
-    }
-
-    // Get symbol metadata if symbol graph available
-    if (options.includeSymbols && this.symbolGraph && options.projectId) {
-      try {
-        // Symbol DB stores relative paths — use original relative path for queries
-        const queryPath = options.relativePath || filePath;
-        const { definitions } = await this.symbolGraph.listDefinitions(
-          options.projectId,
-          {
-            file: queryPath,
-            limit: 100,
-          }
-        );
-
-        metadata.symbols = {
-          definitions: definitions.length,
-          references: 0, // Would need separate query
-        };
-      } catch (error) {
-        logger.debug("Failed to get symbol metadata", { filePath, error });
-      }
-    }
-
-    return metadata;
-  }
-
   private extractLines(lines: string[], range: ReadRange): string {
     const start = range.start - 1; // Convert to 0-indexed
     const end = range.end;
@@ -523,68 +388,5 @@ export class ReadFileTool implements IToolHandler {
         return `${lineNum.toString().padStart(6, " ")}: ${line}`;
       })
       .join("\n");
-  }
-
-  private detectLanguage(filePath: string): string | undefined {
-    const ext = path.extname(filePath).toLowerCase();
-    const languageMap: Record<string, string> = {
-      ".ts": "TypeScript",
-      ".tsx": "TypeScript",
-      ".js": "JavaScript",
-      ".jsx": "JavaScript",
-      ".vue": "Vue",
-      ".py": "Python",
-      ".go": "Go",
-      ".rs": "Rust",
-      ".java": "Java",
-      ".cpp": "C++",
-      ".c": "C",
-      ".h": "C",
-      ".hpp": "C++",
-      ".cs": "C#",
-      ".rb": "Ruby",
-      ".php": "PHP",
-      ".swift": "Swift",
-      ".kt": "Kotlin",
-      ".kts": "Kotlin",
-      ".scala": "Scala",
-      ".md": "Markdown",
-      ".json": "JSON",
-      ".yaml": "YAML",
-      ".yml": "YAML",
-      ".xml": "XML",
-      ".html": "HTML",
-      ".css": "CSS",
-      ".scss": "SCSS",
-      ".sql": "SQL",
-      ".sh": "Shell",
-      ".bash": "Shell",
-    };
-    return languageMap[ext];
-  }
-
-  private extractImports(lines: string[], language: string): string[] {
-    const imports: string[] = [];
-    
-    const importPatterns: Record<string, RegExp> = {
-      TypeScript: /^(import\s+.*?from\s+['"]|import\s+['"])/,
-      JavaScript: /^(import\s+.*?from\s+['"]|import\s+['"]|require\s*\(\s*['"])/,
-      Python: /^(import\s+|from\s+\S+\s+import)/,
-      Go: /^import\s+/,
-      Java: /^import\s+/,
-      Rust: /^use\s+/,
-    };
-
-    const pattern = importPatterns[language];
-    if (!pattern) return imports;
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (pattern.test(trimmed)) {
-        imports.push(trimmed);
-      }
-    }
-
-    return imports;
   }
 }

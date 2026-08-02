@@ -69,7 +69,7 @@
  *    (workspace mock), never through `MASSA_AI_READ_FILE_ROOTS` — which is
  *    cleared and restored around the file, with a tripwire, so an ambient value
  *    cannot make a case pass for the wrong reason.
- * 3. THE COMPRESSOR IS MOCKED. `read_file.ts:160` builds a real `CodeCompressor`
+ * 3. THE COMPRESSOR IS MOCKED. `read_file.ts:135` builds a real `CodeCompressor`
  *    with no injection seam, and T2's gate measured that `CodeCompressor` is this
  *    repo's live-LLM edge (`llm.enabled:true` with local Ollama; 42 s cold).
  */
@@ -311,8 +311,9 @@ describe("R-31 — read_file handle() presentation block, characterized pre-extr
     expect(d.recommendations).toEqual([tipSymbols(3)]);
 
     // `:333` guards on `definitions > 0`. A distinct file is used because
-    // `readFileWithCache`'s key (`:542-548`) includes projectId + relativePath,
-    // so re-reading the same path would serve the 3-definition metadata back.
+    // `readFileWithCache`'s key (`file-content-cache.ts:97-103`, T10 moved it
+    // out of read_file.ts) includes projectId + relativePath, so re-reading the
+    // same path would serve the 3-definition metadata back.
     const withoutSymbols = new ReadFileTool(symbolGraphWith(0));
     const res0 = (await withoutSymbols.handle({
       filePath: noSymbolFile,

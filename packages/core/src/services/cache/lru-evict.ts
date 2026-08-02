@@ -3,8 +3,8 @@
  *
  * WHY A FUNCTION AND NOT A CACHE CLASS.
  * The five caches this serves agree on eviction ORDER and disagree on everything else: cap
- * (512 at four sites, 50 at `file-filter-cache`), TTL (enforced at `read_file`'s `fileCache`
- * only) and read-promotion (absent at `file-filter-cache`). A shared cache class would impose
+ * (512 at four sites, 50 at `file-filter-cache`), TTL (enforced at `file-content-cache`'s
+ * `fileCache` only) and read-promotion (absent at `file-filter-cache`). A shared cache class would impose
  * one policy on all five, and that IS the behavior change `spec.md` §3.B measured the eviction
  * itself is not. RFS-02 AC-2 therefore fixes this as an eviction function; every site keeps its
  * own cap, its own TTL and its own promotion policy.
@@ -13,7 +13,7 @@
  * `design.md` §5.1 specifies only "a function taking `(cache, cap)`", and that phrasing does
  * not determine the predicate, because the five sites do not share one:
  *
- *   read_file.ts   · fileCache         pre-insert   while (size >= 512)
+ *   file-content-cache.ts (T10)        pre-insert   while (size >= 512)
  *   project-root-cache.ts (T9)         pre-insert   while (size >= 512)
  *   symbol-graph.service.ts            pre-insert   while (size >= 512)
  *   web-controller.ts                  post-insert  while (size >  512)

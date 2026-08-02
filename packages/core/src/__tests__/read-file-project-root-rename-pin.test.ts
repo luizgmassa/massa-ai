@@ -10,7 +10,9 @@
  *   1. `project-root-cache.ts:30` declares `private readonly ROOT_CACHE_TTL = 300000`
  *      and NOTHING READS IT. The declaration is the constant's only occurrence
  *      in the file. So the cache is LRU-bounded only, while `fileCache`'s
- *      `CACHE_TTL` really is checked at `:552`.
+ *      `CACHE_TTL` really is checked at `file-content-cache.ts:107` (T10 moved
+ *      the content cache out of `read_file.ts` into module 4, so the two
+ *      constants are no longer even in the same file).
  *   2. `production-wiring.ts` composes the post-commit project-rename/merge
  *      invalidator registry and registers `symbolGraph.clearProjectRoot` — the
  *      exact same data, in a class whose own comment
@@ -175,7 +177,7 @@ describe("RFS-02 AC-4 — CACHE_TTL is enforced and ROOT_CACHE_TTL is not", () =
   test("past 60s the content re-reads; past 300s the project root still does not", async () => {
     const PROJECT = "pin-ttl";
     const BASE = new Date("2026-01-01T00:00:00.000Z").getTime();
-    const CACHE_TTL = 60_000; // read_file.ts:148, read at :552
+    const CACHE_TTL = 60_000; // file-content-cache.ts:69, read at :107
     const ROOT_CACHE_TTL = 300_000; // project-root-cache.ts:30, read nowhere
 
     const movable = fs.mkdtempSync(path.join(os.tmpdir(), "massa-ai-pin-ttl-"));

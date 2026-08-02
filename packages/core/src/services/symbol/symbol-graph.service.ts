@@ -172,7 +172,10 @@ export class SymbolGraphService {
    * caller cycling distinct projectIds grows the map for the process lifetime.
    * Map preserves INSERTION order in JS; we promote a key to most-recently-used
    * on GET via delete+set, and evict the oldest key on SET while over the cap.
-   * Mirrors ReadFileTool's FILE_CACHE_MAX_ENTRIES / evictOldest pattern.
+   * Mirrors services/file-read/file-content-cache.ts's FILE_CACHE_MAX_ENTRIES
+   * and services/file-read/project-root-cache.ts's own cap. Both were
+   * ReadFileTool's private fields when this comment was written; T9 and T10
+   * moved them out, and the shared operator is services/cache/lru-evict.ts.
    */
   private readonly PROJECT_ROOT_CACHE_MAX_ENTRIES = 512;
 

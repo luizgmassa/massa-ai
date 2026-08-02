@@ -377,7 +377,13 @@ export function analyzeSource(file: string, text: string): FileReading {
 
   // Clause 1. Recursion terminates at a flagged body, which is what makes the count
   // MAXIMAL rather than raw — descending unconditionally reports every nested arrow
-  // as a sibling of its own parent and inflates `read_file.ts` from 13 to 17.
+  // as a sibling of its own parent, so the two counts diverge wherever a flagged
+  // body contains one. Deliberately unnumbered, for the reason the docblock above
+  // gives: this line used to quote `read_file.ts`'s own maximal and raw counts as
+  // a worked example. That was exact when written, went stale at T9 and stale
+  // again at T10, and was the same live-tree figure this file declares 278 lines
+  // above that it does not carry. The gate PRINTS both counts per file on every
+  // run; read them there.
   const bodies: BodyFinding[] = [];
   let rawBodies = 0;
   const countRaw = (node: ts.Node): void => {
