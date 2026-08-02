@@ -285,18 +285,30 @@ describe("ReadFileTool — fileCache LRU cap + promotion", () => {
   // POST-CALL bound, so a pre-insert caller reserves the slot its pending set()
   // takes. `size > CAP - 1` and `size >= CAP` are the same predicate over the
   // integers, so the retained count is identical to the wrapper's (C44).
+  //
+  // T12 REPOINT (GMS-05 AC-3), AND C34'S TABLE DID NOT PREDICT IT. That table
+  // assigns this file's break phases to T7/T8/T9/T10 and stops; T12 moves the
+  // COLLABORATOR — fileContent, projectRoots and fileMetadata leave ReadFileTool
+  // for read-file.service.ts — rather than the member, so all four casts in this
+  // file break one task after the last one any row anticipated. They break at
+  // RUNTIME only: every reach here is written `as unknown as {…}`, which erases,
+  // so tsc and `bun run type-check` stay green while the suite reads 176p/4f.
+  // Observed before repointing, not predicted. The reach is one hop longer
+  // again; nothing about what is asserted changed.
   const CAP = 512;
 
   test("inserting CAP+1 distinct keys evicts the oldest; a promoted hot key survives", () => {
     const priv = new ReadFileTool() as unknown as {
-      fileContent: {
-        fileCache: Map<string, unknown>;
-        FILE_CACHE_MAX_ENTRIES: number;
+      service: {
+        fileContent: {
+          fileCache: Map<string, unknown>;
+          FILE_CACHE_MAX_ENTRIES: number;
+        };
       };
     };
-    const cache = priv.fileContent.fileCache;
+    const cache = priv.service.fileContent.fileCache;
 
-    expect(priv.fileContent.FILE_CACHE_MAX_ENTRIES).toBe(CAP);
+    expect(priv.service.fileContent.FILE_CACHE_MAX_ENTRIES).toBe(CAP);
 
     // Seed CAP entries. The first-inserted is the eviction candidate.
     for (let i = 0; i < CAP; i++) {
@@ -371,13 +383,15 @@ describe("ReadFileTool — eviction call sites are driven, not just the operator
   test("one real read past a full fileCache evicts — readFileWithCache's call site is live", async () => {
     const tool = new ReadFileTool();
     const priv = tool as unknown as {
-      fileContent: {
-        fileCache: Map<string, unknown>;
-        FILE_CACHE_MAX_ENTRIES: number;
+      service: {
+        fileContent: {
+          fileCache: Map<string, unknown>;
+          FILE_CACHE_MAX_ENTRIES: number;
+        };
       };
     };
-    const cache = priv.fileContent.fileCache;
-    const CAP = priv.fileContent.FILE_CACHE_MAX_ENTRIES;
+    const cache = priv.service.fileContent.fileCache;
+    const CAP = priv.service.fileContent.FILE_CACHE_MAX_ENTRIES;
 
     // Seed to exactly CAP. These keys are bare strings; handle() composes its
     // own key as a JSON blob (see the writeback test below), so the two key
@@ -412,13 +426,15 @@ describe("ReadFileTool — eviction call sites are driven, not just the operator
   test("one indexing:started past a full projectRootCache evicts — the subscription's call site is live", () => {
     const tool = new ReadFileTool();
     const priv = tool as unknown as {
-      projectRoots: {
-        projectRootCache: Map<string, string>;
-        PROJECT_ROOT_CACHE_MAX_ENTRIES: number;
+      service: {
+        projectRoots: {
+          projectRootCache: Map<string, string>;
+          PROJECT_ROOT_CACHE_MAX_ENTRIES: number;
+        };
       };
     };
-    const roots = priv.projectRoots.projectRootCache;
-    const CAP = priv.projectRoots.PROJECT_ROOT_CACHE_MAX_ENTRIES;
+    const roots = priv.service.projectRoots.projectRootCache;
+    const CAP = priv.service.projectRoots.PROJECT_ROOT_CACHE_MAX_ENTRIES;
 
     for (let i = 0; i < CAP; i++) roots.set(`seeded-root-${i}`, `/tmp/root-${i}`);
     expect(roots.size).toBe(CAP);
@@ -466,13 +482,18 @@ describe("ReadFileTool — cache-hit metadata writeback", () => {
   // services/file-read/file-content-cache.ts, so the spy target and the cache
   // reach are each one hop longer.
   //
-  // THE SPY STILL WORKS BECAUSE OF HOW read_file.ts WIRES THE 4 -> 5 EDGE, and
-  // that is the property this case now also pins. The cache receives an ARROW
-  // that re-resolves `this.fileMetadata.extractMetadata` on every call; a
+  // THE SPY STILL WORKS BECAUSE OF HOW THE 4 -> 5 EDGE IS WIRED, and that is the
+  // property this case now also pins. The cache receives an ARROW that
+  // re-resolves `this.fileMetadata.extractMetadata` on every call; a
   // `.bind(...)` captured in the constructor would freeze the pre-replacement
   // function and this spy would silently count 0. Replacing the method on the
   // FileMetadataExtractor instance below is therefore observed by both of the
   // cache's call sites, exactly as replacing it on the tool was before the move.
+  //
+  // T12 REPOINT (GMS-05 AC-3). The whole composition — including that arrow —
+  // moved from ReadFileTool's constructor into read-file.service.ts, so both
+  // reaches gain a `service` hop. The arrow is still an arrow, which is why the
+  // paragraph above survives the move unchanged.
   //
   // The cache KEY shape is unchanged by the extraction — same five fields, same
   // order, same JSON — which is why it is still hardcoded here rather than
@@ -480,10 +501,12 @@ describe("ReadFileTool — cache-hit metadata writeback", () => {
   // catches.
   test("undefined-metadata entry: first hit re-extracts + persists, second hit does NOT re-extract", async () => {
     const tool = new ReadFileTool();
-    const priv = tool as unknown as {
-      fileMetadata: { extractMetadata: (...args: never[]) => Promise<unknown> };
-      fileContent: { fileCache: Map<string, unknown> };
-    };
+    const priv = (tool as unknown as {
+      service: {
+        fileMetadata: { extractMetadata: (...args: never[]) => Promise<unknown> };
+        fileContent: { fileCache: Map<string, unknown> };
+      };
+    }).service;
 
     // Spy extractMetadata by replacing it on the extractor instance.
     let callCount = 0;

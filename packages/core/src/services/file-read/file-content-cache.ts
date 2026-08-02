@@ -50,8 +50,9 @@ export interface CachedFile {
 }
 
 /**
- * The 4 → 5 edge. Module 7 (T12) binds this with the `symbolGraph` it already
- * holds; until then `ReadFileTool` does, from its own constructor parameter.
+ * The 4 → 5 edge. Module 7 (`read-file.service.ts`) binds this with the
+ * `symbolGraph` forwarded to it from `ReadFileTool`'s constructor parameter.
+ * Bound there since T12; `ReadFileTool` itself bound it from T10 until then.
  */
 export type MetadataExtractor = (
   content: string,

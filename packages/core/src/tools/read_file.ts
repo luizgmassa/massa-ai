@@ -1,43 +1,22 @@
 /**
  * @massa-ai/core - Read File Tool
- * 
- * Optimized file reading with:
- * - Automatic compression for large files
- * - Intelligent caching
- * - Symbol metadata integration
- * - Multi-range support
- * - Language detection
+ *
+ * Schema and delegation only. Everything this tool used to do lives in
+ * `services/file-read/` — containment, both caches, metadata, the line range
+ * and N9 cap, and `read-file.service.ts` (module 7), which composes them.
+ * Deliberately terse: the split's decision record sits in those modules'
+ * docblocks, and repeating it here costs this file its 125-line ceiling.
  */
 
-import { IToolHandler, ToolResponse, estimateTokens } from "@massa-ai/shared";
+import { IToolHandler, ToolResponse } from "@massa-ai/shared";
 import { logger } from "@massa-ai/shared";
-import { CodeCompressor } from "../services/compression/code-compressor.js";
 import { serializeToolResponse } from "./serialize.js";
-import { FileContentCache } from "../services/file-read/file-content-cache.js";
-import { FileMetadataExtractor } from "../services/file-read/file-metadata.js";
-import { calculateRange, adjustRange, selectLines } from "../services/file-read/line-range.js";
-import { PathContainment } from "../services/file-read/path-containment.js";
-import { ProjectRootCache } from "../services/file-read/project-root-cache.js";
+import { ReadFileService, readFileOptions, type ReadFileParams } from "../services/file-read/read-file.service.js";
 import { SymbolGraphService } from "../services/symbol/symbol-graph.service.js";
-
-interface ReadFileParams {
-  filePath: string;
-  projectId?: string;
-  offset?: number;
-  limit?: number;
-  lineStart?: number;
-  lineEnd?: number;
-  compress?: boolean;
-  targetRatio?: number;
-  format?: "json" | "toon";
-  includeSymbols?: boolean;
-  includeImports?: boolean;
-  fields?: string[];
-}
 
 export class ReadFileTool implements IToolHandler {
   name = "read_file";
-  description = 
+  description =
     "Read file with automatic compression, caching, and symbol metadata. " +
     "Use with search results for 60% token savings.";
 
@@ -104,203 +83,34 @@ export class ReadFileTool implements IToolHandler {
     required: ["filePath"],
   };
 
-  private compressor: CodeCompressor;
-  private symbolGraph?: SymbolGraphService;
-  private projectRoots: ProjectRootCache;
-  private pathContainment: PathContainment;
-  private fileMetadata: FileMetadataExtractor;
-  private fileContent: FileContentCache;
+  private service: ReadFileService;
 
+  /**
+   * The parameter's arity and type are public surface — 41 measured construction
+   * sites, both transports among them (`design.md` §3.2 as corrected at T9) — so
+   * it is forwarded unchanged rather than replaced by an injected service.
+   */
   constructor(symbolGraph?: SymbolGraphService) {
-    this.compressor = new CodeCompressor();
-    this.symbolGraph = symbolGraph;
-
-    // One ProjectRootCache PER TOOL, constructed here rather than shared at
-    // module scope: every instance owned its own root Map before the extraction,
-    // and its constructor is what subscribes to `indexing:started`, so the
-    // subscription count and lifetime are unchanged by the move.
-    this.projectRoots = new ProjectRootCache();
-    this.pathContainment = new PathContainment(this.projectRoots);
-
-    // Same per-tool rule for the file CONTENT cache and its metadata extractor.
-    // The 4 -> 5 edge is a CALLBACK (services/file-read/file-content-cache.ts
-    // never names SymbolGraphService), and it is an arrow rather than a
-    // `.bind(...)`: `this.fileMetadata.extractMetadata` is re-resolved on every
-    // call, exactly as `this.extractMetadata` was before the move, so replacing
-    // the method on the instance is still observable from the cache's two call
-    // sites. A bound reference captured here would freeze the pre-replacement
-    // function and silently make that seam untestable.
-    //
-    // MEASURED COST, RECORDED RATHER THAN GLOSSED: this arrow is a function body
-    // inside the constructor, and the constructor is exempt from check-tools-thin
-    // clause 1 BY KIND — so the arrow is counted MAXIMAL rather than nested (the
-    // C39 asymmetry the gate's own suite pins synthetically). It is the only body
-    // this task ADDS to the file the gate measures, taking read_file.ts to
-    // maximal 5 where removing four methods alone would have left 4. It is
-    // transient: T12 moves this whole composition into module 7, where it is
-    // outside the gate's `tools/` population. RFS-01 AC-1 cannot read 0 of 30
-    // until it does.
-    this.fileMetadata = new FileMetadataExtractor(symbolGraph);
-    this.fileContent = new FileContentCache((content, filePath, options) =>
-      this.fileMetadata.extractMetadata(content, filePath, options),
-    );
+    this.service = new ReadFileService(symbolGraph);
   }
 
   async handle(params: unknown): Promise<ToolResponse> {
     const p = params as ReadFileParams;
-    const shouldCompress = p.compress !== false;
-    const targetRatio = p.targetRatio || 0.3;
-    const format = p.format || "json";
-    const { fields } = p;
-    const includeSymbols = p.includeSymbols !== false;
-    const includeImports = p.includeImports !== false;
+    // Read OUTSIDE the try, at the position the inline prelude occupied: these
+    // are the first property accesses on `params`, so a null/undefined argument
+    // must keep throwing out of handle() rather than being caught and turned
+    // into `{success:false}`. See read-file.service.ts's header.
+    const options = readFileOptions(p);
 
     try {
-      // Resolve file path (async — looks up project root when projectId provided).
-      // Returns null when the path is ambiguous (relative + no projectId) — we must
-      // NOT guess against process.cwd(), so surface a distinct error here rather
-      // than letting the generic "Failed to read file" catch swallow it.
-      const resolved = await this.pathContainment.resolveFilePath(p.filePath, p.projectId);
-      if (resolved === null) {
-        return {
-          success: false,
-          error:
-            "Relative filePath requires a projectId (to resolve against the workspace) or an absolute path.",
-        };
+      const outcome = await this.service.read(p, options);
+      if (!outcome.ok) {
+        return { success: false, error: outcome.error };
       }
-      const filePath = resolved;
-
-      // ── Wave 5 FR-12 / AD-W5-006: filesystem-side path containment. Absolute
-      // paths must resolve under one of: the project root (projectPath arg /
-      // workspace lookup), cwd, or an explicit allowlist env
-      // MASSA_AI_READ_FILE_ROOTS (colon-separated). Outside → teaching
-      // error listing valid roots only (no host path enumeration). Project
-      // root + cwd are ALWAYS allowed. sanitizeFilePath strips ../ traversal
-      // tokens before the containment check so a crafted relative path can't
-      // escape. Does not regress the 500-line cap (N9) — applied later.
-      const containment = await this.pathContainment.checkPathContainment(filePath, p.projectId);
-      if (!containment.allowed) {
-        return {
-          success: false,
-          error: containment.error,
-        };
-      }
-
-      // Keep original relative path for symbol DB queries (DB stores relative paths)
-      const relativePath = p.filePath;
-
-      // Calculate line range
-      const range = calculateRange(p);
-
-      // Read file with cache
-      const { content, metadata } = await this.fileContent.readFileWithCache(filePath, {
-        includeSymbols,
-        includeImports,
-        projectId: p.projectId,
-        relativePath,
+      return serializeToolResponse(outcome.data, {
+        format: options.format,
+        fields: options.fields,
       });
-
-      // Extract requested lines, then apply the N9 output cap. Both live in
-      // services/file-read/line-range.ts: `selectLines` returns the clipped flag
-      // rather than reassigning locals, and `lineRange.actual.total` below still
-      // carries the true total so `omitted = total - shown` stays derivable.
-      const lines = content.split("\n");
-      const totalLines = lines.length;
-      const adjustedRange = adjustRange(range, totalLines);
-      const {
-        content: selectedContent,
-        lineCount: selectedLineCount,
-        clipped: source_clipped,
-      } = selectLines(lines, adjustedRange);
-
-      // Determine if compression is needed
-      const shouldAutoCompress = 
-        shouldCompress && 
-        selectedLineCount > 100 && 
-        targetRatio < 1;
-
-      const result: any = {
-        filePath: p.filePath,
-        absolutePath: filePath,
-        lineRange: {
-          requested: {
-            start: range.start,
-            end: range.end === Infinity ? null : range.end,
-          },
-          actual: {
-            start: adjustedRange.start,
-            end: source_clipped
-              ? adjustedRange.start + selectedLineCount - 1
-              : adjustedRange.end,
-            total: totalLines,
-          },
-          selected: selectedLineCount,
-        },
-        source_clipped,
-        metadata: {
-          totalLines,
-          language: metadata.language,
-          ...(metadata.symbols && { symbols: metadata.symbols }),
-          ...(metadata.imports && { imports: metadata.imports }),
-        },
-        compressed: shouldAutoCompress,
-        recommendations: [],
-      };
-
-      if (shouldAutoCompress) {
-        // Auto-compress
-        const compressed = await this.compressor.compress(
-          selectedContent,
-          "code_structure" as any
-        );
-
-        const originalTokens = estimateTokens(selectedContent, "code");
-        const compressedTokens = estimateTokens(compressed.compressed, "code");
-        const actualRatio = compressedTokens / originalTokens;
-
-        result.content = compressed.compressed;
-        result.tokens = {
-          original: originalTokens,
-          compressed: compressedTokens,
-          saved: originalTokens - compressedTokens,
-          savingsPercent: Math.round((1 - actualRatio) * 100),
-        };
-        result.compressionRatio = actualRatio;
-        result.recommendations.push(
-          `✓ Auto-compressed ${selectedLineCount} lines (${result.tokens.savingsPercent}% reduction)`
-        );
-      } else {
-        result.content = selectedContent;
-        result.tokens = {
-          original: estimateTokens(selectedContent, "code"),
-          compressed: estimateTokens(selectedContent, "code"),
-          saved: 0,
-          savingsPercent: 0,
-        };
-
-        // Add recommendations for large files
-        if (selectedLineCount > 100) {
-          result.recommendations.push(
-            "💡 Content > 100 lines. Consider compress=true for token savings"
-          );
-        }
-      }
-
-      // Add usage tips
-      if (range.start === 1 && range.end === Infinity) {
-        result.recommendations.push(
-          "💡 Use lineStart/lineEnd or offset/limit to read specific sections (60% token savings)"
-        );
-      }
-
-      // Add related files tip if symbols found
-      if (metadata.symbols && metadata.symbols.definitions > 0) {
-        result.recommendations.push(
-          `💡 Use get_references() to find usages of ${metadata.symbols.definitions} symbols in this file`
-        );
-      }
-
-      return serializeToolResponse(result, { format, fields });
     } catch (error) {
       logger.error("Failed to read file", error as Error, {
         filePath: p.filePath,
@@ -311,5 +121,4 @@ export class ReadFileTool implements IToolHandler {
       };
     }
   }
-
 }

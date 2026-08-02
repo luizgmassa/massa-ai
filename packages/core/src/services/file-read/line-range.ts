@@ -22,9 +22,9 @@
  *
  * `LineRangeRequest` EXISTS BECAUSE `ReadFileParams` IS MODULE 7's. `design.md`
  * §5.1 assigns `interface ReadFileParams` to `read-file.service.ts`, which T12
- * builds and which COMPOSES this module — so importing it here would be a 6 → 7
- * edge against the composition direction, and the interface does not exist yet
- * either way. `calculateRange` reads exactly four fields off its argument, so
+ * built and which COMPOSES this module — so importing it here would be a 6 → 7
+ * edge against the composition direction. It exists now and the rule is
+ * unchanged. `calculateRange` reads exactly four fields off its argument, so
  * this module declares those four and `ReadFileParams` satisfies it
  * structurally. The alternative Design's module table hides is that module 6
  * silently depends on module 7's type; naming the subset is what keeps 6
