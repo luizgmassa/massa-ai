@@ -491,7 +491,8 @@ all state came from `.specs/` and source reads.
   amendment covers it and only the note is wrong. **C59**: T9 moves 6 spans and **shifts 27 further
   citations**, a class C55 does not assign. Every one names code T10/T11/T12 relocate, so renumbering
   now buys a third falsification; left to the owning task and **recorded with its size** so a
-  verifier can tell a scheduled transient from a defect. Post-repoint the sweep reads **moved-out 0**.
+  verifier can tell a scheduled transient from a defect. ~~Post-repoint the sweep reads **moved-out
+  0**.~~ → **corrected by C61 at T10: the true figure is 1 and the population is 45.**
 - **Column B was re-chosen, and which two mutations it misses is the result to carry.** B is *the
   pre-existing suites with only the C53 repoint* — what the repository would catch if T9 had written
   no new tests — because R-36 forces two module suites and R-26 warns that is how shallow tests get
@@ -506,13 +507,80 @@ all state came from `.specs/` and source reads.
   `read_file.ts` **13/17/2/175 → 9/10/1/175**, `handle()` unchanged at 175. Both new modules **100%
   lines / funcs**. The one first-run failure was `apps/mcp-client`'s documented 22 s live-provider
   case — zero-diff against `main`, 95p/0f standalone under both configs, 3.96 s empty vs 17.82 s real.
+- **T10 done `f1413b6`** — record in `tasks.md` §10.12. **C34's repoint lands and GMS-05 AC-3 is
+  satisfied for it**; RFS-03 AC-1/AC-2 hold. Modules 4 and 5 out:
+  `services/file-read/{file-content-cache,file-metadata}.ts` plus two new suites; `read_file.ts`
+  **590 → 392**. **Six new plan defects (C60–C65), running total seventy.** None of §5's nine spans
+  matched the tree — the row is pre-T7 *and* pre-T9 — so all nine were AST-derived and
+  anchor-verified, as T9's were.
+- **The 4→5 callback is wired as an ARROW, not a `.bind()`, and that is measured rather than styled.**
+  The cache re-resolves `this.fileMetadata.extractMetadata` per call, exactly as the handler resolved
+  `this.extractMetadata` before the move, so the writeback case's spy still observes it. Mutation
+  **M14** confirms that spy is the **only** sensor for the choice anywhere — and it lives in a
+  pre-existing test T10 repoints, not in either new module suite.
+- **C60: the `evictOldest` delegate died here, not at T12.** Its body reads `FILE_CACHE_MAX_ENTRIES`,
+  which T10's own row moves, so it could not compile even as dead code. Three artifacts said T12 —
+  including `read_file.ts`'s own docblock — and the task row never named the member at all. Author
+  level; GMS-05 AC-4 fixes the answer. *C33's shape one phase down: a clause and the work meant to
+  satisfy it were checked at file granularity and disagreed at member granularity.*
+- **C61 is the one a resumer must not skip: T9's `moved-out 0` was false, and the sweep's own repoint
+  is what blinded it.** `read-file-containment-shapes.test.ts` carried two bare citations naming
+  `handle()` call sites, exact at `5fb88fd^` and stale from T9 onward. `t9-citation-sweep.ts` decides
+  a file's subject by testing for the literal `read_file.ts` in it — and T9's repoint of that file's
+  *other* citations took the count **5 → 0**, dropping it out of the population before the verifying
+  run. True figures: **moved-out 1**, population **45**, not 43. *An instrument whose subject
+  predicate is a literal its own repoint deletes verifies a smaller population than it measured, and
+  the shrinkage reads exactly like a clean sweep.*
+- **C62, C63, C64, C65 — the other four, all live for T11 and T12.** **C62**: C55's *"owner = whoever
+  moves the subject"* has a **null case** — one citation names code no remaining task moves, so under
+  the rule it belongs to nobody; it belongs to the task that shifts it. **C63**: the **by-FIGURE**
+  class — a count claim carries no line and no identifier, so every sweep here was blind to it; the
+  instance was `check-tools-thin.ts`'s own implementation comment, stale since T9 and contradicting
+  its file's stated no-live-figures policy 278 lines above. **C64**: the wiring arrow is the first
+  body PR-D **adds** to `tools/` (the constructor is exempt *by kind*, so it counts as maximal), and
+  §5's Phase-3 acceptance reading assumed the count only falls — **T12 must move it or RFS-01 AC-1
+  cannot read `0 of 30`**. **C65**: §1's table stopped summing to its own total two tasks ago, because
+  T8b's write-set growth never reached it; re-derived, **sum 101, union 81**, and three files now sit
+  in *three* phases, which is what broke the table's own self-check.
+- **The write set grew from the 5 + N the row predicts to 17, on a user decision** (fix-all-now
+  chosen). Beyond the two line-citation files, **eight** carry a by-FILE, by-IDENTIFIER or by-FIGURE
+  claim T10 falsifies — two of them production files. **T9 rejected the same finding for those two
+  files and both dispositions are right**: T9's was about *unqualified* identifiers inside behavioural
+  claims a behavior-preserving move preserves; T10's is `ReadFileTool.CACHE_TTL`, a **qualified member
+  path** that stops resolving. Eleven diffs **proven** comment-only; five repointed pairs verified by
+  **round trip against three distinct frames**, because the revision a citation was written against is
+  per citation and the sweep takes one base for every row.
+- **Column B was re-chosen, and which four mutations it misses is the result to carry.** B is *the
+  pre-existing suites with only the C34 repoint* — T10 takes a design decision whose only sensor is a
+  test it repoints, so that sensor belongs inside B. **B misses 4 of 15**: the TTL predicate read
+  **exactly at** the cap (every pre-existing sensor steps a full second past it), and three
+  `file-metadata` branches the handler cannot reach because it asks for one language, always stubs
+  `listDefinitions` to resolve, and always passes a `relativePath`. Against T9's 2 of 12.
+- **Gates.** `lint` **0**, proven to bite on a T10 file, restored SHA-identical. `type-check` **6/6**,
+  `build` **5/5**, both 0 cached forced. `test` **11/11 exit 0** warm, 5 cached all `:build`, core
+  `all 150 group(s)` — **+1 for two new files, verified not assumed**: `file-content-cache.test.ts`
+  uses `setSystemTime` and is forked as process-global, `file-metadata.test.ts` joins the mock-free
+  batch. `test:scripts` **1114**/0. `test:plugins` **96**/0. `check-core-layering` **edges 973 → 977,
+  files 908 → 912**. `check-tools-thin` **`2 of 30` HOLDS**, members **221 → 215**, `read_file.ts`
+  **9/10/1/175 → 5/6/0/175**, `handle()` unchanged; **clause 2's own reading reaches `0 of 30`** —
+  `fileCache` was its last subject anywhere under `tools/`. Both new modules **100% lines / funcs**.
+  The one first-run failure was `apps/mcp-client`'s documented live-provider case again — zero-diff
+  against `main`, 95p/0f standalone under both configs, 3.80 s empty vs 16.90 s real.
+- **An instrument lesson worth more than its size.** The first draft of `file-content-cache.test.ts`
+  stubbed `fs/promises` with `mock.module` to count disk reads; run beside its eight sibling suites in
+  one process the aggregate went **128 pass / 26 fail**, and `run-tests-isolated.ts` would have forked
+  the file and hidden it. Rewritten onto real temp files with the rewrite-and-re-read observation —
+  **154 pass / 0 fail** in one process. *A global module mock is measured cross-contamination, not a
+  style question.*
 - ~~**Next action: Execute, T5**~~ ~~**Execute, T6**~~ ~~**Execute, T7**~~ ~~**Execute, T8**~~
-  ~~**Execute, T8b**~~ ~~**Execute, T9**~~ → **Next action: Execute, T10.** Modules 4 and 5. **The
-  4→5 edge is a callback — `tasks.md` §4.1, already decided, do not re-take it.** Four things not to
-  miss: §5's spans are **pre-T7 and now also pre-T9**, so re-derive from the AST; **C34's
-  `read-file.test.ts` repoint is T10's**; the `evictOldest` delegate loses its **last** call site here
-  and **T12 deletes it**; and **part of C59's 27 shifted plus 9 ambiguous citations are T10's**, the
-  ambiguous ones needing per-case adjudication because their cited text now occurs 2–3 times.
+  ~~**Execute, T8b**~~ ~~**Execute, T9**~~ ~~**Execute, T10**~~ → **Next action: Execute, T11.**
+  Module 6 — `line-range.ts` (`calculateRange` + `adjustRange` + `extractLines` + `interface
+  ReadRange` + `MASSA_AI_READ_FILE_MAX_LINES` + the N9 clipping inside `handle()`). Four things not to
+  miss: §5's spans are **pre-T7, pre-T9 and now pre-T10**, so re-derive every one from the AST;
+  **C62** means a citation T11 shifts whose subject nobody later moves is **T11's**, not nobody's;
+  **C59's backlog is now T11 1 / T12 26** and the frame for each is the revision it was written
+  against, not `HEAD`; and the N9 clipping is 15 lines **inside `handle()`**, so it is the first
+  Phase-3 task that moves `handle()`'s own line count.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed
@@ -524,9 +592,10 @@ all state came from `.specs/` and source reads.
   so the `handle() ≤ 120` clause stayed red at **1 of 30** and T15 could not wire the gate into
   `ci.yml` without failing a required check. Closed by a new task **T14b**, extracting the 45-line
   managed-run lease block `:158-202`; `handle()` **128 → ~87**. Zero allowlist.
-- ~~**Six** corrections are owed to `design.md` itself~~ → ~~fourteen~~ → **fifteen** (`tasks.md`
-  §8.1, task T20b), on PR-C's C18 precedent. *"Six" was last true at Design; §8.1 grew at T4b, T5 and
-  T6.* **C28–C33** are owed to the parent `spec.md` (T20); none is written there yet.
+- ~~**Six** corrections are owed to `design.md` itself~~ → ~~fourteen~~ → ~~fifteen~~ → **sixteen**
+  (`tasks.md` §8.1, task T20b), on PR-C's C18 precedent. *"Six" was last true at Design; §8.1 grew at
+  T4b, T5, T6 and again at T9.* **C28–C33** are owed to the parent `spec.md` (T20); none is written
+  there yet.
 - **C28 through C32 and the parent's stale layer figures are owed back** to
   `core-layering-god-module-split/spec.md` (RFS-05 AC-2/AC-3), landing with the work. None is
   written there yet. C29 additionally amends the parent's own `~390 of 707` Evidence row.
