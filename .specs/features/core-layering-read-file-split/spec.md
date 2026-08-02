@@ -153,9 +153,9 @@ sites disagree; read with the **call position** they do not:
 | --- | --- | --- | --- | --- | --- | --- |
 | `tools/read_file.ts` · `fileCache` | `FILE_CACHE_MAX_ENTRIES = 512` | `while (size >= cap)` | **before** `set` | 512 | **yes** — `CACHE_TTL` read at `:544` | none |
 | `tools/read_file.ts` · `projectRootCache` | same 512 | same | **before** `set` | 512 | **NO** — see below | `eventBus "indexing:started"` only (`:167`) |
-| `services/symbol/symbol-graph.service.ts` | `PROJECT_ROOT_CACHE_MAX_ENTRIES = 512` | `while (size >= cap)` | **before** `set` | 512 | no | **`clearProjectRoot`**, wired at `production-wiring.ts:105` |
+| `services/symbol/symbol-graph.service.ts` | `PROJECT_ROOT_CACHE_MAX_ENTRIES = 512` | `while (size >= cap)` | **before** `set` | 512 | no | **`clearProjectRoot`**, wired at ~~`production-wiring.ts:105`~~ → **`:114`** (T8b) |
 | `services/web/web-controller.ts` | `WEB_CACHE_MAX_ENTRIES = 512` | `while (size > cap)` | **after** `set` (`:135-142`) | **512** | no | none |
-| `services/search/file-filter-cache.ts` | `MAX_CACHE_SIZE = 50` | evict **one**, `min(createdAt)` | **after** `set` (`:82`) | **50** | yes (`TTL_MS`, on read) | **`invalidateProject`**, wired at `production-wiring.ts:91` |
+| `services/search/file-filter-cache.ts` | `MAX_CACHE_SIZE = 50` | evict **one**, `min(createdAt)` | **after** `set` (`:82`) | **50** | yes (`TTL_MS`, on read) | **`invalidateProject`**, wired at ~~`production-wiring.ts:91`~~ → **`:100`** (T8b) |
 
 Post-insert `> cap` and pre-insert `>= cap` retain the same number. `file-filter-cache`'s entries
 are `set` exactly once and never re-inserted — it has no read-promotion — so **`min(createdAt)` is
@@ -420,9 +420,18 @@ spots (*"`tools → data` is LEGAL … Recorded because …"*) is the precedent.
 ### RFS-02 — the LRU unification is proven behavior-preserving, not argued
 
 **AC-1**: Characterization tests covering **all four** cache sites exist and pass **before** the
-extraction, and pass **unmodified** after it — byte-identity of the test files asserted across the
-move, on GMS-02 AC-2's own evidence shape (`validation.md` §1: ancestry + SHA-256, not "the tests
-are green now").
+extraction, and pass **unmodified** after it — ~~byte-identity of the test files~~ → **byte-identity
+of the test files with comments stripped** asserted across the move, on GMS-02 AC-2's own evidence
+shape (`validation.md` §1: ancestry + SHA-256, not "the tests are green now").
+**Amended at T8b** (`tasks.md` §10.10) as **C56**, on the C37/C41/C48 precedent, and **handed to T25
+as a question**. Whole-file byte-identity is **falsified by construction** by **C55**: the Phase-3
+tasks must repoint the `:NNN` citations in these suites' comments, because T9 and T10 move the very
+`read_file.ts` spans those comments name. AC-1's own stated purpose is that **no assertion was
+weakened to accommodate the move**, and a comment-only diff cannot weaken one — so the predicate is
+narrowed to the property it was written to protect rather than dropped. It is **measured, not
+argued**: both revisions are parsed and printed with `removeComments: true` and the outputs compared
+(`t8b-comment-only-proof.ts`, observed red on the T7 diff). *A criterion whose letter a later task
+must break is amended with its reason, not quietly satisfied.*
 **AC-2**: The shared module is an **eviction function**, not a cache class. No site's TTL or
 read-promotion policy moves.
 **AC-3**: ~~`kernel/lru-cache.ts` imports nothing relative — kernel leaf-ness is enforced by
@@ -466,7 +475,11 @@ are unguarded by all seven existing tests** — measured, not argued:
 | `sanitizeFilePath` dropped from `resolveFilePath`'s projectId branch | **Ambiguous.** `:153-173`'s own comment says it accepts *"either ENOENT … or a containment error"* — it deliberately cannot tell which of two independent defenses caught the traversal, so dropping one silently loses defence-in-depth | ~~assert the returned `absolutePath` carries no literal `..` segment, independent of containment~~ → **assert the resolved path is still under the project root** (`path.relative(root, absolutePath)` does not start with `..`) and that the **content served** is the in-root file's — **amended by C37**, `tasks.md` §10.2, at Execute. The struck assertion is **vacuous**: `resolveFilePath`'s only two non-null exits (`:370`, `:379`) both return `path.resolve(...)`, which normalizes `..` away unconditionally, so it reads identically with and without the sanitize call. Proven, not argued — a probe written to this clause's letter **passes under the mutation the clause exists to catch**. *"Independent of containment"* survives and is honoured by putting the escaped directory on `MASSA_AI_READ_FILE_ROOTS` so containment permits both candidates |
 
 **AC-1**: All three tests exist and pass **against the pre-extraction code** — proving they hold
-today — before the extraction commit, and pass **unmodified** after it.
+today — before the extraction commit, and pass ~~**unmodified**~~ → **unmodified apart from their
+comments** after it. **Amended at T8b as C56**, same reason as RFS-02 AC-1 above: T9 moves
+`resolveFilePath` and `checkPathContainment` out of `read_file.ts`, so this suite's header citations
+must be repointed by the task that moves their subject (**C55**). The assertions are unchanged and
+that is what is measured.
 **AC-2**: The teaching-error text (`read_file.ts:443-447`) is unchanged, including that it
 enumerates roots only and never a host path.
 **AC-3**: The env allowlist is still read **at call time**. This is the one property with no

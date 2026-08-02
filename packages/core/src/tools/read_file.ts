@@ -481,10 +481,10 @@ export class ReadFileTool implements IToolHandler {
    * `size >= CAP` are the same predicate over the integers, so the retained
    * count at all three call sites is unchanged.
    *
-   * Kept as a one-line delegate rather than inlined at :169, :462 and :570.
-   * Deleting it would take this file from 13 maximal bodies to 12 and the
-   * gate's examined-member count from 224 to 223 while the extraction it
-   * exists to measure has not started yet.
+   * Kept as a one-line delegate rather than inlined at its three call sites,
+   * left unnumbered because Phase 3 moves one. Deleting it would take this
+   * file from 13 maximal bodies to 12 and the gate's examined-member count
+   * from 224 to 223, before the extraction it exists to measure has started.
    */
   private evictOldest<K, V>(cache: Map<K, V>): void {
     evictOldestShared(cache, this.FILE_CACHE_MAX_ENTRIES - 1);

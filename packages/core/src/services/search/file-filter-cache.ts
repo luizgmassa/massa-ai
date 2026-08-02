@@ -148,7 +148,7 @@ export class FileFilterCache {
    * agree unconditionally at this site: every write to the Map either inserts
    * fresh with the current Date.now(), or deletes without reordering the
    * survivors. Nothing ever repositions a key without also giving it the
-   * newest createdAt — the TTL-expiry path at :51-53 deletes before the miss
+   * newest createdAt — the TTL-expiry path at :52-54 deletes before the miss
    * path re-inserts, so an expired-then-recomputed key moves to the end of
    * insertion order and gets a new timestamp together. A read does NOT promote
    * here (it only bumps accessCount), which is the axis this cache does not

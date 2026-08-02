@@ -5,14 +5,14 @@
  * `spec.md` §3.B measured two things about this cache and could not separate
  * their consequences by reading source:
  *
- *   1. `read_file.ts:148` declares `private readonly ROOT_CACHE_TTL = 300000`
+ *   1. `read_file.ts:149` declares `private readonly ROOT_CACHE_TTL = 300000`
  *      and NOTHING READS IT. The declaration is the constant's only occurrence
  *      in the file. So the cache is LRU-bounded only, while `fileCache`'s
- *      `CACHE_TTL` really is checked at `:544`.
+ *      `CACHE_TTL` really is checked at `:552`.
  *   2. `production-wiring.ts` composes the post-commit project-rename/merge
  *      invalidator registry and registers `symbolGraph.clearProjectRoot` — the
  *      exact same data, in a class whose own comment
- *      (`symbol-graph.service.ts:174`) cites `ReadFileTool` as the pattern it
+ *      (`symbol-graph.service.ts:175`) cites `ReadFileTool` as the pattern it
  *      mirrors. `ReadFileTool`'s caches are deliberately absent, and
  *      `production-wiring.ts:67-68` gives the reason: *"both are TTL-bounded and
  *      self-evict."* Finding 1 makes that false for `projectRootCache`.
@@ -170,8 +170,8 @@ describe("RFS-02 AC-4 — CACHE_TTL is enforced and ROOT_CACHE_TTL is not", () =
   test("past 60s the content re-reads; past 300s the project root still does not", async () => {
     const PROJECT = "pin-ttl";
     const BASE = new Date("2026-01-01T00:00:00.000Z").getTime();
-    const CACHE_TTL = 60_000; // read_file.ts:147, read at :544
-    const ROOT_CACHE_TTL = 300_000; // read_file.ts:148, read nowhere
+    const CACHE_TTL = 60_000; // read_file.ts:148, read at :552
+    const ROOT_CACHE_TTL = 300_000; // read_file.ts:149, read nowhere
 
     const movable = fs.mkdtempSync(path.join(os.tmpdir(), "massa-ai-pin-ttl-"));
     fs.writeFileSync(path.join(movable, REL), "V1\n");

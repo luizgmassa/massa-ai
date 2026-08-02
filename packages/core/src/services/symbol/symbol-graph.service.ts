@@ -809,7 +809,7 @@ export class SymbolGraphService {
    * post-call bound rather than the cap, so this pre-insert caller passes
    * CAP - 1 to reserve the slot the pending set() takes.
    *
-   * Kept as a wrapper rather than inlined at its one call site (:792) because
+   * Kept as a wrapper rather than inlined at its one call site (:793) because
    * symbol-graph-service.test.ts reaches this method by name through a cast;
    * inlining it makes that suite red with no task owning the repoint.
    */

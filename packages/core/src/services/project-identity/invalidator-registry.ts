@@ -31,9 +31,15 @@ export const EMPTY_INVALIDATION_REPORT: ProjectIdentityInvalidationReport = Obje
  * for QueryUnderstandingCache, SymbolGraphService.projectRootCache, and any other
  * in-memory projectId-scoped state.
  *
- * L1MemoryCache and the read_file tool cache are deliberately NOT registered:
- * both are TTL-bounded, so a stale entry self-evicts within the TTL window
- * without a per-project hook.
+ * L1MemoryCache and the read_file tool cache are deliberately NOT registered.
+ * The reason this comment used to give — "both are TTL-bounded, so a stale
+ * entry self-evicts within the TTL window" — is FALSE for read_file's
+ * projectRootCache. Measured by
+ * __tests__/read-file-project-root-rename-pin.test.ts (RFS-02 AC-4):
+ * ReadFileTool.CACHE_TTL bounds the file CONTENT cache and is enforced, while
+ * ROOT_CACHE_TTL is declared and read nowhere, so that cache is LRU-bounded
+ * only and a committed rename leaves it serving the pre-rename root. Logged,
+ * not fixed. production-wiring.ts composes this registry and states the same.
  */
 export class ProjectIdentityInvalidatorRegistry {
   private readonly invalidators: ProjectIdentityInvalidator[] = [];

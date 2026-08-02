@@ -1,6 +1,6 @@
 /**
  * R-31 / GMS-05 AC-1 — `handle()`'s presentation block characterized BEFORE
- * Phase 3's T12 moves `read_file.ts:251-336` into
+ * Phase 3's T12 moves `read_file.ts:252-337` into
  * `services/file-read/read-file.service.ts` and collapses `handle()` 175 → ~15.
  *
  * This is AUTHORSHIP, not verification (`tasks.md` §3.1, §11 item 4 as re-scoped
@@ -9,8 +9,8 @@
  * source files. So they are written first, against the unmodified tree.
  *
  * Subject, per `design.md` §5.1 module 7:
- *   compression decision `:251-255` · result assembly `:257-283`
- *   token math + recommendation `:285-322` · usage tips `:324-336`
+ *   compression decision `:252-256` · result assembly `:258-284`
+ *   token math + recommendation `:286-323` · usage tips `:325-337`
  *
  * ── C38, the forty-third plan defect ─────────────────────────────────────────
  * `design.md` R-31's per-key table states, for the token-math segment,
@@ -21,8 +21,8 @@
  *    `e2e/08.search.test.ts` is `:556`, inside test **F28**, which calls
  *    `compressContext(...)` — a different tool — and reads
  *    `r.metadata.compressionRatio`. `ReadFileTool` assigns `compressionRatio` at
- *    the **top level** of `data` (`read_file.ts:303`) and never under `metadata`
- *    (`:275-280` carries only totalLines/language/symbols/imports). Different
+ *    the **top level** of `data` (`read_file.ts:304`) and never under `metadata`
+ *    (`:276-281` carries only totalLines/language/symbols/imports). Different
  *    tool, different path: it can never observe this field.
  *  - `tokens` is **2**, not 1 — `e2e/08.search.test.ts:675` and `:676`, in F32 —
  *    and neither has `.tokens` as its literal receiver; the field is read two
@@ -69,7 +69,7 @@
  *    (workspace mock), never through `MASSA_AI_READ_FILE_ROOTS` — which is
  *    cleared and restored around the file, with a tripwire, so an ambient value
  *    cannot make a case pass for the wrong reason.
- * 3. THE COMPRESSOR IS MOCKED. `read_file.ts:159` builds a real `CodeCompressor`
+ * 3. THE COMPRESSOR IS MOCKED. `read_file.ts:160` builds a real `CodeCompressor`
  *    with no injection seam, and T2's gate measured that `CodeCompressor` is this
  *    repo's live-LLM edge (`llm.enabled:true` with local Ollama; 42 s cold).
  */
@@ -97,7 +97,7 @@ mock.module("../services/events/event-bus.js", () => ({
 
 /**
  * Deterministic stand-in for `CodeCompressor`. `compressBehaviour` is switched
- * per case; the reject arm exists to prove `handle()`'s `catch` (`:339-347`)
+ * per case; the reject arm exists to prove `handle()`'s `catch` (`:340-348`)
  * still wraps a throw from inside the moved span after T12.
  */
 let compressBehaviour: "ok" | "reject" = "ok";
@@ -105,7 +105,7 @@ let compressBehaviour: "ok" | "reject" = "ok";
 /**
  * 480 chars → `estimateTokens(_, "code")` = ceil(480/4) = 120 against the
  * 920-token selection, giving savingsPercent = round(86.9565) = **87** while
- * floor() gives **86**. Chosen so the `Math.round` at `:301` is observable:
+ * floor() gives **86**. Chosen so the `Math.round` at `:302` is observable:
  * at most fixture sizes round and floor coincide and the operator is untestable.
  */
 const COMPRESSED_OUTPUT = "compressed:" + "x".repeat(469);
@@ -198,8 +198,8 @@ afterAll(() => {
 });
 
 // ── The four literal strings the four `.push(` sites emit ────────────────────
-// `read_file.ts:282` is the initializer `recommendations: []` — NOT a push site.
-// The push sites are exactly `:304`, `:318`, `:326`, `:333` (`tasks.md` §3.4;
+// `read_file.ts:283` is the initializer `recommendations: []` — NOT a push site.
+// The push sites are exactly `:305`, `:319`, `:327`, `:334` (`tasks.md` §3.4;
 // `design.md` R-31 and `tasks.md` T3's own row still say five — see the record).
 const TIP_LARGE_FILE = "💡 Content > 100 lines. Consider compress=true for token savings";
 const TIP_LINE_RANGE =
@@ -229,16 +229,16 @@ describe("R-31 — read_file handle() presentation block, characterized pre-extr
     expect(d.lineRange.actual.total).toBe(10);
     expect(d.lineRange.selected).toBe(3);
 
-    // `:282`'s initializer survives as an empty array — the key is always present.
+    // `:283`'s initializer survives as an empty array — the key is always present.
     expect(d.recommendations).toEqual([]);
 
-    // `:303` runs only inside `if (shouldAutoCompress)`, so on this branch the
+    // `:304` runs only inside `if (shouldAutoCompress)`, so on this branch the
     // key is never assigned at all. `toBeUndefined()` would also pass if the key
     // were present-and-undefined; `in` distinguishes them.
     expect("compressionRatio" in d).toBe(false);
     expect(d.compressed).toBe(false);
 
-    // `:309-314`'s else-branch token block: original === compressed, saved 0.
+    // `:310-315`'s else-branch token block: original === compressed, saved 0.
     expect(d.tokens).toEqual({ original: 17, compressed: 17, saved: 0, savingsPercent: 0 });
   });
 
@@ -270,8 +270,8 @@ describe("R-31 — read_file handle() presentation block, characterized pre-extr
     expect(d.lineRange.selected).toBe(150);
     expect(d.compressed).toBe(false);
 
-    // Order is user-visible MCP output: `:318` is emitted inside the else branch
-    // at `:316-321`, `:326` after it. An extraction that reorders them changes
+    // Order is user-visible MCP output: `:319` is emitted inside the else branch
+    // at `:317-322`, `:327` after it. An extraction that reorders them changes
     // what the caller reads first.
     expect(d.recommendations).toEqual([TIP_LARGE_FILE, TIP_LINE_RANGE]);
     expect(d.tokens).toEqual({ original: 920, compressed: 920, saved: 0, savingsPercent: 0 });
@@ -289,7 +289,7 @@ describe("R-31 — read_file handle() presentation block, characterized pre-extr
     const d = res.data!;
     expect(d.lineRange.selected).toBe(100);
 
-    // `:254` (`shouldAutoCompress`) and `:317` (the large-file tip) both read
+    // `:255` (`shouldAutoCompress`) and `:318` (the large-file tip) both read
     // `selectedLineCount > 100`. At exactly 100 neither fires; a `>=` in either
     // place is invisible at any other fixture size.
     expect(d.compressed).toBe(false);
@@ -310,8 +310,8 @@ describe("R-31 — read_file handle() presentation block, characterized pre-extr
     expect(d.metadata.symbols).toEqual({ definitions: 3, references: 0 });
     expect(d.recommendations).toEqual([tipSymbols(3)]);
 
-    // `:332` guards on `definitions > 0`. A distinct file is used because
-    // `readFileWithCache`'s key (`:534-540`) includes projectId + relativePath,
+    // `:333` guards on `definitions > 0`. A distinct file is used because
+    // `readFileWithCache`'s key (`:542-548`) includes projectId + relativePath,
     // so re-reading the same path would serve the 3-definition metadata back.
     const withoutSymbols = new ReadFileTool(symbolGraphWith(0));
     const res0 = (await withoutSymbols.handle({
@@ -345,8 +345,8 @@ describe("R-31 — read_file handle() presentation block, characterized pre-extr
     // Characterized as literals, not as a re-implementation of the formula: a
     // test that recomputes `Math.ceil(len/4)` alongside the subject moves with it.
     // `original` is measured over the NUMBERED text `extractLines` emits
-    // (`:637-641`), not the raw file — swapping `selectedContent` for `content`
-    // at `:292` changes this number.
+    // (`:645-649`), not the raw file — swapping `selectedContent` for `content`
+    // at `:293` changes this number.
     expect(d.tokens.original).toBe(920);
     expect(d.tokens.compressed).toBe(120);
     expect(d.tokens.saved).toBe(800);
@@ -357,7 +357,7 @@ describe("R-31 — read_file handle() presentation block, characterized pre-extr
     expect(d.tokens.saved).toBe(d.tokens.original - d.tokens.compressed);
     expect(d.tokens.savingsPercent).toBe(Math.round((1 - d.compressionRatio!) * 100));
 
-    // `:305` interpolates `result.tokens.savingsPercent` — the message and the
+    // `:306` interpolates `result.tokens.savingsPercent` — the message and the
     // field cannot disagree.
     expect(d.recommendations).toEqual([tipCompressed(150, 87)]);
   });
@@ -376,9 +376,9 @@ describe("R-31 — read_file handle() presentation block, characterized pre-extr
     expect(d.lineRange.selected).toBe(150);
     expect(d.compressed).toBe(true);
 
-    // `:304` sits in the `if (shouldAutoCompress)` arm and `:318` in the `else`,
-    // so no response can ever carry all four strings. Whole-file read → `:326`;
-    // 7 definitions → `:333`.
+    // `:305` sits in the `if (shouldAutoCompress)` arm and `:319` in the `else`,
+    // so no response can ever carry all four strings. Whole-file read → `:327`;
+    // 7 definitions → `:334`.
     expect(d.recommendations).toEqual([tipCompressed(150, 87), TIP_LINE_RANGE, tipSymbols(7)]);
     expect(d.recommendations).toHaveLength(3);
     expect(d.recommendations).not.toContain(TIP_LARGE_FILE);
@@ -397,7 +397,7 @@ describe("R-31 — read_file handle() presentation block, characterized pre-extr
         lineEnd: 150,
       })) as ToolResult;
 
-      // `:287`'s await is the only throwing call in the moved span. After T12 it
+      // `:288`'s await is the only throwing call in the moved span. After T12 it
       // lives in module 7 while the catch stays in the handler, so this pins the
       // boundary rather than assuming it from T9's precedent.
       expect(res.success).toBe(false);

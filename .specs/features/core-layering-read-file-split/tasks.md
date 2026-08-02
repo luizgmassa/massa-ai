@@ -511,16 +511,16 @@ landed as an **operator swap in place**, not a move onto a bare `Map`: the case 
 `lru-evict.test.ts:60` and `:70` already assert both properties over a plain `Map` and a repoint onto
 one would have been a **duplicate of T6 and a deletion wearing a repoint's clothes** (Plan Challenge
 gate, §10.9 finding 3). Both sensors flip their site from `92p/0f` to `93p/1f` | 1 file | GMS-05 AC-3, **C49** |
-| **T8b** | ~~**The two comments RFS-02 AC-4 requires corrected**~~ → **five comment sites, three of them added by C52 (§10.9) — `production-wiring.ts:67-68` and `invalidator-registry.ts:34-36`.** Both state the same false claim and the **named site cites the unnamed one as its authority**, so correcting only the named one leaves a reader who follows its own pointer at the uncorrected claim (**C35**, §10.1). Corrected to state what T1's pin measured: `CACHE_TTL` is enforced, `ROOT_CACHE_TTL` is **not**, and no invalidator id matches `read_file`. **Added by C35 at T1; this row was created at T4b** — C35 resolved the defect and named the task but never wrote a row for it, so for four tasks T8b existed only in §10.1's prose and was absent from §5 and from §1's write-set table (§10.5). **Three further comment sites added by C52 (§10.9), decided by the user, 2026-08-01, from four options** — widening T8 to 4 files, a new task T8c and record-only were all rejected; this row was chosen because its charter already *is* comment correction, so *"comments only"* stays true and T8's write set stays at 1 file. All three were **added by T7 itself** and cite line numbers in their own file that T7's own commit falsified: `read_file.ts:484` (`:169, :462, :570` → **`:170`, `:463`, `:578`**), `symbol-graph.service.ts:812` (`:792` → **`:793`**), `file-filter-cache.ts:151` (`:51-53` → **`:52-54`**). **`read_file.ts`'s is de-numbered rather than renumbered** — T10 deletes `:578`'s call outright, so a renumber there would be falsified a third time; the other two files appear in **no** Phase 3–5 write set, so a plain renumber is stable | ~~2~~ → **5 files, comments only** | **RFS-02 AC-4**, **C52** |
+| **T8b** | ~~**The two comments RFS-02 AC-4 requires corrected**~~ → **five comment sites, three of them added by C52 (§10.9) — `production-wiring.ts:67-68` and `invalidator-registry.ts:34-36`.** Both state the same false claim and the **named site cites the unnamed one as its authority**, so correcting only the named one leaves a reader who follows its own pointer at the uncorrected claim (**C35**, §10.1). Corrected to state what T1's pin measured: `CACHE_TTL` is enforced, `ROOT_CACHE_TTL` is **not**, and no invalidator id matches `read_file`. **Added by C35 at T1; this row was created at T4b** — C35 resolved the defect and named the task but never wrote a row for it, so for four tasks T8b existed only in §10.1's prose and was absent from §5 and from §1's write-set table (§10.5). **Three further comment sites added by C52 (§10.9), decided by the user, 2026-08-01, from four options** — widening T8 to 4 files, a new task T8c and record-only were all rejected; this row was chosen because its charter already *is* comment correction, so *"comments only"* stays true and T8's write set stays at 1 file. All three were **added by T7 itself** and cite line numbers in their own file that T7's own commit falsified: `read_file.ts:484` (`:169, :462, :570` → **`:170`, `:463`, `:578`**), `symbol-graph.service.ts:812` (`:792` → **`:793`**), `file-filter-cache.ts:151` (`:51-53` → **`:52-54`**). **`read_file.ts`'s is de-numbered rather than renumbered** — T10 deletes `:578`'s call outright, so a renumber there would be falsified a third time; the other two files appear in **no** Phase 3–5 write set, so a plain renumber is stable. **DONE at `HEAD` — §10.10. Phase 2 is complete.** The write set grew again *during* the task, **decided by the user from four options**: C52's sweep was **self-referential**, and T7's `+1` import insertions falsify a citation *into* those files from anywhere — measured over 892 tracked source files, **14 explicit cross-file citations plus a bare-`:NNN` tail, 48 stale across the three Phase-0 suites**, three of which **invert** (`read-file-project-root-rename-pin.test.ts:8`/`:173`/`:174` name `read_file.ts:147`/`:148`, which on the shipped tree are the `projectRootCache` Map and `CACHE_TTL` — the constant the sentence says is never read). **C54**, §10.10; assigning them to Phase 3, de-numbering all, and record-only were rejected. **`spec.md` is edited too, and that is a second user decision**: an honest correction to `production-wiring.ts:67-69` needs ~6 lines, and the growth shifts the **2** citations below it — `spec.md:156` (`:105` → **`:114`**) and `:158` (`:91` → **`:100`**), both in §3.B's evidence table. The `read_file.ts` edit is **line-neutral by construction** (four lines replacing four), so `check-tools-thin` comes back **byte-identical, spans included** — stronger than T7's and T8's counts-only claim. **Nine `:NNN` in `test()` title strings are deliberately left stale** and are T12's: editing a string literal would make *"comments only"* false | ~~2~~ → ~~5~~ → **8 files + `spec.md`, comments only** | **RFS-02 AC-4**, **C52**, **C54** |
 
 ### Phase 3 — the extraction, 490 of 707 lines
 
 | # | task | write set | closes |
 | --- | --- | --- | --- |
-| **T9** | **Modules 2 and 3** — `services/file-read/path-containment.ts` (`checkPathContainment` `:387-448` + `resolveFilePath` `:350-385`) and `services/file-read/project-root-cache.ts` (`getProjectRoot` `:450-470` + `projectRootCache` + `ROOT_CACHE_TTL` + the `eventBus` subscription `:162-171`). **Module 2 → module 3 is a real edge** — `:373` and `:415` both call `getProjectRoot` — one-directional, so no cycle, but module 2 cannot be constructed without module 3. T2's suite passes unmodified. **Write set gains `+ 1 test repoint` — added by C53 (§10.9), and it is C34's resolution one task earlier than C34 predicted.** This module takes `projectRootCache` **and** the `eventBus` subscription, so T8's new `indexing:started` call-site sensor — which seeds `tool.projectRootCache` through a cast — loses its subject **here**, not at T10. §1's overlap table scheduled the only Phase-3 touch of `read-file.test.ts` at T10 (C34's), so T9 as written lands a red suite owned by nothing — PR-C's **C19** class, and C48's *"a break owned by nothing"* verbatim. Author level on C34's own precedent: GMS-05 AC-3 fixes the answer and the only open question was which task carries one file | ~~1 handler + 2 new modules + 2 new suites~~ → **+ 1 test repoint** | RFS-06 AC-1 |
-| **T10** | **Modules 4 and 5** — `file-content-cache.ts` (`readFileWithCache` `:518-580` + `fileCache` + `CACHE_TTL` + `FILE_CACHE_MAX_ENTRIES` + `interface CachedFile`) and `file-metadata.ts` (`extractMetadata` `:582-628` + `detectLanguage` `:645-681` + `extractImports` `:683-706` + `interface FileMetadata`). **The 4 → 5 edge is a callback — §4.** Module 4 never names `SymbolGraphService` | 1 handler + 2 new modules + 2 new suites | — |
-| **T11** | **Module 6** — `line-range.ts` (`calculateRange` `:485-507` + `adjustRange` `:509-516` + `extractLines` `:630-643` + `interface ReadRange` + `MASSA_AI_READ_FILE_MAX_LINES` `:22-36` + **the N9 clipping `:235-249`**, which is 15 of `handle()`'s 98 non-delegation lines) | 1 handler + 1 new module + 1 new suite | — |
-| **T12** | **Module 7 and the handler's collapse** — `read-file.service.ts` takes `interface ReadFileParams`, the compression decision `:251-255`, result assembly `:257-283`, token math + recommendation `:285-322` and usage tips `:324-336`, and composes 2–6. **`handle()` goes 175 → ~15**; `read_file.ts` to **≤ 125** (N). **`serializeToolResponse` stays in the handler** (`:338`) — any `services/file-read/` module importing `tools/serialize.ts` is a `services → tools` edge and fails `check-core-layering` (RFS-03 AC-2). **`constructor(symbolGraph?: SymbolGraphService)` keeps its exact arity and parameter type** — 20 construction sites, both transports among them (`design.md` §3.2). **MCP `inputSchema` + REST `/file` response shape byte-identical.** **The four moving interfaces are invisible to consumers**: `read_file.ts` exports exactly one symbol (`ReadFileTool`, `:74`), so `ReadFileParams`, `FileMetadata`, `CachedFile` and `ReadRange` are module-local today, and `services/file-read/` is deliberately not re-exported from `services/index.ts` — the extraction adds **0** names to `@massa-ai/core`'s published surface. T3's suite passes unmodified | 1 handler + 1 new module + 1 new suite | **GMS-02 AC-1**, RFS-03 AC-2 |
+| **T9** | **Modules 2 and 3** — `services/file-read/path-containment.ts` (`checkPathContainment` `:387-448` + `resolveFilePath` `:350-385`) and `services/file-read/project-root-cache.ts` (`getProjectRoot` `:450-470` + `projectRootCache` + `ROOT_CACHE_TTL` + the `eventBus` subscription `:162-171`). **Module 2 → module 3 is a real edge** — `:373` and `:415` both call `getProjectRoot` — one-directional, so no cycle, but module 2 cannot be constructed without module 3. T2's suite passes unmodified. **Write set gains `+ 1 test repoint` — added by C53 (§10.9), and it is C34's resolution one task earlier than C34 predicted.** This module takes `projectRootCache` **and** the `eventBus` subscription, so T8's new `indexing:started` call-site sensor — which seeds `tool.projectRootCache` through a cast — loses its subject **here**, not at T10. §1's overlap table scheduled the only Phase-3 touch of `read-file.test.ts` at T10 (C34's), so T9 as written lands a red suite owned by nothing — PR-C's **C19** class, and C48's *"a break owned by nothing"* verbatim. Author level on C34's own precedent: GMS-05 AC-3 fixes the answer and the only open question was which task carries one file. **Also `+ N citation repoints` — added by C55 (§10.10)**: T8b renumbered 48 citations into `read_file.ts` spans, and this task moves `resolveFilePath`, `checkPathContainment`, `getProjectRoot`, `projectRootCache` and `ROOT_CACHE_TTL` out of the file, so the citations naming them in `read-file-containment-shapes.test.ts` and `read-file-project-root-rename-pin.test.ts` name a file that no longer holds the code. **Re-run the sweep here; do not inherit T8b's count** | ~~1 handler + 2 new modules + 2 new suites~~ → **+ 1 test repoint + N citation repoints** | RFS-06 AC-1 |
+| **T10** | **Modules 4 and 5** — `file-content-cache.ts` (`readFileWithCache` `:518-580` + `fileCache` + `CACHE_TTL` + `FILE_CACHE_MAX_ENTRIES` + `interface CachedFile`) and `file-metadata.ts` (`extractMetadata` `:582-628` + `detectLanguage` `:645-681` + `extractImports` `:683-706` + `interface FileMetadata`). **The 4 → 5 edge is a callback — §4.** Module 4 never names `SymbolGraphService`. **`+ N citation repoints` — added by C55 (§10.10)**: this task takes `CACHE_TTL`, `fileCache` and `readFileWithCache`, which the pin suite and the presentation suite both cite by line | 1 handler + 2 new modules + 2 new suites **+ N citation repoints** | — |
+| **T11** | **Module 6** — `line-range.ts` (`calculateRange` `:485-507` + `adjustRange` `:509-516` + `extractLines` `:630-643` + `interface ReadRange` + `MASSA_AI_READ_FILE_MAX_LINES` `:22-36` + **the N9 clipping `:235-249`**, which is 15 of `handle()`'s 98 non-delegation lines). **`+ N citation repoints` — added by C55 (§10.10)**: `extractLines` is cited by the presentation suite | 1 handler + 1 new module + 1 new suite **+ N citation repoints** | — |
+| **T12** | **Module 7 and the handler's collapse** — `read-file.service.ts` takes `interface ReadFileParams`, the compression decision `:251-255`, result assembly `:257-283`, token math + recommendation `:285-322` and usage tips `:324-336`, and composes 2–6. **`handle()` goes 175 → ~15**; `read_file.ts` to **≤ 125** (N). **`serializeToolResponse` stays in the handler** (`:338`) — any `services/file-read/` module importing `tools/serialize.ts` is a `services → tools` edge and fails `check-core-layering` (RFS-03 AC-2). **`constructor(symbolGraph?: SymbolGraphService)` keeps its exact arity and parameter type** — 20 construction sites, both transports among them (`design.md` §3.2). **MCP `inputSchema` + REST `/file` response shape byte-identical.** **The four moving interfaces are invisible to consumers**: `read_file.ts` exports exactly one symbol (`ReadFileTool`, `:74`), so `ReadFileParams`, `FileMetadata`, `CachedFile` and `ReadRange` are module-local today, and `services/file-read/` is deliberately not re-exported from `services/index.ts` — the extraction adds **0** names to `@massa-ai/core`'s published surface. ~~T3's suite passes unmodified~~ → **T3's suite's assertions pass unmodified; its comments do not, and that is this task's `+ N citation repoints` — added by C55 (§10.10).** It carries the largest share of the 48: the whole `:252-337` span this task moves. **It also carries the nine stale `:NNN` in `test()` TITLE strings that T8b deliberately left** (`:245`, `:260` ×2, `:300`, `:328`, `:365` ×2) — a string literal is not a comment, so T8b could not touch them without making *"comments only"* false; this task rewrites those tests anyway | 1 handler + 1 new module + 1 new suite **+ N citation repoints + 9 test-title repoints** | **GMS-02 AC-1**, RFS-03 AC-2 |
 
 **Phase 3's four task rows sum to 16 and the phase is 13 distinct files** — all four edit
 `read_file.ts`, which is the write set's only overlap. Each task removes its own spans and adds its
@@ -2655,3 +2655,251 @@ Running total: **fifty-eight** plan defects.
 5. **A stale label does not imply a stale instrument.** All four of C49's call-site line numbers were
    wrong and its measurement was exactly right, because `t7-callsite-sensors.ts` anchors on text.
    **Correct the frame, not the reading.**
+
+### 10.10 T8b — executed, 2026-08-01
+
+**RFS-02 AC-4 closes and C52 closes. Phase 2 is complete.** The write set grew from **5 comment
+sites to 8 source files plus `spec.md`** on a user decision taken during the task, because T8b's own
+charter — correcting comments that state something false — surfaced a strictly larger instance of
+the defect it was created to fix. **Three new plan defects (C54–C56, the fifty-ninth to sixty-first),
+running total sixty-one**, and C56 amends two criteria rather than a figure. No behavior changed: all
+eight source diffs are **proven** comment-only.
+
+**The five sites the row named, all measured stale on the shipped tree before being touched:**
+
+| site | was | now | treatment |
+| --- | --- | --- | --- |
+| `production-wiring.ts:67-69` | *"both are TTL-bounded and self-evict (see invalidator-registry.ts)"* | what T1's pin measured | rewritten, **`:67-78`** |
+| `invalidator-registry.ts:34-36` | *"both are TTL-bounded, so a stale entry self-evicts"* | same, and it no longer serves as the other site's authority | rewritten, **`:34-42`** |
+| `read_file.ts:484` | `inlined at :169, :462 and :570` | `inlined at its three call sites, left unnumbered because Phase 3 moves one` | **de-numbered**, and **line-neutral** |
+| `symbol-graph.service.ts:812` | `(:792)` | **`(:793)`** | renumbered |
+| `file-filter-cache.ts:151` | `:51-53` | **`:52-54`** | renumbered |
+
+**C35's structural half is closed, not just its text.** `production-wiring.ts` cited
+`invalidator-registry.ts` as the authority for a claim that was false in both places. The
+replacement cites **the pin test** — `__tests__/read-file-project-root-rename-pin.test.ts` — at both
+sites. *A comment's authority should be a measurement, not another comment.*
+
+#### C54 — the fifty-ninth: C52's sweep was self-referential, and the population is a strict superset
+
+C52 measured *"5 citations inside the four T7-edited files → 3 comments in 3 files"* and withdrew any
+repo-wide figure as unmeasurable. Both halves are right and the scoping is not: **T7's `+1` import
+insertions falsify a citation *into* those files no matter which file the citation lives in.**
+Measured over all **892** tracked source files (`.specs/` excluded):
+
+| population | count | note |
+| --- | --- | --- |
+| self-referential — C52's | **5** in 3 blocks / 3 files | reproduced exactly, twice, independently |
+| explicit `<t7-file>:NNN` living **elsewhere** | **14**, all 14 textually stale | outside C52's sweep entirely |
+| bare `:NNN` in the three Phase-0 suites | **~35 more** | subject inherited from the docblock |
+| stale citations, three Phase-0 suites, comment lines | **48**, of which **44** point into a span Phase 3 relocates | census |
+
+**Two figures the author stated and the evidence-audit lens corrected, both kept at the audited
+value.** *"13 stale"* was narrated against an instrument that printed **14** — the definition given
+(*"pre-T7 text differs from shipped text"*) admits `active-generation.ts:20`, which C4 separately and
+correctly argues is not a degradation; **14 textually stale, 13 degrading** is the honest pair. And
+*"10 of 13 land in a Phase-3 span"* was a hand count against a span table missing the **field
+declarations** T9 and T10 take by identifier rather than by span (`fileCache`, `projectRootCache`,
+`CACHE_TTL`, `ROOT_CACHE_TTL`, `FILE_CACHE_MAX_ENTRIES`); corrected, **11 of 13**, and the census
+moved 43 → **44 of 48**. *Neither correction changes a conclusion and both change a number — which is
+the reason to run the lens at all.*
+
+**Three of them do not merely dangle, they invert** — the shipped line at the cited number contradicts
+the sentence citing it, which is strictly worse than the three C52 sites, where a stale number lands
+on an adjacent line:
+
+| citation | claims | shipped line at that number |
+| --- | --- | --- |
+| `read-file-project-root-rename-pin.test.ts:8` | `read_file.ts:148` declares `ROOT_CACHE_TTL` and **NOTHING READS IT** | `private readonly CACHE_TTL = 60000;` — the constant that **is** read |
+| `…:174` | `// read_file.ts:148, read nowhere` | same inversion |
+| `…:173` | `// read_file.ts:147, read at :544` | `:147` is the `projectRootCache` **Map**; `:544` is `includeSymbols: …` |
+
+**Decided by the user from four options: fix all now, widening T8b to 8 files.** Assigning them to
+the Phase-3 tasks that move each span, de-numbering all of them, and record-only were rejected. The
+cost the option carries was stated before it was chosen and is real: the three Phase-0 suites are
+re-baselined mid-Phase-2, so `§10.8`'s SHA table no longer describes them, and **44 of 48 will be
+falsified again at Phase 3** — see **C55**.
+
+*C48 said a decision recorded against the file that provoked it is not thereby recorded against the
+class it belongs to. **C54 is that sentence applied to a sweep**: a population scoped to the files a
+commit touched is not the population of citations that commit falsified.*
+
+#### C55 — the sixtieth: Phase 3 re-falsifies what T8b just fixed, and no row owns it
+
+Fixing the citations now does not retire the obligation, it moves it. **44 of the 48** name spans
+that T9, T10, T11 and T12 relocate into `services/file-read/`, after which they will name a file that
+no longer contains the code. Measured against `tasks.md` §5's Phase-3 rows: **no row names any of the
+three Phase-0 suites**, and T9's only test entry is C53's `read-file.test.ts` repoint.
+C48's *"a break owned by nothing"* verbatim, third occurrence.
+
+**Resolution: T9, T10, T11 and T12 each gain `+ N citation repoints`** for the suites whose citations
+name the spans that task moves. Author level, because the user's own C54 decision fixes the policy
+(*repointed, now, not deferred*) and the only open question is which task carries which file — C53's
+precedent exactly. The counts are per-task and re-derived at each task, not inherited from here:
+**a task that moves a span must re-run the sweep, because the reaching set moves in both directions**
+(C53's own lesson).
+
+**Nine `:NNN` citations are deliberately NOT fixed and are T12's.** They sit in `test()` **title
+strings**, not comments — `read-file-presentation-characterization.test.ts:245`, `:260` ×2, `:300`,
+`:328`, `:365` ×2, plus two `:00` false hits from a date literal at `read-file-project-root-rename-pin.test.ts:172`.
+Editing a string literal changes the token stream and would make *"comments only"* false, which is
+the property the user preserved when C52 chose this row. They are stale and recorded as stale.
+
+#### What was measured, and what proves it
+
+**The repoint is content-anchored, never arithmetic.** For each cited pre-T7 number the instrument
+reads the **text** at that line in `ea59b04^` and locates that exact text on the shipped tree.
+Deriving *"+1 below the import, +8 below `:474`"* is the class of arithmetic that produced C50 and
+then C52; a unique text match cannot drift. Verified by a round trip that is **not** the proposal
+generator re-run — for every pair it asserts `pre-T7[old] === shipped[new]`:
+
+```
+PASS — 49 citation pair(s) checked by content, 0 mismatch,
+       274 comment line(s) deliberately unchanged, 8 foreign citations skipped by name
+```
+
+**Four adjudications a regex cannot make**, written into the instrument with their reason rather than
+skipped silently: `presentation:21` (`:556`), `:27` (`:676`), `:30` (`:652-668`) all inherit
+`e2e/08.search.test.ts` as their subject, and `:49` (`:11`, `:23`) inherits
+`apps/tools-api/src/routes/file.test.ts` from four lines earlier. **All four were left untouched**;
+renumbering them against `read_file.ts` is precisely `t8-cite-population.ts`'s recorded
+cross-contamination defect.
+
+**Comment-only is proven, not asserted.** Both revisions of all eight files are parsed and printed
+with `removeComments: true`; identical output means the only difference was trivia.
+
+| file | code lines | source lines | verdict |
+| --- | --- | --- | --- |
+| `read_file.ts` | 493 → 493 | **715 → 715, delta 0** | COMMENT-ONLY |
+| `symbol-graph.service.ts` | 507 → 507 | 830 → 830 | COMMENT-ONLY |
+| `file-filter-cache.ts` | 129 → 129 | 234 → 234 | COMMENT-ONLY |
+| `production-wiring.ts` | 78 → 78 | 132 → **141** | COMMENT-ONLY |
+| `invalidator-registry.ts` | 74 → 74 | 101 → **107** | COMMENT-ONLY |
+| the three Phase-0 suites | unchanged | unchanged | COMMENT-ONLY |
+
+**`read_file.ts`'s zero line delta is a design constraint, not luck.** The gate's spans are
+declaration-only (§3.3), so `evictOldest`'s own `:489-491` is unaffected by its docblock — but the
+**eight** members below it are not, and the frozen base has already been re-derived once at T7 for
+exactly this reason (C50, as corrected by C52). The de-numbered sentence was therefore written as
+**four lines replacing four**, absorbing *"left unnumbered because Phase 3 moves one"* by tightening
+the two sentences that follow it. A fifth line would have moved fifteen spans a second time.
+
+#### The two prose sites grew, and that falsified two citations in `spec.md`
+
+Found by the red-team lens **before** the edit was written. An honest correction needs ~6 lines, not
+3. Measured blast radius of the growth — **20** citations of `production-wiring.ts` repo-wide:
+
+| zone | count | consequence |
+| --- | --- | --- |
+| above `:67` | 8 | unaffected |
+| inside `:67-69` | 10 | all cite `:67-68`, which still lands inside the corrected comment |
+| **below `:69`** | **2** | **shift onto different code** |
+
+The two are `spec.md:156` → `production-wiring.ts:105` (`symbolGraph.clearProjectRoot`) and
+`spec.md:158` → `:91` (`fileFilterCache.invalidateProject`) — both exactly right beforehand, both in
+**§3.B's own evidence table**, the table RFS-02 AC-4 rests on. Re-measured by content after the edit:
+**`:91` → `:100`, `:105` → `:114`**, and both amended in place in `spec.md`. **Decided by the user
+from four options**; de-numbering them, constraining the correction to three lines, and deferring to
+T20/T25 were rejected. The repoint is stable: `production-wiring.ts` appears in **no** Phase 3–7
+write set. `invalidator-registry.ts` has **0** citations below its edit and needed none.
+
+*A comment-only diff moves no tokens and still moves line numbers, and line numbers are load-bearing
+in this feature's own record. "Comments only" is a claim about the AST, not about the document.*
+
+#### Gates, all six plus both structural gates
+
+`lint` exit **0**, and proven to bite **on a T8b file** rather than assumed: a duplicate declaration
+appended to `read-file-presentation-characterization.test.ts` produced
+`…:412:7: error: Identifier \`dupProbeT8b\` has already been declared` and exit **1**; restored
+SHA-256-identical (`bfb23fdc1d05f5e7…`), lint back to **0**. `type-check` **6/6, 0 cached** (forced).
+`build` **5/5, 0 cached** (forced), 5 `cache bypass, force executing` lines and Prisma generated.
+`test` exit **0**, **11/11 tasks**, **5 cached and all five are `:build`** — every one of the 6
+`:test` tasks executed — `[test-isolation] PASS: all 147 group(s)`, clean on the **first** run.
+`test:scripts` exit **0**, **1114** pass / 0 fail across **49** files, unchanged as it must be for a
+commit adding no `scripts/` test. `test:plugins` exit **0**, **96** pass / 0 fail across 8 files.
+The three Phase-0 suites plus both eviction suites run together: **37 pass / 0 fail / 3258 expect()
+in 302 ms** under an empty `XDG_CONFIG_HOME`.
+
+**`check-core-layering` after `git add`: `PASS — 0 violation(s) across 969 tier-to-tier edges in 904
+tracked files`.** Read it as **edges 969 → 969; files 904 → 904 — both unchanged.** T7 was the commit
+that moved the edge count (965 → 969); T8b changes no import at all, so the figure could not move —
+and *"unchanged"* is a reading only because it is a figure that can move (RFS-03 AC-1).
+
+**`check-tools-thin` after `git add`: byte-identical to the pre-edit run** — the whole report, not
+its summary line. `2 of 30`, 224 members, `read_file.ts` 13 / 17 / 2 / 175 with all 15 spans
+unmoved, `index_project.ts` 3 / 3 / 0 / 128, exit **1**, the intended pre-Phase-5 state. **This is a
+strictly stronger claim than T7's and T8's**, which held the counts while 15 of 15 spans moved
+(C50/C52). It is available only because the `read_file.ts` edit was made line-neutral on purpose.
+
+#### The Plan Challenge gate on T8b — two modes, and the gate rewrote the write set
+
+Mode selection reuses this feature's recorded route (`spec.md` §9.1, `design.md` §10). Per §10.7 gate
+finding 10 and §10.8 gate finding 1, **no harness ran while either lens was live**, and both were
+handed measurements to attack rather than asked to reproduce a tree. `git status --porcelain` and the
+SHA-256 of all six files they were pointed at were checked after each returned: **tree clean, all six
+SHAs unchanged**.
+
+| # | mode | finding | disposition |
+| --- | --- | --- | --- |
+| 1 | red-team | correcting `production-wiring.ts:67-69` honestly cannot stay 3 lines, and ≥1 line of growth silently staleds citations **below** the edit | **CONFIRMED, and it changed the write set.** Re-measured independently: 20 citations, 2 below, both in `spec.md` §3.B, both exact beforehand. Became the second user decision |
+| 2 | red-team | the de-number at `read_file.ts:484` has **no stated line-count requirement**, and a reflow moves 8 member spans a second time with nothing watching | **CONFIRMED.** The token-identity proof is comment-blind **by design** and would have passed a line-count change. The edit was written 4-lines-for-4 and `check-tools-thin` diffed byte-for-byte instead of by counts |
+| 3 | red-team | none of the four planned verification layers can detect findings 1–2; no test in `packages/core/src/__tests__` asserts a literal source line number | **CONFIRMED as a structural gap.** Closed by adding the citation sweep and the byte-diff of the gate report to the recipe |
+| 4 | red-team | sites 4 and 5's *"plain renumber is stable"* justification, the `13→12 / 224→223` counterfactual, and the quoted gate baselines all verified against the tree | **ACCEPTED as confirmation**, reported rather than omitted |
+| 5 | evidence audit | claim sets A, B, C1, C3, C4, D1, D2, D3 — every figure re-derived independently, including running the pin suite live (**2 pass / 23 expect()**) to confirm all four sub-claims the corrected comments assert | **CONFIRMED — all reproduce.** Fourth clean evidence-audit pass on this feature |
+| 6 | evidence audit | *"13 stale"* does not reproduce under its own stated definition — measured **14** | **CONFIRMED, author corrected.** Folded into C54 |
+| 7 | evidence audit | *"10 of 13 land in a Phase-3 span"* does not reproduce — measured **11** by occurrence; the author's span table omitted the field declarations T9/T10 take by identifier | **CONFIRMED, author corrected**, and the census moved 43 → 44 of 48. Folded into C54 |
+
+**Twenty-first and twenty-second time a critic's mechanism held while a figure did not — except this
+time both figures were the author's and both critics were right.** Findings 6 and 7 are the first on
+this feature where the evidence-audit lens corrected a number and the correction survived
+re-measurement unchanged.
+
+#### What T8b pins that no artifact named
+
+1. **A population scoped to the files a commit touched is not the population that commit falsified**
+   (C54). C52 swept self-referential citations because the defect was found in a self-referential
+   one. The superset had to be found by asking what the commit *moved*, not what it *edited*.
+2. **"Comments only" is a claim about the AST and says nothing about line numbers.** Two of the eight
+   files grew, and in this feature a line number is load-bearing evidence. The prover reports the
+   line delta beside the verdict for exactly this reason.
+3. **A checker that passes one observed red can still be unsound.** The comment-only prover first
+   drove a raw `ts.createScanner`, which cannot re-scan template spans without a parser; at the first
+   backtick in `read_file.ts` it swallowed the file's remainder into one "token" **including the
+   comments it was meant to be blind to**, and reported NOT COMMENT-ONLY for a comment-only diff. It
+   had passed its red test earlier only because that diff differed before reaching a template
+   literal. **A red proves the checker can fire, not that it fires for the right reason.**
+4. **A verifier that only inspects the diff cannot see an omission.** The round-trip checker skipped
+   unchanged lines; a probe reverting one citation to its stale value made the line equal to `HEAD`
+   and read **PASS**. Correctness of what moved and completeness over what did not are two properties
+   — the fix was to pair an unchanged line as `N → N`, where the same content assertion becomes
+   exactly *"this line needed no change"*. **T6's and T8's inert-mutation lesson, now in the
+   instrument rather than the subject.**
+5. **Three instrument defects in one task, all found by something other than a green run** — the
+   scanner above, the `/g` `RegExp.test` whose `lastIndex` silently skipped lines, and a `\b`-anchored
+   negative lookahead that matched mid-token and classified `-graph.service.ts:174` as a foreign file.
+   Each produced a confident wrong answer about a correct edit. *When the instrument and the edit
+   disagree, neither is presumed right.*
+
+#### C56 — the sixty-first: C55 falsifies RFS-02 AC-1's byte-identity clause by construction
+
+**Found by following C55's own consequence rather than by a critic.** RFS-02 AC-1 requires T1's two
+suites to *"pass unmodified after [the extraction] — byte-identity of the test files asserted across
+the move"*, and RFS-06 AC-1 says the same of T2's. **C55 requires T9, T10, T11 and T12 to edit those
+suites' comments**, because they move the `read_file.ts` spans the comments name. The two cannot both
+hold, and the conflict is created by a decision taken at T8b rather than discovered at T9.
+
+**Amended in place at both criteria, at author level, and handed to T25 as a question** alongside
+C37's, C41's, C48's and AC-2's. The replacement is **byte-identity with comments stripped**, which is
+the property AC-1's own sentence says it is for — *"not 'the tests are green now'"*, i.e. that no
+assertion was weakened to accommodate the move. A comment-only diff cannot weaken an assertion, and
+the predicate is now the one this task already ships an instrument for, with an observed red.
+
+**Note what does NOT change.** `lru-eviction-characterization.test.ts` — T1's other file, and AC-1's
+main subject — carries **zero** `read_file.ts` line citations and is byte-identical through T8b. The
+narrowing is needed for the three suites that cite line numbers, not for the oracle.
+
+*The rule this feature already recorded, applied to itself: a spec that contradicts a structural
+requirement loses the clause, and the amendment names the reason and goes to the verifier as a
+question rather than being satisfied quietly.*
+
+**Running total: sixty-one plan defects.**
