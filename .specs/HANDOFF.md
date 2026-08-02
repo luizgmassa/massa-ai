@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — Phase 3 OPEN, T10 done**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — Phase 3 OPEN, T11 done**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -33,11 +33,12 @@
 > **Do not re-take** §4's two threading decisions; §4.2's rejected option is rejected for a subtler
 > reason than the obvious one, and the obvious one does not survive measurement.
 >
-> ~~**Six** corrections are owed to `design.md` itself~~ → ~~fourteen~~ → ~~fifteen~~ → **sixteen**
-> (§8.1 → task **T20b**, PR-C's C18 precedent), and **C28–C33** to the parent `spec.md` (T20). None is
-> written in either yet. *"Six" was last true at Design; §8.1 grew at T4b, again at T5, again at T6,
-> and again at T9 — row 16 is §3.2's "20 construction sites", measured **41**, a figure true when
-> Design wrote it and falsified by PR-D's own Phase 0 suites.*
+> ~~**Six** corrections are owed to `design.md` itself~~ → ~~fourteen~~ → ~~fifteen~~ → ~~sixteen~~ →
+> **seventeen** (§8.1 → task **T20b**, PR-C's C18 precedent), and **C28–C33** to the parent `spec.md`
+> (T20). None is written in either yet. *"Six" was last true at Design; §8.1 grew at T4b, again at T5,
+> again at T6, again at T9, and again at T11 — row 16 is §3.2's "20 construction sites", measured
+> **41**, a figure true when Design wrote it and falsified by PR-D's own Phase 0 suites; row 17 is
+> **C66**, §5.1 giving module 6 a parameter type it gives to module 7, which composes it.*
 >
 > ~~**Next action: Execute, T1.**~~ **T1 DONE — `d0fbc92`**, and the Tasks work is committed as
 > `4f1e8ad`. **Its whole record is `tasks.md` §10.1** — three new plan defects (**C34–C36**, the
@@ -704,14 +705,98 @@
 > matching (re-keyed onto the citing line's text). *A rule that matches nothing reads exactly like a
 > correct one — print the unmatched ones.*
 >
-> **Next action: Execute, T11.** Module 6 — `line-range.ts` (`calculateRange` + `adjustRange` +
-> `extractLines` + `interface ReadRange` + `MASSA_AI_READ_FILE_MAX_LINES` + the N9 clipping). Four
-> things a T11 executor must not miss: §5's spans are **pre-T7, pre-T9 and now pre-T10**, so re-derive
-> every one from the AST rather than reading the row; **C62** means a citation T11 shifts whose subject
-> no later task moves is **T11's**, not nobody's; the C59 backlog now attributes **T11 1 / T12 26**,
-> and the frame for each row is the revision it was written against rather than `HEAD`; and the N9
-> clipping is 15 lines **inside `handle()`**, so T11 is the first Phase-3 task to move `handle()`'s own
-> line count — `check-tools-thin` will read something other than 175 for the first time since T5.
+> ~~**Next action: Execute, T11.**~~ **T11 DONE — `834f00a`.** Module 6 is out:
+> `services/file-read/line-range.ts` plus its suite; `read_file.ts` **392 → 315**, and
+> **`handle()` reads 165 — the first figure other than 175 since T5**, because the N9 clipping was 15
+> comment-inclusive lines inside it. Its record is `tasks.md` §10.13 — the AST-derived span table, the
+> 15-row two-column discrimination table, and **five new plan defects (C66–C70, running total
+> seventy-five)**. Not restated here.
+>
+> **`read_file.ts` now reads `1 / 1 / 0 / 165` and the single surviving body IS C64's wiring arrow.**
+> `extractLines` carried the file's only nested body, so it was the *entire* raw-vs-maximal gap and
+> both counts moved together, `5 / 6 → 1 / 1`. **`2 of 30` holds** — a drop to `1 of 30` would mean the
+> file went green one phase early. So the whole remaining distance to `0 of 30` for this file is the
+> 4 → 5 composition at `:144-145`, which is **T12's and is now measured rather than predicted**.
+>
+> **The write set is 8, not the 6 two rows predict, and both growths were user decisions.** N was
+> *resolved* at 2 rather than grown — the sweep measured exactly two citation-repoint files, which is
+> §5's own shape. What grew: **`spec.md`** (C68 — its §6 row cites two sites as setting a variable
+> **neither sets**; both set `MASSA_AI_READ_FILE_ROOTS`, and the table was short a **third** read of
+> the N9 cap, `workspace.ts:774`, which is *per request* rather than per process and is why the row's
+> own evidence looked right) and **`scripts/check-tools-thin.ts` + its suite** (C69).
+>
+> **C69 is the one a resumer must not skip: a shipped gate's population counter was pinned at 2.**
+> `sf.forEachChild(() => membersExamined++)` — `forEachChild` halts on a truthy return and a
+> post-increment returns the **pre**-increment value, so it stopped after two top-level nodes in every
+> file, for the gate's whole life. It never moved a verdict, and it falsified both sentences the file
+> states about the field plus the one property **RFS-01 AC-1** asks the population print to have: a
+> counter pinned at 2 cannot tell a dead subject from a live one. **Fixed with the recalibration
+> recorded** — the same tree reads `read_file.ts` **16 → 28** and the repo total **215 → 419**, so
+> T5's **224**, T7's **223**, T9's **221** and T10's **215** are all old-counter figures meaning
+> `2 + members`. *It is not cosmetic and this task is the proof*: on the old counter T11's member delta
+> reads −3, on the corrected one −4, and the fourth is `interface ReadRange` leaving the file — a
+> member the old counter was structurally incapable of noticing. **Its suite was blind by shape**: six
+> assertions reached that member and every one was `> 0` or `=== a sibling`, all passing at 2 as
+> readily as at 14.
+>
+> **C67 changed the code before it was written, and the red-team found it.** The N9 cap re-slices the
+> **raw** array, so a clipped response loses the line numbering an unclipped one carries — shipped
+> since Wave 4, and **no test anywhere asserted content on the clipped path** (four cases drive it;
+> all assert the boolean, `lineRange.actual.*`, or a line *count*, which is identical either way).
+> Composing `selectLines` the natural way — extract, then slice the extracted text — would have
+> **silently "fixed"** it. Mutation **M10** is the proof: that mutation is killed only by the new
+> suite. Pinned in both directions, logged and not fixed.
+>
+> **C66 is a third cross-module edge Design handed to nobody.** §5.1 gives module 6 `calculateRange`,
+> whose parameter type it gives to **module 7** — which composes 2–6 — so module 6 as specified imports
+> from the module that composes it. §4's header could truthfully say §5.1 *"names one"* because this
+> one is named nowhere. Module 6 declares the four fields it actually reads instead; **T12 must not
+> re-unify them.**
+>
+> **The sweep now derives its baseline PER CITATION, and that closes §10.12's stated limitation
+> structurally rather than by a second instrument.** The frame is a property of the citation — the
+> commit that last modified the citing line — and `git blame -L n,n` already stores it. Measured:
+> **32 of 40 rows are classified differently by a single BASE than by their own frame.** §10.12
+> recorded that a sweep *"cannot verify its own repoints"*; this one can, and it was checked as a
+> falsifiable prediction rather than asserted — pre-commit the repointed row read `SHIFTED` with the
+> fallback frame, post-commit it blames to `834f00a` and reads **STABLE**, NO-OWNER **0**.
+> **C62's null case materialized exactly as predicted**: `presentation:72` cites the constructor line
+> nobody else moves, and the sweep reports the no-owner class separately so it cannot go silent.
+>
+> **Two of fifteen mutations were not discriminating subjects, and re-measuring them is the point.**
+> M6 "survived" because `adjustRange`'s `Infinity` ternary is **dead branching** (32 pairs, 0
+> differing — **C70**, logged not fixed), and M14's branch is **unreachable in-process**. Honest
+> denominator **12**: column A kills **12 of 12**, the pre-existing suites **3 of 12** — against T10's
+> 4-of-15 miss. **This is the first Phase-3 module where the new suite is discrimination rather than
+> coverage**, and structurally so: the range functions are reachable from `handle()` only through
+> whole-file reads, so every arithmetic detail below the response surface was unpinned.
+>
+> **Each mutation column is the union of TWO processes**, because `wave-4-correctness.test.ts` — which
+> carries the N9 sensors and therefore matters most to column B — matches two of
+> `run-tests-isolated.ts`'s isolation patterns and is forked by CI. Run beside its siblings it
+> contributes **7** unrelated N4 failures; standalone it is 24p/0f. *A baseline taken in a
+> configuration CI never runs is not a baseline.*
+>
+> **Gates, all six plus both structural gates.** `lint` **0**, proven to bite on a T11 file
+> (`line-range.ts:187:7`, exit 1, restored SHA-identical). `type-check` **6/6, 0 cached** forced;
+> `build` **5/5, 0 cached** forced. `test` exit **0 on the first run** — unlike T9 and T10 — 11/11,
+> **5 cached and all five `:build`**, core `all 150 group(s)`, **unchanged for one added file**:
+> `line-range.test.ts` matches no isolation pattern and joins the mock-free batch, verified rather than
+> assumed. `test:scripts` **1114 → 1115** (the +1 is C69's sensor; a commit adding a `scripts/` test is
+> the one case where that figure must move). `test:plugins` **96**/0. `check-core-layering`:
+> **edges 977 → 978, files 912 → 914** — `read_file.ts`'s own `tools → services` goes **6 → 7** and
+> **module 6 adds zero edges, importing nothing at all** (module 1's property, asserted by an AST walk
+> in its own suite). New module **100% lines / 100% funcs** (R-36).
+>
+> **Next action: Execute, T12 — the last task in Phase 3.** Module 7 and `handle()`'s collapse. Five
+> things it must not miss: **every span in its row is pre-T7/pre-T9/pre-T10/pre-T11** and must be
+> re-derived from the AST, as T9, T10 and T11 all had to; **it must take the 4 → 5 wiring arrow**, now
+> measured as the only remaining body (C64), or `read_file.ts` cannot reach maximal 0 and RFS-01 AC-1
+> cannot read `0 of 30`; the C59 backlog attributes **T12 29** with a frame per row, plus the **nine
+> stale `:NNN` in `test()` TITLE strings** T8b deliberately left; **do not re-unify `LineRangeRequest`
+> with `ReadFileParams`** (C66), which would recreate the 6 → 7 edge; and `handle()` must go
+> **165 → ~15** against a ceiling of 120, with `read_file.ts` to **≤ 125** but **not below ~100**
+> (R-30 — a materially smaller file means the schema was altered).
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.

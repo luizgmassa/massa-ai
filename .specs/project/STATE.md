@@ -572,15 +572,46 @@ all state came from `.specs/` and source reads.
   the file and hidden it. Rewritten onto real temp files with the rewrite-and-re-read observation —
   **154 pass / 0 fail** in one process. *A global module mock is measured cross-contamination, not a
   style question.*
+- **T11 DONE — `834f00a`.** Module 6 out: `services/file-read/line-range.ts` + its suite.
+  `read_file.ts` **392 → 315**; `check-tools-thin` **5/6/0/175 → 1/1/0/165** — **`handle()` moves off
+  175 for the first time since T5**, and the one surviving body IS C64's wiring arrow, so the whole
+  remaining distance to `0 of 30` is T12's. `2 of 30` holds. **Five new plan defects (C66–C70), running
+  total seventy-five.** Record is `tasks.md` §10.13. Write set **8**, from two user decisions —
+  `spec.md` (**C68**) and `check-tools-thin.ts` + its suite (**C69**); N was *resolved* at 2, not grown.
+- **C69 is the one not to skip: a shipped gate's population counter was pinned at 2.**
+  `forEachChild(() => membersExamined++)` short-circuits — `forEachChild` halts on a truthy return and
+  post-increment returns the pre-value. Never moved a verdict; falsified both sentences the file states
+  about the field and RFS-01 AC-1's own property. Fixed **with the recalibration recorded**: same tree
+  reads `read_file.ts` **16 → 28**, repo total **215 → 419**, so T5's 224 / T7's 223 / T9's 221 /
+  T10's 215 all mean `2 + members`. Its suite had six assertions on that member, all shape assertions,
+  all blind. *This task is the proof it is not cosmetic*: the member delta reads −3 on the old counter
+  and −4 on the fixed one, the fourth being `interface ReadRange` leaving.
+- **C67 changed the code before it was written.** The N9 cap re-slices the **raw** array, so a clipped
+  response loses the line numbering an unclipped one carries — and no test anywhere asserted content on
+  that path. The natural composition would have silently "fixed" it; mutation **M10** is killed only by
+  the new suite. Pinned, logged, not fixed. **C66**: `design.md` §5.1 makes module 6 import from module
+  7, which composes it — a third cross-module edge Design handed to nobody. **C70**: `adjustRange`'s
+  `Infinity` ternary is dead branching.
+- **The sweep now derives its baseline PER CITATION** (`git blame` on the citing line), which closes
+  §10.12's *"cannot verify its own repoints"* structurally. **32 of 40 rows** classify differently
+  under one BASE. Checked as a falsifiable prediction: pre-commit the repointed row read SHIFTED,
+  post-commit it reads **STABLE**, NO-OWNER **0**. C62's null case materialized exactly as predicted.
+- **Gates.** `lint` **0**, proven to bite on a T11 file. `type-check` **6/6**, `build` **5/5**, both 0
+  cached forced. `test` exit **0 on the first run**, 11/11, 5 cached all `:build`, core `all 150
+  group(s)` — **unchanged for one added file**, verified: `line-range.test.ts` matches no isolation
+  pattern. `test:scripts` **1114 → 1115** (the +1 is C69's sensor). `test:plugins` **96**/0.
+  `check-core-layering` **edges 977 → 978, files 912 → 914**; module 6 adds **zero** edges, importing
+  nothing at all. New module **100% lines / funcs**. Discrimination: 15 mutations, M6 **equivalent**
+  and M14 **unreachable**, so the honest denominator is **12** — A kills 12/12, pre-existing 3/12, the
+  first Phase-3 module where the new suite is discrimination rather than coverage.
 - ~~**Next action: Execute, T5**~~ ~~**Execute, T6**~~ ~~**Execute, T7**~~ ~~**Execute, T8**~~
-  ~~**Execute, T8b**~~ ~~**Execute, T9**~~ ~~**Execute, T10**~~ → **Next action: Execute, T11.**
-  Module 6 — `line-range.ts` (`calculateRange` + `adjustRange` + `extractLines` + `interface
-  ReadRange` + `MASSA_AI_READ_FILE_MAX_LINES` + the N9 clipping inside `handle()`). Four things not to
-  miss: §5's spans are **pre-T7, pre-T9 and now pre-T10**, so re-derive every one from the AST;
-  **C62** means a citation T11 shifts whose subject nobody later moves is **T11's**, not nobody's;
-  **C59's backlog is now T11 1 / T12 26** and the frame for each is the revision it was written
-  against, not `HEAD`; and the N9 clipping is 15 lines **inside `handle()`**, so it is the first
-  Phase-3 task that moves `handle()`'s own line count.
+  ~~**Execute, T8b**~~ ~~**Execute, T9**~~ ~~**Execute, T10**~~ ~~**Execute, T11**~~ → **Next action:
+  Execute, T12 — the last task in Phase 3.** Module 7 and `handle()`'s collapse. Five things not to
+  miss: every span in its row is **pre-T7/T9/T10/T11** and must be re-derived from the AST; **it must
+  take the 4 → 5 wiring arrow** (C64), now measured as the only remaining body, or `0 of 30` is
+  unreachable; the C59 backlog is **T12 29** with a frame per row, plus the **nine** stale `:NNN` in
+  `test()` TITLE strings T8b left; **do not re-unify `LineRangeRequest` with `ReadFileParams`** (C66);
+  and `handle()` goes **165 → ~15** with `read_file.ts` to **≤ 125 but not below ~100** (R-30).
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed
@@ -592,10 +623,10 @@ all state came from `.specs/` and source reads.
   so the `handle() ≤ 120` clause stayed red at **1 of 30** and T15 could not wire the gate into
   `ci.yml` without failing a required check. Closed by a new task **T14b**, extracting the 45-line
   managed-run lease block `:158-202`; `handle()` **128 → ~87**. Zero allowlist.
-- ~~**Six** corrections are owed to `design.md` itself~~ → ~~fourteen~~ → ~~fifteen~~ → **sixteen**
-  (`tasks.md` §8.1, task T20b), on PR-C's C18 precedent. *"Six" was last true at Design; §8.1 grew at
-  T4b, T5, T6 and again at T9.* **C28–C33** are owed to the parent `spec.md` (T20); none is written
-  there yet.
+- ~~**Six** corrections are owed to `design.md` itself~~ → ~~fourteen~~ → ~~fifteen~~ → ~~sixteen~~ →
+  **seventeen** (`tasks.md` §8.1, task T20b), on PR-C's C18 precedent. *"Six" was last true at Design;
+  §8.1 grew at T4b, T5, T6, T9 and again at T11 (**C66**).* **C28–C33** are owed to the parent
+  `spec.md` (T20); none is written there yet.
 - **C28 through C32 and the parent's stale layer figures are owed back** to
   `core-layering-god-module-split/spec.md` (RFS-05 AC-2/AC-3), landing with the work. None is
   written there yet. C29 additionally amends the parent's own `~390 of 707` Evidence row.
