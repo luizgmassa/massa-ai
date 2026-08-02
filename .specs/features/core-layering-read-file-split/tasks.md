@@ -41,13 +41,13 @@ the per-task write sets only Tasks produces. Those sets are now measured, repo-w
 | **0 — instrument before moving** | **5** | 5 | 4 new characterization suites + this document |
 | **1 — the gate** | **3** | 2 | `check-tools-thin.ts` + its unit suite + this document (T5's reading) |
 | **2 — LRU** | ~~7~~ → **9** | 2 | `services/cache/lru-evict.ts` + its unit test + **4** repointed sites + `read-file.test.ts` + **T8b's 2 comment sites** |
-| **3 — the extraction** | ~~13~~ → **14** | 12 | `read_file.ts` + **6** modules + **6** module suites + **C34's `read-file.test.ts` repoint** |
+| **3 — the extraction** | ~~13~~ → ~~14~~ → **20 so far** | 12 | `read_file.ts` + **6** modules + **6** module suites + **C34's `read-file.test.ts` repoint** + **T9's 6 citation-repoint files** (§10.11). **Still rising**: C55 makes T10, T11 and T12 re-derive their own citation counts, and none is taken yet |
 | **4 — `index_project.ts`** | **9** | 6 | 1 handler + **3** modules + 3 module suites + **2** test repoints |
 | **5 — the gate goes green** | **1** | 0 | `.github/workflows/ci.yml` |
 | **6 — the rename** | **29** | 0 | **7** `git mv` + **19** external importers + **3** prose/fixture sites |
 | **7 — the record** | **16** | 1 | RFS-04's 5 + RFS-05's 9 + `design.md` (T20b) + `validation.md` |
-| **sum** | ~~83~~ → **86** | **28** | |
-| **distinct union** | ~~78~~ → **80** | | against PR-C's planned **104** and PR-B's **37** |
+| **sum** | ~~83~~ → ~~86~~ → **92** | **28** | |
+| **distinct union** | ~~78~~ → **80** | | **unchanged by T9** — all 6 files it added to Phase 3 are already in the set, written by Phases 0–2. Against PR-C's planned **104** and PR-B's **37** |
 
 **Both figures are corrected at T4b (§10.5), and neither correction is T4b's own work** — they are
 the two amendments §10 recorded without carrying back into this table. **C35** minted T8b with two
@@ -57,13 +57,17 @@ the union by 2 — C34's file is already inside the distinct set, and what it ad
 overlap rather than a seventy-ninth file. *An execute-time amendment that adds a file is a claim
 about the planning table, and nothing was watching that table.*
 
-**The phases are not disjoint, and the sum is not the review surface.** Measured: ~~**5**~~ → **6**
-files are touched by two phases each, which is what takes ~~83 to 78~~ → **86 to 80**.
+**The phases are not disjoint, and the sum is not the review surface.** Measured: ~~**5**~~ → ~~**6**~~
+→ **12** files are touched by two phases each, which is what takes ~~83 to 78~~ → ~~86 to 80~~ →
+**92 to 80**. *The table sums to its own total: 92 − 80 = 12, and the overlap rows below enumerate
+exactly 12 files.*
 
 | overlap | files |
 | --- | --- |
 | Phase 0 ∩ Phase 1 (**1**) | **this document** — created at Phase 0, and T5 writes the frozen reading into it. Reported by the Plan Challenge gate (§8, evidence finding 2); the first draft's per-phase rows omitted it and it self-cancelled in the union, which is how it survived a check that only verified the total |
-| Phase 2 ∩ Phase 3 (~~**1**~~ → **2**) | `packages/core/src/tools/read_file.ts` — the LRU repoint, then the extraction; and **`read-file.test.ts`** — T8's eviction repoint, then **C34**'s undefined-metadata repoint at T10 |
+| Phase 2 ∩ Phase 3 (~~**1**~~ → ~~**2**~~ → **3**) | `packages/core/src/tools/read_file.ts` — the LRU repoint, then the extraction; **`read-file.test.ts`** — T8's eviction repoint, then **C53**'s at T9 and **C34**'s at T10; and **`services/cache/lru-evict.ts`** — written at T6, its own site table repointed at T9 |
+| Phase 0 ∩ Phase 3 (**3**) | `read-file-containment-shapes.test.ts`, `read-file-project-root-rename-pin.test.ts`, `lru-eviction-characterization.test.ts` — **added at T9** (§10.11). All three are Phase-0 suites whose comments cite spans T9 relocates; the third is RFS-02 AC-1's own main subject, which **C56 recorded as unchanged** and **C58** falsifies |
+| Phase 1 ∩ Phase 3 (**2**) | `scripts/check-tools-thin.ts` and its unit suite — **added at T9**. The gate's own docblock cited the `eventBus.subscribe` arrow it measures, and T9 moves that arrow out of `tools/` altogether (**C57**) |
 | Phase 6 ∩ Phase 7 (**3**) | `scripts/check-coverage.ts`, `scripts/__tests__/check-coverage.test.ts`, `CLAUDE.md` |
 | Phase 6 ∩ Phases 0–5 | **none** — measured, and it is what made Phase 6 the cut candidate |
 
@@ -3169,5 +3173,15 @@ prover was in fact run against all six citation diffs for this task.
    **stderr on success as well as failure** — every baseline read "did not load". It **refused rather
    than reporting a table**, which is the property T1 added for exactly this reason: had it defaulted
    to *"no match → treat as pass"*, all thirteen rows would have read PASS.
+6. **A second instrument defect, and it only became visible after the commit.**
+   `t9-citation-sweep.ts` took its pre-change baseline as `HEAD`. That is correct while the work is
+   uncommitted and **silently wrong the moment it lands**: `HEAD` becomes the post-T9 tree, `pre`
+   equals `now`, and the sweep reports **moved-out 0, SHIFTED 0, stable 39** — *"nothing ever
+   moved"* — which is indistinguishable from a clean result and would have made §10.11's own figures
+   unreproducible for any later reader. Fixed by taking the ref as an argument and **refusing without
+   one** rather than defaulting. Re-run as `bun t9-citation-sweep.ts 5fb88fd^` it reproduces this
+   section exactly: **moved-out 0, SHIFTED 27, stable 5, ambiguous 9, adjudicated 2**. *A
+   before-baseline must not read a moving reference — the same rule the frozen base (RFS-01 AC-3)
+   exists to enforce on the subject, applied to the instrument.*
 
 **Running total: sixty-four plan defects.**

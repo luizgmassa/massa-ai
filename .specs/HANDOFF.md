@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — Phase 2 COMPLETE, T8b done**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — Phase 3 OPEN, T9 done**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -33,9 +33,11 @@
 > **Do not re-take** §4's two threading decisions; §4.2's rejected option is rejected for a subtler
 > reason than the obvious one, and the obvious one does not survive measurement.
 >
-> ~~**Six** corrections are owed to `design.md` itself~~ → ~~fourteen~~ → **fifteen** (§8.1 → task
-> **T20b**, PR-C's C18 precedent), and **C28–C33** to the parent `spec.md` (T20). None is written in
-> either yet. *"Six" was last true at Design; §8.1 grew at T4b, again at T5, and again at T6.*
+> ~~**Six** corrections are owed to `design.md` itself~~ → ~~fourteen~~ → ~~fifteen~~ → **sixteen**
+> (§8.1 → task **T20b**, PR-C's C18 precedent), and **C28–C33** to the parent `spec.md` (T20). None is
+> written in either yet. *"Six" was last true at Design; §8.1 grew at T4b, again at T5, again at T6,
+> and again at T9 — row 16 is §3.2's "20 construction sites", measured **41**, a figure true when
+> Design wrote it and falsified by PR-D's own Phase 0 suites.*
 >
 > ~~**Next action: Execute, T1.**~~ **T1 DONE — `d0fbc92`**, and the Tasks work is committed as
 > `4f1e8ad`. **Its whole record is `tasks.md` §10.1** — three new plan defects (**C34–C36**, the
@@ -539,12 +541,81 @@
 > verifier that only inspects the diff cannot see an omission: reverting one citation to its stale
 > value read PASS until unchanged lines were paired `N → N`.*
 >
-> **Next action: Execute, T9 — Phase 3 opens.** Two things a T9 executor must not miss, both added
-> after T9's row was written: **`+ 1 test repoint`** (C53, §10.9 — this task takes `projectRootCache`
-> *and* the `eventBus` subscription, so T8's `indexing:started` sensor loses its subject here, not at
-> T10), and **`+ N citation repoints`** (C55, §10.10 — re-run the sweep, do not inherit T8b's count).
-> **T9 before T10** (§6 item 6): module 2 calls module 3 at `:373` and `:415`, so extracting the
-> containment module without its root-cache dependency leaves a commit that does not compile.
+> ~~**Next action: Execute, T9 — Phase 3 opens.**~~ **T9 DONE — `5fb88fd`. Phase 3 is open.**
+> **RFS-06 AC-1 closes**, GMS-05 AC-3 is satisfied for the C53 repoint, and RFS-03 AC-1/AC-2 hold.
+> Its record is `tasks.md` §10.11 — the AST-derived span table, two author-level decisions with their
+> rejected options, a 13-row two-column discrimination table, and **three new plan defects
+> (C57–C59), running total sixty-four**. Not restated here.
+>
+> **The write set grew from 8 files to 12, and that was a user decision.** `read_file.ts` **715 →
+> 590**; `services/file-read/{path-containment,project-root-cache}.ts` plus their two suites are new.
+> **Not one span in §5's T9 row matches the tree** — the row is pre-T7 numbering throughout, so every
+> span was re-derived from the AST and anchor-verified rather than read off the plan. The 2→3 edge is
+> at `:374`/`:416`, not the row's `:373`/`:415`.
+>
+> **C57 is the one a resumer must not skip: the sweep's SHAPE, not its count, is what kept going
+> stale.** C54 took the **explicit** `<file>:NNN` sweep repo-wide over 892 files and left its sibling
+> hand-scoped — `t8b-phase0-citation-census.ts` reads bare `:NNN` from a hard-coded three-carrier
+> array — and **no sweep on this feature has ever looked at by-FILE or by-IDENTIFIER claims at all**.
+> Proven by patching the subject predicate and diffing the counts, because a widening that cannot
+> match is a no-op that reads exactly like a clean sweep: header-rule **3** citations in 1 file →
+> anywhere-rule **5** in 3 files → adding `ReadFileTool` **5** in 3 files (saturated). Four measured
+> instances, the sharpest being **`scripts/check-tools-thin.ts:103` — the gate's own docblock** — which
+> has read *"the `eventBus.subscribe` arrow at `:167-171`"* since **T7** moved it to `:168-172`. It was
+> correct when the gate was authored (`180f7d2` precedes `ea59b04`) and T8b's sweep could not see it.
+> Also two citations **into** `read-file.test.ts` that T8 orphaned — one naming four private members
+> where T8's own repoint left two — and one **semantic inversion**, the pin suite citing
+> `production-wiring.ts` as *giving* a reason that comment now explicitly disavows.
+>
+> **C58 and C59 are both live for T10–T12.** **C58**: C56's *"Note what does NOT change"* exempted
+> `lru-eviction-characterization.test.ts` — RFS-02 AC-1's own main subject — on the true premise that
+> it carries zero *line* citations. It carries **two by-FILE claims** T9 relocates, so it is edited
+> after all; C56's **amendment** covers that and only its note is wrong. **C59**: T9 moves 6 spans and
+> **shifts 27 further citations** by removing 122 lines, a class C55 does not assign — it assigns by
+> *subject moved*, silent on *subject shifted*. Every one of the 27 names code T10, T11 or T12
+> relocates, so renumbering at T9 buys a third falsification (T8b's own reason for de-numbering
+> `read_file.ts:484`). Left to the owning task per C55 as written, and **recorded with its size so a
+> verifier re-running the sweep can tell a scheduled transient from a defect.** Post-repoint the sweep
+> reads **moved-out 0**.
+>
+> **The result a resumer should carry forward is column B, and which two mutations it misses.** Column
+> B was re-chosen as *the pre-existing suites with only the C53 repoint applied* — what the repository
+> would still catch if T9 had extracted and repointed but written no new tests — because R-36 forces
+> two new module suites into existence and R-26 warns that is how shallow tests get written. **B
+> catches 10 of 12.** On the extraction's main risk surface the new suites add **coverage, not
+> discrimination**. The two they alone catch are both `getProjectRoot` **failure branches** — a
+> throwing lookup and a `project_path`-less workspace — which every pre-existing suite stubs away by
+> construction. *A module suite earns its place at the branches its callers cannot reach, and here
+> that is exactly two of thirteen.*
+>
+> **Gates, all six plus both structural gates.** `lint` **0**, proven to bite on a T9 file
+> (`project-root-cache.ts:81:7`, exit 1, restored SHA-identical). `type-check` **6/6, 0 cached**
+> forced; `build` **5/5, 0 cached** forced. `test` exit **0** warm, 11/11, **5 cached and all five
+> `:build`**, core `all 149 group(s)` (147 → 149). `test:scripts` **1114**/0 across 49.
+> `test:plugins` **96**/0. `check-core-layering`: **edges 969 → 973, files 904 → 908** — and
+> `read_file.ts`'s own edge count is unchanged, having traded `event-bus`/`workspace-manager` for the
+> two `file-read/` modules. `check-tools-thin`: **`2 of 30` HOLDS** — a drop to `1 of 30` would mean
+> `read_file.ts` went green four phases early — members **224 → 221**, `read_file.ts`
+> **13/17/2/175 → 9/10/1/175**, `handle()` **unchanged at 175** because both call sites stay one line.
+> Both new modules **100% lines / 100% funcs** (R-36). **§3.1's guarantee that the population is
+> unchanged *between T5 and T9* expires here by design.**
+>
+> **`bun run test` exited 1 on its first run and it is not T9's.** `apps/mcp-client`
+> `embedded-api-client-endpoints.test.ts` → *"POST web/fetch_and_index"* at **22031 ms**, the class
+> `CLAUDE.md` documents for that exact file. Measured: `apps/mcp-client/` **zero-diff against `main`**,
+> the file names nothing T9 touched, and standalone it is **95p/0f under BOTH configs** — **3.96 s**
+> empty `XDG_CONFIG_HOME` against **17.82 s** real, a 4.5× live-provider penalty. Both readings kept.
+>
+> **Next action: Execute, T10.** Modules 4 and 5 — `file-content-cache.ts` (`readFileWithCache` +
+> `fileCache` + `CACHE_TTL` + `FILE_CACHE_MAX_ENTRIES` + `interface CachedFile`) and `file-metadata.ts`
+> (`extractMetadata` + `detectLanguage` + `extractImports` + `interface FileMetadata`). **The 4→5 edge
+> is a callback — `tasks.md` §4.1, already decided, do not re-take it.** Four things a T10 executor
+> must not miss: §5's spans are **pre-T7 and now also pre-T9**, so re-derive every one from the AST
+> rather than reading the row; **C34's `read-file.test.ts` repoint** is T10's (`extractMetadata` +
+> `fileCache`, and the cache-key JSON hardcoded at that describe); the `evictOldest` delegate loses its
+> **last** call site here, after which nothing calls it and **T12 deletes it**; and **C59's 27 shifted
+> citations plus 9 ambiguous ones are partly T10's** — `:518-580`, `:645-681` and `:70` are its spans,
+> and the ambiguous ones need per-case adjudication because their cited text now occurs 2–3 times.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
