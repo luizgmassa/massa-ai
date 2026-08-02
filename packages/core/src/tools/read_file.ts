@@ -9,14 +9,14 @@
  * - Language detection
  */
 
-import { IToolHandler, ToolResponse, estimateTokens, sanitizeFilePath } from "@massa-ai/shared";
+import { IToolHandler, ToolResponse, estimateTokens } from "@massa-ai/shared";
 import { logger } from "@massa-ai/shared";
 import { CodeCompressor } from "../services/compression/code-compressor.js";
 import { serializeToolResponse } from "./serialize.js";
 import { evictOldest as evictOldestShared } from "../services/cache/lru-evict.js";
-import { eventBus } from "../services/events/event-bus.js";
+import { PathContainment } from "../services/file-read/path-containment.js";
+import { ProjectRootCache } from "../services/file-read/project-root-cache.js";
 import { SymbolGraphService } from "../services/symbol/symbol-graph.service.js";
-import { workspaceManager } from "../services/workspace/workspace-manager.js";
 import fs from "fs/promises";
 import path from "path";
 
@@ -143,10 +143,10 @@ export class ReadFileTool implements IToolHandler {
 
   private compressor: CodeCompressor;
   private symbolGraph?: SymbolGraphService;
+  private projectRoots: ProjectRootCache;
+  private pathContainment: PathContainment;
   private fileCache: Map<string, CachedFile> = new Map();
-  private projectRootCache: Map<string, string> = new Map();
   private readonly CACHE_TTL = 60000; // 1 minute
-  private readonly ROOT_CACHE_TTL = 300000; // 5 minutes
   /**
    * Maximum entries retained in each in-memory cache. Without a cap, an
    * adversarial caller cycling distinct cache keys grows the map for the
@@ -160,16 +160,12 @@ export class ReadFileTool implements IToolHandler {
     this.compressor = new CodeCompressor();
     this.symbolGraph = symbolGraph;
 
-    // The API keeps one ReadFileTool instance for the process lifetime. A
-    // guarded reset/reindex may legitimately move the same projectId to a new
-    // canonical root, so refresh the cached root as soon as ETL announces the
-    // new run. Without this, relative reads keep resolving against the prior
-    // workspace path until the API restarts.
-    eventBus.subscribe("indexing:started", ({ projectId, projectPath }) => {
-      this.projectRootCache.delete(projectId);
-      this.evictOldest(this.projectRootCache);
-      this.projectRootCache.set(projectId, projectPath);
-    });
+    // One ProjectRootCache PER TOOL, constructed here rather than shared at
+    // module scope: every instance owned its own root Map before the extraction,
+    // and its constructor is what subscribes to `indexing:started`, so the
+    // subscription count and lifetime are unchanged by the move.
+    this.projectRoots = new ProjectRootCache();
+    this.pathContainment = new PathContainment(this.projectRoots);
   }
 
   async handle(params: unknown): Promise<ToolResponse> {
@@ -186,7 +182,7 @@ export class ReadFileTool implements IToolHandler {
       // Returns null when the path is ambiguous (relative + no projectId) — we must
       // NOT guess against process.cwd(), so surface a distinct error here rather
       // than letting the generic "Failed to read file" catch swallow it.
-      const resolved = await this.resolveFilePath(p.filePath, p.projectId);
+      const resolved = await this.pathContainment.resolveFilePath(p.filePath, p.projectId);
       if (resolved === null) {
         return {
           success: false,
@@ -204,7 +200,7 @@ export class ReadFileTool implements IToolHandler {
       // root + cwd are ALWAYS allowed. sanitizeFilePath strips ../ traversal
       // tokens before the containment check so a crafted relative path can't
       // escape. Does not regress the 500-line cap (N9) — applied later.
-      const containment = await this.checkPathContainment(filePath, p.projectId);
+      const containment = await this.pathContainment.checkPathContainment(filePath, p.projectId);
       if (!containment.allowed) {
         return {
           success: false,
@@ -349,128 +345,6 @@ export class ReadFileTool implements IToolHandler {
   }
 
   /**
-   * Resolve a filePath to an absolute path.
-   *
-   * Resolution rules:
-   *  - Absolute path → returned verbatim (still normalized via path.resolve, but base-independent).
-   *  - `projectId` present → resolved against the workspace `project_path`. If the
-   *    workspace lookup fails (no root), this returns null (ambiguous).
-   *  - No `projectId` AND relative `filePath` → returns null. We deliberately do NOT
-   *    fall back to `path.resolve(filePath)` against process.cwd(), because a
- relative
-   *    path arriving without a projectId is ambiguous and historically read from
-   *    the
-   *    server's cwd (COVERAGE finding #3). Callers must provide an absolute path or
-   *    a projectId.
-   *
-   * Returns null to signal an ambiguous/unsatisfiable path so `handle()` can map it
-   * to a distinct, clear error instead of the generic "Failed to read file" catch.
-   */
-  private async resolveFilePath(filePath: string, projectId?: string): Promise<string | null> {
-    if (path.isAbsolute(filePath)) {
-      return path.resolve(filePath);
-    }
-    if (projectId) {
-      const root = await this.getProjectRoot(projectId);
-      if (root) {
-        // Wave 5 FR-12: strip ../ traversal tokens from relative paths before
-        // resolving under the project root. sanitizeFilePath removes ../ and
-        // ..\ segments so a crafted relative path can't escape the root.
-        const cleaned = sanitizeFilePath(filePath);
-        return path.resolve(root, cleaned);
-      }
-      return null;
-    }
-    // Relative path with no projectId — do not guess against cwd.
-    return null;
-  }
-
-  /**
-   * Wave 5 FR-12 / AD-W5-006: filesystem-side path containment.
-   *
-   * An absolute path is allowed iff it resolves under one of:
-   *   1. the project root (workspace lookup for projectId, when provided)
-   *   2. process.cwd()
-   *   3. an entry in MASSA_AI_READ_FILE_ROOTS (colon-separated env)
-   *
-   * Project root + cwd are ALWAYS allowed. Outside → teaching error listing
-   * valid roots only (no host path enumeration). The check uses path.relative
-   * to detect traversal out of a root (a result starting with ".." or an
-   * absolute path on another drive means outside).
-   *
-   * The env allowlist is read at CALL TIME (not config-load time) so test
-   * suites and runtime operators can set it without restarting the process.
-   * config.readFile.extraRoots mirrors the same env for introspection.
-   *
-   * Returns { allowed: true } on success, or { allowed: false, error } with a
-   * Wave-4-N6-style teaching error listing the valid roots.
-   */
-  private async checkPathContainment(
-    absoluteFilePath: string,
-    projectId?: string,
-  ): Promise<{ allowed: true } | { allowed: false; error: string }> {
-    // Collect valid roots. Project root is included only when actually
-    // resolvable (workspace lookup succeeds); cwd is always available.
-    const roots: string[] = [];
-    if (projectId) {
-      const root = await this.getProjectRoot(projectId);
-      if (root) roots.push(path.resolve(root));
-    }
-    roots.push(path.resolve(process.cwd()));
-    // Read the env allowlist at call time so tests/operators can set it
-    // without restarting the process. Colon-separated (POSIX-style).
-    const envRoots = (process.env.MASSA_AI_READ_FILE_ROOTS ?? "")
-      .split(":")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    for (const extra of envRoots) {
-      roots.push(path.resolve(extra));
-    }
-
-    const target = path.resolve(absoluteFilePath);
-    for (const root of roots) {
-      const rel = path.relative(root, target);
-      // Inside iff rel does not start with ".." and is not absolute (cross-drive).
-      if (rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel)) {
-        return { allowed: true };
-      }
-      // Exact root match (rel === "") is also inside.
-      if (rel === "") return { allowed: true };
-    }
-    // Outside all roots → teaching error listing valid roots only.
-    const validRootsList = roots.map((r) => `  - ${r}`).join("\n");
-    return {
-      allowed: false,
-      error:
-        `read_file path containment: "${target}" is outside the allowed roots.\n` +
-        `Valid roots (project root + cwd + MASSA_AI_READ_FILE_ROOTS):\n${validRootsList}\n` +
-        `Provide a filePath that resolves under one of these roots.`,
-    };
-  }
-
-  private async getProjectRoot(projectId: string): Promise<string | null> {
-    const cached = this.projectRootCache.get(projectId);
-    if (cached !== undefined) {
-      // LRU touch: promote this key to most-recently-used.
-      this.projectRootCache.delete(projectId);
-      this.projectRootCache.set(projectId, cached);
-      return cached;
-    }
-
-    try {
-      const workspace = await workspaceManager.getWorkspace(projectId);
-      if (workspace?.project_path) {
-        this.evictOldest(this.projectRootCache);
-        this.projectRootCache.set(projectId, workspace.project_path);
-        return workspace.project_path;
-      }
-    } catch (error) {
-      logger.warn("Failed to look up project root", { projectId, error: (error as Error).message });
-    }
-    return null;
-  }
-
-  /**
    * Evict the oldest (first-inserted) entries from a cache Map until it is
    * under FILE_CACHE_MAX_ENTRIES. Called BEFORE the new insert so the cap is
    * honored post-insert with a single iteration.
@@ -479,12 +353,13 @@ export class ReadFileTool implements IToolHandler {
    * POST-CALL BOUND rather than the cap: a pre-insert caller passes CAP - 1 to
    * reserve the slot the pending set() takes. `size > CAP - 1` and
    * `size >= CAP` are the same predicate over the integers, so the retained
-   * count at all three call sites is unchanged.
+   * count at the call site is unchanged.
    *
-   * Kept as a one-line delegate rather than inlined at its three call sites,
-   * left unnumbered because Phase 3 moves one. Deleting it would take this
-   * file from 13 maximal bodies to 12 and the gate's examined-member count
-   * from 224 to 223, before the extraction it exists to measure has started.
+   * ONE call site remains — readFileWithCache's. T9 took the other two out of
+   * this file together with projectRootCache; T10 takes this one into
+   * services/file-read/file-content-cache.ts, after which nothing calls this
+   * wrapper and T12 deletes it. Deliberately unnumbered: every line number
+   * written here has been falsified by the next task in this phase.
    */
   private evictOldest<K, V>(cache: Map<K, V>): void {
     evictOldestShared(cache, this.FILE_CACHE_MAX_ENTRIES - 1);

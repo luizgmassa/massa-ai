@@ -14,7 +14,7 @@
  * not determine the predicate, because the five sites do not share one:
  *
  *   read_file.ts   · fileCache         pre-insert   while (size >= 512)
- *   read_file.ts   · projectRootCache  pre-insert   while (size >= 512)
+ *   project-root-cache.ts (T9)         pre-insert   while (size >= 512)
  *   symbol-graph.service.ts            pre-insert   while (size >= 512)
  *   web-controller.ts                  post-insert  while (size >  512)
  *   file-filter-cache.ts               post-insert  if   (size >  50) evict-one

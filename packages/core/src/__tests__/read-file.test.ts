@@ -248,8 +248,9 @@ describe("ReadFileTool — cache key includes option flags", () => {
 
 // ── T3: fileCache LRU cap (512) + cache-hit metadata writeback ──────────────
 //
-// The fileCache and projectRootCache are bounded LRU maps mirroring
-// WebController's 512-cap pattern. On GET a key is promoted to
+// The fileCache is a bounded LRU map mirroring WebController's 512-cap
+// pattern, as was the projectRootCache T9 moved into
+// services/file-read/project-root-cache.ts. On GET a key is promoted to
 // most-recently-used (delete+set); on SET the oldest entry is evicted while
 // over the cap. Separately, a legacy cache entry with undefined metadata used
 // to re-extract on EVERY hit without persisting; it now writes back so the
@@ -322,10 +323,12 @@ describe("ReadFileTool — fileCache LRU cap + promotion", () => {
 // The case above characterizes the eviction OPERATOR. It calls it directly and
 // never drives readFileWithCache or the indexing:started subscription, so it is
 // blind to whether anything still CALLS eviction. Measured across all 92 cases
-// in the repo's six eviction suites: deleting read_file.ts's fileCache call
-// (:578 on the shipped tree) or its projectRootCache call inside the
-// indexing:started handler (:170) left 92 pass / 0 fail — no sensor anywhere.
-// The other three of the five repointed sites each had one.
+// in the repo's six eviction suites: deleting read_file.ts's fileCache call or
+// its projectRootCache call inside the indexing:started handler left
+// 92 pass / 0 fail — no sensor anywhere. The other three of the five repointed
+// sites each had one. Deliberately unnumbered: T9 moved the second of those two
+// call sites out of read_file.ts, so any line number written here is falsified
+// by the next task in this phase.
 //
 // Both cases below seed the cache to CAP through the cast and then drive the
 // PRODUCTION path once, so the only thing standing between CAP and CAP+1 is the
@@ -373,16 +376,31 @@ describe("ReadFileTool — eviction call sites are driven, not just the operator
     expect(priv.fileCache.has("seed-1")).toBe(true); // and only the oldest
   });
 
+  // T9 REPOINT (GMS-05 AC-3 — repointed, not weakened, skipped or deleted).
+  // projectRootCache, its cap and the indexing:started subscription all moved
+  // into services/file-read/project-root-cache.ts, so the reach is one hop
+  // longer and the cap is now that module's own PROJECT_ROOT_CACHE_MAX_ENTRIES
+  // rather than the file CONTENT cache's FILE_CACHE_MAX_ENTRIES. Both were 512
+  // and neither ever read the other's value, so the bound is unchanged.
+  //
+  // It stays HERE, and is not made redundant by project-root-cache.test.ts's
+  // own eviction case, because the two assert different things: that suite
+  // asserts the module evicts, this one asserts ReadFileTool still WIRES a live
+  // subscription whose eviction call is reachable from a constructed tool. Drop
+  // this case and the module could be correct while nothing constructed it.
   test("one indexing:started past a full projectRootCache evicts — the subscription's call site is live", () => {
     const tool = new ReadFileTool();
     const priv = tool as unknown as {
-      projectRootCache: Map<string, string>;
-      FILE_CACHE_MAX_ENTRIES: number;
+      projectRoots: {
+        projectRootCache: Map<string, string>;
+        PROJECT_ROOT_CACHE_MAX_ENTRIES: number;
+      };
     };
-    const CAP = priv.FILE_CACHE_MAX_ENTRIES;
+    const roots = priv.projectRoots.projectRootCache;
+    const CAP = priv.projectRoots.PROJECT_ROOT_CACHE_MAX_ENTRIES;
 
-    for (let i = 0; i < CAP; i++) priv.projectRootCache.set(`seeded-root-${i}`, `/tmp/root-${i}`);
-    expect(priv.projectRootCache.size).toBe(CAP);
+    for (let i = 0; i < CAP; i++) roots.set(`seeded-root-${i}`, `/tmp/root-${i}`);
+    expect(roots.size).toBe(CAP);
 
     // The handler deletes the incoming projectId BEFORE evicting. If that id
     // were already cached, the delete alone would free a slot and the assertion
@@ -391,7 +409,7 @@ describe("ReadFileTool — eviction call sites are driven, not just the operator
     // therefore drawn from a namespace the seed loop cannot produce, and the
     // precondition is asserted rather than assumed.
     const freshProjectId = "fresh-project-outside-seed-namespace";
-    expect(priv.projectRootCache.has(freshProjectId)).toBe(false);
+    expect(roots.has(freshProjectId)).toBe(false);
 
     eventBus.publish("indexing:started", {
       jobId: "job-cap-boundary",
@@ -400,10 +418,10 @@ describe("ReadFileTool — eviction call sites are driven, not just the operator
     });
 
     // Exact, not an upper bound: without the eviction call this is CAP + 1.
-    expect(priv.projectRootCache.size).toBe(CAP);
-    expect(priv.projectRootCache.has("seeded-root-0")).toBe(false); // oldest evicted
-    expect(priv.projectRootCache.has("seeded-root-1")).toBe(true); // and only the oldest
-    expect(priv.projectRootCache.get(freshProjectId)).toBe("/tmp/fresh-root");
+    expect(roots.size).toBe(CAP);
+    expect(roots.has("seeded-root-0")).toBe(false); // oldest evicted
+    expect(roots.has("seeded-root-1")).toBe(true); // and only the oldest
+    expect(roots.get(freshProjectId)).toBe("/tmp/fresh-root");
   });
 });
 

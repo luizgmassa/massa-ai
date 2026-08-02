@@ -1,6 +1,9 @@
 /**
  * RFS-06 AC-1, AC-2, AC-3 — the three containment mutation shapes, instrumented
- * BEFORE `checkPathContainment` moves.
+ * against the pre-extraction code, BEFORE `checkPathContainment` moved. T9 has
+ * since moved it to `services/file-read/path-containment.ts`; the assertions
+ * below are unchanged and only these citations were repointed (RFS-06 AC-1 as
+ * amended by C56 — byte-identity with comments stripped).
  *
  * `spec.md` §5 RFS-06 measured three shapes a mechanical extraction plausibly
  * introduces and that ALL SEVEN existing tests in `read-file-containment.test.ts`
@@ -11,20 +14,20 @@
  * after the move.
  *
  * (a) `rel.startsWith("..")` narrowed to `rel.startsWith("../")`
- *     (`read_file.ts:434`). Measured: `path.relative(root, target)` is the bare
+ *     (`path-containment.ts:115`). Measured: `path.relative(root, target)` is the bare
  *     string ".." for EXACTLY ONE target — `path.dirname(root)`. A file in the
  *     parent gives "../secret.txt" and a prefix-named sibling gives
  *     "../ws-evil/f.txt"; both are rejected under either reading. The existing
  *     suite's only outside fixture is a sibling directory, and the string
  *     `dirname` does not occur in it.
  *
- * (b) the env allowlist read hoisted from CALL TIME (`read_file.ts:420-425`,
- *     the property `:401-403` asserts in a comment and nothing else witnesses)
+ * (b) the env allowlist read hoisted from CALL TIME (`path-containment.ts:101-106`,
+ *     the property `path-containment.ts:82-84` asserts in a comment and nothing else witnesses)
  *     to construction time. All 7 existing tests construct a FRESH tool after
  *     any env mutation, so a hoist is invisible to every one of them.
  *
  * (c) `sanitizeFilePath` dropped from `resolveFilePath`'s projectId branch
- *     (`read_file.ts:379`). The existing test at `read-file-containment.test.ts:153-173`
+ *     (`path-containment.ts:60`). The existing test at `read-file-containment.test.ts:153-173`
  *     is ambiguous BY ITS OWN COMMENT — it accepts "either ENOENT ... or a
  *     containment error", so it cannot tell which of two independent defenses
  *     caught the traversal, and dropping one silently loses defence-in-depth.
@@ -33,7 +36,7 @@
  * `spec.md` §5 RFS-06 row 3 and `tasks.md` §5 T2(c) both prescribe this test as
  * *"assert the returned `absolutePath` carries no literal `..` segment"*.
  * THAT ASSERTION IS VACUOUS AND IS DELIBERATELY NOT WRITTEN HERE. `resolveFilePath`
- * has exactly two non-null exits (`:371` and `:380`) and both return
+ * has exactly two non-null exits (`path-containment.ts:52` and `:61`) and both return
  * `path.resolve(...)`, which normalizes `..` away unconditionally — measured over
  * nine adversarial inputs including over-traversal and `....//`, every result
  * carried zero `..` segments INCLUDING the ones that resolved outside the root.
@@ -258,7 +261,7 @@ describe("RFS-06 AC-1 shape (c) — a traversal token cannot move the resolution
       const data = res.data as { absolutePath: string; content: string };
 
       // The three assertions that flip when sanitizeFilePath is dropped from
-      // read_file.ts:379. NOT the literal-".." assertion the criterion
+      // path-containment.ts:60. NOT the literal-".." assertion the criterion
       // prescribes — see C37 in this file's header; path.resolve normalizes it
       // away on both sides, so it can never fail.
       expect(data.absolutePath).toBe(path.resolve(c.root, "nested/sample.txt"));
@@ -310,7 +313,7 @@ describe("RFS-06 AC-2 — the teaching error's shape and its root list", () => {
       const error = res.error!;
       const target = path.resolve(a.container);
 
-      // read_file.ts:444-448, unchanged — including that the first line names
+      // path-containment.ts:125-129, unchanged — including that the first line names
       // the target and the last tells the caller what to do instead.
       const lines = error.split("\n");
       expect(lines[0]).toBe(

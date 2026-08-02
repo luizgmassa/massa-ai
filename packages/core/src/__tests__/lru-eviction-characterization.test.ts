@@ -13,10 +13,12 @@
  * Every case drives a site through a surface that SURVIVES the extraction —
  * `ReadFileTool.handle()`, `SymbolGraphService.goToDefinition()`, the
  * `WebIndexDeps` seam, `FileFilterCache.getValidFiles()`. Deliberately NOT the
- * private members `read-file.test.ts:264-299` reaches (`fileCache`,
- * `projectRootCache`, `evictOldest`, `FILE_CACHE_MAX_ENTRIES`): all four move
- * during Phases 2-3, so a test written against them cannot be both a
- * characterization and byte-identical across the move (`tasks.md` §3.5 item 3).
+ * private members `read-file.test.ts`'s own "fileCache LRU cap + promotion"
+ * describe reaches: they move during Phases 2-3, so a test written against them
+ * cannot be both a characterization and byte-identical across the move
+ * (`tasks.md` §3.5 item 3). Deliberately unnumbered and un-enumerated — T8's
+ * repoint already narrowed that cast from four members to two, and this line
+ * named all four for one task after it did.
  *
  * WHAT EACH CASE DISCRIMINATES. The five caches agree on eviction order and
  * disagree elsewhere, and a unification that flattened the differences would
@@ -25,7 +27,7 @@
  *
  *   | site                              | cap | evict     | read promotes? |
  *   | read_file.ts   · fileCache        | 512 | pre-set   | YES            |
- *   | read_file.ts   · projectRootCache | 512 | pre-set   | YES            |
+ *   | project-root-cache.ts (T9)       | 512 | pre-set   | YES            |
  *   | symbol-graph.service.ts           | 512 | pre-set   | YES            |
  *   | web-controller.ts                 | 512 | post-set  | YES            |
  *   | file-filter-cache.ts              |  50 | post-set  | NO             |
@@ -175,7 +177,8 @@ describe("LRU characterization — read_file fileCache (cap 512, promote on hit)
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Site 2 — tools/read_file.ts · projectRootCache
+// Site 2 — services/file-read/project-root-cache.ts (was tools/read_file.ts
+// until T9; still driven here through ReadFileTool.handle(), unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // Same cache mechanics, different observable: the resolved root shows up as

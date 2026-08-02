@@ -1,11 +1,13 @@
 /**
- * RFS-02 AC-4 — a PIN on `ReadFileTool.projectRootCache`, not an assertion that
+ * RFS-02 AC-4 — a PIN on the `projectRootCache` T9 moved into
+ * `services/file-read/project-root-cache.ts` (it was `ReadFileTool`s own field
+ * when this pin was written), not an assertion that
  * it is correct.
  *
  * `spec.md` §3.B measured two things about this cache and could not separate
  * their consequences by reading source:
  *
- *   1. `read_file.ts:149` declares `private readonly ROOT_CACHE_TTL = 300000`
+ *   1. `project-root-cache.ts:30` declares `private readonly ROOT_CACHE_TTL = 300000`
  *      and NOTHING READS IT. The declaration is the constant's only occurrence
  *      in the file. So the cache is LRU-bounded only, while `fileCache`'s
  *      `CACHE_TTL` really is checked at `:552`.
@@ -14,8 +16,10 @@
  *      exact same data, in a class whose own comment
  *      (`symbol-graph.service.ts:175`) cites `ReadFileTool` as the pattern it
  *      mirrors. `ReadFileTool`'s caches are deliberately absent, and
- *      `production-wiring.ts:67-68` gives the reason: *"both are TTL-bounded and
- *      self-evict."* Finding 1 makes that false for `projectRootCache`.
+ *      `production-wiring.ts:67-68` USED TO give the reason: *"both are
+ *      TTL-bounded and self-evict."* Finding 1 makes that false for
+ *      `projectRootCache`, and T8b rewrote both that comment and
+ *      `invalidator-registry.ts` to say so, citing this pin as the authority.
  *
  * Two readings survive the source: a live staleness bug, or a dead constant plus
  * a wrong comment over intended LRU-only behavior. Static reading cannot choose.
@@ -30,7 +34,8 @@
  * Taken BEFORE the extraction, against surfaces that survive it: `handle()`,
  * `goToDefinition()`, and the injectable resolver on the production registry.
  * The already-covered path — a reindex refreshing the root through the
- * `indexing:started` event — is `read-file.test.ts:120-151`; this file covers
+ * `indexing:started` event — is `read-file.test.ts`s own
+ * "resolveFilePath branches" describe; this file covers
  * the rename that does NOT reindex, which nothing covered.
  */
 
@@ -171,7 +176,7 @@ describe("RFS-02 AC-4 — CACHE_TTL is enforced and ROOT_CACHE_TTL is not", () =
     const PROJECT = "pin-ttl";
     const BASE = new Date("2026-01-01T00:00:00.000Z").getTime();
     const CACHE_TTL = 60_000; // read_file.ts:148, read at :552
-    const ROOT_CACHE_TTL = 300_000; // read_file.ts:149, read nowhere
+    const ROOT_CACHE_TTL = 300_000; // project-root-cache.ts:30, read nowhere
 
     const movable = fs.mkdtempSync(path.join(os.tmpdir(), "massa-ai-pin-ttl-"));
     fs.writeFileSync(path.join(movable, REL), "V1\n");

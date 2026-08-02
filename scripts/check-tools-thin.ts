@@ -92,16 +92,24 @@
  * Two counts are reported for clause 1 and they are different numbers:
  *
  *   - **maximal** — a body not contained in another **flagged** body. This is the
- *     frozen baseline's metric (RFS-01 AC-3). `read_file.ts` is **13**.
- *   - **raw** — every body, descending into flagged ones. `read_file.ts` is **17**.
- *     Reported alongside so a refactor that only re-nests existing arrows is
- *     visibly not a change in the thing the baseline measures.
+ *     frozen baseline's metric (RFS-01 AC-3).
+ *   - **raw** — every body, descending into flagged ones. Reported alongside so a
+ *     refactor that only re-nests existing arrows is visibly not a change in the
+ *     thing the baseline measures.
  *
- * The difference for `read_file.ts` is four nested arrows: three one-line
- * `.map`/`.filter` callbacks inside `checkPathContainment` and one inside
- * `extractLines`. The constructor is exempt from both counts, so a fifth body —
- * the `eventBus.subscribe` arrow at `:167-171` — is *maximal* rather than nested,
- * because its container is exempt and therefore never flagged.
+ * DELIBERATELY STATED WITHOUT LIVE-TREE FIGURES. This docblock used to read
+ * "`read_file.ts` is **13** … is **17**", worked through that file's four nested
+ * arrows and its constructor-exempt `eventBus.subscribe` arrow "at `:167-171`".
+ * Every one of those is falsified by the extraction this gate exists to measure:
+ * T7 shifted the arrow to `:168-172` and the citation stayed stale for four
+ * tasks, then T9 moved the arrow, `checkPathContainment` and its three nested
+ * callbacks out of the file altogether. The gate PRINTS both counts per file on
+ * every run (`-- maximal bodies N, raw M, state S, handle() H`); read them
+ * there, where they cannot go stale. The asymmetry the worked example taught —
+ * a body inside an EXEMPT container is *maximal* rather than nested, because
+ * its container is never flagged — is pinned synthetically by
+ * `__tests__/check-tools-thin.test.ts`'s "the constructor is exempt by kind"
+ * case, which no extraction can invalidate.
  *
  * Clause 3 measures the `handle` **member's full line span**, declaration line
  * through closing-brace line, inclusive. On today's corpus that is numerically

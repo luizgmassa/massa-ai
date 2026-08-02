@@ -249,9 +249,12 @@ describe("maximal vs raw — the two counts are different numbers and both are r
   });
 
   test("the constructor is exempt by kind, so a body it contains is maximal", () => {
-    // `read_file.ts`'s `eventBus.subscribe` arrow is exactly this: its container is
-    // exempt and therefore never flagged, so the arrow is maximal rather than
-    // nested. This is the asymmetry C39 was about.
+    // `read_file.ts`'s `eventBus.subscribe` arrow WAS exactly this until T9 moved
+    // it into `services/file-read/project-root-cache.ts`: its container is exempt
+    // and therefore never flagged, so the arrow is maximal rather than nested.
+    // This is the asymmetry C39 was about. The fixture below is synthetic on
+    // purpose — the live corpus no longer contains an instance, and a rule whose
+    // only witness is one file stops being tested when that file changes.
     const reading = read(`${IMPORT}export class T implements ${HANDLER_INTERFACE} {
   constructor() {
     subscribe(() => { void 0; });
