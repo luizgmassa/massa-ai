@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — Phase 2, T8 done**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — Phase 2 COMPLETE, T8b done**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -472,17 +472,79 @@
 > post-seed call it reads `FAIL 93p/1f`. *T6 recorded this for a dead anchor; here the anchor resolved
 > and the **call position** made it inert. Print the position, not just the verdict.*
 >
-> **Next action: Execute, T8b** — now **5 files, comments only** by the user's decision from four
-> options (widening T8 to 4 files, a new task T8c, and record-only all rejected; T8's write set stays
-> **1 file**). RFS-02 AC-4's two — `production-wiring.ts:67-68` and `invalidator-registry.ts:34-36`,
-> both stating the same false claim, **the named one citing the unnamed one as its authority** (C35) —
-> corrected to what T1's pin measured: `CACHE_TTL` enforced, `ROOT_CACHE_TTL` **not**, no invalidator
-> id matching `read_file`. Plus C52's three: **`read_file.ts:484` de-numbered rather than renumbered**
-> (T10 deletes `:578`'s call, so a renumber goes stale a third time), `symbol-graph.service.ts:812`
-> `:792` → **`:793`**, `file-filter-cache.ts:151` `:51-53` → **`:52-54`** — those two files are in
-> **no** Phase 3–5 write set, so a plain renumber is stable there. Then **Phase 2 entirely before
-> Phase 3** (§6 item 5): the LRU move is provable behavior-preserving only while both `read_file.ts`
-> caches are still in `read_file.ts`.
+> ~~**Next action: Execute, T8b.**~~ **T8b DONE — `38fdc52`. RFS-02 AC-4 closes, C52 closes, and
+> Phase 2 is complete.** Its record is `tasks.md` §10.10 — **three new plan defects (C54–C56), running
+> total sixty-one**, and C56 amends two criteria rather than a figure. Not restated here.
+>
+> **The write set grew twice during the task and both growths were user decisions.** It shipped
+> **8 source files + `spec.md`**, not 5. RFS-02 AC-4's two — `production-wiring.ts:67-69` and
+> `invalidator-registry.ts:34-36`, the named one citing the unnamed one as its authority (C35) — now
+> state what T1's pin measured and both cite **the pin test** rather than each other. *A comment's
+> authority should be a measurement, not another comment.* C52's three landed as planned:
+> `read_file.ts:484` **de-numbered** in four lines replacing four, `symbol-graph.service.ts:812`
+> `:792` → `:793`, `file-filter-cache.ts:151` `:51-53` → `:52-54`.
+>
+> **C54 is the one a resumer must not skip, and it is C48's sentence applied to a sweep.** C52's
+> population was **self-referential** — citations inside the four files T7 edited. But T7's `+1`
+> import insertions falsify a citation *into* those files from anywhere, so the real population is a
+> strict superset: measured over 892 tracked source files, **14 explicit cross-file citations plus a
+> bare-`:NNN` tail, 48 stale across the three Phase-0 suites, 44 naming spans Phase 3 relocates**.
+> Three **invert** rather than dangle — `read-file-project-root-rename-pin.test.ts:8`/`:173`/`:174`
+> name `read_file.ts:147`/`:148`, which on the shipped tree are the `projectRootCache` **Map** and
+> **`CACHE_TTL`**, the constant the sentence says is never read. **Decided by the user from four
+> options: fix all now.** *A population scoped to the files a commit touched is not the population
+> that commit falsified.*
+>
+> **C55 and C56 are what fixing them now costs, and both are live for Phase 3.** Fixing moves the
+> obligation rather than retiring it: Phase 3 re-falsifies **44 of the 48**, and no row owned that —
+> C48's *"a break owned by nothing"*, third occurrence. **T9, T10, T11 and T12 each gain `+ N citation
+> repoints`**, counts re-derived per task and never inherited; **T12 additionally owns the nine stale
+> `:NNN` in `test()` TITLE strings** T8b deliberately left, because a string literal is not a comment
+> and editing one makes *"comments only"* false. And C55 then falsifies **RFS-02 AC-1's and RFS-06
+> AC-1's byte-identity clause by construction** — both amended in place to **byte-identity with
+> comments stripped**, the property AC-1's own sentence says it is for, and **handed to T25 as a
+> question** alongside C37's, C41's, C48's and AC-2's.
+>
+> **`spec.md` was edited for a second reason, also a user decision, and the red-team found it before a
+> line was written.** An honest correction to `production-wiring.ts:67-69` needs six lines, not three,
+> and the growth shifts the **2** citations *below* it. Measured by content: `spec.md:158` `:91` →
+> **`:100`** and `:156` `:105` → **`:114`**, both in §3.B's evidence table, both exact beforehand.
+> `production-wiring.ts` is in no Phase 3–7 write set, so the repoint is stable. *A comment-only diff
+> moves no tokens and still moves line numbers, and here line numbers are load-bearing evidence.*
+>
+> **The result a resumer should carry forward: the repoint is content-anchored, never arithmetic.**
+> For each cited pre-T7 number the instrument reads the **text** at that line in `ea59b04^` and finds
+> that exact text on the shipped tree — deriving *"+1 below the import, +8 below `:474`"* is the
+> arithmetic that produced C50 and then C52. Verified by a round trip that is **not** the proposal
+> generator re-run: **49 pairs checked by content, 0 mismatch**, 274 comment lines deliberately
+> unchanged, 8 foreign citations skipped **by name**, and four bare `:NNN` whose subject is
+> `e2e/08.search.test.ts` or `routes/file.test.ts` adjudicated by reading the block and left untouched.
+>
+> **Gates, all six plus both structural gates.** `lint` **0**, proven to bite on a T8b file
+> (`read-file-presentation-characterization.test.ts:412:7`, exit 1, restored SHA-identical).
+> `type-check` **6/6, 0 cached** forced; `build` **5/5, 0 cached** forced. `test` exit **0**, 11/11,
+> **5 cached and all five `:build`**, clean on the **first** run. `test:scripts` **1114**/0 across 49.
+> `test:plugins` **96**/0. `check-core-layering`: **edges 969 → 969, files 904 → 904, both unchanged**
+> — T8b changes no import at all. **`check-tools-thin` byte-identical to the pre-edit run, spans
+> included**, which is strictly stronger than T7's and T8's counts-only claim and is available only
+> because the `read_file.ts` edit was made **line-neutral on purpose** (715 → 715).
+>
+> **Three instrument defects in one task, none found by a green run.** A raw `ts.createScanner` cannot
+> re-scan template spans without a parser; at the first backtick in `read_file.ts` it swallowed the
+> file's remainder into one "token" **including the comments it was meant to be blind to**, and called
+> a comment-only diff NOT COMMENT-ONLY — **after passing its own observed red**, which had simply
+> differed before reaching a template literal. A `/g` `RegExp.test` skipped lines through `lastIndex`.
+> A `\b`-anchored negative lookahead matched mid-token and classified `-graph.service.ts:174` as a
+> foreign file. *A red proves a checker can fire, not that it fires for the right reason — and a
+> verifier that only inspects the diff cannot see an omission: reverting one citation to its stale
+> value read PASS until unchanged lines were paired `N → N`.*
+>
+> **Next action: Execute, T9 — Phase 3 opens.** Two things a T9 executor must not miss, both added
+> after T9's row was written: **`+ 1 test repoint`** (C53, §10.9 — this task takes `projectRootCache`
+> *and* the `eventBus` subscription, so T8's `indexing:started` sensor loses its subject here, not at
+> T10), and **`+ N citation repoints`** (C55, §10.10 — re-run the sweep, do not inherit T8b's count).
+> **T9 before T10** (§6 item 6): module 2 calls module 3 at `:373` and `:415`, so extracting the
+> containment module without its root-cache dependency leaves a commit that does not compile.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
