@@ -1,11 +1,20 @@
 /**
  * index_project tool coverage tests — covers canonicalizeProjectRoot,
  * assertProjectRootReuse, and IndexProjectTool handler error paths.
- * Mocks EtlPipeline and ContextualSearchRLM to test the handler + executeIndexing.
+ * Mocks EtlPipeline and ContextualSearchRLM to test the handler plus the
+ * background `executeIndexing`, which since PR-D T13 lives in
+ * `services/indexing/execute-indexing.ts` rather than in the tool. The
+ * EtlPipeline mock below still reaches it: `mock.module` registers by RESOLVED
+ * path, so this file's `"../services/etl/pipeline.js"` and that module's own
+ * `"../etl/pipeline.js"` are the same registration.
+ *
+ * This file asserts only `handle()`'s SYNCHRONOUS return; the background
+ * contract is pinned by `execute-indexing.test.ts`.
  */
 
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { realpathSync } from "node:fs";
+import { indexJobTracker } from "../services/jobs/index-job-tracker.js";
 import {
   canonicalizeProjectRoot,
   assertProjectRootReuse,
@@ -15,10 +24,15 @@ import {
 let etlRunResult: any = null;
 let etlRunShouldThrow = false;
 
+// Every request the pipeline receives, recorded — this is how the handler's
+// wiring is observed without replacing `executeIndexing` itself.
+const etlRunCalls: any[] = [];
+
 mock.module("../services/etl/pipeline.js", () => ({
   EtlPipeline: {
     getInstance: () => ({
-      run: async () => {
+      run: async (req: any) => {
+        etlRunCalls.push(req);
         if (etlRunShouldThrow) throw new Error("ETL failed");
         return etlRunResult ?? {
           filesDiscovered: 1,
@@ -50,11 +64,36 @@ mock.module("../services/etl/pipeline.js", () => ({
 }));
 
 // Mock ContextualSearchRLM to avoid heavy init.
+//
+// `warmupCache` deliberately reaches through `this`, as the real method does
+// (`await this.ensureInitialized()`), and returns the real method's shape. A
+// receiver-free stub cannot tell a bound callback from an unbound one, so the
+// §4.2 identity decision would be unenforceable — measured: the call-site
+// mutation that drops `.bind()` survived every suite until this stub used
+// `this`.
 mock.module("../services/search/contextual-search-rlm.js", () => ({
   ContextualSearchRLM: class {
-    async warmupCache() { return { warmed: 0 }; }
+    #ready = true;
+    async warmupCache() {
+      if (!this.#ready) throw new Error("contextual search not initialized");
+      return { queriesWarmed: 0, errors: 0 };
+    }
   },
 }));
+
+/**
+ * What the handler wires into the background run is observed through the ETL
+ * mock above rather than by mocking `execute-indexing.js`, DELIBERATELY: the
+ * real `executeIndexing` forwards the request's fields to
+ * `EtlPipeline.run(...)`, so recording that call reaches the wiring without
+ * replacing the module the three background-path tests exist to exercise
+ * (GMS-05 AC-3 — no test weakened).
+ *
+ * A delegating module mock was tried first and is a trap worth recording:
+ * `mock.module` also rebinds a namespace imported BEFORE the registration, so
+ * the "real" implementation captured for delegation resolves to the mock and
+ * recurses. Observed, not predicted — `Maximum call stack size exceeded`.
+ */
 
 // Mock workspaceManager.
 mock.module("../services/workspace/workspace-manager.js", () => ({
@@ -110,7 +149,86 @@ afterEach(() => {
   etlRunShouldThrow = false;
   managedRunBeginShouldFail = false;
   managedRunBeginShouldBeBusy = false;
+  etlRunCalls.length = 0;
   mock.restore();
+});
+
+/** Lets the background `.catch()`-free promise chain settle before asserting. */
+const settle = () => new Promise((r) => setTimeout(r, 300));
+
+/**
+ * The call site itself, which no suite observed before PR-D T13.
+ *
+ * `execute-indexing.test.ts` pins what the extracted module DOES; it cannot see
+ * how the handler wires it. Measured with the T13 mutation harness: four
+ * call-site mutations — an unbound callback, a dropped lease, `projectPath`
+ * receiving the project ID, and a dropped `include_tests` — survived BOTH the
+ * module suite and every pre-existing suite. A method test is not a call-site
+ * test; these four cases are the sensor for the wiring.
+ */
+describe("IndexProjectTool → executeIndexing wiring", () => {
+  test("forwards the CANONICAL project path, not the project id", async () => {
+    const tool = new IndexProjectTool();
+    const result = await tool.handle({
+      projectPath: "/tmp",
+      projectId: "cov-wire-path",
+    });
+    expect(result.success).toBe(true);
+    await settle();
+    expect(etlRunCalls).toHaveLength(1);
+    const req = etlRunCalls[0];
+    expect(req.projectId).toBe("cov-wire-path");
+    expect(req.projectPath).toBe(realpathSync("/tmp"));
+    expect(req.projectPath).not.toBe(req.projectId);
+    expect(req.jobId).toBe(result.data!.jobId);
+  });
+
+  test("hands the ACQUIRED lease through to the pipeline", async () => {
+    const tool = new IndexProjectTool();
+    const result = await tool.handle({
+      projectPath: "/tmp",
+      projectId: "cov-wire-lease",
+    });
+    await settle();
+    const req = etlRunCalls[0];
+    expect(req.managedRunLease).toBeDefined();
+    expect(req.managedRunLease.runId).toBe(result.data!.runId);
+  });
+
+  test("forwards include_tests and forceReindex as given", async () => {
+    const tool = new IndexProjectTool();
+    await tool.handle({
+      projectPath: "/tmp",
+      projectId: "cov-wire-flags",
+      include_tests: true,
+      forceReindex: true,
+    });
+    await settle();
+    const req = etlRunCalls[0];
+    expect(req.include_tests).toBe(true);
+    expect(req.forceReindex).toBe(true);
+  });
+
+  test("the warmup callback reaches its receiver — an unbound one would throw", async () => {
+    // The stubbed ContextualSearchRLM reads `this.#ready`, so a callback passed
+    // without `.bind()` rejects; the module's catch then records a FAILURE via
+    // setResult instead of completing through setResultAndFlush. Asserting the
+    // successful terminal transition is what discriminates the two.
+    const flush = spyOn(indexJobTracker, "setResultAndFlush");
+    try {
+      const tool = new IndexProjectTool();
+      await tool.handle({
+        projectPath: "/tmp",
+        projectId: "cov-wire-bound",
+        warmCache: true,
+        warmupQueries: ["q1"],
+      });
+      await settle();
+      expect(flush).toHaveBeenCalled();
+    } finally {
+      flush.mockRestore();
+    }
+  });
 });
 
 describe("canonicalizeProjectRoot", () => {
@@ -310,10 +428,22 @@ describe("IndexProjectTool handler", () => {
   });
 
   test("background indexing catch handler fires on executeIndexing rejection", async () => {
-    // Force ETL to throw → executeIndexing catches internally → setResult.
-    // The outer .catch on executeIndexing should NOT fire because
-    // executeIndexing has its own catch. But if indexJobTracker.updateStatus
-    // throws before the try/catch, the .catch fires.
+    // Force ETL to throw → `executeIndexing` catches internally → setResult.
+    // The outer .catch on the call does NOT fire, because `executeIndexing`
+    // (now `services/indexing/execute-indexing.ts`, PR-D T13) has its own catch
+    // and RESOLVES.
+    //
+    // This comment used to say the outer .catch fires "if indexJobTracker
+    // .updateStatus throws before the try/catch". Measured at T13: it does not,
+    // and it never did — `updateStatus` is the FIRST statement INSIDE that try,
+    // so it is caught like everything else. The only code outside the try is the
+    // request destructure and `Date.now()`, neither reachable as a throw from any
+    // request `handle()` builds. The outer .catch is unreachable defensive code,
+    // which is why it is the one uncovered arrow in this file — a dead branch,
+    // not a missing sensor, and deliberately not covered by an artificial reach.
+    //
+    // The swallow itself is pinned in `execute-indexing.test.ts`; this case
+    // asserts only the handler's synchronous return.
     etlRunShouldThrow = true;
     const tool = new IndexProjectTool();
     const result = await tool.handle({
