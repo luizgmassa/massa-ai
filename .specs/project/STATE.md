@@ -644,14 +644,65 @@ all state came from `.specs/` and source reads.
   `mcp-client`'s `web/fetch_and_index` at 22780 ms, zero diff against `main`, **95p/0f standalone
   under an empty config dir**; warm re-run 11/11 exit 0, core `all 150 group(s)`, unchanged for one
   added file and the runner's classification read rather than assumed.
-- ~~**Next action: Execute, T5**~~ … ~~**Execute, T12**~~ → **Next action: Execute, T13 — Phase 4
-  opens.** `index_project.ts`, closed by removal. **T13, T14 and T14b may land in any order among
-  themselves** (`:39-68`, `:151-202`, `:246-351` are disjoint) but all three edit one file, and
-  **T15 comes after all three** (§6 item 8). **T14b is the one that matters**: without it `handle()`
-  stays at 128 against a ceiling of 120, the gate stays at `1 of 30` and T15 cannot wire it into
-  `ci.yml` (C33). Read `tasks.md` §5 Phase 4, §4.2's threading decision and §10.6's C43 — **every span
-  in those three rows is pre-Execute and must be re-derived from the AST**, as T9–T12 all had to, and
-  C43 already found two of them declaration-only where the gate measures comment-inclusive.
+- **T13 DONE — `f56e03e`. Phase 4 is open.** Module 8 out:
+  `services/indexing/execute-indexing.ts` + its suite. `index_project.ts` **352 → 246**, maximal
+  bodies **3 → 2**, members **404 → 403**, and `check-tools-thin` **stays `1 of 30`** — the three
+  remaining flag reasons are T14's two module-level bodies and T14b's `handle()` ceiling, exactly as
+  C33 predicted. **Two new plan defects (C76–C77), running total eighty-two.** Record is `tasks.md`
+  §10.15. Write set **4** against the row's **3**, one user decision — and **the phase total does not
+  move**, because that fourth file is one of the 2 test repoints §1's Phase-4 row already carries for
+  T14. First growth on this feature that leaves §1's sum/union/identity untouched, checked not assumed.
+- **All nine cited spans were EXACT, which inverts T9–T12** — because `index_project.ts` is
+  **byte-identical at HEAD, `main`, `d7091ac` and `f06b01d`** (blob `aa953e5c`), confirmed by blob SHA
+  at four refs rather than by reading, so C43's T5-era re-derivation still held. 12 text anchors.
+- **Order taken: T13 → T14b → T14, and it is the hazard §6 item 8 does not state.** The spans are
+  disjoint; the line numbers are not. File order is T14 `:39-68` < T14b `:151-202` < T13 `:246-351`,
+  so landing the **last** span first renumbers neither of the others, while T14 first renumbers both.
+  **Verified by outcome**: after T13, all six remaining anchors re-derived EXACT, so **T14b and T14
+  inherit zero re-derivation cost**. Re-derive anyway — the import block sits above every span.
+- **C76**: §6 item 8 still cited the **pre-C43** spans, and §8.1's declared scope is `design.md`, so
+  no task was scheduled to fix a `tasks.md` site — PR-C's **C19** shape, third time here.
+  `design.md:747` carries the same superseded figure and is added to §8.1 row 14. Disjointness
+  unchanged; only the figures were stale.
+- **C77**: T14b's *`handle()` 128 → ~87* is unreachable from its own mechanism. `52 − 16 = 36`, so
+  **92**, and 92 is a floor. `87` is reconstructably `128 − 45 + 4` — the pre-C43 span minus **only**
+  the 4-line catch return, omitting the 12-line `"busy"` block the same sentence keeps in the handler;
+  **C43's `~94` re-derived from that wrong baseline instead of from the mechanism**, inheriting the
+  defect it was correcting. All three figures clear the ceiling, so **nothing downstream moves**.
+- **The mutation harness found what both lenses missed, for the second consecutive task.** 16
+  mutations, two subject files, **no refusals and no equivalent or unreachable rows**. First run: A
+  killed **12 of 16**, **B killed ZERO** — T13's premise measured rather than asserted. **All four
+  survivors were handler-side**, and **M13 is the one that mattered**: passing `warmupCache` without
+  `.bind()` loses the receiver and throws on every `warmCache` request, so §4.2's identity decision was
+  **documented and unenforced** — C74's shape. *A method test is not a call-site test.* Fixed in the
+  subject: four wiring cases, each with an **observed red** first; the union now kills **16 of 16**.
+- **A stub had to be strengthened before a sensor could fire at all.** The `ContextualSearchRLM` double
+  was receiver-free, so an unbound callback was **undetectable by construction**; it now reads through
+  `this` as the real method does. *A stub simpler than its subject can make a decision unenforceable no
+  matter how the test is written.* A delegating module mock was tried first and **recursed** —
+  `mock.module` rebinds a namespace imported before registration.
+- **Gates.** `lint` **0**, proven to bite on a T13 file. `type-check` **6/6**, `build` **5/5**, both 0
+  cached forced. `test` exit **0 on the first run**, 11/11, 5 cached all `:build`. `test:scripts`
+  **1115 unchanged** (T13 adds no `scripts/` test). `test:plugins` **96**/0. `check-core-layering`
+  **edges 980 → 983, files 916 → 918** — **and the pre-`git add` run reported 916 unchanged**, because
+  the gate enumerates `git ls-files` and could not see either new file. Core's group count
+  **150 → 151**, the new suite classified `database/integration`; **T12's fork-free property cannot
+  carry**, since a suite stubbing the ETL pipeline must name it. Coverage (R-36): new module **100% /
+  100%**; `index_project.ts` **85.71% funcs / 97.79% lines** against **88.89% / 98.61%** before — the
+  same single uncovered function over a smaller denominator, and the gate enforces **line** coverage
+  only, so both clear it. That arrow is `handle()`'s outer `.catch` and is **unreachable rather than
+  untested**; no artificial reach was written to buy the percentage, and its documented trigger was
+  wrong and is corrected (`updateStatus` is the first statement *inside* the try it was said to precede).
+- ~~**Next action: Execute, T5**~~ … ~~**Execute, T13**~~ → **Next action: Execute, T14b.** The
+  managed-run lease block, `:151-202` — **re-derived EXACT after T13, so its span is current**.
+  **It is the load-bearing task of the whole feature** (C33): without it `handle()` stays at 129
+  against a ceiling of 120, the gate stays `1 of 30`, and T15 cannot wire it into `ci.yml` — a check in
+  `main`'s live `required_status_checks`. Read `tasks.md` §5's T14b row **as amended by C77** — its
+  target is **~92, a floor, not ~87 or ~94** — plus §3.6 and §6 item 8 as amended. **T14 last**, then
+  **T15 after all three**. Two things T13 measured that T14 needs: `services/project-identity/`
+  **already exists** with 11 files, so T14's "new file in a new directory" framing needs re-checking;
+  and the four call-site mutations that survived here mean **any threading decision needs a call-site
+  sensor, not only a module suite**.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed

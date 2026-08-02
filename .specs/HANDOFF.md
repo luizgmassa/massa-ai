@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASE 3 COMPLETE, T12 done**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASE 4 OPEN, T13 done**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -860,15 +860,81 @@
 > core `all 150 group(s)`, **unchanged for one added file** and verified by reading the runner's
 > classification (`1 pure/shared, 0 stateful/isolated`) rather than assuming it.
 >
-> **Next action: Execute, T13 — Phase 4 opens.** `index_project.ts`, closed by removal. Ordering is §6
-> item 8: **T13, T14 and T14b may land in any order among themselves** — their spans `:39-68`,
-> `:151-202` and `:246-351` are disjoint — but all three edit the one file, and **T15 comes after all
-> three**. Four things not to miss: **T14b is load-bearing** (C33 — without it `handle()` stays 128
-> against a ceiling of 120 and T15 cannot wire the gate into `ci.yml`); **every span in those rows is
-> pre-Execute and must be re-derived from the AST**, as T9–T12 all had to; **C43 already found two of
-> them declaration-only where the gate measures comment-inclusive**, which is worth 7 of T14b's 33 lines
-> of margin; and §4.2's `warmupCache` threading decision is taken — do not re-take it, its rejected
-> option is rejected for a subtler reason than the obvious one.
+> ~~**Next action: Execute, T13.**~~ **T13 DONE — `f56e03e`. Phase 4 is open.** Module 8 is out:
+> `services/indexing/execute-indexing.ts` plus its suite; `index_project.ts` **352 → 246**, maximal
+> bodies **3 → 2**, members **404 → 403**, and `check-tools-thin` **stays `1 of 30`** — the three
+> remaining flag reasons are T14's two module-level bodies and T14b's `handle()` ceiling, exactly as
+> C33 predicted. Its record is `tasks.md` §10.15 — the span table, the 16-row two-column
+> discrimination table, and **two new plan defects (C76–C77, running total eighty-two)**. Not restated
+> here.
+>
+> **All nine cited spans were EXACT, and that inverts what T9–T12 established.** The mechanism is that
+> `index_project.ts` is **byte-identical at HEAD, `main`, `d7091ac` and `f06b01d`** (blob `aa953e5c`) —
+> PR-D had never touched it, so C43's T5-era re-derivation still held. **Confirmed by blob SHA at four
+> refs rather than by reading the file**, and re-derived through an AST pass with **12 text anchors**,
+> because "it looks unchanged" is the claim this feature has falsified most often.
+>
+> **The order was the hazard §6 item 8 does not state, and it is now decided and verified.** The spans
+> are disjoint; the line numbers are not. File order is T14 `:39-68` < T14b `:151-202` < T13
+> `:246-351`, so landing the **last** span first renumbers neither of the others, while landing T14
+> first renumbers both. **Order: T13 → T14b → T14.** Verified by outcome — after T13 landed, all six
+> remaining anchors re-derived **EXACT**, so **T14b and T14 inherit zero re-derivation cost**. Re-derive
+> between commits anyway: the import block sits above every span, and T13 only held the count steady
+> because it removed one import and added one.
+>
+> **C77 is the one that changes a number T14b is about to act on.** Its row's `handle()` **128 → ~87**
+> is unreachable from its own mechanism: the span is 52 lines, the two early returns the same sentence
+> keeps in the handler are 16, so `128 − 36 = ` **92** — and 92 is a **floor**, since the handler must
+> also carry the mapping code. `87` is reconstructably `128 − 45 + 4`, the pre-C43 span minus **only**
+> the 4-line catch return, silently omitting the 12-line `"busy"` block; **C43's `~94` then re-derived
+> from that wrong baseline rather than from the mechanism**, inheriting the defect it was correcting —
+> the seventh time on this feature. **Everything downstream is unchanged**: 87, 92 and 94 all clear the
+> ceiling of 120, so C33's resolution, the user's three-option decision and T15's `0 of 30` stand.
+> **C76** is the companion: §6 item 8 still cited the pre-C43 spans and sat outside §8.1's declared
+> `design.md` scope, so nothing was scheduled to fix it — PR-C's **C19** shape, third time here.
+>
+> **The mutation harness found the defect that mattered, for the second consecutive task, and both
+> Plan Challenge lenses passed the plan.** 16 mutations across two subject files — the module *and*
+> the handler — with **no refusals and no equivalent or unreachable rows**, so the denominator really
+> is 16. On the first run **column A killed 12 of 16 and column B killed ZERO**, which is T13's premise
+> measured rather than asserted. **All four survivors were handler-side**, and **M13 is the one that
+> mattered**: passing `warmupCache` without `.bind()` loses its receiver and throws on every
+> `warmCache: true` request, so §4.2's identity decision was **documented and unenforced** — C74's
+> shape exactly. *A method test is not a call-site test.* Fixed in the subject with four wiring cases,
+> each carrying an **observed red**; the union now kills **16 of 16**.
+>
+> **One sensor was unenforceable by construction until a stub was strengthened.** The suite's
+> `ContextualSearchRLM` double was receiver-free, so an unbound callback behaved identically to a bound
+> one and M13 could not be detected however the test was written. It now reads `this.#ready`, as the
+> real method reads `this.ensureInitialized()`. A delegating module mock was tried first and
+> **recursed** — `mock.module` rebinds a namespace imported *before* registration, observed as
+> `Maximum call stack size exceeded` rather than predicted.
+>
+> **Two readings that would have been wrong if inherited.** `check-core-layering` run **before**
+> `git add` reported files **unchanged at 916** — it enumerates `git ls-files` and could not see either
+> new file; the true figures are **edges 980 → 983, files 916 → 918**. And core's group count moves
+> **150 → 151**: **T12's "fork-free by construction" property cannot carry to T13**, because a suite
+> that stubs the ETL pipeline must name it, and `run-tests-isolated.ts` forks on that literal.
+>
+> **Coverage (R-36): the new module 100% funcs / 100% lines.** `index_project.ts` reads **85.71% funcs
+> / 97.79% lines** against **88.89% / 98.61%** before T13 — the *same single* uncovered function over a
+> smaller denominator, measured by swapping the pre-T13 file in and restoring it SHA-256-identical.
+> **The gate enforces line coverage only** (`LINE_COVERAGE_FLOOR = 90`), checked rather than assumed,
+> so both files clear it. That arrow is `handle()`'s outer `.catch` and is **unreachable rather than
+> untested** — nothing outside the module's `try` can throw — so **no artificial reach was written to
+> buy the percentage**. Its documented trigger was also false and is corrected in place:
+> `updateStatus` is the first statement *inside* the try it was said to precede.
+>
+> **Next action: Execute, T14b.** The managed-run lease block `:151-202`, **re-derived EXACT after
+> T13**. It is the load-bearing task of the feature (C33): without it `handle()` stays at **129**
+> against a ceiling of 120, the gate stays `1 of 30`, and T15 cannot wire it into `ci.yml` — a check in
+> `main`'s live `required_status_checks`. Read the T14b row **as amended by C77** — the target is
+> **~92, a floor**, not ~87 or ~94 — with §3.6 and §6 item 8 as amended. Then **T14**, then **T15**.
+> Two things T13 measured that T14 will need: `services/project-identity/` **already exists** with 11
+> files, so T14's "new file in a new directory" framing must be re-checked; and the four call-site
+> mutations that survived here mean **any threading decision needs a call-site sensor, not only a
+> module suite**. §4.2's `warmupCache` decision is taken — do not re-take it; its rejected option is
+> rejected for a subtler reason than the obvious one.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
