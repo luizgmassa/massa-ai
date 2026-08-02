@@ -882,6 +882,41 @@ describe("RFS-01 AC-4 — both directions observed red, plus an inert control", 
     expect(noHandlers.handlerFiles).toBe(0);
     expect(noHandlers.membersExamined).toBeGreaterThan(0);
   });
+
+  test("membersExamined RESPONDS to the population — it is not pinned at a constant", () => {
+    // THE ASSERTION THIS FILE DID NOT HAVE, AND WHY. Six assertions here reached
+    // `membersExamined` and every one was a SHAPE assertion — `> 0`, or equal to
+    // a sibling reading. All six pass at 2 exactly as they pass at 14, so the
+    // whole suite was structurally blind to the defect T11 fixed: the counter's
+    // top-level walk was `sf.forEachChild(() => membersExamined++)`, and because
+    // `forEachChild` halts on a truthy return while post-increment returns the
+    // PRE-increment value, it stopped after two nodes in every file with two or
+    // more. `read_file.ts` read 16 where the truth was 28; the repo total read
+    // 215 where the truth was 419.
+    //
+    // The delta is asserted rather than only the absolute, deliberately. An
+    // absolute count bakes in whether `forEachChild` yields `EndOfFileToken`,
+    // which is a TypeScript convention this suite does not own (R-33's class).
+    // A counter that does not MOVE when the population moves is the defect;
+    // three statements added must read three higher, whatever the base is.
+    const oneStatement = `export const a = 1;\n`;
+    const fourStatements = `export const a = 1;\nexport const b = 2;\nexport const c = 3;\nexport const d = 4;\n`;
+
+    const small = scanRepo({ [`${TOOLS_DIR}small.ts`]: oneStatement });
+    const large = scanRepo({ [`${TOOLS_DIR}small.ts`]: fourStatements });
+
+    expect(large.membersExamined - small.membersExamined).toBe(3);
+    // ...and the absolute, so a counter that merely tracks the delta from a
+    // wrong base is caught too. One statement plus the EOF token is 2.
+    expect(small.membersExamined).toBe(2);
+    expect(large.membersExamined).toBe(5);
+
+    // The class half must stay additive on top of the file half, which is the
+    // sentence `FileReading.membersExamined`'s docblock actually states.
+    const handler = scanRepo({ [GREEN]: greenHandler });
+    const reading = handler.readings.find((r) => r.file.endsWith("green.ts"));
+    expect(reading?.membersExamined).toBe(6); // import + class + EOF, plus 3 class members
+  });
 });
 
 describe("trackedToolFiles — the population filter", () => {

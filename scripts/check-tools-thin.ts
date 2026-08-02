@@ -349,8 +349,31 @@ export function analyzeSource(file: string, text: string): FileReading {
   };
   sf.forEachChild(collectHandlerObjects);
 
+  // The callback body is BRACED, and that is load-bearing rather than styling.
+  // `ts.forEachChild` stops the moment its callback returns a truthy value, and
+  // `membersExamined++` is a post-increment, so it RETURNS the pre-increment
+  // value: 0 on the first child (falsy, continue), 1 on the second (truthy,
+  // stop). The concise-arrow form therefore counted exactly TWO top-level nodes
+  // in every file with two or more of them, for the whole life of this gate.
+  //
+  // Found at T11 by the Plan Challenge gate's evidence-audit lens and fixed here
+  // on the user's decision. It never moved a VERDICT — `isViolation` does not
+  // read this field — but it falsified the two sentences this file states about
+  // it: the `FileReading` docblock's "class members plus top-level statements
+  // inspected", and the population-print note's "a diffable record … a reviewer
+  // comparing it against the frozen base is what closes that loop". A population
+  // counter pinned at 2 cannot distinguish a dead subject from a live one, which
+  // is the one property RFS-01 AC-1 asks this print to have.
+  //
+  // RECALIBRATION, so five prior readings stay comparable. On the pre-T11 tree
+  // this gate reported `read_file.ts` at 16 and the repo total at 215; corrected,
+  // the same tree reads 28 and 419. Every `membersExamined` figure recorded at
+  // T5 (224), T7 (223), T9 (221) and T10 (215) is on the OLD counter and must be
+  // read as `2 + members` per file, never as the stated contract above.
   let membersExamined = 0;
-  sf.forEachChild(() => membersExamined++);
+  sf.forEachChild(() => {
+    membersExamined++;
+  });
   for (const cls of handlerClasses) membersExamined += cls.members.length;
   for (const obj of handlerObjects) membersExamined += obj.properties.length;
 

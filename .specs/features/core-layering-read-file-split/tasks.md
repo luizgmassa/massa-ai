@@ -41,13 +41,13 @@ the per-task write sets only Tasks produces. Those sets are now measured, repo-w
 | **0 — instrument before moving** | **5** | 5 | 4 new characterization suites + this document |
 | **1 — the gate** | **3** | 2 | `check-tools-thin.ts` + its unit suite + this document (T5's reading) |
 | **2 — LRU** | ~~7~~ → ~~9~~ → **13** | 2 | `services/cache/lru-evict.ts` + its unit test + **4** repointed sites + `read-file.test.ts` + ~~T8b's 2 comment sites~~ → **T8b's 8 source files + `spec.md`** (§10.10, C54: `production-wiring.ts`, `invalidator-registry.ts`, `read_file.ts`, `symbol-graph.service.ts`, `file-filter-cache.ts` and the three Phase-0 suites; the first two and `spec.md` are the only ones new to this phase, and `spec.md` is new to the whole set). **Corrected at T10 — C65 (§10.12), and it is not T10's own work**: T8b's write set grew from 2 to 9 on a user decision and this row was never carried back, so §1 asserted **9** for two tasks while §5's own T8b row said 8 + `spec.md` |
-| **3 — the extraction** | ~~13~~ → ~~14~~ → ~~20~~ → **25 so far** | 12 | `read_file.ts` + **6** modules + **6** module suites + **C34's `read-file.test.ts` repoint** + **T9's 6 citation-repoint files** (§10.11) + **T10's 5 further ones** (§10.12: `lru-evict.test.ts`, `symbol-graph.service.ts`, `production-wiring.ts`, `invalidator-registry.ts`, `read-file-presentation-characterization.test.ts` — its other six files were already in the set, `read-file-project-root-rename-pin.test.ts` among T9's own six). **Still rising**: C55 makes T11 and T12 re-derive their own citation counts, and neither is taken yet |
+| **3 — the extraction** | ~~13~~ → ~~14~~ → ~~20~~ → ~~25~~ → **29 so far** | 14 | `read_file.ts` + **6** modules + **6** module suites + **C34's `read-file.test.ts` repoint** + **T9's 6 citation-repoint files** (§10.11) + **T10's 5 further ones** (§10.12: `lru-evict.test.ts`, `symbol-graph.service.ts`, `production-wiring.ts`, `invalidator-registry.ts`, `read-file-presentation-characterization.test.ts` — its other six files were already in the set, `read-file-project-root-rename-pin.test.ts` among T9's own six) + **T11's 4 further ones** (§10.13: `line-range.ts` and `line-range.test.ts` are the 2 new; `wave-4-correctness.test.ts` and `spec.md` are new to **this phase**, the latter already in the union via Phase 2 — the presentation suite and the two `check-tools-thin` files were already here). **Still rising**: C55 makes T12 re-derive its own citation count and it is not taken yet |
 | **4 — `index_project.ts`** | **9** | 6 | 1 handler + **3** modules + 3 module suites + **2** test repoints |
 | **5 — the gate goes green** | **1** | 0 | `.github/workflows/ci.yml` |
 | **6 — the rename** | **29** | 0 | **7** `git mv` + **19** external importers + **3** prose/fixture sites |
 | **7 — the record** | **16** | 1 | RFS-04's 5 + RFS-05's 9 + `design.md` (T20b) + `validation.md` |
-| **sum** | ~~83~~ → ~~86~~ → ~~92~~ → **101** | **28** | Phase 2 **+4** and Phase 3 **+5** since the 92 |
-| **distinct union** | ~~78~~ → ~~80~~ → **81** | | **unchanged by T9** — all 6 files it added to Phase 3 were already in the set. **T10 adds none either**; the **+1** is `spec.md`, which T8b brought in and which no row recorded (**C65**). Against PR-C's planned **104** and PR-B's **37** |
+| **sum** | ~~83~~ → ~~86~~ → ~~92~~ → ~~101~~ → **105** | **30** | Phase 2 **+4** and Phase 3 **+9** since the 92 |
+| **distinct union** | ~~78~~ → ~~80~~ → ~~81~~ → **84** | | **unchanged by T9** — all 6 files it added to Phase 3 were already in the set. **T10 adds none either**; the **+1** there is `spec.md`, which T8b brought in and which no row recorded (**C65**). **T11 adds 3**: `line-range.ts`, `line-range.test.ts` and `wave-4-correctness.test.ts` — `spec.md` and the two `check-tools-thin` files were already in the union. Against PR-C's planned **104** and PR-B's **37** |
 
 **Both figures are corrected at T4b (§10.5), and neither correction is T4b's own work** — they are
 the two amendments §10 recorded without carrying back into this table. **C35** minted T8b with two
@@ -58,24 +58,26 @@ overlap rather than a seventy-ninth file. *An execute-time amendment that adds a
 about the planning table, and nothing was watching that table.*
 
 **The phases are not disjoint, and the sum is not the review surface.** Measured: ~~**5**~~ → ~~**6**~~
-→ ~~**12**~~ → **17 files in more than one phase, three of them in three phases**, which is what takes
-~~83 to 78~~ → ~~86 to 80~~ → ~~92 to 80~~ → **101 to 81**.
+→ ~~**12**~~ → ~~**17**~~ → **18 files in more than one phase, three of them in three phases**, which
+is what takes ~~83 to 78~~ → ~~86 to 80~~ → ~~92 to 80~~ → ~~101 to 81~~ → **105 to 84**.
 
 ***The identity changed and the old sentence would now be false.*** It read *"the table sums to its own
 total: 92 − 80 = 12, and the overlap rows below enumerate exactly 12 files"* — which holds only while
 every overlapping file is in **exactly two** phases. T8b put the three Phase-0 suites into Phase 2 and
 T9 put them into Phase 3, so each contributes **2**, not 1. The identity is
-`sum − union = Σ (phases containing the file − 1)`, and it checks out: **8 files × 1 + 3 files × 2 +
-the six below × 1 = 20 = 101 − 81**. *A self-checking table stops self-checking when a file enters a
-third phase, and nothing said so.*
+`sum − union = Σ (phases containing the file − 1)`, and it checks out: ~~8 files × 1 + 3 files × 2 +
+the six below × 1 = 20 = 101 − 81~~ → **15 files × 1 + 3 files × 2 = 21 = 105 − 84** at T11, the
+fifteenth being `spec.md`, which T8b brought into Phase 2 and T11 brings into Phase 3 (**C68**).
+*A self-checking table stops self-checking when a file enters a third phase, and nothing said so —
+so the check is re-run per task rather than trusted.*
 
 | overlap | files |
 | --- | --- |
 | Phase 0 ∩ Phase 1 (**1**) | **this document** — created at Phase 0, and T5 writes the frozen reading into it. Reported by the Plan Challenge gate (§8, evidence finding 2); the first draft's per-phase rows omitted it and it self-cancelled in the union, which is how it survived a check that only verified the total |
-| Phase 2 ∩ Phase 3 (~~**1**~~ → ~~**2**~~ → ~~**3**~~ → **7**) | `packages/core/src/tools/read_file.ts` — the LRU repoint, then the extraction; **`read-file.test.ts`** — T8's eviction repoint, then **C53**'s at T9 and **C34**'s at T10; **`services/cache/lru-evict.ts`** — written at T6, its site table repointed at T9 and again at T10; and **four added at T10** (§10.12) — `lru-evict.test.ts`, `symbol-graph.service.ts`, `production-wiring.ts`, `invalidator-registry.ts`, each carrying a by-FILE or by-IDENTIFIER claim T10 falsifies |
+| Phase 2 ∩ Phase 3 (~~**1**~~ → ~~**2**~~ → ~~**3**~~ → ~~**7**~~ → **8**) | `packages/core/src/tools/read_file.ts` — the LRU repoint, then the extraction; **`read-file.test.ts`** — T8's eviction repoint, then **C53**'s at T9 and **C34**'s at T10; **`services/cache/lru-evict.ts`** — written at T6, its site table repointed at T9 and again at T10; **four added at T10** (§10.12) — `lru-evict.test.ts`, `symbol-graph.service.ts`, `production-wiring.ts`, `invalidator-registry.ts`, each carrying a by-FILE or by-IDENTIFIER claim T10 falsifies; and **`spec.md` added at T11** (§10.13) — T8b brought it into Phase 2 for RFS-02 AC-4's evidence table, and **C68** corrects its §6 duplication rows here. It is the file whose second phase takes the identity above from 20 to 21 |
 | Phase 0 ∩ Phase 2 (**3**) | `read-file-containment-shapes.test.ts`, `read-file-project-root-rename-pin.test.ts`, `lru-eviction-characterization.test.ts` — **this pair was missing from the table entirely** (**C65**, §10.12). T8b's C54 growth put all three Phase-0 suites into Phase 2 and no row recorded it, which is also why they now sit in **three** phases each |
 | Phase 0 ∩ Phase 3 (~~**3**~~ → **4**) | the same three — **added at T9** (§10.11), all Phase-0 suites whose comments cite spans T9 relocates; the third is RFS-02 AC-1's own main subject, which **C56 recorded as unchanged** and **C58** falsifies — plus **`read-file-presentation-characterization.test.ts`, added at T10** |
-| Phase 1 ∩ Phase 3 (**2**) | `scripts/check-tools-thin.ts` and its unit suite — **added at T9**. The gate's own docblock cited the `eventBus.subscribe` arrow it measures, and T9 moves that arrow out of `tools/` altogether (**C57**). T10 edits the gate again, for the by-FIGURE claim in its implementation (**C63**) |
+| Phase 1 ∩ Phase 3 (**2**) | `scripts/check-tools-thin.ts` and its unit suite — **added at T9**. The gate's own docblock cited the `eventBus.subscribe` arrow it measures, and T9 moves that arrow out of `tools/` altogether (**C57**). T10 edits the gate again, for the by-FIGURE claim in its implementation (**C63**). **T11 edits both a third time** (**C69**, §10.13) — this time the gate's *code*, not its prose: `membersExamined` was pinned at 2 top-level nodes per file, and the suite's six assertions on that member were all shape assertions that pass at 2 as readily as at 14 |
 | Phase 6 ∩ Phase 7 (**3**) | `scripts/check-coverage.ts`, `scripts/__tests__/check-coverage.test.ts`, `CLAUDE.md` |
 | Phase 6 ∩ Phases 0–5 | **none** — measured, and it is what made Phase 6 the cut candidate |
 
@@ -531,16 +533,22 @@ gate, §10.9 finding 3). Both sensors flip their site from `92p/0f` to `93p/1f` 
 | --- | --- | --- | --- |
 | **T9** | **Modules 2 and 3** — `services/file-read/path-containment.ts` (`checkPathContainment` `:387-448` + `resolveFilePath` `:350-385`) and `services/file-read/project-root-cache.ts` (`getProjectRoot` `:450-470` + `projectRootCache` + `ROOT_CACHE_TTL` + the `eventBus` subscription `:162-171`). **Module 2 → module 3 is a real edge** — `:373` and `:415` both call `getProjectRoot` — one-directional, so no cycle, but module 2 cannot be constructed without module 3. T2's suite passes unmodified. **Write set gains `+ 1 test repoint` — added by C53 (§10.9), and it is C34's resolution one task earlier than C34 predicted.** This module takes `projectRootCache` **and** the `eventBus` subscription, so T8's new `indexing:started` call-site sensor — which seeds `tool.projectRootCache` through a cast — loses its subject **here**, not at T10. §1's overlap table scheduled the only Phase-3 touch of `read-file.test.ts` at T10 (C34's), so T9 as written lands a red suite owned by nothing — PR-C's **C19** class, and C48's *"a break owned by nothing"* verbatim. Author level on C34's own precedent: GMS-05 AC-3 fixes the answer and the only open question was which task carries one file. **Also `+ N citation repoints` — added by C55 (§10.10)**: T8b renumbered 48 citations into `read_file.ts` spans, and this task moves `resolveFilePath`, `checkPathContainment`, `getProjectRoot`, `projectRootCache` and `ROOT_CACHE_TTL` out of the file, so the citations naming them in `read-file-containment-shapes.test.ts` and `read-file-project-root-rename-pin.test.ts` name a file that no longer holds the code. **Re-run the sweep here; do not inherit T8b's count** — measured **21 citation sites in 7 files**, not T8b's 48 and not the 14 the first sweep returned. **DONE at `HEAD` — §10.11.** The write set grew from the **8** files this row and C55 together predict to **12**, **decided by the user from three options** (fix-all-now chosen; line-citations-only and defer-to-T12 rejected): the sweep's bare-`:NNN` half was still hand-scoped to three carriers and its **by-file / by-identifier** half had never been swept at all, so four more files carry a claim T9 falsifies — `lru-eviction-characterization.test.ts` (RFS-02 AC-1's **own main subject**, which C56 explicitly recorded as unchanged), `services/cache/lru-evict.ts`, and **`scripts/check-tools-thin.ts` plus its suite**, the gate's own docblock having cited the `eventBus.subscribe` arrow at `:167-171` since T7 falsified it (**C57**). A second user decision folded in the two citations **into** `read-file.test.ts` that T8 left orphaned. All six citation-only diffs **proven** comment-only | ~~1 handler + 2 new modules + 2 new suites~~ → ~~+ 1 test repoint + N citation repoints~~ → **12 files: 2 new modules + 2 new suites + 1 handler + 1 test repoint + 6 citation repoints** | **RFS-06 AC-1**, GMS-05 AC-3, RFS-03 AC-1/AC-2 |
 | **T10** | **Modules 4 and 5** — `file-content-cache.ts` (`readFileWithCache` ~~`:518-580`~~ → **`:401-463`** + `fileCache` + `CACHE_TTL` + `FILE_CACHE_MAX_ENTRIES` + `interface CachedFile`) and `file-metadata.ts` (`extractMetadata` ~~`:582-628`~~ → **`:465-511`** + `detectLanguage` ~~`:645-681`~~ → **`:528-564`** + `extractImports` ~~`:683-706`~~ → **`:566-589`** + `interface FileMetadata`). **Every span in this row was pre-T7 and pre-T9; all nine were re-derived from the AST and anchor-verified at execute time (§10.12).** **The 4 → 5 edge is a callback — §4.** Module 4 never names `SymbolGraphService`, though it type-imports `FileMetadata`, which is what §4.1 permits and not what it forbids. **`+ N citation repoints` — added by C55 (§10.10)**: this task takes `CACHE_TTL`, `fileCache` and `readFileWithCache`, which the pin suite and the presentation suite both cite by line. **It also DELETES the `evictOldest` delegate, one task earlier than every artifact said — added by C60 (§10.12)**: the wrapper's body reads `FILE_CACHE_MAX_ENTRIES`, which this row moves, so it cannot compile once the field leaves the class. Author level; GMS-05 AC-4 fixes the answer. **DONE at `HEAD` — §10.12.** The write set grew from the **5 + N** this row predicts to **17**, **decided by the user from three options** (fix-all-now chosen; leaving C61's file to T12 and deferring all eight by-claim files to T12 both rejected): beyond the two line-citation files, **eight** files carry a by-FILE, by-IDENTIFIER or by-FIGURE claim T10 falsifies — two of them production files whose *qualified* `ReadFileTool.CACHE_TTL` stops resolving, which is the other half of the finding T9 rejected for *unqualified* identifiers (**C63** for the by-FIGURE class, in the gate's own source) — and a ninth carries two citations T9's sweep was structurally blind to (**C61**). All eleven citation diffs **proven** comment-only | ~~1 handler + 2 new modules + 2 new suites + N citation repoints~~ → **17 files: 2 new modules + 2 new suites + 1 handler + 1 test repoint + 11 citation repoints** | GMS-05 AC-3, **C34**, RFS-03 AC-1/AC-2 |
-| **T11** | **Module 6** — `line-range.ts` (`calculateRange` `:485-507` + `adjustRange` `:509-516` + `extractLines` `:630-643` + `interface ReadRange` + `MASSA_AI_READ_FILE_MAX_LINES` `:22-36` + **the N9 clipping `:235-249`**, which is 15 of `handle()`'s 98 non-delegation lines). **`+ N citation repoints` — added by C55 (§10.10)**: `extractLines` is cited by the presentation suite | 1 handler + 1 new module + 1 new suite **+ N citation repoints** | — |
-| **T12** | **Module 7 and the handler's collapse** — `read-file.service.ts` takes `interface ReadFileParams`, the compression decision `:251-255`, result assembly `:257-283`, token math + recommendation `:285-322` and usage tips `:324-336`, and composes 2–6. **Every span here is pre-T7/pre-T9/pre-T10 and must be re-derived from the AST, as T9 and T10 both had to** (§10.11, §10.12). ~~It also deletes the `evictOldest` delegate~~ → **struck: T10 deleted it, because its body read `FILE_CACHE_MAX_ENTRIES` and could not compile once T10 moved that field (C60, §10.12).** **It MUST also take the 4 → 5 wiring arrow** — `read_file.ts`'s constructor builds the callback with an arrow, which the constructor's exempt-by-kind status makes a **maximal** body (C64, §10.12), so `read_file.ts` cannot reach maximal 0 and RFS-01 AC-1 cannot read `0 of 30` until that composition moves into module 7. **`handle()` goes 175 → ~15**; `read_file.ts` to **≤ 125** (N). **`serializeToolResponse` stays in the handler** (`:338`) — any `services/file-read/` module importing `tools/serialize.ts` is a `services → tools` edge and fails `check-core-layering` (RFS-03 AC-2). **`constructor(symbolGraph?: SymbolGraphService)` keeps its exact arity and parameter type** — 20 construction sites, both transports among them (`design.md` §3.2). **MCP `inputSchema` + REST `/file` response shape byte-identical.** **The four moving interfaces are invisible to consumers**: `read_file.ts` exports exactly one symbol (`ReadFileTool`, `:74`), so `ReadFileParams`, `FileMetadata`, `CachedFile` and `ReadRange` are module-local today, and `services/file-read/` is deliberately not re-exported from `services/index.ts` — the extraction adds **0** names to `@massa-ai/core`'s published surface. ~~T3's suite passes unmodified~~ → **T3's suite's assertions pass unmodified; its comments do not, and that is this task's `+ N citation repoints` — added by C55 (§10.10).** It carries the largest share of the 48: the whole `:252-337` span this task moves. **It also carries the nine stale `:NNN` in `test()` TITLE strings that T8b deliberately left** (`:245`, `:260` ×2, `:300`, `:328`, `:365` ×2) — a string literal is not a comment, so T8b could not touch them without making *"comments only"* false; this task rewrites those tests anyway | 1 handler + 1 new module + 1 new suite **+ N citation repoints + 9 test-title repoints** | **GMS-02 AC-1**, RFS-03 AC-2 |
+| **T11** | **Module 6** — `line-range.ts` (`calculateRange` ~~`:485-507`~~ → **`:345-367`** + `adjustRange` ~~`:509-516`~~ → **`:369-376`** + `extractLines` ~~`:630-643`~~ → **`:378-391`** + `interface ReadRange` **`:53-56`** + `MASSA_AI_READ_FILE_MAX_LINES` `:22-36` **comment-inclusive, decl `:33-36`** + **the N9 clipping** ~~`:235-249`~~ → **`:230-244`** comment-inclusive, which is 15 of `handle()`'s 98 non-delegation lines). **Every span in this row was pre-T7, pre-T9 and pre-T10; all six were re-derived from the AST and anchor-verified at execute time (§10.13)** — only `MASSA_AI_READ_FILE_MAX_LINES` was still exact, and only because it sits above everything three tasks removed. **`+ N citation repoints` — added by C55 (§10.10)**: `extractLines` is cited by the presentation suite; **measured, N = 2** — that suite carries a second row **C62** assigns here, the constructor citation nobody else moves. **The module is FREE FUNCTIONS, not a class** — it owns no per-tool state, on module 1's precedent (`design.md` §5.2) — and it **imports nothing at all**. **It also declares `interface LineRangeRequest` — added by C66 (§10.13)**: `calculateRange` takes `ReadFileParams`, which `design.md` §5.1 assigns to **module 7**, so module 6 as specified imports from the module that composes it; the four fields it actually reads are declared here instead and `ReadFileParams` satisfies them structurally. **DONE at `HEAD` — §10.13.** The write set grew from the **6** this row and C55 together predict to **8**, **decided by the user from four options on the gate half and three on the spec half**: `spec.md` §6's row cites two sites for a variable neither sets and its table was short a third read of the N9 cap (**C68**), and `scripts/check-tools-thin.ts` plus its suite carry a defect the gate's own evidence-audit lens found in the gate — `forEachChild(() => membersExamined++)` short-circuits, pinning the population print at 2 top-level nodes per file (**C69**, fixed here with its recalibration recorded; record-only, fix-without-record and a new T11b were rejected). Both citation diffs **proven** comment-only | ~~1 handler + 1 new module + 1 new suite + N citation repoints~~ → **8 files: 1 new module + 1 new suite + 1 handler + 2 citation repoints + `spec.md` + the gate and its suite** | **C66**, **C67**, **C69** |
+| **T12** | **Module 7 and the handler's collapse** — `read-file.service.ts` takes `interface ReadFileParams`, the compression decision `:251-255`, result assembly `:257-283`, token math + recommendation `:285-322` and usage tips `:324-336`, and composes 2–6. **Every span here is pre-T7/pre-T9/pre-T10 and must be re-derived from the AST, as T9 and T10 both had to** (§10.11, §10.12). ~~It also deletes the `evictOldest` delegate~~ → **struck: T10 deleted it, because its body read `FILE_CACHE_MAX_ENTRIES` and could not compile once T10 moved that field (C60, §10.12).** **It MUST also take the 4 → 5 wiring arrow** — `read_file.ts`'s constructor builds the callback with an arrow, which the constructor's exempt-by-kind status makes a **maximal** body (C64, §10.12), so `read_file.ts` cannot reach maximal 0 and RFS-01 AC-1 cannot read `0 of 30` until that composition moves into module 7. **Confirmed at T11 (§10.13): `read_file.ts` now reads maximal 1 / raw 1, and that single body IS the arrow at `:144-145`** — so this obligation is the whole remaining distance to `0 of 30` for this file. **`handle()` goes ~~175~~ → 165 → ~15**; `read_file.ts` ~~392~~ → **315** → **≤ 125** (N). **Do NOT re-unify `LineRangeRequest` with `ReadFileParams` (C66, §10.13)**: module 6 declares the four fields `calculateRange` reads precisely so it does not import from the module composing it, and module 7 passing its own `ReadFileParams` satisfies them structurally with no call-site change. Merging them recreates the 6 → 7 edge C66 exists to remove. **`serializeToolResponse` stays in the handler** (`:338`) — any `services/file-read/` module importing `tools/serialize.ts` is a `services → tools` edge and fails `check-core-layering` (RFS-03 AC-2). **`constructor(symbolGraph?: SymbolGraphService)` keeps its exact arity and parameter type** — 20 construction sites, both transports among them (`design.md` §3.2). **MCP `inputSchema` + REST `/file` response shape byte-identical.** **The four moving interfaces are invisible to consumers**: `read_file.ts` exports exactly one symbol (`ReadFileTool`, `:74`), so `ReadFileParams`, `FileMetadata`, `CachedFile` and `ReadRange` are module-local today, and `services/file-read/` is deliberately not re-exported from `services/index.ts` — the extraction adds **0** names to `@massa-ai/core`'s published surface. ~~T3's suite passes unmodified~~ → **T3's suite's assertions pass unmodified; its comments do not, and that is this task's `+ N citation repoints` — added by C55 (§10.10).** It carries the largest share of the 48: the whole `:252-337` span this task moves. **It also carries the nine stale `:NNN` in `test()` TITLE strings that T8b deliberately left** (`:245`, `:260` ×2, `:300`, `:328`, `:365` ×2) — a string literal is not a comment, so T8b could not touch them without making *"comments only"* false; this task rewrites those tests anyway | 1 handler + 1 new module + 1 new suite **+ N citation repoints + 9 test-title repoints** | **GMS-02 AC-1**, RFS-03 AC-2 |
 
-**Phase 3's four task rows sum to 16 and the phase is 13 distinct files** — all four edit
-`read_file.ts`, which is the write set's only overlap. Each task removes its own spans and adds its
-own imports; a reviewer sizing per-task diffs must not count that file four times.
+~~**Phase 3's four task rows sum to 16 and the phase is 13 distinct files**~~ → **amended at T11: the
+rows sum to 12 + 17 + 8 + T12's, and §1's Phase-3 row (**29 so far**, still rising) is the figure to
+read.** Both figures were written before C55 made each task re-derive its own citation count, and
+neither survived first contact. What is unchanged and is the point: all four tasks edit
+`read_file.ts`, which is the write set's only *structural* overlap. Each removes its own spans and
+adds its own imports; a reviewer sizing per-task diffs must not count that file four times.
 
 **Acceptance reading for Phase 3** (GMS-02 AC-1, not a gate): `read_file.ts` **707 → ≤ 125**,
 maximal bodies **13 → 0**, `Map` fields **2 → 0**, `handle()` **175 → ≤ 120**, the six modules
-present and imported, schema byte-identical. **Below ~100 is also a failure** — 68 of the 125 is
+present and imported, schema byte-identical. **Measured waypoints, so a resumer can tell progress
+from completion**: after T9 `715 → 590`; after T10 `→ 392`, maximal `13 → 5`, `Map` **2 → 0**; after
+T11 `→ 315`, maximal **→ 1**, raw **→ 1**, `handle()` **175 → 165** — the first movement in
+`handle()` since T5, and the surviving body is C64's wiring arrow, which is T12's. **Below ~100 is also a failure** — 68 of the 125 is
 schema and `IToolHandler` members, so a materially smaller file means the schema was altered
 (R-30).
 
@@ -733,8 +741,10 @@ Tasks PR corrected it in place rather than deferring:
 
 | 16 | `design.md` §3.2 (*"`ReadFileTool` is constructed at **20 sites**"*) | **T9 (§10.11)** — measured **41** across **9** files, not 20 across 5: `read-file-containment.test.ts` 7, `read-file.test.ts` **9** (not 7), `wave-4-correctness.test.ts` 4, plus four files §3.2 predates — `read-file-presentation-characterization.test.ts` **9**, `read-file-containment-shapes.test.ts` **6**, `lru-eviction-characterization.test.ts` 2, `read-file-project-root-rename-pin.test.ts` 2 — and the 2 production sites. **True when written and falsified by PR-D's own Phase 0**, which is the same shape as C55: this feature's earlier tasks invalidating a figure in its own Design. The constraint §3.2 exists to state — that the constructor's arity and parameter type are public surface — is **strengthened**, not weakened, by the larger number |
 
-These are **T20b**. ~~Six~~ → ~~fourteen~~ → ~~fifteen~~ → **sixteen** corrections; the count in
-`HANDOFF.md` and `STATE.md` was last true at Design.
+| 17 | `design.md` §5.1 module 6 (`:455`) vs module 7 (`:456`) | **C66** (§10.13) — the table gives module 6 `calculateRange`, whose parameter is **`ReadFileParams`**, and gives `interface ReadFileParams` to **module 7**, which *composes* 2–6. As written module 6 imports from the module that composes it: a backward edge naming a type that does not exist until T12. §5.1's own note says the table *"is not the dependency graph"* and names **two** crossing edges (2 → 3, 4 → 5), handing the second to Tasks explicitly; **this is a third of the same shape and it was handed to nobody**, which is why §4's header could truthfully say §5.1 *"names one"*. Resolved at T11 by declaring `interface LineRangeRequest` — the four fields `calculateRange` reads — in module 6, which `ReadFileParams` satisfies structurally |
+
+These are **T20b**. ~~Six~~ → ~~fourteen~~ → ~~fifteen~~ → ~~sixteen~~ → **seventeen** corrections;
+the count in `HANDOFF.md` and `STATE.md` was last true at Design.
 
 ---
 
@@ -3527,3 +3537,365 @@ Both lenses also produced a confirmation (findings 5 and 6), reported rather tha
    because it names no number at all.
 
 **Running total: seventy plan defects.**
+
+---
+
+### 10.13 T11 — executed, 2026-08-02
+
+**Module 6 is extracted and `handle()` moves off 175 for the first time since T5.**
+`services/file-read/line-range.ts` (`calculateRange` + `adjustRange` + `extractLines` +
+`selectLines` + `interface ReadRange` + `MASSA_AI_READ_FILE_MAX_LINES` + the N9 clipping).
+`read_file.ts` **392 → 315**. **Five new plan defects (C66–C70, the seventy-first to
+seventy-fifth), running total seventy-five.** The write set is **8 files**, from two user
+decisions: `spec.md` was added to the **6** §5's row provides for, and `check-tools-thin.ts`
+plus its suite were added to fix a defect the gate's evidence-audit lens found in the gate itself.
+
+#### The spans, AST-derived and anchor-verified — none of them is what the row cites
+
+§5's T11 row is **pre-T7, pre-T9 and pre-T10** numbering throughout. Every span was derived from
+the TypeScript AST (declaration span + `getLeadingCommentRanges`) and cross-checked against a
+required anchor on its declaration line; a mismatch throws rather than reports.
+
+| member | row cites | shipped decl | shipped with comments | kind |
+| --- | --- | --- | --- | --- |
+| `MASSA_AI_READ_FILE_MAX_LINES` | `:22-36` | `:33-36` | `:22-36` | `VariableStatement` |
+| `interface ReadRange` | `:53-56` (`design.md` §5.1) | `:53-56` | `:53-56` | `InterfaceDeclaration` |
+| the N9 clipping | `:235-249` | `:235-244` | `:230-244` | 2 statements **inside `handle()`** |
+| `calculateRange` | `:485-507` | `:345-367` | `:345-367` | `MethodDeclaration` |
+| `adjustRange` | `:509-516` | `:369-376` | `:369-376` | `MethodDeclaration` |
+| `extractLines` | `:630-643` | `:378-391` | `:378-391` | `MethodDeclaration` |
+
+**63L declaration-only / 79L comment-inclusive**, both summed from the rows. Only one of the six
+cited spans — `MASSA_AI_READ_FILE_MAX_LINES`'s comment-inclusive `:22-36` — is still exact, and
+only because it sits above everything three tasks have removed. **The N9 clipping is not a
+declaration**, so it is located by walking `handle()`'s own statement list rather than by member
+lookup; that is why the row's 15-line figure matches the *comment-inclusive* span and not the
+statement-only one.
+
+#### C66 — the seventy-first: module 6 as specified depends on the module that composes it
+
+`design.md` §5.1 gives module 6 `calculateRange`, whose parameter is **`ReadFileParams`** — and the
+same table gives `interface ReadFileParams` to **module 7**, which T12 builds and which **composes
+2–6**. So the module table as written makes 6 import from 7: a backward edge against the composition
+direction, naming a type that does not exist yet.
+
+**§4's own header is the tell.** It opens *"`design.md` §5.1 names **one**"* cross-module state
+decision and hands it to Tasks — the 4 → 5 edge. §4.1 and §4.2 then decide two. **This is a third,
+of the same shape, and Design handed it to nobody**: the module table presents module 6 as
+free-standing exactly as §5.1's note says the table wrongly presents modules 4 and 5.
+
+**Resolved at author level**: module 6 declares `interface LineRangeRequest` — the **four** fields
+`calculateRange` actually reads — and `ReadFileParams` satisfies it structurally, so no call site
+changes and T12 passes its own interface unmodified. Rejected: moving `ReadFileParams` into module 6
+(contradicts §5.1 and drags module 7's whole surface down a level), and four positional parameters
+(rewrites the body instead of moving it, so the move stops being verbatim). GMS-05 AC-4 fixes the
+answer — the tree must type-check — and the replacement was already named by the measurement.
+**T12's row gains a note** so module 7 does not "unify" the two interfaces back into a cycle.
+
+#### C67 — the seventy-second: the clipped path drops the line numbering, and nothing anywhere saw it
+
+`extractLines` prefixes every line with a padded line number. The N9 cap **does not slice that
+string** — it re-slices the RAW `lines` array and joins it (`read_file.ts:237-241` before this task).
+**So a clipped response is unnumbered where an unclipped one is numbered**, and has been since
+Wave 4.
+
+**Found by the red-team lens before a line of module 6 was written**, and it changed the
+implementation. The natural composition — *extract, then slice the extracted text* — is what
+`selectLines` would have been on any reading of §5's row, and it would have **silently "fixed"** the
+asymmetry: a behavior change inside a behavior-preserving PR, invisible to every gate.
+
+**The evidence audit confirmed the zero coverage independently** and this task measured it:
+`wave-4-correctness.test.ts` and `read-file-containment.test.ts` drive the cap **four** times
+between them and every assertion is on the boolean, on `lineRange.actual.*`, or on
+`content.split("\n").length` — a line **count**, identical numbered or not. **Mutation M10 is the
+proof**: slicing the numbered text instead of the raw array is killed **only in column A**, by the
+new suite alone. *A characterization gap is not "the tests are thin"; it is a specific mutation the
+whole existing suite passes.* Pinned in both directions, logged and **not** fixed (`spec.md` §6,
+R-07's precedent).
+
+#### C68 — the seventy-third: `spec.md` §6 cites two sites for a variable neither sets
+
+The row reads *"both read-file suites set the var in-process (`read-file-containment.test.ts:180`,
+`read-file.test.ts:44`)"* under a subject naming **two** variables. Measured, both sites set
+**`MASSA_AI_READ_FILE_ROOTS`**; **no test anywhere sets `MASSA_AI_READ_FILE_MAX_LINES` in a way that
+can reach it**, because it is a module-level `const` evaluated once at import.
+
+**And the table was short a site.** The N9 cap is read at **three** independent places with **three
+different timings** — module 6 (once per process), `apps/tools-api/src/routes/workspace.ts:774`
+(**per request**, for `symbol_snippet`) and `apps/mcp-client/src/embedded-api-client.ts:327`. The
+third is why the row's own evidence read wrong: `workspace.test.ts:422` *does* set the variable and
+its test passes, which looks like proof the tool honours it. Amended in place at `spec.md` §6, both
+halves. *C63's class in an approved spec rather than in a gate: a claim with no line number and no
+member, invisible to every sweep this feature has run.*
+
+#### C69 — the seventy-fourth: the gate's population counter was pinned at 2, and its own suite could not see it
+
+`scripts/check-tools-thin.ts:353` read `sf.forEachChild(() => membersExamined++)`. **`forEachChild`
+stops the moment its callback returns a truthy value, and a post-increment returns the
+pre-increment value** — 0 on the first child (continue), 1 on the second (stop). The top-level
+contribution was therefore **exactly 2 in every file with two or more top-level nodes**, for the
+whole life of the gate. Measured three ways: the shipped callback counts **2**, a braced one counts
+**14**, and `read_file.ts`'s reported 16 is exactly `2 + 14` class members.
+
+**It never moved a verdict** — `isViolation` does not read the field — **and it falsified both
+sentences this file states about it**: `FileReading`'s *"class members plus top-level statements
+inspected"* (`:235`) and the population note's *"a diffable record … a reviewer comparing it against
+the frozen base is what closes that loop"* (`:160-162`). A counter pinned at 2 cannot distinguish a
+dead subject from a live one, which is the one property **RFS-01 AC-1** asks the population print to
+have and **R-37**'s mitigation depends on.
+
+**The suite was blind by shape, not by omission.** Six assertions reached `membersExamined` and every
+one was `> 0` or `=== a sibling reading`; all six pass at 2 exactly as at 14. *Sensor coverage is a
+shape, not a population.*
+
+**Fixed here, with the recalibration recorded — decided by the user** from four options (record-only
+and hand to T25, fix without a recalibration record, and a new task T11b were rejected). On the same
+tree the gate now reads `read_file.ts` **16 → 28** and the repo total **215 → 419**. Every figure at
+T5 (**224**), T7 (**223**), T9 (**221**) and T10 (**215**) is on the OLD counter and must be read as
+`2 + members` per file. The fix necessarily carried its suite — **T4b's precedent**, where closing
+AC-5 needed the gate *and* its test — and the new sensor asserts the **delta** as well as the
+absolute, so a counter that tracks a wrong base is caught too. **Observed red**: the reverse mutation
+leaves **96p/1f** and the new case is the only one that dies, by name; restore SHA-256-identical.
+
+**It is not cosmetic, and this very task is the proof.** On the old counter T11's member delta reads
+**16 → 13**, −3, one per method. On the corrected counter it reads **28 → 24**, −4 — and the fourth
+is `interface ReadRange` leaving the file, **a top-level member the old counter was structurally
+incapable of noticing**.
+
+#### C70 — the seventy-fifth: `adjustRange`'s Infinity ternary is dead branching
+
+`range.end === Infinity ? totalLines : Math.min(range.end, totalLines)`. Measured over 32
+`(end, totalLines)` pairs including `Infinity`, `0` and negatives: **0 differ** from the plain
+`Math.min(range.end, totalLines)`, because `Math.min` already handles `Infinity`. Surfaced as
+mutation **M6**, which "survived" column A — and it survived because it is an **equivalent
+mutation**, not because a sensor is missing. Pre-existing, moved verbatim, **logged not fixed**:
+simplifying it is a behavior-preserving change PR-D is not chartered to make, and it would break the
+verbatim-move claim the extraction rests on. *Recorded because a surviving mutation and a mutation
+with no subject read identically in a table, and only one of them is a gap.*
+
+#### The write set — 6 predicted by two rows, 8 shipped, two user decisions
+
+| tier | files | what |
+| --- | --- | --- |
+| structural | **3** | `read_file.ts`, `services/file-read/line-range.ts`, `__tests__/line-range.test.ts` |
+| citation repoints (**N = 2**) | **2** | `read-file-presentation-characterization.test.ts` (2 rows), `wave-4-correctness.test.ts` |
+| C68 — the spec row | **1** | `spec.md` §6, **user decision** |
+| C69 — the gate | **2** | `scripts/check-tools-thin.ts` + its suite, **user decision** |
+
+**N was resolved, not grown.** §5's row provides for *"+ N citation repoints"* and names one suite as
+an example; the sweep measured N at **2**, so the first two tiers are exactly the row's own shape.
+The growths that went to the user are `spec.md` and the gate pair.
+
+**Both citation diffs are proven comment-only**, not asserted: both revisions parsed and printed with
+`removeComments: true`, identical output, **2 of 2**.
+
+#### The sweep derives its baseline PER CITATION, and that is the structural fix for §10.12's limitation
+
+§10.12 records that the sweep *"takes one BASE for every row and cannot verify its own repoints"*, and
+patched it with a separate round-trip verifier carrying a hand-derived frame per pair. **The frame is
+a property of the citation, and git already stores it**: the commit that last modified the citing
+line. This sweep therefore derives BASE per row from `git blame -L n,n` and falls back to `argv[2]`
+only for uncommitted lines.
+
+**Not a cosmetic change — measured:** over 40 citations in 912 tracked source files, **32 rows are
+classified differently by a single `BASE=HEAD` than by their own frame.** Pre-edit attribution:
+**T11 1, T12 31** (T10's one-BASE run read T12 26). NARROW and WIDE subject rules both return 40,
+so the population is saturated.
+
+**C62's null case materialized exactly as predicted, and the sweep reports it as its own class.**
+Post-edit the sweep reads **moved-out 1, NO-OWNER 2** — `presentation:349` (cites `:645`,
+`extractLines`' arrow, MOVED-OUT to module 6) and `presentation:72` (cites `:135`, the constructor's
+`CodeCompressor` line, SHIFTED to `:115`). Neither resolves into any remaining owner span, so under
+C55/C59 as written both are owned by nobody; **under C62 both are T11's** and both are discharged.
+
+**One reading in that post-edit run is an artifact and is recorded rather than quoted.** It still
+prints `T11 — 1`, for `presentation:25`. The OWNERS table is keyed on **line spans derived from the
+pre-edit tree**, and post-edit `:240` is `metadata: {` — T12's result assembly — not the N9 clipping
+that occupied those numbers before. *An owner table keyed on line numbers is only valid against the
+tree it was derived from; the pre-edit run assigns ownership and the post-edit run's only job is to
+surface what the edit falsified.*
+
+#### The repoints, verified by round trip against two frames
+
+```
+PASS — 2 pair(s) verified by content against 2 distinct frames,
+       1 de-numbering(s) verified in both directions, 0 mismatch
+```
+
+Frames derived, not assumed: **`f1413b6`** for `presentation:72` (`:135` → **`:115`**) and
+**`38fdc52`** for `presentation:349` (`read_file.ts:645-649` → **`line-range.ts:138-142`**).
+**The comparison is TRIMMED, and that is a real weakening stated rather than hidden**: T9 and T10
+moved class members to class members and could assert exact equality; T11 moves three **methods** to
+free **functions**, which dedents every moved line by two. The indentation delta is asserted
+separately (`0, 2` — one pair unmoved, one uniformly dedented) so "trimmed" cannot conceal a body
+that was reformatted rather than moved. The de-numbering in `wave-4-correctness.test.ts` is checked
+in **both** directions: the retired fragment does not reappear (C63's trap) **and** the replacement
+names the new home, or it would be a deletion wearing a repoint's clothes.
+
+#### Two design decisions taken at author level, with their rejected options
+
+1. **Module 6 is FREE FUNCTIONS, not a class.** Modules 2–5 are classes because each owns per-tool
+   state; module 6 owns none, and module 1 (`services/cache/lru-evict.ts`) is a bare function for
+   exactly that reason (`design.md` §5.2). *Rejected: a `LineRange` class per tool* — it adds a field
+   and a constructor assignment to the one surface **C64** is about, and falsely implies per-instance
+   state. Consequence measured: `read_file.ts` gains **no** member, which is why its member count
+   falls by 4 rather than by 3 net.
+2. **`selectLines` composes `extractLines` and the cap; `extractLines` stays exported.** The two were
+   never separable at the call site — the cap reassigned the `selectedContent` and
+   `selectedLineCount` `extractLines` produced one line earlier. *Rejected:
+   `clipToMaxLines(lines, range, content, count)`*, which duplicates the `.split("\n")` at the call
+   site and passes an argument derivable from another.
+
+**`MASSA_AI_READ_FILE_MAX_LINES` moves verbatim as a module-level IIFE**, and the timing is
+unchanged in the only sense that is observable: it is evaluated once at module-body evaluation
+either way. Module 6 is a dependency of `read_file.ts` so it now evaluates strictly earlier in the
+graph, but both happen on the first import of `read_file.ts`. **The red-team corrected the author's
+premise here** — the plan asserted *"zero tests in the repo set that env var"*, which is false:
+`workspace.test.ts:422` sets it, and drives the **per-request** copy at `workspace.ts:774`. The
+narrower claim survives and is what C68 records.
+
+#### The discrimination table, two columns
+
+Scratch-copy backup, SHA-256 byte-identity asserted on restore, refuse-on-anchor-not-found,
+refuse-on-anchor-ambiguous, refuse-on-byte-identical, refuse-on-load-failure. **Never `git checkout`.**
+
+**Each column is the union of TWO processes, and that is new.** `wave-4-correctness.test.ts` carries
+the N9 sensors and therefore matters most to column B — but it matches **two** of
+`run-tests-isolated.ts`'s isolation patterns (`mock.module(` at `:533` and `process.env.X =` at
+`:38`), so CI forks it. Run beside its siblings it reports **7 failures** in its unrelated N4
+describes; standalone it is **24p/0f**. Folding those 7 into a mutation reading would have made
+every row look killed. *A baseline taken in a configuration CI never runs is not a baseline.*
+
+**Choosing column B, re-chosen rather than inherited.** T10's was *"the pre-existing suites with only
+the C34 repoint applied"*, because T10 took a design decision whose only sensor was a test it
+repointed. T11's repoints are **comment-only**, and its one characterization decision — C67's
+clipped format — has **no pre-existing sensor at all**, which is itself the finding. So B is simply
+**the pre-existing suites**, and the question it answers is how much of module 6 was already pinned
+by driving `handle()` from outside.
+
+| # | mutation | A: with T11's new suite | B: pre-existing only |
+| --- | --- | --- | --- |
+| M1 | `calculateRange` drops the `lineStart` floor | FAIL 203p/1f | **PASS 178p/0f** |
+| M2 | its `lineStart`/`lineEnd` guard becomes `\|\|` instead of `&&` | FAIL 203p/1f | **PASS 178p/0f** |
+| M3 | `offset`/`limit` becomes exclusive — `offset + limit`, not `- 1` | FAIL 201p/3f | **PASS 178p/0f** |
+| M4 | the limit default becomes nullish, so `limit: 0` stops defaulting | FAIL 203p/1f | **PASS 178p/0f** |
+| M5 | `adjustRange` drops the start floor of 1 | FAIL 202p/2f | **PASS 178p/0f** |
+| M6 | `adjustRange` stops expanding `Infinity` — **EQUIVALENT, see C70** | PASS 204p/0f | PASS 178p/0f |
+| M7 | `extractLines` pads to 4 instead of 6 | FAIL 192p/12f | FAIL 173p/5f |
+| M8 | `extractLines` numbers relative to the slice, not the file | FAIL 202p/2f | **PASS 178p/0f** |
+| M9 | the cap comparison becomes `>=` — clipping fires exactly AT the cap | FAIL 202p/2f | **PASS 178p/0f** |
+| M10 | **the clip slices the NUMBERED text — C67's asymmetry silently "fixed"** | FAIL 202p/2f | **PASS 178p/0f** |
+| M11 | the N9 default drops 500 → 250 | FAIL 196p/8f | FAIL 175p/3f |
+| M12 | `lineCount` is not recomputed after clipping | FAIL 198p/6f | FAIL 175p/3f |
+| M13 | the clip slices from the file's start rather than the range's | FAIL 203p/1f | **PASS 178p/0f** |
+| M14 | the env guard drops its positivity check — **UNREACHABLE in-process** | PASS 204p/0f | PASS 178p/0f |
+| M15 | comment-only edit in `line-range.ts` — **inert control** | PASS 204p/0f | PASS 178p/0f |
+
+Baselines **A 204p/0f, B 178p/0f**; post-restore control **204p/0f, matches**. Killing cases read
+**by name**, never by count.
+
+**Two rows are not discriminating subjects and were re-measured rather than reported as survivors.**
+M6 is C70's equivalent mutation (32 pairs, 0 differing). M14's branch is unreachable in-process — the
+variable is unset, so `Number(undefined)` is `NaN` and both the guarded and unguarded forms return
+500; that is the branch the module's docblock and the suite's *"What is NOT asserted"* section both
+name. **So the honest denominator is 12, A kills 12 of 12 and B kills 3 of 12** — against T10's
+4-of-15 miss and T9's 2-of-12. *This is the first Phase-3 module where the new suite is
+discrimination rather than coverage*, and the reason is structural: the three range functions are
+reachable from `handle()` only through whole-file reads, so every arithmetic detail below the
+response surface was unpinned. The three B does kill (M7, M11, M12) are the ones whose effect reaches
+the response — the numbering format via the presentation suite's token math, and the cap via the N9
+tests.
+
+#### Gates, all six plus both structural gates
+
+`lint` exit **0**, proven to bite **on a T11 file**: a duplicate declaration appended to
+`line-range.ts` produced `…:187:7: error: Identifier dupProbeT11 has already been declared` and exit
+**1**; restored SHA-256-identical (`712a79238f68d2dd…`), lint back to **0**. `type-check` **6/6, 0
+cached** (forced); `build` **5/5, 0 cached** (forced), 5 `cache bypass, force executing` lines.
+`test:scripts` exit **0**, **1114 → 1115** pass / 0 fail across **49** files — the **+1** is C69's
+new sensor, and a commit adding a `scripts/` test is the one case where this figure must move.
+`test:plugins` exit **0**, **96** / 0 across 8.
+
+**`check-core-layering` after `git add`: `PASS — 0 violation(s) across 978 tier-to-tier edges in 914
+tracked files`** — edges **977 → 978 (+1)**, files **912 → 914 (+2)**. `read_file.ts`'s own
+`tools → services` count goes **6 → 7**: it gains `file-read/line-range` and loses nothing, because
+the three methods it shed named no module. **Module 6 adds zero edges — it imports nothing at all**,
+which is module 1's property (RFS-02 AC-3's replacement) and is asserted by an AST walk in its own
+suite rather than by a text match. **RFS-03 AC-2 holds.**
+
+**`check-tools-thin` after `git add`: `FAIL — 2 of 30 … 415 members examined`, exit 1.** The verdict
+`2 of 30` **holds**, which is the required reading — a drop to `1 of 30` would mean `read_file.ts`
+went green one phase early. `read_file.ts` moves **5 / 6 / 0 / 175 → 1 / 1 / 0 / 165**.
+
+**Both body counts move, and that was the point.** `extractLines` carried the file's only nested body
+(its `.map` arrow), so it was the *entire* raw-vs-maximal gap; T11 removes four maximal bodies (the
+module-level IIFE, `calculateRange`, `adjustRange`, `extractLines`) and that one nested arrow, taking
+`6 / 5` to `1 / 1`. **The single survivor is C64's 4 → 5 wiring arrow at `:144-145`**, exactly as
+C64 predicted, and it is why the file cannot reach maximal 0 before T12.
+
+**`handle()` reads 165, the first reading other than 175 since T5**, because the N9 clipping is 15
+comment-inclusive lines inside it and the replacement is 12. *A reading that had stayed 175 would
+have meant the clipping did not move.* Still **45 over** the ceiling of 120, which T12 closes.
+
+**Coverage on the new module, measured directly (R-36): 100% funcs / 100% lines.**
+
+**`bun run test` exited 0 on its first run**, unlike T9's and T10's. 11/11 tasks, **5 cached and all
+five are `:build`** — every one of the 6 `:test` tasks executed — core `[test-isolation] PASS: all
+150 group(s)`. **The group count is unchanged at 150 for one added file, and the mechanism was
+verified rather than assumed**: `line-range.test.ts` matches **no** isolation pattern, so it joins
+the mock-free batch instead of being forked. A resumer expecting 151 should read the runner's
+classification, not the file count. `apps/mcp-client`'s
+`embedded-api-client-endpoints.test.ts` did **not** fail this time; the class `CLAUDE.md` documents
+for it is a first-run/cold-provider effect, and its absence is recorded as an observation rather than
+as a fix.
+
+#### The Plan Challenge gate on T11 — two modes, and both changed the work
+
+Mode selection reuses this feature's recorded route (`spec.md` §9.1, `design.md` §10). Per §10.7
+finding 10 and §10.8 finding 1, **no harness ran while either lens was live**, and both were handed
+measurements to attack rather than asked to reproduce a tree. `git status --porcelain` and the
+SHA-256 of all **12** files they were pointed at were checked after each returned: **tree clean, all
+12 unmodified, HEAD unchanged**. The evidence-audit agent **self-reported writing two `/tmp` files**
+against its instructions and having removed them; both were verified absent.
+
+| # | mode | finding | disposition |
+| --- | --- | --- | --- |
+| 1 | red-team | the clipped path drops `extractLines`' numbering, nothing pins either state, and D3's phrasing would have silently "fixed" it | **CONFIRMED, and it became C67 — the finding changed the implementation before it was written.** Mutation M10 is the proof it was invisible: killed only in column A |
+| 2 | red-team | `presentation:200-203` carries a five-citation cluster stale by a uniform +6 right now, and T11's stated repoint rationale would not surface it | **CONFIRMED IN MECHANISM, REJECTED AS STATED.** The sweep already reported every one of them — `:283 → :277`, `:304 → :298`, `:319 → :313` and two AMBIG — and attributed all five to **T12**, which moves those spans. Repointing them at T11 buys a third falsification, which is §10.11's own reason for deferring. **Twenty-sixth time on this feature that a critic's mechanism held while its conclusion did not** |
+| 3 | red-team | `presentation:72` breaks because content *above* it moved, and a repoint pass driven by "which citations name a relocated identifier" misses it structurally | **CONFIRMED as already-planned.** This is C62, recorded at T10 precisely for this class, and it was item 5 of the packet the lens was given. Reported as a confirmation rather than dropped |
+| 4 | red-team | D4's premise *"zero tests set that env var"* is false — `workspace.test.ts:422` sets it | **CONFIRMED, and the author's figure was wrong.** The narrower claim survives (that test drives `workspace.ts:774`'s per-request copy), and the correction is half of **C68** |
+| 5 | red-team | `handle() ≈ 165` rests on a call-site shape the plan had not committed to; T14b's C43 precedent is an explanatory comment eating the predicted margin | **ACCEPTED**, medium. The shape was fixed before implementation and the figure then measured: **exactly 165** |
+| 6 | evidence audit | `check-tools-thin.ts:353`'s `forEachChild(() => membersExamined++)` short-circuits, pinning the top-level count at 2 for every file | **CONFIRMED, and it became C69** — re-measured independently (2 vs 14 vs `2 + 14 = 16`) before acceptance. **The fourth author-side instrument defect a critic has found on this feature**, after T10's two |
+| 7 | evidence audit | `spec.md:570` cites two sites that set a different variable, and the duplication table is short a third site | **CONFIRMED**, and it is the other half of **C68** |
+| 8 | evidence audit | `check-tools-thin.ts:81`'s *"`read_file.ts`'s 11 methods"* — is it a live figure gone stale, or scoped history? | **RE-MEASURED AND LEFT.** Scoped to a named design-time measurement (*"written while `design.md` §6.5 was being measured"*) and naming `evictOldest<K, V>`, deleted at T10 — the same "quoted history" class as the two `:167`/`:168` adjudications. Not a C63 instance |
+| 9 | evidence audit | 8 of 12 figure sets re-derived exactly — the 392 length, all six spans **and their sum**, `handle()`'s 175 with the gate's comment-inclusive span rule read off its source, the identity of the 5 maximal and 1 nested body, the whole-gate 30/27/215/2, and `presentation:349`'s frame-anchored resolution | **CONFIRMED — all reproduce.** Rows I and K (the 40-row sweep and the by-claim widening delta) were **explicitly declined as unreproducible within budget rather than silently skipped**, which is the honest report |
+
+**The audit's own headline figure did not survive re-measurement, and the mechanism did.** It
+estimated the corrected repo total at **364** from a handler-files-only sweep; measured through the
+fixed gate it is **419**. *Keep the mechanism, re-run the number* — third occurrence on this feature.
+
+#### What T11 pins that no artifact named
+
+1. **A citation's baseline is a property of the citation, and git stores it** — the commit that last
+   modified the citing line. Deriving BASE per row from `git blame` rather than taking one per run
+   reclassified **32 of 40** rows, and it is what lets a sweep be re-run after its own repoint.
+2. **An owner table keyed on line spans is only valid against the tree it was derived from.** Re-run
+   after the edit, the sweep re-attributes rows to whatever now occupies those numbers — one row
+   read `T11` for a span that is now T12's result assembly. The pre-edit run assigns ownership; the
+   post-edit run's only job is to surface what the edit falsified.
+3. **A surviving mutation and a mutation with no subject are indistinguishable in a table** (C70,
+   M14). Two of fifteen rows here were an *equivalent* mutation and an *unreachable* branch; both
+   read as "the suite missed it" until re-measured, and the honest denominator is 12, not 15.
+4. **A baseline taken in a configuration CI never runs is not a baseline.** Column B's most important
+   suite is forked by `run-tests-isolated.ts`; run beside its siblings it contributes 7 unrelated
+   failures. Each column had to become the union of two processes.
+5. **Sensor coverage is a shape, not a population** (C69). Six assertions reached the defective
+   counter and all six were shape assertions, so the suite was blind by construction. The replacement
+   asserts the **delta** as well as the absolute, because a counter tracking a wrong base is the next
+   version of the same defect.
+6. **A round-trip check weakened to accommodate a legitimate change must say so and re-close the gap
+   another way.** Moving methods to free functions dedents every line, so exact text equality had to
+   become trimmed equality — and the indentation delta is asserted separately so a reflow cannot hide
+   inside the trim.
+
+**Running total: seventy-five plan defects.**

@@ -69,7 +69,7 @@
  *    (workspace mock), never through `MASSA_AI_READ_FILE_ROOTS` — which is
  *    cleared and restored around the file, with a tripwire, so an ambient value
  *    cannot make a case pass for the wrong reason.
- * 3. THE COMPRESSOR IS MOCKED. `read_file.ts:135` builds a real `CodeCompressor`
+ * 3. THE COMPRESSOR IS MOCKED. `read_file.ts:115` builds a real `CodeCompressor`
  *    with no injection seam, and T2's gate measured that `CodeCompressor` is this
  *    repo's live-LLM edge (`llm.enabled:true` with local Ollama; 42 s cold).
  */
@@ -346,8 +346,9 @@ describe("R-31 — read_file handle() presentation block, characterized pre-extr
     // Characterized as literals, not as a re-implementation of the formula: a
     // test that recomputes `Math.ceil(len/4)` alongside the subject moves with it.
     // `original` is measured over the NUMBERED text `extractLines` emits
-    // (`:645-649`), not the raw file — swapping `selectedContent` for `content`
-    // at `:293` changes this number.
+    // (`services/file-read/line-range.ts:138-142` — T11 moved it out of
+    // read_file.ts), not the raw file.
+    // Swapping `selectedContent` for `content` at `:293` changes this number.
     expect(d.tokens.original).toBe(920);
     expect(d.tokens.compressed).toBe(120);
     expect(d.tokens.saved).toBe(800);

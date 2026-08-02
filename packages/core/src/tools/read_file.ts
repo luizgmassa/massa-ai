@@ -15,25 +15,10 @@ import { CodeCompressor } from "../services/compression/code-compressor.js";
 import { serializeToolResponse } from "./serialize.js";
 import { FileContentCache } from "../services/file-read/file-content-cache.js";
 import { FileMetadataExtractor } from "../services/file-read/file-metadata.js";
+import { calculateRange, adjustRange, selectLines } from "../services/file-read/line-range.js";
 import { PathContainment } from "../services/file-read/path-containment.js";
 import { ProjectRootCache } from "../services/file-read/project-root-cache.js";
 import { SymbolGraphService } from "../services/symbol/symbol-graph.service.js";
-
-/**
- * N9: per-read line ceiling on user-facing read_file output. Default 500;
- * override via `MASSA_AI_READ_FILE_MAX_LINES`. Invalid/negative/zero
- * values fall back to 500 (treat invalid as unset). When the requested
- * range exceeds the cap, `selectedContent` is sliced and `source_clipped:
- * true` is emitted in the same response. The true total line count is
- * always surfaced as `lineRange.actual.total` so `omitted = total - shown`
- * is derivable. Internal enrichment paths (SymbolGraphService.readSnippet
- * /readContext used by go_to_definition) are NOT capped — see
- * symbol-graph.service.ts for the exclusion comment.
- */
-const MASSA_AI_READ_FILE_MAX_LINES = (() => {
-  const v = Number(process.env.MASSA_AI_READ_FILE_MAX_LINES);
-  return Number.isFinite(v) && v > 0 ? Math.floor(v) : 500;
-})();
 
 interface ReadFileParams {
   filePath: string;
@@ -48,11 +33,6 @@ interface ReadFileParams {
   includeSymbols?: boolean;
   includeImports?: boolean;
   fields?: string[];
-}
-
-interface ReadRange {
-  start: number;
-  end: number;
 }
 
 export class ReadFileTool implements IToolHandler {
@@ -210,7 +190,7 @@ export class ReadFileTool implements IToolHandler {
       const relativePath = p.filePath;
 
       // Calculate line range
-      const range = this.calculateRange(p);
+      const range = calculateRange(p);
 
       // Read file with cache
       const { content, metadata } = await this.fileContent.readFileWithCache(filePath, {
@@ -220,28 +200,18 @@ export class ReadFileTool implements IToolHandler {
         relativePath,
       });
 
-      // Extract requested lines
+      // Extract requested lines, then apply the N9 output cap. Both live in
+      // services/file-read/line-range.ts: `selectLines` returns the clipped flag
+      // rather than reassigning locals, and `lineRange.actual.total` below still
+      // carries the true total so `omitted = total - shown` stays derivable.
       const lines = content.split("\n");
       const totalLines = lines.length;
-      const adjustedRange = this.adjustRange(range, totalLines);
-      let selectedContent = this.extractLines(lines, adjustedRange);
-      let selectedLineCount = selectedContent.split("\n").length;
-
-      // N9: cap user-facing read_file output at MASSA_AI_READ_FILE_MAX_LINES
-      // (default 500). When the adjusted range exceeds the cap, slice the
-      // content and emit `source_clipped: true` in the same response so the
-      // caller knows lines were omitted. `lineRange.actual.total` keeps the
-      // true total line count so `omitted = total - shown` is derivable.
-      let source_clipped = false;
-      if (selectedLineCount > MASSA_AI_READ_FILE_MAX_LINES) {
-        const cappedLines = lines.slice(
-          adjustedRange.start - 1,
-          adjustedRange.start - 1 + MASSA_AI_READ_FILE_MAX_LINES,
-        );
-        selectedContent = cappedLines.join("\n");
-        selectedLineCount = selectedContent.split("\n").length;
-        source_clipped = true;
-      }
+      const adjustedRange = adjustRange(range, totalLines);
+      const {
+        content: selectedContent,
+        lineCount: selectedLineCount,
+        clipped: source_clipped,
+      } = selectLines(lines, adjustedRange);
 
       // Determine if compression is needed
       const shouldAutoCompress = 
@@ -342,51 +312,4 @@ export class ReadFileTool implements IToolHandler {
     }
   }
 
-  private calculateRange(params: ReadFileParams): ReadRange {
-    // Priority: lineStart/lineEnd > offset/limit > entire file
-    if (params.lineStart !== undefined && params.lineEnd !== undefined) {
-      return {
-        start: Math.max(1, params.lineStart),
-        end: params.lineEnd,
-      };
-    }
-
-    if (params.offset !== undefined) {
-      const offset = Math.max(1, params.offset);
-      const limit = params.limit || 1000;
-      return {
-        start: offset,
-        end: offset + limit - 1,
-      };
-    }
-
-    return {
-      start: 1,
-      end: Infinity,
-    };
-  }
-
-  private adjustRange(range: ReadRange, totalLines: number): ReadRange {
-    const start = Math.max(1, Math.min(range.start, totalLines));
-    const end = range.end === Infinity 
-      ? totalLines 
-      : Math.min(range.end, totalLines);
-    
-    return { start, end };
-  }
-
-  private extractLines(lines: string[], range: ReadRange): string {
-    const start = range.start - 1; // Convert to 0-indexed
-    const end = range.end;
-    
-    const selectedLines = lines.slice(start, end);
-    
-    // Add line numbers for context
-    return selectedLines
-      .map((line, index) => {
-        const lineNum = start + index + 1;
-        return `${lineNum.toString().padStart(6, " ")}: ${line}`;
-      })
-      .join("\n");
-  }
 }
