@@ -1,0 +1,23 @@
+# XP-03 / TASK-XP-005 — reviewed dangerous-primitive call sites.
+#
+# Format: class|path|expected-count|justification
+#
+# Seeded from scripts/check-security-allowlist.ts's own measured run against
+# the tree at TASK-XP-005 (post-XP-02). Every entry below was reviewed at
+# that point — 6 entries total, under the ~10-entry pause threshold the
+# Plan-Challenge amendment (critic C4) set, so no pause was needed. A file's
+# count changing in EITHER direction fails the gate (spec AC-3): a new site
+# is unreviewed, a removed site is a stale entry nobody updated.
+#
+# `dynamic-eval` permits NO entries by design — it is not listed here because
+# it must never appear; the gate hard-fails any hit regardless of this file.
+
+# child-process — array-args spawn/execFileSync/execSync, never a shell string.
+child-process|packages/core/src/services/bootstrap/bootstrap-service.ts|1|Default git runner: spawn("git", args, ...) with a fixed literal command and an argument array (no shell interpolation); never throws, used to read repo metadata (branch/remote) for bootstrap seeding.
+child-process|packages/core/src/services/executor/executor.ts|3|The documented code-execution sandbox itself (CLAUDE.md "Architecture"): execSync taskkill (Windows process-tree cleanup on timeout), execFileSync rustc (compiling a submitted Rust source to a temp binary under the sandbox's own tmp dir), spawn(sandboxedCmd) (running the already-sandboxed command array built by sandbox.ts).
+child-process|packages/core/src/services/executor/runtime.ts|3|Sandbox runtime probes/execution: execSync(check) (a fixed capability-probe command per language runtime), execSync(cmdStr) and execFileSync(cmd, args) (running the already-validated, sandboxed command for the target language, with an explicit timeout).
+child-process|packages/core/src/services/executor/sandbox.ts|2|Sandbox capability probes: execFileSync("docker", ["--version"]) and execFileSync("sandbox-exec", ["--version"]) — fixed literal commands with fixed args, used only to detect which sandbox backend is available.
+child-process|packages/core/src/services/symbol/impact-analysis.ts|5|Five execFileSync("git", [...]) calls (rev-parse, rev-list, hash-object, diff args, ls-files) — always the literal "git" binary with an argument array built from caller-supplied paths/dates, never a shell string, used to compute impacted symbols over a git history window.
+
+# raw-sql-unsafe — dynamic IN-list/column shape, values still bind-parameterized.
+raw-sql-unsafe|packages/core/src/data/symbol/symbol-repo-graph.ts|1|findEdges: the WHERE clause's placeholder count and column list are built dynamically (Prisma's tagged-template $queryRaw cannot express a variable-length IN list), but every actual value is passed through `params` as a bind parameter, never string-interpolated into the SQL text itself.

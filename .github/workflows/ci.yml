@@ -114,6 +114,17 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      # XP-03. Count-bounded allowlist over four dangerous-primitive classes
+      # (child-process, Bun.spawn/Bun.$, raw-SQL $queryRawUnsafe/$executeRawUnsafe,
+      # eval/new Function) via the TypeScript compiler API — never regex, so a
+      # string literal, a comment, or RegExp.prototype.exec cannot match. A new
+      # unreviewed site OR a stale entry (a site removed without updating the
+      # list) both fail; dynamic-eval permits zero allowlist entries at all.
+      # Runs beside Lint, before the full turbo Build, for the same cheap-gate-first
+      # reasoning as DEBT-01 above.
+      - name: Verify security allowlist (XP-03)
+        run: bun scripts/check-security-allowlist.ts
+
       - name: Build
         run: bun run build
 
