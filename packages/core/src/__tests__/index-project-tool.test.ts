@@ -14,11 +14,14 @@
 
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { realpathSync } from "node:fs";
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { indexJobTracker } from "../services/jobs/index-job-tracker.js";
 import {
   canonicalizeProjectRoot,
   assertProjectRootReuse,
-} from "../tools/index_project.js";
+} from "../services/project-identity/project-root-identity.js";
 
 // Mock EtlPipeline to avoid real ETL execution.
 let etlRunResult: any = null;
@@ -95,10 +98,16 @@ mock.module("../services/search/contextual-search-rlm.js", () => ({
  * recurses. Observed, not predicted — `Maximum call stack size exceeded`.
  */
 
-// Mock workspaceManager.
+// Mock workspaceManager. `workspaceStoredPath` is the stored-root knob for the
+// project-root-identity wiring describe; its null default (restored in the
+// afterEach beside the other knobs) preserves the no-stored-workspace state
+// every pre-existing case in this file was written against.
+let workspaceStoredPath: string | null = null;
+
 mock.module("../services/workspace/workspace-manager.js", () => ({
   workspaceManager: {
-    getWorkspace: async () => null,
+    getWorkspace: async () =>
+      workspaceStoredPath === null ? null : { project_path: workspaceStoredPath },
     markIndexing: async () => {},
     markIndexed: async () => {},
     markError: async () => {},
@@ -149,6 +158,7 @@ afterEach(() => {
   etlRunShouldThrow = false;
   managedRunBeginShouldFail = false;
   managedRunBeginShouldBeBusy = false;
+  workspaceStoredPath = null;
   etlRunCalls.length = 0;
   mock.restore();
 });
@@ -321,6 +331,79 @@ describe("IndexProjectTool → acquireIndexingLease wiring", () => {
     expect(result.data!.runId).toBe("1");
     await settle();
     expect(etlRunCalls[0].managedRunLease.runId).toBe(result.data!.runId);
+  });
+});
+
+/**
+ * The project-root-identity call site, which no suite observed before PR-D T14.
+ *
+ * `project-root-identity.test.ts` pins what the extracted helpers DO; it cannot
+ * see how the handler wires them. Measured on the unmoved tree before T14, with
+ * every core suite that reaches the class (61p/0f baseline): eleven mutations of
+ * the helpers AND their call sites — the reuse-guard call deleted outright, its
+ * `await` dropped, the RAW request path passed as the canonical one, the stored
+ * path dropped, the raw request projectId passed, `createJob` fed the raw path,
+ * `createJob` hoisted above the guard, and four helper-internal shapes — ALL
+ * survived, because this file's workspace mock returned no stored path so the
+ * guard no-opped in every handler test. The two cases below are the call-site
+ * sensor: real directories via mkdtemp (never a literal /tmp), expectations
+ * computed through realpathSync (macOS tmpdir resolves through /private), and
+ * the tracker spied so job creation on the rejection path is observable.
+ */
+describe("IndexProjectTool → project-root-identity wiring", () => {
+  test("a reused projectId with a DIFFERENT stored root rejects through handle() with both canonical roots, creating no job", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "massa-ai-t14-wire-"));
+    const stored = path.join(root, "stored");
+    const requested = path.join(root, "requested");
+    const requestedAlias = path.join(root, "requested-alias");
+    await mkdir(stored);
+    await mkdir(requested);
+    await symlink(requested, requestedAlias);
+    const createJob = spyOn(indexJobTracker, "createJob");
+    try {
+      workspaceStoredPath = stored;
+      const tool = new IndexProjectTool();
+      // No projectId: the handler derives it from the CANONICAL root's basename
+      // ("requested", not the alias's), which is what puts finalProjectId — and
+      // a raw-projectId wiring mutation — inside the asserted message.
+      const result = await tool.handle({ projectPath: requestedAlias });
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(
+        'Failed to start indexing: Project ID "requested" already ' +
+          `indexes canonical root "${realpathSync(stored)}", not ` +
+          `"${realpathSync(requested)}"; use forceReindex only after ` +
+          "verifying ownership of the existing project",
+      );
+      expect(createJob).not.toHaveBeenCalled();
+    } finally {
+      createJob.mockRestore();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("an ALIAS of the stored root is accepted, and the job carries the canonical path", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "massa-ai-t14-wire-"));
+    const requested = path.join(root, "requested");
+    const storedAlias = path.join(root, "stored-alias");
+    await mkdir(requested);
+    await symlink(requested, storedAlias);
+    const createJob = spyOn(indexJobTracker, "createJob");
+    try {
+      workspaceStoredPath = storedAlias;
+      const tool = new IndexProjectTool();
+      const result = await tool.handle({
+        projectPath: requested,
+        projectId: "cov-reuse-accept",
+      });
+      expect(result.success).toBe(true);
+      expect(createJob).toHaveBeenCalledWith(
+        "cov-reuse-accept",
+        realpathSync(requested),
+      );
+    } finally {
+      createJob.mockRestore();
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 

@@ -18,8 +18,8 @@ import { logger } from "@massa-ai/shared";
 import { indexJobTracker } from "../services/jobs/index-job-tracker.js";
 import { executeIndexing } from "../services/indexing/execute-indexing.js";
 import { acquireIndexingLease } from "../services/indexing/acquire-indexing-lease.js";
+import { assertProjectRootReuse, canonicalizeProjectRoot } from "../services/project-identity/project-root-identity.js";
 import { workspaceManager } from "../services/workspace/workspace-manager.js";
-import { realpath } from "node:fs/promises";
 import path from "path";
 import { assertParserReadyForIndexing } from "../services/structural/parser-readiness.js";
 
@@ -31,39 +31,6 @@ interface IndexProjectParams {
   warmupQueries?: string[];
   /** Include test/benchmark files so typed edges from `.test.ts` etc. are indexed. */
   include_tests?: boolean;
-}
-
-type CanonicalizePath = (projectPath: string) => Promise<string>;
-
-export async function canonicalizeProjectRoot(
-  projectPath: string,
-  canonicalize: CanonicalizePath = realpath,
-): Promise<string> {
-  return canonicalize(path.resolve(projectPath));
-}
-
-export async function assertProjectRootReuse(options: {
-  projectId: string;
-  canonicalProjectPath: string;
-  storedProjectPath?: string | null;
-  forceReindex: boolean;
-  canonicalize?: CanonicalizePath;
-}): Promise<void> {
-  if (!options.storedProjectPath || options.forceReindex) return;
-  const canonicalize = options.canonicalize ?? realpath;
-  let storedCanonical: string;
-  try {
-    storedCanonical = await canonicalize(path.resolve(options.storedProjectPath));
-  } catch {
-    storedCanonical = path.resolve(options.storedProjectPath);
-  }
-  if (storedCanonical !== options.canonicalProjectPath) {
-    throw new Error(
-      `Project ID "${options.projectId}" already indexes canonical root ` +
-        `"${storedCanonical}", not "${options.canonicalProjectPath}"; ` +
-        "use forceReindex only after verifying ownership of the existing project",
-    );
-  }
 }
 
 export class IndexProjectTool implements IToolHandler {

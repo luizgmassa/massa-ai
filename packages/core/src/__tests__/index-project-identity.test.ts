@@ -5,7 +5,7 @@ import path from "node:path";
 import {
   assertProjectRootReuse,
   canonicalizeProjectRoot,
-} from "../tools/index_project.js";
+} from "../services/project-identity/project-root-identity.js";
 
 const roots: string[] = [];
 

@@ -35,8 +35,9 @@
  * callback cannot follow an optional parameter in TypeScript — so threading
  * `warmupCache` positionally would have forced the existing parameters to be
  * reordered, which is a larger change to the call site than the object is.
- * `assertProjectRootReuse` in the very file this module leaves already takes
- * `options: { ... }`, and sibling module 6 takes `calculateRange(params:
+ * `assertProjectRootReuse` — beside this code in `index_project.ts` until PR-D
+ * T14 moved it to `services/project-identity/project-root-identity.ts` — already
+ * took `options: { ... }`, and sibling module 6 takes `calculateRange(params:
  * LineRangeRequest)`.
  *
  * THE CATCH SWALLOWS, AND THAT IS THE PIN THAT MATTERS. On a thrown ETL this
