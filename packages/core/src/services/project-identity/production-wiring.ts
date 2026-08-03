@@ -64,8 +64,17 @@ async function resolveServingTargets(): Promise<ProductionInvalidatorTargets> {
  *    engine (IndexManager is assigned during engine initialization).
  *  - `symbol-graph-project-root` — cached project-root path resolution.
  *
- * L1MemoryCache and the read_file tool cache are deliberately absent: both
- * are TTL-bounded and self-evict (see invalidator-registry.ts). Durable
+ * L1MemoryCache and the read_file tool cache are deliberately absent. The
+ * reason this comment used to give — "both are TTL-bounded and self-evict" —
+ * is FALSE for read_file, and the authority is the measurement, not the
+ * neighbouring comment in invalidator-registry.ts that this line used to cite.
+ * Pinned by __tests__/read-file-project-root-rename-pin.test.ts (RFS-02 AC-4):
+ * FileContentCache.CACHE_TTL bounds the file CONTENT cache and IS enforced,
+ * while ROOT_CACHE_TTL is declared and read nowhere, so projectRootCache is
+ * LRU-bounded only. Driven across a committed rename, this registry clears
+ * SymbolGraphService's cached root and ReadFileTool keeps serving the
+ * PRE-rename one; no invalidator id below matches /read[-_]?file/i. That
+ * stale read is RECORDED, NOT FIXED — fixing it is a behavior change. Durable
  * caches (search_cache PG rows) are rewritten by apply itself (T3 stores).
  *
  * Every invalidation failure is caught by the registry and surfaced as a

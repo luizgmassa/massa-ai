@@ -76,7 +76,7 @@ const graphInstance = {
   getNeighborhoodSummary: mock(() => Promise.resolve("summary")),
 };
 
-mock.module("../services/graph/memory-graph.service.js", () => ({
+mock.module("../services/memory-graph/memory-graph.service.js", () => ({
   MemoryGraphService: { getInstance: () => graphInstance },
 }));
 

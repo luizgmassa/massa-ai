@@ -156,10 +156,12 @@ export const EXCLUSIONS: ReadonlyArray<{ file: string; reason: string }> = [
     file: "packages/core/src/services/health/local-health-checker.ts",
     reason: "e2e-gated — requires a live API server, covered by the e2e suite instead",
   },
-  {
-    file: "packages/core/src/services/query/prisma-client.ts",
-    reason: "connection singleton and env boilerplate",
-  },
+  // `packages/core/src/services/query/prisma-client.ts` was excluded here as
+  // "connection singleton and env boilerplate" and deleted at PR-D's T21: the
+  // file moved to `kernel/prisma-client.ts` at PR-C (9fe4545), `2ea4ebd` then
+  // took it to 100% (26/26), so the entry was dangling AND dead weight under
+  // either path. The existence pin in `check-coverage.test.ts` is what now
+  // makes the next silent `git mv` fail instead of read as an active exemption.
   // `packages/core/src/__tests__/e2e/{_helpers,qwen-fixture}.ts` were carried
   // here from the `coverage-90pct` report and have been removed: `isMeasuredSource`
   // already drops everything under `__tests__/`, so both entries were inert.
@@ -276,7 +278,7 @@ export interface FileCoverage {
    * degenerate record that marks *every physical line* uncovered — blank lines,
    * closing braces and JSDoc included.
    *
-   * Measured on `packages/core/src/services/graph/graph-queries.ts` (440 lines):
+   * Measured on `packages/core/src/services/memory-graph/graph-queries.ts` (440 lines):
    * the instrumenting group reported 220 executable lines and covered all 220;
    * seven shallow groups each reported 377 and covered 14. The 157-line
    * difference is entirely comments, blanks and braces, and the real set is a

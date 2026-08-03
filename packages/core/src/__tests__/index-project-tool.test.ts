@@ -1,24 +1,41 @@
 /**
  * index_project tool coverage tests — covers canonicalizeProjectRoot,
  * assertProjectRootReuse, and IndexProjectTool handler error paths.
- * Mocks EtlPipeline and ContextualSearchRLM to test the handler + executeIndexing.
+ * Mocks EtlPipeline and ContextualSearchRLM to test the handler plus the
+ * background `executeIndexing`, which since PR-D T13 lives in
+ * `services/indexing/execute-indexing.ts` rather than in the tool. The
+ * EtlPipeline mock below still reaches it: `mock.module` registers by RESOLVED
+ * path, so this file's `"../services/etl/pipeline.js"` and that module's own
+ * `"../etl/pipeline.js"` are the same registration.
+ *
+ * This file asserts only `handle()`'s SYNCHRONOUS return; the background
+ * contract is pinned by `execute-indexing.test.ts`.
  */
 
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { realpathSync } from "node:fs";
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { indexJobTracker } from "../services/jobs/index-job-tracker.js";
 import {
   canonicalizeProjectRoot,
   assertProjectRootReuse,
-} from "../tools/index_project.js";
+} from "../services/project-identity/project-root-identity.js";
 
 // Mock EtlPipeline to avoid real ETL execution.
 let etlRunResult: any = null;
 let etlRunShouldThrow = false;
 
+// Every request the pipeline receives, recorded — this is how the handler's
+// wiring is observed without replacing `executeIndexing` itself.
+const etlRunCalls: any[] = [];
+
 mock.module("../services/etl/pipeline.js", () => ({
   EtlPipeline: {
     getInstance: () => ({
-      run: async () => {
+      run: async (req: any) => {
+        etlRunCalls.push(req);
         if (etlRunShouldThrow) throw new Error("ETL failed");
         return etlRunResult ?? {
           filesDiscovered: 1,
@@ -50,16 +67,47 @@ mock.module("../services/etl/pipeline.js", () => ({
 }));
 
 // Mock ContextualSearchRLM to avoid heavy init.
+//
+// `warmupCache` deliberately reaches through `this`, as the real method does
+// (`await this.ensureInitialized()`), and returns the real method's shape. A
+// receiver-free stub cannot tell a bound callback from an unbound one, so the
+// §4.2 identity decision would be unenforceable — measured: the call-site
+// mutation that drops `.bind()` survived every suite until this stub used
+// `this`.
 mock.module("../services/search/contextual-search-rlm.js", () => ({
   ContextualSearchRLM: class {
-    async warmupCache() { return { warmed: 0 }; }
+    #ready = true;
+    async warmupCache() {
+      if (!this.#ready) throw new Error("contextual search not initialized");
+      return { queriesWarmed: 0, errors: 0 };
+    }
   },
 }));
 
-// Mock workspaceManager.
+/**
+ * What the handler wires into the background run is observed through the ETL
+ * mock above rather than by mocking `execute-indexing.js`, DELIBERATELY: the
+ * real `executeIndexing` forwards the request's fields to
+ * `EtlPipeline.run(...)`, so recording that call reaches the wiring without
+ * replacing the module the three background-path tests exist to exercise
+ * (GMS-05 AC-3 — no test weakened).
+ *
+ * A delegating module mock was tried first and is a trap worth recording:
+ * `mock.module` also rebinds a namespace imported BEFORE the registration, so
+ * the "real" implementation captured for delegation resolves to the mock and
+ * recurses. Observed, not predicted — `Maximum call stack size exceeded`.
+ */
+
+// Mock workspaceManager. `workspaceStoredPath` is the stored-root knob for the
+// project-root-identity wiring describe; its null default (restored in the
+// afterEach beside the other knobs) preserves the no-stored-workspace state
+// every pre-existing case in this file was written against.
+let workspaceStoredPath: string | null = null;
+
 mock.module("../services/workspace/workspace-manager.js", () => ({
   workspaceManager: {
-    getWorkspace: async () => null,
+    getWorkspace: async () =>
+      workspaceStoredPath === null ? null : { project_path: workspaceStoredPath },
     markIndexing: async () => {},
     markIndexed: async () => {},
     markError: async () => {},
@@ -110,7 +158,253 @@ afterEach(() => {
   etlRunShouldThrow = false;
   managedRunBeginShouldFail = false;
   managedRunBeginShouldBeBusy = false;
+  workspaceStoredPath = null;
+  etlRunCalls.length = 0;
   mock.restore();
+});
+
+/** Lets the background `.catch()`-free promise chain settle before asserting. */
+const settle = () => new Promise((r) => setTimeout(r, 300));
+
+/**
+ * The call site itself, which no suite observed before PR-D T13.
+ *
+ * `execute-indexing.test.ts` pins what the extracted module DOES; it cannot see
+ * how the handler wires it. Measured with the T13 mutation harness: four
+ * call-site mutations — an unbound callback, a dropped lease, `projectPath`
+ * receiving the project ID, and a dropped `include_tests` — survived BOTH the
+ * module suite and every pre-existing suite. A method test is not a call-site
+ * test; these four cases are the sensor for the wiring.
+ */
+describe("IndexProjectTool → executeIndexing wiring", () => {
+  test("forwards the CANONICAL project path, not the project id", async () => {
+    const tool = new IndexProjectTool();
+    const result = await tool.handle({
+      projectPath: "/tmp",
+      projectId: "cov-wire-path",
+    });
+    expect(result.success).toBe(true);
+    await settle();
+    expect(etlRunCalls).toHaveLength(1);
+    const req = etlRunCalls[0];
+    expect(req.projectId).toBe("cov-wire-path");
+    expect(req.projectPath).toBe(realpathSync("/tmp"));
+    expect(req.projectPath).not.toBe(req.projectId);
+    expect(req.jobId).toBe(result.data!.jobId);
+  });
+
+  test("hands the ACQUIRED lease through to the pipeline", async () => {
+    const tool = new IndexProjectTool();
+    const result = await tool.handle({
+      projectPath: "/tmp",
+      projectId: "cov-wire-lease",
+    });
+    await settle();
+    const req = etlRunCalls[0];
+    expect(req.managedRunLease).toBeDefined();
+    expect(req.managedRunLease.runId).toBe(result.data!.runId);
+  });
+
+  test("forwards include_tests and forceReindex as given", async () => {
+    const tool = new IndexProjectTool();
+    await tool.handle({
+      projectPath: "/tmp",
+      projectId: "cov-wire-flags",
+      include_tests: true,
+      forceReindex: true,
+    });
+    await settle();
+    const req = etlRunCalls[0];
+    expect(req.include_tests).toBe(true);
+    expect(req.forceReindex).toBe(true);
+  });
+
+  test("the warmup callback reaches its receiver — an unbound one would throw", async () => {
+    // The stubbed ContextualSearchRLM reads `this.#ready`, so a callback passed
+    // without `.bind()` rejects; the module's catch then records a FAILURE via
+    // setResult instead of completing through setResultAndFlush. Asserting the
+    // successful terminal transition is what discriminates the two.
+    const flush = spyOn(indexJobTracker, "setResultAndFlush");
+    try {
+      const tool = new IndexProjectTool();
+      await tool.handle({
+        projectPath: "/tmp",
+        projectId: "cov-wire-bound",
+        warmCache: true,
+        warmupQueries: ["q1"],
+      });
+      await settle();
+      expect(flush).toHaveBeenCalled();
+    } finally {
+      flush.mockRestore();
+    }
+  });
+});
+
+/**
+ * The lease call site, which no suite observed before PR-D T14b.
+ *
+ * `acquire-indexing-lease.test.ts` pins what the extracted module DOES; it
+ * cannot see how the handler consumes its discriminated result. The two cases
+ * below asserted `result.error` only — the RESPONSE — and the response is not
+ * what separates the two failure modes. `handle()`'s outer catch returns a
+ * plausible 500 body and calls `setResult` NOT AT ALL, so a lease failure that
+ * throws out of the module instead of resolving to `{status:"failed"}` returns
+ * a similar-looking error while leaving the job non-terminal forever.
+ *
+ * Measured before these cases existed: `managed_runs_begin_failed:` appeared at
+ * one site in the repository and in zero tests, and nothing anywhere asserted
+ * the tracker's terminal state on either lease branch. The tracker transition is
+ * therefore the sensor, not the message.
+ */
+describe("IndexProjectTool → acquireIndexingLease wiring", () => {
+  test("the BUSY branch records a terminal job result, not just a 409 body", async () => {
+    managedRunBeginShouldBeBusy = true;
+    const setResult = spyOn(indexJobTracker, "setResult");
+    try {
+      const tool = new IndexProjectTool();
+      const result = await tool.handle({
+        projectPath: "/tmp",
+        projectId: "cov-busy-terminal",
+      });
+      expect(result.success).toBe(false);
+      const call = setResult.mock.calls.find((c) =>
+        String(c[2]).startsWith("indexing_busy:"),
+      );
+      expect(call).toBeDefined();
+      expect(call![0]).toBe(result.data!.jobId);
+      expect(String(call![2])).toBe("indexing_busy:existing-run");
+      expect((call![1] as { errors: number }).errors).toBe(0);
+    } finally {
+      setResult.mockRestore();
+    }
+  });
+
+  test("the 409 body carries the ACTIVE run's id and expiry, not the job's", async () => {
+    // The two mutations that survived T14b's first harness run were both here:
+    // reporting `job.jobId` in the error string (the pre-existing assertion is
+    // `toContain("indexing_busy")`, which passes either way) and zeroing
+    // `leaseExpiresAt` (asserted by nothing at all). The 409 body is precisely
+    // the part T14b's design keeps in the handler as response shaping, so it is
+    // the part a module suite structurally cannot reach.
+    managedRunBeginShouldBeBusy = true;
+    const before = Date.now();
+    const tool = new IndexProjectTool();
+    const result = await tool.handle({
+      projectPath: "/tmp",
+      projectId: "cov-busy-body",
+    });
+    expect(result.error).toBe("indexing_busy:existing-run");
+    expect(result.data!.activeRunId).toBe("existing-run");
+    expect(result.data!.leaseExpiresAt).toBeGreaterThanOrEqual(before);
+    expect(result.data!.jobId).not.toBe(result.data!.activeRunId);
+  });
+
+  test("the FAILED branch records a terminal job result — the outer catch does not", async () => {
+    managedRunBeginShouldFail = true;
+    const setResult = spyOn(indexJobTracker, "setResult");
+    try {
+      const tool = new IndexProjectTool();
+      const result = await tool.handle({
+        projectPath: "/tmp",
+        projectId: "cov-fail-terminal",
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Failed to acquire indexing lease");
+      const call = setResult.mock.calls.find((c) =>
+        String(c[2]).startsWith("managed_runs_begin_failed:"),
+      );
+      expect(call).toBeDefined();
+      expect((call![1] as { errors: number }).errors).toBe(1);
+    } finally {
+      setResult.mockRestore();
+    }
+  });
+
+  test("an ACQUIRED lease reaches the response runId and the pipeline together", async () => {
+    const tool = new IndexProjectTool();
+    const result = await tool.handle({
+      projectPath: "/tmp",
+      projectId: "cov-lease-mapped",
+    });
+    expect(result.success).toBe(true);
+    expect(result.data!.runId).toBe("1");
+    await settle();
+    expect(etlRunCalls[0].managedRunLease.runId).toBe(result.data!.runId);
+  });
+});
+
+/**
+ * The project-root-identity call site, which no suite observed before PR-D T14.
+ *
+ * `project-root-identity.test.ts` pins what the extracted helpers DO; it cannot
+ * see how the handler wires them. Measured on the unmoved tree before T14, with
+ * every core suite that reaches the class (61p/0f baseline): eleven mutations of
+ * the helpers AND their call sites — the reuse-guard call deleted outright, its
+ * `await` dropped, the RAW request path passed as the canonical one, the stored
+ * path dropped, the raw request projectId passed, `createJob` fed the raw path,
+ * `createJob` hoisted above the guard, and four helper-internal shapes — ALL
+ * survived, because this file's workspace mock returned no stored path so the
+ * guard no-opped in every handler test. The two cases below are the call-site
+ * sensor: real directories via mkdtemp (never a literal /tmp), expectations
+ * computed through realpathSync (macOS tmpdir resolves through /private), and
+ * the tracker spied so job creation on the rejection path is observable.
+ */
+describe("IndexProjectTool → project-root-identity wiring", () => {
+  test("a reused projectId with a DIFFERENT stored root rejects through handle() with both canonical roots, creating no job", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "massa-ai-t14-wire-"));
+    const stored = path.join(root, "stored");
+    const requested = path.join(root, "requested");
+    const requestedAlias = path.join(root, "requested-alias");
+    await mkdir(stored);
+    await mkdir(requested);
+    await symlink(requested, requestedAlias);
+    const createJob = spyOn(indexJobTracker, "createJob");
+    try {
+      workspaceStoredPath = stored;
+      const tool = new IndexProjectTool();
+      // No projectId: the handler derives it from the CANONICAL root's basename
+      // ("requested", not the alias's), which is what puts finalProjectId — and
+      // a raw-projectId wiring mutation — inside the asserted message.
+      const result = await tool.handle({ projectPath: requestedAlias });
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(
+        'Failed to start indexing: Project ID "requested" already ' +
+          `indexes canonical root "${realpathSync(stored)}", not ` +
+          `"${realpathSync(requested)}"; use forceReindex only after ` +
+          "verifying ownership of the existing project",
+      );
+      expect(createJob).not.toHaveBeenCalled();
+    } finally {
+      createJob.mockRestore();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("an ALIAS of the stored root is accepted, and the job carries the canonical path", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "massa-ai-t14-wire-"));
+    const requested = path.join(root, "requested");
+    const storedAlias = path.join(root, "stored-alias");
+    await mkdir(requested);
+    await symlink(requested, storedAlias);
+    const createJob = spyOn(indexJobTracker, "createJob");
+    try {
+      workspaceStoredPath = storedAlias;
+      const tool = new IndexProjectTool();
+      const result = await tool.handle({
+        projectPath: requested,
+        projectId: "cov-reuse-accept",
+      });
+      expect(result.success).toBe(true);
+      expect(createJob).toHaveBeenCalledWith(
+        "cov-reuse-accept",
+        realpathSync(requested),
+      );
+    } finally {
+      createJob.mockRestore();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("canonicalizeProjectRoot", () => {
@@ -310,10 +604,22 @@ describe("IndexProjectTool handler", () => {
   });
 
   test("background indexing catch handler fires on executeIndexing rejection", async () => {
-    // Force ETL to throw → executeIndexing catches internally → setResult.
-    // The outer .catch on executeIndexing should NOT fire because
-    // executeIndexing has its own catch. But if indexJobTracker.updateStatus
-    // throws before the try/catch, the .catch fires.
+    // Force ETL to throw → `executeIndexing` catches internally → setResult.
+    // The outer .catch on the call does NOT fire, because `executeIndexing`
+    // (now `services/indexing/execute-indexing.ts`, PR-D T13) has its own catch
+    // and RESOLVES.
+    //
+    // This comment used to say the outer .catch fires "if indexJobTracker
+    // .updateStatus throws before the try/catch". Measured at T13: it does not,
+    // and it never did — `updateStatus` is the FIRST statement INSIDE that try,
+    // so it is caught like everything else. The only code outside the try is the
+    // request destructure and `Date.now()`, neither reachable as a throw from any
+    // request `handle()` builds. The outer .catch is unreachable defensive code,
+    // which is why it is the one uncovered arrow in this file — a dead branch,
+    // not a missing sensor, and deliberately not covered by an artificial reach.
+    //
+    // The swallow itself is pinned in `execute-indexing.test.ts`; this case
+    // asserts only the handler's synchronous return.
     etlRunShouldThrow = true;
     const tool = new IndexProjectTool();
     const result = await tool.handle({

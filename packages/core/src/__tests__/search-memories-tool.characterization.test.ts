@@ -54,7 +54,7 @@ mock.module("../data/memory/memory-repository-factory.js", () => ({
 mock.module("../services/memory/memory-service.js", () => ({
   MemoryService: { getInstance: () => ({}) },
 }));
-mock.module("../services/graph/memory-graph.service.js", () => ({
+mock.module("../services/memory-graph/memory-graph.service.js", () => ({
   MemoryGraphService: { getInstance: () => ({}) },
 }));
 

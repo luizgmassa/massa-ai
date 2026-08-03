@@ -152,6 +152,21 @@ jobs:
       - name: Verify core layer contract (GMS-01 AC-1)
         run: bun scripts/check-core-layering.ts
 
+      # GMS-02 / RFS-01 AC-1 (PR-D). The tools-tier thinness contract: a file
+      # under packages/core/src/tools/ declares no function body beyond handle()
+      # and the constructor, holds no Map/Set state, and keeps handle() at or
+      # under 120 lines — schema + delegation only. Zero allowlist, on the
+      # layering gate's stated ground: an accepted exception is indistinguishable
+      # from a new violation of the same shape.
+      #
+      # Prints its examined population on a PASS (file count, handler split,
+      # members) because a run that resolved nothing reports zero violations
+      # exactly like a clean tree, and the two must not read alike in the log.
+      # A violation prints per-file findings and exits 1. Structural only: the
+      # script's own docblock names what it does not certify (RFS-01 AC-6).
+      - name: Verify tools-tier thinness (GMS-02 / RFS-01 AC-1)
+        run: bun scripts/check-tools-thin.ts
+
       # GMS-04 AC-3. Classifies every path-shaped pointer at a renamed module as
       # RESOLVES, HISTORICAL or BROKEN. Broken must be 0 and historical must sit
       # exactly on its pin, so a newly dangling pointer and a silently dropped

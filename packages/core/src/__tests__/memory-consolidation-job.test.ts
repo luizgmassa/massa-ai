@@ -18,7 +18,7 @@ mock.module("../data/memory/memory-repository-factory.js", () => ({
   getMemoryRepository: () => mockRepo,
 }));
 
-mock.module("../services/graph/graph-store-factory.js", () => ({
+mock.module("../services/memory-graph/graph-store-factory.js", () => ({
   getGraphStore: () => mockGraphStore,
 }));
 

@@ -11,8 +11,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "crypto";
 import { MemoryRelationType, type MemoryEdge } from "@massa-ai/shared";
-import { GraphQueries } from "../services/graph/graph-queries.js";
-import type { EdgeFilter, IGraphStore } from "../services/graph/types.js";
+import { GraphQueries } from "../services/memory-graph/graph-queries.js";
+import type { EdgeFilter, IGraphStore } from "../services/memory-graph/types.js";
 import { Prisma } from "../generated/prisma/index.js";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";

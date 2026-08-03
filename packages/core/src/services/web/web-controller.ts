@@ -22,6 +22,7 @@
 
 import type { IVectorStore, IKeywordSearch, VectorDocument } from "@massa-ai/shared";
 import { logger } from "@massa-ai/shared";
+import { evictOldest } from "../cache/lru-evict.js";
 import { runPool, type PoolJob } from "../executor/run-pool.js";
 import {
   fetchAndConvertOne,
@@ -134,12 +135,11 @@ export class WebController {
         // Replace any existing entry so the key's insertion order is refreshed.
         this.cache.delete(key);
         this.cache.set(key, ts);
-        // Evict oldest (first-key) entries while over the cap.
-        while (this.cache.size > WEB_CACHE_MAX_ENTRIES) {
-          const oldest = this.cache.keys().next().value;
-          if (oldest === undefined) break;
-          this.cache.delete(oldest);
-        }
+        // Evict oldest (first-key) entries while over the cap. This site runs
+        // AFTER the insert, so it passes the cap itself — services/cache's
+        // second parameter is a post-call bound, and only pre-insert callers
+        // subtract one to reserve the slot their pending set() takes.
+        evictOldest(this.cache, WEB_CACHE_MAX_ENTRIES);
       },
     };
   }

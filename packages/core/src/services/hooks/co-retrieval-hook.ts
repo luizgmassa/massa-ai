@@ -25,7 +25,7 @@
 import { logger, MemoryRelationType } from "@massa-ai/shared";
 import { eventBus } from "../events/event-bus.js";
 import type { EventMap } from "../events/event-bus.js";
-import { getGraphStore } from "../graph/graph-store-factory.js";
+import { getGraphStore } from "../memory-graph/graph-store-factory.js";
 import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
 import type { MemoryRepositoryPg } from "../../data/memory/memory-repository-pg.js";
 

@@ -19,6 +19,7 @@ import {
 import { definitionLookupService, type DefinitionLookupResult } from "./definition-lookup.js";
 import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
 import { workspaceManager } from "../workspace/workspace-manager.js";
+import { evictOldest } from "../cache/lru-evict.js";
 import type {
   SymbolDefinition,
   SymbolReference,
@@ -171,7 +172,10 @@ export class SymbolGraphService {
    * caller cycling distinct projectIds grows the map for the process lifetime.
    * Map preserves INSERTION order in JS; we promote a key to most-recently-used
    * on GET via delete+set, and evict the oldest key on SET while over the cap.
-   * Mirrors ReadFileTool's FILE_CACHE_MAX_ENTRIES / evictOldest pattern.
+   * Mirrors services/file-read/file-content-cache.ts's FILE_CACHE_MAX_ENTRIES
+   * and services/file-read/project-root-cache.ts's own cap. Both were
+   * ReadFileTool's private fields when this comment was written; T9 and T10
+   * moved them out, and the shared operator is services/cache/lru-evict.ts.
    */
   private readonly PROJECT_ROOT_CACHE_MAX_ENTRIES = 512;
 
@@ -803,13 +807,17 @@ export class SymbolGraphService {
    * Evict the oldest (first-inserted) entries from projectRootCache until it is
    * under PROJECT_ROOT_CACHE_MAX_ENTRIES. Called BEFORE the new insert so the cap
    * is honored post-insert with a single iteration.
+   *
+   * Delegates to services/cache/lru-evict.ts, whose second parameter is a
+   * post-call bound rather than the cap, so this pre-insert caller passes
+   * CAP - 1 to reserve the slot the pending set() takes.
+   *
+   * Kept as a wrapper rather than inlined at its one call site (:793) because
+   * symbol-graph-service.test.ts reaches this method by name through a cast;
+   * inlining it makes that suite red with no task owning the repoint.
    */
   private evictOldestProjectRoot(): void {
-    while (this.projectRootCache.size >= this.PROJECT_ROOT_CACHE_MAX_ENTRIES) {
-      const oldest = this.projectRootCache.keys().next().value;
-      if (oldest === undefined) break;
-      this.projectRootCache.delete(oldest);
-    }
+    evictOldest(this.projectRootCache, this.PROJECT_ROOT_CACHE_MAX_ENTRIES - 1);
   }
 
   /**

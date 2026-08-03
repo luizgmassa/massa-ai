@@ -40,7 +40,9 @@ retrieval benchmark corpus (`benchmarks/needles/fixtures/sicad.json`,
   tree-sitter grammars. Never run app code under Node.
 - Turborepo drives cross-package tasks; TypeScript ESM strict, `module: NodeNext`.
 - **PostgreSQL 17 + pgvector is the only backend.** There is no SQLite path. Prisma
-  schema and migrations live in `packages/core/prisma/` (24 migrations).
+  schema and migrations live in `packages/core/prisma/` (23 migrations — 23 `migration.sql`
+  directories; the 24th tracked entry under `migrations/` is `migration_lock.toml`, the lock
+  file, not a migration).
 - Native tree-sitter grammars build via **node-gyp during `bun install`**. On macOS arm64
   the build helper must be **Node 22**, not the pinned 25 — Node 25's V8 headers use a
   braced-init-list template arg that Apple clang rejects (`error: expected expression`).
@@ -233,9 +235,12 @@ the property the tier exists to preserve. It holds 11 modules.
 `services/` subdirectory that already held their collaborators — `services/{memory,search,
 context,executor,symbol}/` — keeping their exported symbol names, and `@massa-ai/core`
 re-exports them through `./services/index.js`. The published `@massa-ai/core/controllers`
-subpath is gone; `./services` gained the 17 symbols it used to carry. Two names are a trap
-for a newcomer: `services/graph/` is the **memory-relation** graph, while the **symbol**
-graph and the controller fronting it live in `services/symbol/`.
+subpath is gone; `./services` gained the 17 symbols it used to carry. Naming is a trap
+for a newcomer here, and the trap is **three** directories: `services/memory-graph/` is the
+**memory-relation** graph; the **symbol** graph and the controller fronting it live in
+`services/symbol/`; and the symbol **repository** is `data/symbol/`, the one that has already
+produced a real path error in in-repo specs (a spec cited
+`services/symbol/symbol-repository-pg.ts`; the file lives under `data/`).
 
 This section and `packages/core/src/index.ts`'s header are the only two descriptions of
 this contract. Do not add a third — `docs/ONBOARDING.md` cites them rather than restating.
@@ -564,7 +569,9 @@ tree and would be missing on every tag older than itself.
 Re-dispatching is safe: each publish step checks `npm view <pkg>@<version>` first and skips
 what already landed, so a partial publish resumes instead of dying on `403
 EPUBLISHCONFLICT`. Rehearse the guard against an already-complete tag (`-f ref=v1.3.1`),
-where the correct outcome is five "already on npm — skipping" lines and zero publishes.
+where the correct outcome is one "already on npm — skipping" line per publishable package — eight
+today, measured from every non-`private` `package.json`; five when v1.3.1 itself shipped — and
+zero publishes.
 
 ## Working conventions
 

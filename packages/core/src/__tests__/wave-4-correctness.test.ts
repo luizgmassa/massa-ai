@@ -231,9 +231,13 @@ describe("defaultDiffRunner — N7 three-source diff + secrets denylist", () => 
  * that need a non-default cap have to construct the tool with the env
  * already set; we verify the default (500) behavior here and trust the
  * IIFE for the env override path (the IIFE is unit-trivial: parse + floor).
+ * T11 moved that IIFE, with the whole cap, into
+ * `services/file-read/line-range.ts`; the module's own suite pins the default
+ * and both directions of its boundary.
  *
- * Discrimination: remove the `if (selectedLineCount > MAX_LINES)` slice →
- * the 1000-line-file test fails (content would be 1000 lines, not 500).
+ * Discrimination: remove the cap's slice from `selectLines` in
+ * `services/file-read/line-range.ts` → the 1000-line-file test fails (content
+ * would be 1000 lines, not 500). T11 moved that block out of `handle()`.
  */
 import { ReadFileTool } from "../tools/read_file.js";
 

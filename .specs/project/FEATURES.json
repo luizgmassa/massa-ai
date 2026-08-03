@@ -603,13 +603,13 @@
     {
       "slug": "core-layering-god-module-split",
       "title": "Core layering and god-module split — retire the controllers layer, break the contextual-search-rlm facade, rename rlm-* once",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P2",
       "phases": {
         "specify": true,
         "design": true,
         "tasks": true,
-        "execute": false
+        "execute": true
       },
       "spec": ".specs/features/core-layering-god-module-split/spec.md",
       "depends_on": [
@@ -617,12 +617,13 @@
       ],
       "design": ".specs/features/core-layering-god-module-split/design.md",
       "tasks": ".specs/features/core-layering-god-module-split/tasks.md",
+      "notes": "Umbrella over four PRs (AS-05). PR-A sensor-repair-2026-07 complete; PR-B merged #53, v1.16.0; PR-C core-layering-controller-retirement merged #59, v1.17.0; PR-D core-layering-read-file-split EXECUTE COMPLETE 2026-08-03 (was 'in Specify' here — the exact stale-field class its own RFS-05 AC-1 polices). phases.execute was false through PR-B and PR-C and is corrected here — Execute has happened twice. Status flipped to complete at PR-D's T23: GMS-02's headline closed at PR-D's T15 (check-tools-thin PASS 0 of 30, wired into ci.yml's build) and thirty-three corrections C1-C33 are indexed in the spec. PR-D's T25 independent validation ran 2026-08-03 in a fresh conversation (the user's authorship decision) and returned PASS -- validation.md is the record; push, PR and --no-ff merge remain.",
       "validation": ".specs/features/core-layering-god-module-split/validation.md"
     },
     {
       "slug": "core-layering-controller-retirement",
       "title": "Core layering — controller retirement (PR-C): kernel tier, controllers/ retired into services/, AC-1's import check shipped with the restructuring",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P2",
       "workflow": "spec-driven",
       "branch": "spec/pr-c-execute",
@@ -638,8 +639,29 @@
       "depends_on": [
         "core-layering-god-module-split"
       ],
-      "notes": "PR-C of 4 under core-layering-god-module-split. Executes GMS-01 (all six ACs) and GMS-02 AC-2 only; GMS-02 AC-1 is PR-D's by C13. All 20 tasks shipped in 22 commits; T18 independent validation PASS (author != verifier), see validation.md. Awaiting merge.",
+      "notes": "PR-C of 4 under core-layering-god-module-split. Executed GMS-01 (all six ACs) and GMS-02 AC-2 only; GMS-02 AC-1 is PR-D's by C13. All 20 tasks shipped in 22 commits; T18 independent validation PASS (author != verifier), see validation.md. Merged as #59 (2bea11e, --no-ff, parents 450352b + 2ea4ebd) and released v1.17.0 on 2026-07-31.",
       "validation": ".specs/features/core-layering-controller-retirement/validation.md"
+    },
+    {
+      "slug": "core-layering-read-file-split",
+      "title": "Core layering — read_file.ts split (PR-D): GMS-02 AC-1 and its headline, a tools/ thinness gate that did not exist, and the deferrals PR-C could not price",
+      "status": "complete",
+      "priority": "P2",
+      "workflow": "spec-driven",
+      "branch": "spec/pr-d-read-file-split",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/core-layering-read-file-split/spec.md",
+      "depends_on": [
+        "core-layering-controller-retirement"
+      ],
+      "notes": "PR-D of 4, the last. TASKS COMPLETE 2026-07-31 -- 28 task rows, eight phases, 78 distinct files; cut resolved as ONE PR with eight phased commits, artifacts and code on one branch (so the no-changelog label must NOT be used), CHANGELOG under ### Changed + ### Removed (both minor here; CONTRIBUTING makes Removed a minor, not a major). C33 is the fortieth plan defect and the highest-consequence line in tasks.md: Phase 4 as designed could NOT close the gate -- index_project.ts handle() is 128 lines and all three extracted spans sit outside it, so the handle() <= 120 clause stayed red and T15 could not wire the gate to CI. Closed by a new task T14b extracting the 45-line managed-run lease block, handle() 128 -> ~87. Closes GMS-02 AC-1 and the GMS-02 headline. Specify complete; DESIGN COMPLETE 2026-07-31 -- sized at six changes and nine new files under the 90% per-file coverage floor. Five decisions with rejected options: rename services/graph/ -> services/memory-graph/ (7 git mv, 19 importers, 28 import lines, 6 mock.module); delete the dangling check-coverage EXCLUSIONS entry and add an existence assert to the gate's TEST, not the gate; N = 125; handle() sheds all 98 of its non-delegation lines so the extraction is 490 of 707 (69.3%), not 392; and the shared LRU lands in services/cache/lru-evict.ts rather than kernel/, which stays at 11. Five corrections owed back to the parent spec.md: C28 (AS-06's named sensor cannot discriminate -- check-core-layering's FORBIDDEN.tools is empty by the declared order), C29, C30, C31, C32 -- the 35th through 39th plan defects across the umbrella. RFS-01's gate gains a third clause (handle() body <= 120, band [113,128) measured) and ships on a TypeScript AST rather than a regex, because 'no private method' is the wrong predicate: private run: (...) => ... is a function-typed FIELD in 4 files and a literal reading makes the frozen base 6 of 30 instead of 2. Two full Plan Challenge gates run; the Design one returned twelve findings across two modes, all twelve re-measured and confirmed, all twelve revising the document. EXECUTE COMPLETE 2026-08-03 through T24 -- all eight phases closed, 29 task rows (the 28 here was pre-T8b), final write-set sum 112 / union 86, EIGHTY-NINE plan defects (C34-C84 internal + C28-C33 indexed into the parent at T20). RFS-01 AC-1 closed at T15: check-tools-thin wired into ci.yml's build, PASS 0 of 30 / 398 members post-T19. N=125 landed at 124. The rename landed T16+T17 as one measured commit; RFS-04's removals at T19 (published surface verified against a proven-fresh npm pack); the twenty design.md corrections at T20b; C28-C33 + layer figures (three frames) into the parent at T20; the coverage-gate existence pin at T21 (red observed first); Phase 6's prose carriers at T18; CLAUDE.md/ONBOARDING figures at T22. T25 independent validation DONE 2026-08-03 by a fresh-conversation verifier (the user's authorship decision): VERDICT PASS, no surviving mutant across ten verifier-chosen faults, all five re-takes reproduced from raw data, both open criteria questions answered in the amendments' favour -- validation.md is the record. Push, PR and --no-ff merge are the user's next step.",
+      "design": ".specs/features/core-layering-read-file-split/design.md",
+      "tasks": ".specs/features/core-layering-read-file-split/tasks.md"
     },
     {
       "slug": "sensor-repair-2026-07",

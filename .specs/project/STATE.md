@@ -197,7 +197,741 @@ all state came from `.specs/` and source reads.
   J1 deepseek-v4-pro, J2 minimax-m3, J3 GLM-5.2 — as given, unverified) with loud host-default
   fallback; generic artifacts; standalone only; audit-report-io storage; consensus file saved.
 
-## Active — Core Layering, Controller Retirement (PR-C)
+## Active — Core Layering, `read_file.ts` Split (PR-D)
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-core-layering-read-file-split`
+- workflow: spec-driven (Large — Specify + Design + Tasks + Execute)
+- feature: `core-layering-read-file-split` — **Specify COMPLETE 2026-07-31. Design COMPLETE
+  2026-07-31.** Branch `spec/pr-d-read-file-split`. **PR-D of 4, the last.** Registered in
+  `FEATURES.json` at Specify time (55 → 56), `active_feature` untouched and verified not stale for
+  the second time.
+- Artifacts: `.specs/features/core-layering-read-file-split/{spec,design}.md`. **They are the
+  record** — nothing from them is duplicated here, on the rule this file's own PR-B section learned
+  the hard way: a duplicated table drifted and was wrong for five tasks.
+- **PR-D is sized: six changes, nine new files under the 90% per-file coverage floor** (`design.md`
+  §7). Five decisions taken with the user, each with its rejected options — the rename
+  `services/graph/` → `services/memory-graph/`; delete-not-repoint the dangling `EXCLUSIONS` entry
+  plus an existence assert in the gate's *test*; **N = 125**; `handle()` sheds all 98 of its
+  non-delegation lines (extraction **490 of 707**, not 392); and the LRU lands in
+  `services/cache/lru-evict.ts`, not `kernel/`.
+- feature: **Tasks COMPLETE 2026-07-31** — `tasks.md`, ~~28 task rows~~ → **29 task rows**, eight
+  phases, ~~78~~ → **80 distinct files** (corrected in `tasks.md` at T4b, carried here at T5 — this
+  line and the T4b bullet below contradicted each other inside one file for two tasks). Three user decisions with their rejected options: **one PR, eight phased commits**;
+  artifacts *and* code on one branch (so the `no-changelog` label must **not** be used, since the PR
+  edits `CHANGELOG.md`); **`### Changed` + `### Removed`**, both minor.
+- feature: **Execute STARTED.** Tasks committed `4f1e8ad`; **T1 done `d0fbc92`** — record in
+  `tasks.md` §10.1, including **C34–C36** and the two plan amendments they forced (T10 gains a test
+  repoint; new task **T8b**). **T2 done `ee578b2`** — record in `tasks.md` §10.2. RFS-06 AC-1, AC-2
+  and AC-3 all close. **T3 done `f2222d3`** — record in `tasks.md` §10.3. R-31 and GMS-05 AC-1
+  close; **Phase 0 is complete**. Six gates plus `check-core-layering` green at all three.
+  **T4a done `180f7d2`** — record in `tasks.md` §10.4. `scripts/check-tools-thin.ts`, 524 lines,
+  three clauses over a TypeScript AST; **RFS-01 AC-2 and AC-6 close**, as does AC-1's
+  population-print clause (AC-1's *"exits 0"* and *"runs in CI"* conjuncts are **T15's**). Reads
+  `FAIL — 2 of 30` and exits **1**, which is the intended Phase 1 state. **Phase 1 is started.**
+  **T4b done `e0ebf17`** — record in `tasks.md` §10.5. `scripts/__tests__/check-tools-thin.test.ts`,
+  96 cases / 258 assertions, synthetic fixtures only; **RFS-01 AC-4 and AC-5 close**. It shipped
+  **two files**: AC-5 could not be closed against the gate as T4a shipped it, so the gate is amended
+  too (**524 → 614 lines**). Six gates plus `check-core-layering` green — `test:scripts` **1114 / 0
+  across 49 files**, edges **965 unchanged**, files 901 → 902.
+  **T6 done** — record in `tasks.md` §10.7. `services/cache/lru-evict.ts` + its unit suite, 15 cases
+  / 43 assertions; **RFS-02 AC-3 closes and AC-2 closes in part** (C47 reassigns AC-2's second clause
+  to T7). **Phase 2 started, and it is the first task on this branch that moves code.** Four plan
+  defects (**C44–C47**). Six gates plus `check-core-layering` green — `test:scripts` **1114 / 0
+  across 49 files** unchanged, `test:plugins` 96 / 0, edges **965 unchanged**, files 902 → 904,
+  `check-tools-thin` **byte-identical to T5's frozen base**, and the new module measured at **100%
+  lines** against the 90% floor (R-36).
+- **C44–C47 are the forty-ninth to fifty-second plan defects; two of them change what a later task
+  does.** **C44** — `design.md` §5.1's *"a function taking `(cache, cap)`"* does not determine the
+  predicate and the five caches do not share one, so one operator with each site passing its own
+  literal cap is behavior-preserving at **neither** call position (measured, both directions). The
+  shipped contract is a post-call bound with pre-insert callers passing `CAP - 1`, exact because
+  `size > cap - 1` and `size >= cap` are the same predicate over integers. **C46** — T7's shape was
+  unfixed by any artifact and decides whether RFS-01 AC-3's frozen base **moves during Phase 2**:
+  inlining takes `read_file.ts` 13 → 12 maximal bodies and leaves `read-file.test.ts` red until T8,
+  while a one-line delegate leaves both byte-identical. **T7 takes the delegate shape**, and T8's
+  *"cannot survive T7 unmodified"* is struck as falsified. **C45** — T1's `fileCache` characterization
+  case does not discriminate eviction at all. **C47** — T6's row credited it with a criterion a module
+  with no call sites cannot close. All four author level on the C34/C35/C37/C38/C39/C41/C42/C43
+  precedent; **C44 owed to `design.md`** (T20b, §8.1 row 15), the other three internal to `tasks.md`.
+- **C37 is the forty-second plan defect, and the first on this feature to amend a criterion rather
+  than a figure.** RFS-06 shape (c)'s prescribed assertion — *"no literal `..` segment"* — is
+  **vacuous**: `path.resolve` normalizes `..` away on every exit, and a probe written to the clause's
+  letter **passes under the very mutation it exists to catch**. Struck and amended in place in both
+  `spec.md` §5 and T2(c); replacement predicate is containment-relative. Author level on the C34/C35
+  precedent, **handed to T25 as a question**.
+- **C38 is the forty-third plan defect, and it enlarges T3's subject rather than changing it.**
+  `design.md` R-31's per-key table credits `compressionRatio` with an `e2e/08.search` assertion that
+  belongs to **`compress_context`** — `:556` reads `metadata.compressionRatio` while `ReadFileTool`
+  assigns the field at the top level. True figure **0**, not ×1; `tokens` is **2**, not ×1, and both
+  sit behind a `catch { return }`. R-31 was rewritten for citing another tool's *fixture* and its
+  replacement then credited another tool's *assertion*. Author level; owed to `design.md` (T20b,
+  §8.1 row 7), **not** to the parent — R-31 has no parent criterion behind it.
+- **C39 is the forty-fourth plan defect, and its tell was the document's own subtraction.**
+  `design.md` §6.5's two raw body figures are measured under **two different constructor
+  conventions** — `read_file.ts`'s **18** counts the constructor, `index_project.ts`'s **3** does
+  not, and 18 / 3 is a pair no single convention produces (17 / 3 exempt, 18 / 4 counted). The
+  named nested list is short by one: 13 plus the four named arrows is **17**, and the fifth item is
+  the constructor entry, not a nested arrow. **The maximal figures 13 and 3 are identical under
+  both conventions**, so RFS-01 AC-3's frozen base is untouched and no decision moves. Author
+  level; owed to `design.md` (T20b, §8.1 row 8), **not** to the parent — §6.5 is Design's own
+  instrument note with no criterion behind it.
+- **C40 is the forty-fifth plan defect: AC-5's sixth evasion shape was the one the gate could not
+  see.** RFS-01 AC-5 lists *"an object-literal handler that is not a class"* and says omitting one
+  would be C21's shape aimed forward. **Measured — an object literal with a 200-line `handle()` and
+  a module-level `Map` read PASS**, because `analyzeSource` returns early with no class to check.
+  Five of six caught; the sixth needed the population predicate to move, which is **C33's shape
+  inside the task that closes the clause**. **Decided by the user, 2026-08-01**, from three options;
+  the population now admits an object literal claiming the interface by annotation, `satisfies` or
+  `as`. The widened live-tree reading is **byte-identical**, so **AC-3's frozen base is untouched**.
+  The Plan Challenge gate then found a **false positive in the widening itself** — clause 2's
+  module-level walk has no `handle()` exemption, and an object literal puts `handle()`'s body inside
+  a `VariableStatement` — which the author's own three probes could not have caught, all having
+  referenced an *outer* cache.
+- **C41 is the forty-sixth, and it strikes a criterion three documents had already contradicted.**
+  RFS-01 AC-4's *"a legal public method added must stay PASS"* is **falsified by C32**: the
+  predicate is a declared body, so visibility is never consulted. Measured **RED**. `design.md`
+  §6.5 listed a public method among C32's subsumed shapes, §6.6 property 4 had substituted a
+  different inert control without striking anything, and T4b's own row listed *"public method"* as a
+  RED shape. Amended in place; **handed to T25 as a question** alongside C37's and AC-2's. Author
+  level on the C34/C35/C37/C38/C39 precedent.
+- **T4b's mutation table measured a premise nothing had tested: ten of thirteen mutations of the
+  rule are invisible to the live-tree run, and the `2 of 30` verdict moves under none of them.**
+  *"The gate still reads `2 of 30`"* is not evidence the rule is intact — R-40's concern one level
+  further out than R-40 states.
+- **Three corrections landed at T4b that are not its own work.** **T8b existed only in C35's prose
+  for four tasks** — no §5 row, no write-set entry — so the task/file totals were **28 / 78** and are
+  **29 / 80**; §10.4's *"both task rows claim AC-1"* is **three**; and `design.md` §6.5's nine-case
+  table is `declaresBody()`'s truth table, not `BodyFinding.kind`'s — **second figure in that table
+  not to survive being re-run, after C39**.
+- **T5 done `9adee57`** — record in `tasks.md` §10.6. **RFS-01 AC-3 closes**, and **all four
+  non-retroactive steps are now taken**. The frozen base transcribed per member with spans:
+  `2 of 30`, 27 declare an `IToolHandler`, 3 do not, 224 members; `read_file.ts` 13 maximal / 17 raw
+  / 2 state / `handle()` 175, `index_project.ts` 3 / 3 / 0 / 128. R-37 verified — zero diff in
+  `packages/core/src/tools/` across the branch. `HANDOFF.md` predicted *"at least one"* arrow body
+  would report `ArrowFunction`; measured **two**, and neither is a class member (a module-level IIFE
+  and the constructor's `eventBus` callback), so *"13 per member"* is **11 methods + 2 anonymous
+  arrows** — the 11 being C29's corrected count exactly.
+- **C42 is the forty-seventh plan defect: `2 of 30` is a union.** Per clause the readings are
+  **2 / 1 / 2** — `index_project.ts` has **zero** `Map`/`Set` state, so clause 2 flags `read_file.ts`
+  alone. R-39 calls the third clause's value prospective for flagging no file the other two miss;
+  **clause 2's RED set is a strict subset of both** and nothing said so. Author level; owed to
+  `design.md` (T20b, §8.1 row 13), **not** to the parent.
+- **C43 is the forty-eighth: the span anchor is split per file and unstated.** `read_file.ts`'s cited
+  spans are comment-inclusive at all 8 sites with a comment; `index_project.ts`'s are
+  declaration-only at both, orphaning `executeIndexing`'s doc `:246-253` (**T13**, 8 lines) and the
+  managed-run lease's `:151-157` (**T14b**, 7 lines). **The second is gate-relevant** — that comment
+  is inside `handle()` `:117-244`, measured **including comment lines**, so T14b's `128 → ~87` lands
+  at **~94**. `design.md` §5.1's ~110 estimate is the tell: 106 comment-inclusive, 98
+  declaration-only. Both rows amended; **C33 does not move**. Owed to `design.md` (T20b, §8.1 row 14).
+- **T5's own measured result, and the one to carry forward: the frozen base is a claim about the
+  tree, not about the rule.** Seven gate copies with only `isViolation` patched, plus an inert
+  control and a byte-identical baseline copy — **deleting any one of the three clauses leaves the
+  entire report byte-identical**. T4b: 10 of 13 internal mutations invisible. T5: **3 of 3** at
+  whole-clause granularity. It does **not** falsify the per-member rationale, which is about the AST
+  enumerating correctly; AC-4's suite is the complementary sensor. R-40 already sends T25 per clause
+  — T5 adds that the per-clause reading **is not derivable from the default report**, only from
+  `--json` or a patched gate.
+- **Both Plan Challenge modes caught the same figure and it was the author's** — a carried `108` that
+  measures **106**, inherited from an instrument anchored at `handle()`'s closing brace whose control
+  had already failed once. The red-team's finding was sharper: **the author's span sweep was
+  structurally blind to T14b**, its population being *declared members* while task rows cite plain
+  code ranges. Re-run over all 26 cited spans. The critic's own figure for that comment was off by
+  one. **Transcription verified rather than proofread** — the fenced block byte-identical to the live
+  run, both tables parsed back out and checked cell by cell against `--json`, 72 assertions / 0
+  mismatches.
+- **T7 done `ea59b04`** — record in `tasks.md` §10.8. Four files / five caches repointed at
+  `services/cache/lru-evict.ts`; **RFS-02 AC-1 closes and AC-2 clause 2 closes** where C47 reassigned
+  it. Delegate shape at both wrapper sites, pre-insert passing `CAP - 1` and post-insert `CAP`.
+  Evidence is byte-identity rather than greenness: **all six suites reaching any of the five caches
+  are SHA-256 identical to `HEAD`** and pass together at **92 / 0 / 3335 expect()**. Six gates plus
+  both structural gates green — `test:scripts` **1114 / 0 across 49** unchanged, `test:plugins`
+  96 / 0, `check-tools-thin` counts byte-identical to T5's base, and **edges 965 → 969 with files
+  904 unchanged**: the first commit on this branch where the edge count is the figure that moves,
+  the delta being exactly the four new imports. Four plan defects (**C48–C51**), running total
+  **fifty-six**.
+- **C48–C51 are the fifty-third to fifty-sixth; two change what a later task does.** **C48** — C46
+  fixed T7's shape for `read_file.ts` and is scoped to that file, while `symbol-graph.service.ts` has
+  the identical wrapper reached by a cast in `symbol-graph-service.test.ts`; `evictOldestProjectRoot`
+  has **0 occurrences anywhere under `.specs/`**, and inlining leaves that suite **48p/1f with no task
+  owning the repoint**. Delegate shape at both. **C49** — C45's *"the site is still covered today by
+  `read-file.test.ts:264-299`"* is true of the **method** and false of the **call site**: deleting
+  `read_file.ts:570` (`fileCache`) or `:169` leaves **all 92 cases green**, because that test calls
+  `evictOldest` directly and never drives `readFileWithCache`. Live for **T10**, which moves `:570`'s
+  call into a new module with nothing watching. **C50** — C46's *"byte-identical"* was measured on the
+  gate's summary line, which carries **counts**; §3.3's frozen base also carries **line spans**, and
+  the delegate moves **15 of 15** while every count holds. RFS-01 AC-3's own text records a verdict
+  and is untouched. **C51** — `read-file.test.ts`'s cast declares four private members and the body
+  exercises **three**; `projectRootCache` is type-only, which is the mechanism under half of C49.
+  C48, C50 and C51 author level on the C34…C47 precedent; **all owed to `tasks.md`'s own rows, so
+  §8.1 stays at fifteen** and §5 stays at **29 task rows**.
+- **Two user decisions at T7, each against named alternatives.** `file-filter-cache`'s
+  `logger.debug` at `:154` is **dropped and priced in the site's docblock** — keeping it behind a
+  victim-naming wrapper and not repointing the site at all were rejected; the shared function cannot
+  report a victim, the other four sites do not log, and the line had **0 assertions repo-wide**. And
+  **C49 is closed now by widening T8** rather than recorded-only or given a new task T8c: T8's write
+  set stays **1 file** and its subject gains call-site sensors for `:570` and `:169`.
+- **T7's discrimination table measured RFS-02 AC-1's own justification for the first time.** Column B
+  is the suites that existed **before** PR-D — the honest counterfactual — and it **misses 4 of 7**
+  mutations: both post-insert sites are entirely unsensed, and `file-filter-cache.test.ts:94` asserts
+  `toBeLessThanOrEqual`, an upper bound only, so over-eviction walks through. Every column-A FAIL is
+  `4p/1f` because **C45's vacuity covers the off-by-one too**, not only the neuter — confirmed by
+  reading the failing case name rather than the count.
+- **T8 done `887350c`** — record in `tasks.md` §10.9. **GMS-05 AC-3 satisfied for
+  `read-file.test.ts`, and C49 closes.** One file, **7p/34x → 9p/45x, 0 fail**. C49's closure is a
+  **before/after pair**, not a green suite: on the shipped tree `read_file.ts:170` and `:578` read
+  **92p/0f — NO SENSOR** before the edit and **93p/1f** after, each killed by one of the two new
+  cases, read **by name**. All four call sites now sensed; before T8 the repository sensed two.
+  The repoint shipped as an **operator swap in place** rather than a move onto a bare `Map` — the
+  gate found `lru-evict.test.ts:60`/`:70`/`:107` already assert both properties over a plain `Map`,
+  so that move would have duplicated T6 and severed the `ReadFileTool` link. Six gates plus both
+  structural gates green — `test:scripts` **1114 / 0 across 49** unchanged, `test:plugins` 96 / 0,
+  **edges 969 → 969 and files 904 → 904, both unchanged** (T8's import lands in `__tests__/`, which
+  is not a tier), `check-tools-thin` counts byte-identical to T5's base. Two plan defects
+  (**C52–C53**), running total **fifty-eight**.
+- **C52–C53 are the fifty-seventh and fifty-eighth; both change what a later task does.** **C52** —
+  C50's post-delegate span table was measured on a tree that was **never committed**: the probe
+  applies a minimal delegate (net −3) while the shipped commit also carries an 11-line docblock
+  (`+13/−5`, `read_file.ts` **707 → 715**). So net is **+8**, seven entries shift **+8** not −3, and
+  `evictOldest` lands at **`:489-491`** not `:478-480`. **C50's headline reproduces exactly** — 15 of
+  15 spans move, every count holds — which is why the arithmetic under it survived. Three
+  consequences in three artifacts: §3.3 and C50 amended; **C48's and C49's own tables carry four
+  pre-T7 call-site citations** and gained a shipped-tree column, since T25 must re-run C49's table on
+  the real tree; and **three source comments T7 itself added cite line numbers in their own file that
+  its own commit falsified**. **C53** — closing C49 creates a private reach that dies **one task
+  before C34's break-phase table predicted**: T9 moves `projectRootCache` *and* the `eventBus`
+  subscription into module 3, while §1's overlap table schedules the only Phase-3 touch of
+  `read-file.test.ts` at T10, so T9 as written lands a red suite owned by nothing. **T9's write set
+  gains `+ 1 test repoint`**, author level on C34's own precedent. Both internal to `tasks.md`, so
+  **§8.1 stays at fifteen** and §5 stays at **29 task rows**.
+- **One user decision at T8, against three named alternatives.** C52's three false source comments
+  **fold into T8b**, taking it from 2 files to **5, comments only** — widening T8 to 4 files, a new
+  task T8c, and record-only were all rejected. T8's write set stays **1 file**. `read_file.ts`'s
+  comment is **de-numbered** rather than renumbered, because T10 deletes `:578`'s call outright and a
+  renumber would go stale a third time; the other two files are in **no** Phase 3–5 write set.
+- **A figure withdrawn rather than shipped.** The repo-wide count of self-referential `:NNN` comment
+  citations: per-line classification said **59**, the evidence-audit lens said **~6**, block-aware
+  re-measurement says **25**, and it still cannot decide a bare `:NNN` in a docblock that does not
+  re-name its subject. **None is defensible and none is quoted.** The only figure anything depends on
+  — **5 citations in the four T7-edited files → 3 comments in 3 files**, T8b's write set — was
+  reproduced exactly and independently by both parties.
+- **T8's discrimination table re-chose column B rather than inheriting it.** T7 shipped no new test,
+  so its column B was *"the suites that existed before PR-D"*; T8 **does** ship cases, so column B is
+  **the six eviction suites exactly as they stood at `HEAD`**. It **misses 2 of 5** applicable
+  mutations and they are **exactly the two sites C49 named**. Expectation mismatches **0**, both
+  controls hold. M1 was split into **M1a/M1b** after the first run read `PASS` on a **dead mutation**
+  — the repointed case has two operator calls and only the post-seed one can cross the bound, so the
+  seed-loop call is inert **by position**. T6's lesson recurring: the verdict column cannot show a
+  dead subject.
+- **T8b done `38fdc52`** — record in `tasks.md` §10.10. **RFS-02 AC-4 closes, C52 closes, and Phase 2
+  is COMPLETE.** It shipped **8 source files + `spec.md`**, not the 5 the row named: two user
+  decisions grew the write set during the task. RFS-02 AC-4's pair now states what T1's pin measured
+  and **both cite the pin test rather than each other** — *a comment's authority should be a
+  measurement, not another comment.* C52's three landed as planned, `read_file.ts:484` de-numbered in
+  **four lines replacing four**. Six gates plus both structural gates green: edges **969 unchanged**,
+  files **904 unchanged**, and `check-tools-thin` **byte-identical to the pre-edit run, spans
+  included** — stronger than T7's and T8's counts-only claim, and available only because the
+  `read_file.ts` edit was line-neutral on purpose (715 → 715).
+- **C54–C56 are the fifty-ninth to sixty-first plan defects; two of them change what a later task
+  does and one amends two criteria.** **C54** — C52's sweep was **self-referential**, and T7's `+1`
+  import insertions falsify a citation *into* those files from anywhere: measured over 892 tracked
+  source files, **14 explicit cross-file citations plus a bare-`:NNN` tail, 48 stale across the three
+  Phase-0 suites, 44 naming spans Phase 3 relocates**. Three **invert** rather than dangle — the pin
+  suite cites `read_file.ts:148` for `ROOT_CACHE_TTL` *"and NOTHING READS IT"* while shipped `:148`
+  is `CACHE_TTL`, the constant that **is** read. **User decision from four options: fix all now.**
+  **C55** — fixing them moves the obligation rather than retiring it, and no row owned the Phase-3
+  re-break: **T9, T10, T11 and T12 each gain `+ N citation repoints`**, counts re-derived per task;
+  **T12 additionally owns the nine stale `:NNN` in `test()` TITLE strings** T8b deliberately left,
+  because a string literal is not a comment. **C56** — C55 then falsifies **RFS-02 AC-1's and RFS-06
+  AC-1's byte-identity clause by construction**; both amended in place to **byte-identity with
+  comments stripped** and **handed to T25 as a question**. C54/C55 are internal to `tasks.md` and C56
+  amends `spec.md`, so **§8.1 stays at fifteen** and §5 stays at **29 task rows**.
+- **A second user decision, and the red-team found it before a line was written.** An honest
+  correction to `production-wiring.ts:67-69` needs six lines, not three, and the growth shifts the
+  **2** citations *below* it. Measured by content: `spec.md:158` `:91` → **`:100`** and `:156` `:105`
+  → **`:114`**, both in §3.B's evidence table, both exact beforehand; `production-wiring.ts` is in no
+  Phase 3–7 write set, so the repoint is stable. *A comment-only diff moves no tokens and still moves
+  line numbers, and here line numbers are load-bearing evidence.*
+- **The repoint is content-anchored, never arithmetic**, and that is the result to carry forward. For
+  each cited pre-T7 number the instrument reads the **text** at that line in `ea59b04^` and finds it
+  on the shipped tree; deriving *"+1 below the import, +8 below `:474`"* is the arithmetic that
+  produced C50 and then C52. Verified by a round trip that is **not** the proposal generator re-run —
+  **49 pairs checked by content, 0 mismatch**, plus four bare `:NNN` whose subject is another file
+  adjudicated by reading the block and left untouched.
+- **Three instrument defects at T8b, none found by a green run.** A raw `ts.createScanner` cannot
+  re-scan template spans without a parser and swallowed `read_file.ts`'s remainder into one token
+  **including the comments it was meant to be blind to** — **after passing its own observed red**. A
+  `/g` `RegExp.test` skipped lines via `lastIndex`. A `\b`-anchored negative lookahead matched
+  mid-token. *A red proves a checker can fire, not that it fires for the right reason; and a verifier
+  that only inspects the diff cannot see an omission.*
+- **T9 done `5fb88fd`** — record in `tasks.md` §10.11. **RFS-06 AC-1 closes**, GMS-05 AC-3 is
+  satisfied for the C53 repoint, RFS-03 AC-1/AC-2 hold, and **Phase 3 is open**. Modules 2 and 3 out:
+  `services/file-read/{path-containment,project-root-cache}.ts` plus two new suites;
+  `read_file.ts` **715 → 590**. **Three new plan defects (C57–C59), running total sixty-four.**
+  **Not one span in §5's T9 row matches the tree** — it is pre-T7 numbering throughout, so every span
+  was re-derived from the AST and anchor-verified; the 2→3 edge is `:374`/`:416`, not `:373`/`:415`.
+- **Two decisions taken at author level with their rejected options.** Module 3 is instantiated **per
+  `ReadFileTool`**, not as a module singleton — mutation M10 shows the repository sees the difference.
+  Module 2 takes module 3 as a **constructor dependency**, not a callback: the red-team lens correctly
+  caught that the first framing (*"`design.md` §5.1 already decided this"*) **overstates the
+  artifact** — §5.1 names the edge and its direction and chooses no mechanism, and `tasks.md` §4's own
+  header says §5.1 names **one** edge, the 4→5 one.
+- **C57 — the sweep's SHAPE, not its count, is what kept going stale.** C54 took the **explicit**
+  `<file>:NNN` sweep repo-wide and left its sibling hand-scoped to three carriers, and **no sweep on
+  this feature ever looked at by-FILE or by-IDENTIFIER claims at all**. Proven by patching the subject
+  predicate and diffing counts — a widening that cannot match is a no-op that reads like a clean
+  sweep. Four instances, the sharpest being **`check-tools-thin.ts:103`, the gate's own docblock**,
+  citing the `eventBus.subscribe` arrow at `:167-171` since **T7** moved it to `:168-172`; correct
+  when authored (`180f7d2` precedes `ea59b04`) and invisible to T8b. Plus two citations **into**
+  `read-file.test.ts` that T8 orphaned, and one **semantic inversion** citing `production-wiring.ts`
+  as giving a reason that comment now disavows. **The write set grew 8 → 12 files on a user decision.**
+- **C58 and C59 are live for T10–T12.** **C58**: C56's *"Note what does NOT change"* exempted
+  `lru-eviction-characterization.test.ts` — RFS-02 AC-1's own main subject — on the true premise that
+  it carries zero *line* citations; it carries **two by-FILE claims** T9 relocates, so C56's
+  amendment covers it and only the note is wrong. **C59**: T9 moves 6 spans and **shifts 27 further
+  citations**, a class C55 does not assign. Every one names code T10/T11/T12 relocate, so renumbering
+  now buys a third falsification; left to the owning task and **recorded with its size** so a
+  verifier can tell a scheduled transient from a defect. ~~Post-repoint the sweep reads **moved-out
+  0**.~~ → **corrected by C61 at T10: the true figure is 1 and the population is 45.**
+- **Column B was re-chosen, and which two mutations it misses is the result to carry.** B is *the
+  pre-existing suites with only the C53 repoint* — what the repository would catch if T9 had written
+  no new tests — because R-36 forces two module suites and R-26 warns that is how shallow tests get
+  written. **B catches 10 of 12**: on the main risk surface the new suites add **coverage, not
+  discrimination**. The two they alone catch are both `getProjectRoot` **failure branches** that every
+  pre-existing suite stubs away. *A module suite earns its place at the branches its callers cannot
+  reach.*
+- **Gates.** `lint` **0**, proven to bite on a T9 file, restored SHA-identical. `type-check` **6/6**,
+  `build` **5/5**, both 0 cached forced. `test` **11/11 exit 0** warm, 5 cached all `:build`, core
+  `all 149 group(s)`. `test:scripts` **1114**/0. `test:plugins` **96**/0. `check-core-layering`
+  **edges 969 → 973, files 904 → 908**. `check-tools-thin` **`2 of 30` HOLDS**, members **224 → 221**,
+  `read_file.ts` **13/17/2/175 → 9/10/1/175**, `handle()` unchanged at 175. Both new modules **100%
+  lines / funcs**. The one first-run failure was `apps/mcp-client`'s documented 22 s live-provider
+  case — zero-diff against `main`, 95p/0f standalone under both configs, 3.96 s empty vs 17.82 s real.
+- **T10 done `f1413b6`** — record in `tasks.md` §10.12. **C34's repoint lands and GMS-05 AC-3 is
+  satisfied for it**; RFS-03 AC-1/AC-2 hold. Modules 4 and 5 out:
+  `services/file-read/{file-content-cache,file-metadata}.ts` plus two new suites; `read_file.ts`
+  **590 → 392**. **Six new plan defects (C60–C65), running total seventy.** None of §5's nine spans
+  matched the tree — the row is pre-T7 *and* pre-T9 — so all nine were AST-derived and
+  anchor-verified, as T9's were.
+- **The 4→5 callback is wired as an ARROW, not a `.bind()`, and that is measured rather than styled.**
+  The cache re-resolves `this.fileMetadata.extractMetadata` per call, exactly as the handler resolved
+  `this.extractMetadata` before the move, so the writeback case's spy still observes it. Mutation
+  **M14** confirms that spy is the **only** sensor for the choice anywhere — and it lives in a
+  pre-existing test T10 repoints, not in either new module suite.
+- **C60: the `evictOldest` delegate died here, not at T12.** Its body reads `FILE_CACHE_MAX_ENTRIES`,
+  which T10's own row moves, so it could not compile even as dead code. Three artifacts said T12 —
+  including `read_file.ts`'s own docblock — and the task row never named the member at all. Author
+  level; GMS-05 AC-4 fixes the answer. *C33's shape one phase down: a clause and the work meant to
+  satisfy it were checked at file granularity and disagreed at member granularity.*
+- **C61 is the one a resumer must not skip: T9's `moved-out 0` was false, and the sweep's own repoint
+  is what blinded it.** `read-file-containment-shapes.test.ts` carried two bare citations naming
+  `handle()` call sites, exact at `5fb88fd^` and stale from T9 onward. `t9-citation-sweep.ts` decides
+  a file's subject by testing for the literal `read_file.ts` in it — and T9's repoint of that file's
+  *other* citations took the count **5 → 0**, dropping it out of the population before the verifying
+  run. True figures: **moved-out 1**, population **45**, not 43. *An instrument whose subject
+  predicate is a literal its own repoint deletes verifies a smaller population than it measured, and
+  the shrinkage reads exactly like a clean sweep.*
+- **C62, C63, C64, C65 — the other four, all live for T11 and T12.** **C62**: C55's *"owner = whoever
+  moves the subject"* has a **null case** — one citation names code no remaining task moves, so under
+  the rule it belongs to nobody; it belongs to the task that shifts it. **C63**: the **by-FIGURE**
+  class — a count claim carries no line and no identifier, so every sweep here was blind to it; the
+  instance was `check-tools-thin.ts`'s own implementation comment, stale since T9 and contradicting
+  its file's stated no-live-figures policy 278 lines above. **C64**: the wiring arrow is the first
+  body PR-D **adds** to `tools/` (the constructor is exempt *by kind*, so it counts as maximal), and
+  §5's Phase-3 acceptance reading assumed the count only falls — **T12 must move it or RFS-01 AC-1
+  cannot read `0 of 30`**. **C65**: §1's table stopped summing to its own total two tasks ago, because
+  T8b's write-set growth never reached it; re-derived, **sum 101, union 81**, and three files now sit
+  in *three* phases, which is what broke the table's own self-check.
+- **The write set grew from the 5 + N the row predicts to 17, on a user decision** (fix-all-now
+  chosen). Beyond the two line-citation files, **eight** carry a by-FILE, by-IDENTIFIER or by-FIGURE
+  claim T10 falsifies — two of them production files. **T9 rejected the same finding for those two
+  files and both dispositions are right**: T9's was about *unqualified* identifiers inside behavioural
+  claims a behavior-preserving move preserves; T10's is `ReadFileTool.CACHE_TTL`, a **qualified member
+  path** that stops resolving. Eleven diffs **proven** comment-only; five repointed pairs verified by
+  **round trip against three distinct frames**, because the revision a citation was written against is
+  per citation and the sweep takes one base for every row.
+- **Column B was re-chosen, and which four mutations it misses is the result to carry.** B is *the
+  pre-existing suites with only the C34 repoint* — T10 takes a design decision whose only sensor is a
+  test it repoints, so that sensor belongs inside B. **B misses 4 of 15**: the TTL predicate read
+  **exactly at** the cap (every pre-existing sensor steps a full second past it), and three
+  `file-metadata` branches the handler cannot reach because it asks for one language, always stubs
+  `listDefinitions` to resolve, and always passes a `relativePath`. Against T9's 2 of 12.
+- **Gates.** `lint` **0**, proven to bite on a T10 file, restored SHA-identical. `type-check` **6/6**,
+  `build` **5/5**, both 0 cached forced. `test` **11/11 exit 0** warm, 5 cached all `:build`, core
+  `all 150 group(s)` — **+1 for two new files, verified not assumed**: `file-content-cache.test.ts`
+  uses `setSystemTime` and is forked as process-global, `file-metadata.test.ts` joins the mock-free
+  batch. `test:scripts` **1114**/0. `test:plugins` **96**/0. `check-core-layering` **edges 973 → 977,
+  files 908 → 912**. `check-tools-thin` **`2 of 30` HOLDS**, members **221 → 215**, `read_file.ts`
+  **9/10/1/175 → 5/6/0/175**, `handle()` unchanged; **clause 2's own reading reaches `0 of 30`** —
+  `fileCache` was its last subject anywhere under `tools/`. Both new modules **100% lines / funcs**.
+  The one first-run failure was `apps/mcp-client`'s documented live-provider case again — zero-diff
+  against `main`, 95p/0f standalone under both configs, 3.80 s empty vs 16.90 s real.
+- **An instrument lesson worth more than its size.** The first draft of `file-content-cache.test.ts`
+  stubbed `fs/promises` with `mock.module` to count disk reads; run beside its eight sibling suites in
+  one process the aggregate went **128 pass / 26 fail**, and `run-tests-isolated.ts` would have forked
+  the file and hidden it. Rewritten onto real temp files with the rewrite-and-re-read observation —
+  **154 pass / 0 fail** in one process. *A global module mock is measured cross-contamination, not a
+  style question.*
+- **T11 DONE — `834f00a`.** Module 6 out: `services/file-read/line-range.ts` + its suite.
+  `read_file.ts` **392 → 315**; `check-tools-thin` **5/6/0/175 → 1/1/0/165** — **`handle()` moves off
+  175 for the first time since T5**, and the one surviving body IS C64's wiring arrow, so the whole
+  remaining distance to `0 of 30` is T12's. `2 of 30` holds. **Five new plan defects (C66–C70), running
+  total seventy-five.** Record is `tasks.md` §10.13. Write set **8**, from two user decisions —
+  `spec.md` (**C68**) and `check-tools-thin.ts` + its suite (**C69**); N was *resolved* at 2, not grown.
+- **C69 is the one not to skip: a shipped gate's population counter was pinned at 2.**
+  `forEachChild(() => membersExamined++)` short-circuits — `forEachChild` halts on a truthy return and
+  post-increment returns the pre-value. Never moved a verdict; falsified both sentences the file states
+  about the field and RFS-01 AC-1's own property. Fixed **with the recalibration recorded**: same tree
+  reads `read_file.ts` **16 → 28**, repo total **215 → 419**, so T5's 224 / T7's 223 / T9's 221 /
+  T10's 215 all mean `2 + members`. Its suite had six assertions on that member, all shape assertions,
+  all blind. *This task is the proof it is not cosmetic*: the member delta reads −3 on the old counter
+  and −4 on the fixed one, the fourth being `interface ReadRange` leaving.
+- **C67 changed the code before it was written.** The N9 cap re-slices the **raw** array, so a clipped
+  response loses the line numbering an unclipped one carries — and no test anywhere asserted content on
+  that path. The natural composition would have silently "fixed" it; mutation **M10** is killed only by
+  the new suite. Pinned, logged, not fixed. **C66**: `design.md` §5.1 makes module 6 import from module
+  7, which composes it — a third cross-module edge Design handed to nobody. **C70**: `adjustRange`'s
+  `Infinity` ternary is dead branching.
+- **The sweep now derives its baseline PER CITATION** (`git blame` on the citing line), which closes
+  §10.12's *"cannot verify its own repoints"* structurally. **32 of 40 rows** classify differently
+  under one BASE. Checked as a falsifiable prediction: pre-commit the repointed row read SHIFTED,
+  post-commit it reads **STABLE**, NO-OWNER **0**. C62's null case materialized exactly as predicted.
+- **Gates.** `lint` **0**, proven to bite on a T11 file. `type-check` **6/6**, `build` **5/5**, both 0
+  cached forced. `test` exit **0 on the first run**, 11/11, 5 cached all `:build`, core `all 150
+  group(s)` — **unchanged for one added file**, verified: `line-range.test.ts` matches no isolation
+  pattern. `test:scripts` **1114 → 1115** (the +1 is C69's sensor). `test:plugins` **96**/0.
+  `check-core-layering` **edges 977 → 978, files 912 → 914**; module 6 adds **zero** edges, importing
+  nothing at all. New module **100% lines / funcs**. Discrimination: 15 mutations, M6 **equivalent**
+  and M14 **unreachable**, so the honest denominator is **12** — A kills 12/12, pre-existing 3/12, the
+  first Phase-3 module where the new suite is discrimination rather than coverage.
+- **T12 DONE — `83922db`. PHASE 3 IS COMPLETE.** Module 7 out:
+  `services/file-read/read-file.service.ts` + its suite. `read_file.ts` **315 → 124**, `handle()`
+  **165 → 27**, `check-tools-thin` **`1/1/0/165` → `0/0/0/27`** and the verdict **`2 of 30` → `1 of
+  30`** — the one file still red is `index_project.ts`, T14b's, exactly as C33 predicted. **Five new
+  plan defects (C71–C75), running total eighty.** Record is `tasks.md` §10.14. Write set **7** against
+  the row's **4**, one user decision covering all three growths; citation policy also the user's.
+- **C72 is the one not to skip, and `type-check` cannot see it.** `read-file.test.ts` reaches
+  `ReadFileTool`'s collaborators through **four erasing casts**; T12 moves those fields onto module 7,
+  so all four break at RUNTIME while `tsc` stays green — observed as **176p/4f** before repointing,
+  the four failing cases being exactly the four cast sites. §10.1's **C34 break-phase table tracks
+  MEMBERS and stops at T10**; every prior task moved a member, T12 moves the holder. *A break-phase
+  table is falsified by moving the container, not only the contents.*
+- **C74: the plan's stated mechanism was wrong and only the mutation harness said so.**
+  `readFileOptions` sits above `handle()`'s `try` to preserve the pre-T12 throw position — but
+  `handle(null)` rejects **either way**, because the catch dereferences `p.filePath`. The real
+  discriminating input is a throwing option accessor with a readable `filePath`. M14 survived column A
+  **twice**: first the pin was missing, then it was written without `await` and floated. *A pin can be
+  absent, vacuous, or aimed at the wrong input, and all three read identically in a green suite.*
+- **C71**: the row's four spans are **97 of `handle()`'s 165** lines and cannot produce its own
+  *`handle()` → ~15*; all five cited spans were stale. **C73**: R-30's *above 125 → logic was left
+  behind* cannot say what went over — the five sibling docblocks average **32.4** lines against a
+  budgeted **10**, and the first draft measured **131**, trimmed in prose not code; the reading is now
+  recorded decomposed. **C75**: module 7's own size is measured by **no** gate (`check-tools-thin` is
+  `tools/`-scoped, G-HUB runs on `services/search` alone) — recorded, not fixed.
+- **Citations: 46 swept, 7 adjudicated, 39 T12's, all in one file.** T12 is TERMINAL for
+  `read_file.ts`, so C62's null case is the default rather than a residue. **37 of 46** classify
+  differently under one BASE. Widening to `test()` TITLE strings moved **39 → 46**: measured **7**
+  citations on **5** lines, against the row's stated *nine* and its own enumeration of seven — with
+  two of its five line numbers stale. Verified by round trip: 26 pairs by content across 2 frames, 5
+  de-numberings in both directions, **0** residual.
+- **Gates.** `lint` **0**, proven to bite on a T12 file. `type-check` **6/6**, `build` **5/5**, both 0
+  cached forced. `test:scripts` **1115** unchanged (T12 adds no `scripts/` test); `test:plugins`
+  **96**/0. `check-core-layering` **edges 978 → 980, files 914 → 916**; `read_file.ts`'s own
+  `tools → services` count **7 → 2**. Module 7 **100% lines / funcs**. Discrimination: **15**
+  mutations, **no** equivalent or unreachable rows this time — A kills **15/15**, pre-existing
+  **9/15**, the six misses being the whole of `readFileOptions`' contract, the conditional-spread
+  shape and the call position. **`bun run test` exited 1 on its first run and it is not PR-D's** —
+  `mcp-client`'s `web/fetch_and_index` at 22780 ms, zero diff against `main`, **95p/0f standalone
+  under an empty config dir**; warm re-run 11/11 exit 0, core `all 150 group(s)`, unchanged for one
+  added file and the runner's classification read rather than assumed.
+- **T13 DONE — `f56e03e`. Phase 4 is open.** Module 8 out:
+  `services/indexing/execute-indexing.ts` + its suite. `index_project.ts` **352 → 246**, maximal
+  bodies **3 → 2**, members **404 → 403**, and `check-tools-thin` **stays `1 of 30`** — the three
+  remaining flag reasons are T14's two module-level bodies and T14b's `handle()` ceiling, exactly as
+  C33 predicted. **Two new plan defects (C76–C77), running total eighty-two.** Record is `tasks.md`
+  §10.15. Write set **4** against the row's **3**, one user decision — and **the phase total does not
+  move**, because that fourth file is one of the 2 test repoints §1's Phase-4 row already carries for
+  T14. First growth on this feature that leaves §1's sum/union/identity untouched, checked not assumed.
+- **All nine cited spans were EXACT, which inverts T9–T12** — because `index_project.ts` is
+  **byte-identical at HEAD, `main`, `d7091ac` and `f06b01d`** (blob `aa953e5c`), confirmed by blob SHA
+  at four refs rather than by reading, so C43's T5-era re-derivation still held. 12 text anchors.
+- **Order taken: T13 → T14b → T14, and it is the hazard §6 item 8 does not state.** The spans are
+  disjoint; the line numbers are not. File order is T14 `:39-68` < T14b `:151-202` < T13 `:246-351`,
+  so landing the **last** span first renumbers neither of the others, while T14 first renumbers both.
+  **Verified by outcome**: after T13, all six remaining anchors re-derived EXACT, so **T14b and T14
+  inherit zero re-derivation cost**. Re-derive anyway — the import block sits above every span.
+- **C76**: §6 item 8 still cited the **pre-C43** spans, and §8.1's declared scope is `design.md`, so
+  no task was scheduled to fix a `tasks.md` site — PR-C's **C19** shape, third time here.
+  `design.md:747` carries the same superseded figure and is added to §8.1 row 14. Disjointness
+  unchanged; only the figures were stale.
+- **C77**: T14b's *`handle()` 128 → ~87* is unreachable from its own mechanism. `52 − 16 = 36`, so
+  ~~**92**~~ → **93 — C77's own first operand is stale, corrected by C78 at T14b**: `128` is
+  `handle()` BEFORE T13, the shipped tree is **129**. C77 was written after T13 committed and
+  re-derived from the number it was amending rather than from the tree, which is the sentence it uses
+  to convict C43. The mechanism holds; only the baseline was wrong, and 92, 93, 94 and the shipped
+  **106** all clear 120. `87` is reconstructably `128 − 45 + 4` — the pre-C43 span minus **only**
+  the 4-line catch return, omitting the 12-line `"busy"` block the same sentence keeps in the handler;
+  **C43's `~94` re-derived from that wrong baseline instead of from the mechanism**, inheriting the
+  defect it was correcting. All three figures clear the ceiling, so **nothing downstream moves**.
+- **The mutation harness found what both lenses missed, for the second consecutive task.** 16
+  mutations, two subject files, **no refusals and no equivalent or unreachable rows**. First run: A
+  killed **12 of 16**, **B killed ZERO** — T13's premise measured rather than asserted. **All four
+  survivors were handler-side**, and **M13 is the one that mattered**: passing `warmupCache` without
+  `.bind()` loses the receiver and throws on every `warmCache` request, so §4.2's identity decision was
+  **documented and unenforced** — C74's shape. *A method test is not a call-site test.* Fixed in the
+  subject: four wiring cases, each with an **observed red** first; the union now kills **16 of 16**.
+- **A stub had to be strengthened before a sensor could fire at all.** The `ContextualSearchRLM` double
+  was receiver-free, so an unbound callback was **undetectable by construction**; it now reads through
+  `this` as the real method does. *A stub simpler than its subject can make a decision unenforceable no
+  matter how the test is written.* A delegating module mock was tried first and **recursed** —
+  `mock.module` rebinds a namespace imported before registration.
+- **Gates.** `lint` **0**, proven to bite on a T13 file. `type-check` **6/6**, `build` **5/5**, both 0
+  cached forced. `test` exit **0 on the first run**, 11/11, 5 cached all `:build`. `test:scripts`
+  **1115 unchanged** (T13 adds no `scripts/` test). `test:plugins` **96**/0. `check-core-layering`
+  **edges 980 → 983, files 916 → 918** — **and the pre-`git add` run reported 916 unchanged**, because
+  the gate enumerates `git ls-files` and could not see either new file. Core's group count
+  **150 → 151**, the new suite classified `database/integration`; **T12's fork-free property cannot
+  carry**, since a suite stubbing the ETL pipeline must name it. Coverage (R-36): new module **100% /
+  100%**; `index_project.ts` **85.71% funcs / 97.79% lines** against **88.89% / 98.61%** before — the
+  same single uncovered function over a smaller denominator, and the gate enforces **line** coverage
+  only, so both clear it. That arrow is `handle()`'s outer `.catch` and is **unreachable rather than
+  untested**; no artificial reach was written to buy the percentage, and its documented trigger was
+  wrong and is corrected (`updateStatus` is the first statement *inside* the try it was said to precede).
+- **T14b DONE — `7d4fc22`. The gate's third clause is CLOSED.**
+  `services/indexing/acquire-indexing-lease.ts` + its suite. `index_project.ts` **246 → 222**,
+  `handle()` **129 → 106** (ceiling 120), members **403 → 402**, maximal bodies **unchanged at 2** —
+  the lease block was statements inside `handle()`, never a member, so no other clause could move.
+  `check-tools-thin` still reads **`1 of 30`, now for TWO reasons rather than three**, and both are
+  T14's. **Two new plan defects (C78–C79), running total eighty-four.** Record is `tasks.md` §10.16.
+  Write set **5** against the row's **3**, one user decision; **the phase total again does not move**,
+  both growths being intra-phase re-touches.
+- **C78 corrects C77's baseline, and C79 states a frame.** C78 is above. **C79**: `tasks.md` §4.2's
+  evidence paragraph is wholly in the `d7091ac` frame — `:254-351` and `:306` were deleted by T13,
+  `:111`/`:114` were shifted to `:110`/`:113` by T14b — so the **frame is stated** rather than two of
+  four numbers renumbered (C52's rule). §10.15's sweep called the whole subsection historical; two of
+  its numbers were live.
+- **The filename was an author-level choice no artifact makes.** `design.md` §5.1's table runs 1-8
+  plus 8b and has **no row for this module at all** (C33 minted T14b after Design). Chosen on the one
+  sibling's convention — `execute-indexing.ts` exports `executeIndexing`. Owed to `design.md` as
+  **§8.1 row 19; the count is now nineteen, not eighteen.**
+- **The mutation harness found what both lenses missed, for the THIRD consecutive task.** 18
+  mutations, two subject files, **no refusals and no equivalent or unreachable rows**. Column B swaps
+  `index-project-tool.test.ts` back to its **HEAD content**, because the row prices no test repoint.
+  First run: A killed **16 of 18**, B **5 of 18**. **Both survivors were the 409 response body** — the
+  part the design deliberately keeps in the handler, and therefore the part the module suite is
+  structurally unable to reach; the pre-existing assertion is `toContain("indexing_busy")`, which
+  passes when the handler reports the **job** id as the **active run** id, and `leaseExpiresAt` was
+  asserted by nothing. Fixed in the subject with an observed red; A now kills **18 of 18**. *T13's
+  survivors were the call site; T14b's were the call site's OUTPUT SHAPE.*
+- **A docblock sentence claiming a property destroyed it.** The new suite asserted it named none of
+  `run-tests-isolated.ts`'s isolation literals **by listing them**, and the predicate is a plain
+  word-boundary scan over test source, comments included — classifying the file
+  `database/integration`. Core went `150 → 151` isolated, then back to `122 pure/shared, 150` once the
+  names left the comment, so the group count holds at **151, unchanged for one added file**.
+- **Gates.** `lint` **0**, proven to bite on a T14b file. `type-check` **6/6**, `build` **5/5**, both
+  0 cached forced. `test:scripts` **1115 unchanged**; `test:plugins` **96**/0. `check-core-layering`
+  **edges 983 → 985, files 918 → 920**, taken after `git add` on T13's lesson. **`bun run test` ran
+  four times and three were red with DISJOINT failing sets** — `mcp-client` `web/fetch_and_index`
+  (21903.99 ms), `architecture-map`, `trace_path` — each zero-diff against `main`, naming 0 of T14b's
+  five subjects, and green standalone (95p/0f in 2.15 s under an empty config dir, 24p/0f, 18p/0f);
+  host load rose **2.30 → 4.12** across the repeated runs. **Run 4 clean: 11/11, exit 0, core `all 151
+  group(s)`.** Coverage (R-36): new module **100% / 100%**; `index_project.ts` **85.71% funcs /
+  97.52% lines** against **85.71% / 97.79%** after T13 — the same unreachable `.catch` over a smaller
+  denominator.
+- **T14 DONE — `6af528e`. PHASE 4 IS CLOSED AND THE GATE IS GREEN.**
+  `services/project-identity/project-root-identity.ts` + its suite; `index_project.ts` **222 →
+  189**, members **402 → 399**, maximal **2 → 0**, `handle()` **106 unchanged** — `check-tools-thin`
+  **`PASS — 0 of 30`, exit 0**; the criterion and CI wiring stay T15's. Record is `tasks.md`
+  **§10.17**. **One new plan defect (C80), running total eighty-five** — the row's published-surface
+  argument was SOURCE-side only; the destination barrel is `export *`-ed by `services/index.ts:66`,
+  so the module is deliberately absent from the directory barrel (author level, design.md §5.1's
+  precedent). The inherited `:38-67` re-derived EXACT, and the drag rule recursed one level down:
+  `type CanonicalizePath` (:36, outside the span) departed on the same 2-in-span/0-elsewhere reader
+  count as T14b's imports.
+- **The row's "no test rewrite" premise was measured false BEFORE a line moved**: 11 mutations of
+  the helpers and their call sites survived every class-reaching suite on the unmoved tree, 11 of
+  11 at 61p/0f — the workspace mock returns no stored path in every handler test, so the reuse
+  guard no-ops everywhere. Write set **6 against the row's 5, one user decision** (fix-all-now):
+  call-site sensors (stored-root knob reset in the existing `afterEach`, `mkdtemp` fixtures,
+  `realpathSync` expectations, `createJob` spied), four module-suite pins (message operand order +
+  three `path.resolve` placements), `execute-indexing.ts:38` amended. **Phase total unchanged a
+  third time** — every T14 file was already in Phase 4's 9-file roster; §1's 107/86/21 hold,
+  re-checked.
+- **Harness: 18 of 18 written, no refusals; A kills 18, the repoint-only counterfactual kills 6 —
+  and A killed everything on run 1, the first task of four where the harness found nothing the
+  Plan Challenge lenses missed.** The premeasure ran before planning finished, so the sensors were
+  designed against measured survivors rather than predicted ones. B's 6 = the four method-covered
+  module behaviors + T13's one pre-existing canonical-path sensor + the self-sensing repoint (an
+  unresolvable specifier is a load failure in both columns).
+- **Gates at T14.** `lint` 0 (+bite on a T14 file), `type-check` 6/6 / `build` 5/5 both 0-cached
+  forced, **`bun run test` green twice** (11/11; the disjoint-red class did not fire; load 5.85 →
+  4.18, both readings kept), `test:scripts` 1115 unchanged, `test:plugins` 96/0,
+  `check-core-layering` **985 → 986 edges, 920 → 922 files** after `git add`. Coverage (R-36):
+  module **100/100**; handler **75.00% funcs / 97.03% lines**, same single unreachable arrow,
+  floor cleared. Isolation: core **273 files, 151 groups unchanged**, new suite pure/shared, read
+  from the runner. Both pre-move instruments (`t14-spans.ts`, `t14-citation-sweep.ts`) now exit 1
+  on this tree — the refusals working.
+- **T15 DONE — `89d3c25`. PHASE 5 IS COMPLETE; RFS-01 AC-1 CLOSES ON ALL THREE CONJUNCTS AND THE
+  GMS-02 HEADLINE WITH IT.** The step lands at `ci.yml:167-168` (comment `:155-166`, +15 lines),
+  parsed build step **12 of 21** between `check-core-layering` and the stale-pointers gate — no
+  `if:`, no `continue-on-error`, no live figures in the comment (C63). Ruleset re-verified live
+  in-session (context = job id; `build` among the six); gate re-read `PASS — 0 of 30`, exit 0,
+  **both directions re-observed on the live tree**: Map-field mutation → `FAIL — 1 of 30`, exit 1,
+  members 399 → 400, restore SHA-256-identical. Record is `tasks.md` **§10.18**.
+- **The write set grew 1 → 3 under C55's standing rule, no new user decision.** The +15 insertion
+  shifts every `ci.yml` line ≥ 155; five live-frame `ci.yml:200` sites adjudicated — two repointed
+  `:200 → :215` (`check-tools-thin.test.ts:14`, `design.md:828`), `tasks.md:528` amended in place,
+  HANDOFF's Next-action paragraph superseded by its own rewrite, `design.md:970` frame-stated and
+  kept (C52). The evidence-audit lens found the author's "three live citations" figure wrong (true
+  count **five**); the red-team's critical — parse-success is not list-membership — was folded into
+  `t15-verify-post.ts` **before** the edit (16/16 post; observed red 11/16 FAIL pre). One
+  pre-existing stale cite logged not fixed: `native-macos-arm64-workflow.test.ts:11`'s colon-free
+  "(lines 150-190)" — C57's shape, 166 lines stale before T15, outside every sweep on this feature.
+- **C81, the eighty-sixth plan defect, running total eighty-six.** §1's *"which is what takes …
+  105 to 84"* sentence sat two tasks stale while the same table's sum and union rows moved to
+  107/86 at T12 — the C19 no-owner family inside a self-checking table. Struck and advanced
+  (`109 to 86`; identity `15 × 1 + 4 × 2 = 23`), with `check-tools-thin.test.ts` the fourth
+  three-phase file (1, 3, 5) and `design.md` entering the two-phase group (5, 7).
+- **The local-gate call for a workflow-YAML commit is decided and its population measured** —
+  `test:scripts` **IS sensitive** (`scripts/tests/native-*-workflow.test.ts` `readFileSync`
+  `ci.yml`): **1115/0 across 49 + 5 shell suites, both sides of the edit**. `actionlint` 0 both
+  sides; Bun.YAML structural probe 20 → 21 steps, one match, index 12; `check-core-layering`
+  **986 / 922 unchanged** and `lint` 0, both stated as tree-state frames (neither population can
+  sense a YAML diff); `type-check`/`build`/`bun run test`/`test:plugins` **N/A by measured
+  population** — zero ci.yml readers in either (§10.18). Residual named: local validators are
+  proxies for GitHub's server-side validator; first live step run comes with the PR, and the
+  CHANGELOG gate cannot fire before then (`pull_request`-only, no PR open, push trigger
+  `main`-only — checked, not assumed).
+- **T16+T17 DONE — `ef5f837`, ONE commit; PHASE 6's RENAME IS LANDED (T18 deferred after T21).**
+  `services/graph/` → `services/memory-graph/`: 7 `git mv` + 28 import lines rewritten by an
+  AST-anchored instrument (refuses on population ≠ 28 and on offset drift) + `docs/ONBOARDING.md:225`.
+  The commit shape was a measured decision, the first task:commit break on this feature: a bare mv
+  reads core tsc exit 2 (13 errors / exactly the 7 production importers) while the 6 `mock.module`
+  registrations degrade silently, so C46's no-red-commit bar beat the 1:1 mapping; rejected shapes
+  in `tasks.md` §10.19. Acceptance both directions: old path **RAW 0 files / 0 lines**, new path an
+  exact **25/45** mirror of the premeasured baseline (§3.5 item 8 reproduced to the digit first).
+- **The T17 discrimination table is the carry-forward: 4 of 6 single-miss mock mutations are
+  SILENT** — the resolver sweep is those four's only sensor in the repository; the loud two
+  (`memory-controller` 27p/5f, `search-facade-synapse` 21p/5f) fell on the axis the red-team did
+  not predict, and bun 1.3.14 registers a dead mock path without throwing (probed live). Control:
+  a reverted production import is compiler-red. All restores SHA-256-verified.
+- **C82 and C83, the eighty-seventh and eighty-eighth plan defects, running total eighty-eight.**
+  C82: `docs/ONBOARDING.md:225` fell between two differently-derived "3"s (design §7 group E's
+  prose carriers vs §3.5 item 2's R-32 intersection) and was owned by no row — repointed in the
+  commit under C55/C62, T15's precedent; `CHANGELOG.md:35` stays as a dated v1.17.0 record (C52).
+  C83: group E's "9 fixture citations" contradicts design's own §1.4 and R-32 ("Eight") and the
+  measured 8 at all three baselines — `tasks.md` §8.1 row 20 (now twenty rows), T20b's to apply.
+- **Post-commit literal residue is an enumerated set, recorded with frames**: outside
+  `.specs/`/`.ua/` exactly 11 lines / 4 files (CHANGELOG permanent-dated + T18's ten, scheduled
+  transients across the T16→T21 window); `.specs/` 40/12 frame-stated; `.ua/` 200/3 deferred
+  (spec §4.4), verified already-excluded from every gate. Gates: lint 0; type-check 6/6 and build
+  5/5 forced 0-cached; `bun run test` 11/11 first-run green, core isolation 273/151 unchanged;
+  test:scripts 1115/0/49; test:plugins 96/0; `check-core-layering` **986 / 922 count-identical**;
+  `check-tools-thin` **byte-identical**; `check-stale-pointers` PASS/28 as the nothing-else-broke
+  frame ONLY (stems blind to all 7 renamed basenames). Both Plan Challenge lenses ran — **no author
+  figure fell, a first on this feature**. New residual: a populated local pgvector index keys
+  embeddings by pre-rename paths; a git rename does not re-index (operational, post-merge).
+- **T19 DONE — `40103b6`. PHASE 7 IS OPEN; RFS-04 AC-1 + AC-3 close.** The three removals landed
+  at exactly the row's 5 files — `data/vector/{index,hybrid-search}.ts` deleted, `IHybridSearch`
+  and `BatchCommand` stripped — **zero write-set growth and zero new plan defects, both firsts on
+  this feature** (running total stays eighty-eight). Record: `tasks.md` §10.20. Every figure was
+  premeasured at `9abe04c` and full-path-cited (the LIVE `services/search/hybrid-search.ts`: 3
+  files / 5 lines — 3 import/require + 2 `mock.module` — untouched); AC-1 read a proven-fresh pack
+  (core's `build` never cleans `dist/`, measured; `rm -rf dist` + forced rebuild; tarball
+  `dist/data/vector/` 16 → 8, both symbols 1 → 0); the control probe removed the live file and
+  observed tsc exit 2 / TS2307 at `contextual-search-rlm.ts(57,8)`, restore SHA-verified. Gates:
+  layering 986 → 982 edges / 922 → 920 files, thinness 399 → 398 members — both predicted from
+  gate source before the run, both exact; the red-team's 984 fell to the source-derived 982.
+  For T25: `.specs/reports/` is untracked hence invisible to `git grep` sweeps and is accepted
+  region; `.ua/` regenerates after PR-D.
+- **T20b DONE — `7fb8ddf`.** All twenty §8.1 rows applied into `design.md` in place (+103/−27),
+  verified **20/20 APPLIED-CORRECT** by an independent row audit; the +76-line shift's citation
+  adjudication (T15's precedent) found **zero live repoints owed** — every citing site frame-stated,
+  `t15-verify-post.ts` content-anchored and 16/16 post-edit. **C84 minted and fixed in the same
+  commit (running total eighty-nine)**: row 19's new 8c table row falsified design's thrice-stated
+  "Nine new files under the floor" — the tree holds **ten** — amended at all three sites + R-36.
+  §8.1 gained its frame line (ledger numbers are minting-frame; find positions by content). Record:
+  `tasks.md` §10.21. Gates (`.specs/`-only): test:scripts 1115/0/49; both structural gates
+  byte-stable at T19's readings.
+- **T20 DONE — `32f36d5`. RFS-05 AC-2 + AC-3 close.** The parent gains its C28–C33 section
+  (C13–C27 convention, six rows verified against rationale artifacts) and every falsified site is
+  amended in place — including the two the row's letter did not name, **AS-06's own row and GMS-02
+  AC-1's parenthetical** (still carrying ~390 and the C28-falsified sensor as live fact; both
+  critics found the gap independently; AC-2's "in place AND indexed" now holds everywhere). Layer
+  figures carry three frames + method (a6216cd 31/6/208/41 → d7091ac 30/0/208/39+11 → T20 tree
+  **30/0/218/37+11**, critic-re-derived); ~390/55% → **490/707 (69.3%)**; the 707 row frame-stated
+  at current **124**. Three author insertions fell to the gate pre-commit (83-vs-51 range
+  conflation, C25→C23 misattribution, non-reproducible frame label). Record `tasks.md` §10.22;
+  zero new defects, running total eighty-nine; +40-line citation adjudication: zero live repoints,
+  bare-`:NNN` swept.
+- **T21 DONE — `644f190`. RFS-05 AC-4 closes, red observed FIRST** (22p/1f pre-deletion →
+  23p/0f; `EXCLUSIONS` 9 → 8 by module import; behavior-neutral by consumption-site reading;
+  gate untouched per Design §4). Record `tasks.md` §10.23. Write set 2 → **4 tracked + 2
+  `.specs/`** under C55 (−4/+6 = **+2** shift; lru-evict comments `:318` → `:320`). **Both
+  critics caught the author's +3 arithmetic and a missed fourth site** — fixed pre-commit;
+  recorded anti-pattern: repoint by content identity against `git show HEAD`, never by delta.
+  APFS case-insensitivity noted in the test (pin load-bearing in Linux CI for case-drift). §1:
+  sum **112** / union 86 / identity 26 = 14×1 + 6×2. Gates: lint 0; test:scripts **1116/0/49**;
+  structural gates byte-stable. Zero new defects, running total eighty-nine.
+- **T18 DONE — `96908f3`. PHASE 6 CLOSES.** 10 literal sites swapped in place, zero net line
+  change; residual outside `.specs/`/`.ua/` = `CHANGELOG.md:35` alone (permanent C52 record).
+  Record `tasks.md` §10.24 with a recorded route deviation (one combined-lens critic, reason
+  stated; 8/8 confirmed; `graph-queries.ts` still 440 so the repointed figure is exact). The
+  critic's finding — the `:237` trap note is really THREE-way (`data/symbol/` third, Design §1.1)
+  and owned by nobody — is **assigned to T22**. Gates: lint 0; test:scripts 1116/0/49; suite
+  23p/0f; stale-pointers PASS/28 frame-only. Zero new defects, running total eighty-nine.
+- **T22 DONE — `a5a3aa1`. RFS-05 AC-5 closes** + the T18-assigned three-way widen. All five
+  figures critic-reproduced (23 migrations, metric named; 8 publishable today / 5 at v1.3.1 by
+  `git ls-tree`, both frames stated; the `data/symbol/` error named). Two author-prose defects
+  fixed pre-commit (two-vs-three contradiction; over-label). One shell-harness flake adjudicated,
+  three readings kept (static assertion, untouched file, red once in aggregate, green twice).
+  Record `tasks.md` §10.25; zero new defects, running total eighty-nine.
+- **T23 DONE — `036e5b2`** (state files flipped with the T25-pending frame stated inside them;
+  `active_feature` untouched, fourth check; §10.26). **T24 DONE — `c6ee80c`. RFS-04 AC-2 closes
+  and EXECUTE IS COMPLETE THROUGH T24** — CHANGELOG under both decided headings, semver re-taken
+  per item on the reachability table, live file exempted by name, no skip-ci literal anywhere it
+  matters; §10.27. Running total **eighty-nine** plan defects; branch **57 ahead of `main`**,
+  unpushed, no PR; `test:scripts` 1116/0/49 at the close.
+- ~~**Next action: Execute, T5**~~ … ~~**Execute, T22**~~ → ~~**Execute, T23 + T24**~~ →
+  ~~**Next action: T25 — STOPPED ON THE USER'S AUTHORSHIP QUESTION.**~~ The question was answered
+  (fresh conversation = different author; HANDOFF Active tail carries the decision with its
+  rejected options).
+- **T25 DONE — `e18ee11`, 2026-08-03, by the fresh-conversation verifier. VERDICT: PASS.** Record:
+  `core-layering-read-file-split/validation.md` (`tasks.md` §10.28 the pointer). All five re-takes
+  reproduced from raw data (frozen base per clause 2/1/2 via `--json` in a T5 worktree;
+  `edgesExamined` per structural commit, 18 rows all exit 0, 965/896 → 986/922 → 982/920; resolver
+  sweep old 0/0 / new 25/45 exact; pack from proven-fresh dist, 8 survivors, both symbols 0; a
+  ten-fault discrimination table, SHA-256 restores, **no surviving mutant**). Both open criteria
+  questions closed in the amendments' favour on two-sided executed evidence (C37 probe green under
+  the mutation while the resolution escaped the root; `$HOME`-leak red only under the set-equality
+  case). Ten new modules re-measured 100/100 each (GMS-05 AC-2 per file). Zero new plan defects —
+  running total stays **eighty-nine**. **Next action: the user's — push, PR (first live CI run of
+  the new step; CHANGELOG gate fires there), `--no-ff` merge (R-04/R-27).**
+- **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
+  document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
+  confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed
+  (`tasks.md` §8) — plus **eleven** corrections the sizing measurement produced before the gate ran
+  (`tasks.md` §3.5).
+- **C33 is the fortieth plan defect and the highest-consequence line in `tasks.md`.** Phase 4 as
+  designed **could not close the gate**: `index_project.ts`'s `handle()` is `:117-244` = **128
+  lines**, and all three spans Design extracts (`:39-44`, `:46-68`, `:254-351`) sit **outside** it,
+  so the `handle() ≤ 120` clause stayed red at **1 of 30** and T15 could not wire the gate into
+  `ci.yml` without failing a required check. Closed by a new task **T14b**, extracting the 45-line
+  managed-run lease block `:158-202`; `handle()` **128 → ~87**. Zero allowlist.
+- ~~**Six** corrections are owed to `design.md` itself~~ → ~~fourteen~~ → ~~fifteen~~ → ~~sixteen~~ →
+  **seventeen** (`tasks.md` §8.1, task T20b), on PR-C's C18 precedent. *"Six" was last true at Design;
+  §8.1 grew at T4b, T5, T6, T9 and again at T11 (**C66**).* **C28–C33** are owed to the parent
+  `spec.md` (T20); none is written there yet.
+- **C28 through C32 and the parent's stale layer figures are owed back** to
+  `core-layering-god-module-split/spec.md` (RFS-05 AC-2/AC-3), landing with the work. None is
+  written there yet. C29 additionally amends the parent's own `~390 of 707` Evidence row.
+
+## Previous — Core Layering, Controller Retirement (PR-C) — MERGED #59, RELEASED v1.17.0
+
+> **Merged 2026-07-31 as `2bea11e`, `--no-ff`, two parents (`450352b` + `2ea4ebd`); released
+> v1.17.0.** T18 PASS, `validation.md`. Everything below was written before the merge and is kept
+> as the pre-merge record; where it describes work as outstanding, this line supersedes it. The
+> four residual findings are `validation.md` §5.1–§5.4 and what was not verified is §6.
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-core-layering-controller-retirement`

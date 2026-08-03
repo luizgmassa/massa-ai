@@ -43,7 +43,7 @@ mock.module("../services/synapse/session/index.js", () => ({
 mock.module("../services/synapse/index.js", () => ({
   getSynapseManager: mock(() => ({ process: () => ({ results: [] }) })),
 }));
-mock.module("../services/graph/graph-store-factory.js", () => ({
+mock.module("../services/memory-graph/graph-store-factory.js", () => ({
   getGraphStore: mock(() => ({ bfsNeighbors: () => [] })),
 }));
 mock.module("../data/memory/memory-repository-factory.js", () => ({

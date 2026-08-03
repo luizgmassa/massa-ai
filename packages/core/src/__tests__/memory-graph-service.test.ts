@@ -11,7 +11,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "crypto";
 import { MemoryRelationType } from "@massa-ai/shared";
-import { MemoryGraphService } from "../services/graph/memory-graph.service.js";
+import { MemoryGraphService } from "../services/memory-graph/memory-graph.service.js";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
 const DEDICATED_DB =

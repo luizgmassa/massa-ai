@@ -2,7 +2,7 @@
 import { logger } from "@massa-ai/shared";
 import { getPrismaClient } from "../../kernel/prisma-client.js";
 import { TokenMetrics } from "../metrics/token-metrics.js";
-import type { MemoryRowWithEmbedding } from "../graph/types.js";
+import type { MemoryRowWithEmbedding } from "../memory-graph/types.js";
 
 export interface DuplicatePair { keepId: string; removeId: string; similarity: number; reason: string; }
 export interface MergeResult { merged: number; edgesTransferred: number; accessCountsBoosted: number; }

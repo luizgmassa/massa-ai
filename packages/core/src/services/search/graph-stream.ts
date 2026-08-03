@@ -13,7 +13,7 @@
 
 import { SearchResult, logger } from "@massa-ai/shared";
 import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
-import { getGraphStore } from "../graph/graph-store-factory.js";
+import { getGraphStore } from "../memory-graph/graph-store-factory.js";
 import type { SearchDegradationReporter } from "../../kernel/search-diagnostics.js";
 
 /**
