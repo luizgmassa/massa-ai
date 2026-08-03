@@ -170,12 +170,14 @@ They are enumerated in §7 so no task re-derives them.
 
 **Eight further citations are fixture literals, not references.**
 `scripts/__tests__/check-coverage.test.ts` cites `src/services/graph/graph-queries.ts` at `:12`,
-`:38`, `:51`, `:58`, `:106`, `:107`, `:115` and `:143`. `BASE` there is the synthetic
+`:39`, `:52`, `:59`, `:107`, `:108`, `:116` and `:144` *(seven of the eight shifted +1 at T21 — its
+`existsSync` import; `:12` sits above it — grep-verified)*. `BASE` there is the synthetic
 `"/repo/packages/core"` and no path is resolved on disk — they are the measured shape of a real
 defect used as an lcov fixture, the same class as `check-stale-pointers`' own test file, which that
 gate's `EXCLUDED` list carries for exactly this reason. **They are repointed as prose** (they cite a
 file that will no longer exist) but they are not load-bearing, and no test breaks if they are
-missed. `scripts/check-coverage.ts:279` carries the same citation in a docblock.
+missed. `scripts/check-coverage.ts:281` carries the same citation in a docblock *(`:279` → `:281`
+at T21 — its EXCLUSIONS deletion is a net **+2** comment swap above this line, −4/+6; C55's rule)*.
 
 ---
 
@@ -374,7 +376,8 @@ a 4-line diff. §7 read the rejected option's cost as the chosen option's size a
 **And the class fix is not an edit to the gate.** The pinning test already exists:
 
 ```ts
-// scripts/__tests__/check-coverage.test.ts:178
+// scripts/__tests__/check-coverage.test.ts:179  (was :178; +1 at T21's existsSync import —
+// the site the author's own repoint sweep missed and the evidence-audit lens found, §10.23)
 test("every excluded path is one the gate would otherwise measure", () => {
   for (const entry of EXCLUSIONS) {
     expect(isMeasuredSource(entry.file)).toBe(true);
@@ -382,7 +385,7 @@ test("every excluded path is one the gate would otherwise measure", () => {
 });
 ```
 
-`isMeasuredSource` (`check-coverage.ts:379-388`) is a **pure string-shape predicate** — an extension
+`isMeasuredSource` (`check-coverage.ts:381-390` — repointed at T21; the author's first repoint wrote `:381-391` from a +3 shift belief, and the true hunk is −4/+6 = **+2** — both Plan Challenge lenses caught it, §10.23) is a **pure string-shape predicate** — an extension
 regex plus six substring/prefix checks. It contains no `existsSync`, no `readFileSync`, no
 `statSync`, no `execSync`, no `git`. **It cannot touch the filesystem, so it can never see a
 dangle**, and `"packages/core/src/services/query/prisma-client.ts"` passes it trivially. That is

@@ -19,6 +19,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import {
   EXCLUSIONS,
@@ -180,6 +181,22 @@ describe("EXCLUSIONS", () => {
     // reads as an active exemption.
     for (const entry of EXCLUSIONS) {
       expect(isMeasuredSource(entry.file)).toBe(true);
+    }
+  });
+
+  test("every excluded path exists on disk", () => {
+    // The shape pin above cannot see a dangle: `isMeasuredSource` is a pure
+    // string predicate that never touches the filesystem, which is how
+    // `services/query/prisma-client.ts` sat here for a full release after its
+    // file moved to `kernel/`. Resolve against the repo root, the same base
+    // `check-coverage.ts`'s own `REPO_ROOT` uses — never this file's synthetic
+    // `BASE`, never the invoking cwd. One environment split, stated: default
+    // APFS is case-insensitive, so a case-drifted entry passes existsSync
+    // locally on macOS and fails only in Linux CI — the sensor is load-bearing
+    // there for that one shape.
+    const repoRoot = path.resolve(import.meta.dir, "..", "..");
+    for (const entry of EXCLUSIONS) {
+      expect(existsSync(path.resolve(repoRoot, entry.file))).toBe(true);
     }
   });
 });

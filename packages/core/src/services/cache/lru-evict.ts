@@ -67,7 +67,7 @@ export function evictOldest<K, V>(cache: Map<K, V>, maxRetained: number): void {
     // `cache.size >= 1`, so `keys().next()` always yields an entry. Kept because all four
     // original sites carry it, and dropping it inside a behavior-preserving PR would be an
     // unprovable change. It is NOT here for the 90% line-coverage floor — that gate parses
-    // `DA:` records only (`scripts/check-coverage.ts:318`), never `BRDA:`, so this line counts
+    // `DA:` records only (`scripts/check-coverage.ts:320`), never `BRDA:`, so this line counts
     // as covered the moment it is evaluated, whichever way the branch goes.
     if (oldest === undefined) break;
     cache.delete(oldest);

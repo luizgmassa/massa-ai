@@ -170,7 +170,7 @@ describe("evictOldest — edges", () => {
     // because the loop condition forces size >= 1 whenever maxRetained >= 0. It IS reachable
     // with `undefined` as an actual key, which is the only way a Map yields `undefined` from
     // `keys().next().value` while non-empty. Asserted so the guard's behavior is stated rather
-    // than assumed — NOT for coverage: `scripts/check-coverage.ts:318` parses `DA:` only, so
+    // than assumed — NOT for coverage: `scripts/check-coverage.ts:320` parses `DA:` only, so
     // that line is already covered by every case above.
     const m = new Map<string | undefined, number>([[undefined, 1], ["b", 2]]);
     evictOldest(m, 0);
