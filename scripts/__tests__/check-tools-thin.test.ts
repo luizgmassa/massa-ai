@@ -11,7 +11,7 @@
  * ## Synthetic fixtures only — never a live-tree count (design.md §6.6 property 5)
  *
  * `"test:scripts": "bun test scripts/__tests__ …"` **auto-discovers** every
- * `*.test.ts` under this directory with no registration step, and `ci.yml:200` runs
+ * `*.test.ts` under this directory with no registration step, and `ci.yml:215` runs
  * it inside the `build` job, which is in `main`'s live `required_status_checks`. So
  * this file executes in CI from the moment it lands. A `2 of 30` assertion written
  * here would go **red at Phase 3**, when `read_file.ts` becomes green, and would

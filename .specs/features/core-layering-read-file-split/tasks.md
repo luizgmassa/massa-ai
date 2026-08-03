@@ -43,11 +43,11 @@ the per-task write sets only Tasks produces. Those sets are now measured, repo-w
 | **2 — LRU** | ~~7~~ → ~~9~~ → **13** | 2 | `services/cache/lru-evict.ts` + its unit test + **4** repointed sites + `read-file.test.ts` + ~~T8b's 2 comment sites~~ → **T8b's 8 source files + `spec.md`** (§10.10, C54: `production-wiring.ts`, `invalidator-registry.ts`, `read_file.ts`, `symbol-graph.service.ts`, `file-filter-cache.ts` and the three Phase-0 suites; the first two and `spec.md` are the only ones new to this phase, and `spec.md` is new to the whole set). **Corrected at T10 — C65 (§10.12), and it is not T10's own work**: T8b's write set grew from 2 to 9 on a user decision and this row was never carried back, so §1 asserted **9** for two tasks while §5's own T8b row said 8 + `spec.md` |
 | **3 — the extraction** | ~~13~~ → ~~14~~ → ~~20~~ → ~~25~~ → ~~29~~ → **31, and Phase 3 is now COMPLETE** | 16 | `read_file.ts` + **6** modules + **6** module suites + **C34's `read-file.test.ts` repoint** + **T9's 6 citation-repoint files** (§10.11) + **T10's 5 further ones** (§10.12: `lru-evict.test.ts`, `symbol-graph.service.ts`, `production-wiring.ts`, `invalidator-registry.ts`, `read-file-presentation-characterization.test.ts` — its other six files were already in the set, `read-file-project-root-rename-pin.test.ts` among T9's own six) + **T11's 4 further ones** (§10.13: `line-range.ts` and `line-range.test.ts` are the 2 new; `wave-4-correctness.test.ts` and `spec.md` are new to **this phase**, the latter already in the union via Phase 2 — the presentation suite and the two `check-tools-thin` files were already here). **T12 adds 2** (§10.14: `read-file.service.ts` and `read-file.service.test.ts` are the only files new to any phase; `read_file.ts`, `read-file.test.ts`, the presentation suite, `file-content-cache.ts` and `line-range.ts` were all already here). Its write set was **7** against the **4** its row provides for — the third growth in this phase, and both gate lenses reached the same 7 independently (**C72**, and the two by-claim clauses) |
 | **4 — `index_project.ts`** | **9, unchanged by T13 or T14b** | 6 | 1 handler + **3** modules + 3 module suites + **2** test repoints. **T13 shipped 4 files against its row's 3** — `index_project.ts`, `services/indexing/execute-indexing.ts`, its suite, and `index-project-tool.test.ts` — but the phase total does **not** move, because that fourth file is one of the 2 test repoints this row already carries for T14. So T13's growth is an **intra-phase overlap**, not a new file, and §1's sum/union/identity are all untouched (§10.15). *This is the first growth on this feature that does not move the table, and it was checked rather than assumed — the check working, not a coincidence.* **T14b shipped 5 against its row's 3 and the total again does not move** (§10.16): `execute-indexing.ts` is already one of this row's 3 modules and `index-project-tool.test.ts` one of its 2 test repoints, so both growths are intra-phase **re-touches**. Two consecutive tasks whose growth the table absorbs — recorded because the reason is structural (Phase 4 has one handler and a fixed module roster) and will not carry to Phase 6 or 7. **T14 shipped 6 against its row's 5 and the total does not move a THIRD time** (§10.17): `execute-indexing.ts` is one of this row's 3 modules and both repointed suites are the row's 2 test repoints, so every T14 file was already in the roster — the phase's 9, §1's sum **107**, union **86** and identity **21** all hold, re-checked rather than assumed. |
-| **5 — the gate goes green** | **1** | 0 | `.github/workflows/ci.yml` |
+| **5 — the gate goes green** | ~~1~~ → **3, and Phase 5 is COMPLETE** | 0 | `.github/workflows/ci.yml` + **T15's 2 C55 citation repoints** (§10.18): `check-tools-thin.test.ts:14` and `design.md:828`, both `ci.yml:200 → :215` — the gate's suite thereby enters its **third** phase and `design.md` its second |
 | **6 — the rename** | **29** | 0 | **7** `git mv` + **19** external importers + **3** prose/fixture sites |
 | **7 — the record** | **16** | 1 | RFS-04's 5 + RFS-05's 9 + `design.md` (T20b) + `validation.md` |
-| **sum** | ~~83~~ → ~~86~~ → ~~92~~ → ~~101~~ → ~~105~~ → **107** | **32** | Phase 2 **+4** and Phase 3 **+11** since the 92 |
-| **distinct union** | ~~78~~ → ~~80~~ → ~~81~~ → ~~84~~ → **86** | | **unchanged by T9** — all 6 files it added to Phase 3 were already in the set. **T10 adds none either**; the **+1** there is `spec.md`, which T8b brought in and which no row recorded (**C65**). **T11 adds 3**: `line-range.ts`, `line-range.test.ts` and `wave-4-correctness.test.ts` — `spec.md` and the two `check-tools-thin` files were already in the union. **T12 adds 2**: `read-file.service.ts` and its suite; its other five files were already in it. Against PR-C's planned **104** and PR-B's **37** |
+| **sum** | ~~83~~ → ~~86~~ → ~~92~~ → ~~101~~ → ~~105~~ → ~~107~~ → **109** | **32** | Phase 2 **+4** and Phase 3 **+11** since the 92; **Phase 5 +2 at T15** (§10.18) |
+| **distinct union** | ~~78~~ → ~~80~~ → ~~81~~ → ~~84~~ → **86** | | **unchanged by T9** — all 6 files it added to Phase 3 were already in the set. **T10 adds none either**; the **+1** there is `spec.md`, which T8b brought in and which no row recorded (**C65**). **T11 adds 3**: `line-range.ts`, `line-range.test.ts` and `wave-4-correctness.test.ts` — `spec.md` and the two `check-tools-thin` files were already in the union. **T12 adds 2**: `read-file.service.ts` and its suite; its other five files were already in it. **T15 adds none** — both its repoint files were already in the set, the suite via Phases 1 and 3 and `design.md` via Phase 7 (T20b). Against PR-C's planned **104** and PR-B's **37** |
 
 **Both figures are corrected at T4b (§10.5), and neither correction is T4b's own work** — they are
 the two amendments §10 recorded without carrying back into this table. **C35** minted T8b with two
@@ -58,8 +58,13 @@ overlap rather than a seventy-ninth file. *An execute-time amendment that adds a
 about the planning table, and nothing was watching that table.*
 
 **The phases are not disjoint, and the sum is not the review surface.** Measured: ~~**5**~~ → ~~**6**~~
-→ ~~**12**~~ → ~~**17**~~ → **18 files in more than one phase, three of them in three phases**, which
-is what takes ~~83 to 78~~ → ~~86 to 80~~ → ~~92 to 80~~ → ~~101 to 81~~ → **105 to 84**.
+→ ~~**12**~~ → ~~**17**~~ → ~~**18**~~ → **19 files in more than one phase, four of them in three
+phases** (T15, §10.18), which
+is what takes ~~83 to 78~~ → ~~86 to 80~~ → ~~92 to 80~~ → ~~101 to 81~~ → ~~105 to 84~~ →
+~~107 to 86~~ → **109 to 86**. *(The `105 to 84` pair stood unstruck through T12–T14 while the sum
+and union rows above read `107` and `86` — T12's growth reached the identity line and the sum row but
+not this sentence between them. **C81**, the eighty-sixth plan defect, the C19 no-owner family one
+clause down; found and fixed at T15, the next task to edit this table.)*
 
 ***The identity changed and the old sentence would now be false.*** It read *"the table sums to its own
 total: 92 − 80 = 12, and the overlap rows below enumerate exactly 12 files"* — which holds only while
@@ -67,8 +72,8 @@ every overlapping file is in **exactly two** phases. T8b put the three Phase-0 s
 T9 put them into Phase 3, so each contributes **2**, not 1. The identity is
 `sum − union = Σ (phases containing the file − 1)`, and it checks out: ~~8 files × 1 + 3 files × 2 +
 the six below × 1 = 20 = 101 − 81~~ → ~~**15 files × 1 + 3 files × 2 = 21 = 105 − 84** at T11~~ →
-**15 files × 1 + 3 files × 2 = 21 = 107 − 86** at T12, the fifteenth being `spec.md`, which T8b
-brought into Phase 2 and T11 brings into Phase 3 (**C68**). **The identity is UNCHANGED by T12 and
+~~**15 files × 1 + 3 files × 2 = 21 = 107 − 86** at T12~~ → **15 × 1 + 4 × 2 = 23 = 109 − 86 at T15**, the fifteenth two-phase file at T12 being `spec.md`, which T8b
+brought into Phase 2 and T11 brings into Phase 3 (**C68**); at T15 `check-tools-thin.test.ts` moves to the three-phase group (its fourth member) and `design.md` enters the two-phase group in its place (§10.18), both re-derived rather than assumed. **The identity is UNCHANGED by T12 and
 that is the check working, not a coincidence**: both files T12 adds are in exactly one phase, so
 neither contributes a term — and it was re-derived independently by the gate's evidence-audit lens
 before being written here (§10.14).
@@ -81,7 +86,8 @@ so the check is re-run per task rather than trusted.*
 | Phase 2 ∩ Phase 3 (~~**1**~~ → ~~**2**~~ → ~~**3**~~ → ~~**7**~~ → **8**) | `packages/core/src/tools/read_file.ts` — the LRU repoint, then the extraction; **`read-file.test.ts`** — T8's eviction repoint, then **C53**'s at T9 and **C34**'s at T10; **`services/cache/lru-evict.ts`** — written at T6, its site table repointed at T9 and again at T10; **four added at T10** (§10.12) — `lru-evict.test.ts`, `symbol-graph.service.ts`, `production-wiring.ts`, `invalidator-registry.ts`, each carrying a by-FILE or by-IDENTIFIER claim T10 falsifies; and **`spec.md` added at T11** (§10.13) — T8b brought it into Phase 2 for RFS-02 AC-4's evidence table, and **C68** corrects its §6 duplication rows here. It is the file whose second phase takes the identity above from 20 to 21 |
 | Phase 0 ∩ Phase 2 (**3**) | `read-file-containment-shapes.test.ts`, `read-file-project-root-rename-pin.test.ts`, `lru-eviction-characterization.test.ts` — **this pair was missing from the table entirely** (**C65**, §10.12). T8b's C54 growth put all three Phase-0 suites into Phase 2 and no row recorded it, which is also why they now sit in **three** phases each |
 | Phase 0 ∩ Phase 3 (~~**3**~~ → **4**) | the same three — **added at T9** (§10.11), all Phase-0 suites whose comments cite spans T9 relocates; the third is RFS-02 AC-1's own main subject, which **C56 recorded as unchanged** and **C58** falsifies — plus **`read-file-presentation-characterization.test.ts`, added at T10** |
-| Phase 1 ∩ Phase 3 (**2**) | `scripts/check-tools-thin.ts` and its unit suite — **added at T9**. The gate's own docblock cited the `eventBus.subscribe` arrow it measures, and T9 moves that arrow out of `tools/` altogether (**C57**). T10 edits the gate again, for the by-FIGURE claim in its implementation (**C63**). **T11 edits both a third time** (**C69**, §10.13) — this time the gate's *code*, not its prose: `membersExamined` was pinned at 2 top-level nodes per file, and the suite's six assertions on that member were all shape assertions that pass at 2 as readily as at 14 |
+| Phase 1 ∩ Phase 3 (**2**) | `scripts/check-tools-thin.ts` and its unit suite — **added at T9**. The gate's own docblock cited the `eventBus.subscribe` arrow it measures, and T9 moves that arrow out of `tools/` altogether (**C57**). T10 edits the gate again, for the by-FIGURE claim in its implementation (**C63**). **T11 edits both a third time** (**C69**, §10.13) — this time the gate's *code*, not its prose: `membersExamined` was pinned at 2 top-level nodes per file, and the suite's six assertions on that member were all shape assertions that pass at 2 as readily as at 14. **At T15 the suite alone enters Phase 5** (its docblock's `ci.yml:200 → :215` repoint, §10.18) — its third phase |
+| Phase 5 ∩ Phase 7 (**1**) | **`design.md` — added at T15** (§10.18): T15's C55 repoint of §6.6 property 5's `ci.yml:200 → :215`, then T20b's §8.1 corrections |
 | Phase 6 ∩ Phase 7 (**3**) | `scripts/check-coverage.ts`, `scripts/__tests__/check-coverage.test.ts`, `CLAUDE.md` |
 | Phase 6 ∩ Phases 0–5 | **none** — measured, and it is what made Phase 6 the cut candidate |
 
@@ -525,7 +531,7 @@ unchanged, and `check-tools-thin` does not exist yet.
 | # | task | write set | closes |
 | --- | --- | --- | --- |
 | **T4a** | **`scripts/check-tools-thin.ts`** — three clauses over a **TypeScript AST**, never a regex: no function body declared anywhere in a file declaring an `IToolHandler` class except inside `handle()`'s own; ~~no `Map`/`Set` instance **or module-level** state~~ → **no `Map`/`Set` state at any of *three* sites — class field, module level, and `this.x = new Map()` assignment** (§10.4): the constructor is exempt from clause 1 **by kind**, so `private cache: unknown` plus `constructor() { this.cache = new Map(); }` declares no body and carries no `Map` in its own declaration, and a two-site clause 2 passes it; `handle()` body ≤ **120**. **File-scoped, not class-scoped** (C32) — a class scope is defeated by a constructor-body closure, which is none of AC-5's six shapes. **Zero allowlist entries, no exemption parameter, no suppression flag** (AC-2). **Prints its examined population on a PASS** (AC-1), on `check-core-layering.ts:277-282`'s `edgesExamined` precedent — *"a check that resolved nothing also reports zero violations, and the two must not read the same."* **Docblock names what it does not certify** (AC-6): a delegating `handle()` reads identically whether its delegate is correct or subtly wrong | 1 new script | **RFS-01 AC-1, AC-2, AC-6** |
-| **T4b** | **`scripts/__tests__/check-tools-thin.test.ts`** — **synthetic fixtures only**, on `check-core-layering.test.ts`'s `mkdtemp` precedent, **never a live-tree count** (`design.md` §6.6 property 5): `bun test scripts/__tests__` auto-discovers and `ci.yml:200` runs it inside `build`, so a `2 of 30` assertion written here goes red at Phase 3 and makes §1.1's per-phase-green promise false. **Both directions observed red plus an inert control** (AC-4) — ~~and a legal public method staying PASS~~ → **the inert control is a file declaring no handler**, `design.md` §6.6 property 4's subject, because a public method is **RED** under C32 (**C41**, §10.5). **AC-5's fail shapes**: private method, public method, getter/setter, `static`, `#private`, arrow-function class property, module-level `const cache = new Map()`, object-literal handler, **the constructor-body closure**, and a `handle()` containing a string like `"unexpected token: {"` — the last because a careful and a naive brace counter are byte-identical on today's corpus, so the corpus **cannot falsify** a naive reimplementation. **Assert the nine member-kind classifications directly** so a `typescript` bump fails `test:scripts` rather than the gate (R-33) — but **derive them by running the gate, not by transcribing `design.md` §6.5's table**, which is `declaresBody()`'s truth table and not `BodyFinding.kind`'s (**C40**, §10.5). ~~1 new test file~~ → **2 files**: the object-literal shape read **PASS** against the gate as shipped, so closing AC-5 needs `check-tools-thin.ts` too | 1 new test file **+ 1 gate amendment** | **RFS-01 AC-4, AC-5** |
+| **T4b** | **`scripts/__tests__/check-tools-thin.test.ts`** — **synthetic fixtures only**, on `check-core-layering.test.ts`'s `mkdtemp` precedent, **never a live-tree count** (`design.md` §6.6 property 5): `bun test scripts/__tests__` auto-discovers and `ci.yml:215` runs it inside `build` (T15's +15 insertion; was `:200` when this row was written), so a `2 of 30` assertion written here goes red at Phase 3 and makes §1.1's per-phase-green promise false. **Both directions observed red plus an inert control** (AC-4) — ~~and a legal public method staying PASS~~ → **the inert control is a file declaring no handler**, `design.md` §6.6 property 4's subject, because a public method is **RED** under C32 (**C41**, §10.5). **AC-5's fail shapes**: private method, public method, getter/setter, `static`, `#private`, arrow-function class property, module-level `const cache = new Map()`, object-literal handler, **the constructor-body closure**, and a `handle()` containing a string like `"unexpected token: {"` — the last because a careful and a naive brace counter are byte-identical on today's corpus, so the corpus **cannot falsify** a naive reimplementation. **Assert the nine member-kind classifications directly** so a `typescript` bump fails `test:scripts` rather than the gate (R-33) — but **derive them by running the gate, not by transcribing `design.md` §6.5's table**, which is `declaresBody()`'s truth table and not `BodyFinding.kind`'s (**C40**, §10.5). ~~1 new test file~~ → **2 files**: the object-literal shape read **PASS** against the gate as shipped, so closing AC-5 needs `check-tools-thin.ts` too | 1 new test file **+ 1 gate amendment** | **RFS-01 AC-4, AC-5** |
 | **T5** | **RFS-01 AC-3's frozen base reading — the fourth non-retroactive step, first by dependency.** Run T4a's script after `git add`, record §3.3's table **per member with line spans** into this file. Not a test (§3.5 item 4, `design.md` §6.6 property 5) | this file | **RFS-01 AC-3** |
 
 ### Phase 2 — the LRU, behavior-preserving
@@ -608,7 +614,7 @@ site is one line longer than the method call it replaces, T13's span was never i
 
 | # | task | write set | closes |
 | --- | --- | --- | --- |
-| **T15** | **`check-tools-thin` reads `0 of 30`, and `ci.yml`'s `build` job invokes it in the same commit** — *"ships with the restructuring, not after it"*, GMS-01 AC-1's wording and PR-C's precedent. `build` is in `main`'s live `required_status_checks`; verify against the ruleset API rather than a green check, and note the context is the **job id** | `.github/workflows/ci.yml` | **RFS-01 AC-1**, GMS-02 headline |
+| **T15** | **`check-tools-thin` reads `0 of 30`, and `ci.yml`'s `build` job invokes it in the same commit** — *"ships with the restructuring, not after it"*, GMS-01 AC-1's wording and PR-C's precedent. `build` is in `main`'s live `required_status_checks`; verify against the ruleset API rather than a green check, and note the context is the **job id**. **DONE at `HEAD` — §10.18. RFS-01 AC-1 closes on all three conjuncts, and the GMS-02 headline with it.** The step lands at `ci.yml:167-168` (block comment `:155-166`, +15 lines total), between `check-core-layering`'s invocation `:152-153` and the stale-pointers gate — no `if:`, no `continue-on-error`, no live figures in the comment (C63's rule). The ruleset re-verified live in-session (context = job id `build`); the gate re-read `PASS — 0 of 30 file(s) over the rule; 27 declare an IToolHandler, 3 do not; 399 members examined`, exit 0, and **both directions re-observed on the live tree**: a Map-field mutation reads `FAIL — 1 of 30`, exit 1, per-file finding named, members 400, restore SHA-256-identical, green re-read. The write set grew 1 → **3 under C55's standing rule**: the insertion shifts every `ci.yml` line ≥ 155 by +15, falsifying two live `ci.yml:200` citations — `check-tools-thin.test.ts:14` and `design.md:828`, both repointed `:200 → :215`; the five-site population's other three adjudicated in §10.18 (one amended in this document, one superseded by the docs commit, one frame-stated historical). **C81** found in §1 while carrying the growth back | ~~`.github/workflows/ci.yml`~~ → **3 files: `ci.yml` + 2 C55 citation repoints (`check-tools-thin.test.ts`, `design.md`)** | **RFS-01 AC-1**, GMS-02 headline |
 
 ### Phase 6 — the rename, independent of everything above
 
@@ -4916,3 +4922,122 @@ tree** — dead subject and OWNERS-anchor refusals respectively, the refusal wor
 `t14-verify-post.ts` is their green counterpart with 15 held assertions.
 
 **Running total: eighty-five plan defects.**
+
+### 10.18 T15 — executed, 2026-08-02
+
+**The gate is wired, RFS-01 AC-1 closes on all three conjuncts, and the GMS-02 headline closes with
+it. Phase 5 is COMPLETE.** The step lands in `ci.yml`'s `build` job at `:167-168` (block comment
+`:155-166`; +15 lines total), directly between `check-core-layering`'s invocation `:152-153` and the
+stale-pointers gate — parsed position: build step **12 of 21**, exactly one match, no `if:`, no
+`continue-on-error`, no `env`. The comment carries the population-print rationale (a check that
+resolved nothing must not read like a clean one) and the AC-6 blind-spot pointer, and **no live
+figures** (C63's rule). **One new plan defect (C81, the eighty-sixth), running total eighty-six.**
+The write set is **3 tracked files** against the row's 1, under C55's standing rule — no new user
+decision, the class rule fixes the answer; re-decide only if you disagree.
+
+#### AC-1's three conjuncts, each measured in-session
+
+1. **Exits 0 with the population printed on a PASS**: `[tools-thin] PASS — 0 of 30 file(s) over the
+   rule; 27 declare an IToolHandler, 3 do not; 399 members examined; handle() ceiling 120`, exit 0 —
+   byte-identical across four runs this session (pre-plan, post-restore, harness green leg,
+   verify-post).
+2. **Both directions of the exit contract re-observed on the LIVE tree**, not inherited from T4a/T4b:
+   a Map field inserted after `read_file.ts`'s class-open line reads `FAIL — 1 of 30`, **exit 1**,
+   per-file finding `state :18 t15Probe [field]`, members **399 → 400** (C69's corrected counter
+   sensing the member); scratch-copy restore SHA-256-identical (`aec61283…`), gate green again.
+   `t15-observed-red.ts` is the durable harness (refuses on a non-baseline tree; never git-restores);
+   `t15-verify-post.ts` is the green counterpart — **16 assertions, all held** post-edit, and
+   observed red first: **11 of 16 FAIL, exit 1** on the pre-edit tree.
+3. **`build` is in `main`'s live `required_status_checks`**, re-verified in-session against the
+   ruleset API (not a green check): contexts `["build","mcp","validate","Structural native tests
+   (darwin-arm64)","Structural native tests (linux-x64)","coverage"]`, and the context is the **job
+   id**. Residual named rather than absorbed: `Bun.YAML` + `actionlint` are local proxies for
+   GitHub's server-side workflow validator; the step's first live execution happens when the PR
+   opens. The CHANGELOG merge gate cannot fire before then either — checked, not assumed: it is
+   `pull_request`-only, no PR exists on this branch, and `ci.yml`'s push trigger is `main`-only.
+
+#### The citation population — five live-frame `ci.yml:200` sites, each adjudicated
+
+The +15 insertion shifts every `ci.yml` line ≥ 155, so `:200` (the `test:scripts` run line) becomes
+**`:215`**. `git grep 'ci\.yml:[0-9]'` repo-wide, verified by both gate lenses independently:
+
+| site | disposition |
+| --- | --- |
+| `scripts/__tests__/check-tools-thin.test.ts:14` | **repointed `:200 → :215`** (C55 — live docblock claim, T15 falsifies it) |
+| `design.md:828` (§6.6 property 5 prose) | **repointed `:200 → :215`** (C55 — live present-tense claim; enters Phase 5's write set) |
+| `tasks.md:528` (T4b row) | **amended in place with the old number stated** — a record edit in the record document, not a roster entry (the §1 Phase-0∩1 convention: `tasks.md`'s per-task record and amendment edits have never been phase write-set entries) |
+| `HANDOFF.md:1038` | **superseded by the docs commit's rewrite** of the Next-action paragraph; verified post-commit by scoped grep (no live `ci.yml:200` in the Active section) |
+| `design.md:970` (Plan Challenge record, dated 2026-07-31) | **stays `:200`** — frame-stated historical record; renumbering a dated measurement corrupts it (C52's rule). `t15-verify-post.ts` asserts this site survives |
+
+Below-insertion citations verified unmoved: PR-C `validation.md:28`'s `ci.yml:153` and
+`read-file.service.ts:40`'s `ci.yml:140` — both above the insertion point, both still exact.
+**One pre-existing stale citation found by the sweep-shape probe and logged, not fixed**:
+`scripts/tests/native-macos-arm64-workflow.test.ts:11` cites the `structural-native` job at
+"(lines 150-190)" — a **colon-free prose shape no sweep on this feature can see** (C57's lesson
+re-observed), already **166 lines stale before T15** (the job sits at `:316` pre-insertion), so T15
+takes no true→false transition and the repoint duty is nobody's under C55; recorded here so T25 can
+tell a known stale from a new one. The variant probe measured exactly **one** instance of this shape
+in tracked source outside `.specs/`.
+
+#### C81 — the eighty-sixth: §1's sum-to-union sentence was two tasks stale inside a self-checking table
+
+§1's *"which is what takes … → 105 to 84"* chain was last advanced at **T11**, while the same
+table's sum row, union row and identity line all moved at T12 (`107`, `86`, `21 = 107 − 86`). Three
+sites assert the same pair; T12's growth reached two. The C19 no-owner family one clause down —
+found at T15 because T15 is the next task to edit the table, struck and advanced in place
+(`→ 109 to 86`), with the identity re-derived per group: `15 × 1 + 4 × 2 = 23 = 109 − 86` —
+`check-tools-thin.test.ts` becomes the **fourth three-phase file** (1, 3, 5) and `design.md` enters
+the two-phase group (5, 7). *A self-checking table has to be re-checked at every site that states
+the figure, not every site the update happened to touch.*
+
+#### The local-gate call for a workflow-YAML commit — decided, with the population that decided it
+
+The open question this task inherited: which gates a `ci.yml`-only commit runs. Measured first
+(`git grep -l 'ci\.yml'` over tracked code + the workflow-dir variant): the file IS read by tests —
+`scripts/tests/native-{macos-arm64,linux-x64}-workflow.test.ts` `readFileSync` it and assert
+`structural-native*` job content by `toContain` — so `test:scripts` is **sensitive** to this diff
+and the handoff's untaken position (skip it) was wrong. **RAN, with the reason each belongs to the
+set**: `check-tools-thin` (the criterion itself); `Bun.YAML` **structural** assertion — steps 20 →
+**21**, exactly one match, index 12, correct neighbours — because parse-alone cannot distinguish a
+sibling list element from a stray key on the prior step (red-team finding, folded into
+`t15-verify-post.ts`); `actionlint` **post-edit** (baseline exit 0 → post exit 0); `test:scripts`
+**1115 pass / 0 fail across 49 files + 5 shell suites, exit 0** — byte-count-identical to the
+pre-edit baseline taken this session, the two ci.yml-reading suites green against the edited file;
+`check-core-layering` **PASS — 0 violation(s) across 986 tier-to-tier edges in 922 tracked files**,
+unchanged from T14 (frame: its population is tracked code files, so it cannot sense a YAML diff —
+run as the nothing-else-moved confirmation, stated so the green is not read as diff evidence);
+`lint` exit 0 (same frame — oxlint's population excludes `.yml`). **N/A with reasons, not
+skipped silently**: `type-check`, `build`, `bun run test`, `test:plugins` — zero compiled-source
+diff, and the evidence-audit lens verified **zero** ci.yml readers under `apps/*-plugin/__tests__`
+and `packages/*/src/__tests__`; T14's two green `bun run test` readings stand as the tree's last
+full-suite evidence. Ordering inside `build` needs no artifact: the gate is a pure TS-AST source
+scan, the same class as `check-core-layering` at the same position.
+
+#### The Plan Challenge gate on T15 — two modes, and what each was worth
+
+**Evidence audit: 9 figures, 8 REPRODUCE, 1 DOES-NOT-REPRODUCE and it was the author's.** The
+"three live citations" framing undercounted the literal population — **5 sites in 4 files**
+(`HANDOFF.md:1038` and `design.md:970` unlisted). The adjudication table above is the absorption;
+the arithmetic consequence it demanded (Phase-5 roster 5 files, sum 111) is **rejected with the
+reason stated**: record edits in the record documents have never been roster entries on this
+feature, and the identity's own convention decides the count at 3 → sum 109. Its geometry,
+arithmetic, suite-synthetic-only, native-test-insensitivity, no-other-reader and ruleset figures
+all reproduced against my commands. **Red-team: one critical finding folded into the instrument
+before the edit** — YAML parse-success is not list-membership, so the verifier asserts the parsed
+array (count, match, index, neighbours) rather than parseability; also named the
+GitHub-server-side-validator residual (recorded above), the CHANGELOG-gate interaction (checked:
+cannot fire pre-PR), and the fourth live citation independently. Its escalation call
+(`escalate_to_full: true`) was already satisfied — this WAS the full gate, two modes. **Twenty-
+eighth and twenty-ninth findings on this feature where a critic's mechanism held while a figure or
+conclusion needed correction — and this time one author figure (3 sites) fell with them.**
+
+#### Gates
+
+`t15-verify-post.ts` **16/16, exit 0** (pre-edit: 11/16 FAIL, exit 1 — the refusal observed).
+`actionlint` exit 0 baseline and post. `check-tools-thin` `PASS — 0 of 30`, exit 0, print
+byte-identical to T14's. `test:scripts` **1115/0/49 + 5 shell suites** pre- AND post-edit, exit 0.
+`check-core-layering` **PASS 986 edges / 922 files**, unchanged. `lint` **0**. `bun run test` /
+`type-check` / `build` / `test:plugins` **N/A by measured population** (above). Host load 3.59 at
+the readings. No `git add` needed before the gates — T15 creates no new tracked file.
+
+**Running total: eighty-six plan defects.**

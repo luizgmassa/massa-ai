@@ -825,7 +825,7 @@ population method, alongside C29–C31.
 5. **The gate is committed before it is wired to CI — but its unit suite is not "unwired", and the
    first draft of this property said otherwise.** A *script* not referenced by `ci.yml` cannot fail
    a build. Its *suite* can: `"test:scripts": "bun test scripts/__tests__ …"` **auto-discovers every
-   `*.test.ts` under that directory** with no registration step, and `ci.yml:200` runs it inside the
+   `*.test.ts` under that directory** with no registration step, and `ci.yml:215` runs it inside the
    `build` job — one of `main`'s required checks. So the moment Phase 1 lands
    `scripts/__tests__/check-tools-thin.test.ts`, CI executes it. Found by the Plan Challenge gate
    (§10, finding 4).
