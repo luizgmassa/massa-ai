@@ -844,11 +844,22 @@ all state came from `.specs/` and source reads.
   gate source before the run, both exact; the red-team's 984 fell to the source-derived 982.
   For T25: `.specs/reports/` is untracked hence invisible to `git grep` sweeps and is accepted
   region; `.ua/` regenerates after PR-D.
+- **T20b DONE — `7fb8ddf`.** All twenty §8.1 rows applied into `design.md` in place (+103/−27),
+  verified **20/20 APPLIED-CORRECT** by an independent row audit; the +76-line shift's citation
+  adjudication (T15's precedent) found **zero live repoints owed** — every citing site frame-stated,
+  `t15-verify-post.ts` content-anchored and 16/16 post-edit. **C84 minted and fixed in the same
+  commit (running total eighty-nine)**: row 19's new 8c table row falsified design's thrice-stated
+  "Nine new files under the floor" — the tree holds **ten** — amended at all three sites + R-36.
+  §8.1 gained its frame line (ledger numbers are minting-frame; find positions by content). Record:
+  `tasks.md` §10.21. Gates (`.specs/`-only): test:scripts 1115/0/49; both structural gates
+  byte-stable at T19's readings.
 - ~~**Next action: Execute, T5**~~ … ~~**Execute, T14b**~~ → ~~**Execute, T14**~~ →
-  ~~**Execute, T15**~~ → ~~**Execute, T16**~~ → ~~**Execute, T19**~~ → **Next action: Execute,
-  T20b** — §8.1's twenty rows into `design.md`, C33 load-bearing, PR-C's C18 precedent. Then T20,
-  T21, then T18 (§6 item 9), T22, T23 + T24 last before T25; **T25 by a different author** —
-  whether a fresh conversation satisfies that is the user's call, asked before T25 starts.
+  ~~**Execute, T15**~~ → ~~**Execute, T16**~~ → ~~**Execute, T19**~~ → ~~**Execute, T20b**~~ →
+  **Next action: Execute, T20** — C28–C33 + C29's Evidence-row amendment + RFS-05 AC-3's layer
+  figures into the parent `core-layering-god-module-split/spec.md`, indexed on the C1–C27
+  convention. Then T21, T18 (§6 item 9), T22, T23 + T24 last before T25; **T25 by a different
+  author** — whether a fresh conversation satisfies that is the user's call, asked before T25
+  starts.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed

@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–5 CLOSED, PHASE 6's RENAME LANDED (T18 deferred after T21), PHASE 7 OPEN (T19 DONE); next T20b**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–5 CLOSED, PHASE 6's RENAME LANDED (T18 deferred after T21), PHASE 7 OPEN (T19, T20b DONE); next T20**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -1116,10 +1116,26 @@ Two frames for T25: `.specs/reports/` is **untracked, invisible to every `git gr
 all four subjects, and is accepted region; `.ua/`'s references to the deleted pair regenerate after
 PR-D (spec §4.4).
 
-**Next action: Execute, T20b** — the §8.1 corrections into `design.md`, now **twenty** rows, C33
-the load-bearing one, on PR-C's C18 precedent. Then **T20**, **T21**, then **T18** (§6 item 9),
-**T22**, **T23 + T24 last before T25** — **T25 by a different author**; whether a fresh
-conversation satisfies that is the user's call, asked before T25 starts, per its row.
+~~**Next action: Execute, T20b.**~~ **T20b DONE — `7fb8ddf`. All twenty §8.1 rows are applied into
+`design.md` in place**, verified 20/20 APPLIED-CORRECT by an independent row-by-row audit (zero
+missed sites, zero scope creep). Its record is `tasks.md` **§10.21** — the +76-net-line shift got
+T15's citation adjudication and the answer is **zero live repoints owed** (every `design.md:NNN`
+citing site repo-wide is a frame-stated record; `t15-verify-post.ts` anchors by content, re-ran
+**16/16**), and **one cascade was surfaced and fixed in the same commit: C84, the eighty-ninth
+plan defect** — §8.1 row 19's new 8c table row falsified `design.md`'s thrice-stated "Nine new
+files under the coverage floor"; the shipped tree holds **TEN** (T14b's lease module the tenth),
+amended at all three sites plus `tasks.md`'s own R-36. §8.1 now carries its own frame line: the
+ledger's line numbers are the frames the rows were minted in; find current positions by content.
+Gates for a `.specs/`-only commit (T5/T15 precedent): `test:scripts` 1115/0/49, both structural
+gates byte-stable at T19's readings (`0 of 30`/398; 982/920).
+
+**Next action: Execute, T20** — C28–C33 into the parent
+`core-layering-god-module-split/spec.md`, in place at each criterion or figure **and** indexed in
+its *Design and Execute corrections* table; same commit carries C29's Evidence-row amendment
+(`~390 of 707` → 490/69.3%, methods 13 → 11) and RFS-05 AC-3's layer figures at `:502` and `:161`
+(30/0/208/39 + kernel 11, method named). Then **T21**, **T18** (§6 item 9), **T22**, **T23 + T24
+last before T25** — **T25 by a different author**; whether a fresh conversation satisfies that is
+the user's call, asked before T25 starts, per its row.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
