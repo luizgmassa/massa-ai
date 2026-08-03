@@ -864,13 +864,22 @@ all state came from `.specs/` and source reads.
   conflation, C25→C23 misattribution, non-reproducible frame label). Record `tasks.md` §10.22;
   zero new defects, running total eighty-nine; +40-line citation adjudication: zero live repoints,
   bare-`:NNN` swept.
+- **T21 DONE — `644f190`. RFS-05 AC-4 closes, red observed FIRST** (22p/1f pre-deletion →
+  23p/0f; `EXCLUSIONS` 9 → 8 by module import; behavior-neutral by consumption-site reading;
+  gate untouched per Design §4). Record `tasks.md` §10.23. Write set 2 → **4 tracked + 2
+  `.specs/`** under C55 (−4/+6 = **+2** shift; lru-evict comments `:318` → `:320`). **Both
+  critics caught the author's +3 arithmetic and a missed fourth site** — fixed pre-commit;
+  recorded anti-pattern: repoint by content identity against `git show HEAD`, never by delta.
+  APFS case-insensitivity noted in the test (pin load-bearing in Linux CI for case-drift). §1:
+  sum **112** / union 86 / identity 26 = 14×1 + 6×2. Gates: lint 0; test:scripts **1116/0/49**;
+  structural gates byte-stable. Zero new defects, running total eighty-nine.
 - ~~**Next action: Execute, T5**~~ … ~~**Execute, T14b**~~ → ~~**Execute, T14**~~ →
   ~~**Execute, T15**~~ → ~~**Execute, T16**~~ → ~~**Execute, T19**~~ → ~~**Execute, T20b**~~ →
-  ~~**Execute, T20**~~ → **Next action: Execute, T21** — the dangling `EXCLUSIONS` entry deleted,
-  the class closed in the gate's test (existence assertion against the real `REPO_ROOT`), AC-4 on
-  an observed red. Then T18 (§6 item 9), T22, T23 + T24 last before T25; **T25 by a different
-  author** — whether a fresh conversation satisfies that is the user's call, asked before T25
-  starts.
+  ~~**Execute, T20**~~ → ~~**Execute, T21**~~ → **Next action: Execute, T18** (§6 item 9
+  satisfied): `CLAUDE.md:237`, `check-coverage.ts:281`, the test file's 8 fixture cites at their
+  +1 positions — all row-updated at T21, grep-verified. Then T22, T23 + T24 last before T25;
+  **T25 by a different author** — whether a fresh conversation satisfies that is the user's call,
+  asked before T25 starts.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed

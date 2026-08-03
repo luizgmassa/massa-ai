@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–5 CLOSED, PHASE 6's RENAME LANDED (T18 deferred after T21), PHASE 7 OPEN (T19, T20b, T20 DONE); next T21**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–5 CLOSED, PHASE 6's RENAME LANDED, PHASE 7 OPEN (T19, T20b, T20, T21 DONE); next T18**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -1146,12 +1146,28 @@ adjudication for the parent's +40 lines: **zero live repoints owed**, bare-`:NNN
 (C57's lesson). Gates (`.specs/`-only): test:scripts 1115/0/49; both structural gates byte-stable
 at T19's readings. Zero new plan defects — running total **eighty-nine**.
 
-**Next action: Execute, T21** — `check-coverage.ts`'s dangling `EXCLUSIONS` entry deleted, the
-class closed in the gate's **test** (an existence assertion against `check-coverage.ts`'s real
-`REPO_ROOT`, never the test's synthetic `BASE`), AC-4 closing on an **observed red** (revert the
-deletion, the test must fail). 2 files. Then **T18** (§6 item 9), **T22**, **T23 + T24 last before
-T25** — **T25 by a different author**; whether a fresh conversation satisfies that is the user's
-call, asked before T25 starts, per its row.
+~~**Next action: Execute, T21.**~~ **T21 DONE — `644f190`. RFS-05 AC-4 CLOSES, red observed
+FIRST**: the existence pin ran against the still-dangling tree at **22p/1f**, then the deletion
+took it to **23p/0f**, `EXCLUSIONS` 9 → 8 read by module import. Behavior-neutral by
+consumption-site reading (exact `Set.has`; a no-file path can never be a key); all 8 survivors
+verified on disk; the gate itself untouched per Design §4. Its record is `tasks.md` **§10.23** —
+the write set grew 2 → **4 tracked + 2 `.specs/`** under C55 (the −4/+6 swap is **+2**, shifting
+the two lru-evict comments' `:318` → `:320`), and **both critics caught the author's shift
+arithmetic**: the first repoints said +3, wrote `:321` and a phantom `:391`, and missed a fourth
+site (`design.md:379`'s `:178` → `:179`) — all fixed pre-commit, with the recorded anti-pattern:
+**repoint by content identity against `git show HEAD`, never by adding a delta** (the author's
+"content check" had semantic-matched the wrong neighbor). APFS case-insensitivity makes the
+existence pin load-bearing in Linux CI only for case-drift — stated in the test. §1: sum 110 →
+**112**, union **86** holds, identity **26 = 14×1 + 6×2** (the two lru files became three-phase).
+Gates: lint 0; test:scripts **1116/0/49** twice; both structural gates byte-stable; lru suite
+15/0 standalone. Zero new plan defects — running total **eighty-nine**.
+
+**Next action: Execute, T18** (§6 item 9 satisfied — T21 is done): the 3 prose/fixture sites,
+R-32 as corrected — `CLAUDE.md:237`, `check-coverage.ts:281` (T21's post-shift position, already
+repointed in the row), and the test file's 8 fixture citations at their +1 positions (row updated
+at T21, grep-verified). Then **T22**, **T23 + T24 last before T25** — **T25 by a different
+author**; whether a fresh conversation satisfies that is the user's call, asked before T25
+starts, per its row.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
