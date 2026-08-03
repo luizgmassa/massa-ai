@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–5 CLOSED, PHASE 6's RENAME LANDED (T16+T17, one commit; T18 deferred after T21); next T19 (Phase 7)**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–5 CLOSED, PHASE 6's RENAME LANDED (T18 deferred after T21), PHASE 7 OPEN (T19 DONE); next T20b**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -1095,13 +1095,31 @@ feature**; snapshot SHAs verified before and after both critics; no harness over
 New residual: a populated local pgvector index keys embeddings by pre-rename paths and a git rename
 does not re-index — operational follow-up after merge, no gate's concern.
 
-**Next action: Execute, T19 — Phase 7 opens.** RFS-04's three removals, priced per item (§5 row:
-`data/vector/index.ts`, `data/vector/hybrid-search.ts`, `IHybridSearch`, `BatchCommand`; there are
-TWO files named `hybrid-search.ts` and the live one has 3 importers + 2 `mock.module` — cite which
-file every figure read; verify against a cache-forced `npm pack --dry-run`). Then **T20b before
-T20** (§8.1 is now **twenty** rows), **T21**, then **T18** (§6 item 9), **T22**, **T23 + T24 last
-before T25** — **T25 by a different author**; whether a fresh conversation satisfies that is the
-user's call, asked before T25 starts, per its row.
+~~**Next action: Execute, T19 — Phase 7 opens.**~~ **T19 DONE — `40103b6`. PHASE 7 IS OPEN, AND
+RFS-04 AC-1 + AC-3 BOTH CLOSE.** The three removals landed as the row priced them — write set
+exactly 5 files, **zero growth, the first task on this feature to mint no plan defect** (running
+total stays eighty-eight). Its record is `tasks.md` **§10.20** — the per-item premeasure table
+(every §5-row figure reproduced at `9abe04c` before a line moved; the LIVE
+`services/search/hybrid-search.ts` reads **3 files / 5 specifier lines** — 3 import/require + 2
+`mock.module` — and is untouched), the observed-both-ways discrimination (removing the live file
+reads core tsc exit 2, TS2307 at `contextual-search-rlm.ts(57,8)` — the specifier token, the red
+team's convention finding vindicated — restore SHA-verified; the dead pair reads 0/0 by resolver
+and 6/6 forced type-check green), and the AC-1 pack sequence with its measured premise: **core's
+`build` never cleans `dist/`**, so the reading is `rm -rf dist` + forced rebuild + pack — tarball
+`dist/data/vector/` **16 → 8** (survivors exactly the two live stores), `BatchCommand` and
+`IHybridSearch` each **1 → 0** in fresh `.d.ts`. Gates: layering **986 → 982 edges / 922 → 920
+files** and thinness **399 → 398 members**, both predicted from gate source BEFORE the run and
+exact — the red team's own 984 prediction fell to the source-derived 982 (`export type … from`
+counts; the barrel carried three edges, not one). Both Plan Challenge lenses ran, snapshot SHAs
+verified before and after, no harness overlapped a critic; evidence audit F1–F10 all reproduced.
+Two frames for T25: `.specs/reports/` is **untracked, invisible to every `git grep` sweep**, names
+all four subjects, and is accepted region; `.ua/`'s references to the deleted pair regenerate after
+PR-D (spec §4.4).
+
+**Next action: Execute, T20b** — the §8.1 corrections into `design.md`, now **twenty** rows, C33
+the load-bearing one, on PR-C's C18 precedent. Then **T20**, **T21**, then **T18** (§6 item 9),
+**T22**, **T23 + T24 last before T25** — **T25 by a different author**; whether a fresh
+conversation satisfies that is the user's call, asked before T25 starts, per its row.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.

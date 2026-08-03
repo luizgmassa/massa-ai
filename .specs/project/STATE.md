@@ -831,12 +831,24 @@ all state came from `.specs/` and source reads.
   frame ONLY (stems blind to all 7 renamed basenames). Both Plan Challenge lenses ran — **no author
   figure fell, a first on this feature**. New residual: a populated local pgvector index keys
   embeddings by pre-rename paths; a git rename does not re-index (operational, post-merge).
+- **T19 DONE — `40103b6`. PHASE 7 IS OPEN; RFS-04 AC-1 + AC-3 close.** The three removals landed
+  at exactly the row's 5 files — `data/vector/{index,hybrid-search}.ts` deleted, `IHybridSearch`
+  and `BatchCommand` stripped — **zero write-set growth and zero new plan defects, both firsts on
+  this feature** (running total stays eighty-eight). Record: `tasks.md` §10.20. Every figure was
+  premeasured at `9abe04c` and full-path-cited (the LIVE `services/search/hybrid-search.ts`: 3
+  files / 5 lines — 3 import/require + 2 `mock.module` — untouched); AC-1 read a proven-fresh pack
+  (core's `build` never cleans `dist/`, measured; `rm -rf dist` + forced rebuild; tarball
+  `dist/data/vector/` 16 → 8, both symbols 1 → 0); the control probe removed the live file and
+  observed tsc exit 2 / TS2307 at `contextual-search-rlm.ts(57,8)`, restore SHA-verified. Gates:
+  layering 986 → 982 edges / 922 → 920 files, thinness 399 → 398 members — both predicted from
+  gate source before the run, both exact; the red-team's 984 fell to the source-derived 982.
+  For T25: `.specs/reports/` is untracked hence invisible to `git grep` sweeps and is accepted
+  region; `.ua/` regenerates after PR-D.
 - ~~**Next action: Execute, T5**~~ … ~~**Execute, T14b**~~ → ~~**Execute, T14**~~ →
-  ~~**Execute, T15**~~ → ~~**Execute, T16**~~ → **Next action: Execute, T19 — Phase 7 opens.**
-  RFS-04's three removals, priced per item; two files named `hybrid-search.ts`, cite which one each
-  figure read; verify against a cache-forced `npm pack --dry-run`. Then T20b before T20, T21, then
-  T18 (§6 item 9), T22, T23 + T24 last before T25; **T25 by a different author** — whether a fresh
-  conversation satisfies that is the user's call, asked before T25 starts.
+  ~~**Execute, T15**~~ → ~~**Execute, T16**~~ → ~~**Execute, T19**~~ → **Next action: Execute,
+  T20b** — §8.1's twenty rows into `design.md`, C33 load-bearing, PR-C's C18 precedent. Then T20,
+  T21, then T18 (§6 item 9), T22, T23 + T24 last before T25; **T25 by a different author** —
+  whether a fresh conversation satisfies that is the user's call, asked before T25 starts.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed
