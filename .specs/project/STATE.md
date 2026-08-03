@@ -853,11 +853,22 @@ all state came from `.specs/` and source reads.
   §8.1 gained its frame line (ledger numbers are minting-frame; find positions by content). Record:
   `tasks.md` §10.21. Gates (`.specs/`-only): test:scripts 1115/0/49; both structural gates
   byte-stable at T19's readings.
+- **T20 DONE — `32f36d5`. RFS-05 AC-2 + AC-3 close.** The parent gains its C28–C33 section
+  (C13–C27 convention, six rows verified against rationale artifacts) and every falsified site is
+  amended in place — including the two the row's letter did not name, **AS-06's own row and GMS-02
+  AC-1's parenthetical** (still carrying ~390 and the C28-falsified sensor as live fact; both
+  critics found the gap independently; AC-2's "in place AND indexed" now holds everywhere). Layer
+  figures carry three frames + method (a6216cd 31/6/208/41 → d7091ac 30/0/208/39+11 → T20 tree
+  **30/0/218/37+11**, critic-re-derived); ~390/55% → **490/707 (69.3%)**; the 707 row frame-stated
+  at current **124**. Three author insertions fell to the gate pre-commit (83-vs-51 range
+  conflation, C25→C23 misattribution, non-reproducible frame label). Record `tasks.md` §10.22;
+  zero new defects, running total eighty-nine; +40-line citation adjudication: zero live repoints,
+  bare-`:NNN` swept.
 - ~~**Next action: Execute, T5**~~ … ~~**Execute, T14b**~~ → ~~**Execute, T14**~~ →
   ~~**Execute, T15**~~ → ~~**Execute, T16**~~ → ~~**Execute, T19**~~ → ~~**Execute, T20b**~~ →
-  **Next action: Execute, T20** — C28–C33 + C29's Evidence-row amendment + RFS-05 AC-3's layer
-  figures into the parent `core-layering-god-module-split/spec.md`, indexed on the C1–C27
-  convention. Then T21, T18 (§6 item 9), T22, T23 + T24 last before T25; **T25 by a different
+  ~~**Execute, T20**~~ → **Next action: Execute, T21** — the dangling `EXCLUSIONS` entry deleted,
+  the class closed in the gate's test (existence assertion against the real `REPO_ROOT`), AC-4 on
+  an observed red. Then T18 (§6 item 9), T22, T23 + T24 last before T25; **T25 by a different
   author** — whether a fresh conversation satisfies that is the user's call, asked before T25
   starts.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the

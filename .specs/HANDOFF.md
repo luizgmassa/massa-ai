@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–5 CLOSED, PHASE 6's RENAME LANDED (T18 deferred after T21), PHASE 7 OPEN (T19, T20b DONE); next T20**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–5 CLOSED, PHASE 6's RENAME LANDED (T18 deferred after T21), PHASE 7 OPEN (T19, T20b, T20 DONE); next T21**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -1129,13 +1129,29 @@ ledger's line numbers are the frames the rows were minted in; find current posit
 Gates for a `.specs/`-only commit (T5/T15 precedent): `test:scripts` 1115/0/49, both structural
 gates byte-stable at T19's readings (`0 of 30`/398; 982/920).
 
-**Next action: Execute, T20** — C28–C33 into the parent
-`core-layering-god-module-split/spec.md`, in place at each criterion or figure **and** indexed in
-its *Design and Execute corrections* table; same commit carries C29's Evidence-row amendment
-(`~390 of 707` → 490/69.3%, methods 13 → 11) and RFS-05 AC-3's layer figures at `:502` and `:161`
-(30/0/208/39 + kernel 11, method named). Then **T21**, **T18** (§6 item 9), **T22**, **T23 + T24
-last before T25** — **T25 by a different author**; whether a fresh conversation satisfies that is
-the user's call, asked before T25 starts, per its row.
+~~**Next action: Execute, T20.**~~ **T20 DONE — `32f36d5`. RFS-05 AC-2 + AC-3 CLOSE.** The parent
+carries its third corrections section (**C28–C33**, the C13–C27 convention, six rows all verified
+against their rationale artifacts) and every falsified site is amended **in place**: Status block
+(*"in Specify"* → in Execute Phase 7, corrections 27 → 33 = 12+15+6 checked against actual row
+counts), the layer figures with **three frames + method** (`a6216cd` 31/6/208/41 → `d7091ac`
+30/0/208/39+11 → T20's tree **30/0/218/37+11**, critic-re-derived to the digit), ~390/55% → **490
+of 707 (69.3%)**, the `707 — unchanged, confirmed` row frame-stated at the current **124** — and,
+found by **both** critics independently, **AS-06's own row and GMS-02 AC-1's parenthetical**,
+which still stated the ~390 and the C28-falsified sensor as live fact (AC-2's *"in place AND
+indexed"* conjunction was unmet at exactly those two sites; both amended). Three author insertions
+fell to the gate pre-commit — an 83-vs-51 range conflation (the C-numbers and defect ordinals are
+separate counters with a drifting offset; the parent now says so), a C25-for-C23 misattribution,
+a task-name frame label made blame-reproducible. Record: `tasks.md` **§10.22**. Citation
+adjudication for the parent's +40 lines: **zero live repoints owed**, bare-`:NNN` class swept
+(C57's lesson). Gates (`.specs/`-only): test:scripts 1115/0/49; both structural gates byte-stable
+at T19's readings. Zero new plan defects — running total **eighty-nine**.
+
+**Next action: Execute, T21** — `check-coverage.ts`'s dangling `EXCLUSIONS` entry deleted, the
+class closed in the gate's **test** (an existence assertion against `check-coverage.ts`'s real
+`REPO_ROOT`, never the test's synthetic `BASE`), AC-4 closing on an **observed red** (revert the
+deletion, the test must fail). 2 files. Then **T18** (§6 item 9), **T22**, **T23 + T24 last before
+T25** — **T25 by a different author**; whether a fresh conversation satisfies that is the user's
+call, asked before T25 starts, per its row.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
