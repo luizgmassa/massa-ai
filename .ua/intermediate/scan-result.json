@@ -1,6 +1,6 @@
 {
   "name": "massa-ai",
-  "description": "massa-ai is a local-first MCP server that indexes codebases for semantic search, keyword search, and dependency-ranked symbol graphs, providing persistent cross-session memory of decisions and patterns while reducing the token cost of AI-assisted coding. Note: this project has over 100 source files; consider scoping analysis to a subdirectory for faster results.",
+  "description": "massa-ai is a local-first MCP server that indexes a codebase for semantic search, keyword search, and a dependency-ranked symbol graph. It also keeps a persistent, cross-session memory of decisions and facts, letting AI coding assistants retrieve only relevant context instead of loading whole files. Note: this project has over 100 source files; consider scoping analysis to a subdirectory for faster results.",
   "languages": [
     "c",
     "clj",
@@ -30,9 +30,18 @@
     "zig"
   ],
   "frameworks": [
-    "Prisma"
+    "Prisma",
+    "Docker",
+    "Docker Compose",
+    "GitHub Actions"
   ],
   "files": [
+    {
+      "path": "apps/mcp-client/src/__tests__/api-key-config-seeded.test.ts",
+      "language": "typescript",
+      "sizeLines": 182,
+      "fileCategory": "code"
+    },
     {
       "path": "apps/mcp-client/src/__tests__/config-cli.test.ts",
       "language": "typescript",
@@ -55,6 +64,12 @@
       "path": "apps/mcp-client/src/__tests__/embedded-mode-parity.test.ts",
       "language": "typescript",
       "sizeLines": 161,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/mcp-client/src/__tests__/executor-sandbox-passthrough.test.ts",
+      "language": "typescript",
+      "sizeLines": 64,
       "fileCategory": "code"
     },
     {
@@ -96,7 +111,7 @@
     {
       "path": "apps/mcp-client/src/api-client.ts",
       "language": "typescript",
-      "sizeLines": 179,
+      "sizeLines": 186,
       "fileCategory": "code"
     },
     {
@@ -114,13 +129,13 @@
     {
       "path": "apps/mcp-client/src/config-cli.ts",
       "language": "typescript",
-      "sizeLines": 236,
+      "sizeLines": 235,
       "fileCategory": "code"
     },
     {
       "path": "apps/mcp-client/src/embedded-api-client.ts",
       "language": "typescript",
-      "sizeLines": 1046,
+      "sizeLines": 1049,
       "fileCategory": "code"
     },
     {
@@ -234,7 +249,7 @@
     {
       "path": "apps/opencode-plugin/src/__tests__/agents-install.test.ts",
       "language": "typescript",
-      "sizeLines": 199,
+      "sizeLines": 265,
       "fileCategory": "code"
     },
     {
@@ -264,7 +279,7 @@
     {
       "path": "apps/opencode-plugin/src/config-cli.ts",
       "language": "typescript",
-      "sizeLines": 273,
+      "sizeLines": 272,
       "fileCategory": "code"
     },
     {
@@ -283,12 +298,6 @@
       "path": "apps/opencode-plugin/src/session-project-pin.ts",
       "language": "typescript",
       "sizeLines": 101,
-      "fileCategory": "code"
-    },
-    {
-      "path": "apps/tools-api/src/__tests__/admin-preservation.test.ts",
-      "language": "typescript",
-      "sizeLines": 65,
       "fileCategory": "code"
     },
     {
@@ -358,6 +367,12 @@
       "fileCategory": "code"
     },
     {
+      "path": "apps/tools-api/src/__tests__/web-ui-key-http.test.ts",
+      "language": "typescript",
+      "sizeLines": 163,
+      "fileCategory": "code"
+    },
+    {
       "path": "apps/tools-api/src/__tests__/web-ui-readonly.test.ts",
       "language": "typescript",
       "sizeLines": 159,
@@ -376,6 +391,12 @@
       "fileCategory": "code"
     },
     {
+      "path": "apps/tools-api/src/__tests__/web-ui-trust.test.ts",
+      "language": "typescript",
+      "sizeLines": 150,
+      "fileCategory": "code"
+    },
+    {
       "path": "apps/tools-api/src/__tests__/web-ui-views.test.ts",
       "language": "typescript",
       "sizeLines": 196,
@@ -390,31 +411,31 @@
     {
       "path": "apps/tools-api/src/index.ts",
       "language": "typescript",
-      "sizeLines": 262,
+      "sizeLines": 271,
       "fileCategory": "code"
     },
     {
-      "path": "apps/tools-api/src/middleware/admin-preservation.test.ts",
+      "path": "apps/tools-api/src/middleware/auth-http.test.ts",
       "language": "typescript",
-      "sizeLines": 109,
-      "fileCategory": "code"
-    },
-    {
-      "path": "apps/tools-api/src/middleware/admin-preservation.ts",
-      "language": "typescript",
-      "sizeLines": 120,
+      "sizeLines": 231,
       "fileCategory": "code"
     },
     {
       "path": "apps/tools-api/src/middleware/auth.test.ts",
       "language": "typescript",
-      "sizeLines": 83,
+      "sizeLines": 176,
       "fileCategory": "code"
     },
     {
       "path": "apps/tools-api/src/middleware/auth.ts",
       "language": "typescript",
-      "sizeLines": 73,
+      "sizeLines": 142,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/tools-api/src/middleware/cors-http.test.ts",
+      "language": "typescript",
+      "sizeLines": 127,
       "fileCategory": "code"
     },
     {
@@ -618,7 +639,7 @@
     {
       "path": "apps/tools-api/src/routes/synapse.ts",
       "language": "typescript",
-      "sizeLines": 392,
+      "sizeLines": 383,
       "fileCategory": "code"
     },
     {
@@ -642,7 +663,7 @@
     {
       "path": "apps/tools-api/src/routes/web-ui-errors.test.ts",
       "language": "typescript",
-      "sizeLines": 155,
+      "sizeLines": 153,
       "fileCategory": "code"
     },
     {
@@ -654,13 +675,13 @@
     {
       "path": "apps/tools-api/src/routes/web-ui.ts",
       "language": "typescript",
-      "sizeLines": 192,
+      "sizeLines": 271,
       "fileCategory": "code"
     },
     {
       "path": "apps/tools-api/src/routes/web.test.ts",
       "language": "typescript",
-      "sizeLines": 78,
+      "sizeLines": 76,
       "fileCategory": "code"
     },
     {
@@ -682,15 +703,33 @@
       "fileCategory": "code"
     },
     {
+      "path": "apps/tools-api/src/startup-config.test.ts",
+      "language": "typescript",
+      "sizeLines": 142,
+      "fileCategory": "code"
+    },
+    {
       "path": "apps/tools-api/src/startup-config.ts",
       "language": "typescript",
-      "sizeLines": 10,
+      "sizeLines": 73,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/tools-api/src/web-ui-trust.ts",
+      "language": "typescript",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web-ui/src/__tests__/api-key-header.test.ts",
+      "language": "typescript",
+      "sizeLines": 128,
       "fileCategory": "code"
     },
     {
       "path": "apps/web-ui/src/__tests__/app-renderers.test.ts",
       "language": "typescript",
-      "sizeLines": 558,
+      "sizeLines": 664,
       "fileCategory": "code"
     },
     {
@@ -726,7 +765,7 @@
     {
       "path": "apps/web-ui/src/static/app.js",
       "language": "javascript",
-      "sizeLines": 937,
+      "sizeLines": 959,
       "fileCategory": "code"
     },
     {
@@ -748,18 +787,6 @@
       "fileCategory": "markup"
     },
     {
-      "path": "packages/core/create-3072d-table.ts",
-      "language": "typescript",
-      "sizeLines": 82,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/create-progress-memory.ts",
-      "language": "typescript",
-      "sizeLines": 167,
-      "fileCategory": "code"
-    },
-    {
       "path": "packages/core/prisma.config.ts",
       "language": "typescript",
       "sizeLines": 25,
@@ -778,9 +805,15 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/__tests__/acquire-indexing-lease.test.ts",
+      "language": "typescript",
+      "sizeLines": 260,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/__tests__/architecture-map.test.ts",
       "language": "typescript",
-      "sizeLines": 600,
+      "sizeLines": 680,
       "fileCategory": "code"
     },
     {
@@ -792,13 +825,13 @@
     {
       "path": "packages/core/src/__tests__/auto-improve-job.characterization.test.ts",
       "language": "typescript",
-      "sizeLines": 303,
+      "sizeLines": 302,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/auto-improve-job.test.ts",
       "language": "typescript",
-      "sizeLines": 601,
+      "sizeLines": 599,
       "fileCategory": "code"
     },
     {
@@ -810,13 +843,13 @@
     {
       "path": "packages/core/src/__tests__/base-vector-store.test.ts",
       "language": "typescript",
-      "sizeLines": 334,
+      "sizeLines": 353,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/bootstrap-service.test.ts",
       "language": "typescript",
-      "sizeLines": 505,
+      "sizeLines": 504,
       "fileCategory": "code"
     },
     {
@@ -846,7 +879,7 @@
     {
       "path": "packages/core/src/__tests__/checkpoint-pg.test.ts",
       "language": "typescript",
-      "sizeLines": 527,
+      "sizeLines": 526,
       "fileCategory": "code"
     },
     {
@@ -856,9 +889,15 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/__tests__/chunker-code-security.test.ts",
+      "language": "typescript",
+      "sizeLines": 82,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/__tests__/chunker-coverage.test.ts",
       "language": "typescript",
-      "sizeLines": 425,
+      "sizeLines": 424,
       "fileCategory": "code"
     },
     {
@@ -870,13 +909,19 @@
     {
       "path": "packages/core/src/__tests__/code-compressor.test.ts",
       "language": "typescript",
-      "sizeLines": 209,
+      "sizeLines": 221,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/compact-snapshot-attribution.test.ts",
       "language": "typescript",
       "sizeLines": 97,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/compaction-snapshot-escaping.test.ts",
+      "language": "typescript",
+      "sizeLines": 78,
       "fileCategory": "code"
     },
     {
@@ -912,19 +957,19 @@
     {
       "path": "packages/core/src/__tests__/context-controller-coverage.test.ts",
       "language": "typescript",
-      "sizeLines": 814,
+      "sizeLines": 848,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/context-controller.test.ts",
       "language": "typescript",
-      "sizeLines": 518,
+      "sizeLines": 516,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/contextual-search-rlm-coverage.test.ts",
       "language": "typescript",
-      "sizeLines": 229,
+      "sizeLines": 936,
       "fileCategory": "code"
     },
     {
@@ -948,7 +993,7 @@
     {
       "path": "packages/core/src/__tests__/dart-support.test.ts",
       "language": "typescript",
-      "sizeLines": 55,
+      "sizeLines": 74,
       "fileCategory": "code"
     },
     {
@@ -967,6 +1012,12 @@
       "path": "packages/core/src/__tests__/definition-lookup.test.ts",
       "language": "typescript",
       "sizeLines": 90,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/discover-capture-policy.test.ts",
+      "language": "typescript",
+      "sizeLines": 218,
       "fileCategory": "code"
     },
     {
@@ -996,7 +1047,7 @@
     {
       "path": "packages/core/src/__tests__/e2e/08.search.test.ts",
       "language": "typescript",
-      "sizeLines": 1155,
+      "sizeLines": 1153,
       "fileCategory": "code"
     },
     {
@@ -1008,43 +1059,43 @@
     {
       "path": "packages/core/src/__tests__/e2e/10.synapse.test.ts",
       "language": "typescript",
-      "sizeLines": 818,
+      "sizeLines": 814,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/e2e/11.lifecycle.test.ts",
       "language": "typescript",
-      "sizeLines": 763,
+      "sizeLines": 749,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/e2e/13.cli.test.ts",
       "language": "typescript",
-      "sizeLines": 289,
+      "sizeLines": 286,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/e2e/14.needles.test.ts",
       "language": "typescript",
-      "sizeLines": 326,
+      "sizeLines": 336,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/e2e/15.nfr.test.ts",
       "language": "typescript",
-      "sizeLines": 802,
+      "sizeLines": 801,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/e2e/16.destructive.test.ts",
       "language": "typescript",
-      "sizeLines": 541,
+      "sizeLines": 540,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/e2e/17.cleanup-verify.test.ts",
       "language": "typescript",
-      "sizeLines": 109,
+      "sizeLines": 107,
       "fileCategory": "code"
     },
     {
@@ -1056,13 +1107,13 @@
     {
       "path": "packages/core/src/__tests__/e2e/19.web-exec.test.ts",
       "language": "typescript",
-      "sizeLines": 572,
+      "sizeLines": 570,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/e2e/20.new-features.test.ts",
       "language": "typescript",
-      "sizeLines": 585,
+      "sizeLines": 583,
       "fileCategory": "code"
     },
     {
@@ -1080,13 +1131,13 @@
     {
       "path": "packages/core/src/__tests__/e2e/24.dashboard-architecture.test.ts",
       "language": "typescript",
-      "sizeLines": 519,
+      "sizeLines": 515,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/e2e/_helpers.ts",
       "language": "typescript",
-      "sizeLines": 685,
+      "sizeLines": 693,
       "fileCategory": "code"
     },
     {
@@ -1288,9 +1339,15 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/__tests__/embedding-failure-propagation.test.ts",
+      "language": "typescript",
+      "sizeLines": 48,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/__tests__/embedding-service.test.ts",
       "language": "typescript",
-      "sizeLines": 170,
+      "sizeLines": 194,
       "fileCategory": "code"
     },
     {
@@ -1320,13 +1377,13 @@
     {
       "path": "packages/core/src/__tests__/etl-cache-invalidation.test.ts",
       "language": "typescript",
-      "sizeLines": 107,
+      "sizeLines": 118,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/etl-idempotent.test.ts",
       "language": "typescript",
-      "sizeLines": 399,
+      "sizeLines": 407,
       "fileCategory": "code"
     },
     {
@@ -1338,7 +1395,7 @@
     {
       "path": "packages/core/src/__tests__/etl-pipeline-lease.test.ts",
       "language": "typescript",
-      "sizeLines": 251,
+      "sizeLines": 385,
       "fileCategory": "code"
     },
     {
@@ -1356,7 +1413,13 @@
     {
       "path": "packages/core/src/__tests__/etl-stages-coverage.test.ts",
       "language": "typescript",
-      "sizeLines": 1130,
+      "sizeLines": 1242,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/execute-indexing.test.ts",
+      "language": "typescript",
+      "sizeLines": 336,
       "fileCategory": "code"
     },
     {
@@ -1372,15 +1435,33 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/__tests__/executor-sandbox-mode.test.ts",
+      "language": "typescript",
+      "sizeLines": 165,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/__tests__/executor.test.ts",
       "language": "typescript",
-      "sizeLines": 389,
+      "sizeLines": 388,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/file-content-cache.test.ts",
+      "language": "typescript",
+      "sizeLines": 319,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/file-filter-cache.test.ts",
       "language": "typescript",
       "sizeLines": 147,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/file-metadata.test.ts",
+      "language": "typescript",
+      "sizeLines": 301,
       "fileCategory": "code"
     },
     {
@@ -1470,7 +1551,7 @@
     {
       "path": "packages/core/src/__tests__/graph-generation-repository-pg-coverage.test.ts",
       "language": "typescript",
-      "sizeLines": 492,
+      "sizeLines": 491,
       "fileCategory": "code"
     },
     {
@@ -1504,15 +1585,21 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/__tests__/graph-stream-project-scope-pg.test.ts",
+      "language": "typescript",
+      "sizeLines": 137,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/__tests__/handoff-proposal-pg.test.ts",
       "language": "typescript",
-      "sizeLines": 354,
+      "sizeLines": 366,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/handoff-service.test.ts",
       "language": "typescript",
-      "sizeLines": 591,
+      "sizeLines": 588,
       "fileCategory": "code"
     },
     {
@@ -1548,7 +1635,13 @@
     {
       "path": "packages/core/src/__tests__/hook-service.test.ts",
       "language": "typescript",
-      "sizeLines": 515,
+      "sizeLines": 516,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/hybrid-search-late-bind.test.ts",
+      "language": "typescript",
+      "sizeLines": 207,
       "fileCategory": "code"
     },
     {
@@ -1560,7 +1653,7 @@
     {
       "path": "packages/core/src/__tests__/ignore-patterns.test.ts",
       "language": "typescript",
-      "sizeLines": 165,
+      "sizeLines": 200,
       "fileCategory": "code"
     },
     {
@@ -1578,13 +1671,19 @@
     {
       "path": "packages/core/src/__tests__/impact-bfs-cte.test.ts",
       "language": "typescript",
-      "sizeLines": 162,
+      "sizeLines": 161,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/impact-bfs-parity.test.ts",
       "language": "typescript",
       "sizeLines": 158,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/index-admin-late-bind.test.ts",
+      "language": "typescript",
+      "sizeLines": 164,
       "fileCategory": "code"
     },
     {
@@ -1606,6 +1705,12 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/__tests__/index-manager-seam.test.ts",
+      "language": "typescript",
+      "sizeLines": 120,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/__tests__/index-manager.test.ts",
       "language": "typescript",
       "sizeLines": 323,
@@ -1620,7 +1725,7 @@
     {
       "path": "packages/core/src/__tests__/index-project-tool.test.ts",
       "language": "typescript",
-      "sizeLines": 327,
+      "sizeLines": 632,
       "fileCategory": "code"
     },
     {
@@ -1686,7 +1791,7 @@
     {
       "path": "packages/core/src/__tests__/integration/real-api.test.ts",
       "language": "typescript",
-      "sizeLines": 471,
+      "sizeLines": 467,
       "fileCategory": "code"
     },
     {
@@ -1720,6 +1825,12 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/__tests__/line-range.test.ts",
+      "language": "typescript",
+      "sizeLines": 268,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/__tests__/llm-client-json-schema.test.ts",
       "language": "typescript",
       "sizeLines": 198,
@@ -1735,6 +1846,18 @@
       "path": "packages/core/src/__tests__/llm-judge.benchmark.test.ts",
       "language": "typescript",
       "sizeLines": 271,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/lru-evict.test.ts",
+      "language": "typescript",
+      "sizeLines": 259,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/lru-eviction-characterization.test.ts",
+      "language": "typescript",
+      "sizeLines": 364,
       "fileCategory": "code"
     },
     {
@@ -1758,7 +1881,7 @@
     {
       "path": "packages/core/src/__tests__/memory-clustering.test.ts",
       "language": "typescript",
-      "sizeLines": 368,
+      "sizeLines": 395,
       "fileCategory": "code"
     },
     {
@@ -1770,7 +1893,7 @@
     {
       "path": "packages/core/src/__tests__/memory-controller.test.ts",
       "language": "typescript",
-      "sizeLines": 474,
+      "sizeLines": 495,
       "fileCategory": "code"
     },
     {
@@ -1782,7 +1905,7 @@
     {
       "path": "packages/core/src/__tests__/memory-repository-pg-coverage.test.ts",
       "language": "typescript",
-      "sizeLines": 612,
+      "sizeLines": 651,
       "fileCategory": "code"
     },
     {
@@ -1818,19 +1941,19 @@
     {
       "path": "packages/core/src/__tests__/observation-consolidation-job.test.ts",
       "language": "typescript",
-      "sizeLines": 268,
+      "sizeLines": 265,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/observation-extractor.test.ts",
       "language": "typescript",
-      "sizeLines": 345,
+      "sizeLines": 344,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/observation-repository-pg-coverage.test.ts",
       "language": "typescript",
-      "sizeLines": 490,
+      "sizeLines": 549,
       "fileCategory": "code"
     },
     {
@@ -1843,6 +1966,12 @@
       "path": "packages/core/src/__tests__/parse-long-class.test.ts",
       "language": "typescript",
       "sizeLines": 54,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/path-containment.test.ts",
+      "language": "typescript",
+      "sizeLines": 197,
       "fileCategory": "code"
     },
     {
@@ -1860,13 +1989,19 @@
     {
       "path": "packages/core/src/__tests__/postgres-vector-store.integration.test.ts",
       "language": "typescript",
-      "sizeLines": 278,
+      "sizeLines": 287,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/postgres-vector-store.test.ts",
       "language": "typescript",
       "sizeLines": 168,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/prisma-client.test.ts",
+      "language": "typescript",
+      "sizeLines": 43,
       "fileCategory": "code"
     },
     {
@@ -1878,7 +2013,7 @@
     {
       "path": "packages/core/src/__tests__/project-identity-apply-coverage.test.ts",
       "language": "typescript",
-      "sizeLines": 501,
+      "sizeLines": 500,
       "fileCategory": "code"
     },
     {
@@ -1908,7 +2043,7 @@
     {
       "path": "packages/core/src/__tests__/project-identity-pg-acceptance.test.ts",
       "language": "typescript",
-      "sizeLines": 669,
+      "sizeLines": 668,
       "fileCategory": "code"
     },
     {
@@ -1936,6 +2071,24 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/__tests__/project-indexer-late-bind.test.ts",
+      "language": "typescript",
+      "sizeLines": 175,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/project-root-cache.test.ts",
+      "language": "typescript",
+      "sizeLines": 249,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/project-root-identity.test.ts",
+      "language": "typescript",
+      "sizeLines": 90,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/__tests__/proposal-store-fail-loud.test.ts",
       "language": "typescript",
       "sizeLines": 163,
@@ -1954,21 +2107,45 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/__tests__/read-file-containment-shapes.test.ts",
+      "language": "typescript",
+      "sizeLines": 349,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/__tests__/read-file-containment.test.ts",
       "language": "typescript",
-      "sizeLines": 230,
+      "sizeLines": 229,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/read-file-presentation-characterization.test.ts",
+      "language": "typescript",
+      "sizeLines": 417,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/read-file-project-root-rename-pin.test.ts",
+      "language": "typescript",
+      "sizeLines": 229,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/read-file.service.test.ts",
+      "language": "typescript",
+      "sizeLines": 459,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/read-file.test.ts",
       "language": "typescript",
-      "sizeLines": 367,
+      "sizeLines": 559,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/redundancy-filter.test.ts",
       "language": "typescript",
-      "sizeLines": 288,
+      "sizeLines": 286,
       "fileCategory": "code"
     },
     {
@@ -1984,33 +2161,9 @@
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/__tests__/rlm-admin.test.ts",
-      "language": "typescript",
-      "sizeLines": 146,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/__tests__/rlm-indexing.test.ts",
-      "language": "typescript",
-      "sizeLines": 553,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/__tests__/rlm-search.test.ts",
-      "language": "typescript",
-      "sizeLines": 520,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/__tests__/rlm-synapse.test.ts",
-      "language": "typescript",
-      "sizeLines": 324,
-      "fileCategory": "code"
-    },
-    {
       "path": "packages/core/src/__tests__/runtime-extra.test.ts",
       "language": "typescript",
-      "sizeLines": 311,
+      "sizeLines": 310,
       "fileCategory": "code"
     },
     {
@@ -2022,13 +2175,13 @@
     {
       "path": "packages/core/src/__tests__/sandbox.test.ts",
       "language": "typescript",
-      "sizeLines": 169,
+      "sizeLines": 168,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/scheduler-catchup.test.ts",
       "language": "typescript",
-      "sizeLines": 354,
+      "sizeLines": 353,
       "fileCategory": "code"
     },
     {
@@ -2046,7 +2199,7 @@
     {
       "path": "packages/core/src/__tests__/scheduler.test.ts",
       "language": "typescript",
-      "sizeLines": 1120,
+      "sizeLines": 1118,
       "fileCategory": "code"
     },
     {
@@ -2070,7 +2223,7 @@
     {
       "path": "packages/core/src/__tests__/search-analytics-pg.test.ts",
       "language": "typescript",
-      "sizeLines": 356,
+      "sizeLines": 337,
       "fileCategory": "code"
     },
     {
@@ -2094,19 +2247,43 @@
     {
       "path": "packages/core/src/__tests__/search-controller.test.ts",
       "language": "typescript",
-      "sizeLines": 566,
+      "sizeLines": 570,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/search-definitions.test.ts",
       "language": "typescript",
-      "sizeLines": 286,
+      "sizeLines": 285,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/search-dependency-outage.test.ts",
       "language": "typescript",
       "sizeLines": 245,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/search-facade-admin.test.ts",
+      "language": "typescript",
+      "sizeLines": 162,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/search-facade-hybrid.test.ts",
+      "language": "typescript",
+      "sizeLines": 520,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/search-facade-indexing.test.ts",
+      "language": "typescript",
+      "sizeLines": 647,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/search-facade-synapse.test.ts",
+      "language": "typescript",
+      "sizeLines": 389,
       "fileCategory": "code"
     },
     {
@@ -2119,6 +2296,18 @@
       "path": "packages/core/src/__tests__/search-filter-overfetch.test.ts",
       "language": "typescript",
       "sizeLines": 272,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/search-memories-tool.characterization.test.ts",
+      "language": "typescript",
+      "sizeLines": 348,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/search-project-tool.characterization.test.ts",
+      "language": "typescript",
+      "sizeLines": 290,
       "fileCategory": "code"
     },
     {
@@ -2142,7 +2331,7 @@
     {
       "path": "packages/core/src/__tests__/search-tools-coverage.test.ts",
       "language": "typescript",
-      "sizeLines": 186,
+      "sizeLines": 184,
       "fileCategory": "code"
     },
     {
@@ -2154,13 +2343,25 @@
     {
       "path": "packages/core/src/__tests__/security-ssrf-dns-pin.test.ts",
       "language": "typescript",
-      "sizeLines": 211,
+      "sizeLines": 210,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/serialize.test.ts",
       "language": "typescript",
       "sizeLines": 757,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/session-bias-late-bind.test.ts",
+      "language": "typescript",
+      "sizeLines": 124,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/session-bias.test.ts",
+      "language": "typescript",
+      "sizeLines": 230,
       "fileCategory": "code"
     },
     {
@@ -2172,7 +2373,7 @@
     {
       "path": "packages/core/src/__tests__/smart-chunker.characterization.test.ts",
       "language": "typescript",
-      "sizeLines": 172,
+      "sizeLines": 168,
       "fileCategory": "code"
     },
     {
@@ -2214,7 +2415,7 @@
     {
       "path": "packages/core/src/__tests__/structural-resolver.test.ts",
       "language": "typescript",
-      "sizeLines": 1226,
+      "sizeLines": 1291,
       "fileCategory": "code"
     },
     {
@@ -2232,7 +2433,7 @@
     {
       "path": "packages/core/src/__tests__/symbol-repo-graph-coverage.test.ts",
       "language": "typescript",
-      "sizeLines": 793,
+      "sizeLines": 792,
       "fileCategory": "code"
     },
     {
@@ -2250,7 +2451,7 @@
     {
       "path": "packages/core/src/__tests__/symbol-repository-pg.characterization.test.ts",
       "language": "typescript",
-      "sizeLines": 471,
+      "sizeLines": 457,
       "fileCategory": "code"
     },
     {
@@ -2262,7 +2463,7 @@
     {
       "path": "packages/core/src/__tests__/synapse-attention-score.test.ts",
       "language": "typescript",
-      "sizeLines": 232,
+      "sizeLines": 231,
       "fileCategory": "code"
     },
     {
@@ -2316,7 +2517,7 @@
     {
       "path": "packages/core/src/__tests__/synapse-golden-relevance.test.ts",
       "language": "typescript",
-      "sizeLines": 184,
+      "sizeLines": 182,
       "fileCategory": "code"
     },
     {
@@ -2340,7 +2541,7 @@
     {
       "path": "packages/core/src/__tests__/synapse-index.test.ts",
       "language": "typescript",
-      "sizeLines": 101,
+      "sizeLines": 99,
       "fileCategory": "code"
     },
     {
@@ -2368,9 +2569,15 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/__tests__/synapse-session-id.test.ts",
+      "language": "typescript",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/__tests__/synapse-session-registry.test.ts",
       "language": "typescript",
-      "sizeLines": 426,
+      "sizeLines": 425,
       "fileCategory": "code"
     },
     {
@@ -2442,19 +2649,25 @@
     {
       "path": "packages/core/src/__tests__/tools-coverage.test.ts",
       "language": "typescript",
-      "sizeLines": 306,
+      "sizeLines": 304,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/trace-path-unit.test.ts",
       "language": "typescript",
-      "sizeLines": 978,
+      "sizeLines": 973,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/trace-path.test.ts",
       "language": "typescript",
       "sizeLines": 545,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/__tests__/vector-embedding-seam.test.ts",
+      "language": "typescript",
+      "sizeLines": 207,
       "fileCategory": "code"
     },
     {
@@ -2466,7 +2679,7 @@
     {
       "path": "packages/core/src/__tests__/wave-4-correctness.test.ts",
       "language": "typescript",
-      "sizeLines": 807,
+      "sizeLines": 810,
       "fileCategory": "code"
     },
     {
@@ -2496,7 +2709,7 @@
     {
       "path": "packages/core/src/__tests__/web-fetch.test.ts",
       "language": "typescript",
-      "sizeLines": 802,
+      "sizeLines": 799,
       "fileCategory": "code"
     },
     {
@@ -2518,42 +2731,6 @@
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/controllers/context-controller.ts",
-      "language": "typescript",
-      "sizeLines": 519,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/controllers/executor-controller.ts",
-      "language": "typescript",
-      "sizeLines": 268,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/controllers/graph-controller.ts",
-      "language": "typescript",
-      "sizeLines": 234,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/controllers/index.ts",
-      "language": "typescript",
-      "sizeLines": 32,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/controllers/memory-controller.ts",
-      "language": "typescript",
-      "sizeLines": 358,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/controllers/search-controller.ts",
-      "language": "typescript",
-      "sizeLines": 463,
-      "fileCategory": "code"
-    },
-    {
       "path": "packages/core/src/data/audit/operation-log-contract.ts",
       "language": "typescript",
       "sizeLines": 76,
@@ -2569,12 +2746,6 @@
       "path": "packages/core/src/data/audit/operation-log-pg.ts",
       "language": "typescript",
       "sizeLines": 154,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/data/db-connection.ts",
-      "language": "typescript",
-      "sizeLines": 40,
       "fileCategory": "code"
     },
     {
@@ -2640,7 +2811,7 @@
     {
       "path": "packages/core/src/data/managed-runs/managed-run-repository-pg.ts",
       "language": "typescript",
-      "sizeLines": 364,
+      "sizeLines": 362,
       "fileCategory": "code"
     },
     {
@@ -2664,7 +2835,7 @@
     {
       "path": "packages/core/src/data/memory/memory-repository-pg.ts",
       "language": "typescript",
-      "sizeLines": 527,
+      "sizeLines": 544,
       "fileCategory": "code"
     },
     {
@@ -2682,7 +2853,7 @@
     {
       "path": "packages/core/src/data/memory/observation-repository-pg.ts",
       "language": "typescript",
-      "sizeLines": 269,
+      "sizeLines": 293,
       "fileCategory": "code"
     },
     {
@@ -2718,7 +2889,7 @@
     {
       "path": "packages/core/src/data/symbol/symbol-repo-graph.ts",
       "language": "typescript",
-      "sizeLines": 551,
+      "sizeLines": 550,
       "fileCategory": "code"
     },
     {
@@ -2730,13 +2901,13 @@
     {
       "path": "packages/core/src/data/symbol/symbol-repo-mappers.ts",
       "language": "typescript",
-      "sizeLines": 184,
+      "sizeLines": 183,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/data/symbol/symbol-repo-queries.ts",
       "language": "typescript",
-      "sizeLines": 459,
+      "sizeLines": 458,
       "fileCategory": "code"
     },
     {
@@ -2766,31 +2937,13 @@
     {
       "path": "packages/core/src/data/vector/base-vector-store.ts",
       "language": "typescript",
-      "sizeLines": 190,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/data/vector/hybrid-search.ts",
-      "language": "typescript",
-      "sizeLines": 300,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/data/vector/index.ts",
-      "language": "typescript",
-      "sizeLines": 12,
+      "sizeLines": 233,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/data/vector/postgres-vector-store.ts",
       "language": "typescript",
-      "sizeLines": 910,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/data/vector/vector-store-factory.ts",
-      "language": "typescript",
-      "sizeLines": 52,
+      "sizeLines": 924,
       "fileCategory": "code"
     },
     {
@@ -2802,7 +2955,73 @@
     {
       "path": "packages/core/src/index.ts",
       "language": "typescript",
-      "sizeLines": 188,
+      "sizeLines": 197,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/kernel/alias-resolver.ts",
+      "language": "typescript",
+      "sizeLines": 187,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/kernel/db-connection.ts",
+      "language": "typescript",
+      "sizeLines": 40,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/kernel/enum-validation.ts",
+      "language": "typescript",
+      "sizeLines": 69,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/kernel/fqn-codec.ts",
+      "language": "typescript",
+      "sizeLines": 361,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/kernel/identity-guard-installer.ts",
+      "language": "typescript",
+      "sizeLines": 155,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/kernel/lexical-search.ts",
+      "language": "typescript",
+      "sizeLines": 328,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/kernel/prisma-client.ts",
+      "language": "typescript",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/kernel/registry.ts",
+      "language": "typescript",
+      "sizeLines": 93,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/kernel/schema-version.ts",
+      "language": "typescript",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/kernel/search-diagnostics.ts",
+      "language": "typescript",
+      "sizeLines": 148,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/kernel/types.ts",
+      "language": "typescript",
+      "sizeLines": 199,
       "fileCategory": "code"
     },
     {
@@ -2815,12 +3034,6 @@
       "path": "packages/core/src/models/CompressedContent.ts",
       "language": "typescript",
       "sizeLines": 201,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/models/Memory.ts",
-      "language": "typescript",
-      "sizeLines": 8,
       "fileCategory": "code"
     },
     {
@@ -2866,9 +3079,15 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/services/cache/lru-evict.ts",
+      "language": "typescript",
+      "sizeLines": 75,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/services/checkpoint/auto-checkpointer.ts",
       "language": "typescript",
-      "sizeLines": 198,
+      "sizeLines": 197,
       "fileCategory": "code"
     },
     {
@@ -2880,13 +3099,13 @@
     {
       "path": "packages/core/src/services/checkpoint/checkpoint-store-pg.ts",
       "language": "typescript",
-      "sizeLines": 563,
+      "sizeLines": 558,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/services/checkpoint/checkpoint-store.ts",
       "language": "typescript",
-      "sizeLines": 124,
+      "sizeLines": 123,
       "fileCategory": "code"
     },
     {
@@ -2898,13 +3117,25 @@
     {
       "path": "packages/core/src/services/compression/code-compressor.ts",
       "language": "typescript",
-      "sizeLines": 526,
+      "sizeLines": 517,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/compression/compress-with-metrics.ts",
+      "language": "typescript",
+      "sizeLines": 89,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/services/compression/index.ts",
       "language": "typescript",
-      "sizeLines": 5,
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/context/context-controller.ts",
+      "language": "typescript",
+      "sizeLines": 527,
       "fileCategory": "code"
     },
     {
@@ -2928,7 +3159,7 @@
     {
       "path": "packages/core/src/services/embeddings/embedding-service.ts",
       "language": "typescript",
-      "sizeLines": 164,
+      "sizeLines": 177,
       "fileCategory": "code"
     },
     {
@@ -2940,7 +3171,7 @@
     {
       "path": "packages/core/src/services/embeddings/provider.ts",
       "language": "typescript",
-      "sizeLines": 748,
+      "sizeLines": 747,
       "fileCategory": "code"
     },
     {
@@ -2970,19 +3201,19 @@
     {
       "path": "packages/core/src/services/etl/pipeline.ts",
       "language": "typescript",
-      "sizeLines": 620,
+      "sizeLines": 624,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/services/etl/stage-context.ts",
       "language": "typescript",
-      "sizeLines": 194,
+      "sizeLines": 191,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/services/etl/stages/discover.ts",
       "language": "typescript",
-      "sizeLines": 244,
+      "sizeLines": 288,
       "fileCategory": "code"
     },
     {
@@ -3000,7 +3231,7 @@
     {
       "path": "packages/core/src/services/etl/stages/resolve.ts",
       "language": "typescript",
-      "sizeLines": 644,
+      "sizeLines": 660,
       "fileCategory": "code"
     },
     {
@@ -3016,21 +3247,33 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/services/executor/executor-controller.ts",
+      "language": "typescript",
+      "sizeLines": 279,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/services/executor/executor.ts",
       "language": "typescript",
-      "sizeLines": 583,
+      "sizeLines": 597,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/services/executor/index.ts",
       "language": "typescript",
-      "sizeLines": 55,
+      "sizeLines": 65,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/services/executor/intent-search.ts",
       "language": "typescript",
-      "sizeLines": 243,
+      "sizeLines": 242,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/executor/params.ts",
+      "language": "typescript",
+      "sizeLines": 41,
       "fileCategory": "code"
     },
     {
@@ -3048,49 +3291,43 @@
     {
       "path": "packages/core/src/services/executor/sandbox.ts",
       "language": "typescript",
-      "sizeLines": 198,
+      "sizeLines": 252,
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/services/graph/graph-queries.ts",
+      "path": "packages/core/src/services/file-read/file-content-cache.ts",
       "language": "typescript",
-      "sizeLines": 440,
+      "sizeLines": 145,
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/services/graph/graph-store-factory.ts",
+      "path": "packages/core/src/services/file-read/file-metadata.ts",
       "language": "typescript",
-      "sizeLines": 34,
+      "sizeLines": 157,
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/services/graph/graph-store-pg.ts",
+      "path": "packages/core/src/services/file-read/line-range.ts",
       "language": "typescript",
-      "sizeLines": 509,
+      "sizeLines": 188,
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/services/graph/index.ts",
+      "path": "packages/core/src/services/file-read/path-containment.ts",
       "language": "typescript",
-      "sizeLines": 13,
+      "sizeLines": 131,
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/services/graph/memory-graph.service.ts",
+      "path": "packages/core/src/services/file-read/project-root-cache.ts",
       "language": "typescript",
-      "sizeLines": 210,
+      "sizeLines": 80,
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/services/graph/relation-extractor.ts",
+      "path": "packages/core/src/services/file-read/read-file.service.ts",
       "language": "typescript",
-      "sizeLines": 409,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/services/graph/types.ts",
-      "language": "typescript",
-      "sizeLines": 155,
+      "sizeLines": 309,
       "fileCategory": "code"
     },
     {
@@ -3114,19 +3351,19 @@
     {
       "path": "packages/core/src/services/hooks/attribution-resolver.ts",
       "language": "typescript",
-      "sizeLines": 301,
+      "sizeLines": 298,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/services/hooks/co-retrieval-hook.ts",
       "language": "typescript",
-      "sizeLines": 193,
+      "sizeLines": 192,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/services/hooks/compaction-snapshot-service.ts",
       "language": "typescript",
-      "sizeLines": 399,
+      "sizeLines": 402,
       "fileCategory": "code"
     },
     {
@@ -3162,7 +3399,19 @@
     {
       "path": "packages/core/src/services/index.ts",
       "language": "typescript",
-      "sizeLines": 478,
+      "sizeLines": 517,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/indexing/acquire-indexing-lease.ts",
+      "language": "typescript",
+      "sizeLines": 127,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/indexing/execute-indexing.ts",
+      "language": "typescript",
+      "sizeLines": 193,
       "fileCategory": "code"
     },
     {
@@ -3192,7 +3441,7 @@
     {
       "path": "packages/core/src/services/jobs/auto-improve-ops.ts",
       "language": "typescript",
-      "sizeLines": 173,
+      "sizeLines": 172,
       "fileCategory": "code"
     },
     {
@@ -3244,9 +3493,51 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/services/memory-graph/graph-queries.ts",
+      "language": "typescript",
+      "sizeLines": 440,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/memory-graph/graph-store-factory.ts",
+      "language": "typescript",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/memory-graph/graph-store-pg.ts",
+      "language": "typescript",
+      "sizeLines": 509,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/memory-graph/index.ts",
+      "language": "typescript",
+      "sizeLines": 13,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/memory-graph/memory-graph.service.ts",
+      "language": "typescript",
+      "sizeLines": 210,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/memory-graph/relation-extractor.ts",
+      "language": "typescript",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/memory-graph/types.ts",
+      "language": "typescript",
+      "sizeLines": 155,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/services/memory/consolidator.ts",
       "language": "typescript",
-      "sizeLines": 234,
+      "sizeLines": 233,
       "fileCategory": "code"
     },
     {
@@ -3274,6 +3565,12 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/services/memory/memory-controller.ts",
+      "language": "typescript",
+      "sizeLines": 365,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/services/memory/memory-service.ts",
       "language": "typescript",
       "sizeLines": 250,
@@ -3282,7 +3579,7 @@
     {
       "path": "packages/core/src/services/memory/redundancy-filter.ts",
       "language": "typescript",
-      "sizeLines": 75,
+      "sizeLines": 74,
       "fileCategory": "code"
     },
     {
@@ -3307,12 +3604,6 @@
       "path": "packages/core/src/services/pricing/models-dev-client.ts",
       "language": "typescript",
       "sizeLines": 673,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/services/project-identity/alias-resolver.ts",
-      "language": "typescript",
-      "sizeLines": 170,
       "fileCategory": "code"
     },
     {
@@ -3346,12 +3637,6 @@
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/services/project-identity/identity-guard-installer.ts",
-      "language": "typescript",
-      "sizeLines": 155,
-      "fileCategory": "code"
-    },
-    {
       "path": "packages/core/src/services/project-identity/index.ts",
       "language": "typescript",
       "sizeLines": 106,
@@ -3360,7 +3645,7 @@
     {
       "path": "packages/core/src/services/project-identity/invalidator-registry.ts",
       "language": "typescript",
-      "sizeLines": 101,
+      "sizeLines": 107,
       "fileCategory": "code"
     },
     {
@@ -3378,25 +3663,19 @@
     {
       "path": "packages/core/src/services/project-identity/production-wiring.ts",
       "language": "typescript",
-      "sizeLines": 132,
+      "sizeLines": 141,
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/services/project-identity/registry.ts",
+      "path": "packages/core/src/services/project-identity/project-root-identity.ts",
       "language": "typescript",
-      "sizeLines": 93,
+      "sizeLines": 63,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/services/project-identity/service.ts",
       "language": "typescript",
       "sizeLines": 117,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/services/query/prisma-client.ts",
-      "language": "typescript",
-      "sizeLines": 37,
       "fileCategory": "code"
     },
     {
@@ -3474,7 +3753,7 @@
     {
       "path": "packages/core/src/services/search/chunker/chunker-code.ts",
       "language": "typescript",
-      "sizeLines": 213,
+      "sizeLines": 331,
       "fileCategory": "code"
     },
     {
@@ -3504,13 +3783,13 @@
     {
       "path": "packages/core/src/services/search/contextual-search-rlm.ts",
       "language": "typescript",
-      "sizeLines": 483,
+      "sizeLines": 695,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/services/search/file-filter-cache.ts",
       "language": "typescript",
-      "sizeLines": 217,
+      "sizeLines": 234,
       "fileCategory": "code"
     },
     {
@@ -3520,21 +3799,39 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/services/search/graph-stream.ts",
+      "language": "typescript",
+      "sizeLines": 161,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/search/hybrid-search.ts",
+      "language": "typescript",
+      "sizeLines": 685,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/services/search/ignore-patterns.ts",
       "language": "typescript",
-      "sizeLines": 136,
+      "sizeLines": 171,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/search/index-admin.ts",
+      "language": "typescript",
+      "sizeLines": 234,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/services/search/index-manager.ts",
       "language": "typescript",
-      "sizeLines": 400,
+      "sizeLines": 401,
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/services/search/lexical-search.ts",
+      "path": "packages/core/src/services/search/project-indexer.ts",
       "language": "typescript",
-      "sizeLines": 328,
+      "sizeLines": 640,
       "fileCategory": "code"
     },
     {
@@ -3550,33 +3847,9 @@
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/services/search/rlm-admin.ts",
+      "path": "packages/core/src/services/search/result-fusion.ts",
       "language": "typescript",
-      "sizeLines": 125,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/services/search/rlm-fusion.ts",
-      "language": "typescript",
-      "sizeLines": 263,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/services/search/rlm-indexing.ts",
-      "language": "typescript",
-      "sizeLines": 581,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/services/search/rlm-search.ts",
-      "language": "typescript",
-      "sizeLines": 582,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/services/search/rlm-synapse.ts",
-      "language": "typescript",
-      "sizeLines": 243,
+      "sizeLines": 270,
       "fileCategory": "code"
     },
     {
@@ -3598,15 +3871,21 @@
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/services/search/search-diagnostics.ts",
+      "path": "packages/core/src/services/search/search-controller.ts",
       "language": "typescript",
-      "sizeLines": 148,
+      "sizeLines": 463,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/services/search/search-warmup.ts",
       "language": "typescript",
       "sizeLines": 125,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/search/session-bias.ts",
+      "language": "typescript",
+      "sizeLines": 99,
       "fileCategory": "code"
     },
     {
@@ -3619,12 +3898,6 @@
       "path": "packages/core/src/services/structural/diagnostics.ts",
       "language": "typescript",
       "sizeLines": 35,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/services/structural/fqn-codec.ts",
-      "language": "typescript",
-      "sizeLines": 361,
       "fileCategory": "code"
     },
     {
@@ -3732,7 +4005,7 @@
     {
       "path": "packages/core/src/services/structural/resolver.ts",
       "language": "typescript",
-      "sizeLines": 323,
+      "sizeLines": 365,
       "fileCategory": "code"
     },
     {
@@ -3772,12 +4045,6 @@
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/services/structural/schema-version.ts",
-      "language": "typescript",
-      "sizeLines": 101,
-      "fileCategory": "code"
-    },
-    {
       "path": "packages/core/src/services/structural/source-span.ts",
       "language": "typescript",
       "sizeLines": 144,
@@ -3793,12 +4060,6 @@
       "path": "packages/core/src/services/structural/symbol-signature.ts",
       "language": "typescript",
       "sizeLines": 325,
-      "fileCategory": "code"
-    },
-    {
-      "path": "packages/core/src/services/structural/types.ts",
-      "language": "typescript",
-      "sizeLines": 199,
       "fileCategory": "code"
     },
     {
@@ -3844,6 +4105,12 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/services/symbol/graph-controller.ts",
+      "language": "typescript",
+      "sizeLines": 233,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/services/symbol/impact-analysis.ts",
       "language": "typescript",
       "sizeLines": 780,
@@ -3858,13 +4125,13 @@
     {
       "path": "packages/core/src/services/symbol/symbol-graph.service.ts",
       "language": "typescript",
-      "sizeLines": 826,
+      "sizeLines": 833,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/services/symbol/trace-path.ts",
       "language": "typescript",
-      "sizeLines": 576,
+      "sizeLines": 575,
       "fileCategory": "code"
     },
     {
@@ -3996,13 +4263,13 @@
     {
       "path": "packages/core/src/services/synapse/session/index.ts",
       "language": "typescript",
-      "sizeLines": 6,
+      "sizeLines": 7,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/services/synapse/session/session-registry.ts",
       "language": "typescript",
-      "sizeLines": 254,
+      "sizeLines": 275,
       "fileCategory": "code"
     },
     {
@@ -4033,6 +4300,12 @@
       "path": "packages/core/src/services/synapse/types.ts",
       "language": "typescript",
       "sizeLines": 90,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/services/vector/vector-store-factory.ts",
+      "language": "typescript",
+      "sizeLines": 79,
       "fileCategory": "code"
     },
     {
@@ -4080,7 +4353,7 @@
     {
       "path": "packages/core/src/tools/batch_execute.ts",
       "language": "typescript",
-      "sizeLines": 76,
+      "sizeLines": 68,
       "fileCategory": "code"
     },
     {
@@ -4092,7 +4365,7 @@
     {
       "path": "packages/core/src/tools/compress_context.ts",
       "language": "typescript",
-      "sizeLines": 138,
+      "sizeLines": 119,
       "fileCategory": "code"
     },
     {
@@ -4108,21 +4381,15 @@
       "fileCategory": "code"
     },
     {
-      "path": "packages/core/src/tools/enum-validation.ts",
-      "language": "typescript",
-      "sizeLines": 53,
-      "fileCategory": "code"
-    },
-    {
       "path": "packages/core/src/tools/execute.ts",
       "language": "typescript",
-      "sizeLines": 82,
+      "sizeLines": 77,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/tools/execute_file.ts",
       "language": "typescript",
-      "sizeLines": 78,
+      "sizeLines": 74,
       "fileCategory": "code"
     },
     {
@@ -4182,7 +4449,7 @@
     {
       "path": "packages/core/src/tools/index_project.ts",
       "language": "typescript",
-      "sizeLines": 353,
+      "sizeLines": 189,
       "fileCategory": "code"
     },
     {
@@ -4200,7 +4467,7 @@
     {
       "path": "packages/core/src/tools/read_file.ts",
       "language": "typescript",
-      "sizeLines": 707,
+      "sizeLines": 124,
       "fileCategory": "code"
     },
     {
@@ -4306,9 +4573,33 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/shared/src/config/__tests__/allowed-extensions-config.test.ts",
+      "language": "typescript",
+      "sizeLines": 103,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/shared/src/config/__tests__/api-key.test.ts",
+      "language": "typescript",
+      "sizeLines": 371,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/shared/src/config/__tests__/config-loader-fs.test.ts",
+      "language": "typescript",
+      "sizeLines": 164,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/shared/src/config/__tests__/config-loader.test.ts",
       "language": "typescript",
-      "sizeLines": 351,
+      "sizeLines": 432,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/shared/src/config/__tests__/config-validators.test.ts",
+      "language": "typescript",
+      "sizeLines": 166,
       "fileCategory": "code"
     },
     {
@@ -4318,15 +4609,33 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/shared/src/config/__tests__/isolated-config.ts",
+      "language": "typescript",
+      "sizeLines": 111,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/shared/src/config/__tests__/llm-env-prefix.test.ts",
+      "language": "typescript",
+      "sizeLines": 149,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/shared/src/config/__tests__/xdg.test.ts",
       "language": "typescript",
       "sizeLines": 154,
       "fileCategory": "code"
     },
     {
+      "path": "packages/shared/src/config/api-key.ts",
+      "language": "typescript",
+      "sizeLines": 178,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/shared/src/config/config-loader.ts",
       "language": "typescript",
-      "sizeLines": 166,
+      "sizeLines": 202,
       "fileCategory": "code"
     },
     {
@@ -4338,7 +4647,7 @@
     {
       "path": "packages/shared/src/config/index.ts",
       "language": "typescript",
-      "sizeLines": 1055,
+      "sizeLines": 1120,
       "fileCategory": "code"
     },
     {
@@ -4350,7 +4659,7 @@
     {
       "path": "packages/shared/src/config/massa-ai-config.ts",
       "language": "typescript",
-      "sizeLines": 336,
+      "sizeLines": 358,
       "fileCategory": "code"
     },
     {
@@ -4362,13 +4671,13 @@
     {
       "path": "packages/shared/src/env.ts",
       "language": "typescript",
-      "sizeLines": 77,
+      "sizeLines": 90,
       "fileCategory": "code"
     },
     {
       "path": "packages/shared/src/index.ts",
       "language": "typescript",
-      "sizeLines": 38,
+      "sizeLines": 42,
       "fileCategory": "code"
     },
     {
@@ -4380,7 +4689,7 @@
     {
       "path": "packages/shared/src/types/interfaces.ts",
       "language": "typescript",
-      "sizeLines": 280,
+      "sizeLines": 305,
       "fileCategory": "code"
     },
     {
@@ -4398,7 +4707,7 @@
     {
       "path": "packages/shared/src/utils/index.ts",
       "language": "typescript",
-      "sizeLines": 28,
+      "sizeLines": 27,
       "fileCategory": "code"
     },
     {
@@ -4422,7 +4731,7 @@
     {
       "path": "packages/shared/src/utils/sanitizer.ts",
       "language": "typescript",
-      "sizeLines": 105,
+      "sizeLines": 111,
       "fileCategory": "code"
     },
     {
@@ -4432,10 +4741,11 @@
       "fileCategory": "code"
     }
   ],
-  "totalFiles": 733,
-  "filteredByIgnore": 1354,
+  "totalFiles": 784,
+  "filteredByIgnore": 1501,
   "estimatedComplexity": "very-large",
   "importMap": {
+    "apps/mcp-client/src/__tests__/api-key-config-seeded.test.ts": [],
     "apps/mcp-client/src/__tests__/config-cli.test.ts": [
       "apps/mcp-client/src/config-cli.ts"
     ],
@@ -4453,6 +4763,9 @@
       "apps/mcp-client/src/call-tool-proxy.ts",
       "apps/mcp-client/src/embedded-api-client.ts",
       "apps/mcp-client/src/tool-definitions.ts"
+    ],
+    "apps/mcp-client/src/__tests__/executor-sandbox-passthrough.test.ts": [
+      "apps/mcp-client/src/embedded-api-client.ts"
     ],
     "apps/mcp-client/src/__tests__/index.test.ts": [
       "apps/mcp-client/src/index.ts"
@@ -4563,9 +4876,6 @@
     ],
     "apps/opencode-plugin/src/observation-emitter.ts": [],
     "apps/opencode-plugin/src/session-project-pin.ts": [],
-    "apps/tools-api/src/__tests__/admin-preservation.test.ts": [
-      "apps/tools-api/src/middleware/admin-preservation.ts"
-    ],
     "apps/tools-api/src/__tests__/architecture-route.test.ts": [
       "apps/tools-api/src/routes/architecture.ts"
     ],
@@ -4600,6 +4910,10 @@
       "apps/tools-api/src/routes/search.ts",
       "apps/tools-api/src/routes/workspace.ts"
     ],
+    "apps/tools-api/src/__tests__/web-ui-key-http.test.ts": [
+      "apps/tools-api/src/middleware/auth.ts",
+      "apps/tools-api/src/routes/web-ui.ts"
+    ],
     "apps/tools-api/src/__tests__/web-ui-readonly.test.ts": [
       "apps/web-ui/src/static/app.js"
     ],
@@ -4609,13 +4923,16 @@
     "apps/tools-api/src/__tests__/web-ui-serve.test.ts": [
       "apps/tools-api/src/routes/web-ui.ts"
     ],
+    "apps/tools-api/src/__tests__/web-ui-trust.test.ts": [
+      "apps/tools-api/src/routes/web-ui.ts",
+      "apps/tools-api/src/web-ui-trust.ts"
+    ],
     "apps/tools-api/src/__tests__/web-ui-views.test.ts": [
       "apps/web-ui/src/static/app.js"
     ],
     "apps/tools-api/src/health.ts": [],
     "apps/tools-api/src/index.ts": [
       "apps/tools-api/src/health.ts",
-      "apps/tools-api/src/middleware/admin-preservation.ts",
       "apps/tools-api/src/middleware/auth.ts",
       "apps/tools-api/src/middleware/error.ts",
       "apps/tools-api/src/routes/analytics.ts",
@@ -4638,16 +4955,21 @@
       "apps/tools-api/src/routes/web-ui.ts",
       "apps/tools-api/src/routes/web.ts",
       "apps/tools-api/src/routes/workspace.ts",
-      "apps/tools-api/src/startup-config.ts"
+      "apps/tools-api/src/startup-config.ts",
+      "apps/tools-api/src/web-ui-trust.ts"
     ],
-    "apps/tools-api/src/middleware/admin-preservation.test.ts": [
-      "apps/tools-api/src/middleware/admin-preservation.ts"
+    "apps/tools-api/src/middleware/auth-http.test.ts": [
+      "apps/tools-api/src/middleware/auth.ts",
+      "apps/tools-api/src/routes/executor.ts",
+      "apps/tools-api/src/routes/web-ui.ts"
     ],
-    "apps/tools-api/src/middleware/admin-preservation.ts": [],
     "apps/tools-api/src/middleware/auth.test.ts": [
       "apps/tools-api/src/middleware/auth.ts"
     ],
     "apps/tools-api/src/middleware/auth.ts": [],
+    "apps/tools-api/src/middleware/cors-http.test.ts": [
+      "apps/tools-api/src/startup-config.ts"
+    ],
     "apps/tools-api/src/middleware/error.ts": [],
     "apps/tools-api/src/routes/analytics.test.ts": [
       "apps/tools-api/src/routes/analytics.ts"
@@ -4727,7 +5049,10 @@
     "apps/tools-api/src/routes/web-ui-static-dir.test.ts": [
       "apps/tools-api/src/routes/web-ui.ts"
     ],
-    "apps/tools-api/src/routes/web-ui.ts": [],
+    "apps/tools-api/src/routes/web-ui.ts": [
+      "apps/tools-api/src/middleware/auth.ts",
+      "apps/tools-api/src/web-ui-trust.ts"
+    ],
     "apps/tools-api/src/routes/web.test.ts": [
       "apps/tools-api/src/routes/web.ts"
     ],
@@ -4736,7 +5061,14 @@
       "apps/tools-api/src/routes/workspace.ts"
     ],
     "apps/tools-api/src/routes/workspace.ts": [],
-    "apps/tools-api/src/startup-config.ts": [],
+    "apps/tools-api/src/startup-config.test.ts": [
+      "apps/tools-api/src/startup-config.ts"
+    ],
+    "apps/tools-api/src/startup-config.ts": [
+      "apps/tools-api/src/middleware/auth.ts"
+    ],
+    "apps/tools-api/src/web-ui-trust.ts": [],
+    "apps/web-ui/src/__tests__/api-key-header.test.ts": [],
     "apps/web-ui/src/__tests__/app-renderers.test.ts": [],
     "apps/web-ui/src/__tests__/dashboard.test.ts": [],
     "apps/web-ui/src/__tests__/index.test.ts": [
@@ -4751,26 +5083,25 @@
     "apps/web-ui/src/static/dashboard.js": [],
     "apps/web-ui/src/static/index.html": [],
     "apps/web-ui/src/static/styles.css": [],
-    "packages/core/create-3072d-table.ts": [
-      "packages/core/src/data/db-connection.ts"
-    ],
-    "packages/core/create-progress-memory.ts": [
-      "packages/core/src/services/query/prisma-client.ts"
-    ],
     "packages/core/prisma.config.ts": [],
     "packages/core/src/__tests__/_bun-mock-guard.ts": [
       "packages/core/src/data/symbol/symbol-repository-factory.ts"
     ],
     "packages/core/src/__tests__/_helpers/native-skip.ts": [],
+    "packages/core/src/__tests__/acquire-indexing-lease.test.ts": [
+      "packages/core/src/data/managed-runs/managed-run-repository-pg.ts",
+      "packages/core/src/services/indexing/acquire-indexing-lease.ts",
+      "packages/core/src/services/jobs/index-job-tracker.ts"
+    ],
     "packages/core/src/__tests__/architecture-map.test.ts": [
       "packages/core/src/__tests__/_helpers/native-skip.ts",
       "packages/core/src/data/symbol/symbol-repository-factory.ts",
+      "packages/core/src/kernel/enum-validation.ts",
       "packages/core/src/services/etl/pipeline.ts",
       "packages/core/src/services/symbol/architecture.ts",
       "packages/core/src/services/symbol/communities.ts",
       "packages/core/src/services/symbol/symbol-graph.service.ts",
-      "packages/core/src/services/workspace/workspace-manager.ts",
-      "packages/core/src/tools/enum-validation.ts"
+      "packages/core/src/services/workspace/workspace-manager.ts"
     ],
     "packages/core/src/__tests__/attribution-resolver.test.ts": [
       "packages/core/src/services/hooks/attribution-resolver.ts",
@@ -4787,10 +5118,10 @@
       "packages/core/src/data/memory/memory-repository.ts",
       "packages/core/src/data/memory/observation-repository.ts",
       "packages/core/src/data/proposal/proposal-repository.ts",
+      "packages/core/src/kernel/search-diagnostics.ts",
       "packages/core/src/services/events/event-bus.ts",
       "packages/core/src/services/jobs/auto-improve-job.ts",
-      "packages/core/src/services/memory/consolidator.ts",
-      "packages/core/src/services/search/search-diagnostics.ts"
+      "packages/core/src/services/memory/consolidator.ts"
     ],
     "packages/core/src/__tests__/auto-improve-pinned-invariant.test.ts": [
       "packages/core/src/data/memory/memory-repository.ts",
@@ -4826,8 +5157,11 @@
       "packages/core/src/services/checkpoint/checkpoint-store-pg.ts"
     ],
     "packages/core/src/__tests__/checkpoint-schema-guard.test.ts": [
-      "packages/core/src/services/checkpoint/checkpoint-store-pg.ts",
-      "packages/core/src/services/structural/schema-version.ts"
+      "packages/core/src/kernel/schema-version.ts",
+      "packages/core/src/services/checkpoint/checkpoint-store-pg.ts"
+    ],
+    "packages/core/src/__tests__/chunker-code-security.test.ts": [
+      "packages/core/src/services/search/chunker/chunker-code.ts"
     ],
     "packages/core/src/__tests__/chunker-coverage.test.ts": [
       "packages/core/src/services/search/chunker/chunker-code.ts",
@@ -4849,6 +5183,10 @@
       "packages/core/src/services/hooks/attribution-resolver.ts",
       "packages/core/src/tools/compact_snapshot.ts"
     ],
+    "packages/core/src/__tests__/compaction-snapshot-escaping.test.ts": [
+      "packages/core/src/data/memory/observation-repository.ts",
+      "packages/core/src/services/hooks/compaction-snapshot-service.ts"
+    ],
     "packages/core/src/__tests__/compress-context.test.ts": [
       "packages/core/src/services/memory/llm-client.ts",
       "packages/core/src/tools/compress_context.ts"
@@ -4868,12 +5206,15 @@
       "packages/core/src/services/memory/consolidator.ts"
     ],
     "packages/core/src/__tests__/context-controller-coverage.test.ts": [
-      "packages/core/src/controllers/context-controller.ts",
+      "packages/core/src/services/context/context-controller.ts",
       "packages/core/src/services/metrics/token-metrics.ts"
     ],
     "packages/core/src/__tests__/context-controller.test.ts": [],
     "packages/core/src/__tests__/contextual-search-rlm-coverage.test.ts": [
-      "packages/core/src/services/search/contextual-search-rlm.ts"
+      "packages/core/src/services/search/contextual-search-rlm.ts",
+      "packages/core/src/services/search/hybrid-search.ts",
+      "packages/core/src/services/search/ignore-patterns.ts",
+      "packages/core/src/services/search/project-indexer.ts"
     ],
     "packages/core/src/__tests__/contextual-search-rlm.characterization.test.ts": [
       "packages/core/src/__tests__/_helpers/native-skip.ts",
@@ -4895,18 +5236,23 @@
       "packages/core/src/services/search/smart-chunker.ts"
     ],
     "packages/core/src/__tests__/db-connection.test.ts": [
-      "packages/core/src/data/db-connection.ts"
+      "packages/core/src/kernel/db-connection.ts"
     ],
     "packages/core/src/__tests__/decay.test.ts": [
       "packages/core/src/services/memory/decay.ts"
     ],
     "packages/core/src/__tests__/definition-lookup.test.ts": [
       "packages/core/src/data/symbol/symbol-repository-pg.ts",
-      "packages/core/src/services/structural/types.ts",
+      "packages/core/src/kernel/types.ts",
       "packages/core/src/services/symbol/definition-lookup.ts",
       "packages/core/src/services/symbol/symbol-graph.service.ts",
       "packages/core/src/services/symbol/trace-path.ts",
       "packages/core/src/tools/search_definitions.ts"
+    ],
+    "packages/core/src/__tests__/discover-capture-policy.test.ts": [
+      "packages/core/src/services/etl/stage-context.ts",
+      "packages/core/src/services/etl/stages/discover.ts",
+      "packages/core/src/services/search/ignore-patterns.ts"
     ],
     "packages/core/src/__tests__/e2e/00.harness.smoke.test.ts": [
       "packages/core/src/__tests__/e2e/_helpers.ts",
@@ -4934,7 +5280,7 @@
       "packages/core/src/__tests__/e2e/_helpers.ts",
       "packages/core/src/__tests__/e2e/_mcp.ts",
       "packages/core/src/__tests__/e2e/polyglot-fixture.ts",
-      "packages/core/src/services/structural/fqn-codec.ts"
+      "packages/core/src/kernel/fqn-codec.ts"
     ],
     "packages/core/src/__tests__/e2e/10.synapse.test.ts": [
       "packages/core/src/__tests__/e2e/_helpers.ts",
@@ -5028,6 +5374,7 @@
     "packages/core/src/__tests__/embedding-cache-pg.test.ts": [
       "packages/core/src/services/cache/embedding-cache-pg.ts"
     ],
+    "packages/core/src/__tests__/embedding-failure-propagation.test.ts": [],
     "packages/core/src/__tests__/embedding-service.test.ts": [
       "packages/core/src/services/embeddings/provider.ts"
     ],
@@ -5061,11 +5408,11 @@
       "packages/core/src/data/managed-runs/managed-run-contract.ts",
       "packages/core/src/data/managed-runs/managed-run-repository-pg.ts",
       "packages/core/src/data/symbol/symbol-repository-factory.ts",
+      "packages/core/src/kernel/alias-resolver.ts",
       "packages/core/src/services/etl/graph-generation-coordinator.ts",
       "packages/core/src/services/etl/pipeline.ts",
       "packages/core/src/services/etl/stage-context.ts",
       "packages/core/src/services/jobs/index-job-tracker.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts",
       "packages/core/src/services/structural/grammar-loaders.ts",
       "packages/core/src/services/structural/language-manifest.ts",
       "packages/core/src/services/structural/parser-readiness.ts"
@@ -5077,10 +5424,10 @@
       "packages/core/src/data/managed-runs/managed-run-contract.ts",
       "packages/core/src/data/managed-runs/managed-run-repository-pg.ts",
       "packages/core/src/data/symbol/symbol-repository-factory.ts",
+      "packages/core/src/kernel/alias-resolver.ts",
       "packages/core/src/services/etl/graph-generation-coordinator.ts",
       "packages/core/src/services/etl/pipeline.ts",
       "packages/core/src/services/jobs/index-job-tracker.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts",
       "packages/core/src/services/structural/grammar-loaders.ts",
       "packages/core/src/services/structural/language-manifest.ts",
       "packages/core/src/services/structural/parser-readiness.ts"
@@ -5091,9 +5438,9 @@
     ],
     "packages/core/src/__tests__/etl-pipeline-queue.test.ts": [
       "packages/core/src/__tests__/_helpers/native-skip.ts",
+      "packages/core/src/kernel/alias-resolver.ts",
       "packages/core/src/services/etl/pipeline.ts",
       "packages/core/src/services/jobs/index-job-tracker.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts",
       "packages/core/src/services/structural/grammar-loaders.ts",
       "packages/core/src/services/structural/language-manifest.ts",
       "packages/core/src/services/structural/parser-readiness.ts"
@@ -5106,23 +5453,41 @@
       "packages/core/src/services/etl/stages/parse.ts",
       "packages/core/src/services/etl/stages/resolve.ts"
     ],
+    "packages/core/src/__tests__/execute-indexing.test.ts": [
+      "packages/core/src/services/etl/pipeline.ts",
+      "packages/core/src/services/indexing/execute-indexing.ts",
+      "packages/core/src/services/jobs/index-job-tracker.ts"
+    ],
     "packages/core/src/__tests__/executor-controller.test.ts": [
-      "packages/core/src/controllers/executor-controller.ts",
+      "packages/core/src/services/executor/executor-controller.ts",
       "packages/core/src/services/executor/index.ts"
     ],
     "packages/core/src/__tests__/executor-extra.test.ts": [
       "packages/core/src/services/executor/index.ts"
     ],
+    "packages/core/src/__tests__/executor-sandbox-mode.test.ts": [
+      "packages/core/src/services/executor/executor-controller.ts",
+      "packages/core/src/services/executor/executor.ts",
+      "packages/core/src/services/executor/sandbox.ts"
+    ],
     "packages/core/src/__tests__/executor.test.ts": [
-      "packages/core/src/controllers/executor-controller.ts",
+      "packages/core/src/services/executor/executor-controller.ts",
       "packages/core/src/services/executor/index.ts"
+    ],
+    "packages/core/src/__tests__/file-content-cache.test.ts": [
+      "packages/core/src/services/file-read/file-content-cache.ts",
+      "packages/core/src/services/file-read/file-metadata.ts"
     ],
     "packages/core/src/__tests__/file-filter-cache.test.ts": [
       "packages/core/src/services/search/file-filter-cache.ts"
     ],
+    "packages/core/src/__tests__/file-metadata.test.ts": [
+      "packages/core/src/services/file-read/file-metadata.ts",
+      "packages/core/src/services/symbol/symbol-graph.service.ts"
+    ],
     "packages/core/src/__tests__/filter-validation.test.ts": [
-      "packages/core/src/services/search/filter-validation.ts",
-      "packages/core/src/tools/enum-validation.ts"
+      "packages/core/src/kernel/enum-validation.ts",
+      "packages/core/src/services/search/filter-validation.ts"
     ],
     "packages/core/src/__tests__/fixtures/ir-metrics.ts": [],
     "packages/core/src/__tests__/fixtures/structural/javascript-flow.jsx": [],
@@ -5131,9 +5496,9 @@
     "packages/core/src/__tests__/fixtures/structural/typescript-native.ts": [],
     "packages/core/src/__tests__/fixtures/synapse-test-corpus.ts": [],
     "packages/core/src/__tests__/fqn-codec-schema-guard.test.ts": [
-      "packages/core/src/services/structural/fqn-codec.ts",
-      "packages/core/src/services/structural/schema-version.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/kernel/fqn-codec.ts",
+      "packages/core/src/kernel/schema-version.ts",
+      "packages/core/src/kernel/types.ts"
     ],
     "packages/core/src/__tests__/get-architecture.test.ts": [
       "packages/core/src/services/symbol/architecture.ts",
@@ -5145,7 +5510,7 @@
       "packages/core/src/services/structural/native-lock-identities.ts"
     ],
     "packages/core/src/__tests__/graph-controller.test.ts": [
-      "packages/core/src/controllers/graph-controller.ts",
+      "packages/core/src/services/symbol/graph-controller.ts",
       "packages/core/src/services/symbol/impact-analysis.ts",
       "packages/core/src/services/symbol/trace-path.ts"
     ],
@@ -5159,26 +5524,28 @@
     ],
     "packages/core/src/__tests__/graph-generation-migration.test.ts": [],
     "packages/core/src/__tests__/graph-generation-repository-pg-coverage.test.ts": [
-      "packages/core/src/data/graph-generation/graph-generation-contract.ts",
       "packages/core/src/data/graph-generation/graph-generation-repository-pg.ts"
     ],
     "packages/core/src/__tests__/graph-generation-symbol-repository-pg.test.ts": [
       "packages/core/src/data/graph-generation/graph-generation-contract.ts"
     ],
     "packages/core/src/__tests__/graph-queries.test.ts": [
-      "packages/core/src/services/graph/graph-queries.ts",
-      "packages/core/src/services/graph/types.ts"
+      "packages/core/src/services/memory-graph/graph-queries.ts",
+      "packages/core/src/services/memory-graph/types.ts"
     ],
     "packages/core/src/__tests__/graph-store-factory.test.ts": [
-      "packages/core/src/services/graph/graph-store-factory.ts",
-      "packages/core/src/services/graph/graph-store-pg.ts",
-      "packages/core/src/services/graph/types.ts"
+      "packages/core/src/services/memory-graph/graph-store-factory.ts",
+      "packages/core/src/services/memory-graph/graph-store-pg.ts",
+      "packages/core/src/services/memory-graph/types.ts"
     ],
     "packages/core/src/__tests__/graph-store-pg-coverage.test.ts": [
-      "packages/core/src/services/graph/graph-store-pg.ts"
+      "packages/core/src/services/memory-graph/graph-store-pg.ts"
     ],
     "packages/core/src/__tests__/graph-store-pg-parity.test.ts": [
-      "packages/core/src/services/graph/graph-store-pg.ts"
+      "packages/core/src/services/memory-graph/graph-store-pg.ts"
+    ],
+    "packages/core/src/__tests__/graph-stream-project-scope-pg.test.ts": [
+      "packages/core/src/services/search/graph-stream.ts"
     ],
     "packages/core/src/__tests__/handoff-proposal-pg.test.ts": [
       "packages/core/src/data/handoff/handoff-repository-pg.ts",
@@ -5196,18 +5563,18 @@
     "packages/core/src/__tests__/handoff-store-fail-loud.test.ts": [
       "packages/core/src/data/handoff/handoff-contract.ts",
       "packages/core/src/data/handoff/handoff-repository-pg.ts",
-      "packages/core/src/services/search/search-diagnostics.ts"
+      "packages/core/src/kernel/search-diagnostics.ts"
     ],
     "packages/core/src/__tests__/health-checker-config.test.ts": [
       "packages/core/src/services/health/local-health-checker.ts"
     ],
     "packages/core/src/__tests__/hook-attribution-acceptance.test.ts": [
-      "packages/core/src/data/db-connection.ts",
       "packages/core/src/data/memory/observation-repository.ts",
+      "packages/core/src/kernel/alias-resolver.ts",
+      "packages/core/src/kernel/db-connection.ts",
+      "packages/core/src/kernel/prisma-client.ts",
       "packages/core/src/services/hooks/attribution-resolver.ts",
-      "packages/core/src/services/hooks/hook-service.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/services/hooks/hook-service.ts"
     ],
     "packages/core/src/__tests__/hook-scripts.test.ts": [],
     "packages/core/src/__tests__/hook-service-bridge.test.ts": [
@@ -5223,6 +5590,10 @@
       "packages/core/src/services/hooks/hook-service.ts",
       "packages/core/src/services/hooks/writer-queue.ts"
     ],
+    "packages/core/src/__tests__/hybrid-search-late-bind.test.ts": [
+      "packages/core/src/services/search/contextual-search-rlm.ts",
+      "packages/core/src/services/search/hybrid-search.ts"
+    ],
     "packages/core/src/__tests__/ignore-patterns.characterization.test.ts": [
       "packages/core/src/services/search/ignore-patterns.ts"
     ],
@@ -5236,11 +5607,13 @@
       "packages/core/src/services/symbol/impact-analysis.ts"
     ],
     "packages/core/src/__tests__/impact-bfs-cte.test.ts": [
-      "packages/core/src/data/symbol/symbol-repository-factory.ts",
-      "packages/core/src/data/symbol/symbol-repository-pg.ts"
+      "packages/core/src/data/symbol/symbol-repository-factory.ts"
     ],
     "packages/core/src/__tests__/impact-bfs-parity.test.ts": [
       "packages/core/src/data/symbol/symbol-repository-factory.ts"
+    ],
+    "packages/core/src/__tests__/index-admin-late-bind.test.ts": [
+      "packages/core/src/services/search/contextual-search-rlm.ts"
     ],
     "packages/core/src/__tests__/index-job-store-pg-coverage.test.ts": [
       "packages/core/src/services/jobs/index-job-store-pg.ts",
@@ -5255,14 +5628,19 @@
       "packages/core/src/services/events/event-bus.ts",
       "packages/core/src/services/jobs/index-job-tracker.ts"
     ],
+    "packages/core/src/__tests__/index-manager-seam.test.ts": [
+      "packages/core/src/services/search/contextual-search-rlm.ts",
+      "packages/core/src/services/search/index-manager.ts"
+    ],
     "packages/core/src/__tests__/index-manager.test.ts": [
       "packages/core/src/services/search/index-manager.ts"
     ],
     "packages/core/src/__tests__/index-project-identity.test.ts": [
-      "packages/core/src/tools/index_project.ts"
+      "packages/core/src/services/project-identity/project-root-identity.ts"
     ],
     "packages/core/src/__tests__/index-project-tool.test.ts": [
-      "packages/core/src/tools/index_project.ts"
+      "packages/core/src/services/jobs/index-job-tracker.ts",
+      "packages/core/src/services/project-identity/project-root-identity.ts"
     ],
     "packages/core/src/__tests__/indexing-readiness-guard.test.ts": [
       "packages/core/src/services/etl/pipeline.ts",
@@ -5272,32 +5650,32 @@
       "packages/core/src/tools/index_project.ts"
     ],
     "packages/core/src/__tests__/integration/crud-operations.script.ts": [
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/__tests__/integration/db-basic.script.ts": [
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/__tests__/integration/memory-operations.script.ts": [
-      "packages/core/src/controllers/memory-controller.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts",
+      "packages/core/src/services/memory/memory-controller.ts"
     ],
     "packages/core/src/__tests__/integration/memory-simple.script.ts": [
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/__tests__/integration/migration.script.ts": [
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/__tests__/integration/pg-connection-simple.script.ts": [
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/__tests__/integration/phase1-complements.script.ts": [
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/__tests__/integration/postgres-connection.script.ts": [
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/__tests__/integration/postgres-migration.script.ts": [
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/__tests__/integration/real-api.test.ts": [],
     "packages/core/src/__tests__/keyword-search-factory.test.ts": [
@@ -5311,11 +5689,14 @@
       "packages/core/src/data/keyword/keyword-search-pg.ts"
     ],
     "packages/core/src/__tests__/language-manifest.test.ts": [
-      "packages/core/src/services/structural/language-manifest.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/kernel/types.ts",
+      "packages/core/src/services/structural/language-manifest.ts"
     ],
     "packages/core/src/__tests__/lexical-search.test.ts": [
-      "packages/core/src/services/search/lexical-search.ts"
+      "packages/core/src/kernel/lexical-search.ts"
+    ],
+    "packages/core/src/__tests__/line-range.test.ts": [
+      "packages/core/src/services/file-read/line-range.ts"
     ],
     "packages/core/src/__tests__/llm-client-json-schema.test.ts": [
       "packages/core/src/services/memory/llm-client.ts"
@@ -5327,6 +5708,16 @@
       "packages/core/src/services/memory/llm-client.ts",
       "packages/core/src/services/memory/salience-judge.ts",
       "packages/core/src/services/search/reranker.ts"
+    ],
+    "packages/core/src/__tests__/lru-evict.test.ts": [
+      "packages/core/src/services/cache/lru-evict.ts"
+    ],
+    "packages/core/src/__tests__/lru-eviction-characterization.test.ts": [
+      "packages/core/src/services/search/file-filter-cache.ts",
+      "packages/core/src/services/symbol/definition-lookup.ts",
+      "packages/core/src/services/symbol/symbol-graph.service.ts",
+      "packages/core/src/services/web/web-controller.ts",
+      "packages/core/src/tools/read_file.ts"
     ],
     "packages/core/src/__tests__/m25-m26-resolution-serialize.test.ts": [
       "packages/core/src/data/symbol/symbol-repository-pg.ts",
@@ -5349,20 +5740,20 @@
       "packages/core/src/services/memory/consolidator.ts"
     ],
     "packages/core/src/__tests__/memory-controller.test.ts": [
-      "packages/core/src/controllers/memory-controller.ts",
-      "packages/core/src/data/memory/memory-repository.ts"
+      "packages/core/src/data/memory/memory-repository.ts",
+      "packages/core/src/services/memory/memory-controller.ts"
     ],
     "packages/core/src/__tests__/memory-graph-service.test.ts": [
-      "packages/core/src/services/graph/memory-graph.service.ts"
+      "packages/core/src/services/memory-graph/memory-graph.service.ts"
     ],
     "packages/core/src/__tests__/memory-repository-pg-coverage.test.ts": [
       "packages/core/src/data/memory/memory-repository-pg.ts",
       "packages/core/src/data/memory/memory-repository.ts"
     ],
     "packages/core/src/__tests__/memory-repository-pg-parity.test.ts": [
-      "packages/core/src/controllers/memory-controller.ts",
       "packages/core/src/data/memory/memory-repository-pg.ts",
-      "packages/core/src/data/memory/memory-repository.ts"
+      "packages/core/src/data/memory/memory-repository.ts",
+      "packages/core/src/services/memory/memory-controller.ts"
     ],
     "packages/core/src/__tests__/memory-service.test.ts": [
       "packages/core/src/data/memory/memory-repository.ts",
@@ -5384,20 +5775,23 @@
       "packages/core/src/services/memory/consolidator.ts"
     ],
     "packages/core/src/__tests__/observation-extractor.test.ts": [
-      "packages/core/src/data/memory/observation-repository.ts",
       "packages/core/src/services/hooks/observation-extractor.ts"
     ],
     "packages/core/src/__tests__/observation-repository-pg-coverage.test.ts": [
-      "packages/core/src/data/db-connection.ts",
       "packages/core/src/data/memory/observation-contract.ts",
       "packages/core/src/data/memory/observation-repository-pg.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/alias-resolver.ts",
+      "packages/core/src/kernel/db-connection.ts",
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/__tests__/operation-log-repository.test.ts": [],
     "packages/core/src/__tests__/parse-long-class.test.ts": [
       "packages/core/src/__tests__/_helpers/native-skip.ts",
       "packages/core/src/services/etl/stages/parse.ts"
+    ],
+    "packages/core/src/__tests__/path-containment.test.ts": [
+      "packages/core/src/services/file-read/path-containment.ts",
+      "packages/core/src/services/file-read/project-root-cache.ts"
     ],
     "packages/core/src/__tests__/postgres-vector-store-extended.test.ts": [
       "packages/core/src/data/vector/postgres-vector-store.ts"
@@ -5406,13 +5800,17 @@
       "packages/core/src/data/vector/postgres-vector-store.ts"
     ],
     "packages/core/src/__tests__/postgres-vector-store.integration.test.ts": [
-      "packages/core/src/data/vector/postgres-vector-store.ts"
+      "packages/core/src/data/vector/postgres-vector-store.ts",
+      "packages/core/src/services/embeddings/index.ts"
     ],
     "packages/core/src/__tests__/postgres-vector-store.test.ts": [
       "packages/core/src/data/vector/postgres-vector-store.ts"
     ],
+    "packages/core/src/__tests__/prisma-client.test.ts": [
+      "packages/core/src/kernel/prisma-client.ts"
+    ],
     "packages/core/src/__tests__/project-identity-alias-resolver.test.ts": [
-      "packages/core/src/services/project-identity/alias-resolver.ts",
+      "packages/core/src/kernel/alias-resolver.ts",
       "packages/core/src/services/project-identity/index.ts"
     ],
     "packages/core/src/__tests__/project-identity-apply-coverage.test.ts": [
@@ -5450,10 +5848,17 @@
       "packages/core/src/data/handoff/handoff-repository-pg.ts",
       "packages/core/src/services/project-identity/index.ts"
     ],
+    "packages/core/src/__tests__/project-indexer-late-bind.test.ts": [
+      "packages/core/src/services/search/contextual-search-rlm.ts"
+    ],
+    "packages/core/src/__tests__/project-root-cache.test.ts": [],
+    "packages/core/src/__tests__/project-root-identity.test.ts": [
+      "packages/core/src/services/project-identity/project-root-identity.ts"
+    ],
     "packages/core/src/__tests__/proposal-store-fail-loud.test.ts": [
       "packages/core/src/data/proposal/proposal-contract.ts",
       "packages/core/src/data/proposal/proposal-repository-pg.ts",
-      "packages/core/src/services/search/search-diagnostics.ts"
+      "packages/core/src/kernel/search-diagnostics.ts"
     ],
     "packages/core/src/__tests__/query-understanding.test.ts": [
       "packages/core/src/services/search/query-understanding.ts"
@@ -5461,11 +5866,27 @@
     "packages/core/src/__tests__/rate-limiter.test.ts": [
       "packages/core/src/services/embeddings/rate-limiter.ts"
     ],
+    "packages/core/src/__tests__/read-file-containment-shapes.test.ts": [
+      "packages/core/src/tools/read_file.ts"
+    ],
     "packages/core/src/__tests__/read-file-containment.test.ts": [
+      "packages/core/src/tools/read_file.ts"
+    ],
+    "packages/core/src/__tests__/read-file-presentation-characterization.test.ts": [
+      "packages/core/src/tools/read_file.ts"
+    ],
+    "packages/core/src/__tests__/read-file-project-root-rename-pin.test.ts": [
+      "packages/core/src/services/project-identity/production-wiring.ts",
+      "packages/core/src/services/symbol/definition-lookup.ts",
       "packages/core/src/services/symbol/symbol-graph.service.ts",
       "packages/core/src/tools/read_file.ts"
     ],
+    "packages/core/src/__tests__/read-file.service.test.ts": [
+      "packages/core/src/services/file-read/read-file.service.ts",
+      "packages/core/src/services/symbol/symbol-graph.service.ts"
+    ],
     "packages/core/src/__tests__/read-file.test.ts": [
+      "packages/core/src/services/cache/lru-evict.ts",
       "packages/core/src/services/events/event-bus.ts",
       "packages/core/src/services/symbol/symbol-graph.service.ts",
       "packages/core/src/tools/read_file.ts"
@@ -5474,25 +5895,12 @@
       "packages/core/src/services/memory/redundancy-filter.ts"
     ],
     "packages/core/src/__tests__/relation-extractor.test.ts": [
-      "packages/core/src/services/graph/relation-extractor.ts",
-      "packages/core/src/services/graph/types.ts"
+      "packages/core/src/services/memory-graph/relation-extractor.ts",
+      "packages/core/src/services/memory-graph/types.ts"
     ],
     "packages/core/src/__tests__/reranker.test.ts": [
       "packages/core/src/services/memory/llm-client.ts",
       "packages/core/src/services/search/reranker.ts"
-    ],
-    "packages/core/src/__tests__/rlm-admin.test.ts": [
-      "packages/core/src/services/search/contextual-search-rlm.ts"
-    ],
-    "packages/core/src/__tests__/rlm-indexing.test.ts": [
-      "packages/core/src/services/search/contextual-search-rlm.ts",
-      "packages/core/src/services/search/rlm-indexing.ts"
-    ],
-    "packages/core/src/__tests__/rlm-search.test.ts": [
-      "packages/core/src/services/search/contextual-search-rlm.ts"
-    ],
-    "packages/core/src/__tests__/rlm-synapse.test.ts": [
-      "packages/core/src/services/search/contextual-search-rlm.ts"
     ],
     "packages/core/src/__tests__/runtime-extra.test.ts": [
       "packages/core/src/services/executor/runtime.ts"
@@ -5519,11 +5927,11 @@
       "packages/core/src/services/scheduler/index.ts"
     ],
     "packages/core/src/__tests__/schema-version.test.ts": [
-      "packages/core/src/services/structural/schema-version.ts"
+      "packages/core/src/kernel/schema-version.ts"
     ],
     "packages/core/src/__tests__/search-admission-preflight.test.ts": [
-      "packages/core/src/controllers/search-controller.ts",
       "packages/core/src/services/search/contextual-search-rlm.ts",
+      "packages/core/src/services/search/search-controller.ts",
       "packages/core/src/tools/search_code.ts",
       "packages/core/src/tools/search_project.ts"
     ],
@@ -5543,18 +5951,31 @@
       "packages/core/src/services/search/search-cache-pg.ts"
     ],
     "packages/core/src/__tests__/search-controller.test.ts": [
-      "packages/core/src/controllers/search-controller.ts"
+      "packages/core/src/services/search/search-controller.ts"
     ],
     "packages/core/src/__tests__/search-definitions.test.ts": [
       "packages/core/src/tools/go_to_definition.ts",
       "packages/core/src/tools/search_definitions.ts"
     ],
     "packages/core/src/__tests__/search-dependency-outage.test.ts": [
-      "packages/core/src/controllers/search-controller.ts",
+      "packages/core/src/kernel/search-diagnostics.ts",
       "packages/core/src/services/health/local-health-checker.ts",
       "packages/core/src/services/search/contextual-search-rlm.ts",
-      "packages/core/src/services/search/search-diagnostics.ts",
+      "packages/core/src/services/search/search-controller.ts",
       "packages/core/src/tools/search_project.ts"
+    ],
+    "packages/core/src/__tests__/search-facade-admin.test.ts": [
+      "packages/core/src/services/search/contextual-search-rlm.ts"
+    ],
+    "packages/core/src/__tests__/search-facade-hybrid.test.ts": [
+      "packages/core/src/services/search/contextual-search-rlm.ts"
+    ],
+    "packages/core/src/__tests__/search-facade-indexing.test.ts": [
+      "packages/core/src/services/search/contextual-search-rlm.ts",
+      "packages/core/src/services/search/project-indexer.ts"
+    ],
+    "packages/core/src/__tests__/search-facade-synapse.test.ts": [
+      "packages/core/src/services/search/contextual-search-rlm.ts"
     ],
     "packages/core/src/__tests__/search-factories.test.ts": [
       "packages/core/src/services/search/analytics-factory.ts",
@@ -5562,6 +5983,11 @@
     ],
     "packages/core/src/__tests__/search-filter-overfetch.test.ts": [
       "packages/core/src/services/search/contextual-search-rlm.ts"
+    ],
+    "packages/core/src/__tests__/search-memories-tool.characterization.test.ts": [],
+    "packages/core/src/__tests__/search-project-tool.characterization.test.ts": [
+      "packages/core/src/kernel/search-diagnostics.ts",
+      "packages/core/src/tools/search_project.ts"
     ],
     "packages/core/src/__tests__/search-ranking-regression.test.ts": [
       "packages/core/src/services/search/contextual-search-rlm.ts"
@@ -5575,7 +6001,7 @@
       "packages/core/src/services/synapse/types.ts"
     ],
     "packages/core/src/__tests__/search-tools-coverage.test.ts": [
-      "packages/core/src/services/search/search-diagnostics.ts",
+      "packages/core/src/kernel/search-diagnostics.ts",
       "packages/core/src/tools/fetch_and_index.ts",
       "packages/core/src/tools/get_optimized_context.ts",
       "packages/core/src/tools/search_code.ts",
@@ -5590,6 +6016,13 @@
     "packages/core/src/__tests__/serialize.test.ts": [
       "packages/core/src/tools/serialize-interfaces.ts",
       "packages/core/src/tools/serialize.ts"
+    ],
+    "packages/core/src/__tests__/session-bias-late-bind.test.ts": [
+      "packages/core/src/services/search/contextual-search-rlm.ts"
+    ],
+    "packages/core/src/__tests__/session-bias.test.ts": [
+      "packages/core/src/services/search/session-bias.ts",
+      "packages/core/src/services/synapse/types.ts"
     ],
     "packages/core/src/__tests__/session-file-cache.test.ts": [
       "packages/core/src/services/context/session-file-cache.ts"
@@ -5609,6 +6042,7 @@
     ],
     "packages/core/src/__tests__/structural-etl.test.ts": [
       "packages/core/src/__tests__/_helpers/native-skip.ts",
+      "packages/core/src/kernel/types.ts",
       "packages/core/src/services/etl/pipeline.ts",
       "packages/core/src/services/etl/stage-context.ts",
       "packages/core/src/services/etl/stages/load.ts",
@@ -5617,8 +6051,7 @@
       "packages/core/src/services/search/smart-chunker.ts",
       "packages/core/src/services/structural/language-manifest.ts",
       "packages/core/src/services/structural/resolvers/typescript.ts",
-      "packages/core/src/services/structural/structural-runtime.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/services/structural/structural-runtime.ts"
     ],
     "packages/core/src/__tests__/structural-grammar-readiness.test.ts": [
       "packages/core/src/__tests__/_helpers/native-skip.ts",
@@ -5627,7 +6060,7 @@
       "packages/core/src/services/structural/parser-readiness.ts"
     ],
     "packages/core/src/__tests__/structural-identity.test.ts": [
-      "packages/core/src/services/structural/fqn-codec.ts",
+      "packages/core/src/kernel/fqn-codec.ts",
       "packages/core/src/services/structural/source-span.ts"
     ],
     "packages/core/src/__tests__/structural-query-pack.test.ts": [
@@ -5644,12 +6077,12 @@
     ],
     "packages/core/src/__tests__/structural-runtime.test.ts": [
       "packages/core/src/__tests__/_helpers/native-skip.ts",
+      "packages/core/src/kernel/types.ts",
       "packages/core/src/services/structural/grammar-loaders.ts",
       "packages/core/src/services/structural/language-manifest.ts",
       "packages/core/src/services/structural/parser-pool.ts",
       "packages/core/src/services/structural/parser-readiness.ts",
-      "packages/core/src/services/structural/structural-runtime.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/services/structural/structural-runtime.ts"
     ],
     "packages/core/src/__tests__/symbol-graph-service.test.ts": [
       "packages/core/src/data/symbol/symbol-repository-pg.ts",
@@ -5657,9 +6090,9 @@
       "packages/core/src/services/symbol/symbol-graph.service.ts"
     ],
     "packages/core/src/__tests__/symbol-repo-graph-coverage.test.ts": [
-      "packages/core/src/data/db-connection.ts",
       "packages/core/src/data/symbol/symbol-repo-graph.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/db-connection.ts",
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/__tests__/symbol-repository-pg-coverage.test.ts": [
       "packages/core/src/data/graph-generation/graph-generation-contract.ts",
@@ -5756,6 +6189,9 @@
     "packages/core/src/__tests__/synapse-score-spectrum.test.ts": [
       "packages/core/src/services/synapse/metacognition/score-spectrum.ts"
     ],
+    "packages/core/src/__tests__/synapse-session-id.test.ts": [
+      "packages/core/src/services/synapse/session/index.ts"
+    ],
     "packages/core/src/__tests__/synapse-session-registry.test.ts": [
       "packages/core/src/services/synapse/buffer/working-memory-buffer.ts",
       "packages/core/src/services/synapse/session/session-registry.ts",
@@ -5788,7 +6224,7 @@
       "packages/core/src/services/synapse/session/session-registry.ts"
     ],
     "packages/core/src/__tests__/synapse-task-envelope.test.ts": [
-      "packages/core/src/controllers/search-controller.ts",
+      "packages/core/src/services/search/search-controller.ts",
       "packages/core/src/services/synapse/session/index.ts",
       "packages/core/src/services/synapse/task-envelope.ts"
     ],
@@ -5828,13 +6264,17 @@
       "packages/core/src/services/workspace/workspace-manager.ts",
       "packages/core/src/tools/trace_path.ts"
     ],
+    "packages/core/src/__tests__/vector-embedding-seam.test.ts": [
+      "packages/core/src/data/vector/base-vector-store.ts",
+      "packages/core/src/services/vector/vector-store-factory.ts"
+    ],
     "packages/core/src/__tests__/vector-store-factory.test.ts": [
       "packages/core/src/data/vector/postgres-vector-store.ts",
-      "packages/core/src/data/vector/vector-store-factory.ts"
+      "packages/core/src/services/vector/vector-store-factory.ts"
     ],
     "packages/core/src/__tests__/wave-4-correctness.test.ts": [
-      "packages/core/src/controllers/search-controller.ts",
       "packages/core/src/services/search/contextual-search-rlm.ts",
+      "packages/core/src/services/search/search-controller.ts",
       "packages/core/src/services/symbol/impact-analysis.ts",
       "packages/core/src/services/symbol/symbol-graph.service.ts",
       "packages/core/src/tools/get_references.ts",
@@ -5842,11 +6282,11 @@
       "packages/core/src/tools/search_definitions.ts"
     ],
     "packages/core/src/__tests__/wave-4-enum-validation.test.ts": [
-      "packages/core/src/controllers/executor-controller.ts",
+      "packages/core/src/kernel/enum-validation.ts",
+      "packages/core/src/services/executor/executor-controller.ts",
       "packages/core/src/services/symbol/git-ref-validation.ts",
       "packages/core/src/tools/compress_context.ts",
       "packages/core/src/tools/create_checkpoint.ts",
-      "packages/core/src/tools/enum-validation.ts",
       "packages/core/src/tools/get_analytics.ts",
       "packages/core/src/tools/impact_analysis.ts",
       "packages/core/src/tools/list_projects.ts",
@@ -5854,8 +6294,8 @@
       "packages/core/src/tools/trace_path.ts"
     ],
     "packages/core/src/__tests__/wave-4-generation-staleness.test.ts": [
+      "packages/core/src/kernel/enum-validation.ts",
       "packages/core/src/services/symbol/active-generation.ts",
-      "packages/core/src/tools/enum-validation.ts",
       "packages/core/src/tools/get_references.ts",
       "packages/core/src/tools/impact_analysis.ts",
       "packages/core/src/tools/search_definitions.ts",
@@ -5882,68 +6322,29 @@
     "packages/core/src/__tests__/writer-queue.test.ts": [
       "packages/core/src/services/hooks/writer-queue.ts"
     ],
-    "packages/core/src/controllers/context-controller.ts": [
-      "packages/core/src/controllers/memory-controller.ts",
-      "packages/core/src/controllers/search-controller.ts",
-      "packages/core/src/services/context/session-file-cache.ts",
-      "packages/core/src/services/metrics/token-metrics.ts",
-      "packages/core/src/services/symbol/symbol-graph.service.ts",
-      "packages/core/src/tools/compress_context.ts"
-    ],
-    "packages/core/src/controllers/executor-controller.ts": [
-      "packages/core/src/services/executor/index.ts",
-      "packages/core/src/tools/batch_execute.ts",
-      "packages/core/src/tools/enum-validation.ts",
-      "packages/core/src/tools/execute.ts",
-      "packages/core/src/tools/execute_file.ts"
-    ],
-    "packages/core/src/controllers/graph-controller.ts": [
-      "packages/core/src/services/symbol/definition-lookup.ts",
-      "packages/core/src/services/symbol/impact-analysis.ts",
-      "packages/core/src/services/symbol/symbol-graph.service.ts",
-      "packages/core/src/services/symbol/trace-path.ts"
-    ],
-    "packages/core/src/controllers/index.ts": [],
-    "packages/core/src/controllers/memory-controller.ts": [
-      "packages/core/src/data/memory/memory-repository-factory.ts",
-      "packages/core/src/data/memory/memory-repository.ts",
-      "packages/core/src/services/events/event-bus.ts",
-      "packages/core/src/services/graph/memory-graph.service.ts",
-      "packages/core/src/services/jobs/memory-consolidation-job.ts",
-      "packages/core/src/services/memory/memory-service.ts",
-      "packages/core/src/services/memory/salience-judge.ts"
-    ],
-    "packages/core/src/controllers/search-controller.ts": [
-      "packages/core/src/services/events/event-bus.ts",
-      "packages/core/src/services/search/contextual-search-rlm.ts",
-      "packages/core/src/services/search/filter-validation.ts",
-      "packages/core/src/services/search/reranker.ts",
-      "packages/core/src/services/search/search-diagnostics.ts"
-    ],
     "packages/core/src/data/audit/operation-log-contract.ts": [],
     "packages/core/src/data/audit/operation-log-factory.ts": [
       "packages/core/src/data/audit/operation-log-pg.ts"
     ],
     "packages/core/src/data/audit/operation-log-pg.ts": [
       "packages/core/src/data/audit/operation-log-contract.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts"
     ],
-    "packages/core/src/data/db-connection.ts": [],
     "packages/core/src/data/graph-generation/graph-generation-contract.ts": [],
     "packages/core/src/data/graph-generation/graph-generation-repository-factory.ts": [
       "packages/core/src/data/graph-generation/graph-generation-repository-pg.ts"
     ],
     "packages/core/src/data/graph-generation/graph-generation-repository-pg.ts": [
       "packages/core/src/data/graph-generation/graph-generation-contract.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/data/graph-generation/index.ts": [],
     "packages/core/src/data/handoff/handoff-contract.ts": [],
     "packages/core/src/data/handoff/handoff-repository-pg.ts": [
       "packages/core/src/data/handoff/handoff-contract.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts",
-      "packages/core/src/services/query/prisma-client.ts",
-      "packages/core/src/services/search/search-diagnostics.ts"
+      "packages/core/src/kernel/alias-resolver.ts",
+      "packages/core/src/kernel/prisma-client.ts",
+      "packages/core/src/kernel/search-diagnostics.ts"
     ],
     "packages/core/src/data/handoff/handoff-repository.ts": [
       "packages/core/src/data/handoff/handoff-repository-pg.ts"
@@ -5952,14 +6353,14 @@
       "packages/core/src/data/keyword/keyword-search-pg.ts"
     ],
     "packages/core/src/data/keyword/keyword-search-pg.ts": [
-      "packages/core/src/data/db-connection.ts",
-      "packages/core/src/services/project-identity/identity-guard-installer.ts",
-      "packages/core/src/services/search/lexical-search.ts"
+      "packages/core/src/kernel/db-connection.ts",
+      "packages/core/src/kernel/identity-guard-installer.ts",
+      "packages/core/src/kernel/lexical-search.ts"
     ],
     "packages/core/src/data/managed-runs/managed-run-contract.ts": [],
     "packages/core/src/data/managed-runs/managed-run-repository-pg.ts": [
       "packages/core/src/data/managed-runs/managed-run-contract.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/data/memory/index.ts": [],
     "packages/core/src/data/memory/memory-repository-contract.ts": [],
@@ -5968,15 +6369,15 @@
     ],
     "packages/core/src/data/memory/memory-repository-pg.ts": [
       "packages/core/src/data/memory/memory-repository-contract.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/alias-resolver.ts",
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/data/memory/memory-repository.ts": [],
     "packages/core/src/data/memory/observation-contract.ts": [],
     "packages/core/src/data/memory/observation-repository-pg.ts": [
       "packages/core/src/data/memory/observation-contract.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/alias-resolver.ts",
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/data/memory/observation-repository.ts": [
       "packages/core/src/data/memory/observation-repository-pg.ts"
@@ -5984,9 +6385,9 @@
     "packages/core/src/data/proposal/proposal-contract.ts": [],
     "packages/core/src/data/proposal/proposal-repository-pg.ts": [
       "packages/core/src/data/proposal/proposal-contract.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts",
-      "packages/core/src/services/query/prisma-client.ts",
-      "packages/core/src/services/search/search-diagnostics.ts"
+      "packages/core/src/kernel/alias-resolver.ts",
+      "packages/core/src/kernel/prisma-client.ts",
+      "packages/core/src/kernel/search-diagnostics.ts"
     ],
     "packages/core/src/data/proposal/proposal-repository.ts": [
       "packages/core/src/data/proposal/proposal-repository-pg.ts"
@@ -5995,20 +6396,20 @@
       "packages/core/src/data/graph-generation/graph-generation-contract.ts",
       "packages/core/src/data/symbol/symbol-repo-identity.ts",
       "packages/core/src/data/symbol/symbol-repo-types.ts",
-      "packages/core/src/services/query/prisma-client.ts",
-      "packages/core/src/services/structural/fqn-codec.ts"
+      "packages/core/src/kernel/fqn-codec.ts",
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/data/symbol/symbol-repo-graph.ts": [
       "packages/core/src/data/symbol/symbol-repo-generation.ts",
       "packages/core/src/data/symbol/symbol-repo-mappers.ts",
       "packages/core/src/data/symbol/symbol-repo-types.ts",
-      "packages/core/src/services/query/prisma-client.ts",
-      "packages/core/src/services/structural/fqn-codec.ts"
+      "packages/core/src/kernel/fqn-codec.ts",
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/data/symbol/symbol-repo-identity.ts": [
       "packages/core/src/data/symbol/symbol-repo-types.ts",
-      "packages/core/src/services/query/prisma-client.ts",
-      "packages/core/src/services/structural/fqn-codec.ts"
+      "packages/core/src/kernel/fqn-codec.ts",
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/data/symbol/symbol-repo-mappers.ts": [
       "packages/core/src/data/symbol/symbol-repo-types.ts"
@@ -6018,15 +6419,14 @@
       "packages/core/src/data/symbol/symbol-repo-identity.ts",
       "packages/core/src/data/symbol/symbol-repo-mappers.ts",
       "packages/core/src/data/symbol/symbol-repo-types.ts",
-      "packages/core/src/data/symbol/symbol-repo-workspace.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/data/symbol/symbol-repo-types.ts": [
-      "packages/core/src/services/structural/fqn-codec.ts"
+      "packages/core/src/kernel/fqn-codec.ts"
     ],
     "packages/core/src/data/symbol/symbol-repo-workspace.ts": [
       "packages/core/src/data/symbol/symbol-repo-types.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/data/symbol/symbol-repository-factory.ts": [
       "packages/core/src/data/symbol/symbol-repository-pg.ts"
@@ -6038,26 +6438,34 @@
       "packages/core/src/data/symbol/symbol-repo-queries.ts",
       "packages/core/src/data/symbol/symbol-repo-types.ts"
     ],
-    "packages/core/src/data/vector/base-vector-store.ts": [
-      "packages/core/src/services/embeddings/index.ts"
-    ],
-    "packages/core/src/data/vector/hybrid-search.ts": [
-      "packages/core/src/data/keyword/keyword-search-pg.ts",
-      "packages/core/src/data/vector/vector-store-factory.ts"
-    ],
-    "packages/core/src/data/vector/index.ts": [],
+    "packages/core/src/data/vector/base-vector-store.ts": [],
     "packages/core/src/data/vector/postgres-vector-store.ts": [
       "packages/core/src/data/vector/base-vector-store.ts",
-      "packages/core/src/services/project-identity/identity-guard-installer.ts"
-    ],
-    "packages/core/src/data/vector/vector-store-factory.ts": [
-      "packages/core/src/data/vector/postgres-vector-store.ts"
+      "packages/core/src/kernel/identity-guard-installer.ts"
     ],
     "packages/core/src/data/with-deadlock-retry.ts": [],
     "packages/core/src/index.ts": [],
+    "packages/core/src/kernel/alias-resolver.ts": [
+      "packages/core/src/kernel/db-connection.ts"
+    ],
+    "packages/core/src/kernel/db-connection.ts": [],
+    "packages/core/src/kernel/enum-validation.ts": [],
+    "packages/core/src/kernel/fqn-codec.ts": [
+      "packages/core/src/kernel/schema-version.ts",
+      "packages/core/src/kernel/types.ts"
+    ],
+    "packages/core/src/kernel/identity-guard-installer.ts": [
+      "packages/core/src/kernel/db-connection.ts",
+      "packages/core/src/kernel/registry.ts"
+    ],
+    "packages/core/src/kernel/lexical-search.ts": [],
+    "packages/core/src/kernel/prisma-client.ts": [],
+    "packages/core/src/kernel/registry.ts": [],
+    "packages/core/src/kernel/schema-version.ts": [],
+    "packages/core/src/kernel/search-diagnostics.ts": [],
+    "packages/core/src/kernel/types.ts": [],
     "packages/core/src/models/CacheEntry.ts": [],
     "packages/core/src/models/CompressedContent.ts": [],
-    "packages/core/src/models/Memory.ts": [],
     "packages/core/src/models/index.ts": [],
     "packages/core/src/services/bootstrap/bootstrap-service.ts": [
       "packages/core/src/data/memory/memory-repository-factory.ts",
@@ -6073,13 +6481,14 @@
       "packages/core/src/services/cache/embedding-cache-pg.ts"
     ],
     "packages/core/src/services/cache/embedding-cache-pg.ts": [
-      "packages/core/src/services/cache/embedding-cache-contract.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts",
+      "packages/core/src/services/cache/embedding-cache-contract.ts"
     ],
     "packages/core/src/services/cache/index.ts": [],
     "packages/core/src/services/cache/l1-memory-cache.ts": [
       "packages/core/src/models/CacheEntry.ts"
     ],
+    "packages/core/src/services/cache/lru-evict.ts": [],
     "packages/core/src/services/checkpoint/auto-checkpointer.ts": [
       "packages/core/src/services/checkpoint/checkpoint-manager.ts"
     ],
@@ -6087,10 +6496,10 @@
       "packages/core/src/services/checkpoint/checkpoint-store-pg.ts"
     ],
     "packages/core/src/services/checkpoint/checkpoint-store-pg.ts": [
-      "packages/core/src/services/checkpoint/checkpoint-store.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts",
-      "packages/core/src/services/query/prisma-client.ts",
-      "packages/core/src/services/structural/schema-version.ts"
+      "packages/core/src/kernel/alias-resolver.ts",
+      "packages/core/src/kernel/prisma-client.ts",
+      "packages/core/src/kernel/schema-version.ts",
+      "packages/core/src/services/checkpoint/checkpoint-store.ts"
     ],
     "packages/core/src/services/checkpoint/checkpoint-store.ts": [],
     "packages/core/src/services/checkpoint/index.ts": [],
@@ -6098,7 +6507,18 @@
       "packages/core/src/models/CompressedContent.ts",
       "packages/core/src/services/memory/llm-client.ts"
     ],
+    "packages/core/src/services/compression/compress-with-metrics.ts": [
+      "packages/core/src/services/compression/code-compressor.ts"
+    ],
     "packages/core/src/services/compression/index.ts": [],
+    "packages/core/src/services/context/context-controller.ts": [
+      "packages/core/src/services/compression/index.ts",
+      "packages/core/src/services/context/session-file-cache.ts",
+      "packages/core/src/services/memory/memory-controller.ts",
+      "packages/core/src/services/metrics/token-metrics.ts",
+      "packages/core/src/services/search/search-controller.ts",
+      "packages/core/src/services/symbol/symbol-graph.service.ts"
+    ],
     "packages/core/src/services/context/session-file-cache.ts": [
       "packages/core/src/services/metrics/token-metrics.ts"
     ],
@@ -6142,7 +6562,7 @@
       "packages/core/src/data/managed-runs/managed-run-contract.ts",
       "packages/core/src/data/managed-runs/managed-run-repository-pg.ts",
       "packages/core/src/data/symbol/symbol-repository-factory.ts",
-      "packages/core/src/data/vector/vector-store-factory.ts",
+      "packages/core/src/kernel/alias-resolver.ts",
       "packages/core/src/services/etl/graph-generation-coordinator.ts",
       "packages/core/src/services/etl/stage-context.ts",
       "packages/core/src/services/etl/stages/discover.ts",
@@ -6151,22 +6571,24 @@
       "packages/core/src/services/etl/stages/resolve.ts",
       "packages/core/src/services/events/event-bus.ts",
       "packages/core/src/services/jobs/index-job-tracker.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts",
       "packages/core/src/services/search/cache-factory.ts",
       "packages/core/src/services/search/index-manager.ts",
       "packages/core/src/services/structural/language-manifest.ts",
-      "packages/core/src/services/structural/parser-readiness.ts"
+      "packages/core/src/services/structural/parser-readiness.ts",
+      "packages/core/src/services/vector/vector-store-factory.ts"
     ],
     "packages/core/src/services/etl/stage-context.ts": [
       "packages/core/src/data/graph-generation/graph-generation-contract.ts",
       "packages/core/src/data/managed-runs/managed-run-contract.ts",
+      "packages/core/src/kernel/types.ts",
       "packages/core/src/services/search/smart-chunker.ts",
-      "packages/core/src/services/structural/language-manifest.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/services/structural/language-manifest.ts"
     ],
     "packages/core/src/services/etl/stages/discover.ts": [
       "packages/core/src/data/symbol/symbol-repository-factory.ts",
       "packages/core/src/services/etl/stage-context.ts",
+      "packages/core/src/services/search/capture-policy-interfaces.ts",
+      "packages/core/src/services/search/capture-policy.ts",
       "packages/core/src/services/search/ignore-patterns.ts"
     ],
     "packages/core/src/services/etl/stages/load.ts": [
@@ -6174,24 +6596,25 @@
       "packages/core/src/data/managed-runs/managed-run-repository-pg.ts",
       "packages/core/src/data/symbol/symbol-repository-factory.ts",
       "packages/core/src/data/symbol/symbol-repository-pg.ts",
-      "packages/core/src/data/vector/vector-store-factory.ts",
       "packages/core/src/data/with-deadlock-retry.ts",
       "packages/core/src/services/etl/stage-context.ts",
-      "packages/core/src/services/structural/language-manifest.ts"
+      "packages/core/src/services/structural/language-manifest.ts",
+      "packages/core/src/services/vector/vector-store-factory.ts"
     ],
     "packages/core/src/services/etl/stages/parse.ts": [
+      "packages/core/src/kernel/types.ts",
       "packages/core/src/services/etl/stage-context.ts",
       "packages/core/src/services/search/smart-chunker.ts",
       "packages/core/src/services/structural/language-manifest.ts",
       "packages/core/src/services/structural/source-span.ts",
-      "packages/core/src/services/structural/structural-runtime.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/services/structural/structural-runtime.ts"
     ],
     "packages/core/src/services/etl/stages/resolve.ts": [
       "packages/core/src/data/symbol/symbol-repository-factory.ts",
       "packages/core/src/data/symbol/symbol-repository-pg.ts",
+      "packages/core/src/kernel/fqn-codec.ts",
+      "packages/core/src/kernel/types.ts",
       "packages/core/src/services/etl/stage-context.ts",
-      "packages/core/src/services/structural/fqn-codec.ts",
       "packages/core/src/services/structural/language-manifest.ts",
       "packages/core/src/services/structural/resolver.ts",
       "packages/core/src/services/structural/resolvers/data-document.ts",
@@ -6199,11 +6622,14 @@
       "packages/core/src/services/structural/resolvers/managed.ts",
       "packages/core/src/services/structural/resolvers/scripting.ts",
       "packages/core/src/services/structural/resolvers/systems.ts",
-      "packages/core/src/services/structural/resolvers/typescript.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/services/structural/resolvers/typescript.ts"
     ],
     "packages/core/src/services/events/event-bus.ts": [],
     "packages/core/src/services/events/index.ts": [],
+    "packages/core/src/services/executor/executor-controller.ts": [
+      "packages/core/src/kernel/enum-validation.ts",
+      "packages/core/src/services/executor/index.ts"
+    ],
     "packages/core/src/services/executor/executor.ts": [
       "packages/core/src/services/executor/runtime.ts",
       "packages/core/src/services/executor/sandbox.ts"
@@ -6212,37 +6638,37 @@
     "packages/core/src/services/executor/intent-search.ts": [
       "packages/core/src/services/search/smart-chunker.ts"
     ],
+    "packages/core/src/services/executor/params.ts": [
+      "packages/core/src/services/executor/runtime.ts"
+    ],
     "packages/core/src/services/executor/run-pool.ts": [],
     "packages/core/src/services/executor/runtime.ts": [],
     "packages/core/src/services/executor/sandbox.ts": [],
-    "packages/core/src/services/graph/graph-queries.ts": [
-      "packages/core/src/services/graph/graph-store-factory.ts",
-      "packages/core/src/services/graph/types.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+    "packages/core/src/services/file-read/file-content-cache.ts": [
+      "packages/core/src/services/cache/lru-evict.ts",
+      "packages/core/src/services/file-read/file-metadata.ts"
     ],
-    "packages/core/src/services/graph/graph-store-factory.ts": [
-      "packages/core/src/services/graph/graph-store-pg.ts",
-      "packages/core/src/services/graph/types.ts"
+    "packages/core/src/services/file-read/file-metadata.ts": [
+      "packages/core/src/services/symbol/symbol-graph.service.ts"
     ],
-    "packages/core/src/services/graph/graph-store-pg.ts": [
-      "packages/core/src/services/graph/types.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+    "packages/core/src/services/file-read/line-range.ts": [],
+    "packages/core/src/services/file-read/path-containment.ts": [
+      "packages/core/src/services/file-read/project-root-cache.ts"
     ],
-    "packages/core/src/services/graph/index.ts": [],
-    "packages/core/src/services/graph/memory-graph.service.ts": [
-      "packages/core/src/services/graph/graph-queries.ts",
-      "packages/core/src/services/graph/graph-store-factory.ts",
-      "packages/core/src/services/graph/relation-extractor.ts",
-      "packages/core/src/services/graph/types.ts"
+    "packages/core/src/services/file-read/project-root-cache.ts": [
+      "packages/core/src/services/cache/lru-evict.ts",
+      "packages/core/src/services/events/event-bus.ts",
+      "packages/core/src/services/workspace/workspace-manager.ts"
     ],
-    "packages/core/src/services/graph/relation-extractor.ts": [
-      "packages/core/src/data/memory/memory-repository-factory.ts",
-      "packages/core/src/data/memory/memory-repository.ts",
-      "packages/core/src/services/embeddings/index.ts",
-      "packages/core/src/services/graph/graph-store-factory.ts",
-      "packages/core/src/services/graph/types.ts"
+    "packages/core/src/services/file-read/read-file.service.ts": [
+      "packages/core/src/services/compression/code-compressor.ts",
+      "packages/core/src/services/file-read/file-content-cache.ts",
+      "packages/core/src/services/file-read/file-metadata.ts",
+      "packages/core/src/services/file-read/line-range.ts",
+      "packages/core/src/services/file-read/path-containment.ts",
+      "packages/core/src/services/file-read/project-root-cache.ts",
+      "packages/core/src/services/symbol/symbol-graph.service.ts"
     ],
-    "packages/core/src/services/graph/types.ts": [],
     "packages/core/src/services/handoff/handoff-auto-injector.ts": [
       "packages/core/src/services/events/event-bus.ts",
       "packages/core/src/services/handoff/handoff-service.ts"
@@ -6256,21 +6682,20 @@
       "packages/core/src/services/memory/llm-client.ts"
     ],
     "packages/core/src/services/health/local-health-checker.ts": [
-      "packages/core/src/data/db-connection.ts",
-      "packages/core/src/services/search/search-diagnostics.ts"
+      "packages/core/src/kernel/db-connection.ts",
+      "packages/core/src/kernel/search-diagnostics.ts"
     ],
     "packages/core/src/services/hooks/attribution-resolver.ts": [
-      "packages/core/src/data/db-connection.ts",
       "packages/core/src/data/memory/observation-contract.ts",
-      "packages/core/src/services/hooks/session-pin-store.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts"
+      "packages/core/src/kernel/alias-resolver.ts",
+      "packages/core/src/kernel/db-connection.ts",
+      "packages/core/src/services/hooks/session-pin-store.ts"
     ],
     "packages/core/src/services/hooks/co-retrieval-hook.ts": [
       "packages/core/src/data/memory/memory-repository-factory.ts",
       "packages/core/src/data/memory/memory-repository-pg.ts",
       "packages/core/src/services/events/event-bus.ts",
-      "packages/core/src/services/graph/graph-store-factory.ts",
-      "packages/core/src/services/graph/types.ts"
+      "packages/core/src/services/memory-graph/graph-store-factory.ts"
     ],
     "packages/core/src/services/hooks/compaction-snapshot-service.ts": [
       "packages/core/src/data/memory/observation-repository.ts",
@@ -6288,12 +6713,22 @@
       "packages/core/src/data/memory/observation-repository.ts"
     ],
     "packages/core/src/services/hooks/search-session-hook.ts": [
-      "packages/core/src/controllers/memory-controller.ts",
-      "packages/core/src/services/events/event-bus.ts"
+      "packages/core/src/services/events/event-bus.ts",
+      "packages/core/src/services/memory/memory-controller.ts"
     ],
     "packages/core/src/services/hooks/session-pin-store.ts": [],
     "packages/core/src/services/hooks/writer-queue.ts": [],
     "packages/core/src/services/index.ts": [],
+    "packages/core/src/services/indexing/acquire-indexing-lease.ts": [
+      "packages/core/src/data/managed-runs/managed-run-contract.ts",
+      "packages/core/src/data/managed-runs/managed-run-repository-pg.ts",
+      "packages/core/src/services/jobs/index-job-tracker.ts"
+    ],
+    "packages/core/src/services/indexing/execute-indexing.ts": [
+      "packages/core/src/data/managed-runs/managed-run-contract.ts",
+      "packages/core/src/services/etl/pipeline.ts",
+      "packages/core/src/services/jobs/index-job-tracker.ts"
+    ],
     "packages/core/src/services/jobs/auto-improve-apply.ts": [
       "packages/core/src/data/memory/memory-repository.ts",
       "packages/core/src/data/proposal/proposal-repository.ts",
@@ -6322,13 +6757,12 @@
     "packages/core/src/services/jobs/auto-improve-ops.ts": [
       "packages/core/src/data/memory/observation-repository.ts",
       "packages/core/src/data/proposal/proposal-repository.ts",
+      "packages/core/src/kernel/search-diagnostics.ts",
       "packages/core/src/services/events/event-bus.ts",
       "packages/core/src/services/jobs/auto-improve-apply.ts",
-      "packages/core/src/services/jobs/auto-improve-config.ts",
       "packages/core/src/services/jobs/auto-improve-job.ts",
       "packages/core/src/services/jobs/auto-improve-llm.ts",
-      "packages/core/src/services/jobs/auto-improve-patterns.ts",
-      "packages/core/src/services/search/search-diagnostics.ts"
+      "packages/core/src/services/jobs/auto-improve-patterns.ts"
     ],
     "packages/core/src/services/jobs/auto-improve-patterns.ts": [
       "packages/core/src/data/memory/observation-repository.ts",
@@ -6339,10 +6773,10 @@
       "packages/core/src/services/jobs/index-job-tracker.ts"
     ],
     "packages/core/src/services/jobs/index-job-store-pg.ts": [
+      "packages/core/src/kernel/alias-resolver.ts",
+      "packages/core/src/kernel/prisma-client.ts",
       "packages/core/src/services/jobs/index-job-store-contract.ts",
-      "packages/core/src/services/jobs/index-job-tracker.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/services/jobs/index-job-tracker.ts"
     ],
     "packages/core/src/services/jobs/index-job-store.ts": [
       "packages/core/src/services/jobs/index-job-store-pg.ts"
@@ -6356,8 +6790,8 @@
       "packages/core/src/data/memory/memory-repository-factory.ts",
       "packages/core/src/data/memory/memory-repository.ts",
       "packages/core/src/services/events/event-bus.ts",
-      "packages/core/src/services/graph/graph-store-factory.ts",
-      "packages/core/src/services/graph/types.ts",
+      "packages/core/src/services/memory-graph/graph-store-factory.ts",
+      "packages/core/src/services/memory-graph/types.ts",
       "packages/core/src/services/memory/consolidator.ts",
       "packages/core/src/services/memory/decay.ts",
       "packages/core/src/services/memory/llm-client.ts"
@@ -6369,16 +6803,51 @@
       "packages/core/src/services/memory/consolidator.ts",
       "packages/core/src/services/memory/llm-client.ts"
     ],
-    "packages/core/src/services/memory/consolidator.ts": [
+    "packages/core/src/services/memory-graph/graph-queries.ts": [
+      "packages/core/src/kernel/prisma-client.ts",
+      "packages/core/src/services/memory-graph/graph-store-factory.ts",
+      "packages/core/src/services/memory-graph/types.ts"
+    ],
+    "packages/core/src/services/memory-graph/graph-store-factory.ts": [
+      "packages/core/src/services/memory-graph/graph-store-pg.ts",
+      "packages/core/src/services/memory-graph/types.ts"
+    ],
+    "packages/core/src/services/memory-graph/graph-store-pg.ts": [
+      "packages/core/src/kernel/prisma-client.ts",
+      "packages/core/src/services/memory-graph/types.ts"
+    ],
+    "packages/core/src/services/memory-graph/index.ts": [],
+    "packages/core/src/services/memory-graph/memory-graph.service.ts": [
+      "packages/core/src/services/memory-graph/graph-queries.ts",
+      "packages/core/src/services/memory-graph/graph-store-factory.ts",
+      "packages/core/src/services/memory-graph/relation-extractor.ts",
+      "packages/core/src/services/memory-graph/types.ts"
+    ],
+    "packages/core/src/services/memory-graph/relation-extractor.ts": [
+      "packages/core/src/data/memory/memory-repository-factory.ts",
       "packages/core/src/data/memory/memory-repository.ts",
-      "packages/core/src/services/memory/llm-client.ts"
+      "packages/core/src/services/memory-graph/graph-store-factory.ts",
+      "packages/core/src/services/memory-graph/types.ts"
+    ],
+    "packages/core/src/services/memory-graph/types.ts": [],
+    "packages/core/src/services/memory/consolidator.ts": [
+      "packages/core/src/data/memory/memory-repository.ts"
     ],
     "packages/core/src/services/memory/decay.ts": [],
     "packages/core/src/services/memory/index.ts": [],
     "packages/core/src/services/memory/llm-client.ts": [],
     "packages/core/src/services/memory/memory-clustering.ts": [
-      "packages/core/src/services/graph/types.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts",
+      "packages/core/src/services/memory-graph/types.ts"
+    ],
+    "packages/core/src/services/memory/memory-controller.ts": [
+      "packages/core/src/data/memory/memory-repository-factory.ts",
+      "packages/core/src/data/memory/memory-repository.ts",
+      "packages/core/src/services/events/event-bus.ts",
+      "packages/core/src/services/jobs/memory-consolidation-job.ts",
+      "packages/core/src/services/memory-graph/memory-graph.service.ts",
+      "packages/core/src/services/memory/memory-service.ts",
+      "packages/core/src/services/memory/salience-judge.ts"
     ],
     "packages/core/src/services/memory/memory-service.ts": [
       "packages/core/src/data/memory/memory-repository.ts",
@@ -6386,9 +6855,9 @@
       "packages/core/src/services/memory/decay.ts"
     ],
     "packages/core/src/services/memory/redundancy-filter.ts": [
-      "packages/core/src/services/graph/types.ts",
-      "packages/core/src/services/metrics/token-metrics.ts",
-      "packages/core/src/services/query/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts",
+      "packages/core/src/services/memory-graph/types.ts",
+      "packages/core/src/services/metrics/token-metrics.ts"
     ],
     "packages/core/src/services/memory/salience-judge.ts": [
       "packages/core/src/services/memory/llm-client.ts",
@@ -6397,35 +6866,28 @@
     "packages/core/src/services/metrics/token-metrics.ts": [],
     "packages/core/src/services/monitoring/metrics.ts": [],
     "packages/core/src/services/pricing/models-dev-client.ts": [],
-    "packages/core/src/services/project-identity/alias-resolver.ts": [
-      "packages/core/src/data/db-connection.ts"
-    ],
     "packages/core/src/services/project-identity/apply.ts": [
+      "packages/core/src/kernel/registry.ts",
       "packages/core/src/services/project-identity/contracts.ts",
       "packages/core/src/services/project-identity/discovery.ts",
       "packages/core/src/services/project-identity/errors.ts",
       "packages/core/src/services/project-identity/hash.ts",
       "packages/core/src/services/project-identity/invalidator-registry.ts",
       "packages/core/src/services/project-identity/pg-array-codec.ts",
-      "packages/core/src/services/project-identity/planner.ts",
-      "packages/core/src/services/project-identity/registry.ts"
+      "packages/core/src/services/project-identity/planner.ts"
     ],
     "packages/core/src/services/project-identity/contracts.ts": [
       "packages/core/src/services/project-identity/errors.ts",
       "packages/core/src/services/project-identity/invalidator-registry.ts"
     ],
     "packages/core/src/services/project-identity/discovery.ts": [
+      "packages/core/src/kernel/registry.ts",
       "packages/core/src/services/project-identity/hash.ts",
-      "packages/core/src/services/project-identity/pg-array-codec.ts",
-      "packages/core/src/services/project-identity/registry.ts"
+      "packages/core/src/services/project-identity/pg-array-codec.ts"
     ],
     "packages/core/src/services/project-identity/errors.ts": [],
     "packages/core/src/services/project-identity/hash.ts": [
       "packages/core/src/services/project-identity/contracts.ts"
-    ],
-    "packages/core/src/services/project-identity/identity-guard-installer.ts": [
-      "packages/core/src/data/db-connection.ts",
-      "packages/core/src/services/project-identity/registry.ts"
     ],
     "packages/core/src/services/project-identity/index.ts": [],
     "packages/core/src/services/project-identity/invalidator-registry.ts": [],
@@ -6437,14 +6899,14 @@
       "packages/core/src/services/project-identity/hash.ts"
     ],
     "packages/core/src/services/project-identity/production-wiring.ts": [
+      "packages/core/src/kernel/alias-resolver.ts",
       "packages/core/src/services/events/event-bus.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts",
       "packages/core/src/services/project-identity/apply.ts",
       "packages/core/src/services/project-identity/invalidator-registry.ts"
     ],
-    "packages/core/src/services/project-identity/registry.ts": [],
+    "packages/core/src/services/project-identity/project-root-identity.ts": [],
     "packages/core/src/services/project-identity/service.ts": [
-      "packages/core/src/data/db-connection.ts",
+      "packages/core/src/kernel/db-connection.ts",
       "packages/core/src/services/project-identity/apply.ts",
       "packages/core/src/services/project-identity/contracts.ts",
       "packages/core/src/services/project-identity/errors.ts",
@@ -6452,7 +6914,6 @@
       "packages/core/src/services/project-identity/planner.ts",
       "packages/core/src/services/project-identity/production-wiring.ts"
     ],
-    "packages/core/src/services/query/prisma-client.ts": [],
     "packages/core/src/services/scheduler/index.ts": [],
     "packages/core/src/services/scheduler/scheduler-cron.ts": [],
     "packages/core/src/services/scheduler/scheduler-defaults.ts": [
@@ -6464,8 +6925,8 @@
       "packages/core/src/services/scheduler/scheduler-store.ts"
     ],
     "packages/core/src/services/scheduler/scheduler-store-pg.ts": [
-      "packages/core/src/services/project-identity/alias-resolver.ts",
-      "packages/core/src/services/query/prisma-client.ts",
+      "packages/core/src/kernel/alias-resolver.ts",
+      "packages/core/src/kernel/prisma-client.ts",
       "packages/core/src/services/scheduler/scheduler-store.ts",
       "packages/core/src/services/scheduler/scheduler-types.ts"
     ],
@@ -6507,45 +6968,76 @@
     "packages/core/src/services/search/chunker/chunker-types.ts": [],
     "packages/core/src/services/search/contextual-search-rlm.ts": [
       "packages/core/src/data/keyword/keyword-search-factory.ts",
-      "packages/core/src/data/memory/memory-repository-factory.ts",
       "packages/core/src/data/symbol/symbol-repository-factory.ts",
-      "packages/core/src/data/vector/vector-store-factory.ts",
-      "packages/core/src/services/events/event-bus.ts",
-      "packages/core/src/services/graph/graph-store-factory.ts",
+      "packages/core/src/kernel/search-diagnostics.ts",
       "packages/core/src/services/search/analytics-factory.ts",
       "packages/core/src/services/search/cache-factory.ts",
       "packages/core/src/services/search/file-filter-cache.ts",
+      "packages/core/src/services/search/graph-stream.ts",
+      "packages/core/src/services/search/hybrid-search.ts",
+      "packages/core/src/services/search/index-admin.ts",
       "packages/core/src/services/search/index-manager.ts",
-      "packages/core/src/services/search/lexical-search.ts",
+      "packages/core/src/services/search/project-indexer.ts",
       "packages/core/src/services/search/query-understanding.ts",
-      "packages/core/src/services/search/rlm-admin.ts",
-      "packages/core/src/services/search/rlm-indexing.ts",
-      "packages/core/src/services/search/rlm-search.ts",
-      "packages/core/src/services/search/rlm-synapse.ts",
+      "packages/core/src/services/search/result-fusion.ts",
       "packages/core/src/services/search/search-analytics-pg.ts",
       "packages/core/src/services/search/search-analytics.ts",
-      "packages/core/src/services/search/search-diagnostics.ts",
-      "packages/core/src/services/search/smart-chunker.ts",
+      "packages/core/src/services/search/session-bias.ts",
       "packages/core/src/services/structural/parser-readiness.ts",
-      "packages/core/src/services/synapse/index.ts",
-      "packages/core/src/services/synapse/session/index.ts",
       "packages/core/src/services/synapse/session/session-registry.ts",
       "packages/core/src/services/synapse/synapse-manager.ts",
-      "packages/core/src/services/synapse/types.ts"
+      "packages/core/src/services/vector/vector-store-factory.ts"
     ],
-    "packages/core/src/services/search/file-filter-cache.ts": [],
+    "packages/core/src/services/search/file-filter-cache.ts": [
+      "packages/core/src/services/cache/lru-evict.ts"
+    ],
     "packages/core/src/services/search/filter-validation.ts": [
-      "packages/core/src/tools/enum-validation.ts"
+      "packages/core/src/kernel/enum-validation.ts"
+    ],
+    "packages/core/src/services/search/graph-stream.ts": [
+      "packages/core/src/data/memory/memory-repository-factory.ts",
+      "packages/core/src/kernel/search-diagnostics.ts",
+      "packages/core/src/services/memory-graph/graph-store-factory.ts"
+    ],
+    "packages/core/src/services/search/hybrid-search.ts": [
+      "packages/core/src/data/keyword/keyword-search-factory.ts",
+      "packages/core/src/kernel/lexical-search.ts",
+      "packages/core/src/kernel/search-diagnostics.ts",
+      "packages/core/src/services/events/event-bus.ts",
+      "packages/core/src/services/search/analytics-factory.ts",
+      "packages/core/src/services/search/cache-factory.ts",
+      "packages/core/src/services/search/query-understanding.ts",
+      "packages/core/src/services/search/result-fusion.ts",
+      "packages/core/src/services/vector/vector-store-factory.ts"
     ],
     "packages/core/src/services/search/ignore-patterns.ts": [
       "packages/core/src/services/search/capture-policy-interfaces.ts",
       "packages/core/src/services/search/capture-policy.ts"
     ],
+    "packages/core/src/services/search/index-admin.ts": [
+      "packages/core/src/data/keyword/keyword-search-factory.ts",
+      "packages/core/src/services/search/cache-factory.ts",
+      "packages/core/src/services/search/file-filter-cache.ts",
+      "packages/core/src/services/search/search-analytics-pg.ts",
+      "packages/core/src/services/search/search-analytics.ts",
+      "packages/core/src/services/vector/vector-store-factory.ts"
+    ],
     "packages/core/src/services/search/index-manager.ts": [
-      "packages/core/src/services/project-identity/alias-resolver.ts",
+      "packages/core/src/kernel/alias-resolver.ts",
       "packages/core/src/services/search/ignore-patterns.ts"
     ],
-    "packages/core/src/services/search/lexical-search.ts": [],
+    "packages/core/src/services/search/project-indexer.ts": [
+      "packages/core/src/data/keyword/keyword-search-factory.ts",
+      "packages/core/src/data/managed-runs/managed-run-contract.ts",
+      "packages/core/src/data/managed-runs/managed-run-repository-pg.ts",
+      "packages/core/src/data/symbol/symbol-repository-factory.ts",
+      "packages/core/src/kernel/alias-resolver.ts",
+      "packages/core/src/services/search/cache-factory.ts",
+      "packages/core/src/services/search/ignore-patterns.ts",
+      "packages/core/src/services/search/index-manager.ts",
+      "packages/core/src/services/search/smart-chunker.ts",
+      "packages/core/src/services/vector/vector-store-factory.ts"
+    ],
     "packages/core/src/services/search/query-understanding.ts": [
       "packages/core/src/services/embeddings/index.ts",
       "packages/core/src/services/memory/llm-client.ts"
@@ -6554,59 +7046,34 @@
       "packages/core/src/services/memory/llm-client.ts",
       "packages/core/src/services/search/query-understanding.ts"
     ],
-    "packages/core/src/services/search/rlm-admin.ts": [
-      "packages/core/src/services/search/contextual-search-rlm.ts",
-      "packages/core/src/services/search/search-analytics-pg.ts",
-      "packages/core/src/services/search/search-analytics.ts"
-    ],
-    "packages/core/src/services/search/rlm-fusion.ts": [
-      "packages/core/src/services/search/contextual-search-rlm.ts"
-    ],
-    "packages/core/src/services/search/rlm-indexing.ts": [
-      "packages/core/src/data/keyword/keyword-search-factory.ts",
-      "packages/core/src/data/managed-runs/managed-run-contract.ts",
-      "packages/core/src/data/managed-runs/managed-run-repository-pg.ts",
-      "packages/core/src/data/symbol/symbol-repository-factory.ts",
-      "packages/core/src/data/vector/vector-store-factory.ts",
-      "packages/core/src/services/project-identity/alias-resolver.ts",
-      "packages/core/src/services/search/analytics-factory.ts",
-      "packages/core/src/services/search/cache-factory.ts",
-      "packages/core/src/services/search/contextual-search-rlm.ts",
-      "packages/core/src/services/search/ignore-patterns.ts",
-      "packages/core/src/services/search/index-manager.ts",
-      "packages/core/src/services/search/smart-chunker.ts",
-      "packages/core/src/services/structural/parser-readiness.ts"
-    ],
-    "packages/core/src/services/search/rlm-search.ts": [
-      "packages/core/src/services/events/event-bus.ts",
-      "packages/core/src/services/search/contextual-search-rlm.ts",
-      "packages/core/src/services/search/lexical-search.ts",
-      "packages/core/src/services/search/query-understanding.ts",
-      "packages/core/src/services/search/search-diagnostics.ts"
-    ],
-    "packages/core/src/services/search/rlm-synapse.ts": [
-      "packages/core/src/data/memory/memory-repository-factory.ts",
-      "packages/core/src/services/graph/graph-store-factory.ts",
-      "packages/core/src/services/search/contextual-search-rlm.ts",
-      "packages/core/src/services/search/lexical-search.ts",
-      "packages/core/src/services/search/search-diagnostics.ts",
-      "packages/core/src/services/synapse/index.ts",
-      "packages/core/src/services/synapse/session/index.ts",
-      "packages/core/src/services/synapse/types.ts"
-    ],
+    "packages/core/src/services/search/result-fusion.ts": [],
     "packages/core/src/services/search/search-analytics-pg.ts": [
-      "packages/core/src/data/db-connection.ts",
-      "packages/core/src/services/project-identity/identity-guard-installer.ts"
+      "packages/core/src/kernel/db-connection.ts",
+      "packages/core/src/kernel/identity-guard-installer.ts"
     ],
     "packages/core/src/services/search/search-analytics.ts": [],
     "packages/core/src/services/search/search-cache-pg.ts": [
-      "packages/core/src/data/db-connection.ts",
-      "packages/core/src/services/project-identity/identity-guard-installer.ts"
+      "packages/core/src/kernel/db-connection.ts",
+      "packages/core/src/kernel/identity-guard-installer.ts"
     ],
-    "packages/core/src/services/search/search-diagnostics.ts": [],
+    "packages/core/src/services/search/search-controller.ts": [
+      "packages/core/src/kernel/search-diagnostics.ts",
+      "packages/core/src/services/events/event-bus.ts",
+      "packages/core/src/services/search/contextual-search-rlm.ts",
+      "packages/core/src/services/search/filter-validation.ts",
+      "packages/core/src/services/search/reranker.ts"
+    ],
     "packages/core/src/services/search/search-warmup.ts": [
       "packages/core/src/services/search/contextual-search-rlm.ts",
       "packages/core/src/services/search/search-analytics.ts"
+    ],
+    "packages/core/src/services/search/session-bias.ts": [
+      "packages/core/src/kernel/search-diagnostics.ts",
+      "packages/core/src/services/synapse/index.ts",
+      "packages/core/src/services/synapse/session/index.ts",
+      "packages/core/src/services/synapse/session/session-registry.ts",
+      "packages/core/src/services/synapse/synapse-manager.ts",
+      "packages/core/src/services/synapse/types.ts"
     ],
     "packages/core/src/services/search/smart-chunker.ts": [
       "packages/core/src/services/search/chunker/chunker-code.ts",
@@ -6616,21 +7083,17 @@
       "packages/core/src/services/search/chunker/chunker-types.ts"
     ],
     "packages/core/src/services/structural/diagnostics.ts": [
-      "packages/core/src/services/structural/types.ts"
-    ],
-    "packages/core/src/services/structural/fqn-codec.ts": [
-      "packages/core/src/services/structural/schema-version.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/kernel/types.ts"
     ],
     "packages/core/src/services/structural/grammar-integrity.ts": [
       "packages/core/src/services/structural/native-lock-identities.ts"
     ],
     "packages/core/src/services/structural/grammar-loaders.ts": [
-      "packages/core/src/services/structural/language-manifest.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/kernel/types.ts",
+      "packages/core/src/services/structural/language-manifest.ts"
     ],
     "packages/core/src/services/structural/language-manifest.ts": [
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/kernel/types.ts"
     ],
     "packages/core/src/services/structural/native-lock-identities.ts": [],
     "packages/core/src/services/structural/native-node-helpers.ts": [
@@ -6641,10 +7104,10 @@
       "packages/core/src/services/structural/grammar-loaders.ts"
     ],
     "packages/core/src/services/structural/parser-readiness.ts": [
+      "packages/core/src/kernel/types.ts",
       "packages/core/src/services/structural/grammar-integrity.ts",
       "packages/core/src/services/structural/grammar-loaders.ts",
-      "packages/core/src/services/structural/language-manifest.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/services/structural/language-manifest.ts"
     ],
     "packages/core/src/services/structural/query-pack-captures.ts": [
       "packages/core/src/services/structural/grammar-loaders.ts",
@@ -6653,30 +7116,30 @@
       "packages/core/src/services/structural/structural-runtime.ts"
     ],
     "packages/core/src/services/structural/query-pack-edges.ts": [
+      "packages/core/src/kernel/types.ts",
       "packages/core/src/services/structural/grammar-loaders.ts",
       "packages/core/src/services/structural/native-node-helpers.ts",
       "packages/core/src/services/structural/query-pack-captures.ts",
       "packages/core/src/services/structural/query-pack-registry.ts",
-      "packages/core/src/services/structural/source-span.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/services/structural/source-span.ts"
     ],
     "packages/core/src/services/structural/query-pack-registry.ts": [
+      "packages/core/src/kernel/types.ts",
       "packages/core/src/services/structural/query-packs/data-document.ts",
       "packages/core/src/services/structural/query-packs/functional.ts",
       "packages/core/src/services/structural/query-packs/managed.ts",
       "packages/core/src/services/structural/query-packs/scripting.ts",
       "packages/core/src/services/structural/query-packs/systems.ts",
-      "packages/core/src/services/structural/query-packs/typescript.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/services/structural/query-packs/typescript.ts"
     ],
     "packages/core/src/services/structural/query-pack.ts": [
+      "packages/core/src/kernel/types.ts",
       "packages/core/src/services/structural/query-pack-captures.ts",
       "packages/core/src/services/structural/query-pack-edges.ts",
       "packages/core/src/services/structural/query-pack-registry.ts",
       "packages/core/src/services/structural/source-span.ts",
       "packages/core/src/services/structural/structural-runtime.ts",
-      "packages/core/src/services/structural/symbol-signature.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/services/structural/symbol-signature.ts"
     ],
     "packages/core/src/services/structural/query-packs/data-document.ts": [
       "packages/core/src/services/structural/query-pack.ts"
@@ -6697,8 +7160,8 @@
       "packages/core/src/services/structural/query-pack.ts"
     ],
     "packages/core/src/services/structural/resolver.ts": [
-      "packages/core/src/services/structural/fqn-codec.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/kernel/fqn-codec.ts",
+      "packages/core/src/kernel/types.ts"
     ],
     "packages/core/src/services/structural/resolvers/data-document.ts": [
       "packages/core/src/services/structural/resolver.ts",
@@ -6721,39 +7184,37 @@
       "packages/core/src/services/structural/resolvers/typescript.ts"
     ],
     "packages/core/src/services/structural/resolvers/typescript.ts": [
-      "packages/core/src/services/structural/fqn-codec.ts",
+      "packages/core/src/kernel/fqn-codec.ts",
       "packages/core/src/services/structural/resolver.ts"
     ],
-    "packages/core/src/services/structural/schema-version.ts": [],
     "packages/core/src/services/structural/source-span.ts": [
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/kernel/types.ts"
     ],
     "packages/core/src/services/structural/structural-runtime.ts": [
+      "packages/core/src/kernel/types.ts",
       "packages/core/src/services/structural/diagnostics.ts",
       "packages/core/src/services/structural/grammar-loaders.ts",
       "packages/core/src/services/structural/language-manifest.ts",
       "packages/core/src/services/structural/parser-pool.ts",
       "packages/core/src/services/structural/parser-readiness.ts",
       "packages/core/src/services/structural/query-pack.ts",
-      "packages/core/src/services/structural/source-span.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/services/structural/source-span.ts"
     ],
     "packages/core/src/services/structural/symbol-signature.ts": [
+      "packages/core/src/kernel/types.ts",
       "packages/core/src/services/structural/grammar-loaders.ts",
       "packages/core/src/services/structural/native-node-helpers.ts",
       "packages/core/src/services/structural/query-pack-registry.ts",
-      "packages/core/src/services/structural/source-span.ts",
-      "packages/core/src/services/structural/types.ts"
+      "packages/core/src/services/structural/source-span.ts"
     ],
-    "packages/core/src/services/structural/types.ts": [],
     "packages/core/src/services/symbol/active-generation.ts": [
       "packages/core/src/data/symbol/symbol-repository-factory.ts",
-      "packages/core/src/tools/enum-validation.ts"
+      "packages/core/src/kernel/enum-validation.ts"
     ],
     "packages/core/src/services/symbol/architecture.ts": [
+      "packages/core/src/kernel/enum-validation.ts",
       "packages/core/src/services/symbol/communities.ts",
-      "packages/core/src/services/symbol/cycle-detection.ts",
-      "packages/core/src/tools/enum-validation.ts"
+      "packages/core/src/services/symbol/cycle-detection.ts"
     ],
     "packages/core/src/services/symbol/centrality.ts": [],
     "packages/core/src/services/symbol/communities.ts": [],
@@ -6763,10 +7224,16 @@
     "packages/core/src/services/symbol/definition-lookup.ts": [
       "packages/core/src/data/symbol/symbol-repository-factory.ts",
       "packages/core/src/data/symbol/symbol-repository-pg.ts",
-      "packages/core/src/services/structural/fqn-codec.ts"
+      "packages/core/src/kernel/fqn-codec.ts"
     ],
     "packages/core/src/services/symbol/git-ref-validation.ts": [
-      "packages/core/src/tools/enum-validation.ts"
+      "packages/core/src/kernel/enum-validation.ts"
+    ],
+    "packages/core/src/services/symbol/graph-controller.ts": [
+      "packages/core/src/services/symbol/definition-lookup.ts",
+      "packages/core/src/services/symbol/impact-analysis.ts",
+      "packages/core/src/services/symbol/symbol-graph.service.ts",
+      "packages/core/src/services/symbol/trace-path.ts"
     ],
     "packages/core/src/services/symbol/impact-analysis.ts": [
       "packages/core/src/data/symbol/symbol-repository-factory.ts",
@@ -6777,6 +7244,7 @@
     "packages/core/src/services/symbol/symbol-graph.service.ts": [
       "packages/core/src/data/symbol/symbol-repository-factory.ts",
       "packages/core/src/data/symbol/symbol-repository-pg.ts",
+      "packages/core/src/services/cache/lru-evict.ts",
       "packages/core/src/services/symbol/architecture.ts",
       "packages/core/src/services/symbol/centrality.ts",
       "packages/core/src/services/symbol/communities.ts",
@@ -6784,7 +7252,6 @@
       "packages/core/src/services/workspace/workspace-manager.ts"
     ],
     "packages/core/src/services/symbol/trace-path.ts": [
-      "packages/core/src/data/symbol/symbol-repository-factory.ts",
       "packages/core/src/services/symbol/definition-lookup.ts",
       "packages/core/src/services/symbol/symbol-graph.service.ts"
     ],
@@ -6833,8 +7300,8 @@
       "packages/core/src/services/synapse/types.ts"
     ],
     "packages/core/src/services/synapse/session/session-store-pg.ts": [
-      "packages/core/src/services/project-identity/alias-resolver.ts",
-      "packages/core/src/services/query/prisma-client.ts",
+      "packages/core/src/kernel/alias-resolver.ts",
+      "packages/core/src/kernel/prisma-client.ts",
       "packages/core/src/services/synapse/buffer/working-memory-buffer.ts",
       "packages/core/src/services/synapse/session/session-store.ts",
       "packages/core/src/services/synapse/types.ts"
@@ -6852,12 +7319,16 @@
       "packages/core/src/services/synapse/types.ts"
     ],
     "packages/core/src/services/synapse/task-envelope.ts": [
-      "packages/core/src/controllers/search-controller.ts",
+      "packages/core/src/services/search/search-controller.ts",
       "packages/core/src/services/synapse/buffer/index.ts",
       "packages/core/src/services/synapse/session/index.ts"
     ],
     "packages/core/src/services/synapse/types.ts": [
       "packages/core/src/services/synapse/buffer/working-memory-buffer.ts"
+    ],
+    "packages/core/src/services/vector/vector-store-factory.ts": [
+      "packages/core/src/data/vector/postgres-vector-store.ts",
+      "packages/core/src/services/embeddings/index.ts"
     ],
     "packages/core/src/services/web/fetcher.ts": [
       "packages/core/src/services/web/html-to-md.ts",
@@ -6867,6 +7338,7 @@
     "packages/core/src/services/web/index.ts": [],
     "packages/core/src/services/web/ssrf.ts": [],
     "packages/core/src/services/web/web-controller.ts": [
+      "packages/core/src/services/cache/lru-evict.ts",
       "packages/core/src/services/executor/run-pool.ts",
       "packages/core/src/services/web/fetcher.ts"
     ],
@@ -6877,73 +7349,75 @@
       "packages/core/src/services/events/event-bus.ts",
       "packages/core/src/services/symbol/symbol-graph.service.ts"
     ],
-    "packages/core/src/tools/batch_execute.ts": [],
+    "packages/core/src/tools/batch_execute.ts": [
+      "packages/core/src/services/executor/params.ts"
+    ],
     "packages/core/src/tools/compact_snapshot.ts": [
       "packages/core/src/data/memory/observation-repository.ts",
       "packages/core/src/services/hooks/attribution-resolver.ts",
       "packages/core/src/services/hooks/compaction-snapshot-service.ts"
     ],
     "packages/core/src/tools/compress_context.ts": [
+      "packages/core/src/kernel/enum-validation.ts",
       "packages/core/src/services/compression/code-compressor.ts",
-      "packages/core/src/tools/enum-validation.ts"
+      "packages/core/src/services/compression/compress-with-metrics.ts"
     ],
     "packages/core/src/tools/create_checkpoint.ts": [
+      "packages/core/src/kernel/enum-validation.ts",
       "packages/core/src/services/checkpoint/checkpoint-manager.ts",
-      "packages/core/src/tools/enum-validation.ts",
       "packages/core/src/tools/serialize.ts"
     ],
     "packages/core/src/tools/delete_memory.ts": [
-      "packages/core/src/controllers/memory-controller.ts",
+      "packages/core/src/services/memory/memory-controller.ts",
       "packages/core/src/tools/serialize.ts"
     ],
-    "packages/core/src/tools/enum-validation.ts": [],
     "packages/core/src/tools/execute.ts": [
-      "packages/core/src/services/executor/runtime.ts"
+      "packages/core/src/services/executor/params.ts"
     ],
     "packages/core/src/tools/execute_file.ts": [
-      "packages/core/src/services/executor/runtime.ts"
+      "packages/core/src/services/executor/params.ts"
     ],
     "packages/core/src/tools/fetch_and_index.ts": [
       "packages/core/src/services/web/web-controller.ts"
     ],
     "packages/core/src/tools/get_analytics.ts": [
-      "packages/core/src/services/search/analytics-factory.ts",
-      "packages/core/src/tools/enum-validation.ts"
+      "packages/core/src/kernel/enum-validation.ts",
+      "packages/core/src/services/search/analytics-factory.ts"
     ],
     "packages/core/src/tools/get_architecture.ts": [
+      "packages/core/src/kernel/enum-validation.ts",
       "packages/core/src/services/symbol/architecture.ts",
       "packages/core/src/services/symbol/symbol-graph.service.ts",
-      "packages/core/src/tools/enum-validation.ts",
       "packages/core/src/tools/serialize.ts"
     ],
     "packages/core/src/tools/get_index_status.ts": [
       "packages/core/src/services/jobs/index-job-tracker.ts"
     ],
     "packages/core/src/tools/get_optimized_context.ts": [
-      "packages/core/src/controllers/context-controller.ts",
+      "packages/core/src/services/context/context-controller.ts",
       "packages/core/src/tools/serialize.ts"
     ],
     "packages/core/src/tools/get_references.ts": [
+      "packages/core/src/kernel/enum-validation.ts",
       "packages/core/src/services/symbol/active-generation.ts",
       "packages/core/src/services/symbol/symbol-graph.service.ts",
-      "packages/core/src/tools/enum-validation.ts",
       "packages/core/src/tools/serialize.ts"
     ],
     "packages/core/src/tools/go_to_definition.ts": [
       "packages/core/src/services/symbol/symbol-graph.service.ts"
     ],
     "packages/core/src/tools/impact_analysis.ts": [
+      "packages/core/src/kernel/enum-validation.ts",
       "packages/core/src/services/symbol/active-generation.ts",
       "packages/core/src/services/symbol/impact-analysis.ts",
-      "packages/core/src/tools/enum-validation.ts",
       "packages/core/src/tools/serialize.ts"
     ],
     "packages/core/src/tools/index.ts": [],
     "packages/core/src/tools/index_project.ts": [
-      "packages/core/src/data/managed-runs/managed-run-contract.ts",
-      "packages/core/src/data/managed-runs/managed-run-repository-pg.ts",
-      "packages/core/src/services/etl/pipeline.ts",
+      "packages/core/src/services/indexing/acquire-indexing-lease.ts",
+      "packages/core/src/services/indexing/execute-indexing.ts",
       "packages/core/src/services/jobs/index-job-tracker.ts",
+      "packages/core/src/services/project-identity/project-root-identity.ts",
       "packages/core/src/services/search/contextual-search-rlm.ts",
       "packages/core/src/services/structural/parser-readiness.ts",
       "packages/core/src/services/workspace/workspace-manager.ts"
@@ -6953,14 +7427,12 @@
       "packages/core/src/tools/serialize.ts"
     ],
     "packages/core/src/tools/list_projects.ts": [
-      "packages/core/src/services/workspace/workspace-manager.ts",
-      "packages/core/src/tools/enum-validation.ts"
+      "packages/core/src/kernel/enum-validation.ts",
+      "packages/core/src/services/workspace/workspace-manager.ts"
     ],
     "packages/core/src/tools/read_file.ts": [
-      "packages/core/src/services/compression/code-compressor.ts",
-      "packages/core/src/services/events/event-bus.ts",
+      "packages/core/src/services/file-read/read-file.service.ts",
       "packages/core/src/services/symbol/symbol-graph.service.ts",
-      "packages/core/src/services/workspace/workspace-manager.ts",
       "packages/core/src/tools/serialize.ts"
     ],
     "packages/core/src/tools/restore_checkpoint.ts": [
@@ -6971,17 +7443,17 @@
       "packages/core/src/tools/search_project.ts"
     ],
     "packages/core/src/tools/search_definitions.ts": [
+      "packages/core/src/kernel/enum-validation.ts",
       "packages/core/src/services/symbol/active-generation.ts",
-      "packages/core/src/services/symbol/symbol-graph.service.ts",
-      "packages/core/src/tools/enum-validation.ts"
+      "packages/core/src/services/symbol/symbol-graph.service.ts"
     ],
     "packages/core/src/tools/search_memories.ts": [
-      "packages/core/src/controllers/memory-controller.ts",
+      "packages/core/src/services/memory/memory-controller.ts",
       "packages/core/src/tools/serialize.ts"
     ],
     "packages/core/src/tools/search_project.ts": [
-      "packages/core/src/controllers/search-controller.ts",
-      "packages/core/src/services/search/search-diagnostics.ts",
+      "packages/core/src/kernel/search-diagnostics.ts",
+      "packages/core/src/services/search/search-controller.ts",
       "packages/core/src/tools/serialize.ts"
     ],
     "packages/core/src/tools/serialize-interfaces.ts": [],
@@ -6989,18 +7461,18 @@
       "packages/core/src/tools/serialize-interfaces.ts"
     ],
     "packages/core/src/tools/store_memory.ts": [
-      "packages/core/src/controllers/memory-controller.ts",
+      "packages/core/src/services/memory/memory-controller.ts",
       "packages/core/src/tools/serialize.ts"
     ],
     "packages/core/src/tools/trace_path.ts": [
+      "packages/core/src/kernel/enum-validation.ts",
       "packages/core/src/services/symbol/active-generation.ts",
       "packages/core/src/services/symbol/symbol-graph.service.ts",
       "packages/core/src/services/symbol/trace-path.ts",
-      "packages/core/src/tools/enum-validation.ts",
       "packages/core/src/tools/serialize.ts"
     ],
     "packages/core/src/tools/update_memory.ts": [
-      "packages/core/src/controllers/memory-controller.ts",
+      "packages/core/src/services/memory/memory-controller.ts",
       "packages/core/src/tools/serialize.ts"
     ],
     "packages/shared/src/__tests__/benchmark.test.ts": [
@@ -7025,16 +7497,36 @@
       "packages/shared/src/types/index.ts",
       "packages/shared/src/types/structural-transport.ts"
     ],
+    "packages/shared/src/config/__tests__/allowed-extensions-config.test.ts": [
+      "packages/shared/src/config/__tests__/isolated-config.ts",
+      "packages/shared/src/config/index.ts"
+    ],
+    "packages/shared/src/config/__tests__/api-key.test.ts": [
+      "packages/shared/src/config/__tests__/isolated-config.ts"
+    ],
+    "packages/shared/src/config/__tests__/config-loader-fs.test.ts": [
+      "packages/shared/src/config/__tests__/isolated-config.ts"
+    ],
     "packages/shared/src/config/__tests__/config-loader.test.ts": [
       "packages/shared/src/config/config-loader.ts",
       "packages/shared/src/config/massa-ai-config.ts"
+    ],
+    "packages/shared/src/config/__tests__/config-validators.test.ts": [
+      "packages/shared/src/config/index.ts"
     ],
     "packages/shared/src/config/__tests__/db-guard.test.ts": [
       "packages/shared/src/config/db-guard.ts",
       "packages/shared/src/config/int-env.ts"
     ],
+    "packages/shared/src/config/__tests__/isolated-config.ts": [],
+    "packages/shared/src/config/__tests__/llm-env-prefix.test.ts": [
+      "packages/shared/src/config/__tests__/isolated-config.ts"
+    ],
     "packages/shared/src/config/__tests__/xdg.test.ts": [
       "packages/shared/src/config/xdg.ts"
+    ],
+    "packages/shared/src/config/api-key.ts": [
+      "packages/shared/src/config/config-loader.ts"
     ],
     "packages/shared/src/config/config-loader.ts": [
       "packages/shared/src/config/massa-ai-config.ts",
