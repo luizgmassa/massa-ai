@@ -186,6 +186,20 @@ Batch plan: B1 = P0+P1+P2 (7 tasks) · B2 = P3+P4 (6) · B3 = P5 (6) · P6 inlin
 
 ---
 
+## Execution Record
+
+**T1 DONE — `d62ab74`** (orchestrator): worktree `feature/cross-pollination-ports` @ 94e6b05, artifacts committed, provisioned (install 8.7s), baseline battery green warm (one cold red = documented DA-13 mcp-client flake, standalone-green both configs).
+
+**Batch 1 (T2–T7) DONE — worker, Status Complete.**
+- T2 `b1360c4`: +28 passThroughEnv (27 `MASSA_AI_*` re-derived + `RUN_POSTGRES_TESTS`); drift test observed-red on removed var; test:scripts 1119/0/50.
+- T3 `170f357`: scrubber 26/26, 100% cov, layering 0 violations; non-growth observed-red. SPEC_DEVIATION (accepted): rule id `aws-key` (not `aws-key-id`) + slack near-miss floor 18 — both forced by the non-growth invariant vs marker length; documented in module header.
+- T4 `a6fdafb`: full battery green; compile-fixture diagnostic verbatim (`Type 'string' is not assignable to type 'SanitizedPayloadJson'`); insert sweep zero bare strings; one justified `as unknown as InsertableObservation` fixture in `compact-snapshot-attribution.test.ts:123` fabricating a pre-spec legacy row (verified by orchestrator — the fixture proves compact_snapshot re-scrubs legacy content on persist; response-XML deliberately unredacted, durable row redacted). SPEC_DEVIATION (accepted): AD-013 STATE append deferred to T21 (worker forbidden from `.specs/**`).
+- T5 `261d118`: allowlist gate live in ci.yml build; 15 measured sites (14 child-process, 1 raw-sql-unsafe, 0 bun-spawn, 0 dynamic-eval) in 6 entries; observed-red scratch exec named file:line; 39 tests; test:scripts 1161/52.
+- T6 `c8410d7`: venue-parity gate live; 21 tests; observed-red on mutated coverage.yml env key; test:scripts 1182/53.
+- T7 `fada98b`: build job flipped to dedicated triple; sensor before/after `graph-store-pg-coverage.test.ts` 0 pass/20 skip → 18 pass/0 fail THROUGH turbo (passthrough proven end-to-end); full `bun run test` under flipped env 11/11, 151 groups, 0 fail; `release.yml` diff empty; check-coverage comment now states measured 13/11/1-overlap (union 23); venue-parity exceptions 4→1.
+
+Real-CI confirmation of T7 deferred to the PR run (as scoped). Statuses: T1–T7 ✅.
+
 ## Task Granularity Check
 
 | Task | Scope | Status |
