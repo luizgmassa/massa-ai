@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Cross-Pollination Ports & Gap Closure (**VALIDATED PASS 2026-08-03 — EXECUTE + INDEPENDENT VALIDATION COMPLETE; PR open, merge is the user's decision**)
+## Previous — Cross-Pollination Ports & Gap Closure (**VALIDATED PASS 2026-08-03 — MERGED as PR #61 @ `0084d1a`, RELEASED as v1.19.0 @ `8e63477`; CI + Coverage + Release all green on the merge sha**)
 
 **Outcome.** All 19 implementation tasks done on `feature/cross-pollination-ports` (worktree
 `.claude/worktrees/cross-pollination-ports`, cut from `origin/main` @ `94e6b05`), one atomic
@@ -27,11 +27,13 @@ spelling; lessons L-009..L-014 via lessons.py; CHANGELOG Added×7/Fixed×4.
 and gated-suite execution in GitHub Actions (T7).
 
 **Residual:** massa-ai MCP server unreachable ALL session — durable-memory sync skipped
-(`.specs/` files canonical, per contract). Main checkout still holds untracked duplicates of
+(`.specs/` files canonical, per contract). ~~Main checkout still holds untracked duplicates of
 `.specs/reports/*` + `.specs/features/cross-pollination-ports/*` (classifier declined deletion);
-at merge, remove them before `git pull` or git will refuse the checkout. Verifier's process
-finding: a design doc that pre-assigns an AD number goes stale by append time — AD-014
-renumbering is the instance (lesson L-014).
+at merge, remove them before `git pull` or git will refuse the checkout.~~ **Resolved
+2026-08-03 post-merge: duplicates diffed against merged versions (identical except the recorded
+design/tasks amendments), deleted, and the main checkout fast-forwarded to `8e63477` cleanly.**
+Verifier's process finding: a design doc that pre-assigns an AD number goes stale by append
+time — AD-014 renumbering is the instance (lesson L-014).
 
 ## Previous — Cross-Pollination Ports (registration snapshot, superseded by the block above)
 

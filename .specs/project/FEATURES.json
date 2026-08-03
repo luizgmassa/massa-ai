@@ -742,7 +742,7 @@
       "status": "complete",
       "workflow": "spec-driven",
       "branch": "feature/cross-pollination-ports",
-      "notes": "VALIDATED PASS 2026-08-03 (35/35 ACs, 6/6 mutations killed). 23 commits, one PR from feature/cross-pollination-ports; merge pending user. AD-014 added. Real-CI confirmation of T7/T8 deferred to the PR run."
+      "notes": "VALIDATED PASS 2026-08-03 (35/35 ACs, 6/6 mutations killed). Merged as PR #61 @ 0084d1a, released v1.19.0 @ 8e63477; CI + Coverage + Release green on the merge sha, so T7/T8's deferred real-CI confirmation landed. AD-014 added."
     }
   ],
   "active_feature": "cross-pollination-ports"

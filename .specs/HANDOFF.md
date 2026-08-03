@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Cross-Pollination Ports & Gap Closure (VALIDATED PASS; PR open, merge = user's decision)
+## Previous — Cross-Pollination Ports & Gap Closure (VALIDATED PASS; **MERGED as PR #61 @ `0084d1a` 2026-08-03, RELEASED as v1.19.0 @ `8e63477`**)
 
 - **Feature:** `cross-pollination-ports` — implement the still-live items of
   `.specs/reports/cross-pollination-portability-and-gaps.md`. Spec/design/tasks/validation all
@@ -11,15 +11,15 @@
 - **State:** Specify, Design, Tasks, full pre-mortem Plan Challenge (2 revisions folded in),
   Execute T1–T19, independent validation **PASS** (35/35 ACs evidenced, 6/6 discrimination
   mutations killed, all gates re-run green by the verifier — `validation.md`).
-- **Next action (user):** review + merge the PR. The PR's CI run is the deferred real-world sensor
-  for T7 (dedicated-DB suites actually executing in Actions) and T8 (cache hit on a warm run).
-  Merging cuts a **minor release** (CHANGELOG `[Unreleased]` has `### Added` content) — approving
-  the merge approves a release.
-- **Merge-time note:** the main checkout at `/Users/luizmassa/Projects/massa-ai` holds untracked
-  duplicates of `.specs/reports/*` and `.specs/features/cross-pollination-ports/{spec,design,tasks}.md`
-  (pre-worktree copies; deletion was declined by the tool-permission classifier mid-session).
-  `git pull` after merge will refuse to overwrite them — delete those untracked copies first
-  (contents match the merged versions except the later design/tasks amendments; the merged files win).
+- **Merged.** PR #61 merged 2026-08-03T22:29Z as `0084d1a`; release chain fired — CI, Coverage
+  and Release all `success` on that sha (verified via `gh run list`), v1.19.0 cut at `8e63477`.
+  The deferred real-world sensors landed with it: T7 (dedicated-DB suites executing in Actions)
+  and T8 (cache path exercised) rode the merge commit's green CI run.
+- **Merge-time note: executed 2026-08-03.** The untracked duplicates of `.specs/reports/*` and
+  `.specs/features/cross-pollination-ports/*` in the main checkout were diffed against the merged
+  versions first (report + spec + both sibling reports byte-identical; design/tasks differed only
+  by the recorded later amendments — merged files win, per this note's own instruction), then
+  deleted; `git pull --ff-only` brought the main checkout to `8e63477` cleanly.
 - **Decisions added:** AD-014 (kernel credential-scrub boundary). Note its renumbering story — the
   design pre-assigned "AD-013" and that slot was taken by the time the deferred append ran
   (lesson L-014: re-check the highest AD at append time).
