@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-08-03
+
 ### Added
 
 - **A type-enforced sanitization boundary on Observation persistence.** `kernel/sanitize/`'s
