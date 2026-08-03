@@ -38,7 +38,7 @@ Disposition legend: **FIX** = fix in this feature · **RESOLVED** = already fixe
 | DA-12 (PR-B in progress / R-08 open) | RESOLVED — `core-layering-god-module-split` is `complete` in `FEATURES.json` ("Umbrella over four PRs… PR-B merged #53 v1.16.0; PR-C #59 v1.17.0; PR-D" #60 v1.18.0); R-08's "where do cross-cutting modules live" is answered in the shipped contract: the `kernel/` tier, 11 modules, no allowlist (`packages/core/src/index.ts` header + `CLAUDE.md` §Architecture) | RESOLVED |
 | DA-13 (load-dependent flakes, do-not-chase) | ACCEPTED and already written — guidance verbatim at `STATE.md:2235-2238` ("Do not chase them; re-run the package alone and say so rather than claiming a clean parallel aggregate"); all three named members still exist. DI-01 removes the root cause of one member (`embedded-api-client-endpoints`) | ACCEPTED (already documented; DI-01 shrinks the set) |
 | DA-14 (`includePersistent` "inert" vs CHANGELOG) | RESOLVED IN CODE, STALE IN STATE — the five-minute look was taken: `memory-controller.ts:281` defaults `includePersistent = true` and `:305` forwards it; `memory-repository-pg.ts:236-238` applies `level <> PERSISTENT` when `false` (its comment narrates the fix); `CHANGELOG.md:734-741` ([1.9.1], BEH-01) documents the behavior change. The "inert" note at `STATE.md:2308` is a carried-forward claim its own feature later fixed (STATE:2042 lists BEH-01 in the same feature's scope). Not two call sites: `context-controller.ts:376` merely passes constant `true` | **FIX — DI-04** (annotate the stale STATE note; docs-only) |
-| DA-15 (no isolation rule for `@massa-ai/shared`) | LIVE and WIDER — 0 `@massa-ai/shared` hits in `scripts/lib/run-tests-isolated.ts` or `packages/core/scripts/run-tests-isolated.ts`; **94** core test files now import it (report said 75). Mechanism proven by probe this session: importing the barrel with a malformed sentinel `config.json` under `XDG_CONFIG_HOME` triggers a parse attempt (`dist/config/index.js:233`) and module-level runtime init ("Smart Rate Limiter initialized") — an eager real-`CONFIG_DIR` read on every import, which is exactly the class that produced DA-01 | **FIX — DI-05** (hermetic config dir in the shared runner; see Assumptions for the fallback) |
+| DA-15 (no isolation rule for `@massa-ai/shared`) | ~~LIVE — 0 isolation-rule hits in either runner~~ **RESOLVED — struck at Design (D0): the fix shipped before the report was written, at a different surface than the report proposed.** `scripts/lib/run-tests-isolated.ts` `buildChildEnv` (`:79-109`) gives **every** spawned group (shared aggregate and isolated alike, single spawn site `:323`) a scratch `XDG_CONFIG_HOME`, strips `MASSA_AI_LLM_*`, and pins `MASSA_AI_LLM_ENABLED=false` — SEN-03, commit `39afe59`, contained in v1.10.0; direction-complete unit suite `scripts/__tests__/runner-child-env.test.ts`. Re-measured live: mcp-client wrapper under real config → PASS all 8 groups. The barrel's eager config read (probe: parse attempt at `dist/config/index.js:233` + module-level init; 94 importing files) is real but reaches only a scratch dir under every wrapper run; the un-hermetic surface is the **direct** `bun test <file>` invocation, which is intentional and is DI-01's subject. The report inherited STATE's stale carried-forward note without re-measuring — the same defect shape as DA-14 | RESOLVED (SEN-03; ~~DI-05~~ withdrawn — its STATE-note clause moved into DI-04) |
 | DA-16 (three tree-sitter env failures) | REPRODUCED, DIAGNOSED, REPAIRED THIS SESSION — fresh worktree `bun install` under PATH Node 25.9.0 on macOS arm64 exits **0** while node-gyp silently fails (the documented clang break), leaving no `build/Release/*.node`; `test:scripts` then fails exactly 3 suites ("native Tree-sitter package contract", `No native build was found`) — 1227 pass / 3 fail. Copying the 4 built `build/` dirs from the provisioned main checkout turned the suite 9 pass / 0 fail. The class is a **worktree-provisioning gap with a silent install**, not a test defect | **FIX — DI-06** (document the provisioning rule + named repair; docs) |
 | DA-17 (measurement-methodology recurrence) | LIVE — `CONTRIBUTING.md` has 0 hits for measurement/cached-result language; the class recurred ≥4 recorded times and twice again **during this session's own triage** (a `tail` pipe masked `test:scripts` exit 1 — the wrapper reported its own exit code; and a `tail -6` cut the pass/fail split off a suite summary) | **FIX — DI-07** (standing rule in CONTRIBUTING, linked from CLAUDE.md) |
 
@@ -51,7 +51,7 @@ Disposition legend: **FIX** = fix in this feature · **RESOLVED** = already fixe
 - [ ] DI-02: the UNION GUARD missing-path **wiring** has a discriminating test (observed red on the wiring mutation before close).
 - [ ] DI-03: `FEATURES.json` reflects `subagent-skills-plugin-parity` reality (complete, phases done, note citing validation).
 - [ ] DI-04: the stale `STATE.md:2308` "inert includePersistent" note is annotated resolved with the BEH-01 evidence chain.
-- [ ] DI-05: the shared test runner gives non-DB children (and core's aggregate) a hermetic config dir; both-direction tests; full suite parity measured.
+- [x] ~~DI-05: hermetic config dir in the shared runner~~ — withdrawn at Design D0: already shipped as SEN-03 `39afe59` (v1.10.0), every group hermetic, unit-tested both directions; re-measured green this session. Goal closes as RESOLVED, not as work.
 - [ ] DI-06: worktree-provisioning rule for native grammars documented (CLAUDE.md), with the silent-install trap and the named repair + verify command.
 - [ ] DI-07: "Measurement discipline" section in CONTRIBUTING.md; CLAUDE.md links to it.
 - [ ] DI-08: lessons pipeline updated **via `lessons.py` only** — recurrence/closure observations for L-001 (subject fixed here) and the subjects independently fixed (L-002..L-005), per the tool's own semantics; `lessons.json` never hand-edited.
@@ -68,7 +68,7 @@ Disposition legend: **FIX** = fix in this feature · **RESOLVED** = already fixe
 | CodeQL gate behavior change | Platform-owned (DA-04 ACCEPTED) |
 | Chasing DA-13's remaining flake members beyond DI-01's root-cause removal | The documented guidance is the accepted trade-off; re-litigating it is not closure |
 | Making `bun install` fail loudly on native-build failure | Upstream bun/node-gyp behavior; DI-06 documents the trap instead (changing install semantics risks CI) |
-| Lazy-loading the shared config singleton | Blast radius across every consumer; DI-05 fixes the test-runner exposure, not the barrel's design |
+| Lazy-loading the shared config singleton | Blast radius across every consumer; SEN-03's hermetic child env already closes the test-runner exposure (D0), and the barrel's design is not this feature's subject |
 | Promoting lessons by hand | `lessons.py` owns state transitions; DI-08 records observations only |
 
 ## Assumptions & Open Questions
@@ -78,8 +78,7 @@ Disposition legend: **FIX** = fix in this feature · **RESOLVED** = already fixe
 | DI-01 seam surface | Export `_setLlmEnabledForTesting` (+ `_setJsonSchemaSupportedForTesting` for symmetry) through `services/index.ts` → core barrel | Precedent: `__setAuthKeyForTests` (tools-api), `reset*()` factory pairs are already public-for-tests; underscore prefix marks intent | assumption |
 | DI-01 sufficiency | Pinning LLM-enabled false fixes the 5001 ms class for `/search/project` + `/search/code`; if a live embedding path remains, use the already-exported `resetVectorStore`/factory seam in the same suite | CLAUDE.md names the missing seam as *the* blocker; measured before close (observed green under real config) | assumption — measured in Execute |
 | DI-02 mechanism | A test-only injection env var (e.g. `_PARALLEL_DROP_RESULT=<suite-id>`) read by `run-tests-parallel.ts` main path, dropping one result pre-guard; test drives the script end-to-end and asserts exit 1 + "UNION GUARD FAIL" naming the id | L-001's own ask is a mock-drop test of the wiring; repo idiom `_set*ForTesting`/`_DETERMINISTIC_ONLY` supports explicit test seams; an AC that names a mechanism demands that mechanism | assumption |
-| DI-05 shape | In `scripts/lib/run-tests-isolated.ts`: children whose isolation class is NOT database/integration/e2e get `XDG_CONFIG_HOME=<fresh tmp>`; core's non-isolated aggregate process gets the same; DB-classified children keep the real environment (local e2e reads `DATABASE_URL` from the real config) | Fixes the DA-01 class at the runner level, converges local runs toward CI (which has no config file); preserves DB suites | assumption |
-| DI-05 fallback | If the hermetic flip changes any suite verdict that cannot be attributed to a genuinely-missing seam fixable in that suite, stop, record the measurement, and downgrade DI-05 to a routed follow-up feature with the probe evidence | The runner touches every core suite; a measured retreat beats a shipped flake source | assumption |
+| ~~DI-05 shape / fallback~~ | Withdrawn at Design D0 — SEN-03 (`39afe59`, v1.10.0) already gives **every** group (not just non-DB children) the scratch config home plus the `.env`-leak pin, which is strictly stronger than the shape assumed here; `runner-child-env.test.ts` asserts both directions incl. `DATABASE_URL` pass-through | The assumption row is kept struck so the withdrawal has a visible reason at the site that carried it | superseded (D0) |
 | DI-06 placement | CLAUDE.md "Running tests"/worktree context gains the provisioning paragraph; HANDOFF env facts updated for this session's worktree | CLAUDE.md already owns the Node-22 helper trap; this is its worktree corollary | assumption |
 | DI-07 content | Distill the four recorded recurrences + this session's two: verify instruments in the tracked state they ship in; read the pass/fail split, never the pass count; a cached/turbo-replayed/wrapper-reported result is not a measurement; print population beside verdict; re-derive figures from inputs, never from the figure being amended | The rule must name the shapes that actually recurred here, not generic advice | assumption |
 | DI-08 semantics | Use `lessons.py observe`/`add` per its CLI contract read at Execute; if the tool's dedup treats a same-key `add` from a new feature as recurrence, that is the recurrence record for L-001; otherwise record observations and leave promotion to the tool | Never hand-edit lessons.json; never fabricate recurrence the tool's rules don't support | assumption |
@@ -87,7 +86,7 @@ Disposition legend: **FIX** = fix in this feature · **RESOLVED** = already fixe
 | DI-10 sweep | Before `git rm -r .specs/reports/`, sweep tracked files for references to `reports/` paths by content; repoint or annotate each (LESSONS evidence fields, feature specs, HANDOFF/STATE) so no tracked pointer dangles | A repoint can delete its own sweep's subject; sweep from the artifact, not memory | assumption |
 | `.gitignore` premise | User asked to "remove .ua from .gitignore"; measured: `git check-ignore` exit 1 on `.ua/` paths — **nothing in `.gitignore` ignores `.ua/`**, so there is nothing to remove; recorded here rather than silently skipped | Measure the premise before acting on it | measured, y |
 
-**Open questions:** none blocking — DI-05's fallback is pre-decided above.
+**Open questions:** none blocking.
 
 ## Acceptance Criteria (per fix requirement)
 
@@ -108,13 +107,14 @@ Disposition legend: **FIX** = fix in this feature · **RESOLVED** = already fixe
 
 ### DI-04 — STATE note annotated (P2)
 1. The `STATE.md:2308` carried-forward bullet SHALL be annotated (strike + resolution) citing BEH-01/[1.9.1], `memory-controller.ts:281,:305`, `memory-repository-pg.ts:236-238` — the DA-14 disambiguation, written where the stale claim lives.
-2. The companion carried-forward clause about the missing `@massa-ai/shared` isolation rule SHALL be annotated as closed by DI-05 (or routed, per DI-05's outcome).
+2. The companion carried-forward clause about the missing `@massa-ai/shared` isolation rule SHALL be annotated as superseded by SEN-03 `39afe59` (v1.10.0) with the D0 evidence.
 
-### DI-05 — hermetic runner config (P1)
-1. WHEN the shared runner forks a child whose isolation class is not database/integration/e2e THEN the child env SHALL carry `XDG_CONFIG_HOME` pointing at a fresh empty dir; DB-classed children SHALL inherit the real env unchanged (both directions asserted with a sentinel config).
-2. WHEN core's aggregate (non-isolated) pass runs THEN it SHALL receive the same hermetic dir.
-3. WHEN the full core suite runs before and after the flip THEN pass/fail parity SHALL hold (same verdict set; any diff is either fixed-in-suite with its own seam or triggers the recorded fallback).
-4. A `test:scripts` unit test SHALL discriminate the routing rule (mutation: hermetic-for-DB or real-for-unit flips it red).
+### ~~DI-05 — hermetic runner config~~ (withdrawn at Design D0)
+The requirement's outcome already holds on `main` via SEN-03 (`39afe59`, v1.10.0): every
+spawned group receives the scratch config home and the LLM-env pin, asserted by
+`scripts/__tests__/runner-child-env.test.ts` and re-measured green this session (mcp-client
+wrapper PASS all 8 groups under a real user config). No work ships under this ID; DA-15's
+closure evidence lives in the Re-verified table and D0.
 
 ### DI-06 — provisioning rule (P2)
 1. CLAUDE.md SHALL document: fresh-worktree `bun install` on macOS arm64 under Node 25 exits 0 with **no native build** (silent node-gyp failure); the named repair (copy `node_modules/tree-sitter*/build/` from a provisioned checkout, or install with a Node 22 helper); and the verify command (`bun test ./scripts/tests/verify-tree-sitter-grammars.test.ts` → 9 pass).
@@ -136,8 +136,6 @@ Disposition legend: **FIX** = fix in this feature · **RESOLVED** = already fixe
 
 - DI-01: pinning must survive the isolation runner's process model — the suite is isolation-classified; the pin lives inside the suite file (beforeAll), not the wrapper, so a direct `bun test <file>` behaves identically.
 - DI-02: the seam must not be readable outside tests — gate it on the env var's presence only (absent ⇒ zero-cost branch); the control case asserts absence-behavior.
-- DI-05: a child that is DB-classed AND reads LLM config keeps today's behavior by design (documented in the routing-rule test); the flip must not touch `turbo.json` passthrough semantics (`XDG_CONFIG_HOME` is set by the runner process, not passed through turbo).
-- DI-05: CI parity — CI has no user config; the hermetic dir makes local match CI, so a suite green locally-only is surfaced, not hidden (that is the point; any such find is a fix, not a regression).
 - DI-10: `.specs/reports/` deletion must not orphan the two sibling reports' own cross-references — they die together in the same `git rm`.
 - DI-09: if any `.ua` tracked file changes again mid-feature (dashboard running), commit the state at task time; `.ua` is generated data, not a gate subject.
 
@@ -149,7 +147,7 @@ Disposition legend: **FIX** = fix in this feature · **RESOLVED** = already fixe
 | DI-02 | UNION GUARD wiring sensor | Design | Pending |
 | DI-03 | FEATURES.json registry truth | Tasks | Pending |
 | DI-04 | STATE annotations (DA-14, DA-15 clause) | Tasks | Pending |
-| DI-05 | Hermetic runner config dir | Design | Pending |
+| ~~DI-05~~ | ~~Hermetic runner config dir~~ withdrawn (D0 — shipped as SEN-03) | — | Withdrawn |
 | DI-06 | Provisioning rule doc | Tasks | Pending |
 | DI-07 | Measurement discipline section | Tasks | Pending |
 | DI-08 | Lessons via lessons.py | Tasks | Pending |
@@ -157,19 +155,19 @@ Disposition legend: **FIX** = fix in this feature · **RESOLVED** = already fixe
 | DI-10 | reports/ removal + sweep | Tasks | Pending |
 | DI-11 | CHANGELOG + PR | Execute | Pending |
 
-**Coverage:** 11 mapped, 0 unmapped. RESOLVED/ROUTED/ACCEPTED rows (DA-02/03/04/06/07/08/09/10/12/13) close at Specify with the table's evidence — no implementation phase.
+**Coverage:** 10 live + 1 withdrawn (DI-05), 0 unmapped. RESOLVED/ROUTED/ACCEPTED rows (DA-02/03/04/06/07/08/09/10/12/13) close at Specify with the table's evidence — no implementation phase.
 
 ## Implicit-Requirement Dimensions (Large — resolved)
 
 | Dimension | Resolution |
 |---|---|
-| Input validation & bounds | DI-02 seam validates suite-id against the filtered list (unknown id ⇒ no-op + note); DI-05 sentinel tests both directions |
-| Failure / partial-failure | DI-05 fallback pre-decided; DI-06 documents the silent-install failure it cannot fix |
+| Input validation & bounds | DI-02 seam: unknown id ⇒ no-op, control case asserts absence-behavior |
+| Failure / partial-failure | DI-06 documents the silent-install failure it cannot fix; DI-01 fallback pre-decided in design D1 |
 | Idempotency | DI-03/DI-04 edits idempotent (annotate once); addon copy idempotent |
-| Auth boundaries | none touched — AD-011 surface untouched; AD-014 constrains observation writers and **no observation-writing code is in any DI write set** (DI-05 touches the test runner only) |
-| Concurrency / ordering | DI-05 preserves the runner's sequential child model; hermetic dirs are per-run fresh (no shared tmp) |
+| Auth boundaries | none touched — AD-011 surface untouched; AD-014 constrains observation writers and **no observation-writing code is in any DI write set** |
+| Concurrency / ordering | runner semantics untouched (DI-05 withdrawn); DI-02 seam runs in the single main pass |
 | Data lifecycle | `.ua` committed as-is (generated data); token never enters git |
-| Observability | DI-02 prints the dropped id; DI-05 runner logs the hermetic path at debug; gates keep population-beside-verdict |
+| Observability | DI-02 documents the drop in the run log via the guard's own FAIL output; gates keep population-beside-verdict |
 | External deps | gh api used read-only for DA-03 evidence; no network in new tests (capture-server pattern stays local) |
 | State transitions | FEATURES.json via approved write (DI-03); lessons only via tool (DI-08) |
 
