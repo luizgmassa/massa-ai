@@ -212,6 +212,17 @@ Real-CI confirmation of T7 deferred to the PR run (as scoped). Statuses: T1–T7
 
 Statuses: T8–T13 ✅. Worker note carried for the verifier: T12's `capsLookup` injection seam shape was an Execute-level judgment (design fixed the observable AC, not the seam mechanics) — reviewer's eye requested.
 
+**Batch 3 (T14–T19) DONE — worker, Status Complete.**
+- T14 `2a665f9`: rss-delta helper + both consumers; zero numeric/comparator literal changed (diff-reviewed); helper unexported; layering 0 violations.
+- T15 `cc050d8`: CLAUDE.md figures re-measured in-task (121/30/46 over shared 373; 1230 TS tests/55 files + 21 shell suites); commands + outputs in commit body; AD-010 note verified current.
+- T16 `6d0b83e`: CONTRIBUTING Step 6 tripwire paragraph, 9-line append, cited path resolves.
+- T17 `e8d28f7`: FEATURES.json single-line status fix; near-miss recorded — first write used `ensure_ascii=True` (would have re-encoded every em-dash), caught via `git diff --stat` before staging, reverted, redone with `ensure_ascii=False`.
+- T18 `e7ead10`: lessons L-009..L-013 via lessons.py (13 total, 5 new, all candidate); LESSONS.md 100% tool-regenerated.
+- T19 `24d657e`: CHANGELOG `### Added` ×7 + `### Fixed` ×4 under [Unreleased]; no skip-ci literal in the diff. Worker flag for T20: CHANGELOG prose summarizes B1/B2 work from the Execution Record, not independently re-verified — validator spot-check requested.
+- Batch close: test:scripts 1230/55 + 21/21 shell, lint 0, tree clean.
+
+Statuses: T14–T19 ✅. All 19 implementation tasks complete; Phase 6 (T20 validation, T21 close-out) runs inline.
+
 ## Task Granularity Check
 
 | Task | Scope | Status |
