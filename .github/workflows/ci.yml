@@ -125,6 +125,17 @@ jobs:
       - name: Verify security allowlist (XP-03)
         run: bun scripts/check-security-allowlist.ts
 
+      # XP-04 AC-2/3. Every test-running workflow's test-invocation env
+      # (workflow ∪ job ∪ step env, projected onto a declared semantic key
+      # set: DATABASE_URL, MASSA_AI_DEDICATED, RUN_POSTGRES_TESTS,
+      # MASSA_AI_EXECUTOR_SANDBOX, RUN_E2E, RUN_E2E_DESTRUCTIVE, runner OS,
+      # invocation string) must match another's, or the divergence must be
+      # named in scripts/workflow-venue-parity-exceptions.txt. Reads the YAML
+      # files directly, so it runs beside the security gate rather than
+      # depending on anything Build produces.
+      - name: Verify workflow venue parity (XP-04 AC-2/3)
+        run: bun scripts/check-workflow-venue-parity.ts
+
       - name: Build
         run: bun run build
 
