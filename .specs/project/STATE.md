@@ -665,7 +665,11 @@ all state came from `.specs/` and source reads.
   `design.md:747` carries the same superseded figure and is added to §8.1 row 14. Disjointness
   unchanged; only the figures were stale.
 - **C77**: T14b's *`handle()` 128 → ~87* is unreachable from its own mechanism. `52 − 16 = 36`, so
-  **92**, and 92 is a floor. `87` is reconstructably `128 − 45 + 4` — the pre-C43 span minus **only**
+  ~~**92**~~ → **93 — C77's own first operand is stale, corrected by C78 at T14b**: `128` is
+  `handle()` BEFORE T13, the shipped tree is **129**. C77 was written after T13 committed and
+  re-derived from the number it was amending rather than from the tree, which is the sentence it uses
+  to convict C43. The mechanism holds; only the baseline was wrong, and 92, 93, 94 and the shipped
+  **106** all clear 120. `87` is reconstructably `128 − 45 + 4` — the pre-C43 span minus **only**
   the 4-line catch return, omitting the 12-line `"busy"` block the same sentence keeps in the handler;
   **C43's `~94` re-derived from that wrong baseline instead of from the mechanism**, inheriting the
   defect it was correcting. All three figures clear the ceiling, so **nothing downstream moves**.
@@ -693,16 +697,58 @@ all state came from `.specs/` and source reads.
   only, so both clear it. That arrow is `handle()`'s outer `.catch` and is **unreachable rather than
   untested**; no artificial reach was written to buy the percentage, and its documented trigger was
   wrong and is corrected (`updateStatus` is the first statement *inside* the try it was said to precede).
-- ~~**Next action: Execute, T5**~~ … ~~**Execute, T13**~~ → **Next action: Execute, T14b.** The
-  managed-run lease block, `:151-202` — **re-derived EXACT after T13, so its span is current**.
-  **It is the load-bearing task of the whole feature** (C33): without it `handle()` stays at 129
-  against a ceiling of 120, the gate stays `1 of 30`, and T15 cannot wire it into `ci.yml` — a check in
-  `main`'s live `required_status_checks`. Read `tasks.md` §5's T14b row **as amended by C77** — its
-  target is **~92, a floor, not ~87 or ~94** — plus §3.6 and §6 item 8 as amended. **T14 last**, then
-  **T15 after all three**. Two things T13 measured that T14 needs: `services/project-identity/`
-  **already exists** with 11 files, so T14's "new file in a new directory" framing needs re-checking;
-  and the four call-site mutations that survived here mean **any threading decision needs a call-site
-  sensor, not only a module suite**.
+- **T14b DONE — `7d4fc22`. The gate's third clause is CLOSED.**
+  `services/indexing/acquire-indexing-lease.ts` + its suite. `index_project.ts` **246 → 222**,
+  `handle()` **129 → 106** (ceiling 120), members **403 → 402**, maximal bodies **unchanged at 2** —
+  the lease block was statements inside `handle()`, never a member, so no other clause could move.
+  `check-tools-thin` still reads **`1 of 30`, now for TWO reasons rather than three**, and both are
+  T14's. **Two new plan defects (C78–C79), running total eighty-four.** Record is `tasks.md` §10.16.
+  Write set **5** against the row's **3**, one user decision; **the phase total again does not move**,
+  both growths being intra-phase re-touches.
+- **C78 corrects C77's baseline, and C79 states a frame.** C78 is above. **C79**: `tasks.md` §4.2's
+  evidence paragraph is wholly in the `d7091ac` frame — `:254-351` and `:306` were deleted by T13,
+  `:111`/`:114` were shifted to `:110`/`:113` by T14b — so the **frame is stated** rather than two of
+  four numbers renumbered (C52's rule). §10.15's sweep called the whole subsection historical; two of
+  its numbers were live.
+- **The filename was an author-level choice no artifact makes.** `design.md` §5.1's table runs 1-8
+  plus 8b and has **no row for this module at all** (C33 minted T14b after Design). Chosen on the one
+  sibling's convention — `execute-indexing.ts` exports `executeIndexing`. Owed to `design.md` as
+  **§8.1 row 19; the count is now nineteen, not eighteen.**
+- **The mutation harness found what both lenses missed, for the THIRD consecutive task.** 18
+  mutations, two subject files, **no refusals and no equivalent or unreachable rows**. Column B swaps
+  `index-project-tool.test.ts` back to its **HEAD content**, because the row prices no test repoint.
+  First run: A killed **16 of 18**, B **5 of 18**. **Both survivors were the 409 response body** — the
+  part the design deliberately keeps in the handler, and therefore the part the module suite is
+  structurally unable to reach; the pre-existing assertion is `toContain("indexing_busy")`, which
+  passes when the handler reports the **job** id as the **active run** id, and `leaseExpiresAt` was
+  asserted by nothing. Fixed in the subject with an observed red; A now kills **18 of 18**. *T13's
+  survivors were the call site; T14b's were the call site's OUTPUT SHAPE.*
+- **A docblock sentence claiming a property destroyed it.** The new suite asserted it named none of
+  `run-tests-isolated.ts`'s isolation literals **by listing them**, and the predicate is a plain
+  word-boundary scan over test source, comments included — classifying the file
+  `database/integration`. Core went `150 → 151` isolated, then back to `122 pure/shared, 150` once the
+  names left the comment, so the group count holds at **151, unchanged for one added file**.
+- **Gates.** `lint` **0**, proven to bite on a T14b file. `type-check` **6/6**, `build` **5/5**, both
+  0 cached forced. `test:scripts` **1115 unchanged**; `test:plugins` **96**/0. `check-core-layering`
+  **edges 983 → 985, files 918 → 920**, taken after `git add` on T13's lesson. **`bun run test` ran
+  four times and three were red with DISJOINT failing sets** — `mcp-client` `web/fetch_and_index`
+  (21903.99 ms), `architecture-map`, `trace_path` — each zero-diff against `main`, naming 0 of T14b's
+  five subjects, and green standalone (95p/0f in 2.15 s under an empty config dir, 24p/0f, 18p/0f);
+  host load rose **2.30 → 4.12** across the repeated runs. **Run 4 clean: 11/11, exit 0, core `all 151
+  group(s)`.** Coverage (R-36): new module **100% / 100%**; `index_project.ts` **85.71% funcs /
+  97.52% lines** against **85.71% / 97.79%** after T13 — the same unreachable `.catch` over a smaller
+  denominator.
+- ~~**Next action: Execute, T5**~~ … ~~**Execute, T14b**~~ → **Next action: Execute, T14.** The two
+  module-level helpers → `services/project-identity/project-root-identity.ts`. **Its span is
+  `:38-67`, NOT the row's `:39-68`** — T14b removed the two imports whose only readers were inside its
+  own span and added one, and the import block sits above T14's, so a task whose span is *disjoint*
+  from T14's renumbered it anyway. Anchor-verified after the commit; **re-derive regardless**.
+  *Span disjointness bounds whose CONTENT a task rewrites, never the imports it drags out with it* —
+  §6 item 8 as amended. Two further things measured: `services/project-identity/` **already exists**
+  with 11 files, so T14's "new file in a new directory" framing needs re-checking; and both helpers
+  are already imported by name in `index-project-identity.test.ts` and `index-project-tool.test.ts`.
+  **After T14, `check-tools-thin` should reach `0 of 30` — that reading is T15's**, which also wires
+  it into `ci.yml`'s `build` job.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed
