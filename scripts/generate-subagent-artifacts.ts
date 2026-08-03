@@ -21,10 +21,11 @@ import {
   profileFlagFrom,
   resolveTier,
   selectProfile,
-  type Host as RegistryHost,
   type Registry,
   type Resolved,
 } from "./lib/model-profiles.ts";
+import { HOSTS, capabilitiesFor, type Host } from "./lib/host-capabilities.ts";
+export { HOSTS, type Host };
 
 // ── Paths ───────────────────────────────────────────────────────────────────
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -108,7 +109,8 @@ const OPENCODE_BASH_OVERRIDE: Partial<Record<SpecialistName, string>> = {
 };
 
 // ── Types ───────────────────────────────────────────────────────────────────
-export type Host = "claude" | "codex" | "cursor" | "opencode";
+// Host is imported from ./lib/host-capabilities.ts (re-exported from
+// lib/model-profiles.ts) — the single canonical enumeration (design.md C5).
 export type Permission = "read-only" | "write";
 
 export interface Charter {
@@ -394,14 +396,28 @@ export interface EmitOptions {
   readonly env?: Record<string, string | undefined>;
 }
 
+type EmitFn = (c: Charter, m: Resolved) => string;
+
+/** Per-host body-rendering dispatch. Byte-identity-constrained: string
+ *  rendering itself stays per-host (design.md C5 "Not moved"), only the
+ *  SELECTION of which renderer to call is now table-shaped rather than a
+ *  nested ternary. */
+const EMIT_BY_HOST: Record<Host, EmitFn> = {
+  claude: emitClaude,
+  codex: emitCodex,
+  cursor: emitCursor,
+  opencode: emitOpenCode,
+};
+
 /** Which profile each host resolves against, after the full precedence chain. */
 export function profilesPerHost(
   registry: Registry,
-  opts: EmitOptions = {}
+  opts: EmitOptions = {},
+  hosts: readonly Host[] = HOSTS
 ): Record<Host, string> {
   const out = {} as Record<Host, string>;
-  for (const host of Object.keys(HOST_DIRS) as Host[]) {
-    out[host] = selectProfile(registry, host as RegistryHost, {
+  for (const host of hosts) {
+    out[host] = selectProfile(registry, host, {
       flag: opts.profileFlag ?? null,
       env: opts.env,
     });
@@ -409,31 +425,34 @@ export function profilesPerHost(
   return out;
 }
 
+/**
+ * `hosts` is an APPENDED third parameter (default `HOSTS`) — every existing
+ * 2-arg call site (2 production + 6 in generate-subagent-artifacts.test.ts)
+ * keeps working unmodified. It exists so a fixture-host test can restrict or
+ * extend which hosts get iterated without touching the production 4-host set
+ * (XP-06 AC-2 / T12).
+ */
 export async function emitAll(
   targetDirs: Record<Host, string>,
-  opts: EmitOptions = {}
+  opts: EmitOptions = {},
+  hosts: readonly Host[] = HOSTS
 ): Promise<Record<Host, string>> {
   const charters = await loadAllCharters();
   const registry = opts.registry ?? loadRegistry();
-  const profiles = profilesPerHost(registry, opts);
-  for (const [host, dir] of Object.entries(targetDirs) as [Host, string][]) {
+  const profiles = profilesPerHost(registry, opts, hosts);
+  for (const host of hosts) {
+    const dir = targetDirs[host];
     await fs.mkdir(dir, { recursive: true });
     const profile = profiles[host];
+    const emit = EMIT_BY_HOST[host];
     for (const c of charters) {
       // Resolution is (charter tier) x host x profile. A tier the profile does not
       // define, or a profile that does not support this host, throws by design.
-      const resolved = resolveTier(registry, host as RegistryHost, profile, c.modelTier);
-      const ext = host === "codex" ? "toml" : "md";
+      const resolved = resolveTier(registry, host, profile, c.modelTier);
+      const ext = capabilitiesFor(host).artifactExtension;
       const fileName = `massa-ai-${c.name}.${ext}`;
       const filePath = path.join(dir, fileName);
-      const content =
-        host === "claude"
-          ? emitClaude(c, resolved)
-          : host === "codex"
-            ? emitCodex(c, resolved)
-            : host === "cursor"
-              ? emitCursor(c, resolved)
-              : emitOpenCode(c, resolved);
+      const content = emit(c, resolved);
       await fs.writeFile(filePath, content, "utf8");
     }
   }
@@ -447,7 +466,7 @@ export async function diffHost(
 ): Promise<string[]> {
   // Compare every generated charter file per host. Non-massa-ai files in the
   // host dir are not generator-owned and are ignored.
-  const ext = host === "codex" ? "toml" : "md";
+  const ext = capabilitiesFor(host).artifactExtension;
   const expected = SPECIALIST_NAMES.map(
     (n) => `massa-ai-${n}.${ext}`
   );
@@ -484,7 +503,7 @@ export async function runCheck(opts: EmitOptions = {}): Promise<number> {
     };
     await emitAll(tmpDirs, opts);
     let drift = false;
-    for (const host of Object.keys(HOST_DIRS) as Host[]) {
+    for (const host of HOSTS) {
       const diffs = await diffHost(tmpDirs[host], HOST_DIRS[host], host);
       if (diffs.length > 0) {
         drift = true;
