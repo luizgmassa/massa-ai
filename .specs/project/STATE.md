@@ -880,12 +880,19 @@ all state came from `.specs/` and source reads.
   critic's finding — the `:237` trap note is really THREE-way (`data/symbol/` third, Design §1.1)
   and owned by nobody — is **assigned to T22**. Gates: lint 0; test:scripts 1116/0/49; suite
   23p/0f; stale-pointers PASS/28 frame-only. Zero new defects, running total eighty-nine.
+- **T22 DONE — `a5a3aa1`. RFS-05 AC-5 closes** + the T18-assigned three-way widen. All five
+  figures critic-reproduced (23 migrations, metric named; 8 publishable today / 5 at v1.3.1 by
+  `git ls-tree`, both frames stated; the `data/symbol/` error named). Two author-prose defects
+  fixed pre-commit (two-vs-three contradiction; over-label). One shell-harness flake adjudicated,
+  three readings kept (static assertion, untouched file, red once in aggregate, green twice).
+  Record `tasks.md` §10.25; zero new defects, running total eighty-nine.
 - ~~**Next action: Execute, T5**~~ … ~~**Execute, T14b**~~ → ~~**Execute, T14**~~ →
   ~~**Execute, T15**~~ → ~~**Execute, T16**~~ → ~~**Execute, T19**~~ → ~~**Execute, T20b**~~ →
-  ~~**Execute, T20**~~ → ~~**Execute, T21**~~ → ~~**Execute, T18**~~ → **Next action: Execute,
-  T22** — the two CLAUDE.md figures + ONBOARDING's deferral marker + the T18-assigned three-way
-  trap widen. Then T23 + T24 last before T25; **T25 by a different author** — whether a fresh
-  conversation satisfies that is the user's call, asked before T25 starts.
+  ~~**Execute, T20**~~ → ~~**Execute, T21**~~ → ~~**Execute, T18**~~ → ~~**Execute, T22**~~ →
+  **Next action: Execute, T23** (state files; never touch `active_feature`; never `git add -A`
+  under `.specs/`), **then T24** (CHANGELOG, `### Changed` + `### Removed`, never the literal
+  skip-ci marker), **then STOP for the T25 authorship question** — T25 by a different author;
+  whether a fresh conversation satisfies that is the user's call, asked before T25 starts.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed

@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–6 CLOSED (T18 landed), PHASE 7 OPEN (T19, T20b, T20, T21 DONE); next T22**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–6 CLOSED, PHASE 7 OPEN (T19, T20b, T20, T21, T22 DONE); next T23 + T24, then the T25 question**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -1173,11 +1173,25 @@ framing was measured **three-way** at Design (`data/symbol/` the third) and owne
 **assigned to T22**, whose row gained the item. Gates: lint 0; test:scripts 1116/0/49; suite
 23p/0f; stale-pointers PASS/28 as frame only. Zero new plan defects — running total eighty-nine.
 
-**Next action: Execute, T22** — `CLAUDE.md:43` "24 migrations" → 23 naming the metric;
-`CLAUDE.md:567` "five" → 8 publishable packages; `docs/ONBOARDING.md:83-87`'s deferral marker
-re-scoped per spec §4.4; **plus the T18-assigned widen of `CLAUDE.md:237` to the three-way trap**.
-Then **T23 + T24 last before T25** — **T25 by a different author**; whether a fresh conversation
-satisfies that is the user's call, asked before T25 starts, per its row.
+~~**Next action: Execute, T22.**~~ **T22 DONE — `a5a3aa1`. RFS-05 AC-5 CLOSES**, plus the
+T18-assigned three-way trap widen. Its record is `tasks.md` **§10.25** — all five figures
+critic-reproduced exactly (23 migrations with the lock-file metric named; **8** publishable
+packages today and **5 at `v1.3.1`** verified against `git ls-tree` at the tag, both frames now
+stated in the rehearsal line; the `data/symbol/` path error real and named); **two defects in
+the author's own staged prose fixed pre-commit** (a two-vs-three self-contradiction in the
+grafted trap sentence; "shipped docs" over-labelling internal specs); and **one shell-harness
+flake adjudicated with all three readings kept** — `test-setup-wizard-db-selection.sh`'s
+`migrations fail closed`, a static string assertion over an untouched file, red once in
+aggregate (10p/1f), green standalone and on the aggregate re-run (1116/0 + 11p/0f, exit 0).
+Zero new plan defects — running total **eighty-nine**.
+
+**Next action: Execute, T23** — the state files (`HANDOFF.md`, `STATE.md`, `FEATURES.json`):
+PR-D `status: complete`, `phases.tasks/execute: true`, parent to `complete`; **do not touch
+`active_feature`** (reads `skills-directive-dedup`, genuinely paused — verified three times);
+never `git add -A` under `.specs/`. **Then T24** — the CHANGELOG entry, `### Changed` +
+`### Removed` per §2, never writing the skip-ci marker literally. **Then STOP: T25 is by a
+different author** — whether a fresh conversation satisfies that is the user's call, and the
+question is asked before T25 starts, per its row.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
