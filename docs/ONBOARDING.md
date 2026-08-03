@@ -81,8 +81,9 @@ inventory of that structure, not a third statement of it.
 ```
 
 > **Hand-edited for PR-C, against generated output.** This guide is generated from the
-> knowledge graph at `17ee7083` and `.ua/` regeneration is out of scope until after PR-D,
-> so the retirement of `controllers/` and the arrival of `kernel/` are edited in by hand.
+> knowledge graph at `17ee7083`. **`.ua/` regeneration is its own follow-up change after PR-D
+> merges** (`core-layering-read-file-split/spec.md` §4.4) — it is not part of any PR in the
+> umbrella, so the retirement of `controllers/` and the arrival of `kernel/` are edited in by hand.
 > **The `kernel/` count of 11 is hand-measured over `git ls-files`; every other count on
 > this page is still the graph's at `17ee7083` and is not re-measured here.** Two of them
 > are known to have moved since (`tools/` is 30, `data/` + `models/` is 42) — left alone
