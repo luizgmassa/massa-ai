@@ -652,7 +652,7 @@ certifies the rename while missing **all 12 production edges**, because they are
 | **T21** | **`scripts/check-coverage.ts`'s dangling `EXCLUSIONS` entry deleted, and the class closed in the gate's *test*, not the gate.** 9 entries, **1** dangling — `packages/core/src/services/query/prisma-client.ts`, at `kernel/` since `9fe4545`. **Delete rather than repoint**: `2ea4ebd` took `kernel/prisma-client.ts` to **100% (26/26)**, so the exclusion is dead weight. The existing pinning test — `scripts/__tests__/check-coverage.test.ts:178`, *"every excluded path is one the gate would otherwise measure"* — asserts `isMeasuredSource(entry.file)`, and that is a **pure string-shape predicate** (`check-coverage.ts:379-388`: an extension regex plus six substring/prefix checks, no `existsSync`, no `readFileSync`, no `git`), so it can never see a dangle. **Cite the file with the line — `check-coverage.ts:178` is an unrelated `EXCLUSIONS` entry.** Add an existence assertion resolving against `check-coverage.ts`'s real `REPO_ROOT` (used at `:619`), **not** the test's synthetic `BASE = "/repo/packages/core"` or its cwd. **AC-4 closes with an observed red**: revert the deletion and the test must fail. **DONE — §10.23. AC-4 closed with the red observed FIRST** (22p/1f pre-deletion → 23p/0f post; `EXCLUSIONS` 9 → 8 by module import). Write set grew ~~2~~ → **4 tracked + 2 `.specs/`** under C55: the −4/+6 swap (+2, NOT the author's first +3 — both critics caught the constant and its three consequences pre-commit) shifted four live citations, all repointed by content identity against `git show HEAD`; the existence pin's one environment split (APFS case-insensitivity) is stated in the test itself | ~~2~~ → **4 files** (+ 2 `.specs/` repoint carriers) | **RFS-05 AC-4** |
 | **T22** | **`CLAUDE.md` and `docs/ONBOARDING.md`.** `CLAUDE.md:43`'s *"24 migrations"* → **23**, **naming the metric** (24 counts `migration_lock.toml`; there are 23 migration directories and 23 tracked `migration.sql` — §3.5 item 10). `CLAUDE.md:567`'s *"five … skipping lines"* → **8** publishable packages, measured from every non-`private` `package.json`. `docs/ONBOARDING.md:83-87`'s deferral marker must say `.ua/` regeneration is **its own change after PR-D**, not point at a PR that will have merged (`spec.md` §4.4). **Gained at T18 (§10.24, C55/C62's owner rule): widen `CLAUDE.md:237`'s trap note from two-way to the THREE-way `design.md` §1.1 measured** — `services/memory-graph/` vs `services/symbol/` vs **`data/symbol/`**, the third being the directory that already produced a real path error. **DONE — §10.25. AC-5 closes**; all five figures critic-reproduced exactly (both publish-rehearsal frames verified — 8 today, 5 at `v1.3.1` by `git ls-tree`); two author prose defects fixed pre-commit (a two-vs-three self-contradiction in the grafted sentence; "shipped docs" over-label); one harness flake adjudicated with three readings (a static-string shell assertion over an untouched file, red once in aggregate, green standalone and on re-run) | 2 files | **RFS-05 AC-5** |
 | **T23** | **The state files.** `HANDOFF.md`, `STATE.md`, `FEATURES.json` — PR-D `status: complete`, `phases.tasks: true`, `phases.execute: true`; parent `core-layering-god-module-split` to `complete`. **Do not touch `active_feature`** — it reads `skills-directive-dedup`, genuinely paused at T5 of 12 on the user's instruction, verified against `STATE.md`'s `## Current` for the **third** time. **Never `git add -A` under `.specs/`**: `.specs/reports/` is untracked on purpose and stays untracked; stage explicitly. **DONE — §10.26.** Both status flips position-checked and parse-verified; `active_feature` untouched (fourth verification); both notes tails state the T25-pending frame so the status fields carry their own honesty | 3 files | RFS-05 AC-1 |
-| **T24** | **CHANGELOG entry — `### Changed` **and** `### Removed`** (§2). **Never write the skip-ci marker literally**, in the commit message, a commit body or the PR body | 1 file | **RFS-04 AC-2** |
+| **T24** | **CHANGELOG entry — `### Changed` **and** `### Removed`** (§2). **Never write the skip-ci marker literally**, in the commit message, a commit body or the PR body. **DONE — §10.27. AC-2 closes**: both decided headings, semver re-taken per item on the reachability table, live file exempted by name, pack verification named; the marker literal absent from entry and commit; the +37 shift of v1.17.0's `:35` note frame-stated | 1 file | **RFS-04 AC-2** |
 | **T25** | **Independent validation — author ≠ verifier**, on PR-C's T18 and PR-B's T20 precedent. Re-derives every criterion from raw data rather than from this file. **Must re-take, not inherit**: T5's frozen reading against the shipped tree, Phase 6's resolver sweep, `check-core-layering`'s `edgesExamined` per structural commit, the `npm pack --dry-run`, and a **discrimination table** on the real tree — each subject backed up to a **scratch copy** with SHA-256 byte-identity asserted on restore. **Never `git checkout` to restore**: it restores to `HEAD`, not to pre-mutation state, and destroyed two files of uncommitted work at PR-C's T8b. **Two open questions to answer rather than inherit, both amendments to criteria rather than to figures:** whether **C37**'s replacement predicate for RFS-06 shape (c) (§10.2) is the right reading of *"independent of containment"*, given the original clause was struck for being unfalsifiable; and whether AC-2's enumerated-**set** assertion is what *"roots only, never a host path"* requires, given the existing suite's presence/absence pair stays green under a `$HOME` leak | 1 new file | GMS-02, RFS-01…RFS-06 |
 
 ---
@@ -5624,3 +5624,32 @@ suite reads it as data); run anyway post-stage with the docs commit's battery. S
 N/A by population.
 
 **Running total: eighty-nine plan defects — unchanged at T23.**
+
+### 10.27 T24 — executed, 2026-08-03. EXECUTE IS COMPLETE THROUGH T24; ONLY T25 REMAINS
+
+**RFS-04 AC-2 closes: the CHANGELOG entry lands under `### Changed` **and** `### Removed`, §2's
+user decision applied as decided (both headings minor under CONTRIBUTING's table — the choice was
+record accuracy, not version), and the semver framing is re-taken PER ITEM on the reachability
+table exactly as AC-2 requires**: the two interfaces stated as reachable-but-zero-consumers (with
+every method tried named), the `data/vector/` pair as zero-reachability on top (no `./data`
+subpath), the live `services/search/hybrid-search.ts` explicitly exempted, and the verification
+named as the cache-forced `npm pack --dry-run` from a clean rebuild. Three `### Changed` bullets:
+the split + the gate (0 of 30, zero allowlist, required `build`), the rename (internal layout
+only — the exports map never exposed the path), the coverage-gate existence pin. **The skip-ci
+literal appears nowhere in the entry or the commit message** — the one pre-existing literal at
+the old v1.4.x release record (`:1264`) is a dated file body, which GitHub never scans; only
+commit messages and PR bodies matter, and the rule held. Zero new plan defects; running total
+stays eighty-nine.**
+
+**One shift, frame-stated**: the entry's +37 lines move v1.17.0's rename note `:35 → :72` — every
+`CHANGELOG.md:35` in this document and `HANDOFF.md`/`STATE.md` is a dated record of the pre-T24
+tree (C52; find it by content). No live citation exists (swept: all holders are `.specs/`
+records).
+
+Gates: `test:scripts` **1116/0 across 49**, exit 0. The CHANGELOG merge gate is satisfied by this
+entry itself — the `no-changelog` label must NOT be applied (§1.2, user decision). Everything
+else N/A by population (one markdown file).
+
+**Running total at Execute's close: eighty-nine plan defects across §10.1–§10.27; §8.1's twenty
+applied at T20b; C28–C33 indexed in the parent at T20. T25 — independent validation, author ≠
+verifier — is the only open task, and its authorship question belongs to the user.**

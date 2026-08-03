@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`tools/read_file.ts` is a thin handler now — 490 of its 707 lines (69.3%) moved into
+  `services/`, and a new CI gate keeps every handler that way.** The path-containment security
+  rules, project-root cache, file-content cache, metadata extraction, line-range math and the
+  read orchestration live in `services/file-read/` (six modules); the shared LRU eviction landed
+  in `services/cache/lru-evict.ts` and five formerly copy-pasted cache sites delegate to it.
+  `index_project.ts` shed `executeIndexing`, the project-identity helpers and the managed-run
+  lease acquisition the same way. **Behavior is preserved and proven, not argued**: the
+  characterization suites written before anything moved pass unmodified across every extraction,
+  and the MCP `read_file` `inputSchema` and REST `/file` response shape are byte-identical.
+  `scripts/check-tools-thin.ts` — a TypeScript-AST rule with **zero allowlist entries** — now runs
+  in CI's required `build` job and reads `PASS — 0 of 30`.
+
+- **`services/graph/` is renamed `services/memory-graph/`** so the memory-relation graph stops
+  sharing a bare name with the symbol graph (`services/symbol/`) and the symbol repository
+  (`data/symbol/`). Internal layout only: `@massa-ai/core`'s `exports` map (`.`, `./tools`,
+  `./services`) never exposed the old directory path, and every exported symbol name is unchanged.
+
+- **The coverage gate can now see a dangling exclusion.** The stale `EXCLUSIONS` entry for a file
+  that moved to `kernel/` a release ago (and has been at 100% since) is deleted, and the gate's
+  test gains an existence assertion resolving every entry against the real repo root — the prior
+  pin was a pure string-shape check that a `git mv` could never fail.
+
+### Removed
+
+- **`IHybridSearch`** from `@massa-ai/shared`, **`BatchCommand`** from `@massa-ai/core/tools`,
+  and core's unshipped `data/vector/{index,hybrid-search}.ts` pair. Priced per item rather than as
+  one blanket removal: the two interfaces **were reachable** from published entry points
+  (`@massa-ai/shared`'s `.`/`./types`; `@massa-ai/core`'s `./tools`) and measured **zero
+  consumers by every method tried** — static import, dynamic `import()`, `mock.module`,
+  string-built specifier, both transports; the `data/vector/` barrel and its dead `HybridSearch`
+  class had **zero reachability** on top of zero consumers (`@massa-ai/core` exposes no `./data`
+  subpath), making that half of the removal invisible to any package consumer. The live hybrid
+  search — `services/search/hybrid-search.ts` — is untouched. Verified against a cache-forced
+  `npm pack --dry-run` from a clean rebuild, not a stale `dist/`.
+
 ## [1.17.0] - 2026-07-31
 
 ### Changed
