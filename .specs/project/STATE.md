@@ -771,13 +771,45 @@ all state came from `.specs/` and source reads.
   floor cleared. Isolation: core **273 files, 151 groups unchanged**, new suite pure/shared, read
   from the runner. Both pre-move instruments (`t14-spans.ts`, `t14-citation-sweep.ts`) now exit 1
   on this tree — the refusals working.
-- ~~**Next action: Execute, T5**~~ … ~~**Execute, T14b**~~ → ~~**Execute, T14**~~ → **Next action:
-  Execute, T15.** The gate already reads `PASS — 0 of 30` at HEAD; T15 is the one-file `ci.yml`
-  commit that wires it into the **`build`** job and closes RFS-01 AC-1 + the GMS-02 headline.
-  Verify `build` against the live ruleset API (context = the job id), re-run the gate in-session,
-  and place the invocation beside `check-core-layering`'s (re-derive the line numbers). Then
-  Phase 6 (T16–T18; T18 after T21) and Phase 7 (T19–T25; T20b before T20; T23 + T24 last before
-  T25; **T25 by a different author**).
+- **T15 DONE — `89d3c25`. PHASE 5 IS COMPLETE; RFS-01 AC-1 CLOSES ON ALL THREE CONJUNCTS AND THE
+  GMS-02 HEADLINE WITH IT.** The step lands at `ci.yml:167-168` (comment `:155-166`, +15 lines),
+  parsed build step **12 of 21** between `check-core-layering` and the stale-pointers gate — no
+  `if:`, no `continue-on-error`, no live figures in the comment (C63). Ruleset re-verified live
+  in-session (context = job id; `build` among the six); gate re-read `PASS — 0 of 30`, exit 0,
+  **both directions re-observed on the live tree**: Map-field mutation → `FAIL — 1 of 30`, exit 1,
+  members 399 → 400, restore SHA-256-identical. Record is `tasks.md` **§10.18**.
+- **The write set grew 1 → 3 under C55's standing rule, no new user decision.** The +15 insertion
+  shifts every `ci.yml` line ≥ 155; five live-frame `ci.yml:200` sites adjudicated — two repointed
+  `:200 → :215` (`check-tools-thin.test.ts:14`, `design.md:828`), `tasks.md:528` amended in place,
+  HANDOFF's Next-action paragraph superseded by its own rewrite, `design.md:970` frame-stated and
+  kept (C52). The evidence-audit lens found the author's "three live citations" figure wrong (true
+  count **five**); the red-team's critical — parse-success is not list-membership — was folded into
+  `t15-verify-post.ts` **before** the edit (16/16 post; observed red 11/16 FAIL pre). One
+  pre-existing stale cite logged not fixed: `native-macos-arm64-workflow.test.ts:11`'s colon-free
+  "(lines 150-190)" — C57's shape, 166 lines stale before T15, outside every sweep on this feature.
+- **C81, the eighty-sixth plan defect, running total eighty-six.** §1's *"which is what takes …
+  105 to 84"* sentence sat two tasks stale while the same table's sum and union rows moved to
+  107/86 at T12 — the C19 no-owner family inside a self-checking table. Struck and advanced
+  (`109 to 86`; identity `15 × 1 + 4 × 2 = 23`), with `check-tools-thin.test.ts` the fourth
+  three-phase file (1, 3, 5) and `design.md` entering the two-phase group (5, 7).
+- **The local-gate call for a workflow-YAML commit is decided and its population measured** —
+  `test:scripts` **IS sensitive** (`scripts/tests/native-*-workflow.test.ts` `readFileSync`
+  `ci.yml`): **1115/0 across 49 + 5 shell suites, both sides of the edit**. `actionlint` 0 both
+  sides; Bun.YAML structural probe 20 → 21 steps, one match, index 12; `check-core-layering`
+  **986 / 922 unchanged** and `lint` 0, both stated as tree-state frames (neither population can
+  sense a YAML diff); `type-check`/`build`/`bun run test`/`test:plugins` **N/A by measured
+  population** — zero ci.yml readers in either (§10.18). Residual named: local validators are
+  proxies for GitHub's server-side validator; first live step run comes with the PR, and the
+  CHANGELOG gate cannot fire before then (`pull_request`-only, no PR open, push trigger
+  `main`-only — checked, not assumed).
+- ~~**Next action: Execute, T5**~~ … ~~**Execute, T14b**~~ → ~~**Execute, T14**~~ →
+  ~~**Execute, T15**~~ → **Next action: Execute, T16 — Phase 6 opens.**
+  `git mv packages/core/src/services/graph/` → `services/memory-graph/`, **7** files, 17
+  intra-directory import lines needing no edit (§3.5 item 8). Then T17 (19 importers / 28 lines;
+  the 6 `mock.module` string specifiers are the sharp edge — R-28). **T18 after T21** (§6 item 9).
+  Phase 6's acceptance is the resolver sweep, not a grep count. Then Phase 7 (T19–T25; T20b before
+  T20; T23 + T24 last before T25; **T25 by a different author** — whether a fresh conversation
+  satisfies that is the user's call, asked before T25 starts).
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed

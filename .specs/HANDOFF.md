@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–4 CLOSED, the gate reads `0 of 30`; next T15 (wire it), then Phases 6–7**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–5 CLOSED, the gate WIRED into `build`; next T16 (Phase 6), then Phase 7**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -1033,16 +1033,46 @@
 > on this tree** (dead subject / OWNERS anchor — the refusals working); `t14-verify-post.ts` is
 > the green counterpart, 15 assertions.
 
-**Next action: Execute, T15.** `check-tools-thin` already reads `PASS — 0 of 30` at HEAD, so T15 is
-the one-file commit that makes the reading a criterion: add the gate's invocation to `ci.yml`'s
-**`build`** job (T4b's row says `ci.yml:200` runs `bun test scripts/__tests__` inside `build` —
-place the gate beside `check-core-layering`'s invocation, and re-derive both line numbers rather
-than trusting these). `build` is in `main`'s live `required_status_checks` — verify against the
-ruleset API (`gh api repos/luizgmassa/massa-ai/rules/branches/main`, context = the **job id**), not
-a green check. RFS-01 AC-1 and the GMS-02 headline close there; re-run the gate in the same session
-and record its print, since every gate enumerates `git ls-files`. Then Phase 6 (T16–T18; §6 item 9:
-T18 after T21) and Phase 7 (T19–T25; T20b before T20; T23 + T24 last before T25; **T25 by a
-different author**).
+~~**Next action: Execute, T15.**~~ **T15 DONE — `89d3c25`. PHASE 5 IS COMPLETE, RFS-01 AC-1 IS
+CLOSED ON ALL THREE CONJUNCTS, AND THE GMS-02 HEADLINE CLOSES WITH IT.** The step lands at
+`ci.yml:167-168` (block comment `:155-166`, +15 lines), parsed build step **12 of 21** directly
+between `check-core-layering`'s invocation and the stale-pointers gate — no `if:`, no
+`continue-on-error`, no live figures in the comment (C63). The ruleset re-verified live in-session
+(context = the **job id**; `build` present among the six), the gate re-read
+`PASS — 0 of 30 … 27 declare an IToolHandler, 3 do not; 399 members examined`, exit 0, and **both
+directions of the exit contract were re-observed on the live tree** rather than inherited: a
+Map-field mutation reads `FAIL — 1 of 30`, exit 1, members 399 → 400 (C69's counter sensing the
+member), restore SHA-256-identical, green re-read. Its record is `tasks.md` **§10.18** — the
+five-site adjudication table for the shifted `:200` citations (the +15 shift falsified two live ones,
+`check-tools-thin.test.ts:14` and `design.md:828`, both repointed `:200 → :215` under C55's
+standing rule, write set 1 → 3; `tasks.md:528` amended in place; this paragraph's own predecessor
+was the fourth site, superseded here; `design.md:970` frame-stated and kept), the decided
+local-gate call for a workflow-YAML commit with the population that decided it (**`test:scripts`
+IS sensitive** — `scripts/tests/native-*-workflow.test.ts` `readFileSync` ci.yml; **1115/0 across
+49 both sides of the edit**; type-check/build/test/test:plugins N/A by measured population), and
+**one new plan defect — C81, the eighty-sixth, running total eighty-six**: §1's sum-to-union
+sentence sat two tasks stale inside the self-checking table while the sum and union rows moved at
+T12. Both Plan Challenge lenses ran; the evidence audit's one non-reproducing figure was the
+author's own "three live citations" (true count five), and the red-team's critical — YAML
+parse-success is not list-membership — was folded into `t15-verify-post.ts` before the edit
+(**16/16 post-edit; observed red first at 11/16 FAIL pre-edit**). `t15-observed-red.ts` is the
+durable exit-contract harness (refuses on a non-baseline tree; never git-restores). One
+pre-existing stale citation logged, not fixed: `native-macos-arm64-workflow.test.ts:11`'s
+colon-free "(lines 150-190)", 166 lines stale before T15 — C57's shape, outside every sweep.
+Residual named: `Bun.YAML`/`actionlint` are local proxies for GitHub's server-side validator; the
+step's first live run happens when the PR opens, and the CHANGELOG gate cannot fire before then
+(`pull_request`-only, no PR exists, push trigger is `main`-only — checked, not assumed).
+
+**Next action: Execute, T16 — Phase 6 opens.** `git mv packages/core/src/services/graph/` →
+`services/memory-graph/` — **7** files, the members' own 17 intra-directory import lines needing no
+edit (§3.5 item 8). Then **T17** (19 external importers / 28 import lines; the **6 `mock.module`
+string specifiers are the sharp edge** — `tsc`, `build` and `type-check` are blind to all six, R-28;
+`services/index.ts` carries 5 specifier lines re-exporting 7 symbols, both figures right). **T18 is
+sequenced after T21** (§6 item 9 — they share `scripts/check-coverage.ts` and its test). Phase 6's
+acceptance is the **resolver sweep**, not a grep count (§5) — a literal `services/graph` sweep
+misses all 12 production edges. Then Phase 7 (T19–T25; T20b before T20; T23 + T24 last before T25;
+**T25 by a different author** — whether a fresh conversation satisfies that is the user's call,
+asked before T25 starts, per its row).
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
