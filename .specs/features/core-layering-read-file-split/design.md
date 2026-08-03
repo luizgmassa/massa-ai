@@ -333,10 +333,16 @@ crossed its ceiling twice while writing prose that had to move into `tasks.md`.
 
 ### 3.2 One constraint on the retained surface that `spec.md` does not name
 
-`ReadFileTool` is constructed at **20 sites**: `apps/tools-api/src/routes/file.ts:15` and
+`ReadFileTool` is constructed at ~~**20 sites**~~ → **41 sites across 9 files (T9, `tasks.md`
+§10.11; §8.1 row 16) — 20 was true at `d7091ac` and falsified by PR-D's own Phase 0 suites**:
+`apps/tools-api/src/routes/file.ts:15` and
 `apps/mcp-client/src/embedded-api-client.ts:181` — **both transports, both `new ReadFileTool(symbolGraph)`**
-— plus 18 in tests (`read-file-containment.test.ts` 7, `read-file.test.ts` 7,
-`wave-4-correctness.test.ts` 4). **The constructor's arity and parameter type are public surface**,
+— plus **39** in tests (`read-file-containment.test.ts` 7, `read-file.test.ts` **9**,
+`wave-4-correctness.test.ts` 4, `read-file-presentation-characterization.test.ts` 9,
+`read-file-containment-shapes.test.ts` 6, `lru-eviction-characterization.test.ts` 2,
+`read-file-project-root-rename-pin.test.ts` 2 — the last four postdate this section). The larger
+number **strengthens** the constraint this section exists to state, not weakens it.
+**The constructor's arity and parameter type are public surface**,
 in R-06's class, and neither `spec.md` nor the parent names it. The extraction must keep
 `constructor(symbolGraph?: SymbolGraphService)` exactly; the service is constructed *inside* it, not
 injected through it.
@@ -447,15 +453,23 @@ everything else into a new `services/file-read/`. Boundaries follow the state ea
 
 | # | module | contents (source spans) | ≈ LOC |
 | --- | --- | --- | --- |
-| 1 | `services/cache/lru-evict.ts` | `evictOldest` `:472-483` — a function taking `(cache, cap)`, **not** a class (§5.2) | ~25 |
+| 1 | `services/cache/lru-evict.ts` | `evictOldest` `:472-483` — ~~a function taking `(cache, cap)`~~ → **a post-call bound `(cache, maxRetained)`, pre-insert callers passing `CAP − 1` (C44, T6, `tasks.md` §10.7; §8.1 row 15)**: the five sites do not share a predicate (three evict pre-insert on `>=`, two post-insert on `>`), one shared operator fails T1's oracle in **both** directions (3p/2f either way), and the bound is exact rather than a compromise — `size > cap − 1` ≡ `size >= cap` over integers. **Not** a class (§5.2) | ~25 |
 | 2 | `services/file-read/path-containment.ts` | `checkPathContainment` `:387-448` + `resolveFilePath` `:350-385` | ~110 |
 | 3 | `services/file-read/project-root-cache.ts` | `getProjectRoot` `:450-470` + `projectRootCache` + `ROOT_CACHE_TTL` + the `eventBus` subscription `:162-171` | ~50 |
 | 4 | `services/file-read/file-content-cache.ts` | `readFileWithCache` `:518-580` + `fileCache` + `CACHE_TTL` + `FILE_CACHE_MAX_ENTRIES` + `interface CachedFile` `:68-72` | ~85 |
 | 5 | `services/file-read/file-metadata.ts` | `extractMetadata` `:582-628` + `detectLanguage` `:645-681` + `extractImports` `:683-706` + `interface FileMetadata` `:58-66` | ~125 |
-| 6 | `services/file-read/line-range.ts` | `calculateRange` `:485-507` + `adjustRange` `:509-516` + `extractLines` `:630-643` + `interface ReadRange` `:53-56` + `MASSA_AI_READ_FILE_MAX_LINES` `:22-36` + the N9 clipping `:235-249` | ~90 |
-| 7 | `services/file-read/read-file.service.ts` | the orchestrator — `interface ReadFileParams` `:38-51`, the compression decision `:251-255`, result assembly `:257-283`, token math + recommendation `:285-322`, usage tips `:324-336`; composes 2–6 | ~120 |
-| 8 | `services/indexing/execute-indexing.ts` | `index_project.ts`'s `executeIndexing` `:254-351` (`spec.md` §4.2) | ~110 |
+| 6 | `services/file-read/line-range.ts` | `calculateRange` `:485-507` + `adjustRange` `:509-516` + `extractLines` `:630-643` + `interface ReadRange` `:53-56` + `MASSA_AI_READ_FILE_MAX_LINES` `:22-36` + the N9 clipping `:235-249`. **C66 (T11, `tasks.md` §10.13; §8.1 row 17): as written, `calculateRange`'s parameter is `ReadFileParams` — which this table gives to module 7, the module that COMPOSES this one — a third boundary-crossing edge, handed to nobody where the note below names two. Resolved at T11: module 6 declares `interface LineRangeRequest` (the four fields it reads), which `ReadFileParams` satisfies structurally** | ~90 |
+| 7 | `services/file-read/read-file.service.ts` | the orchestrator — `interface ReadFileParams` `:38-51`, the compression decision `:251-255`, result assembly `:257-283`, token math + recommendation `:285-322`, usage tips `:324-336`; composes 2–6. **C71 (T12, `tasks.md` §10.14; §8.1 row 18): the five spans total 97 of `handle()`'s 165 comment-inclusive lines, and neither this row's ≈120 nor `tasks.md`'s `handle()` → ~15 is reachable from them** — taking only those spans leaves `handle()` at ~70 and modules 2–6 composed from inside `tools/`, which "composes 2–6" forbids; all five were also stale by T12 (pre-T7/T9/T10/T11 numbering, `ReadFileParams` by 15 lines). As built the module takes the whole try-block pipeline, the six private collaborator fields and the entire constructor composition | ~120 |
+| 8 | `services/indexing/execute-indexing.ts` | `index_project.ts`'s `executeIndexing` `:254-351` (`spec.md` §4.2) — **not free-standing: it reads `this.contextualSearch` at `:306`, which this table does not show (§8.1 row 3)**. *The span is DECLARATION-only and orphans the 8-line doc `:246-253`, while every `read_file.ts` span above is comment-inclusive — the convention is mixed per file and was unstated (**C43**, T5, `tasks.md` §10.6; §8.1 row 14); comment-inclusive the figure is 106, which is this row's own ~110 tell* | ~110 |
 | 8b | `services/project-identity/project-root-identity.ts` | `index_project.ts`'s **module-level** `canonicalizeProjectRoot` `:39-44` and `assertProjectRootReuse` `:46-68` — surfaced by C32's file-scoped rule, unnamed by `spec.md` §4.2 | ~35 |
+| 8c | `services/indexing/acquire-indexing-lease.ts` | `index_project.ts`'s managed-run lease block `:151-202` (52 comment-inclusive) — **absent from this table as written, and the omission is honest in origin: C33 minted its task (T14b) at Tasks, after this document. Without it the decomposition is short exactly the module that closes the gate's third clause** (`tasks.md` §3.6, §10.16; §8.1 row 19) | ≈128 |
+
+**This table now cites two frames at once, stated rather than renumbered (C52's rule; §8.1 row 19):
+rows 1–8b are wholly in the `d7091ac` frame** — 8b's `:39-44`/`:46-68` were `:38-43`/`:45-67` by the
+time T14 executed them — **while row 8c cites post-T13 numbers**; renumbering nine rows into a third
+frame would manufacture staleness in every citation into this table. Module 8b also shipped **63**
+lines against the ≈35 above; the delta is the sibling-convention docblock **C73** already prices
+(`tasks.md` §10.16), recorded so the estimate is not read as a defect on its own.
 
 **The module boundaries are not the dependency graph, and two edges cross them.** Named because the
 table above reads as if each module stands alone and two of them do not:
@@ -471,10 +485,13 @@ table above reads as if each module stands alone and two of them do not:
   invert so module 7 calls 5 and hands the result to 4 — and record which, because the table above
   presents them as separable and they are not. Found by the Plan Challenge gate (§10, finding 3).
 
-**Nine new files, and every one is under the DEBT-02 90% per-file floor.** `spec.md`'s **R-23**
-says *"five or six"*; measured it is **nine**, and `scripts/` is **not** measured
+~~**Nine new files, and every one is under the DEBT-02 90% per-file floor.**~~ → **Ten (C84,
+`tasks.md` §10.21): nine was true when this paragraph was written, and C33's T14b minted the tenth —
+`services/indexing/acquire-indexing-lease.ts`, table row 8c — at Tasks. Applying §8.1 row 19 widened
+the table and left this count, stated three times in this document, contradicting it.** `spec.md`'s
+**R-23** says *"five or six"*; measured it is ~~nine~~ → **ten**, and `scripts/` is **not** measured
 (`isMeasuredSource` returns `false` for `scripts/check-tools-thin.ts`), so the gate script itself is
-outside the floor. R-23 is corrected to nine and R-26's incentive pressure is scoped to these nine
+outside the floor. R-23 is corrected to ten and R-26's incentive pressure is scoped to these ten
 files only.
 
 **`services/file-read/` is not re-exported from `services/index.ts`.** Its only consumer is
@@ -666,6 +683,13 @@ handler from a helper — is drawn by the metric itself.
    declare exactly one `export class`, and **0** files declare a `handle(` without a class. The
    three non-class files (`serialize.ts`, `serialize-interfaces.ts`, `index.ts`) are helpers and a
    barrel, declare no `handle(`, and must read green.
+   **C40 (T4b, `tasks.md` §10.5; §8.1 row 9): absence is not immunity, and this item's conclusion —
+   that the shape needs no handling — shipped a hole.** Measured against the gate as T4a shipped it,
+   an object literal carrying a 200-line `handle()` **and** a module-level `Map` read **PASS**:
+   `analyzeSource` returned early with no class to check, so neither clause was ever evaluated — the
+   disposition RFS-01 AC-5's own last sentence forbids. The population predicate was widened at T4b
+   to admit object-literal handlers claiming `IToolHandler` by annotation, `satisfies` or `as`; the
+   live reading was byte-identical before and after.
 4. **The `handle()`-body measurement's robustness is currently unfalsifiable on this corpus, so a
    naive implementation could ship and only fail later.** A brace counter that strips strings,
    comments and template literals and a naive one that strips nothing produce **byte-identical**
@@ -675,6 +699,11 @@ handler from a helper — is drawn by the metric itself.
    whose `handle()` contains a string like `"unexpected token: {"` joins RFS-01 AC-5 so a future
    regex reimplementation fails rather than drifts. Found by the Plan Challenge gate (§10,
    finding 5).
+   **C40's sizing note (T4b, `tasks.md` §10.5; §8.1 row 12): the named `{` fixture discriminates
+   against a naive brace counter at exactly ONE span** — a `handle()` of 120 where the counter
+   overshoots to 121 (the full falsifiable window is 121–124) — **while the `}` form discriminates
+   across the whole range above the ceiling.** Sized anywhere else, both are inert: the
+   mutation-that-resolves-to-nothing class this feature recorded at T3.
 
 ### 6.5 C32 — the thirty-ninth plan defect: *"no private method"* is the wrong predicate, and taking it literally makes the rule unshippable
 
@@ -715,6 +744,12 @@ scope is the file, not the class.**
 
 > **In a file declaring a class that implements `IToolHandler`, no function body may be declared
 > anywhere except inside `handle()`'s own.**
+>
+> *Amended by C40 (T4b, `tasks.md` §10.5; §8.1 row 9): the population is wider than "declaring a
+> class" — an object literal claiming `IToolHandler` by annotation, `satisfies` or `as` is a handler
+> too, and under the class-only population it fell out of scope entirely and read PASS carrying a
+> 200-line `handle()` plus a module-level `Map`. The shipped gate's population label dropped the
+> word "class"; a population that shrinks without an error is the exact defect this gate replaces.*
 
 That single clause subsumes every shape RFS-01 AC-5 enumerates — a private method, a public method,
 a getter or setter, a `static` member, a `#private` method, and an arrow-function class property —
@@ -750,6 +785,15 @@ on a project-identity invariant — domain logic by any reading — and both are
 `index-project-identity.test.ts` and `index-project-tool.test.ts`, so they move to
 `services/project-identity/` with two import repoints and no test rewrite. **Closed by removal, zero
 allowlist** — §4.2's own principle.
+**Two amendments to this paragraph (§8.1 rows 1 and 14).** *C43 (T5, `tasks.md` §10.6):* the span
+convention here is mixed per file — `executeIndexing` `:254-351` (98) is DECLARATION-only and
+orphans its 8-line doc `:246-253`, while every `read_file.ts` span in this document is
+comment-inclusive; comment-inclusive the figure is 106. *C33 (Tasks, `tasks.md` §3.6):* removing
+these three bodies closes clauses 1 and 2 for this file and does **NOT** close clause 3 —
+`handle()` `:117-244` = 128 > 120 sits **outside all three spans**, so the ceiling clause is closed
+by T14b's managed-run lease extraction (`:151-202` → `services/indexing/`), a task this document
+could not name because C33 was found at Tasks. *"Closed by removal"* is true of the file only once
+that fourth removal exists.
 
 **And it must be decided over an AST, not a regex.** Three regex detectors were written while
 measuring this section and **all three were wrong**, in three different ways, on the same tree:
@@ -784,12 +828,19 @@ true   MethodDeclaration    handle       <- exempt by name
 true   Constructor          constructor  <- exempt by kind
 ```
 
+*C40's frame for this table (T4b, `tasks.md` §10.5; §8.1 row 11): it is `declaresBody()`'s truth
+table for the MEMBER node, **not** a table of `BodyFinding.kind` — an arrow-function class property
+is flagged as its nested `ArrowFunction`, not as `PropertyDeclaration`, and the table omits
+`SetAccessor`, a distinct `ts.SyntaxKind` the gate handles. Second figure in this table not to
+survive being re-run, after C39.*
+
 `check-core-layering.ts`'s hand-rolled `strip()` at `:120` is **not** the precedent to copy here: it
 exists because that gate needs a per-offset *in-a-string* mask so an import statement written inside
 a fixture string is not counted as an edge (C17). This gate needs member kinds and bodies, which is
 what an AST is for.
 
-**The rule as resolved reads `RED 2 of 30`** — verified by running it, not by reasoning about it:
+**The rule as resolved reads `RED 2 of 30`** — the clauses' **union**; per clause the reading is
+2 / 1 / 2 (§6.6 property 2, C42) — verified by running it, not by reasoning about it:
 25 handler files PASS with `bodies=0`, 3 files are `n/a` (no `IToolHandler` class), and the two RED
 are `read_file.ts` (**13** maximal bodies outside `handle()`, 2 `Map` fields, `handle()` 175) and
 `index_project.ts` (**3** bodies, 0 `Map`, `handle()` 128). The evasion fixture above reads **FAIL**
@@ -798,6 +849,13 @@ for `read_file.ts` rather than 13, because `checkPathContainment` contains three
 `.filter` arrows at `:423`, `:424`, `:440` and `extractLines` one at `:638-641`. **The baseline
 counts maximal bodies** — a body not contained in another flagged body — and the reported number
 must say which, or the frozen reading moves on a refactor that changes nothing.
+**C39 (T4a, `tasks.md` §10.4; §8.1 row 8): the two raw body figures here were measured under two
+different constructor conventions** — the 18 for `read_file.ts` COUNTS the constructor while
+`index_project.ts`'s 3 does not, and **18 / 3 is a pair no single convention produces**
+(ctor-exempt: 17 / 3; ctor-counted: 18 / 4). The nested list this paragraph implies is also short by
+one: 13 plus the four named arrows is 17, the fifth item being the constructor entry, which is not a
+nested arrow. **The maximal figures 13 and 3 are identical under both conventions, so RFS-01 AC-3's
+frozen base is untouched by this defect.**
 
 **Owed back to the parent `spec.md`** as **C32**, amending `spec.md` §4.1's stated rule and §3.A's
 population method, alongside C29–C31.
@@ -805,23 +863,41 @@ population method, alongside C29–C31.
 ### 6.6 The properties the task must honour
 
 1. **Frozen base reading before the first extraction commit** (RFS-01 AC-3), and **after `git add`**
-   — the gate enumerates `git ls-files` exactly as `check-core-layering.ts:186` does, so its own two
-   files are invisible to it while untracked. This has cost this feature twice already.
-2. **The reading is `2 of 30` on the body/`Map` clauses and `2 of 27` on the `handle()` clause, and
-   it is the same two files** — `read_file.ts` and `index_project.ts`. Record both, because a third
-   clause that flags no file the other two miss is a clause whose contribution is unmeasured on this
-   tree; its value is prospective and the record must say so.
+   — the gate enumerates `git ls-files` exactly as `check-core-layering.ts:186` does.
+   ~~so its own two files are invisible to it while untracked~~ → **The stated mechanism does not apply to the
+   gate's own files (§8.1 row 6; R-37): they live under `scripts/`, outside its `tools/` population,
+   tracked or not. The real precondition the `git add` protects is that nothing changes the
+   `packages/core/src/tools/` population before T5's reading is taken** — believing the wrong
+   mechanism is how the real one goes unnamed. This has cost this feature twice already.
+2. **The reading is ~~`2 of 30` on the body/`Map` clauses~~ → per clause `2 / 1 / 2` (C42, T5,
+   `tasks.md` §10.6; §8.1 row 13) — clause 2 flags `read_file.ts` ALONE, `index_project.ts` carrying
+   0 `Map`/`Set` state, so the stated `2 of 30` is the clauses' UNION — and `2 of 27` on the
+   `handle()` clause, the same two files** — `read_file.ts` and `index_project.ts`. Record each
+   clause separately, because a clause that flags no file the others miss is a clause whose
+   contribution is unmeasured on this tree; measured at T5 that sentence is true of clause **2** as
+   well (its RED set is a strict subset of both others), and this property as first written said it
+   only of the third. **And the `handle()` clause is not closed by the removals §4.2 names (C33,
+   `tasks.md` §3.6; §8.1 row 1)** — all three extracted spans sit outside `handle()` `:117-244` =
+   128, so clause 3 needed T14b's lease extraction.
    **Record it per member, not per file** — C32: every detector tried got the per-file verdict right
    and the per-member count wrong, so a file-level `2 of 30` is not evidence the instrument works.
    The baseline enumerates, by AST, **13 maximal bodies + 2 `Map` fields + `handle()` 175 in
    `read_file.ts`** and **3 maximal bodies + `handle()` 128 in `index_project.ts`**, each with its
-   line span. The three regexes tried reported 8 / 0, 8 / 1 and 11 / 1 for those two files — all
-   three RED, none right.
+   line span — *figures identical under either constructor convention (C39, §8.1 row 8), which is
+   why the frozen base survives that defect*. The three regexes tried reported 8 / 0, 8 / 1 and
+   11 / 1 for those two files — all three RED, none right.
 3. **The examined population printed on a PASS** (RFS-01 AC-1), on `check-core-layering.ts`'s
    `edgesExamined` precedent at `:277-281`: *"a check that resolved nothing also …"*.
 4. **Both directions observed red, plus an inert control** (RFS-01 AC-4). The inert control is
    `serialize.ts` — 438 lines, three function-local `Map`/`Set` constructions, no `handle()` — which
    must stay PASS **while still being counted**.
+   **C41 (T4b, `tasks.md` §10.5; §8.1 row 10): this property substituted `serialize.ts` for the
+   control `spec.md` AC-4 actually named — *"a legal public method added must stay PASS"* — without
+   striking the clause it replaced, and the two are not the same subject**: one is a file with no
+   handler class, the other a member of a green one, and only the first behaves as claimed. Measured
+   at T4b, a public method reads **RED** — C32's predicate is a declared body and never consults
+   visibility — so AC-4's public-method criterion was struck and amended in place, and it is one of
+   T25's questions. *A document that quietly substitutes a different subject reads as agreement.*
 5. **The gate is committed before it is wired to CI — but its unit suite is not "unwired", and the
    first draft of this property said otherwise.** A *script* not referenced by `ci.yml` cannot fail
    a build. Its *suite* can: `"test:scripts": "bun test scripts/__tests__ …"` **auto-discovers every
@@ -859,12 +935,13 @@ component (§6's third clause, inside an existing deliverable).
 | **A. The gate** — `check-tools-thin.ts` + unit suite + `ci.yml` | 3 | 2 |
 | **B. LRU unification** — `services/cache/lru-evict.ts` + 4 sites repointed + characterization | 5 + tests | 1 |
 | **C. `read_file.ts` extraction** — 490 of 707 lines into 6 modules | 1 + 6 + 3 test files | 6 |
-| **D. `index_project.ts`** — `executeIndexing` out, **plus the two module-level helpers C32's file scope surfaces** | 1 + 2 test files repointed | 2 |
-| **E. The rename** — `services/graph/` → `services/memory-graph/` | **7** `git mv` + **19** editors / **28** lines (6 `mock.module`) + 3 prose + 9 fixture citations | 0 |
+| **D. `index_project.ts`** — `executeIndexing` out, **plus the two module-level helpers C32's file scope surfaces**, **plus the managed-run lease block `:151-202` (C33, `tasks.md` §3.6; §8.1 row 1): the three extractions named here all sit OUTSIDE `handle()` `:117-244`, so the ceiling clause stays red at 128 > 120 without T14b's lease module — this group as first written could not close the gate** | 1 + 2 test files repointed | ~~2~~ → **3** |
+| **E. The rename** — `services/graph/` → `services/memory-graph/` | **7** `git mv` + **19** editors / **28** lines (6 `mock.module`) + 3 prose + ~~9~~ → **8 fixture citations (C83, `tasks.md` §10.19; §8.1 row 20 — this document's own §1.4 and R-32 both say Eight, and 8 is the measured count at `f06b01d`, `d7091ac` and `e58c08e` alike; the 9 was never true at any baseline)**. *This cell's "3 prose" and §3.5 item 2's R-32 "3" are differently-derived sets whose membership this cell never stated — the conflation is what left `docs/ONBOARDING.md:225` owned by no row (**C82**, §10.19)* | 0 |
 | **F. Vestigial sweep** (RFS-04) — `IHybridSearch`, `BatchCommand`, `data/vector/index.ts` | 3 + `package.json` surface checks | 0 |
-| **G. The record** (RFS-05) — 6 stale statements, **C28–C32** into the parent, layer figures, `check-coverage` entry + its test, `CLAUDE.md` figures | ~8 | 0 |
+| **G. The record** (RFS-05) — ~~6 stale statements~~ → **1 stale statement (§8.1 row 5: RFS-05 AC-1's six were already corrected by the Specify commit; one remained for the work to carry)**, **C28–C32** into the parent, layer figures, `check-coverage` entry + its test, `CLAUDE.md` figures | ~8 | 0 |
 
-**Nine new source files under the 90% per-file coverage floor** (§5.1), plus two under `scripts/`
+~~**Nine**~~ → **Ten new source files under the 90% per-file coverage floor** (§5.1; **C84**,
+`tasks.md` §10.21 — T14b's lease module is the tenth), plus two under `scripts/`
 which the floor does not measure.
 
 **Read against the precedent, not against the count.** **R-25** is the number that matters: PR-C
@@ -901,7 +978,7 @@ sets existed. Phase 6 is the obvious candidate cut point: it shares no file with
 | R-28 | **The rename ships essentially ungated.** `check-stale-pointers` sees 1 of 19 files (§1.4) and 6 of the 28 edges are `mock.module` strings `tsc` cannot see | A missed `mock.module` specifier does not fail — the mock silently stops applying and the test runs against the real module. That is T13's collision class one step over | The acceptance reading is the **resolver sweep** (0 members, 0 resolvable importers of the old path), not a grep count — which would miss all 12 production edges. The 6 specifiers are enumerated in §1.4 so no task re-derives them |
 | R-29 | **`lru-evict.ts` in `services/cache/` loses the CI-enforced leaf-ness the kernel path would have had** | RFS-02 AC-3 was written against `check-core-layering`'s clause 1. `services/cache/` is not the kernel, so no tier rule constrains its imports | AC-3's replacement property — *imports nothing at all* — is asserted by the module's own unit test. Weaker than a CI clause and recorded as such (§5.2), not glossed |
 | R-30 | **`N = 125` has 14 lines of headroom over a bottom-up estimate of ≈111** | G-HUB sat at 696/700 through PR-C — four lines — and PR-B's T13 crossed its ceiling twice while writing the file | N is a **ceiling with a stated derivation** (§3.1) and the acceptance reading records the **actual**. If the actual lands materially below 100, the schema was altered and the byte-identity check is the thing that failed |
-| R-31 | **`handle()` shrinking 175 → ~15 is the largest behavior-preserving rewrite in the PR, and the recommendation block has zero assertions anywhere** | Measured across the only four suites that exercise `ReadFileTool` (`read-file`, `read-file-containment`, `wave-4-correctness`, `e2e/08.search`) — see the table below | **Unit-level characterization of `:282-336` written before Phase 3**, and treated as new-test authorship, not verification. R-26 applies: these are exactly the tests that get written fast under a red coverage gate |
+| R-31 | **`handle()` shrinking 175 → ~15 is the largest behavior-preserving rewrite in the PR, and the recommendation block has zero assertions anywhere** | Measured across ~~the only four suites that exercise `ReadFileTool`~~ → **the four suites that exercise it directly** (`read-file`, `read-file-containment`, `wave-4-correctness`, `e2e/08.search`) — *a fifth, `apps/tools-api/src/routes/file.test.ts`, predates this document and names the class, though it mocks it wholesale, so the count was short while the conclusion held (C38, T3, `tasks.md` §10.3; §8.1 row 7)* — see the table below | **Unit-level characterization of `:282-336` written before Phase 3**, and treated as new-test authorship, not verification. R-26 applies: these are exactly the tests that get written fast under a red coverage gate |
 
 **R-31's first mitigation was false and the gate caught it (§10, finding 2).** This row originally
 cited `packages/core/src/__tests__/test-seam/fixtures/read-file-response.json` as *"already pins the
@@ -922,19 +999,22 @@ What is actually characterized, per key, over those four suites:
 | N9 clipping `:235-249` | 15 | `source_clipped` in `read-file-containment` + `wave-4-correctness` | ✅ covered |
 | result assembly `:257-283` | 27 | `lineRange` ×3 suites, `absolutePath` ×2, `metadata.language` ×3, `.symbols` ×2, `.imports` ×1, `compressed` ×1 | ✅ covered |
 | compression decision `:251-255` | 5 | `compress: true` in 2 suites | ⚠️ reached, not asserted |
-| token math `:285-322` | 38 | `tokens` ×1, `compressionRatio` ×1 — **both only `e2e/08.search`**, which needs a live PostgreSQL; `savingsPercent` **0** | ⚠️ e2e-only |
+| token math `:285-322` | 38 | ~~`tokens` ×1, `compressionRatio` ×1~~ → **`tokens` ×2 (`e2e/08.search:675`, `:676`) and `compressionRatio` 0 — the assertion credited to it is `e2e/08.search:556`, inside F28, which calls `compressContext(...)` and reads `compress_context`'s `metadata.compressionRatio`, a different tool and a different path; `ReadFileTool` assigns the field at `data`'s top level and never under `metadata`. Both `tokens` assertions also sit behind a `catch { return }` that skips them silently on an LLM timeout (C38, T3, `tasks.md` §10.3; §8.1 row 7)** — only `e2e/08.search`, which needs a live PostgreSQL; `savingsPercent` **0** | ⚠️ e2e-only, and thinner than first credited |
 | **usage tips `:324-336`** | **13** | **`recommendations` — 0 files, in any of the four** | ❌ **unguarded** |
 
 **The correct figure is not "56 of 98 uncharacterized"** — which is what a segment-level reading
 gives — but **13 lines with no assertion anywhere plus 38 reachable only through an e2e suite the
-default unit path does not run**. The five `recommendations.push` sites (`:282`, `:304`, `:318`,
-`:326`, `:333`) and the four literal strings they emit are user-visible MCP output and are pinned by
-nothing.
-| R-32 | **The `services/graph/` rename touches `scripts/__tests__/check-coverage.test.ts`, the same file §4 adds an assertion to** | Eight fixture citations there (§1.4) name `src/services/graph/graph-queries.ts` | They are synthetic (`BASE = "/repo/…"`, never resolved), so no test breaks. Sequence Phase 6 after Phase 7's `check-coverage` edit, or accept one merge conflict in one file |
+default unit path does not run**. ~~The five `recommendations.push` sites (`:282`, …)~~ → **The FOUR
+`recommendations.push` sites (`:304`, `:318`, `:326`, `:333`) — `:282` is the array initializer, not
+a push (T3, `tasks.md` §10.3; §8.1 row 2)** — and the four literal strings they emit are user-visible
+MCP output and are pinned by nothing. With C38's corrections, `recommendations`, `savingsPercent`
+**and** `compressionRatio` all have **zero** assertions anywhere.
+| R-32 | **The `services/graph/` rename touches ~~`scripts/__tests__/check-coverage.test.ts`, the same file~~ → THREE files Phase 7 also edits (§3.5 item 2; §8.1 row 4): `scripts/__tests__/check-coverage.test.ts` AND `scripts/check-coverage.ts` (docblock `:279`) AND `CLAUDE.md` (`:237`)** — the first being the file §4 adds an assertion to | Eight fixture citations there (§1.4) name `src/services/graph/graph-queries.ts`; the other two files carry one prose citation each | They are synthetic (`BASE = "/repo/…"`, never resolved), so no test breaks. Sequence Phase 6's prose repoint after Phase 7's `check-coverage` edit (T18 after T21, `tasks.md` §6 item 9), or accept merge conflicts in shared files |
 | R-33 | **A merge-blocking gate gains a `typescript` dependency** (§6.5) | `check-tools-thin.ts` runs in `ci.yml`'s `build` job, which is in `main`'s live `required_status_checks`. `typescript` is a **dev**Dependency (`^5.4.0`, resolved 5.9.3) | Precedented: `scripts/verify-tree-sitter-grammars.ts` already imports it and already runs in CI after `bun install`. The gate runs only in `build`, never in the Docker targets. **Pin the behaviour, not the version**: the unit suite must assert the nine member-kind classifications directly, so a `typescript` bump that changes them fails `test:scripts` rather than the gate |
 
 **Inherited and unchanged:** R-04, R-07, R-20, R-21, R-22, R-26, R-27.
-**R-23 is corrected: nine new files under the coverage floor, not five or six** (§5.1), and
+**R-23 is corrected: ~~nine~~ → ten new files under the coverage floor, not five or six** (§5.1;
+**C84**, `tasks.md` §10.21 — nine predates T14b's lease module), and
 `scripts/` is outside the floor, so §6's gate script is not subject to R-26's incentive.
 **R-24 is corrected: six changes, not five** (§7).
 
@@ -1039,8 +1119,11 @@ first three are `spec.md` §10's; the fourth is this Design's:
    the containment module moves and before `coverage` can turn "write tests" into "write tests
    fast" (R-26).
 4. **R-31's `handle()` characterization gap** — **author** unit-level characterization for
-   `recommendations` (0 assertions anywhere, 5 push sites, 4 literal strings) and for the `tokens` /
-   `savingsPercent` / `compressionRatio` block (assertable today only through an e2e suite needing a
-   live PostgreSQL), **before Phase 3**. This is new-test authorship, not verification of an existing
+   `recommendations` (0 assertions anywhere, ~~5~~ → **4** push sites — `:282` is the initializer
+   (T3, `tasks.md` §10.3; §8.1 row 2) — 4 literal strings) and for the `tokens` / `savingsPercent` /
+   `compressionRatio` block
+   (~~assertable today only through an e2e suite needing a live PostgreSQL~~ →
+   **`tokens` e2e-only ×2 behind a `catch { return }`; `savingsPercent` and
+   `compressionRatio` 0 assertions anywhere — C38, §10.3; §8.1 row 7**), **before Phase 3**. This is new-test authorship, not verification of an existing
    fixture — the fixture cited for it is a different tool's response (R-31). It needs its own task
    line, not a bullet.
