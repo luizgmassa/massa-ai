@@ -1,5 +1,26 @@
 # Handoff
 
+## Active — DA Inventory Closure (Specify DONE 2026-08-03)
+
+- **Feature:** `da-inventory-closure` — disposition + closure of DA-01..DA-17 from
+  `.specs/reports/cross-pollination-portability-and-gaps.md`. Contract:
+  `.specs/features/da-inventory-closure/spec.md` (the Re-verified table is the triage record;
+  read it, not this file). Branch `spec/da-inventory-closure`, worktree
+  `.claude/worktrees/da-inventory-closure`, from `origin/main` @ `8e63477` (v1.19.0).
+- **State:** Specify complete — 17 rows re-measured at HEAD: 7 FIX / 8 RESOLVED / 1 ROUTED /
+  2 ACCEPTED. Next: Design (DI-01/02/05 need shape decisions), Tasks, full Plan Challenge,
+  Execute, independent validation.
+- **Worktree provisioning note (measured):** `bun install` here exited 0 while node-gyp silently
+  failed under Node 25.9.0 (macOS arm64) — no native tree-sitter builds; repaired by copying the
+  4 `node_modules/tree-sitter*/build/` dirs from the main checkout; contract suite then 9/0.
+  DI-06 turns this into a documented rule.
+- **User process constraints:** `.ua/` data committed, token + trash excluded (flagged);
+  `.specs/reports/` removed at end after content sweep; one PR; `skills-directive-dedup` parked,
+  untouchable.
+- **Environment facts that carry:** native PG on `localhost:5432/massa_ai` + dedicated
+  `127.0.0.1:5433/massa_ai_test`; massa-ai MCP server not consulted this session
+  (`.specs/` canonical).
+
 ## Previous — Cross-Pollination Ports & Gap Closure (VALIDATED PASS; **MERGED as PR #61 @ `0084d1a` 2026-08-03, RELEASED as v1.19.0 @ `8e63477`**)
 
 - **Feature:** `cross-pollination-ports` — implement the still-live items of

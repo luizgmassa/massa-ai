@@ -1,5 +1,37 @@
 # massa-ai Spec State
 
+## Current — DA Inventory Closure (Specify DONE 2026-08-03; Design next)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-da-inventory-closure` · workflow:
+  spec-driven (Large) · branch `spec/da-inventory-closure`, worktree
+  `.claude/worktrees/da-inventory-closure`, cut from `origin/main` @ `8e63477` (v1.19.0).
+- Scope: the DA-01..DA-17 inventory of `.specs/reports/cross-pollination-portability-and-gaps.md`
+  §"(a) already documented", re-measured row-by-row at `8e63477` (the report is a week stale and
+  was written at `45daaa1`). Full disposition table with per-row evidence:
+  `.specs/features/da-inventory-closure/spec.md`.
+- Outcome of triage: **7 FIX** (DI-01 LLM seam export + embedded-suite pin; DI-02 UNION GUARD
+  wiring sensor; DI-03 `subagent-skills-plugin-parity` registry truth — validated PASS 2026-07-23
+  yet still "Specify-only" in the registry; DI-04 stale STATE notes annotated; DI-05 hermetic
+  runner config dir; DI-06 native-grammar worktree-provisioning doc; DI-07 CONTRIBUTING
+  measurement-discipline section), **8 RESOLVED** with evidence (DA-02/03/06/07/08/09/12 + DA-14's
+  code half — BEH-01 shipped it in v1.9.1), **1 ROUTED** (DA-10 → `sqlite-removal-followup`),
+  **2 ACCEPTED** (DA-04 CodeQL platform behavior; DA-13 do-not-chase flakes, already documented).
+- Session measurements worth keeping: fresh-worktree `bun install` under Node 25.9.0 on macOS
+  arm64 exits 0 with **no native tree-sitter build** (silent node-gyp failure) → exactly DA-16's
+  3 red suites; copying `node_modules/tree-sitter*/build/` from the provisioned main checkout
+  turned the contract suite 9/0 (DI-06 documents this). Importing `@massa-ai/shared` eagerly
+  reads the real config dir (malformed-sentinel probe hit `dist/config/index.js:233` + module-level
+  "Smart Rate Limiter initialized") — DA-15's mechanism, 94 importing core test files (was 75).
+- Process constraints (user, this session): commit `.ua/` data files (the `.gitignore` premise is
+  false — `git check-ignore` exit 1, nothing ignores `.ua/`); do NOT commit
+  `.ua/tmp-dashboard-token.txt` (credential-shaped) or `.ua/.trash-*` (transient) — flagged;
+  remove `.specs/reports/` as the final development step after a content sweep; one PR;
+  `skills-directive-dedup` (parked T5/12) untouchable.
+- massa-ai MCP server not consulted; `.specs/` files canonical per contract.
+- Next action: **Design** (`design.md`) — DI-01 seam surface + sufficiency measurement, DI-02
+  drop-seam shape, DI-05 hermetic-routing rule + parity measurement plan, then Tasks, full Plan
+  Challenge, Execute.
+
 ## Previous — Cross-Pollination Ports & Gap Closure (**VALIDATED PASS 2026-08-03 — MERGED as PR #61 @ `0084d1a`, RELEASED as v1.19.0 @ `8e63477`; CI + Coverage + Release all green on the merge sha**)
 
 **Outcome.** All 19 implementation tasks done on `feature/cross-pollination-ports` (worktree
