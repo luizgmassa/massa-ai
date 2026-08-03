@@ -11,7 +11,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "crypto";
 import { MemoryRelationType } from "@massa-ai/shared";
-import { GraphStorePg } from "../services/graph/graph-store-pg.js";
+import { GraphStorePg } from "../services/memory-graph/graph-store-pg.js";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
 const DEDICATED_DB =

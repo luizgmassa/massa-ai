@@ -16,7 +16,7 @@ import {
   MemoryService,
   type ScoredMemory,
 } from "./memory-service.js";
-import { MemoryGraphService } from "../graph/memory-graph.service.js";
+import { MemoryGraphService } from "../memory-graph/memory-graph.service.js";
 import { memoryConsolidationJob } from "../jobs/memory-consolidation-job.js";
 import { getSalienceJudge } from "./salience-judge.js";
 import { eventBus } from "../events/event-bus.js";

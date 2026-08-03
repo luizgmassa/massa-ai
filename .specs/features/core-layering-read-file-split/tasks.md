@@ -44,10 +44,10 @@ the per-task write sets only Tasks produces. Those sets are now measured, repo-w
 | **3 — the extraction** | ~~13~~ → ~~14~~ → ~~20~~ → ~~25~~ → ~~29~~ → **31, and Phase 3 is now COMPLETE** | 16 | `read_file.ts` + **6** modules + **6** module suites + **C34's `read-file.test.ts` repoint** + **T9's 6 citation-repoint files** (§10.11) + **T10's 5 further ones** (§10.12: `lru-evict.test.ts`, `symbol-graph.service.ts`, `production-wiring.ts`, `invalidator-registry.ts`, `read-file-presentation-characterization.test.ts` — its other six files were already in the set, `read-file-project-root-rename-pin.test.ts` among T9's own six) + **T11's 4 further ones** (§10.13: `line-range.ts` and `line-range.test.ts` are the 2 new; `wave-4-correctness.test.ts` and `spec.md` are new to **this phase**, the latter already in the union via Phase 2 — the presentation suite and the two `check-tools-thin` files were already here). **T12 adds 2** (§10.14: `read-file.service.ts` and `read-file.service.test.ts` are the only files new to any phase; `read_file.ts`, `read-file.test.ts`, the presentation suite, `file-content-cache.ts` and `line-range.ts` were all already here). Its write set was **7** against the **4** its row provides for — the third growth in this phase, and both gate lenses reached the same 7 independently (**C72**, and the two by-claim clauses) |
 | **4 — `index_project.ts`** | **9, unchanged by T13 or T14b** | 6 | 1 handler + **3** modules + 3 module suites + **2** test repoints. **T13 shipped 4 files against its row's 3** — `index_project.ts`, `services/indexing/execute-indexing.ts`, its suite, and `index-project-tool.test.ts` — but the phase total does **not** move, because that fourth file is one of the 2 test repoints this row already carries for T14. So T13's growth is an **intra-phase overlap**, not a new file, and §1's sum/union/identity are all untouched (§10.15). *This is the first growth on this feature that does not move the table, and it was checked rather than assumed — the check working, not a coincidence.* **T14b shipped 5 against its row's 3 and the total again does not move** (§10.16): `execute-indexing.ts` is already one of this row's 3 modules and `index-project-tool.test.ts` one of its 2 test repoints, so both growths are intra-phase **re-touches**. Two consecutive tasks whose growth the table absorbs — recorded because the reason is structural (Phase 4 has one handler and a fixed module roster) and will not carry to Phase 6 or 7. **T14 shipped 6 against its row's 5 and the total does not move a THIRD time** (§10.17): `execute-indexing.ts` is one of this row's 3 modules and both repointed suites are the row's 2 test repoints, so every T14 file was already in the roster — the phase's 9, §1's sum **107**, union **86** and identity **21** all hold, re-checked rather than assumed. |
 | **5 — the gate goes green** | ~~1~~ → **3, and Phase 5 is COMPLETE** | 0 | `.github/workflows/ci.yml` + **T15's 2 C55 citation repoints** (§10.18): `check-tools-thin.test.ts:14` and `design.md:828`, both `ci.yml:200 → :215` — the gate's suite thereby enters its **third** phase and `design.md` its second |
-| **6 — the rename** | **29** | 0 | **7** `git mv` + **19** external importers + **3** prose/fixture sites |
+| **6 — the rename** | ~~29~~ → **30, T16+T17 landed as one commit** | 0 | **7** `git mv` + ~~19~~ → **20** external editors (**+ `docs/ONBOARDING.md:225`**, the unowned live prose site — **C82**, §10.19) + **3** prose/fixture sites (T18's, still owed) |
 | **7 — the record** | **16** | 1 | RFS-04's 5 + RFS-05's 9 + `design.md` (T20b) + `validation.md` |
-| **sum** | ~~83~~ → ~~86~~ → ~~92~~ → ~~101~~ → ~~105~~ → ~~107~~ → **109** | **32** | Phase 2 **+4** and Phase 3 **+11** since the 92; **Phase 5 +2 at T15** (§10.18) |
-| **distinct union** | ~~78~~ → ~~80~~ → ~~81~~ → ~~84~~ → **86** | | **unchanged by T9** — all 6 files it added to Phase 3 were already in the set. **T10 adds none either**; the **+1** there is `spec.md`, which T8b brought in and which no row recorded (**C65**). **T11 adds 3**: `line-range.ts`, `line-range.test.ts` and `wave-4-correctness.test.ts` — `spec.md` and the two `check-tools-thin` files were already in the union. **T12 adds 2**: `read-file.service.ts` and its suite; its other five files were already in it. **T15 adds none** — both its repoint files were already in the set, the suite via Phases 1 and 3 and `design.md` via Phase 7 (T20b). Against PR-C's planned **104** and PR-B's **37** |
+| **sum** | ~~83~~ → ~~86~~ → ~~92~~ → ~~101~~ → ~~105~~ → ~~107~~ → ~~109~~ → **110** | **32** | Phase 2 **+4** and Phase 3 **+11** since the 92; **Phase 5 +2 at T15** (§10.18); **Phase 6 +1 at T16/T17** (§10.19) |
+| **distinct union** | ~~78~~ → ~~80~~ → ~~81~~ → ~~84~~ → **86** | | **unchanged by T9** — all 6 files it added to Phase 3 were already in the set. **T10 adds none either**; the **+1** there is `spec.md`, which T8b brought in and which no row recorded (**C65**). **T11 adds 3**: `line-range.ts`, `line-range.test.ts` and `wave-4-correctness.test.ts` — `spec.md` and the two `check-tools-thin` files were already in the union. **T12 adds 2**: `read-file.service.ts` and its suite; its other five files were already in it. **T15 adds none** — both its repoint files were already in the set, the suite via Phases 1 and 3 and `design.md` via Phase 7 (T20b). **T16/T17 add none either** — `docs/ONBOARDING.md` was already in the union via Phase 7 (T22), so Phase 6's +1 is a **seventh** overlap, not an eighty-seventh file (§10.19). Against PR-C's planned **104** and PR-B's **37** |
 
 **Both figures are corrected at T4b (§10.5), and neither correction is T4b's own work** — they are
 the two amendments §10 recorded without carrying back into this table. **C35** minted T8b with two
@@ -58,10 +58,10 @@ overlap rather than a seventy-ninth file. *An execute-time amendment that adds a
 about the planning table, and nothing was watching that table.*
 
 **The phases are not disjoint, and the sum is not the review surface.** Measured: ~~**5**~~ → ~~**6**~~
-→ ~~**12**~~ → ~~**17**~~ → ~~**18**~~ → **19 files in more than one phase, four of them in three
-phases** (T15, §10.18), which
+→ ~~**12**~~ → ~~**17**~~ → ~~**18**~~ → ~~19~~ → **20 files in more than one phase, four of them in three
+phases** (T16/T17, §10.19 — the twentieth is `docs/ONBOARDING.md`), which
 is what takes ~~83 to 78~~ → ~~86 to 80~~ → ~~92 to 80~~ → ~~101 to 81~~ → ~~105 to 84~~ →
-~~107 to 86~~ → **109 to 86**. *(The `105 to 84` pair stood unstruck through T12–T14 while the sum
+~~107 to 86~~ → ~~109 to 86~~ → **110 to 86**. *(The `105 to 84` pair stood unstruck through T12–T14 while the sum
 and union rows above read `107` and `86` — T12's growth reached the identity line and the sum row but
 not this sentence between them. **C81**, the eighty-sixth plan defect, the C19 no-owner family one
 clause down; found and fixed at T15, the next task to edit this table.)*
@@ -72,8 +72,8 @@ every overlapping file is in **exactly two** phases. T8b put the three Phase-0 s
 T9 put them into Phase 3, so each contributes **2**, not 1. The identity is
 `sum − union = Σ (phases containing the file − 1)`, and it checks out: ~~8 files × 1 + 3 files × 2 +
 the six below × 1 = 20 = 101 − 81~~ → ~~**15 files × 1 + 3 files × 2 = 21 = 105 − 84** at T11~~ →
-~~**15 files × 1 + 3 files × 2 = 21 = 107 − 86** at T12~~ → **15 × 1 + 4 × 2 = 23 = 109 − 86 at T15**, the fifteenth two-phase file at T12 being `spec.md`, which T8b
-brought into Phase 2 and T11 brings into Phase 3 (**C68**); at T15 `check-tools-thin.test.ts` moves to the three-phase group (its fourth member) and `design.md` enters the two-phase group in its place (§10.18), both re-derived rather than assumed. **The identity is UNCHANGED by T12 and
+~~**15 files × 1 + 3 files × 2 = 21 = 107 − 86** at T12~~ → ~~**15 × 1 + 4 × 2 = 23 = 109 − 86** at T15~~ → **16 × 1 + 4 × 2 = 24 = 110 − 86 at T16/T17**, the fifteenth two-phase file at T12 being `spec.md`, which T8b
+brought into Phase 2 and T11 brings into Phase 3 (**C68**); at T15 `check-tools-thin.test.ts` moves to the three-phase group (its fourth member) and `design.md` enters the two-phase group in its place (§10.18); at T16/T17 `docs/ONBOARDING.md` becomes the **sixteenth** two-phase file (Phases 6 and 7 — **C82**, §10.19), each step re-derived rather than assumed. **The identity is UNCHANGED by T12 and
 that is the check working, not a coincidence**: both files T12 adds are in exactly one phase, so
 neither contributes a term — and it was re-derived independently by the gate's evidence-audit lens
 before being written here (§10.14).
@@ -88,7 +88,7 @@ so the check is re-run per task rather than trusted.*
 | Phase 0 ∩ Phase 3 (~~**3**~~ → **4**) | the same three — **added at T9** (§10.11), all Phase-0 suites whose comments cite spans T9 relocates; the third is RFS-02 AC-1's own main subject, which **C56 recorded as unchanged** and **C58** falsifies — plus **`read-file-presentation-characterization.test.ts`, added at T10** |
 | Phase 1 ∩ Phase 3 (**2**) | `scripts/check-tools-thin.ts` and its unit suite — **added at T9**. The gate's own docblock cited the `eventBus.subscribe` arrow it measures, and T9 moves that arrow out of `tools/` altogether (**C57**). T10 edits the gate again, for the by-FIGURE claim in its implementation (**C63**). **T11 edits both a third time** (**C69**, §10.13) — this time the gate's *code*, not its prose: `membersExamined` was pinned at 2 top-level nodes per file, and the suite's six assertions on that member were all shape assertions that pass at 2 as readily as at 14. **At T15 the suite alone enters Phase 5** (its docblock's `ci.yml:200 → :215` repoint, §10.18) — its third phase |
 | Phase 5 ∩ Phase 7 (**1**) | **`design.md` — added at T15** (§10.18): T15's C55 repoint of §6.6 property 5's `ci.yml:200 → :215`, then T20b's §8.1 corrections |
-| Phase 6 ∩ Phase 7 (**3**) | `scripts/check-coverage.ts`, `scripts/__tests__/check-coverage.test.ts`, `CLAUDE.md` |
+| Phase 6 ∩ Phase 7 (~~**3**~~ → **4**) | `scripts/check-coverage.ts`, `scripts/__tests__/check-coverage.test.ts`, `CLAUDE.md` — and **`docs/ONBOARDING.md`, added at T16/T17** (**C82**, §10.19): Phase 6 repoints `:225`, Phase 7's T22 edits `:83-87`, disjoint spans |
 | Phase 6 ∩ Phases 0–5 | **none** — measured, and it is what made Phase 6 the cut candidate |
 
 **Decision: PR-D ships as one PR, planned and committed as eight independently-revertable phases,
@@ -289,6 +289,17 @@ Tasks-level corrections to `design.md`, not new parent-spec C-numbers, except wh
    `scripts/check-coverage.ts` (`:279`, a docblock citing `src/services/graph/graph-queries.ts`) and
    `CLAUDE.md` (`:237`, the naming-trap note Phase 6 rewrites, while Phase 7 edits the same file's
    migration and package figures). *Changes what a task does* — **T18** sequences after **T21**.
+   **Amended at T16/T17 — C82, the eighty-seventh plan defect: the intersection is 4, and the miss
+   has a mechanism — two different "3"s conflated.** `design.md` §7 group E's *"3 prose"* names the
+   tracked tree's three prose carriers (`CHANGELOG.md:35`, `CLAUDE.md:237`,
+   `docs/ONBOARDING.md:225` — the only three outside `.specs/`/`.ua/`, measured); this item's "3" is
+   the R-32 file intersection above. The sets share one member, and **`docs/ONBOARDING.md:225` —
+   the same present-tense sentence as `CLAUDE.md:237`, live since before `d7091ac` — fell between
+   them, owned by no row** (T18's list is the R-32 set; T22's span is `:83-87`). Repointed **in the
+   T16/T17 commit itself** under C55/C62's standing rule (T15's precedent — the falsifying commit
+   repoints unowned live sites); `CHANGELOG.md:35` **stays**, a dated record inside the released
+   v1.17.0 entry (C52's rule). Both gate lenses found the site independently and the red-team named
+   the conflation mechanism (§10.19).
 3. **RFS-02 AC-1's "unmodified" property is unachievable for the test that already characterizes the
    LRU.** `read-file.test.ts:265-272` reaches into `ReadFileTool`'s **private** `fileCache`,
    `projectRootCache`, `evictOldest` and `FILE_CACHE_MAX_ENTRIES`. `evictOldest` moves at Phase 2 and
@@ -620,8 +631,8 @@ site is one line longer than the method call it replaces, T13's span was never i
 
 | # | task | write set | closes |
 | --- | --- | --- | --- |
-| **T16** | **`git mv packages/core/src/services/graph/ → services/memory-graph/`** — **7** files. The members' own **17** intra-directory import lines need no edit (§3.5 item 8) | 7 `git mv` | — |
-| **T17** | **Repoint 19 external importers / 28 import lines**, 7 production and 12 test. **The 6 `mock.module` string specifiers are the sharp edge** — `tsc`, `build` and `type-check` are blind to all six, and a missed one does not fail: the registration silently targets a path nothing loads and the test runs against the real module (R-28). They are in `memory-consolidation-job.test.ts`, `memory-controller.test.ts`, `search-facade-{hybrid,indexing,synapse}.test.ts` and `search-memories-tool.characterization.test.ts`. **`services/index.ts` carries 5 of the 28 lines** — *name the metric*: `:127-135` is **5 specifier lines** re-exporting **7 symbols**, which is the figure `design.md` §1.2 quotes; both are right and they are not the same number. It includes the `MemoryRow as GraphMemoryRow` collision workaround at `:132` | 19 files | — |
+| **T16** | **`git mv packages/core/src/services/graph/ → services/memory-graph/`** — **7** files. The members' own **17** intra-directory import lines need no edit (§3.5 item 8). **DONE — landed WITH T17 as ONE commit (§10.19), the first task:commit break on this feature and a measured decision**: a bare 7-file mv reads **core tsc exit 2, 13 errors across exactly the 7 production importers** (12 × TS2307 on the import lines + 1 downstream TS7006), and the 6 `mock.module` registrations degrade **silently** rather than red — so the practiced no-red-commit bar (C46's T7 precedent) beats §1.1's letter, which speaks of phases and is satisfied either way. Rejected shapes in §10.19 | 7 `git mv` | — |
+| **T17** | **Repoint 19 external importers / 28 import lines**, 7 production and 12 test. **The 6 `mock.module` string specifiers are the sharp edge** — `tsc`, `build` and `type-check` are blind to all six, and a missed one does not fail: the registration silently targets a path nothing loads and the test runs against the real module (R-28). They are in `memory-consolidation-job.test.ts`, `memory-controller.test.ts`, `search-facade-{hybrid,indexing,synapse}.test.ts` and `search-memories-tool.characterization.test.ts`. **`services/index.ts` carries 5 of the 28 lines** — *name the metric*: `:127-135` is **5 specifier lines** re-exporting **7 symbols**, which is the figure `design.md` §1.2 quotes; both are right and they are not the same number. It includes the `MemoryRow as GraphMemoryRow` collision workaround at `:132`. **DONE — same commit as T16 (§10.19).** All 28 lines rewritten by an AST-anchored instrument that refuses on population drift (read exactly 28) and on offset drift, then verifies every new specifier resolves; the resolver reads **0 files / 0 lines** against the old path and an exact **25 / 45** mirror against the new, 0 unresolvable. The 6 `mock.module` rows were **measured, not assumed**: under a single-miss mutation each, **4 of 6 are SILENT** (suite green against a dead registration — R-28's mechanism live) and **2 SENSED** (`memory-controller` 27p/5f, `search-facade-synapse` 21p/5f), so the resolver sweep is the *only* sensor for four of the six. Write set **19 → 20 files**: `docs/ONBOARDING.md:225`, the unowned live prose site (**C82**, §3.5 item 2) | ~~19~~ → **20 files** | — |
 | **T18** | **The 3 prose and fixture sites — R-32 as corrected to 3 (§3.5 item 2).** `CLAUDE.md:237`'s naming-trap note, `scripts/check-coverage.ts:279`'s docblock citation, and `scripts/__tests__/check-coverage.test.ts`'s **8** fixture citations at `:12`, `:38`, `:51`, `:58`, `:106`, `:107`, `:115`, `:143`. The fixtures are synthetic (`BASE = "/repo/packages/core"`, never resolved on disk) so **no test breaks if they are missed** — they are repointed as prose. **Sequence after T21** | 3 files | — |
 
 **Acceptance reading for Phase 6** (R-28): the **resolver sweep**, not a grep count —
@@ -829,7 +840,9 @@ Tasks PR corrected it in place rather than deferring:
 
 | 19 | `design.md` §5.1's module table (`:448-458`) | **T14b (§10.16)** — the table runs modules **1-8 plus 8b** and has **no row for the managed-run lease module at all**, so the decomposition it presents is short by the one module that closes the gate. It is not the same defect as row 1: **C33 amends §4.2's *"closed by removal"* claim and §6.6 property 2's reading, and neither of those sites is the table.** The omission is honest in origin — C33 minted T14b at **Tasks** time, after `design.md` was written — but the table is the document's only enumeration of where the extracted lines land, and a reader who counts modules from it gets nine where the shipped tree has ten. Add a row: `services/indexing/acquire-indexing-lease.ts`, `index_project.ts`'s lease block `:151-202` (52 comment-inclusive), ≈128 LOC. *A correction indexed against one site is not scheduled against the others — row 14 had to be widened at T13 for exactly this, and row 2 at T3.* **Widened at T14**: applying this row leaves the table citing TWO frames at once — rows 1-8b are wholly in the `d7091ac` frame (8b's `:39-44`/`:46-68` were `:38-43`/`:45-67` by the time T14 executed them) while the added row cites post-T13 numbers — so T20b must **state the table's frame** (C52's rule) rather than renumber nine rows into a third one. Module 8b also shipped **63** lines against the table's ≈35; the delta is the sibling-convention docblock **C73** already prices, recorded here so the estimate is not read as a defect on its own |
 
-These are **T20b**. ~~Six~~ → ~~fourteen~~ → ~~fifteen~~ → ~~sixteen~~ → ~~seventeen~~ → ~~eighteen~~ → **nineteen** corrections;
+| 20 | `design.md` §7 group E (`:863`) | **C83** (§10.19) — *"9 fixture citations"*: the document contradicts itself at both other sites naming the figure — §1.4 (`:171-178`) says **"Eight further citations"** and lists the 8 lines, R-32 (`:933`) says **"Eight fixture citations"** — and the measured count is **8** at `f06b01d`, `d7091ac` and `e58c08e` alike, so the 9 was never true at any baseline. The same cell's *"3 prose"* is unstated-membership rather than wrong, and that unstatedness is what let §3.5 item 2's differently-derived "3" read as the same set (**C82**) |
+
+These are **T20b**. ~~Six~~ → ~~fourteen~~ → ~~fifteen~~ → ~~sixteen~~ → ~~seventeen~~ → ~~eighteen~~ → ~~nineteen~~ → **twenty** corrections;
 the count in `HANDOFF.md` and `STATE.md` was last true at Design.
 
 ---
@@ -5041,3 +5054,141 @@ byte-identical to T14's. `test:scripts` **1115/0/49 + 5 shell suites** pre- AND 
 the readings. No `git add` needed before the gates — T15 creates no new tracked file.
 
 **Running total: eighty-six plan defects.**
+
+### 10.19 T16 + T17 — executed, 2026-08-03, ONE commit
+
+**The rename is landed and repointed: `services/graph/` → `services/memory-graph/`, 7 files moved,
+28 import lines rewritten, and Phase 6's acceptance reading holds in both directions — the old path
+reads `RAW: 0 files / 0 specifier lines` and the new path an exact mirror of the baseline. T18 (the
+3 prose/fixture sites) stays owed and stays sequenced after T21 (§6 item 9). Two new plan defects
+(C82, C83), running total eighty-eight.**
+
+#### The commit-shape decision — the first task:commit break on this feature, taken on a measurement
+
+The untaken position this task inherited was T16+T17 as one commit; measured before deciding:
+a bare 7-file `git mv` reads **core tsc exit 2, 13 `error TS` lines across exactly the 7 production
+importer files** (12 × TS2307 on the import lines themselves + 1 downstream TS7006 at
+`memory-clustering.ts:328`, the failed `types.js` import erasing `MemoryRowWithEmbedding` and
+collapsing a callback parameter to implicit `any`) — and the 6 `mock.module` registrations do not
+go red at all: they degrade **silently** (R-28's mechanism, confirmed live this task — see the
+table). A commit that is simultaneously red on `build` and silently degraded on its mocks is the
+exact class this feature polices. **§1.1's text is about phases** (*"each phase is its own commit
+range and must be green on its own"*) and is satisfied under either shape; the practiced bar is
+stricter — **no red commit at all** (C46: T7's delegate shape was chosen specifically to avoid one
+red commit until T8) — and only the one-commit shape meets it. **Rejected**: (a) *two commits,
+T16 then T17* — plants a permanently red, silently-degraded commit in `--no-ff`-preserved history,
+a bisect trap bought for nothing, since the mv is meaningless without its repoints; (b) *an interim
+re-export shim at the old path to keep a bare T16 green* — the shim would itself be a
+`services/graph/` member, so the phase's own acceptance reading (**0 members**) is unreachable
+while it exists: self-defeating by construction. Author level — the class rule and the measurement
+fix the answer; re-decide only if you disagree. Both §5 rows state the shared commit.
+
+#### The premeasure, reproduced before a line moved
+
+§3.5 item 8's figures were re-derived at `e58c08e` with a new resolver instrument before the mv
+(the §10.17/§10.18 norm): **RAW 25 files / 45 specifier lines** into the old directory; members
+**6 files / 17 intra-directory lines** (the 7th member, `types.ts`, imports nothing); **EXTERNAL
+19 files / 28 lines**, split **7 production files / 12 lines** and **12 test files / 16 lines**;
+**6 `mock.module` in exactly the 6 files T17's row names**; 0 unresolvable; 0 non-relative
+specifiers naming the segment (control). Every figure matches §3.5 item 8 and `design.md` §1.2.
+The 12 production lines are written `./graph/…` or `../graph/…` — no `services/` segment — so the
+literal sweep misses all 12, which is the acceptance note's stated reason, now observed rather than
+inherited. Post-rewrite, the same instrument pointed at the new directory reproduces the mirror
+**exactly**: 25/45, 6/17, 19/28 (7/12 + 12/16), 6 mock.module, **0 unresolvable**.
+
+#### The T17 discrimination table — premise stated, and the split is the result
+
+Column B's premise, said out loud: **the suites exactly as T17 ships them, run standalone** — what
+does ONE missed `mock.module` repoint read as? Each mutation reverts exactly one of the six
+specifiers to the old (dead) path; restore is byte-restore + SHA-256 verify, never `git checkout`.
+
+| # | carrier | baseline | mutated | verdict |
+| --- | --- | --- | --- | --- |
+| M1 | `memory-consolidation-job.test.ts` | 18p/0f | 18p/0f, exit 0 | **SILENT** |
+| M2 | `memory-controller.test.ts` | 32p/0f | **27p/5f, exit 1** | SENSED |
+| M3 | `search-facade-hybrid.test.ts` | 31p/0f | 31p/0f, exit 0 | **SILENT** |
+| M4 | `search-facade-indexing.test.ts` | 25p/0f | 25p/0f, exit 0 | **SILENT** |
+| M5 | `search-facade-synapse.test.ts` | 26p/0f | **21p/5f, exit 1** | SENSED |
+| M6 | `search-memories-tool.characterization.test.ts` | 13p/0f | 13p/0f, exit 0 | **SILENT** |
+| CTRL | `co-retrieval-hook.ts` production import reverted | — | tsc exit 2, TS2307 | SENSED (compiler) |
+
+**4 of 6 single-miss mock mutations are SILENT — for those four the resolver sweep is the only
+sensor in the repository**, which is the measured justification for Phase 6's acceptance reading.
+R-28 stands as a class claim with a measured refinement: 2 of 6 carriers happen to fail loudly when
+the real module replaces the mock. The red-team lens predicted non-uniformity but guessed the wrong
+axis (it named the three `search-facade-*` `getGraphStore()` carriers as the loud candidates;
+measured, hybrid and indexing are silent while synapse and `memory-controller` are the loud two) —
+per-carrier measurement beats class prediction, which was that lens's own stated point. Its /tmp
+probe independently confirmed bun 1.3.14 `mock.module` **does not throw on registering a dead
+path** and a subsequent real import resolves the real module untouched. All six restores SHA-OK;
+the control proves the mutation method produces observable breakage where a sensor exists.
+
+#### The citation adjudication — literal 268 → 251, and the residue is an enumerated set
+
+The rename removes 17 literal lines (the 16 test-file import lines + `docs/ONBOARDING.md:225`).
+Post-commit residue, classified with frames so T25 can tell a scheduled transient from a defect
+(C59's rule):
+
+| class | population | disposition |
+| --- | --- | --- |
+| outside `.specs/`/`.ua/` | **11 lines / 4 files** | the enumerated scheduled set, nothing else: `CHANGELOG.md:35` — **stays permanently**, a dated record inside the released v1.17.0 entry (C52's rule); `CLAUDE.md:237` + `scripts/check-coverage.ts:279` + `scripts/__tests__/check-coverage.test.ts` × 8 — **T18's, scheduled transients** across the T16→T21 window (§6 item 9) |
+| `.specs/` | 40 lines / 12 files | frame-stated records and plan rows — plan text is the record's own language (C52) |
+| `.ua/` | 200 lines / 3 files | deferred per `spec.md` §4.4; **verified already-excluded** from every gate (`check-stale-pointers.ts:170` `EXCLUDED`, `.oxlintrc.json` ignore) — checked so a later reader does not re-discover them as misses |
+
+`docs/ONBOARDING.md:225` itself: **C82** (§3.5 item 2's amendment carries the mechanism — two
+differently-derived "3"s conflated between `design.md` §7 group E and the R-32 correction, the site
+falling between the sets, owned by no row). Repointed in this commit under C55/C62 (T15's
+precedent). The evidence-audit lens' alternative — fold it into T18 — was **rejected**: it leaves
+the line false across the whole T16→T21 window with zero sensor, exactly what C55's rule exists to
+prevent. **C83** is §8.1 row 20: group E's *"9 fixture citations"* contradicts `design.md`'s own
+§1.4 and R-32 (both "Eight") and the measured 8 at all three baselines — never true.
+
+#### Gates — each with its population frame
+
+`lint` **0**. `type-check` **6/6, 0 cached, forced**. `build` **5/5, 0 cached, forced**.
+`bun run test` exit **0 on the first run**, 11/11, 5 cached and **all five `:build`** (verified by
+task name), core isolation **273 files / 151 groups — both unchanged** (a rename moves no test
+file). `test:scripts` **1115 pass / 0 fail across 49 files** + shell suites, exit 0 (pre-side
+baseline is §10.18's identical reading at `e58c08e`). `test:plugins` **96/0 across 8**.
+`check-core-layering` **PASS — 0 violation(s) across 986 tier-to-tier edges in 922 tracked files —
+count-identical to T14/T15** (frame: the rename moves edge endpoints within the `services/` tier;
+`edgesExamined` recorded per §1.1). `check-tools-thin` **byte-identical to the pre-mv run**
+(`PASS — 0 of 30 … 399 members`; frame: its population is `tools/`, untouched).
+`check-stale-pointers` `PASS — 0 broken, historical exactly at its pin of 28` — **recorded as the
+nothing-else-broke regression frame ONLY, not as rename corroboration**: `PREFIX_STEMS`
+`["rlm","search-facade"]` / `SUFFIX_STEMS ["controller"]` match none of the 7 renamed basenames, so
+this gate is structurally blind to the rename (the red-team lens' explicit finding; `design.md`
+§1.4 said so and it was re-read, then re-run, this session). Host load 3.59 at the readings —
+T15 parity.
+
+#### The Plan Challenge gate on T16/T17 — two modes, and the first task where no author figure fell
+
+**Evidence audit: 10 of 10 figures REPRODUCE** against independent read-only re-derivation
+(resolver baseline and instrument audited — `vi.mock`/`jest.mock` measured **0** occurrences, a
+latent-but-inert instrument blind spot; tsconfig `paths`, `package.json` `exports`, plugin bundles,
+`turbo.json` all clean), snapshot SHA-256-verified before and after both critics. Its adopted
+strengthening: the acceptance must include the **literal enumerated-set check** above alongside the
+resolver sweep, because prose is invisible to an AST. Its ownership alternative for `:225` was
+rejected with the reason stated. **Red team: mechanism findings, all absorbed** — C82's root cause
+must be recorded as set-conflation rather than "+1 file" (adopted, §3.5 item 2); stale-pointers
+must not be framed as corroboration (adopted, above); the discrimination table must not pre-commit
+to uniform silence (adopted — and vindicated by the 2/4 split); it also re-ran three gates at
+baseline getting byte-identical readings, and live-probed the dead-path mock mechanism. Neither
+lens falsified an author figure — a first on this feature after fourteen-plus inversions; both
+critics' file sets were SHA-verified unchanged after their runs, and no mutation harness overlapped
+a critic (the T7 rule, held).
+
+#### Residuals, named
+
+The local pgvector index (if populated) keys embeddings by file path and does not re-index on a git
+rename — an operational follow-up outside every file-scoped gate, owed a line in `HANDOFF.md`, not
+a blocking gap. `.ua/`'s 200 stale-to-be lines regenerate after PR-D (`spec.md` §4.4). The first
+live CI run of the renamed tree still happens when the PR opens (T15's residual, unchanged).
+
+**Instruments** (`~/prd-exec-instruments/`, 75 → 78): `t16-resolver-sweep.ts` (parameterized
+target; population printed before rows; containment judged on the resolved path so it measures
+both the pre-state and the post-state's absence), `t16-rewrite.ts` (refuses on a pre-mv tree, on a
+population ≠ 28, on offset drift, and on any dangling result), `t17-mock-discrimination.ts`
+(refuses off the post-rename tree; byte-restore + SHA-256 per row; never git-restores).
+
+**Running total: eighty-eight plan defects.**

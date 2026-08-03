@@ -40,7 +40,7 @@ let mockBfsNeighbors: (ids: string[], depth: number) => string[] | Promise<strin
 let mockFullTextSearch: (query: string, n: number, filters: any) => Promise<any[]> = async () => [];
 let mockGetById: (id: string) => Promise<any> = async () => null;
 
-mock.module("../services/graph/graph-store-factory.js", () => ({
+mock.module("../services/memory-graph/graph-store-factory.js", () => ({
   getGraphStore: () => ({
     bfsNeighbors: (ids: string[], depth: number) => mockBfsNeighbors(ids, depth),
   }),

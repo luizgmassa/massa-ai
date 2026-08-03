@@ -124,15 +124,15 @@ export {
 export type { ModelPricing } from "./pricing/models-dev-client.js";
 
 // Graph (knowledge graph over memories)
-export { MemoryGraphService } from "./graph/memory-graph.service.js";
-export { GraphStorePg } from "./graph/graph-store-pg.js";
-export { GraphQueries } from "./graph/graph-queries.js";
-export { RelationExtractor } from "./graph/relation-extractor.js";
+export { MemoryGraphService } from "./memory-graph/memory-graph.service.js";
+export { GraphStorePg } from "./memory-graph/graph-store-pg.js";
+export { GraphQueries } from "./memory-graph/graph-queries.js";
+export { RelationExtractor } from "./memory-graph/relation-extractor.js";
 export type {
   MemoryRow as GraphMemoryRow,
   MemoryRowWithEmbedding,
   RelatedMemory,
-} from "./graph/types.js";
+} from "./memory-graph/types.js";
 
 // Memory (domain service + quality)
 export { MemoryService } from "./memory/memory-service.js";

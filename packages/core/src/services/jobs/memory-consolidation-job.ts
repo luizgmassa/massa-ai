@@ -21,8 +21,8 @@
 import { logger, MemoryLevel, MemoryType, MemoryRelationType } from "@massa-ai/shared";
 import { randomUUID } from "crypto";
 import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
-import { getGraphStore } from "../graph/graph-store-factory.js";
-import type { IGraphStore } from "../graph/types.js";
+import { getGraphStore } from "../memory-graph/graph-store-factory.js";
+import type { IGraphStore } from "../memory-graph/types.js";
 import { eventBus } from "../events/event-bus.js";
 import { decayScore, DEFAULT_DECAY_PARAMS } from "../memory/decay.js";
 import { consolidateWindow, rowsToCandidates, type LlmSurface } from "../memory/consolidator.js";

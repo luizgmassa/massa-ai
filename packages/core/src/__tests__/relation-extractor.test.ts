@@ -9,7 +9,7 @@
 
 import { describe, test, expect, beforeEach, mock, afterEach } from "bun:test";
 import { MemoryRelationType } from "@massa-ai/shared";
-import type { MemoryRow } from "../services/graph/types.js";
+import type { MemoryRow } from "../services/memory-graph/types.js";
 
 // Restore any stale mocks from sibling files sharing the module registry.
 mock.restore();
@@ -34,7 +34,7 @@ mock.module("../services/embeddings/index.js", () => ({
   createEmbeddingProvider: mock(async () => { throw new Error("no provider"); }),
 }));
 
-import { RelationExtractor } from "../services/graph/relation-extractor.js";
+import { RelationExtractor } from "../services/memory-graph/relation-extractor.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

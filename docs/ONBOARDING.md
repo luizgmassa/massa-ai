@@ -222,7 +222,7 @@ Key files per layer, ranked by coupling (in + out dependency edges).
 ### Orchestrators (inside Service)
 
 Not a layer of their own since PR-C. Each sits in the `services/` subdirectory that already
-held the collaborators it composes; `services/graph/` is the **memory-relation** graph, so
+held the collaborators it composes; `services/memory-graph/` is the **memory-relation** graph, so
 the **symbol**-graph controller belongs to `services/symbol/`, one directory over.
 
 | Deg | File | Role |

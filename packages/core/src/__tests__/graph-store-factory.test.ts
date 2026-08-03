@@ -4,12 +4,12 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { GraphStorePg } from "../services/graph/graph-store-pg.js";
+import { GraphStorePg } from "../services/memory-graph/graph-store-pg.js";
 import {
   getGraphStore,
   resetGraphStore,
-} from "../services/graph/graph-store-factory.js";
-import type { IGraphStore } from "../services/graph/types.js";
+} from "../services/memory-graph/graph-store-factory.js";
+import type { IGraphStore } from "../services/memory-graph/types.js";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
 const DEDICATED_DB =
