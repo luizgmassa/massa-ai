@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — DA Inventory Closure (Specify DONE 2026-08-03; Design next)
+## Current — DA Inventory Closure (**VALIDATED PASS 2026-08-03 — EXECUTE + INDEPENDENT VALIDATION COMPLETE; PR open, merge is the user's decision**)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-da-inventory-closure` · workflow:
   spec-driven (Large) · branch `spec/da-inventory-closure`, worktree
@@ -29,9 +29,15 @@
   remove `.specs/reports/` as the final development step after a content sweep; one PR;
   `skills-directive-dedup` (parked T5/12) untouchable.
 - massa-ai MCP server not consulted; `.specs/` files canonical per contract.
-- Next action: **Design** (`design.md`) — DI-01 seam surface + sufficiency measurement, DI-02
-  drop-seam shape, DI-05 hermetic-routing rule + parity measurement plan, then Tasks, full Plan
-  Challenge, Execute.
+- Execute complete: T1-T11 one commit each (`c8174af`..`d6329a0`); full Plan Challenge revised
+  the plan twice before Execute (D1 mechanism — the LLM seam provably never gated the embedding
+  path; D3 sweep population 3 named classes → 14 measured files). Independent validation **PASS**
+  (`validation.md` — verifier re-derived the DI-02 mutation kill with a copy-aside restore, re-ran
+  the five gates + test:scripts, all exit 0). L-001 tool-promoted to confirmed. DI-05 withdrawn at
+  D0 (SEN-03 `39afe59` v1.10.0 had already shipped the fix — a carried-forward status the report
+  re-inherited unre-measured). `.specs/reports/` removed after a fully-dispositioned 14-file sweep.
+- Next action (user): review + merge the PR. Merging cuts a **minor** release (CHANGELOG
+  `[Unreleased]` has `### Added` content) — approving the merge approves a release.
 
 ## Previous — Cross-Pollination Ports & Gap Closure (**VALIDATED PASS 2026-08-03 — MERGED as PR #61 @ `0084d1a`, RELEASED as v1.19.0 @ `8e63477`; CI + Coverage + Release all green on the merge sha**)
 

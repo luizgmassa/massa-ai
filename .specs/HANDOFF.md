@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — DA Inventory Closure (Specify DONE 2026-08-03)
+## Active — DA Inventory Closure (VALIDATED PASS 2026-08-03; PR open, merge = user's decision)
 
 - **Feature:** `da-inventory-closure` — disposition + closure of DA-01..DA-17 from
   `.specs/reports/cross-pollination-portability-and-gaps.md` (folder removed at close-out per
@@ -8,9 +8,12 @@
   `.specs/features/da-inventory-closure/spec.md` (the Re-verified table is the triage record;
   read it, not this file). Branch `spec/da-inventory-closure`, worktree
   `.claude/worktrees/da-inventory-closure`, from `origin/main` @ `8e63477` (v1.19.0).
-- **State:** Specify complete — 17 rows re-measured at HEAD: 7 FIX / 8 RESOLVED / 1 ROUTED /
-  2 ACCEPTED. Next: Design (DI-01/02/05 need shape decisions), Tasks, full Plan Challenge,
-  Execute, independent validation.
+- **State:** COMPLETE — Specify (17 rows: 7 FIX / 8 RESOLVED / 1 ROUTED / 2 ACCEPTED), Design +
+  full Plan Challenge (2 structural revisions: DI-01 mechanism, DI-10 sweep rule; DI-05 withdrawn
+  at D0 — SEN-03 had already shipped it), Execute T1-T11 (`c8174af`..`d6329a0`), independent
+  validation **PASS** (`validation.md`; DI-02 mutation re-derived + killed, gates exit 0).
+  L-001 promoted to confirmed by the lessons tool.
+- **Next action (user):** review + merge the PR — merging cuts a **minor** release.
 - **Worktree provisioning note (measured):** `bun install` here exited 0 while node-gyp silently
   failed under Node 25.9.0 (macOS arm64) — no native tree-sitter builds; repaired by copying the
   4 `node_modules/tree-sitter*/build/` dirs from the main checkout; contract suite then 9/0.
