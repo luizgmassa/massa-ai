@@ -893,12 +893,20 @@ all state came from `.specs/` and source reads.
   matters; §10.27. Running total **eighty-nine** plan defects; branch **57 ahead of `main`**,
   unpushed, no PR; `test:scripts` 1116/0/49 at the close.
 - ~~**Next action: Execute, T5**~~ … ~~**Execute, T22**~~ → ~~**Execute, T23 + T24**~~ →
-  **Next action: T25 — STOPPED ON THE USER'S AUTHORSHIP QUESTION.** T25 is independent
-  validation, author ≠ verifier; whether a fresh conversation satisfies "different author" or the
-  user wants a genuinely different agent/person is the user's call, and nothing starts until it
-  is answered. The row carries the re-take list and the two open criteria questions; HANDOFF's
-  Active tail carries the frames a fresh verifier needs (`.specs/reports/` untracked-invisible;
-  ledger numbers are minting-frame; 79 instruments).
+  ~~**Next action: T25 — STOPPED ON THE USER'S AUTHORSHIP QUESTION.**~~ The question was answered
+  (fresh conversation = different author; HANDOFF Active tail carries the decision with its
+  rejected options).
+- **T25 DONE — `e18ee11`, 2026-08-03, by the fresh-conversation verifier. VERDICT: PASS.** Record:
+  `core-layering-read-file-split/validation.md` (`tasks.md` §10.28 the pointer). All five re-takes
+  reproduced from raw data (frozen base per clause 2/1/2 via `--json` in a T5 worktree;
+  `edgesExamined` per structural commit, 18 rows all exit 0, 965/896 → 986/922 → 982/920; resolver
+  sweep old 0/0 / new 25/45 exact; pack from proven-fresh dist, 8 survivors, both symbols 0; a
+  ten-fault discrimination table, SHA-256 restores, **no surviving mutant**). Both open criteria
+  questions closed in the amendments' favour on two-sided executed evidence (C37 probe green under
+  the mutation while the resolution escaped the root; `$HOME`-leak red only under the set-equality
+  case). Ten new modules re-measured 100/100 each (GMS-05 AC-2 per file). Zero new plan defects —
+  running total stays **eighty-nine**. **Next action: the user's — push, PR (first live CI run of
+  the new step; CHANGELOG gate fires there), `--no-ff` merge (R-04/R-27).**
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed

@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute COMPLETE THROUGH T24 — ALL PHASES CLOSED; ONLY T25 REMAINS, BY A DIFFERENT AUTHOR, AND ITS AUTHORSHIP QUESTION IS THE USER'S**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **VALIDATED PASS — T25 DONE 2026-08-03 BY THE FRESH-CONVERSATION VERIFIER; EXECUTE + VALIDATION COMPLETE, BRANCH UNPUSHED; PUSH, PR AND `--no-ff` MERGE ARE THE USER'S NEXT DECISION**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -1198,13 +1198,29 @@ eighty-nine plan defects across §10.1–§10.27; branch 57 commits ahead of `ma
 (measured by `git rev-list --count`, not estimated), unpushed, no
 PR.**
 
-**Next action: T25 — independent validation, author ≠ verifier — in a FRESH CONVERSATION.**
-**The authorship question is ANSWERED. Decided by: the user, 2026-08-03**: a new session with no
+~~**Next action: T25 — independent validation, author ≠ verifier — in a FRESH CONVERSATION.**~~
+**T25 DONE — `e18ee11`, 2026-08-03. VERDICT: PASS.** The record is
+`core-layering-read-file-split/validation.md` (`tasks.md` §10.28 is the pointer). The verifier was
+this fresh conversation, exactly as decided below; every §10.x record was treated as a claim, and
+**all five re-takes reproduced from raw data**: the frozen base per clause (`--json`, T5's own gate
+in a worktree — 2/1/2 and 13/17/2/175 + 3/3/0/128), `edgesExamined` per structural commit (18
+worktree rows, exit 0 at every one, 965/896 → 986/922 → 982/920), the resolver sweep both
+directions (old 0/0, new the exact 25/45 mirror), the pack from a proven-fresh dist (8 survivors,
+both stripped symbols at 0), and a ten-fault discrimination table with SHA-256 restores — **no
+surviving mutant**. **Both open criteria questions closed in the amendments' favour on two-sided
+executed evidence** (C37's probe passed under the sanitize-drop mutation while the resolution
+escaped the root; the presence/absence pair stayed green under the `$HOME`-leak while the set case
+went red). Zero new plan defects; running total stays eighty-nine. **Next action: the user's —
+push, open the PR (first live run of the new CI step; CHANGELOG gate fires there), merge
+`--no-ff` (R-04/R-27: a squash destroys RFS-01 AC-3's ancestry evidence).**
+
+**The authorship decision, kept as the record it is. Decided by: the user, 2026-08-03**: a new session with no
 carried context beyond the `.specs/` artifacts and `~/prd-exec-instruments/` satisfies *"by a
 different author"* (PR-C's T18 precedent). **Rejected**: a verifier agent dispatched from the
 authoring session (the author would frame the verification), manual verification by the user, and
-deferring. The next conversation to open this handoff IS T25's verifier and must not treat this
-session's §10.x records as its own findings — re-take, never inherit, per the row. Its row carries the two open criteria questions to answer rather than
+deferring. ~~The next conversation to open this handoff IS T25's verifier~~ — **satisfied: that
+conversation ran on 2026-08-03 and its verdict is above**; it treated this
+session's §10.x records as claims — re-take, never inherit, per the row — and none failed. Its row carries the two open criteria questions to answer rather than
 inherit (C37's predicate; AC-2's enumerated-set reading), the re-take list (T5's frozen reading,
 Phase 6's resolver sweep both directions, `edgesExamined` per structural commit, the pack
 reading, a discrimination table on the real tree), and the restore discipline (scratch copies +
