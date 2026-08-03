@@ -49,25 +49,46 @@ underscore prefix is the package's established test-seam idiom (`_set*ForTesting
 module; `check-core-layering` sees no new edge class). Both symbols ship in the public npm
 surface — accepted: the names state their contract, and `reset*()` factory seams already do.
 
-**Suite pin.** `embedded-api-client-endpoints.test.ts` adds:
+**Suite fix — REVISED after the Plan Challenge (finding 1, critical).** The gate's call-graph
+trace proved the original pin-only shape wrong before a line was written:
+`_setLlmEnabledForTesting` feeds `isLlmEnabled()` (`llm-client.ts:114`), whose only callers
+are the NL-judgment gates and the reranker — while `/search/project` and `/search/code` reach
+`ContextualSearchRLM.ensureInitialized()` (`contextual-search-rlm.ts:209,244`), which calls
+the real `getVectorStore()` (`vector-store-factory.ts:37`, live `embeddingProviderFactory`
+`:56`) **unconditionally, before admission**. Two independent mechanisms; the seam gates one.
+The prior CLAUDE.md triage named the wrong single cause for this file — trace the call graph
+before trusting a prior triage's named mechanism.
+
+The shape that closes **both** leak paths for direct runs, without mocking anything (the suite
+stays deliberately-unmocked integration), mirrors SEN-03 at suite scope:
 
 ```ts
-import { _setLlmEnabledForTesting } from "@massa-ai/core";
-beforeAll(() => _setLlmEnabledForTesting(false));
-afterAll(() => _setLlmEnabledForTesting(null));
+// Before ANY core import: scratch config home, exactly what the isolated
+// runner gives every child (SEN-03). Static imports hoist, so the core
+// import must be dynamic — the m25-m26 suite's established pattern.
+process.env.XDG_CONFIG_HOME = mkdtempSync(path.join(tmpdir(), "embedded-endpoints-config-"));
+const { EmbeddedApiClient } = await import("../embedded-api-client.js");
 ```
 
-The pin lives in the suite file, so direct `bun test <file>` and the wrapper behave
-identically. Restore-to-`null` returns the client to config-derived resolution.
+plus `_setLlmEnabledForTesting(false)` in `beforeAll` / restore-`null` in `afterAll` — not as
+the fix but as the explicit second-gate pin the wrapper also applies (`buildChildEnv:105`),
+keeping direct-run semantics identical to wrapper semantics. `DATABASE_URL` still arrives via
+env, so the real-test-DB contract is unchanged (same as `buildChildEnv`'s pass-through).
 
 **Sufficiency measurement (Execute, not assumed).** Baseline red observed this session: cold
 direct run 93 pass / 2 fail (44.96 s; live ETL against the real data dir visible in the log),
-warm 95/0 (21.57 s). After the pin: direct run must be green and materially faster on the
-search-route cases. If a live *embedding* path (vector-store factory auto-selection) still
-reaches Ollama on a cold model, the fallback inside the same task is the already-exported
-`resetVectorStore()` + `MASSA_AI_TEST_CONFIG_HOME`-style env pin **in the suite file**, and
-the residue is recorded; CLAUDE.md's own prescription list names the LLM seam as the missing
-piece for this file, so that is what is tried first.
+warm 95/0 (21.57 s); empty-config baseline 3.96 s green (CLAUDE.md's own measurement). After
+the fix: direct run green with duration in the empty-config band, wrapper run green, and the
+falsifier is commenting out the env line — cold-model red cannot be forced on demand, so the
+discrimination evidence is the duration band plus the two-mechanism trace above, recorded as
+such. Both direct and wrapper counts are captured **separately** in the execution record
+(gate finding 7).
+
+**Seam export still ships (AC-1)** — it is the documented gap and the wrapper's second gate;
+the CLAUDE.md rewrite names the true two-mechanism story: the seam alone was never sufficient
+for this file, the config leak (embedding auto-selection included) was the other half.
+Post-build, the shipped `.d.ts` is grepped for both seam names and the public exposure is
+recorded as accepted (gate finding 6).
 
 **CLAUDE.md rewrite (same task pair).** The "Known outstanding case" paragraph
 (`CLAUDE.md:176` area) is replaced: seam now exported and pinned; the wrapper path has been
@@ -141,11 +162,30 @@ covers the call-site class; recorded as the accepted asymmetry).
 - **DI-09**: `.ua/` state lives in the **main checkout** working tree; copy the 4 modified
   tracked files + untracked `diff-overlay.json` into this worktree, commit. Token + trash
   excluded (spec §Assumptions).
-- **DI-10**: pre-removal sweep: `git grep -n "\.specs/reports/"` over tracked files at the
-  then-HEAD; each hit repointed or annotated (expected hits: HANDOFF/STATE historical prose —
-  annotate with "removed at da-inventory-closure, recover via git history"; this feature's own
-  spec §Source line — annotate likewise; `lessons.json` evidence strings — only via lessons.py
-  if any). Then `git rm -r .specs/reports/` as the final development commit before validation.
+- **DI-10 — REVISED after the Plan Challenge (findings 3+4).** The design's three named
+  hit-classes undercounted the live population ~4×: `git grep -l "\.specs/reports/"` at gate
+  time returned **13 tracked files**, including two other features' sealed validation artifacts
+  and `docs/adding-a-host.md`. The sweep therefore runs with an explicit, written disposition
+  rule, and prints the full population beside the per-file verdict:
+  1. **Sealed historical artifacts** (other features' `spec/design/tasks/validation.md`,
+     STATE/HANDOFF `Previous` blocks): **leave untouched.** They describe the tree at their
+     own time; editing a sealed validation record to chase a deletion would damage the record.
+     After removal these references resolve via git history, which is what historical prose is
+     for. Counted, listed, dispositioned `historical — left`.
+  2. **Living documents** (`docs/adding-a-host.md`, README/FEATURES if hit, STATE/HANDOFF
+     `Active`/`Current` blocks, this feature's own `spec.md` §Source line): **annotate or
+     repoint** — the reference gains "(removed at `da-inventory-closure` close-out; recover via
+     git history)" or is rewritten to not depend on the path existing.
+  3. **Tool-owned files** (`lessons.json`/`LESSONS.md` evidence strings): only via `lessons.py`;
+     if the tool has no edit path for an evidence string, disposition `tool-owned — left` with
+     the reason.
+  T10's gate is: printed population count == `git grep -l` count at that HEAD, and **0 files
+  without a recorded disposition** (not "0 hits" — self-references and sealed history are
+  legitimate survivors). Then `git rm -r .specs/reports/` in the same commit as the class-2
+  annotations, so the sweep and the removal cannot drift apart. The verifying run re-greps at
+  the post-commit HEAD and checks survivors against the disposition list — the sweep's own
+  repoints must not delete its subjects before that verification (the repoint-deletes-subject
+  shape is why the verify step re-derives the population instead of diffing the proposal).
 
 ## Risks & Concerns
 
