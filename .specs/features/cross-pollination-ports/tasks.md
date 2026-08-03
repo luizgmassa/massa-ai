@@ -200,6 +200,18 @@ Batch plan: B1 = P0+P1+P2 (7 tasks) · B2 = P3+P4 (6) · B3 = P5 (6) · P6 inlin
 
 Real-CI confirmation of T7 deferred to the PR run (as scoped). Statuses: T1–T7 ✅.
 
+**Batch 2 (T8–T13) DONE — worker, Status Complete.**
+- T8 `30ee336`: cache steps ×5 (ci ×3, coverage, publish); observed-red on removed build-job cache step (2 tests named it); purge blocks byte-identical (33 insertions / 0 deletions across 3 workflow files); needles-gate exclusion asserted for real; both B1 gates re-run green post-edit; test:scripts 1197/54.
+- T9 `41ea0d4`: `scripts/lib/host-capabilities.ts` (deep-frozen, HOSTS re-exported from model-profiles); test:scripts 1224/55. SPEC_DEVIATION (accepted): `ownershipMarker` gained third value `"filename"` — measured against `apps/{claude,cursor}-plugin/install.sh` uninstall scoping (filename prefix, not text marker); nothing wires the field into a generator, enum accuracy over design literal.
+- T10 `e9d6105`: subagent generator on the table; `emitAll(targetDirs, opts={}, hosts=HOSTS)` per critic-C2 amendment, 8 call sites unmodified (47/47); parity 40/40; --check no drift.
+- T11 `c27b9f7`: skill generator on the table via injectable `capsLookup` seam; parity 19/19; --check no drift.
+- T12 `fd02d2e`: fixture 5th host drives real emit behavior (hook-binary + lib copy vs control host); scratch codex ext flip → --check exit 1 naming 17 codex files, reverted diff-empty; apps/ 0 lines.
+- T13 `96c207a`: `docs/adding-a-host.md` — all 8 fields + quirk classes + sibling surfaces; stale-pointers PASS.
+- Phase-4 close (worker): lint 0 / type-check 6/6 / build 5/5 / test 11/11 under dedicated triple (184 groups: 151 core + 25 tools-api + 8 mcp-client, 0 fail) / test:scripts **1230/55** / test:plugins 96 / deterministic **2098 pass, 127 skip, 0 fail, 138 files** / both --check no drift / layering 985 edges 933 files 0 violations / bun.lock untouched.
+- Orchestrator re-verified first-hand: both --check no-drift re-run, `git diff fc15882..HEAD -- apps/` EMPTY, tree clean.
+
+Statuses: T8–T13 ✅. Worker note carried for the verifier: T12's `capsLookup` injection seam shape was an Execute-level judgment (design fixed the observable AC, not the seam mechanics) — reviewer's eye requested.
+
 ## Task Granularity Check
 
 | Task | Scope | Status |
