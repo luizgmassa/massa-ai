@@ -474,14 +474,15 @@
     {
       "slug": "subagent-skills-plugin-parity",
       "title": "Subagent Skills Plugin Parity — Ship the 12 sub-agent specialists as host-native subagent definitions across Claude Code, Codex, Cursor, and OpenCode plugins",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
-        "design": "pending",
-        "tasks": "pending",
-        "execute": "pending"
-      }
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "notes": "Validated PASS 2026-07-23 (independent verifier, bc57daa..80994eb, T1-T12 all done). Registry lagged reality until 2026-08-03 (DA-11/DI-03): phases sat 'pending' for a feature whose validation.md had verified the shipped work; roster later grew 12 -> 17 under the generator features."
     },
     {
       "slug": "workflow-tools-adaptation",
