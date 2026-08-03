@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–5 CLOSED, PHASE 6's RENAME LANDED, PHASE 7 OPEN (T19, T20b, T20, T21 DONE); next T18**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–6 CLOSED (T18 landed), PHASE 7 OPEN (T19, T20b, T20, T21 DONE); next T22**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -1162,12 +1162,22 @@ existence pin load-bearing in Linux CI only for case-drift — stated in the tes
 Gates: lint 0; test:scripts **1116/0/49** twice; both structural gates byte-stable; lru suite
 15/0 standalone. Zero new plan defects — running total **eighty-nine**.
 
-**Next action: Execute, T18** (§6 item 9 satisfied — T21 is done): the 3 prose/fixture sites,
-R-32 as corrected — `CLAUDE.md:237`, `check-coverage.ts:281` (T21's post-shift position, already
-repointed in the row), and the test file's 8 fixture citations at their +1 positions (row updated
-at T21, grep-verified). Then **T22**, **T23 + T24 last before T25** — **T25 by a different
-author**; whether a fresh conversation satisfies that is the user's call, asked before T25
-starts, per its row.
+~~**Next action: Execute, T18.**~~ **T18 DONE — `96908f3`. PHASE 6 CLOSES.** All 10 literal sites
+swapped in place, zero net line change, no repoint cascade; the repo-wide `services/graph`
+residual outside `.specs/`/`.ua/` is now **exactly `CHANGELOG.md:35`** — §10.19's enumerated set
+collapsed to its one permanent member. Its record is `tasks.md` **§10.24**, including a **route
+deviation recorded with its reason**: one combined-lens critic instead of two (10 literal swaps,
+zero shifts, zero arithmetic), 8/8 verdicts confirmed, `graph-queries.ts` still **440 lines** so
+the repointed docblock figure is exact. The critic's one finding — `CLAUDE.md:237`'s two-way trap
+framing was measured **three-way** at Design (`data/symbol/` the third) and owned by nobody — is
+**assigned to T22**, whose row gained the item. Gates: lint 0; test:scripts 1116/0/49; suite
+23p/0f; stale-pointers PASS/28 as frame only. Zero new plan defects — running total eighty-nine.
+
+**Next action: Execute, T22** — `CLAUDE.md:43` "24 migrations" → 23 naming the metric;
+`CLAUDE.md:567` "five" → 8 publishable packages; `docs/ONBOARDING.md:83-87`'s deferral marker
+re-scoped per spec §4.4; **plus the T18-assigned widen of `CLAUDE.md:237` to the three-way trap**.
+Then **T23 + T24 last before T25** — **T25 by a different author**; whether a fresh conversation
+satisfies that is the user's call, asked before T25 starts, per its row.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.

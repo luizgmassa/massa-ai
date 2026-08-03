@@ -873,13 +873,19 @@ all state came from `.specs/` and source reads.
   APFS case-insensitivity noted in the test (pin load-bearing in Linux CI for case-drift). §1:
   sum **112** / union 86 / identity 26 = 14×1 + 6×2. Gates: lint 0; test:scripts **1116/0/49**;
   structural gates byte-stable. Zero new defects, running total eighty-nine.
+- **T18 DONE — `96908f3`. PHASE 6 CLOSES.** 10 literal sites swapped in place, zero net line
+  change; residual outside `.specs/`/`.ua/` = `CHANGELOG.md:35` alone (permanent C52 record).
+  Record `tasks.md` §10.24 with a recorded route deviation (one combined-lens critic, reason
+  stated; 8/8 confirmed; `graph-queries.ts` still 440 so the repointed figure is exact). The
+  critic's finding — the `:237` trap note is really THREE-way (`data/symbol/` third, Design §1.1)
+  and owned by nobody — is **assigned to T22**. Gates: lint 0; test:scripts 1116/0/49; suite
+  23p/0f; stale-pointers PASS/28 frame-only. Zero new defects, running total eighty-nine.
 - ~~**Next action: Execute, T5**~~ … ~~**Execute, T14b**~~ → ~~**Execute, T14**~~ →
   ~~**Execute, T15**~~ → ~~**Execute, T16**~~ → ~~**Execute, T19**~~ → ~~**Execute, T20b**~~ →
-  ~~**Execute, T20**~~ → ~~**Execute, T21**~~ → **Next action: Execute, T18** (§6 item 9
-  satisfied): `CLAUDE.md:237`, `check-coverage.ts:281`, the test file's 8 fixture cites at their
-  +1 positions — all row-updated at T21, grep-verified. Then T22, T23 + T24 last before T25;
-  **T25 by a different author** — whether a fresh conversation satisfies that is the user's call,
-  asked before T25 starts.
+  ~~**Execute, T20**~~ → ~~**Execute, T21**~~ → ~~**Execute, T18**~~ → **Next action: Execute,
+  T22** — the two CLAUDE.md figures + ONBOARDING's deferral marker + the T18-assigned three-way
+  trap widen. Then T23 + T24 last before T25; **T25 by a different author** — whether a fresh
+  conversation satisfies that is the user's call, asked before T25 starts.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed
