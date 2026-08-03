@@ -570,7 +570,7 @@
     {
       "slug": "workflow-harness-overhaul",
       "title": "Workflow harness overhaul — remove chat-restart/context-handoff, add delivery, annotation, root-cause and project-context contracts",
-      "status": "in-progress",
+      "status": "in_progress",
       "priority": "P1",
       "phases": {
         "specify": true,
