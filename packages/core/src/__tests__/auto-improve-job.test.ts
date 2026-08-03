@@ -22,6 +22,7 @@ import {
 } from "../data/proposal/proposal-repository.js";
 import {
   MemoryObservationStore,
+  type InsertableObservation,
   type Observation,
   type ObservationStore,
 } from "../data/memory/observation-repository.js";
@@ -29,21 +30,24 @@ import type { InsertMemoryInput, UpdateMemoryPatch } from "../data/memory/memory
 import type { LlmSurface } from "../services/memory/consolidator.js";
 import { eventBus } from "../services/events/event-bus.js";
 import { SearchServiceError } from "../kernel/search-diagnostics.js";
+import { scrubCredentials } from "../kernel/sanitize/credential-scrub.js";
 
 // ── Fakes ────────────────────────────────────────────────────────────────────
 
+// XP-02: routed through scrubCredentials so the insert seam exercises the
+// real boundary — obsStore.insert() below now requires InsertableObservation.
 function makeObs(
   projectId: string,
   source: Observation["source"],
   payload: unknown,
   i: number,
-): Observation {
+): InsertableObservation {
   return {
     id: `obs_${i}`,
     projectId,
     sessionId: "s1",
     source,
-    payloadJson: JSON.stringify(payload),
+    payloadJson: scrubCredentials(JSON.stringify(payload)).sanitized,
     importance: 0.5,
     createdAt: 1000 + i,
   };

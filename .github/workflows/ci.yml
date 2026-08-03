@@ -19,7 +19,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: postgresql://massa_ai:massa_ai_password@localhost:5432/massa_ai
+      # XP-04 AC-1: flipped to the dedicated-DB shape coverage.yml already
+      # proves out, so isDedicatedDatabase() (scripts/check-coverage.ts) is
+      # true here too and the DEDICATED_DB/RUN_POSTGRES_TESTS-gated suites
+      # (23 files — see check-coverage.ts's assertDedicatedDatabase docblock)
+      # execute in this blocking job instead of silently skipping. Literal
+      # 127.0.0.1 (not localhost) and port 5433 are both load-bearing: the
+      # predicate is a regex on this exact string.
+      DATABASE_URL: postgresql://massa_ai:massa_ai_password@127.0.0.1:5433/massa_ai_test
+      MASSA_AI_DEDICATED: "1"
 
     services:
       postgres:
@@ -27,9 +35,12 @@ jobs:
         env:
           POSTGRES_USER: massa_ai
           POSTGRES_PASSWORD: massa_ai_password
-          POSTGRES_DB: massa_ai
+          POSTGRES_DB: massa_ai_test
         ports:
-          - 5432:5432
+          # Host 5433 -> container 5432, mirroring coverage.yml. A second,
+          # unrelated service was rejected (design.md C4): DEDICATED_DB reads
+          # DATABASE_URL itself, so a side service can never satisfy it.
+          - 5433:5432
         options: >-
           --health-cmd "pg_isready -U massa_ai"
           --health-interval 5s
@@ -95,6 +106,19 @@ jobs:
       # `Directory not empty`) aborted the script under `-e` before the retry's own
       # `bun install` ever ran, defeating the one thing this block exists to do. `|| true`
       # makes the purge best-effort so the retry always gets its attempt.
+      # XP-01. Warms ~/.bun/install/cache from a prior run so the install-cache
+      # race documented below is hit warm rather than cold. Additive only — a
+      # cache miss (first run, lockfile change) falls straight through to the
+      # purge-and-retry block unchanged (design.md C3). Never caches
+      # node_modules or build output, only Bun's own package cache.
+      - name: Restore Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-install-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-install-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Install dependencies
         run: |
           bun install --frozen-lockfile && exit 0
@@ -113,6 +137,28 @@ jobs:
       # a violation should not wait on a full turbo build to surface.
       - name: Lint
         run: bun run lint
+
+      # XP-03. Count-bounded allowlist over four dangerous-primitive classes
+      # (child-process, Bun.spawn/Bun.$, raw-SQL $queryRawUnsafe/$executeRawUnsafe,
+      # eval/new Function) via the TypeScript compiler API — never regex, so a
+      # string literal, a comment, or RegExp.prototype.exec cannot match. A new
+      # unreviewed site OR a stale entry (a site removed without updating the
+      # list) both fail; dynamic-eval permits zero allowlist entries at all.
+      # Runs beside Lint, before the full turbo Build, for the same cheap-gate-first
+      # reasoning as DEBT-01 above.
+      - name: Verify security allowlist (XP-03)
+        run: bun scripts/check-security-allowlist.ts
+
+      # XP-04 AC-2/3. Every test-running workflow's test-invocation env
+      # (workflow ∪ job ∪ step env, projected onto a declared semantic key
+      # set: DATABASE_URL, MASSA_AI_DEDICATED, RUN_POSTGRES_TESTS,
+      # MASSA_AI_EXECUTOR_SANDBOX, RUN_E2E, RUN_E2E_DESTRUCTIVE, runner OS,
+      # invocation string) must match another's, or the divergence must be
+      # named in scripts/workflow-venue-parity-exceptions.txt. Reads the YAML
+      # files directly, so it runs beside the security gate rather than
+      # depending on anything Build produces.
+      - name: Verify workflow venue parity (XP-04 AC-2/3)
+        run: bun scripts/check-workflow-venue-parity.ts
 
       - name: Build
         run: bun run build
@@ -210,6 +256,10 @@ jobs:
         run: bun run test
         env:
           MASSA_AI_EXECUTOR_SANDBOX: none
+          # XP-04 AC-1. Turbo sandboxes the environment (AD-010) — without
+          # RUN_POSTGRES_TESTS in turbo.json's passThroughEnv (T2), setting it
+          # here would be a silent no-op under `bun run test` = `turbo run test`.
+          RUN_POSTGRES_TESTS: "1"
 
       - name: Test scripts (root-level suites)
         run: bun run test:scripts
@@ -360,6 +410,16 @@ jobs:
         with:
           node-version: '22'
 
+      # XP-01. Same cache-warming step as the build job above — see there for
+      # the rationale and the invariant on what is (and is not) cached.
+      - name: Restore Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-install-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-install-${{ runner.os }}-${{ runner.arch }}-
+
       # Purge-and-retry against the Bun install-cache race — see the `build` job for the
       # full signature and why this is not a composite action.
       - name: Install dependencies
@@ -403,6 +463,16 @@ jobs:
 
       - name: Reconcile npm to contract version (11.14.1)
         run: npm install -g npm@11.14.1
+
+      # XP-01. Same cache-warming step as the build job above — see there for
+      # the rationale and the invariant on what is (and is not) cached.
+      - name: Restore Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-install-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-install-${{ runner.os }}-${{ runner.arch }}-
 
       # This job's install is where the race actually fired on CI run 30208529279
       # attempt 1. Purge-and-retry — see the `build` job for the full signature.

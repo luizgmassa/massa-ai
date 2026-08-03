@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A type-enforced sanitization boundary on Observation persistence.** `kernel/sanitize/`'s
+  `scrubCredentials` redacts seven credential shapes (PEM blocks, JWTs, AWS key ids, `sk-` keys,
+  GitHub tokens, bearer tokens) both directions (near-miss content passes through byte-identical),
+  and a branded `SanitizedPayloadJson` type at `ObservationStore.insert` makes a bare-string
+  payload a compile error — enforced by an in-process `ts.createProgram` compile-fixture gate,
+  since `packages/core/tsconfig.json` excludes `src/__tests__` from every other type-check. Both
+  the hook-ingestion and `compact_snapshot` call sites are wired through the boundary.
+- **`scripts/check-security-allowlist.ts`, a count-bounded CI gate for dangerous primitives.**
+  AST-based (TypeScript compiler API, not regex) matching of `exec`/`spawn`/raw-SQL/`eval` call
+  sites; a new or removed call site outside the reviewed allowlist fails the build naming
+  file:line. Runs in CI's `build` job beside oxlint.
+- **`scripts/check-workflow-venue-parity.ts`, a CI gate closing the two-workflow divergence
+  class.** Compares each workflow's test-invocation environment against a declared semantic key
+  set (with an explicit, justified exception list) and fails naming the file + key on an
+  unclassified or undeclared divergence.
+- **Bun install-cache warming across every install-bearing CI job.** An `actions/cache@v4` step
+  keyed on `hashFiles('bun.lock')` (with an os/arch-scoped restore-key fallback) now precedes
+  `bun install` in `ci.yml` (×3 jobs), `coverage.yml`, and `publish.yml`; the existing
+  purge-and-retry fallback is unchanged and still runs on a cache-independent failure.
+- **`ci.yml`'s blocking `build` job now runs the DEDICATED_DB-gated test suites.** The job's
+  Postgres service and `DATABASE_URL` match `isDedicatedDatabase()`'s literal shape
+  (`127.0.0.1:5433/massa_ai_test`) and sets `RUN_POSTGRES_TESTS=1`, so the suites that previously
+  skipped silently under the required check now execute there.
+- **`scripts/lib/host-capabilities.ts`, an explicit per-host capability table** driving both the
+  subagent and skill generators (byte-identical output for all four existing hosts), proven
+  load-bearing by a test-only fixture fifth host, plus `docs/adding-a-host.md` documenting the
+  capability contract a new host must declare.
+- **A shared RSS-delta test helper** (`packages/core/src/__tests__/helpers/rss-delta.ts`) so
+  `cycle-detection.test.ts` and `structural-runtime.test.ts` no longer each reimplement the
+  baseline/measure/median idiom; thresholds and comparison semantics are unchanged.
+
+### Fixed
+
+- CLAUDE.md's "Running tests" section described the three per-package isolated-test runners as
+  "separate, divergent copies" with stale line counts; they are thin wrappers over the shared
+  `scripts/lib/run-tests-isolated.ts`, and both the runner-architecture description and the
+  `test:scripts` pass/file/shell-suite counts are corrected to figures re-measured at HEAD.
+- `check-coverage.ts`'s stale "50 suites" comment is replaced with the re-measured population.
+- `turbo.json`'s `tasks.test.passThroughEnv` was missing 27 read `MASSA_AI_*` vars plus
+  `RUN_POSTGRES_TESTS`; both are added, and a new drift test
+  (`scripts/__tests__/turbo-passthrough-env.test.ts`) mechanically re-derives the read-set on
+  every `test:scripts` run so the gap cannot silently reopen.
+- `FEATURES.json`'s `workflow-harness-overhaul` entry used the hyphenated `"in-progress"` spelling
+  against every other entry's `"in_progress"`; normalized.
+
 ## [1.18.0] - 2026-08-03
 
 ### Changed

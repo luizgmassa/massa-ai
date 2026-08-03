@@ -14,11 +14,12 @@ import {
 } from "../services/jobs/observation-consolidation-job.js";
 import {
   MemoryObservationStore,
-  type Observation,
+  type InsertableObservation,
 } from "../data/memory/observation-repository.js";
 import { eventBus } from "../services/events/event-bus.js";
 import type { LlmSurface } from "../services/memory/consolidator.js";
 import type { z } from "zod";
+import { scrubCredentials } from "../kernel/sanitize/credential-scrub.js";
 
 // ── Fakes ───────────────────────────────────────────────────────────────────
 
@@ -92,12 +93,14 @@ function failingSurface(): LlmSurface {
 function makeStoreWith(n: number): MemoryObservationStore {
   const s = new MemoryObservationStore();
   for (let i = 0; i < n; i++) {
-    const obs: Observation = {
+    // XP-02: routed through scrubCredentials — s.insert() requires
+    // InsertableObservation (branded payloadJson).
+    const obs: InsertableObservation = {
       id: `obs-${i + 1}`,
       projectId: "p",
       sessionId: null,
       source: "user-prompt",
-      payloadJson: JSON.stringify({ prompt: `q${i}` }),
+      payloadJson: scrubCredentials(JSON.stringify({ prompt: `q${i}` })).sanitized,
       importance: 0.5,
       createdAt: Date.now() - (n - i) * 1000,
     };

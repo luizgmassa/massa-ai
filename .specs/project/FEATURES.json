@@ -570,7 +570,7 @@
     {
       "slug": "workflow-harness-overhaul",
       "title": "Workflow harness overhaul — remove chat-restart/context-handoff, add delivery, annotation, root-cause and project-context contracts",
-      "status": "in-progress",
+      "status": "in_progress",
       "priority": "P1",
       "phases": {
         "specify": true,
@@ -735,7 +735,15 @@
       "workflow": "spec-driven",
       "branch": "refactor/skills-directive-dedup",
       "notes": "T1-T5 of 12 committed and green at ed1028e; T6-T12 not started. Not pushed, no PR. See .specs/HANDOFF.md."
+    },
+    {
+      "slug": "cross-pollination-ports",
+      "title": "Cross-pollination ports & gap closure — implement live PORT-01..07 + DB-05/06/07/08/09/10 fixes + lessons from the 2026-07-29 portability report",
+      "status": "complete",
+      "workflow": "spec-driven",
+      "branch": "feature/cross-pollination-ports",
+      "notes": "VALIDATED PASS 2026-08-03 (35/35 ACs, 6/6 mutations killed). 23 commits, one PR from feature/cross-pollination-ports; merge pending user. AD-014 added. Real-CI confirmation of T7/T8 deferred to the PR run."
     }
   ],
-  "active_feature": "skills-directive-dedup"
+  "active_feature": "cross-pollination-ports"
 }

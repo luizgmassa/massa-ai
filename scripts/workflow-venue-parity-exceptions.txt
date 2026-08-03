@@ -1,0 +1,20 @@
+# XP-04 AC-2/3 / TASK-XP-006 — declared, justified venue divergences.
+#
+# Format: class|workflowA|workflowB|key|justification
+# Workflow order is normalized to alphabetical internally, so either order
+# here resolves to the same entry. `#` comments and blank lines ignored.
+#
+# A divergence not listed here fails the gate; an entry listed here that no
+# longer diverges (the code changed and the gap closed) ALSO fails the gate
+# as a stale exception — drift in either direction is a defect (mirrors the
+# XP-03 security-allowlist discipline).
+
+# TASK-XP-007 (T7) landed: ci.yml's build job now sets the same DATABASE_URL /
+# MASSA_AI_DEDICATED / RUN_POSTGRES_TESTS shape coverage.yml already used, so
+# the three entries that used to live here (DATABASE_URL, MASSA_AI_DEDICATED,
+# RUN_POSTGRES_TESTS) no longer diverge and were removed — a listed exception
+# for a divergence that no longer exists is itself a failure (stale-exception,
+# same rule as everywhere else in this file).
+
+# --- permanent: coverage.yml intentionally runs a different, heavier command.
+invocation-shape|ci.yml|coverage.yml|__invocation__|ci.yml's build job runs the regular aggregate (bun run test / test:scripts / test:plugins); coverage.yml runs bun run test:coverage, the same suites under coverage instrumentation, on purpose (SEN-02's per-file floor gate) — the commands will never be identical strings.

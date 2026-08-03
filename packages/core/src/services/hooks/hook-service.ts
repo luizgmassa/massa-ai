@@ -21,8 +21,8 @@ import {
   getObservationStore,
   LIFECYCLE_EVENTS,
   newObservationId,
+  type InsertableObservation,
   type LifecycleEventKind,
-  type Observation,
   type ObservationStore,
 } from "../../data/memory/observation-repository.js";
 import { WriterQueue } from "./writer-queue.js";
@@ -32,6 +32,7 @@ import {
   getAttributionResolver,
   type AttributionResolverLike,
 } from "./attribution-resolver.js";
+import { scrubCredentials } from "../../kernel/sanitize/credential-scrub.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -237,13 +238,25 @@ export class HookService {
     // Enqueue may throw QueueSaturatedError BEFORE any side effect; pinning
     // happens only after admission survives (HAR-04, no pin on rejection).
     void this.queue.enqueue(async () => {
-      const obs: Observation = {
+      // XP-02 boundary: scrub before persisting so no writer can land raw
+      // credential-shaped content (spec.md P1 "Passive Capture stops
+      // persisting raw secrets"). scrubCredentials() is the only way to
+      // produce the branded SanitizedPayloadJson InsertableObservation.insert
+      // requires.
+      const scrub = scrubCredentials(JSON.stringify(ev.payload));
+      if (scrub.total > 0) {
+        logger.debug("hook payload redacted before persist", {
+          redactions: scrub.redactions,
+          total: scrub.total,
+        });
+      }
+      const obs: InsertableObservation = {
         id,
         projectId: attribution.projectId,
         sessionId: ev.sessionId,
         source: ev.event,
         category: extractCategory(ev.event, ev.payload),
-        payloadJson: JSON.stringify(ev.payload),
+        payloadJson: scrub.sanitized,
         importance: ev.importance,
         createdAt: ev.ts,
         agentId: ev.agentId,

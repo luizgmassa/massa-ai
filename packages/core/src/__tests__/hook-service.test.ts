@@ -235,6 +235,56 @@ describe("HookService.ingestOne", () => {
   });
 });
 
+// ── XP-02: credential scrubbing at the insert seam ──────────────────────────
+//
+// spec.md P1 "Passive Capture stops persisting raw secrets" AC-1: the
+// MemoryObservationStore path (this is HookService's default in tests) must
+// show a redaction marker in the persisted row and must NOT contain the raw
+// credential bytes, for every v1 rule shape.
+
+describe("HookService XP-02 credential redaction", () => {
+  const cases: Array<{ id: string; field: string; secret: string }> = [
+    {
+      id: "pem",
+      field: "key",
+      secret:
+        "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj\n-----END PRIVATE KEY-----",
+    },
+    {
+      id: "jwt",
+      field: "token",
+      secret: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
+    },
+    { id: "aws-key", field: "key", secret: "AKIAABCDEFGHIJKLMNOP" },
+    { id: "sk-key", field: "key", secret: "sk-abcdefghijklmnopqrstuvwxyz012345" },
+    { id: "github-token", field: "token", secret: "ghp_" + "a".repeat(36) },
+    { id: "slack-token", field: "token", secret: "xoxb-" + "1".repeat(24) },
+    { id: "bearer", field: "auth", secret: `Bearer ${"a".repeat(40)}` },
+  ];
+
+  for (const { id, field, secret } of cases) {
+    it(`${id}: persisted row is redacted and the raw ${id} bytes never land in the store`, async () => {
+      const env = makeService();
+      await env.svc.ingestOne(
+        validEvent({ projectId: `xp02-${id}`, payload: { [field]: secret } }),
+      );
+      await flush();
+      const obs = env.store.listRecent(`xp02-${id}`, 1)[0];
+      expect(obs.payloadJson).toContain(`[REDACTED:${id}]`);
+      expect(obs.payloadJson).not.toContain(secret);
+    });
+  }
+
+  it("a clean payload persists byte-identical (near-miss/no-op stays a no-op)", async () => {
+    const env = makeService();
+    const payload = { prompt: "nothing sensitive in here" };
+    await env.svc.ingestOne(validEvent({ projectId: "xp02-clean", payload }));
+    await flush();
+    const obs = env.store.listRecent("xp02-clean", 1)[0];
+    expect(obs.payloadJson).toBe(JSON.stringify(payload));
+  });
+});
+
 describe("HookService.ingestBatch", () => {
   let env: ReturnType<typeof makeService>;
   beforeEach(() => {

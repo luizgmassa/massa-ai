@@ -39,6 +39,9 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { tmpdir } from "os";
+import { HOSTS, capabilitiesFor, type Host, type HostCapabilities } from "./lib/host-capabilities.ts";
+
+export { HOSTS, type Host };
 
 // ── Paths ───────────────────────────────────────────────────────────────────
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -46,14 +49,31 @@ const SKILLS_DIR = path.join(ROOT, "skills");
 const APPS_DIR = path.join(ROOT, "apps");
 const OPENCODE_CONFIG_LIB_SOURCE = path.join(ROOT, "scripts", "lib", "opencode-config.cjs");
 const HOOK_BINARY_SOURCE = path.join(APPS_DIR, "claude-plugin", "hooks", "massa-ai-hook.ts");
-// Hosts whose hooks/massa-ai-hook was a symlink to HOOK_BINARY_SOURCE and is
-// now a generated real file (T14/PDO-14). claude-plugin IS the source, and
-// opencode-plugin has no shared hook binary (its plugin entry is src/index.ts).
-const HOOK_BINARY_HOSTS: readonly Host[] = ["codex", "cursor"];
 const HOOK_BINARY_MODE = 0o755; // invoked directly (no "bun run" prefix), so it must be executable.
 
-export type Host = "claude" | "codex" | "cursor" | "opencode";
-export const HOSTS: readonly Host[] = ["claude", "codex", "cursor", "opencode"];
+/** A capability lookup, injectable so a fixture-host test (T12) can drive
+ *  hookBinaryHosts()/managedRootsFor() for a host that never ships. Production
+ *  always defaults to the real capabilitiesFor(). */
+export type CapsLookup = (host: string) => HostCapabilities | undefined;
+const REAL_CAPS_LOOKUP: CapsLookup = (host) => capabilitiesFor(host as Host);
+
+/**
+ * Hosts whose hooks/massa-ai-hook was a symlink to HOOK_BINARY_SOURCE and is
+ * now a generated real file (T14/PDO-14). claude-plugin IS the source
+ * (hookBinaryDelivery: "source"), and opencode-plugin has no shared hook
+ * binary (hookBinaryDelivery: "none" — its plugin entry is src/index.ts).
+ * Exported as a pure function of (hosts, capsLookup) so XP-06 AC-2's
+ * fixture-host test can prove the capability table — not a hardcoded list —
+ * is what drives which hosts get a hook-binary copy.
+ */
+export function hookBinaryHosts(
+  hosts: readonly string[] = HOSTS,
+  capsLookup: CapsLookup = REAL_CAPS_LOOKUP,
+): string[] {
+  return hosts.filter((h) => capsLookup(h)?.hookBinaryDelivery === "real-copy");
+}
+
+const HOOK_BINARY_HOSTS: readonly Host[] = hookBinaryHosts() as Host[];
 
 export function pluginRoot(host: Host): string {
   return path.join(APPS_DIR, `${host}-plugin`);
@@ -175,14 +195,20 @@ async function assertCopyable(entry: ManagedEntry): Promise<void> {
 // Every subtree this generator owns, relative to a plugin root. `--check`
 // walks each of these on both sides (freshly generated vs checked-in) so an
 // unmanaged extra file inside one of them is caught, not just a changed one.
-export function managedRootsFor(host: Host): string[] {
+//
+// The opencode-only "lib" root now comes from capabilitiesFor(host).
+// extraManagedRoots rather than a hardcoded `host === "opencode"` branch.
+// `capsLookup` is injectable so XP-06 AC-2's fixture-host test can prove an
+// arbitrary capability combination drives this list (production always uses
+// the real capabilitiesFor()).
+export function managedRootsFor(host: string, capsLookup: CapsLookup = REAL_CAPS_LOOKUP): string[] {
   const common = [
     path.join("skills", "massa-ai"),
     path.join("skills", "persona-router"),
     path.join("skills", "agents"),
   ];
-  if (host === "opencode") return [...common, "lib"];
-  return common;
+  const extra = capsLookup(host)?.extraManagedRoots ?? [];
+  return [...common, ...extra];
 }
 
 // ── Emit ─────────────────────────────────────────────────────────────────────
@@ -200,25 +226,41 @@ async function copyEntries(
   }
 }
 
-export async function emitAll(targetRoots: Record<Host, string>): Promise<number> {
+/**
+ * `hosts` (default `HOSTS`) and `capsLookup` (default the real
+ * capabilitiesFor()) are the seam XP-06 AC-2's fixture-host test drives:
+ * injecting an extra host + a fixture capability record proves the "lib"
+ * root and the hook-binary copy are both decided from the table, not from a
+ * literal host-name comparison. Only 2 production call sites (main, runCheck
+ * below), both in this file — no external call-site contract to preserve.
+ */
+export async function emitAll(
+  targetRoots: Record<string, string>,
+  hosts: readonly string[] = HOSTS,
+  capsLookup: CapsLookup = REAL_CAPS_LOOKUP,
+): Promise<number> {
   const skillEntries = await collectSkillEntries();
   const opencodeLibEntries = await collectOpencodeLibEntries();
   const hookBinaryEntries = await collectHookBinaryEntries();
+  const hookHosts = hookBinaryHosts(hosts, capsLookup);
 
   let total = 0;
-  for (const host of HOSTS) {
-    const skillsDest = path.join(targetRoots[host], "skills");
+  for (const host of hosts) {
+    const skillsDest = path.join(targetRoots[host]!, "skills");
     await copyEntries(skillEntries, skillsDest);
     total += skillEntries.length;
 
-    if (host === "opencode") {
-      const libDest = path.join(targetRoots[host], "lib");
+    // "lib" is opencode's vendored opencode-config.cjs copy today; whether a
+    // host gets it is now table-driven (extraManagedRoots), not a literal
+    // `host === "opencode"` check.
+    if (capsLookup(host)?.extraManagedRoots.includes("lib")) {
+      const libDest = path.join(targetRoots[host]!, "lib");
       await copyEntries(opencodeLibEntries, libDest);
       total += opencodeLibEntries.length;
     }
 
-    if (HOOK_BINARY_HOSTS.includes(host)) {
-      const hooksDest = path.join(targetRoots[host], "hooks");
+    if (hookHosts.includes(host)) {
+      const hooksDest = path.join(targetRoots[host]!, "hooks");
       await copyEntries(hookBinaryEntries, hooksDest);
       for (const entry of hookBinaryEntries) {
         await fs.chmod(path.join(hooksDest, ...entry.relPath.split("/")), HOOK_BINARY_MODE);

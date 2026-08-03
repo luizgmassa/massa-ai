@@ -65,6 +65,48 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: validation.md Addendum item 6 (workflows/judge-with-debate.md:audits/judge)
 - last seen: 2026-07-30T12:26:06Z
 
+### L-009 - An in-process self-updater that fetches and applies code from the network is structurally a downloader, not an update mechanism; prefer printing the update command for the user to run over auto-applying it.
+- signal: `spec_deviation` | recurrence: 1 feature(s) | scope: `harness/self-update` | harmful: 0 | confidence: 0.62
+- features: cross-pollination-ports
+- context: project=massa-ai session=spec-cross-pollination-ports workflow=spec-driven entity=cross-pollination-ports
+- evidence: codebase-memory-mcp PR #1316/#1332/#1338 (harness/self-update)
+- last seen: 2026-08-03T20:59:30Z
+
+### L-010 - Retiring a compatibility boundary (env-var prefix, config key, feature flag) needs a two-direction test: the new name reaches its target AND the old name has zero effect; a one-direction test still passes if the old path is silently left wired up beside the new one.
+- signal: `spec_precision_gap` | recurrence: 1 feature(s) | scope: `spec-precision/compat-boundary` | harmful: 0 | confidence: 0.62
+- features: cross-pollination-ports
+- context: project=massa-ai session=spec-cross-pollination-ports workflow=spec-driven entity=cross-pollination-ports
+- evidence: packages/shared/src/config/__tests__/llm-env-prefix.test.ts (spec-precision/compat-boundary)
+- last seen: 2026-08-03T20:59:38Z
+
+### L-011 - CI's Bun install-cache race was mitigated only reactively (purge-and-retry on failure); warm the package-manager cache with actions/cache keyed on the lockfile hash instead, and keep the purge as a fallback rather than the sole mitigation.
+- signal: `gate_fail` | recurrence: 1 feature(s) | scope: `ci/install-cache` | harmful: 0 | confidence: 0.62
+- features: cross-pollination-ports
+- context: project=massa-ai session=spec-cross-pollination-ports workflow=spec-driven entity=cross-pollination-ports
+- evidence: .github/workflows/ci.yml:75 (ci/install-cache)
+- last seen: 2026-08-03T20:59:43Z
+
+### L-012 - Two CI workflows' test venues diverging silently isolates coverage: a gated suite that skips in the blocking workflow's venue but runs in a non-blocking one lets the required check report green while that suite never actually executed there; assert venue parity between workflows, not just presence in one.
+- signal: `gate_fail` | recurrence: 1 feature(s) | scope: `ci/venue-parity` | harmful: 0 | confidence: 0.62
+- features: cross-pollination-ports
+- context: project=massa-ai session=spec-cross-pollination-ports workflow=spec-driven entity=cross-pollination-ports
+- evidence: .github/workflows/ci.yml + coverage.yml RUN_POSTGRES_TESTS divergence (ci/venue-parity)
+- last seen: 2026-08-03T21:00:06Z
+
+### L-013 - A type-enforced sanitization boundary at a persistence insert seam needs to exist before the first real payload reaches it; retrofitting it after live data has accumulated leaves every pre-fix row permanently unsanitized, since sanitization is write-time only and does not retroactively touch existing rows.
+- signal: `ac_gap` | recurrence: 1 feature(s) | scope: `core/security-boundary` | harmful: 0 | confidence: 0.62
+- features: cross-pollination-ports
+- context: project=massa-ai session=spec-cross-pollination-ports workflow=spec-driven entity=cross-pollination-ports
+- evidence: packages/core/src/services/hooks/hook-service.ts:246 (core/security-boundary)
+- last seen: 2026-08-03T21:00:12Z
+
+### L-014 - A design doc that pre-assigns a decision-record ID (AD-NNN 'to append at Execute') goes stale if other features land AD entries before the deferred append runs; re-derive the next ID at append time, never trust the pre-assigned number.
+- signal: `spec_deviation` | recurrence: 1 feature(s) | scope: `.specs/project/STATE.md` | harmful: 0 | confidence: 0.62
+- features: cross-pollination-ports
+- context: project=massa-ai session=spec-cross-pollination-ports workflow=spec-driven entity=cross-pollination-ports
+- evidence: .specs/features/cross-pollination-ports/design.md:107 (.specs/project/STATE.md)
+- last seen: 2026-08-03T21:30:48Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

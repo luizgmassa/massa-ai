@@ -411,11 +411,22 @@ export function isDedicatedDatabase(
 }
 
 /**
- * 50 of core's suites are wrapped in `describe.skipIf(!DEDICATED_DB)`, which
- * requires `MASSA_AI_DEDICATED=1` **and** a `DATABASE_URL` pointing at the
- * dedicated `127.0.0.1:5433/massa_ai_test` instance. Without both, those suites
- * report `0 pass / N skip` and their subjects measure near zero — `graph-queries.ts`
- * lands at 3.98% while its 19 dedicated tests sit right there, skipped.
+ * XP-04 design.md correction: the "50" this docblock used to claim was wrong
+ * in the source itself. Re-measured (`git grep -l`, plain grep, not this
+ * repo's rtk-filtered wrapper): **13** files match the `DEDICATED_DB`
+ * predicate (12 exact-literal `describe.skipIf(!DEDICATED_DB)` + 1 compound
+ * `describe.skipIf(!(DEDICATED_DB && RUN_PG))` in
+ * `synapse-session-store-pg.test.ts:55`), and **11** files match
+ * `RUN_POSTGRES_TESTS` (1 file — `synapse-session-store-pg.test.ts` again —
+ * overlaps both predicates). The union gated behind at least one of the two
+ * is **23** files, not 50 — the original figure likely miscounted the
+ * unrelated `skipIf(!READY)` population (~51 hits) instead.
+ *
+ * Both predicates require `MASSA_AI_DEDICATED=1` **and** a `DATABASE_URL`
+ * pointing at the dedicated `127.0.0.1:5433/massa_ai_test` instance. Without
+ * both, those suites report `0 pass / N skip` and their subjects measure near
+ * zero — `graph-queries.ts` lands at 3.98% while its 19 dedicated tests sit
+ * right there, skipped.
  *
  * That is the difference between 132 files "below the floor" and the truth, so
  * this refuses to run rather than emit a report that looks like a coverage
@@ -431,9 +442,10 @@ function assertDedicatedDatabase(): void {
     [
       "[coverage] refusing to run: the dedicated test database is not configured.",
       "",
-      "50 core suites are gated behind `describe.skipIf(!DEDICATED_DB)`. Without it they",
-      "skip, and their subjects measure near-zero coverage that has nothing to do with how",
-      "well they are tested. Required:",
+      "23 core suites are gated behind DEDICATED_DB and/or RUN_POSTGRES_TESTS (13 + 11,",
+      "1 file overlapping both). Without the env below they skip, and their subjects",
+      "measure near-zero coverage that has nothing to do with how well they are tested.",
+      "Required:",
       "",
       "  MASSA_AI_DEDICATED=1",
       "  DATABASE_URL=postgresql://<user>:<pass>@127.0.0.1:5433/massa_ai_test",
