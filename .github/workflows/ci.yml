@@ -19,7 +19,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: postgresql://massa_ai:massa_ai_password@localhost:5432/massa_ai
+      # XP-04 AC-1: flipped to the dedicated-DB shape coverage.yml already
+      # proves out, so isDedicatedDatabase() (scripts/check-coverage.ts) is
+      # true here too and the DEDICATED_DB/RUN_POSTGRES_TESTS-gated suites
+      # (23 files — see check-coverage.ts's assertDedicatedDatabase docblock)
+      # execute in this blocking job instead of silently skipping. Literal
+      # 127.0.0.1 (not localhost) and port 5433 are both load-bearing: the
+      # predicate is a regex on this exact string.
+      DATABASE_URL: postgresql://massa_ai:massa_ai_password@127.0.0.1:5433/massa_ai_test
+      MASSA_AI_DEDICATED: "1"
 
     services:
       postgres:
@@ -27,9 +35,12 @@ jobs:
         env:
           POSTGRES_USER: massa_ai
           POSTGRES_PASSWORD: massa_ai_password
-          POSTGRES_DB: massa_ai
+          POSTGRES_DB: massa_ai_test
         ports:
-          - 5432:5432
+          # Host 5433 -> container 5432, mirroring coverage.yml. A second,
+          # unrelated service was rejected (design.md C4): DEDICATED_DB reads
+          # DATABASE_URL itself, so a side service can never satisfy it.
+          - 5433:5432
         options: >-
           --health-cmd "pg_isready -U massa_ai"
           --health-interval 5s
@@ -232,6 +243,10 @@ jobs:
         run: bun run test
         env:
           MASSA_AI_EXECUTOR_SANDBOX: none
+          # XP-04 AC-1. Turbo sandboxes the environment (AD-010) — without
+          # RUN_POSTGRES_TESTS in turbo.json's passThroughEnv (T2), setting it
+          # here would be a silent no-op under `bun run test` = `turbo run test`.
+          RUN_POSTGRES_TESTS: "1"
 
       - name: Test scripts (root-level suites)
         run: bun run test:scripts

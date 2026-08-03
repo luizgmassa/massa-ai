@@ -9,12 +9,12 @@
 # as a stale exception — drift in either direction is a defect (mirrors the
 # XP-03 security-allowlist discipline).
 
-# --- pending TASK-XP-007 (T7): ci.yml's build job has not yet been flipped
-# --- to the dedicated-DB shape coverage.yml already uses. T7 removes these
-# --- three entries; the gate must go back to near-empty exceptions after it.
-pending-xp04-t7|ci.yml|coverage.yml|DATABASE_URL|ci.yml's build job still points at the shared 5432/massa_ai service; T7 flips it to the dedicated 127.0.0.1:5433/massa_ai_test shape coverage.yml already uses. Remove this entry once T7 lands.
-pending-xp04-t7|ci.yml|coverage.yml|MASSA_AI_DEDICATED|Same T7 flip as DATABASE_URL above — ci.yml's build job does not yet set MASSA_AI_DEDICATED=1. Remove this entry once T7 lands.
-pending-xp04-t7|ci.yml|coverage.yml|RUN_POSTGRES_TESTS|Same T7 flip — ci.yml's build job does not yet set RUN_POSTGRES_TESTS=1 on its Test step, which is why turbo's passThroughEnv addition (T2) was a prerequisite. Remove this entry once T7 lands.
+# TASK-XP-007 (T7) landed: ci.yml's build job now sets the same DATABASE_URL /
+# MASSA_AI_DEDICATED / RUN_POSTGRES_TESTS shape coverage.yml already used, so
+# the three entries that used to live here (DATABASE_URL, MASSA_AI_DEDICATED,
+# RUN_POSTGRES_TESTS) no longer diverge and were removed — a listed exception
+# for a divergence that no longer exists is itself a failure (stale-exception,
+# same rule as everywhere else in this file).
 
 # --- permanent: coverage.yml intentionally runs a different, heavier command.
 invocation-shape|ci.yml|coverage.yml|__invocation__|ci.yml's build job runs the regular aggregate (bun run test / test:scripts / test:plugins); coverage.yml runs bun run test:coverage, the same suites under coverage instrumentation, on purpose (SEN-02's per-file floor gate) — the commands will never be identical strings.
