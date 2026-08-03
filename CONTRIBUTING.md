@@ -82,6 +82,15 @@ never silently violate an invariant.
 **Acceptance gate**: tests cover the happy path, error path, timeout path, and
 partial-failure path for each invariant. No invariant is silently violated.
 
+**Retiring a compatibility boundary** (an env-var prefix, a config key, a
+feature flag) is itself an invariant change and needs the same discipline. A
+suite that only checks the new name still passes if the old name was left
+silently wired up beside it — that is exactly the outcome the retirement is
+supposed to rule out. Assert both directions in one test: the new name
+reaches its target, AND the old name has zero effect. See
+`packages/shared/src/config/__tests__/llm-env-prefix.test.ts` for the
+reference shape (AD-010's `MASSA_AI_LLM_*` retirement of `RLM_LLM_*`).
+
 ---
 
 ## Step 7: Tests — write tests that discriminate (kill mutations)
