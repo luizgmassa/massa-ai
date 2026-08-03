@@ -209,7 +209,10 @@ Turbo sandboxes the environment: any env var a test reads must be listed in
 `MASSA_AI_*` knob means editing that list too. There is exactly one env prefix in this
 project (**AD-010**), and all ten `MASSA_AI_LLM_*` vars are now listed — six of them were
 absent before that decision, so they arrived `undefined` under `bun run test` while
-appearing to work under a direct `bun test`.
+appearing to work under a direct `bun test`. `scripts/__tests__/turbo-passthrough-env.test.ts`
+mechanizes the "editing that list too" rule for every `MASSA_AI_*` var read via a literal
+`process.env` accessor anywhere in `packages/`+`apps/`, failing with the missing names
+whenever the read-set and the allowlist diverge.
 
 ## Architecture
 
