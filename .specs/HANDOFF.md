@@ -1198,10 +1198,13 @@ eighty-nine plan defects across §10.1–§10.27; branch 57 commits ahead of `ma
 (measured by `git rev-list --count`, not estimated), unpushed, no
 PR.**
 
-**Next action: T25 — independent validation, author ≠ verifier — and it does NOT start until the
-user answers its authorship question**: whether a fresh conversation (new session, no carried
-context beyond the artifacts) satisfies *"by a different author"*, or the user wants a genuinely
-different agent/person. Its row carries the two open criteria questions to answer rather than
+**Next action: T25 — independent validation, author ≠ verifier — in a FRESH CONVERSATION.**
+**The authorship question is ANSWERED. Decided by: the user, 2026-08-03**: a new session with no
+carried context beyond the `.specs/` artifacts and `~/prd-exec-instruments/` satisfies *"by a
+different author"* (PR-C's T18 precedent). **Rejected**: a verifier agent dispatched from the
+authoring session (the author would frame the verification), manual verification by the user, and
+deferring. The next conversation to open this handoff IS T25's verifier and must not treat this
+session's §10.x records as its own findings — re-take, never inherit, per the row. Its row carries the two open criteria questions to answer rather than
 inherit (C37's predicate; AC-2's enumerated-set reading), the re-take list (T5's frozen reading,
 Phase 6's resolver sweep both directions, `edgesExamined` per structural commit, the pack
 reading, a discrimination table on the real tree), and the restore discipline (scratch copies +
