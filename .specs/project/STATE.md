@@ -886,13 +886,19 @@ all state came from `.specs/` and source reads.
   fixed pre-commit (two-vs-three contradiction; over-label). One shell-harness flake adjudicated,
   three readings kept (static assertion, untouched file, red once in aggregate, green twice).
   Record `tasks.md` §10.25; zero new defects, running total eighty-nine.
-- ~~**Next action: Execute, T5**~~ … ~~**Execute, T14b**~~ → ~~**Execute, T14**~~ →
-  ~~**Execute, T15**~~ → ~~**Execute, T16**~~ → ~~**Execute, T19**~~ → ~~**Execute, T20b**~~ →
-  ~~**Execute, T20**~~ → ~~**Execute, T21**~~ → ~~**Execute, T18**~~ → ~~**Execute, T22**~~ →
-  **Next action: Execute, T23** (state files; never touch `active_feature`; never `git add -A`
-  under `.specs/`), **then T24** (CHANGELOG, `### Changed` + `### Removed`, never the literal
-  skip-ci marker), **then STOP for the T25 authorship question** — T25 by a different author;
-  whether a fresh conversation satisfies that is the user's call, asked before T25 starts.
+- **T23 DONE — `036e5b2`** (state files flipped with the T25-pending frame stated inside them;
+  `active_feature` untouched, fourth check; §10.26). **T24 DONE — `c6ee80c`. RFS-04 AC-2 closes
+  and EXECUTE IS COMPLETE THROUGH T24** — CHANGELOG under both decided headings, semver re-taken
+  per item on the reachability table, live file exempted by name, no skip-ci literal anywhere it
+  matters; §10.27. Running total **eighty-nine** plan defects; branch **57 ahead of `main`**,
+  unpushed, no PR; `test:scripts` 1116/0/49 at the close.
+- ~~**Next action: Execute, T5**~~ … ~~**Execute, T22**~~ → ~~**Execute, T23 + T24**~~ →
+  **Next action: T25 — STOPPED ON THE USER'S AUTHORSHIP QUESTION.** T25 is independent
+  validation, author ≠ verifier; whether a fresh conversation satisfies "different author" or the
+  user wants a genuinely different agent/person is the user's call, and nothing starts until it
+  is answered. The row carries the re-take list and the two open criteria questions; HANDOFF's
+  Active tail carries the frames a fresh verifier needs (`.specs/reports/` untracked-invisible;
+  ledger numbers are minting-frame; 79 instruments).
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed

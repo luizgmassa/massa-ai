@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–6 CLOSED, PHASE 7 OPEN (T19, T20b, T20, T21, T22 DONE); next T23 + T24, then the T25 question**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute COMPLETE THROUGH T24 — ALL PHASES CLOSED; ONLY T25 REMAINS, BY A DIFFERENT AUTHOR, AND ITS AUTHORSHIP QUESTION IS THE USER'S**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -1185,13 +1185,31 @@ flake adjudicated with all three readings kept** — `test-setup-wizard-db-selec
 aggregate (10p/1f), green standalone and on the aggregate re-run (1116/0 + 11p/0f, exit 0).
 Zero new plan defects — running total **eighty-nine**.
 
-**Next action: Execute, T23** — the state files (`HANDOFF.md`, `STATE.md`, `FEATURES.json`):
-PR-D `status: complete`, `phases.tasks/execute: true`, parent to `complete`; **do not touch
-`active_feature`** (reads `skills-directive-dedup`, genuinely paused — verified three times);
-never `git add -A` under `.specs/`. **Then T24** — the CHANGELOG entry, `### Changed` +
-`### Removed` per §2, never writing the skip-ci marker literally. **Then STOP: T25 is by a
-different author** — whether a fresh conversation satisfies that is the user's call, and the
-question is asked before T25 starts, per its row.
+~~**Next action: Execute, T23 … then T24.**~~ **T23 DONE — `036e5b2`** (state files: PR-D
+`complete`/`execute: true`, parent `complete`, both notes tails carrying the T25-pending frame so
+the status fields state their own caveat; `active_feature` untouched, fourth verification;
+record §10.26). **T24 DONE — `c6ee80c`. RFS-04 AC-2 CLOSES and EXECUTE IS COMPLETE THROUGH
+T24**: the CHANGELOG entry under `### Changed` + `### Removed` as §2 decided, semver re-taken
+**per item** on the reachability table, the live `services/search/hybrid-search.ts` exempted by
+name, verification named as the cache-forced `npm pack --dry-run`; the skip-ci literal appears in
+neither entry nor commit; the +37 shift of v1.17.0's `:35` rename note frame-stated (now `:72`,
+find by content). Record §10.27. `test:scripts` 1116/0/49 at the close. **Running total:
+eighty-nine plan defects across §10.1–§10.27; branch 57 commits ahead of `main` at this commit
+(measured by `git rev-list --count`, not estimated), unpushed, no
+PR.**
+
+**Next action: T25 — independent validation, author ≠ verifier — and it does NOT start until the
+user answers its authorship question**: whether a fresh conversation (new session, no carried
+context beyond the artifacts) satisfies *"by a different author"*, or the user wants a genuinely
+different agent/person. Its row carries the two open criteria questions to answer rather than
+inherit (C37's predicate; AC-2's enumerated-set reading), the re-take list (T5's frozen reading,
+Phase 6's resolver sweep both directions, `edgesExamined` per structural commit, the pack
+reading, a discrimination table on the real tree), and the restore discipline (scratch copies +
+SHA-256; never `git checkout`). Frames a fresh verifier needs beyond the row: `.specs/reports/`
+is untracked and invisible to `git grep` while naming RFS-04's subjects (accepted region,
+§10.20); the §8.1 ledger and §10.x records cite minting-frame line numbers by design (find
+content, not numbers); `~/prd-exec-instruments/` holds 79 instruments, `t19-importer-sweep.ts`
+the newest.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
