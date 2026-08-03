@@ -6,6 +6,7 @@
   spec-driven (Large) · branch `spec/da-inventory-closure`, worktree
   `.claude/worktrees/da-inventory-closure`, cut from `origin/main` @ `8e63477` (v1.19.0).
 - Scope: the DA-01..DA-17 inventory of `.specs/reports/cross-pollination-portability-and-gaps.md`
+  (folder removed at close-out per the user's instruction — recover via git history)
   §"(a) already documented", re-measured row-by-row at `8e63477` (the report is a week stale and
   was written at `45daaa1`). Full disposition table with per-row evidence:
   `.specs/features/da-inventory-closure/spec.md`.

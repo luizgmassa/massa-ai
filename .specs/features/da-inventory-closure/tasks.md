@@ -78,4 +78,45 @@ Verdict: **escalate_to_full: true — plan revised before Execute** (policy
 
 ## Execution record
 
-(filled per task)
+- **T1 `c8174af`** — seam export + hermetic suite. Direct run under real config: 93/2 cold
+  (44.96 s) → **95/0 in 5.78 s** first-run post-fix; wrapper PASS all 8 groups (both counts
+  recorded separately per gate finding 7). Falsifier run confounded warm (966 ms green with
+  the env line commented) and recorded as such — discrimination rests on the call-graph trace
+  (the seam never gates `ensureInitialized` → `getVectorStore()`) plus the cold-band delta.
+  `.d.ts` exposure verified (`dist/services/index.d.ts:13`) and accepted. Full battery green:
+  lint 0 · type-check · build · test 11/11 · test:scripts 1230/0/55 · test:plugins 96/0 ·
+  deterministic 138 PASS · core-layering 986 edges PASS.
+- **T2 `5b60e88`** — CLAUDE.md known-outstanding paragraph replaced with the two-mechanism
+  post-mortem; single reference remains (`CLAUDE.md:177`).
+- **T3 `d9bf535`** — wiring seam + upgraded missing-suite tests (control / drop / unknown-id /
+  empty-filter). **Observed red:** deleting the missing-branch `return 1` (live line `:328`
+  post-seam; `:316` pre-seam) → **10 pass / 1 fail, exactly the new drop test**; every
+  pre-existing test green under the mutation — the wiring was provably unsensed before.
+  Restore incident: first restore used `git restore` on the not-yet-committed file and deleted
+  the seam itself (the known mutation-harness trap, hit live); re-applied from the design
+  text, re-verified 11/0 + coverage 30/0. test:scripts after commit: **exit 0, 1233 pass /
+  0 fail** (+3 net-new), captured with the command's own exit code after two tail-pipe
+  maskings earlier the same session (DI-07 rule 3's citations).
+- **T4 `db23d05`** — registry truth; diff = one entry (status, 3 phase flags, note).
+- **T5 `8434254`** — both carried-forward clauses struck in place with BEH-01 and SEN-03
+  evidence chains.
+- **T6 `8f519e5`** — provisioning paragraph; signature grep-able
+  (`No native build was found for platform`).
+- **T7 `30f7e0c`** — CONTRIBUTING §Measurement discipline (6 rules, each citing a recorded
+  instance incl. this session's two pipe-maskings); CLAUDE.md links, does not restate.
+- **T8 `9b50bbf`** — `lessons.py add` merged L-001 to recurrence=2 → **tool-promoted to
+  confirmed** (same dedup key, new feature, signal genuinely re-observed via the T3 mutation).
+  L-002..L-005: no entry — their subjects were fixed by T24/T35/wave-7 and no signal recurred
+  here; the prune window owns stale candidates. `lessons.json` diff is tool-shaped only.
+- **T9 `d1c329d`** — .ua data committed (4 tracked + diff-overlay.json). Porcelain before:
+  4×`M` + 3×`??`; after: **empty for the committed set**; token + trash remain untracked in the
+  main checkout by decision (flagged).
+- **T10** — sweep population **14** at gate time (the critic's 13 + `.ua/diff-overlay.json`,
+  which T9's own commit added — the population moved between Design and Execute, caught by
+  printing it). Dispositions: **annotated (4 living)** — `docs/adding-a-host.md:47`, HANDOFF
+  Active `:6`, STATE Current `:8`, this spec's §Source; **historical — left (6 sealed)** —
+  `core-layering-controller-retirement/validation.md`, `core-layering-read-file-split/{tasks,
+  validation}.md`, `cross-pollination-ports/{spec,design,tasks}.md`; **own-record — left (3)**
+  — this feature's spec/design/tasks sweep mechanics; **tool-owned — left (1)** —
+  `.ua/diff-overlay.json` (generated `changedFiles` data). Post-`git rm` re-grep: **13
+  survivors, 0 without a disposition** (the 14th was the report folder itself).

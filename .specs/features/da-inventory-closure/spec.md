@@ -3,7 +3,7 @@
 - **Slug:** `da-inventory-closure`
 - **workflowSessionId:** `spec-da-inventory-closure`
 - **Workflow:** spec-driven (Large — Specify + Design + Tasks + full Plan Challenge + Execute + independent validation)
-- **Source:** `.specs/reports/cross-pollination-portability-and-gaps.md` §"massa-ai defect & gap inventory (a) already documented" (DA-01..DA-17) plus the DA-14 and STATE-coverage bullets in §"Ambiguities and residual risk". The report is dated 2026-07-29, written at `45daaa1`.
+- **Source:** `.specs/reports/cross-pollination-portability-and-gaps.md` (folder removed at close-out per the user's instruction, T10 — recover via git history) §"massa-ai defect & gap inventory (a) already documented" (DA-01..DA-17) plus the DA-14 and STATE-coverage bullets in §"Ambiguities and residual risk". The report is dated 2026-07-29, written at `45daaa1`.
 - **Spec baseline:** every DA row **re-measured at `8e63477`** (v1.19.0, `main`) on 2026-08-03, in the `spec/da-inventory-closure` worktree, via plain `/usr/bin/grep`/`sed`/`ls`/`gh api`/direct suite runs — never rtk-filtered output (rtk rewrites numbers and paths; anything cited as proof below was taken raw). The report is input, not authority; this spec's re-measured statuses win where they differ.
 - **Process requirements from the user (this session):** commit the `.ua/` data files; verify the `.gitignore` premise; remove `.specs/reports/` as the final development step; one PR.
 

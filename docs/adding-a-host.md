@@ -44,7 +44,7 @@ every property).
 ## The two quirk classes (from the ai-memory evidence)
 
 A sibling managed-harness project's evidence
-(`.specs/reports/ai-memory-changes-2a85950-to-head.md`) documents that
+(`.specs/reports/ai-memory-changes-2a85950-to-head.md`, removed at `da-inventory-closure` close-out — recover via git history) documents that
 lifecycle-hook delivery is genuinely not uniform across AI coding
 hosts, and a new host must be measured, not assumed:
 

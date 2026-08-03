@@ -3,7 +3,8 @@
 ## Active — DA Inventory Closure (Specify DONE 2026-08-03)
 
 - **Feature:** `da-inventory-closure` — disposition + closure of DA-01..DA-17 from
-  `.specs/reports/cross-pollination-portability-and-gaps.md`. Contract:
+  `.specs/reports/cross-pollination-portability-and-gaps.md` (folder removed at close-out per
+  the user's instruction — recover via git history). Contract:
   `.specs/features/da-inventory-closure/spec.md` (the Re-verified table is the triage record;
   read it, not this file). Branch `spec/da-inventory-closure`, worktree
   `.claude/worktrees/da-inventory-closure`, from `origin/main` @ `8e63477` (v1.19.0).
