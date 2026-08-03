@@ -11,18 +11,24 @@
       "text": "UNION GUARD missing-suite path has no discriminating test. No test injects a suite into SUITE_TABLE but not into results. Add a mock-drop test asserting exit 1 + UNION GUARD FAIL.",
       "signal": "surviving_mutant",
       "scope": "test-strength",
-      "status": "candidate",
+      "status": "confirmed",
       "features": [
-        "wave-6-architecture-features"
+        "wave-6-architecture-features",
+        "da-inventory-closure"
       ],
-      "recurrence": 1,
+      "recurrence": 2,
       "harmful": 0,
       "evidence": [
-        "scripts/run-tests-parallel.ts:243-257 + scripts/__tests__/run-tests-parallel.test.ts:69-74 (test-strength)"
+        "scripts/run-tests-parallel.ts:243-257 + scripts/__tests__/run-tests-parallel.test.ts:69-74 (test-strength)",
+        "scripts/run-tests-parallel.ts:328 return-1 deletion survived all pre-existing tests (10p/0f on them); killed by the DI-02 drop-seam test (test-strength)"
       ],
       "created": "2026-07-22T21:39:38Z",
-      "last_seen": "2026-07-22T21:39:38Z",
-      "confidence": 0.62
+      "last_seen": "2026-08-03T23:36:28Z",
+      "confidence": 1.0,
+      "project": "massa-ai",
+      "session": "spec-da-inventory-closure",
+      "workflow": "spec-driven",
+      "entity": "da-inventory-closure"
     },
     {
       "id": "L-002",
