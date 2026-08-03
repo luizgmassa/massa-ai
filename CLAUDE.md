@@ -599,6 +599,8 @@ zero publishes.
 
 ## Working conventions
 
+- Figures quoted as evidence follow `CONTRIBUTING.md` § "Measurement discipline" — the
+  recurring measurement-defect classes and their rules live there, once.
 - `.specs/` is the source of truth for in-flight work: `project/STATE.md`,
   `project/FEATURES.json`, `HANDOFF.md`, `features/<slug>/{spec,design,tasks,validation}.md`,
   `LESSONS.md`. Read state from these files, never from recalled memory.
