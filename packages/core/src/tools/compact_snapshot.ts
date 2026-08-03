@@ -25,6 +25,7 @@ import {
   getAttributionResolver,
   type AttributionResolverLike,
 } from "../services/hooks/attribution-resolver.js";
+import { scrubCredentials } from "../kernel/sanitize/credential-scrub.js";
 
 interface CompactSnapshotParams {
   sessionId: string;
@@ -108,19 +109,31 @@ export class CompactSnapshotTool implements IToolHandler {
           const attribution = await (
             this.resolverOverride ?? getAttributionResolver()
           ).resolve({ callerProjectId: projectId, sessionId, cwd });
-          store.insert({
-            id: persistedId,
-            projectId: attribution.projectId,
-            sessionId,
-            source: "pre-compact",
-            category: "compaction-snapshots",
-            payloadJson: JSON.stringify({
+          // XP-02 boundary: this writer bypasses HookService entirely (it
+          // persists via `/api/v1/hook/compact-snapshot`), so it must apply
+          // the same scrub-before-persist boundary independently.
+          const scrub = scrubCredentials(
+            JSON.stringify({
               snapshot: snapshot.xml,
               eventCount: snapshot.eventCount,
               compactCount: snapshot.compactCount,
               generatedAt: snapshot.generatedAt,
               sectionCount: snapshot.sections.length,
             }),
+          );
+          if (scrub.total > 0) {
+            logger.debug("compact_snapshot payload redacted before persist", {
+              redactions: scrub.redactions,
+              total: scrub.total,
+            });
+          }
+          store.insert({
+            id: persistedId,
+            projectId: attribution.projectId,
+            sessionId,
+            source: "pre-compact",
+            category: "compaction-snapshots",
+            payloadJson: scrub.sanitized,
             importance: 0.8,
             createdAt: Date.now(),
             attributionSource: attribution.source,

@@ -15,7 +15,11 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 
 import { PgObservationStore } from "../data/memory/observation-repository-pg.js";
-import { newObservationId, type Observation } from "../data/memory/observation-contract.js";
+import {
+  newObservationId,
+  type InsertableObservation,
+  type Observation,
+} from "../data/memory/observation-contract.js";
 import {
   resetProjectIdentityAliasResolver,
   setProjectIdentityAliasResolverForTests,
@@ -23,6 +27,7 @@ import {
 } from "../kernel/alias-resolver.js";
 import { _resetPrismaForTesting } from "../kernel/prisma-client.js";
 import { closeConnections } from "../kernel/db-connection.js";
+import { scrubCredentials } from "../kernel/sanitize/credential-scrub.js";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
 const DEDICATED_DB =
@@ -37,8 +42,11 @@ function projectId(): string {
   return `${TEST_PREFIX}${randomUUID()}`;
 }
 
-function makeObservation(overrides: Partial<Observation> = {}): Observation {
-  return {
+// XP-02: whatever payloadJson ends up after overrides is always routed
+// through scrubCredentials before being returned — store.insert() below now
+// requires InsertableObservation (branded payloadJson).
+function makeObservation(overrides: Partial<Observation> = {}): InsertableObservation {
+  const merged: Observation = {
     id: newObservationId(),
     projectId: "",
     sessionId: null,
@@ -48,6 +56,7 @@ function makeObservation(overrides: Partial<Observation> = {}): Observation {
     createdAt: Date.now(),
     ...overrides,
   };
+  return { ...merged, payloadJson: scrubCredentials(merged.payloadJson).sanitized };
 }
 
 async function settle(store: PgObservationStore): Promise<void> {

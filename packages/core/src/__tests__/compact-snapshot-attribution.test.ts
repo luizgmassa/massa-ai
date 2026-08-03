@@ -5,12 +5,16 @@
  */
 import { describe, expect, test } from "bun:test";
 import { CompactSnapshotTool } from "../tools/compact_snapshot.js";
-import { MemoryObservationStore } from "../data/memory/observation-repository.js";
+import {
+  MemoryObservationStore,
+  type InsertableObservation,
+} from "../data/memory/observation-repository.js";
 import type {
   AttributionInput,
   AttributionResult,
   AttributionResolverLike,
 } from "../services/hooks/attribution-resolver.js";
+import { scrubCredentials } from "../kernel/sanitize/credential-scrub.js";
 
 class FakeResolver implements AttributionResolverLike {
   calls: AttributionInput[] = [];
@@ -28,13 +32,15 @@ class FakeResolver implements AttributionResolverLike {
 
 function seededStore(): MemoryObservationStore {
   const store = new MemoryObservationStore();
+  // XP-02: routed through scrubCredentials — store.insert() requires
+  // InsertableObservation (branded payloadJson).
   store.insert({
     id: "obs-seed-1",
     projectId: "anything",
     sessionId: "s1",
     source: "user-prompt",
     category: "user-prompts",
-    payloadJson: JSON.stringify({ prompt: "hello" }),
+    payloadJson: scrubCredentials(JSON.stringify({ prompt: "hello" })).sanitized,
     importance: 0.5,
     createdAt: Date.now(),
   });
@@ -93,5 +99,44 @@ describe("CompactSnapshotTool attribution seam", () => {
     expect(out.success).toBe(true);
     expect(resolver.calls.length).toBe(0);
     expect(store.rows.length).toBe(0);
+  });
+});
+
+describe("CompactSnapshotTool XP-02 credential redaction (independent HookService bypass)", () => {
+  test("a credential surfaced into the snapshot summary is redacted in the tool's own persisted row", async () => {
+    const secret = "AKIAABCDEFGHIJKLMNOP";
+    const store = new MemoryObservationStore();
+    // Simulates a pre-existing row written before this feature shipped (spec.md's
+    // documented accepted limitation: "Pre-existing rows stay unsanitized").
+    // compact_snapshot.ts persists independently of HookService (M45/HAR-01),
+    // so its own scrub-before-persist boundary must catch a secret even when
+    // it originates from upstream content this seam does not control.
+    const legacyRow = {
+      id: "obs-legacy-1",
+      projectId: "anything",
+      sessionId: "s1",
+      source: "user-prompt",
+      category: "user-prompts",
+      payloadJson: JSON.stringify({ prompt: secret }),
+      importance: 0.5,
+      createdAt: Date.now(),
+    } as unknown as InsertableObservation;
+    store.insert(legacyRow);
+
+    const resolver = new FakeResolver({ projectId: "resolved-proj", source: "containment" });
+    const tool = new CompactSnapshotTool({ store, resolver });
+    const out = await tool.handle({ sessionId: "s1", projectId: "junk", persist: true });
+    expect(out.success).toBe(true);
+
+    const snapshotRow = store
+      .listRecent("resolved-proj", 10)
+      .find((r) => r.category === "compaction-snapshots");
+    expect(snapshotRow).toBeDefined();
+    // The secret did surface into the human-readable snapshot xml...
+    expect(out.data?.snapshot as string).toContain(secret);
+    // ...but the tool's OWN persisted payloadJson (built independently from
+    // scrub.sanitized, not from out.data.snapshot) must never carry it.
+    expect(snapshotRow?.payloadJson).toContain("[REDACTED:aws-key]");
+    expect(snapshotRow?.payloadJson).not.toContain(secret);
   });
 });

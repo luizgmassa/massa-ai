@@ -35,6 +35,7 @@ import type {
   Observation,
   ObservationStore,
   ObservationRow,
+  InsertableObservation,
 } from "./observation-contract.js";
 
 // ── Raw row shape returned by $queryRaw ────────────────────────────────────
@@ -162,7 +163,7 @@ export class PgObservationStore implements ObservationStore {
     return this.hydrating;
   }
 
-  insert(obs: Observation): void {
+  insert(obs: InsertableObservation): void {
     // Mirror update is synchronous so a subsequent sync read sees the value.
     //
     // BUG-06: key it on the canonical project id when the alias resolver

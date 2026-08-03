@@ -1,3 +1,5 @@
+import type { SanitizedPayloadJson } from "../../kernel/sanitize/credential-scrub.js";
+
 export const LIFECYCLE_EVENTS = ["session-start", "user-prompt", "pre-tool-use", "post-tool-use", "pre-compact", "session-end"] as const;
 export type LifecycleEventKind = (typeof LIFECYCLE_EVENTS)[number];
 export const OBSERVATION_CATEGORIES = ["files-read", "files-written", "file-search", "tool-calls", "git-changes", "tasks", "plan-changes", "errors", "error-resolution", "iteration-loop", "decisions", "constraints", "rejected-approaches", "user-prompts", "intent", "goal", "role", "blocked-on", "rules", "skills-invoked", "subagents-spawned", "env-changes", "cwd-changes", "session-settings", "external-refs", "web-fetch", "searches", "memories-stored", "compaction-snapshots", "mcp-calls", "agent-findings", "cost-telemetry", "lifecycle-raw"] as const;
@@ -5,7 +7,16 @@ export type ObservationCategory = (typeof OBSERVATION_CATEGORIES)[number];
 export const ATTRIBUTION_SOURCES = ["explicit", "sticky", "containment", "verbatim", "repaired"] as const;
 export type AttributionSource = (typeof ATTRIBUTION_SOURCES)[number];
 export interface Observation { id: string; projectId: string; sessionId: string | null; source: LifecycleEventKind; category?: ObservationCategory; payloadJson: string; importance: number; createdAt: number; agentId?: string | null; attributionSource?: AttributionSource | null; }
+/**
+ * Observation shape accepted by {@link ObservationStore.insert}. Identical to
+ * {@link Observation} except `payloadJson` must be the branded
+ * `SanitizedPayloadJson` produced by `kernel/sanitize/credential-scrub.ts`'s
+ * `scrubCredentials()` — the only way to construct that brand. Read shapes
+ * (`Observation`, `ObservationRow`, `listRecent`/`listBySession` results)
+ * stay plain `string`: rows read back are not re-branded (XP-02 / AD-013).
+ */
+export type InsertableObservation = Omit<Observation, "payloadJson"> & { payloadJson: SanitizedPayloadJson };
 export interface ObservationRow { id: string; project_id: string; session_id: string | null; source: string; category: string | null; payload_json: string; importance: number; created_at: number; agent_id?: string | null; attribution_source?: string | null; }
-export interface ObservationStore { insert(obs: Observation): void; listRecent(projectId: string, limit: number): Observation[]; listBySession(sessionId: string, limit: number): Observation[]; countByProject(projectId: string): number; journalMode(): string; }
-export class MemoryObservationStore implements ObservationStore { public rows: Observation[] = []; insert(row: Observation): void { this.rows.push(structuredClone(row)); } listRecent(projectId: string, limit: number): Observation[] { return this.rows.filter((row) => row.projectId === projectId).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit).map((row) => structuredClone(row)); } listBySession(sessionId: string, limit: number): Observation[] { return this.rows.filter((row) => row.sessionId === sessionId).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit).map((row) => structuredClone(row)); } countByProject(projectId: string): number { return this.rows.filter((row) => row.projectId === projectId).length; } journalMode(): string { return "memory"; } }
+export interface ObservationStore { insert(obs: InsertableObservation): void; listRecent(projectId: string, limit: number): Observation[]; listBySession(sessionId: string, limit: number): Observation[]; countByProject(projectId: string): number; journalMode(): string; }
+export class MemoryObservationStore implements ObservationStore { public rows: Observation[] = []; insert(row: InsertableObservation): void { this.rows.push(structuredClone(row)); } listRecent(projectId: string, limit: number): Observation[] { return this.rows.filter((row) => row.projectId === projectId).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit).map((row) => structuredClone(row)); } listBySession(sessionId: string, limit: number): Observation[] { return this.rows.filter((row) => row.sessionId === sessionId).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit).map((row) => structuredClone(row)); } countByProject(projectId: string): number { return this.rows.filter((row) => row.projectId === projectId).length; } journalMode(): string { return "memory"; } }
 export function newObservationId(): string { return `obs_${crypto.randomUUID()}`; }
