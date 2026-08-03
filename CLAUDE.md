@@ -234,7 +234,7 @@ the property the tier exists to preserve. It holds 11 modules.
 context,executor,symbol}/` — keeping their exported symbol names, and `@massa-ai/core`
 re-exports them through `./services/index.js`. The published `@massa-ai/core/controllers`
 subpath is gone; `./services` gained the 17 symbols it used to carry. Two names are a trap
-for a newcomer: `services/graph/` is the **memory-relation** graph, while the **symbol**
+for a newcomer: `services/memory-graph/` is the **memory-relation** graph, while the **symbol**
 graph and the controller fronting it live in `services/symbol/`.
 
 This section and `packages/core/src/index.ts`'s header are the only two descriptions of

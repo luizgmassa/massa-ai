@@ -278,7 +278,7 @@ export interface FileCoverage {
    * degenerate record that marks *every physical line* uncovered — blank lines,
    * closing braces and JSDoc included.
    *
-   * Measured on `packages/core/src/services/graph/graph-queries.ts` (440 lines):
+   * Measured on `packages/core/src/services/memory-graph/graph-queries.ts` (440 lines):
    * the instrumenting group reported 220 executable lines and covered all 220;
    * seven shallow groups each reported 377 and covered 14. The 157-line
    * difference is entirely comments, blanks and braces, and the real set is a

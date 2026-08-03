@@ -9,7 +9,7 @@
  * is what is pinned here. These run under `bun run test:scripts`, which CI runs.
  *
  * The fixtures below are the shape of the real defect, not invented numbers.
- * Measured on `packages/core/src/services/graph/graph-queries.ts` (440 lines):
+ * Measured on `packages/core/src/services/memory-graph/graph-queries.ts` (440 lines):
  * the group that genuinely instruments it reported 220 executable lines and
  * covered all 220, while seven groups that only imported it transitively each
  * reported 377 and covered 14. The 157-line difference is entirely blank lines,
@@ -36,7 +36,7 @@ import {
 } from "../check-coverage.ts";
 
 const BASE = "/repo/packages/core";
-const SUBJECT = path.resolve(BASE, "src/services/graph/graph-queries.ts");
+const SUBJECT = path.resolve(BASE, "src/services/memory-graph/graph-queries.ts");
 
 /** An lcov record listing `lines`, of which `covered` ran. */
 function lcov(file: string, lines: number[], covered: ReadonlySet<number>): string {
@@ -49,14 +49,14 @@ const range = (from: number, to: number): number[] =>
 
 /** The instrumenting group: 220 real executable lines, all of them executed. */
 const DEEP_LINES = range(1, 220);
-const DEEP = lcov("src/services/graph/graph-queries.ts", DEEP_LINES, new Set(DEEP_LINES));
+const DEEP = lcov("src/services/memory-graph/graph-queries.ts", DEEP_LINES, new Set(DEEP_LINES));
 
 /**
  * A transitive importer: Bun marks all 377 physical lines executable and only
  * the 14 module-level ones as run. A strict superset of the real set.
  */
 const SHALLOW_LINES = range(1, 377);
-const SHALLOW = lcov("src/services/graph/graph-queries.ts", SHALLOW_LINES, new Set(range(1, 14)));
+const SHALLOW = lcov("src/services/memory-graph/graph-queries.ts", SHALLOW_LINES, new Set(range(1, 14)));
 
 function merge(...fragments: string[]): FileCoverage {
   const merged = new Map<string, FileCoverage>();
@@ -104,8 +104,8 @@ describe("mergeInto — the degenerate-record defect", () => {
     // Two test files each exercising a different half of the same subject must
     // add up. Taking the minimum executable set must not also narrow the
     // numerator to a single group.
-    const firstHalf = lcov("src/services/graph/graph-queries.ts", DEEP_LINES, new Set(range(1, 110)));
-    const secondHalf = lcov("src/services/graph/graph-queries.ts", DEEP_LINES, new Set(range(111, 220)));
+    const firstHalf = lcov("src/services/memory-graph/graph-queries.ts", DEEP_LINES, new Set(range(1, 110)));
+    const secondHalf = lcov("src/services/memory-graph/graph-queries.ts", DEEP_LINES, new Set(range(111, 220)));
     expect(linePercent(merge(firstHalf, secondHalf))).toBe(100);
     expect(linePercent(merge(firstHalf))).toBeCloseTo(50, 5);
   });
@@ -113,7 +113,7 @@ describe("mergeInto — the degenerate-record defect", () => {
   test("a genuine gap is still reported as a gap", () => {
     // The fix must not make everything pass. 110 of 220 executable lines run,
     // and no number of shallow records may launder that into a passing score.
-    const half = lcov("src/services/graph/graph-queries.ts", DEEP_LINES, new Set(range(1, 110)));
+    const half = lcov("src/services/memory-graph/graph-queries.ts", DEEP_LINES, new Set(range(1, 110)));
     expect(linePercent(merge(half, SHALLOW, SHALLOW))).toBeCloseTo(50, 5);
     expect(linePercent(merge(half, SHALLOW))).toBeLessThan(LINE_COVERAGE_FLOOR);
   });
@@ -141,7 +141,7 @@ describe("linePercent", () => {
 
 describe("isMeasuredSource", () => {
   test("product source is measured", () => {
-    expect(isMeasuredSource("packages/core/src/services/graph/graph-queries.ts")).toBe(true);
+    expect(isMeasuredSource("packages/core/src/services/memory-graph/graph-queries.ts")).toBe(true);
     expect(isMeasuredSource("apps/tools-api/src/routes/project.ts")).toBe(true);
   });
 
