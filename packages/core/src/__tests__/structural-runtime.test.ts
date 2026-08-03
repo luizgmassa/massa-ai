@@ -28,6 +28,7 @@ import {
 } from "../services/structural/structural-runtime.js";
 import type { NormalizedStructure } from "../kernel/types.js";
 import { loadNativeGrammarSet } from "../services/structural/grammar-loaders.js";
+import { rssNow, median } from "./helpers/rss-delta.js";
 
 const EMPTY: NormalizedStructure = Object.freeze({
   symbols: Object.freeze([]),
@@ -399,12 +400,8 @@ describeNative("structural runtime outcomes and lifetime", () => {
       const result = await runtime.parse({ extension: ".ts", source });
       expect(result.status === "ok" || result.status === "recovered").toBe(true);
       Bun.gc(true);
-      rss.push(process.memoryUsage.rss());
+      rss.push(rssNow());
     }
-    const median = (values: number[]) => {
-      const sorted = [...values].sort((a, b) => a - b);
-      return (sorted[9]! + sorted[10]!) / 2;
-    };
     const early = median(rss.slice(20, 40));
     const late = median(rss.slice(80, 100));
     expect(late).toBeLessThanOrEqual(early + 16 * 1024 * 1024);

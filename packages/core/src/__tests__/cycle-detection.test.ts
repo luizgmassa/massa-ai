@@ -20,6 +20,7 @@ import {
   DEFAULT_CYCLE_EDGE_BUDGET,
 } from "../services/symbol/cycle-detection.js";
 import type { CallEdge } from "../services/symbol/architecture.js";
+import { rssDeltaOver } from "./helpers/rss-delta.js";
 
 function edges(pairs: Array<[string, string]>): CallEdge[] {
   return pairs.map(([from, to]) => ({ from, to }));
@@ -191,13 +192,10 @@ describe("detectCycles — RSS guard (Wave 3 MLTS-022 / AD-W5-001 / AC-2 amended
     // AC-2 amended: baseline measured AFTER input graph is built so the
     // CallEdge[] allocation is excluded from the delta. Force GC first so
     // transient allocations from graph construction are collected.
-    if (typeof globalThis.gc === "function") globalThis.gc();
-    const baseline = process.memoryUsage().rss;
-
-    const result = detectCycles(stress);
-
-    const after = process.memoryUsage().rss;
-    const growthMiB = (after - baseline) / (1024 * 1024);
+    let result!: ReturnType<typeof detectCycles>;
+    const growthMiB = rssDeltaOver(() => {
+      result = detectCycles(stress);
+    }) / (1024 * 1024);
 
     // Each ring is a cycle of NODES_PER_RING nodes → 10 SCCs expected.
     expect(result.sccs.length).toBe(RINGS);
@@ -225,15 +223,12 @@ describe("detectCycles — RSS guard (Wave 3 MLTS-022 / AD-W5-001 / AC-2 amended
     expect(stress.length).toBe(TARGET);
 
     // AC-2 amended: baseline AFTER input build.
-    if (typeof globalThis.gc === "function") globalThis.gc();
-    const baseline = process.memoryUsage().rss;
-
     // The iterative impl must NOT throw a RangeError (stack overflow). This is
     // the core AD-W5-001 guarantee: no JS call-stack growth.
-    const result = detectCycles(stress);
-
-    const after = process.memoryUsage().rss;
-    const growthMiB = (after - baseline) / (1024 * 1024);
+    let result!: ReturnType<typeof detectCycles>;
+    const growthMiB = rssDeltaOver(() => {
+      result = detectCycles(stress);
+    }) / (1024 * 1024);
 
     expect(result.truncated).toBe(true);
     expect(result.sccs.length).toBeGreaterThan(0);
