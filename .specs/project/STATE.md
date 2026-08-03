@@ -1,6 +1,29 @@
 # massa-ai Spec State
 
-## Current — skills/ Directive Dedup (T1–T5 of 12, stopped at user instruction)
+## Current — Cross-Pollination Ports & Gap Closure (Specify done; Design next)
+
+- projectId: `massa-ai`
+- workflowSessionId: `spec-cross-pollination-ports`
+- workflow: spec-driven (Large — Specify + Design + Tasks + full Plan Challenge + Execute + independent validation)
+- feature: `cross-pollination-ports` — implement the still-live items of
+  `.specs/reports/cross-pollination-portability-and-gaps.md` (2026-07-29, written at `45daaa1`).
+  **Every report claim was re-verified at `94e6b05` before specifying** — DB-01/02/03/04 are
+  already fixed on main (recorded no-ops); PORT-01..07 and DB-05/06/07/08/09/10 are live.
+  Spec: `.specs/features/cross-pollination-ports/spec.md` (sha256 `63c88cd…5836c`), XP-01..XP-13.
+- **User decisions (2026-08-03):** XP-04 = enforce `RUN_POSTGRES_TESTS` in ci.yml **plus**
+  venue-parity script; XP-06 = **full** capability-predicate prep refactor (agent recommended
+  defer; user overruled); delivery = one branch `feature/cross-pollination-ports`, one PR,
+  atomic per-task commits.
+- DB-09 re-measured **wider** than the report: 27 missing `MASSA_AI_*` vars (24 in
+  `passThroughEnv`, 35 read), not the report's smaller set. XP-10 fixes the class
+  (wildcard if Turbo `^2.5.0` supports it — verify in Design).
+- massa-ai MCP server unreachable this session ("Unable to connect") — memory recall/persist
+  skipped; `.specs/` files + source are the canonical state, per contract.
+- Next action: **Design** (`design.md`) — sanitizer branded type + redaction rule set,
+  allowlist-gate AST design, ci.yml dedicated-DB wiring, generator capability-predicate
+  extraction shape, then Tasks, full Plan Challenge (before Execute, never concurrent), Execute.
+
+## Previous — skills/ Directive Dedup (T1–T5 of 12, stopped at user instruction)
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-skills-directive-dedup`

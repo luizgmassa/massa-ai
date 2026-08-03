@@ -735,7 +735,15 @@
       "workflow": "spec-driven",
       "branch": "refactor/skills-directive-dedup",
       "notes": "T1-T5 of 12 committed and green at ed1028e; T6-T12 not started. Not pushed, no PR. See .specs/HANDOFF.md."
+    },
+    {
+      "slug": "cross-pollination-ports",
+      "title": "Cross-pollination ports & gap closure — implement live PORT-01..07 + DB-05/06/07/08/09/10 fixes + lessons from the 2026-07-29 portability report",
+      "status": "in_progress",
+      "workflow": "spec-driven",
+      "branch": "feature/cross-pollination-ports",
+      "notes": "Specify DONE. Report re-verified at 94e6b05: DB-01/02/03/04 already fixed (no-op); rest live. User decisions: XP-04 enforce+parity, XP-06 full prep refactor, one branch/one PR."
     }
   ],
-  "active_feature": "skills-directive-dedup"
+  "active_feature": "cross-pollination-ports"
 }
