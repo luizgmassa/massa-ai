@@ -309,6 +309,18 @@ export async function runCli(argv: string[]): Promise<number> {
 
   // ── UNION GUARD: result-set must equal list ──────────────────────────────────
 
+  // DI-02 test seam: drop one assembled result pre-guard so the guard's
+  // call-site wiring (exit 1 + UNION GUARD FAIL naming) is testable
+  // end-to-end — the exported unionGuardCheck unit tests sense the branch
+  // logic, not this wiring. Unset ⇒ zero-cost no-op. Unknown id ⇒ no-op
+  // (the control case asserts absence-behavior, so a typo cannot fake a
+  // pass). Not a CLI surface; never add it to turbo passThroughEnv.
+  const dropId = process.env._PARALLEL_DROP_RESULT;
+  if (dropId) {
+    const dropIndex = allResults.findIndex((r) => r.suiteId === dropId);
+    if (dropIndex >= 0) allResults.splice(dropIndex, 1);
+  }
+
   const guard = unionGuardCheck(filteredSuites, allResults);
   if (guard.missing.length > 0) {
     console.error(`\n[parallel-runner] UNION GUARD FAIL: ${guard.missing.length} suite(s) missing from results:`);
