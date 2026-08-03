@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASE 4 OPEN, T14b done; only T14 left in the phase**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–4 CLOSED, the gate reads `0 of 30`; next T15 (wire it), then Phases 6–7**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -986,18 +986,63 @@
 > 4.12** across the repeated runs. **Run 4 clean: 11/11, exit 0, core `all 151 group(s)`.** All four
 > readings are kept rather than only the green one.
 >
-> **Next action: Execute, T14.** The two module-level helpers → `services/project-identity/project-root-identity.ts`.
-> **Its span is `:38-67`, NOT the row's `:39-68`.** T14b removed the two imports whose only readers
-> lived inside its own span and added one, and the import block sits above T14's — so a task whose
-> span is *disjoint* from T14's renumbered it anyway. Anchor-verified after the commit; **re-derive
-> regardless.** *Span disjointness bounds whose CONTENT a task rewrites; it says nothing about the
-> imports a task drags out with it* — §6 item 8 as amended, and the caveat T13's ordering rule does
-> not state. Two further measured things T14 needs: `services/project-identity/` **already exists**
-> with 11 files, so the row's "new file in a new directory" framing must be re-checked; and both
-> helpers are already imported **by name** in `index-project-identity.test.ts` and
-> `index-project-tool.test.ts`, so it is import repoints rather than a test rewrite. **After T14 the
-> gate should reach `0 of 30` — but that reading is T15's**, which wires it into `ci.yml`'s `build`
-> job in the same commit. §4.2's `warmupCache` decision is taken — do not re-take it.
+> ~~**Next action: Execute, T14.**~~ **T14 DONE — `6af528e`. PHASE 4 IS CLOSED AND THE GATE IS
+> GREEN**: `services/project-identity/project-root-identity.ts` plus its suite; `index_project.ts`
+> **222 → 189**, members **402 → 399**, maximal bodies **2 → 0**, `handle()` **106 unchanged**, and
+> `check-tools-thin` reads **`PASS — 0 of 30`, exit 0, 399 members** — the reading recorded at T14,
+> the criterion and the CI wiring T15's. Its record is `tasks.md` **§10.17** — the drag table (the
+> inherited `:38-67` re-derived EXACT, and `type CanonicalizePath` at `:36` departing on the same
+> 2-readers-in-span/0-elsewhere rule as T14b's imports, so the executed removal was `:36-68` and
+> the handler landed at the pre-stated 189), the 18-row two-column discrimination table, and **one
+> new plan defect (C80, running total eighty-five)**. Not restated here.
+>
+> **The row's "no test rewrite" premise was measured false BEFORE a line moved, and that ordering
+> is the method finding.** Eleven mutations of the helpers and their call sites — the reuse-guard
+> call deleted, floated, mis-wired four ways, `createJob` mis-fed and hoisted, plus four module
+> shapes — ran against every class-reaching suite on the UNMOVED tree: **11 of 11 survived,
+> 61p/0f**, because every handler test's workspace mock returns no stored path. **The write set
+> grew 5 → 6 on one user decision (fix-all-now)**: call-site sensors in `index-project-tool.test.ts`
+> (stored-root knob reset in the existing `afterEach`, `mkdtemp` fixtures, expectations through
+> `realpathSync`, `createJob` spied), four pinning cases in the new module suite, and
+> `execute-indexing.ts:38`'s *"in the very file this module leaves"* amended past-tense. Post-edit
+> harness: **18 of 18 written, no refusals, A kills 18, the repoint-only counterfactual kills 6**
+> — and for the first time in four tasks **A killed everything on run 1 and the harness found
+> nothing the Plan Challenge lenses missed**, because the premeasure ran before planning finished.
+> *A mutation reads the tree; running it before planning turns the harness from a net into a spec.*
+>
+> **C80**: the row's *"not a published-surface change"* argument reads `tools/index.ts:5` — the
+> SOURCE side. The destination barrel is `export *`-ed by `services/index.ts:66` onto
+> `@massa-ai/core`'s `./services`, so the conclusion survives only because the module is
+> deliberately absent from `services/project-identity/index.ts` (design.md §5.1's
+> `services/file-read` precedent, reason in the module docblock). Author level; §8.1 row 19 widened
+> with the module-table frame note for T20b (rows 1-8b are `d7091ac`-frame, the added row is
+> post-T13 — state the frame, do not renumber nine rows).
+>
+> **Gates at T14**: `lint` 0 (+bite at `project-root-identity.ts:65:7`), `type-check` 6/6 and
+> `build` 5/5 both 0-cached forced, **`bun run test` green TWICE** (11/11, the 5 cached all
+> `:build`; T14b's disjoint-red class did not fire; load 5.85 → 4.18, both readings kept),
+> `test:scripts` 1115 unchanged, `test:plugins` 96/0, `check-core-layering` **PASS 985 → 986
+> edges, 920 → 922 files** after `git add` (+1 = the handler's new `tools → services` edge; the
+> module itself has zero tier-to-tier imports). Coverage (R-36): module **100/100**;
+> `index_project.ts` **75.00% funcs / 97.03% lines** — the same single unreachable
+> background-`.catch` over a smaller denominator, line floor cleared, no exclusion. Isolation:
+> core **273 files, 123 pure/shared, 151 groups unchanged**, the new suite pure/shared, read from
+> the runner. Citations: one source-side edit owed and taken (`execute-indexing.ts:38`);
+> `acquire-indexing-lease.test.ts:13`'s `index_project.ts:196` states its own frame (*"measured at
+> HEAD before a line moved"*) and stays. `t14-spans.ts` and `t14-citation-sweep.ts` now **exit 1
+> on this tree** (dead subject / OWNERS anchor — the refusals working); `t14-verify-post.ts` is
+> the green counterpart, 15 assertions.
+
+**Next action: Execute, T15.** `check-tools-thin` already reads `PASS — 0 of 30` at HEAD, so T15 is
+the one-file commit that makes the reading a criterion: add the gate's invocation to `ci.yml`'s
+**`build`** job (T4b's row says `ci.yml:200` runs `bun test scripts/__tests__` inside `build` —
+place the gate beside `check-core-layering`'s invocation, and re-derive both line numbers rather
+than trusting these). `build` is in `main`'s live `required_status_checks` — verify against the
+ruleset API (`gh api repos/luizgmassa/massa-ai/rules/branches/main`, context = the **job id**), not
+a green check. RFS-01 AC-1 and the GMS-02 headline close there; re-run the gate in the same session
+and record its print, since every gate enumerates `git ls-files`. Then Phase 6 (T16–T18; §6 item 9:
+T18 after T21) and Phase 7 (T19–T25; T20b before T20; T23 + T24 last before T25; **T25 by a
+different author**).
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.

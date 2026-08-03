@@ -738,17 +738,46 @@ all state came from `.specs/` and source reads.
   group(s)`.** Coverage (R-36): new module **100% / 100%**; `index_project.ts` **85.71% funcs /
   97.52% lines** against **85.71% / 97.79%** after T13 — the same unreachable `.catch` over a smaller
   denominator.
-- ~~**Next action: Execute, T5**~~ … ~~**Execute, T14b**~~ → **Next action: Execute, T14.** The two
-  module-level helpers → `services/project-identity/project-root-identity.ts`. **Its span is
-  `:38-67`, NOT the row's `:39-68`** — T14b removed the two imports whose only readers were inside its
-  own span and added one, and the import block sits above T14's, so a task whose span is *disjoint*
-  from T14's renumbered it anyway. Anchor-verified after the commit; **re-derive regardless**.
-  *Span disjointness bounds whose CONTENT a task rewrites, never the imports it drags out with it* —
-  §6 item 8 as amended. Two further things measured: `services/project-identity/` **already exists**
-  with 11 files, so T14's "new file in a new directory" framing needs re-checking; and both helpers
-  are already imported by name in `index-project-identity.test.ts` and `index-project-tool.test.ts`.
-  **After T14, `check-tools-thin` should reach `0 of 30` — that reading is T15's**, which also wires
-  it into `ci.yml`'s `build` job.
+- **T14 DONE — `6af528e`. PHASE 4 IS CLOSED AND THE GATE IS GREEN.**
+  `services/project-identity/project-root-identity.ts` + its suite; `index_project.ts` **222 →
+  189**, members **402 → 399**, maximal **2 → 0**, `handle()` **106 unchanged** — `check-tools-thin`
+  **`PASS — 0 of 30`, exit 0**; the criterion and CI wiring stay T15's. Record is `tasks.md`
+  **§10.17**. **One new plan defect (C80), running total eighty-five** — the row's published-surface
+  argument was SOURCE-side only; the destination barrel is `export *`-ed by `services/index.ts:66`,
+  so the module is deliberately absent from the directory barrel (author level, design.md §5.1's
+  precedent). The inherited `:38-67` re-derived EXACT, and the drag rule recursed one level down:
+  `type CanonicalizePath` (:36, outside the span) departed on the same 2-in-span/0-elsewhere reader
+  count as T14b's imports.
+- **The row's "no test rewrite" premise was measured false BEFORE a line moved**: 11 mutations of
+  the helpers and their call sites survived every class-reaching suite on the unmoved tree, 11 of
+  11 at 61p/0f — the workspace mock returns no stored path in every handler test, so the reuse
+  guard no-ops everywhere. Write set **6 against the row's 5, one user decision** (fix-all-now):
+  call-site sensors (stored-root knob reset in the existing `afterEach`, `mkdtemp` fixtures,
+  `realpathSync` expectations, `createJob` spied), four module-suite pins (message operand order +
+  three `path.resolve` placements), `execute-indexing.ts:38` amended. **Phase total unchanged a
+  third time** — every T14 file was already in Phase 4's 9-file roster; §1's 107/86/21 hold,
+  re-checked.
+- **Harness: 18 of 18 written, no refusals; A kills 18, the repoint-only counterfactual kills 6 —
+  and A killed everything on run 1, the first task of four where the harness found nothing the
+  Plan Challenge lenses missed.** The premeasure ran before planning finished, so the sensors were
+  designed against measured survivors rather than predicted ones. B's 6 = the four method-covered
+  module behaviors + T13's one pre-existing canonical-path sensor + the self-sensing repoint (an
+  unresolvable specifier is a load failure in both columns).
+- **Gates at T14.** `lint` 0 (+bite on a T14 file), `type-check` 6/6 / `build` 5/5 both 0-cached
+  forced, **`bun run test` green twice** (11/11; the disjoint-red class did not fire; load 5.85 →
+  4.18, both readings kept), `test:scripts` 1115 unchanged, `test:plugins` 96/0,
+  `check-core-layering` **985 → 986 edges, 920 → 922 files** after `git add`. Coverage (R-36):
+  module **100/100**; handler **75.00% funcs / 97.03% lines**, same single unreachable arrow,
+  floor cleared. Isolation: core **273 files, 151 groups unchanged**, new suite pure/shared, read
+  from the runner. Both pre-move instruments (`t14-spans.ts`, `t14-citation-sweep.ts`) now exit 1
+  on this tree — the refusals working.
+- ~~**Next action: Execute, T5**~~ … ~~**Execute, T14b**~~ → ~~**Execute, T14**~~ → **Next action:
+  Execute, T15.** The gate already reads `PASS — 0 of 30` at HEAD; T15 is the one-file `ci.yml`
+  commit that wires it into the **`build`** job and closes RFS-01 AC-1 + the GMS-02 headline.
+  Verify `build` against the live ruleset API (context = the job id), re-run the gate in-session,
+  and place the invocation beside `check-core-layering`'s (re-derive the line numbers). Then
+  Phase 6 (T16–T18; T18 after T21) and Phase 7 (T19–T25; T20b before T20; T23 + T24 last before
+  T25; **T25 by a different author**).
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed
