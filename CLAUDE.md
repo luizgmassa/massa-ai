@@ -173,11 +173,19 @@ Genuinely slow tests are a separate class and do get budgets: `etl-cache-invalid
 a budget that tracks accumulated shared test-database state rather than the fixture — the
 same file measures 1213 ms against a fresh database and over 120 s partway through the gate.
 Note the isolation runner is **sequential**, one child process at a time, so a slow suite
-inside it is accumulation, not contention. **Known outstanding case:** `mcp-client`
-`embedded-api-client-endpoints.test.ts` ("routes without 404" for `/search/project` and
-`/search/code`) fails at 5001 ms under a real user config and passes with an empty one. It is
-deliberately unmocked integration and core does not export the LLM seam to `apps/`, so it has no
-one-line fix; run that package with `XDG_CONFIG_HOME` set until it does.
+inside it is accumulation, not contention. The former known outstanding case — `mcp-client`
+`embedded-api-client-endpoints.test.ts` failing at 5001 ms under a real user config — is
+closed, and its post-mortem is worth the paragraph: the standing diagnosis blamed the
+unexported LLM seam, but the failing `/search/project` + `/search/code` cases reach **live
+embedding-provider auto-selection** through `ensureInitialized` → `getVectorStore()`
+unconditionally — a second mechanism `MASSA_AI_LLM_ENABLED` never gated. The suite now sets a
+scratch `XDG_CONFIG_HOME` **before any core-reaching import** (static imports hoist, so the
+core imports are dynamic — the m25-m26 pattern) and pins `_setLlmEnabledForTesting(false)` as
+the env-path second gate, exactly mirroring what `buildChildEnv` (SEN-03) gives every wrapper
+child. Both seams are exported from `@massa-ai/core` for any `apps/` suite that needs the
+same treatment. Direct runs went 93/2-cold → 95/0 in ~5.8 s. When a suite fails only under a
+real config, trace the call graph before trusting a prior triage's named mechanism — two
+independent gates can look like one blocker from the symptom alone.
 
 ```bash
 # one file (safe — single process)
