@@ -2337,10 +2337,20 @@ Also update the feature block above: **Phase 0 is done, remaining Execute is ~21
   the three items this feature deferred — the controllers-layer restructuring, the
   `contextual-search-rlm.ts` split, and the `rlm-*` filename rename. All six of its assumptions are
   open questions.
-- Open findings carried forward, not actioned: `memory-controller.ts:274`'s inert
+- ~~Open findings carried forward, not actioned: `memory-controller.ts:274`'s inert
   `includePersistent` option (a behavior decision), and `packages/core`'s test runner having no
   isolation rule for `@massa-ai/shared` — 75 core test files import it and its barrel side-effects
-  run against the real `CONFIG_DIR` under a plain `bun run test`.
+  run against the real `CONFIG_DIR` under a plain `bun run test`.~~ **Both clauses went stale and
+  were annotated at `da-inventory-closure` (2026-08-03, DA-14/DA-15/DI-04) rather than deleted:**
+  (1) `includePersistent` was made live by this same feature's later BEH-01 ([1.9.1]) — today
+  `memory-controller.ts:281` defaults it `true` and `:305` forwards it, and
+  `memory-repository-pg.ts:236-238` applies `level <> PERSISTENT` when `false`; the note simply
+  predated the fix and was carried forward verbatim. (2) The `@massa-ai/shared` exposure was
+  closed by SEN-03 (`39afe59`, v1.10.0) at a different surface than the isolation rule this note
+  proposed: `scripts/lib/run-tests-isolated.ts` `buildChildEnv` gives **every** spawned group a
+  scratch `XDG_CONFIG_HOME` and pins the LLM env gate (unit suite
+  `runner-child-env.test.ts`); the cross-pollination report's DA-15 row inherited this note
+  unre-measured — a carried-forward status is a claim that goes stale.
 - Skipped sensor: `recall` returned 0 memories for this workspace, so no durable memory informed
   this plan. Context7 MCP not registered — oxlint's rule catalogue is unverified against upstream
   docs and must be confirmed in TASK-018.
