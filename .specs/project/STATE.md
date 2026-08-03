@@ -802,14 +802,41 @@ all state came from `.specs/` and source reads.
   proxies for GitHub's server-side validator; first live step run comes with the PR, and the
   CHANGELOG gate cannot fire before then (`pull_request`-only, no PR open, push trigger
   `main`-only — checked, not assumed).
+- **T16+T17 DONE — `ef5f837`, ONE commit; PHASE 6's RENAME IS LANDED (T18 deferred after T21).**
+  `services/graph/` → `services/memory-graph/`: 7 `git mv` + 28 import lines rewritten by an
+  AST-anchored instrument (refuses on population ≠ 28 and on offset drift) + `docs/ONBOARDING.md:225`.
+  The commit shape was a measured decision, the first task:commit break on this feature: a bare mv
+  reads core tsc exit 2 (13 errors / exactly the 7 production importers) while the 6 `mock.module`
+  registrations degrade silently, so C46's no-red-commit bar beat the 1:1 mapping; rejected shapes
+  in `tasks.md` §10.19. Acceptance both directions: old path **RAW 0 files / 0 lines**, new path an
+  exact **25/45** mirror of the premeasured baseline (§3.5 item 8 reproduced to the digit first).
+- **The T17 discrimination table is the carry-forward: 4 of 6 single-miss mock mutations are
+  SILENT** — the resolver sweep is those four's only sensor in the repository; the loud two
+  (`memory-controller` 27p/5f, `search-facade-synapse` 21p/5f) fell on the axis the red-team did
+  not predict, and bun 1.3.14 registers a dead mock path without throwing (probed live). Control:
+  a reverted production import is compiler-red. All restores SHA-256-verified.
+- **C82 and C83, the eighty-seventh and eighty-eighth plan defects, running total eighty-eight.**
+  C82: `docs/ONBOARDING.md:225` fell between two differently-derived "3"s (design §7 group E's
+  prose carriers vs §3.5 item 2's R-32 intersection) and was owned by no row — repointed in the
+  commit under C55/C62, T15's precedent; `CHANGELOG.md:35` stays as a dated v1.17.0 record (C52).
+  C83: group E's "9 fixture citations" contradicts design's own §1.4 and R-32 ("Eight") and the
+  measured 8 at all three baselines — `tasks.md` §8.1 row 20 (now twenty rows), T20b's to apply.
+- **Post-commit literal residue is an enumerated set, recorded with frames**: outside
+  `.specs/`/`.ua/` exactly 11 lines / 4 files (CHANGELOG permanent-dated + T18's ten, scheduled
+  transients across the T16→T21 window); `.specs/` 40/12 frame-stated; `.ua/` 200/3 deferred
+  (spec §4.4), verified already-excluded from every gate. Gates: lint 0; type-check 6/6 and build
+  5/5 forced 0-cached; `bun run test` 11/11 first-run green, core isolation 273/151 unchanged;
+  test:scripts 1115/0/49; test:plugins 96/0; `check-core-layering` **986 / 922 count-identical**;
+  `check-tools-thin` **byte-identical**; `check-stale-pointers` PASS/28 as the nothing-else-broke
+  frame ONLY (stems blind to all 7 renamed basenames). Both Plan Challenge lenses ran — **no author
+  figure fell, a first on this feature**. New residual: a populated local pgvector index keys
+  embeddings by pre-rename paths; a git rename does not re-index (operational, post-merge).
 - ~~**Next action: Execute, T5**~~ … ~~**Execute, T14b**~~ → ~~**Execute, T14**~~ →
-  ~~**Execute, T15**~~ → **Next action: Execute, T16 — Phase 6 opens.**
-  `git mv packages/core/src/services/graph/` → `services/memory-graph/`, **7** files, 17
-  intra-directory import lines needing no edit (§3.5 item 8). Then T17 (19 importers / 28 lines;
-  the 6 `mock.module` string specifiers are the sharp edge — R-28). **T18 after T21** (§6 item 9).
-  Phase 6's acceptance is the resolver sweep, not a grep count. Then Phase 7 (T19–T25; T20b before
-  T20; T23 + T24 last before T25; **T25 by a different author** — whether a fresh conversation
-  satisfies that is the user's call, asked before T25 starts).
+  ~~**Execute, T15**~~ → ~~**Execute, T16**~~ → **Next action: Execute, T19 — Phase 7 opens.**
+  RFS-04's three removals, priced per item; two files named `hybrid-search.ts`, cite which one each
+  figure read; verify against a cache-forced `npm pack --dry-run`. Then T20b before T20, T21, then
+  T18 (§6 item 9), T22, T23 + T24 last before T25; **T25 by a different author** — whether a fresh
+  conversation satisfies that is the user's call, asked before T25 starts.
 - **Three full Plan Challenge gates run.** Specify: two modes, seven findings, six revising the
   document (`spec.md` §9.1). Design: two modes, **twelve** findings, all twelve re-measured and
   confirmed (`design.md` §10). Tasks: two modes, **eight** findings, all eight confirmed

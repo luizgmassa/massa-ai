@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–5 CLOSED, the gate WIRED into `build`; next T16 (Phase 6), then Phase 7**
+## Active — Core Layering, `read_file.ts` Split (**PR-D**, the last), **Execute — PHASES 0–5 CLOSED, PHASE 6's RENAME LANDED (T16+T17, one commit; T18 deferred after T21); next T19 (Phase 7)**
 
 > **Tasks status, 2026-07-31.** **DONE — `tasks.md`**, ~~28~~ → **29** task rows, eight phases,
 > ~~78~~ → **80 distinct files**. Everything below this block was written before Tasks and is kept as
@@ -1063,16 +1063,45 @@ Residual named: `Bun.YAML`/`actionlint` are local proxies for GitHub's server-si
 step's first live run happens when the PR opens, and the CHANGELOG gate cannot fire before then
 (`pull_request`-only, no PR exists, push trigger is `main`-only — checked, not assumed).
 
-**Next action: Execute, T16 — Phase 6 opens.** `git mv packages/core/src/services/graph/` →
-`services/memory-graph/` — **7** files, the members' own 17 intra-directory import lines needing no
-edit (§3.5 item 8). Then **T17** (19 external importers / 28 import lines; the **6 `mock.module`
-string specifiers are the sharp edge** — `tsc`, `build` and `type-check` are blind to all six, R-28;
-`services/index.ts` carries 5 specifier lines re-exporting 7 symbols, both figures right). **T18 is
-sequenced after T21** (§6 item 9 — they share `scripts/check-coverage.ts` and its test). Phase 6's
-acceptance is the **resolver sweep**, not a grep count (§5) — a literal `services/graph` sweep
-misses all 12 production edges. Then Phase 7 (T19–T25; T20b before T20; T23 + T24 last before T25;
-**T25 by a different author** — whether a fresh conversation satisfies that is the user's call,
-asked before T25 starts, per its row).
+~~**Next action: Execute, T16 — Phase 6 opens.**~~ **T16+T17 DONE — `ef5f837`, ONE commit — the
+first task:commit break on this feature, and a measured decision.** A bare 7-file mv reads **core
+tsc exit 2, 13 errors across exactly the 7 production importers**, while the 6 `mock.module`
+registrations degrade **silently** — so the practiced no-red-commit bar (C46) beat the 1:1 mapping;
+rejected shapes (two commits — a permanent red bisect trap; a re-export shim — itself a
+`services/graph/` member, self-defeating against the 0-member acceptance) in **§10.19**, the full
+record. Acceptance held in both directions: old path `RAW: 0 files / 0 specifier lines`, new path
+an exact **25/45** mirror of the premeasured baseline (which reproduced §3.5 item 8 to the digit
+before a line moved), 0 unresolvable. **The discrimination table is the result a resumer should
+carry: 4 of 6 single-miss `mock.module` mutations are SILENT** — for those four the resolver sweep
+is the repository's *only* sensor — and the loud two (`memory-controller` 27p/5f,
+`search-facade-synapse` 21p/5f) fell on the axis the red-team lens did *not* predict; bun 1.3.14
+registers a dead mock path without throwing (probed). **Two new plan defects, running total
+eighty-eight.** **C82**: `docs/ONBOARDING.md:225` fell between two differently-derived "3"s —
+`design.md` §7 group E's prose carriers vs §3.5 item 2's R-32 intersection — owned by no row;
+repointed in the commit under C55/C62 (T15's precedent), the fold-into-T18 alternative rejected
+(false line across the T16→T21 window, zero sensor). `CHANGELOG.md:35` stays — dated v1.17.0
+record (C52). **C83**: group E's *"9 fixture citations"* contradicts `design.md`'s own §1.4 and
+R-32 (both "Eight") and the measured 8 at `f06b01d`/`d7091ac`/`e58c08e` — §8.1 row 20, T20b's.
+Post-commit literal residue outside `.specs/`/`.ua/` is the **enumerated scheduled set only** —
+11 lines / 4 files (CHANGELOG permanent + T18's ten); `.specs/` 40/12 frame-stated; `.ua/` 200/3
+deferred (§4.4) and verified already-excluded from every gate. Gates: lint 0; type-check 6/6 and
+build 5/5 both forced 0-cached; `bun run test` 11/11 first-run green, 5 cached all `:build`, core
+isolation 273 files/151 groups unchanged; test:scripts 1115/0/49; test:plugins 96/0;
+`check-core-layering` **PASS 986 edges / 922 files count-identical** (endpoints moved within
+`services/`); `check-tools-thin` **byte-identical** pre/post; `check-stale-pointers` PASS/28
+recorded as the **nothing-else-broke frame only** — its stems match none of the 7 renamed
+basenames. Both Plan Challenge lenses ran (§10.19); **no author figure fell — a first on this
+feature**; snapshot SHAs verified before and after both critics; no harness overlapped a critic.
+New residual: a populated local pgvector index keys embeddings by pre-rename paths and a git rename
+does not re-index — operational follow-up after merge, no gate's concern.
+
+**Next action: Execute, T19 — Phase 7 opens.** RFS-04's three removals, priced per item (§5 row:
+`data/vector/index.ts`, `data/vector/hybrid-search.ts`, `IHybridSearch`, `BatchCommand`; there are
+TWO files named `hybrid-search.ts` and the live one has 3 importers + 2 `mock.module` — cite which
+file every figure read; verify against a cache-forced `npm pack --dry-run`). Then **T20b before
+T20** (§8.1 is now **twenty** rows), **T21**, then **T18** (§6 item 9), **T22**, **T23 + T24 last
+before T25** — **T25 by a different author**; whether a fresh conversation satisfies that is the
+user's call, asked before T25 starts, per its row.
 
 **Feature**: `core-layering-read-file-split` · branch `spec/pr-d-read-file-split` · artifacts
 `.specs/features/core-layering-read-file-split/{spec,design,tasks}.md`.
