@@ -653,7 +653,7 @@ certifies the rename while missing **all 12 production edges**, because they are
 | **T22** | **`CLAUDE.md` and `docs/ONBOARDING.md`.** `CLAUDE.md:43`'s *"24 migrations"* → **23**, **naming the metric** (24 counts `migration_lock.toml`; there are 23 migration directories and 23 tracked `migration.sql` — §3.5 item 10). `CLAUDE.md:567`'s *"five … skipping lines"* → **8** publishable packages, measured from every non-`private` `package.json`. `docs/ONBOARDING.md:83-87`'s deferral marker must say `.ua/` regeneration is **its own change after PR-D**, not point at a PR that will have merged (`spec.md` §4.4). **Gained at T18 (§10.24, C55/C62's owner rule): widen `CLAUDE.md:237`'s trap note from two-way to the THREE-way `design.md` §1.1 measured** — `services/memory-graph/` vs `services/symbol/` vs **`data/symbol/`**, the third being the directory that already produced a real path error. **DONE — §10.25. AC-5 closes**; all five figures critic-reproduced exactly (both publish-rehearsal frames verified — 8 today, 5 at `v1.3.1` by `git ls-tree`); two author prose defects fixed pre-commit (a two-vs-three self-contradiction in the grafted sentence; "shipped docs" over-label); one harness flake adjudicated with three readings (a static-string shell assertion over an untouched file, red once in aggregate, green standalone and on re-run) | 2 files | **RFS-05 AC-5** |
 | **T23** | **The state files.** `HANDOFF.md`, `STATE.md`, `FEATURES.json` — PR-D `status: complete`, `phases.tasks: true`, `phases.execute: true`; parent `core-layering-god-module-split` to `complete`. **Do not touch `active_feature`** — it reads `skills-directive-dedup`, genuinely paused at T5 of 12 on the user's instruction, verified against `STATE.md`'s `## Current` for the **third** time. **Never `git add -A` under `.specs/`**: `.specs/reports/` is untracked on purpose and stays untracked; stage explicitly. **DONE — §10.26.** Both status flips position-checked and parse-verified; `active_feature` untouched (fourth verification); both notes tails state the T25-pending frame so the status fields carry their own honesty | 3 files | RFS-05 AC-1 |
 | **T24** | **CHANGELOG entry — `### Changed` **and** `### Removed`** (§2). **Never write the skip-ci marker literally**, in the commit message, a commit body or the PR body. **DONE — §10.27. AC-2 closes**: both decided headings, semver re-taken per item on the reachability table, live file exempted by name, pack verification named; the marker literal absent from entry and commit; the +37 shift of v1.17.0's `:35` note frame-stated | 1 file | **RFS-04 AC-2** |
-| **T25** | **Independent validation — author ≠ verifier**, on PR-C's T18 and PR-B's T20 precedent. Re-derives every criterion from raw data rather than from this file. **Must re-take, not inherit**: T5's frozen reading against the shipped tree, Phase 6's resolver sweep, `check-core-layering`'s `edgesExamined` per structural commit, the `npm pack --dry-run`, and a **discrimination table** on the real tree — each subject backed up to a **scratch copy** with SHA-256 byte-identity asserted on restore. **Never `git checkout` to restore**: it restores to `HEAD`, not to pre-mutation state, and destroyed two files of uncommitted work at PR-C's T8b. **Two open questions to answer rather than inherit, both amendments to criteria rather than to figures:** whether **C37**'s replacement predicate for RFS-06 shape (c) (§10.2) is the right reading of *"independent of containment"*, given the original clause was struck for being unfalsifiable; and whether AC-2's enumerated-**set** assertion is what *"roots only, never a host path"* requires, given the existing suite's presence/absence pair stays green under a `$HOME` leak | 1 new file | GMS-02, RFS-01…RFS-06 |
+| **T25** | **Independent validation — author ≠ verifier**, on PR-C's T18 and PR-B's T20 precedent. Re-derives every criterion from raw data rather than from this file. **Must re-take, not inherit**: T5's frozen reading against the shipped tree, Phase 6's resolver sweep, `check-core-layering`'s `edgesExamined` per structural commit, the `npm pack --dry-run`, and a **discrimination table** on the real tree — each subject backed up to a **scratch copy** with SHA-256 byte-identity asserted on restore. **Never `git checkout` to restore**: it restores to `HEAD`, not to pre-mutation state, and destroyed two files of uncommitted work at PR-C's T8b. **Two open questions to answer rather than inherit, both amendments to criteria rather than to figures:** whether **C37**'s replacement predicate for RFS-06 shape (c) (§10.2) is the right reading of *"independent of containment"*, given the original clause was struck for being unfalsifiable; and whether AC-2's enumerated-**set** assertion is what *"roots only, never a host path"* requires, given the existing suite's presence/absence pair stays green under a `$HOME` leak. **DONE — `validation.md` (§10.28), 2026-08-03, fresh-conversation verifier per the user's authorship decision. VERDICT: PASS — no surviving mutant, all five re-takes reproduced, both questions answered in the amendments' favour on two-sided executed evidence** | 1 new file | GMS-02, RFS-01…RFS-06 |
 
 ---
 
@@ -5653,3 +5653,48 @@ else N/A by population (one markdown file).
 **Running total at Execute's close: eighty-nine plan defects across §10.1–§10.27; §8.1's twenty
 applied at T20b; C28–C33 indexed in the parent at T20. T25 — independent validation, author ≠
 verifier — is the only open task, and its authorship question belongs to the user.**
+
+### 10.28 T25 — executed, 2026-08-03, by the VERIFIER (fresh conversation, the user's authorship decision). VERDICT: PASS
+
+**The record is `validation.md` — one new file, the row's whole write set — and this section is
+the pointer, not a restatement.** Author ≠ verifier held as decided: a fresh session carrying
+nothing beyond `.specs/` and `~/prd-exec-instruments/`, treating every §10.x record above as a
+claim. Full Plan Challenge gate ran on the verification plan itself, two modes: the evidence
+audit reproduced 10 of 12 plan premises (1 partial — RFS-02 AC-1's file scope is a task-level
+grouping, stated as such in the verdict table; 1 methodology finding — a bare `git log | wc -l`
+pipe returned 50 and 58 for the identical command in one session, so every cited count went
+through redirect/`--quiet`/`rtk proxy` capture); the red team's critical finding was adopted —
+the default gate report is file-organized, so the per-clause reading R-40 sends T25 to take was
+run via `--json`: **HEAD 0/0/0 per clause; the T5 worktree reproduces the frozen 2/1/2 and the
+per-member 13/17/2/175 + 3/3/0/128 from that commit's own gate.**
+
+**All five re-takes taken, none inherited**: the frozen reading (above); `edgesExamined` re-run
+per structural commit in detached worktrees — 18 rows, exit 0 at every one, `965/896 → 986/922 →
+982/920` with every recorded milestone reproducing and the one apparent mismatch (900 → 904
+across T4a/T4b) dissolved by the gate's own repo-wide `trackedFiles()`; the Phase-6 resolver
+sweep both directions (old path **0/0**, new path the exact **25/45** mirror); the pack reading
+from a proven-fresh dist (**16 → 8** never re-observed — the fresh tree holds 8, survivors
+exactly the two live stores; `BatchCommand`/`IHybridSearch` 0 in fresh `.d.ts`); and a ten-fault
+discrimination table on the real tree, scratch-copy + SHA-256 restores, **no surviving mutant**
+(`validation.md` §4 — including M10's honest split: the module suite senses the cap constant, the
+characterization oracle does not, C45/C49's recorded shape).
+
+**Both open criteria questions close in favour of the author's amendments, on two-sided executed
+evidence** (`validation.md` §3): **C37 — agreed**; the struck literal-`..` assertion re-proven
+vacuous by a probe that passed under the sanitize-drop mutation *while the resolution escaped the
+root*, the replacement red at exactly shape (c), and the deny-branch reading shown structurally
+uninstantiable (sanitized projectId resolutions always land in-root), so the allowlist
+construction is the clause's whole testable content. **AC-2's enumerated set — agreed**; under a
+`$HOME` leak into the enumeration the presence/absence pair stays 7p/0f green while the set case
+goes red, and the three-source construction was read closed (`getProjectRoot` draws only on the
+event payload and the workspace lookup — no fourth source exists).
+
+**Gates at validation, all first-run green** (`validation.md` §5): lint 0; type-check 6/6 forced;
+build 5/5 forced after `rm -rf dist`; `bun run test` 11/11 exit 0 (2 cached, both `:build`; core
+151 groups); `test:scripts` 1116/0/49; `test:plugins` 96/0; layering **982/920**; tools-thin
+**0 of 30 / 398**, per clause 0/0/0; the ten new modules each **100/100** under their own suites
+(GMS-05 AC-2 re-derived per file; the repo-wide floor stays `coverage.yml`'s, in the live ruleset
+re-queried this session). Instruments: **none added** (79 unchanged; probes lived in `/tmp/t25/`).
+
+**Zero new plan defects. Running total stays eighty-nine. The feature is VALIDATED — PASS — and
+the remaining steps (push, PR, `--no-ff` merge) are the user's.**
