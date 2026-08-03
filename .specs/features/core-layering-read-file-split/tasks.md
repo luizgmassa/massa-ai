@@ -42,7 +42,7 @@ the per-task write sets only Tasks produces. Those sets are now measured, repo-w
 | **1 — the gate** | **3** | 2 | `check-tools-thin.ts` + its unit suite + this document (T5's reading) |
 | **2 — LRU** | ~~7~~ → ~~9~~ → **13** | 2 | `services/cache/lru-evict.ts` + its unit test + **4** repointed sites + `read-file.test.ts` + ~~T8b's 2 comment sites~~ → **T8b's 8 source files + `spec.md`** (§10.10, C54: `production-wiring.ts`, `invalidator-registry.ts`, `read_file.ts`, `symbol-graph.service.ts`, `file-filter-cache.ts` and the three Phase-0 suites; the first two and `spec.md` are the only ones new to this phase, and `spec.md` is new to the whole set). **Corrected at T10 — C65 (§10.12), and it is not T10's own work**: T8b's write set grew from 2 to 9 on a user decision and this row was never carried back, so §1 asserted **9** for two tasks while §5's own T8b row said 8 + `spec.md` |
 | **3 — the extraction** | ~~13~~ → ~~14~~ → ~~20~~ → ~~25~~ → ~~29~~ → **31, and Phase 3 is now COMPLETE** | 16 | `read_file.ts` + **6** modules + **6** module suites + **C34's `read-file.test.ts` repoint** + **T9's 6 citation-repoint files** (§10.11) + **T10's 5 further ones** (§10.12: `lru-evict.test.ts`, `symbol-graph.service.ts`, `production-wiring.ts`, `invalidator-registry.ts`, `read-file-presentation-characterization.test.ts` — its other six files were already in the set, `read-file-project-root-rename-pin.test.ts` among T9's own six) + **T11's 4 further ones** (§10.13: `line-range.ts` and `line-range.test.ts` are the 2 new; `wave-4-correctness.test.ts` and `spec.md` are new to **this phase**, the latter already in the union via Phase 2 — the presentation suite and the two `check-tools-thin` files were already here). **T12 adds 2** (§10.14: `read-file.service.ts` and `read-file.service.test.ts` are the only files new to any phase; `read_file.ts`, `read-file.test.ts`, the presentation suite, `file-content-cache.ts` and `line-range.ts` were all already here). Its write set was **7** against the **4** its row provides for — the third growth in this phase, and both gate lenses reached the same 7 independently (**C72**, and the two by-claim clauses) |
-| **4 — `index_project.ts`** | **9, unchanged by T13** | 6 | 1 handler + **3** modules + 3 module suites + **2** test repoints. **T13 shipped 4 files against its row's 3** — `index_project.ts`, `services/indexing/execute-indexing.ts`, its suite, and `index-project-tool.test.ts` — but the phase total does **not** move, because that fourth file is one of the 2 test repoints this row already carries for T14. So T13's growth is an **intra-phase overlap**, not a new file, and §1's sum/union/identity are all untouched (§10.15). *This is the first growth on this feature that does not move the table, and it was checked rather than assumed — the check working, not a coincidence.* |
+| **4 — `index_project.ts`** | **9, unchanged by T13 or T14b** | 6 | 1 handler + **3** modules + 3 module suites + **2** test repoints. **T13 shipped 4 files against its row's 3** — `index_project.ts`, `services/indexing/execute-indexing.ts`, its suite, and `index-project-tool.test.ts` — but the phase total does **not** move, because that fourth file is one of the 2 test repoints this row already carries for T14. So T13's growth is an **intra-phase overlap**, not a new file, and §1's sum/union/identity are all untouched (§10.15). *This is the first growth on this feature that does not move the table, and it was checked rather than assumed — the check working, not a coincidence.* **T14b shipped 5 against its row's 3 and the total again does not move** (§10.16): `execute-indexing.ts` is already one of this row's 3 modules and `index-project-tool.test.ts` one of its 2 test repoints, so both growths are intra-phase **re-touches**. Two consecutive tasks whose growth the table absorbs — recorded because the reason is structural (Phase 4 has one handler and a fixed module roster) and will not carry to Phase 6 or 7. |
 | **5 — the gate goes green** | **1** | 0 | `.github/workflows/ci.yml` |
 | **6 — the rename** | **29** | 0 | **7** `git mv` + **19** external importers + **3** prose/fixture sites |
 | **7 — the record** | **16** | 1 | RFS-04's 5 + RFS-05's 9 + `design.md` (T20b) + `validation.md` |
@@ -440,6 +440,17 @@ from the instance it already holds. `services/indexing/execute-indexing.ts` neve
 `ContextualSearchRLM`.** Same shape as §4.1, for consistency and to keep the extracted module
 import-light.
 
+**Every line number in this subsection is in the `d7091ac` frame, and is left there deliberately —
+added at T14b as C79, the eighty-fourth plan defect.** The paragraph cites four: `:254-351` and
+`:306`, which **T13 deleted outright**, and `:111`/`:114`, which **T14b shifted to `:110`/`:113`** by
+removing one net import line above them. Renumbering the two that still resolve would leave the
+paragraph half in the shipped frame and half in a frame that no longer exists — the state C52 named
+(*"correct the frame, not the reading"*) and the reason T8b de-numbered `read_file.ts:484` rather
+than renumbering it a third time. The decision this subsection records is settled and does not
+depend on any of the four; what a verifier needs is the frame, which is now stated. *Nothing was
+scheduled to notice this: §10.15's sweep classified the whole subsection as a historical record, and
+two of its four numbers were live.*
+
 **Measured.** The extracted span `:254-351` contains **exactly one** `this.` reference:
 
 ```
@@ -566,7 +577,7 @@ schema and `IToolHandler` members, so a materially smaller file means the schema
 | --- | --- | --- | --- |
 | **T13** | **`executeIndexing` ~~`:254-351`~~ → `:246-351` → `services/indexing/execute-indexing.ts`.** **Amended by C43 (§10.6)**: the cited span is declaration-only and leaves the member's own 8-line doc comment `:246-253` orphaned in `index_project.ts`, describing code that no longer lives there. `design.md` §5.1's own **~110** LOC estimate for this module is the tell — the comment-inclusive span is **106** and the declaration-only one **98**. Outside `handle()` either way, so **C33's conclusion does not move**. It is `private` and has **0** importers — the only occurrences outside the file are **5 non-code mentions** in `index-project-tool.test.ts` — a JSDoc line (`:4`), a `test()` **title string** (`:312`) and three `//` comments (`:313-315`) — so no test repoints for this move. *(The first draft said "three comments"; the gate corrected it, §8 evidence finding 3. The conclusion is unchanged and slightly stronger: none of the five is an import.)* **It is not a pure function: `:306` reads `this.contextualSearch`, the sole `this.` reference in the span. It takes a bound `warmupCache` callback — §4.2**, decided here because no artifact named the dependency | 1 handler + 1 new module + 1 new suite | GMS-02 headline |
 | **T14** | **The two module-level helpers C32's file scope surfaces → `services/project-identity/project-root-identity.ts`** — `canonicalizeProjectRoot` `:39-44` and `assertProjectRootReuse` `:46-68`. `spec.md` §4.2 names **1** body in this file; measured there are **3**. Both are already imported by name in `index-project-identity.test.ts` and `index-project-tool.test.ts`, so it is **2 import repoints and no test rewrite**. **Not a published-surface change**: `tools/index.ts` re-exports only `IndexProjectTool` (`:5`) and `ReadFileTool` (`:37`), so neither helper is on `@massa-ai/core/tools`. RFS-04's semver framing does not reach this task | 1 handler + 1 new module + 1 new suite + 2 test repoints | — |
-| **T14b** | **The managed-run lease acquisition ~~`:158-202`~~ → `:151-202` → `services/indexing/`. Without this task the gate cannot reach `0 of 30` — C33, §3.6.** **Amended by C43 (§10.6), and this one is gate-relevant rather than tidiness**: the cited span is statement-only and leaves the 7-line `// ── Wave 5 FR-09:` block `:151-157` behind — **inside `handle()` `:117-244`**, whose span the gate measures **including comment lines**. So the planned `128 → ~87` lands at **~94** if the comment stays, eating 7 of the 33 lines of margin this row prices. No artifact mentioned this comment at all. ~~45~~ → **52** lines: `eventId`, `ManagedRunRepositoryPg.getInstance()`, `begin()`, the `"busy"` branch, the `catch`, and the `lease` assignment. **The module returns a discriminated result and `handle()` maps it to a `ToolResponse`** — the two early returns at `:175-186` and `:198-201` are response *shaping* and stay in the handler, so no `services/` module imports `tools/serialize.ts` (RFS-03 AC-2). `handle()` ~~**128 → ~87**, 33 lines under the ceiling~~ → **128 → ~92 at best, 28 lines under the ceiling — and ~92 is a FLOOR, not an estimate**. **Amended at T13 — C77, the eighty-second plan defect, and neither of this row's two figures survives its own mechanism.** The corrected span `:151-202` is **52** lines; the two early returns this same sentence keeps in the handler are `:175-186` (**12**) and `:198-201` (**4**) = **16** lines that come back. Net departure is 52 − 16 = **36**, so 128 − 36 = **92**. *The origin of `87` is reconstructable and is the defect*: `128 − 45 + 4 = 87` exactly — the pre-C43 span minus **only the 4-line catch return**, silently omitting the 12-line `"busy"` block the same sentence names as staying. **C43's amendment then re-derived from that wrong baseline rather than from the mechanism** (`87 + 7 = 94`), inheriting the defect it was correcting — the seventh time on this feature. The floor is higher still, because `handle()` must also carry the mapping code for the discriminated result, which no figure here prices. **Everything that depends on this is unchanged**: 92, 94 and 87 are all under the ceiling of 120, so C33's resolution, the user's three-option decision and T15's `0 of 30` are untouched — this is a precision defect, not a gate-outcome one. Reached independently by the Plan Challenge gate's evidence-audit lens and by T13's own span instrument, which printed `handle() if the returns are kept as-is: 92` before the lens ran. *C71's rule at the level of a figure: check the arithmetic of the spans against the number they are meant to produce, not only the spans against the tree.* **Closed by removal, zero allowlist** — §4.2's own principle, and this block is managed-run orchestration by any reading, so it is on-requirement rather than scope creep. **Decided by: the user, 2026-07-31**, from three options with their measured consequences | 1 handler + 1 new module + 1 new suite | **RFS-01 AC-1**, GMS-02 headline |
+| **T14b** | **The managed-run lease acquisition ~~`:158-202`~~ → `:151-202` → `services/indexing/`. Without this task the gate cannot reach `0 of 30` — C33, §3.6.** **Amended by C43 (§10.6), and this one is gate-relevant rather than tidiness**: the cited span is statement-only and leaves the 7-line `// ── Wave 5 FR-09:` block `:151-157` behind — **inside `handle()` `:117-244`**, whose span the gate measures **including comment lines**. So the planned `128 → ~87` lands at **~94** if the comment stays, eating 7 of the 33 lines of margin this row prices. No artifact mentioned this comment at all. ~~45~~ → **52** lines: `eventId`, `ManagedRunRepositoryPg.getInstance()`, `begin()`, the `"busy"` branch, the `catch`, and the `lease` assignment. **The module returns a discriminated result and `handle()` maps it to a `ToolResponse`** — the two early returns at `:175-186` and `:198-201` are response *shaping* and stay in the handler, so no `services/` module imports `tools/serialize.ts` (RFS-03 AC-2). `handle()` ~~**128 → ~87**, 33 lines under the ceiling~~ → ~~**128 → ~92 at best, 28 lines under the ceiling — and ~92 is a FLOOR, not an estimate**~~ → **129 → 106 as SHIPPED, 14 under the ceiling; the floor was 93, not 92 — C78 (§10.16), and the floor is a floor: the mapping code no figure priced is the other 13**. **Amended at T13 — C77, the eighty-second plan defect, and neither of this row's two figures survives its own mechanism.** The corrected span `:151-202` is **52** lines; the two early returns this same sentence keeps in the handler are `:175-186` (**12**) and `:198-201` (**4**) = **16** lines that come back. Net departure is 52 − 16 = **36**, so 128 − 36 = ~~**92**~~ → **93 — amended at T14b, C78, the eighty-third plan defect, and it is C77's own defect one turn further out.** `128` is `handle()`'s span **before T13 landed**; T13 took it to **129**, which the acceptance reading four lines below this row already recorded as *"`handle()` 128 → 129"* and which `check-tools-thin` printed on every run between the two tasks. C77 was written **after** T13 committed, so the 129 was available; it re-derived from the number it was amending rather than from the tree, **which is the exact sentence C77 uses to convict C43** — the eighth time on this feature and the second inside one correction chain. Nothing downstream moves: 92, 93, 94 and the shipped 106 all clear 120. *The origin of `87` is reconstructable and is the defect*: `128 − 45 + 4 = 87` exactly — the pre-C43 span minus **only the 4-line catch return**, silently omitting the 12-line `"busy"` block the same sentence names as staying. **C43's amendment then re-derived from that wrong baseline rather than from the mechanism** (`87 + 7 = 94`), inheriting the defect it was correcting — the seventh time on this feature. The floor is higher still, because `handle()` must also carry the mapping code for the discriminated result, which no figure here prices. **Everything that depends on this is unchanged**: 92, 94 and 87 are all under the ceiling of 120, so C33's resolution, the user's three-option decision and T15's `0 of 30` are untouched — this is a precision defect, not a gate-outcome one. Reached independently by the Plan Challenge gate's evidence-audit lens and by T13's own span instrument, which printed `handle() if the returns are kept as-is: 92` before the lens ran. *C71's rule at the level of a figure: check the arithmetic of the spans against the number they are meant to produce, not only the spans against the tree.* **Closed by removal, zero allowlist** — §4.2's own principle, and this block is managed-run orchestration by any reading, so it is on-requirement rather than scope creep. **Decided by: the user, 2026-07-31**, from three options with their measured consequences. **DONE at `HEAD` — §10.16. The gate's third clause is CLOSED**: `handle()` **129 → 106** and the `handle()` line is gone from `check-tools-thin`'s violation entirely, leaving only T14's two module-level bodies, so the file reads `1 of 30` for two reasons rather than three. Destination `services/indexing/acquire-indexing-lease.ts` — **an author-level choice no artifact makes**, since `design.md` §5.1's table runs 1-8 plus 8b and has no row for this module at all (C33 minted T14b after Design); chosen on its one sibling's convention, `execute-indexing.ts` exporting `executeIndexing`, with `managed-run-lease.ts` and `indexing-lease.ts` rejected in the module's own docblock. The result type is `BeginManagedRunOutcome` (`managed-run-contract.ts:92-94`) **plus a `failed` arm**, because `begin()` throws and the handler needs one exhaustive discriminant. The write set grew from the **3** this row prices to **5**, **decided by the user from three options** (fix-all-now chosen; sensor-only and structural-only rejected): `execute-indexing.ts`'s docblock named the managed-run lease among what `handle()` keeps, which this task makes false, and `index-project-tool.test.ts` gains the call-site sensor T13's four survivors argued for | ~~1 handler + 1 new module + 1 new suite~~ → **5 files: 1 new module + 1 new suite + 1 handler + 1 by-claim clause + 1 call-site sensor** | **RFS-01 AC-1** (the `handle()` ceiling clause; `0 of 30` and the CI wiring stay T15's), GMS-02 headline |
 
 **Acceptance reading for Phase 4** (RFS-01 AC-1, and it IS a gate): `check-tools-thin` reads
 **`0 of 30`** and `index_project.ts` reads maximal bodies **3 → 0** with `handle()` **128 → ≤ 120**.
@@ -574,7 +585,15 @@ All four flag reasons must clear, and they are owned by different tasks — the 
 by **T14**, `executeIndexing`'s body by **T13**, and the `handle()` ceiling by **T14b** alone (C33).
 **Measured waypoints, so a resumer can tell progress from completion**: at HEAD the file is 352 lines,
 `1 of 30`, maximal **3**, `handle()` **128**, **404** members examined; **after T13** `→ 246` lines,
-maximal **3 → 2**, members **404 → 403**, `handle()` **128 → 129** and the file is **still `1 of 30`**.
+maximal **3 → 2**, members **404 → 403**, `handle()` **128 → 129** and the file is **still `1 of 30`**;
+**after T14b** `→ 222` lines, maximal **2, unchanged** (the lease block was statements inside
+`handle()`, never a member), members **403 → 402**, `handle()` **129 → 106** — and the file is
+**still `1 of 30`, now for TWO reasons rather than three**, the `handle()` line having left the
+violation entirely. **Two of the four flag reasons are now clear and the remaining two are both
+T14's.** T14's own span moved `:39-68` → **`:38-67`**, net −1: T14b deletes two imports whose only
+readers were inside its span and adds one, and the import block sits above T14's — **C76(b)'s
+renumbering hazard reproducing between two spans it calls disjoint, predicted before the commit and
+verified after it**.
 *The `handle()` figure moving the WRONG WAY at T13 is expected and is not a regression*: the new call
 site is one line longer than the method call it replaces, T13's span was never inside `handle()`
 (C33), and `check-tools-thin` is wired to **no** workflow until T15 — verified against `.github/`,
@@ -657,6 +676,16 @@ certifies the rename while missing **all 12 production edges**, because they are
    landed, all six T14/T14b anchors re-derived EXACT on the new tree, so those two tasks inherit zero
    re-derivation cost. Re-derive between commits regardless — the import block is above every span and
    T13 only held the count steady because it removed one import and added one.
+   **Confirmed at T14b, and the caveat is the finding rather than the rule.** T13's *"landing the last
+   span first renumbers neither of the others"* held for T13 → T14b: the lease block re-derived
+   **EXACT at `:151-202`** on the post-T13 tree, 11 anchors verified. It did **not** hold for
+   T14b → T14, and not because the spans overlap — they do not. T14b removes the two imports whose
+   only readers lived inside its own span (`ManagedRunRepositoryPg`, `ManagedRunLease`) and adds one,
+   and the import block is above **both** remaining spans, so T14 moved `:39-68` → **`:38-67`**.
+   *Span disjointness bounds which task's CONTENT another task rewrites; it says nothing about the
+   imports a task drags out with it.* Predicted from a per-import reader count before the commit and
+   verified against the AST after it — **T14 inherits `:38-67`, anchor-verified, and must re-derive
+   anyway.**
 9. **T18 after T21.** They share `scripts/check-coverage.ts` and its test (§3.5 item 2); doing the
    rename's prose repoint after the exclusion edit turns R-32 from a merge conflict into a rebase.
 10. **T20 after T5 and T12.** C29's `490 of 707` and the per-member frozen reading are both figures
@@ -784,7 +813,9 @@ Tasks PR corrected it in place rather than deferring:
 
 | 18 | `design.md` §5.1 module 7 (`:456`) | **C71** (§10.14) — the row gives module 7 five spans totalling **97 of `handle()`'s 165** comment-inclusive lines, and the same table's ≈120 LOC estimate and `tasks.md`'s *`handle()` → ~15* are both unreachable from them: taking only those spans leaves `handle()` at ~70 and leaves modules 2–6 composed from inside `tools/`, which the same row's *"composes 2–6"* forbids. All five cited spans were additionally stale by T12 (pre-T7/T9/T10/T11), `interface ReadFileParams` by 15 lines. Module 7 as built takes the whole try-block pipeline, the six private collaborator fields and the entire constructor composition. **C33's shape at the level of a module row**: nothing checked that a subject list and the figure it is meant to produce act on the same lines |
 
-These are **T20b**. ~~Six~~ → ~~fourteen~~ → ~~fifteen~~ → ~~sixteen~~ → ~~seventeen~~ → **eighteen** corrections;
+| 19 | `design.md` §5.1's module table (`:448-458`) | **T14b (§10.16)** — the table runs modules **1-8 plus 8b** and has **no row for the managed-run lease module at all**, so the decomposition it presents is short by the one module that closes the gate. It is not the same defect as row 1: **C33 amends §4.2's *"closed by removal"* claim and §6.6 property 2's reading, and neither of those sites is the table.** The omission is honest in origin — C33 minted T14b at **Tasks** time, after `design.md` was written — but the table is the document's only enumeration of where the extracted lines land, and a reader who counts modules from it gets nine where the shipped tree has ten. Add a row: `services/indexing/acquire-indexing-lease.ts`, `index_project.ts`'s lease block `:151-202` (52 comment-inclusive), ≈128 LOC. *A correction indexed against one site is not scheduled against the others — row 14 had to be widened at T13 for exactly this, and row 2 at T3.* |
+
+These are **T20b**. ~~Six~~ → ~~fourteen~~ → ~~fifteen~~ → ~~sixteen~~ → ~~seventeen~~ → ~~eighteen~~ → **nineteen** corrections;
 the count in `HANDOFF.md` and `STATE.md` was last true at Design.
 
 ---
@@ -4296,6 +4327,11 @@ to §8.1 row 14. Disjointness is unchanged; only the figures were stale.
 
 #### C77 — the eighty-second: T14b's `~87` is unreachable from T14b's own mechanism
 
+**Superseded in its arithmetic by C78 at T14b (§10.16): the baseline `128` is `handle()` BEFORE T13,
+the shipped tree is 129, and the floor is 93 — this correction inherited a stale baseline exactly as
+it convicts C43 of doing, four lines from an acceptance reading that already said `128 → 129`. The
+mechanism below is unchanged and correct; only its first operand was wrong.**
+
 Recorded in full in the T14b row. `52 − 16 = 36`, so `128 − 36 = 92`, and 92 is a **floor** because the
 handler must also carry the mapping code. `87` is reconstructably `128 − 45 + 4` — the pre-C43 span
 minus **only** the 4-line catch return, omitting the 12-line `"busy"` block the same sentence keeps in
@@ -4475,3 +4511,220 @@ the plan; a mutation reads the tree.*
    the bound receiver. Four mutations survived every suite in the repo before these four cases existed.
 
 **Running total: eighty-two plan defects.**
+
+---
+
+### 10.16 T14b — executed, 2026-08-02
+
+**The gate's third clause is closed, and that is the whole point of this task.**
+`services/indexing/acquire-indexing-lease.ts` (`interface AcquireIndexingLeaseRequest` +
+`type AcquireIndexingLeaseResult` + `acquireIndexingLease`) plus its suite. `index_project.ts`
+**246 → 222**, `handle()` **129 → 106**, members examined **403 → 402**, and `check-tools-thin` still
+reads **`1 of 30`** — *for two reasons instead of three*, the `handle()` ceiling line having left the
+violation entirely. Maximal bodies are **unchanged at 2**: the lease block was statements inside
+`handle()`, never a member, which is why no clause but the third could ever have moved. **Two new
+plan defects (C78–C79, the eighty-third and eighty-fourth), running total eighty-four.** The write
+set is **5 files**, from one user decision.
+
+#### The spans — both re-derived EXACT before the edit, and one moved because of it
+
+| member | row cites | shipped decl | shipped w/ comments | kind |
+| --- | --- | --- | --- | --- |
+| `canonicalizeProjectRoot` (T14) | `:39-44` | `:39-44` | `:39-44` | `FunctionDeclaration` |
+| `assertProjectRootReuse` (T14) | `:46-68` | `:46-68` | `:46-68` | `FunctionDeclaration` |
+| `handle()` | — | `:117-245` | `:117-245` | `MethodDeclaration`, **129** |
+| lease block (T14b) | `:151-202` | `:158-202` | `:151-202` | statement run, 4 statements |
+
+**11 text anchors, a mismatch throws**; T13's own instrument was repointed rather than copied, and
+its `executeIndexing` entry — now a dead subject — makes it exit 1 on this tree, which is the refusal
+working. **After the commit**, verified by a second AST pass with 7 anchors: `handle()`
+**`:116-221` = 106**, the lease block asserted **ABSENT** rather than assumed gone, and T14 at
+**`:38-67`**.
+
+#### C78 — the eighty-third: C77's floor is C77's own defect one turn out
+
+Recorded in full in the T14b row. `128` is `handle()` **before T13**; the shipped tree is **129**, so
+the floor is **93**, not 92. C77 was written *after* T13 committed and *four lines above* an
+acceptance reading that already said `handle()` **128 → 129** — it re-derived from the number it was
+amending rather than from the tree, **which is the exact sentence it uses to convict C43**. Eighth
+instance of that family and the second inside a single correction chain. Nothing downstream moves.
+**Found by the author's span instrument, which printed the delta beside both figures rather than
+either alone, and independently CONFIRMED by the evidence-audit lens against the `f56e03e^` blob.**
+
+#### C79 — the eighty-fourth: §4.2's evidence paragraph is in the `d7091ac` frame, and two of its four numbers were live
+
+Recorded in full at §4.2. `:254-351` and `:306` were deleted by T13; `:111`/`:114` were shifted to
+`:110`/`:113` by T14b. Renumbering the two that still resolve would put the paragraph half in each
+frame. **The frame is stated instead** — C52's rule, and T8b's reason for de-numbering rather than
+renumbering. *§10.15's sweep classified the whole subsection as a historical record; two of its four
+numbers were not.*
+
+#### The write set — 3 predicted by the row, 5 shipped, one user decision
+
+| tier | files | what |
+| --- | --- | --- |
+| structural | **3** | `index_project.ts`, `services/indexing/acquire-indexing-lease.ts`, `__tests__/acquire-indexing-lease.test.ts` |
+| by-claim | **1** | `services/indexing/execute-indexing.ts` — its docblock listed *"the managed-run lease"* among what `handle()` keeps |
+| the call-site sensor | **1** | `__tests__/index-project-tool.test.ts` |
+
+**Decided by the user** (fix-all-now; sensor-only and structural-only rejected). **The phase total
+does not move** — `execute-indexing.ts` is already one of Phase 4's 3 modules and
+`index-project-tool.test.ts` one of its 2 test repoints, so both growths are intra-phase re-touches
+and §1's sum **107**, union **86** and identity **21** are unchanged. Checked, not assumed — the
+second consecutive task where that holds, and both times it was the check working rather than luck.
+
+**The destination filename is an author-level choice that no artifact makes.** `design.md` §5.1's
+table runs 1-8 plus 8b and has no row for this module (C33 minted T14b after Design), and the task
+row names only the directory. Chosen on the one sibling's convention — `execute-indexing.ts` exports
+`executeIndexing` — with `managed-run-lease.ts` (borrows `data/managed-runs/`'s vocabulary, names the
+persisted concept rather than the action) and `indexing-lease.ts` (noun-led, reads like a type
+module) rejected in the module's own docblock. Owed to `design.md` as **§8.1 row 19**.
+
+#### The discrimination table, two columns
+
+Two subject files — the module **and** the handler — because the mapping of the discriminated result
+is a call-site property a module-only harness cannot reach. **Column B swaps
+`index-project-tool.test.ts` back to its HEAD content for every run**, because this row prices no
+test repoint, so the honest counterfactual is *what the repository would have caught had T14b shipped
+exactly the 3 files it promised*. Running the shipped suite in column B would have credited this
+task's own sensors to the suites that predate it.
+
+| # | mutation | A — T14b's suites | B — the pre-existing suites |
+| --- | --- | --- | --- |
+| M1 | eventId prefix changed (idempotency key) | **KILLED** | SURVIVED |
+| M2 | lease acquired under the wrong runKind | **KILLED** | SURVIVED |
+| M3 | busy recorded with errors: 1 | **KILLED** | SURVIVED |
+| M4 | busy records NO terminal job result | **KILLED** | SURVIVED |
+| M5 | failure records NO terminal job result | **KILLED** | SURVIVED |
+| M6 | failure recorded with errors: 0 | **KILLED** | SURVIVED |
+| M7 | the catch RETHROWS instead of returning `failed` | **KILLED** | **KILLED** |
+| M8 | `getInstance()` moved INSIDE the try (throw position) | **KILLED** | SURVIVED |
+| M9 | busy drops `leaseExpiresAt` | **KILLED** | SURVIVED |
+| M10 | the failure is not logged | **KILLED** | SURVIVED |
+| M11 | `begin()` receives the job id as the project id | **KILLED** | SURVIVED |
+| M12 | acquired arm returns a lease-less result | **KILLED** | **KILLED** |
+| M13 | 409 body reports the job id as the active run | **KILLED** | SURVIVED |
+| M14 | the `failed` arm is never mapped | **KILLED** | **KILLED** |
+| M15 | 409 body drops `leaseExpiresAt` | **KILLED** | SURVIVED |
+| M16 | the acquired lease is not handed to the background run | **KILLED** | **KILLED** |
+| M17 | jobId and projectId swapped at the lease call | **KILLED** | SURVIVED |
+| M18 | the busy guard is inverted | **KILLED** | **KILLED** |
+
+**Denominator 18 of 18 written — no refusals, no equivalent or unreachable rows.** A kills **18 of
+18**, B kills **5 of 18**. Scratch-copy restore with SHA-256 asserted after every mutation and again
+at the end; `git checkout` never used.
+
+**A killed 16 of 18 on the first run, and the two survivors are the finding.** **M13** and **M15**
+are both the **409 response body** — the part T14b's own design keeps in the handler as response
+shaping, and therefore the part the module suite is structurally unable to reach. The pre-existing
+assertion is `expect(result.error).toContain("indexing_busy")`, which passes just as readily when the
+handler reports the **job** id as the **active run** id; `leaseExpiresAt` was asserted by nothing at
+all. **Fixed in the subject, not the harness** (GMS-05 AC-3): one case asserting the 409 body
+exactly, and both mutations flipped SURVIVED → KILLED — the observed red taken rather than argued.
+*Third consecutive task where the defect that mattered survived both Plan Challenge lenses and only
+the mutation harness found it.* And it is the mirror of T13's: there the four survivors were all
+call-site, here both are the call site's **output shape**.
+
+**B's 5 of 18 is the row's premise made into a number.** The five it catches are the ones that break
+the *acquired* path outright — a rethrow, a lease-less result, an unmapped `failed` arm, a dropped
+lease, an inverted busy guard. Everything the extraction actually decides — the event id, the run
+kind, the terminal transitions on both failure branches, the throw position, the 409 body's contents,
+the argument order — walks straight through. **All four of the tracker-transition mutations (M3–M6)
+survive B**, which is the pre-mortem's finding measured: `handle()`'s outer catch calls `setResult`
+not at all, and before this task no suite anywhere asserted the tracker's state on either lease path.
+
+#### Two premises measured that were previously only asserted
+
+**`mock.module` reaches the new module's deeper specifier, proven by execution rather than inherited
+from T13.** `index-project-tool.test.ts` registers `"../data/managed-runs/managed-run-repository-pg.js"`
+from `__tests__/`; the module imports `"../../data/managed-runs/…"` from `services/indexing/`. The
+failure-path stack trace reads `at begin (index-project-tool.test.ts:116)` ← `at acquireIndexingLease
+(acquire-indexing-lease.ts:93)` — one registration, two specifier shapes. R-28's class, invisible to
+`tsc`, and a wrong answer would have silently reached the real repository.
+
+**The `getInstance()` throw position is a contract, and it is now pinned in both directions.** In the
+shipped handler it sat outside the inner try but inside `handle()`'s outer one, so a throw produced
+`"Failed to start indexing: …"` and **no** tracker transition; inside the module's try it would
+produce `"Failed to acquire indexing lease: …"` **and** a terminal `setResult`. M8 is the proof that
+the pin bites.
+
+#### The instrument defect this task found in its own test file
+
+**The docblock sentence claiming the suite names none of `run-tests-isolated.ts`'s isolation literals
+was itself the match.** The predicate at `run-tests-isolated.ts:28-54` is a plain word-boundary scan
+over test **source, comments included**, so listing the three pipeline/search/workspace singletons in
+order to assert their absence classified the file `database/integration`. Measured: core went
+`121 pure/shared, 150 isolated` → **`121, 151`**, then back to **`122, 150`** once the names were
+removed — so the group count holds at **151, unchanged for one added file**. *A sentence asserting a
+property can destroy it; read the classification out of the runner rather than predicting it.* The
+original prediction — fork-free — was correct about the code and falsified by the prose.
+
+#### Coverage
+
+**Measured directly (R-36): `acquire-indexing-lease.ts` 100% funcs / 100% lines.** `index_project.ts`
+reads **85.71% funcs / 97.52% lines** against **85.71% / 97.79%** after T13 — the *same single*
+uncovered function over a smaller denominator, and it is still `handle()`'s outer `.catch`, which is
+**unreachable rather than untested**. `LINE_COVERAGE_FLOOR = 90` and `check-coverage.ts` compares
+line percentage only, so both files clear it and neither carries an exclusion. **No artificial reach
+was written to buy the percentage.**
+
+#### Gates, all six plus both structural gates
+
+`lint` **0**, proven to bite on a T14b file (`acquire-indexing-lease.ts:129:7`, exit 1, restored
+SHA-256-identical, clean re-run exit 0). `type-check` **6/6, 0 cached**; `build` **5/5, 0 cached**,
+both forced. `test:scripts` **1115, unchanged** — T14b adds no `scripts/` test, the one case where
+that figure must not move. `test:plugins` **96**/0. `check-core-layering`: **edges 983 → 985, files
+918 → 920**, PASS — taken **after** `git add`, on T13's own lesson. `check-tools-thin`: `1 of 30`
+holds, members **403 → 402**, `handle()` **129 → 106**.
+
+**`bun run test` was run four times and three were red, with DISJOINT failing sets.** Run 1:
+`mcp-client` `web/fetch_and_index` at **21903.99 ms**. Run 2: `core` `architecture-map` *"routes
+surfaced from http_call edges"*. Run 3: `core` `trace_path` *"both direction"*. **Every one is
+zero-diff against `main`, names 0 of T14b's five subjects, and is green standalone** — 95p/0f in
+2.15 s under an empty `XDG_CONFIG_HOME` (against 21.9 s to failure under the real one), 24p/0f in
+783 ms, 18p/0f in 1331 ms. Host load rose **2.30 → 4.12** across the repeated full runs, which is the
+accumulation class `CLAUDE.md` documents for exactly these suites. **Run 4 clean: 11/11 tasks,
+exit 0, core `all 151 group(s)`.** All four readings are kept rather than only the green one. *A
+fourth reading was mis-scoped by a persisted shell cwd and measured `mcp-client`'s own runner instead
+of the aggregate; it is discarded here and named so the count of runs reconciles.*
+
+#### The Plan Challenge gate on T14b — two modes, and what each was worth
+
+**Red-team / pre-mortem**: 9 findings. **The one that changed the task is finding 2** — `handle()`'s
+outer catch records no terminal job result, so a failure escaping the module leaves the job
+non-terminal forever, and the marker `managed_runs_begin_failed:` occurred at **one** site in the
+repository and in **zero** tests. Re-measured independently before acceptance and confirmed; it is
+why the sensors assert tracker state rather than the response string, and why M3–M6 exist. Finding 9
+is a scope tripwire also confirmed: `services/search/project-indexer.ts:436` runs the same
+begin/busy/lease shape with its own `reindex:${projectId}:${randomUUID()}` id and no `jobId`, and
+generalising the module to serve it would widen the write set for a caller sharing neither. Finding 3
+independently agreed the discriminated-union narrowing is sound and **stronger** than the
+`let lease: … | undefined` it replaces. Its critical-severity finding 1 — that mapping code lands
+`handle()` near 105 rather than at the floor — is **read down to the missing figure it really is**:
+the row already says the floor is a floor, and the measured landing is **106**.
+
+**Evidence audit**: 17 figures re-derived with independent methods. **15 reproduce, 1 does not, 1
+cannot be checked.** The one that does not is **C78**, reached independently of the author's route by
+diffing `handle()` at `f56e03e^` against HEAD. The one that cannot: the citation sweep's count of
+**29** is method-dependent — the auditor's two regexes returned 8 and 24 — because the figure counts
+*(citing line × target)* pairs rather than distinct citations. **The load-bearing half reproduced
+under both of its methods and mine: ZERO line-citations into `index_project.ts` outside `.specs/`.**
+*Name the metric* — the count is a pair count and is recorded as one.
+
+**Both lenses passed the plan on the 409 body.** Neither saw that the response shape the design
+deliberately keeps in the handler is the shape no suite asserts.
+
+#### What T14b pins that no artifact named
+
+1. **The terminal job transition on both lease failure branches.** Busy records `errors: 0` with the
+   `indexing_busy:` marker; failure records `errors: 1` with the `managed_runs_begin_failed:` marker.
+   Before this task, zero tests observed either, and the outer catch that would swallow an escaping
+   throw records nothing at all.
+2. **The throw position of `getInstance()`**, in both directions — resolve for a thrown `begin()`,
+   reject for a thrown `getInstance()`.
+3. **The 409 body's contents** — the *active* run's id and expiry, not the job's. Two mutations
+   survived every suite in the repository, including this task's own module suite, until one case
+   existed.
+4. **The event id and run kind** the lease is acquired under, which are the FR-10 idempotency key.
+
+**Running total: eighty-four plan defects.**

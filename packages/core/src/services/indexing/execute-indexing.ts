@@ -5,7 +5,10 @@
  * background half of `index_project`: the 4-stage ETL run, the optional search
  * cache warmup, and the job-tracker transitions on both the success and the
  * failure path. `IndexProjectTool.handle()` keeps only the synchronous half —
- * validation, job creation, the managed-run lease, and the immediate response.
+ * validation, job creation, and the immediate response. The managed-run lease
+ * was in that list until T14b moved it to `acquire-indexing-lease.ts`; the
+ * handler now maps that module's discriminated result to a `ToolResponse` and
+ * owns no lease logic of its own.
  *
  * THE BODY IS MOVED VERBATIM apart from one line. `:306` used to read
  * `this.contextualSearch.warmupCache(...)`; it now calls the injected

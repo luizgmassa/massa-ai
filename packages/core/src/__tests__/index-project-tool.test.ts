@@ -231,6 +231,99 @@ describe("IndexProjectTool → executeIndexing wiring", () => {
   });
 });
 
+/**
+ * The lease call site, which no suite observed before PR-D T14b.
+ *
+ * `acquire-indexing-lease.test.ts` pins what the extracted module DOES; it
+ * cannot see how the handler consumes its discriminated result. The two cases
+ * below asserted `result.error` only — the RESPONSE — and the response is not
+ * what separates the two failure modes. `handle()`'s outer catch returns a
+ * plausible 500 body and calls `setResult` NOT AT ALL, so a lease failure that
+ * throws out of the module instead of resolving to `{status:"failed"}` returns
+ * a similar-looking error while leaving the job non-terminal forever.
+ *
+ * Measured before these cases existed: `managed_runs_begin_failed:` appeared at
+ * one site in the repository and in zero tests, and nothing anywhere asserted
+ * the tracker's terminal state on either lease branch. The tracker transition is
+ * therefore the sensor, not the message.
+ */
+describe("IndexProjectTool → acquireIndexingLease wiring", () => {
+  test("the BUSY branch records a terminal job result, not just a 409 body", async () => {
+    managedRunBeginShouldBeBusy = true;
+    const setResult = spyOn(indexJobTracker, "setResult");
+    try {
+      const tool = new IndexProjectTool();
+      const result = await tool.handle({
+        projectPath: "/tmp",
+        projectId: "cov-busy-terminal",
+      });
+      expect(result.success).toBe(false);
+      const call = setResult.mock.calls.find((c) =>
+        String(c[2]).startsWith("indexing_busy:"),
+      );
+      expect(call).toBeDefined();
+      expect(call![0]).toBe(result.data!.jobId);
+      expect(String(call![2])).toBe("indexing_busy:existing-run");
+      expect((call![1] as { errors: number }).errors).toBe(0);
+    } finally {
+      setResult.mockRestore();
+    }
+  });
+
+  test("the 409 body carries the ACTIVE run's id and expiry, not the job's", async () => {
+    // The two mutations that survived T14b's first harness run were both here:
+    // reporting `job.jobId` in the error string (the pre-existing assertion is
+    // `toContain("indexing_busy")`, which passes either way) and zeroing
+    // `leaseExpiresAt` (asserted by nothing at all). The 409 body is precisely
+    // the part T14b's design keeps in the handler as response shaping, so it is
+    // the part a module suite structurally cannot reach.
+    managedRunBeginShouldBeBusy = true;
+    const before = Date.now();
+    const tool = new IndexProjectTool();
+    const result = await tool.handle({
+      projectPath: "/tmp",
+      projectId: "cov-busy-body",
+    });
+    expect(result.error).toBe("indexing_busy:existing-run");
+    expect(result.data!.activeRunId).toBe("existing-run");
+    expect(result.data!.leaseExpiresAt).toBeGreaterThanOrEqual(before);
+    expect(result.data!.jobId).not.toBe(result.data!.activeRunId);
+  });
+
+  test("the FAILED branch records a terminal job result — the outer catch does not", async () => {
+    managedRunBeginShouldFail = true;
+    const setResult = spyOn(indexJobTracker, "setResult");
+    try {
+      const tool = new IndexProjectTool();
+      const result = await tool.handle({
+        projectPath: "/tmp",
+        projectId: "cov-fail-terminal",
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Failed to acquire indexing lease");
+      const call = setResult.mock.calls.find((c) =>
+        String(c[2]).startsWith("managed_runs_begin_failed:"),
+      );
+      expect(call).toBeDefined();
+      expect((call![1] as { errors: number }).errors).toBe(1);
+    } finally {
+      setResult.mockRestore();
+    }
+  });
+
+  test("an ACQUIRED lease reaches the response runId and the pipeline together", async () => {
+    const tool = new IndexProjectTool();
+    const result = await tool.handle({
+      projectPath: "/tmp",
+      projectId: "cov-lease-mapped",
+    });
+    expect(result.success).toBe(true);
+    expect(result.data!.runId).toBe("1");
+    await settle();
+    expect(etlRunCalls[0].managedRunLease.runId).toBe(result.data!.runId);
+  });
+});
+
 describe("canonicalizeProjectRoot", () => {
   test("resolves and canonicalizes a path", async () => {
     const result = await canonicalizeProjectRoot("/tmp");

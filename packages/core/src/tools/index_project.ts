@@ -17,12 +17,11 @@ import { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js
 import { logger } from "@massa-ai/shared";
 import { indexJobTracker } from "../services/jobs/index-job-tracker.js";
 import { executeIndexing } from "../services/indexing/execute-indexing.js";
+import { acquireIndexingLease } from "../services/indexing/acquire-indexing-lease.js";
 import { workspaceManager } from "../services/workspace/workspace-manager.js";
 import { realpath } from "node:fs/promises";
 import path from "path";
 import { assertParserReadyForIndexing } from "../services/structural/parser-readiness.js";
-import { ManagedRunRepositoryPg } from "../data/managed-runs/managed-run-repository-pg.js";
-import type { ManagedRunLease } from "../data/managed-runs/managed-run-contract.js";
 
 interface IndexProjectParams {
   projectPath: string;
@@ -148,58 +147,35 @@ export class IndexProjectTool implements IToolHandler {
         projectId: finalProjectId,
       });
 
-      // ── Wave 5 FR-09: acquire a managed_runs lease synchronously so the
-      // MCP/HTTP caller gets 202 (acquired) or 409 busy BEFORE the long ETL
-      // runs in the background. The lease is passed into the pipeline, which
-      // owns heartbeat/complete/abort. eventId is derived from the job id so
-      // a retry of the same job is idempotent at the lease layer (a
-      // completed/aborted row's event_id is not reused because the partial
-      // UNIQUE only covers active rows).
-      const eventId = `index:${job.jobId}`;
-      const managedRunRepo = ManagedRunRepositoryPg.getInstance();
-      let lease: ManagedRunLease | undefined;
-      try {
-        const beginOutcome = await managedRunRepo.begin({
-          projectId: finalProjectId,
-          runKind: "indexing",
-          eventId,
-        });
-        if (beginOutcome.status === "busy") {
-          // 409: another live indexer holds this project. Surface the active
-          // runId so the caller can poll get_index_status.
-          indexJobTracker.setResult(
-            job.jobId,
-            { filesIndexed: 0, chunksIndexed: 0, errors: 0, duration: 0 },
-            `indexing_busy:${beginOutcome.activeRunId}`,
-          );
-          return {
-            success: false,
-            error: `indexing_busy:${beginOutcome.activeRunId}`,
-            data: {
-              jobId: job.jobId,
-              projectId: finalProjectId,
-              status: "busy",
-              activeRunId: beginOutcome.activeRunId,
-              leaseExpiresAt: beginOutcome.leaseExpiresAt,
-              message: "Another indexing run is active for this project. Poll get_index_status(activeRunId).",
-            },
-          };
-        }
-        lease = beginOutcome.lease;
-      } catch (beginError) {
-        logger.error("managed_runs begin failed", beginError as Error, { jobId: job.jobId, projectId: finalProjectId });
-        // Fail loud — a lease failure is a 500, not a silent retry. The caller
-        // can retry; the lease table is the source of truth.
-        indexJobTracker.setResult(
-          job.jobId,
-          { filesIndexed: 0, chunksIndexed: 0, errors: 1, duration: 0 },
-          `managed_runs_begin_failed:${(beginError as Error).message}`,
-        );
+      // ── Wave 5 FR-09: the lease is acquired synchronously so the caller gets
+      // 202 (acquired) or 409 (busy) before the background ETL starts. Only the
+      // ToolResponse shaping stays here — a `services/` module that shapes a
+      // ToolResponse is the boundary RFS-03 AC-2 forbids (PR-D T14b).
+      const leaseOutcome = await acquireIndexingLease({
+        jobId: job.jobId,
+        projectId: finalProjectId,
+      });
+      if (leaseOutcome.status === "busy") {
         return {
           success: false,
-          error: `Failed to acquire indexing lease: ${(beginError as Error).message}`,
+          error: `indexing_busy:${leaseOutcome.activeRunId}`,
+          data: {
+            jobId: job.jobId,
+            projectId: finalProjectId,
+            status: "busy",
+            activeRunId: leaseOutcome.activeRunId,
+            leaseExpiresAt: leaseOutcome.leaseExpiresAt,
+            message: "Another indexing run is active for this project. Poll get_index_status(activeRunId).",
+          },
         };
       }
+      if (leaseOutcome.status === "failed") {
+        return {
+          success: false,
+          error: `Failed to acquire indexing lease: ${leaseOutcome.message}`,
+        };
+      }
+      const lease = leaseOutcome.lease;
 
       // Executa indexação em background (não await)
       executeIndexing({
