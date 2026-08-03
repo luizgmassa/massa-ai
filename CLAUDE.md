@@ -119,6 +119,17 @@ classifies as needing isolation:
 Consequence: running `bun test` over a whole directory cross-contaminates module and
 process state and will produce false failures. Use the runner, or target one file.
 
+**Provisioning a fresh worktree: `bun install` can silently skip the native grammars.** On
+macOS arm64 with the pinned Node 25 as the build helper, node-gyp fails (the documented clang
+break above) while **`bun install` still exits 0** — no `node_modules/tree-sitter*/build/`
+directories exist, and the first `test:scripts` run fails exactly 3 "native Tree-sitter
+package contract" suites with `No native build was found for platform=… runtime=node`. That
+signature means provisioning, not code. Two repairs: copy the `node_modules/tree-sitter*/build/`
+directories from any provisioned checkout of the same lockfile (the addon is N-API —
+position-independent between identical dependency trees), or re-run the install with a Node 22
+helper. Verify with `bun test ./scripts/tests/verify-tree-sitter-grammars.test.ts` → 9 pass.
+Measured 2026-08-03: fresh worktree red 1227/3 → addon copy → 9/0 and the full run green.
+
 **`bun run test` is not the whole suite.** Turbo only reaches packages under
 `packages/*` / `apps/*` that declare a `test` script. Root-level suites live outside those
 globs and run from a separate script:
