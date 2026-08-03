@@ -101,9 +101,11 @@ bash scripts/setup-local-first.sh      # full offline wizard: Postgres + Ollama 
 
 Three packages — `packages/core`, `apps/tools-api`, `apps/mcp-client` — do **not** run
 plain `bun test`; their `test` script is `bun scripts/run-tests-isolated.ts`. The three
-runners are **separate, divergent copies** (236 / 124 / 141 lines) with different pattern
-sets; the table below is core's, the richest. `packages/shared` and
-`apps/opencode-plugin` do run plain `bun test`.
+runners are now **thin per-package wrappers** (121 / 30 / 46 lines, `wc -l` at HEAD) over
+the shared `scripts/lib/run-tests-isolated.ts` (373 lines), which owns discovery, process
+forking, and result aggregation; each wrapper supplies only its package's classification
+rules and CLI surface. The table below is core's classification set, the richest.
+`packages/shared` and `apps/opencode-plugin` do run plain `bun test`.
 
 The runner scans test *source* and forks a dedicated child process for any file it
 classifies as needing isolation:
@@ -122,7 +124,7 @@ process state and will produce false failures. Use the runner, or target one fil
 globs and run from a separate script:
 
 ```bash
-bun run test:scripts   # scripts/__tests__ + scripts/tests (551 TS tests + 3 shell suites)
+bun run test:scripts   # scripts/__tests__ + scripts/tests (1230 TS tests across 55 files + 21 shell suites)
 ```
 
 That covers `scripts/__tests__/subagent-parity.test.ts`, the guard for the generated
