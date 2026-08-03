@@ -106,6 +106,19 @@ jobs:
       # `Directory not empty`) aborted the script under `-e` before the retry's own
       # `bun install` ever ran, defeating the one thing this block exists to do. `|| true`
       # makes the purge best-effort so the retry always gets its attempt.
+      # XP-01. Warms ~/.bun/install/cache from a prior run so the install-cache
+      # race documented below is hit warm rather than cold. Additive only — a
+      # cache miss (first run, lockfile change) falls straight through to the
+      # purge-and-retry block unchanged (design.md C3). Never caches
+      # node_modules or build output, only Bun's own package cache.
+      - name: Restore Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-install-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-install-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Install dependencies
         run: |
           bun install --frozen-lockfile && exit 0
@@ -397,6 +410,16 @@ jobs:
         with:
           node-version: '22'
 
+      # XP-01. Same cache-warming step as the build job above — see there for
+      # the rationale and the invariant on what is (and is not) cached.
+      - name: Restore Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-install-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-install-${{ runner.os }}-${{ runner.arch }}-
+
       # Purge-and-retry against the Bun install-cache race — see the `build` job for the
       # full signature and why this is not a composite action.
       - name: Install dependencies
@@ -440,6 +463,16 @@ jobs:
 
       - name: Reconcile npm to contract version (11.14.1)
         run: npm install -g npm@11.14.1
+
+      # XP-01. Same cache-warming step as the build job above — see there for
+      # the rationale and the invariant on what is (and is not) cached.
+      - name: Restore Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-install-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-install-${{ runner.os }}-${{ runner.arch }}-
 
       # This job's install is where the race actually fired on CI run 30208529279
       # attempt 1. Purge-and-retry — see the `build` job for the full signature.

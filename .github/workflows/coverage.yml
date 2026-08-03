@@ -136,6 +136,16 @@ jobs:
       - name: Reconcile npm to contract version (11.14.1)
         run: npm install -g npm@11.14.1
 
+      # XP-01. Same cache-warming step as ci.yml's install steps — see there for
+      # the rationale and the invariant on what is (and is not) cached.
+      - name: Restore Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-install-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-install-${{ runner.os }}-${{ runner.arch }}-
+
       # Same purge-and-retry as ci.yml's install step, for the same reason: Bun's
       # install cache intermittently races the lifecycle scripts it feeds and the
       # casualty is always a native grammar. The happy path pays nothing — `&&`

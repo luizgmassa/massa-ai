@@ -49,6 +49,18 @@ jobs:
       # `FileNotFound ... undici` -> `tree-sitter-clojure-orchard` exit 1), skipping all
       # four publish jobs. Purge-and-retry — see ci.yml's `build` job for the signature.
       #
+      # XP-01. Same cache-warming step as ci.yml's install steps. actions/cache@v4 is a
+      # marketplace action (not a local composite), so — unlike a `uses: ./.github/actions/...`
+      # reference — it resolves fine when this workflow runs against an old tag; the
+      # inline-`run:` reasoning below does not apply to it.
+      - name: Restore Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-install-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-install-${{ runner.os }}-${{ runner.arch }}-
+
       # Deliberately inline rather than a `uses: ./.github/actions/...` composite action.
       # A local action resolves from the *checked-out* tree, and this job checks out
       # `inputs.ref`; a composite would be unresolvable on every tag older than itself —
