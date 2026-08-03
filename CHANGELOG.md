@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-08-03
+
 ### Changed
 
 - **`tools/read_file.ts` is a thin handler now — 490 of its 707 lines (69.3%) moved into
