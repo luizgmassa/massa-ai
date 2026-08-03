@@ -246,16 +246,6 @@ export interface IKeywordSearch {
 }
 
 /**
- * Hybrid Search Interface
- * 
- * Combines vector + keyword search
- */
-export interface IHybridSearch {
-  search(query: string, options: RetrievalOptions): Promise<SearchResult[]>;
-  rerank(resultSets: SearchResult[][]): SearchResult[];
-}
-
-/**
  * Embedding Service Interface
  */
 export interface IEmbeddingService {

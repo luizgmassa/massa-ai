@@ -45,7 +45,7 @@ the per-task write sets only Tasks produces. Those sets are now measured, repo-w
 | **4 — `index_project.ts`** | **9, unchanged by T13 or T14b** | 6 | 1 handler + **3** modules + 3 module suites + **2** test repoints. **T13 shipped 4 files against its row's 3** — `index_project.ts`, `services/indexing/execute-indexing.ts`, its suite, and `index-project-tool.test.ts` — but the phase total does **not** move, because that fourth file is one of the 2 test repoints this row already carries for T14. So T13's growth is an **intra-phase overlap**, not a new file, and §1's sum/union/identity are all untouched (§10.15). *This is the first growth on this feature that does not move the table, and it was checked rather than assumed — the check working, not a coincidence.* **T14b shipped 5 against its row's 3 and the total again does not move** (§10.16): `execute-indexing.ts` is already one of this row's 3 modules and `index-project-tool.test.ts` one of its 2 test repoints, so both growths are intra-phase **re-touches**. Two consecutive tasks whose growth the table absorbs — recorded because the reason is structural (Phase 4 has one handler and a fixed module roster) and will not carry to Phase 6 or 7. **T14 shipped 6 against its row's 5 and the total does not move a THIRD time** (§10.17): `execute-indexing.ts` is one of this row's 3 modules and both repointed suites are the row's 2 test repoints, so every T14 file was already in the roster — the phase's 9, §1's sum **107**, union **86** and identity **21** all hold, re-checked rather than assumed. |
 | **5 — the gate goes green** | ~~1~~ → **3, and Phase 5 is COMPLETE** | 0 | `.github/workflows/ci.yml` + **T15's 2 C55 citation repoints** (§10.18): `check-tools-thin.test.ts:14` and `design.md:828`, both `ci.yml:200 → :215` — the gate's suite thereby enters its **third** phase and `design.md` its second |
 | **6 — the rename** | ~~29~~ → **30, T16+T17 landed as one commit** | 0 | **7** `git mv` + ~~19~~ → **20** external editors (**+ `docs/ONBOARDING.md:225`**, the unowned live prose site — **C82**, §10.19) + **3** prose/fixture sites (T18's, still owed) |
-| **7 — the record** | **16** | 1 | RFS-04's 5 + RFS-05's 9 + `design.md` (T20b) + `validation.md` |
+| **7 — the record** | **16, unchanged by T19** | 1 | RFS-04's 5 + RFS-05's 9 + `design.md` (T20b) + `validation.md`. **T19 shipped exactly its 5** (§10.20) — the first Phase-7 landing, zero growth, sum/union/identity re-checked and unmoved |
 | **sum** | ~~83~~ → ~~86~~ → ~~92~~ → ~~101~~ → ~~105~~ → ~~107~~ → ~~109~~ → **110** | **32** | Phase 2 **+4** and Phase 3 **+11** since the 92; **Phase 5 +2 at T15** (§10.18); **Phase 6 +1 at T16/T17** (§10.19) |
 | **distinct union** | ~~78~~ → ~~80~~ → ~~81~~ → ~~84~~ → **86** | | **unchanged by T9** — all 6 files it added to Phase 3 were already in the set. **T10 adds none either**; the **+1** there is `spec.md`, which T8b brought in and which no row recorded (**C65**). **T11 adds 3**: `line-range.ts`, `line-range.test.ts` and `wave-4-correctness.test.ts` — `spec.md` and the two `check-tools-thin` files were already in the union. **T12 adds 2**: `read-file.service.ts` and its suite; its other five files were already in it. **T15 adds none** — both its repoint files were already in the set, the suite via Phases 1 and 3 and `design.md` via Phase 7 (T20b). **T16/T17 add none either** — `docs/ONBOARDING.md` was already in the union via Phase 7 (T22), so Phase 6's +1 is a **seventh** overlap, not an eighty-seventh file (§10.19). Against PR-C's planned **104** and PR-B's **37** |
 
@@ -645,7 +645,7 @@ certifies the rename while missing **all 12 production edges**, because they are
 
 | # | task | write set | closes |
 | --- | --- | --- | --- |
-| **T19** | **RFS-04's three removals, priced per item.** Delete `data/vector/index.ts` (**0** importers, **unreachable** — `@massa-ai/core`'s `exports` are exactly `.`, `./tools`, `./services`), `data/vector/hybrid-search.ts` (its only importer is the barrel above), `IHybridSearch` from `packages/shared/src/types/interfaces.ts:253`, and `BatchCommand` from `tools/batch_execute.ts:13` + `tools/index.ts:45`. **Every command full-path-qualified, and each figure states which of the two files it read** — there are two files named `hybrid-search.ts`, and `services/search/hybrid-search.ts` is live with 3 importers and 2 `mock.module` registrations (**RFS-04 AC-3**). **Verify against a cache-forced `npm pack --dry-run`, not a stale `dist/`** — a `turbo` cache replay satisfying a published-surface check is a recorded failure mode (**RFS-04 AC-1**) | 5 files | **RFS-04 AC-1, AC-3** |
+| **T19** | **RFS-04's three removals, priced per item.** Delete `data/vector/index.ts` (**0** importers, **unreachable** — `@massa-ai/core`'s `exports` are exactly `.`, `./tools`, `./services`), `data/vector/hybrid-search.ts` (its only importer is the barrel above), `IHybridSearch` from `packages/shared/src/types/interfaces.ts:253`, and `BatchCommand` from `tools/batch_execute.ts:13` + `tools/index.ts:45`. **Every command full-path-qualified, and each figure states which of the two files it read** — there are two files named `hybrid-search.ts`, and `services/search/hybrid-search.ts` is live with 3 importers and 2 `mock.module` registrations (**RFS-04 AC-3**). **Verify against a cache-forced `npm pack --dry-run`, not a stale `dist/`** — a `turbo` cache replay satisfying a published-surface check is a recorded failure mode (**RFS-04 AC-1**). **DONE — §10.20. Both ACs close; write set exactly these 5 files, zero growth — the first task since T13's chain to move no figure in §1.** Every row figure reproduced at `9abe04c` before a line moved; the live file's reading is **3 files / 5 specifier lines** (3 import/require + 2 `mock.module`), untouched. The pack reading was taken from a dist **proven** fresh (16 → 8 under `dist/data/vector/`, survivors exactly the two live stores) after measuring that core's `build` never cleans `dist/` — the row's named trap is real on this tree. Gates: layering **986 → 982 edges / 922 → 920 files**, thinness **399 → 398 members**, both predicted from gate source before the run and exact | 5 files | **RFS-04 AC-1, AC-3** |
 | **T20b** | **The six corrections this document's Plan Challenge gate found in `design.md` (§8.1), applied in place.** On PR-C's **C18** precedent — the Tasks gate found a broken regex in a `design.md` already on `main` and the Tasks PR fixed it there rather than deferring. **C33 is the load-bearing one**; the other five are figure corrections | 1 file | §8.1 |
 | **T20** | **C28–C33 into the parent `core-layering-god-module-split/spec.md`**, in place at the criterion or figure each amends **and** indexed in its *Design and Execute corrections* table, on the C1–C27 convention. Measured: **C28 is named in the parent's Status block as owed and has no table row; C29–C32 are absent entirely.** Same commit: **C29 amends the Evidence row** *"`read_file.ts` is ~55% domain logic (~390 of 707 lines)"* → **490 of 707, 69.3%**, private methods **13 → 11**; **RFS-05 AC-3 corrects the layer figures at two sites** — `:502`'s Evidence row and `:161`'s prose, both reading `tools 31 / controllers 6 / services 208 / data 41`, measured **30 / 0 / 208 / 39** plus `kernel/` **11**, *with the method named* because the row claims *"unchanged, confirmed"*; and `:14`'s *"is in Specify"* (§3.5 item 9) | 1 file | **RFS-05 AC-2, AC-3** |
 | **T21** | **`scripts/check-coverage.ts`'s dangling `EXCLUSIONS` entry deleted, and the class closed in the gate's *test*, not the gate.** 9 entries, **1** dangling — `packages/core/src/services/query/prisma-client.ts`, at `kernel/` since `9fe4545`. **Delete rather than repoint**: `2ea4ebd` took `kernel/prisma-client.ts` to **100% (26/26)**, so the exclusion is dead weight. The existing pinning test — `scripts/__tests__/check-coverage.test.ts:178`, *"every excluded path is one the gate would otherwise measure"* — asserts `isMeasuredSource(entry.file)`, and that is a **pure string-shape predicate** (`check-coverage.ts:379-388`: an extension regex plus six substring/prefix checks, no `existsSync`, no `readFileSync`, no `git`), so it can never see a dangle. **Cite the file with the line — `check-coverage.ts:178` is an unrelated `EXCLUSIONS` entry.** Add an existence assertion resolving against `check-coverage.ts`'s real `REPO_ROOT` (used at `:619`), **not** the test's synthetic `BASE = "/repo/packages/core"` or its cwd. **AC-4 closes with an observed red**: revert the deletion and the test must fail | 2 files | **RFS-05 AC-4** |
@@ -5192,3 +5192,122 @@ population ≠ 28, on offset drift, and on any dangling result), `t17-mock-discr
 (refuses off the post-rename tree; byte-restore + SHA-256 per row; never git-restores).
 
 **Running total: eighty-eight plan defects.**
+
+### 10.20 T19 — executed, 2026-08-03
+
+**RFS-04's three removals are landed and priced per item: `data/vector/index.ts` and
+`data/vector/hybrid-search.ts` deleted, `IHybridSearch` and `BatchCommand` stripped, write set
+exactly the row's 5 files plus this document — zero growth, and §1's table is re-checked, not
+assumed: sum 110 / union 86 / identity 16 × 1 + 4 × 2 = 24 all hold. RFS-04 AC-1 and AC-3 close.
+Zero new plan defects; running total stays eighty-eight. The one figure that fell this task was a
+critic's, not an author's — the red team predicted `edgesExamined` 986 → 984 from "reading both
+target files"; re-derived from `check-core-layering.ts`'s own extraction rule (STATIC matches
+`export type … from` — no type-only skip — so the barrel carries THREE edges `:5`/`:12`/`:14`, the
+dead file one at `:11`; `@massa-ai/shared` specifiers are bare and never resolve) the prediction is
+986 → 982, and the live run read exactly 982. Mechanism held, figure didn't — the recurring class,
+this time on the critic's side of the table.**
+
+#### The premeasure, reproduced before a line moved (§10.17–§10.19's norm)
+
+Every figure in the §5 row re-derived at `9abe04c` with a new per-FILE resolver instrument
+(`t19-importer-sweep.ts` — t16's AST walk, containment by resolved-path EQUALITY against one file,
+because AC-3's trap is exactly that a directory- or basename-scoped sweep conflates the two
+`hybrid-search.ts` files). Population 910 tracked code files, printed before rows:
+
+| subject (full path, per AC-3) | reading |
+| --- | --- |
+| `packages/core/src/data/vector/index.ts` | **0 files / 0 specifier lines** across import / export-from / dynamic import / require / `mock.module`; non-relative "index" controls = 2 MCP-SDK imports, foreign |
+| `packages/core/src/data/vector/hybrid-search.ts` | **exactly 1 edge** — `data/vector/index.ts:5` `[export-from] "./hybrid-search.js"`, the barrel deleted with it |
+| `packages/core/src/services/search/hybrid-search.ts` (**LIVE**) | **3 files / 5 specifier lines**: 3 import/require (`services/search/contextual-search-rlm.ts:49` production; 2 test `require`s) + **2 `mock.module`** (`contextual-search-rlm-coverage.test.ts:162`, `hybrid-search-late-bind.test.ts:77`) — untouched by T19, suites green |
+| `IHybridSearch` outside `.specs/`/`.ua/` | declaration `interfaces.ts:253` + the dead file's `:8`/`:23` only — the dead file was the interface's sole consumer, so both leave in one commit |
+| `BatchCommand` outside `.specs/`/`.ua/` | `batch_execute.ts:13` + `tools/index.ts:45` only; **0** further references in the 72-line declaring file |
+| citations to shift | **0** live by-LINE citations into the three edited files, **0** live by-FILE claims naming the dead pair; `.specs/` holds 8 files / 24 lines, frame-stated records (C52), untouched |
+| reachability | core `exports` exactly `.` / `./tools` / `./services` (no `./data`), `files: ["dist","prisma"]`; shared `files: ["dist"]`, `exports` `.` **and `./types`** — a second live path to `IHybridSearch` the spec's table did not name; verdict unchanged (reachable either way) |
+
+**And one premise the AC names was measured rather than inherited: core's `build` script never
+cleans `dist/`** (`rm -f tsconfig.tsbuildinfo && tsc && cp -r src/generated dist/`), so a
+post-deletion rebuild alone would leave the dead pair's 8 emitted files on disk and `npm pack`
+would list them — the "stale `dist/`" trap is real on this exact tree, and AC-1's sequence must be
+`rm -rf dist` + forced rebuild + pack.
+
+#### The edits
+
+`git rm` × 2; `interfaces.ts` `:248-257` deleted (docblock `:248-252` + interface `:253-256` +
+trailing blank — span verified byte-exact by the evidence audit; `:246` closes `IKeywordSearch`,
+`:258` opens the next docblock; −10 lines, and F5's zero-citation reading means the shift falsifies
+nothing); `batch_execute.ts` `:13-16` deleted (−4); `tools/index.ts:45` edited **in place** —
+`BatchCommand` dropped, `BatchExecuteParams` kept (its real definition is
+`services/executor/params.ts:34`, consumed by `executor-controller.ts:29`/`:196` — verified
+load-bearing, not assumed).
+
+#### The discrimination frame — delete-plus-type-check told live from dead, observed both ways
+
+Per item there is no suite to go red — that is what vestigial means — so the control is the
+inverse: **temporarily removing the LIVE `services/search/hybrid-search.ts` reads core `tsc` exit
+2, 12 `error TS` lines, TS2307 at `contextual-search-rlm.ts(57,8)`**, restore SHA-256-verified.
+The red team predicted the diagnostic would land on the specifier token rather than the sweep's
+`:49` ImportDeclaration anchor, and it did: `(57,8)` is the string literal. Same edge, two
+conventions — the record cites tsc's own. Against that observed red, the dead pair's removal reads:
+type-check **6/6 forced 0-cached green**, resolver re-sweep **0 files / 0 lines both dead paths**
+(population 910 → 908), identifier re-sweep **0** outside `.specs/`/`.ua/`.
+
+#### RFS-04 AC-1 — the pack reading, from a dist proven fresh rather than declared fresh
+
+Sequence: `rm -rf` both dists → `npx turbo run build --force` → `npm pack --dry-run` per package.
+The pre-state sensor was established first (fresh forced build at `9abe04c`): core's tarball listed
+**16** files under `dist/data/vector/` (8 the dead pair's), `BatchCommand` present in fresh
+`dist/tools/index.d.ts` and `dist/tools/batch_execute.d.ts`, `IHybridSearch` in shared's fresh
+`dist/types/interfaces.d.ts` with the `export *` chain live at `dist/index.d.ts:6`. Post-removal:
+**16 → 8** — the survivors exactly `base-vector-store.*` + `postgres-vector-store.*`, zero
+`hybrid-search.*`/`index.*`; `BatchCommand` **1 → 0** in both `.d.ts`; `IHybridSearch` **1 → 0** in
+both shared files. One anomaly recorded with its mechanism: a `--dry-run=json` immediately before
+the build read `cache: HIT` for both packages — not a stale entry but a **correct same-tree one**,
+because `type-check` declares `dependsOn: ["^build"]` and the forced type-check had already built
+shared+core at the post-edit tree. The freshness proof AC-1 actually rests on is `dist/` CONTENT:
+a replay of any pre-edit artifact would have restored 16 files, and the tree held 8.
+
+#### Gates — each with its population frame
+
+`lint` **0**, proven to bite on a T19 file (planted duplicate declaration →
+`tools/index.ts:49:7` semantic error, exit 1; restored from the index, SHA-256-identical).
+`type-check` **6/6, 0 cached, forced**. `build` **5/5, 0 cached, forced** after `rm -rf dist`.
+`bun run test` exit **0 on the first run**, 11/11, 5 cached and **all five `:build`** (verified by
+task name). `test:scripts` **1115 pass / 0 fail across 49 files** + shell suites (§10.19-identical).
+`test:plugins` **96/0 across 8**. `check-core-layering` **PASS — 0 violation(s) across 982
+tier-to-tier edges in 920 tracked files** — both deltas predicted before the run from the gate's
+own source (986 − 4 edges: the barrel's three export-froms and the dead file's one relative
+import; 922 − 2 files) and landed exact. `check-tools-thin` **PASS — 0 of 30 … 398 members
+examined** — predicted 399 − 1 before the run (the deleted interface is one top-level statement in
+`batch_execute.ts`; `tools/index.ts:45` edited in place keeps its statement); population 30 files
+unchanged, `data/vector/` outside `TOOLS_DIR`. Host load 2.09 at the readings.
+
+#### The Plan Challenge gate on T19 — two modes, and the figure that fell was a critic's
+
+Both critics ran read-only against SHA-256-snapshotted files, verified unchanged after each
+returned; no mutation ran while either read, and the control probe waited for both (T7's rule,
+held). **Evidence audit: F1–F10 all REPRODUCE**, all three edit spans byte-correct,
+`BatchExecuteParams` confirmed load-bearing, and its named top risk — static resolution is not
+`tsc` — is exactly what the battery then discharged (forced type-check + the observed-red control).
+**Red team: two mediums, two lows, all four adopted**: the TS2307-at-specifier-token convention
+(vindicated at `(57,8)`); commit the `edgesExamined` prediction before running (adopted — and its
+own 984 fell to the source-derived 982); observe the turbo cache status rather than assume it
+(adopted — HIT found and explained above); and `.specs/reports/` is **untracked, so invisible to
+every `git grep` sweep** — it names all four subjects and is accepted region, recorded here so
+T25's broader sweep does not flag it as a new stale-pointer class. AC-2 foreclosure checked: none —
+the CHANGELOG heading decision stays T24's, re-taken per item on the reachability table (§2, spec
+§5 RFS-04).
+
+#### Residuals, named
+
+`.ua/`'s stale-to-be references to the deleted pair regenerate after PR-D (spec §4.4, unchanged).
+The first live CI run of this tree still happens when the PR opens (T15's residual, unchanged).
+String-CONCATENATED specifiers are invisible to every sweep here by construction; the red team
+sanity-checked the class live and found **0** computed-specifier `require`/`import` patterns in
+tracked code.
+
+**Instruments** (`~/prd-exec-instruments/`, 78 → 79): `t19-importer-sweep.ts` (per-FILE resolver:
+containment by resolved-path equality, never basename; population printed before rows; non-relative
+controls printed for hand adjudication; exit 0 always — a measurement, not a gate).
+
+**Running total: eighty-eight plan defects — unchanged, the first task on this feature to add
+none.**
