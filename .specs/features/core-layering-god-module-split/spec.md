@@ -12,14 +12,19 @@
   **#59** (`2bea11e`, `--no-ff`, parents `450352b` + `2ea4ebd`), released **v1.17.0** on
   2026-07-31; **T18 PASS**, `core-layering-controller-retirement/validation.md`. **PR-D**
   (`core-layering-read-file-split` — `tools/read_file.ts`, AS-06, and GMS-02 **AC-1** by C13) is
-  **in Specify**.
-  **Twenty-seven corrections** have been applied to this document — twelve at PR-B's T19
-  (C1–C12) and **fifteen at PR-C's T16 (C13–C27)** — see *Design and Execute corrections*
-  below before trusting a criterion or a figure. **A twenty-eighth is owed and not yet written
-  here: C28, raised in PR-D's Specify** (`core-layering-read-file-split/spec.md` §2) — **AS-06's
-  stated sensor does not discriminate**. It lands with PR-D's work, not ahead of it, on the T16
-  precedent. Three of this document's four layer-size figures are also stale after PR-C
-  (**30 / 0 / 208 / 39**, plus `kernel/` **11**) and are corrected under the same task.
+  ~~**in Specify**~~ → **in Execute, Phase 7 of 8** (T20 is the commit carrying this correction;
+  the field went stale twice, exactly as `core-layering-read-file-split/tasks.md` §3.5 item 9
+  predicted of it).
+  ~~**Twenty-seven corrections**~~ → **Thirty-three corrections** have been applied to this
+  document — twelve at PR-B's T19 (C1–C12), **fifteen at PR-C's T16 (C13–C27)**, and **six at
+  PR-D's T20 (C28–C33)** — see *Design and Execute corrections* below before trusting a criterion
+  or a figure. ~~A twenty-eighth is owed and not yet written here: C28, raised in PR-D's Specify~~
+  → **C28 through C33 are written below**, landed with PR-D's work on the T16
+  precedent. ~~Three of this document's four layer-size figures are also stale after PR-C
+  (**30 / 0 / 208 / 39**, plus `kernel/` **11**) and are corrected under the same task.~~ →
+  **The layer-size figures are corrected in the Evidence row and §"Problem Statement" with all
+  three frames stated** — the PR-C-era 30/0/208/39+11 this sentence carried was itself stale by
+  the time T20 ran, PR-D's own extraction having moved two of the five (RFS-05 AC-3).
 - **Depends on**: `sensor-repair-2026-07` (PR-A) must land and release first. Three of the gates
   this spec is validated by are unreliable until it does, and one — the needles gate — is
   *guaranteed* to report a false failure against this refactor. See the Evidence Corrections
@@ -134,6 +139,36 @@ the same method that found C16 one phase earlier, in the identical section, whic
 remedies deep. C27 was found by running a suite outside the task's own gate list. Neither is
 visible from the document that contains it.
 
+## Design and Execute corrections (C28–C33) — applied at PR-D's T20
+
+**PR-D confirmed six further defects amending this document's criteria, figures, or agreed
+assumptions**, indexed here on the C13–C27 convention: applied **in place** at the site each
+amends, rationale living once in the artifact named in the last column
+(`core-layering-read-file-split/{spec,design,tasks}.md`), so there is one copy to drift. **These
+six are the subset owed to this document** — PR-D's own artifacts additionally carry corrections
+**C34 through C84**, amending PR-D's spec, design and tasks internally, within a running total of
+**eighty-nine plan defects** across PR-D (`core-layering-read-file-split/tasks.md` §10; the
+C-numbers and the defect ordinals are separate counters with a drifting offset, so neither count
+is derivable from the other's range); those
+amend no criterion here and are deliberately not restated, on the same one-copy rule.
+
+**Five of the six replace a criterion, a remedy, or an agreed assumption's rationale rather than a
+figure** — the same ratio warning C13–C27's header carries, one PR later.
+
+| # | Amends | Kind | What changed | Rationale in |
+| --- | --- | --- | --- | --- |
+| C28 | **AS-06's stated rationale** (GMS-02 AC-1's sensor) | **criterion** | *"the CI import check PR-C adds is what proves the extraction landed"* is false — `FORBIDDEN.tools` is `[]`, so `check-core-layering` reads `PASS` before, during, after, and against a tree where no extraction ever happened. **Zero discrimination; no other gate measured handler thinness at all.** GMS-02 AC-1 gains a deterministic check **PR-D ships**: `scripts/check-tools-thin.ts`, repo-wide over `tools/`, zero allowlist, wired into `ci.yml`'s `build` in the commit where it reads `0 of 30`. AS-06's sequencing stands on its other leg (extraction size + security-sensitive containment). Decided by the user from three options | PR-D `spec.md` §2 |
+| C29 | **the Evidence row** *"`read_file.ts` is ~55% domain logic (~390 of 707)"* and GMS-02's sizing | figure | **490 of 707 (69.3%)**, private methods **13 → 11**, components summed 387–388 rather than 392, and the ~390 excluded **98 non-delegation lines inside `handle()`** — the four-way classification (schema / delegation / logic / presentation) was measured against a two-category criterion. All 98 move. Decided by the user from three options | PR-D `design.md` §2 |
+| C30 | **PR-D `spec.md` §4.3's kernel admission** for the shared LRU | **criterion** | The two-tier premise is true only until the extraction it authorises lands — after PR-D, `tools/` holds **0** LRU consumers and `services/` all five, so `kernel/lru-evict.ts` would be the tier's first single-tier admission, unguarded (the gate enforces leaf-ness, never two-tier-ness). Lands in **`services/cache/lru-evict.ts`**; `kernel/` stays 11 of 11 two-tier. The lost CI-enforced leaf-ness is recorded as a real loss, replaced by the module's own imports-nothing unit assertion | PR-D `design.md` §5.2 |
+| C31 | **PR-D `spec.md` §7 item 2's premise and cost** (the `EXCLUSIONS` dangle) | **criterion** | §7 read the rejected option's cost as the chosen option's size: `2ea4ebd` is **43 insertions in 1 test file**, not "four lines of test", and `check-coverage.ts` was untouched by it. The class fix is **one line in the gate's test** (an existence assertion — `isMeasuredSource` is a pure string-shape predicate that can never see a dangle), not an edit to a merge-blocking gate. Changed what gets done, not only what was believed | PR-D `design.md` §4.1 |
+| C32 | **PR-D `spec.md` §4.1's stated rule** (*"no private method"*) and §3.A's population method | **criterion** | The predicate is a **declared function body**, file-scoped — `private run: (…) => …` is a function-typed field with no body, carried by all four canonical thin handlers, so the literal rule reads **6 of 30** and is unshippable against AC-2's zero-allowlist. File scope closes the constructor-body-closure and module-level-function evasions a class scope admits. Decided over a TypeScript AST after three regex detectors were each wrong on the same tree | PR-D `design.md` §6.5 |
+| C33 | **Phase 4's design** (PR-D `spec.md` §4.2's *"closed by removal"* as planned) | **criterion** | The three planned extractions all sit **outside** `index_project.ts`'s `handle()` `:117-244` = 128, so the `≤ 120` clause chosen specifically to catch that file stays red and the gate cannot be wired green — **RFS-01 AC-1 and the GMS-02 headline could not close as designed**. Resolved by a task the plan did not contain: **T14b**, extracting the 45→52-line managed-run lease block into `services/indexing/`. Decided by the user from three options | PR-D `tasks.md` §3.6 |
+
+**C33 is this table's C23** — the task the plan did not contain, found by measuring what a clause's
+named work actually touches. And the six together repeat C13–C27's sharpest property: none is
+visible from the document that contains it; every one was found by measuring an instrument, a span,
+or a premise against the tree.
+
 ## Why this exists
 
 `audit-remediation-2026-07` deferred exactly three items to "their own spec" and named this one
@@ -158,14 +193,21 @@ data/         persistence
 ```
 
 The directory structure exists. The dependency direction does not hold, and the layer sizes say
-so on their own: **31 tool files, 6 controllers, 208 services, 41 data modules.** Six controllers
+so on their own: **31 tool files, 6 controllers, 208 services, 41 data modules** *(the `a6216cd`
+frame this document argues from — see the amended Evidence row for the two later frames: PR-C
+retired `controllers/` and populated `kernel/`; PR-D reshaped `services/` and `data/`; RFS-05
+AC-3, applied at PR-D's T20)*. Six controllers
 cannot be the orchestration layer for 31 tools, and the import counts confirm what that shape
 implies — `tools → services` occurs 34 times (unique tool-file → service-module edges) against
 `tools → controllers` 6 times. The controllers layer is not a layer that is being bypassed
 occasionally; it is a layer that was mostly never adopted. `tools/read_file.ts` is **707 lines**,
 which is not a thin handler under any reading of the contract it is supposed to satisfy — a full
-read classifies **~390 of those lines (55%) as domain logic**: path-containment security rules,
-two LRU caches, line-range math, language detection and import-regex extraction.
+read classifies ~~**~390 of those lines (55%) as domain logic**~~ → **490 of 707 (69.3%) as
+non-schema, non-delegation logic (C29, PR-D `design.md` §2, applied at T20)** — the ~390/55%
+figure excluded 98 non-delegation lines inside `handle()` itself, counted 13 private methods where
+the file held 11, and its stated components summed to 387–388, not 392: path-containment security
+rules, two LRU caches, line-range math, language detection and import-regex extraction, plus
+`handle()`'s own clipping, compression orchestration, result assembly and recommendation strings.
 
 The re-derivation sharpened this in a way the original draft got wrong. Only **3 of the 6
 controllers hold anything the layer contract claims for them.** `MemoryController.store` publishes
@@ -259,7 +301,7 @@ not arguing it during Execute.
 | AS-03 | Does the `rlm-*` rename land in the same PR as the split, or after it? | **Same PR (PR-B).** The locked programme decision — rename exactly once, inside the change that already rewrites the files. Now near-free: 4 importers, not 40+. | **y** |
 | AS-04 | How is "behavior preserving" proven? | Characterization tests first, then the structural change, per the repo's own precedent. The existing net is smaller than it looks — see GMS-05 AC-1. | **y** |
 | AS-05 | One PR or several, and what is the intermediate state? | **Three PRs, plus a fourth for AS-06.** PR-A `sensor-repair-2026-07` (separate feature) → PR-B search split + rename → PR-C layering + CI import check → PR-D `read_file.ts`. Each independently shippable and revertable; every merge to `main` auto-cuts a release, so no PR may leave a contract holding nowhere. | **y** |
-| AS-06 | Does `tools/read_file.ts` get split here, or its own change? | **Its own change, PR-D**, sequenced after PR-C so the CI import check PR-C adds is what proves the extraction landed. ~390 lines of extraction including a security-sensitive containment check is too much to ride along with the contract change itself. | **y** |
+| AS-06 | Does `tools/read_file.ts` get split here, or its own change? | **Its own change, PR-D**, sequenced after PR-C ~~so the CI import check PR-C adds is what proves the extraction landed~~ → *(struck at T20 — **C28**: that check cannot discriminate the extraction from its absence, `FORBIDDEN.tools` being `[]`; the proving sensor is PR-D's own `check-tools-thin.ts`, zero allowlist, wired into `build`)*. ~~390~~ → **490** lines of extraction *(C29)* including a security-sensitive containment check is too much to ride along with the contract change itself — **the decision stands on this leg alone, and at 490 it is more true, not less**. | **y** |
 
 **Open questions: none.** `execute` moves to `true` when Tasks is written.
 
@@ -324,8 +366,9 @@ is the check.
 No file under `packages/core/src/tools/` contains orchestration or domain logic.
 
 **AC-1** *(re-assigned at PR-C's T16 — **C13**; **owned by PR-D**, not PR-C. AS-06 is an agreed
-decision that assigns this file to PR-D *sequenced after PR-C*, on the ground that ~390 lines of
-extraction including a security-sensitive containment check is too much to ride along with the
+decision that assigns this file to PR-D *sequenced after PR-C*, on the ground that ~~~390~~ →
+**490** lines of extraction *(C29, applied at T20)* including a security-sensitive containment
+check is too much to ride along with the
 contract change; AS-05 sizes the two PRs the same way. As written, PR-C owned a requirement whose
 only concrete criterion is another PR's work — the same shape as C10, C11 and C12)*:
 `tools/read_file.ts` no longer holds logic that is not schema validation or delegation.
@@ -499,7 +542,7 @@ that draft. Every number was read from current source, not inferred and not carr
 
 | Claim | How it was measured |
 | --- | --- |
-| tools 31 / controllers 6 / services 208 / data 41 | `find packages/core/src/<layer> -name '*.ts' \| wc -l` — unchanged, confirmed |
+| tools 31 / controllers 6 / services 208 / data 41 | `find packages/core/src/<layer> -name '*.ts' \| wc -l` — ~~unchanged, confirmed~~ → **true in this table's `a6216cd` frame; the durability claim is what failed (RFS-05 AC-3, applied at PR-D's T20).** Same method re-run at `d7091ac` (PR-D Tasks): **30 / 0 / 208 / 39 + `kernel/` 11** — PR-C retired `controllers/` into `services/` and populated `kernel/`. Re-run again at T20 on PR-D's own tree (2026-08-03; the commit is this row's own `git blame` — a task label alone is not reproducible): **30 / 0 / 218 / 37 + `kernel/` 11** — PR-D's extraction added ten `services/` modules and its RFS-04 removals deleted two `data/vector/` files. *A row that says "unchanged, confirmed" is a standing claim, and this one was falsified twice by the umbrella's own work* |
 | `tools → services` 34× vs `tools → controllers` 6× | `rg -n 'from "\.\./services'` over `tools/*.ts`, deduped to unique (tool-file → service-module) edges; raw line count is 36 **[re-derived — 34 confirmed, method corrected]** |
 | backward imports **36**, not 38: `data → services` 24, `controllers → tools` 5, `services → tools` 4, `services → controllers` 3 | `rg` for `from "(\.\./)+<layer>/"` plus dynamic `import(...)` across `services/`, `data/`, `controllers/`. One of the 3 `services → controllers` edges is dynamic (`services/project-identity/production-wiring.ts:46`) and is invisible to a static grep **[re-derived]** |
 | `data → services` is **24 edges across 14 files**, over **6** target service modules | **Added at T19 — C7**, and the metric is named because three figures here are quotable and different: at `a6216cd`, `git grep -nE 'from "(\.\./)+services/'` over `packages/core/src/data/**/*.ts` returns **24 matching lines**, **24** unique (data-file → service-module) edges and **14** distinct files. The **12** this document cites elsewhere is the `getPrismaClient` subset alone and is **correct, re-confirmed at 12** — it is not the group total. **The stated method has a blind spot, found at T19 and left for PR-C**: the pattern anchors on a **double quote**, so a quote-agnostic sweep (`from ["'](\.\./)+services/`) returns **26 edges / 16 files / 7 modules**. The two extra sites are `data/vector/base-vector-store.ts:14` → `services/embeddings/index.js` and `data/vector/postgres-vector-store.ts:26` → `services/project-identity/identity-guard-installer.js`, both single-quoted, both present at `a6216cd` and unchanged at the shipped tree — so neither is a PR-B regression, and both belong to **GMS-01/PR-C**, which owns this group |
@@ -511,7 +554,7 @@ that draft. Every number was read from current source, not inferred and not carr
 | `trace_path`/`impact_analysis` have two implementations | REST `routes/workspace.ts:461,612` → `GraphController`; embedded `embedded-api-client.ts:159,166` → `new TracePathTool()` → `tracePathService` **[new]** |
 | `ExecuteTool`/`ExecuteFileTool`/`BatchExecuteTool` are dead | exported at `tools/index.ts:40,42,44`; `rg 'new (ExecuteTool\|ExecuteFileTool\|BatchExecuteTool)\('` → zero matches **[new]** |
 | `WebController` lives in `services/` and both transports use it | `services/web/web-controller.ts`; `routes/web.ts:34-35`, `embedded-api-client.ts:61,195-196` **[new]** |
-| `read_file.ts` is ~55% domain logic (~390 of 707 lines) | full read, classified per section into schema / delegation / logic / presentation **[new]** |
+| ~~`read_file.ts` is ~55% domain logic (~390 of 707 lines)~~ → **490 of 707 (69.3%) — C29, PR-D `design.md` §2, applied at T20** | ~~full read, classified per section into schema / delegation / logic / presentation~~ → **the four-way classification was measured against a criterion (GMS-02 AC-1) that admits two categories — schema validation and delegation — and the two extra categories are where 98 non-delegation lines inside `handle()` went uncounted. Private methods 13 → 11 (§3.A's brace-matched count is right); the stated components summed 387–388, never 392. 490 = §5.1's modules 1–7 spans (502) minus `evictOldest` (12, which leaves the file for `services/cache/` rather than `services/file-read/`)** **[new; amended at T20]** |
 | `IndexManager` is the one non-injectable dependency | `rlm-indexing.ts:586` constructs it directly; `injectedDeps` (`contextual-search-rlm.ts:103-111`) has no field for it **[new]** |
 | `searchImpl` touches **13 of 23** facade members; `ensureInitialized()` is called by 7 of 15 delegates; `RRF_K`, `fileFilterCache`, `queryUnderstanding` are each touched by exactly one | read of every `*Impl` body, tabulated as a member→consumer matrix **[new]** · **corrected at T19 — C2**: this read "13 of ~16". The class declares **11 state members and 21 methods**; the denominator is the **23 distinct members the delegates actually read**, and `~16` had no method behind it. Do not confuse this `~16` with the "~16 files mention the `rlm-` name" figure elsewhere in this document, which is a different metric and is correct |
 | facade tests: 41 total = 24 forwarding-only + 17 real behavior, covering 6 of 21 delegate surfaces | read of `__tests__/contextual-search-rlm-coverage.test.ts` **[new]** |
@@ -521,4 +564,4 @@ that draft. Every number was read from current source, not inferred and not carr
 | T18 removed ~23 lines of dead imports from the facade | `git show 17f345a --stat -- packages/core/src/services/search/` |
 | facade at 63.55% line coverage, 78 uncovered lines all delegation bodies | DEBT-02 coverage gate run, `audit-remediation-2026-07` PR2 |
 | `48d0f39` five-factory initialization failure | `.specs/project/STATE.md`, PR1 out-of-band fix |
-| `tools/read_file.ts` 707 lines | `wc -l` — unchanged, confirmed |
+| `tools/read_file.ts` 707 lines | `wc -l` — ~~unchanged, confirmed~~ → **true in the `a6216cd` frame; at T20, post-extraction, the same command reads 124** (N = 125 is PR-D's acceptance ceiling, `core-layering-read-file-split/design.md` §3). *Amended at T20 as the adjacent instance of the same "unchanged, confirmed" durability claim the layer-figures row carried — the letter of RFS-05 AC-3 names only that row; leaving this one false beside it would be the indexed-against-one-site shape PR-D convicted three times* |

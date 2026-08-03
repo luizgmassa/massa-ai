@@ -647,7 +647,7 @@ certifies the rename while missing **all 12 production edges**, because they are
 | --- | --- | --- | --- |
 | **T19** | **RFS-04's three removals, priced per item.** Delete `data/vector/index.ts` (**0** importers, **unreachable** — `@massa-ai/core`'s `exports` are exactly `.`, `./tools`, `./services`), `data/vector/hybrid-search.ts` (its only importer is the barrel above), `IHybridSearch` from `packages/shared/src/types/interfaces.ts:253`, and `BatchCommand` from `tools/batch_execute.ts:13` + `tools/index.ts:45`. **Every command full-path-qualified, and each figure states which of the two files it read** — there are two files named `hybrid-search.ts`, and `services/search/hybrid-search.ts` is live with 3 importers and 2 `mock.module` registrations (**RFS-04 AC-3**). **Verify against a cache-forced `npm pack --dry-run`, not a stale `dist/`** — a `turbo` cache replay satisfying a published-surface check is a recorded failure mode (**RFS-04 AC-1**). **DONE — §10.20. Both ACs close; write set exactly these 5 files, zero growth — the first task since T13's chain to move no figure in §1.** Every row figure reproduced at `9abe04c` before a line moved; the live file's reading is **3 files / 5 specifier lines** (3 import/require + 2 `mock.module`), untouched. The pack reading was taken from a dist **proven** fresh (16 → 8 under `dist/data/vector/`, survivors exactly the two live stores) after measuring that core's `build` never cleans `dist/` — the row's named trap is real on this tree. Gates: layering **986 → 982 edges / 922 → 920 files**, thinness **399 → 398 members**, both predicted from gate source before the run and exact | 5 files | **RFS-04 AC-1, AC-3** |
 | **T20b** | **~~The six corrections~~ → ALL TWENTY §8.1 rows applied into `design.md` in place** (the row's "six" was Design-era; §8.1 grew task by task). On PR-C's **C18** precedent — the Tasks gate found a broken regex in a `design.md` already on `main` and the Tasks PR fixed it there rather than deferring. **C33 is the load-bearing one**. **DONE — §10.21.** 20/20 verified APPLIED-CORRECT by an independent row-by-row audit; +76 net lines, whose citation-shift adjudication (T15's §10.18 precedent) found **zero live repoints owed** — every citing site is a frame-stated record, and the one live-sensor candidate (`t15-verify-post.ts`) anchors by content and re-ran 16/16. **One cascade the application surfaced and fixed in the same commit: C84** — the table's new 8c row falsifies `design.md`'s thrice-stated "Nine new files under the coverage floor"; measured TEN on the shipped tree, all three sites + this document's R-36 amended (a self-amendment, riding with the record as every task's do — not a write-set entry, or the §1 overlap table would carry this document in every phase) | 1 file | §8.1 |
-| **T20** | **C28–C33 into the parent `core-layering-god-module-split/spec.md`**, in place at the criterion or figure each amends **and** indexed in its *Design and Execute corrections* table, on the C1–C27 convention. Measured: **C28 is named in the parent's Status block as owed and has no table row; C29–C32 are absent entirely.** Same commit: **C29 amends the Evidence row** *"`read_file.ts` is ~55% domain logic (~390 of 707 lines)"* → **490 of 707, 69.3%**, private methods **13 → 11**; **RFS-05 AC-3 corrects the layer figures at two sites** — `:502`'s Evidence row and `:161`'s prose, both reading `tools 31 / controllers 6 / services 208 / data 41`, measured **30 / 0 / 208 / 39** plus `kernel/` **11**, *with the method named* because the row claims *"unchanged, confirmed"*; and `:14`'s *"is in Specify"* (§3.5 item 9) | 1 file | **RFS-05 AC-2, AC-3** |
+| **T20** | **C28–C33 into the parent `core-layering-god-module-split/spec.md`**, in place at the criterion or figure each amends **and** indexed in its *Design and Execute corrections* table, on the C1–C27 convention. Measured: **C28 is named in the parent's Status block as owed and has no table row; C29–C32 are absent entirely.** Same commit: **C29 amends the Evidence row** *"`read_file.ts` is ~55% domain logic (~390 of 707 lines)"* → **490 of 707, 69.3%**, private methods **13 → 11**; **RFS-05 AC-3 corrects the layer figures at two sites** — `:502`'s Evidence row and `:161`'s prose, both reading `tools 31 / controllers 6 / services 208 / data 41`, measured **30 / 0 / 208 / 39** plus `kernel/` **11**, *with the method named* because the row claims *"unchanged, confirmed"*; and `:14`'s *"is in Specify"* (§3.5 item 9). **DONE — §10.22. Both ACs close.** All named edits landed plus the two sites the letter did not name — **AS-06's own row and GMS-02 AC-1's parenthetical still stated the ~390 and the falsified sensor as live fact**; both critics found the gap independently, both sites amended (AC-2's *"in place AND indexed"* conjunction now holds at every site). Three author insertions fell to the gate and were fixed pre-commit (the 83/51 range conflation, a C25→C23 misattribution, a non-reproducible frame label). *This row's own `:502`/`:161` are its minting frame — the parent grew +40 net lines at T20, and current positions are found by content (§10.22's adjudication: zero live repoints owed repo-wide, bare-`:NNN` class swept)* | 1 file | **RFS-05 AC-2, AC-3** |
 | **T21** | **`scripts/check-coverage.ts`'s dangling `EXCLUSIONS` entry deleted, and the class closed in the gate's *test*, not the gate.** 9 entries, **1** dangling — `packages/core/src/services/query/prisma-client.ts`, at `kernel/` since `9fe4545`. **Delete rather than repoint**: `2ea4ebd` took `kernel/prisma-client.ts` to **100% (26/26)**, so the exclusion is dead weight. The existing pinning test — `scripts/__tests__/check-coverage.test.ts:178`, *"every excluded path is one the gate would otherwise measure"* — asserts `isMeasuredSource(entry.file)`, and that is a **pure string-shape predicate** (`check-coverage.ts:379-388`: an extension regex plus six substring/prefix checks, no `existsSync`, no `readFileSync`, no `git`), so it can never see a dangle. **Cite the file with the line — `check-coverage.ts:178` is an unrelated `EXCLUSIONS` entry.** Add an existence assertion resolving against `check-coverage.ts`'s real `REPO_ROOT` (used at `:619`), **not** the test's synthetic `BASE = "/repo/packages/core"` or its cwd. **AC-4 closes with an observed red**: revert the deletion and the test must fail | 2 files | **RFS-05 AC-4** |
 | **T22** | **`CLAUDE.md` and `docs/ONBOARDING.md`.** `CLAUDE.md:43`'s *"24 migrations"* → **23**, **naming the metric** (24 counts `migration_lock.toml`; there are 23 migration directories and 23 tracked `migration.sql` — §3.5 item 10). `CLAUDE.md:567`'s *"five … skipping lines"* → **8** publishable packages, measured from every non-`private` `package.json`. `docs/ONBOARDING.md:83-87`'s deferral marker must say `.ua/` regeneration is **its own change after PR-D**, not point at a PR that will have merged (`spec.md` §4.4) | 2 files | **RFS-05 AC-5** |
 | **T23** | **The state files.** `HANDOFF.md`, `STATE.md`, `FEATURES.json` — PR-D `status: complete`, `phases.tasks: true`, `phases.execute: true`; parent `core-layering-god-module-split` to `complete`. **Do not touch `active_feature`** — it reads `skills-directive-dedup`, genuinely paused at T5 of 12 on the user's instruction, verified against `STATE.md`'s `## Current` for the **third** time. **Never `git add -A` under `.specs/`**: `.specs/reports/` is untracked on purpose and stays untracked; stage explicitly | 3 files | RFS-05 AC-1 |
@@ -5384,3 +5384,71 @@ population** (markdown-only diff; T15's rule).
 table as its record; no new harness was warranted for a one-shot enumeration.
 
 **Running total: eighty-nine plan defects (C84).**
+
+### 10.22 T20 — executed, 2026-08-03
+
+**C28–C33 are in the parent `core-layering-god-module-split/spec.md` — indexed in a new
+"Design and Execute corrections (C28–C33) — applied at PR-D's T20" section on the C13–C27
+convention, AND amended in place at every site stating a falsified figure or rationale. RFS-05
+AC-2 and AC-3 close. Write set 1 file, zero growth; §1's Phase-7 roster already carried the
+parent. Zero new plan defects; running total stays eighty-nine.**
+
+#### What landed, and the two sites the row's letter did not name
+
+The row's named edits all landed and all re-verified: Status block (*"in Specify"* →
+**in Execute, Phase 7 of 8** — the field's second staleness, §3.5 item 9's prediction; corrections
+count **27 → 33 = 12 + 15 + 6**, checked against the tables' actual row counts, not the prose);
+Problem-Statement prose (layer figures frame-noted; **~390/55% → 490 of 707, 69.3%** with C29's
+three reasons); the Evidence rows (layer figures with **three frames**, each with the method —
+`a6216cd` 31/6/208/41, `d7091ac` 30/0/208/39 + kernel 11, and T20's own tree **30/0/218/37 +
+kernel 11**, re-derived live by the critic to the digit; the C29 row; and the adjacent
+`707 — unchanged, confirmed` row frame-stated at the current **124**, the same durability-claim
+class AC-3's named row carried — left false beside an amended twin it would have been the
+indexed-against-one-site shape a fourth time). **Both Plan Challenge lenses then found the same
+gap independently: AS-06's own decision row and GMS-02 AC-1's parenthetical still stated the
+falsified sensor rationale and the ~390 as live fact.** RFS-05 AC-2's letter is *"in place AND
+indexed"* — the conjunction's first half was unmet at exactly those two sites. Both amended:
+AS-06's sensor clause struck with C28's mechanism (the decision stands on its surviving leg,
+stated), its ~390 → 490 (C29); AC-1's parenthetical likewise. The deterministic check the audit
+named — no unstruck `~390` outside the corrections' own quoting — reads **clean, 2 intentional
+quoting sites only**.
+
+#### Three of the author's own insertions fell to the critics, and one was predicted before they ran
+
+**"C34–C84, eighty-three further defects"** — the C-range holds 51 numbers; 83 was ordinal
+arithmetic (89 − 6) glued to a range label, and the C-number↔ordinal offset drifts (C33 is the
+fortieth, C82 the eighty-seventh). The author flagged the figure as suspect before dispatch; the
+red team confirmed incoherence; reworded to state the range and the running total as **separate
+counters with a drifting offset, neither derivable from the other**. **"C33 is this table's
+C25"** — the *"task the plan did not contain"* phrase is **C23's** verbatim; C25 is the
+importer-population miscount. Misattribution in T20's own new prose, caught by the evidence audit
+against source, fixed. **The third-frame label "T20"** — a task name is not reproducible under the
+Evidence section's own `a6216cd` convention; relabeled to the row's own `git blame` as the
+commit pointer (a baseline ref is per item). *Three author figures fell in one task — the
+two-critic gate earning its cost on the author's own insertions, which is exactly the population
+T20b's audit warned it cannot see (transcription fidelity is not upstream truth, and here the
+upstream was the transcription's own connective prose).*
+
+#### The citation adjudication for the parent's +40 net lines
+
+Sweep population: citations into `god-module-split/spec.md` by line, explicit **and bare-`:NNN`**
+(C57's lesson — the explicit-form sweep alone read a false zero). Findings: **zero** explicit
+`god-module-split/spec.md:NNN` citations exist anywhere; the bare forms live in exactly this
+document — the T20 §5 row's `:502`/`:161` (its minting-frame directive, frame-stated by the DONE
+strike; current positions: the Evidence row and the prose moved ~+40 lines down, found by
+content) and this section's own quotations (self-framing). HANDOFF's superseded next-action
+paragraph carried both bare numbers and is superseded by T20's DONE paragraph in the same docs
+commit. **Zero live repoints owed** — T20b's outcome, one document over, this time with the
+bare-`:NNN` class swept explicitly.
+
+#### Gates — a `.specs/`-only commit, T5/T15/T20b's precedent
+
+`test:scripts` **1115 pass / 0 fail across 49 files** + shell suites, exit 0. `check-tools-thin`
+**byte-identical** (`PASS — 0 of 30 … 398 members`); `check-core-layering` **PASS — 0 across 982
+edges / 920 files** — both unchanged from T19, as a markdown-only diff demands.
+lint / type-check / build / `bun run test` / `test:plugins` **N/A by measured population**.
+Host load checked at the readings.
+
+**Instruments**: none added (79 unchanged).
+
+**Running total: eighty-nine plan defects — unchanged at T20.**
