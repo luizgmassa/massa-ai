@@ -739,10 +739,10 @@
     {
       "slug": "cross-pollination-ports",
       "title": "Cross-pollination ports & gap closure — implement live PORT-01..07 + DB-05/06/07/08/09/10 fixes + lessons from the 2026-07-29 portability report",
-      "status": "in_progress",
+      "status": "complete",
       "workflow": "spec-driven",
       "branch": "feature/cross-pollination-ports",
-      "notes": "Specify DONE. Report re-verified at 94e6b05: DB-01/02/03/04 already fixed (no-op); rest live. User decisions: XP-04 enforce+parity, XP-06 full prep refactor, one branch/one PR."
+      "notes": "VALIDATED PASS 2026-08-03 (35/35 ACs, 6/6 mutations killed). 23 commits, one PR from feature/cross-pollination-ports; merge pending user. AD-014 added. Real-CI confirmation of T7/T8 deferred to the PR run."
     }
   ],
   "active_feature": "cross-pollination-ports"

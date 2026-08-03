@@ -104,7 +104,7 @@ export function scrubCredentials(payloadJson: string): ScrubResult;
   - `MemoryObservationStore` + `PgObservationStore` signatures follow the contract; internals unchanged (both treat it as a string at runtime — brand is compile-time only).
 - **Ordering**: `validateEvent`'s 413 size check stays first (pre-scrub); scrub happens at the serialization site. Wire shape of `POST /api/v1/hook` unchanged (AC-5): same accept/reject behavior, only stored bytes differ.
 - **Pre-existing rows stay unsanitized** — accepted limitation, recorded here (retrofit migration out of scope; L-DRAFT-E is the lesson about exactly this cost).
-- **Proposed project decision (AD-013, to append at Execute)**: *every durable Observation write passes the kernel credential-scrub boundary; new observation-writing code must construct `InsertableObservation` via `scrubCredentials` — the type makes violation a compile error.*
+- **Proposed project decision (landed as AD-014 at close-out — this design pre-assigned "AD-013", but that slot was already taken by sensor-repair's needle decision when the deferred append ran; verifier caught it)**: *every durable Observation write passes the kernel credential-scrub boundary; new observation-writing code must construct `InsertableObservation` via `scrubCredentials` — the type makes violation a compile error.*
 
 ### C2 — Security allowlist gate (XP-03)
 

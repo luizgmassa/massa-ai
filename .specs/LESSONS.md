@@ -100,6 +100,13 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: packages/core/src/services/hooks/hook-service.ts:246 (core/security-boundary)
 - last seen: 2026-08-03T21:00:12Z
 
+### L-014 - A design doc that pre-assigns a decision-record ID (AD-NNN 'to append at Execute') goes stale if other features land AD entries before the deferred append runs; re-derive the next ID at append time, never trust the pre-assigned number.
+- signal: `spec_deviation` | recurrence: 1 feature(s) | scope: `.specs/project/STATE.md` | harmful: 0 | confidence: 0.62
+- features: cross-pollination-ports
+- context: project=massa-ai session=spec-cross-pollination-ports workflow=spec-driven entity=cross-pollination-ports
+- evidence: .specs/features/cross-pollination-ports/design.md:107 (.specs/project/STATE.md)
+- last seen: 2026-08-03T21:30:48Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

@@ -13,7 +13,7 @@ export interface Observation { id: string; projectId: string; sessionId: string 
  * `SanitizedPayloadJson` produced by `kernel/sanitize/credential-scrub.ts`'s
  * `scrubCredentials()` — the only way to construct that brand. Read shapes
  * (`Observation`, `ObservationRow`, `listRecent`/`listBySession` results)
- * stay plain `string`: rows read back are not re-branded (XP-02 / AD-013).
+ * stay plain `string`: rows read back are not re-branded (XP-02 / AD-014).
  */
 export type InsertableObservation = Omit<Observation, "payloadJson"> & { payloadJson: SanitizedPayloadJson };
 export interface ObservationRow { id: string; project_id: string; session_id: string | null; source: string; category: string | null; payload_json: string; importance: number; created_at: number; agent_id?: string | null; attribution_source?: string | null; }

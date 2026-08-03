@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 14,
+  "next_id": 15,
   "lessons": [
     {
       "id": "L-001",
@@ -278,6 +278,29 @@
       ],
       "created": "2026-08-03T21:00:12Z",
       "last_seen": "2026-08-03T21:00:12Z",
+      "project": "massa-ai",
+      "session": "spec-cross-pollination-ports",
+      "workflow": "spec-driven",
+      "entity": "cross-pollination-ports",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-014",
+      "key": "spec_deviation::a design doc that pre assigns a decision record id ad nnn to append at execute goes stale if other features land ad entries before the deferred append runs re derive the next id at append time never trust the pre assigned number",
+      "text": "A design doc that pre-assigns a decision-record ID (AD-NNN 'to append at Execute') goes stale if other features land AD entries before the deferred append runs; re-derive the next ID at append time, never trust the pre-assigned number.",
+      "signal": "spec_deviation",
+      "scope": ".specs/project/STATE.md",
+      "status": "candidate",
+      "features": [
+        "cross-pollination-ports"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        ".specs/features/cross-pollination-ports/design.md:107 (.specs/project/STATE.md)"
+      ],
+      "created": "2026-08-03T21:30:48Z",
+      "last_seen": "2026-08-03T21:30:48Z",
       "project": "massa-ai",
       "session": "spec-cross-pollination-ports",
       "workflow": "spec-driven",
