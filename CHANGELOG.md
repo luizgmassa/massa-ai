@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **All 8 harness/repo Python scripts ported to TypeScript under Bun; lessons store is
+  single-file.** `check_commit`, `check_specs_delivered`, `validate_spec`, `validate_state`,
+  `validate_tasks`, and `lessons` (under `skills/massa-ai/scripts/`), plus
+  `scripts/update-fixture-hashes` and `scripts/synapse-bench-analyze-v2`, are now `.ts`
+  invoked as `bun <script>.ts`; every `.py` original is deleted and `package.json:42`'s
+  `update-fixture-hashes` script no longer assumes a `python3` runtime. CLI surface (flags,
+  positionals, exit codes 0/1/2, asserted output) is preserved byte-for-byte, proven per
+  script by a temporary dual-run characterization harness before each `.py` deletion, then
+  materialized as a permanent `bun test`-only golden regression suite
+  (`scripts/__tests__/pyts-golden.test.ts`) once the harness itself was removed. `lessons.json`
+  is now the only lessons artifact — the rendered `.specs/LESSONS.md` playbook and its
+  render path are gone; `lessons list` is the on-demand replacement view. Every `python3`
+  invocation and `.py` basename reference under `skills/` and `apps/*/skills/` is repointed
+  or removed (sweep-verified, zero remaining). **Operator note:** if you installed the
+  `check_commit.py` git `commit-msg` hook via the old `ln -sf … check_commit.py
+  .git/hooks/commit-msg` recipe, that symlink now targets a deleted file — re-create it
+  against `check_commit.ts` (`ln -sf skills/massa-ai/scripts/check_commit.ts
+  .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg`, the same recipe now in
+  `references/spec-driven/execute.md`).
+
 ## [1.21.0] - 2026-08-04
 
 ### Changed
@@ -38,25 +60,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   host bundles. New planned feature spec `python-to-typescript-scripts` registered:
   migrate all 8 Python scripts (including `lessons.py`) to Bun TypeScript with dual-run
   characterization parity.
-- **All 8 harness/repo Python scripts ported to TypeScript under Bun; lessons store is
-  single-file.** `check_commit`, `check_specs_delivered`, `validate_spec`, `validate_state`,
-  `validate_tasks`, and `lessons` (under `skills/massa-ai/scripts/`), plus
-  `scripts/update-fixture-hashes` and `scripts/synapse-bench-analyze-v2`, are now `.ts`
-  invoked as `bun <script>.ts`; every `.py` original is deleted and `package.json:42`'s
-  `update-fixture-hashes` script no longer assumes a `python3` runtime. CLI surface (flags,
-  positionals, exit codes 0/1/2, asserted output) is preserved byte-for-byte, proven per
-  script by a temporary dual-run characterization harness before each `.py` deletion, then
-  materialized as a permanent `bun test`-only golden regression suite
-  (`scripts/__tests__/pyts-golden.test.ts`) once the harness itself was removed. `lessons.json`
-  is now the only lessons artifact — the rendered `.specs/LESSONS.md` playbook and its
-  render path are gone; `lessons list` is the on-demand replacement view. Every `python3`
-  invocation and `.py` basename reference under `skills/` and `apps/*/skills/` is repointed
-  or removed (sweep-verified, zero remaining). **Operator note:** if you installed the
-  `check_commit.py` git `commit-msg` hook via the old `ln -sf … check_commit.py
-  .git/hooks/commit-msg` recipe, that symlink now targets a deleted file — re-create it
-  against `check_commit.ts` (`ln -sf skills/massa-ai/scripts/check_commit.ts
-  .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg`, the same recipe now in
-  `references/spec-driven/execute.md`).
 
 ## [1.20.0] - 2026-08-04
 
