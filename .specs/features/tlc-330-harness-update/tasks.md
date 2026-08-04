@@ -161,7 +161,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T6
 **Tests**: chain table contains new stage; Propose precondition named
 **Gate**: sweep green
-**Status**: [ ]
+**Status**: [x]
 
 ### Phase 3: Charter, regeneration, close-out
 
