@@ -145,7 +145,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: none
 **Tests**: sections present; massa-ai-only sections untouched (diff scoped)
 **Gate**: sweep green
-**Status**: [ ]
+**Status**: [x]
 
 ### T14: workflows/spec-driven.md — threshold + contract + step 7
 **Where**: `skills/massa-ai/workflows/spec-driven.md`
