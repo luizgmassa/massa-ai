@@ -13,6 +13,7 @@ Phase 2: T3
 Phase 3: T4 ──→ T5 ──→ T6 ──→ T7 ──→ T8 ──→ T9
 Phase 4: T10 ──→ T11 ──→ T12
 Phase 5: FT1
+Phase 6: FT2
 ```
 
 Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py, never the render path). Phase 3 depends on Phase 2 (every port runs the dual-run gate). Phase 4 depends on Phase 3 (the global sweep needs all skill ports landed).
@@ -156,4 +157,14 @@ Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py
 **Depends on**: T12
 **Tests**: pyts-golden suite green (46 cases); scratch replay of mutation (b) kills — both F1 entries fail under naive rounding
 **Gate**: golden suite + observed mutation kill + full `bun run test:scripts` + `bun run lint` all exit 0
+**Status**: [x]
+
+### Phase 6: Fix tasks — delivery-chain repair iteration 1 (PR #65 CI)
+
+### FT2: Scope opencode-plugin test discovery off the bundled _spec.ts
+**Where**: `apps/opencode-plugin/package.json`
+**What**: PR #65 CI `build` (turbo `Test` step) and `coverage` both failed on the single task `@massa-ai/opencode-plugin#test`: Bun test discovery treats any file ending `_spec.ts` as a test file, and the migration shipped `validate_spec.ts` into the plugin's bundled `skills/` tree — the package's bare `bun test` walked it, loaded the CLI as a test module, and died on its usage error. The old `.py` was invisible to discovery, and only this plugin declares its own test script (the other three deliberately don't), so only this package collided; local gates missed it because the scoped set ran `test:scripts`, never turbo `bun run test`. Fix: `"test": "bun test __tests__ src/__tests__"` — the package's two real test dirs (find-verified); nothing that ever ran is excluded.
+**Depends on**: FT1
+**Tests**: `bunx turbo run test --filter=@massa-ai/opencode-plugin --force` exit 0 — 124/0 across the same 6 files the dir walk finds
+**Gate**: turbo-filtered task 0 + `test:scripts` 0 + `lint` 0; PR #65 checks re-watched to green
 **Status**: [x]

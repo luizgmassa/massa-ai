@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Python→TypeScript Scripts + Lessons Single-Store (VALIDATED PASS 2026-08-04 — T1-T12 + FT1, 2 verification iterations; PR pending, merge = user's decision)
+## Active — Python→TypeScript Scripts + Lessons Single-Store (VALIDATED PASS 2026-08-04 — T1-T12 + FT1-FT2 (FT2 = delivery repair 1), 2 verification iterations; PR #65 open, merge = user's decision)
 
 - **Validation:** iteration 1 FAIL (critical: round-half-even sensor not standing after
   T11's harness deletion — F1's "exercised, not assumed") → FT1 `67e769ca` (mutating
@@ -33,8 +33,21 @@
   generate; grammar suite 9/0 — note turbo FULL-TURBO cache restores dist but NOT
   `src/generated/prisma`, run `bunx prisma generate` in fresh worktrees). massa-ai MCP
   unreachable; `.specs/` canonical.
-- **Next action:** push + `gh pr create` (authorized) → CI watch to green → user merge
-  decision (minor release on merge; CHANGELOG carries the commit-msg-hook operator note).
+- **Delivery repair 1 (FT2):** PR #65 (https://github.com/luizgmassa/massa-ai/pull/65)
+  CI red on `e6d8362a` — `build` + `coverage`, one root cause, two venues: Bun test
+  discovery matches any `*_spec.ts`, and the migration shipped `validate_spec.ts` into
+  the plugin's bundled `skills/` tree; opencode-plugin is the only plugin declaring its
+  own `test` script, so its bare package-wide `bun test` walked the bundle and died on
+  the CLI's usage error. Fix: test script scoped to `__tests__ src/__tests__` (FT2,
+  tasks.md Phase 6 — full record in STATE.md). Gates re-run own-exit-code green:
+  turbo-filtered plugin test 0 (124/0), `test:scripts` 0 (1323/0 TS + shell suites),
+  `lint` 0, `validate_tasks.ts` 0 errors. No verifier re-dispatch (delivery-stage
+  repair — tlc-330 FT6 precedent). The `github-advanced-security` check-run failure is
+  pre-existing (red on both PR #64 heads, merge state CLEAN), not merge-blocking.
+- **Next action:** push FT2 commit → re-watch PR #65 to green (poll the new sha's
+  check-run count >0 before `gh pr checks --watch` — the old-sha rollup race) → user
+  merge decision (minor release on merge; CHANGELOG carries the commit-msg-hook operator
+  note).
 
 ## Previous — TLC 3.3.0 Harness Update (VALIDATED PASS 2026-08-04 incl. Phase 5 amendment + FT6 delivery repair; MERGED as PR #64 @ `e932a673` 2026-08-04)
 - **Phase 5 (user amendment):** ALL-workflows rules (verify-don't-assume + docs-are-leads +

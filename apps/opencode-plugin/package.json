@@ -16,7 +16,7 @@
     "start": "bun run src/index.ts",
     "build": "bun build src/index.ts src/config-cli.ts --outdir=dist --target=bun",
     "type-check": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test __tests__ src/__tests__"
   },
   "dependencies": {
     "@opencode-ai/plugin": "^1.2.15",

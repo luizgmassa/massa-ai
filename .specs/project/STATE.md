@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Python→TypeScript Scripts + Lessons Single-Store (**VALIDATED PASS 2026-08-04 — T1-T12 + FT1, 2 verification iterations; delivery authorized, merge = user's decision**)
+## Current — Python→TypeScript Scripts + Lessons Single-Store (**VALIDATED PASS 2026-08-04 — T1-T12 + FT1-FT2 (FT2 = delivery repair 1), 2 verification iterations; PR #65 open, merge = user's decision**)
 
 - **Validation:** independent verifier (deep tier) iteration 1 FAIL (1 critical gap:
   mutation (b) — naive rounding for `roundHalfEven2` — survived the whole delivered gate
@@ -50,9 +50,29 @@
   `generate-skill-artifacts.ts --check`, `generate-subagent-artifacts.ts --check`, the four
   ported validators + `check_specs_delivered.ts` dogfooded against this feature.
 - massa-ai MCP server unreachable this session; `.specs/` files canonical per contract.
-- Next action: push + `gh pr create` (delivery authorized this session) → CI watch to
-  green → merge decision to the user (minor release on merge). `check_specs_delivered.ts`
-  + `validate_state.ts` both exit 0 on the close-out commit.
+- **Delivery repair 1 (FT2, post-`e6d8362a`):** PR #65 CI red on `e6d8362a` — `build`
+  (run 30952327811, `Test` step) and `coverage` (run 30952330241) both failed on the one
+  turbo task `@massa-ai/opencode-plugin#test`; `mcp`/`install-test` skipped downstream
+  (the `github-advanced-security` check-run failure is pre-existing — red on both PR #64
+  heads too, merge state CLEAN — not this branch's doing). Root cause (log-verified and
+  reproduced locally): Bun test discovery matches any file ending `_spec.ts`; the
+  migration shipped `validate_spec.ts` into the plugin's bundled `skills/` tree, and
+  opencode-plugin is the only plugin declaring its own `test` script — its bare
+  package-wide `bun test` walked the bundle, loaded the CLI as a test module, and died on
+  its usage error. The old `.py` was invisible to discovery; local gates missed it
+  because the feature's scoped set ran `test:scripts`, never turbo `bun run test` —
+  lesson L-007's blind-spot class. Fix FT2 (tasks.md Phase 6): `"test": "bun test
+  __tests__ src/__tests__"` — the package's two real test dirs, find-verified, nothing
+  that ever ran excluded. Gates re-run, each command's own exit code, no pipes:
+  turbo-filtered `@massa-ai/opencode-plugin#test` 0 (124/0 across the same 6 files),
+  `test:scripts` 0 (1323/0 TS + shell suites), `lint` 0, `validate_tasks.ts` 0 errors.
+  One atomic FT2 commit (package.json + tasks.md + STATE + HANDOFF,
+  status-before-commit); no verifier re-dispatch for a delivery-stage repair (precedent:
+  tlc-330 FT6) — CI green is the gate.
+- Next action: push FT2 → re-watch PR #65 to green (poll the new sha's check-run count
+  >0 before `gh pr checks --watch` — the old-sha rollup race) → merge decision to the
+  user (minor release on merge). `check_specs_delivered.ts` + `validate_state.ts` both
+  exit 0 on the close-out commit.
 
 ## Previous — TLC 3.3.0 Harness Update (**VALIDATED PASS 2026-08-04 — T1-T22 + FT1-FT6 (FT6 = delivery repair 1), 5 verification iterations; MERGED as PR #64 @ `e932a673` 2026-08-04, release chain fired on green main CI**)
 - **Phase 5 amendment (user, post-PR#64-green):** ALLWF-01/02 Core Contract rules + KVC
