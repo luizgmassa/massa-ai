@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Python→TypeScript Scripts + Lessons Single-Store (**VALIDATED PASS 2026-08-04 — T1-T12 + FT1-FT2 (FT2 = delivery repair 1), 2 verification iterations; PR #65 open, merge = user's decision**)
+## Current — Python→TypeScript Scripts + Lessons Single-Store (**VALIDATED PASS 2026-08-04 — T1-T12 + FT1-FT3 (FT2-FT3 = delivery repairs 1-2), 2 verification iterations; PR #65 open, merge = user's decision**)
 
 - **Validation:** independent verifier (deep tier) iteration 1 FAIL (1 critical gap:
   mutation (b) — naive rounding for `roundHalfEven2` — survived the whole delivered gate
@@ -69,7 +69,24 @@
   One atomic FT2 commit (package.json + tasks.md + STATE + HANDOFF,
   status-before-commit); no verifier re-dispatch for a delivery-stage repair (precedent:
   tlc-330 FT6) — CI green is the gate.
-- Next action: push FT2 → re-watch PR #65 to green (poll the new sha's check-run count
+- **Delivery repair 2 (FT3, post-`46f7e581`):** FT2 turned `build` green; `coverage`
+  (run 30953865966) stayed red — one root cause, but a **second discovery mechanism**,
+  not a second venue of the same one: `check-coverage.ts`'s opencode-plugin UNITS entry
+  spawns its own bare `bun test --coverage` in the package cwd and never consults the
+  package.json `test` script FT2 scoped, so the coverage walk still loaded the bundled
+  `validate_spec.ts` (`suite exited 2`, no lcov.info — same usage-error signature).
+  Found by enumerating every bare `bun test` call site instead of re-reading FT2's
+  resolution; populations in tasks.md FT3 (3 of 6 UNITS entries bare; `*_spec.ts` per
+  unit dir 0,0,0,0,0,1 — opencode-plugin the single live site; `test:plugins` /
+  `test:scripts` dir-targeted, safe). Fix: the unit command mirrors the package's own
+  test script (`bun test __tests__ src/__tests__ --coverage …`). Evidence: observed
+  red→green on the exact unit command (bare exit 2, no lcov, CI-identical signature →
+  scoped exit 0, lcov.info, 124/0); venue mirror `bun run test:coverage
+  apps/opencode-plugin` against the dedicated 5433 DB exit 0 — merged 1 lcov, 4 source
+  files measured, floor PASS. Gates re-run, own exit codes: check-coverage.test solo
+  23/0, `test:scripts` 0 (1323/0), `lint` 0, `validate_tasks.ts` 0 errors. One atomic
+  FT3 commit; still no verifier re-dispatch (delivery-stage repair).
+- Next action: push FT3 → re-watch PR #65 to green (poll the new sha's check-run count
   >0 before `gh pr checks --watch` — the old-sha rollup race) → merge decision to the
   user (minor release on merge). `check_specs_delivered.ts` + `validate_state.ts` both
   exit 0 on the close-out commit.

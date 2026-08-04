@@ -13,7 +13,7 @@ Phase 2: T3
 Phase 3: T4 ──→ T5 ──→ T6 ──→ T7 ──→ T8 ──→ T9
 Phase 4: T10 ──→ T11 ──→ T12
 Phase 5: FT1
-Phase 6: FT2
+Phase 6: FT2, FT3
 ```
 
 Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py, never the render path). Phase 3 depends on Phase 2 (every port runs the dual-run gate). Phase 4 depends on Phase 3 (the global sweep needs all skill ports landed).
@@ -167,4 +167,12 @@ Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py
 **Depends on**: FT1
 **Tests**: `bunx turbo run test --filter=@massa-ai/opencode-plugin --force` exit 0 — 124/0 across the same 6 files the dir walk finds
 **Gate**: turbo-filtered task 0 + `test:scripts` 0 + `lint` 0; PR #65 checks re-watched to green
+**Status**: [x]
+
+### FT3: Scope the coverage gate's opencode-plugin unit off the bundled _spec.ts
+**Where**: `scripts/check-coverage.ts`
+**What**: FT2 turned `build` green but PR #65 `coverage` stayed red on `46f7e581` (run 30953865966): `check-coverage.ts`'s UNITS entry for apps/opencode-plugin spawns its own bare `bun test --coverage` in the package cwd — it never consults the package.json `test` script FT2 scoped, so the coverage walk still loaded the bundled `skills/massa-ai/scripts/validate_spec.ts` and died on its usage error (`suite exited 2`, no lcov.info). Same root cause, second discovery mechanism — found by enumerating every bare `bun test` spawn rather than re-reading FT2's resolution: populations printed — 3 of 6 UNITS entries are bare (`packages/shared`, `apps/web-ui`, `apps/opencode-plugin`), and `*_spec.ts` counts per unit dir are 0,0,0,0,0,1 — only opencode-plugin carries one (the bundled validate_spec.ts), so it is the single live site; `test:plugins` and `test:scripts` are dir-targeted (safe). Fix: the unit command mirrors the package's own test script — `bun test __tests__ src/__tests__ --coverage --coverage-reporter=lcov --coverage-dir=coverage`.
+**Depends on**: FT2
+**Tests**: observed red→green on the exact unit command in the plugin cwd — bare walk exit 2, no lcov.info, the same `validate_spec: could not locate a spec.md` signature as the CI log → scoped command exit 0, lcov.info produced, 124/0 across the same 6 files. Venue mirror: `MASSA_AI_DEDICATED=1 DATABASE_URL=<dedicated 5433> bun run test:coverage apps/opencode-plugin` exit 0 — merged 1 lcov file, 4 source files measured, floor PASS.
+**Gate**: `test:scripts` 0 + `lint` 0 + `validate_tasks.ts` 0 errors; PR #65 checks re-watched to green
 **Status**: [x]

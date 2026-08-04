@@ -254,7 +254,19 @@ const UNITS: CoverageUnit[] = [
   {
     name: "apps/opencode-plugin",
     cwd: "apps/opencode-plugin",
-    command: ["bun", "test", "--coverage", "--coverage-reporter=lcov", "--coverage-dir=coverage"],
+    // Scoped to the package's two real test dirs, mirroring its own `test`
+    // script: a bare walk also loads the bundled skills/ tree, where
+    // `validate_spec.ts` matches Bun's `*_spec.ts` discovery and dies on its
+    // CLI usage error (PR #65 FT3).
+    command: [
+      "bun",
+      "test",
+      "__tests__",
+      "src/__tests__",
+      "--coverage",
+      "--coverage-reporter=lcov",
+      "--coverage-dir=coverage",
+    ],
     coverageDir: "coverage",
   },
 ];

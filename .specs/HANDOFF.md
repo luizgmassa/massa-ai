@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Python→TypeScript Scripts + Lessons Single-Store (VALIDATED PASS 2026-08-04 — T1-T12 + FT1-FT2 (FT2 = delivery repair 1), 2 verification iterations; PR #65 open, merge = user's decision)
+## Active — Python→TypeScript Scripts + Lessons Single-Store (VALIDATED PASS 2026-08-04 — T1-T12 + FT1-FT3 (FT2-FT3 = delivery repairs 1-2), 2 verification iterations; PR #65 open, merge = user's decision)
 
 - **Validation:** iteration 1 FAIL (critical: round-half-even sensor not standing after
   T11's harness deletion — F1's "exercised, not assumed") → FT1 `67e769ca` (mutating
@@ -44,7 +44,16 @@
   `lint` 0, `validate_tasks.ts` 0 errors. No verifier re-dispatch (delivery-stage
   repair — tlc-330 FT6 precedent). The `github-advanced-security` check-run failure is
   pre-existing (red on both PR #64 heads, merge state CLEAN), not merge-blocking.
-- **Next action:** push FT2 commit → re-watch PR #65 to green (poll the new sha's
+- **Delivery repair 2 (FT3):** FT2's fix covered only the turbo venue — `coverage`
+  stayed red on `46f7e581` (the FT2 commit itself) because `check-coverage.ts`'s
+  opencode-plugin UNITS entry spawns its own bare `bun test --coverage` (second
+  discovery mechanism; package.json `test` never consulted). Fix: unit command scoped
+  to `__tests__ src/__tests__` mirroring the package test script (FT3, tasks.md Phase
+  6 — full record in STATE.md). Observed red→green locally on the exact unit command;
+  venue mirror `test:coverage apps/opencode-plugin` (dedicated DB) floor PASS. Gates:
+  check-coverage.test solo 23/0, `test:scripts` 0 (1323/0), `lint` 0,
+  `validate_tasks.ts` 0 errors.
+- **Next action:** push FT3 commit → re-watch PR #65 to green (poll the new sha's
   check-run count >0 before `gh pr checks --watch` — the old-sha rollup race) → user
   merge decision (minor release on merge; CHANGELOG carries the commit-msg-hook operator
   note).
