@@ -60,6 +60,14 @@ Before reading any massa-ai file:
 - Persist only durable, useful knowledge. Do not fabricate memories to satisfy
   process. Use `memory_update` to correct stale memories and `memory_delete`
   to remove obsolete ones.
+- Expand every word abbreviation on first use in user-facing output — e.g.
+  "PR (Pull Request)", "AC (Acceptance Criteria)", "KMP (Kotlin Multiplatform)"
+  — including workflow-specific shorthands and finding-ID families.
+- Use one uniform vocabulary for separating batches of work in every workflow:
+  a **Task** is the atomic unit; a **Phase** is an ordered group of Tasks.
+  Report a phase's size as `1 Phase = X Tasks` and a plan's total as
+  `Y Phases = Z Tasks`. Do not substitute synonyms such as batch, wave, stage,
+  or chunk for these units in agent prose.
 - Emit concise user-facing status updates at meaningful workflow boundaries
   when the Conversation Feedback Policy is active.
 - Verify, don't assume: every factual claim that drives a decision is
