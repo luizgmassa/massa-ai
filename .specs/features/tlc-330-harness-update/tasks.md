@@ -206,4 +206,4 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: FT1
 **Tests**: new diverging-verdict fixture red-before/green-after
 **Gate**: validator suite green
-**Status**: [ ]
+**Status**: [x]

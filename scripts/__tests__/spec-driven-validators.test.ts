@@ -495,6 +495,38 @@ describe("validate_state.py (T4, SYNC-01 AC4)", () => {
     expect(r.stdout).toContain("verdict is FAIL");
   });
 
+  test("Summary FAIL with a diverging sensor PASS sub-line reads as FAIL, not unfilled (FT2)", () => {
+    const root = makeTempRoot("validate-state-diverging");
+    writeFeatureFile(root, "my-feature", "tasks.md", DONE_TASKS_MD);
+    // Realistic report shape: overall verdict FAIL for a gap unrelated to the
+    // sensor, while the Discrimination Sensor's own Result sub-line says PASS.
+    // An unscoped whole-document scan sees both words and misreads this as an
+    // unfilled "[PASS | FAIL]" template placeholder.
+    writeFeatureFile(
+      root,
+      "my-feature",
+      "validation.md",
+      [
+        "# My Feature Validation",
+        "",
+        "## Summary",
+        "",
+        "**Result**: FAIL",
+        "",
+        "## Discrimination Sensor",
+        "",
+        "**Result**: 3/3 killed — PASS ✅",
+        "",
+        "Evidence: src/thing.ts:42",
+        "",
+      ].join("\n"),
+    );
+    const r = runPy(VALIDATE_STATE, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("verdict is FAIL");
+    expect(r.stdout).not.toContain("template placeholder");
+  });
+
   test("unfilled template placeholder verdict exits 1", () => {
     const root = makeTempRoot("validate-state-unfilled");
     writeFeatureFile(root, "my-feature", "tasks.md", DONE_TASKS_MD);

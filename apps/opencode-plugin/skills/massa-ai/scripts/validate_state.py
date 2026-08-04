@@ -52,14 +52,34 @@ def _feature_dirs(root):
 
 def _verdict(text):
     """Return 'pass', 'fail', 'unfilled', or None from a validation report."""
-    # Look at the '## Validation' heading first, then a '**Result**' line.
     lines = text.splitlines()
+    # Scope to the '## Summary' section when it carries its own Result line:
+    # the Discrimination Sensor's per-mutation `**Result**:` sub-line elsewhere
+    # in the report can carry the opposite word (sensor PASS, overall FAIL) and
+    # must not collide with the report verdict.
+    summary_lines = []
+    in_summary = False
+    for ln in lines:
+        stripped = ln.strip()
+        if re.match(r"^#{1,4}\s*summary\b", stripped, re.IGNORECASE):
+            in_summary = True
+            continue
+        if in_summary and re.match(r"^#{1,4}\s", stripped):
+            break
+        if in_summary:
+            summary_lines.append(ln)
+    result_re = r"\*{0,2}result\*{0,2}\s*:"
+    if any(re.search(result_re, ln.strip(), re.IGNORECASE) for ln in summary_lines):
+        scope = summary_lines
+    else:
+        scope = lines
+    # Look at the '## Validation' heading first, then a '**Result**' line.
     candidates = [
-        ln for ln in lines
+        ln for ln in scope
         if re.search(r"^#{1,4}\s*validation\b", ln.strip(), re.IGNORECASE)
-        or re.search(r"\*{0,2}result\*{0,2}\s*:", ln.strip(), re.IGNORECASE)
+        or re.search(result_re, ln.strip(), re.IGNORECASE)
     ]
-    hay = " ".join(candidates) if candidates else text
+    hay = " ".join(candidates) if candidates else "\n".join(scope)
     has_pass = re.search(r"\bPASS\b", hay) is not None
     has_fail = re.search(r"\bFAIL\b", hay) is not None
     if has_pass and has_fail:
