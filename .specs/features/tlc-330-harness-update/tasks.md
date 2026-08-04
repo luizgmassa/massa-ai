@@ -121,7 +121,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T4
 **Tests**: sweep — `git stash` appears only as forbidden; template line matches `validate_state.py` regex (executed against a rendered fixture)
 **Gate**: sweep + fixture check green
-**Status**: [ ]
+**Status**: [x]
 
 ### T11: sub-agents.md — stash ban + threshold + tier rubric
 **Where**: `skills/massa-ai/references/spec-driven/sub-agents.md`
