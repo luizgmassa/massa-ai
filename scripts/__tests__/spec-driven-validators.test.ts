@@ -6,7 +6,7 @@
  * `bun test scripts/__tests__/spec-driven-validators.test.ts`.
  */
 import { describe, expect, test, afterEach } from "bun:test";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -543,5 +543,85 @@ describe("validate_state.py (T4, SYNC-01 AC4)", () => {
     expect(r.exitCode).toBe(1);
     expect(r.stdout).toContain("feature-b");
     expect(r.stdout).not.toContain("verdict is FAIL across [feature-a");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C5 (Plan Challenge, GEN-02 AC2): template-conformance tests. Extract each
+// validator's required-section/field expectations and assert the live
+// template blocks in specify.md/tasks.md/validate.md still satisfy them, so a
+// future edit to those templates that breaks a validator's structural
+// assumptions fails HERE in test:scripts instead of silently drifting.
+// ---------------------------------------------------------------------------
+
+/** Extract the fenced ```markdown block that follows the first line containing `headingMarker`. */
+function extractFencedMarkdownBlock(fileContent: string, headingMarker: string): string {
+  const lines = fileContent.split("\n");
+  const headingIdx = lines.findIndex((l) => l.includes(headingMarker));
+  if (headingIdx === -1) {
+    throw new Error(`heading marker not found: ${headingMarker}`);
+  }
+  const fenceStart = lines.findIndex((l, i) => i > headingIdx && l.trim() === "```markdown");
+  if (fenceStart === -1) {
+    throw new Error(`no \`\`\`markdown fence found after heading: ${headingMarker}`);
+  }
+  const fenceEnd = lines.findIndex((l, i) => i > fenceStart && l.trim() === "```");
+  if (fenceEnd === -1) {
+    throw new Error(`unterminated \`\`\`markdown fence after heading: ${headingMarker}`);
+  }
+  return lines.slice(fenceStart + 1, fenceEnd).join("\n");
+}
+
+const SPECIFY_MD = readFileSync(join(REPO_ROOT, "skills/massa-ai/references/spec-driven/specify.md"), "utf-8");
+const TASKS_REF_MD = readFileSync(join(REPO_ROOT, "skills/massa-ai/references/spec-driven/tasks.md"), "utf-8");
+const VALIDATE_REF_MD = readFileSync(join(REPO_ROOT, "skills/massa-ai/references/spec-driven/validate.md"), "utf-8");
+
+// Mirrors validate_spec.py's REQUIRED_SECTIONS / validate_tasks.py's REQUIRED_SECTIONS.
+// Kept literal (not re-parsed from the .py source) so a future validator edit that
+// silently drops a required section is also visible in this test's own diff.
+const VALIDATE_SPEC_REQUIRED_SECTIONS = [
+  "Problem Statement",
+  "Out of Scope",
+  "Assumptions & Open Questions",
+  "User Stories",
+  "Requirement Traceability",
+];
+const VALIDATE_TASKS_REQUIRED_SECTIONS = ["Test Coverage Matrix", "Gate Check Commands", "Execution Plan", "Task Breakdown"];
+
+describe("template-conformance (C5, GEN-02 AC2)", () => {
+  test("specify.md's spec.md template block satisfies validate_spec.py's REQUIRED_SECTIONS", () => {
+    const template = extractFencedMarkdownBlock(SPECIFY_MD, "## Template: `.specs/features/<slug>/spec.md`");
+    for (const section of VALIDATE_SPEC_REQUIRED_SECTIONS) {
+      expect(template).toContain(`## ${section}`);
+    }
+    // Run the real validator against the extracted template as a fixture and
+    // assert none of validate_spec.py's "missing required section" errors fire.
+    const root = makeTempRoot("c5-spec-template");
+    writeFeatureFile(root, "template-feature", "spec.md", template);
+    const r = runPy(VALIDATE_SPEC, ["--root", root]);
+    expect(r.stdout).not.toContain("missing required section");
+  });
+
+  test("tasks.md's tasks.md template block satisfies validate_tasks.py's REQUIRED_SECTIONS", () => {
+    const template = extractFencedMarkdownBlock(TASKS_REF_MD, "## Template: `.specs/features/<slug>/tasks.md`");
+    for (const section of VALIDATE_TASKS_REQUIRED_SECTIONS) {
+      expect(template).toMatch(new RegExp(`#{1,4}\\s+${section}\\b`));
+    }
+    const root = makeTempRoot("c5-tasks-template");
+    writeFeatureFile(root, "template-feature", "tasks.md", template);
+    const r = runPy(VALIDATE_TASKS, ["--root", root]);
+    expect(r.stdout).not.toContain("missing required section");
+  });
+
+  test("validate.md's validation.md report template satisfies validate_state.py's verdict + evidence detection", () => {
+    const template = extractFencedMarkdownBlock(VALIDATE_REF_MD, "## Validation Report Template (`.specs/features/<slug>/validation.md`)");
+    // validate_state.py's _verdict() only scans lines matching either the
+    // '## Validation' heading shape or a '**Result**:' line.
+    const verdictCandidateRe = /^#{1,4}\s*validation\b/im;
+    const resultLineRe = /\*{0,2}result\*{0,2}\s*:/im;
+    expect(verdictCandidateRe.test(template) || resultLineRe.test(template)).toBe(true);
+    // EVIDENCE_RE: a file:line citation must be structurally representable in the template.
+    const evidenceRe = /[\w./-]+\.[A-Za-z0-9]+:\d+/;
+    expect(evidenceRe.test(template)).toBe(true);
   });
 });
