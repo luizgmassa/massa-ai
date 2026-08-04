@@ -57,6 +57,7 @@ function runPy(scriptRelPath: string, args: string[], cwd: string = REPO_ROOT): 
 
 const VALIDATE_SPEC = "skills/massa-ai/scripts/validate_spec.py";
 const VALIDATE_TASKS = "skills/massa-ai/scripts/validate_tasks.py";
+const CHECK_COMMIT = "skills/massa-ai/scripts/check_commit.py";
 
 // ---------------------------------------------------------------------------
 // T1: validate_spec.py (SYNC-01 AC1)
@@ -328,5 +329,79 @@ T1 → T2
     const r = runPy(VALIDATE_TASKS, ["--root", root]);
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain("diagram arrows not parsed confidently");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T3: check_commit.py (SYNC-01 AC3)
+// ---------------------------------------------------------------------------
+
+function runCheckCommit(message: string): PyResult {
+  return runPy(CHECK_COMMIT, ["--message", message]);
+}
+
+describe("check_commit.py (T3, SYNC-01 AC3)", () => {
+  test("valid Conventional Commits header exits 0", () => {
+    const r = runCheckCommit("feat(auth): add email validation");
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("check_commit: OK");
+  });
+
+  test("valid massa-ai [KEY] feat(x): y prefixed header exits 0", () => {
+    const r = runCheckCommit("[SA-142] feat(auth): reject expired tokens");
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("check_commit: OK");
+  });
+
+  test("valid [KEY] prefixed header from spec's own example exits 0", () => {
+    const r = runCheckCommit("[SA-142] fix(auth): reject expired tokens");
+    expect(r.exitCode).toBe(0);
+  });
+
+  test("non-Conventional-Commit header exits 1", () => {
+    const r = runCheckCommit("updated the auth module");
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("does not match");
+  });
+
+  test("disallowed type exits 1", () => {
+    const r = runCheckCommit("feature(auth): add email validation");
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("is not one of");
+  });
+
+  test("uppercase description start exits 1", () => {
+    const r = runCheckCommit("feat(auth): Add email validation");
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("should start lowercase");
+  });
+
+  test("description ending with a period exits 1", () => {
+    const r = runCheckCommit("feat(auth): add email validation.");
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("should not end with a period");
+  });
+
+  test("breaking marker without BREAKING CHANGE footer exits 1", () => {
+    const r = runCheckCommit("feat(auth)!: change token format");
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("BREAKING CHANGE");
+  });
+
+  test("breaking marker with BREAKING CHANGE footer exits 0", () => {
+    const r = runCheckCommit("feat(auth)!: change token format\n\nBREAKING CHANGE: tokens are now opaque");
+    expect(r.exitCode).toBe(0);
+  });
+
+  test("empty message exits 2 (usage error)", () => {
+    const r = runCheckCommit("");
+    expect(r.exitCode).toBe(2);
+  });
+
+  test("header over 72 chars only warns, does not fail an otherwise-valid header", () => {
+    const longDesc = "a".repeat(70);
+    const r = runCheckCommit(`feat(auth): ${longDesc}`);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("WARN");
   });
 });

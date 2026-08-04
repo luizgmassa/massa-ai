@@ -63,7 +63,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T1
 **Tests**: valid/invalid/prefixed headers; breaking-marker footer rule
 **Gate**: same suite green
-**Status**: [ ]
+**Status**: [x]
 
 ### T4: Port validate_state.py
 **Where**: `skills/massa-ai/scripts/validate_state.py` (new) + tests
