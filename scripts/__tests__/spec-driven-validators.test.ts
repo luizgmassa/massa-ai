@@ -53,7 +53,7 @@ const SCRIPT_RUNTIME: Record<string, ScriptRuntime> = {
   check_commit: "bun",
   validate_state: "python",
   lessons: "python",
-  check_specs_delivered: "python",
+  check_specs_delivered: "bun",
 };
 
 // -B: never write __pycache__ into the source tree — skill-artifact --check

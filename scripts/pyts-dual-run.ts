@@ -114,6 +114,86 @@ export const REGISTRY: Record<string, ScriptEntry> = {
       { label: "no args, no stdin (usage error)", args: [] },
     ],
   },
+  check_specs_delivered: {
+    pyRel: "skills/massa-ai/scripts/check_specs_delivered.py",
+    tsRel: "skills/massa-ai/scripts/check_specs_delivered.ts",
+    invocations: () => {
+      function initGitRepo(root: string): void {
+        Bun.spawnSync(["git", "init", "-q", "-b", "main"], { cwd: root });
+        Bun.spawnSync(["git", "config", "user.email", "test@example.com"], { cwd: root });
+        Bun.spawnSync(["git", "config", "user.name", "Test"], { cwd: root });
+        Bun.spawnSync(["git", "config", "commit.gpgsign", "false"], { cwd: root });
+      }
+
+      function commitAll(root: string, message: string): void {
+        Bun.spawnSync(["git", "add", "-A"], { cwd: root });
+        Bun.spawnSync(["git", "commit", "-q", "-m", message], { cwd: root });
+      }
+
+      function writeStateFiles(root: string): void {
+        mkdirSync(join(root, ".specs", "project"), { recursive: true });
+        writeFileSync(join(root, ".specs", "project", "STATE.md"), "# State\n", "utf-8");
+        writeFileSync(join(root, ".specs", "HANDOFF.md"), "# Handoff\n", "utf-8");
+        writeFileSync(join(root, ".specs", "project", "FEATURES.json"), "{}\n", "utf-8");
+      }
+
+      const cleanRoot = makeTempRoot("dual-run-delivered-clean");
+      writeFeatureFile(cleanRoot, "my-feature", "spec.md", "# Spec\n");
+      initGitRepo(cleanRoot);
+      writeStateFiles(cleanRoot);
+      commitAll(cleanRoot, "init");
+
+      const dirtyRoot = makeTempRoot("dual-run-delivered-dirty");
+      const specPath = writeFeatureFile(dirtyRoot, "my-feature", "spec.md", "# Spec\n");
+      initGitRepo(dirtyRoot);
+      writeStateFiles(dirtyRoot);
+      commitAll(dirtyRoot, "init");
+      writeFileSync(specPath, "# Spec\n\nModified after commit, not re-committed.\n", "utf-8");
+
+      const untrackedRoot = makeTempRoot("dual-run-delivered-untracked");
+      writeFeatureFile(untrackedRoot, "my-feature", "spec.md", "# Spec\n");
+      initGitRepo(untrackedRoot);
+      writeStateFiles(untrackedRoot);
+      commitAll(untrackedRoot, "init");
+      writeFeatureFile(untrackedRoot, "my-feature", "design.md", "# Design\n"); // never `git add`ed
+
+      const absentRoot = makeTempRoot("dual-run-delivered-absent");
+      writeFeatureFile(absentRoot, "my-feature", "spec.md", "# Spec\n");
+      initGitRepo(absentRoot);
+      mkdirSync(join(absentRoot, ".specs", "project"), { recursive: true });
+      writeFileSync(join(absentRoot, ".specs", "project", "STATE.md"), "# State\n", "utf-8");
+      writeFileSync(join(absentRoot, ".specs", "HANDOFF.md"), "# Handoff\n", "utf-8");
+      commitAll(absentRoot, "init"); // FEATURES.json never written - porcelain-clean but absent
+
+      const optionalRoot = makeTempRoot("dual-run-delivered-optional");
+      writeFeatureFile(optionalRoot, "my-feature", "spec.md", "# Spec\n");
+      writeFeatureFile(optionalRoot, "my-feature", "tasks.md", "# Tasks\n");
+      initGitRepo(optionalRoot);
+      writeStateFiles(optionalRoot);
+      commitAll(optionalRoot, "init");
+
+      return [
+        { label: "clean + tracked", args: ["my-feature", "--root", cleanRoot], cwd: cleanRoot },
+        { label: "dirty modified-but-uncommitted", args: ["my-feature", "--root", dirtyRoot], cwd: dirtyRoot },
+        {
+          label: "untracked file under .specs/",
+          args: ["my-feature", "--root", untrackedRoot],
+          cwd: untrackedRoot,
+        },
+        {
+          label: "required artifact never written (absent, not dirty)",
+          args: ["my-feature", "--root", absentRoot],
+          cwd: absentRoot,
+        },
+        { label: "optional artifacts present", args: ["my-feature", "--root", optionalRoot], cwd: optionalRoot },
+        {
+          label: "live dogfood: python-to-typescript-scripts",
+          args: ["python-to-typescript-scripts", "--root", "."],
+          cwd: REPO_ROOT,
+        },
+      ];
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------
