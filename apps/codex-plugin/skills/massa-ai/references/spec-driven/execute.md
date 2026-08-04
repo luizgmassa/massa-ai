@@ -302,13 +302,13 @@ for reuse across multiple endpoints.
 - Never sneak in "while I'm here" changes.
 - If tests are part of the task, include them in the same commit.
 
-**Deterministic backing (run it, do not eyeball it):** `python3 skills/massa-ai/scripts/check_commit.py --message "<your message>"` before committing. A non-zero exit means fix the format first — this makes the format rule enforceable instead of memory-dependent. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
+**Deterministic backing (run it, do not eyeball it):** `bun skills/massa-ai/scripts/check_commit.ts --message "<your message>"` before committing. A non-zero exit means fix the format first — this makes the format rule enforceable instead of memory-dependent. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
 **Optional git-level guard (git only, no agent dependency).** In a git repo the same check can run on every commit by wiring it as a `commit-msg` hook, so a malformed message is rejected regardless of who or what drives the commit:
 
 ```bash
 # from the repo root, one time:
-ln -sf skills/massa-ai/scripts/check_commit.py .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
+ln -sf skills/massa-ai/scripts/check_commit.ts .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
 ```
 
 This is a plain git hook, not tied to any editor or assistant. Skip it if the project manages hooks its own way (for example a pre-commit framework); the manual check above still applies.

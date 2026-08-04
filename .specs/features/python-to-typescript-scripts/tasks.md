@@ -79,7 +79,7 @@ Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py
 **Depends on**: T3
 **Tests**: suite green; dual-run empty; scratch-repo hook smoke (R4)
 **Gate**: suite + dual-run + `--check` all exit 0
-**Status**: [ ]
+**Status**: [x]
 
 ### T5: Port check_specs_delivered
 **Where**: `skills/massa-ai/scripts/check_specs_delivered.ts` (new), `.py` (deleted), its prose sites (incl. `references/implementation-delivery.md:26`), suite spawns + regenerated bundles

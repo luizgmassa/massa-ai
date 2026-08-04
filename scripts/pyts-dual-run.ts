@@ -86,7 +86,35 @@ interface DualRunOutcome {
 // exists yet for any of the 8 target scripts.
 // ---------------------------------------------------------------------------
 
-export const REGISTRY: Record<string, ScriptEntry> = {};
+export const REGISTRY: Record<string, ScriptEntry> = {
+  check_commit: {
+    pyRel: "skills/massa-ai/scripts/check_commit.py",
+    tsRel: "skills/massa-ai/scripts/check_commit.ts",
+    invocations: () => [
+      { label: "valid conventional commit", args: ["--message", "feat(auth): add email validation"] },
+      {
+        label: "valid jira-prefixed feat",
+        args: ["--message", "[SA-142] feat(auth): reject expired tokens"],
+      },
+      {
+        label: "valid jira-prefixed fix (spec example)",
+        args: ["--message", "[SA-142] fix(auth): reject expired tokens"],
+      },
+      { label: "non-conventional header", args: ["--message", "updated the auth module"] },
+      { label: "disallowed type", args: ["--message", "feature(auth): add email validation"] },
+      { label: "uppercase description", args: ["--message", "feat(auth): Add email validation"] },
+      { label: "period-ending description", args: ["--message", "feat(auth): add email validation."] },
+      { label: "breaking marker without footer", args: ["--message", "feat(auth)!: change token format"] },
+      {
+        label: "breaking marker with footer",
+        args: ["--message", "feat(auth)!: change token format\n\nBREAKING CHANGE: tokens are now opaque"],
+      },
+      { label: "empty message (usage error)", args: ["--message", ""] },
+      { label: "header over 72 chars (warn only)", args: ["--message", `feat(auth): ${"a".repeat(70)}`] },
+      { label: "no args, no stdin (usage error)", args: [] },
+    ],
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Process execution
