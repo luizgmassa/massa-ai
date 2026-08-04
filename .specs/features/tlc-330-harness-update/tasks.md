@@ -137,7 +137,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: none
 **Tests**: sweep — "3-4 questions" phrasing gone; pace section present; preserved sections intact
 **Gate**: sweep green
-**Status**: [ ]
+**Status**: [x]
 
 ### T13: coding-principles.md + memory.md ports
 **Where**: `skills/massa-ai/references/spec-driven/{coding-principles,memory}.md`
