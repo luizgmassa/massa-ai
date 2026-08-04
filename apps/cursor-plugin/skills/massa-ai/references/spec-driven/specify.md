@@ -9,7 +9,7 @@ If the feature has ambiguous gray areas (multiple valid approaches for user-faci
 - First user request and any supplied requirement source.
 - Current repository source and docs needed to understand scope.
 - Existing `.specs/features/<slug>/` artifacts when resuming.
-- `.specs/LESSONS.md` only when lessons are enabled by existing lesson artifacts.
+- `.specs/lessons.json` (via `lessons list`) only when lessons are enabled by existing lesson artifacts.
 
 ## Required Sections
 

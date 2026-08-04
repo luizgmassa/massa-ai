@@ -59,7 +59,7 @@ Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py
 **Depends on**: T1
 **Tests**: content sweep prints 0 + `skill-artifact-parity` green
 **Gate**: sweep 0 + `--check` exit 0
-**Status**: [ ]
+**Status**: [x]
 
 ### Phase 2: Migration harness
 

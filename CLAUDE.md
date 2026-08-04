@@ -603,7 +603,8 @@ zero publishes.
   recurring measurement-defect classes and their rules live there, once.
 - `.specs/` is the source of truth for in-flight work: `project/STATE.md`,
   `project/FEATURES.json`, `HANDOFF.md`, `features/<slug>/{spec,design,tasks,validation}.md`,
-  `LESSONS.md`. Read state from these files, never from recalled memory.
+  `lessons.json` (the single lessons store; `lessons list` is the on-demand view). Read
+  state from these files, never from recalled memory.
 - Docs are layered: `README.md` = install/integration/quick-start, `FEATURES.md` = the
   complete per-feature reference, `docs/` = per-workflow guides and ADRs. Keep each rule
   in one place and link from the others.
