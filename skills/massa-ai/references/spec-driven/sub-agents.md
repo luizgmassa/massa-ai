@@ -1,6 +1,6 @@
 # Sub-Agent Delegation
 
-Use this reference during Execute when formal task planning packs into more than one task-budgeted batch (> ~8 tasks), when the user explicitly asks for delegation, or when final validation needs an independent verifier. Full mechanics for phase-batch workers and the Verifier sub-agent used during Execute.
+Use this reference during Execute when formal task planning has more than 3 tasks, when the user explicitly asks for delegation, or when final validation needs an independent verifier. Full mechanics for phase-batch workers and the Verifier sub-agent used during Execute.
 
 ## Phase-Batch Workers
 
@@ -11,15 +11,15 @@ Use this reference during Execute when formal task planning packs into more than
 
 Conflating the two (one worker per phase) is what fragments execution: a feature's dependency-layer count has nothing to do with the ideal per-worker workload. Batching by task budget separates the two concerns without breaking phases.
 
-**Trigger:** Count total tasks across all phases. If the feature packs into **more than one batch** (> ~8 tasks), offer the user phase-batch sub-agents before starting Execute. If it fits a single batch (≤ ~8 tasks), execute inline in the main window — no sub-agents spawned.
+**Trigger:** Count total tasks across all phases. If the feature has **more than 3 tasks**, offer the user phase-batch sub-agents before starting Execute — even when packing yields a single batch (a 4–8-task feature is offered as one batch worker). If the feature has 3 or fewer tasks, execute inline in the main window — no sub-agents spawned, no offer made.
 
 **Batching algorithm (task budget ≈ 7 tasks/worker, phase-aligned):**
 
 The benchmarked sweet spot is ~7 tasks of context per worker (~20 tasks → 3 workers). Pack whole phases into that budget:
 
 1. Count total tasks `T`.
-2. If `T ≤ ~8` → inline, no sub-agents.
-3. Otherwise walk phases **in order**, accumulating whole phases into the current batch. When the batch's running task count reaches ~7 **and** phases remain, close the batch and start the next.
+2. If `T ≤ 3` → inline, no sub-agents, no offer.
+3. Otherwise (even for `T` as low as 4) offer sub-agents and walk phases **in order**, accumulating whole phases into the current batch. When the batch's running task count reaches ~7 **and** phases remain, close the batch and start the next.
 4. **Never split a phase** across workers — the cut only ever lands on a phase boundary. This preserves dependency ordering and keeps a phase's tasks + shared context in one worker.
 5. If the final batch is a lone tail (1–2 tasks), fold it into the previous batch.
 
@@ -121,7 +121,7 @@ Delegated work returns through the compact summary contract above. Planning, tas
 **What the Verifier does (full process in `validate.md`):**
 
 1. **Spec-anchored coverage check** — re-derives coverage evidence-or-zero: every AC traced to `file:line` + assertion expression. For each covered criterion, confirms the test's asserted value matches the **spec-defined expected outcome** (not just that an assertion exists). Where the spec does not define a precise outcome, flags a **spec-precision gap** rather than passing silently.
-2. **Discrimination sensor** — injects a small behavior-level fault (flip a condition, change a return value, off-by-one, remove a required side effect) in a **scratch/throwaway state** (git stash or temp copy), runs the relevant tests, confirms they FAIL (kill the mutant), then discards the mutation. Tiered by risk: lightweight (1–3 mutations) for standard features; expanded (≥5 mutations or full mutation tooling) for P0/critical paths. Surviving mutants become fix tasks.
+2. **Discrimination sensor** — injects a small behavior-level fault (flip a condition, change a return value, off-by-one, remove a required side effect) in an **isolated scratch** (temporary `git worktree` or temp file copies — never `git stash`), runs the relevant tests there, confirms they FAIL (kill the mutant), discards the scratch, and verifies the real worktree's `git status --porcelain` matches the pre-sensor baseline. Tiered by risk: lightweight (1–3 mutations) for standard features; expanded (≥5 mutations or full mutation tooling) for P0/critical paths. Surviving mutants become fix tasks.
 3. Applies the **payload/conjunction rule**: checks payload fields are asserted on value/state, not just that the call occurred.
 4. **Writes the persisted report** to `.specs/features/<slug>/validation.md` — PASS/FAIL, per-AC evidence (`file:line` + assertion + spec outcome), sensor result (killed/survived per mutation), gate exit results, diff/commit range.
 5. **Returns a compact verdict in chat** to the orchestrator.
@@ -148,4 +148,29 @@ Delegated work returns through the compact summary contract above. Planning, tas
 
 ## Standalone Fallback
 
-When sub-agents are unavailable (a single agent executing the full feature), use the standalone fresh-eyes fallback: run `references/spec-driven/validate.md` as a standalone pass — clear implementation assumptions, re-read `spec.md` and the diff from scratch, apply evidence-or-zero, run the spec-anchored coverage check and discrimination sensor, write `.specs/features/<slug>/validation.md`, and report the PASS/FAIL verdict before marking the feature done.
+When sub-agents are unavailable (a single agent executing the full feature), use the standalone fresh-eyes fallback: run `references/spec-driven/validate.md` as a standalone pass — clear implementation assumptions, re-read `spec.md` and the diff from scratch, apply evidence-or-zero, run the spec-anchored coverage check and discrimination sensor, write `.specs/features/<slug>/validation.md`, then run `python3 skills/massa-ai/scripts/validate_state.py <feature> [--root .]` to confirm the report is a real PASS, and report the PASS/FAIL verdict before marking the feature done. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
+
+---
+
+## Model Tier per Role
+
+**Applies only if the harness can assign a model per sub-agent.** If it cannot, ignore this section and run everything on the default model — the workflow is correct either way. The point is to spend high-reasoning capacity where ambiguity and consequence are high, and a faster tier where the work is mechanical, instead of paying top-tier cost uniformly.
+
+massa-ai resolves the actual model per agent through `metadata.model_tier` (`light` / `standard` / `deep`) in each sub-agent's charter (`skills/agents/<name>/SKILL.md`), combined with the host and the active profile in `skills/model-profiles.json` (see `CLAUDE.md` § Agent-harness surface). This section maps role/work characteristics onto that mechanism — it is not a separate free-floating table.
+
+Judge the tier by the work in front of the role, not by the role's title:
+
+| Role / work | Characteristic | Suggested tier |
+| ----------- | -------------- | -------------- |
+| Design phase | High ambiguity, hard-to-reverse structural decisions | `deep` |
+| Batch worker — core-domain or high-ambiguity phase | Non-obvious logic, tricky edge cases, novel integration | `deep` |
+| Batch worker — mechanical phase | Entities, DTOs, config, wiring, straightforward CRUD against a settled pattern | `light` / `standard` |
+| Verifier | Adversarial reasoning: designs mutations, re-derives coverage, judges outcome precision | `deep` (always — see below) |
+| Specify / Tasks authoring | Structured but judgment-heavy | `standard` / `deep` |
+
+**Rules of thumb:**
+
+- When unsure, size up, not down. An under-powered worker on ambiguous logic produces gaps the Verifier then has to catch — more expensive than paying for reasoning once.
+- **The Verifier always runs on the deepest tier** — per project rule, `skills/agents/verification-agent/SKILL.md` pins `metadata.model_tier: deep`, structurally, not just as advisory guidance here. A weak Verifier defeats the author ≠ verifier gate.
+- Set the tier per batch, from that batch's phases. A feature can mix tiers across batches.
+- Outside the Verifier's structural pin, this table is advisory metadata only — no gate, commit, or verification step depends on it.

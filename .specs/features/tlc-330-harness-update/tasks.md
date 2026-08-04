@@ -129,7 +129,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T4
 **Tests**: content sweeps per rule
 **Gate**: sweep 0 old / new present
-**Status**: [ ]
+**Status**: [x]
 
 ### T12: discuss.md — pace system
 **Where**: `skills/massa-ai/references/spec-driven/discuss.md`
