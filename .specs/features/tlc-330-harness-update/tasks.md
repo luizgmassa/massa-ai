@@ -217,7 +217,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T18
 **Tests**: content sweep — both rules present once in Core Contract; 4 KVC sites carry the qualifier; `--check` clean
 **Gate**: sweep populations printed + `skill-artifact-parity` green
-**Status**: [ ]
+**Status**: [x]
 
 ### T20: Read-only charter tier sweep → deep
 **Where**: `skills/agents/{audit-specialist,context-curator,furps-analyst,investigator,mobile-specialist,navigator,requirements-analyst,reviewer}/SKILL.md`

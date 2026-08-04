@@ -22,7 +22,7 @@ When researching or resolving any technical question during exploration, follow 
 
 ```
 Step 1: Codebase → existing code, conventions, patterns already in use
-Step 2: Project docs → README, docs/, inline comments, .specs/project/STATE.md (Decisions)
+Step 2: Project docs (leads, not truth) → README, docs/, inline comments, .specs/project/STATE.md (Decisions) — verify against current source before relying
 Step 3: Context7 MCP → resolve library ID, then query for current API/patterns
 Step 4: Web search → official docs, reputable sources, community patterns
 Step 5: Flag as uncertain → "I'm not certain about X — here's my reasoning, but verify"

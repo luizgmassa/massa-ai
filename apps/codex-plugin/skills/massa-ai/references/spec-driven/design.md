@@ -44,7 +44,7 @@ If the feature involves unfamiliar technology, patterns, or integrations, resear
 Follow the **Knowledge Verification Chain** (see SKILL.md) in strict order:
 
 ```
-Codebase → Project docs → Context7 MCP → Web search → Flag as uncertain
+Codebase → Project docs (leads, not truth) → Context7 MCP → Web search → Flag as uncertain
 ```
 
 When verifying codebase claims, prefer the massa-ai tool chain FIRST — `list_projects`, `search`, `project_map`, `optimized_context` — before falling back to ast-grep / ripgrep / grep. Apply freshness and source-precedence rules: current source code overrides a stale index, and a stale index or durable memory never overrides current evidence. When uncertain about index freshness, read the live file directly.
@@ -110,7 +110,7 @@ When the design replaces an existing decision, never delete the old entry. Appen
 Use this order for technical claims:
 
 1. Current codebase.
-2. Project docs and approved specs.
+2. Project docs and approved specs (leads, not truth) — verify against current source before relying.
 3. Context7 MCP or available local MCP source for current library behavior when relevant.
 4. Official documentation or primary source when current APIs or external services matter.
 5. Mark uncertainty explicitly when evidence is unavailable.
