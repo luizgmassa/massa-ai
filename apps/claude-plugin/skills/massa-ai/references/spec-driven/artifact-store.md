@@ -60,7 +60,7 @@ Quick tasks are also listed in the STATE.md Quick Tasks table (see `references/s
 
 Load only what you need. Prefer metadata-only inspection before loading full content.
 
-- **Feature registry status:** `cat .specs/project/FEATURES.json | python3 -c "import json,sys; d=json.load(sys.stdin); print('active:', d.get('active_feature')); [print(f['id'], f['status']) for f in d.get('features',[])]"`
+- **Feature registry status:** `bun -e "const d=await Bun.file('.specs/project/FEATURES.json').json(); console.log('active:', d.active_feature); for (const f of d.features??[]) console.log(f.id, f.status);"`
 - **Full feature registry:** `cat .specs/project/FEATURES.json`
 - **Project state:** `cat .specs/project/STATE.md`
 - **Handoff:** `cat .specs/HANDOFF.md`
@@ -69,12 +69,12 @@ Load only what you need. Prefer metadata-only inspection before loading full con
 
 ## Writing Artifacts
 
-Write artifacts directly to `.specs/` files. Use a here-doc or `printf` for Markdown, or `python3 -c` for JSON mutations.
+Write artifacts directly to `.specs/` files. Use a here-doc or `printf` for Markdown, or `bun -e` for JSON mutations.
 
 - **Update state:** `printf '...' > .specs/project/STATE.md`
 - **Update handoff:** `printf '...' > .specs/HANDOFF.md`
 - **Write feature artifact:** `printf '...' > .specs/features/<slug>/design.md`
-- **Update feature registry:** use `python3 -c` to read-modify-write `FEATURES.json`
+- **Update feature registry:** use `bun -e` to read-modify-write `FEATURES.json`
 
 Feature activate/complete flows update `.specs/project/FEATURES.json`, `.specs/project/STATE.md`, and `.specs/HANDOFF.md` through file writes.
 

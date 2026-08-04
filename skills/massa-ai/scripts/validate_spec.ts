@@ -49,7 +49,7 @@ void STATUS_VALUES;
 /**
  * Mirrors Python's os.path.join(): unlike node:path's join(), it does NOT
  * normalize away a leading "." segment (os.path.join(".", "a") === "./a",
- * node's join(".", "a") === "a") - divergence risk since validate_spec.py's
+ * node's join(".", "a") === "a") - divergence risk since this script's
  * default --root "." is never abspath()'d, so a joined path can be printed
  * or matched literally with the leading "./" intact.
  */

@@ -137,7 +137,7 @@ Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py
 **Depends on**: T10
 **Tests**: golden suite green replaying all captured pairs; all three sweeps print 0; `test:scripts` green without the harness
 **Gate**: sweeps 0 + suite exit 0
-**Status**: [ ]
+**Status**: [x]
 
 ### T12: CHANGELOG, close-out, delivery gate
 **Where**: `CHANGELOG.md`, `.specs/project/STATE.md`, `.specs/HANDOFF.md`, `.specs/project/FEATURES.json`

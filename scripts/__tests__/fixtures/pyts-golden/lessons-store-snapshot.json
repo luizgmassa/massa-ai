@@ -1,0 +1,340 @@
+{
+  "schema": 1,
+  "promote_threshold": 2,
+  "window_days": 45,
+  "quarantine_threshold": 2,
+  "next_id": 16,
+  "lessons": [
+    {
+      "id": "L-001",
+      "key": "surviving_mutant::union guard missing suite path has no discriminating test no test injects a suite into suite table but not into results add a mock drop test asserting exit 1 union guard fail",
+      "text": "UNION GUARD missing-suite path has no discriminating test. No test injects a suite into SUITE_TABLE but not into results. Add a mock-drop test asserting exit 1 + UNION GUARD FAIL.",
+      "signal": "surviving_mutant",
+      "scope": "test-strength",
+      "status": "confirmed",
+      "features": [
+        "wave-6-architecture-features",
+        "da-inventory-closure"
+      ],
+      "recurrence": 2,
+      "harmful": 0,
+      "evidence": [
+        "scripts/run-tests-parallel.ts:243-257 + scripts/__tests__/run-tests-parallel.test.ts:69-74 (test-strength)",
+        "scripts/run-tests-parallel.ts:328 return-1 deletion survived all pre-existing tests (10p/0f on them); killed by the DI-02 drop-seam test (test-strength)"
+      ],
+      "created": "2026-07-22T21:39:38Z",
+      "last_seen": "2026-08-03T23:36:28Z",
+      "confidence": 1.0,
+      "project": "massa-ai",
+      "session": "spec-da-inventory-closure",
+      "workflow": "spec-driven",
+      "entity": "da-inventory-closure"
+    },
+    {
+      "id": "L-002",
+      "key": "surviving_mutant::hook binary tests assert exit 0 only never post body endpoint count removing second pre compact post survived add capture server test verifying 2 posts to correct endpoints body shapes",
+      "text": "Hook binary tests assert exit 0 only, never POST body/endpoint/count. Removing second pre-compact POST survived. Add capture-server test verifying 2 POSTs to correct endpoints + body shapes.",
+      "signal": "surviving_mutant",
+      "scope": "test-strength",
+      "status": "candidate",
+      "features": [
+        "wave-6-architecture-features"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "apps/claude-plugin/hooks/massa-ai-hook.ts:219-227 + apps/claude-plugin/hooks/__tests__/massa-ai-hook.test.ts (test-strength)"
+      ],
+      "created": "2026-07-22T21:39:38Z",
+      "last_seen": "2026-07-22T21:39:38Z",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-003",
+      "key": "ac_gap::m25 name tail resolution has 0 behavior tests test only checks method exists add tests mocking listworkspaces asserting unique ambiguous not found paths",
+      "text": "M25 name-tail resolution has 0 behavior tests. Test only checks method exists. Add tests mocking listWorkspaces asserting unique/ambiguous/not-found paths.",
+      "signal": "ac_gap",
+      "scope": "test-coverage",
+      "status": "candidate",
+      "features": [
+        "wave-6-architecture-features"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "packages/core/src/__tests__/m25-m26-resolution-serialize.test.ts:101-107 (test-coverage)"
+      ],
+      "created": "2026-07-22T21:39:38Z",
+      "last_seen": "2026-07-22T21:39:38Z",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-004",
+      "key": "gate_fail::n20 crash test assumes architecture map fails with database url empty but it passes via sqlite fallback test gets exit 0 expects non zero rewrite to use genuinely failing suite or wire unused crashtest variable",
+      "text": "N20 crash test assumes architecture-map fails with DATABASE_URL empty but it passes via SQLite fallback. Test gets exit 0, expects non-zero. Rewrite to use genuinely-failing suite or wire unused crashTest variable.",
+      "signal": "gate_fail",
+      "scope": "test-design",
+      "status": "candidate",
+      "features": [
+        "wave-6-architecture-features"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "scripts/__tests__/run-tests-parallel.test.ts:113 (test-design)"
+      ],
+      "created": "2026-07-22T21:39:38Z",
+      "last_seen": "2026-07-22T21:39:38Z",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-005",
+      "key": "surviving_mutant::when a unit test bypasses a version gate threshold via a testing seam setjsonschemasupportedfortesting the threshold logic checkjsonschemasupport minor 5 is uncovered add direct tests of the version parser with mocked version strings 0 5 0 0 4 9 1 0 0 garbage so threshold regressions are caught",
+      "text": "When a unit test bypasses a version-gate threshold via a testing seam (_setJsonSchemaSupportedForTesting), the threshold logic (_checkJsonSchemaSupport minor >= 5) is uncovered. Add direct tests of the version parser with mocked version strings (0.5.0, 0.4.9, 1.0.0, garbage) so threshold regressions are caught.",
+      "signal": "surviving_mutant",
+      "scope": "packages/core",
+      "status": "candidate",
+      "features": [
+        "wave-7-hygiene-ui-process"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "packages/core/src/__tests__/llm-client-json-schema.test.ts:62-69 (packages/core)"
+      ],
+      "created": "2026-07-22T23:54:13Z",
+      "last_seen": "2026-07-22T23:54:13Z",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-006",
+      "key": "gate_fail::codeql pr check treats a flagged pattern on any diff touched line as a new alert even when the pattern is unchanged and only moved security fixes that refactor flagged regex code must expect the gate to re fire on the branch and must eliminate the pattern class not just the originally flagged instance",
+      "text": "CodeQL PR check treats a flagged pattern on any diff-touched line as a NEW alert, even when the pattern is unchanged and only moved. Security fixes that refactor flagged regex code must expect the gate to re-fire on the branch and must eliminate the pattern class, not just the originally flagged instance.",
+      "signal": "gate_fail",
+      "scope": "",
+      "status": "candidate",
+      "features": [
+        "security-code-scanning-closeout"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "PR #48 CodeQL check, runs 90715511426/90719305396"
+      ],
+      "created": "2026-07-29T22:26:30Z",
+      "last_seen": "2026-07-29T22:26:30Z",
+      "project": "massa-ai",
+      "session": "security-fix-code-scanning",
+      "workflow": "security-fix",
+      "entity": "code-scanning",
+      "confidence": 0.53
+    },
+    {
+      "id": "L-007",
+      "key": "gate_fail::a registry count change 15 17 specialists shipped green under test scripts but ci went red the four plugin install test rosters shell installer advisories config cli help readme features marketplace copy are covered by test plugins which the local spec driven final gate did not run when a feature changes a shared cardinality run test plugins or any surface asserting the count before the local final gate not after ci",
+      "text": "A registry-count change (15→17 specialists) shipped green under test:scripts but CI went red: the four plugin install-test rosters + shell installer advisories + config-cli help + README/FEATURES/marketplace copy are covered by test:plugins, which the local spec-driven final gate did not run. When a feature changes a shared cardinality, run test:plugins (or any surface asserting the count) before the local final gate, not after CI.",
+      "signal": "gate_fail",
+      "scope": "scripts/__tests__:apps/*/install.test.ts",
+      "status": "candidate",
+      "features": [
+        "judge-with-debate"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "PR #50 build/coverage red, repair e190b43 (scripts/__tests__:apps/*/install.test.ts)"
+      ],
+      "created": "2026-07-30T12:25:12Z",
+      "last_seen": "2026-07-30T12:25:12Z",
+      "project": "massa-ai",
+      "session": "spec-judge-with-debate",
+      "workflow": "spec-driven",
+      "entity": "judge-with-debate",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-008",
+      "key": "spec_precision_gap::live multi agent protocol behavior judge with debate meta judge spec plus 3 judges plus consensus is user gated smoke only no ci sensor can execute a prose workflow so acceptance rests on charter and workflow file integrity plus discrimination sensors not runtime evidence",
+      "text": "Live multi-agent protocol behavior (judge-with-debate meta-judge spec plus 3 judges plus consensus) is user-gated smoke only: no CI sensor can execute a prose workflow, so acceptance rests on charter and workflow file integrity plus discrimination sensors, not runtime evidence.",
+      "signal": "spec_precision_gap",
+      "scope": "workflows/judge-with-debate.md:audits/judge",
+      "status": "candidate",
+      "features": [
+        "judge-with-debate"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "validation.md Addendum item 6 (workflows/judge-with-debate.md:audits/judge)"
+      ],
+      "created": "2026-07-30T12:26:06Z",
+      "last_seen": "2026-07-30T12:26:06Z",
+      "project": "massa-ai",
+      "session": "spec-judge-with-debate",
+      "workflow": "spec-driven",
+      "entity": "judge-with-debate",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-009",
+      "key": "spec_deviation::an in process self updater that fetches and applies code from the network is structurally a downloader not an update mechanism prefer printing the update command for the user to run over auto applying it",
+      "text": "An in-process self-updater that fetches and applies code from the network is structurally a downloader, not an update mechanism; prefer printing the update command for the user to run over auto-applying it.",
+      "signal": "spec_deviation",
+      "scope": "harness/self-update",
+      "status": "candidate",
+      "features": [
+        "cross-pollination-ports"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "codebase-memory-mcp PR #1316/#1332/#1338 (harness/self-update)"
+      ],
+      "created": "2026-08-03T20:59:30Z",
+      "last_seen": "2026-08-03T20:59:30Z",
+      "project": "massa-ai",
+      "session": "spec-cross-pollination-ports",
+      "workflow": "spec-driven",
+      "entity": "cross-pollination-ports",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-010",
+      "key": "spec_precision_gap::retiring a compatibility boundary env var prefix config key feature flag needs a two direction test the new name reaches its target and the old name has zero effect a one direction test still passes if the old path is silently left wired up beside the new one",
+      "text": "Retiring a compatibility boundary (env-var prefix, config key, feature flag) needs a two-direction test: the new name reaches its target AND the old name has zero effect; a one-direction test still passes if the old path is silently left wired up beside the new one.",
+      "signal": "spec_precision_gap",
+      "scope": "spec-precision/compat-boundary",
+      "status": "candidate",
+      "features": [
+        "cross-pollination-ports"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "packages/shared/src/config/__tests__/llm-env-prefix.test.ts (spec-precision/compat-boundary)"
+      ],
+      "created": "2026-08-03T20:59:38Z",
+      "last_seen": "2026-08-03T20:59:38Z",
+      "project": "massa-ai",
+      "session": "spec-cross-pollination-ports",
+      "workflow": "spec-driven",
+      "entity": "cross-pollination-ports",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-011",
+      "key": "gate_fail::ci s bun install cache race was mitigated only reactively purge and retry on failure warm the package manager cache with actions cache keyed on the lockfile hash instead and keep the purge as a fallback rather than the sole mitigation",
+      "text": "CI's Bun install-cache race was mitigated only reactively (purge-and-retry on failure); warm the package-manager cache with actions/cache keyed on the lockfile hash instead, and keep the purge as a fallback rather than the sole mitigation.",
+      "signal": "gate_fail",
+      "scope": "ci/install-cache",
+      "status": "candidate",
+      "features": [
+        "cross-pollination-ports"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        ".github/workflows/ci.yml:75 (ci/install-cache)"
+      ],
+      "created": "2026-08-03T20:59:43Z",
+      "last_seen": "2026-08-03T20:59:43Z",
+      "project": "massa-ai",
+      "session": "spec-cross-pollination-ports",
+      "workflow": "spec-driven",
+      "entity": "cross-pollination-ports",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-012",
+      "key": "gate_fail::two ci workflows test venues diverging silently isolates coverage a gated suite that skips in the blocking workflow s venue but runs in a non blocking one lets the required check report green while that suite never actually executed there assert venue parity between workflows not just presence in one",
+      "text": "Two CI workflows' test venues diverging silently isolates coverage: a gated suite that skips in the blocking workflow's venue but runs in a non-blocking one lets the required check report green while that suite never actually executed there; assert venue parity between workflows, not just presence in one.",
+      "signal": "gate_fail",
+      "scope": "ci/venue-parity",
+      "status": "candidate",
+      "features": [
+        "cross-pollination-ports"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        ".github/workflows/ci.yml + coverage.yml RUN_POSTGRES_TESTS divergence (ci/venue-parity)"
+      ],
+      "created": "2026-08-03T21:00:06Z",
+      "last_seen": "2026-08-03T21:00:06Z",
+      "project": "massa-ai",
+      "session": "spec-cross-pollination-ports",
+      "workflow": "spec-driven",
+      "entity": "cross-pollination-ports",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-013",
+      "key": "ac_gap::a type enforced sanitization boundary at a persistence insert seam needs to exist before the first real payload reaches it retrofitting it after live data has accumulated leaves every pre fix row permanently unsanitized since sanitization is write time only and does not retroactively touch existing rows",
+      "text": "A type-enforced sanitization boundary at a persistence insert seam needs to exist before the first real payload reaches it; retrofitting it after live data has accumulated leaves every pre-fix row permanently unsanitized, since sanitization is write-time only and does not retroactively touch existing rows.",
+      "signal": "ac_gap",
+      "scope": "core/security-boundary",
+      "status": "candidate",
+      "features": [
+        "cross-pollination-ports"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "packages/core/src/services/hooks/hook-service.ts:246 (core/security-boundary)"
+      ],
+      "created": "2026-08-03T21:00:12Z",
+      "last_seen": "2026-08-03T21:00:12Z",
+      "project": "massa-ai",
+      "session": "spec-cross-pollination-ports",
+      "workflow": "spec-driven",
+      "entity": "cross-pollination-ports",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-014",
+      "key": "spec_deviation::a design doc that pre assigns a decision record id ad nnn to append at execute goes stale if other features land ad entries before the deferred append runs re derive the next id at append time never trust the pre assigned number",
+      "text": "A design doc that pre-assigns a decision-record ID (AD-NNN 'to append at Execute') goes stale if other features land AD entries before the deferred append runs; re-derive the next ID at append time, never trust the pre-assigned number.",
+      "signal": "spec_deviation",
+      "scope": ".specs/project/STATE.md",
+      "status": "candidate",
+      "features": [
+        "cross-pollination-ports"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        ".specs/features/cross-pollination-ports/design.md:107 (.specs/project/STATE.md)"
+      ],
+      "created": "2026-08-03T21:30:48Z",
+      "last_seen": "2026-08-03T21:30:48Z",
+      "project": "massa-ai",
+      "session": "spec-cross-pollination-ports",
+      "workflow": "spec-driven",
+      "entity": "cross-pollination-ports",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-015",
+      "key": "gate_fail::test harnesses that spawn python3 against in repo scripts must pass b bytecode caches materialize inside generator managed subtrees and read as drift to full inventory check gates but only when suites run in the same invocation per suite runs stay green",
+      "text": "Test harnesses that spawn python3 against in-repo scripts must pass -B: bytecode caches materialize inside generator-managed subtrees and read as drift to full-inventory --check gates, but only when suites run in the same invocation - per-suite runs stay green",
+      "signal": "gate_fail",
+      "scope": "",
+      "status": "candidate",
+      "features": [
+        "tlc-330-harness-update"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "tlc-330-harness-update validation gap 1: spec-driven-validators.test.ts x skill-artifact-parity, reproduced 4/4 combined, 0/4 isolated"
+      ],
+      "created": "2026-08-04T16:18:13Z",
+      "last_seen": "2026-08-04T16:18:13Z",
+      "project": "massa-ai",
+      "session": "spec-harness-330-update",
+      "workflow": "spec-driven",
+      "entity": "tlc-330-harness-update",
+      "confidence": 0.53
+    }
+  ]
+}

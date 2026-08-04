@@ -1,0 +1,52 @@
+[
+  {
+    "label": "clean + tracked",
+    "args": [
+      "my-feature",
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 0,
+    "stdout": "\ncheck_specs_delivered: checked 4 path(s):\n  - .specs/features/my-feature/spec.md\n  - .specs/project/STATE.md\n  - .specs/HANDOFF.md\n  - .specs/project/FEATURES.json\ncheck_specs_delivered: 0 error(s)\n"
+  },
+  {
+    "label": "dirty modified-but-uncommitted",
+    "args": [
+      "my-feature",
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR uncommitted/untracked under .specs/: M .specs/features/my-feature/spec.md\n\ncheck_specs_delivered: checked 4 path(s):\n  - .specs/features/my-feature/spec.md\n  - .specs/project/STATE.md\n  - .specs/HANDOFF.md\n  - .specs/project/FEATURES.json\ncheck_specs_delivered: 1 error(s)\n"
+  },
+  {
+    "label": "untracked file under .specs/",
+    "args": [
+      "my-feature",
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR uncommitted/untracked under .specs/: ?? .specs/features/my-feature/design.md\n  ERROR not tracked on HEAD: .specs/features/my-feature/design.md\n\ncheck_specs_delivered: checked 5 path(s):\n  - .specs/features/my-feature/spec.md\n  - .specs/features/my-feature/design.md\n  - .specs/project/STATE.md\n  - .specs/HANDOFF.md\n  - .specs/project/FEATURES.json\ncheck_specs_delivered: 2 error(s)\n"
+  },
+  {
+    "label": "required artifact never written (absent, not dirty)",
+    "args": [
+      "my-feature",
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR not tracked on HEAD: .specs/project/FEATURES.json\n\ncheck_specs_delivered: checked 4 path(s):\n  - .specs/features/my-feature/spec.md\n  - .specs/project/STATE.md\n  - .specs/HANDOFF.md\n  - .specs/project/FEATURES.json\ncheck_specs_delivered: 1 error(s)\n"
+  },
+  {
+    "label": "optional artifacts present",
+    "args": [
+      "my-feature",
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 0,
+    "stdout": "\ncheck_specs_delivered: checked 5 path(s):\n  - .specs/features/my-feature/spec.md\n  - .specs/features/my-feature/tasks.md\n  - .specs/project/STATE.md\n  - .specs/HANDOFF.md\n  - .specs/project/FEATURES.json\ncheck_specs_delivered: 0 error(s)\n"
+  }
+]

@@ -285,7 +285,7 @@ delay. Preferred shell pattern:
 MASSA_AI_API_URL="${MASSA_AI_API_URL:-http://localhost:3333}"
 for i in $(seq 1 40); do
   result=$(rtk curl -s "$MASSA_AI_API_URL/api/v1/project/index/status/JOB_ID")
-  status=$(printf '%s' "$result" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['status'])")
+  status=$(printf '%s' "$result" | bun -e "console.log(JSON.parse(await Bun.stdin.text()).data.status)")
   printf '[%s] status=%s\n' "$i" "$status"
   [ "$status" = "completed" ] || [ "$status" = "failed" ] && break
   sleep 15

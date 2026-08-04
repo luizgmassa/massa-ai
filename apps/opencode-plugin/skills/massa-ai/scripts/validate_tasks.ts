@@ -57,7 +57,7 @@ function isDir(p: string): boolean {
 /**
  * Mirrors Python's os.path.join(): unlike node:path's join(), it does NOT
  * normalize away a leading "." segment (os.path.join(".", "a") === "./a",
- * node's join(".", "a") === "a") - divergence risk since validate_tasks.py's
+ * node's join(".", "a") === "a") - divergence risk since this script's
  * default --root "." is never abspath()'d.
  */
 function pyJoin(...parts: string[]): string {
