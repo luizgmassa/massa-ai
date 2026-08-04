@@ -1,6 +1,13 @@
 # massa-ai Spec State
 
-## Current — TLC 3.3.0 Harness Update (**EXECUTE COMPLETE 2026-08-04, T1-T18 of 18; validation pending — independent verifier runs next**)
+## Current — TLC 3.3.0 Harness Update (**VALIDATED PASS 2026-08-04 — T1-T18 + FT1-FT2; PR next**)
+- **Validation:** independent verifier (deep tier) iteration 1 FAIL (2 gaps: __pycache__
+  drift under combined suites — GEN-01 blocker; validate_state.py verdict collision —
+  SYNC-12 major) → FT1 `19ebe0cd` + FT2 `98f76d0f` → iteration 2 **PASS** (gaps closed,
+  mutation killed, gates 0). Report: `.specs/features/tlc-330-harness-update/validation.md`.
+  Non-blocking follow-ups recorded there: IT2-01 (validate_tasks.py FT-prefix headers fold
+  into prior task's record), IT2-02 (anchor _verdict candidate match to declaration lines).
+
 
 - projectId: `massa-ai` · parent workflowSessionId: `spec-harness-330-update` · workflow:
   spec-driven Execute (batched: 2 inline task ranges + 3 sequential batch workers, offered

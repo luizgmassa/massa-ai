@@ -1,6 +1,10 @@
 # Handoff
 
-## Active — TLC 3.3.0 Harness Update (EXECUTE COMPLETE 2026-08-04, T1-T18 of 18; validation pending)
+## Active — TLC 3.3.0 Harness Update (VALIDATED PASS 2026-08-04; PR open, merge = user's decision)
+- **Validation:** iteration 1 FAIL → FT1/FT2 (`19ebe0cd`, `98f76d0f`) → iteration 2 PASS
+  (4/4 + 1 mutations killed across iterations, gates exit 0). Follow-ups IT2-01/IT2-02 in
+  `validation.md` — future minor fix tasks, not blockers.
+
 
 - **Feature:** `tlc-330-harness-update` — port TLC 3.3.0's spec-driven harness (four
   deterministic validator scripts + `check_specs_delivered.py`, EARS ACs, discuss pace system,
