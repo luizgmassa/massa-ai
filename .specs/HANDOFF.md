@@ -1,6 +1,10 @@
 # Handoff
 
-## Active — TLC 3.3.0 Harness Update (VALIDATED PASS 2026-08-04; PR open, merge = user's decision)
+## Active — TLC 3.3.0 Harness Update (Phase 5 amendment executing 2026-08-04; PR #64 open)
+- **Phase 5 (user amendment):** ALL-workflows rules (verify-don't-assume + docs-are-leads +
+  ask-when-in-doubt in router Core Contract; 8 read-only charters → `deep`) + planned
+  `python-to-typescript-scripts` spec. T19 `e751c777`, T20 `277ec7a5`, T21 `b291b0fb`;
+  T22 close-out + iteration-3 validation in flight.
 - **Validation:** iteration 1 FAIL → FT1/FT2 (`19ebe0cd`, `98f76d0f`) → iteration 2 PASS
   (4/4 + 1 mutations killed across iterations, gates exit 0). Follow-ups IT2-01/IT2-02 in
   `validation.md` — future minor fix tasks, not blockers.

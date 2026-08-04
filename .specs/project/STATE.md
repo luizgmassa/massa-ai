@@ -1,6 +1,10 @@
 # massa-ai Spec State
 
-## Current — TLC 3.3.0 Harness Update (**VALIDATED PASS 2026-08-04 — T1-T18 + FT1-FT2; PR next**)
+## Current — TLC 3.3.0 Harness Update (**AMENDED 2026-08-04: Phase 5 T19-T22 executing; iteration-3 validation next**)
+- **Phase 5 amendment (user, post-PR#64-green):** ALLWF-01/02 Core Contract rules + KVC
+  leads-not-truth rewording (T19 `e751c777`), ALLWF-03 read-only charter sweep to `deep` —
+  14/17 charters deep, 3 write-capable unchanged (T20 `277ec7a5`), PYTS-01
+  `python-to-typescript-scripts` spec authored + registered planned P2 (T21 `b291b0fb`).
 - **Validation:** independent verifier (deep tier) iteration 1 FAIL (2 gaps: __pycache__
   drift under combined suites — GEN-01 blocker; validate_state.py verdict collision —
   SYNC-12 major) → FT1 `19ebe0cd` + FT2 `98f76d0f` → iteration 2 **PASS** (gaps closed,

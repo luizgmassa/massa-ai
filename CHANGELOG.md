@@ -24,6 +24,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   subagents always run the heaviest available model), regenerated across all four host
   bundles. `lessons.py`'s dedup normalizer now strips Unicode combining marks (NFD) instead
   of matching only ASCII, with a `selftest` subcommand.
+- **ALL-workflows evidence rules + read-only tier pins.** The massa-ai router's Core
+  Contract gains two universal rules: verify-don't-assume (documentation of any kind —
+  README, docs/, comments, `.specs` prose — is a lead to verify against current source,
+  never a trustable source of truth by itself) and ask-when-in-doubt (facts are looked up,
+  decisions are asked); the Knowledge Verification Chain's "Project docs" step carries the
+  leads-not-truth qualifier at all four sites. All read-only specialist charters now pin
+  `model_tier: deep` (8 bumped: audit-specialist, context-curator, furps-analyst,
+  investigator, mobile-specialist, navigator, requirements-analyst, reviewer — read-only
+  and verification subagents always run the heaviest model), regenerated across all four
+  host bundles. New planned feature spec `python-to-typescript-scripts` registered:
+  migrate all 8 Python scripts (including `lessons.py`) to Bun TypeScript with dual-run
+  characterization parity.
 
 ## [1.20.0] - 2026-08-04
 
