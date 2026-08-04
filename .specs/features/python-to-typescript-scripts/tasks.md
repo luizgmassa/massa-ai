@@ -95,7 +95,7 @@ Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py
 **Depends on**: T5
 **Tests**: suite green (incl. diverging-verdict regression fixture); dual-run empty
 **Gate**: suite + dual-run + `--check` all exit 0
-**Status**: [ ]
+**Status**: [x]
 
 ### T7: Port validate_spec
 **Where**: `skills/massa-ai/scripts/validate_spec.ts` (new), `.py` (deleted), its prose sites, suite spawns + regenerated bundles

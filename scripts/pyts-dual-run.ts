@@ -194,6 +194,145 @@ export const REGISTRY: Record<string, ScriptEntry> = {
       ];
     },
   },
+  validate_state: {
+    pyRel: "skills/massa-ai/scripts/validate_state.py",
+    tsRel: "skills/massa-ai/scripts/validate_state.ts",
+    invocations: () => {
+      const DONE_TASKS_MD = [
+        "## Test Coverage Matrix",
+        "",
+        "## Gate Check Commands",
+        "",
+        "## Execution Plan",
+        "",
+        "### Phase 1: Foundation",
+        "",
+        "```",
+        "T1",
+        "```",
+        "",
+        "## Task Breakdown",
+        "",
+        "### T1: Do the thing",
+        "**What**: thing",
+        "**Where**: `src/thing.ts`",
+        "**Depends on**: None",
+        "**Tests**: unit",
+        "**Gate**: quick",
+        "",
+        "- [x] done",
+        "",
+      ].join("\n");
+
+      const PASS_MD = [
+        "# Feature Validation",
+        "",
+        "## Summary",
+        "",
+        "**Overall**: ✅ Ready",
+        "",
+        "**Result**: PASS",
+        "",
+        "**Evidence**: `src/thing.ts:42` — `expect(result).toBe(true)`",
+        "",
+      ].join("\n");
+
+      const FAIL_MD = ["# Feature Validation", "", "## Summary", "", "**Result**: FAIL", "", "**Issues found**: gap in coverage", ""].join(
+        "\n",
+      );
+
+      const UNFILLED_MD = [
+        "# Feature Validation",
+        "",
+        "## Summary",
+        "",
+        "**Overall**: ✅ Ready | ⚠️ Issues | ❌ Not Ready",
+        "",
+        "**Result**: [PASS | FAIL]",
+        "",
+      ].join("\n");
+
+      const NO_EVIDENCE_MD = [
+        "# Feature Validation",
+        "",
+        "## Summary",
+        "",
+        "**Result**: PASS",
+        "",
+        "**What works**: everything, allegedly",
+        "",
+      ].join("\n");
+
+      const DIVERGING_MD = [
+        "# My Feature Validation",
+        "",
+        "## Summary",
+        "",
+        "**Result**: FAIL",
+        "",
+        "## Discrimination Sensor",
+        "",
+        "**Result**: 3/3 killed — PASS ✅",
+        "",
+        "Evidence: src/thing.ts:42",
+        "",
+      ].join("\n");
+
+      const missingRoot = makeTempRoot("dual-run-state-missing");
+      writeFeatureFile(missingRoot, "my-feature", "tasks.md", DONE_TASKS_MD);
+
+      const failRoot = makeTempRoot("dual-run-state-fail");
+      writeFeatureFile(failRoot, "my-feature", "tasks.md", DONE_TASKS_MD);
+      writeFeatureFile(failRoot, "my-feature", "validation.md", FAIL_MD);
+
+      const divergingRoot = makeTempRoot("dual-run-state-diverging");
+      writeFeatureFile(divergingRoot, "my-feature", "tasks.md", DONE_TASKS_MD);
+      writeFeatureFile(divergingRoot, "my-feature", "validation.md", DIVERGING_MD);
+
+      const unfilledRoot = makeTempRoot("dual-run-state-unfilled");
+      writeFeatureFile(unfilledRoot, "my-feature", "tasks.md", DONE_TASKS_MD);
+      writeFeatureFile(unfilledRoot, "my-feature", "validation.md", UNFILLED_MD);
+
+      const noEvidenceRoot = makeTempRoot("dual-run-state-no-evidence");
+      writeFeatureFile(noEvidenceRoot, "my-feature", "tasks.md", DONE_TASKS_MD);
+      writeFeatureFile(noEvidenceRoot, "my-feature", "validation.md", NO_EVIDENCE_MD);
+
+      const passRoot = makeTempRoot("dual-run-state-pass");
+      writeFeatureFile(passRoot, "my-feature", "tasks.md", DONE_TASKS_MD);
+      writeFeatureFile(passRoot, "my-feature", "validation.md", PASS_MD);
+
+      const legacyRoot = makeTempRoot("dual-run-state-legacy");
+      writeFeatureFile(legacyRoot, "legacy-feature", "spec.md", "# Legacy Feature\n");
+      writeFeatureFile(legacyRoot, "done-feature", "tasks.md", DONE_TASKS_MD);
+      writeFeatureFile(legacyRoot, "done-feature", "validation.md", PASS_MD);
+
+      const namedRoot = makeTempRoot("dual-run-state-named");
+      writeFeatureFile(namedRoot, "feature-a", "tasks.md", DONE_TASKS_MD);
+      writeFeatureFile(namedRoot, "feature-a", "validation.md", PASS_MD);
+      writeFeatureFile(namedRoot, "feature-b", "tasks.md", DONE_TASKS_MD);
+      writeFeatureFile(namedRoot, "feature-b", "validation.md", FAIL_MD);
+
+      return [
+        { label: "missing validation.md", args: ["--root", missingRoot], cwd: missingRoot },
+        { label: "FAIL verdict", args: ["--root", failRoot], cwd: failRoot },
+        { label: "diverging sensor PASS sub-line (FT2)", args: ["--root", divergingRoot], cwd: divergingRoot },
+        { label: "unfilled template placeholder", args: ["--root", unfilledRoot], cwd: unfilledRoot },
+        { label: "PASS with no evidence", args: ["--root", noEvidenceRoot], cwd: noEvidenceRoot },
+        { label: "PASS with evidence", args: ["--root", passRoot], cwd: passRoot },
+        { label: "legacy-shaped feature (no crash, R2)", args: ["--root", legacyRoot], cwd: legacyRoot },
+        {
+          label: "explicit feature name resolves",
+          args: ["feature-b", "--root", namedRoot],
+          cwd: namedRoot,
+        },
+        {
+          label: "live dogfood: python-to-typescript-scripts",
+          args: ["python-to-typescript-scripts", "--root", "."],
+          cwd: REPO_ROOT,
+        },
+      ];
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------

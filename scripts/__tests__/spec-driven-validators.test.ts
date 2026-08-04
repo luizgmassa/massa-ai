@@ -51,7 +51,7 @@ const SCRIPT_RUNTIME: Record<string, ScriptRuntime> = {
   validate_spec: "python",
   validate_tasks: "python",
   check_commit: "bun",
-  validate_state: "python",
+  validate_state: "bun",
   lessons: "python",
   check_specs_delivered: "bun",
 };

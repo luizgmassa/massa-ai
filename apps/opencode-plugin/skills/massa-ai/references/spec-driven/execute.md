@@ -452,7 +452,7 @@ Then run `references/spec-driven/validate.md` as the final Execute gate. The ver
 **Status**: ✅ Complete | ❌ Blocked | ⚠️ Partial
 ```
 
-**After the LAST task:** dispatch the Verifier sub-agent (see step 9 and [sub-agents.md](sub-agents.md)) for independent feature-level validation, including the spec-anchored check and discrimination sensor. Validation always runs automatically — never prompted. Execute is not done until the Verifier reports PASS and the validation report is written, confirmed deterministically by `python3 skills/massa-ai/scripts/validate_state.py <feature> [--root .]` (exit non-zero = not done); see [validate.md](validate.md). If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
+**After the LAST task:** dispatch the Verifier sub-agent (see step 9 and [sub-agents.md](sub-agents.md)) for independent feature-level validation, including the spec-anchored check and discrimination sensor. Validation always runs automatically — never prompted. Execute is not done until the Verifier reports PASS and the validation report is written, confirmed deterministically by `bun skills/massa-ai/scripts/validate_state.ts <feature> [--root .]` (exit non-zero = not done); see [validate.md](validate.md). If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
 ---
 
