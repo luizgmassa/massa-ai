@@ -1,6 +1,51 @@
 # massa-ai Spec State
 
-## Current — DA Inventory Closure (**VALIDATED PASS 2026-08-03 — EXECUTE + INDEPENDENT VALIDATION COMPLETE; PR open, merge is the user's decision**)
+## Current — TLC 3.3.0 Harness Update (**EXECUTE COMPLETE 2026-08-04, T1-T18 of 18; validation pending — independent verifier runs next**)
+
+- projectId: `massa-ai` · parent workflowSessionId: `spec-harness-330-update` · workflow:
+  spec-driven Execute (batched: 2 inline task ranges + 3 sequential batch workers, offered
+  and confirmed per BATCH-01) · branch `spec/tlc-330-harness-update`, worktree
+  `.claude/worktrees/tlc-330-harness-update`, cut from `origin/main` @ `066e86e` (v1.20.0).
+- Scope: port TLC 3.3.0's spec-driven harness into massa-ai. Contract:
+  `.specs/features/tlc-330-harness-update/{spec,design,tasks}.md`.
+- Three phases, 18 tasks, one atomic commit each, commit range `e6b282c4`..`ca621e0a`+close-out:
+  **Phase 1 (T1-T6)** four new deterministic validator scripts (`validate_spec.py`,
+  `validate_tasks.py`, `check_commit.py` with Jira-prefix support, `validate_state.py`) plus
+  `check_specs_delivered.py` (GATE-02, porcelain + tracked-on-HEAD conjunction) and a Unicode
+  (NFD) fix to `lessons.py`'s dedup normalizer with a new `selftest` subcommand; **Phase 2
+  (T7-T15)** EARS-shaped acceptance criteria and a facts-vs-decisions rule in `specify.md`;
+  scripted wiring ("run it, do not eyeball it") for all four validators plus
+  `check_specs_delivered.py` across `tasks.md`/`execute.md`/`validate.md`/`sub-agents.md`/
+  `workflows/spec-driven.md`; a `git stash` ban with a porcelain-baseline discrimination
+  sensor in `validate.md`; status-before-commit reordered into one step in `execute.md`; the
+  batch sub-agent offer trigger lowered from `>~8` to `>3` tasks everywhere it is stated; a
+  discuss-pace system (Quick/Guided/Detailed) in `discuss.md`; a Writing Voice section and a
+  git-reconciliation resume procedure ported into `coding-principles.md`/`memory.md`; a new
+  stage 3.5 "deliver specs before PR" in `implementation-delivery.md` plus a blast-radius
+  delivery-authorization sentence (one approval per feature covers commits+push+PR); **Phase 3
+  (T16-T18)** `verification-agent`'s charter pinned to the `deep` model tier and regenerated
+  through both generators in one commit (D9 as amended by Plan Challenge C1), a repo-wide
+  threshold sweep (population 0) and a cross-file blast-radius/gate-invocation clause
+  consistency check (Plan Challenge C3; both clause families byte-identical or
+  parameterized-identical across all touched source + regenerated bundle files), and this
+  close-out.
+- Plan Challenge folded five findings into the design before Execute (not appended after):
+  C1 widened T16's gate to run both generators + both parity tests in the same commit; C2
+  reordered close-out to always precede the first push (stage 3.5's remediation branch is a
+  defensive fallback that should never fire); C3 added the T17 cross-file consistency check;
+  C5 added a template-conformance test tying each validator's expectations to the live
+  `specify.md`/`tasks.md`/`validate.md` template blocks so future template drift goes red.
+- T16's regen also updated `FEATURES.md`'s role -> tier table and
+  `scripts/__tests__/subagent-parity.test.ts`'s frozen-baseline allowlist to record the
+  intentional `verification-agent` tier change (outside the task's originally stated write
+  set, but required for both parity suites to stay green — not a weakening, an addition to
+  the allowlist the test itself designed for this case).
+- massa-ai MCP server not consulted this session; `.specs/` files canonical per contract.
+- Next action: independent verifier runs the Verification Ladder against this branch
+  (author != verifier) and writes `.specs/features/tlc-330-harness-update/validation.md`
+  before PR creation, per GATE-02 / `check_specs_delivered.py`.
+
+## Previous — DA Inventory Closure (**VALIDATED PASS 2026-08-03 — EXECUTE + INDEPENDENT VALIDATION COMPLETE; PR open, merge is the user's decision**)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-da-inventory-closure` · workflow:
   spec-driven (Large) · branch `spec/da-inventory-closure`, worktree

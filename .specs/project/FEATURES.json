@@ -759,7 +759,25 @@
         "execute": true
       },
       "notes": "VALIDATED PASS 2026-08-03 (independent verifier; all live DI ACs evidenced, DI-02 mutation re-derived + killed, gates exit 0). 17 DA rows: 7 FIX shipped, 8 RESOLVED evidenced, 1 ROUTED (DA-10), 2 ACCEPTED (DA-04, DA-13). DI-05 withdrawn at Design D0 (SEN-03 had already shipped the fix). L-001 promoted to confirmed. .specs/reports/ removed after a 14-file dispositioned sweep. PR from spec/da-inventory-closure; merge = user's decision."
+    },
+    {
+      "slug": "tlc-330-harness-update",
+      "title": "TLC 3.3.0 Harness Update — port TLC's four deterministic validator scripts + check_specs_delivered.py, EARS ACs, discuss pace system, git-stash ban + porcelain baseline, status-before-commit reorder, deliver-specs-before-PR gate, batch-trigger lowering, verification-agent deep-tier pin, lessons.py Unicode dedup fix",
+      "status": "in_progress",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/tlc-330-harness-update",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/tlc-330-harness-update/spec.md",
+      "design": ".specs/features/tlc-330-harness-update/design.md",
+      "tasks": ".specs/features/tlc-330-harness-update/tasks.md",
+      "notes": "T1-T18 of 18 all complete (three phases: T1-T6 validator scripts, T7-T15 reference/workflow prose, T16-T18 charter regen + close-out). Not yet independently validated -- validation.md intentionally absent at this commit; an independent verifier runs next. Not pushed, no PR. massa-ai MCP was unreachable this session; .specs/ is canonical. See .specs/HANDOFF.md."
     }
   ],
-  "active_feature": "da-inventory-closure"
+  "active_feature": "tlc-330-harness-update"
 }

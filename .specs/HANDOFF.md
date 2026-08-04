@@ -1,6 +1,35 @@
 # Handoff
 
-## Active — DA Inventory Closure (VALIDATED PASS 2026-08-03; PR open, merge = user's decision)
+## Active — TLC 3.3.0 Harness Update (EXECUTE COMPLETE 2026-08-04, T1-T18 of 18; validation pending)
+
+- **Feature:** `tlc-330-harness-update` — port TLC 3.3.0's spec-driven harness (four
+  deterministic validator scripts + `check_specs_delivered.py`, EARS ACs, discuss pace system,
+  git-stash ban with a porcelain baseline, status-before-commit reorder, deliver-specs-before-PR
+  gate, batch-trigger lowering to `>3`, `verification-agent` deep-tier pin, `lessons.py` Unicode
+  dedup fix). Contract: `.specs/features/tlc-330-harness-update/{spec,design,tasks}.md` — read
+  those, not this file, for the per-task write sets and gate commands. Branch
+  `spec/tlc-330-harness-update`, worktree `.claude/worktrees/tlc-330-harness-update`, from
+  `origin/main` @ `066e86e` (v1.20.0).
+- **State:** Specify + Design + Tasks + full Plan Challenge (five findings folded in: C1/C2/C3/C5
+  revised the plan before Execute, C4 rejected) all DONE. Execute T1-T18 of 18, one atomic commit
+  per task, commit range `e6b282c4`..`ca621e0a`+close-out. Delivery ran as two inline task ranges
+  plus three sequential batch workers (Phase 1 inline T1-T6, Phase 2 inline T7-T15, Phase 3 batch
+  T16-T18) — offered and confirmed per BATCH-01's own lowered `>3`-task trigger, which this
+  feature's own change now governs. Independent validation **NOT RUN** — `validation.md`
+  intentionally absent at this commit; the next verifier writes it.
+- **Next action (independent verifier):** run the Verification Ladder against this branch
+  (author != verifier is mandatory), then `python3 skills/massa-ai/scripts/validate_state.py
+  tlc-330-harness-update` before the feature is marked done. Do not push or open a PR until
+  `check_specs_delivered.py tlc-330-harness-update` exits 0 on the close-out commit (GATE-02).
+- **Process constraint (this session):** the close-out commit (this one) always lands **before**
+  the first push — `implementation-delivery.md` stage 3.5's remediation branch is a defensive
+  fallback that should never fire on this feature, per Plan Challenge C2.
+- **Environment facts that carry:** massa-ai MCP server unreachable this session (`.specs/`
+  files canonical, per contract); the worktree's `bun install` may have skipped native
+  tree-sitter grammars (documented, harmless — the parity tests and both generators never
+  touch tree-sitter).
+
+## Previous — DA Inventory Closure (VALIDATED PASS 2026-08-03; PR open, merge = user's decision)
 
 - **Feature:** `da-inventory-closure` — disposition + closure of DA-01..DA-17 from
   `.specs/reports/cross-pollination-portability-and-gaps.md` (folder removed at close-out per

@@ -179,7 +179,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T7, T8, T9, T10, T11, T12, T13, T14, T15, T16
 **Tests**: `skill-artifact-parity.test.ts`; sweep output; consistency-check output
 **Gate**: `--check` clean + parity green + sweep 0 + consistency check pass
-**Status**: [ ]
+**Status**: [x] (no-op regen — T16's run already covered it; no commit, no diff)
 
 ### T18: CHANGELOG + state artifacts + delivery gate dogfood
 **Where**: `CHANGELOG.md`, `.specs/project/STATE.md`, `.specs/HANDOFF.md`, `.specs/project/FEATURES.json`
@@ -187,4 +187,4 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T17
 **Tests**: CI CHANGELOG gate; script exit 0
 **Gate**: script prints population, exits 0
-**Status**: [ ]
+**Status**: [x]
