@@ -129,7 +129,7 @@ Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py
 **Depends on**: T9
 **Tests**: `bun run update-fixture-hashes` parity; dual-run empty
 **Gate**: dual-run + `bun run lint` exit 0
-**Status**: [ ]
+**Status**: [x]
 
 ### T11: Golden fixtures, global zero-sweeps, harness removal
 **Where**: `scripts/__tests__/pyts-golden.test.ts` + `scripts/__tests__/fixtures/pyts-golden/` (new), any sweep-surfaced straggler prose, `scripts/pyts-dual-run.ts` (deleted)
