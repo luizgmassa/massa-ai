@@ -153,7 +153,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T6, T9
 **Tests**: content sweeps per rule
 **Gate**: sweep 0 old / new present
-**Status**: [ ]
+**Status**: [x]
 
 ### T15: implementation-delivery.md — stage 3.5 + push precondition
 **Where**: `skills/massa-ai/references/implementation-delivery.md`

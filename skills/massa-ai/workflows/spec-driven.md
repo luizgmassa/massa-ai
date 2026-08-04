@@ -27,6 +27,7 @@ Holds for every task, even if reference files are not opened:
 2. The gate must pass (tests pass) before a task is done — the test runner decides, not self-assessment.
 3. One atomic commit per task. Never batch tasks; never weaken, skip, or delete tests to make them pass.
 4. After the last task, a fresh verification-agent always runs automatically (author ≠ verifier) — spec-anchored outcome check plus discrimination sensor. Never optional, never prompted.
+5. **Blast radius (approval ≠ remote authority):** Approving Execute for this feature authorizes local implementation and local commits, and covers one delivery through PR creation — branch push and `gh pr create` — under one explicit go-ahead given at Execute start. Force-push, deploy, production database changes, merges, and any other remote/externally-visible/destructive operation always require a separate explicit go-ahead, even after that authorization.
 
 ## Auto-Sizing
 
@@ -39,7 +40,7 @@ Complexity determines depth, not a fixed pipeline. Assess scope first, apply onl
 | Large | >10 tasks OR multi-component feature | Full spec + requirement IDs | Architecture + components | Full breakdown + deps | Implement + verify per task |
 | Complex | Ambiguity or new domain (unfamiliar vocabulary, no prior pattern) | Full spec + discuss gray areas | Research + architecture | Breakdown + phase plan | Implement + interactive UAT |
 
-A "phase" is a group of tasks sharing a dependency boundary or a checkpoint commit — it is distinct from a single task or atomic step. The sub-agent offer fires when a formal `tasks.md` packs into more than one task-budgeted batch (> ~8 tasks).
+A "phase" is a group of tasks sharing a dependency boundary or a checkpoint commit — it is distinct from a single task or atomic step. The sub-agent offer fires when a formal `tasks.md` has more than 3 tasks — packing itself still uses ~7-task batches; a 4–8-task feature is offered as a single batch worker.
 
 - Specify and Execute are always required.
 - Design is skipped when straightforward (no architectural decisions, no new patterns).
@@ -93,7 +94,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
    - Run repo-rules discovery from `references/repo-rules-discovery.md` before the first repository mutation: record the harness sources loaded (or `repo-rules: none present`), and implement so every new or changed file conforms to the target repo's module layout, unit-test location, and testing-area conventions. A repo rule wins over a skill default for placement and gate commands; record any deviation with an explicit reason. Never fabricate rules or create `.claude/`/`.cursor/` directories the repo lacks.
    - Use the Test Coverage Matrix and Gate Check Commands from `tasks.md`, or state their inline equivalents when Tasks was skipped.
    - Ask the MCP and skill question in Tasks or inline Execute when tool choice can change correctness or verification.
-   - If a formal `tasks.md` packs into more than one task-budgeted batch (> ~8 tasks), present the sub-agent offer from `references/spec-driven/sub-agents.md` before starting Execute. Offer-then-confirm — never auto-spawn; the user must accept before any sub-agent is dispatched. One worker per batch (~7 tasks, whole phases): each batch worker executes all its tasks in order (implement → gate → atomic commit), then reports a compact summary (tasks done, commit hashes, test counts, deviations). Workers never spawn further sub-agents.
+   - If a formal `tasks.md` has more than 3 tasks, present the sub-agent offer from `references/spec-driven/sub-agents.md` before starting Execute — even when packing yields a single batch (a 4–8-task feature is offered as one batch worker). Offer-then-confirm — never auto-spawn; the user must accept before any sub-agent is dispatched. One worker per batch (~7 tasks, whole phases): each batch worker executes all its tasks in order (implement → gate → atomic commit), then reports a compact summary (tasks done, commit hashes, test counts, deviations). Workers never spawn further sub-agents.
    - Implement one atomic step or approved task at a time.
    - For long-running task sequences, create a checkpoint via `create_checkpoint` at task boundaries with `taskId`, `description`, `progressPercent`, `currentStep`, `nextAction`, `fileChanges`, and `checkpointType: "manual"` so progress is resumable after interruption.
    - If resuming after interruption, call `list_checkpoints` with the `taskId` and `restore_checkpoint` to recover task state before continuing. If `create_checkpoint` is unavailable (e.g. `task_checkpoints` table missing), continue with `.specs/` artifact state as the fallback.
@@ -116,7 +117,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
     - The verification-agent re-derives coverage independently using evidence-or-zero and does not inherit the author's mental model.
    - The fix → re-verify loop is capped at 3 iterations before escalating to `Blocked`.
    - Distill lesson signals through `references/lessons.md` when validation produces grounded reusable failures.
-7. Update `.specs/project/STATE.md`, `.specs/HANDOFF.md`, and `references/spec-driven/memory.md` records for decisions, blockers, handoff, and completion evidence.
+7. Before the delivery chain's Propose stage (PR creation), write and commit `.specs/project/STATE.md`, `.specs/HANDOFF.md`, and `.specs/project/FEATURES.json` on the branch — not merely "after meaningful progress" during Execute, but committed before `gh pr create`. **Deterministic backing (run it, do not eyeball it):** `python3 skills/massa-ai/scripts/check_specs_delivered.py <feature> [--root .]` — a non-zero exit blocks Propose (see `references/implementation-delivery.md` stage 3.5 and GATE-02). If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved). Record `references/spec-driven/memory.md` decisions, blockers, handoff, and completion evidence per that reference's write triggers.
 8. When the user splits planning and implementation across clean chats, resume from the canonical `.specs/` artifacts — `.specs/project/STATE.md`, `.specs/project/FEATURES.json`, `.specs/HANDOFF.md`, and the feature's phase files. This workflow owns the spec phase contracts on both sides of the split; there is no separate save/load procedure.
 9. Complete the configured Plan Challenge Gate for non-trivial plans and complete `references/evidence-gate.md` before claiming completion.
 
