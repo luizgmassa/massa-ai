@@ -201,10 +201,10 @@ All mutations run in an isolated `git worktree` scratch (`/tmp/scratch-tlc330`, 
 
 ## Summary
 
-**Overall**: ❌ Needs Fix (iteration 3 — Phase 5 amendment)
-**Result**: FAIL
+**Overall**: ✅ Verified (iteration 5 — all 3 iteration-4 gaps closed with reproduced evidence; no regression)
+**Result**: PASS
 
-**Spec-anchored check**: 30/33 ACs matched spec outcome (iterations 1-2 base: 27/29; Phase 5 amendment adds ALLWF-01/02/03 + PYTS-01 = 4 more ACs, 3 PASS) — 1 open gap (PYTS-01 AC1, iteration 3)
+**Spec-anchored check**: 33/33 ACs matched spec outcome (iterations 1-2 base: 27/29; Phase 5 amendment adds ALLWF-01/02/03 + PYTS-01 = 4 more ACs) — PYTS-01 AC1's iteration-3/4 gap closed at iteration 5 (see Iteration 5 section below)
 **Sensor**: 6/6 mutations killed (4 from iterations 1-2 + 2 new in iteration 3)
 **Gate**: isolated suites all green (100/100 across 3 files run separately in iterations 1-2); combined invocation matching the real `bun run test:scripts` shape: 99/100 in iteration 1 (1 failure, closed by FT1); iteration 3's scoped gate re-run (validators + both parity suites + both generator `--check` + lint + 3 python validators, run individually, own exit codes, no pipes) is 10/10 green, no regression
 
@@ -213,6 +213,10 @@ All mutations run in an isolated `git worktree` scratch (`/tmp/scratch-tlc330`, 
 **Issues found (iteration 1, now resolved)**: two gaps were opened at iteration 1 review, both closed at iteration 2 with reproduced evidence, a killed discrimination mutation, and a new regression fixture — see the "Iteration 2" section below for the closure evidence. One new non-blocking informational finding (IT2-01, a task-header ID-recognition quirk in validate_tasks.py) surfaced during iteration 2's no-regression sweep and is recorded there.
 
 **Next steps (iteration 3)**: route a fix task to correct `python-to-typescript-scripts/spec.md`'s Problem Statement and PTS-04 wiring-ripple population (currently "24 prose sites across 12 skill files", measured 41 sites / 25 files by raw sweep — see Iteration 3 section below) before that spec is treated as authoritative scope for Design. IT2-01 remains a future minor fix task at the team's discretion; it does not block this feature.
+
+**Next steps (iteration 4)**: route a small fix task to correct the one residual stale citation — `python-to-typescript-scripts/spec.md:79`'s Requirement Traceability row for PTS-04 still reads "12 skill prose files (24 sites)", contradicting the corrected Problem Statement/PTS-04 body two sections above it (see Iteration 4 section below). Also strengthen FT4's first regression fixture (verified non-discriminating by mutation) and, at the team's discretion, sync HANDOFF.md's stale "validation.md intentionally absent" narrative. None of these block this PR's mergeability.
+
+**Next steps (iteration 5)**: none — all 3 iteration-4 gaps (spec.md:79 residual, FT4's non-discriminating fixture, HANDOFF.md's stale narrative) are closed with reproduced evidence at commit `c7e22fea` (FT5); see Iteration 5 section below. This feature is ready for delivery.
 
 ---
 
@@ -423,3 +427,165 @@ ALLWF-01, ALLWF-02, ALLWF-03 all independently re-verified PASS with fresh, from
 One genuine gap: **PYTS-01 AC1's wiring-ripple population claim ("24 prose sites across 12 skill files") is measurably wrong** — independently re-derived at 41 sites / 25 files (raw) or 36/23 (target-script-scoped), a ~40-70% undercount, plus at least one non-`python3`-literal wiring site the claimed methodology cannot see. This does not break any gate, does not block this PR's mergeability, and does not reopen iterations 1-2's closed findings — but it is a real, AC-anchored defect in the delivered Specify artifact, and per this PR's own newly-added ALLWF-01 rule, an unverified factual claim driving future scope is exactly what must not ship silently. Route as a fix task before `python-to-typescript-scripts` proceeds to Design.
 
 **Overall verdict (iteration 3): FAIL — 1 open gap (PYTS-01 AC1).**
+
+---
+
+## Iteration 4 (re-verification — Phase 5 amendment fix loop, iteration 2 of 3)
+
+**Role**: independent verifier (author != verifier). **Scope**: fix commits FT3 (`f470e2cd`) and FT4 (`75c211f8`), auditing closure of iteration 3's PYTS-01 AC1 gap and IT2-01. Iterations 1-3's other findings are not re-litigated except via the mandated no-regression gate re-run.
+
+**Porcelain baseline**: `git status --porcelain` empty before all scratch work (0 lines) and empty after every cleanup (0 lines) — matched at each of 3 checkpoints (post-FT3-state inspection worktrees ×2, post-FT4-mutation worktree ×1).
+
+### Check 1 — PYTS-01 AC1 closure: NOT FULLY CLOSED (residual contradiction)
+
+Re-ran the iteration-3 sweep methodology against `.specs/features/python-to-typescript-scripts/spec.md` at HEAD (`75c211f8`):
+
+- **Problem Statement and PTS-04 body now quote the measured populations** — confirmed present verbatim: `41 python3 lines across 25 skill source files (36 lines / 23 files naming the 8 target scripts), 16 further .py references... including the ln -sf ... check_commit.py .git/hooks/commit-msg hook recipe at references/spec-driven/execute.md:311... plus 3 spawns in scripts/__tests__/spec-driven-validators.test.ts and package.json:42` (`spec.md:11`, `spec.md:56`). All six figures named in this check (41/25 raw, 36/23 scoped, 16 non-literal refs incl. `execute.md:311`, 3 test spawns, `package.json:42`) are present and match exactly. **PASS.**
+- **PTS-04 AC2 requires Design to re-derive the list** — confirmed: `spec.md:60`, "WHEN Design derives the rewire work list, THEN it SHALL re-run the sweeps and record the fresh populations, superseding the figures quoted in this spec." **PASS.**
+- **FEATURES.json title updated** — confirmed: `python-to-typescript-scripts` entry's `title` now reads "...full python3 wiring rewire (sweep-derived work list: 41 python3 lines / 25 skill files + 16 non-literal .py refs + tests + package.json at authoring)", replacing the stale "24 prose sites across 12 skill files" wording. **PASS.**
+- **Stale "intentionally absent" note gone from FEATURES.json** — repo-wide sweep (`/usr/bin/grep -rn "intentionally absent"`) found **zero** occurrences in `.specs/project/FEATURES.json` (the `tlc-330-harness-update` entry's `notes` field is fully rewritten to describe the FT1-FT4/iteration-1-3 history). **PASS.**
+- **Sweep commands embedded** — **PARTIAL.** Only one literal reproduction command is embedded (`` /usr/bin/grep -rn 'python3' skills/ --include='*.md' ``, `spec.md:11`), followed by "and companions" as an unspecified placeholder for the other three measurement categories (the 36/23 target-scoped subset, the 16 non-literal `.py`-reference sweep, and the 3-spawn test-file count) — none of those three have their own embedded command. This does not block AC1 (AC1's literal wording requires the *populations* printed beside the verdict at sweep time, which PTS-04 AC1/AC2 correctly delegate to Design's live re-run, not this spec), but the check's "embed the sweep commands" wording is only singular-example-satisfied, not fully satisfied. Recorded as a minor, non-blocking completeness note.
+- **Residual gap — Requirement Traceability table not updated.** `spec.md:79`, the `PTS-04` row of the `## Requirement Traceability` table, still reads: `12 skill prose files (24 sites), scripts/__tests__/spec-driven-validators.test.ts, regenerated apps/*-plugin/skills/**` — the exact stale figures FT3 was tasked to correct, sitting 18 lines below the corrected Problem Statement paragraph and 23 lines below the corrected PTS-04 body in the same document. Confirmed via direct read and `/usr/bin/grep -n "24\|12 skill" spec.md`, which returns exactly three hits: line 11 (corrected prose, references the *old* "24 sites/12 files" only to disclaim it as a prior draft's undercount — not itself stale), line 79 (**stale, uncorrected**), and line 88 (`24 .py files` in Edge Cases — a *different*, correct count: 6 scripts × 4 host bundles = 24 generated-file deletions, not a wiring-site count; not stale). Line 79 is the one live contradiction: a reader consulting the Requirement Traceability table — the table `validate_spec.py`'s structural check confirms is present but cannot content-check — sees the exact disproven number the Problem Statement three paragraphs above it just named as a "narrower sweep" undercount.
+
+**Judgment**: PYTS-01 AC1 is substantially improved from iteration 3 (the ~40-70% undercount in the Problem Statement and requirement body is fixed, with sweep provenance and a Design re-derivation gate now in place) but is **not fully closed** — one direct, in-document contradiction remains. This is a much smaller residual than iteration 3's finding (a two-line table-row fix, not a rewrite), and per iteration 3's own judgment this class of gap does not block `tlc-330-harness-update`'s own mergeability (it is a Specify-phase artifact for a different, not-yet-started feature) — but the check's literal question ("PYTS-01 AC1 closed?") is answered **no**.
+
+### Check 2 — FT4 `validate_tasks.py` letter-prefixed task ids
+
+**(a) Diff minimality / no weakening.** `git show 75c211f8 -- skills/massa-ai/scripts/validate_tasks.py` is +5/-2 lines: a 3-line explanatory comment plus widening `TASK_RE`'s captured id from `(T\d+)` to `([A-Z]*T\d+)` and `EDGE_RE` from `\bT\d+\b` to `\b[A-Z]*T\d+\b` (now also `re.IGNORECASE`). Both changes are strictly widening (the `*` quantifier admits the empty-prefix case unchanged, so every previously-matching id — `T1`, `T22`, etc. — still matches identically). Traced every use site (`parse_tasks`, `parse_phase_membership`, `parse_diagram_order`): the widened `EDGE_RE` can only ever add extra, non-task phantom edges (e.g. a word like `PORT8` inside prose would now spuriously token-match) — and every consumer already no-ops on an edge that resolves to an unknown task id (`membership.get(dep)` returns `None` → skipped in both the forward-phase and diagram checks). No path was found where the widening could suppress a previously-fired ERROR. **No existing check weakened.**
+
+**(b) Live-contract re-run.** `python3 -B skills/massa-ai/scripts/validate_tasks.py tlc-330-harness-update` at HEAD → exit 0, 5 warnings (`T18`, `FT1`, `FT2`, `T21`, `T22`, each quoting its own distinct `Where` file list — confirmed by reading `tasks.md`'s FT1/FT2/T18/T22 blocks directly). No warning is misattributed or folded; `FT3` and `FT4` do not appear because their `Where` fields are single-file (no granularity-smell trigger). **Confirmed: no folding, correct per-task attribution.**
+
+**(c) Discrimination mutation — PARTIAL KILL, one of two fixtures non-discriminating.** In an isolated `git worktree add /tmp/verif-iter4-mut HEAD` (never `git stash`), reverted exactly `TASK_RE`/`EDGE_RE` to their pre-FT4 shape (test file untouched). Ran both new fixtures individually against the mutated subject:
+
+| Fixture | Result under mutation | Killed? |
+| --- | --- | --- |
+| "FT-prefixed header is its own task: backward dep on T1 passes, no self-dep false positive" | `bun test` → 1 pass, 0 fail — assertions (`exitCode` 0, stdout lacks `"declares \`Depends on\`"`) hold **identically** under the reverted regex | ❌ **Not killed — vacuously passes both before and after the fix** |
+| "FT task missing Gate is reported against FT1, not folded into T1" | `bun test` → 0 pass, 1 fail — `expect(r.exitCode).toBe(1)` received `0` | ✅ **Killed** |
+
+**Root cause of the non-discriminating fixture**: under the reverted regex, `### FT1:` still fails to match `TASK_RE` (its heading text starts `FT1`, not `T1`, so the anchored `^#{2,4}\s+(T\d+)\s*:` never matches regardless of the `\b` word-boundary question), so FT1's fields silently fold into T1's own record exactly as the pre-fix defect describes — producing a genuine `T1` self-dependency (`deps = {"T1"}`). But this specific fixture's shape happens to make that self-dependency undetectable by either downstream check: the forward-phase check only fires when `p_dep > p_here`, and the folded dependency lands in the *same* phase as the task it corrupted (phase 1), so `1 > 1` is false; and the diagram-vs-definition check never runs at all for this fixture, because its diagram block (`Phase 1: T1` / `Phase 2: FT1`, no `->` arrows) fails `parse_diagram_order`'s `found_any_arrow` gate and the whole check is skipped with a warning instead. The fixture's own assertions (`exitCode` 0, no `"declares \`Depends on\`"` text) are satisfied by this skip path regardless of whether the fold happened — an equivalent-mutation shape (memory: "an equivalent mutation is not a surviving one" doesn't apply here since the *code* differs and *is* buggy under the mutation; rather this is the inverse case — a real defect the fixture is blind to; memory: "a receiver-free stub cannot sense binding" is the closer analogy — this fixture's own construction cannot observe the fold it claims to guard against).
+
+Cleanup: `git worktree remove --force /tmp/verif-iter4-mut`; main worktree `git status --porcelain` re-verified empty (0 lines), matching the pre-work baseline.
+
+**Judgment**: FT4's actual code fix is correct and necessary (confirmed independently by (b)'s live dogfood and by fixture 2's genuine kill), and the live-contract self-dependency ERROR this fix resolves was directly reproduced in Check 3 below. But FT4's own claim of "2 new fixtures" as its regression coverage overstates actual discrimination — only 1 of 2 fixtures is load-bearing. This is a sensor-coverage gap in the fix's own test claim, not a defect in `validate_tasks.py` itself; recommend either replacing the first fixture with one that exercises a genuinely observable path (e.g., a forward-phase-violating backward-dep shape, or an arrow-chain diagram that would make the diagram check run and see the corrupted `T1` deps set), or removing it as redundant with fixture 2 and the live-tasks.md dogfood.
+
+### Check 3 — Process deviation audit: no residue beyond the recorded deviation
+
+FT4's commit message and `tasks.md` FT4 body both self-report that FT3's commit (`f470e2cd`) landed while `validate_tasks.py` was red, attributing it to a compound-command echo resetting `$?` (the same class as `CONTRIBUTING.md` measurement rule 3, "a cached, replayed, or pipe-wrapped result is not a measurement"). Independently reproduced both endpoints in isolated `git worktree` checkouts (never `git stash`, cleaned up after each, porcelain re-verified empty both times):
+
+- **At `11747f27` (T22, immediately before FT3):** `validate_tasks.py tlc-330-harness-update` → exit 0, 3 warnings (T18/T21/T22, each correctly attributed) — genuinely green.
+- **At `f470e2cd` (FT3):** `validate_tasks.py tlc-330-harness-update` → **exit 1** — `ERROR T22 declares \`Depends on: T22\` but the phase diagram shows T22 at or after T22, not before it` — confirms the exact self-dependency-fold defect the FT4 commit message describes: FT3's own `### FT3:` header (with `Depends on: T22`) folded into the preceding `T22` task's record under the pre-FT4 regex.
+- **Same commit (`f470e2cd`), other gates checked for undocumented residue:** `validate_spec.py python-to-typescript-scripts` → exit 0 (0 errors, 0 warnings); `check_specs_delivered.py tlc-330-harness-update` → exit 0 (7 paths, 0 errors). Both genuinely green at the same commit where `validate_tasks.py` was red.
+
+**Judgment**: the recorded deviation is complete and accurate — exactly one gate (`validate_tasks.py`) was red for exactly one commit (`f470e2cd`), matching the FT4 commit message and `tasks.md` body verbatim, and no other gate was also red at that point that the deviation note omits. **No additional undocumented residue found.**
+
+### Check 4 — No-regression gate re-run (own exit codes, no pipes)
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `bun test scripts/__tests__/spec-driven-validators.test.ts` (isolated) | 0 | 44 pass, 0 fail |
+| `bun test scripts/__tests__/subagent-parity.test.ts` (isolated) | 0 | 40 pass, 0 fail |
+| `bun test scripts/__tests__/skill-artifact-parity.test.ts` (isolated) | 0 | 19 pass, 0 fail |
+| `bun run scripts/generate-skill-artifacts.ts --check` | 0 | "No drift: generated skill bundles match checked-in files." |
+| `bun run scripts/generate-subagent-artifacts.ts --check` | 0 | "No drift: generated files match checked-in files." |
+| `bun run lint` | 0 | oxlint clean |
+| `python3 -B skills/massa-ai/scripts/validate_spec.py tlc-330-harness-update` | 0 | 0 errors, 0 warnings |
+| `python3 -B skills/massa-ai/scripts/validate_spec.py python-to-typescript-scripts` | 0 | 0 errors, 0 warnings |
+| `python3 -B skills/massa-ai/scripts/validate_tasks.py tlc-330-harness-update` | 0 | 0 errors, 5 warnings (T18/FT1/FT2/T21/T22, each correctly attributed) |
+| `python3 -B skills/massa-ai/scripts/check_specs_delivered.py tlc-330-harness-update` (pre-edit) | 0 | 0 errors, 7 paths checked |
+
+No regression against any of iterations 1-3's closed findings. This report's own uncommitted edit (adding this Iteration 4 section) is the expected exception for a subsequent `check_specs_delivered.py` run, per this feature's own documented convention (the orchestrator commits `validation.md` after the verdict is returned).
+
+### Iteration 4 verdict
+
+Checks 2, 3, and 4 all close clean: FT4's `validate_tasks.py` fix is minimal, non-weakening, and confirmed correct against the live contract (Checks 2a/2b); the one process deviation is fully and accurately recorded with no additional undocumented residue (Check 3); and the full no-regression gate set is 10/10 green with no pipes (Check 4). One informational, non-blocking finding surfaced in Check 2c: one of FT4's two claimed regression fixtures does not actually discriminate against the defect it names (verified by mutation — passes identically before and after the revert); FT4's own code fix and its second fixture remain sound.
+
+Check 1 (PYTS-01 AC1) is **not fully closed**: FT3 corrected the Problem Statement and PTS-04 body's population claim and added a Design re-derivation gate (both confirmed), but left the Requirement Traceability table's PTS-04 row (`spec.md:79`) quoting the exact stale "12 skill prose files (24 sites)" figure the fix was meant to eliminate — a direct, in-document contradiction. This is a much narrower residual than iteration 3's original finding and does not affect `tlc-330-harness-update`'s own mergeability, but it is a real, evidence-anchored gap against the check's literal question.
+
+**Overall verdict (iteration 4): FAIL — 1 open gap (PYTS-01 AC1, narrowed: `spec.md:79` residual stale citation), plus 1 informational finding (FT4 fixture 1 non-discriminating, Check 2c).**
+
+---
+
+## Iteration 5 (re-verification — Phase 5 amendment fix loop, iteration 3 of 3, LAST before Blocked)
+
+**Role**: independent verifier (author != verifier). **Scope**: fix commit FT5 (`c7e22fea`), auditing closure of iteration 4's 3 ranked gaps only. Iterations 1-4's other findings are not re-litigated except via the mandated no-regression gate re-run.
+
+**Porcelain baseline**: `git status --porcelain` — one line before and after all scratch work (` M .specs/features/tlc-330-harness-update/validation.md`, this report's own uncommitted edit, the expected exception), confirmed identical before scratch worktree creation and after removal.
+
+### Gap 1 (spec.md:79 stale row) — CLOSED
+
+`git show c7e22fea -- .specs/features/python-to-typescript-scripts/spec.md` confirms the PTS-04 Requirement Traceability row (`spec.md:79`) no longer reads "12 skill prose files (24 sites)" — it now reads "sweep-derived: 25 skill source files (41 `python3` lines) + 16 non-literal `.py` reference lines at authoring — Design re-derives per AC2", deferring to the sweep-derived population and PTS-04 AC2's re-derivation clause exactly as prescribed.
+
+Independent whole-document sweep (not scoped to line 79) for any remaining stale-figure residual: `/usr/bin/grep -n "24\|12 skill\|12 files\|12 prose" .specs/features/python-to-typescript-scripts/spec.md` → exactly 2 hits, both judged directly:
+
+- `spec.md:11` (Problem Statement) — contains the literal "24 sites/12 files" only as a disclaimed quotation: "An earlier draft of this spec claimed 24 sites/12 files from a narrower sweep; iteration-3 validation caught the undercount — Design re-runs the sweep commands above and treats their printed population, not this paragraph, as the work list." This is the same historical-record pattern iteration 4 itself judged as non-stale on the same line. **Not a live claim.**
+- `spec.md:88` (Edge Cases) — "24 `.py` files under `apps/*/skills/`" is an unrelated count: 6 target scripts × 4 host bundles = 24 generated-file deletions expected at migration time, not a wiring-site population. **Not the stale figure, correct as written.**
+
+No third hit exists. **Gap 1: fully closed** — the last-fix-missed-a-residual failure mode named in the dispatch brief did not recur.
+
+### Gap 2 (dead fixture) — CLOSED
+
+Reviewed the FT5 diff to `scripts/__tests__/spec-driven-validators.test.ts` (`git show c7e22fea -- scripts/__tests__/spec-driven-validators.test.ts`, +16/-4): the first fixture's `FT_TASKS_MD` was rebuilt to the live-defect shape iteration 4 identified — `FT1` now sits in **Phase 2**, `Depends on: T2` (the last task of **Phase 1**, not `T1`), and the diagram now carries a real arrow (`Phase 1: T1 ──→ T2`) so `parse_diagram_order`'s `found_any_arrow` gate no longer skips the check.
+
+Ran the discrimination mutation independently, scratch-only:
+
+- `git worktree add /tmp/verif-iter5-mut HEAD` (never `git stash`).
+- Reverted `TASK_RE`/`EDGE_RE` in the scratch copy only, back to the exact pre-FT4 shape: `TASK_RE = re.compile(r"^#{2,4}\s+(T\d+)\s*:")`, `EDGE_RE = re.compile(r"\bT\d+\b")` (source tree untouched throughout).
+- Ran both FT4 regression tests individually against the mutated subject (`bun test` inside the scratch worktree, whose `REPO_ROOT` resolves to the scratch tree itself since it is computed from `import.meta.dir`):
+
+| Fixture | Result under mutation | Killed? |
+| --- | --- | --- |
+| "FT-prefixed header is its own task: backward dep on T2 passes, no self-dep false positive" | `exitCode` 0 expected, received **1** — fail | ✅ **Killed** |
+| "FT task missing Gate is reported against FT1, not folded into T1" | `stdout` expected to contain `"FT1"`, received the self-dep error text instead — fail (exit code alone was still 1, but the `toContain("FT1")` assertion is what fails) | ✅ **Killed** |
+
+Both fixtures fail (kill) under the reverted mutation. Confirmed fixture 1 fails with **exactly** the self-dep/ordering error shape the FT5 commit message claims: reproduced the identical fixture manually against the mutated script and observed `` ERROR T2 declares `Depends on: T2` but the phase diagram shows T2 at or after T2, not before it `` (exit 1) — matching commit `c7e22fea`'s stated "T2 declares Depends on: T2" verbatim.
+
+Confirmed the inverse: both fixtures pass (`bun test scripts/__tests__/spec-driven-validators.test.ts -t "FT-prefixed header is its own task|FT task missing Gate is reported against FT1"` → 2 pass, 0 fail) against the real, unmutated `validate_tasks.py` at HEAD.
+
+Cleanup: `git worktree remove --force /tmp/verif-iter5-mut`; `rm -rf /tmp/ft5-check-fixture` (the manual-reproduction scratch dir, also outside the real tree); `git status --porcelain` re-verified as exactly the pre-work baseline (one line, the expected validation.md edit).
+
+**Gap 2: fully closed** — the rebuilt fixture is now genuinely discriminating (2/2 killed), not vacuously green.
+
+### Gap 3 (HANDOFF narrative) — CLOSED
+
+`git show c7e22fea -- .specs/HANDOFF.md` confirms the stale "Independent validation **NOT RUN** — `validation.md` intentionally absent at this commit" text is replaced with "Independent validation HAS RUN since this note was first written: iterations 1-4 in `validation.md` (1 FAIL → FT1/FT2 → 2 PASS; Phase 5: 3 FAIL → FT3/FT4 → 4 FAIL → FT5 → iteration 5)" — direct read of `.specs/HANDOFF.md:26-28` confirms this is the live text at HEAD.
+
+Repo-wide sweep for live status claims of "intentionally absent": `/usr/bin/grep -rn "intentionally absent" .specs/` → 5 hits, each judged individually:
+
+- `validation.md:217` (this file, iteration-4 "Next steps" prose) — quotation, narrating the gap that was fixed. **Exempt.**
+- `validation.md:419` (this file, iteration-3 secondary-observation prose) — quotation, describing a pre-existing `FEATURES.json` note (already resolved by an earlier fix task per `tasks.md:251`). **Exempt.**
+- `validation.md:444` (this file, iteration-4 Check-1 sweep result) — quotation confirming zero live occurrences in `FEATURES.json`. **Exempt.**
+- `tasks.md:251` (FT3 task body) and `tasks.md:267` (FT5 task body) — both are fix-task narrative describing what was corrected. **Exempt.**
+- `close-maintenance-next-steps-2026-07-13/spec.md:58` — a sealed, unrelated feature's test-fixture description ("a disposable negative fixture has ... one needle intentionally absent"), a different subject (test fixtures, not validation status) in a different feature entirely. **Exempt (unrelated sealed feature).**
+
+Broadened the sweep beyond the literal phrase to catch a differently-worded live claim (`NOT RUN`, `not yet independently validated`, `validation.md intentionally`): the only other tlc-330-harness-update-related hit is `validation.md:400`, "`test:scripts` not run per the documented native-grammar provisioning gap" — a scoped, accurate statement about a *different* test target (`bun run test:scripts` as a whole, not this feature's validation state) and not a claim that validation itself was not run. **Not a live claim of the defect class this check targets.** All other hits from the broadened sweep belong to unrelated features (`skills-directive-dedup` in `STATE.md`, `sensor-repair-2026-07`, `audit-remediation-2026-07`, `core-layering-*`, etc.) or unrelated topics (migration/test-execution prose), confirmed by reading surrounding context for each.
+
+**Gap 3: fully closed** — no live claim that `tlc-330-harness-update`'s validation was not run or that `validation.md` is intentionally absent remains anywhere in `.specs/`.
+
+### No-regression gate re-run (own exit codes, no pipes)
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `bun test scripts/__tests__/spec-driven-validators.test.ts` (isolated) | 0 | 44 pass, 0 fail |
+| `bun test scripts/__tests__/subagent-parity.test.ts` (isolated) | 0 | 40 pass, 0 fail |
+| `bun test scripts/__tests__/skill-artifact-parity.test.ts` (isolated) | 0 | 19 pass, 0 fail |
+| `bun run scripts/generate-skill-artifacts.ts --check` | 0 | "No drift: generated skill bundles match checked-in files." |
+| `bun run scripts/generate-subagent-artifacts.ts --check` | 0 | "No drift: generated files match checked-in files." |
+| `bun run lint` | 0 | oxlint clean |
+| `python3 -B skills/massa-ai/scripts/validate_spec.py tlc-330-harness-update` | 0 | 0 errors, 0 warnings |
+| `python3 -B skills/massa-ai/scripts/validate_spec.py python-to-typescript-scripts` | 0 | 0 errors, 0 warnings |
+| `python3 -B skills/massa-ai/scripts/validate_tasks.py tlc-330-harness-update` | 0 | 0 errors, 6 warnings (T18/FT1/FT2/T21/T22/FT5, each correctly attributed to its own `Where` field — same pre-existing granularity-smell shape as iteration 4, no new folding introduced by FT5's own `### FT5:` header, which is `T\d+`-shaped-with-prefix and parses correctly under the current widened regex) |
+| `python3 -B skills/massa-ai/scripts/check_specs_delivered.py tlc-330-harness-update` | **1** | 0 other errors, 7 paths checked — the one `ERROR` is `M .specs/features/tlc-330-harness-update/validation.md`, this report's own uncommitted edit. **Expected exception per the dispatch brief** — the orchestrator commits `validation.md` after the verdict is returned. |
+
+No regression against any of iterations 1-4's closed findings (GEN-01 AC1, SYNC-12 AC1, ALLWF-01/02/03 all remain closed — re-exercised implicitly by the clean parity + generator + validator runs above).
+
+### Iteration 5 verdict
+
+All 3 of iteration 4's ranked gaps are closed with independently reproduced evidence:
+
+1. **Gap 1 (spec.md:79 stale row)** — closed; whole-document sweep confirms no remaining live instance of the stale 24/12 figures (2 residual hits, both judged non-stale: one a disclaimed historical quotation, one an unrelated count).
+2. **Gap 2 (dead fixture)** — closed; the rebuilt first FT4 fixture now kills under a scratch-worktree mutation (2/2 fixtures killed), with fixture 1 failing in exactly the self-dep/ordering error shape the fix commit claims.
+3. **Gap 3 (HANDOFF narrative)** — closed; `HANDOFF.md` no longer claims validation was not run, and a `.specs/`-wide sweep for live "intentionally absent" claims (plus a broadened synonym sweep) found zero remaining live instances for this feature — all hits are either quotations narrating the fix history or genuinely unrelated features/topics.
+
+The full no-regression gate set is 9/10 green with the one exception being the expected, documented `check_specs_delivered.py` finding on this report's own uncommitted edit — not a defect.
+
+**Overall verdict (iteration 5): PASS. No gaps remain. This feature is ready for delivery.**

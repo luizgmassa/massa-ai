@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — TLC 3.3.0 Harness Update (**AMENDED 2026-08-04: Phase 5 T19-T22 executing; iteration-3 validation next**)
+## Current — TLC 3.3.0 Harness Update (**VALIDATED PASS 2026-08-04 — T1-T22 + FT1-FT5, 5 verification iterations; PR #64**)
 - **Phase 5 amendment (user, post-PR#64-green):** ALLWF-01/02 Core Contract rules + KVC
   leads-not-truth rewording (T19 `e751c777`), ALLWF-03 read-only charter sweep to `deep` —
   14/17 charters deep, 3 write-capable unchanged (T20 `277ec7a5`), PYTS-01

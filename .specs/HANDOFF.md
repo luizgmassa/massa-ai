@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — TLC 3.3.0 Harness Update (Phase 5 amendment executing 2026-08-04; PR #64 open)
+## Active — TLC 3.3.0 Harness Update (VALIDATED PASS 2026-08-04 incl. Phase 5 amendment; PR #64 open, merge = user's decision)
 - **Phase 5 (user amendment):** ALL-workflows rules (verify-don't-assume + docs-are-leads +
   ask-when-in-doubt in router Core Contract; 8 read-only charters → `deep`) + planned
   `python-to-typescript-scripts` spec. T19 `e751c777`, T20 `277ec7a5`, T21 `b291b0fb`;
