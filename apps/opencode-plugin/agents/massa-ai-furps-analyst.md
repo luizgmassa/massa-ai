@@ -1,7 +1,7 @@
 ---
 description: Read-only FURPS+ dimension analyst. Analyze exactly one FURPS+ dimension (F, U, R, P, S, or X) of a PRD or ADR against its checklist section and return structured refinement findings. Triggers when the furps-refinement workflow fans out per-dimension analysis. Never analyzes other dimensions, never writes files, never mutates Atlassian issues.
 mode: all
-model: opencode-go/glm-5.2
+model: opencode-go/minimax-m3
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
 ---

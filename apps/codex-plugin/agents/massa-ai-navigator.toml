@@ -1,7 +1,7 @@
 # massa-ai-owned
 name = "massa-ai-navigator"
 description = "Code exploration specialist that leverages the massa-ai semantic index instead of brute-force file reads. Use when the user asks \"where is X?\", \"how does Y work?\", \"who calls Z?\", or for any question about an indexed codebase. Starts every investigation by consulting the massa-ai index (project map, definitions, references) before falling back to Read/Grep."
-model = "gpt-5.4-mini"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = """# Navigator Agent Skill

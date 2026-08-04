@@ -1,7 +1,7 @@
 ---
 description: Read-only requirements analysis agent. Detect ambiguity, missing requirements, contradictions, implicit requirements, and uncovered scenarios before implementation. Triggers during the Specify phase when gray areas, persistence, external calls, auth, payments, concurrency, or state transitions affect behavior. Never implements.
 mode: all
-model: opencode-go/glm-5.2
+model: opencode-go/minimax-m3
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
 ---

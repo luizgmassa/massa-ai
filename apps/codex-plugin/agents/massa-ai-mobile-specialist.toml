@@ -1,7 +1,7 @@
 # massa-ai-owned
 name = "massa-ai-mobile-specialist"
 description = "Conditional mobile expertise agent. Provide Android, Kotlin, Compose, KMP, Swift, iOS, Gradle, CocoaPods, performance, lifecycle, and offline-sync guidance. Invoked only when the workflow detects a mobile-related project. Read-only. Triggers on mobile detection signals; refuses non-mobile targets."
-model = "gpt-5.6-terra"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = """# Mobile Specialist Agent Skill

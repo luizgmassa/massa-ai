@@ -167,10 +167,12 @@ Judge the tier by the work in front of the role, not by the role's title:
 | Batch worker — mechanical phase | Entities, DTOs, config, wiring, straightforward CRUD against a settled pattern | `light` / `standard` |
 | Verifier | Adversarial reasoning: designs mutations, re-derives coverage, judges outcome precision | `deep` (always — see below) |
 | Specify / Tasks authoring | Structured but judgment-heavy | `standard` / `deep` |
+| Read-only specialist (audit-specialist, context-curator, furps-analyst, investigator, mobile-specialist, navigator, requirements-analyst, reviewer) | No write access — findings, investigation, or review quality is the entire deliverable, with no implementation pass downstream to catch a missed nuance | `deep` (always — see below) |
 
 **Rules of thumb:**
 
 - When unsure, size up, not down. An under-powered worker on ambiguous logic produces gaps the Verifier then has to catch — more expensive than paying for reasoning once.
 - **The Verifier always runs on the deepest tier** — per project rule, `skills/agents/verification-agent/SKILL.md` pins `metadata.model_tier: deep`, structurally, not just as advisory guidance here. A weak Verifier defeats the author ≠ verifier gate.
+- **Read-only specialists always run on the deepest tier** — this generalizes the Verifier rule: every findings-only or investigation-only charter (`permission: read-only`) pins `metadata.model_tier: deep` structurally, because there is no later implementation pass to catch what a weaker read-only pass missed.
 - Set the tier per batch, from that batch's phases. A feature can mix tiers across batches.
-- Outside the Verifier's structural pin, this table is advisory metadata only — no gate, commit, or verification step depends on it.
+- Outside the Verifier's and read-only specialists' structural pins, this table is advisory metadata only — no gate, commit, or verification step depends on it.

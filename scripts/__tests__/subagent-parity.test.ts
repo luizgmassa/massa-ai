@@ -658,6 +658,31 @@ describe("subagent parity — frozen baseline diff (MPR-R8)", () => {
     "claude/verification-agent",
     "codex/verification-agent",
     "opencode/verification-agent",
+    // ALLWF-03 (T20): 8 read-only specialist charters bumped standard/light -> deep.
+    // Cursor excepted wholesale (see the loop above); claude/navigator and
+    // opencode/requirements-analyst were already authorised above and stay listed once.
+    "claude/audit-specialist",
+    "codex/audit-specialist",
+    "opencode/audit-specialist",
+    "claude/context-curator",
+    "codex/context-curator",
+    "opencode/context-curator",
+    "claude/furps-analyst",
+    "codex/furps-analyst",
+    "opencode/furps-analyst",
+    "claude/investigator",
+    "codex/investigator",
+    "opencode/investigator",
+    "claude/mobile-specialist",
+    "codex/mobile-specialist",
+    "opencode/mobile-specialist",
+    "codex/navigator",
+    "opencode/navigator",
+    "claude/requirements-analyst",
+    "codex/requirements-analyst",
+    "claude/reviewer",
+    "codex/reviewer",
+    "opencode/reviewer",
   ]);
 
   // The fixture is frozen to the base commit (45daaa1) and must never be regenerated, so it
@@ -704,9 +729,12 @@ describe("subagent parity — frozen baseline diff (MPR-R8)", () => {
 
   test("every enumerated change actually happened — the diff is not empty", async () => {
     // Guards the inverse failure: a fixture test that passes because nothing changed.
+    // navigator and requirements-analyst were re-bumped again by ALLWF-03 (T20, both
+    // now `deep`), so their expected post-change model is the T20 value, not the
+    // earlier SYNC-11-era one.
     const claudeNav = parseMdFrontmatter(await readAgentMd("claude-plugin", "navigator"));
     expect(BASELINE.agents.navigator!.claude!.model).toBe("sonnet");
-    expect(claudeNav.model).toBe("haiku");
+    expect(claudeNav.model).toBe("opus");
 
     const ocPlanner = parseMdFrontmatter(await readAgentMd("opencode-plugin", "planner"));
     expect(BASELINE.agents.planner!.opencode!.model).toBe("opencode-go/glm-5.2");
@@ -716,6 +744,40 @@ describe("subagent parity — frozen baseline diff (MPR-R8)", () => {
     expect(BASELINE.agents["requirements-analyst"]!.opencode!.model).toBe(
       "opencode-go/deepseek-v4-pro",
     );
-    expect(ocReq.model).toBe("opencode-go/glm-5.2");
+    expect(ocReq.model).toBe("opencode-go/minimax-m3");
+
+    // ALLWF-03 (T20): read-only-specialist tier bump to `deep`, one sanity check per
+    // remaining charter (host chosen to exercise a distinct provider each time).
+    const claudeAudit = parseMdFrontmatter(await readAgentMd("claude-plugin", "audit-specialist"));
+    expect(BASELINE.agents["audit-specialist"]!.claude!.model).toBe("sonnet");
+    expect(claudeAudit.model).toBe("opus");
+
+    const codexCtx = toml.parse(await readAgentToml("context-curator")) as Record<
+      string,
+      unknown
+    >;
+    expect(BASELINE.agents["context-curator"]!.codex!.model).toBe("gpt-5.4-mini");
+    expect(codexCtx.model).toBe("gpt-5.6-sol");
+
+    const ocFurps = parseMdFrontmatter(await readAgentMd("opencode-plugin", "furps-analyst"));
+    expect(BASELINE.agents["furps-analyst"]!.opencode!.model).toBe("opencode-go/glm-5.2");
+    expect(ocFurps.model).toBe("opencode-go/minimax-m3");
+
+    const claudeInvestigator = parseMdFrontmatter(
+      await readAgentMd("claude-plugin", "investigator"),
+    );
+    expect(BASELINE.agents["investigator"]!.claude!.model).toBe("haiku");
+    expect(claudeInvestigator.model).toBe("opus");
+
+    const codexMobile = toml.parse(await readAgentToml("mobile-specialist")) as Record<
+      string,
+      unknown
+    >;
+    expect(BASELINE.agents["mobile-specialist"]!.codex!.model).toBe("gpt-5.6-terra");
+    expect(codexMobile.model).toBe("gpt-5.6-sol");
+
+    const claudeReviewer = parseMdFrontmatter(await readAgentMd("claude-plugin", "reviewer"));
+    expect(BASELINE.agents["reviewer"]!.claude!.model).toBe("sonnet");
+    expect(claudeReviewer.model).toBe("opus");
   });
 });

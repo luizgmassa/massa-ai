@@ -225,7 +225,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T19
 **Tests**: scripted tier sweep prints 14/17 deep + 3 write-capable unchanged; both parity suites green; both `--check` clean
 **Gate**: sweep + parity + checks all exit 0
-**Status**: [ ]
+**Status**: [x]
 
 ### T21: Author python-to-typescript-scripts spec + registration
 **Where**: `.specs/features/python-to-typescript-scripts/spec.md` (new), `.specs/project/FEATURES.json`

@@ -2,7 +2,7 @@
 name: massa-ai-reviewer
 description: Read-only diff review agent. Analyze diffs to detect bugs, regressions, code smells, missing edge cases, and suggest improvements. Triggers after a builder completes a task and before the verification gate. Never implements, rewrites files, or plans features.
 tools: ["Read","Grep","Glob","Bash"]
-model: sonnet
+model: opus
 effort: high
 ---
 # Reviewer Agent Skill

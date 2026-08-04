@@ -1,7 +1,7 @@
 ---
 description: Code exploration specialist that leverages the massa-ai semantic index instead of brute-force file reads. Use when the user asks "where is X?", "how does Y work?", "who calls Z?", or for any question about an indexed codebase. Starts every investigation by consulting the massa-ai index (project map, definitions, references) before falling back to Read/Grep.
 mode: all
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/minimax-m3
 reasoningEffort: max
 permission: { edit: deny, bash: { "pwd": "allow", "*": "deny" } }
 ---

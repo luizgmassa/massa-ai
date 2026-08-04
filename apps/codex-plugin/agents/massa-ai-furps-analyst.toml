@@ -1,7 +1,7 @@
 # massa-ai-owned
 name = "massa-ai-furps-analyst"
 description = "Read-only FURPS+ dimension analyst. Analyze exactly one FURPS+ dimension (F, U, R, P, S, or X) of a PRD or ADR against its checklist section and return structured refinement findings. Triggers when the furps-refinement workflow fans out per-dimension analysis. Never analyzes other dimensions, never writes files, never mutates Atlassian issues."
-model = "gpt-5.6-terra"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = """# FURPS-Analyst Agent Skill

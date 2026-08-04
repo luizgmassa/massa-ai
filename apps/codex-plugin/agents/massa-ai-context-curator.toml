@@ -1,7 +1,7 @@
 # massa-ai-owned
 name = "massa-ai-context-curator"
 description = "Read-only context preparation agent. Decide which files to open, retrieve memories, use Synapse when appropriate, apply Context Firewall rules, and produce a concise Context Packet consumed by other agents. Triggers when a workflow needs the minimum high-quality context before dispatching a planner, builder, or reviewer. Never implements, reviews, or plans."
-model = "gpt-5.4-mini"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = """# Context Curator Agent Skill
