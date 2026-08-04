@@ -233,7 +233,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T18
 **Tests**: `validate_spec.py python-to-typescript-scripts` exit 0 (dogfood)
 **Gate**: validator exit 0
-**Status**: [ ]
+**Status**: [x]
 
 ### T22: Amendment close-out
 **Where**: `CHANGELOG.md`, `.specs/project/STATE.md`, `.specs/HANDOFF.md`, `.specs/features/tlc-330-harness-update/validation.md`
