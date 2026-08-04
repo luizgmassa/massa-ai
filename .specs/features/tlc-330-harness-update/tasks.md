@@ -13,7 +13,7 @@ Phase 2: T7 ──→ T8 ──→ T9 ──→ T10 ──→ T11 ──→ T12 
 Phase 3: T16 ──→ T17 ──→ T18
 Phase 4: FT1 ──→ FT2
 Phase 5: T19 ──→ T20 ──→ T21 ──→ T22
-Phase 6: FT3 ──→ FT4
+Phase 6: FT3 ──→ FT4 ──→ FT5
 ```
 
 Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depends on Phase 2 (regeneration snapshots final prose).
@@ -260,4 +260,12 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: FT3
 **Tests**: 2 new fixtures in `spec-driven-validators.test.ts` (44/0)
 **Gate**: suite + live-contract validator + `--check` all exit 0
+**Status**: [x]
+
+### FT5: Close iteration-4 gaps — stale traceability row, dead fixture, HANDOFF narrative
+**Where**: `.specs/features/python-to-typescript-scripts/spec.md`, `scripts/__tests__/spec-driven-validators.test.ts`, `.specs/HANDOFF.md`
+**What**: (1) spec.md:79 PTS-04 traceability row still carried the "12 skill prose files (24 sites)" figure FT3 was meant to eliminate — a clause and its fix must touch the same lines; now sweep-derived phrasing. (2) FT4's first regression fixture never observed its defect (passed identically under mutation); rebuilt into the live defect shape (later-phase FT depending on previous phase's last task, diagram arrows present) and observed red against a reverted parser in scratch (exit 1, exact "T2 declares Depends on: T2" error) vs current exit 0. (3) HANDOFF.md's "validation.md intentionally absent" narrative replaced with the iteration history.
+**Depends on**: FT4
+**Tests**: suite green with rebuilt fixture; scratch mutation kills 2/2; sweep shows 0 LIVE status claims of the stale phrase (8 hits total, all quotations in fix-task/validation narrative + one unrelated sealed spec — a claim of absence can be the match)
+**Gate**: suite + validators + sweep all exit 0
 **Status**: [x]

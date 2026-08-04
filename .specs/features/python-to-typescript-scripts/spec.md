@@ -76,7 +76,7 @@ Open questions: none — the migration is user-directed; remaining unknowns are 
 | PTS-01 | `skills/massa-ai/scripts/{validate_spec,validate_tasks,validate_state,check_commit,check_specs_delivered}.{py→ts}` |
 | PTS-02 | `skills/massa-ai/scripts/lessons.{py→ts}`, `.specs/lessons.json` (read-only contract) |
 | PTS-03 | `scripts/update-fixture-hashes.{py→ts}`, `scripts/synapse-bench-analyze-v2.{py→ts}`, `package.json` |
-| PTS-04 | 12 skill prose files (24 sites), `scripts/__tests__/spec-driven-validators.test.ts`, regenerated `apps/*-plugin/skills/**` |
+| PTS-04 | sweep-derived: 25 skill source files (41 `python3` lines) + 16 non-literal `.py` reference lines at authoring — Design re-derives per AC2; `scripts/__tests__/spec-driven-validators.test.ts`, `package.json`, regenerated `apps/*-plugin/skills/**` |
 | PTS-05 | per-task commit discipline (process requirement) |
 | PTS-06 | new dual-run characterization harness (location decided in Design) |
 

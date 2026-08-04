@@ -23,8 +23,9 @@
   per task, commit range `e6b282c4`..`ca621e0a`+close-out. Delivery ran as two inline task ranges
   plus three sequential batch workers (Phase 1 inline T1-T6, Phase 2 inline T7-T15, Phase 3 batch
   T16-T18) — offered and confirmed per BATCH-01's own lowered `>3`-task trigger, which this
-  feature's own change now governs. Independent validation **NOT RUN** — `validation.md`
-  intentionally absent at this commit; the next verifier writes it.
+  feature's own change now governs. Independent validation HAS RUN since this note was first
+  written: iterations 1-4 in `validation.md` (1 FAIL → FT1/FT2 → 2 PASS; Phase 5: 3 FAIL →
+  FT3/FT4 → 4 FAIL → FT5 → iteration 5).
 - **Next action (independent verifier):** run the Verification Ladder against this branch
   (author != verifier is mandatory), then `python3 skills/massa-ai/scripts/validate_state.py
   tlc-330-harness-update` before the feature is marked done. Do not push or open a PR until

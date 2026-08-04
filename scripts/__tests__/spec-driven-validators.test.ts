@@ -829,6 +829,11 @@ describe("check_specs_delivered.py (T6, GATE-02 AC1-2)", () => {
 // ---------------------------------------------------------------------------
 
 describe("validate_tasks.py fix-task headers (FT4, IT2-01)", () => {
+  // Defect shape from the live contract (iteration-4 sensor finding): the FT
+  // task sits in a LATER phase and depends on the last task of the previous
+  // phase. An unrecognized `### FT1:` header folds its `Depends on: T2` line
+  // into T2's own record, which the ordering check reports as T2 depending on
+  // itself — the exact false ERROR observed on this feature's tasks.md.
   const FT_TASKS_MD = [
     "# Tasks",
     "",
@@ -837,7 +842,7 @@ describe("validate_tasks.py fix-task headers (FT4, IT2-01)", () => {
     "### Phase Execution Map",
     "",
     "```",
-    "Phase 1: T1",
+    "Phase 1: T1 ──→ T2",
     "Phase 2: FT1",
     "```",
     "",
@@ -862,18 +867,25 @@ describe("validate_tasks.py fix-task headers (FT4, IT2-01)", () => {
     "**Gate**: g",
     "**Status**: [x]",
     "",
+    "### T2: Extend the thing",
+    "**Where**: `b.ts`",
+    "**Depends on**: T1",
+    "**Tests**: t",
+    "**Gate**: g",
+    "**Status**: [x]",
+    "",
     "### Phase 2: Fixes",
     "",
     "### FT1: Fix the thing",
     "**Where**: `a.ts`",
-    "**Depends on**: T1",
+    "**Depends on**: T2",
     "**Tests**: t",
     "**Gate**: g",
     "**Status**: [x]",
     "",
   ].join("\n");
 
-  test("FT-prefixed header is its own task: backward dep on T1 passes, no self-dep false positive", () => {
+  test("FT-prefixed header is its own task: backward dep on T2 passes, no self-dep false positive", () => {
     const root = makeTempRoot("validate-tasks-ft-ok");
     writeFeatureFile(root, "my-feature", "tasks.md", FT_TASKS_MD);
     const r = runPy(VALIDATE_TASKS, ["--root", root]);
@@ -887,7 +899,7 @@ describe("validate_tasks.py fix-task headers (FT4, IT2-01)", () => {
       root,
       "my-feature",
       "tasks.md",
-      FT_TASKS_MD.replace("### FT1: Fix the thing\n**Where**: `a.ts`\n**Depends on**: T1\n**Tests**: t\n**Gate**: g", "### FT1: Fix the thing\n**Where**: `a.ts`\n**Depends on**: T1\n**Tests**: t"),
+      FT_TASKS_MD.replace("### FT1: Fix the thing\n**Where**: `a.ts`\n**Depends on**: T2\n**Tests**: t\n**Gate**: g", "### FT1: Fix the thing\n**Where**: `a.ts`\n**Depends on**: T2\n**Tests**: t"),
     );
     const r = runPy(VALIDATE_TASKS, ["--root", root]);
     expect(r.exitCode).toBe(1);
