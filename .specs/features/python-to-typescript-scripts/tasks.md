@@ -103,7 +103,7 @@ Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py
 **Depends on**: T6
 **Tests**: suite green (incl. C5 template-conformance); dual-run empty
 **Gate**: suite + dual-run + `--check` all exit 0
-**Status**: [ ]
+**Status**: [x]
 
 ### T8: Port validate_tasks
 **Where**: `skills/massa-ai/scripts/validate_tasks.ts` (new), `.py` (deleted), its prose sites, suite spawns + regenerated bundles

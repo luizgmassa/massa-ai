@@ -48,7 +48,7 @@ type ScriptRuntime = "python" | "bun";
 // task (T4-T9) flips exactly one basename from "python" to "bun" as its `.ts`
 // twin lands; after T9 every entry resolves to "bun".
 const SCRIPT_RUNTIME: Record<string, ScriptRuntime> = {
-  validate_spec: "python",
+  validate_spec: "bun",
   validate_tasks: "python",
   check_commit: "bun",
   validate_state: "bun",

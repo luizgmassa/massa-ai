@@ -333,6 +333,89 @@ export const REGISTRY: Record<string, ScriptEntry> = {
       ];
     },
   },
+  validate_spec: {
+    pyRel: "skills/massa-ai/scripts/validate_spec.py",
+    tsRel: "skills/massa-ai/scripts/validate_spec.ts",
+    invocations: () => {
+      const FILLED_SPEC = `# Test Feature Specification
+
+## Problem Statement
+
+Users need to authenticate. This solves a security gap by adding login.
+
+## Out of Scope
+
+| Feature | Reason |
+| --- | --- |
+| SSO | not needed for v1 |
+
+## Assumptions & Open Questions
+
+| Assumption / decision | Chosen default | Rationale | Confirmed? |
+| --- | --- | --- | --- |
+| Session length | 30 minutes | Matches existing services | y |
+
+**Open questions:** none — all resolved or logged above.
+
+## User Stories
+
+### P1: Login ⭐ MVP
+
+**User Story**: As a user, I want to log in so that I can access my account.
+
+**Acceptance Criteria**:
+
+1. WHEN the user submits valid credentials THEN the system SHALL authenticate the user.
+2. WHEN the user submits invalid credentials THEN the system SHALL reject the login.
+
+## Requirement Traceability
+
+| Requirement ID | Story | Phase | Status |
+| --- | --- | --- | --- |
+| AUTH-01 | P1: Login | Design | Pending |
+`;
+
+      const WITHOUT_OUT_OF_SCOPE = FILLED_SPEC.replace(/## Out of Scope[\s\S]*?\n\n(?=## Assumptions)/, "");
+      const NO_SHALL = FILLED_SPEC.replace(
+        "1. WHEN the user submits valid credentials THEN the system SHALL authenticate the user.",
+        "1. WHEN the user submits valid credentials THEN the system logs the user in.",
+      );
+
+      const filledRoot = makeTempRoot("dual-run-spec-filled");
+      writeFeatureFile(filledRoot, "auth-feature", "spec.md", FILLED_SPEC);
+
+      const missingSectionRoot = makeTempRoot("dual-run-spec-missing-section");
+      writeFeatureFile(missingSectionRoot, "auth-feature", "spec.md", WITHOUT_OUT_OF_SCOPE);
+
+      const noShallRoot = makeTempRoot("dual-run-spec-no-shall");
+      writeFeatureFile(noShallRoot, "auth-feature", "spec.md", NO_SHALL);
+
+      const autodetectRoot = makeTempRoot("dual-run-spec-autodetect");
+      writeFeatureFile(autodetectRoot, "only-feature", "spec.md", FILLED_SPEC);
+
+      const ambiguousRoot = makeTempRoot("dual-run-spec-ambiguous");
+      writeFeatureFile(ambiguousRoot, "feature-a", "spec.md", FILLED_SPEC);
+      writeFeatureFile(ambiguousRoot, "feature-b", "spec.md", FILLED_SPEC);
+
+      return [
+        { label: "filled fixture", args: ["--root", filledRoot], cwd: filledRoot },
+        { label: "missing required section", args: ["--root", missingSectionRoot], cwd: missingSectionRoot },
+        { label: "SHALL-less acceptance criterion", args: ["--root", noShallRoot], cwd: noShallRoot },
+        { label: "auto-detect sole feature", args: ["--root", autodetectRoot], cwd: autodetectRoot },
+        { label: "ambiguous multiple features", args: ["--root", ambiguousRoot], cwd: ambiguousRoot },
+        {
+          label: "feature-name resolution with default root='.' (path-join dialect sensor)",
+          args: ["python-to-typescript-scripts", "--root", "."],
+          cwd: REPO_ROOT,
+        },
+        {
+          label: "live dogfood: this feature's own spec.md",
+          args: [".specs/features/python-to-typescript-scripts/spec.md"],
+          cwd: REPO_ROOT,
+        },
+      ];
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------

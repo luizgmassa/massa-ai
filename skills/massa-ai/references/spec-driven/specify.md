@@ -115,7 +115,7 @@ Write every acceptance criterion in **EARS** (Easy Approach to Requirements Synt
 
 **Why patterns beat one shape:** failure states, state transitions, and optional behavior become first-class criteria instead of footnotes squeezed into WHEN/THEN. The patterns map onto the implicit-requirement dimensions above: state-transition integrity to State-driven; failure and external-dependency failure to Unwanted-behavior; feature flags to Optional-feature.
 
-**Rules:** one requirement per criterion (never bundle two behaviors); use concrete values (a specific status code, a specific message, a bound) rather than "quickly" or "gracefully"; every criterion contains a SHALL and is measurable. `python3 skills/massa-ai/scripts/validate_spec.py` flags any criterion without a SHALL and any that matches no recognized pattern.
+**Rules:** one requirement per criterion (never bundle two behaviors); use concrete values (a specific status code, a specific message, a bound) rather than "quickly" or "gracefully"; every criterion contains a SHALL and is measurable. `bun skills/massa-ai/scripts/validate_spec.ts` flags any criterion without a SHALL and any that matches no recognized pattern.
 
 ### 4. Requirement Closure Gate (before confirm)
 
@@ -135,7 +135,7 @@ Before Design, Tasks, or Execute — and before presenting the spec for confirma
 
 6. **Continue only when** the Open Questions table is empty or every row has an accepted assumption.
 
-7. **Deterministic backing (run it, do not eyeball it):** `python3 skills/massa-ai/scripts/validate_spec.py <feature> [--root .]` checks that required sections exist, every AC is EARS-shaped (has a SHALL), no Assumptions row has an empty default or rationale, and requirement IDs are well-formed. A non-zero exit means fix before confirming — the script checks structure; the judgment calls (is the interpretation right, is the outcome precise) stay yours. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
+7. **Deterministic backing (run it, do not eyeball it):** `bun skills/massa-ai/scripts/validate_spec.ts <feature> [--root .]` checks that required sections exist, every AC is EARS-shaped (has a SHALL), no Assumptions row has an empty default or rationale, and requirement IDs are well-formed. A non-zero exit means fix before confirming — the script checks structure; the judgment calls (is the interpretation right, is the outcome precise) stay yours. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
 Fix inline. This gate is bounded to THIS feature's stated dimensions and actual behavior — never to "anything imaginable." The Out of Scope table and anti-scope-creep rules remain the counterweights: the gate clarifies existing requirements, it never invents new ones.
 
@@ -286,13 +286,13 @@ How we know the feature is successful:
 - **Edge cases matter** — What breaks? What's empty? What's huge?
 - **Out of Scope prevents creep** — If it's not here, it doesn't get built
 - **Closure gate before confirm** — Three checks: unambiguity + precision, open-questions/assumptions closure, declined gray areas logged; scope-tiered; bounded to stated dimensions; never invents requirements
-- **Confirm after the gate passes** — Present the spec for user confirmation only after the closure gate passes (no unresolved-and-unmarked items remain) and `validate_spec.py` exits clean; user approves spec before moving to the discuss phase
+- **Confirm after the gate passes** — Present the spec for user confirmation only after the closure gate passes (no unresolved-and-unmarked items remain) and `validate_spec.ts` exits clean; user approves spec before moving to the discuss phase
 
 ---
 
 ## Done
 
-Specify is done when every requirement has an ID, acceptance criteria are testable EARS statements, edge cases are named, out-of-scope boundaries are explicit, implicit-requirement dimensions are resolved or marked `N/A because <reason>`, the Requirement Closure Gate is satisfied, and `validate_spec.py` exits clean (or the no-code-execution-tool fallback was applied).
+Specify is done when every requirement has an ID, acceptance criteria are testable EARS statements, edge cases are named, out-of-scope boundaries are explicit, implicit-requirement dimensions are resolved or marked `N/A because <reason>`, the Requirement Closure Gate is satisfied, and `validate_spec.ts` exits clean (or the no-code-execution-tool fallback was applied).
 
 ## Massa-ai Integration
 
