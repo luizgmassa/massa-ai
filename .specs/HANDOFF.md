@@ -1,6 +1,30 @@
 # Handoff
 
-## Active — TLC 3.3.0 Harness Update (VALIDATED PASS 2026-08-04 incl. Phase 5 amendment; PR #64 open, merge = user's decision)
+## Active — Python→TypeScript Scripts + Lessons Single-Store (EXECUTE in progress 2026-08-04)
+
+- **Feature:** `python-to-typescript-scripts` — 8-script py→ts migration (PTS-01..06) +
+  lessons single-store LSN-01 (user amendment: `lessons.json` survives, `LESSONS.md` +
+  render path deleted). Contract:
+  `.specs/features/python-to-typescript-scripts/{spec,design,tasks}.md` — read those, not
+  this file, for per-task write sets and gates. Branch `spec/python-to-typescript-scripts`,
+  worktree `.claude/worktrees/python-to-typescript-scripts`, from `origin/main` @
+  `e932a673` (PR #64 merge commit).
+- **State:** Specify (amended) + Design + Tasks + full Plan Challenge (pre_mortem, 4
+  findings all folded — see design.md Plan Challenge Record) DONE; Execute dispatched as
+  3 sequential batch workers (user confirmed): B1 T1-T3, B2 T4-T9, B3 T10-T12. One
+  atomic commit per task, status-before-commit, dual-run parity before every `.py`
+  deletion, same-commit bundle regen.
+- **User decisions this session:** merge PR #64 first (done, `e932a673`); lessons.json is
+  the single store; one combined feature; delivery through PR creation authorized
+  (commits+push+PR); merge of THIS feature's PR stays the user's (minor release).
+- **Environment:** worktree provisioned (install + 4-dir addon copy + build + prisma
+  generate; grammar suite 9/0 — note turbo FULL-TURBO cache restores dist but NOT
+  `src/generated/prisma`, run `bunx prisma generate` in fresh worktrees). massa-ai MCP
+  unreachable; `.specs/` canonical.
+- **Next action:** B1 → B2 → B3 → independent verification-agent (deep) validation →
+  delivery gate → push + PR → CI watch → user merge decision.
+
+## Previous — TLC 3.3.0 Harness Update (VALIDATED PASS 2026-08-04 incl. Phase 5 amendment + FT6 delivery repair; MERGED as PR #64 @ `e932a673` 2026-08-04)
 - **Phase 5 (user amendment):** ALL-workflows rules (verify-don't-assume + docs-are-leads +
   ask-when-in-doubt in router Core Contract; 8 read-only charters → `deep`) + planned
   `python-to-typescript-scripts` spec. T19 `e751c777`, T20 `277ec7a5`, T21 `b291b0fb`;

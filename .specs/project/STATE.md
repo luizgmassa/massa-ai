@@ -1,6 +1,40 @@
 # massa-ai Spec State
 
-## Current — TLC 3.3.0 Harness Update (**VALIDATED PASS 2026-08-04 — T1-T22 + FT1-FT6 (FT6 = delivery repair 1), 5 verification iterations; PR #64**)
+## Current — Python→TypeScript Scripts + Lessons Single-Store (**EXECUTE dispatched 2026-08-04; branch `spec/python-to-typescript-scripts`**)
+
+- projectId: `massa-ai` · parent workflowSessionId: `spec-python-to-typescript-scripts` ·
+  workflow: spec-driven (Large) · branch `spec/python-to-typescript-scripts`, worktree
+  `.claude/worktrees/python-to-typescript-scripts`, cut from `origin/main` @ `e932a673`
+  (the PR #64 merge commit; that merge's minor release chain was in flight at cut).
+- Scope: PTS-01..06 (8-script py→ts migration under Bun, CLI/exit/output parity) + LSN-01
+  (lessons single-store: `.specs/lessons.json` survives, `LESSONS.md` + render path
+  deleted). User decisions this session: json survives (over markdown-canonical), one
+  combined feature (over two sequential), delivery-through-PR authorized for the feature,
+  merge stays the user's.
+- Contract: `.specs/features/python-to-typescript-scripts/{spec,design,tasks}.md` — spec
+  amended (LSN group; PTS-02 + Out-of-Scope losing clauses superseded in place with
+  reasons), design D1-D9, 12 tasks / 4 phases. Full Plan Challenge (pre_mortem,
+  massa-ai-plan-critic, deep): 4 findings F1-F4 ALL folded before Execute — F1 Python
+  `round()` half-to-even parity sensor (0.625-class boundary op mandated in T9), F2
+  sweep-blind installed commit-msg hook symlinks (T4 local repoint + T12 CHANGELOG note),
+  F3 golden fixtures must outlive the dual-run harness (T11), F4 coverage floor verified
+  to never reach `scripts/`/`skills/` (R6 reframed). See design.md Plan Challenge Record.
+- Execute: 3 sequential batch workers (offered per the >3-task trigger, user confirmed):
+  B1 T1-T3 (LSN-01 + harness), B2 T4-T9 (six skill-script ports), B3 T10-T12 (repo
+  scripts + golden/sweeps + close-out). One atomic commit per task, status-before-commit,
+  same-commit bundle regen + `--check`, dual-run parity before every `.py` deletion,
+  python3 always spawned with `-B` (L-015).
+- Sweep populations re-derived at `e932a673` (supersede spec authoring figures per
+  PTS-04 AC2): 41 `python3` lines / 25 skill md files (36 naming the 8 targets), 28
+  `.py`-no-python3 lines (12 = LSN repoint set; 9 foreign hook basenames stay), 3 test
+  spawns, `package.json:42`; 14 live `LESSONS.md` lines; 15 live lessons in lessons.json.
+- massa-ai MCP server unreachable this session; `.specs/` files canonical per contract.
+- Next action: B1 executes T1-T3 → review → B2 → B3 → independent verification-agent
+  (deep) writes `validation.md` → `check_specs_delivered` (`.ts` by then) exit 0 →
+  push + `gh pr create` (authorized) → CI watch → merge decision to the user (minor
+  release on merge).
+
+## Previous — TLC 3.3.0 Harness Update (**VALIDATED PASS 2026-08-04 — T1-T22 + FT1-FT6 (FT6 = delivery repair 1), 5 verification iterations; MERGED as PR #64 @ `e932a673` 2026-08-04, release chain fired on green main CI**)
 - **Phase 5 amendment (user, post-PR#64-green):** ALLWF-01/02 Core Contract rules + KVC
   leads-not-truth rewording (T19 `e751c777`), ALLWF-03 read-only charter sweep to `deep` —
   14/17 charters deep, 3 write-capable unchanged (T20 `277ec7a5`), PYTS-01
