@@ -106,6 +106,13 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: .specs/features/cross-pollination-ports/design.md:107 (.specs/project/STATE.md)
 - last seen: 2026-08-03T21:30:48Z
 
+### L-015 - Test harnesses that spawn python3 against in-repo scripts must pass -B: bytecode caches materialize inside generator-managed subtrees and read as drift to full-inventory --check gates, but only when suites run in the same invocation - per-suite runs stay green
+- signal: `gate_fail` | recurrence: 1 feature(s) | harmful: 0 | confidence: 0.53
+- features: tlc-330-harness-update
+- context: project=massa-ai session=spec-harness-330-update workflow=spec-driven entity=tlc-330-harness-update
+- evidence: tlc-330-harness-update validation gap 1: spec-driven-validators.test.ts x skill-artifact-parity, reproduced 4/4 combined, 0/4 isolated
+- last seen: 2026-08-04T16:18:13Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

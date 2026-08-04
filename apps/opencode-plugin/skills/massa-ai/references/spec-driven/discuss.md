@@ -60,22 +60,42 @@ Present the feature boundary (from `spec.md`) and the gray areas to the user. Le
 
 Any gray area the user **declines** to discuss, or that goes undiscussed, is written to the spec's **Assumptions & Open Questions** section (agent's chosen default + rationale) — never silently dropped. This ensures the spec's closure gate can pass: every gray area is either resolved through discussion or recorded as a signed-off assumption.
 
-### 3. Deep-Dive Each Area
+### 3. Choose discussion pace (once)
 
-For each selected area:
+Before deep-diving, ask **one** pace question. Recommend **Guided** as the default. If the user skips, says "whatever", or "you choose", use Guided.
 
-1. Ask 3-4 concrete questions with specific options (not vague categories)
-2. After the questions, check: "More about [area], or move on?"
-3. If more → ask 3-4 more, check again
-4. After all areas → "Ready to create context?"
+| Pace         | When it fits                                      | Cadence                                                                 |
+| ------------ | -------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Quick**    | User wants speed; trusts defaults                 | Propose defaults per area (rationale included); user accepts / overrides |
+| **Guided**   | Default — balances depth and turn count           | Adaptive elicitation (see below)                                        |
+| **Detailed** | High ambiguity; user wants Socratic control       | Exactly one decision per turn, dependency order                         |
 
-**Question design:**
+Honor mid-discussion switches immediately ("go faster", "slow down", "just decide") — change pace without restarting or re-asking settled decisions.
 
-- Options should be concrete ("Card layout" not "Option A")
-- Each answer should inform the next question
-- Include "You decide" as an option when reasonable — captures agent discretion
+### 4. Deep-Dive Each Area
 
-### 4. Scope Guardrail (CRITICAL)
+Shared rules for every pace:
+
+1. Options must be concrete ("Card layout" or "Table layout" — not "Option A" or "how should it look?").
+2. Lead with your recommended answer and one line of reasoning. You have read the codebase; the user should be able to accept or override in a word.
+3. Offer "You decide" when reasonable — it records agent discretion explicitly.
+4. Resolve anything discoverable from the code yourself (Knowledge Verification Chain); only put genuine product decisions to the user.
+5. When an area is settled: "More on [area], or move on?" After all areas: "Ready to create context?"
+
+**Quick:** For each selected gray area, present the recommended decisions for that area in one turn (defaults + short rationale). Wait for accept / override. Do not drip-feed single questions unless the user challenges a default and opens a real fork.
+
+**Guided:** Adaptive elicitation — questions are a decision tree to prune, not a checklist to finish.
+
+1. Classify upcoming decisions as **independent** vs **dependent**.
+2. Low-stakes / safe-to-default → state the assumption and invite correction (no blocking question).
+3. Independent product decisions → ask **at most 2** in the same turn, each with options + recommended default.
+4. Dependent decisions → ask **exactly one**, wait, then continue (the earlier answer should prune later questions).
+5. Never dump 3+ questions in one turn. Never ask what the code already answers.
+6. Stop the area as soon as enough is decided.
+
+**Detailed:** Walk selected gray areas as a strict decision tree — one concrete question per turn, dependency order, wait for each answer before the next. Use when the user wants maximum control or the feature is highly ambiguous.
+
+### 5. Scope Guardrail (CRITICAL)
 
 The feature boundary from `spec.md` is **fixed**. Discussion clarifies HOW to implement, never WHETHER to add new capabilities.
 
@@ -84,7 +104,7 @@ The feature boundary from `spec.md` is **fixed**. Discussion clarifies HOW to im
 
 When user suggests scope creep: "That sounds like a separate feature. I'll note it in Deferred Ideas. Back to [current area]."
 
-### 5. Write `context.md`
+### 6. Write `context.md`
 
 Write `.specs/features/<slug>/context.md` (see template below).
 
@@ -175,6 +195,9 @@ Discuss is done when every gray area is either resolved with the user, recorded 
 
 ## Tips
 
+- **Pace is a user choice; Guided is the default** — Quick for speed, Guided for balance, Detailed for Socratic depth; honor mid-discussion switches
+- **Guided ≠ interrogation and ≠ form dump** — Assume-first when safe, ≤2 independent questions per turn, one-at-a-time only when answers depend on each other
+- **Look it up, don't ask** — Resolve anything discoverable from the code yourself; ask only genuine product decisions
 - **Decisions, not vision** — "Card-based layout with subtle shadows" is a decision. "Should feel modern" is not.
 - **Scope is sacred** — Deferred Ideas captures scope creep without losing ideas
 - **User = visionary, Agent = builder** — Ask about how they imagine it, not about technical implementation

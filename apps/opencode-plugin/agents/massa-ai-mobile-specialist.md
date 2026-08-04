@@ -1,7 +1,7 @@
 ---
 description: Conditional mobile expertise agent. Provide Android, Kotlin, Compose, KMP, Swift, iOS, Gradle, CocoaPods, performance, lifecycle, and offline-sync guidance. Invoked only when the workflow detects a mobile-related project. Read-only. Triggers on mobile detection signals; refuses non-mobile targets.
 mode: all
-model: opencode-go/glm-5.2
+model: opencode-go/minimax-m3
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
 ---

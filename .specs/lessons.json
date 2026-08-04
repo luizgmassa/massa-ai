@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 15,
+  "next_id": 16,
   "lessons": [
     {
       "id": "L-001",
@@ -312,6 +312,29 @@
       "workflow": "spec-driven",
       "entity": "cross-pollination-ports",
       "confidence": 0.62
+    },
+    {
+      "id": "L-015",
+      "key": "gate_fail::test harnesses that spawn python3 against in repo scripts must pass b bytecode caches materialize inside generator managed subtrees and read as drift to full inventory check gates but only when suites run in the same invocation per suite runs stay green",
+      "text": "Test harnesses that spawn python3 against in-repo scripts must pass -B: bytecode caches materialize inside generator-managed subtrees and read as drift to full-inventory --check gates, but only when suites run in the same invocation - per-suite runs stay green",
+      "signal": "gate_fail",
+      "scope": "",
+      "status": "candidate",
+      "features": [
+        "tlc-330-harness-update"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "tlc-330-harness-update validation gap 1: spec-driven-validators.test.ts x skill-artifact-parity, reproduced 4/4 combined, 0/4 isolated"
+      ],
+      "created": "2026-08-04T16:18:13Z",
+      "last_seen": "2026-08-04T16:18:13Z",
+      "project": "massa-ai",
+      "session": "spec-harness-330-update",
+      "workflow": "spec-driven",
+      "entity": "tlc-330-harness-update",
+      "confidence": 0.53
     }
   ]
 }

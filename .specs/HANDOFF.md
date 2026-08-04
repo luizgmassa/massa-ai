@@ -1,6 +1,54 @@
 # Handoff
 
-## Active — DA Inventory Closure (VALIDATED PASS 2026-08-03; PR open, merge = user's decision)
+## Active — TLC 3.3.0 Harness Update (VALIDATED PASS 2026-08-04 incl. Phase 5 amendment; PR #64 open, merge = user's decision)
+- **Phase 5 (user amendment):** ALL-workflows rules (verify-don't-assume + docs-are-leads +
+  ask-when-in-doubt in router Core Contract; 8 read-only charters → `deep`) + planned
+  `python-to-typescript-scripts` spec. T19 `e751c777`, T20 `277ec7a5`, T21 `b291b0fb`;
+  T22 close-out + iteration-3 validation in flight.
+- **Validation:** iteration 1 FAIL → FT1/FT2 (`19ebe0cd`, `98f76d0f`) → iteration 2 PASS
+  (4/4 + 1 mutations killed across iterations, gates exit 0). Follow-ups IT2-01/IT2-02 in
+  `validation.md` — future minor fix tasks, not blockers.
+- **Delivery repair 1 (FT6):** post-close-out CI `build` red — 3 `bun run test:scripts`
+  failures, all stale tests vs ALLWF-03 (outside the scoped verification set;
+  validation.md's recorded scope limit). FT6: duplication ceiling 313→331
+  raise-with-reason (+18 differential = charter-frontmatter uniformity from the 8 deep
+  pins), investigator expectation `light`→`deep`, profile-selection test →
+  `documentation-agent` (the remaining light charter). Worktree was wholly unprovisioned
+  (no `node_modules`, worse than the earlier partial-copy note) — install + 4-dir addon
+  copy + `bun run build`, grammar suite 9/0. Local gates own-exit-code green:
+  `test:scripts` 0 (1277/0 TS + shell suites), `lint` 0, `validate_tasks.py` 0 errors.
+  One atomic commit, then push + `gh pr checks 64` re-watch. Merge = user (minor release).
+
+
+- **Feature:** `tlc-330-harness-update` — port TLC 3.3.0's spec-driven harness (four
+  deterministic validator scripts + `check_specs_delivered.py`, EARS ACs, discuss pace system,
+  git-stash ban with a porcelain baseline, status-before-commit reorder, deliver-specs-before-PR
+  gate, batch-trigger lowering to `>3`, `verification-agent` deep-tier pin, `lessons.py` Unicode
+  dedup fix). Contract: `.specs/features/tlc-330-harness-update/{spec,design,tasks}.md` — read
+  those, not this file, for the per-task write sets and gate commands. Branch
+  `spec/tlc-330-harness-update`, worktree `.claude/worktrees/tlc-330-harness-update`, from
+  `origin/main` @ `066e86e` (v1.20.0).
+- **State:** Specify + Design + Tasks + full Plan Challenge (five findings folded in: C1/C2/C3/C5
+  revised the plan before Execute, C4 rejected) all DONE. Execute T1-T18 of 18, one atomic commit
+  per task, commit range `e6b282c4`..`ca621e0a`+close-out. Delivery ran as two inline task ranges
+  plus three sequential batch workers (Phase 1 inline T1-T6, Phase 2 inline T7-T15, Phase 3 batch
+  T16-T18) — offered and confirmed per BATCH-01's own lowered `>3`-task trigger, which this
+  feature's own change now governs. Independent validation HAS RUN since this note was first
+  written: iterations 1-4 in `validation.md` (1 FAIL → FT1/FT2 → 2 PASS; Phase 5: 3 FAIL →
+  FT3/FT4 → 4 FAIL → FT5 → iteration 5).
+- **Next action (independent verifier):** run the Verification Ladder against this branch
+  (author != verifier is mandatory), then `python3 skills/massa-ai/scripts/validate_state.py
+  tlc-330-harness-update` before the feature is marked done. Do not push or open a PR until
+  `check_specs_delivered.py tlc-330-harness-update` exits 0 on the close-out commit (GATE-02).
+- **Process constraint (this session):** the close-out commit (this one) always lands **before**
+  the first push — `implementation-delivery.md` stage 3.5's remediation branch is a defensive
+  fallback that should never fire on this feature, per Plan Challenge C2.
+- **Environment facts that carry:** massa-ai MCP server unreachable this session (`.specs/`
+  files canonical, per contract); the worktree's `bun install` may have skipped native
+  tree-sitter grammars (documented, harmless — the parity tests and both generators never
+  touch tree-sitter).
+
+## Previous — DA Inventory Closure (VALIDATED PASS 2026-08-03; PR open, merge = user's decision)
 
 - **Feature:** `da-inventory-closure` — disposition + closure of DA-01..DA-17 from
   `.specs/reports/cross-pollination-portability-and-gaps.md` (folder removed at close-out per

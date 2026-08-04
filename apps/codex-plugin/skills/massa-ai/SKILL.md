@@ -62,6 +62,16 @@ Before reading any massa-ai file:
   to remove obsolete ones.
 - Emit concise user-facing status updates at meaningful workflow boundaries
   when the Conversation Feedback Policy is active.
+- Verify, don't assume: every factual claim that drives a decision is
+  verified against current codebase/command evidence or confirmed with the
+  user. Documentation of any kind — README, docs/, inline comments, external
+  summaries, even `.specs/` prose — is a lead to verify against current
+  source, never a trustable source of truth by itself. Unverifiable claims
+  become explicit assumptions the user confirms or accepts.
+- Ask when in doubt: when genuine doubt remains after looking it up —
+  requirement meaning, scope boundaries, destructive/irreversible choices,
+  contradictory evidence — ask the user rather than choose silently. Facts
+  are looked up; decisions are asked.
 - Complete Evidence Gate before claiming done.
 
 Use internal references only when needed:

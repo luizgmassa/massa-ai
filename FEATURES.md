@@ -401,21 +401,21 @@ the charters and is the only role-keyed model table in this file.
 
 | Agent | Tier |
 | --- | --- |
-| investigator | light |
+| investigator | deep |
 | planner | deep |
 | builder | standard |
-| reviewer | standard |
-| context-curator | light |
-| verification-agent | standard |
-| requirements-analyst | standard |
+| reviewer | deep |
+| context-curator | deep |
+| verification-agent | deep |
+| requirements-analyst | deep |
 | architecture-specialist | deep |
 | test-engineer | standard |
 | documentation-agent | light |
-| audit-specialist | standard |
-| mobile-specialist | standard |
+| audit-specialist | deep |
+| mobile-specialist | deep |
 | plan-critic | deep |
-| furps-analyst | standard |
-| navigator | light |
+| furps-analyst | deep |
+| navigator | deep |
 | meta-judge | deep |
 | judge | deep |
 

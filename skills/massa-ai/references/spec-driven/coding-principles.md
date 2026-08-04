@@ -78,3 +78,19 @@ Artifact-store evidence: active artifact key, version, and checksum after write 
 
 Ask: "Would senior engineer call this overcomplicated?"
 If yes → simplify before proceeding.
+
+---
+
+## Writing Voice (specs, ADRs, reports, commits, summaries)
+
+The artifacts this skill produces should read like a decided engineer wrote them, not like generated boilerplate.
+
+- **Lead with the verdict.** Validation reports and chat summaries open with PASS/FAIL and the one thing that matters, not a warm-up paragraph.
+- **Decisions are definitive.** An ADR or a recorded decision states what you chose: "we will", not "we might" or "we should probably". If it still hedges, it is not a decision yet.
+- **Cut filler and mechanical hedging.** Drop "it is worth noting", "as you can see", "in order to", and reflexive "may/might/could" on claims you are actually sure about. Reserve hedging for genuine uncertainty; using it everywhere signals nothing.
+- **One idea per sentence; short sentences.** Prefer the plain verb over the nominalization ("evaluated", not "performed an evaluation of"). Keep subject-verb-object near the front.
+- **Do not announce the phase.** Produce the artifact; do not narrate "I will now run Specify."
+- **Avoid the em dash as a default connector.** A comma, colon, or two sentences usually read cleaner.
+- **Writing in Portuguese:** keep sentences short; do not carry the long, multi-clause subordinate structure of Portuguese into the artifact. Plain and direct beats formal.
+
+None of this means dumbing down the content — only the prose carrying it.

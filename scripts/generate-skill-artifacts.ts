@@ -105,6 +105,9 @@ async function walkFiles(dir: string): Promise<string[]> {
   for (const entry of entries) {
     const abs = path.join(dir, entry.name);
     if (entry.isDirectory()) {
+      // Python bytecode caches are ephemeral interpreter output, never bundle
+      // content — a stray one must not read as source drift in --check.
+      if (entry.name === "__pycache__") continue;
       const nested = await walkFiles(abs);
       for (const rel of nested) out.push(path.posix.join(entry.name, rel));
     } else if (entry.isFile()) {

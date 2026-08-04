@@ -11,7 +11,7 @@ Use this reference for the required Execute phase. Implement ONE task at a time:
 - `.specs/features/<slug>/tasks.md` when Tasks was included, otherwise the inline atomic step list from `workflows/spec-driven.md`.
 - Current `.specs/project/STATE.md`.
 - `references/spec-driven/coding-principles.md`.
-- `references/spec-driven/sub-agents.md` when a formal task plan packs into more than one task-budgeted batch (> ~8 tasks), or final validation needs the standalone verifier fallback.
+- `references/spec-driven/sub-agents.md` when a formal task plan has more than 3 tasks (the batch offer trigger — packing still uses ~7-task batches), or final validation needs the standalone verifier fallback.
 
 Artifact-store evidence: active artifact key, version, and checksum after write (see `references/spec-driven/artifact-store.md`).
 
@@ -35,7 +35,7 @@ Do not proceed without stating these explicitly.
 
 ### Before implementing: assess sub-agent delegation (MANDATORY — before the first task)
 
-Before implementing anything, if a formal `.specs/features/<slug>/tasks.md` with an Execution Plan exists, **count its total tasks** and pack the phases into task-budgeted batches (~7 tasks per worker, whole phases — see [sub-agents.md](sub-agents.md)). If that yields **more than one batch** (> ~8 tasks), you MUST present the sub-agent offer to the user and wait for their choice before starting Execute — do not silently proceed inline. If the feature fits a single batch (≤ ~8 tasks, or the user declines), execute inline. Skip this check only when you are already a batch worker executing a delegated batch (the orchestrator already made the delegation decision).
+Before implementing anything, if a formal `.specs/features/<slug>/tasks.md` with an Execution Plan exists, **count its total tasks**. If the feature has **more than 3 tasks**, you MUST present the sub-agent offer to the user and wait for their choice before starting Execute — do not silently proceed inline. Packing itself still uses task-budgeted batches (~7 tasks per worker, whole phases — see [sub-agents.md](sub-agents.md)); a 4–8-task feature packs into a single batch and is still offered as one batch worker. If the feature has 3 or fewer tasks, or the user declines the offer, execute inline. Skip this check only when you are already a batch worker executing a delegated batch (the orchestrator already made the delegation decision).
 
 ### 0. List Atomic Steps (MANDATORY when Tasks phase was skipped)
 
@@ -222,11 +222,16 @@ After the gate check passes:
 
    **On any failure** → rewrite or remove the affected test(s), re-run the gate, then re-run this review.
 
-   *Honest caveat:* This is an inspection-based review (model judgment), complementary to — not a replacement for — the deterministic gate. The gate confirms the test suite runs; the feature-level discrimination sensor (step 10) confirms the tests can detect regressions. This review confirms the suite is meaningful and bounded.
+   *Honest caveat:* This is an inspection-based review (model judgment), complementary to — not a replacement for — the deterministic gate. The gate confirms the test suite runs; the feature-level discrimination sensor (step 9) confirms the tests can detect regressions. This review confirms the suite is meaningful and bounded.
 
    Add the two mapping tables and a one-line adequacy verdict to the Execution Template's Post-Gate section.
 
-### 7. Atomic Git Commit
+### 7. Status + Atomic Commit (same commit)
+
+After the gate is green, close the task record **before** creating the commit, then commit code and status together. Never leave `tasks.md` still open after a successful task commit — a crash between those steps is how resume redoes finished work.
+
+1. Mark the task complete in `.specs/features/<slug>/tasks.md`. Update requirement traceability in `spec.md` if requirement IDs are used. Update logical feature artifact status and `.specs/project/STATE.md` with evidence and the exact next step.
+2. Create **one** atomic commit that includes the implementation, its tests, and those status/traceability updates.
 
 Each task gets its own commit immediately after verification. Never batch multiple tasks into one commit. Use one atomic commit per task when the environment and user permissions allow commits; otherwise record why the commit was skipped.
 
@@ -293,8 +298,33 @@ for reuse across multiple endpoints.
 
 - One task = one commit.
 - Description references what was DONE, not what was planned.
-- Include only files listed in the task — never sneak in "while I'm here" changes.
+- Include only files listed in the task — plus the `tasks.md` / `spec.md` status updates for this task.
+- Never sneak in "while I'm here" changes.
 - If tests are part of the task, include them in the same commit.
+
+**Deterministic backing (run it, do not eyeball it):** `python3 skills/massa-ai/scripts/check_commit.py --message "<your message>"` before committing. A non-zero exit means fix the format first — this makes the format rule enforceable instead of memory-dependent. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
+
+**Optional git-level guard (git only, no agent dependency).** In a git repo the same check can run on every commit by wiring it as a `commit-msg` hook, so a malformed message is rejected regardless of who or what drives the commit:
+
+```bash
+# from the repo root, one time:
+ln -sf skills/massa-ai/scripts/check_commit.py .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
+```
+
+This is a plain git hook, not tied to any editor or assistant. Skip it if the project manages hooks its own way (for example a pre-commit framework); the manual check above still applies.
+
+**Distill a confirmed lesson** when a task produced a reusable signal (an unexpected failure mode, a confirmed pattern, a corrected assumption):
+
+```
+python3 skills/massa-ai/scripts/lessons.py --root . add \
+  --feature <slug> --signal <S> --source <src> --text "<T>" --scope <O>
+```
+
+`--source` is mandatory (grounding gate). Load applicable confirmed lessons before starting a task:
+
+```
+python3 skills/massa-ai/scripts/lessons.py --root . list --status confirmed [--scope <relevant>]
+```
 
 ### 8. Scope Guardrail / Scope Control
 
@@ -311,24 +341,9 @@ During implementation, you will notice things that could be improved, refactored
 - Do not expand task scope to opportunistic refactors.
 - Keep changed files limited to the approved scope and validation.
 
-### 9. Update Task Status
+**Blast radius (approval ≠ remote authority):** Approving Execute for this feature authorizes local implementation and local commits, and covers one delivery through PR creation — branch push and `gh pr create` — under one explicit go-ahead given at Execute start. Force-push, deploy, production database changes, merges, and any other remote/externally-visible/destructive operation always require a separate explicit go-ahead, even after that authorization.
 
-Mark the task complete in `.specs/features/<slug>/tasks.md`. Update requirement traceability in `spec.md` if requirement IDs are used. Update logical feature artifact status and `.specs/project/STATE.md` with evidence and the exact next step.
-
-**Distill a confirmed lesson** when a task produced a reusable signal (an unexpected failure mode, a confirmed pattern, a corrected assumption):
-
-```
-python3 skills/massa-ai/scripts/lessons.py --root . add \
-  --feature <slug> --signal <S> --source <src> --text "<T>" --scope <O>
-```
-
-`--source` is mandatory (grounding gate). Load applicable confirmed lessons before starting a task:
-
-```
-python3 skills/massa-ai/scripts/lessons.py --root . list --status confirmed [--scope <relevant>]
-```
-
-### 10. Feature-Level Validation (after the LAST task — MANDATORY, always runs)
+### 9. Feature-Level Validation (after the LAST task — MANDATORY, always runs)
 
 When the task you just completed is the **last task of the feature** (or of a priority group being delivered on its own, e.g. all P1 tasks), you MUST run feature-level validation before reporting the work as done. **This is not optional and is never prompted — it runs automatically.** Do not stop at the final task's commit.
 
@@ -336,7 +351,7 @@ When the task you just completed is the **last task of the feature** (or of a pr
 
 **Layering:**
 - Per-task adequacy self-check (steps 5–6): cheap, always runs, author does it, confirms each task in isolation.
-- Feature-level validation (step 10): one trustworthy independent gate at completion, always-on, Verifier sub-agent does it.
+- Feature-level validation (step 9): one trustworthy independent gate at completion, always-on, Verifier sub-agent does it.
 
 **How to delegate to the Verifier:**
 Dispatch a fresh sub-agent following the **Verifier** role described in [sub-agents.md](sub-agents.md). Provide it with:
@@ -437,7 +452,7 @@ Then run `references/spec-driven/validate.md` as the final Execute gate. The ver
 **Status**: ✅ Complete | ❌ Blocked | ⚠️ Partial
 ```
 
-**After the LAST task:** dispatch the Verifier sub-agent (see step 10 and [sub-agents.md](sub-agents.md)) for independent feature-level validation, including the spec-anchored check and discrimination sensor. Validation always runs automatically — never prompted. Execute is not done until the Verifier reports PASS and the validation report is written.
+**After the LAST task:** dispatch the Verifier sub-agent (see step 9 and [sub-agents.md](sub-agents.md)) for independent feature-level validation, including the spec-anchored check and discrimination sensor. Validation always runs automatically — never prompted. Execute is not done until the Verifier reports PASS and the validation report is written, confirmed deterministically by `python3 skills/massa-ai/scripts/validate_state.py <feature> [--root .]` (exit non-zero = not done); see [validate.md](validate.md). If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
 ---
 
@@ -447,11 +462,13 @@ Then run `references/spec-driven/validate.md` as the final Execute gate. The ver
 - **Tools matter** — Wrong MCP = wrong approach; ask the MCP and skill question when tool choice changes correctness or verification.
 - **Reuses save tokens** — Copy patterns, don't reinvent; reach for massa-ai tooling first to locate existing reuse.
 - **Check before commit** — Verify all criteria, then commit.
+- **Status then commit, same commit** — Mark `tasks.md` complete before the atomic commit and include that update in it; a crash between the two steps is how resume redoes finished work.
 - **Stay surgical** — Touch only what's necessary.
 - **Commit per task** — Clean git history enables bisect and rollback.
 - **Never "while I'm here"** — Scope creep during implementation is the #1 quality killer.
+- **Approval is local** — Push, deploy, and other remote/destructive ops need an explicit go-ahead beyond Execute's initial delivery authorization.
 - **Learn from mistakes** — If something goes wrong, distill a confirmed lesson and surface it so it informs the next task.
-- **Don't stop at the last commit** — Feature-level validation (step 10) is the final step of Execute, not optional.
+- **Don't stop at the last commit** — Feature-level validation (step 9) is the final step of Execute, not optional.
 
 ---
 

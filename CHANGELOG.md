@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **TLC spec-driven harness synced to 3.3.0.** Four new deterministic validator scripts
+  (`validate_spec.py`, `validate_tasks.py`, `check_commit.py`, `validate_state.py`) plus
+  `check_specs_delivered.py`, wired as "run it, do not eyeball it" gates from
+  `specify.md`/`tasks.md`/`execute.md`/`validate.md`/`sub-agents.md` and
+  `workflows/spec-driven.md`; `specify.md` gains EARS-shaped acceptance criteria and a
+  discuss-pace system (Quick/Guided/Detailed); `validate.md` forbids `git stash` and adds a
+  porcelain baseline for the discrimination sensor; `execute.md` reorders status-before-commit
+  into the same step. The batch sub-agent offer trigger drops from `>~8` to `>3` tasks
+  everywhere it is stated. `implementation-delivery.md` gains a new "deliver specs before PR"
+  gate — stage 3.5 running `check_specs_delivered.py` between Push and Propose, with a
+  blast-radius delivery-authorization sentence naming exactly what one Execute approval
+  covers. `verification-agent`'s charter is pinned to the `deep` model tier (verification
+  subagents always run the heaviest available model), regenerated across all four host
+  bundles. `lessons.py`'s dedup normalizer now strips Unicode combining marks (NFD) instead
+  of matching only ASCII, with a `selftest` subcommand.
+- **ALL-workflows evidence rules + read-only tier pins.** The massa-ai router's Core
+  Contract gains two universal rules: verify-don't-assume (documentation of any kind —
+  README, docs/, comments, `.specs` prose — is a lead to verify against current source,
+  never a trustable source of truth by itself) and ask-when-in-doubt (facts are looked up,
+  decisions are asked); the Knowledge Verification Chain's "Project docs" step carries the
+  leads-not-truth qualifier at all four sites. All read-only specialist charters now pin
+  `model_tier: deep` (8 bumped: audit-specialist, context-curator, furps-analyst,
+  investigator, mobile-specialist, navigator, requirements-analyst, reviewer — read-only
+  and verification subagents always run the heaviest model), regenerated across all four
+  host bundles. New planned feature spec `python-to-typescript-scripts` registered:
+  migrate all 8 Python scripts (including `lessons.py`) to Bun TypeScript with dual-run
+  characterization parity.
+
 ## [1.20.0] - 2026-08-04
 
 ### Added

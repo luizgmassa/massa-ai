@@ -2,7 +2,7 @@
 name: massa-ai-mobile-specialist
 description: Conditional mobile expertise agent. Provide Android, Kotlin, Compose, KMP, Swift, iOS, Gradle, CocoaPods, performance, lifecycle, and offline-sync guidance. Invoked only when the workflow detects a mobile-related project. Read-only. Triggers on mobile detection signals; refuses non-mobile targets.
 tools: ["Read","Grep","Glob","Bash"]
-model: sonnet
+model: opus
 effort: high
 ---
 # Mobile Specialist Agent Skill

@@ -2,7 +2,7 @@
 name: massa-ai-investigator
 description: Read-only codebase investigation agent. Locate implementations, trace execution flow, identify dependencies, estimate change impact, and answer engineering questions. Triggers when a workflow needs to understand existing code before planning or implementing. Never modifies code, never generates implementation, never performs reviews.
 tools: ["Read","Grep","Glob","Bash"]
-model: haiku
+model: opus
 effort: high
 ---
 # Investigator Agent Skill

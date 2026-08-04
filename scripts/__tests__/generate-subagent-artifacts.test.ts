@@ -279,7 +279,8 @@ describe("loadCharter / loadAllCharters (repo charters)", () => {
     const c = await loadCharter("investigator");
     expect(c.name).toBe("investigator");
     expect(c.description.length).toBeGreaterThan(0);
-    expect(c.modelTier).toBe("light");
+    // deep since ALLWF-03: read-only specialists always run the heaviest tier.
+    expect(c.modelTier).toBe("deep");
   });
 
   test("every repo charter declares a tier the registry recognizes", async () => {
@@ -497,12 +498,14 @@ describe("generator profile selection", () => {
       });
       await emitAll(dirsFor("a"), { env: {} });
       await emitAll(dirsFor("b"), { profileFlag: "heavy", env: {} });
+      // documentation-agent is the remaining light-tier charter; the bumped
+      // read-only roles (ALLWF-03) resolve identically across these profiles.
       const a = await fs.readFile(
-        path.join(dirsFor("a").claude, "massa-ai-investigator.md"),
+        path.join(dirsFor("a").claude, "massa-ai-documentation-agent.md"),
         "utf8"
       );
       const b = await fs.readFile(
-        path.join(dirsFor("b").claude, "massa-ai-investigator.md"),
+        path.join(dirsFor("b").claude, "massa-ai-documentation-agent.md"),
         "utf8"
       );
       expect(a).toContain("model: haiku"); // balanced, light tier

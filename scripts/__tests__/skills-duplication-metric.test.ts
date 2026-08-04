@@ -44,7 +44,12 @@ const REPO_ROOT = path.resolve(import.meta.dir, '../..');
  * .specs/features/skills-directive-dedup/. Raising this number is a deliberate
  * edit that needs a reason in the commit message — that friction is the point.
  */
-const EXCESS_CEILING = 313;
+// 331 since ALLWF-03 (tlc-330-harness-update): pinning the 8 remaining
+// read-only charters to `model_tier: deep` (14/17 now deep) made their
+// frontmatter runs identical across files — +18 excess of mandated
+// uniformity, not prose drift. Measured differentially: main 313 → branch
+// 331, every new block is charter frontmatter around the shared tier line.
+const EXCESS_CEILING = 331;
 const CEILING_WINDOW = 4;
 
 let dir: string;

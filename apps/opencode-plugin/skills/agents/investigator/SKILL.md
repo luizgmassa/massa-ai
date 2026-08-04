@@ -5,7 +5,7 @@ license: MIT
 metadata:
   author: S1LV4, luizgmassa
   version: "1.0.0"
-  model_tier: light
+  model_tier: deep
   permission: read-only
 ---
 

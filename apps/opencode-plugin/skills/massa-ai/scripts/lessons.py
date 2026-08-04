@@ -24,6 +24,7 @@ Commands:
   observe    Ingest a JSON observation into the gitignored observations buffer.
   export     Export the lessons store as JSON (round-trips with import).
   import     Import lessons from JSON (merge by dedup key; best-effort massa-ai memory).
+  selftest   Run stdlib regressions (normalization).
 
 Exit codes: 0 ok, 2 usage/validation error (e.g. missing grounding).
 """
@@ -34,6 +35,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 import urllib.request
 
 STORE_REL = os.path.join(".specs", "lessons.json")
@@ -178,13 +180,48 @@ def _lesson_tags(lesson):
 
 
 def _norm(text):
-    """Normalized dedup key: lowercase, strip punctuation, collapse whitespace.
+    """Normalized dedup key for lesson text.
+
+    - casefold + NFD, strip combining marks (so Portuguese diacritics match ASCII peers)
+    - keep characters where str.isalnum() is true (any script) and whitespace
+    - drop other punctuation, collapse whitespace
+
     Exact-after-normalization only - no semantic matching (stdlib-only limitation).
-    Phrase lessons tersely and canonically so recurrences actually merge."""
-    t = text.lower().strip()
-    t = re.sub(r"[^a-z0-9\s]", " ", t)
+    Phrase lessons tersely and canonically so recurrences actually merge.
+    """
+    t = unicodedata.normalize("NFD", text.casefold())
+    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+    t = "".join(c if (c.isalnum() or c.isspace()) else " " for c in t)
     t = re.sub(r"\s+", " ", t).strip()
     return t
+
+
+def _selftest_norm():
+    """Regressions for #158: Portuguese diacritics + distinct non-Latin text."""
+    failures = []
+
+    def check(cond, msg):
+        if not cond:
+            failures.append(msg)
+
+    a = _norm("Não use datas locais")
+    b = _norm("Nao use datas locais")
+    check(a == b == "nao use datas locais", f"PT diacritics: {a!r} vs {b!r}")
+
+    jp1 = _norm("日本語の文です")
+    jp2 = _norm("別の日本語文")
+    check(jp1 != "", f"JP1 empty: {jp1!r}")
+    check(jp2 != "", f"JP2 empty: {jp2!r}")
+    check(jp1 != jp2, f"JP sentences collapsed: {jp1!r} == {jp2!r}")
+
+    check(_norm("café") == _norm("cafe") == "cafe", f"cafe: {_norm('café')!r}")
+
+    if failures:
+        for f in failures:
+            print(f"FAIL: {f}", file=sys.stderr)
+        return 1
+    print("selftest_norm: ok")
+    return 0
 
 
 def _key(signal, text):
@@ -580,6 +617,9 @@ def main(argv=None):
 
     sp = sub.add_parser("status", help="Print counts")
     sp.set_defaults(fn=cmd_status)
+
+    sp = sub.add_parser("selftest", help="Run stdlib regressions (normalization)")
+    sp.set_defaults(fn=lambda root, args: _selftest_norm())
 
     args = p.parse_args(argv)
     root = os.path.abspath(args.root)

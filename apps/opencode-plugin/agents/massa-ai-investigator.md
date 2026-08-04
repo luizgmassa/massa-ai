@@ -1,7 +1,7 @@
 ---
 description: Read-only codebase investigation agent. Locate implementations, trace execution flow, identify dependencies, estimate change impact, and answer engineering questions. Triggers when a workflow needs to understand existing code before planning or implementing. Never modifies code, never generates implementation, never performs reviews.
 mode: all
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/minimax-m3
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
 ---

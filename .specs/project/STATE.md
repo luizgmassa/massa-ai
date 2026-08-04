@@ -1,6 +1,77 @@
 # massa-ai Spec State
 
-## Current — DA Inventory Closure (**VALIDATED PASS 2026-08-03 — EXECUTE + INDEPENDENT VALIDATION COMPLETE; PR open, merge is the user's decision**)
+## Current — TLC 3.3.0 Harness Update (**VALIDATED PASS 2026-08-04 — T1-T22 + FT1-FT6 (FT6 = delivery repair 1), 5 verification iterations; PR #64**)
+- **Phase 5 amendment (user, post-PR#64-green):** ALLWF-01/02 Core Contract rules + KVC
+  leads-not-truth rewording (T19 `e751c777`), ALLWF-03 read-only charter sweep to `deep` —
+  14/17 charters deep, 3 write-capable unchanged (T20 `277ec7a5`), PYTS-01
+  `python-to-typescript-scripts` spec authored + registered planned P2 (T21 `b291b0fb`).
+- **Validation:** independent verifier (deep tier) iteration 1 FAIL (2 gaps: __pycache__
+  drift under combined suites — GEN-01 blocker; validate_state.py verdict collision —
+  SYNC-12 major) → FT1 `19ebe0cd` + FT2 `98f76d0f` → iteration 2 **PASS** (gaps closed,
+  mutation killed, gates 0). Report: `.specs/features/tlc-330-harness-update/validation.md`.
+  Non-blocking follow-ups recorded there: IT2-01 (validate_tasks.py FT-prefix headers fold
+  into prior task's record), IT2-02 (anchor _verdict candidate match to declaration lines).
+- **Delivery repair 1 (FT6, post-`bf23b925`):** PR #64 CI `build` red in `bun run
+  test:scripts` — 3 failures, all stale tests vs ALLWF-03's tier sweep, outside the scoped
+  verification set (validation.md's recorded scope limit): duplication-metric ceiling 313 <
+  measured 331 (differential main→branch: the +18 excess is charter frontmatter made
+  identical by pinning the 8 remaining read-only charters `deep`; raised with reason via
+  the ceiling's own documented path — same class as T16's parity-allowlist addition),
+  `loadCharter` hardcoded investigator `light`, profile-selection test read investigator
+  artifacts (moved to `documentation-agent`, the one remaining light charter). Worktree
+  was wholly unprovisioned (no `node_modules`) — repaired per the CLAUDE.md fresh-worktree
+  rule (install + 4-dir addon copy + `bun run build`; grammar contract suite 9/0). Full
+  gates re-run locally, each command's own exit code, no pipes: `bun run test:scripts` 0
+  (1277/0 TS across 56 files + shell suites), `bun run lint` 0, `validate_tasks.py` 0
+  errors. One atomic commit (both test files + FT6 record + this file + HANDOFF, status
+  closed before commit); push + `gh pr checks 64` re-watch is the delivery gate; merge
+  stays the user's decision (minor release).
+
+
+- projectId: `massa-ai` · parent workflowSessionId: `spec-harness-330-update` · workflow:
+  spec-driven Execute (batched: 2 inline task ranges + 3 sequential batch workers, offered
+  and confirmed per BATCH-01) · branch `spec/tlc-330-harness-update`, worktree
+  `.claude/worktrees/tlc-330-harness-update`, cut from `origin/main` @ `066e86e` (v1.20.0).
+- Scope: port TLC 3.3.0's spec-driven harness into massa-ai. Contract:
+  `.specs/features/tlc-330-harness-update/{spec,design,tasks}.md`.
+- Three phases, 18 tasks, one atomic commit each, commit range `e6b282c4`..`ca621e0a`+close-out:
+  **Phase 1 (T1-T6)** four new deterministic validator scripts (`validate_spec.py`,
+  `validate_tasks.py`, `check_commit.py` with Jira-prefix support, `validate_state.py`) plus
+  `check_specs_delivered.py` (GATE-02, porcelain + tracked-on-HEAD conjunction) and a Unicode
+  (NFD) fix to `lessons.py`'s dedup normalizer with a new `selftest` subcommand; **Phase 2
+  (T7-T15)** EARS-shaped acceptance criteria and a facts-vs-decisions rule in `specify.md`;
+  scripted wiring ("run it, do not eyeball it") for all four validators plus
+  `check_specs_delivered.py` across `tasks.md`/`execute.md`/`validate.md`/`sub-agents.md`/
+  `workflows/spec-driven.md`; a `git stash` ban with a porcelain-baseline discrimination
+  sensor in `validate.md`; status-before-commit reordered into one step in `execute.md`; the
+  batch sub-agent offer trigger lowered from `>~8` to `>3` tasks everywhere it is stated; a
+  discuss-pace system (Quick/Guided/Detailed) in `discuss.md`; a Writing Voice section and a
+  git-reconciliation resume procedure ported into `coding-principles.md`/`memory.md`; a new
+  stage 3.5 "deliver specs before PR" in `implementation-delivery.md` plus a blast-radius
+  delivery-authorization sentence (one approval per feature covers commits+push+PR); **Phase 3
+  (T16-T18)** `verification-agent`'s charter pinned to the `deep` model tier and regenerated
+  through both generators in one commit (D9 as amended by Plan Challenge C1), a repo-wide
+  threshold sweep (population 0) and a cross-file blast-radius/gate-invocation clause
+  consistency check (Plan Challenge C3; both clause families byte-identical or
+  parameterized-identical across all touched source + regenerated bundle files), and this
+  close-out.
+- Plan Challenge folded five findings into the design before Execute (not appended after):
+  C1 widened T16's gate to run both generators + both parity tests in the same commit; C2
+  reordered close-out to always precede the first push (stage 3.5's remediation branch is a
+  defensive fallback that should never fire); C3 added the T17 cross-file consistency check;
+  C5 added a template-conformance test tying each validator's expectations to the live
+  `specify.md`/`tasks.md`/`validate.md` template blocks so future template drift goes red.
+- T16's regen also updated `FEATURES.md`'s role -> tier table and
+  `scripts/__tests__/subagent-parity.test.ts`'s frozen-baseline allowlist to record the
+  intentional `verification-agent` tier change (outside the task's originally stated write
+  set, but required for both parity suites to stay green — not a weakening, an addition to
+  the allowlist the test itself designed for this case).
+- massa-ai MCP server not consulted this session; `.specs/` files canonical per contract.
+- Next action: independent verifier runs the Verification Ladder against this branch
+  (author != verifier) and writes `.specs/features/tlc-330-harness-update/validation.md`
+  before PR creation, per GATE-02 / `check_specs_delivered.py`.
+
+## Previous — DA Inventory Closure (**VALIDATED PASS 2026-08-03 — EXECUTE + INDEPENDENT VALIDATION COMPLETE; PR open, merge is the user's decision**)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-da-inventory-closure` · workflow:
   spec-driven (Large) · branch `spec/da-inventory-closure`, worktree

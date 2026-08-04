@@ -191,8 +191,18 @@ Both are silent data loss. The section-scoped write rule is the single correctne
 
 1. Read `.specs/project/STATE.md` and `.specs/HANDOFF.md` — both.
 2. Re-confirm active decisions from `## Decisions` — nothing superseded since last session?
-3. Read `.specs/HANDOFF.md` — identify feature, phase/task, next step, blockers, uncommitted files, branch.
-4. Propose the next step to the user before writing any code.
+3. Read `.specs/HANDOFF.md` — treat it as a **hypothesis** for feature, phase/task, next step, blockers, uncommitted files, branch — not as ground truth by itself.
+4. **Reconcile with git before editing anything:**
+   - Current branch vs Handoff `Branch`
+   - `git status --porcelain` (uncommitted / unexpected paths)
+   - Recent commits on the branch (messages and touched files)
+   - `tasks.md` completion marks and, when present, gate evidence / commit references
+5. **Resolve conflicts with evidence, not narrative:**
+   - A task with a green gate and an atomic commit already on the branch → do **not** redo it; mark it complete in `tasks.md` if the file still shows it open, then continue from the next incomplete task
+   - Partial unverified work in the working tree → preserve it, re-run the relevant gate, then finish the status+commit cycle
+   - Stale or missing Handoff → rebuild next-step from git + `tasks.md`, then propose that to the user
+   - Unexplained local changes you cannot map to the current task → STOP and ask; do not discard them
+6. Propose the reconciled next step to the user before writing any code.
 
 ---
 
