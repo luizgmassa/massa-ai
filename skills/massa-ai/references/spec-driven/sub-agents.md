@@ -148,7 +148,7 @@ Delegated work returns through the compact summary contract above. Planning, tas
 
 ## Standalone Fallback
 
-When sub-agents are unavailable (a single agent executing the full feature), use the standalone fresh-eyes fallback: run `references/spec-driven/validate.md` as a standalone pass — clear implementation assumptions, re-read `spec.md` and the diff from scratch, apply evidence-or-zero, run the spec-anchored coverage check and discrimination sensor, write `.specs/features/<slug>/validation.md`, then run `python3 skills/massa-ai/scripts/validate_state.py <feature> [--root .]` to confirm the report is a real PASS, and report the PASS/FAIL verdict before marking the feature done. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
+When sub-agents are unavailable (a single agent executing the full feature), use the standalone fresh-eyes fallback: run `references/spec-driven/validate.md` as a standalone pass — clear implementation assumptions, re-read `spec.md` and the diff from scratch, apply evidence-or-zero, run the spec-anchored coverage check and discrimination sensor, and write `.specs/features/<slug>/validation.md`. **Deterministic backing (run it, do not eyeball it):** `python3 skills/massa-ai/scripts/validate_state.py <feature> [--root .]` confirms the report is a real PASS before the feature is marked done. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
 ---
 
