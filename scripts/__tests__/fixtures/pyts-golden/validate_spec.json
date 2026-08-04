@@ -1,0 +1,47 @@
+[
+  {
+    "label": "filled fixture",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 0,
+    "stdout": "\nvalidate_spec: 0 error(s), 0 warning(s) in <ROOT>/.specs/features/auth-feature/spec.md\n"
+  },
+  {
+    "label": "missing required section",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR missing required section: ## Out of Scope\n\nvalidate_spec: 1 error(s), 0 warning(s) in <ROOT>/.specs/features/auth-feature/spec.md\n"
+  },
+  {
+    "label": "SHALL-less acceptance criterion",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR L29: acceptance criterion has no SHALL (not testable): WHEN the user submits valid credentials THEN the system logs the user \n\nvalidate_spec: 1 error(s), 0 warning(s) in <ROOT>/.specs/features/auth-feature/spec.md\n"
+  },
+  {
+    "label": "auto-detect sole feature",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 0,
+    "stdout": "\nvalidate_spec: 0 error(s), 0 warning(s) in <ROOT>/.specs/features/only-feature/spec.md\n"
+  },
+  {
+    "label": "ambiguous multiple features",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": ""
+  }
+]

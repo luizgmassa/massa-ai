@@ -1,0 +1,75 @@
+[
+  {
+    "label": "missing validation.md",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR my-feature: no validation.md - Execute is not done until the Verifier writes it (author != verifier). Dispatch validation before marking done.\n\nvalidate_state: 1 error(s) across [my-feature]\n"
+  },
+  {
+    "label": "FAIL verdict",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR my-feature: validation.md verdict is FAIL - route the ranked gaps to fix tasks, then re-verify (feature is not done)\n\nvalidate_state: 1 error(s) across [my-feature]\n"
+  },
+  {
+    "label": "diverging sensor PASS sub-line (FT2)",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR my-feature: validation.md verdict is FAIL - route the ranked gaps to fix tasks, then re-verify (feature is not done)\n\nvalidate_state: 1 error(s) across [my-feature]\n"
+  },
+  {
+    "label": "unfilled template placeholder",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR my-feature: validation.md verdict is still the template placeholder '[PASS | FAIL]' - not filled\n\nvalidate_state: 1 error(s) across [my-feature]\n"
+  },
+  {
+    "label": "PASS with no evidence",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR my-feature: validation.md is PASS but cites no file:line evidence - evidence-or-zero not satisfied\n\nvalidate_state: 1 error(s) across [my-feature]\n"
+  },
+  {
+    "label": "PASS with evidence",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 0,
+    "stdout": "\nvalidate_state: 0 error(s) across [my-feature]\n"
+  },
+  {
+    "label": "legacy-shaped feature (no crash, R2)",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 0,
+    "stdout": "\nvalidate_state: 0 error(s) across [done-feature]\n"
+  },
+  {
+    "label": "explicit feature name resolves",
+    "args": [
+      "feature-b",
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR feature-b: validation.md verdict is FAIL - route the ranked gaps to fix tasks, then re-verify (feature is not done)\n\nvalidate_state: 1 error(s) across [feature-b]\n"
+  }
+]

@@ -38,7 +38,7 @@ Use this compact shape when closing docs or skill work:
 ✅ [Verified] Skill validation and stale-reference scans passed.
 🏁 [Finished] Updated massa-ai references. Memory outcome: durable decision stored. Remaining risk: none found.
 
-Evidence: `rtk python3 skills/skill-architect/scripts/validate_skill.py skills/massa-ai --format json` passed; stale-reference and local-link scans passed.
+Evidence: `bun run scripts/generate-skill-artifacts.ts --check` passed; stale-reference and local-link scans passed.
 Changed artifacts: `skills/massa-ai/SKILL.md`, `workflows/spec-driven.md`, `references/spec-driven/`, and `references/memory-policy.md`.
 Memory outcome: wrote decision memory `dec_...`; no failed memory writes.
 Residual risk: none found.

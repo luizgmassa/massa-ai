@@ -1,0 +1,65 @@
+[
+  {
+    "label": "well-formed fixture",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 0,
+    "stdout": "\nvalidate_tasks: 0 error(s), 0 warning(s) in <ROOT>/.specs/features/task-feature/tasks.md\n"
+  },
+  {
+    "label": "missing Gate field",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR T2: missing `Gate` field\n\nvalidate_tasks: 1 error(s), 0 warning(s) in <ROOT>/.specs/features/task-feature/tasks.md\n"
+  },
+  {
+    "label": "forward-phase dependency",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  WARN  diagram arrows not parsed confidently - diagram/definition cross-check skipped (verify by hand)\n  ERROR T1 (phase 1) depends on T2 (phase 2) - dependencies must point backward or within the same phase\n\nvalidate_tasks: 1 error(s), 1 warning(s) in <ROOT>/.specs/features/task-feature/tasks.md\n"
+  },
+  {
+    "label": "diagram-order violation",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR T1 declares `Depends on: T2` but the phase diagram shows T2 at or after T1, not before it\n\nvalidate_tasks: 1 error(s), 0 warning(s) in <ROOT>/.specs/features/task-feature/tasks.md\n"
+  },
+  {
+    "label": "unfenced diagram (warn only)",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 0,
+    "stdout": "  WARN  diagram arrows not parsed confidently - diagram/definition cross-check skipped (verify by hand)\n\nvalidate_tasks: 0 error(s), 1 warning(s) in <ROOT>/.specs/features/task-feature/tasks.md\n"
+  },
+  {
+    "label": "FT-prefixed header backward dep OK",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 0,
+    "stdout": "\nvalidate_tasks: 0 error(s), 0 warning(s) in <ROOT>/.specs/features/my-feature/tasks.md\n"
+  },
+  {
+    "label": "FT task missing Gate reported against FT1",
+    "args": [
+      "--root",
+      "<ROOT>"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR FT1: missing `Gate` field\n\nvalidate_tasks: 1 error(s), 0 warning(s) in <ROOT>/.specs/features/my-feature/tasks.md\n"
+  }
+]

@@ -302,13 +302,13 @@ for reuse across multiple endpoints.
 - Never sneak in "while I'm here" changes.
 - If tests are part of the task, include them in the same commit.
 
-**Deterministic backing (run it, do not eyeball it):** `python3 skills/massa-ai/scripts/check_commit.py --message "<your message>"` before committing. A non-zero exit means fix the format first — this makes the format rule enforceable instead of memory-dependent. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
+**Deterministic backing (run it, do not eyeball it):** `bun skills/massa-ai/scripts/check_commit.ts --message "<your message>"` before committing. A non-zero exit means fix the format first — this makes the format rule enforceable instead of memory-dependent. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
 **Optional git-level guard (git only, no agent dependency).** In a git repo the same check can run on every commit by wiring it as a `commit-msg` hook, so a malformed message is rejected regardless of who or what drives the commit:
 
 ```bash
 # from the repo root, one time:
-ln -sf skills/massa-ai/scripts/check_commit.py .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
+ln -sf skills/massa-ai/scripts/check_commit.ts .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
 ```
 
 This is a plain git hook, not tied to any editor or assistant. Skip it if the project manages hooks its own way (for example a pre-commit framework); the manual check above still applies.
@@ -316,14 +316,14 @@ This is a plain git hook, not tied to any editor or assistant. Skip it if the pr
 **Distill a confirmed lesson** when a task produced a reusable signal (an unexpected failure mode, a confirmed pattern, a corrected assumption):
 
 ```
-python3 skills/massa-ai/scripts/lessons.py --root . add \
+bun skills/massa-ai/scripts/lessons.ts --root . add \
   --feature <slug> --signal <S> --source <src> --text "<T>" --scope <O>
 ```
 
 `--source` is mandatory (grounding gate). Load applicable confirmed lessons before starting a task:
 
 ```
-python3 skills/massa-ai/scripts/lessons.py --root . list --status confirmed [--scope <relevant>]
+bun skills/massa-ai/scripts/lessons.ts --root . list --status confirmed [--scope <relevant>]
 ```
 
 ### 8. Scope Guardrail / Scope Control
@@ -452,7 +452,7 @@ Then run `references/spec-driven/validate.md` as the final Execute gate. The ver
 **Status**: ✅ Complete | ❌ Blocked | ⚠️ Partial
 ```
 
-**After the LAST task:** dispatch the Verifier sub-agent (see step 9 and [sub-agents.md](sub-agents.md)) for independent feature-level validation, including the spec-anchored check and discrimination sensor. Validation always runs automatically — never prompted. Execute is not done until the Verifier reports PASS and the validation report is written, confirmed deterministically by `python3 skills/massa-ai/scripts/validate_state.py <feature> [--root .]` (exit non-zero = not done); see [validate.md](validate.md). If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
+**After the LAST task:** dispatch the Verifier sub-agent (see step 9 and [sub-agents.md](sub-agents.md)) for independent feature-level validation, including the spec-anchored check and discrimination sensor. Validation always runs automatically — never prompted. Execute is not done until the Verifier reports PASS and the validation report is written, confirmed deterministically by `bun skills/massa-ai/scripts/validate_state.ts <feature> [--root .]` (exit non-zero = not done); see [validate.md](validate.md). If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
 ---
 

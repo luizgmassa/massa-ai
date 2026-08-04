@@ -22,8 +22,8 @@ human chose to merge it".
 | 1 | Isolate | `git fetch origin <base> && git worktree add -b <type>/<slug> <path> origin/<base>` | Branch name taken → suffix `-2`. Worktree path taken → reuse it only if its branch matches |
 | 2 | Implement | one task → gate → `git commit` | Gate red → fix before committing. Never commit through a failing gate |
 | 3 | Push | `git push -u origin <type>/<slug>` | Rejected non-fast-forward → `git fetch` + rebase, never force-push a shared branch |
-| 3.5 | Deliver specs | `python3 skills/massa-ai/scripts/check_specs_delivered.py <feature> [--root .]` | Non-zero → commit the missing `.specs/` updates (a `docs(specs):`-type commit is normal), push, re-run. Defensive fallback — should not fire when the close-out task already committed `.specs/` before the first push |
-| 4 | Propose — precondition: Stage 3.5 (`check_specs_delivered.py`) green | `gh pr create --base <base> --title <t> --body <b>` | `gh` absent/unauthenticated → degraded path |
+| 3.5 | Deliver specs | `bun skills/massa-ai/scripts/check_specs_delivered.ts <feature> [--root .]` | Non-zero → commit the missing `.specs/` updates (a `docs(specs):`-type commit is normal), push, re-run. Defensive fallback — should not fire when the close-out task already committed `.specs/` before the first push |
+| 4 | Propose — precondition: Stage 3.5 (`check_specs_delivered.ts`) green | `gh pr create --base <base> --title <t> --body <b>` | `gh` absent/unauthenticated → degraded path |
 | 5 | Watch | `gh pr checks --watch` | No checks configured → say so; do not claim CI passed |
 | 6 | Repair | fix on the branch, commit, return to stage 5 | Capped at 3 iterations, then stop as `Blocked` |
 | 7 | **Ask** | report the PR URL and the green check list, then **stop** | — |
@@ -76,7 +76,7 @@ One explicit delivery authorization per feature, obtained before implementation 
 
 ### Stage 3.5 — deliver specs before PR (defensive fallback)
 
-Between Push and Propose, all feature `.specs/` artifacts (`spec/context/design/tasks/validation` as applicable), `.specs/project/STATE.md`, `.specs/HANDOFF.md`, and `.specs/project/FEATURES.json` must be updated and committed on the branch. **Deterministic backing (run it, do not eyeball it):** `python3 skills/massa-ai/scripts/check_specs_delivered.py <feature> [--root .]` — a non-zero exit blocks Propose. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
+Between Push and Propose, all feature `.specs/` artifacts (`spec/context/design/tasks/validation` as applicable), `.specs/project/STATE.md`, `.specs/HANDOFF.md`, and `.specs/project/FEATURES.json` must be updated and committed on the branch. **Deterministic backing (run it, do not eyeball it):** `bun skills/massa-ai/scripts/check_specs_delivered.ts <feature> [--root .]` — a non-zero exit blocks Propose. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
 **Nominal path: this stage should never fire.** The feature's own close-out task (the last task before delivery — see `workflows/spec-driven.md` step 7) commits `.specs/` updates **before** the first push, so stage 3.5's remediation is a defensive fallback for the rare case something slipped through, not the normal place `.specs/` gets committed. On failure: commit the missing `.specs/` updates (a `docs(specs):`-type commit is normal), push, re-run this stage. No commits may land between the close-out commit and PR creation.
 

@@ -550,14 +550,16 @@ describe("hook enforcement reference", () => {
 
 // ── Lessons reference (ported from legacy lessons-contract tests) ─────────
 // Legacy asserted: lessons massa-ai type must be pattern, tag contract enforced,
-// procedural-is-tag loop doc. These verify the lessons reference + lessons.py
-// honor the dual-write contract.
+// procedural-is-tag loop doc. These verify the lessons reference + lessons.ts
+// honor the dual-write contract. (python-to-typescript-scripts T9 ported
+// lessons.py -> lessons.ts; this describe block was missed in that port's
+// prose-site rewire since it is test source, not prose, and is repointed here.)
 
 describe("lessons contract", () => {
   const lessonsRef = path.join(SKILLS_DIR, "massa-ai", "references", "lessons.md");
-  const lessonsScript = path.join(SKILLS_DIR, "massa-ai", "scripts", "lessons.py");
+  const lessonsScript = path.join(SKILLS_DIR, "massa-ai", "scripts", "lessons.ts");
 
-  test("lessons.md and lessons.py both exist", async () => {
+  test("lessons.md and lessons.ts both exist", async () => {
     expect(await fileExists(lessonsRef)).toBe(true);
     expect(await fileExists(lessonsScript)).toBe(true);
   });
@@ -594,11 +596,14 @@ describe("lessons contract", () => {
     expect(content).toContain("quarantined");
   });
 
-  test("lessons.py is a non-empty Python script with the remember-best-effort helper", async () => {
+  test("lessons.ts is a non-empty TypeScript script with the remember-best-effort helper", async () => {
     const content = await readFile(lessonsScript);
     expect(content.length).toBeGreaterThan(500);
-    // The helper was renamed from _th0th_remember_best_effort → _remember_best_effort
-    expect(content).toContain("_remember_best_effort");
+    // The helper was renamed from _th0th_remember_best_effort -> _remember_best_effort in
+    // the Python original, then to camelCase rememberBestEffort by the TypeScript port
+    // (python-to-typescript-scripts T9) - internal identifier casing is not part of PTS-01's
+    // preserved CLI contract (argument names, exit codes, asserted output lines).
+    expect(content).toContain("rememberBestEffort");
     expect(content).not.toContain("_th0th_remember_best_effort");
   });
 });
@@ -652,14 +657,13 @@ describe("harness gitignore contract", () => {
     expect(gitignore).toMatch(/\.env/);
   });
 
-  test(".specs/lessons.json or .specs/LESSONS.md exists (machine-owned lesson state)", async () => {
-    // lessons.json is the canonical machine-owned state; LESSONS.md is the rendered playbook.
-    // Either the state file or the rendered playbook should be present under .specs/.
+  test(".specs/lessons.json exists AND .specs/LESSONS.md is absent (single-store invariant)", async () => {
+    // lessons.json is the single machine-owned lesson store; the rendered LESSONS.md
+    // playbook was removed (LSN-01) — `lessons list` is the on-demand replacement view.
     const lessonsJson = path.join(REPO_ROOT, ".specs", "lessons.json");
     const lessonsMd = path.join(REPO_ROOT, ".specs", "LESSONS.md");
-    const jsonExists = await fileExists(lessonsJson);
-    const mdExists = await fileExists(lessonsMd);
-    expect(jsonExists || mdExists).toBe(true);
+    expect(await fileExists(lessonsJson)).toBe(true);
+    expect(await fileExists(lessonsMd)).toBe(false);
   });
 });
 

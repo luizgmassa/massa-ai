@@ -1,6 +1,97 @@
 # massa-ai Spec State
 
-## Current — TLC 3.3.0 Harness Update (**VALIDATED PASS 2026-08-04 — T1-T22 + FT1-FT6 (FT6 = delivery repair 1), 5 verification iterations; PR #64**)
+## Current — Python→TypeScript Scripts + Lessons Single-Store (**VALIDATED PASS 2026-08-04 — T1-T12 + FT1-FT3 (FT2-FT3 = delivery repairs 1-2), 2 verification iterations; PR #65 open, merge = user's decision**)
+
+- **Validation:** independent verifier (deep tier) iteration 1 FAIL (1 critical gap:
+  mutation (b) — naive rounding for `roundHalfEven2` — survived the whole delivered gate
+  set; Plan Challenge F1's "exercised, not assumed" violated once T11 deleted the dual-run
+  harness) → FT1 `67e769ca` (two mutating golden entries at the 0.625 boundary, observed
+  red 44/2 with the exact 0.63-vs-0.62 signature) → iteration 2 **PASS** (kill re-confirmed
+  independently, 4/4 mutations killed, no regression: goldens 46/0, `test:scripts` 1323/0,
+  lint 0). Report: `.specs/features/python-to-typescript-scripts/validation.md`. Lesson
+  L-016 recorded via `lessons.ts add` (grounded in validation.md Finding 1).
+
+- projectId: `massa-ai` · parent workflowSessionId: `spec-python-to-typescript-scripts` ·
+  workflow: spec-driven (Large) · branch `spec/python-to-typescript-scripts`, worktree
+  `.claude/worktrees/python-to-typescript-scripts`, cut from `origin/main` @ `e932a673`
+  (the PR #64 merge commit; that merge's minor release chain was in flight at cut).
+- Scope: PTS-01..06 (8-script py→ts migration under Bun, CLI/exit/output parity) + LSN-01
+  (lessons single-store: `.specs/lessons.json` survives, `LESSONS.md` + render path
+  deleted). User decisions this session: json survives (over markdown-canonical), one
+  combined feature (over two sequential), delivery-through-PR authorized for the feature,
+  merge stays the user's.
+- Contract: `.specs/features/python-to-typescript-scripts/{spec,design,tasks}.md` — spec
+  amended (LSN group; PTS-02 + Out-of-Scope losing clauses superseded in place with
+  reasons), design D1-D9, 12 tasks / 4 phases, all 12 marked `[x]`. Full Plan Challenge
+  (pre_mortem, massa-ai-plan-critic, deep): 4 findings F1-F4 ALL folded before Execute — F1
+  Python `round()` half-to-even parity sensor (0.625-class boundary op exercised in T9), F2
+  sweep-blind installed commit-msg hook symlinks (T4 local repoint + T12 CHANGELOG operator
+  note), F3 golden fixtures materialized before the dual-run harness's deletion (T11), F4
+  coverage floor verified to never reach `scripts/`/`skills/` (R6 reframed). See design.md
+  Plan Challenge Record.
+- Execute ran as 3 sequential batch workers (offered per the >3-task trigger, user
+  confirmed): B1 T1-T3 (LSN-01 + harness), B2 T4-T9 (six skill-script ports), B3 T10-T12
+  (repo scripts + golden/sweeps + close-out). Commit range (`e932a673..HEAD`, 12 task
+  commits + 1 pre-Execute activation commit): `b4782690` activate, `b8ef61e5` T1,
+  `d6ca0747` T2, `74a19f2c` T3, `6b4e383f` T4, `e4931929` T5, `140398ed` T6, `109a8885` T7,
+  `cccaad7b` T8, `3bc677c4` T9, `9e8ea516` T10, `1503995f` T11, T12 this commit. One atomic
+  commit per task, status-before-commit, same-commit bundle regen + `--check`, dual-run
+  parity before every `.py` deletion (T10 used scratch-copy byte-diff instead, per its
+  mutating-in-place shape), python3 always spawned with `-B` (L-015).
+- All 8 scripts are now `.ts` under Bun; every `.py` original is deleted. Final sweeps
+  (T11, populations printed in the T11 commit body): `python3` under `skills/` +
+  `apps/*/skills/` 25→0; the 8 scripts' `.py` basenames under the same scope 10→0;
+  `LESSONS.md` live refs repo-wide 33 matches, all exempted (sealed other-feature history,
+  this feature's own artifacts, this feature's own STATE/HANDOFF narrative, the
+  validate-repository absence sensor) — zero unexplained. `scripts/pyts-dual-run.ts`
+  deleted; its oracle role lives on in `scripts/__tests__/pyts-golden.test.ts` (44 golden
+  cases, pure `bun test`, no python3).
+- Gates green at T12 close: `bun run test:scripts`, `bun run lint`,
+  `generate-skill-artifacts.ts --check`, `generate-subagent-artifacts.ts --check`, the four
+  ported validators + `check_specs_delivered.ts` dogfooded against this feature.
+- massa-ai MCP server unreachable this session; `.specs/` files canonical per contract.
+- **Delivery repair 1 (FT2, post-`e6d8362a`):** PR #65 CI red on `e6d8362a` — `build`
+  (run 30952327811, `Test` step) and `coverage` (run 30952330241) both failed on the one
+  turbo task `@massa-ai/opencode-plugin#test`; `mcp`/`install-test` skipped downstream
+  (the `github-advanced-security` check-run failure is pre-existing — red on both PR #64
+  heads too, merge state CLEAN — not this branch's doing). Root cause (log-verified and
+  reproduced locally): Bun test discovery matches any file ending `_spec.ts`; the
+  migration shipped `validate_spec.ts` into the plugin's bundled `skills/` tree, and
+  opencode-plugin is the only plugin declaring its own `test` script — its bare
+  package-wide `bun test` walked the bundle, loaded the CLI as a test module, and died on
+  its usage error. The old `.py` was invisible to discovery; local gates missed it
+  because the feature's scoped set ran `test:scripts`, never turbo `bun run test` —
+  lesson L-007's blind-spot class. Fix FT2 (tasks.md Phase 6): `"test": "bun test
+  __tests__ src/__tests__"` — the package's two real test dirs, find-verified, nothing
+  that ever ran excluded. Gates re-run, each command's own exit code, no pipes:
+  turbo-filtered `@massa-ai/opencode-plugin#test` 0 (124/0 across the same 6 files),
+  `test:scripts` 0 (1323/0 TS + shell suites), `lint` 0, `validate_tasks.ts` 0 errors.
+  One atomic FT2 commit (package.json + tasks.md + STATE + HANDOFF,
+  status-before-commit); no verifier re-dispatch for a delivery-stage repair (precedent:
+  tlc-330 FT6) — CI green is the gate.
+- **Delivery repair 2 (FT3, post-`46f7e581`):** FT2 turned `build` green; `coverage`
+  (run 30953865966) stayed red — one root cause, but a **second discovery mechanism**,
+  not a second venue of the same one: `check-coverage.ts`'s opencode-plugin UNITS entry
+  spawns its own bare `bun test --coverage` in the package cwd and never consults the
+  package.json `test` script FT2 scoped, so the coverage walk still loaded the bundled
+  `validate_spec.ts` (`suite exited 2`, no lcov.info — same usage-error signature).
+  Found by enumerating every bare `bun test` call site instead of re-reading FT2's
+  resolution; populations in tasks.md FT3 (3 of 6 UNITS entries bare; `*_spec.ts` per
+  unit dir 0,0,0,0,0,1 — opencode-plugin the single live site; `test:plugins` /
+  `test:scripts` dir-targeted, safe). Fix: the unit command mirrors the package's own
+  test script (`bun test __tests__ src/__tests__ --coverage …`). Evidence: observed
+  red→green on the exact unit command (bare exit 2, no lcov, CI-identical signature →
+  scoped exit 0, lcov.info, 124/0); venue mirror `bun run test:coverage
+  apps/opencode-plugin` against the dedicated 5433 DB exit 0 — merged 1 lcov, 4 source
+  files measured, floor PASS. Gates re-run, own exit codes: check-coverage.test solo
+  23/0, `test:scripts` 0 (1323/0), `lint` 0, `validate_tasks.ts` 0 errors. One atomic
+  FT3 commit; still no verifier re-dispatch (delivery-stage repair).
+- Next action: push FT3 → re-watch PR #65 to green (poll the new sha's check-run count
+  >0 before `gh pr checks --watch` — the old-sha rollup race) → merge decision to the
+  user (minor release on merge). `check_specs_delivered.ts` + `validate_state.ts` both
+  exit 0 on the close-out commit.
+
+## Previous — TLC 3.3.0 Harness Update (**VALIDATED PASS 2026-08-04 — T1-T22 + FT1-FT6 (FT6 = delivery repair 1), 5 verification iterations; MERGED as PR #64 @ `e932a673` 2026-08-04, release chain fired on green main CI**)
 - **Phase 5 amendment (user, post-PR#64-green):** ALLWF-01/02 Core Contract rules + KVC
   leads-not-truth rewording (T19 `e751c777`), ALLWF-03 read-only charter sweep to `deep` —
   14/17 charters deep, 3 write-capable unchanged (T20 `277ec7a5`), PYTS-01

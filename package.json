@@ -39,7 +39,7 @@
     "verify:tree-sitter-source-dist": "bun scripts/verify-tree-sitter-grammars.ts",
     "verify:tree-sitter-package": "bun scripts/verify-tree-sitter-package-artifact.ts",
     "verify:tree-sitter-native": "bun scripts/verify-tree-sitter-grammars.ts && bun scripts/verify-tree-sitter-package-artifact.ts",
-    "update-fixture-hashes": "python3 scripts/update-fixture-hashes.py",
+    "update-fixture-hashes": "bun scripts/update-fixture-hashes.ts",
     "install:skills": "bash scripts/install-skills.sh --apply",
     "uninstall:skills": "bash scripts/install-skills.sh --uninstall",
     "install:agents": "bash scripts/install-agents.sh",

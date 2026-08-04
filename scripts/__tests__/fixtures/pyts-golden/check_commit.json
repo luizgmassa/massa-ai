@@ -1,0 +1,107 @@
+[
+  {
+    "label": "valid conventional commit",
+    "args": [
+      "--message",
+      "feat(auth): add email validation"
+    ],
+    "exitCode": 0,
+    "stdout": "check_commit: OK\n"
+  },
+  {
+    "label": "valid jira-prefixed feat",
+    "args": [
+      "--message",
+      "[SA-142] feat(auth): reject expired tokens"
+    ],
+    "exitCode": 0,
+    "stdout": "check_commit: OK\n"
+  },
+  {
+    "label": "valid jira-prefixed fix (spec example)",
+    "args": [
+      "--message",
+      "[SA-142] fix(auth): reject expired tokens"
+    ],
+    "exitCode": 0,
+    "stdout": "check_commit: OK\n"
+  },
+  {
+    "label": "non-conventional header",
+    "args": [
+      "--message",
+      "updated the auth module"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR header does not match 'type(scope): description': 'updated the auth module'\n\ncheck_commit: FAIL - see https://www.conventionalcommits.org/en/v1.0.0/\n"
+  },
+  {
+    "label": "disallowed type",
+    "args": [
+      "--message",
+      "feature(auth): add email validation"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR type 'feature' is not one of: feat, fix, refactor, docs, test, style, perf, build, ci, chore\n\ncheck_commit: FAIL - see https://www.conventionalcommits.org/en/v1.0.0/\n"
+  },
+  {
+    "label": "uppercase description",
+    "args": [
+      "--message",
+      "feat(auth): Add email validation"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR description should start lowercase: 'Add email validation'\n\ncheck_commit: FAIL - see https://www.conventionalcommits.org/en/v1.0.0/\n"
+  },
+  {
+    "label": "period-ending description",
+    "args": [
+      "--message",
+      "feat(auth): add email validation."
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR description should not end with a period\n\ncheck_commit: FAIL - see https://www.conventionalcommits.org/en/v1.0.0/\n"
+  },
+  {
+    "label": "breaking marker without footer",
+    "args": [
+      "--message",
+      "feat(auth)!: change token format"
+    ],
+    "exitCode": 1,
+    "stdout": "  ERROR '!' breaking marker present but no 'BREAKING CHANGE:' footer\n\ncheck_commit: FAIL - see https://www.conventionalcommits.org/en/v1.0.0/\n"
+  },
+  {
+    "label": "breaking marker with footer",
+    "args": [
+      "--message",
+      "feat(auth)!: change token format\n\nBREAKING CHANGE: tokens are now opaque"
+    ],
+    "exitCode": 0,
+    "stdout": "check_commit: OK\n"
+  },
+  {
+    "label": "empty message (usage error)",
+    "args": [
+      "--message",
+      ""
+    ],
+    "exitCode": 2,
+    "stdout": ""
+  },
+  {
+    "label": "header over 72 chars (warn only)",
+    "args": [
+      "--message",
+      "feat(auth): aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ],
+    "exitCode": 0,
+    "stdout": "  WARN  header is 82 chars (>72): feat(auth): aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...\ncheck_commit: OK\n"
+  },
+  {
+    "label": "no args, no stdin (usage error)",
+    "args": [],
+    "exitCode": 2,
+    "stdout": ""
+  }
+]

@@ -23,7 +23,7 @@ continue only when the next decision still needs more.
 | 2 — Host config | `.claude/` (`settings.json`, `settings.local.json`, `commands/`, `agents/`, `skills/`, `hooks/`), `.cursor/` (`rules/`, `mcp.json`), `.github/copilot-instructions.md`, `.opencode/`, `.codex/` | Permissions, hooks, host-specific tooling, MCP registrations |
 | 3 — Product docs | `README.md`, `CONTRIBUTING.md`, `docs/`, `ARCHITECTURE.md` | Install/run/build surface, contribution protocol, architecture |
 | 4 — Delivery config | `.github/workflows/`, `CHANGELOG.md`, `package.json` / `Cargo.toml` / `build.gradle*` / `pyproject.toml`, `.tool-versions`, `mise.toml`, `Makefile` | CI gates, release rules, runtime and toolchain pins, task commands |
-| 5 — Live state | `.specs/project/STATE.md`, `.specs/project/FEATURES.json`, `.specs/HANDOFF.md`, `.specs/LESSONS.md` | In-flight work, decisions already made, confirmed lessons |
+| 5 — Live state | `.specs/project/STATE.md`, `.specs/project/FEATURES.json`, `.specs/HANDOFF.md`, `.specs/lessons.json` (single store; `lessons list` is the on-demand view) | In-flight work, decisions already made, confirmed lessons |
 
 Tier 1 and Tier 3 (`README.md`) are mandatory in every workflow. Tiers 2, 4, and
 5 are read when the task touches host tooling, a gate/release surface, or

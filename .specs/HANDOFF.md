@@ -1,6 +1,64 @@
 # Handoff
 
-## Active — TLC 3.3.0 Harness Update (VALIDATED PASS 2026-08-04 incl. Phase 5 amendment; PR #64 open, merge = user's decision)
+## Active — Python→TypeScript Scripts + Lessons Single-Store (VALIDATED PASS 2026-08-04 — T1-T12 + FT1-FT3 (FT2-FT3 = delivery repairs 1-2), 2 verification iterations; PR #65 open, merge = user's decision)
+
+- **Validation:** iteration 1 FAIL (critical: round-half-even sensor not standing after
+  T11's harness deletion — F1's "exercised, not assumed") → FT1 `67e769ca` (mutating
+  goldens at the 0.625 boundary; observed red 44/2, mutant prints 0.63) → iteration 2
+  **PASS** (independent kill re-confirmation, 4/4 mutations, no regression). L-016
+  recorded via the ported `lessons.ts` itself.
+
+- **Feature:** `python-to-typescript-scripts` — 8-script py→ts migration (PTS-01..06) +
+  lessons single-store LSN-01 (user amendment: `lessons.json` survives, `LESSONS.md` +
+  render path deleted). Contract:
+  `.specs/features/python-to-typescript-scripts/{spec,design,tasks}.md` — read those, not
+  this file, for per-task write sets and gates. Branch `spec/python-to-typescript-scripts`,
+  worktree `.claude/worktrees/python-to-typescript-scripts`, from `origin/main` @
+  `e932a673` (PR #64 merge commit).
+- **State:** Specify (amended) + Design + Tasks + full Plan Challenge (pre_mortem, 4
+  findings all folded — see design.md Plan Challenge Record) DONE; Execute ran as
+  3 sequential batch workers (user confirmed): B1 T1-T3, B2 T4-T9, B3 T10-T12 — ALL 12
+  TASKS COMPLETE, one atomic commit per task, status-before-commit, dual-run parity (or,
+  for T10's mutating-in-place scripts, scratch-copy byte-diff) before every `.py`
+  deletion, same-commit bundle regen. Commit range `e932a673..HEAD`: `b4782690` activate,
+  `b8ef61e5` T1, `d6ca0747` T2, `74a19f2c` T3, `6b4e383f` T4, `e4931929` T5, `140398ed` T6,
+  `109a8885` T7, `cccaad7b` T8, `3bc677c4` T9, `9e8ea516` T10, `1503995f` T11, T12 this
+  commit. Full gates green at T12 close: `bun run test:scripts`, `bun run lint`,
+  `generate-skill-artifacts.ts --check`, `generate-subagent-artifacts.ts --check`, all four
+  ported validators + `check_specs_delivered.ts` dogfooded against this feature exit 0.
+- **User decisions this session:** merge PR #64 first (done, `e932a673`); lessons.json is
+  the single store; one combined feature; delivery through PR creation authorized
+  (commits+push+PR); merge of THIS feature's PR stays the user's (minor release).
+- **Environment:** worktree provisioned (install + 4-dir addon copy + build + prisma
+  generate; grammar suite 9/0 — note turbo FULL-TURBO cache restores dist but NOT
+  `src/generated/prisma`, run `bunx prisma generate` in fresh worktrees). massa-ai MCP
+  unreachable; `.specs/` canonical.
+- **Delivery repair 1 (FT2):** PR #65 (https://github.com/luizgmassa/massa-ai/pull/65)
+  CI red on `e6d8362a` — `build` + `coverage`, one root cause, two venues: Bun test
+  discovery matches any `*_spec.ts`, and the migration shipped `validate_spec.ts` into
+  the plugin's bundled `skills/` tree; opencode-plugin is the only plugin declaring its
+  own `test` script, so its bare package-wide `bun test` walked the bundle and died on
+  the CLI's usage error. Fix: test script scoped to `__tests__ src/__tests__` (FT2,
+  tasks.md Phase 6 — full record in STATE.md). Gates re-run own-exit-code green:
+  turbo-filtered plugin test 0 (124/0), `test:scripts` 0 (1323/0 TS + shell suites),
+  `lint` 0, `validate_tasks.ts` 0 errors. No verifier re-dispatch (delivery-stage
+  repair — tlc-330 FT6 precedent). The `github-advanced-security` check-run failure is
+  pre-existing (red on both PR #64 heads, merge state CLEAN), not merge-blocking.
+- **Delivery repair 2 (FT3):** FT2's fix covered only the turbo venue — `coverage`
+  stayed red on `46f7e581` (the FT2 commit itself) because `check-coverage.ts`'s
+  opencode-plugin UNITS entry spawns its own bare `bun test --coverage` (second
+  discovery mechanism; package.json `test` never consulted). Fix: unit command scoped
+  to `__tests__ src/__tests__` mirroring the package test script (FT3, tasks.md Phase
+  6 — full record in STATE.md). Observed red→green locally on the exact unit command;
+  venue mirror `test:coverage apps/opencode-plugin` (dedicated DB) floor PASS. Gates:
+  check-coverage.test solo 23/0, `test:scripts` 0 (1323/0), `lint` 0,
+  `validate_tasks.ts` 0 errors.
+- **Next action:** push FT3 commit → re-watch PR #65 to green (poll the new sha's
+  check-run count >0 before `gh pr checks --watch` — the old-sha rollup race) → user
+  merge decision (minor release on merge; CHANGELOG carries the commit-msg-hook operator
+  note).
+
+## Previous — TLC 3.3.0 Harness Update (VALIDATED PASS 2026-08-04 incl. Phase 5 amendment + FT6 delivery repair; MERGED as PR #64 @ `e932a673` 2026-08-04)
 - **Phase 5 (user amendment):** ALL-workflows rules (verify-don't-assume + docs-are-leads +
   ask-when-in-doubt in router Core Contract; 8 read-only charters → `deep`) + planned
   `python-to-typescript-scripts` spec. T19 `e751c777`, T20 `277ec7a5`, T21 `b291b0fb`;

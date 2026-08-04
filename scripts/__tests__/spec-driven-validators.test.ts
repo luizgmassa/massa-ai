@@ -9,6 +9,7 @@ import { describe, expect, test, afterEach } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { norm as lessonsNorm } from "../../skills/massa-ai/scripts/lessons.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 
@@ -42,10 +43,31 @@ interface PyResult {
   stderr: string;
 }
 
+type ScriptRuntime = "python" | "bun";
+
+// Per-script runtime resolution (PTS-05/D3 suite rewire mechanics): each port
+// task (T4-T9) flips exactly one basename from "python" to "bun" as its `.ts`
+// twin lands; after T9 every entry resolves to "bun".
+const SCRIPT_RUNTIME: Record<string, ScriptRuntime> = {
+  validate_spec: "bun",
+  validate_tasks: "bun",
+  check_commit: "bun",
+  validate_state: "bun",
+  lessons: "bun",
+  check_specs_delivered: "bun",
+};
+
 // -B: never write __pycache__ into the source tree — skill-artifact --check
 // diffs full directory inventories and would flag the .pyc files as drift.
-function runPy(scriptRelPath: string, args: string[], cwd: string = REPO_ROOT): PyResult {
-  const proc = Bun.spawnSync(["python3", "-B", join(REPO_ROOT, scriptRelPath), ...args], {
+// scriptBaseRelPath is extension-less; the current entry point (`.py` under
+// `python3 -B`, or `.ts` under `bun`) is resolved by basename via SCRIPT_RUNTIME.
+function runPy(scriptBaseRelPath: string, args: string[], cwd: string = REPO_ROOT): PyResult {
+  const basename = scriptBaseRelPath.split("/").pop()!;
+  const runtime = SCRIPT_RUNTIME[basename] ?? "python";
+  const scriptPath =
+    runtime === "bun" ? join(REPO_ROOT, `${scriptBaseRelPath}.ts`) : join(REPO_ROOT, `${scriptBaseRelPath}.py`);
+  const cmd = runtime === "bun" ? ["bun", scriptPath, ...args] : ["python3", "-B", scriptPath, ...args];
+  const proc = Bun.spawnSync(cmd, {
     cwd,
     stdout: "pipe",
     stderr: "pipe",
@@ -57,12 +79,12 @@ function runPy(scriptRelPath: string, args: string[], cwd: string = REPO_ROOT): 
   };
 }
 
-const VALIDATE_SPEC = "skills/massa-ai/scripts/validate_spec.py";
-const VALIDATE_TASKS = "skills/massa-ai/scripts/validate_tasks.py";
-const CHECK_COMMIT = "skills/massa-ai/scripts/check_commit.py";
-const VALIDATE_STATE = "skills/massa-ai/scripts/validate_state.py";
-const LESSONS_PY = "skills/massa-ai/scripts/lessons.py";
-const CHECK_SPECS_DELIVERED = "skills/massa-ai/scripts/check_specs_delivered.py";
+const VALIDATE_SPEC = "skills/massa-ai/scripts/validate_spec";
+const VALIDATE_TASKS = "skills/massa-ai/scripts/validate_tasks";
+const CHECK_COMMIT = "skills/massa-ai/scripts/check_commit";
+const VALIDATE_STATE = "skills/massa-ai/scripts/validate_state";
+const LESSONS_PY = "skills/massa-ai/scripts/lessons";
+const CHECK_SPECS_DELIVERED = "skills/massa-ai/scripts/check_specs_delivered";
 
 // ---------------------------------------------------------------------------
 // T1: validate_spec.py (SYNC-01 AC1)
@@ -593,18 +615,10 @@ describe("lessons.py selftest (T5, SYNC-10 AC1)", () => {
     expect(r.stdout).toContain("selftest_norm: ok");
   });
 
+  // lessons.ts exports `norm` directly (D2/T9) - no need to spawn a subprocess
+  // and import a module by path the way the Python original required.
   function normOf(text: string): string {
-    const proc = Bun.spawnSync(
-      [
-        "python3",
-        "-B",
-        "-c",
-        `import sys; sys.path.insert(0, "skills/massa-ai/scripts"); import lessons; print(lessons._norm(sys.argv[1]))`,
-        text,
-      ],
-      { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe" },
-    );
-    return proc.stdout.toString().trim();
+    return lessonsNorm(text);
   }
 
   test("diacritic merge: Portuguese text with/without diacritics normalizes to the same key", () => {

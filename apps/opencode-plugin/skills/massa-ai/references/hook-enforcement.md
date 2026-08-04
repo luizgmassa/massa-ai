@@ -44,7 +44,7 @@ Every hook exits 0 on bad stdin or non-critical error. Blocking hooks are
 | Hook | Event | Enforces |
 |---|---|---|
 | `stop_evidence_gate.py` | Stop | `references/evidence-gate.md` |
-| `continuous_learning_evaluate.py` | Stop | `references/lessons.md`, `scripts/lessons.py` |
+| `continuous_learning_evaluate.py` | Stop | `references/lessons.md`, `scripts/lessons.ts` |
 | `precompact_save_state.py` | PreCompact | `workflows/long-session.md`, `references/context-firewall.md` |
 | `suggest_compact.py` | PreToolUse(Edit\|Write) | `references/context-firewall.md` (compaction boundary) |
 | `gateguard_fact_force.py` | PreToolUse(Edit) | `references/context-firewall.md` (investigate-before-edit) |
@@ -100,7 +100,7 @@ absent, it falls back to the flat evidence matrix (graceful degradation).
 
 The continuous-learning loop writes two stores, not one:
 
-- `lessons.py add` / `import` — deterministic grounded file store
+- `lessons.ts add` / `import` — deterministic grounded file store
   (`.specs/lessons.json`); refuses ungrounded lessons; promotion/quarantine.
 - `remember` — durable memory, best-effort via REST (`MASSA_AI_API_URL`),
   file-only fallback when REST is unavailable.

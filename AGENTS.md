@@ -49,8 +49,7 @@ name (see `skills/massa-ai/references/agent-orchestration.md` → Name Resolutio
 - `.specs/project/FEATURES.json` — feature registry and status
 - `.specs/HANDOFF.md` — session handoff state
 - `.specs/features/<slug>/` — per-feature spec, design, tasks, validation
-- `.specs/lessons.json` — machine-owned lesson state
-- `.specs/LESSONS.md` — rendered lesson playbook (read-only)
+- `.specs/lessons.json` — the single machine-owned lesson store; `lessons list` is the on-demand view
 
 ## Indexing / Context Hygiene
 

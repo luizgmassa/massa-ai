@@ -1,10 +1,11 @@
 # Python → TypeScript Scripts Migration Specification
 
 - **Slug:** `python-to-typescript-scripts`
-- **Status:** planned (Specify complete; Design + Tasks + Execute are future work)
+- **Status:** active (Execute authorized 2026-08-04; Design + Tasks in `design.md`/`tasks.md`)
 - **Workflow:** spec-driven (Large — CLI-contract migration across 8 scripts + full wiring ripple; Design and Tasks required)
 - **Authored:** 2026-08-04 inside `tlc-330-harness-update` T21 (PYTS-01), at `4efa7013`
 - **User direction:** "change all python scripts into typescript scripts (including old ones before this work e.g. lessons.py)"
+- **Amendment (user, 2026-08-04):** "implement the removal of duplicated lessons flow (there're two lessons files -- lessons.json and lessons.md -- that duplicate information, there should be only one doing that)" — Group LSN below. `lessons.json` is the surviving store (user decision, this session, over a markdown-canonical alternative); combined into this feature (user decision over two sequential features).
 
 ## Problem Statement
 
@@ -15,7 +16,7 @@ The harness now runs 6 Python scripts under `skills/massa-ai/scripts/` (`lessons
 - `packages/core/src/__tests__/e2e/fixtures/polyglot/indent-method.py` — parser test fixture, not a script; must remain Python.
 - Rewriting git history or sealed `.specs` feature artifacts that mention `python3` as historical record.
 - Installed-host refresh mechanics (`bun run install:skills` after merge covers it; no separate migration path).
-- Any behavior change to the validators or lessons beyond language: contract is byte-level output parity where tests assert output, exit-code parity everywhere.
+- Any behavior change to the validators or lessons beyond language — **except LSN-01** (user amendment 2026-08-04): the lessons single-store change is in scope, lands *before* the lessons port, and the parity contract then binds to the post-LSN-01 behavior. Everywhere else the contract stands: byte-level output parity where tests assert output, exit-code parity everywhere.
 
 ## Assumptions & Open Questions
 
@@ -42,7 +43,7 @@ Open questions: none — the migration is user-directed; remaining unknowns are 
 1. WHEN any ported script runs against the existing test fixtures, THEN it SHALL produce the same exit code and the same asserted output lines as the Python original. <!-- event-driven -->
 2. IF an argument or fixture shape the Python version accepted is rejected, THEN the port SHALL be treated as a regression, not a cleanup. <!-- unwanted-behavior -->
 
-**PTS-02 — lessons migration with data parity.** Port `lessons.py` (22.4K: add/penalize/list/observe/export/import/prune/status/selftest, confidence scoring, dual-write, context tags) to `lessons.ts`; existing `.specs/lessons.json` and `LESSONS.md` rendering remain valid without any data migration.
+**PTS-02 — lessons migration with data parity.** Port `lessons.py` (add/penalize/list/observe/export/import/prune/status/selftest, confidence scoring, context tags) to `lessons.ts`; existing `.specs/lessons.json` remains valid without any data migration. *(Amended 2026-08-04: the original clause "and LESSONS.md rendering remain valid" is superseded by LSN-01 — the render path is removed before the port, so `lessons.ts` never carries it; the losing clause is amended here with its reason rather than left contradicting the amendment.)*
 
 **Acceptance Criteria**:
 1. WHEN `lessons.ts` computes a dedup key for text whose Python key exists in `.specs/lessons.json`, THEN the keys SHALL be identical — proven by dual-run characterization over every existing lesson entry plus the diacritic and Japanese selftest fixtures. <!-- event-driven -->
@@ -69,6 +70,13 @@ Open questions: none — the migration is user-directed; remaining unknowns are 
 **Acceptance Criteria**:
 1. WHEN the dual-run harness reports any divergence, THEN the task SHALL stop as a gate failure rather than adjust the fixture. <!-- unwanted-behavior -->
 
+**LSN-01 — Lessons single-store (user amendment 2026-08-04).** `.specs/lessons.json` becomes the only lessons artifact. Remove the render path from `lessons.py` (`RENDER_REL` :42, `_render_path()` :76-77, `_save`'s render call :106, `_render()` :257-318, `cmd_init`'s dual-path message :326, header docstring :12), delete `.specs/LESSONS.md`, and repoint every live reference — population re-derived at `e932a673`: 14 `LESSONS.md` lines in sources outside bundles and sealed specs, 12 outside `lessons.py` itself (`AGENTS.md:53`, `CLAUDE.md:606`, `docs/massa-ai-spec-driven.md:27`, `scripts/__tests__/validate-repository.test.ts:655-663`, `references/lessons.md:8,72`, `references/project-context.md:26`, `references/spec-driven/artifact-store.md:31`, `references/spec-driven/specify.md:12`, `workflows/spec-driven.md:131`) — then regenerate all four host bundles. The on-demand human view is `lessons list` (`cmd_list`, kept). Sealed `.specs` feature history is exempt.
+
+**Acceptance Criteria**:
+1. WHEN any lessons command writes state, THEN it SHALL write only `.specs/lessons.json`, and no `.specs/LESSONS.md` SHALL exist in the tree. <!-- event-driven -->
+2. WHEN the repo is swept after the change, THEN zero live `LESSONS.md` references SHALL remain outside sealed `.specs` history and this feature's own artifacts, with the sweep command and its population printed beside the verdict. <!-- event-driven -->
+3. WHEN `lessons list` runs, THEN it SHALL present the status-grouped lessons from `lessons.json` as the on-demand replacement for the deleted rendered file. <!-- event-driven -->
+
 ## Requirement Traceability
 
 | ID | Files touched |
@@ -79,6 +87,7 @@ Open questions: none — the migration is user-directed; remaining unknowns are 
 | PTS-04 | sweep-derived: 25 skill source files (41 `python3` lines) + 16 non-literal `.py` reference lines at authoring — Design re-derives per AC2; `scripts/__tests__/spec-driven-validators.test.ts`, `package.json`, regenerated `apps/*-plugin/skills/**` |
 | PTS-05 | per-task commit discipline (process requirement) |
 | PTS-06 | new dual-run characterization harness (location decided in Design) |
+| LSN-01 | `skills/massa-ai/scripts/lessons.py` (render path removed), `.specs/LESSONS.md` (deleted), `scripts/__tests__/validate-repository.test.ts`, 9 prose files repointed (population above), regenerated `apps/*-plugin/skills/**` |
 
 ## Edge Cases
 
@@ -86,3 +95,5 @@ Open questions: none — the migration is user-directed; remaining unknowns are 
 - `unicodedata` category `Mn` stripping vs JS: no direct `\p{Mn}` before ES2018 — Bun supports `\p{Mn}`; assert on the exact selftest fixtures.
 - `check_commit` as a git `commit-msg` hook: hook invocation must not depend on repo-root cwd.
 - Generated bundle copies: 24 `.py` files under `apps/*/skills/` disappear and 24 `.ts` files appear in the same regeneration; `--check` must be clean in the deletion commit itself.
+- `lessons.json` writes must stay byte-stable across the port: the TS serializer must reproduce Python's `json.dump(indent=2, ensure_ascii=False)` + trailing-newline shape, or user state reformats on first write.
+- LSN-01 AC2's sweep will match its own quotations: this feature's spec/design/tasks/validation quote `LESSONS.md` as text — the sweep exempts this feature's artifacts explicitly (a claim of absence can be the match).

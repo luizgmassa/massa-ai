@@ -24,7 +24,7 @@ The workflow combines .specs/ artifact files with massa-ai durable memory:
 - `project/FEATURES.json` tracks active feature and completion evidence.
 - `project/STATE.md` tracks progress, verification evidence, blockers, exact next step, and active/superseded `AD-NNN` decisions.
 - `HANDOFF.md` tracks handoff state and exact restart instructions.
-- `lessons.json` and `LESSONS.md` store project-local lessons in `.specs/lessons.json` and `.specs/LESSONS.md`.
+- `lessons.json` is the single store for project-local lessons at `.specs/lessons.json`; `lessons list` is the on-demand view.
 - massa-ai stores durable decisions, rejected approaches, reusable patterns, and verification recipes across sessions.
 
 Use `skills/massa-ai/references/spec-driven/artifact-store.md` for guidance on reading and writing `.specs/` files directly with standard shell commands. Root aliases are not runtime fallback. Optional `.specs-exports/` projections are untracked review aids only.
