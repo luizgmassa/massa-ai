@@ -1,6 +1,39 @@
 # massa-ai Spec State
 
-## Current — Python→TypeScript Scripts + Lessons Single-Store (**VALIDATED PASS 2026-08-04 — T1-T12 + FT1-FT3 (FT2-FT3 = delivery repairs 1-2), 2 verification iterations; PR #65 open, merge = user's decision**)
+## Current — Workflow Policy Updates (Execute complete pending validation; PR pending)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-workflow-policy-updates` · workflow:
+  spec-driven (Medium-Large) · branch `spec/workflow-policy-updates`, worktree
+  `.claude/worktrees/workflow-policy-updates`, cut from `origin/main` @ `07ffa7fd`
+  (v1.22.0 release commit).
+- Scope WFP-01..05 (user-directed, 2026-08-04): Compose/KMP `@Preview` rule for
+  implementation workflows (`mobile-context.md` normative + `mobile-diagnosis.md`
+  pointer); PR description updated after each requested push, before merge
+  (`implementation-delivery.md`); Figma pre-analysis + strictly-sequential retrieval
+  subagent protocol (new `references/figma-pre-analysis.md`, wired into design,
+  mobile-figma-audit, mobile-figma-fix, feature, spec-driven local gates + router list);
+  abbreviation expansion on first use and uniform Phase/Task vocabulary
+  (`1 Phase = X Tasks` / `Y Phases = Z Tasks`) as SKILL.md Core Contract bullets, with
+  spec-driven sub-agent offer reworded off "batch" nouns.
+- Contract: `.specs/features/workflow-policy-updates/{spec,design,tasks}.md` — 2 Phases =
+  5 Tasks (Phase 1 = 4 Tasks, Phase 2 = 1 Task). Full Plan Challenge (pre_mortem,
+  massa-ai-plan-critic): F1-F6 all folded before Execute — key folds: absence sensors for
+  the protocol's single-copy criterion (F1), wiring into local gate lines only because
+  `mobile-context.md`'s shared design-source gate also serves rfc/adr/tdd (F2), literal
+  grep sensors committed in tasks.md (F4).
+- Execute ran inline in the main agent (no batch-worker offer honored: autonomous
+  session, user unavailable to confirm; recorded deviation). Commits: `5abb8278`
+  activation, `f0701b93` T1, `147e3209` T2, `c557997b` T3, `bb3bfd92` T4, T5 = this
+  commit. Each task commit carries its regenerated 4-host bundles; per-task gates
+  `generate-skill-artifacts.ts --check` + oxlint green; sensor populations printed in
+  each commit body.
+- Accepted assumptions (user absent): "implementation workflows" = the 16 loaders of
+  `implementation-delivery.md`; feature.md included in WFP-03; ticket.md "Phase/Wave"
+  Jira naming out of scope (external structure); delivery-through-PR authorized, merge
+  stays the user's.
+- massa-ai MCP server unreachable this session; `.specs/` files canonical.
+
+## Previous — Python→TypeScript Scripts + Lessons Single-Store (**VALIDATED PASS 2026-08-04 — T1-T12 + FT1-FT3 (FT2-FT3 = delivery repairs 1-2), 2 verification iterations; PR #65 open, merge = user's decision**)
 
 - **Validation:** independent verifier (deep tier) iteration 1 FAIL (1 critical gap:
   mutation (b) — naive rounding for `roundHalfEven2` — survived the whole delivered gate

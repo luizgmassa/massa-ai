@@ -12,6 +12,7 @@ Do not execute from chat summaries, screenshots alone, remembered findings, or a
 2. Load shared references:
    - `references/mobile-figma-matcher/repository-detection.md` before platform guidance.
    - `references/mobile-figma-matcher/core.md` for Figma, assets, mapping, Maestro, matrix, and claim contracts.
+   - `references/figma-pre-analysis.md` when the findings span multiple Figma links or nodes — run its two-stage sequential retrieval protocol for the re-read.
    - `references/lessons.md` to load confirmed project lessons
    - `references/mobile-context.md` for mobile boundary and verification guidance.
    - `references/audit-report-io.md` before any source or validation-asset edit.

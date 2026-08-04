@@ -90,6 +90,18 @@ title: `[SA-100] Phase 1: search facade split`. The per-task commit prefixes on
 the branch are owned by `workflows/commit.md`; this stage owns only the PR-level
 phase prefix. Non-phased work keeps the existing PR title behavior unchanged.
 
+### Stages 3–7 — the PR description stays current
+
+The PR description is a living artifact, not a creation-time snapshot. After
+**every push requested while the PR exists** — repair iterations, follow-up
+tasks, review-requested changes — update the PR description with
+`gh pr edit <number> --body <b>` so it reflects the branch's current commit
+set, scope, and evidence **before** returning to Watch. The description must be
+current before the merge decision is requested; a merge may never be proposed
+over a description that describes an older state of the branch. When generated
+or bundled files are regenerated alongside source edits, the description names
+that blast radius explicitly so reviewers do not undercount the diff.
+
 ### Stage 7 — merge is never automatic
 
 Do not run `gh pr merge` without explicit user approval given in the current
@@ -126,6 +138,8 @@ silently did not run is worse than one that loudly failed.
 - Merging because CI passed. CI passing is the precondition for asking, not the
   approval itself.
 - Reporting "done" while the branch is unpushed.
+- Proposing or performing a merge while the PR description still describes an
+  older commit set — update it after each requested push, before merging.
 
 ## Completion Evidence
 

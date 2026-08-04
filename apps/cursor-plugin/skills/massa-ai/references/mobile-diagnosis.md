@@ -4,7 +4,7 @@ Use this reference when `workflows/debug.md` handles broken behavior involving K
 
 This extends `references/debug-diagnosis-loop.md`. Do not use it instead of the general debug loop.
 
-For non-debug mobile feature, refactor, tests, or security work, keep the intent-specific workflow and load `references/mobile-context.md` instead. Use `references/mobile-context.md` from Debug only when shared mobile vocabulary or non-bug parity/security/test framing is needed.
+For non-debug mobile feature, refactor, tests, or security work, keep the intent-specific workflow and load `references/mobile-context.md` instead. Use `references/mobile-context.md` from Debug only when shared mobile vocabulary or non-bug parity/security/test framing is needed — and always when a fix creates or updates a Compose screen, because its Compose Screen Previews rule (`@Preview` coverage) applies to debug-path edits too.
 
 ## Mobile Intake
 

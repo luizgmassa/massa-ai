@@ -10,6 +10,7 @@ Do not edit code. Route direct design implementation to `design`. Do not use thi
 2. Load shared references:
    - `references/mobile-figma-matcher/repository-detection.md` before platform guidance.
    - `references/mobile-figma-matcher/core.md` for Figma, assets, mapping, comparison, Maestro, and claim contracts.
+   - `references/figma-pre-analysis.md` when Figma links or node IDs are provided — run its two-stage sequential retrieval protocol before Figma extraction.
    - `references/mobile-context.md` for mobile boundaries, parity, and verification context.
    - `references/audit-scope.md` for target resolution and freshness.
    - `references/audit-report-io.md` before producing the report.
