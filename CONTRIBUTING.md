@@ -163,3 +163,33 @@ squash merge folds every commit body into it. Writing it — even while explaini
 skips CI on the merge commit, and no CI run means no release: `release.yml` triggers on a
 completed `CI` run. Refer to it as "the skip-ci marker" in prose instead. This one cannot
 be caught by a test, because the thing that would run the test is what gets skipped.
+## Measurement discipline — a number you will cite is a measurement, and measurements have rules
+
+This project's specs, task records, and validation reports quote figures as evidence. The
+same handful of measurement defects has recurred across features — each rule below names a
+recorded instance, not a hypothetical:
+
+1. **Verify an instrument in the tracked state it ships in.** A measurement script that
+   enumerates `git ls-files` cannot see its own untracked files; PR-B verified a suite
+   17/0 while it was untracked, and staging it flipped three of its own tests red. `git add`
+   first, then take the reading you record.
+2. **Read the pass/fail split, never the pass count.** A "1230 tests" line says nothing
+   until the `fail` line beside it is read — a gate summary once recorded as green carried
+   3 failures behind a bare count (this repository, 2026-08-03).
+3. **A cached, replayed, or pipe-wrapped result is not a measurement.** Turbo replays
+   builds; `--force` or `"cache": false` is what makes a re-run a reading. A command piped
+   into `tail`/`grep` reports the *pipe's* exit code — `bun run test:scripts | tail` said 0
+   while the suite said 1, twice in one session. Capture the command's own exit code.
+4. **Print the population beside the verdict.** A sweep or gate that reports "clean" without
+   reporting how many subjects it examined is indistinguishable from one whose subject list
+   silently shrank to zero — that exact shape shipped a false-clean citation sweep (C61).
+5. **Recompute corrections from inputs, never from the figure being amended.** A correction
+   derived from its own wrong baseline inherits the defect (87 + 7 = 94, both wrong; C52's
+   span table measured on a tree that was never committed).
+6. **A carried-forward status is a claim that goes stale.** Re-measure a "still open" note
+   before repeating it — two such notes outlived their own fixes by weeks (BEH-01,
+   SEN-03) and were re-inherited by a downstream report as live defects.
+
+When a task record cites a figure, the command that produced it (and its exit code, where
+relevant) belongs next to it. `rtk`-filtered output is never citable as evidence — it
+rewrites numbers and paths; use the raw command for anything you will quote.

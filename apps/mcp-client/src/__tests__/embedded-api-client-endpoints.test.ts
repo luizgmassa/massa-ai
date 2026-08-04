@@ -8,12 +8,37 @@
  * (embedded + core) and runs in its own process.
  */
 
-import { describe, test, expect } from "bun:test";
-import { EmbeddedApiClient } from "../embedded-api-client.js";
-import { ApiHttpError } from "../api-client.js";
+import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import type { ApiHttpError as ApiHttpErrorInstance } from "../api-client.js";
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
+
+// DI-01 (da-inventory-closure): scratch config home BEFORE any core-reaching
+// import. The shared barrel eagerly reads the real CONFIG_DIR at import time,
+// and /search/project + /search/code reach live embedding-provider
+// auto-selection through it (`ensureInitialized` → `getVectorStore()`) — the
+// cold-model 5001 ms class. Static imports hoist above statements, so every
+// core-reaching import below is dynamic (the m25-m26 suite's pattern; the
+// type-only import above is erased and loads nothing). This gives a direct
+// `bun test <this file>` the same hermetic env the isolated runner's
+// buildChildEnv (SEN-03) gives every wrapper child, DATABASE_URL still
+// arriving via env exactly as the wrapper passes it through.
+const SCRATCH_CONFIG_HOME = mkdtempSync(path.join(tmpdir(), "embedded-endpoints-config-"));
+process.env.XDG_CONFIG_HOME = SCRATCH_CONFIG_HOME;
+
+const { EmbeddedApiClient } = await import("../embedded-api-client.js");
+const { ApiHttpError } = await import("../api-client.js");
+const { _setLlmEnabledForTesting } = await import("@massa-ai/core");
+
+// Second gate, mirroring buildChildEnv's MASSA_AI_LLM_ENABLED=false pin: the
+// scratch config home closes the config.json path, this closes the env path
+// (a repo .env setting the gate true would sail past the scratch dir).
+beforeAll(() => _setLlmEnabledForTesting(false));
+afterAll(() => {
+  _setLlmEnabledForTesting(null);
+  rmSync(SCRATCH_CONFIG_HOME, { recursive: true, force: true });
+});
 
 const client = new EmbeddedApiClient();
 const BASE_TMP = tmpdir();
@@ -116,7 +141,7 @@ describe("EmbeddedApiClient GET endpoints", () => {
   test("unknown GET → 404", async () => {
     const { err } = await call(() => client.get("/api/v1/unknown-get"));
     expect(err).toBeInstanceOf(ApiHttpError);
-    expect((err as ApiHttpError).status).toBe(404);
+    expect((err as ApiHttpErrorInstance).status).toBe(404);
   });
 });
 
@@ -231,7 +256,7 @@ describe("EmbeddedApiClient POST endpoints", () => {
   test("POST unknown → 404", async () => {
     const { err } = await call(() => client.post("/api/v1/unknown-post", {}));
     expect(err).toBeInstanceOf(ApiHttpError);
-    expect((err as ApiHttpError).status).toBe(404);
+    expect((err as ApiHttpErrorInstance).status).toBe(404);
   });
 });
 
@@ -284,7 +309,7 @@ describe("EmbeddedApiClient synapse session lifecycle", () => {
 describe("EmbeddedApiClient PATCH / DELETE", () => {
   test("PATCH unknown → 404", async () => {
     const { err } = await call(() => client.patch("/api/v1/unknown", {}));
-    expect((err as ApiHttpError)?.status).toBe(404);
+    expect((err as ApiHttpErrorInstance)?.status).toBe(404);
   });
 
   test("DELETE workspace parametric", async () => {
@@ -294,49 +319,49 @@ describe("EmbeddedApiClient PATCH / DELETE", () => {
 
   test("DELETE unknown → 404", async () => {
     const { err } = await call(() => client.delete("/api/v1/unknown-delete"));
-    expect((err as ApiHttpError)?.status).toBe(404);
+    expect((err as ApiHttpErrorInstance)?.status).toBe(404);
   });
 });
 
 describe("EmbeddedApiClient validation branches (missing required params)", () => {
   test("bootstrap missing projectId → 400", async () => {
     const { err } = await call(() => client.post("/api/v1/bootstrap", {}));
-    expect((err as ApiHttpError)?.status).toBe(400);
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
   });
 
   test("handoff/begin missing projectId → 400", async () => {
     const { err } = await call(() => client.post("/api/v1/handoff/begin", {}));
-    expect((err as ApiHttpError)?.status).toBe(400);
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
   });
 
   test("handoff/accept missing id → 400", async () => {
     const { err } = await call(() => client.post("/api/v1/handoff/accept", {}));
-    expect((err as ApiHttpError)?.status).toBe(400);
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
   });
 
   test("handoff/cancel missing id → 400", async () => {
     const { err } = await call(() => client.post("/api/v1/handoff/cancel", {}));
-    expect((err as ApiHttpError)?.status).toBe(400);
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
   });
 
   test("handoff/list missing projectId → 400", async () => {
     const { err } = await call(() => client.post("/api/v1/handoff/list", {}));
-    expect((err as ApiHttpError)?.status).toBe(400);
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
   });
 
   test("proposal/list missing projectId → 400", async () => {
     const { err } = await call(() => client.post("/api/v1/proposal/list", {}));
-    expect((err as ApiHttpError)?.status).toBe(400);
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
   });
 
   test("proposal/approve missing id → 400", async () => {
     const { err } = await call(() => client.post("/api/v1/proposal/approve", {}));
-    expect((err as ApiHttpError)?.status).toBe(400);
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
   });
 
   test("proposal/reject missing id → 400", async () => {
     const { err } = await call(() => client.post("/api/v1/proposal/reject", {}));
-    expect((err as ApiHttpError)?.status).toBe(400);
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
   });
 });
 
@@ -445,7 +470,7 @@ describe("EmbeddedApiClient uploadAndIndex", () => {
       projectPath: "/tmp/x",
       files: [{ relativePath: "/etc/passwd", content: "malicious" }],
     }));
-    const msg = err instanceof Error ? err.message : String((err as ApiHttpError)?.body?.error ?? err);
+    const msg = err instanceof Error ? err.message : String((err as ApiHttpErrorInstance)?.body?.error ?? err);
     expect(msg).toContain("Invalid file path");
   });
 
@@ -454,7 +479,7 @@ describe("EmbeddedApiClient uploadAndIndex", () => {
       projectPath: "/tmp/x",
       files: [{ relativePath: "../../../etc/passwd", content: "malicious" }],
     }));
-    const msg = err instanceof Error ? err.message : String((err as ApiHttpError)?.body?.error ?? err);
+    const msg = err instanceof Error ? err.message : String((err as ApiHttpErrorInstance)?.body?.error ?? err);
     expect(msg).toContain("Invalid file path");
   });
 

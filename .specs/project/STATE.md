@@ -1,6 +1,45 @@
 # massa-ai Spec State
 
-## Current — Cross-Pollination Ports & Gap Closure (**VALIDATED PASS 2026-08-03 — EXECUTE + INDEPENDENT VALIDATION COMPLETE; PR open, merge is the user's decision**)
+## Current — DA Inventory Closure (**VALIDATED PASS 2026-08-03 — EXECUTE + INDEPENDENT VALIDATION COMPLETE; PR open, merge is the user's decision**)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-da-inventory-closure` · workflow:
+  spec-driven (Large) · branch `spec/da-inventory-closure`, worktree
+  `.claude/worktrees/da-inventory-closure`, cut from `origin/main` @ `8e63477` (v1.19.0).
+- Scope: the DA-01..DA-17 inventory of `.specs/reports/cross-pollination-portability-and-gaps.md`
+  (folder removed at close-out per the user's instruction — recover via git history)
+  §"(a) already documented", re-measured row-by-row at `8e63477` (the report is a week stale and
+  was written at `45daaa1`). Full disposition table with per-row evidence:
+  `.specs/features/da-inventory-closure/spec.md`.
+- Outcome of triage: **7 FIX** (DI-01 LLM seam export + embedded-suite pin; DI-02 UNION GUARD
+  wiring sensor; DI-03 `subagent-skills-plugin-parity` registry truth — validated PASS 2026-07-23
+  yet still "Specify-only" in the registry; DI-04 stale STATE notes annotated; DI-05 hermetic
+  runner config dir; DI-06 native-grammar worktree-provisioning doc; DI-07 CONTRIBUTING
+  measurement-discipline section), **8 RESOLVED** with evidence (DA-02/03/06/07/08/09/12 + DA-14's
+  code half — BEH-01 shipped it in v1.9.1), **1 ROUTED** (DA-10 → `sqlite-removal-followup`),
+  **2 ACCEPTED** (DA-04 CodeQL platform behavior; DA-13 do-not-chase flakes, already documented).
+- Session measurements worth keeping: fresh-worktree `bun install` under Node 25.9.0 on macOS
+  arm64 exits 0 with **no native tree-sitter build** (silent node-gyp failure) → exactly DA-16's
+  3 red suites; copying `node_modules/tree-sitter*/build/` from the provisioned main checkout
+  turned the contract suite 9/0 (DI-06 documents this). Importing `@massa-ai/shared` eagerly
+  reads the real config dir (malformed-sentinel probe hit `dist/config/index.js:233` + module-level
+  "Smart Rate Limiter initialized") — DA-15's mechanism, 94 importing core test files (was 75).
+- Process constraints (user, this session): commit `.ua/` data files (the `.gitignore` premise is
+  false — `git check-ignore` exit 1, nothing ignores `.ua/`); do NOT commit
+  `.ua/tmp-dashboard-token.txt` (credential-shaped) or `.ua/.trash-*` (transient) — flagged;
+  remove `.specs/reports/` as the final development step after a content sweep; one PR;
+  `skills-directive-dedup` (parked T5/12) untouchable.
+- massa-ai MCP server not consulted; `.specs/` files canonical per contract.
+- Execute complete: T1-T11 one commit each (`c8174af`..`d6329a0`); full Plan Challenge revised
+  the plan twice before Execute (D1 mechanism — the LLM seam provably never gated the embedding
+  path; D3 sweep population 3 named classes → 14 measured files). Independent validation **PASS**
+  (`validation.md` — verifier re-derived the DI-02 mutation kill with a copy-aside restore, re-ran
+  the five gates + test:scripts, all exit 0). L-001 tool-promoted to confirmed. DI-05 withdrawn at
+  D0 (SEN-03 `39afe59` v1.10.0 had already shipped the fix — a carried-forward status the report
+  re-inherited unre-measured). `.specs/reports/` removed after a fully-dispositioned 14-file sweep.
+- Next action (user): review + merge the PR. Merging cuts a **minor** release (CHANGELOG
+  `[Unreleased]` has `### Added` content) — approving the merge approves a release.
+
+## Previous — Cross-Pollination Ports & Gap Closure (**VALIDATED PASS 2026-08-03 — MERGED as PR #61 @ `0084d1a`, RELEASED as v1.19.0 @ `8e63477`; CI + Coverage + Release all green on the merge sha**)
 
 **Outcome.** All 19 implementation tasks done on `feature/cross-pollination-ports` (worktree
 `.claude/worktrees/cross-pollination-ports`, cut from `origin/main` @ `94e6b05`), one atomic
@@ -27,11 +66,13 @@ spelling; lessons L-009..L-014 via lessons.py; CHANGELOG Added×7/Fixed×4.
 and gated-suite execution in GitHub Actions (T7).
 
 **Residual:** massa-ai MCP server unreachable ALL session — durable-memory sync skipped
-(`.specs/` files canonical, per contract). Main checkout still holds untracked duplicates of
+(`.specs/` files canonical, per contract). ~~Main checkout still holds untracked duplicates of
 `.specs/reports/*` + `.specs/features/cross-pollination-ports/*` (classifier declined deletion);
-at merge, remove them before `git pull` or git will refuse the checkout. Verifier's process
-finding: a design doc that pre-assigns an AD number goes stale by append time — AD-014
-renumbering is the instance (lesson L-014).
+at merge, remove them before `git pull` or git will refuse the checkout.~~ **Resolved
+2026-08-03 post-merge: duplicates diffed against merged versions (identical except the recorded
+design/tasks amendments), deleted, and the main checkout fast-forwarded to `8e63477` cleanly.**
+Verifier's process finding: a design doc that pre-assigns an AD number goes stale by append
+time — AD-014 renumbering is the instance (lesson L-014).
 
 ## Previous — Cross-Pollination Ports (registration snapshot, superseded by the block above)
 
@@ -2303,10 +2344,20 @@ Also update the feature block above: **Phase 0 is done, remaining Execute is ~21
   the three items this feature deferred — the controllers-layer restructuring, the
   `contextual-search-rlm.ts` split, and the `rlm-*` filename rename. All six of its assumptions are
   open questions.
-- Open findings carried forward, not actioned: `memory-controller.ts:274`'s inert
+- ~~Open findings carried forward, not actioned: `memory-controller.ts:274`'s inert
   `includePersistent` option (a behavior decision), and `packages/core`'s test runner having no
   isolation rule for `@massa-ai/shared` — 75 core test files import it and its barrel side-effects
-  run against the real `CONFIG_DIR` under a plain `bun run test`.
+  run against the real `CONFIG_DIR` under a plain `bun run test`.~~ **Both clauses went stale and
+  were annotated at `da-inventory-closure` (2026-08-03, DA-14/DA-15/DI-04) rather than deleted:**
+  (1) `includePersistent` was made live by this same feature's later BEH-01 ([1.9.1]) — today
+  `memory-controller.ts:281` defaults it `true` and `:305` forwards it, and
+  `memory-repository-pg.ts:236-238` applies `level <> PERSISTENT` when `false`; the note simply
+  predated the fix and was carried forward verbatim. (2) The `@massa-ai/shared` exposure was
+  closed by SEN-03 (`39afe59`, v1.10.0) at a different surface than the isolation rule this note
+  proposed: `scripts/lib/run-tests-isolated.ts` `buildChildEnv` gives **every** spawned group a
+  scratch `XDG_CONFIG_HOME` and pins the LLM env gate (unit suite
+  `runner-child-env.test.ts`); the cross-pollination report's DA-15 row inherited this note
+  unre-measured — a carried-forward status is a claim that goes stale.
 - Skipped sensor: `recall` returned 0 memories for this workspace, so no durable memory informed
   this plan. Context7 MCP not registered — oxlint's rule catalogue is unverified against upstream
   docs and must be confirmed in TASK-018.

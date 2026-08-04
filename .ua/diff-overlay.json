@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "baseBranch": "main",
+  "generatedAt": "2026-08-03T17:30:02Z",
+  "changedFiles": [
+    ".specs/reports/ai-memory-changes-2a85950-to-head.md",
+    ".specs/reports/codebase-memory-mcp-changes-7d6cdb2-to-head.md",
+    ".specs/reports/cross-pollination-portability-and-gaps.md",
+    ".specs/reports/pr-c-phase-1-report.md",
+    ".specs/reports/pr-c-phase-2-report.md",
+    ".specs/reports/pr-c-phase-3-report.md"
+  ],
+  "changedNodeIds": [],
+  "affectedNodeIds": []
+}

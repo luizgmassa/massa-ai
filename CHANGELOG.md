@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **LLM test seams on the core barrel.** `_setLlmEnabledForTesting` and
+  `_setJsonSchemaSupportedForTesting` are exported from `@massa-ai/core`, so an `apps/` suite
+  can pin the LLM gate for direct `bun test <file>` runs the same way the isolated runner's
+  `buildChildEnv` (SEN-03) pins it for every wrapper child.
+- **UNION GUARD wiring sensor.** A `_PARALLEL_DROP_RESULT` test seam in
+  `scripts/run-tests-parallel.ts` drops one assembled result pre-guard, making the
+  missing-suite branch's call-site wiring (exit 1 + `UNION GUARD FAIL` naming the id)
+  end-to-end testable; the upgraded suite replaces the previous source-text assertion.
+  Deleting the branch's `return 1` was measured invisible to every pre-existing test and is
+  killed by the new drop test (closes lesson L-001, now confirmed).
+- **`CONTRIBUTING.md` § Measurement discipline.** Six rules for figures quoted as evidence —
+  tracked-state instrument verification, pass/fail split over pass count, cached / replayed /
+  pipe-wrapped results are not measurements, population beside verdict, corrections recomputed
+  from inputs, carried-forward staleness — each citing a recorded instance.
+
+### Fixed
+
+- **The `embedded-api-client-endpoints` "known outstanding case" is closed.** The suite sets a
+  scratch `XDG_CONFIG_HOME` before any core-reaching import (static imports hoist, so the core
+  imports are dynamic) and pins the exported LLM seam: direct runs under a real user config
+  went 93 pass / 2 fail cold (44.96 s) to 95 / 0 in ~5.8 s. The standing diagnosis named the
+  unexported LLM seam as the blocker; the failing search routes actually reach live
+  embedding-provider auto-selection, a second mechanism the seam never gated — `CLAUDE.md`'s
+  paragraph now records the two-mechanism post-mortem.
+- **`FEATURES.json` registry truth for `subagent-skills-plugin-parity`.** The entry sat
+  `in_progress` with design/tasks/execute `"pending"` while the feature's own `validation.md`
+  records an independent PASS dated 2026-07-23; now `complete` with the evidence cited.
+- **Two stale carried-forward STATE notes annotated.** `includePersistent` "inert" (fixed by
+  BEH-01 in v1.9.1) and the `@massa-ai/shared` runner-isolation gap (fixed by SEN-03 in
+  v1.10.0 at the hermetic-child-env surface); both struck in place with their evidence chains.
+- **Worktree-provisioning rule for native grammars documented.** `bun install` exits 0 on
+  macOS arm64 + Node 25 while node-gyp silently fails; `CLAUDE.md` now names the failure
+  signature, the two repairs, and the verify command (measured 1227/3 → 9/0 this session).
+
 ## [1.19.0] - 2026-08-03
 
 ### Added

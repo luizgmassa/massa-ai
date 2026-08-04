@@ -44,6 +44,17 @@ export type {
   SearchMemoryResult,
 } from "./memory/memory-controller.js";
 
+// Test seams (DI-01, da-inventory-closure): the wrapper runners pin the LLM
+// gate for every child (SEN-03 buildChildEnv); exporting the same seam lets an
+// apps/ suite pin it for direct `bun test <file>` runs too. The seam gates the
+// LLM-role call sites only — embedding auto-selection is a separate mechanism
+// (vector-store factory), which is why a suite also needs a scratch config
+// home to be fully hermetic.
+export {
+  _setLlmEnabledForTesting,
+  _setJsonSchemaSupportedForTesting,
+} from "./memory/llm-client.js";
+
 export { SearchController } from "./search/search-controller.js";
 export type {
   ProjectSearchInput,

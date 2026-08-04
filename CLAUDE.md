@@ -119,6 +119,17 @@ classifies as needing isolation:
 Consequence: running `bun test` over a whole directory cross-contaminates module and
 process state and will produce false failures. Use the runner, or target one file.
 
+**Provisioning a fresh worktree: `bun install` can silently skip the native grammars.** On
+macOS arm64 with the pinned Node 25 as the build helper, node-gyp fails (the documented clang
+break above) while **`bun install` still exits 0** — no `node_modules/tree-sitter*/build/`
+directories exist, and the first `test:scripts` run fails exactly 3 "native Tree-sitter
+package contract" suites with `No native build was found for platform=… runtime=node`. That
+signature means provisioning, not code. Two repairs: copy the `node_modules/tree-sitter*/build/`
+directories from any provisioned checkout of the same lockfile (the addon is N-API —
+position-independent between identical dependency trees), or re-run the install with a Node 22
+helper. Verify with `bun test ./scripts/tests/verify-tree-sitter-grammars.test.ts` → 9 pass.
+Measured 2026-08-03: fresh worktree red 1227/3 → addon copy → 9/0 and the full run green.
+
 **`bun run test` is not the whole suite.** Turbo only reaches packages under
 `packages/*` / `apps/*` that declare a `test` script. Root-level suites live outside those
 globs and run from a separate script:
@@ -173,11 +184,19 @@ Genuinely slow tests are a separate class and do get budgets: `etl-cache-invalid
 a budget that tracks accumulated shared test-database state rather than the fixture — the
 same file measures 1213 ms against a fresh database and over 120 s partway through the gate.
 Note the isolation runner is **sequential**, one child process at a time, so a slow suite
-inside it is accumulation, not contention. **Known outstanding case:** `mcp-client`
-`embedded-api-client-endpoints.test.ts` ("routes without 404" for `/search/project` and
-`/search/code`) fails at 5001 ms under a real user config and passes with an empty one. It is
-deliberately unmocked integration and core does not export the LLM seam to `apps/`, so it has no
-one-line fix; run that package with `XDG_CONFIG_HOME` set until it does.
+inside it is accumulation, not contention. The former known outstanding case — `mcp-client`
+`embedded-api-client-endpoints.test.ts` failing at 5001 ms under a real user config — is
+closed, and its post-mortem is worth the paragraph: the standing diagnosis blamed the
+unexported LLM seam, but the failing `/search/project` + `/search/code` cases reach **live
+embedding-provider auto-selection** through `ensureInitialized` → `getVectorStore()`
+unconditionally — a second mechanism `MASSA_AI_LLM_ENABLED` never gated. The suite now sets a
+scratch `XDG_CONFIG_HOME` **before any core-reaching import** (static imports hoist, so the
+core imports are dynamic — the m25-m26 pattern) and pins `_setLlmEnabledForTesting(false)` as
+the env-path second gate, exactly mirroring what `buildChildEnv` (SEN-03) gives every wrapper
+child. Both seams are exported from `@massa-ai/core` for any `apps/` suite that needs the
+same treatment. Direct runs went 93/2-cold → 95/0 in ~5.8 s. When a suite fails only under a
+real config, trace the call graph before trusting a prior triage's named mechanism — two
+independent gates can look like one blocker from the symptom alone.
 
 ```bash
 # one file (safe — single process)
@@ -580,6 +599,8 @@ zero publishes.
 
 ## Working conventions
 
+- Figures quoted as evidence follow `CONTRIBUTING.md` § "Measurement discipline" — the
+  recurring measurement-defect classes and their rules live there, once.
 - `.specs/` is the source of truth for in-flight work: `project/STATE.md`,
   `project/FEATURES.json`, `HANDOFF.md`, `features/<slug>/{spec,design,tasks,validation}.md`,
   `LESSONS.md`. Read state from these files, never from recalled memory.

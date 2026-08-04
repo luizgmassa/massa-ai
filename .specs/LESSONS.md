@@ -8,17 +8,16 @@
 
 Corroborated across multiple features. Safe to apply as guidance.
 
-_none_
+### L-001 - UNION GUARD missing-suite path has no discriminating test. No test injects a suite into SUITE_TABLE but not into results. Add a mock-drop test asserting exit 1 + UNION GUARD FAIL.
+- signal: `surviving_mutant` | recurrence: 2 feature(s) | scope: `test-strength` | harmful: 0 | confidence: 1.0
+- features: wave-6-architecture-features, da-inventory-closure
+- context: project=massa-ai session=spec-da-inventory-closure workflow=spec-driven entity=da-inventory-closure
+- evidence: scripts/run-tests-parallel.ts:243-257 + scripts/__tests__/run-tests-parallel.test.ts:69-74 (test-strength) (+1 more)
+- last seen: 2026-08-03T23:36:28Z
 
 ## Candidates (under observation - do NOT load as guidance yet)
 
 Seen once or not yet corroborated. Tracked, not trusted.
-
-### L-001 - UNION GUARD missing-suite path has no discriminating test. No test injects a suite into SUITE_TABLE but not into results. Add a mock-drop test asserting exit 1 + UNION GUARD FAIL.
-- signal: `surviving_mutant` | recurrence: 1 feature(s) | scope: `test-strength` | harmful: 0 | confidence: 0.62
-- features: wave-6-architecture-features
-- evidence: scripts/run-tests-parallel.ts:243-257 + scripts/__tests__/run-tests-parallel.test.ts:69-74 (test-strength)
-- last seen: 2026-07-22T21:39:38Z
 
 ### L-002 - Hook binary tests assert exit 0 only, never POST body/endpoint/count. Removing second pre-compact POST survived. Add capture-server test verifying 2 POSTs to correct endpoints + body shapes.
 - signal: `surviving_mutant` | recurrence: 1 feature(s) | scope: `test-strength` | harmful: 0 | confidence: 0.62
