@@ -59,6 +59,7 @@ const VALIDATE_SPEC = "skills/massa-ai/scripts/validate_spec.py";
 const VALIDATE_TASKS = "skills/massa-ai/scripts/validate_tasks.py";
 const CHECK_COMMIT = "skills/massa-ai/scripts/check_commit.py";
 const VALIDATE_STATE = "skills/massa-ai/scripts/validate_state.py";
+const LESSONS_PY = "skills/massa-ai/scripts/lessons.py";
 
 // ---------------------------------------------------------------------------
 // T1: validate_spec.py (SYNC-01 AC1)
@@ -543,6 +544,51 @@ describe("validate_state.py (T4, SYNC-01 AC4)", () => {
     expect(r.exitCode).toBe(1);
     expect(r.stdout).toContain("feature-b");
     expect(r.stdout).not.toContain("verdict is FAIL across [feature-a");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T5: lessons.py Unicode _norm + selftest (SYNC-10 AC1)
+// ---------------------------------------------------------------------------
+
+describe("lessons.py selftest (T5, SYNC-10 AC1)", () => {
+  test("selftest subcommand exits 0", () => {
+    const r = runPy(LESSONS_PY, ["selftest"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("selftest_norm: ok");
+  });
+
+  function normOf(text: string): string {
+    const proc = Bun.spawnSync(
+      [
+        "python3",
+        "-c",
+        `import sys; sys.path.insert(0, "skills/massa-ai/scripts"); import lessons; print(lessons._norm(sys.argv[1]))`,
+        text,
+      ],
+      { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe" },
+    );
+    return proc.stdout.toString().trim();
+  }
+
+  test("diacritic merge: Portuguese text with/without diacritics normalizes to the same key", () => {
+    const withDiacritics = normOf("Não use datas locais");
+    const withoutDiacritics = normOf("Nao use datas locais");
+    expect(withDiacritics).toBe(withoutDiacritics);
+    expect(withDiacritics).toBe("nao use datas locais");
+  });
+
+  test("non-Latin merge: café/cafe collapse to the same key (ASCII-only regex could not do this)", () => {
+    expect(normOf("café")).toBe(normOf("cafe"));
+    expect(normOf("café")).toBe("cafe");
+  });
+
+  test("non-collision: distinct Japanese sentences normalize to distinct, non-empty keys", () => {
+    const jp1 = normOf("日本語の文です");
+    const jp2 = normOf("別の日本語文");
+    expect(jp1).not.toBe("");
+    expect(jp2).not.toBe("");
+    expect(jp1).not.toBe(jp2);
   });
 });
 

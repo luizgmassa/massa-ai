@@ -79,7 +79,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: none
 **Tests**: `python3 skills/massa-ai/scripts/lessons.py selftest` exit 0 + TS wrapper asserts diacritic/non-Latin behavior
 **Gate**: selftest 0 + suite green
-**Status**: [ ]
+**Status**: [x]
 
 ### T6: New check_specs_delivered.py
 **Where**: `skills/massa-ai/scripts/check_specs_delivered.py` (new) + tests
