@@ -11,7 +11,7 @@ Phase 2 adds: `bun run test:scripts` (all pass; includes `skill-artifact-parity.
 
 ## Phase 1: Policy source edits (4 Tasks)
 
-- [ ] **T1 (WFP-04, WFP-05):** `skills/massa-ai/SKILL.md` — two Core Contract bullets
+- [x] **T1 (WFP-04, WFP-05):** `skills/massa-ai/SKILL.md` — two Core Contract bullets
   (abbreviation expansion; Phase/Task vocabulary with `1 Phase = X Tasks` /
   `Y Phases = Z Tasks` forms). `workflows/spec-driven.md` — reword sub-agent offer
   "batch" prose to Phase/Task vocabulary (D6), semantics unchanged.
@@ -20,15 +20,15 @@ Phase 2 adds: `bun run test:scripts` (all pass; includes `skill-artifact-parity.
   `grep -n "batch" skills/massa-ai/workflows/spec-driven.md` → print full population;
   expected residual: verb-form "batch tasks" (atomic-commit rule) only — zero
   unit-noun "batch" for worker/task groups. Regen `--check` green.
-- [ ] **T2 (WFP-02):** `references/implementation-delivery.md` — "PR description stays
+- [x] **T2 (WFP-02):** `references/implementation-delivery.md` — "PR description stays
   current" subsection in the chain (after Stage 4) + Anti-Patterns bullet.
   Test: grep single normative copy; lint + regen `--check` green.
-- [ ] **T3 (WFP-01):** `references/mobile-context.md` — Compose Screen Previews rule
+- [x] **T3 (WFP-01):** `references/mobile-context.md` — Compose Screen Previews rule
   (`@Preview` for every created/updated screen-level composable, Android Compose +
   KMP Compose Multiplatform, previews are protected validation assets);
   `references/mobile-diagnosis.md` — one pointer line.
   Test: grep normative copy count == 1 (mobile-context), pointer present; gates green.
-- [ ] **T4 (WFP-03):** new `references/figma-pre-analysis.md` (two-stage protocol per
+- [x] **T4 (WFP-03):** new `references/figma-pre-analysis.md` (two-stage protocol per
   D3); wire load+step into `workflows/design.md`, `workflows/mobile-figma/
   mobile-figma-audit.md`, `workflows/mobile-figma/mobile-figma-fix.md`,
   `workflows/spec-driven.md` (design-source gate), `workflows/feature.md`
@@ -38,13 +38,15 @@ Phase 2 adds: `bun run test:scripts` (all pass; includes `skill-artifact-parity.
   Test (literal, F1/F2/F4):
   `grep -c "figma-pre-analysis" skills/massa-ai/workflows/design.md workflows/mobile-figma/mobile-figma-audit.md workflows/mobile-figma/mobile-figma-fix.md workflows/spec-driven.md workflows/feature.md` — each > 0;
   `grep -c "figma-pre-analysis" skills/massa-ai/references/mobile-context.md` == 0;
-  `grep -rl "proposes a partition\|never parallel" skills/massa-ai/` → only
-  `references/figma-pre-analysis.md` (protocol lives once);
+  `grep -rlE "Partition proposal|never in parallel" skills/massa-ai/` → only
+  `references/figma-pre-analysis.md` (protocol lives once; phrase set corrected
+  post-validation — the delivered reference says "Partition proposal" / "never in
+  parallel", validation.md gap 1);
   SKILL.md Shared References lists the file; gates green.
 
 ## Phase 2: Delivery close-out (1 Task)
 
-- [ ] **T5:** CHANGELOG entry under `[Unreleased]`; mark tasks `[x]`; update
+- [x] **T5:** CHANGELOG entry under `[Unreleased]`; mark tasks `[x]`; update
   `.specs/project/STATE.md`, `.specs/project/FEATURES.json`, `.specs/HANDOFF.md`;
   full gates (`test:scripts`, lint, regen `--check`, spec validators,
   `check_specs_delivered`); push; PR; per WFP-02 update PR description after any

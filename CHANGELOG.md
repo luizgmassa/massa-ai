@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Five harness-wide workflow policies (WFP-01..05).** Implementation workflows now
+  require `@Preview` composables for every created or updated screen-level composable on
+  Android Jetpack Compose / KMP Compose Multiplatform (normative rule in
+  `references/mobile-context.md`, debug-path pointer in `mobile-diagnosis.md`), and must
+  keep the PR description current after each requested push, before merging
+  (`references/implementation-delivery.md`, with a stale-description merge anti-pattern).
+  Figma-consuming workflows (`design`, `mobile-figma-audit`, `mobile-figma-fix`,
+  `feature`, `spec-driven`) gain a new `references/figma-pre-analysis.md` protocol: one
+  read-only pre-analysis subagent maps the provided Figma links and proposes a retrieval
+  partition (by size, coupling, feature flow), then the main agent dispatches retrieval
+  subagents strictly sequentially — never in parallel. All workflows now expand
+  abbreviations on first use and use one batching vocabulary (Task = atomic unit,
+  Phase = ordered group of Tasks, sizes reported as `1 Phase = X Tasks` /
+  `Y Phases = Z Tasks`); the spec-driven sub-agent offer was reworded from "batch" to
+  Phase-group terms. Host skill bundles regenerated for all four plugins.
+
 ## [1.22.0] - 2026-08-04
 
 ### Changed
