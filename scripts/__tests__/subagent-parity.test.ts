@@ -655,6 +655,9 @@ describe("subagent parity — frozen baseline diff (MPR-R8)", () => {
     "claude/navigator",
     "opencode/requirements-analyst",
     "opencode/planner",
+    "claude/verification-agent",
+    "codex/verification-agent",
+    "opencode/verification-agent",
   ]);
 
   // The fixture is frozen to the base commit (45daaa1) and must never be regenerated, so it

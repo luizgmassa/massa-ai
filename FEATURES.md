@@ -406,7 +406,7 @@ the charters and is the only role-keyed model table in this file.
 | builder | standard |
 | reviewer | standard |
 | context-curator | light |
-| verification-agent | standard |
+| verification-agent | deep |
 | requirements-analyst | standard |
 | architecture-specialist | deep |
 | test-engineer | standard |

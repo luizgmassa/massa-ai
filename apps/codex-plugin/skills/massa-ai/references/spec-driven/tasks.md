@@ -58,7 +58,7 @@ This step ALWAYS runs — there is no precondition. Decide which of two paths to
 
 Before sampling tests or inferring anything, scan the project for documented quality and testing standards. Stack-agnostic sources to check (illustrative, not exhaustive):
 
-- Agent/AI instructions: `AGENTS.md`, `CLAUDE.md`, `.cursor/rules/**`, `.github/copilot-instructions.md`
+- Agent/AI convention files, if the repo has any: `AGENTS.md` (the vendor-neutral standard) and any tool-specific rules file or rules directory the project happens to use
 - Contributor guides: `CONTRIBUTING.md`, `docs/` (testing, quality, or standards subdocs), README testing section
 - Tool configuration: coverage thresholds in the test runner config (e.g., `jest.config.*`, `vitest.config.*`, `pytest.ini`, `.nycrc`, `Makefile` coverage targets, CI coverage gates)
 
@@ -74,7 +74,7 @@ Before sampling tests or inferring anything, scan the project for documented qua
 **How to infer (path 1 — existing tests):**
 
 1. **Sample test files.** Locate 5–10 existing test files. Map each file's location relative to its source file to identify which code layers are exercised and at what level (unit, integration, e2e). Use these samples for style, location patterns, framework, and test type — and as a **floor** (never produce tests less thorough than existing ones for the same layer). Existing tests are NOT a ceiling on thoroughness; the thoroughness target comes from the spec ACs, listed edge cases, and guidelines (or strong default). The Coverage Expectation column captures the target per layer.
-2. **Discover commands from the repo.** Do NOT invent commands and do NOT assume an ecosystem. Read the project's own build/task manifests, test config, and CI workflows to extract the actual commands — for example: `package.json` / `project.json` (JS/TS), `Makefile`, `pyproject.toml` / `tox.ini` / `pytest` (Python), `Cargo.toml` (Rust), `go test` invocations (Go), `pom.xml` / `build.gradle` (Java/Kotlin), `Gemfile` / `Rakefile` (Ruby), `composer.json` (PHP), `.github/workflows` / `.gitlab-ci.yml`. The list is illustrative; detect what this repo actually uses.
+2. **Discover commands from the repo.** Do NOT invent commands and do NOT assume an ecosystem. Read the project's own build/task manifests, test config, and CI workflows to extract the actual commands — for example: `package.json` / `project.json` (JS/TS), `Makefile`, `pyproject.toml` / `tox.ini` / `pytest` (Python), `Cargo.toml` (Rust), `go test` invocations (Go), `pom.xml` / `build.gradle` (Java/Kotlin), `Gemfile` / `Rakefile` (Ruby), `composer.json` (PHP), `.github/workflows` / `.gitlab-ci.yml`. The list is illustrative; detect what this repo actually uses. Capture the **linter/formatter** command too (e.g. the configured `lint`/`format`/`typecheck` script, or a `.pre-commit-config`, `.golangci.yml`, `ruff`/`eslint`/`biome` config) — the Build gate runs it alongside the tests.
 
 **Output contract — render these two sections verbatim into `tasks.md`** (the exact headings downstream phases reference):
 
@@ -156,6 +156,8 @@ This keeps phase boundaries meaningful while letting the packing hit its target 
 ### 5. Validate Before Presenting (MANDATORY)
 
 Before showing tasks to the user, run ALL three pre-approval checks. These are NOT optional — they are gates. If any check fails, restructure the tasks and re-run until all pass.
+
+**Deterministic backing (run it, do not eyeball it):** `python3 skills/massa-ai/scripts/validate_tasks.py <feature> [--root .]` enforces the structural half of these checks so they cannot drift: it flags a `Where` that names multiple files (granularity smell, Check 1), a diagram edge with no matching `Depends on` within a phase and vice-versa (Check 2), a task missing its `Tests` or `Gate` field, a `Tests: none` to confirm against the matrix (Check 3), and any dependency pointing to a later phase. A non-zero exit means restructure before presenting. The script checks structure; the two tables below (the layer-to-test co-location judgment) are still yours. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
 **Check 1: Task Granularity** — verify each task is atomic (see Granularity Check section).
 
@@ -350,12 +352,12 @@ Execution is strictly sequential — there is no intra-phase parallelism. A sing
 
 **How phase-based execution works:**
 
-At Execute, the agent counts total tasks and packs phases into **task-budgeted batches** (~7 tasks per worker, whole phases — the benchmarked sweet spot is ~20 tasks → ~3 workers). A **phase** is the semantic/dependency unit; a **batch** is one or more *consecutive whole phases* assigned to one worker. The cut only ever lands on a phase boundary — a phase is never split across workers. When packing yields more than one batch (> ~8 tasks), the agent offers to dispatch batch sub-agents. Batches run sequentially: each worker executes ALL its tasks in order, then reports a compact summary before the next batch starts. This right-sizes the worker count by workload instead of by phase count (one-per-phase is too fragmented; expensive and slow). See `references/spec-driven/sub-agents.md` for the full model — packing algorithm, offer-then-confirm, worker payload, compact summary contract, failure handling, and context sizing guidance.
+At Execute, the agent counts total tasks and packs phases into **task-budgeted batches** (~7 tasks per worker, whole phases — the benchmarked sweet spot is ~20 tasks → ~3 workers). A **phase** is the semantic/dependency unit; a **batch** is one or more *consecutive whole phases* assigned to one worker. The cut only ever lands on a phase boundary — a phase is never split across workers. **The sub-agent offer fires whenever the feature has more than 3 tasks** — a 4–8-task feature still packs into a single batch and is offered as one batch worker; only a feature with 3 or fewer tasks executes inline with no offer. Batches run sequentially: each worker executes ALL its tasks in order, then reports a compact summary before the next batch starts. This right-sizes the worker count by workload instead of by phase count (one-per-phase is too fragmented; expensive and slow). See `references/spec-driven/sub-agents.md` for the full model — packing algorithm, offer-then-confirm, worker payload, compact summary contract, failure handling, and context sizing guidance.
 
-When the whole feature fits a single batch (≤ ~8 tasks), execution happens inline in the main window with no sub-agents spawned.
+When the whole feature has 3 or fewer tasks, execution happens inline in the main window with no sub-agents spawned and no offer made.
 
 **The orchestrating agent's role during Execute:**
-1. Count total tasks and pack phases into ~7-task batches — offer batch sub-agents if that yields more than one batch and the user accepts
+1. Count total tasks — if more than 3, pack phases into ~7-task batches and offer batch sub-agents (even a single resulting batch is offered); wait for the user's choice
 2. Dispatch the next batch (to a worker, or execute inline)
 3. Receive the compact batch summary
 4. Update tasks.md with results
@@ -514,4 +516,4 @@ Before sampling tests manually, prefer massa-ai tooling to read the codebase:
 
 ## Done
 
-Tasks is done when every in-scope requirement maps to one or more executable tasks, dependencies are explicit, the Test Coverage Matrix and Gate Check Commands are present, project testing guideline scan and pre-approval checks are recorded, the three mandatory pre-approval tables (Granularity, Diagram-Definition Cross-Check, Test Co-location Validation) pass, and each task has deterministic validation with artifact-store evidence recorded.
+Tasks is done when every in-scope requirement maps to one or more executable tasks, dependencies are explicit, the Test Coverage Matrix and Gate Check Commands are present, project testing guideline scan and pre-approval checks are recorded, the three mandatory pre-approval tables (Granularity, Diagram-Definition Cross-Check, Test Co-location Validation) pass, `validate_tasks.py` exits clean (or the no-code-execution-tool fallback was applied), and each task has deterministic validation with artifact-store evidence recorded.

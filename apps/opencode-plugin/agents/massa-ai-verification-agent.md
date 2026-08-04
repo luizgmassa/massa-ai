@@ -1,7 +1,7 @@
 ---
 description: Read-only verification agent. Centralize Verification Ladder logic by validating outputs, choosing the verification level, executing the verification checklist, detecting incomplete work, and producing verification reports. Triggers as the mandatory final gate before a task is claimed complete. Never modifies implementation.
 mode: all
-model: opencode-go/glm-5.2
+model: opencode-go/minimax-m3
 reasoningEffort: max
 permission: { edit: deny, bash: deny }
 ---

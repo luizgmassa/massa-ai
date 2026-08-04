@@ -27,7 +27,7 @@ Use this reference for the mandatory final Execute validation gate. This is not 
 
 Prefer a fresh read-only verifier agent or tool. The author must not verify their own work when independent verification tooling is available. When subagents are unavailable, run the standalone fresh-eyes fallback: re-read `spec.md`, changed files, tests, and diff from scratch before making a verdict.
 
-The verifier is read-only against the real worktree. Discrimination sensor mutations run only in scratch state such as a temporary worktree, stash-protected copy, or temp file copy, and must be reverted or discarded before verdict.
+The verifier is read-only against the real worktree. Discrimination sensor mutations run only in an isolated scratch state — a temporary git worktree (preferred) or temp file copies (fallback), never `git stash` — and must be reverted or discarded before verdict.
 
 ## Inputs
 
@@ -100,18 +100,20 @@ The sensor provides the empirical guarantee that the tests can actually detect r
 
 **How it works:**
 
-1. **Prepare a scratch state.** Use one of (choose the safest available for the environment):
-   - `git stash` the current state, apply a mutation, run tests, then `git stash pop`; OR
-   - A temporary worktree (`git worktree add`); OR
-   - A temp copy of the affected file(s).
-2. **Inject a behavior-level fault** into the new code introduced by this feature. Choose a mutation proportional to the code's risk:
+1. **Prepare an isolated scratch.** Never mutate the real worktree. Choose one:
+   - Preferred: a temporary git worktree (`git worktree add <scratch-path> HEAD`), mutate and run tests there, then `git worktree remove --force <scratch-path>`.
+   - Fallback (no git / worktree unavailable): copy only the affected file(s) to a temp directory, mutate the copies, point the test runner at those copies (or restore originals from the copies' backups), then delete the temp directory.
+   - **Forbidden:** `git stash` / `git stash pop`. A stash records state *before* the mutation; popping it does not reverse a mutation applied afterward, and on a clean tree `git stash` creates no entry at all — so the fault is left in the real worktree.
+2. **Capture a baseline.** Record `git status --porcelain` (or equivalent) of the real worktree *before* any sensor work. It must be unchanged after cleanup.
+3. **Inject a behavior-level fault** into the scratch copy of the new code introduced by this feature. Choose a mutation proportional to the code's risk:
    - Flip a boolean condition (`if (x)` → `if (!x)`, `>` → `>=`)
    - Change a return value (return a wrong status code, wrong field, zero instead of a computed value)
    - Off-by-one (shift a loop bound, change a slice index)
    - Remove a required side effect (delete a method call that the spec requires)
-3. **Run the tests** that cover the mutated code. Use the Quick or Full gate command from tasks.md.
-4. **Confirm the mutant is killed** (tests FAIL). Then discard the mutation (restore the scratch state).
-5. **If a mutant survives** (tests still pass after the fault), the tests are not discriminating for that behavior — add a fix task to strengthen the assertion.
+4. **Run the tests** that cover the mutated code (against the scratch). Use the Quick or Full gate command from tasks.md.
+5. **Confirm the mutant is killed** (tests FAIL). Discard the scratch (remove worktree or delete temp copies).
+6. **Verify isolation.** Re-run `git status --porcelain` on the real worktree and confirm it matches the baseline from step 2. If it differs, STOP — restore the real tree before continuing, and treat the sensor run as invalid.
+7. **If a mutant survives** (tests still pass after the fault), the tests are not discriminating for that behavior — add a fix task to strengthen the assertion.
 
 **Tiering (proportional, not optional):**
 
@@ -201,6 +203,8 @@ After all checks complete, the Verifier MUST:
 
 1. **Write the persisted report** to `.specs/features/<slug>/validation.md` (see template below). This file is the evidence artifact — it survives the session and can be referenced by CI, reviewers, or future agents. Record in `.specs/project/STATE.md` (Decisions) that validation evidence is available at that path.
 2. **Return a compact summary in chat** to the orchestrator (see Compact Chat Summary section below). The orchestrator surfaces it to the user and routes any ranked gaps to fix tasks.
+
+**Deterministic backing (run it, do not eyeball it):** after writing the report, run `python3 skills/massa-ai/scripts/validate_state.py <feature> [--root .]`. It confirms the report is real — present, verdict filled to PASS, and backed by at least one `file:line` evidence citation — so a missing, hollow, placeholder, or FAIL report cannot slip through as done. A non-zero exit means the feature is NOT done: repair the report or route the FAIL gaps to fix tasks, then re-run. This is the closing gate of Execute and runs automatically, the same way the lessons layer runs at distillation — never a manual step. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
 ### 10. Distill Lessons (MANDATORY when validation.md has signal)
 
@@ -364,6 +368,7 @@ Update `.specs/features/<slug>/spec.md` requirement statuses and reflect verifie
 ## Summary
 
 **Overall**: ✅ Ready | ⚠️ Issues | ❌ Not Ready
+**Result**: PASS | FAIL
 
 **Spec-anchored check**: [N/N ACs matched spec outcome | M spec-precision gaps]
 **Sensor**: [N/N mutations killed]
@@ -382,7 +387,7 @@ Update `.specs/features/<slug>/spec.md` requirement statuses and reflect verifie
 
 - **Validation is never prompted** — it always runs after the last task; do not ask the user whether to run it
 - **Spec-anchored, not just covered** — "there is an assertion" is not enough; the assertion must target the spec-defined outcome
-- **Sensor in scratch only** — never mutate the real tree; stash/worktree/temp copy, run, discard
+- **Sensor in scratch only** — never mutate the real tree; use a temp worktree or file copies (never `git stash`), run, discard, then confirm porcelain matches the pre-sensor baseline
 - **Surviving mutants are fix tasks** — do not mark the feature done if the sensor found weak tests
 - **P1 first** — MVP must work before P2/P3
 - **WHEN/THEN = Test** — Each criterion is a test case

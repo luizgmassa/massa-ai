@@ -171,7 +171,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T11
 **Tests**: `subagent-parity.test.ts` + `skill-artifact-parity.test.ts`
 **Gate**: both parity suites green + both generators `--check` clean
-**Status**: [ ]
+**Status**: [x]
 
 ### T17: Skill-bundle regeneration + threshold sweep + cross-file consistency
 **Where**: regenerated `apps/*-plugin/skills/**`

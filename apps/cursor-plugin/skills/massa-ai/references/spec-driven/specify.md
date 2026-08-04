@@ -82,6 +82,8 @@ If needed:
 - "What are the constraints (time, tech, resources)?"
 - "What is explicitly out of scope?"
 
+**Facts you look up; decisions you ask.** Anything discoverable by reading the environment (the codebase, config, docs, existing conventions) you resolve yourself through the Knowledge Verification Chain — do not spend the user's attention asking for it. Reserve questions for genuine decisions that are the user's to make: scope, priorities, product behavior, trade-offs. A question you could have answered by reading the code erodes trust and wastes a turn.
+
 **Challenge vagueness.** Never accept fuzzy answers. "Good" means what? "Users" means who? "Simple" means how? Make the abstract concrete: "Walk me through using this." "What does that actually look like?"
 
 **Know when to stop — then run the dimensions sweep.** When you understand what they're building, why, who it's for, and what done looks like, run a closing **implicit-requirement dimensions sweep** before offering to proceed:
@@ -98,11 +100,22 @@ The `N/A because...` escape is mandatory — it prevents inventing requirements 
 
 Each story MUST be **independently testable** — you can implement and demo just that story.
 
-### 3. Write Acceptance Criteria
+### 3. Write Acceptance Criteria (EARS notation)
 
-Use **WHEN/THEN/SHALL** format — it's precise and testable:
+Write every acceptance criterion in **EARS** (Easy Approach to Requirements Syntax). Each criterion resolves to exactly one pattern, which keeps it unambiguous and directly testable. Choose the pattern that fits the requirement instead of forcing everything into a single shape:
 
-- WHEN [event/action] THEN [system] SHALL [response/behavior]
+| Pattern | Keyword | Template | Use for |
+| ------- | ------- | -------- | ------- |
+| Ubiquitous | (none) | The [system] SHALL [response] | Always-on invariants and constraints |
+| Event-driven | WHEN | WHEN [trigger] THEN the [system] SHALL [response] | A response to a discrete trigger |
+| State-driven | WHILE | WHILE [state] the [system] SHALL [response] | Behavior that holds during a state |
+| Optional-feature | WHERE | WHERE [feature is present] the [system] SHALL [response] | Behavior gated behind an optional capability or flag |
+| Unwanted-behavior | IF / THEN | IF [undesired condition] THEN the [system] SHALL [response] | Errors, failures, invalid input, timeouts |
+| Complex | combination | WHILE [state], WHEN [trigger] the [system] SHALL [response] | Richer behavior combining the above |
+
+**Why patterns beat one shape:** failure states, state transitions, and optional behavior become first-class criteria instead of footnotes squeezed into WHEN/THEN. The patterns map onto the implicit-requirement dimensions above: state-transition integrity to State-driven; failure and external-dependency failure to Unwanted-behavior; feature flags to Optional-feature.
+
+**Rules:** one requirement per criterion (never bundle two behaviors); use concrete values (a specific status code, a specific message, a bound) rather than "quickly" or "gracefully"; every criterion contains a SHALL and is measurable. `python3 skills/massa-ai/scripts/validate_spec.py` flags any criterion without a SHALL and any that matches no recognized pattern.
 
 ### 4. Requirement Closure Gate (before confirm)
 
@@ -121,6 +134,8 @@ Before Design, Tasks, or Execute — and before presenting the spec for confirma
 5. **Declined gray areas become assumptions.** Any gray area the user declined to discuss or that went undiscussed is written to the spec's Assumptions & Open Questions section (agent's chosen default + rationale) — never silently dropped. Refused, deferred, or intentionally excluded areas go in the out-of-scope table. See [discuss.md](discuss.md).
 
 6. **Continue only when** the Open Questions table is empty or every row has an accepted assumption.
+
+7. **Deterministic backing (run it, do not eyeball it):** `python3 skills/massa-ai/scripts/validate_spec.py <feature> [--root .]` checks that required sections exist, every AC is EARS-shaped (has a SHALL), no Assumptions row has an empty default or rationale, and requirement IDs are well-formed. A non-zero exit means fix before confirming — the script checks structure; the judgment calls (is the interpretation right, is the outcome precise) stay yours. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
 Fix inline. This gate is bounded to THIS feature's stated dimensions and actual behavior — never to "anything imaginable." The Out of Scope table and anti-scope-creep rules remain the counterweights: the gate clarifies existing requirements, it never invents new ones.
 
@@ -187,11 +202,12 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 
 **Why P1**: [Why this is critical for MVP]
 
-**Acceptance Criteria**:
+**Acceptance Criteria** (each line is one EARS pattern):
 
-1. WHEN [user action/event] THEN system SHALL [expected behavior]
-2. WHEN [user action/event] THEN system SHALL [expected behavior]
-3. WHEN [edge case] THEN system SHALL [graceful handling]
+1. WHEN [user action/event] THEN system SHALL [expected behavior]  <!-- event-driven -->
+2. IF [invalid input / failure] THEN system SHALL [graceful handling]  <!-- unwanted-behavior -->
+3. WHILE [state holds] system SHALL [behavior during that state]  <!-- state-driven -->
+4. The system SHALL [always-on invariant]  <!-- ubiquitous -->
 
 **Independent Test**: [How to verify this story works alone - e.g., "Can demo by doing X and seeing Y"]
 
@@ -226,9 +242,11 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 
 ## Edge Cases
 
+Edge cases are usually unwanted-behavior (IF/THEN) or boundary (WHEN) criteria:
+
+- IF [error scenario] THEN system SHALL [graceful handling]
+- IF [unexpected input] THEN system SHALL [validation response]
 - WHEN [boundary condition] THEN system SHALL [behavior]
-- WHEN [error scenario] THEN system SHALL [graceful handling]
-- WHEN [unexpected input] THEN system SHALL [validation response]
 
 ---
 
@@ -263,18 +281,18 @@ How we know the feature is successful:
 ## Tips
 
 - **P1 = Vertical Slice** — A complete, demo-able feature, not just backend or frontend
-- **WHEN/THEN is code** — If you can't write it as a test, rewrite it
+- **EARS is code** — If you can't write a criterion as a test, rewrite it; pick the pattern (WHEN / WHILE / WHERE / IF / ubiquitous) that fits
 - **Requirement IDs are mandatory** — Every story maps to trackable IDs
 - **Edge cases matter** — What breaks? What's empty? What's huge?
 - **Out of Scope prevents creep** — If it's not here, it doesn't get built
 - **Closure gate before confirm** — Three checks: unambiguity + precision, open-questions/assumptions closure, declined gray areas logged; scope-tiered; bounded to stated dimensions; never invents requirements
-- **Confirm after the gate passes** — Present the spec for user confirmation only after the closure gate passes (no unresolved-and-unmarked items remain); user approves spec before moving to the discuss phase
+- **Confirm after the gate passes** — Present the spec for user confirmation only after the closure gate passes (no unresolved-and-unmarked items remain) and `validate_spec.py` exits clean; user approves spec before moving to the discuss phase
 
 ---
 
 ## Done
 
-Specify is done when every requirement has an ID, acceptance criteria are testable, edge cases are named, out-of-scope boundaries are explicit, implicit-requirement dimensions are resolved or marked `N/A because <reason>`, and the Requirement Closure Gate is satisfied.
+Specify is done when every requirement has an ID, acceptance criteria are testable EARS statements, edge cases are named, out-of-scope boundaries are explicit, implicit-requirement dimensions are resolved or marked `N/A because <reason>`, the Requirement Closure Gate is satisfied, and `validate_spec.py` exits clean (or the no-code-execution-tool fallback was applied).
 
 ## Massa-ai Integration
 
