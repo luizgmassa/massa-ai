@@ -12,6 +12,7 @@ Phase 1: T1 ──→ T2 ──→ T3 ──→ T4 ──→ T5 ──→ T6
 Phase 2: T7 ──→ T8 ──→ T9 ──→ T10 ──→ T11 ──→ T12 ──→ T13 ──→ T14 ──→ T15
 Phase 3: T16 ──→ T17 ──→ T18
 Phase 4: FT1 ──→ FT2
+Phase 5: T19 ──→ T20 ──→ T21 ──→ T22
 ```
 
 Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depends on Phase 2 (regeneration snapshots final prose).
@@ -207,3 +208,37 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Tests**: new diverging-verdict fixture red-before/green-after
 **Gate**: validator suite green
 **Status**: [x]
+
+### Phase 5: ALL-workflows amendment + py→ts spec
+
+### T19: Core Contract rules + KVC leads-not-truth rewording
+**Where**: `skills/massa-ai/SKILL.md`
+**What**: ALLWF-01 + ALLWF-02 as two Core Contract bullets (verify-don't-assume / docs-are-leads; ask-when-in-doubt with facts-vs-decisions boundary), per D10. Reword the KVC "Project docs" step at its 4 sites (spec-driven.md:154, exploration.md:25, design.md:47 and 113) — second file set belongs to this task's sweep, single commit with SKILL.md. Regenerate skill bundles.
+**Depends on**: T18
+**Tests**: content sweep — both rules present once in Core Contract; 4 KVC sites carry the qualifier; `--check` clean
+**Gate**: sweep populations printed + `skill-artifact-parity` green
+**Status**: [ ]
+
+### T20: Read-only charter tier sweep → deep
+**Where**: `skills/agents/{audit-specialist,context-curator,furps-analyst,investigator,mobile-specialist,navigator,requirements-analyst,reviewer}/SKILL.md`
+**What**: ALLWF-03: `model_tier` → `deep` on the 8 read-only charters below it; extend the D5 rubric in `sub-agents.md` (read-only specialists always `deep`); parity allowlist + `FEATURES.md` tier table record the 8 authorized changes; run BOTH generators (D9 rule).
+**Depends on**: T19
+**Tests**: scripted tier sweep prints 14/17 deep + 3 write-capable unchanged; both parity suites green; both `--check` clean
+**Gate**: sweep + parity + checks all exit 0
+**Status**: [ ]
+
+### T21: Author python-to-typescript-scripts spec + registration
+**Where**: `.specs/features/python-to-typescript-scripts/spec.md` (new), `.specs/project/FEATURES.json`
+**What**: PYTS-01 per D12 — Specify-only artifact for the 8-script migration, invocation-surface evidence per script, wiring ripple enumerated; FEATURES.json entry `planned`. Orchestrator-authored (spec authoring is never delegated).
+**Depends on**: T18
+**Tests**: `validate_spec.py python-to-typescript-scripts` exit 0 (dogfood)
+**Gate**: validator exit 0
+**Status**: [ ]
+
+### T22: Amendment close-out
+**Where**: `CHANGELOG.md`, `.specs/project/STATE.md`, `.specs/HANDOFF.md`, `.specs/features/tlc-330-harness-update/validation.md`
+**What**: CHANGELOG entry extended (ALL-workflows rules + tier sweep + py→ts spec); state files updated; verifier iteration 3 re-validates Group E/F ACs; `check_specs_delivered.py` exit 0; push (delivery authorization from this feature covers it).
+**Depends on**: T19, T20, T21
+**Tests**: iteration-3 verdict PASS; delivery gate 0
+**Gate**: validation PASS + gate 0
+**Status**: [ ]

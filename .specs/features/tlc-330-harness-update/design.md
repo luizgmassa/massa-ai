@@ -27,6 +27,14 @@ Three concern groups land in one branch: (A) upstream 3.3.0 sync — 4 ported va
 
 **D9 — Charter regeneration scope.** `verification-agent` tier change regenerates via `scripts/generate-subagent-artifacts.ts` (agents) and `scripts/generate-skill-artifacts.ts` (skills incl. `skills/agents/**` charter copies). Both `--check` gates + `subagent-parity` + `skill-artifact-parity` tests must be green in the same commit as the regeneration — never split source edit from bundle regen across commits. **T16 therefore runs both generators and both parity tests itself** (Plan Challenge C1 revision: T16's gate must be as wide as this invariant); T17's later skill regen then only picks up Phase-2 prose, already-consistent charters included.
 
+## Amendment (2026-08-04, user): ALL-workflows rules + py→ts spec
+
+**D10 — Single-source placement for ALLWF-01/02.** Both rules land in the router's Core Contract (`skills/massa-ai/SKILL.md`) — the one file every workflow loads — as two bullets, not per-workflow copies (repo doc-layering rule: one place, others link). The KVC's "Project docs" step keeps its position but gains the leads-not-truth qualifier at all 4 sites; sweep keys on content identity. Rejected: a new shared reference file — a rule this small in an always-loaded file beats a lazy-loaded reference nobody is forced to open.
+
+**D11 — Read-only tier population is measured, not remembered.** The 8-bump list derives from a scripted sweep of `skills/agents/*/SKILL.md` (tier + tools/permission fields), verified this session: 17 charters, 14 read-only (6 already `deep`), 3 write-capable stay. `handoff-writer` appears in installed hosts but has **no repo charter** — installed-state artifact, out of scope. Cost consequence acknowledged: light-tier roles (navigator, context-curator, investigator) triple in per-call cost; explicit user rule wins.
+
+**D12 — py→ts is a spec, not an implementation, in this PR.** PYTS-01 authors the contract; migration executes as its own future spec-driven feature (its diff surface — 8 scripts + every `python3` wiring site this feature just created — is a full feature's worth). This supersedes D1's "Python-stdlib portability" rationale going forward; recorded there rather than rewritten.
+
 ## Verification Design
 
 - Per-task gates: the relevant validator/test run named in each task (`tasks.md` Gate Check Commands).

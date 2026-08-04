@@ -141,6 +141,30 @@ Open questions: none — all gray areas resolved with the user on 2026-08-04.
 **Acceptance Criteria**:
 1. WHEN the workflow reaches PR creation, THEN the prose SHALL require the GATE-02 gate green first.
 
+### Group E — ALL-workflows rules (user amendment 2026-08-04, post-PR#64-green)
+
+**ALLWF-01 — Verify, don't assume; documentation is a lead, not truth.** Single-sourced in the router's Core Contract (`skills/massa-ai/SKILL.md`, loaded by every workflow): every factual claim that drives a decision is verified against current codebase/command evidence or confirmed with the user; documentation of any kind — README, docs/, inline comments, external summaries, even `.specs` prose — is a lead to verify against current source, never a trustable source of truth by itself; unverifiable claims become explicit assumptions the user confirms or accepts. Reword the Knowledge Verification Chain's "Project docs" step at its 4 sites (`workflows/spec-driven.md:154`, `workflows/exploration.md:25`, `references/spec-driven/design.md:47,113`) to carry the leads-not-truth framing.
+
+**Acceptance Criteria**:
+1. WHEN any workflow is routed, THEN the Core Contract SHALL state the verify-don't-assume rule and the documentation-is-a-lead rule once, and no KVC site SHALL present docs as a trusted step without the verify-against-source qualifier.
+
+**ALLWF-02 — In doubt, ask the user.** Core Contract rule: when genuine doubt remains after looking it up — requirement meaning, scope boundaries, destructive/irreversible choices, contradictory evidence — ask the user instead of picking silently; facts are looked up, decisions are asked (consistent with the SYNC-07 pace rules).
+
+**Acceptance Criteria**:
+1. WHEN the Core Contract is read, THEN it SHALL contain the ask-when-in-doubt rule with the facts-vs-decisions boundary.
+
+**ALLWF-03 — Read-only and verification subagents always use the heaviest tier.** All read-only specialist charters pin `model_tier: deep`: bump the 8 currently below it (audit-specialist, context-curator, furps-analyst, investigator, mobile-specialist, navigator, requirements-analyst, reviewer); architecture-specialist, judge, meta-judge, plan-critic, planner, verification-agent already `deep`. Write-capable agents (builder, documentation-agent, test-engineer) unchanged. Extend the D5 rubric in `sub-agents.md`: read-only specialists always run `deep`. Regenerate both artifact sets; parity allowlist + `FEATURES.md` tier table record the 8 authorized changes.
+
+**Acceptance Criteria**:
+1. WHEN charters are swept, THEN every read-only specialist SHALL carry `model_tier: deep` (population: 14 of 17 charters), both parity suites SHALL pass, and both `--check` gates SHALL be clean.
+
+### Group F — Python→TypeScript migration spec (authoring only)
+
+**PYTS-01 — New feature spec.** Author `.specs/features/python-to-typescript-scripts/spec.md` (Specify phase only; implementation is a future feature) covering migration of all 8 real Python scripts to TypeScript under Bun: the 6 skill scripts (`lessons`, `validate_spec`, `validate_tasks`, `validate_state`, `check_commit`, `check_specs_delivered`) and the 2 repo scripts (`scripts/synapse-bench-analyze-v2.py`, `scripts/update-fixture-hashes.py`); the polyglot parser fixture `indent-method.py` is excluded (test data, not a script). Register the feature in `.specs/project/FEATURES.json` as planned.
+
+**Acceptance Criteria**:
+1. WHEN the new spec is read, THEN it SHALL enumerate the 8-script population with per-script invocation-surface evidence, name the wiring ripple (every `python3` invocation in skill prose + tests + this feature's validators), and close with requirement IDs and testable ACs; FEATURES.json SHALL list the feature as planned.
+
 ### Group D — Cross-cutting
 
 **GEN-01 — Regeneration + parity.** After all `skills/` edits: run `bun run scripts/generate-skill-artifacts.ts` and `scripts/generate-subagent-artifacts.ts`; `--check` drift gates and `skill-artifact-parity` + `subagent-parity` tests pass.
@@ -166,8 +190,10 @@ Open questions: none — all gray areas resolved with the user on 2026-08-04.
 | SYNC-01 | `skills/massa-ai/scripts/{validate_spec,validate_tasks,validate_state,check_commit}.py` (new) |
 | SYNC-02 | `references/spec-driven/{specify,tasks,execute,validate,sub-agents}.md`, `workflows/spec-driven.md` |
 | SYNC-03 | `references/spec-driven/{validate,sub-agents}.md` |
-| SYNC-04, SYNC-05 | `references/spec-driven/execute.md`, `workflows/spec-driven.md` |
-| SYNC-06, SYNC-13 | `references/spec-driven/{specify,tasks}.md` |
+| SYNC-04 | `references/spec-driven/execute.md`, `workflows/spec-driven.md` |
+| SYNC-05 | `references/spec-driven/execute.md`, `workflows/spec-driven.md` |
+| SYNC-06 | `references/spec-driven/specify.md` |
+| SYNC-13 | `references/spec-driven/{specify,tasks}.md` |
 | SYNC-07 | `references/spec-driven/discuss.md` |
 | SYNC-08 | `references/spec-driven/coding-principles.md` |
 | SYNC-09 | `references/spec-driven/memory.md` |
@@ -175,7 +201,13 @@ Open questions: none — all gray areas resolved with the user on 2026-08-04.
 | SYNC-11 | `references/spec-driven/sub-agents.md`, `skills/agents/verification-agent/SKILL.md`, regenerated `apps/*-plugin/agents/*` |
 | SYNC-12 | `references/spec-driven/validate.md` (template block) |
 | BATCH-01 | `references/spec-driven/{sub-agents,execute,tasks}.md`, `workflows/spec-driven.md` |
-| GATE-01..03 | `references/implementation-delivery.md`, `skills/massa-ai/scripts/check_specs_delivered.py` (new), `workflows/spec-driven.md` |
+| GATE-01 | `references/implementation-delivery.md` |
+| GATE-02 | `skills/massa-ai/scripts/check_specs_delivered.py` (new), `workflows/spec-driven.md` |
+| GATE-03 | `workflows/spec-driven.md` |
+| ALLWF-01 | `skills/massa-ai/SKILL.md`, KVC sites in `workflows/{spec-driven,exploration}.md` + `references/spec-driven/design.md` |
+| ALLWF-02 | `skills/massa-ai/SKILL.md` |
+| ALLWF-03 | 8 read-only charters under `skills/agents/`, `references/spec-driven/sub-agents.md`, regenerated bundles |
+| PYTS-01 | `.specs/features/python-to-typescript-scripts/spec.md` (new), `.specs/project/FEATURES.json` |
 | GEN-01 | regenerated `apps/{claude,codex,cursor,opencode}-plugin/skills/**`, `agents/**` |
 | GEN-02 | new test files under `scripts/tests/` or `scripts/__tests__/` (Design decides) |
 | GEN-03 | `CHANGELOG.md` |
