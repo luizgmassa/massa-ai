@@ -71,7 +71,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T1
 **Tests**: missing/FAIL/placeholder/no-evidence/legacy fixtures
 **Gate**: same suite green
-**Status**: [ ]
+**Status**: [x]
 
 ### T5: lessons.py Unicode _norm + selftest
 **Where**: `skills/massa-ai/scripts/lessons.py`

@@ -58,6 +58,7 @@ function runPy(scriptRelPath: string, args: string[], cwd: string = REPO_ROOT): 
 const VALIDATE_SPEC = "skills/massa-ai/scripts/validate_spec.py";
 const VALIDATE_TASKS = "skills/massa-ai/scripts/validate_tasks.py";
 const CHECK_COMMIT = "skills/massa-ai/scripts/check_commit.py";
+const VALIDATE_STATE = "skills/massa-ai/scripts/validate_state.py";
 
 // ---------------------------------------------------------------------------
 // T1: validate_spec.py (SYNC-01 AC1)
@@ -403,5 +404,144 @@ describe("check_commit.py (T3, SYNC-01 AC3)", () => {
     const r = runCheckCommit(`feat(auth): ${longDesc}`);
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain("WARN");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T4: validate_state.py (SYNC-01 AC4)
+// ---------------------------------------------------------------------------
+
+const DONE_TASKS_MD = `## Test Coverage Matrix
+
+## Gate Check Commands
+
+## Execution Plan
+
+### Phase 1: Foundation
+
+\`\`\`
+T1
+\`\`\`
+
+## Task Breakdown
+
+### T1: Do the thing
+**What**: thing
+**Where**: \`src/thing.ts\`
+**Depends on**: None
+**Tests**: unit
+**Gate**: quick
+
+- [x] done
+`;
+
+const PASS_VALIDATION_MD = `# Feature Validation
+
+## Summary
+
+**Overall**: ✅ Ready
+
+**Result**: PASS
+
+**Evidence**: \`src/thing.ts:42\` — \`expect(result).toBe(true)\`
+`;
+
+const FAIL_VALIDATION_MD = `# Feature Validation
+
+## Summary
+
+**Result**: FAIL
+
+**Issues found**: gap in coverage
+`;
+
+const UNFILLED_VALIDATION_MD = `# Feature Validation
+
+## Summary
+
+**Overall**: ✅ Ready | ⚠️ Issues | ❌ Not Ready
+
+**Result**: [PASS | FAIL]
+`;
+
+const NO_EVIDENCE_VALIDATION_MD = `# Feature Validation
+
+## Summary
+
+**Result**: PASS
+
+**What works**: everything, allegedly
+`;
+
+describe("validate_state.py (T4, SYNC-01 AC4)", () => {
+  test("missing validation.md exits 1", () => {
+    const root = makeTempRoot("validate-state-missing");
+    writeFeatureFile(root, "my-feature", "tasks.md", DONE_TASKS_MD);
+    const r = runPy(VALIDATE_STATE, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("no validation.md");
+  });
+
+  test("FAIL verdict exits 1", () => {
+    const root = makeTempRoot("validate-state-fail");
+    writeFeatureFile(root, "my-feature", "tasks.md", DONE_TASKS_MD);
+    writeFeatureFile(root, "my-feature", "validation.md", FAIL_VALIDATION_MD);
+    const r = runPy(VALIDATE_STATE, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("verdict is FAIL");
+  });
+
+  test("unfilled template placeholder verdict exits 1", () => {
+    const root = makeTempRoot("validate-state-unfilled");
+    writeFeatureFile(root, "my-feature", "tasks.md", DONE_TASKS_MD);
+    writeFeatureFile(root, "my-feature", "validation.md", UNFILLED_VALIDATION_MD);
+    const r = runPy(VALIDATE_STATE, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("template placeholder");
+  });
+
+  test("PASS with no file:line evidence exits 1", () => {
+    const root = makeTempRoot("validate-state-no-evidence");
+    writeFeatureFile(root, "my-feature", "tasks.md", DONE_TASKS_MD);
+    writeFeatureFile(root, "my-feature", "validation.md", NO_EVIDENCE_VALIDATION_MD);
+    const r = runPy(VALIDATE_STATE, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("cites no file:line evidence");
+  });
+
+  test("PASS with file:line evidence exits 0", () => {
+    const root = makeTempRoot("validate-state-pass");
+    writeFeatureFile(root, "my-feature", "tasks.md", DONE_TASKS_MD);
+    writeFeatureFile(root, "my-feature", "validation.md", PASS_VALIDATION_MD);
+    const r = runPy(VALIDATE_STATE, ["--root", root]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("0 error(s)");
+  });
+
+  test("legacy-shaped feature (no tasks.md, no validation.md) does not crash (R2)", () => {
+    const root = makeTempRoot("validate-state-legacy");
+    // Legacy feature: only a spec.md, predating tasks.md/validation.md convention.
+    writeFeatureFile(root, "legacy-feature", "spec.md", "# Legacy Feature\n");
+    // A second, properly completed feature so cross-check mode (>1 feature dir) runs.
+    writeFeatureFile(root, "done-feature", "tasks.md", DONE_TASKS_MD);
+    writeFeatureFile(root, "done-feature", "validation.md", PASS_VALIDATION_MD);
+    const r = runPy(VALIDATE_STATE, ["--root", root]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stderr).toBe("");
+    // The legacy dir never "appears complete" (no tasks.md) so it's excluded,
+    // not flagged - cross-check mode only gates features that look done.
+    expect(r.stdout).not.toContain("legacy-feature");
+  });
+
+  test("explicit feature name resolves under <root>/.specs/features/<name>/", () => {
+    const root = makeTempRoot("validate-state-named");
+    writeFeatureFile(root, "feature-a", "tasks.md", DONE_TASKS_MD);
+    writeFeatureFile(root, "feature-a", "validation.md", PASS_VALIDATION_MD);
+    writeFeatureFile(root, "feature-b", "tasks.md", DONE_TASKS_MD);
+    writeFeatureFile(root, "feature-b", "validation.md", FAIL_VALIDATION_MD);
+    const r = runPy(VALIDATE_STATE, ["feature-b", "--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("feature-b");
+    expect(r.stdout).not.toContain("verdict is FAIL across [feature-a");
   });
 });
