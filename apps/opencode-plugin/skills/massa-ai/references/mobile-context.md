@@ -76,6 +76,25 @@ For design, mobile Figma audit, or mobile Figma fix, load `references/mobile-fig
 
 Never rely on model self-evaluation. If device access, signing, credentials, provisioning, or hardware is unavailable, state the missing dependency and use the strongest available artifact or static proof.
 
+## Compose Screen Previews
+
+In every implementation workflow, when the target surface is Android Jetpack
+Compose or KMP (Kotlin Multiplatform) Compose Multiplatform, every created or
+updated screen-level composable ships with `@Preview` composables in the same
+change:
+
+- Cover the representative states the change touches (default content, loading,
+  error, and empty where they exist), using preview parameter providers when
+  the project already uses them.
+- Follow the project's existing preview conventions (naming, placement,
+  multipreview annotations, theme wrappers) rather than inventing new ones.
+- Previews are validation assets: never delete or weaken an existing preview to
+  make a change compile, and treat a screen edit that leaves its previews stale
+  as incomplete work.
+- On KMP, place previews in the source set where the project renders them
+  (commonMain multiplatform previews or per-platform preview hosts), matching
+  established project layout.
+
 ## Tests Lens
 
 When auditing or executing test work, check mobile-specific coverage for:
