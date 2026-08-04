@@ -11,6 +11,7 @@
 Phase 1: T1 ──→ T2 ──→ T3 ──→ T4 ──→ T5 ──→ T6
 Phase 2: T7 ──→ T8 ──→ T9 ──→ T10 ──→ T11 ──→ T12 ──→ T13 ──→ T14 ──→ T15
 Phase 3: T16 ──→ T17 ──→ T18
+Phase 4: FT1 ──→ FT2
 ```
 
 Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depends on Phase 2 (regeneration snapshots final prose).
@@ -188,3 +189,21 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Tests**: CI CHANGELOG gate; script exit 0
 **Gate**: script prints population, exits 0
 **Status**: [x]
+
+### Phase 4: Fix tasks — validation iteration 1
+
+### FT1: Stop validator tests writing __pycache__ into the source tree
+**Where**: `scripts/__tests__/spec-driven-validators.test.ts`, `scripts/generate-skill-artifacts.ts`
+**What**: `python3 -B` on both spawn sites (bytecode cache broke `generate-skill-artifacts.ts --check` when suites run together — verifier gap 1, GEN-01 blocker); generator `walkFiles` skips `__pycache__` as defense-in-depth.
+**Depends on**: T17
+**Tests**: validator suite + both parity suites in ONE run; no `__pycache__` dir afterward
+**Gate**: combined run green, `--check` clean
+**Status**: [x]
+
+### FT2: Scope validate_state.py verdict to the Summary section
+**Where**: `skills/massa-ai/scripts/validate_state.py`, `scripts/__tests__/spec-driven-validators.test.ts`
+**What**: `_verdict()` prefers the `## Summary` section's own `**Result**:` line; the sensor's per-mutation Result sub-line no longer collides when verdicts diverge (verifier gap 2, SYNC-12 major). Regression fixture: Summary FAIL + sensor PASS → "verdict is FAIL", not "template placeholder".
+**Depends on**: FT1
+**Tests**: new diverging-verdict fixture red-before/green-after
+**Gate**: validator suite green
+**Status**: [ ]

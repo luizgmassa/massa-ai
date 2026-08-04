@@ -42,8 +42,10 @@ interface PyResult {
   stderr: string;
 }
 
+// -B: never write __pycache__ into the source tree — skill-artifact --check
+// diffs full directory inventories and would flag the .pyc files as drift.
 function runPy(scriptRelPath: string, args: string[], cwd: string = REPO_ROOT): PyResult {
-  const proc = Bun.spawnSync(["python3", join(REPO_ROOT, scriptRelPath), ...args], {
+  const proc = Bun.spawnSync(["python3", "-B", join(REPO_ROOT, scriptRelPath), ...args], {
     cwd,
     stdout: "pipe",
     stderr: "pipe",
@@ -563,6 +565,7 @@ describe("lessons.py selftest (T5, SYNC-10 AC1)", () => {
     const proc = Bun.spawnSync(
       [
         "python3",
+        "-B",
         "-c",
         `import sys; sys.path.insert(0, "skills/massa-ai/scripts"); import lessons; print(lessons._norm(sys.argv[1]))`,
         text,
