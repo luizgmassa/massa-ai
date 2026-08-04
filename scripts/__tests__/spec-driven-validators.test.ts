@@ -823,3 +823,74 @@ describe("check_specs_delivered.py (T6, GATE-02 AC1-2)", () => {
     expect(r.stdout).not.toContain("my-feature/design.md");
   });
 });
+
+// ---------------------------------------------------------------------------
+// FT4: validate_tasks.py parses letter-prefixed task ids (IT2-01 closure)
+// ---------------------------------------------------------------------------
+
+describe("validate_tasks.py fix-task headers (FT4, IT2-01)", () => {
+  const FT_TASKS_MD = [
+    "# Tasks",
+    "",
+    "## Execution Plan",
+    "",
+    "### Phase Execution Map",
+    "",
+    "```",
+    "Phase 1: T1",
+    "Phase 2: FT1",
+    "```",
+    "",
+    "## Test Coverage Matrix",
+    "",
+    "| Task | Requirement | Test |",
+    "|---|---|---|",
+    "| T1 | R-01 | t |",
+    "",
+    "## Gate Check Commands",
+    "",
+    "- `true`",
+    "",
+    "## Task Breakdown",
+    "",
+    "### Phase 1: Work",
+    "",
+    "### T1: Do the thing",
+    "**Where**: `a.ts`",
+    "**Depends on**: none",
+    "**Tests**: t",
+    "**Gate**: g",
+    "**Status**: [x]",
+    "",
+    "### Phase 2: Fixes",
+    "",
+    "### FT1: Fix the thing",
+    "**Where**: `a.ts`",
+    "**Depends on**: T1",
+    "**Tests**: t",
+    "**Gate**: g",
+    "**Status**: [x]",
+    "",
+  ].join("\n");
+
+  test("FT-prefixed header is its own task: backward dep on T1 passes, no self-dep false positive", () => {
+    const root = makeTempRoot("validate-tasks-ft-ok");
+    writeFeatureFile(root, "my-feature", "tasks.md", FT_TASKS_MD);
+    const r = runPy(VALIDATE_TASKS, ["--root", root]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).not.toContain("declares `Depends on`");
+  });
+
+  test("FT task missing Gate is reported against FT1, not folded into T1", () => {
+    const root = makeTempRoot("validate-tasks-ft-gate");
+    writeFeatureFile(
+      root,
+      "my-feature",
+      "tasks.md",
+      FT_TASKS_MD.replace("### FT1: Fix the thing\n**Where**: `a.ts`\n**Depends on**: T1\n**Tests**: t\n**Gate**: g", "### FT1: Fix the thing\n**Where**: `a.ts`\n**Depends on**: T1\n**Tests**: t"),
+    );
+    const r = runPy(VALIDATE_TASKS, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("FT1");
+  });
+});

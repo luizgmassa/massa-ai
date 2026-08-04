@@ -37,8 +37,11 @@ import re
 import sys
 
 REQUIRED_SECTIONS = ["Test Coverage Matrix", "Gate Check Commands", "Execution Plan", "Task Breakdown"]
-TASK_RE = re.compile(r"^#{2,4}\s+(T\d+)\s*:", re.IGNORECASE)
-EDGE_RE = re.compile(r"\bT\d+\b")
+# Task ids are `T<n>` plus optional letter prefix (`FT3` for fix tasks): an
+# unrecognized `### FT3:` header would fold its fields into the previous task's
+# record and misreport e.g. a self-dependency (IT2-01).
+TASK_RE = re.compile(r"^#{2,4}\s+([A-Z]*T\d+)\s*:", re.IGNORECASE)
+EDGE_RE = re.compile(r"\b[A-Z]*T\d+\b", re.IGNORECASE)
 FILE_HINT_RE = re.compile(r"[\w./-]+\.\w{1,6}\b")
 
 

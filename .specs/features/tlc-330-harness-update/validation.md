@@ -201,18 +201,18 @@ All mutations run in an isolated `git worktree` scratch (`/tmp/scratch-tlc330`, 
 
 ## Summary
 
-**Overall**: ✅ Verified (iteration 2)
-**Result**: PASS
+**Overall**: ❌ Needs Fix (iteration 3 — Phase 5 amendment)
+**Result**: FAIL
 
-**Spec-anchored check**: 27/29 ACs matched spec outcome — 2 gaps (GEN-01 AC1, SYNC-12 AC1)
-**Sensor**: 4/4 mutations killed
-**Gate**: isolated suites all green (100/100 across 3 files run separately); combined invocation matching the real `bun run test:scripts` shape: 99/100 (1 failure, reproduced 4/4 across independent trials)
+**Spec-anchored check**: 30/33 ACs matched spec outcome (iterations 1-2 base: 27/29; Phase 5 amendment adds ALLWF-01/02/03 + PYTS-01 = 4 more ACs, 3 PASS) — 1 open gap (PYTS-01 AC1, iteration 3)
+**Sensor**: 6/6 mutations killed (4 from iterations 1-2 + 2 new in iteration 3)
+**Gate**: isolated suites all green (100/100 across 3 files run separately in iterations 1-2); combined invocation matching the real `bun run test:scripts` shape: 99/100 in iteration 1 (1 failure, closed by FT1); iteration 3's scoped gate re-run (validators + both parity suites + both generator `--check` + lint + 3 python validators, run individually, own exit codes, no pipes) is 10/10 green, no regression
 
 **What works**: All 4 ported validator scripts (with 2 documented, evidenced, contract-strengthening deviations from upstream), the new `check_specs_delivered.py`, the `lessons.py` Unicode fix, 12 of 13 prose-wiring requirements (SYNC-02 through SYNC-11, SYNC-13), the batch-trigger lowering (BATCH-01), the deliver-specs-before-PR gate (GATE-01/02/03), and the verification-agent deep-tier pin with correctly-scoped regenerated artifacts (SYNC-11, deviation c). The discrimination sensor confirms all four subject classes (validator core-check, cross-file bundle-drift, template-conformance, and — implicitly, via the T2 test suite — the phase-membership fix) are real regressions the test suite can detect.
 
 **Issues found (iteration 1, now resolved)**: two gaps were opened at iteration 1 review, both closed at iteration 2 with reproduced evidence, a killed discrimination mutation, and a new regression fixture — see the "Iteration 2" section below for the closure evidence. One new non-blocking informational finding (IT2-01, a task-header ID-recognition quirk in validate_tasks.py) surfaced during iteration 2's no-regression sweep and is recorded there.
 
-**Next steps**: none — both prior gaps are closed. IT2-01 may be routed as a future minor fix task at the team's discretion; it does not block this feature.
+**Next steps (iteration 3)**: route a fix task to correct `python-to-typescript-scripts/spec.md`'s Problem Statement and PTS-04 wiring-ripple population (currently "24 prose sites across 12 skill files", measured 41 sites / 25 files by raw sweep — see Iteration 3 section below) before that spec is treated as authoritative scope for Design. IT2-01 remains a future minor fix task at the team's discretion; it does not block this feature.
 
 ---
 
@@ -290,3 +290,136 @@ Dogfooding this very report against `validate_state.py` (after writing the Itera
 ### Iteration 2 verdict
 
 Both prior gaps (GEN-01 AC1 blocker, SYNC-12 AC1 major) are closed with reproduced evidence and a killed discrimination mutation for the SYNC-12 fix. One new non-blocking informational finding (IT2-01) surfaced during the mandated no-regression gate re-run; it does not defeat any spec-anchored AC and does not affect the closed gaps' evidence. **Overall verdict: PASS.**
+
+---
+
+## Iteration 3 (re-verification — Phase 5 amendment)
+
+**Role**: independent verifier (author ≠ verifier), deep tier. **Scope**: T19-T22 only (ALLWF-01, ALLWF-02, ALLWF-03, PYTS-01). Iterations 1-2's PASS verdict for T1-T18 + FT1/FT2 is not re-litigated; only no-regression is re-confirmed via the gate re-runs below.
+
+**Commits audited**: T19 `e751c777`, T20 `277ec7a5`, T21 `b291b0fb`, T22 `11747f27`. Range `4efa7013..11747f27`.
+**Porcelain baseline**: `git status --porcelain` empty before all work (0 lines) and empty after cleanup (0 lines) — matched.
+
+### ALLWF-01 (Verify, don't assume; documentation is a lead, not truth) — PASS
+
+`skills/massa-ai/SKILL.md` Core Contract carries both bullets once (`SKILL.md:65-73`): "Verify, don't assume" + "Ask when in doubt", each stated exactly once (`grep -c` confirmed 1 occurrence of each trigger phrase in source). Independent sweep of every "Project docs" KVC site in `skills/massa-ai/` (not inherited from the 4-site count in spec.md/design.md D10 — re-derived from scratch via `/usr/bin/grep -rn "Project docs" skills/`): exactly 4 sites, all 4 carry the `(leads, not truth)` / `verify against current source before relying` qualifier, 0 without it:
+
+- `skills/massa-ai/references/spec-driven/design.md:47`
+- `skills/massa-ai/references/spec-driven/design.md:113`
+- `skills/massa-ai/workflows/spec-driven.md:154`
+- `skills/massa-ai/workflows/exploration.md:25`
+
+Also swept every file that mentions "Knowledge Verification Chain" by name (`discuss.md`, `design.md`, `specify.md`, `workflows/spec-driven.md`, `workflows/exploration.md`) to confirm no additional KVC step definition exists outside the swept 4 sites — `discuss.md` and `specify.md` only reference the chain, they do not restate its steps, so they carry no independent "Project docs" site. Population confirmed closed at 4/4, matching D10's count independently.
+
+Bundle parity: `diff skills/massa-ai/SKILL.md apps/{claude,codex,cursor,opencode}-plugin/skills/massa-ai/SKILL.md` — byte-identical, all 4 hosts.
+
+### ALLWF-02 (In doubt, ask the user) — PASS
+
+Core Contract's "Ask when in doubt" bullet (`SKILL.md:71-74`) contains the facts-vs-decisions boundary verbatim: "Facts are looked up; decisions are asked." Present once, correctly placed beside the verify-don't-assume rule.
+
+### ALLWF-03 (Read-only and verification subagents always use the heaviest tier) — PASS
+
+Independent tier census of all 17 charters under `skills/agents/*/SKILL.md` (re-derived from scratch, not inherited from spec.md's claim):
+
+| Tier | Count | Roles |
+| --- | --- | --- |
+| `deep` | 14 | architecture-specialist, audit-specialist, context-curator, furps-analyst, investigator, judge, meta-judge, mobile-specialist, navigator, plan-critic, planner, requirements-analyst, reviewer, verification-agent |
+| `standard` | 2 | builder, test-engineer |
+| `light` | 1 | documentation-agent |
+
+14 + 2 + 1 = 17, matches the expected "14 deep + builder/test-engineer standard + documentation-agent light" shape exactly. All 8 ALLWF-03-named charters (audit-specialist, context-curator, furps-analyst, investigator, mobile-specialist, navigator, requirements-analyst, reviewer) confirmed `deep`.
+
+Regenerated per-host artifact resolution spot-checked for 2+ of the 8 bumped roles against `skills/model-profiles.json`'s `balanced` profile (own re-derivation, not assumed):
+
+- `apps/claude-plugin/agents/massa-ai-audit-specialist.md:5` → `model: opus` — matches `profiles.balanced.hosts.claude.deep.model = "opus"`.
+- `apps/codex-plugin/agents/massa-ai-audit-specialist.toml:4` → `model = "gpt-5.6-sol"` — matches `profiles.balanced.hosts.codex.deep.model = "gpt-5.6-sol"`.
+- `apps/claude-plugin/agents/massa-ai-navigator.md:5` → `model: opus` — matches deep tier.
+- `apps/opencode-plugin/agents/massa-ai-requirements-analyst.md:4` → `model: opencode-go/minimax-m3` — matches `profiles.balanced.hosts.opencode.deep.model`.
+
+`sub-agents.md` D5 rubric extension confirmed present (`sub-agents.md:171,176`): new "Read-only specialist" row + "Read-only specialists always run on the deepest tier" rule-of-thumb bullet, generalizing the existing Verifier rule.
+
+`FEATURES.md` role→tier table (`FEATURES.md:401-417`) confirmed to list all 8 bumped roles as `deep`, no stale `standard`/`light` row remaining for any of the 8.
+
+### PYTS-01 (New python-to-typescript-scripts spec) — GAP (AC1)
+
+**8-script population**: independently re-enumerated via `find` (not inherited from spec.md's claim): `skills/massa-ai/scripts/{check_commit,check_specs_delivered,lessons,validate_spec,validate_state,validate_tasks}.py` (6) + `scripts/{synapse-bench-analyze-v2,update-fixture-hashes}.py` (2) = 8, matching spec.md's Problem Statement and Requirement Traceability table exactly. `packages/core/src/__tests__/e2e/fixtures/polyglot/indent-method.py` correctly excluded as a parser fixture, not a script — confirmed it is real test data (referenced by e2e tests, not invoked as a CLI tool). `.specs/project/FEATURES.json` entry: `slug: "python-to-typescript-scripts"`, `status: "planned"`, valid JSON (60 total features in the array, `python3 -c "import json; json.load(open('.specs/project/FEATURES.json'))"` parses clean). PTS-01 through PTS-06 requirement IDs present with SHALL-bearing, EARS-tagged ACs; `python3 -B skills/massa-ai/scripts/validate_spec.py python-to-typescript-scripts` exits 0 (0 errors, 0 warnings) — structural checks pass.
+
+**Wiring-ripple accuracy — FAILS AC1's literal wording.** PYTS-01 AC1 requires the spec to "name the wiring ripple (every `python3` invocation in skill prose + tests + this feature's validators)". The spec's Problem Statement and PTS-04 both state: *"`python3` invoked at 24 prose sites across 12 skill files"*. Independently re-measured (own sweep, `/usr/bin/grep`, never rtk, population printed):
+
+```
+/usr/bin/grep -rn "python3" skills/massa-ai/ --include="*.md" | wc -l   → 41 lines
+/usr/bin/grep -rl "python3" skills/massa-ai/ --include="*.md" | wc -l   → 25 files
+```
+
+Even narrowing to only sites that name one of the 8 target scripts (excluding `evidence-gate.md:41`'s unrelated `skill-architect/scripts/validate_skill.py` reference and the 3 ad-hoc `python3 -c` JSON-mutation snippets in `artifact-store.md`/`mcp-tools.md` that don't name a target script) still yields **36 sites across 23 files** — the bulk of the undercount is the "distill after writing → lessons.py add" boilerplate line, which recurs identically in 11 separate `workflows/*-fix.md` files (`debug.md`, `security-fix.md`, `maestro-fix.md`, `general.md` ×2, `tests-fix.md`, `bugs-fix.md`, `mobile-figma-fix.md`, `requirements-fix.md`, `architecture-fix.md`, `refactor.md`, `implementation-fix.md`, `code-quality-fix.md`, `feature.md`) plus `lessons.md` (×4) and `workflows/spec-driven.md` (×2), none of which spec.md's stated count appears to have swept. There is also at least one wiring site the literal `python3` grep itself cannot see: `execute.md:311`'s `ln -sf skills/massa-ai/scripts/check_commit.py .git/hooks/commit-msg` commit-msg-hook symlink target — a real rewiring site PTS-04 names in prose ("the commit-msg-hook prose") but which contributes zero to a `python3`-keyed count, meaning even 41/25 is a floor, not a ceiling.
+
+The `python3` count in `scripts/__tests__/spec-driven-validators.test.ts` (3 sites) and the single `package.json:42` site are both independently confirmed accurate.
+
+**Population comparison**:
+
+| Metric | spec.md claim | Measured (raw) | Measured (target-script-scoped) |
+| --- | --- | --- | --- |
+| Prose sites | 24 | 41 | 36 (+ ≥1 non-`python3`-literal hook site) |
+| Skill files | 12 | 25 | 23 |
+
+This is not a rounding difference — the claimed figure undercounts sites by ~40-70% and files by over half. Per this same PR's own new ALLWF-01 rule ("every factual claim that drives a decision is verified against current codebase/command evidence... unverifiable claims become explicit assumptions the user confirms or accepts"), a wiring-ripple count that drives a future feature's scope estimate is exactly the class of claim that rule exists to police, and this specific claim was not verified against source before being written twice into the same spec (Problem Statement + PTS-04) and repeated a third time in `FEATURES.json`'s title field for the entry.
+
+**Impact**: `validate_spec.py`'s structural check (SHALL presence, EARS shape, required sections) cannot and does not catch this — it has no way to verify a prose-embedded numeric claim against the live repo, so PYTS-01's clean `validate_spec.py` exit is correctly orthogonal to this finding, not contradicted by it. The gap does not affect PTS-04 AC1's own execution-time correctness (that AC requires "the repo is swept after migration" with "population printed beside the verdict" — a fresh, live sweep at Design/Execute time of the future feature, not a reliance on this stale Specify-phase number), so it is not a blocker for this PR's mergeability and does not reopen any of iterations 1-2's closed gaps. It is a genuine AC1 defect in the delivered Specify artifact.
+
+**Fix task recommendation**: before `python-to-typescript-scripts` proceeds to Design, correct the Problem Statement and PTS-04 body text with an accurate, scripted-sweep-derived population (41 sites / 25 files raw, or 36/23 target-scoped plus the named non-literal hook site — Design should pick and state the scoping rule), printed beside the requirement per this feature's own established "population printed beside the verdict" discipline (BATCH-01 AC2, D6).
+
+### Deviation Audit — T20 `subagent-parity.test.ts` changes
+
+Diff-scoped review of `scripts/__tests__/subagent-parity.test.ts` (`git diff --stat e751c777..277ec7a5` → 64 insertions, 2 deletions):
+
+- **`ALLOWED_MODEL_CHANGES` set**: 22 new entries added, comment-annotated as ALLWF-03/T20. Verified against the authorized population: 8 bumped charters × 3 hosts (claude/codex/opencode) = 24 combinations; `claude/navigator` and `opencode/requirements-analyst` were already present in the set from an earlier, unrelated change and are correctly *not* re-added (comment confirms this); Cursor is excepted wholesale by the surrounding test's own pre-existing `if (host === "cursor") continue` line (cursor always resolves `inherit` — no charter tier change ever produces a cursor diff). 24 − 2 = 22 new entries — exact match, 0 missing, 0 extra, 0 for an unauthorized role.
+- **"every enumerated change actually happened" test**: exactly 2 pre-existing assertions updated (not deleted) — `claude/navigator`: `"haiku"` → `"opus"` (navigator was `light`→`deep`; claude balanced light=haiku, deep=opus — both values independently confirmed against `model-profiles.json`); `opencode/requirements-analyst`: `"opencode-go/glm-5.2"` → `"opencode-go/minimax-m3"` (requirements-analyst was `standard`→`deep`; opencode balanced standard=glm-5.2, deep=minimax-m3 — both confirmed). 6 new sanity-check pairs added (audit-specialist/claude, context-curator/codex, furps-analyst/opencode, investigator/claude, mobile-specialist/codex, reviewer/claude), each independently re-derived against `model-profiles.json` and confirmed correct in this session (see ALLWF-03 spot-checks above, which reuse 2 of these 6).
+- **No assertion weakened or deleted**: the only deletions in the diff (2 of the reported "2 deletions") are the two stale literal values replaced above; every other line in the diff is a pure addition. `FEATURES.md`'s role→tier table diff is exactly the 8 authorized rows (`investigator`, `reviewer`, `context-curator`, `requirements-analyst`, `audit-specialist`, `mobile-specialist`, `furps-analyst`, `navigator`), confirmed no other row touched.
+
+**Verdict: correctly scoped, no weakening, no deletion.**
+
+### Discrimination sensor (scratch state, `git worktree`, never `git stash`)
+
+Porcelain baseline: 0 lines before, 0 lines after (matched, confirmed twice — before scratch worktree creation and after removal).
+
+**Mutation 1 — revert one bumped charter's tier.** In `/tmp/verif-iter3/scratch` (git worktree at HEAD, node_modules symlinked from the real workspace root for test execution only, never committed): reverted `skills/agents/navigator/SKILL.md`'s `model_tier: deep` back to `standard`. Ran `bun test scripts/__tests__/subagent-parity.test.ts` → **exit 1**, 35 pass / 5 fail (Claude/Codex/OpenCode model-pin mismatches + `FEATURES.md` doc-drift test, all correctly attributing the failure to the reverted navigator tier). **Killed.**
+
+**Mutation 2 — strip the leads-not-truth qualifier from one KVC site in a scratch bundle copy only (source untouched).** Edited `apps/claude-plugin/skills/massa-ai/workflows/exploration.md` in the scratch worktree to remove `(leads, not truth)`, leaving `skills/massa-ai/workflows/exploration.md` (source) unchanged — a deliberate source-vs-bundle divergence. Two independent gates both caught it:
+
+- `bun run scripts/generate-skill-artifacts.ts --check` → **exit 1**, correctly reports `[claude-plugin/skills/massa-ai] drift detected: M workflows/exploration.md (content differs from source)`.
+- `bun test scripts/__tests__/skill-artifact-parity.test.ts` → **exit 1**, 18 pass / 1 fail on the "generator --check exits 0" assertion.
+
+**Killed** by both gates independently.
+
+Both mutations reverted in scratch (`.bak` files restored / worktree discarded); `git worktree remove --force`; main worktree `git status --porcelain` re-verified empty (0 lines) post-cleanup, matching the pre-work baseline exactly.
+
+**Sensor result: 2/2 mutations killed.**
+
+### Gate re-runs (own exit codes, no pipes; full `test:scripts` not run per the documented native-grammar provisioning gap, unrelated to this diff)
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `bun test scripts/__tests__/spec-driven-validators.test.ts` | 0 | 42 pass, 0 fail |
+| `bun test scripts/__tests__/subagent-parity.test.ts` | 0 | 40 pass, 0 fail |
+| `bun test scripts/__tests__/skill-artifact-parity.test.ts` | 0 | 19 pass, 0 fail |
+| `bun run scripts/generate-skill-artifacts.ts --check` | 0 | "No drift" |
+| `bun run scripts/generate-subagent-artifacts.ts --check` | 0 | "No drift" |
+| `bun run lint` | 0 | oxlint clean |
+| `python3 -B skills/massa-ai/scripts/validate_spec.py tlc-330-harness-update` | 0 | 0 errors, 0 warnings |
+| `python3 -B skills/massa-ai/scripts/validate_spec.py python-to-typescript-scripts` | 0 | 0 errors, 0 warnings |
+| `python3 -B skills/massa-ai/scripts/validate_tasks.py tlc-330-harness-update` | 0 | 0 errors, 3 warnings — same pre-existing IT2-01 shape (FT1/FT2 header-recognition folding), no new warning introduced by T19-T22 (all four are `T\d+`-shaped and parse correctly; confirmed T21/T22's own WARN rows quote their own true `Where` fields, not a neighbor's) |
+| `python3 -B skills/massa-ai/scripts/check_specs_delivered.py tlc-330-harness-update` | 0 | 0 errors, 7 paths checked |
+
+No regression against iterations 1-2's closed gaps (GEN-01 AC1, SYNC-12 AC1 both remain closed — re-exercised implicitly by the clean parity + generator runs above).
+
+### Secondary observation (informational, non-blocking, pre-existing, not introduced by Phase 5)
+
+`.specs/project/FEATURES.json`'s `tlc-330-harness-update` entry (`status: "in_progress"`) still carries T18-era notes text ("Not yet independently validated -- validation.md intentionally absent at this commit") that predates iterations 1-2 (last touched at `7ab4fbcb`, before FT1/FT2 and both prior validation iterations). T22's own `tasks.md` `Where` field scopes it to `CHANGELOG.md`, `STATE.md`, `HANDOFF.md`, `validation.md` only — `FEATURES.json` was never in T22's contract, so this is not a Phase-5 regression and not scored against ALLWF-01/02/03/PYTS-01. Flagged for awareness only; does not affect this iteration's verdict.
+
+### Iteration 3 verdict
+
+ALLWF-01, ALLWF-02, ALLWF-03 all independently re-verified PASS with fresh, from-scratch population sweeps (not inherited from spec.md's own counts) — all three matched exactly. The T20 deviation audit found the `subagent-parity.test.ts` change correctly scoped, with no weakened or deleted assertion. Both discrimination mutations were killed. All 10 gate re-runs are green with no regression against iterations 1-2.
+
+One genuine gap: **PYTS-01 AC1's wiring-ripple population claim ("24 prose sites across 12 skill files") is measurably wrong** — independently re-derived at 41 sites / 25 files (raw) or 36/23 (target-script-scoped), a ~40-70% undercount, plus at least one non-`python3`-literal wiring site the claimed methodology cannot see. This does not break any gate, does not block this PR's mergeability, and does not reopen iterations 1-2's closed findings — but it is a real, AC-anchored defect in the delivered Specify artifact, and per this PR's own newly-added ALLWF-01 rule, an unverified factual claim driving future scope is exactly what must not ship silently. Route as a fix task before `python-to-typescript-scripts` proceeds to Design.
+
+**Overall verdict (iteration 3): FAIL — 1 open gap (PYTS-01 AC1).**

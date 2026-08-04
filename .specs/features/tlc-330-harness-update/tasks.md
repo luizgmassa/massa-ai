@@ -13,7 +13,7 @@ Phase 2: T7 ──→ T8 ──→ T9 ──→ T10 ──→ T11 ──→ T12 
 Phase 3: T16 ──→ T17 ──→ T18
 Phase 4: FT1 ──→ FT2
 Phase 5: T19 ──→ T20 ──→ T21 ──→ T22
-Phase 6: FT3
+Phase 6: FT3 ──→ FT4
 ```
 
 Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depends on Phase 2 (regeneration snapshots final prose).
@@ -252,4 +252,12 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T22
 **Tests**: `validate_spec.py python-to-typescript-scripts` exit 0; zero "intentionally absent" refs in FEATURES.json
 **Gate**: validator 0 + sweep 0
+**Status**: [x]
+
+### FT4: validate_tasks.py accepts letter-prefixed task ids (IT2-01 closure)
+**Where**: `skills/massa-ai/scripts/validate_tasks.py`
+**What**: TASK_RE/EDGE_RE accept `[A-Z]*T\d+` so `### FT3:` headers parse as their own tasks instead of folding fields into the previous task's record — the fold produced a false self-dependency ERROR on this feature's own contract after FT3 landed (and FT3's commit slipped through that red gate: compound command echo reset the exit code; recorded as process deviation). Regression fixtures: FT backward-dep passes; FT missing-Gate reported against FT1. Bundles regenerated.
+**Depends on**: FT3
+**Tests**: 2 new fixtures in `spec-driven-validators.test.ts` (44/0)
+**Gate**: suite + live-contract validator + `--check` all exit 0
 **Status**: [x]
