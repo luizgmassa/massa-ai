@@ -678,7 +678,29 @@ describe("pyts golden: validate_tasks", () => {
 // at T11 materialization time, never re-read live: the real store keeps
 // growing as agents record new lessons, so a "live copy" invocation must be
 // replayed against a fixed snapshot to stay a permanent golden fixture).
+//
+// Exception to the otherwise read-only lessons corpus (validation FT1, Plan
+// Challenge F1): two entries exercise the mutating `add` path at the one
+// reachable confidence value that lands on a rounding boundary — recurrence 1
+// + scope under default thresholds computes exactly 0.625, which Python's
+// round-half-to-even (and lessons.ts's roundHalfEven2) stores as 0.62 while
+// naive JS rounding stores 0.63. They stay deterministic because each replay
+// seeds a fresh empty store and no asserted line carries a timestamp.
 // ---------------------------------------------------------------------------
+
+const BOUNDARY_ADD_ARGS = [
+  "add",
+  "--signal",
+  "surviving_mutant",
+  "--text",
+  "Boundary-rounding sensor lesson for F1 golden.",
+  "--scope",
+  "test-strength",
+  "--feature",
+  "fixture-feature",
+  "--source",
+  "fixture.ts:1 (golden)",
+];
 
 function buildLessonsRoot(label: string): string | undefined {
   switch (label) {
@@ -687,6 +709,14 @@ function buildLessonsRoot(label: string): string | undefined {
     case "status on empty store":
     case "list on empty store":
       return makeTempRoot("golden-lessons-empty");
+    case "add at the 0.625 confidence boundary (round-half-even, F1)":
+      return makeTempRoot("golden-lessons-boundary-add");
+    case "list after the boundary add shows conf=0.62 (F1)": {
+      const root = makeTempRoot("golden-lessons-boundary-list");
+      const seeded = runBun("skills/massa-ai/scripts/lessons.ts", ["--root", root, ...BOUNDARY_ADD_ARGS]);
+      if (seeded.exitCode !== 0) throw new Error(`boundary seed add failed (${seeded.exitCode}): ${seeded.stdout}`);
+      return root;
+    }
     case "status over live .specs/lessons.json copy (all 15 lessons)":
     case "list --status all over live .specs/lessons.json copy (key/confidence parity)":
     case "list --query filter over live .specs/lessons.json copy":

@@ -12,6 +12,7 @@ Phase 1: T1 ──→ T2
 Phase 2: T3
 Phase 3: T4 ──→ T5 ──→ T6 ──→ T7 ──→ T8 ──→ T9
 Phase 4: T10 ──→ T11 ──→ T12
+Phase 5: FT1
 ```
 
 Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py, never the render path). Phase 3 depends on Phase 2 (every port runs the dual-run gate). Phase 4 depends on Phase 3 (the global sweep needs all skill ports landed).
@@ -145,4 +146,14 @@ Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py
 **Depends on**: T11
 **Tests**: validators + delivery gate all exit 0; full `bun run test:scripts` + `bun run lint` exit 0
 **Gate**: delivery gate 0 + full gates 0
+**Status**: [x]
+
+### Phase 5: Fix tasks — validation iteration 1
+
+### FT1: Standing sensor for the round-half-even confidence boundary
+**Where**: `scripts/__tests__/pyts-golden.test.ts`, `scripts/__tests__/fixtures/pyts-golden/lessons.json`
+**What**: Verifier Finding 1 (critical): mutation (b) — naive rounding substituted for `roundHalfEven2` — survived the entire delivered gate set because T11's goldens replay only read-only lessons invocations and the dual-run harness (which exercised the boundary once, transiently, at T9) was deleted; Plan Challenge F1 mandated the 0.625-class boundary stay "exercised, not assumed". Two new golden entries: the mutating `add` at the reachable boundary (stdout asserts `confidence=0.62`) and the `list` over the store that add produced (asserts `conf=0.62`), each seeding a fresh store per replay (deterministic, no timestamps in asserted lines). Mutation (b) replayed in scratch after the fix and observed red (a new sensor needs an observed red).
+**Depends on**: T12
+**Tests**: pyts-golden suite green (46 cases); scratch replay of mutation (b) kills — both F1 entries fail under naive rounding
+**Gate**: golden suite + observed mutation kill + full `bun run test:scripts` + `bun run lint` all exit 0
 **Status**: [x]
