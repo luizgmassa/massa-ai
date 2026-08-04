@@ -55,7 +55,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T1
 **Tests**: missing-Gate, forward-dep, diagram-parity fixtures
 **Gate**: same suite green
-**Status**: [ ]
+**Status**: [x]
 
 ### T3: Port check_commit.py with Jira-prefix support
 **Where**: `skills/massa-ai/scripts/check_commit.py` (new) + tests

@@ -56,6 +56,7 @@ function runPy(scriptRelPath: string, args: string[], cwd: string = REPO_ROOT): 
 }
 
 const VALIDATE_SPEC = "skills/massa-ai/scripts/validate_spec.py";
+const VALIDATE_TASKS = "skills/massa-ai/scripts/validate_tasks.py";
 
 // ---------------------------------------------------------------------------
 // T1: validate_spec.py (SYNC-01 AC1)
@@ -148,5 +149,184 @@ describe("validate_spec.py (T1, SYNC-01 AC1)", () => {
     const r = runPy(VALIDATE_SPEC, ["--root", root]);
     expect(r.exitCode).not.toBe(0);
     expect(r.stderr + r.stdout).toContain("multiple features found");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T2: validate_tasks.py (SYNC-01 AC2)
+// ---------------------------------------------------------------------------
+
+function minimalTasksMd(taskBreakdown: string, executionPlan: string): string {
+  return `# Test Feature Tasks
+
+## Test Coverage Matrix
+
+| Code Layer | Required Test Type | Coverage Expectation | Location Pattern | Run Command |
+| --- | --- | --- | --- | --- |
+| Service | unit | all branches | \`src/**/*.test.ts\` | \`bun test\` |
+
+## Gate Check Commands
+
+| Gate Level | When to Use | Command |
+| --- | --- | --- |
+| Quick | after unit-only tasks | \`bun test\` |
+
+## Execution Plan
+
+${executionPlan}
+
+## Task Breakdown
+
+${taskBreakdown}
+`;
+}
+
+describe("validate_tasks.py (T2, SYNC-01 AC2)", () => {
+  test("live fixture: this feature's own tasks.md exits 0 (dogfood)", () => {
+    const r = runPy(VALIDATE_TASKS, ["tlc-330-harness-update", "--root", "."]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("0 error(s)");
+  });
+
+  test("well-formed fixture exits 0", () => {
+    const root = makeTempRoot("validate-tasks-filled");
+    const executionPlan = `### Phase 1: Foundation
+
+\`\`\`
+T1 → T2
+\`\`\`
+`;
+    const taskBreakdown = `### T1: Create thing
+**What**: thing
+**Where**: \`src/thing.ts\`
+**Depends on**: None
+**Tests**: unit
+**Gate**: quick
+
+### T2: Use thing
+**What**: thing2
+**Where**: \`src/thing2.ts\`
+**Depends on**: T1
+**Tests**: unit
+**Gate**: quick
+`;
+    writeFeatureFile(root, "task-feature", "tasks.md", minimalTasksMd(taskBreakdown, executionPlan));
+    const r = runPy(VALIDATE_TASKS, ["--root", root]);
+    expect(r.exitCode).toBe(0);
+  });
+
+  test("missing Gate field exits 1, names the task", () => {
+    const root = makeTempRoot("validate-tasks-missing-gate");
+    const executionPlan = `### Phase 1: Foundation
+
+\`\`\`
+T1 → T2
+\`\`\`
+`;
+    const taskBreakdown = `### T1: Create thing
+**What**: thing
+**Where**: \`src/thing.ts\`
+**Depends on**: None
+**Tests**: unit
+**Gate**: quick
+
+### T2: Use thing
+**What**: thing2
+**Where**: \`src/thing2.ts\`
+**Depends on**: T1
+**Tests**: unit
+`;
+    writeFeatureFile(root, "task-feature", "tasks.md", minimalTasksMd(taskBreakdown, executionPlan));
+    const r = runPy(VALIDATE_TASKS, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("T2: missing `Gate` field");
+  });
+
+  test("dependency on a later phase exits 1, names the task", () => {
+    const root = makeTempRoot("validate-tasks-forward-dep");
+    const executionPlan = `### Phase 1: Foundation
+
+\`\`\`
+T1
+\`\`\`
+
+### Phase 2: Next
+
+\`\`\`
+T2
+\`\`\`
+`;
+    const taskBreakdown = `### T1: Create thing
+**What**: thing
+**Where**: \`src/thing.ts\`
+**Depends on**: T2
+**Tests**: unit
+**Gate**: quick
+
+### T2: Use thing
+**What**: thing2
+**Where**: \`src/thing2.ts\`
+**Depends on**: None
+**Tests**: unit
+**Gate**: quick
+`;
+    writeFeatureFile(root, "task-feature", "tasks.md", minimalTasksMd(taskBreakdown, executionPlan));
+    const r = runPy(VALIDATE_TASKS, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("T1 (phase 1) depends on T2 (phase 2)");
+  });
+
+  test("diagram-order violation (dep placed after the dependent task) exits 1, names the task", () => {
+    const root = makeTempRoot("validate-tasks-diagram-order");
+    const executionPlan = `### Phase 1: Foundation
+
+\`\`\`
+T1 → T2
+\`\`\`
+`;
+    const taskBreakdown = `### T1: Create thing
+**What**: thing
+**Where**: \`src/thing.ts\`
+**Depends on**: T2
+**Tests**: unit
+**Gate**: quick
+
+### T2: Use thing
+**What**: thing2
+**Where**: \`src/thing2.ts\`
+**Depends on**: None
+**Tests**: unit
+**Gate**: quick
+`;
+    writeFeatureFile(root, "task-feature", "tasks.md", minimalTasksMd(taskBreakdown, executionPlan));
+    const r = runPy(VALIDATE_TASKS, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("T1 declares `Depends on: T2`");
+  });
+
+  test("unfenced diagram (unparseable) only warns, does not fail an otherwise valid fixture", () => {
+    const root = makeTempRoot("validate-tasks-no-fence");
+    const executionPlan = `### Phase 1: Foundation
+
+T1 → T2
+`;
+    const taskBreakdown = `### T1: Create thing
+**What**: thing
+**Where**: \`src/thing.ts\`
+**Depends on**: None
+**Tests**: unit
+**Gate**: quick
+
+### T2: Use thing
+**What**: thing2
+**Where**: \`src/thing2.ts\`
+**Depends on**: T1
+**Tests**: unit
+**Gate**: quick
+`;
+    writeFeatureFile(root, "task-feature", "tasks.md", minimalTasksMd(taskBreakdown, executionPlan));
+    const r = runPy(VALIDATE_TASKS, ["--root", root]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("diagram arrows not parsed confidently");
   });
 });
