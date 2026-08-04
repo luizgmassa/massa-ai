@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "8c502864a98e322a321d25587646cbe6e4a2f574",
-  "generatedAt": "2026-08-03T19:47:52.155Z",
+  "gitCommitHash": "8e634771f7c17b4d1ffdd193caacb16870a80427",
+  "generatedAt": "2026-08-04T01:29:38.400Z",
   "files": {
     "apps/mcp-client/src/__tests__/api-key-config-seeded.test.ts": {
       "filePath": "apps/mcp-client/src/__tests__/api-key-config-seeded.test.ts",
@@ -7042,7 +7042,7 @@
     },
     "packages/core/src/__tests__/auto-improve-job.characterization.test.ts": {
       "filePath": "packages/core/src/__tests__/auto-improve-job.characterization.test.ts",
-      "contentHash": "a6771c50c3d1f78ea676c280c9270e5c3692048090d8e61fb71d87f3e354d29a",
+      "contentHash": "2d11345b4d69a67fcba87d2e67203165a63e7542aee9a389aeb87f7e234ea570",
       "functions": [
         {
           "name": "makeObs",
@@ -7052,7 +7052,7 @@
             "payload",
             "i"
           ],
-          "returnType": "Observation",
+          "returnType": "InsertableObservation",
           "exported": false,
           "lineCount": 16
         },
@@ -7111,6 +7111,7 @@
           "source": "../data/memory/observation-repository.js",
           "specifiers": [
             "MemoryObservationStore",
+            "InsertableObservation",
             "Observation",
             "ObservationStore"
           ]
@@ -7135,15 +7136,21 @@
             "MemoryType",
             "MemoryLevel"
           ]
+        },
+        {
+          "source": "../kernel/sanitize/credential-scrub.js",
+          "specifiers": [
+            "scrubCredentials"
+          ]
         }
       ],
       "exports": [],
-      "totalLines": 303,
+      "totalLines": 307,
       "hasStructuralAnalysis": true
     },
     "packages/core/src/__tests__/auto-improve-job.test.ts": {
       "filePath": "packages/core/src/__tests__/auto-improve-job.test.ts",
-      "contentHash": "447acf533780a756db9a62c406c43e9b33102621c1915360d155e73c5e7dc7a4",
+      "contentHash": "d395f54c6178fc4c85e71f743de8ded96db97b14503b7c605cac0d8dac04ee50",
       "functions": [
         {
           "name": "makeObs",
@@ -7153,7 +7160,7 @@
             "payload",
             "i"
           ],
-          "returnType": "Observation",
+          "returnType": "InsertableObservation",
           "exported": false,
           "lineCount": 16
         },
@@ -7255,6 +7262,7 @@
           "source": "../data/memory/observation-repository.js",
           "specifiers": [
             "MemoryObservationStore",
+            "InsertableObservation",
             "Observation",
             "ObservationStore"
           ]
@@ -7283,10 +7291,16 @@
           "specifiers": [
             "SearchServiceError"
           ]
+        },
+        {
+          "source": "../kernel/sanitize/credential-scrub.js",
+          "specifiers": [
+            "scrubCredentials"
+          ]
         }
       ],
       "exports": [],
-      "totalLines": 600,
+      "totalLines": 604,
       "hasStructuralAnalysis": true
     },
     "packages/core/src/__tests__/auto-improve-pinned-invariant.test.ts": {
@@ -8049,14 +8063,14 @@
     },
     "packages/core/src/__tests__/compact-snapshot-attribution.test.ts": {
       "filePath": "packages/core/src/__tests__/compact-snapshot-attribution.test.ts",
-      "contentHash": "b8bd02ef5f6591836105cef5d6f2892cd3fc8be6b192045dd914801d27010ad4",
+      "contentHash": "f2749716b3f43902d14df6dbcf8949ea2c24889b6d52ee7491d7c0e409003dab",
       "functions": [
         {
           "name": "seededStore",
           "params": [],
           "returnType": "MemoryObservationStore",
           "exported": false,
-          "lineCount": 14
+          "lineCount": 16
         }
       ],
       "classes": [
@@ -8093,7 +8107,8 @@
         {
           "source": "../data/memory/observation-repository.js",
           "specifiers": [
-            "MemoryObservationStore"
+            "MemoryObservationStore",
+            "InsertableObservation"
           ]
         },
         {
@@ -8103,10 +8118,16 @@
             "AttributionResult",
             "AttributionResolverLike"
           ]
+        },
+        {
+          "source": "../kernel/sanitize/credential-scrub.js",
+          "specifiers": [
+            "scrubCredentials"
+          ]
         }
       ],
       "exports": [],
-      "totalLines": 98,
+      "totalLines": 143,
       "hasStructuralAnalysis": true
     },
     "packages/core/src/__tests__/compaction-snapshot-escaping.test.ts": {
@@ -8683,6 +8704,42 @@
       "totalLines": 579,
       "hasStructuralAnalysis": true
     },
+    "packages/core/src/__tests__/credential-scrub.test.ts": {
+      "filePath": "packages/core/src/__tests__/credential-scrub.test.ts",
+      "contentHash": "7bc6a7aef5759d20bda13dbbf2a62a0983a7a21a181f34038e3665308e31155e",
+      "functions": [
+        {
+          "name": "markerFor",
+          "params": [
+            "id"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "bun:test",
+          "specifiers": [
+            "describe",
+            "expect",
+            "test"
+          ]
+        },
+        {
+          "source": "../kernel/sanitize/credential-scrub.js",
+          "specifiers": [
+            "RULE_IDS",
+            "scrubCredentials"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 248,
+      "hasStructuralAnalysis": true
+    },
     "packages/core/src/__tests__/cycle-detection.property.test.ts": {
       "filePath": "packages/core/src/__tests__/cycle-detection.property.test.ts",
       "contentHash": "1b4c07b1ce3714bef55797bd59bf25a4d963945db0a88525ac851920484e583c",
@@ -8755,7 +8812,7 @@
     },
     "packages/core/src/__tests__/cycle-detection.test.ts": {
       "filePath": "packages/core/src/__tests__/cycle-detection.test.ts",
-      "contentHash": "800e156741b2f2792a07c14321c973d35dfb5a0911d4b13a81eb5a99ed188f6d",
+      "contentHash": "f33adf39ee38ce8645096e642a391c52241f730cab8bad972ab616512a8e2a6f",
       "functions": [
         {
           "name": "edges",
@@ -8789,10 +8846,16 @@
           "specifiers": [
             "CallEdge"
           ]
+        },
+        {
+          "source": "./helpers/rss-delta.js",
+          "specifiers": [
+            "rssDeltaOver"
+          ]
         }
       ],
       "exports": [],
-      "totalLines": 245,
+      "totalLines": 240,
       "hasStructuralAnalysis": true
     },
     "packages/core/src/__tests__/dart-support.test.ts": {
@@ -14700,6 +14763,46 @@
       "totalLines": 91,
       "hasStructuralAnalysis": true
     },
+    "packages/core/src/__tests__/helpers/rss-delta.ts": {
+      "filePath": "packages/core/src/__tests__/helpers/rss-delta.ts",
+      "contentHash": "230819524745338593127e4032fc00d261ba794f16a4d89bc6f985eb14603668",
+      "functions": [
+        {
+          "name": "rssNow",
+          "params": [],
+          "returnType": "number",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "rssDeltaOver",
+          "params": [
+            "fn"
+          ],
+          "returnType": "number",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "median",
+          "params": [
+            "values"
+          ],
+          "returnType": "number",
+          "exported": true,
+          "lineCount": 7
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [
+        "rssNow",
+        "rssDeltaOver",
+        "median"
+      ],
+      "totalLines": 34,
+      "hasStructuralAnalysis": true
+    },
     "packages/core/src/__tests__/hook-attribution-acceptance.test.ts": {
       "filePath": "packages/core/src/__tests__/hook-attribution-acceptance.test.ts",
       "contentHash": "55bb6d9cb03e756d48e95b96cdd28396f3734f9dadd9a6ee43c5a5ecd3972bdb",
@@ -14937,7 +15040,7 @@
     },
     "packages/core/src/__tests__/hook-service.test.ts": {
       "filePath": "packages/core/src/__tests__/hook-service.test.ts",
-      "contentHash": "79e4357f50ab804cf52a1e111b905dd5451b9a729ac2ce1194c75899cc3ab840",
+      "contentHash": "4267d571f5a782ac416d2c11bbba54dc5c6123f8cfb9e0adf0e3ecd2a21d63f4",
       "functions": [
         {
           "name": "validEvent",
@@ -15062,7 +15165,7 @@
         }
       ],
       "exports": [],
-      "totalLines": 517,
+      "totalLines": 567,
       "hasStructuralAnalysis": true
     },
     "packages/core/src/__tests__/hybrid-search-late-bind.test.ts": {
@@ -17628,7 +17731,7 @@
     },
     "packages/core/src/__tests__/observation-consolidation-job.test.ts": {
       "filePath": "packages/core/src/__tests__/observation-consolidation-job.test.ts",
-      "contentHash": "2a0239da0ac9d7490ccc3bf18f319e946aad7aa01e4099c4868b8a0348dde5e4",
+      "contentHash": "f2a778cbc95583085855379902f279f461723bc6cb502aa40033ec48df06df75",
       "functions": [
         {
           "name": "makeFakeMemoryRepo",
@@ -17664,7 +17767,7 @@
           ],
           "returnType": "MemoryObservationStore",
           "exported": false,
-          "lineCount": 16
+          "lineCount": 18
         }
       ],
       "classes": [],
@@ -17694,7 +17797,7 @@
           "source": "../data/memory/observation-repository.js",
           "specifiers": [
             "MemoryObservationStore",
-            "Observation"
+            "InsertableObservation"
           ]
         },
         {
@@ -17714,10 +17817,16 @@
           "specifiers": [
             "z"
           ]
+        },
+        {
+          "source": "../kernel/sanitize/credential-scrub.js",
+          "specifiers": [
+            "scrubCredentials"
+          ]
         }
       ],
       "exports": [],
-      "totalLines": 266,
+      "totalLines": 269,
       "hasStructuralAnalysis": true
     },
     "packages/core/src/__tests__/observation-extractor.test.ts": {
@@ -17759,7 +17868,7 @@
     },
     "packages/core/src/__tests__/observation-repository-pg-coverage.test.ts": {
       "filePath": "packages/core/src/__tests__/observation-repository-pg-coverage.test.ts",
-      "contentHash": "32a970231f55d8f0a52c504fcdd9f5338b4186edf90e461f860d9d4fc57624b3",
+      "contentHash": "dd1455c0403ea71d594a6fe8ec8f652c074516b51dc561d30755fb83c859b4c4",
       "functions": [
         {
           "name": "projectId",
@@ -17773,9 +17882,9 @@
           "params": [
             "overrides"
           ],
-          "returnType": "Observation",
+          "returnType": "InsertableObservation",
           "exported": false,
-          "lineCount": 12
+          "lineCount": 13
         },
         {
           "name": "settle",
@@ -17847,6 +17956,7 @@
           "source": "../data/memory/observation-contract.js",
           "specifiers": [
             "newObservationId",
+            "InsertableObservation",
             "Observation"
           ]
         },
@@ -17869,10 +17979,16 @@
           "specifiers": [
             "closeConnections"
           ]
+        },
+        {
+          "source": "../kernel/sanitize/credential-scrub.js",
+          "specifiers": [
+            "scrubCredentials"
+          ]
         }
       ],
       "exports": [],
-      "totalLines": 550,
+      "totalLines": 559,
       "hasStructuralAnalysis": true
     },
     "packages/core/src/__tests__/operation-log-repository.test.ts": {
@@ -22130,7 +22246,7 @@
     },
     "packages/core/src/__tests__/structural-runtime.test.ts": {
       "filePath": "packages/core/src/__tests__/structural-runtime.test.ts",
-      "contentHash": "c7a98de77c4a9db120095a19b14fc3536fede8d9376bdc6671beac20339cf33d",
+      "contentHash": "22a67d35108a7a1719ab3039f182c49774010b059f3232cbc7b5b2bccf4b4346",
       "functions": [
         {
           "name": "fakeTree",
@@ -22221,10 +22337,17 @@
           "specifiers": [
             "loadNativeGrammarSet"
           ]
+        },
+        {
+          "source": "./helpers/rss-delta.js",
+          "specifiers": [
+            "rssNow",
+            "median"
+          ]
         }
       ],
       "exports": [],
-      "totalLines": 413,
+      "totalLines": 410,
       "hasStructuralAnalysis": true
     },
     "packages/core/src/__tests__/symbol-graph-service.test.ts": {
@@ -26335,7 +26458,7 @@
     },
     "packages/core/src/data/memory/observation-contract.ts": {
       "filePath": "packages/core/src/data/memory/observation-contract.ts",
-      "contentHash": "415bad1b43ee0b76754911e33507a4ddf05e7ca1a0dac5a780500d72330a073a",
+      "contentHash": "9065df04ca09177f5c31682d3b0ebe7de449a1e808ce760cb4f0d2aca537ca0c",
       "functions": [
         {
           "name": "newObservationId",
@@ -26362,7 +26485,14 @@
           "lineCount": 1
         }
       ],
-      "imports": [],
+      "imports": [
+        {
+          "source": "../../kernel/sanitize/credential-scrub.js",
+          "specifiers": [
+            "SanitizedPayloadJson"
+          ]
+        }
+      ],
       "exports": [
         "LIFECYCLE_EVENTS",
         "OBSERVATION_CATEGORIES",
@@ -26370,12 +26500,12 @@
         "MemoryObservationStore",
         "newObservationId"
       ],
-      "totalLines": 12,
+      "totalLines": 23,
       "hasStructuralAnalysis": true
     },
     "packages/core/src/data/memory/observation-repository-pg.ts": {
       "filePath": "packages/core/src/data/memory/observation-repository-pg.ts",
-      "contentHash": "deebb431ff607be1d290982fa5f8d1af5a229a9c8432b7bf4f2339007385f112",
+      "contentHash": "4780f40b39365e2498f4abdc2615954749d77e139b62f24e8b1c762d98093a41",
       "functions": [
         {
           "name": "toNum",
@@ -26452,14 +26582,15 @@
           "specifiers": [
             "Observation",
             "ObservationStore",
-            "ObservationRow"
+            "ObservationRow",
+            "InsertableObservation"
           ]
         }
       ],
       "exports": [
         "PgObservationStore"
       ],
-      "totalLines": 294,
+      "totalLines": 295,
       "hasStructuralAnalysis": true
     },
     "packages/core/src/data/memory/observation-repository.ts": {
@@ -28928,6 +29059,48 @@
         "isKnownRegistryTable"
       ],
       "totalLines": 94,
+      "hasStructuralAnalysis": true
+    },
+    "packages/core/src/kernel/sanitize/credential-scrub.ts": {
+      "filePath": "packages/core/src/kernel/sanitize/credential-scrub.ts",
+      "contentHash": "63c187060b431f737b270dd52aaa04236332fed33625a79773880a28f828c2c8",
+      "functions": [
+        {
+          "name": "markerFor",
+          "params": [
+            "id"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "fullMatchRule",
+          "params": [
+            "id",
+            "pattern"
+          ],
+          "returnType": "Rule",
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "scrubCredentials",
+          "params": [
+            "payloadJson"
+          ],
+          "returnType": "ScrubResult",
+          "exported": true,
+          "lineCount": 19
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [
+        "RULE_IDS",
+        "scrubCredentials"
+      ],
+      "totalLines": 148,
       "hasStructuralAnalysis": true
     },
     "packages/core/src/kernel/schema-version.ts": {
@@ -33280,7 +33453,7 @@
     },
     "packages/core/src/services/hooks/hook-service.ts": {
       "filePath": "packages/core/src/services/hooks/hook-service.ts",
-      "contentHash": "8aa206553f0a78ca5f0247720e9f48345487f28ec31f83cb95902d19c108d8ca",
+      "contentHash": "9b9e1955f1c0dbe00a6bea352c16217bffd89126f6668be10c8c6fe823624673",
       "functions": [
         {
           "name": "clamp",
@@ -33368,7 +33541,7 @@
             "idFactory"
           ],
           "exported": true,
-          "lineCount": 109
+          "lineCount": 121
         },
         {
           "name": "ValidationError",
@@ -33400,8 +33573,8 @@
             "getObservationStore",
             "LIFECYCLE_EVENTS",
             "newObservationId",
+            "InsertableObservation",
             "LifecycleEventKind",
-            "Observation",
             "ObservationStore"
           ]
         },
@@ -33429,6 +33602,12 @@
             "getAttributionResolver",
             "AttributionResolverLike"
           ]
+        },
+        {
+          "source": "../../kernel/sanitize/credential-scrub.js",
+          "specifiers": [
+            "scrubCredentials"
+          ]
         }
       ],
       "exports": [
@@ -33438,7 +33617,7 @@
         "getHookService",
         "resetHookService"
       ],
-      "totalLines": 353,
+      "totalLines": 366,
       "hasStructuralAnalysis": true
     },
     "packages/core/src/services/hooks/observation-extractor.ts": {
@@ -44958,7 +45137,7 @@
     },
     "packages/core/src/tools/compact_snapshot.ts": {
       "filePath": "packages/core/src/tools/compact_snapshot.ts",
-      "contentHash": "96e8b6fa90a2fabd95e091ca640cc4aa98c59a0bca64ee16ac83c5a057b98a27",
+      "contentHash": "91329c7673a715a53d9ee56e94f699e3559c1b7b4cc371190f95d7cf05200cf0",
       "functions": [],
       "classes": [
         {
@@ -44975,7 +45154,7 @@
             "inputSchema"
           ],
           "exported": true,
-          "lineCount": 133
+          "lineCount": 145
         }
       ],
       "imports": [
@@ -45007,12 +45186,18 @@
             "getAttributionResolver",
             "AttributionResolverLike"
           ]
+        },
+        {
+          "source": "../kernel/sanitize/credential-scrub.js",
+          "specifiers": [
+            "scrubCredentials"
+          ]
         }
       ],
       "exports": [
         "CompactSnapshotTool"
       ],
-      "totalLines": 176,
+      "totalLines": 189,
       "hasStructuralAnalysis": true
     },
     "packages/core/src/tools/compress_context.ts": {
