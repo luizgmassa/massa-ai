@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-08-04
+
 ### Changed
 
 - **TLC spec-driven harness synced to 3.3.0.** Four new deterministic validator scripts
