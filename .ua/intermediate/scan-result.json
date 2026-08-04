@@ -825,13 +825,13 @@
     {
       "path": "packages/core/src/__tests__/auto-improve-job.characterization.test.ts",
       "language": "typescript",
-      "sizeLines": 302,
+      "sizeLines": 306,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/__tests__/auto-improve-job.test.ts",
       "language": "typescript",
-      "sizeLines": 599,
+      "sizeLines": 603,
       "fileCategory": "code"
     },
     {
@@ -915,7 +915,7 @@
     {
       "path": "packages/core/src/__tests__/compact-snapshot-attribution.test.ts",
       "language": "typescript",
-      "sizeLines": 97,
+      "sizeLines": 142,
       "fileCategory": "code"
     },
     {
@@ -979,6 +979,12 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/__tests__/credential-scrub.test.ts",
+      "language": "typescript",
+      "sizeLines": 247,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/__tests__/cycle-detection.property.test.ts",
       "language": "typescript",
       "sizeLines": 218,
@@ -987,7 +993,7 @@
     {
       "path": "packages/core/src/__tests__/cycle-detection.test.ts",
       "language": "typescript",
-      "sizeLines": 244,
+      "sizeLines": 239,
       "fileCategory": "code"
     },
     {
@@ -1615,6 +1621,12 @@
       "fileCategory": "code"
     },
     {
+      "path": "packages/core/src/__tests__/helpers/rss-delta.ts",
+      "language": "typescript",
+      "sizeLines": 33,
+      "fileCategory": "code"
+    },
+    {
       "path": "packages/core/src/__tests__/hook-attribution-acceptance.test.ts",
       "language": "typescript",
       "sizeLines": 455,
@@ -1635,7 +1647,7 @@
     {
       "path": "packages/core/src/__tests__/hook-service.test.ts",
       "language": "typescript",
-      "sizeLines": 516,
+      "sizeLines": 566,
       "fileCategory": "code"
     },
     {
@@ -1941,7 +1953,7 @@
     {
       "path": "packages/core/src/__tests__/observation-consolidation-job.test.ts",
       "language": "typescript",
-      "sizeLines": 265,
+      "sizeLines": 268,
       "fileCategory": "code"
     },
     {
@@ -1953,7 +1965,7 @@
     {
       "path": "packages/core/src/__tests__/observation-repository-pg-coverage.test.ts",
       "language": "typescript",
-      "sizeLines": 549,
+      "sizeLines": 558,
       "fileCategory": "code"
     },
     {
@@ -2421,7 +2433,7 @@
     {
       "path": "packages/core/src/__tests__/structural-runtime.test.ts",
       "language": "typescript",
-      "sizeLines": 412,
+      "sizeLines": 409,
       "fileCategory": "code"
     },
     {
@@ -2847,13 +2859,13 @@
     {
       "path": "packages/core/src/data/memory/observation-contract.ts",
       "language": "typescript",
-      "sizeLines": 11,
+      "sizeLines": 22,
       "fileCategory": "code"
     },
     {
       "path": "packages/core/src/data/memory/observation-repository-pg.ts",
       "language": "typescript",
-      "sizeLines": 293,
+      "sizeLines": 294,
       "fileCategory": "code"
     },
     {
@@ -3004,6 +3016,12 @@
       "path": "packages/core/src/kernel/registry.ts",
       "language": "typescript",
       "sizeLines": 93,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/core/src/kernel/sanitize/credential-scrub.ts",
+      "language": "typescript",
+      "sizeLines": 147,
       "fileCategory": "code"
     },
     {
@@ -3369,7 +3387,7 @@
     {
       "path": "packages/core/src/services/hooks/hook-service.ts",
       "language": "typescript",
-      "sizeLines": 352,
+      "sizeLines": 365,
       "fileCategory": "code"
     },
     {
@@ -4359,7 +4377,7 @@
     {
       "path": "packages/core/src/tools/compact_snapshot.ts",
       "language": "typescript",
-      "sizeLines": 175,
+      "sizeLines": 188,
       "fileCategory": "code"
     },
     {
@@ -4741,8 +4759,8 @@
       "fileCategory": "code"
     }
   ],
-  "totalFiles": 784,
-  "filteredByIgnore": 1501,
+  "totalFiles": 787,
+  "filteredByIgnore": 1571,
   "estimatedComplexity": "very-large",
   "importMap": {
     "apps/mcp-client/src/__tests__/api-key-config-seeded.test.ts": [],
@@ -5111,6 +5129,7 @@
       "packages/core/src/data/memory/memory-repository.ts",
       "packages/core/src/data/memory/observation-repository.ts",
       "packages/core/src/data/proposal/proposal-repository.ts",
+      "packages/core/src/kernel/sanitize/credential-scrub.ts",
       "packages/core/src/services/jobs/auto-improve-job.ts",
       "packages/core/src/services/memory/consolidator.ts"
     ],
@@ -5118,6 +5137,7 @@
       "packages/core/src/data/memory/memory-repository.ts",
       "packages/core/src/data/memory/observation-repository.ts",
       "packages/core/src/data/proposal/proposal-repository.ts",
+      "packages/core/src/kernel/sanitize/credential-scrub.ts",
       "packages/core/src/kernel/search-diagnostics.ts",
       "packages/core/src/services/events/event-bus.ts",
       "packages/core/src/services/jobs/auto-improve-job.ts",
@@ -5180,6 +5200,7 @@
     ],
     "packages/core/src/__tests__/compact-snapshot-attribution.test.ts": [
       "packages/core/src/data/memory/observation-repository.ts",
+      "packages/core/src/kernel/sanitize/credential-scrub.ts",
       "packages/core/src/services/hooks/attribution-resolver.ts",
       "packages/core/src/tools/compact_snapshot.ts"
     ],
@@ -5223,11 +5244,15 @@
       "packages/core/src/services/structural/language-manifest.ts",
       "packages/core/src/services/structural/parser-readiness.ts"
     ],
+    "packages/core/src/__tests__/credential-scrub.test.ts": [
+      "packages/core/src/kernel/sanitize/credential-scrub.ts"
+    ],
     "packages/core/src/__tests__/cycle-detection.property.test.ts": [
       "packages/core/src/services/symbol/architecture.ts",
       "packages/core/src/services/symbol/cycle-detection.ts"
     ],
     "packages/core/src/__tests__/cycle-detection.test.ts": [
+      "packages/core/src/__tests__/helpers/rss-delta.ts",
       "packages/core/src/services/symbol/architecture.ts",
       "packages/core/src/services/symbol/cycle-detection.ts"
     ],
@@ -5568,6 +5593,7 @@
     "packages/core/src/__tests__/health-checker-config.test.ts": [
       "packages/core/src/services/health/local-health-checker.ts"
     ],
+    "packages/core/src/__tests__/helpers/rss-delta.ts": [],
     "packages/core/src/__tests__/hook-attribution-acceptance.test.ts": [
       "packages/core/src/data/memory/observation-repository.ts",
       "packages/core/src/kernel/alias-resolver.ts",
@@ -5770,6 +5796,7 @@
     ],
     "packages/core/src/__tests__/observation-consolidation-job.test.ts": [
       "packages/core/src/data/memory/observation-repository.ts",
+      "packages/core/src/kernel/sanitize/credential-scrub.ts",
       "packages/core/src/services/events/event-bus.ts",
       "packages/core/src/services/jobs/observation-consolidation-job.ts",
       "packages/core/src/services/memory/consolidator.ts"
@@ -5782,7 +5809,8 @@
       "packages/core/src/data/memory/observation-repository-pg.ts",
       "packages/core/src/kernel/alias-resolver.ts",
       "packages/core/src/kernel/db-connection.ts",
-      "packages/core/src/kernel/prisma-client.ts"
+      "packages/core/src/kernel/prisma-client.ts",
+      "packages/core/src/kernel/sanitize/credential-scrub.ts"
     ],
     "packages/core/src/__tests__/operation-log-repository.test.ts": [],
     "packages/core/src/__tests__/parse-long-class.test.ts": [
@@ -6077,6 +6105,7 @@
     ],
     "packages/core/src/__tests__/structural-runtime.test.ts": [
       "packages/core/src/__tests__/_helpers/native-skip.ts",
+      "packages/core/src/__tests__/helpers/rss-delta.ts",
       "packages/core/src/kernel/types.ts",
       "packages/core/src/services/structural/grammar-loaders.ts",
       "packages/core/src/services/structural/language-manifest.ts",
@@ -6373,7 +6402,9 @@
       "packages/core/src/kernel/prisma-client.ts"
     ],
     "packages/core/src/data/memory/memory-repository.ts": [],
-    "packages/core/src/data/memory/observation-contract.ts": [],
+    "packages/core/src/data/memory/observation-contract.ts": [
+      "packages/core/src/kernel/sanitize/credential-scrub.ts"
+    ],
     "packages/core/src/data/memory/observation-repository-pg.ts": [
       "packages/core/src/data/memory/observation-contract.ts",
       "packages/core/src/kernel/alias-resolver.ts",
@@ -6461,6 +6492,7 @@
     "packages/core/src/kernel/lexical-search.ts": [],
     "packages/core/src/kernel/prisma-client.ts": [],
     "packages/core/src/kernel/registry.ts": [],
+    "packages/core/src/kernel/sanitize/credential-scrub.ts": [],
     "packages/core/src/kernel/schema-version.ts": [],
     "packages/core/src/kernel/search-diagnostics.ts": [],
     "packages/core/src/kernel/types.ts": [],
@@ -6703,6 +6735,7 @@
     ],
     "packages/core/src/services/hooks/hook-service.ts": [
       "packages/core/src/data/memory/observation-repository.ts",
+      "packages/core/src/kernel/sanitize/credential-scrub.ts",
       "packages/core/src/services/events/event-bus.ts",
       "packages/core/src/services/hooks/attribution-resolver.ts",
       "packages/core/src/services/hooks/observation-extractor.ts",
@@ -7354,6 +7387,7 @@
     ],
     "packages/core/src/tools/compact_snapshot.ts": [
       "packages/core/src/data/memory/observation-repository.ts",
+      "packages/core/src/kernel/sanitize/credential-scrub.ts",
       "packages/core/src/services/hooks/attribution-resolver.ts",
       "packages/core/src/services/hooks/compaction-snapshot-service.ts"
     ],
