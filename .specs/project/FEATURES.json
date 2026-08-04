@@ -776,11 +776,11 @@
       "spec": ".specs/features/tlc-330-harness-update/spec.md",
       "design": ".specs/features/tlc-330-harness-update/design.md",
       "tasks": ".specs/features/tlc-330-harness-update/tasks.md",
-      "notes": "T1-T18 of 18 all complete (three phases: T1-T6 validator scripts, T7-T15 reference/workflow prose, T16-T18 charter regen + close-out). Not yet independently validated -- validation.md intentionally absent at this commit; an independent verifier runs next. Not pushed, no PR. massa-ai MCP was unreachable this session; .specs/ is canonical. See .specs/HANDOFF.md."
+      "notes": "T1-T18 + FT1-FT2 + Phase 5 amendment (T19-T22) complete. Independently validated: iteration 1 FAIL -> FT1/FT2 -> iteration 2 PASS; Phase 5 iteration 3 FAIL (PYTS spec population undercount) -> FT3 -> re-verify. validation.md at .specs/features/tlc-330-harness-update/validation.md. PR #64 open. massa-ai MCP unreachable this session; .specs/ is canonical. See .specs/HANDOFF.md."
     },
     {
       "slug": "python-to-typescript-scripts",
-      "title": "Python → TypeScript scripts migration — port all 8 Python scripts (6 skill validators/lessons + 2 repo dev scripts) to Bun TypeScript with CLI/exit/output parity, dual-run characterization, per-script atomic deletion, and full python3 wiring rewire (24 prose sites, tests, package.json)",
+      "title": "Python → TypeScript scripts migration — port all 8 Python scripts (6 skill validators/lessons + 2 repo dev scripts) to Bun TypeScript with CLI/exit/output parity, dual-run characterization, per-script atomic deletion, and full python3 wiring rewire (sweep-derived work list: 41 python3 lines / 25 skill files + 16 non-literal .py refs + tests + package.json at authoring)",
       "status": "planned",
       "priority": "P2",
       "workflow": "spec-driven",

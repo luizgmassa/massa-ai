@@ -13,6 +13,7 @@ Phase 2: T7 ──→ T8 ──→ T9 ──→ T10 ──→ T11 ──→ T12 
 Phase 3: T16 ──→ T17 ──→ T18
 Phase 4: FT1 ──→ FT2
 Phase 5: T19 ──→ T20 ──→ T21 ──→ T22
+Phase 6: FT3
 ```
 
 Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depends on Phase 2 (regeneration snapshots final prose).
@@ -241,4 +242,14 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T19, T20, T21
 **Tests**: iteration-3 verdict PASS; delivery gate 0
 **Gate**: validation PASS + gate 0
+**Status**: [x]
+
+### Phase 6: Fix tasks — validation iteration 3
+
+### FT3: Correct py→ts spec wiring-ripple population
+**Where**: `.specs/features/python-to-typescript-scripts/spec.md`
+**What**: Iteration-3 gap (PYTS-01 AC1): spec quoted an earlier narrow sweep (24 sites / 12 files); re-measured 41 python3 lines / 25 skill files (36/23 scoped), + 16 non-literal .py refs incl. the execute.md:311 commit-msg hook recipe, + 3 test spawns + package.json:42. Spec now embeds the sweep commands, prints populations beside claims, and PTS-04 AC2 makes Design re-derive the work list. Also swept the verifier's secondary finding: stale "validation.md intentionally absent" note in FEATURES.json replaced (a status field is a claim that goes stale).
+**Depends on**: T22
+**Tests**: `validate_spec.py python-to-typescript-scripts` exit 0; zero "intentionally absent" refs in FEATURES.json
+**Gate**: validator 0 + sweep 0
 **Status**: [x]

@@ -8,7 +8,7 @@
 
 ## Problem Statement
 
-The harness now runs 6 Python scripts under `skills/massa-ai/scripts/` (`lessons`, `validate_spec`, `validate_tasks`, `validate_state`, `check_commit`, `check_specs_delivered`) plus 2 repo dev scripts (`scripts/update-fixture-hashes.py`, wired at `package.json:42`; `scripts/synapse-bench-analyze-v2.py`, manual-only). The repo's runtime is Bun; Python is a second toolchain the harness must assume present on every host machine (`python3` invoked at 24 prose sites across 12 skill files, in `scripts/__tests__/spec-driven-validators.test.ts`, and in one package.json script). Migrating to TypeScript under Bun removes the second-toolchain assumption, brings the scripts under `bun run lint`/type-checking, and unifies test tooling.
+The harness now runs 6 Python scripts under `skills/massa-ai/scripts/` (`lessons`, `validate_spec`, `validate_tasks`, `validate_state`, `check_commit`, `check_specs_delivered`) plus 2 repo dev scripts (`scripts/update-fixture-hashes.py`, wired at `package.json:42`; `scripts/synapse-bench-analyze-v2.py`, manual-only). The repo's runtime is Bun; Python is a second toolchain the harness must assume present on every host machine. Measured invocation surface (2026-08-04, `11747f27`, `/usr/bin/grep -rn 'python3' skills/ --include='*.md'` and companions): **41 `python3` lines across 25 skill source files** (36 lines / 23 files naming the 8 target scripts), **16 further `.py` references without a `python3` literal on the line** — including the `ln -sf … check_commit.py .git/hooks/commit-msg` hook recipe at `references/spec-driven/execute.md:311` that a `python3`-keyed sweep cannot see — plus 3 spawns in `scripts/__tests__/spec-driven-validators.test.ts` and `package.json:42`. An earlier draft of this spec claimed 24 sites/12 files from a narrower sweep; iteration-3 validation caught the undercount — Design re-runs the sweep commands above and treats their printed population, not this paragraph, as the work list. Migrating to TypeScript under Bun removes the second-toolchain assumption, brings the scripts under `bun run lint`/type-checking, and unifies test tooling.
 
 ## Out of Scope
 
@@ -53,10 +53,11 @@ Open questions: none — the migration is user-directed; remaining unknowns are 
 **Acceptance Criteria**:
 1. WHEN `bun run update-fixture-hashes` runs, THEN it SHALL produce the same fixture-hash updates as the Python version on an identical tree. <!-- event-driven -->
 
-**PTS-04 — Wiring ripple, sweep-verified.** Rewire every invocation site: the 24 `python3` prose sites across 12 skill files, `scripts/__tests__/spec-driven-validators.test.ts` spawns, the commit-msg-hook prose, and `package.json`. Regenerate all four host bundles.
+**PTS-04 — Wiring ripple, sweep-verified.** Rewire every invocation site. The work list is derived at Design time by re-running the measured sweeps from the Problem Statement (41 `python3` lines / 25 skill source files at authoring; 16 non-literal `.py` reference lines including the commit-msg hook recipe; 3 test spawns; `package.json:42`) — never from a remembered count. Regenerate all four host bundles.
 
 **Acceptance Criteria**:
-1. WHEN the repo is swept after migration, THEN zero live `python3` invocations SHALL remain under `skills/` and `apps/*/skills/` (population printed beside the verdict; sealed `.specs` history exempt). <!-- event-driven -->
+1. WHEN the repo is swept after migration, THEN zero live `python3` invocations AND zero live references to the 8 scripts' `.py` basenames SHALL remain under `skills/` and `apps/*/skills/` (both sweep commands and their populations printed beside the verdict; sealed `.specs` history exempt). <!-- event-driven -->
+2. WHEN Design derives the rewire work list, THEN it SHALL re-run the sweeps and record the fresh populations, superseding the figures quoted in this spec. <!-- event-driven -->
 
 **PTS-05 — Deletion discipline.** Each script's `.py` is deleted only in the same commit that lands its `.ts`, its rewired call sites, and its passing dual-run characterization; no commit ships both entry points live or neither.
 
