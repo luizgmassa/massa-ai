@@ -652,14 +652,13 @@ describe("harness gitignore contract", () => {
     expect(gitignore).toMatch(/\.env/);
   });
 
-  test(".specs/lessons.json or .specs/LESSONS.md exists (machine-owned lesson state)", async () => {
-    // lessons.json is the canonical machine-owned state; LESSONS.md is the rendered playbook.
-    // Either the state file or the rendered playbook should be present under .specs/.
+  test(".specs/lessons.json exists AND .specs/LESSONS.md is absent (single-store invariant)", async () => {
+    // lessons.json is the single machine-owned lesson store; the rendered LESSONS.md
+    // playbook was removed (LSN-01) — `lessons list` is the on-demand replacement view.
     const lessonsJson = path.join(REPO_ROOT, ".specs", "lessons.json");
     const lessonsMd = path.join(REPO_ROOT, ".specs", "LESSONS.md");
-    const jsonExists = await fileExists(lessonsJson);
-    const mdExists = await fileExists(lessonsMd);
-    expect(jsonExists || mdExists).toBe(true);
+    expect(await fileExists(lessonsJson)).toBe(true);
+    expect(await fileExists(lessonsMd)).toBe(false);
   });
 });
 

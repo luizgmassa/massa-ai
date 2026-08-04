@@ -9,7 +9,6 @@ rendering the human/agent-readable playbook. Bookkeeping by hand is exactly what
 rots a lessons file, so it lives here, not in a prompt.
 
 Canonical state:  .specs/lessons.json   (machine-owned - do NOT hand-edit)
-Rendered view:    .specs/LESSONS.md      (regenerated on every write)
 
 Pure standard library. No dependencies. Pass --root with the target workspace
 root so the package-local script writes that workspace's .specs directory.
@@ -39,7 +38,6 @@ import unicodedata
 import urllib.request
 
 STORE_REL = os.path.join(".specs", "lessons.json")
-RENDER_REL = os.path.join(".specs", "LESSONS.md")
 OBS_REL = os.path.join(".specs", "observations.json")
 
 SIGNALS = {
@@ -73,10 +71,6 @@ def _store_path(root):
     return os.path.join(root, STORE_REL)
 
 
-def _render_path(root):
-    return os.path.join(root, RENDER_REL)
-
-
 def _load(root):
     path = _store_path(root)
     if not os.path.exists(path):
@@ -103,7 +97,6 @@ def _save(root, data):
     with open(_store_path(root), "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
         f.write("\n")
-    _render(root, data)
 
 
 def _confidence(lesson, data):
@@ -254,76 +247,12 @@ def _find(data, signal, text):
     return None
 
 
-def _render(root, data):
-    lines = []
-    lines.append("# LESSONS - auto-maintained by skills/massa-ai/scripts/lessons.py")
-    lines.append("")
-    lines.append("> Machine-owned. Do NOT hand-edit. Changes are overwritten on the next `lessons.py` write.")
-    lines.append("> Canonical state lives in `.specs/lessons.json`. Edit lessons only via the script.")
-    lines.append(f"> promote_threshold={data['promote_threshold']} distinct features | window_days={data['window_days']} | quarantine_threshold={data['quarantine_threshold']}")
-    lines.append("")
-
-    by_status = {"confirmed": [], "candidate": [], "quarantined": []}
-    for l in data["lessons"]:
-        by_status.get(l["status"], by_status["candidate"]).append(l)
-
-    def block(title, items, note):
-        out = [f"## {title}", ""]
-        if note:
-            out.append(note)
-            out.append("")
-        if not items:
-            out.append("_none_")
-            out.append("")
-            return out
-        for l in sorted(items, key=lambda x: x["id"]):
-            scope = f" | scope: `{l['scope']}`" if l.get("scope") else ""
-            conf = l.get("confidence", _confidence(l, data))
-            out.append(f"### {l['id']} - {l['text']}")
-            out.append(
-                f"- signal: `{l['signal']}` | recurrence: {l['recurrence']} feature(s){scope} | harmful: {l.get('harmful', 0)} | confidence: {conf}"
-            )
-            feats = ", ".join(l.get("features", [])) or "-"
-            out.append(f"- features: {feats}")
-            ctx = []
-            for k in ("project", "session", "workflow", "entity"):
-                if l.get(k):
-                    ctx.append(f"{k}={l[k]}")
-            if ctx:
-                out.append(f"- context: {' '.join(ctx)}")
-            ev = l.get("evidence", [])
-            if ev:
-                out.append(f"- evidence: {ev[0]}" + (f" (+{len(ev) - 1} more)" if len(ev) > 1 else ""))
-            out.append(f"- last seen: {l.get('last_seen', '-')}")
-            out.append("")
-        return out
-
-    lines += block(
-        "Confirmed (load these at Specify/Design)",
-        by_status["confirmed"],
-        "Corroborated across multiple features. Safe to apply as guidance.",
-    )
-    lines += block(
-        "Candidates (under observation - do NOT load as guidance yet)",
-        by_status["candidate"],
-        "Seen once or not yet corroborated. Tracked, not trusted.",
-    )
-    lines += block(
-        "Quarantined (failed when applied - ignore)",
-        by_status["quarantined"],
-        "A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.",
-    )
-
-    with open(_render_path(root), "w", encoding="utf-8") as f:
-        f.write("\n".join(lines).rstrip() + "\n")
-
-
 # ----------------------------- commands -----------------------------
 
 def cmd_init(root, args):
     data = _load(root)
     _save(root, data)
-    print(f"Initialized lessons store at {_store_path(root)} and {_render_path(root)}")
+    print(f"Initialized lessons store at {_store_path(root)}")
     return 0
 
 

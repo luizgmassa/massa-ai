@@ -51,7 +51,7 @@ Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py
 **Depends on**: none
 **Tests**: flipped existence test green; `python3 -B skills/massa-ai/scripts/lessons.py list` renders the status view; selftest still exit 0
 **Gate**: `bun test scripts/__tests__/validate-repository.test.ts` + `generate-skill-artifacts.ts --check` both exit 0
-**Status**: [ ]
+**Status**: [x]
 
 ### T2: Repoint every live LESSONS.md reference
 **Where**: `AGENTS.md`, `CLAUDE.md`, `docs/massa-ai-spec-driven.md`, `skills/massa-ai/references/lessons.md`, `skills/massa-ai/references/project-context.md`, `skills/massa-ai/references/spec-driven/artifact-store.md`, `skills/massa-ai/references/spec-driven/specify.md`, `skills/massa-ai/workflows/spec-driven.md` + regenerated bundles
