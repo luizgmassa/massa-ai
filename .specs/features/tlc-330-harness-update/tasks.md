@@ -87,7 +87,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T1
 **Tests**: 4 fixture repos (dirty, untracked, absent-artifact, clean)
 **Gate**: same suite green
-**Status**: [ ]
+**Status**: [x]
 
 ### Phase 2: Reference + workflow prose
 

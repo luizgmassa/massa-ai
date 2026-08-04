@@ -60,6 +60,7 @@ const VALIDATE_TASKS = "skills/massa-ai/scripts/validate_tasks.py";
 const CHECK_COMMIT = "skills/massa-ai/scripts/check_commit.py";
 const VALIDATE_STATE = "skills/massa-ai/scripts/validate_state.py";
 const LESSONS_PY = "skills/massa-ai/scripts/lessons.py";
+const CHECK_SPECS_DELIVERED = "skills/massa-ai/scripts/check_specs_delivered.py";
 
 // ---------------------------------------------------------------------------
 // T1: validate_spec.py (SYNC-01 AC1)
@@ -669,5 +670,121 @@ describe("template-conformance (C5, GEN-02 AC2)", () => {
     // EVIDENCE_RE: a file:line citation must be structurally representable in the template.
     const evidenceRe = /[\w./-]+\.[A-Za-z0-9]+:\d+/;
     expect(evidenceRe.test(template)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T6: check_specs_delivered.py (GATE-02 AC1-2)
+// ---------------------------------------------------------------------------
+
+function git(args: string[], cwd: string): PyResult {
+  const proc = Bun.spawnSync(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
+  return {
+    exitCode: proc.exitCode ?? -1,
+    stdout: proc.stdout.toString(),
+    stderr: proc.stderr.toString(),
+  };
+}
+
+function initGitRepo(root: string): void {
+  git(["init", "-q", "-b", "main"], root);
+  git(["config", "user.email", "test@example.com"], root);
+  git(["config", "user.name", "Test"], root);
+  git(["config", "commit.gpgsign", "false"], root);
+}
+
+function commitAll(root: string, message: string): void {
+  git(["add", "-A"], root);
+  git(["commit", "-q", "-m", message], root);
+}
+
+const CLEAN_STATE_FILES: Record<string, string> = {
+  [join(".specs", "project", "STATE.md")]: "# State\n",
+  [join(".specs", "HANDOFF.md")]: "# Handoff\n",
+  [join(".specs", "project", "FEATURES.json")]: "{}\n",
+};
+
+function writeStateFiles(root: string): void {
+  for (const [rel, content] of Object.entries(CLEAN_STATE_FILES)) {
+    const full = join(root, rel);
+    mkdirSync(join(full, ".."), { recursive: true });
+    writeFileSync(full, content, "utf-8");
+  }
+}
+
+describe("check_specs_delivered.py (T6, GATE-02 AC1-2)", () => {
+  test("clean + tracked exits 0, prints the checked population", () => {
+    const root = makeTempRoot("delivered-clean");
+    initGitRepo(root);
+    writeFeatureFile(root, "my-feature", "spec.md", "# Spec\n");
+    writeStateFiles(root);
+    commitAll(root, "init");
+    const r = runPy(CHECK_SPECS_DELIVERED, ["my-feature", "--root", root]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("0 error(s)");
+    expect(r.stdout).toContain("checked 4 path(s)");
+    expect(r.stdout).toContain("my-feature/spec.md");
+    expect(r.stdout).toContain(".specs/project/STATE.md");
+    expect(r.stdout).toContain(".specs/HANDOFF.md");
+    expect(r.stdout).toContain(".specs/project/FEATURES.json");
+  });
+
+  test("dirty (modified-but-uncommitted) under .specs/ exits 1, names the path", () => {
+    const root = makeTempRoot("delivered-dirty");
+    initGitRepo(root);
+    const specPath = writeFeatureFile(root, "my-feature", "spec.md", "# Spec\n");
+    writeStateFiles(root);
+    commitAll(root, "init");
+    writeFileSync(specPath, "# Spec\n\nModified after commit, not re-committed.\n", "utf-8");
+    const r = runPy(CHECK_SPECS_DELIVERED, ["my-feature", "--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("uncommitted/untracked under .specs/");
+    expect(r.stdout).toContain("my-feature/spec.md");
+  });
+
+  test("untracked file under .specs/ exits 1, names the path", () => {
+    const root = makeTempRoot("delivered-untracked");
+    initGitRepo(root);
+    writeFeatureFile(root, "my-feature", "spec.md", "# Spec\n");
+    writeStateFiles(root);
+    commitAll(root, "init");
+    writeFeatureFile(root, "my-feature", "design.md", "# Design\n"); // never `git add`ed
+    const r = runPy(CHECK_SPECS_DELIVERED, ["my-feature", "--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("uncommitted/untracked under .specs/");
+    expect(r.stdout).toContain("design.md");
+  });
+
+  test("required artifact never written (absent, not dirty) exits 1, names the path (edge case)", () => {
+    const root = makeTempRoot("delivered-absent");
+    initGitRepo(root);
+    writeFeatureFile(root, "my-feature", "spec.md", "# Spec\n");
+    // Only two of the three state files are ever written - FEATURES.json never existed.
+    const stateDir = join(root, ".specs", "project");
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(join(stateDir, "STATE.md"), "# State\n", "utf-8");
+    writeFileSync(join(root, ".specs", "HANDOFF.md"), "# Handoff\n", "utf-8");
+    commitAll(root, "init");
+    // .specs/ is fully porcelain-clean here - the absence must still fail.
+    const status = git(["status", "--porcelain", "--", ".specs/"], root);
+    expect(status.stdout.trim()).toBe("");
+    const r = runPy(CHECK_SPECS_DELIVERED, ["my-feature", "--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("not tracked on HEAD");
+    expect(r.stdout).toContain("FEATURES.json");
+  });
+
+  test("optional feature artifacts (context/design/tasks/validation) are required only when present on disk", () => {
+    const root = makeTempRoot("delivered-optional");
+    initGitRepo(root);
+    writeFeatureFile(root, "my-feature", "spec.md", "# Spec\n");
+    writeFeatureFile(root, "my-feature", "tasks.md", "# Tasks\n");
+    writeStateFiles(root);
+    commitAll(root, "init");
+    const r = runPy(CHECK_SPECS_DELIVERED, ["my-feature", "--root", root]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("checked 5 path(s)"); // spec + tasks + 3 state files
+    expect(r.stdout).toContain("my-feature/tasks.md");
+    expect(r.stdout).not.toContain("my-feature/design.md");
   });
 });
