@@ -105,7 +105,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T2
 **Tests**: content sweep per rule
 **Gate**: sweep 0 old / new present
-**Status**: [ ]
+**Status**: [x]
 
 ### T9: execute.md — status-before-commit + blast radius + wiring
 **Where**: `skills/massa-ai/references/spec-driven/execute.md`
