@@ -97,7 +97,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T1
 **Tests**: sweep — EARS section present; `validate_spec.py` named; D4 check output recorded
 **Gate**: sweep populations printed, old-phrase count 0
-**Status**: [ ]
+**Status**: [x]
 
 ### T8: tasks.md ref — wiring + linter capture + AGENTS generalization
 **Where**: `skills/massa-ai/references/spec-driven/tasks.md`
