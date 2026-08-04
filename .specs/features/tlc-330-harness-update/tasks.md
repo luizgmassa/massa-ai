@@ -47,7 +47,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: none
 **Tests**: fixture suite in `scripts/__tests__/spec-driven-validators.test.ts`
 **Gate**: `bun test scripts/__tests__/spec-driven-validators.test.ts`
-**Status**: [ ]
+**Status**: [x]
 
 ### T2: Port validate_tasks.py
 **Where**: `skills/massa-ai/scripts/validate_tasks.py` (new) + tests
