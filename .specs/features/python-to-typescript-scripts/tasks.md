@@ -69,7 +69,7 @@ Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py
 **Depends on**: T1
 **Tests**: `--selftest` red-on-divergence and green-on-identity
 **Gate**: `bun scripts/pyts-dual-run.ts --selftest` exit 0
-**Status**: [ ]
+**Status**: [x]
 
 ### Phase 3: Script ports (one script, one commit, one live entry point)
 
