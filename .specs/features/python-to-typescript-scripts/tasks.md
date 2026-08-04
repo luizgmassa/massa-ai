@@ -119,7 +119,7 @@ Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py
 **Depends on**: T8
 **Tests**: dual-run key/write parity empty incl. a 0.625-class confidence-boundary op (Plan Challenge F1); `bun skills/massa-ai/scripts/lessons.ts selftest` exit 0; suite green
 **Gate**: suite + dual-run + `--check` all exit 0
-**Status**: [ ]
+**Status**: [x]
 
 ### Phase 4: Repo scripts, global sweep, close-out
 

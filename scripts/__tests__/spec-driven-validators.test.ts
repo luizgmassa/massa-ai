@@ -9,6 +9,7 @@ import { describe, expect, test, afterEach } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { norm as lessonsNorm } from "../../skills/massa-ai/scripts/lessons.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 
@@ -52,7 +53,7 @@ const SCRIPT_RUNTIME: Record<string, ScriptRuntime> = {
   validate_tasks: "bun",
   check_commit: "bun",
   validate_state: "bun",
-  lessons: "python",
+  lessons: "bun",
   check_specs_delivered: "bun",
 };
 
@@ -614,18 +615,10 @@ describe("lessons.py selftest (T5, SYNC-10 AC1)", () => {
     expect(r.stdout).toContain("selftest_norm: ok");
   });
 
+  // lessons.ts exports `norm` directly (D2/T9) - no need to spawn a subprocess
+  // and import a module by path the way the Python original required.
   function normOf(text: string): string {
-    const proc = Bun.spawnSync(
-      [
-        "python3",
-        "-B",
-        "-c",
-        `import sys; sys.path.insert(0, "skills/massa-ai/scripts"); import lessons; print(lessons._norm(sys.argv[1]))`,
-        text,
-      ],
-      { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe" },
-    );
-    return proc.stdout.toString().trim();
+    return lessonsNorm(text);
   }
 
   test("diacritic merge: Portuguese text with/without diacritics normalizes to the same key", () => {

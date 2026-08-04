@@ -11,7 +11,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
 3. Recall relevant durable context with `recall`. Treat recalled memory as a lead until current source confirms it. Confirm recalled memory against current source before relying on it only when the change touches the enumerated risk-domain set: public API, data loss, auth/PII, migrations, or cross-service contracts. Otherwise trust recalled memory and cite it with a one-line source note.
 4. Create a Synapse session when planned related `search` calls >=2, following `references/synapse-policy.md`.
 5. Load confirmed project lessons through `references/lessons.md` when `.specs/lessons.json` exists:
-   `python3 skills/massa-ai/scripts/lessons.py --root . list --status confirmed`
+   `bun skills/massa-ai/scripts/lessons.ts --root . list --status confirmed`
    Retrieve only the context required for the goal:
    - begin with focused local inspection or the shared summary-search sequence
    - deepen into enriched search, symbols, or exact files only when needed
@@ -21,7 +21,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - For analysis that benefits from running code (derived values, data inspection, bulk transforms), call `execute` with `language` and `code` or `batch_execute` with `commands`[] instead of loading raw data into context. Respect the local-dev-only trust model (no untrusted-client exposure).
 7. Use `compress` only when accumulated source or conversation context is reducing execution quality; preserve decisions, constraints, current state, and next steps rather than raw history.
 8. Before completion, if verification found a reusable signal, record it via `references/lessons.md`. Score potential memories using `references/decision-engine.md` when that guidance is not already loaded:
-   `python3 skills/massa-ai/scripts/lessons.py --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
+   `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
     - remember verified decisions, reusable discoveries, recurring blockers, accepted constraints, and completed outcomes that will save future work
     - if a recalled memory is stale or needs correction, call `memory_update` with `id` and the new `content` (re-embeds automatically); if a memory is obsolete, call `memory_delete` with `id` (hard-delete, severs graph edges)
     - for usage insights (search/cache patterns, recent activity), call `analytics` with `type` and `projectId`

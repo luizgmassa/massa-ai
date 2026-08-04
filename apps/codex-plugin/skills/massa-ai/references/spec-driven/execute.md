@@ -316,14 +316,14 @@ This is a plain git hook, not tied to any editor or assistant. Skip it if the pr
 **Distill a confirmed lesson** when a task produced a reusable signal (an unexpected failure mode, a confirmed pattern, a corrected assumption):
 
 ```
-python3 skills/massa-ai/scripts/lessons.py --root . add \
+bun skills/massa-ai/scripts/lessons.ts --root . add \
   --feature <slug> --signal <S> --source <src> --text "<T>" --scope <O>
 ```
 
 `--source` is mandatory (grounding gate). Load applicable confirmed lessons before starting a task:
 
 ```
-python3 skills/massa-ai/scripts/lessons.py --root . list --status confirmed [--scope <relevant>]
+bun skills/massa-ai/scripts/lessons.ts --root . list --status confirmed [--scope <relevant>]
 ```
 
 ### 8. Scope Guardrail / Scope Control

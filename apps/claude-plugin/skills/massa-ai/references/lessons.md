@@ -5,7 +5,7 @@ Use this reference when loading confirmed project lessons during startup, or rec
 ## Artifacts
 
 - `.specs/lessons.json` — canonical machine-owned lesson state, the single lessons store. Read it; do not hand-edit.
-- `skills/massa-ai/scripts/lessons.py` — deterministic bookkeeping script; `lessons list` is the on-demand view.
+- `skills/massa-ai/scripts/lessons.ts` — deterministic bookkeeping script; `lessons list` is the on-demand view.
 
 ## Lesson Signal Table
 
@@ -22,7 +22,7 @@ Use this reference when loading confirmed project lessons during startup, or rec
 After a workflow's verification step finds a concrete reusable signal, record it:
 
 ```bash
-python3 skills/massa-ai/scripts/lessons.py --root . add \
+bun skills/massa-ai/scripts/lessons.ts --root . add \
   --feature "<feature-slug>" \
   --signal "<ac_gap|surviving_mutant|spec_precision_gap|spec_deviation|gate_fail>" \
   --source "<validation.md source, AC id, file:line, mutant id, or SPEC_DEVIATION ref>" \
@@ -50,7 +50,7 @@ Run this self-check after verification: if a failed acceptance criterion, surviv
 During startup of any applicable workflow, load confirmed lessons when `.specs/lessons.json` exists:
 
 ```bash
-python3 skills/massa-ai/scripts/lessons.py --root . list --status confirmed [--scope <relevant>]
+bun skills/massa-ai/scripts/lessons.ts --root . list --status confirmed [--scope <relevant>]
 ```
 
 - Use `--scope` or `--query` to keep the loaded set small.
@@ -68,7 +68,7 @@ python3 skills/massa-ai/scripts/lessons.py --root . list --status confirmed [--s
 
 ## No-Script Fallback
 
-If `lessons.py` is unavailable or cannot run, record `Lessons: skipped - script unavailable` in the validation report or evidence gate, keep the raw signal in the report, and do not hand-edit `lessons.json`. A future run with the script can import the validated signal.
+If `lessons.ts` is unavailable or cannot run, record `Lessons: skipped - script unavailable` in the validation report or evidence gate, keep the raw signal in the report, and do not hand-edit `lessons.json`. A future run with the script can import the validated signal.
 
 ## Continuous-Learning Loop (hook-fed)
 
@@ -81,13 +81,13 @@ The lessons layer is a closed loop, not manual-only. Two runtime hooks
 2. **evaluate** — `continuous_learning_evaluate.py` (Stop) reads the active
    massa-ai context from `.specs/project/STATE.md` and the observations
    buffer. For each observation that already carries grounded fields
-   (`signal`, `text`, `source`, `feature`), it calls `lessons.py add` with the
+   (`signal`, `text`, `source`, `feature`), it calls `lessons.ts add` with the
    `--project`/`--session`/`--workflow`/`--entity` context. Ungrounded
    observations are left in the buffer for agent input and logged as skipped.
 
 ### massa-ai Dual-Write
 
-`lessons.py add` and `import` best-effort write massa-ai memory so the file store
+`lessons.ts add` and `import` best-effort write massa-ai memory so the file store
 and durable memory stay consistent:
 
 - **type** is always `pattern` (lessons are procedural knowledge). `procedural`
@@ -104,8 +104,8 @@ and durable memory stay consistent:
 ### Round-Trip
 
 ```bash
-python3 skills/massa-ai/scripts/lessons.py --root . export --out lessons.export.json
-python3 skills/massa-ai/scripts/lessons.py --root . import --in lessons.export.json
+bun skills/massa-ai/scripts/lessons.ts --root . export --out lessons.export.json
+bun skills/massa-ai/scripts/lessons.ts --root . import --in lessons.export.json
 ```
 
 `export`/`import` round-trip the file store; `import` re-emits massa-ai memory

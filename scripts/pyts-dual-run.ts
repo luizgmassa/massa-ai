@@ -20,7 +20,7 @@
  * unregistered or not-yet-ported name is a usage error, not a divergence.
  */
 
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -612,6 +612,53 @@ T1 → T2
           label: "live dogfood: this feature's own tasks.md",
           args: ["python-to-typescript-scripts", "--root", "."],
           cwd: REPO_ROOT,
+        },
+      ];
+    },
+  },
+  lessons: {
+    pyRel: "skills/massa-ai/scripts/lessons.py",
+    tsRel: "skills/massa-ai/scripts/lessons.ts",
+    invocations: () => {
+      // Read-only invocations only: `add`/`penalize`/`prune`/`import`/`observe`
+      // mutate the store, and this harness runs the py twin then the ts twin
+      // against the SAME shared cwd for one invocation record - a mutating
+      // command would make the ts run see the py-mutated state, never
+      // matching the py run's own stdout. Key- and write-parity for the
+      // mutating commands are proven separately (T9 evidence): every live
+      // .specs/lessons.json key normalizes identically in both runtimes, and
+      // an identical op sequence (incl. a 0.625 confidence-boundary op)
+      // against two independent scratch stores byte-diffs empty.
+      const liveStoreRoot = makeTempRoot("dual-run-lessons-live-copy");
+      mkdirSync(join(liveStoreRoot, ".specs"), { recursive: true });
+      const liveStoreText = readFileSync(join(REPO_ROOT, ".specs", "lessons.json"), "utf-8");
+      writeFileSync(join(liveStoreRoot, ".specs", "lessons.json"), liveStoreText, "utf-8");
+
+      const emptyRoot = makeTempRoot("dual-run-lessons-empty");
+
+      return [
+        { label: "selftest", args: ["selftest"] },
+        { label: "status on empty store", args: ["--root", emptyRoot, "status"], cwd: emptyRoot },
+        { label: "list on empty store", args: ["--root", emptyRoot, "list", "--status", "all"], cwd: emptyRoot },
+        {
+          label: "status over live .specs/lessons.json copy (all 15 lessons)",
+          args: ["--root", liveStoreRoot, "status"],
+          cwd: liveStoreRoot,
+        },
+        {
+          label: "list --status all over live .specs/lessons.json copy (key/confidence parity)",
+          args: ["--root", liveStoreRoot, "list", "--status", "all"],
+          cwd: liveStoreRoot,
+        },
+        {
+          label: "list --query filter over live .specs/lessons.json copy",
+          args: ["--root", liveStoreRoot, "list", "--status", "all", "--query", "test"],
+          cwd: liveStoreRoot,
+        },
+        {
+          label: "export stdout over live .specs/lessons.json copy",
+          args: ["--root", liveStoreRoot, "export"],
+          cwd: liveStoreRoot,
         },
       ];
     },

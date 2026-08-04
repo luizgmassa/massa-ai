@@ -27,7 +27,7 @@ Use these logical paths:
 - `.specs/features/<slug>/validation.md` — feature validation report
 - `.specs/quick/NNN-slug/TASK.md` — quick-mode task (one-line intent + acceptance)
 - `.specs/quick/NNN-slug/SUMMARY.md` — quick-mode result (files changed + gate evidence)
-- `.specs/lessons.json` — the single lessons store, machine-owned (managed by `lessons.py`); `lessons list` is the on-demand view
+- `.specs/lessons.json` — the single lessons store, machine-owned (managed by `lessons.ts`); `lessons list` is the on-demand view
 
 ## Quick Artifacts
 
@@ -65,7 +65,7 @@ Load only what you need. Prefer metadata-only inspection before loading full con
 - **Project state:** `cat .specs/project/STATE.md`
 - **Handoff:** `cat .specs/HANDOFF.md`
 - **Feature spec:** `cat .specs/features/<slug>/spec.md`
-- **Confirmed lessons:** `python3 skills/massa-ai/scripts/lessons.py --root . list --status confirmed [--scope <relevant>]`
+- **Confirmed lessons:** `bun skills/massa-ai/scripts/lessons.ts --root . list --status confirmed [--scope <relevant>]`
 
 ## Writing Artifacts
 
@@ -82,7 +82,7 @@ Feature activate/complete flows update `.specs/project/FEATURES.json`, `.specs/p
 
 - Feature artifacts under `.specs/features/<slug>/` are versioned by design (one file per slug).
 - `.specs/project/FEATURES.json` and `.specs/project/STATE.md` are append-only versioned by their git history.
-- `lessons.json` versioning is managed automatically by `lessons.py`.
+- `lessons.json` versioning is managed automatically by `lessons.ts`.
 - When content must be superseded (e.g., a decision), update the existing file and rely on git history for the prior version.
 
 ## Debug Exports
@@ -93,5 +93,5 @@ Exports under `.specs-exports/` are optional, untracked review aids. Use `cp -r 
 
 - `.specs/` directory missing or not writable: block spec-driven state mutation; do not fall back to memory or chat.
 - Required artifact missing: create it on first write or block unless it is an approved initial creation.
-- `lessons.py` unavailable: skip lessons loading/recording, record skipped reason in validation report.
+- `lessons.ts` unavailable: skip lessons loading/recording, record skipped reason in validation report.
 .specs/ files
