@@ -1,6 +1,12 @@
 # Handoff
 
-## Active — Python→TypeScript Scripts + Lessons Single-Store (EXECUTE T1-T12 COMPLETE 2026-08-04)
+## Active — Python→TypeScript Scripts + Lessons Single-Store (VALIDATED PASS 2026-08-04 — T1-T12 + FT1, 2 verification iterations; PR pending, merge = user's decision)
+
+- **Validation:** iteration 1 FAIL (critical: round-half-even sensor not standing after
+  T11's harness deletion — F1's "exercised, not assumed") → FT1 `67e769ca` (mutating
+  goldens at the 0.625 boundary; observed red 44/2, mutant prints 0.63) → iteration 2
+  **PASS** (independent kill re-confirmation, 4/4 mutations, no regression). L-016
+  recorded via the ported `lessons.ts` itself.
 
 - **Feature:** `python-to-typescript-scripts` — 8-script py→ts migration (PTS-01..06) +
   lessons single-store LSN-01 (user amendment: `lessons.json` survives, `LESSONS.md` +
@@ -27,9 +33,8 @@
   generate; grammar suite 9/0 — note turbo FULL-TURBO cache restores dist but NOT
   `src/generated/prisma`, run `bunx prisma generate` in fresh worktrees). massa-ai MCP
   unreachable; `.specs/` canonical.
-- **Next action:** independent verification-agent (deep) writes `validation.md` —
-  **PENDING, not yet run; this is the explicit next step, not a claimed-done item** — then
-  delivery gate (already proven post-T12) → push + PR → CI watch → user merge decision.
+- **Next action:** push + `gh pr create` (authorized) → CI watch to green → user merge
+  decision (minor release on merge; CHANGELOG carries the commit-msg-hook operator note).
 
 ## Previous — TLC 3.3.0 Harness Update (VALIDATED PASS 2026-08-04 incl. Phase 5 amendment + FT6 delivery repair; MERGED as PR #64 @ `e932a673` 2026-08-04)
 - **Phase 5 (user amendment):** ALL-workflows rules (verify-don't-assume + docs-are-leads +

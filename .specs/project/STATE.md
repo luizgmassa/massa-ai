@@ -1,6 +1,15 @@
 # massa-ai Spec State
 
-## Current — Python→TypeScript Scripts + Lessons Single-Store (**EXECUTE T1-T12 COMPLETE 2026-08-04; branch `spec/python-to-typescript-scripts`**)
+## Current — Python→TypeScript Scripts + Lessons Single-Store (**VALIDATED PASS 2026-08-04 — T1-T12 + FT1, 2 verification iterations; delivery authorized, merge = user's decision**)
+
+- **Validation:** independent verifier (deep tier) iteration 1 FAIL (1 critical gap:
+  mutation (b) — naive rounding for `roundHalfEven2` — survived the whole delivered gate
+  set; Plan Challenge F1's "exercised, not assumed" violated once T11 deleted the dual-run
+  harness) → FT1 `67e769ca` (two mutating golden entries at the 0.625 boundary, observed
+  red 44/2 with the exact 0.63-vs-0.62 signature) → iteration 2 **PASS** (kill re-confirmed
+  independently, 4/4 mutations killed, no regression: goldens 46/0, `test:scripts` 1323/0,
+  lint 0). Report: `.specs/features/python-to-typescript-scripts/validation.md`. Lesson
+  L-016 recorded via `lessons.ts add` (grounded in validation.md Finding 1).
 
 - projectId: `massa-ai` · parent workflowSessionId: `spec-python-to-typescript-scripts` ·
   workflow: spec-driven (Large) · branch `spec/python-to-typescript-scripts`, worktree
@@ -41,10 +50,9 @@
   `generate-skill-artifacts.ts --check`, `generate-subagent-artifacts.ts --check`, the four
   ported validators + `check_specs_delivered.ts` dogfooded against this feature.
 - massa-ai MCP server unreachable this session; `.specs/` files canonical per contract.
-- Next action: independent verification-agent (deep) writes `validation.md` — **PENDING,
-  not yet run** — then `check_specs_delivered.ts` exit 0 (already proven post-T12 commit)
-  → push + `gh pr create` (authorized) → CI watch → merge decision to the user (minor
-  release on merge).
+- Next action: push + `gh pr create` (delivery authorized this session) → CI watch to
+  green → merge decision to the user (minor release on merge). `check_specs_delivered.ts`
+  + `validate_state.ts` both exit 0 on the close-out commit.
 
 ## Previous — TLC 3.3.0 Harness Update (**VALIDATED PASS 2026-08-04 — T1-T22 + FT1-FT6 (FT6 = delivery repair 1), 5 verification iterations; MERGED as PR #64 @ `e932a673` 2026-08-04, release chain fired on green main CI**)
 - **Phase 5 amendment (user, post-PR#64-green):** ALLWF-01/02 Core Contract rules + KVC

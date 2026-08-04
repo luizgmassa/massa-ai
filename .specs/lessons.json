@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 16,
+  "next_id": 17,
   "lessons": [
     {
       "id": "L-001",
@@ -335,6 +335,29 @@
       "workflow": "spec-driven",
       "entity": "tlc-330-harness-update",
       "confidence": 0.53
+    },
+    {
+      "id": "L-016",
+      "key": "surviving_mutant::a one time parity proof deleted with its harness is not a standing sensor materialized goldens must include the mutating boundary op the plan named or the mutant survives the whole gate set",
+      "text": "A one-time parity proof deleted with its harness is not a standing sensor: materialized goldens must include the mutating boundary op the plan named, or the mutant survives the whole gate set.",
+      "signal": "surviving_mutant",
+      "scope": "test-strength",
+      "status": "candidate",
+      "features": [
+        "python-to-typescript-scripts"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "validation.md Finding 1 + FT1 67e769ca (test-strength) (test-strength)"
+      ],
+      "created": "2026-08-04T21:23:23Z",
+      "last_seen": "2026-08-04T21:23:23Z",
+      "project": "massa-ai",
+      "session": "spec-python-to-typescript-scripts",
+      "workflow": "spec-driven",
+      "entity": "python-to-typescript-scripts",
+      "confidence": 0.62
     }
   ]
 }

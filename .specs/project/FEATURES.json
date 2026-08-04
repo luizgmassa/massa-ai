@@ -763,7 +763,7 @@
     {
       "slug": "tlc-330-harness-update",
       "title": "TLC 3.3.0 Harness Update — port TLC's four deterministic validator scripts + check_specs_delivered.py, EARS ACs, discuss pace system, git-stash ban + porcelain baseline, status-before-commit reorder, deliver-specs-before-PR gate, batch-trigger lowering, verification-agent deep-tier pin, lessons.py Unicode dedup fix",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P1",
       "workflow": "spec-driven",
       "branch": "spec/tlc-330-harness-update",
@@ -781,7 +781,7 @@
     {
       "slug": "python-to-typescript-scripts",
       "title": "Python → TypeScript scripts migration — port all 8 Python scripts (6 skill validators/lessons + 2 repo dev scripts) to Bun TypeScript with CLI/exit/output parity, dual-run characterization, per-script atomic deletion, and full python3 wiring rewire (sweep-derived work list: 41 python3 lines / 25 skill files + 16 non-literal .py refs + tests + package.json at authoring)",
-      "status": "active",
+      "status": "complete",
       "priority": "P2",
       "workflow": "spec-driven",
       "branch": "spec/python-to-typescript-scripts",
