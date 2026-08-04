@@ -416,6 +416,206 @@ Users need to authenticate. This solves a security gap by adding login.
       ];
     },
   },
+  validate_tasks: {
+    pyRel: "skills/massa-ai/scripts/validate_tasks.py",
+    tsRel: "skills/massa-ai/scripts/validate_tasks.ts",
+    invocations: () => {
+      function minimalTasksMd(taskBreakdown: string, executionPlan: string): string {
+        return `# Test Feature Tasks
+
+## Test Coverage Matrix
+
+| Code Layer | Required Test Type | Coverage Expectation | Location Pattern | Run Command |
+| --- | --- | --- | --- | --- |
+| Service | unit | all branches | \`src/**/*.test.ts\` | \`bun test\` |
+
+## Gate Check Commands
+
+| Gate Level | When to Use | Command |
+| --- | --- | --- |
+| Quick | after unit-only tasks | \`bun test\` |
+
+## Execution Plan
+
+${executionPlan}
+
+## Task Breakdown
+
+${taskBreakdown}
+`;
+      }
+
+      const execPlanSimple = `### Phase 1: Foundation
+
+\`\`\`
+T1 → T2
+\`\`\`
+`;
+      const tbWellFormed = `### T1: Create thing
+**What**: thing
+**Where**: \`src/thing.ts\`
+**Depends on**: None
+**Tests**: unit
+**Gate**: quick
+
+### T2: Use thing
+**What**: thing2
+**Where**: \`src/thing2.ts\`
+**Depends on**: T1
+**Tests**: unit
+**Gate**: quick
+`;
+      const tbMissingGate = `### T1: Create thing
+**What**: thing
+**Where**: \`src/thing.ts\`
+**Depends on**: None
+**Tests**: unit
+**Gate**: quick
+
+### T2: Use thing
+**What**: thing2
+**Where**: \`src/thing2.ts\`
+**Depends on**: T1
+**Tests**: unit
+`;
+      const execPlanTwoPhases = `### Phase 1: Foundation
+
+\`\`\`
+T1
+\`\`\`
+
+### Phase 2: Next
+
+\`\`\`
+T2
+\`\`\`
+`;
+      const tbForwardDep = `### T1: Create thing
+**What**: thing
+**Where**: \`src/thing.ts\`
+**Depends on**: T2
+**Tests**: unit
+**Gate**: quick
+
+### T2: Use thing
+**What**: thing2
+**Where**: \`src/thing2.ts\`
+**Depends on**: None
+**Tests**: unit
+**Gate**: quick
+`;
+      const tbDiagramOrder = `### T1: Create thing
+**What**: thing
+**Where**: \`src/thing.ts\`
+**Depends on**: T2
+**Tests**: unit
+**Gate**: quick
+
+### T2: Use thing
+**What**: thing2
+**Where**: \`src/thing2.ts\`
+**Depends on**: None
+**Tests**: unit
+**Gate**: quick
+`;
+      const execPlanUnfenced = `### Phase 1: Foundation
+
+T1 → T2
+`;
+
+      const FT_TASKS_MD = [
+        "# Tasks",
+        "",
+        "## Execution Plan",
+        "",
+        "### Phase Execution Map",
+        "",
+        "```",
+        "Phase 1: T1 ──→ T2",
+        "Phase 2: FT1",
+        "```",
+        "",
+        "## Test Coverage Matrix",
+        "",
+        "| Task | Requirement | Test |",
+        "|---|---|---|",
+        "| T1 | R-01 | t |",
+        "",
+        "## Gate Check Commands",
+        "",
+        "- `true`",
+        "",
+        "## Task Breakdown",
+        "",
+        "### Phase 1: Work",
+        "",
+        "### T1: Do the thing",
+        "**Where**: `a.ts`",
+        "**Depends on**: none",
+        "**Tests**: t",
+        "**Gate**: g",
+        "**Status**: [x]",
+        "",
+        "### T2: Extend the thing",
+        "**Where**: `b.ts`",
+        "**Depends on**: T1",
+        "**Tests**: t",
+        "**Gate**: g",
+        "**Status**: [x]",
+        "",
+        "### Phase 2: Fixes",
+        "",
+        "### FT1: Fix the thing",
+        "**Where**: `a.ts`",
+        "**Depends on**: T2",
+        "**Tests**: t",
+        "**Gate**: g",
+        "**Status**: [x]",
+        "",
+      ].join("\n");
+
+      const FT_TASKS_MD_NO_GATE = FT_TASKS_MD.replace(
+        "### FT1: Fix the thing\n**Where**: `a.ts`\n**Depends on**: T2\n**Tests**: t\n**Gate**: g",
+        "### FT1: Fix the thing\n**Where**: `a.ts`\n**Depends on**: T2\n**Tests**: t",
+      );
+
+      const wellFormedRoot = makeTempRoot("dual-run-tasks-well-formed");
+      writeFeatureFile(wellFormedRoot, "task-feature", "tasks.md", minimalTasksMd(tbWellFormed, execPlanSimple));
+
+      const missingGateRoot = makeTempRoot("dual-run-tasks-missing-gate");
+      writeFeatureFile(missingGateRoot, "task-feature", "tasks.md", minimalTasksMd(tbMissingGate, execPlanSimple));
+
+      const forwardDepRoot = makeTempRoot("dual-run-tasks-forward-dep");
+      writeFeatureFile(forwardDepRoot, "task-feature", "tasks.md", minimalTasksMd(tbForwardDep, execPlanTwoPhases));
+
+      const diagramOrderRoot = makeTempRoot("dual-run-tasks-diagram-order");
+      writeFeatureFile(diagramOrderRoot, "task-feature", "tasks.md", minimalTasksMd(tbDiagramOrder, execPlanSimple));
+
+      const unfencedRoot = makeTempRoot("dual-run-tasks-unfenced");
+      writeFeatureFile(unfencedRoot, "task-feature", "tasks.md", minimalTasksMd(tbWellFormed, execPlanUnfenced));
+
+      const ftOkRoot = makeTempRoot("dual-run-tasks-ft-ok");
+      writeFeatureFile(ftOkRoot, "my-feature", "tasks.md", FT_TASKS_MD);
+
+      const ftGateRoot = makeTempRoot("dual-run-tasks-ft-gate");
+      writeFeatureFile(ftGateRoot, "my-feature", "tasks.md", FT_TASKS_MD_NO_GATE);
+
+      return [
+        { label: "well-formed fixture", args: ["--root", wellFormedRoot], cwd: wellFormedRoot },
+        { label: "missing Gate field", args: ["--root", missingGateRoot], cwd: missingGateRoot },
+        { label: "forward-phase dependency", args: ["--root", forwardDepRoot], cwd: forwardDepRoot },
+        { label: "diagram-order violation", args: ["--root", diagramOrderRoot], cwd: diagramOrderRoot },
+        { label: "unfenced diagram (warn only)", args: ["--root", unfencedRoot], cwd: unfencedRoot },
+        { label: "FT-prefixed header backward dep OK", args: ["--root", ftOkRoot], cwd: ftOkRoot },
+        { label: "FT task missing Gate reported against FT1", args: ["--root", ftGateRoot], cwd: ftGateRoot },
+        {
+          label: "live dogfood: this feature's own tasks.md",
+          args: ["python-to-typescript-scripts", "--root", "."],
+          cwd: REPO_ROOT,
+        },
+      ];
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------

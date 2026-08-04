@@ -49,7 +49,7 @@ type ScriptRuntime = "python" | "bun";
 // twin lands; after T9 every entry resolves to "bun".
 const SCRIPT_RUNTIME: Record<string, ScriptRuntime> = {
   validate_spec: "bun",
-  validate_tasks: "python",
+  validate_tasks: "bun",
   check_commit: "bun",
   validate_state: "bun",
   lessons: "python",

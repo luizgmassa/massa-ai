@@ -111,7 +111,7 @@ Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py
 **Depends on**: T7
 **Tests**: suite green; dual-run empty
 **Gate**: suite + dual-run + `--check` all exit 0
-**Status**: [ ]
+**Status**: [x]
 
 ### T9: Port lessons
 **Where**: `skills/massa-ai/scripts/lessons.ts` (new), `lessons.py` (deleted), its prose sites, suite spawns + regenerated bundles
