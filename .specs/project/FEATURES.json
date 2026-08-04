@@ -796,7 +796,7 @@
     {
       "slug": "workflow-policy-updates",
       "title": "Workflow policy updates WFP-01..05 — Compose @Preview rule for implementation workflows, PR-description currency after each push, Figma pre-analysis + sequential retrieval subagent protocol, abbreviation expansion, uniform Phase/Task batching vocabulary",
-      "status": "in-progress",
+      "status": "complete",
       "priority": "P2",
       "workflow": "spec-driven",
       "branch": "spec/workflow-policy-updates",
@@ -804,12 +804,12 @@
         "specify": "complete",
         "design": "complete",
         "tasks": "complete",
-        "execute": "in-progress"
+        "execute": "complete"
       },
       "spec": ".specs/features/workflow-policy-updates/spec.md",
       "design": ".specs/features/workflow-policy-updates/design.md",
       "tasks": ".specs/features/workflow-policy-updates/tasks.md",
-      "notes": "Phase 1 (T1-T4) committed with per-task bundle regen + sensors; Phase 2 (T5) is close-out + validation + PR. Plan Challenge pre_mortem F1-F6 folded before Execute. massa-ai MCP unreachable this session; .specs/ canonical."
+      "notes": "T1-T5 complete, independently validated (all 5 WFP ACs PASS, 3/3 mutations killed; validation.md). PR #66, CI 14/14 green. Merge = user's decision. Plan Challenge pre_mortem F1-F6 folded before Execute. massa-ai MCP unreachable this session; .specs/ canonical."
     }
   ],
   "active_feature": "workflow-policy-updates"
