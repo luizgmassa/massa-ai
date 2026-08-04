@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Python→TypeScript Scripts + Lessons Single-Store (**EXECUTE dispatched 2026-08-04; branch `spec/python-to-typescript-scripts`**)
+## Current — Python→TypeScript Scripts + Lessons Single-Store (**EXECUTE T1-T12 COMPLETE 2026-08-04; branch `spec/python-to-typescript-scripts`**)
 
 - projectId: `massa-ai` · parent workflowSessionId: `spec-python-to-typescript-scripts` ·
   workflow: spec-driven (Large) · branch `spec/python-to-typescript-scripts`, worktree
@@ -13,25 +13,37 @@
   merge stays the user's.
 - Contract: `.specs/features/python-to-typescript-scripts/{spec,design,tasks}.md` — spec
   amended (LSN group; PTS-02 + Out-of-Scope losing clauses superseded in place with
-  reasons), design D1-D9, 12 tasks / 4 phases. Full Plan Challenge (pre_mortem,
-  massa-ai-plan-critic, deep): 4 findings F1-F4 ALL folded before Execute — F1 Python
-  `round()` half-to-even parity sensor (0.625-class boundary op mandated in T9), F2
-  sweep-blind installed commit-msg hook symlinks (T4 local repoint + T12 CHANGELOG note),
-  F3 golden fixtures must outlive the dual-run harness (T11), F4 coverage floor verified
-  to never reach `scripts/`/`skills/` (R6 reframed). See design.md Plan Challenge Record.
-- Execute: 3 sequential batch workers (offered per the >3-task trigger, user confirmed):
-  B1 T1-T3 (LSN-01 + harness), B2 T4-T9 (six skill-script ports), B3 T10-T12 (repo
-  scripts + golden/sweeps + close-out). One atomic commit per task, status-before-commit,
-  same-commit bundle regen + `--check`, dual-run parity before every `.py` deletion,
-  python3 always spawned with `-B` (L-015).
-- Sweep populations re-derived at `e932a673` (supersede spec authoring figures per
-  PTS-04 AC2): 41 `python3` lines / 25 skill md files (36 naming the 8 targets), 28
-  `.py`-no-python3 lines (12 = LSN repoint set; 9 foreign hook basenames stay), 3 test
-  spawns, `package.json:42`; 14 live `LESSONS.md` lines; 15 live lessons in lessons.json.
+  reasons), design D1-D9, 12 tasks / 4 phases, all 12 marked `[x]`. Full Plan Challenge
+  (pre_mortem, massa-ai-plan-critic, deep): 4 findings F1-F4 ALL folded before Execute — F1
+  Python `round()` half-to-even parity sensor (0.625-class boundary op exercised in T9), F2
+  sweep-blind installed commit-msg hook symlinks (T4 local repoint + T12 CHANGELOG operator
+  note), F3 golden fixtures materialized before the dual-run harness's deletion (T11), F4
+  coverage floor verified to never reach `scripts/`/`skills/` (R6 reframed). See design.md
+  Plan Challenge Record.
+- Execute ran as 3 sequential batch workers (offered per the >3-task trigger, user
+  confirmed): B1 T1-T3 (LSN-01 + harness), B2 T4-T9 (six skill-script ports), B3 T10-T12
+  (repo scripts + golden/sweeps + close-out). Commit range (`e932a673..HEAD`, 12 task
+  commits + 1 pre-Execute activation commit): `b4782690` activate, `b8ef61e5` T1,
+  `d6ca0747` T2, `74a19f2c` T3, `6b4e383f` T4, `e4931929` T5, `140398ed` T6, `109a8885` T7,
+  `cccaad7b` T8, `3bc677c4` T9, `9e8ea516` T10, `1503995f` T11, T12 this commit. One atomic
+  commit per task, status-before-commit, same-commit bundle regen + `--check`, dual-run
+  parity before every `.py` deletion (T10 used scratch-copy byte-diff instead, per its
+  mutating-in-place shape), python3 always spawned with `-B` (L-015).
+- All 8 scripts are now `.ts` under Bun; every `.py` original is deleted. Final sweeps
+  (T11, populations printed in the T11 commit body): `python3` under `skills/` +
+  `apps/*/skills/` 25→0; the 8 scripts' `.py` basenames under the same scope 10→0;
+  `LESSONS.md` live refs repo-wide 33 matches, all exempted (sealed other-feature history,
+  this feature's own artifacts, this feature's own STATE/HANDOFF narrative, the
+  validate-repository absence sensor) — zero unexplained. `scripts/pyts-dual-run.ts`
+  deleted; its oracle role lives on in `scripts/__tests__/pyts-golden.test.ts` (44 golden
+  cases, pure `bun test`, no python3).
+- Gates green at T12 close: `bun run test:scripts`, `bun run lint`,
+  `generate-skill-artifacts.ts --check`, `generate-subagent-artifacts.ts --check`, the four
+  ported validators + `check_specs_delivered.ts` dogfooded against this feature.
 - massa-ai MCP server unreachable this session; `.specs/` files canonical per contract.
-- Next action: B1 executes T1-T3 → review → B2 → B3 → independent verification-agent
-  (deep) writes `validation.md` → `check_specs_delivered` (`.ts` by then) exit 0 →
-  push + `gh pr create` (authorized) → CI watch → merge decision to the user (minor
+- Next action: independent verification-agent (deep) writes `validation.md` — **PENDING,
+  not yet run** — then `check_specs_delivered.ts` exit 0 (already proven post-T12 commit)
+  → push + `gh pr create` (authorized) → CI watch → merge decision to the user (minor
   release on merge).
 
 ## Previous — TLC 3.3.0 Harness Update (**VALIDATED PASS 2026-08-04 — T1-T22 + FT1-FT6 (FT6 = delivery repair 1), 5 verification iterations; MERGED as PR #64 @ `e932a673` 2026-08-04, release chain fired on green main CI**)

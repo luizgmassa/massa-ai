@@ -145,4 +145,4 @@ Phase 2 depends on Phase 1 (the harness characterizes the post-LSN-01 lessons.py
 **Depends on**: T11
 **Tests**: validators + delivery gate all exit 0; full `bun run test:scripts` + `bun run lint` exit 0
 **Gate**: delivery gate 0 + full gates 0
-**Status**: [ ]
+**Status**: [x]

@@ -1,6 +1,6 @@
 # Handoff
 
-## Active — Python→TypeScript Scripts + Lessons Single-Store (EXECUTE in progress 2026-08-04)
+## Active — Python→TypeScript Scripts + Lessons Single-Store (EXECUTE T1-T12 COMPLETE 2026-08-04)
 
 - **Feature:** `python-to-typescript-scripts` — 8-script py→ts migration (PTS-01..06) +
   lessons single-store LSN-01 (user amendment: `lessons.json` survives, `LESSONS.md` +
@@ -10,10 +10,16 @@
   worktree `.claude/worktrees/python-to-typescript-scripts`, from `origin/main` @
   `e932a673` (PR #64 merge commit).
 - **State:** Specify (amended) + Design + Tasks + full Plan Challenge (pre_mortem, 4
-  findings all folded — see design.md Plan Challenge Record) DONE; Execute dispatched as
-  3 sequential batch workers (user confirmed): B1 T1-T3, B2 T4-T9, B3 T10-T12. One
-  atomic commit per task, status-before-commit, dual-run parity before every `.py`
-  deletion, same-commit bundle regen.
+  findings all folded — see design.md Plan Challenge Record) DONE; Execute ran as
+  3 sequential batch workers (user confirmed): B1 T1-T3, B2 T4-T9, B3 T10-T12 — ALL 12
+  TASKS COMPLETE, one atomic commit per task, status-before-commit, dual-run parity (or,
+  for T10's mutating-in-place scripts, scratch-copy byte-diff) before every `.py`
+  deletion, same-commit bundle regen. Commit range `e932a673..HEAD`: `b4782690` activate,
+  `b8ef61e5` T1, `d6ca0747` T2, `74a19f2c` T3, `6b4e383f` T4, `e4931929` T5, `140398ed` T6,
+  `109a8885` T7, `cccaad7b` T8, `3bc677c4` T9, `9e8ea516` T10, `1503995f` T11, T12 this
+  commit. Full gates green at T12 close: `bun run test:scripts`, `bun run lint`,
+  `generate-skill-artifacts.ts --check`, `generate-subagent-artifacts.ts --check`, all four
+  ported validators + `check_specs_delivered.ts` dogfooded against this feature exit 0.
 - **User decisions this session:** merge PR #64 first (done, `e932a673`); lessons.json is
   the single store; one combined feature; delivery through PR creation authorized
   (commits+push+PR); merge of THIS feature's PR stays the user's (minor release).
@@ -21,8 +27,9 @@
   generate; grammar suite 9/0 — note turbo FULL-TURBO cache restores dist but NOT
   `src/generated/prisma`, run `bunx prisma generate` in fresh worktrees). massa-ai MCP
   unreachable; `.specs/` canonical.
-- **Next action:** B1 → B2 → B3 → independent verification-agent (deep) validation →
-  delivery gate → push + PR → CI watch → user merge decision.
+- **Next action:** independent verification-agent (deep) writes `validation.md` —
+  **PENDING, not yet run; this is the explicit next step, not a claimed-done item** — then
+  delivery gate (already proven post-T12) → push + PR → CI watch → user merge decision.
 
 ## Previous — TLC 3.3.0 Harness Update (VALIDATED PASS 2026-08-04 incl. Phase 5 amendment + FT6 delivery repair; MERGED as PR #64 @ `e932a673` 2026-08-04)
 - **Phase 5 (user amendment):** ALL-workflows rules (verify-don't-assume + docs-are-leads +

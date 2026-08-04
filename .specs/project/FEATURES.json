@@ -789,7 +789,7 @@
         "specify": "complete",
         "design": "complete",
         "tasks": "complete",
-        "execute": "in_progress"
+        "execute": "complete"
       },
       "spec": ".specs/features/python-to-typescript-scripts/spec.md"
     }
