@@ -113,7 +113,7 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: T3, T4
 **Tests**: content sweep; ordering asserted by section-sequence check
 **Gate**: sweep 0 old / new present
-**Status**: [ ]
+**Status**: [x]
 
 ### T10: validate.md — stash ban + baseline + template Result line
 **Where**: `skills/massa-ai/references/spec-driven/validate.md`
