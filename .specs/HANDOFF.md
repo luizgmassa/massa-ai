@@ -8,6 +8,16 @@
 - **Validation:** iteration 1 FAIL → FT1/FT2 (`19ebe0cd`, `98f76d0f`) → iteration 2 PASS
   (4/4 + 1 mutations killed across iterations, gates exit 0). Follow-ups IT2-01/IT2-02 in
   `validation.md` — future minor fix tasks, not blockers.
+- **Delivery repair 1 (FT6):** post-close-out CI `build` red — 3 `bun run test:scripts`
+  failures, all stale tests vs ALLWF-03 (outside the scoped verification set;
+  validation.md's recorded scope limit). FT6: duplication ceiling 313→331
+  raise-with-reason (+18 differential = charter-frontmatter uniformity from the 8 deep
+  pins), investigator expectation `light`→`deep`, profile-selection test →
+  `documentation-agent` (the remaining light charter). Worktree was wholly unprovisioned
+  (no `node_modules`, worse than the earlier partial-copy note) — install + 4-dir addon
+  copy + `bun run build`, grammar suite 9/0. Local gates own-exit-code green:
+  `test:scripts` 0 (1277/0 TS + shell suites), `lint` 0, `validate_tasks.py` 0 errors.
+  One atomic commit, then push + `gh pr checks 64` re-watch. Merge = user (minor release).
 
 
 - **Feature:** `tlc-330-harness-update` — port TLC 3.3.0's spec-driven harness (four

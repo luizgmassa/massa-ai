@@ -14,6 +14,7 @@ Phase 3: T16 ──→ T17 ──→ T18
 Phase 4: FT1 ──→ FT2
 Phase 5: T19 ──→ T20 ──→ T21 ──→ T22
 Phase 6: FT3 ──→ FT4 ──→ FT5
+Phase 7: FT6
 ```
 
 Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depends on Phase 2 (regeneration snapshots final prose).
@@ -268,4 +269,14 @@ Phase 2 depends on Phase 1 (prose wires scripts that must exist). Phase 3 depend
 **Depends on**: FT4
 **Tests**: suite green with rebuilt fixture; scratch mutation kills 2/2; sweep shows 0 LIVE status claims of the stale phrase (8 hits total, all quotations in fix-task/validation narrative + one unrelated sealed spec — a claim of absence can be the match)
 **Gate**: suite + validators + sweep all exit 0
+**Status**: [x]
+
+### Phase 7: Fix tasks — delivery-chain repair iteration 1 (PR #64 CI)
+
+### FT6: Un-stale three test:scripts suites after the ALLWF-03 tier sweep
+**Where**: `scripts/__tests__/skills-duplication-metric.test.ts`, `scripts/__tests__/generate-subagent-artifacts.test.ts`
+**What**: PR #64's CI `build` job failed in `bun run test:scripts` — 3 failures, all in suites outside the scoped verification set (validation.md's recorded scope limit: full `test:scripts` was not runnable in the unprovisioned worktree). All three were stale tests against ALLWF-03's mandated tier sweep, not regressions: (1) duplication-metric ceiling 313 < measured 331, diagnosed differentially (main 313 → branch 331; the +18 excess is charter frontmatter made identical by the `deep` pins — mandated uniformity, not prose drift), raised with reason via the test's own documented raise-with-reason path (same class as T16's parity-allowlist addition); (2) `loadCharter` test hardcoded investigator `light`; (3) the profile-selection test read investigator artifacts (`model: haiku`/`model: sonnet`) — moved to `documentation-agent`, the one remaining light charter. Worktree provisioned per the CLAUDE.md fresh-worktree rule (install + 4-dir addon copy + `bun run build` — node_modules was entirely absent).
+**Depends on**: FT5
+**Tests**: the three previously-failing suites green; full `bun run test:scripts` + `bun run lint` re-run locally with each command's own exit code (no pipes)
+**Gate**: full `test:scripts` exit 0 + `lint` exit 0 + `validate_tasks.py`/`check_specs_delivered.py` exit 0; PR #64 checks re-watched to green
 **Status**: [x]
