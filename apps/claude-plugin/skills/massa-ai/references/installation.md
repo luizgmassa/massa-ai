@@ -1,6 +1,6 @@
 # Massa-ai Installation And Diagnostics
 
-Load this only for installing, configuring, validating, or troubleshooting the
+Load only for installing, configuring, validating, or troubleshooting the
 massa-ai stack. Ordinary workflow routing should use MCP tools instead.
 
 ## Install And Upgrade

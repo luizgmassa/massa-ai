@@ -1,6 +1,6 @@
 # Synapse Policy
 
-Load this reference when a task is expected to issue more than one
+Load when a task is expected to issue more than one
 `search`, when parallel agents need isolated retrieval context, or when
 Synapse compatibility/fallback behavior matters.
 

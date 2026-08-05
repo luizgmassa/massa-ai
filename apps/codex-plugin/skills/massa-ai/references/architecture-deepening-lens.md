@@ -1,6 +1,6 @@
 # Architecture Deepening Lens
 
-Use this detail reference when an architecture audit or execution task needs module depth, seams, adapters, testability, locality, or AI-navigability analysis.
+Use when an architecture audit or execution task needs module depth, seams, adapters, testability, locality, or AI-navigability analysis.
 
 ## Contents
 

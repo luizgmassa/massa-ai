@@ -1,6 +1,6 @@
 # massa-ai Tool Contracts (52 Tools)
 
-Load this reference when exact MCP schemas, REST fallbacks, response modes, or
+Load when exact MCP schemas, REST fallbacks, response modes, or
 polling rules are needed. Prefer the active tool declaration over copied
 examples. The canonical tool list and order is defined in
 `apps/mcp-client/src/tool-definitions.ts` CANONICAL_ORDER.
@@ -278,7 +278,7 @@ required operation is absent or its adapter is proven broken.
 
 ## Polling Discipline
 
-Never call `index_status` in a tight turn-by-turn loop. Poll after a real
+Never call `index_status` in a tight turn-by-turn loop — poll after a real
 delay. Preferred shell pattern:
 
 ```bash

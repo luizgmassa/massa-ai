@@ -1,8 +1,8 @@
 # Graceful Degradation
 
-Load this reference when any massa-ai tool, index, or MCP capability named
-below is unavailable, empty, stale, or mismatched. Continue the workflow with
-the listed fallback instead of blocking.
+Load when any massa-ai tool, index, or MCP capability named below is
+unavailable, empty, stale, or mismatched. Continue the workflow with the
+listed fallback instead of blocking.
 
 | Failure | Behavior |
 |---|---|

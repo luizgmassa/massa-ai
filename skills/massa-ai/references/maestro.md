@@ -1,6 +1,6 @@
 # Maestro Reference Index
 
-Use this small index from `workflows/maestro/maestro.md`, `workflows/maestro/maestro-audit.md`, and `workflows/maestro/maestro-fix.md` to select the minimum focused Maestro reference for the current step. Do not treat this index as the full Maestro source of truth.
+Use this small index from `workflows/maestro/maestro.md`, `workflows/maestro/maestro-audit.md`, and `workflows/maestro/maestro-fix.md` to select the minimum focused Maestro reference for the current step. Not the full Maestro source of truth.
 
 ## Source Policy
 

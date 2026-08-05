@@ -1,6 +1,6 @@
 # Memory Policy
 
-Read this when writing, updating, pruning, promoting, or resolving conflicting massa-ai memories.
+Read when writing, updating, pruning, promoting, or resolving conflicting massa-ai memories.
 
 ## Tiers
 
@@ -15,7 +15,7 @@ Supported massa-ai types are only `critical`, `conversation`, `code`, `decision`
 
 ## Observational Memory
 
-Observational Memory is not a new storage layer. It is the discipline for deciding which execution observations become massa-ai memories.
+Observational Memory is not a new storage layer — it is the discipline for deciding which execution observations become massa-ai memories.
 
 - Observer mode: capture only high-signal events, decisions, failed attempts, ruled-out hypotheses, and verification recipes.
 - Reflector mode: when the same lesson appears in 3+ independent sessions, promote it to semantic or procedural memory.

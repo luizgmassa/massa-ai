@@ -1,6 +1,6 @@
 # Mobile Context
 
-Use this reference when a non-debug workflow touches KMP, iOS, Android, native bridges, mobile app lifecycle, offline sync, permissions, push/background work, local persistence, or backend-mobile contracts.
+Use when a non-debug workflow touches KMP, iOS, Android, native bridges, mobile app lifecycle, offline sync, permissions, push/background work, local persistence, or backend-mobile contracts.
 
 Mobile is a context modifier, not a primary workflow. Keep the selected workflow based on user intent:
 

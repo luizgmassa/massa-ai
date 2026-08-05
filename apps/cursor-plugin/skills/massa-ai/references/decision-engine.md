@@ -1,6 +1,6 @@
 # Decision Engine Reference
 
-Load this when scoring memories, making a trade-off decision, or debugging with
+Load when scoring memories, making a trade-off decision, or debugging with
 prior attempts. Do not load for simple edits where no memory write or design
 decision is needed.
 

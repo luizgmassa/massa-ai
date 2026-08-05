@@ -1,6 +1,6 @@
 # Debug Diagnosis Loop
 
-Use this reference when `workflows/debug.md` asks for an evidence-first diagnosis loop.
+Use when `workflows/debug.md` asks for an evidence-first diagnosis loop.
 
 ## Principle
 

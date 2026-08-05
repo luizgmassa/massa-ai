@@ -1,6 +1,6 @@
 # Architecture Domain Lens
 
-Use this detail reference when an architecture audit or execution task needs domain boundaries, bounded contexts, subdomain classification, ubiquitous language, or cohesion analysis.
+Use when an architecture audit or execution task needs domain boundaries, bounded contexts, subdomain classification, ubiquitous language, or cohesion analysis.
 
 ## Contents
 

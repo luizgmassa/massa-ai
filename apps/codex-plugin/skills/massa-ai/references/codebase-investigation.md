@@ -1,6 +1,6 @@
 # Codebase Investigation
 
-Use this reference when understanding unfamiliar code before planning, fixing, reviewing, or refactoring.
+Use when understanding unfamiliar code before planning, fixing, reviewing, or refactoring.
 
 ## Golden Rules
 

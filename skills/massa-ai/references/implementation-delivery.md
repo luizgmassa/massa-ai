@@ -1,7 +1,7 @@
 # Implementation Delivery Protocol
 
-Use this reference in every implementation workflow, before the first repository
-mutation. It defines how verified work leaves the agent's hands: isolated in a
+Use in every implementation workflow, before the first repository
+mutation. Defines how verified work leaves the agent's hands: isolated in a
 worktree, committed atomically, pushed, proposed as a pull request, watched
 through CI, repaired if red — and merged only after the user says so.
 
@@ -10,8 +10,8 @@ They do not mutate, so they have nothing to deliver.
 
 ## Principle
 
-Work that is not isolated, not pushed, and not tested by CI is not delivered —
-it is a local opinion. The protocol turns "I finished" into "CI agrees, and a
+Work that is not isolated, not pushed, and not tested by CI is not delivered — it
+is a local opinion. The protocol turns "I finished" into "CI agrees, and a
 human chose to merge it".
 
 ## The Chain

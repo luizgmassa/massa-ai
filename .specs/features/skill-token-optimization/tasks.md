@@ -180,8 +180,8 @@ Gate: tests + resolver green; regen + `--check` 0 in-commit.
 
 ### T9: Compress references — top level (~40 files)
 
-- [ ] Requirement: STO-4
-- [ ] Same discipline over `skills/massa-ai/references/*.md`.
+- [x] Requirement: STO-4
+- [x] Same discipline over `skills/massa-ai/references/*.md`.
 Tests: same as T8
 Gate: same as T8.
 

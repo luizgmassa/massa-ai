@@ -1,6 +1,6 @@
 # Audit Scope
 
-Use this reference from audit workflows, implementation audit, bug finder, mobile Figma, and execution workflows before inspecting changed code or selecting an audit report.
+Use from audit workflows, implementation audit, bug finder, mobile Figma, and execution workflows before inspecting changed code or selecting an audit report.
 
 ## Scope Packets
 

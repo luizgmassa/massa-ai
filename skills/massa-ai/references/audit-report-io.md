@@ -1,6 +1,6 @@
 # Audit Report I/O
 
-Use this reference from audit workflows before writing reports and from execution workflows before report-driven changes.
+Use from audit workflows before writing reports and from execution workflows before report-driven changes.
 
 ## Report Paths
 

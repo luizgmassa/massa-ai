@@ -1,12 +1,12 @@
 # PR Task Fix
 
-Load this reference from `workflows/feature.md` and `workflows/refactor.md` before non-trivial implementation or refactor execution that can be decomposed into reviewable task groups.
+Load from `workflows/feature.md` and `workflows/refactor.md` before non-trivial implementation or refactor execution that can be decomposed into reviewable task groups.
 
 ## ADR/TDD Input Gate
 
 Before decomposition, inspect the first user prompt, current prompt context, explicitly attached or readable local files, and any already supplied Atlassian MCP source pointers.
 
-If there is no ADR or TDD plain text, no attached/readable ADR or TDD file, and no already supplied Atlassian ADR/TDD source, ask whether the user wants to provide an ADR or TDD through Atlassian MCP. Do not ask again when the user has already supplied, declined, or made Atlassian unavailable for this run.
+If there is no ADR or TDD plain text, no attached/readable ADR or TDD file, and no already-supplied Atlassian ADR/TDD source, ask whether the user wants to provide an ADR or TDD through Atlassian MCP. Do not ask again once the user has already supplied, declined, or made Atlassian unavailable for this run.
 
 Use ADR/TDD input as implementation context, not as permission to bypass the active workflow's scope, source verification, or verification recipe. If the ADR/TDD conflicts with current source or project instructions, surface the conflict and resolve it before implementation.
 

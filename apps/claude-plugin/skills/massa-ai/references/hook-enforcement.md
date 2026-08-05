@@ -2,7 +2,7 @@
 
 Maps the runtime hook layer (`apps/claude-plugin/hooks/`, its `hooks.json`) to massa-ai
 workflows and references, and documents the massa-ai dual-write/tag contract.
-Hooks **enforce** existing references and the gate the router already selected;
+Hooks **enforce** existing references and the gate the router already selected —
 they never re-author policy and never re-route. One canonical location per rule.
 
 ## Platform Scoping

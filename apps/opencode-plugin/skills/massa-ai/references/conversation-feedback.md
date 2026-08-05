@@ -1,6 +1,6 @@
 # Conversation Feedback
 
-Use this reference when a massa-ai workflow needs chat-visible status updates for routing, loading, memory, NotebookLM, subagents, divergences, errors, verification, or completion.
+Use when a massa-ai workflow needs chat-visible status updates for routing, loading, memory, NotebookLM, subagents, divergences, errors, verification, or completion.
 
 ## Principle
 

@@ -1,6 +1,6 @@
 # Root-Cause Proof Scripts
 
-Use this reference the moment an implementation or fix stops converging. It is a
+Use the moment an implementation or fix stops converging. It is a
 circuit breaker, not a diagnosis method: it fires mid-implementation in any
 workflow — `feature`, `debug`, `refactor`, `spec-driven`, any `*-fix` — including
 the ones that never opened a reproduction loop.
@@ -11,7 +11,7 @@ This file is where any implementation *stops guessing*.
 ## Principle
 
 An agent that has failed twice on the same symptom does not have a code-reading
-problem. It has a data problem. Reading the same source a third time produces a
+problem — it has a data problem. Reading the same source a third time produces a
 third theory with the same evidence base as the first two. The only way out is
 to make the program tell you what it is actually doing.
 

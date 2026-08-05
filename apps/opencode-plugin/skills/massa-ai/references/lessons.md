@@ -1,6 +1,6 @@
 # Lessons
 
-Use this reference when loading confirmed project lessons during startup, or recording grounded reusable failures after verification, across any workflow that produces verifiable outcomes.
+Use when loading confirmed project lessons during startup, or recording grounded reusable failures after verification, across any workflow that produces verifiable outcomes.
 
 ## Artifacts
 
