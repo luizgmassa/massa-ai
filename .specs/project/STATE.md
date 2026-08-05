@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Persona Router Token Optimization (Execute in progress — T0–T5 done, resume at T6; see .specs/HANDOFF.md)
+## Current — Persona Router Token Optimization (Execute in progress — T0–T6 done; T7 machine dedupe partially blocked on user permission; T8 PR delivery in progress; see .specs/HANDOFF.md)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-persona-router-token-optimization` ·
   workflow: spec-driven (Large) · branch `spec/persona-router-token-optimization`,
@@ -27,6 +27,15 @@
   settings.json evidence redacted to enabledPlugins/hooks (live OAuth token). F6 —
   PRT-02 walkthrough restart-gated.
 - massa-ai MCP server unreachable this session; `.specs/` files canonical.
+- T6 landed @ `ef29a3cc` (double-surface probe + shell suite red-then-green 14/0 +
+  CHANGELOG). `origin/main` (v1.24.0, PR #67) merged in @ `ad04e953` — conflicts only in
+  `.specs/` state files + CHANGELOG, resolved keeping both histories; post-merge gates
+  223/0 (integrity, capability-packet parity, size budgets, validate-repository),
+  bundles no-drift. T7: step 1a (skills refresh, registry suppressed) done; steps 1b–4
+  (agents/commands refresh, symlink rm, plugin disable) denied by the host permission
+  classifier — awaiting the user's explicit go-ahead or manual run. Both `~/.claude.json`
+  MCP entries observed during T7 prep: dead `th0th` (old checkout path) + owned
+  `massa-ai` (main checkout) — the dead entry is outside PRT-01 scope, flagged to user.
 
 ## Previous — Sub-Agent Orchestration I/O (**VALIDATED PASS 2026-08-04** — 9/9 ORC ACs, 3/3 mutations killed; merged as PR #67 @ `5b338af4`, released v1.24.0)
 

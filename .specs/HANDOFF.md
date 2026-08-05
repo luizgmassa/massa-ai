@@ -1,4 +1,4 @@
-# Handoff — persona-router-token-optimization (mid-Execute, resume at T6)
+# Handoff — persona-router-token-optimization (mid-Execute: T0–T6 done, T7 partially blocked, T8 delivering, T9 pending)
 
 Previous handoffs closed: workflow-policy-updates merged as PR #66, released
 v1.23.0 @ `d18e7764`; subagent-orchestration-io merged as PR #67 @ `5b338af4`,
@@ -35,8 +35,10 @@ Assumptions). Do not re-run it for the existing plan.
 | `e267829` | T3 | SKILL.md slim 13,316→5,484 B + `references/routing-details.md` + authority-scan widening (seeded red observed) + reference-integrity resolver own-skill-first repoint |
 | `901c42a` | T4 | five prompts ≤4,500 B (4,485–4,498) |
 | `cc8377c` | T5 | `persona_pin` policy in `skills/AGENTS.md` bootstrap + repo `AGENTS.md` pin line |
+| `ef29a3cc` | T6 | double-surface probe in `check_platform()` + `test-skills-check-double-surface.sh` (red observed first: 5/5 scenario-1 assertions failed probe-less, then 14/0) + CHANGELOG entries |
+| `ad04e953` | — | merge `origin/main` @ `5b338af4` (v1.24.0, PR #67); conflicts only `.specs/` state + CHANGELOG; post-merge gates 223/0, bundles no-drift |
 
-Tasks T0–T5 complete; T6 in progress; T7–T9 not started. Every commit
+Tasks T0–T6 complete; T7 partially done (see below); T8 in progress; T9 not started. Every task commit
 regenerated the 4-host bundles; `generate-skill-artifacts.ts --check`,
 integrity (32/0), validate-repository (183/0), parity — all green at HEAD.
 `skill-size-budgets.test.ts` green 6/0 at HEAD.
@@ -67,38 +69,63 @@ integrity (32/0), validate-repository (183/0), parity — all green at HEAD.
    own-skill-first with massa-ai fallback (`skills-harness-integrity.test.ts`
    § reference integrity) — a gate repoint, T3 commit body has the rationale.
 
-## T6 remaining (in progress)
+## T6 — DONE @ `ef29a3cc`
 
-Per design.md C9 + tasks.md T6, minus the already-landed gate commit:
+Probe in `check_platform()` (claude-only, `owner = "repo"` guard, runner-heredoc
+settings read, drift row names both surfaces); shell suite 5 scenarios, red
+observed first (scenario 1 failed 5/5 probe-less), then 14/0; CHANGELOG entries
+under `[Unreleased]`. Gates at commit: install-skills suites 130/0 total,
+integrity 32/0, size budgets 6/0, `--check` no-drift, oxlint 0.
 
-- Add the double-surface probe to `scripts/install-skills.sh` inside
-  `check_platform()` (≈ line 698): claude platform only, after the
-  `owner != "plugin"` block. Read `STATE_PATH` (`install-state.json`, v2) and
-  `$TARGET_HOME/.claude/settings.json`; when `skillsOwner == "repo"` AND
-  `enabledPlugins["massa-ai@massa-ai"] === true`, `record "drift" ...` naming
-  both surfaces — the existing drift aggregation (≈ line 862) already exits 1.
-  Missing `enabledPlugins` key or missing state file → no drift (spec edge
-  cases). Use the inline `"$RUNNER"` heredoc house pattern (no jq);
-  `--apply`/`--dry-run` untouched (CONTRIBUTING 7-step protocol applies).
-- New `scripts/tests/test-skills-check-double-surface.sh` driving fixture
-  `TARGET_HOME`s: both-surfaces → exit 1 + both surfaces named;
-  single-surface and missing-key fixtures → exit 0. Observe the red polarity
-  before trusting the green (a-new-sensor-needs-an-observed-red).
-- CHANGELOG `[Unreleased]`: `### Changed` (catalog v2, slim router + fast
-  paths, prompt compression) + `### Added` (size-budget gate, double-surface
-  probe). CHANGELOG merge gate needs this before the PR.
-- Commit (one or two atomic; per-task gates: the new shell suite,
-  `bun run lint`, integrity, `generate-skill-artifacts.ts --check`).
+## T7 — partially done; steps 1b–4 BLOCKED on user permission
 
-## T7–T9
+Provenance verified per design risk row: `apps/claude-plugin/install.sh --user`
+(file route when `MASSA_AI_SKIP_PLUGIN_REGISTRY=1`) is what writes
+`~/.claude/{commands,agents}/massa-ai-*.md`; its hooks merge self-skips while
+the plugin is still registered (`pluginAlreadyInstalled()` reads
+`installed_plugins.json`) — which is exactly why C11's install-first order keeps
+hooks unchanged. Bundle agents/commands/installer byte-identical between main
+checkout @ `5b338af4` and this worktree, so the plugin installer should run from
+the MAIN checkout (keeps the owned `massa-ai` MCP entry pointed at the main
+checkout; run from the worktree it would repoint MCP at a path that dies after
+merge).
 
-Follow tasks.md T7 (order is load-bearing — design.md C11 / Plan Challenge F1;
-`MASSA_AI_SKIP_PLUGIN_REGISTRY=1` on every installer invocation, plugin
-disable LAST, falsifying 3-file re-check; evidence redacted to
-`enabledPlugins`/`hooks` keys only per PRT-01 AC5 — `~/.claude/settings.json`
-carries a live OAuth token). T8 full sweep + push + PR (PR description per
-`references/implementation-delivery.md`; merge stays the user's). T9
-independent verification-agent (author ≠ verifier) writes `validation.md`;
+- Step 1a DONE: `MASSA_AI_SKIP_PLUGIN_REGISTRY=1 bash scripts/install-skills.sh
+  --apply --platform claude --yes` from the worktree → "2 skills copied,
+  AGENTS.md bootstrap written".
+- Steps 1b–4 DENIED by the host permission classifier (self-modification of
+  live `~/.claude`): plugin install.sh run, symlink rm, settings.json plugin
+  disable. Awaiting user go-ahead or manual execution.
+- BEFORE evidence captured (redacted per AC5) at `/tmp/prt01-evidence.md` via
+  `/tmp/prt01-capture.sh` (re-run with args `<out> AFTER` for the after shot):
+  16 agents (handoff-writer present, judge/meta-judge absent), 6 commands,
+  2 BROKEN symlinks (`massa-ai-memory`, `synapse-usage`), enabledPlugins
+  `massa-ai@massa-ai: true`, plugin cache 1.2.1, skillsOwner repo.
+- Side observation, outside PRT-01 scope: `~/.claude.json` `mcpServers` carries
+  a dead `th0th` entry (`/Users/luizmassa/Personal Projects/th0th/...`) beside
+  the owned `massa-ai` entry — likely why massa-ai MCP kept failing; flagged to
+  the user, do not touch without direction.
+
+Remaining T7 commands (order load-bearing, run after go-ahead):
+1b. From MAIN checkout: `MASSA_AI_SKIP_PLUGIN_REGISTRY=1 bash
+    apps/claude-plugin/install.sh --user` → 17-agent roster + 6 commands.
+2.  `rm ~/.claude/skills/massa-ai-memory ~/.claude/skills/synapse-usage`.
+3.  LAST: settings.json `enabledPlugins["massa-ai@massa-ai"] = false`
+    (read-before-write, quote only enabledPlugins/hooks);
+    `installed_plugins.json` has no enablement field (verified) — record
+    alignment as no-op, record stays (F5: cache inert once disabled).
+4.  Falsifying 3-file re-check + AFTER capture; evidence → validation.md.
+
+## T8 — in progress this session
+
+Merge of main done pre-push (`ad04e953`). Sweep: test:plugins 96/0, lint 0,
+`--check` no-drift, contract gates 223/0; `test:scripts` full run + push + PR
+next. PR description per `references/implementation-delivery.md`; user's resume
+instructions carry the Stage-3 delivery authorization; merge stays the user's.
+
+## T9
+
+Independent verification-agent (author ≠ verifier) writes `validation.md`;
 PRT-02 walkthrough is restart-gated (F6) — record pending-restart if
 same-session. Machine dedupe evidence from T7 goes into validation.md, not a
-repo commit.
+repo commit. T1 red-run figures for validation.md are in "Deviations" above.
