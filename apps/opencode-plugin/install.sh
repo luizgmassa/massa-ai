@@ -57,6 +57,47 @@ done
 source "$SCRIPT_DIR/../../scripts/banner.sh"
 massa_ai_banner
 
+# ── Generated-bundle contract (T8, design Component 4 / UGB-05..07) ─────────
+# Why: apps/*-plugin generated subtrees (skills/, agents/, agent-profiles/,
+#      lib/opencode-config.cjs) are gitignored build output (UGB-01) — a repo
+#      checkout must regenerate them before this installer copies, symlinks,
+#      or REQUIRES any of them; a published tarball ships them pre-generated
+#      and has no generator sources to run at all. Runs before any
+#      host-config mutation and, critically, before the CONFIG_LIB
+#      require() a few lines below — an absent lib/opencode-config.cjs would
+#      otherwise surface as a bare Node/Bun MODULE_NOT_FOUND rather than this
+#      actionable message.
+# Impacts: UGB-05 checkout generates, UGB-06 tarball skips, UGB-07 loud
+#          failure before mutation, UGB-08 (skip-env honored for harness runs).
+# Test: apps/opencode-plugin/__tests__/install.test.ts (skip-branch + loud-failure cases)
+if [[ -f "$REPO_ROOT/scripts/generate-skill-artifacts.ts" ]]; then
+  if [[ "${MASSA_AI_SKIP_ARTIFACT_GENERATION:-0}" != "1" ]]; then
+    if ! command -v bun &>/dev/null; then
+      echo "Error: bun required to generate plugin bundles in a repo checkout (scripts/generate-*.ts)" >&2
+      exit 3
+    fi
+    bun "$REPO_ROOT/scripts/generate-skill-artifacts.ts"
+    bun "$REPO_ROOT/scripts/generate-subagent-artifacts.ts"
+  fi
+fi
+# Tarball installs (generator sources absent) skip the block above entirely
+# and fall straight through to this sentinel, which every context must pass:
+# the bundle this installer is about to copy/register/require has to
+# actually exist. opencode additionally ships a generated lib mirror
+# (scripts/lib/opencode-config.cjs, D1) that no other host needs.
+if [[ ! -f "$SCRIPT_DIR/skills/massa-ai/SKILL.md" ]]; then
+  echo "Error: missing $SCRIPT_DIR/skills/massa-ai/SKILL.md — run 'bun run generate:artifacts' first" >&2
+  exit 1
+fi
+if [[ ! -d "$SCRIPT_DIR/agents" ]] || [[ -z "$(ls -A "$SCRIPT_DIR/agents" 2>/dev/null)" ]]; then
+  echo "Error: missing or empty $SCRIPT_DIR/agents — run 'bun run generate:artifacts' first" >&2
+  exit 1
+fi
+if [[ ! -f "$SCRIPT_DIR/lib/opencode-config.cjs" ]]; then
+  echo "Error: missing $SCRIPT_DIR/lib/opencode-config.cjs — run 'bun run generate:artifacts' first" >&2
+  exit 1
+fi
+
 # Resolve target base dir
 if [[ "$SCOPE" == "project" ]]; then
   TARGET="$(pwd)/.opencode"

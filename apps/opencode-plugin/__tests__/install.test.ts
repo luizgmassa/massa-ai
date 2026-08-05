@@ -599,3 +599,72 @@ describe("opencode-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
     ).toBe(false);
   });
 });
+
+// ── T8: generated-bundle contract (design Component 4 / UGB-05..08) ─────────
+describe("opencode-plugin generated-bundle contract (T8, UGB-05..08)", () => {
+  function isNoise(p: string): boolean {
+    return /[\\/](node_modules|\.turbo|coverage)($|[\\/])/.test(p);
+  }
+
+  async function pathWithoutBun(): Promise<string> {
+    const which = spawnSync("which", ["bun"], { encoding: "utf8" });
+    const bunPath = (which.stdout || "").trim();
+    const bunDir = bunPath ? path.dirname(bunPath) : "";
+    const dirs = (process.env.PATH || "").split(path.delimiter);
+    return dirs.filter((d) => d !== bunDir).join(path.delimiter);
+  }
+
+  test("UGB-06: tarball-shaped install (no repo generator sources) skips generation and installs the shipped bundle", async () => {
+    // Mirrors the repo's relative layout (apps/opencode-plugin sibling of
+    // scripts/) so install.sh's pre-existing, unconditional
+    // `source .../scripts/banner.sh` still resolves, and so PLUGIN_JS /
+    // PLUGIN_SOURCE_ROOT (both REPO_ROOT-relative) still find the copied
+    // dist/index.js — that dependency predates this feature and is out of
+    // scope. The ONE thing a real npm tarball lacks, and the ONE thing this
+    // test omits, is scripts/generate-*.ts (UGB-06's actual subject).
+    const pkgRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "mt-opencode-tarball-"),
+    );
+    const pkgDir = path.join(pkgRoot, "apps", "opencode-plugin");
+    try {
+      await fs.cp(path.join(REPO_ROOT, "apps/opencode-plugin"), pkgDir, {
+        recursive: true,
+        filter: (src) => !isNoise(src),
+      });
+      await fs.mkdir(path.join(pkgRoot, "scripts"), { recursive: true });
+      await fs.copyFile(
+        path.join(REPO_ROOT, "scripts/banner.sh"),
+        path.join(pkgRoot, "scripts/banner.sh"),
+      );
+
+      const res = spawnSync("bash", [path.join(pkgDir, "install.sh"), "--user"], {
+        encoding: "utf8",
+        env: { ...process.env, HOME: tmp },
+        cwd: pkgDir,
+        timeout: 30000,
+      });
+      expect(res.status).toBe(0);
+      expect(
+        await pathExists(
+          path.join(tmp, ".config/opencode/agents/massa-ai-navigator.md"),
+        ),
+      ).toBe(true);
+    } finally {
+      await fs.rm(pkgRoot, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  test("UGB-07: missing bun in a repo-checkout context exits non-zero before any host-config mutation", async () => {
+    const pathNoBun = await pathWithoutBun();
+    const res = spawnSync("bash", [INSTALL_SH, "--user"], {
+      encoding: "utf8",
+      env: { ...process.env, HOME: tmp, PATH: pathNoBun },
+      cwd: REPO_ROOT,
+      timeout: 30000,
+    });
+    expect(res.status).not.toBe(0);
+    expect(res.status).toBe(3);
+    expect(res.stderr).toContain("bun required");
+    expect(await pathExists(path.join(tmp, ".config/opencode"))).toBe(false);
+  });
+});
