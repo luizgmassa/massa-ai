@@ -32,33 +32,8 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - If the target focus is missing, vague, or too broad, ask for a concrete target from the supported scope types in `references/audit-scope.md`.
    - If requirements source is missing after checking the prompt, PR description, task file, spec, issue text, and repo docs, ask for the requirements source before proceeding.
    - Build the shared scope packet from `references/audit-scope.md` and carry it into the report.
-5. For modified files scope:
-   - Include staged and unstaged tracked files from the working tree.
-   - Include untracked non-generated source, test, fixture, schema, config, and docs files only when they can affect required behavior.
-   - Exclude deleted files unless their deletion can break required behavior, imports, exports, routing, migrations, config, tests, packaging, or documentation contracts.
-   - Exclude generated, dependency, build, log, cache, temporary, and secret paths per repo rules.
-   - Inspect diffs first, then only the surrounding code needed to compare implementation against requirements.
-6. For commit range scope:
-   - If the user supplied explicit commits or a revision range, use that exact range.
-   - If the user asked for commits made by me, resolve author identity from `git config user.email`; if empty, use `git config user.name`.
-   - For branch-relative commit scopes, resolve the branch base from the upstream merge-base first, then fall back in order to `origin/main`, `origin/master`, `main`, and `master`.
-   - If the user asked for commits made by me, review branch-unique commits authored by the resolved identity.
-   - If no explicit range, required author identity, or branch base can be resolved, ask the user for the missing value before proceeding.
-   - Inspect changed files and diffs from those commits, then requirements sources, callers, tests, config, schemas, and docs only as needed.
-7. For codebase area scope:
-   - Require a concrete path, module, package, feature area, or glob.
-   - If the target area is missing, ask for it before proceeding.
-   - Follow the shared retrieval order from `references/codebase-investigation.md` to find entry points, public API, tests, config, docs, and acceptance criteria.
-8. For explicit files/globs, branch comparison, symbol/class/function, feature/flow, or explicitly requested whole-repo scope:
-   - Resolve the target with `references/audit-scope.md` and record the resolution method, base/head when relevant, resolved files, exclusions, requirements source, and freshness timestamp.
-   - For symbol/class/function targets, inspect definitions, call paths, public contracts, tests, config, docs, and requirement links only as needed.
-   - For feature/flow targets, map expected behavior from the requirements source to implementation, tests, docs, and public contracts.
-   - If whole-repo scope is requested, map top-level requirement areas first and report skipped depth checks rather than implying exhaustive coverage.
-9. For implementation parent scope:
-   - Accept the exact scope packet and requirement source from `implementation-audit`.
-   - Do not broaden beyond resolved files, surrounding code, public contracts, tests, config, docs, and requirements needed to verify a claim.
-   - Return compact findings to the parent implementation audit; do not write broad project memories unless explicitly assigned.
-10. Investigation pass. Dispatch `audit-specialist` per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
+5. Resolve the selected branch's mechanics (modified files, commit range, codebase area, explicit-files/branch/symbol/feature/whole-repo, or implementation parent scope) per `references/audit-scope.md` (Lens Audit Scope Resolution Procedure, Requirements row of Per-Lens Scope Deltas). Implementation parent scope additionally carries the requirement source from `implementation-audit`.
+6. Investigation pass. Dispatch `audit-specialist` per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
 
 > **Dispatch: `massa-ai-audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
 > - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, or independent verification of high-impact finding
@@ -75,16 +50,16 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - Compare implementation and tests against each checklist item.
    - Prioritize missing requirements, contradicted requirements, out-of-scope behavior, changed public contracts, compatibility breaks, incomplete edge cases, and docs or tests that misrepresent delivered behavior.
    - For each candidate finding, record the concrete claim, source evidence, affected requirement, impacted flow, provisional severity, and what would disprove it.
-11. False-positive pass:
+7. False-positive pass:
    - Try to disprove every candidate before reporting it.
    - Check requirement wording, accepted scope changes, ADRs, feature flags, compatibility notes, tests, docs, call paths, and user-provided constraints.
    - Drop candidates disproven by evidence, downgrade candidates with partial mitigation, and mark low-confidence findings explicitly.
-12. Severity rules (apply the countable threshold first, then the qualitative clause):
+8. Severity rules (apply the countable threshold first, then the qualitative clause):
    - `critical`: implementation violates a mandatory requirement in a way that blocks release, causes data loss, breaks auth/privacy, OR affects >10 files; otherwise use the qualitative clause below.
    - `high`: missing or contradictory core requirement, significant out-of-scope behavior, public contract break, or major compatibility regression.
    - `medium`: incomplete edge-case requirement, unclear acceptance gap, recoverable behavior mismatch (<=10 affected files), missing required docs/test coverage around a requirement, or scoped regression.
    - `low`: minor requirement ambiguity, wording mismatch, low-impact out-of-scope behavior, incomplete evidence, or weakly supported concern.
-13. Final report:
+9. Final report:
    - Findings first, ordered by severity: `critical`, `high`, `medium`, `low`.
    - Each finding must use `REQ-<N>` and include the canonical fields from `references/audit-report-io.md`: severity, confidence, requirement source, requirement ID or quote, requirement gap type, file/line, evidence, impact, simplest fix direction, and verification suggestion.
    - If no requirements findings are found, say that clearly and list scope checked, requirement source used, and skipped checks.
@@ -93,11 +68,11 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - Include the Verification/Test Fidelity Checklist from `references/audit-report-io.md`; tie every `REQ-*` finding or no-finding claim to deterministic sensors, commands/artifacts, results, validation assets, or skipped-check reasons. Model judgment alone cannot satisfy verification/testing all-clear.
    - For direct top-level invocation, use the Plan Mode save rule and canonical report contract from `references/audit-report-io.md` for `audits/requirements/<YYYY-MM-DD requirements-audit>.md`.
    - For implementation audit child invocation, return compact findings to the parent unless the parent explicitly requests saved audit artifacts.
-14. Persist only durable knowledge:
+10. Persist only durable knowledge:
    - Do not persist one-off findings.
    - Persist durable requirements decisions, accepted scope constraints, repeated requirement-drift patterns, or reusable verification recipes after scoring with the Importance Calibration System.
    - Use required tags: `project:<projectId>`, `session:<workflowSessionId>`, `workflow:requirements-audit`, `entity:<entity>`, and one `memory:<tier>` tag.
-15. Complete the Evidence Gate from `references/evidence-gate.md`.
+11. Complete the Evidence Gate from `references/evidence-gate.md`.
 
 ## Examples
 

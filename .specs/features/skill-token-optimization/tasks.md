@@ -103,13 +103,13 @@ Gate: sensors green; regen + `--check` 0 in-commit.
 
 ### T4: Audit-scope branch dedupe (6 audit workflows)
 
-- [ ] Requirement: STO-8
-- [ ] Reconcile the 5 mutually-exclusive scope-resolution branches
+- [x] Requirement: STO-8
+- [x] Reconcile the 5 mutually-exclusive scope-resolution branches
       (modified-files, commit-range, explicit-files/glob/branch/symbol/repo,
       codebase-area, implementation-parent) into `references/audit-scope.md`
       as the single home; resolve conflicts in favor of the richer text.
-- [ ] The 6 `*-audit.md` files keep branch names + one pointer line each.
-- [ ] Scripted branch-term check (Plan Challenge F2): extract per-branch
+- [x] The 6 `*-audit.md` files keep branch names + one pointer line each.
+- [x] Scripted branch-term check (Plan Challenge F2): extract per-branch
       distinctive terms from the 6 pre-move blocks (T1 machinery); every term
       present pre-move must be present post-move in `audit-scope.md` or the
       pointer line; misses listed, each resolved or explicitly accepted.

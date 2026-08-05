@@ -34,33 +34,8 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - Implementation parent scope: use only when `workflows/implementation/implementation-audit.md` invokes this workflow with a concrete implementation scope packet.
    - If the target focus is missing, vague, or too broad, ask for a concrete target from the supported scope types in `references/audit-scope.md`.
    - Build the shared scope packet from `references/audit-scope.md` and carry it into the report.
-5. For modified files scope:
-   - Include staged and unstaged tracked files from the working tree.
-   - Include untracked non-generated source, test, fixture, schema, config, and docs files only when they can affect architecture contracts or module boundaries.
-   - Exclude deleted files unless their deletion can break imports, exports, routing, migrations, config, tests, packaging, or architecture contracts.
-   - Exclude generated, dependency, build, log, cache, temporary, and secret paths per repo rules.
-   - Inspect diffs first, then only the surrounding code needed to understand architecture behavior.
-6. For commit range scope:
-   - If the user supplied explicit commits or a revision range, use that exact range.
-   - If the user asked for commits made by me, resolve author identity from `git config user.email`; if empty, use `git config user.name`.
-   - For branch-relative commit scopes, resolve the branch base from the upstream merge-base first, then fall back in order to `origin/main`, `origin/master`, `main`, and `master`.
-   - If the user asked for commits made by me, review branch-unique commits authored by the resolved identity.
-   - If no explicit range, required author identity, or branch base can be resolved, ask the user for the missing value before proceeding.
-   - Inspect changed files and diffs from those commits, then exported surfaces, references, dependency direction, tests, config, and ADRs only as needed.
-7. For codebase area scope:
-   - Require a concrete path, module, package, feature area, architecture question, or glob.
-   - If the target area is missing, ask for it before proceeding.
-   - Follow the shared retrieval order from `references/codebase-investigation.md` to find target modules, entry points, exported surfaces, references, semantic hotspots, tests, and adjacent config.
-   - If scope is broad, map only top-level modules first and ask or recommend a narrower second pass.
-8. For explicit files/globs, branch comparison, symbol/class/function, feature/flow, or explicitly requested whole-repo scope:
-   - Resolve the target with `references/audit-scope.md` and record the resolution method, base/head when relevant, resolved files, exclusions, and freshness timestamp.
-   - For symbol/class/function targets, verify definitions, references, dependency direction, exported surfaces, callers, tests, and ADRs only as needed for architecture claims.
-   - For feature/flow targets, map entry points through main transformations, contracts, and side effects before applying architecture lenses.
-   - If whole-repo scope is requested, map top-level modules first and report skipped depth checks rather than pretending exhaustive coverage.
-9. For implementation parent scope:
-   - Accept the exact scope packet from `implementation-audit`; do not broaden beyond resolved files, surrounding code, exported surfaces, references, config, tests, and ADRs needed to verify an architecture claim.
-   - Return compact findings to the parent implementation audit; do not write broad project memories unless explicitly assigned.
-10. Investigation pass:
+5. Resolve the selected branch's mechanics (modified files, commit range, codebase area, explicit-files/branch/symbol/feature/whole-repo, or implementation parent scope) per `references/audit-scope.md` (Lens Audit Scope Resolution Procedure, Architecture row of Per-Lens Scope Deltas).
+6. Investigation pass:
    - Call `get_architecture` with `id` (projectId) for the architecture-specific deep map: packages, entry points, routes, hotspots, communities, layers, and opt-in cycles (pass `aspects:["cycles"]` for Tarjan SCC over CALL edges). `get_architecture` is distinct from `project_map` (general overview: PageRank backbone + symbol counts) — use `get_architecture` for architecture-specific structure and `project_map` for the general overview. Both only count as evidence when the index is fresh for the current repository path and commit/worktree state; fall back to `search`/`get_references` and record reduced retrieval confidence when the index is stale or unavailable.
    - Call `impact_analysis` with `project`, `projectPath`, and `scope` (unstaged/staged/committed/all) to assess the centrality-ranked blast radius of a change set. An empty diff returns an empty impact set (not an error).
    - Apply the smallest relevant lens set from `references/architecture-lenses.md` and load detail references only when their evidence is needed:
@@ -70,7 +45,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - Use `search_definitions` and `get_references` to verify exported surfaces and dependency direction where needed.
    - Capture positive architecture patterns when they materially disprove a concern, such as versioned contracts, anti-corruption layers, cohesive local coupling, or a deep interface that concentrates tests.
    - For each candidate finding, record the concrete claim, source evidence, lens-specific evidence, impacted boundary or module, provisional severity, tradeoff, simplest sufficient direction, and what would disprove it.
-11. False-positive pass:
+7. False-positive pass:
    - Try to disprove every candidate before reporting it.
    - Check ADRs, accepted exceptions, current domain docs, dependency direction, call paths, tests, package boundaries, framework constraints, git history when cheap, and prior rejected refactors.
    - Treat recalled memories and standalone skill heuristics as leads, not proof.
@@ -79,7 +54,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - Do not recommend ports/adapters, service extraction, VSA migration, or new seams unless evidence shows real variation, volatility, external dependency pressure, or boundary friction.
    - Drop candidates disproven by evidence, downgrade candidates with partial mitigation, and mark judgment-heavy conclusions as `suspect`.
    - When you reject a refactor candidate, record its load-bearing reason in ruled-out candidates; if it is likely to be re-proposed, offer an ADR via `workflows/adr.md` so the rejection is not re-litigated next audit.
-12. Use agent orchestration only when it improves signal. Dispatch per `references/agent-orchestration.md`:
+8. Use agent orchestration only when it improves signal. Dispatch per `references/agent-orchestration.md`:
 
 > **Dispatch: `massa-ai-architecture-specialist`** (role: `architecture-specialist`) — charter `skills/agents/architecture-specialist/SKILL.md`
 > - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, isolated audit slice, or independent verification of high-impact finding
@@ -102,12 +77,12 @@ This workflow is findings-only. Do not edit code unless the user separately asks
 > - firewall: raw logs/snapshots summarized
 > - memory: suggest-only; main agent persists reusable verification recipes
 > - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
-13. Severity rules (apply the countable threshold first, then the qualitative clause):
+9. Severity rules (apply the countable threshold first, then the qualitative clause):
    - `critical`: architecture issue likely causes data loss, auth/privacy break, production outage, irreversible corruption, OR affects >10 files; otherwise use the qualitative clause below.
    - `high`: strong coupling with high volatility, boundary violation, dependency inversion break, or shallow module design likely to cause major change friction or regression.
    - `medium`: meaningful but recoverable coupling, unclear boundary, missing seam, duplicated architecture rule, or module-depth issue with localized impact (<=10 affected files, recoverable).
    - `low`: architecture hardening opportunity, low-impact naming/layering issue, incomplete evidence, or weakly supported concern.
-14. Final report:
+10. Final report:
    - Findings first, ordered by severity.
    - Each finding must use `ARCH-<N>` and include the canonical fields from `references/audit-report-io.md`: lens, boundary/module, tradeoff, dependency direction when relevant, severity, confidence, file/module, concrete evidence, impact, simplest sufficient fix, and verification suggestion.
    - Mark uncertain or judgment-heavy conclusions as `suspect`.
@@ -120,8 +95,8 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - Include the Verification/Test Fidelity Checklist from `references/audit-report-io.md`; tie every `ARCH-*` finding or no-finding claim to deterministic sensors, commands/artifacts, results, validation assets, or skipped-check reasons. Model judgment alone cannot satisfy verification/testing all-clear.
    - For direct top-level invocation, use the Plan Mode save rule and canonical report contract from `references/audit-report-io.md` for `audits/architecture/<YYYY-MM-DD architecture-audit>.md`.
    - For implementation audit child invocation, return compact findings to the parent unless the parent explicitly requests saved audit artifacts.
-15. Persist only durable knowledge:
+11. Persist only durable knowledge:
    - Persist accepted architecture constraints, repeated coupling patterns, accepted exceptions, rejected refactors, or reusable verification recipes.
    - Do not persist every one-off finding.
    - Use required tags: `project:<projectId>`, `session:<workflowSessionId>`, `workflow:architecture-audit`, `entity:<entity>`, and one `memory:<tier>` tag.
-16. Complete the Evidence Gate from `references/evidence-gate.md`.
+12. Complete the Evidence Gate from `references/evidence-gate.md`.
