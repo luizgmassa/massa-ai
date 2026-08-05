@@ -80,6 +80,8 @@ Before reading any massa-ai file:
   requirement meaning, scope boundaries, destructive/irreversible choices,
   contradictory evidence — ask the user rather than choose silently. Facts
   are looked up; decisions are asked.
+- Before writing or changing implementation code, load
+  `references/coding-guidelines.md` if not already loaded.
 - Complete Evidence Gate before claiming done.
 
 Use internal references only when needed:
@@ -164,6 +166,8 @@ current context already contains it.
 | `commit` | draft or create safe Conventional Commits with Jira branch prefixes and audit report exclusions | `workflows/commit.md` |
 | `the-fool` | direct challenge, red-team, pre-mortem, evidence audit | `workflows/the-fool.md` |
 | `judge-with-debate` | standalone multi-judge debate evaluation of user-supplied artifacts | `workflows/judge-with-debate.md` |
+| `to-prd` | turn the current conversation into a PRD without a new interview | `workflows/to-prd.md` |
+| `skill-architect` | design and build a new skill through structured conversation | `workflows/skill-architect.md` |
 | `furps-refinement` | FURPS+ refinement of a PRD and/or ADR before implementation, with The Fool pre-validation and DoR coverage | `workflows/refinement/furps-refinement.md` |
 | `general` | coding work with no more specific workflow | `workflows/general.md` |
 
@@ -176,7 +180,7 @@ match or no match is resolved deterministically without asking.
 Deterministic routing precedence, first match wins:
 
 1. **Explicit route:** user names a massa-ai workflow, report family, saved finding type, or asks for a direct challenge.
-2. **Requested artifact:** ADR, RFC, TDD, Jira ticket, commit, session guide, audit report, implementation audit report, mobile Figma report, or FURPS refinement report.
+2. **Requested artifact:** ADR, RFC, TDD, Jira ticket, commit, session guide, audit report, implementation audit report, mobile Figma report, FURPS refinement report, PRD synthesized from the current conversation -> `to-prd` (explicit request only; refining an existing PRD stays `furps-refinement`), or new SKILL.md / skill design -> `skill-architect`.
 3. **Target type:** broken behavior/error -> `debug`; saved audit finding -> matching `*-fix`; implementation scope review -> `implementation-audit`; Maestro E2E/device automation target -> `maestro`, `maestro-audit`, or child-only `maestro-fix` before generic tests workflows; security/privacy/auth finding -> security workflow; tests/flakes/coverage finding -> tests workflow; supplied Figma/screenshot mobile UI design -> `design`; mobile Figma compare/audit -> `mobile-figma-audit`; saved `MFM-*` findings -> `mobile-figma-fix`.
 4. **Primary verb:** create/add/implement -> `feature` unless the concrete target is new Maestro flow work, which routes to `maestro`; restructure without behavior change -> `refactor`; inspect/understand only -> `exploration`; record selected decision -> `adr`; compare open options -> `rfc`; design settled implementation -> `tdd`; refine/quality-check an existing PRD or ADR document (not implementation auditing) -> `furps-refinement`.
 5. **Risk domain escalation:** migrations, irreversible operations, auth/privacy, cross-service contracts, public compatibility, or work over 10 files routes to `spec-driven` unless the user explicitly requests a narrower workflow and accepts the containment.

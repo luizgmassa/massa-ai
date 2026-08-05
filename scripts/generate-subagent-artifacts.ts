@@ -92,14 +92,16 @@ const SPECIALIST_NAMES = [
 type SpecialistName = (typeof SPECIALIST_NAMES)[number];
 
 // ── Write-permission set (spec AC CLA-03 / design.md) ───────────────────────
-// These three charters declare `permission: write` (test-engineer and
-// documentation-agent are scoped writers: test files / doc files only, with a
-// disjoint write set). Charter frontmatter and this set must agree —
+// These four charters declare `permission: write` (test-engineer,
+// documentation-agent, and judge are scoped writers: test files / doc files /
+// the agent's own judge-N report only, with a disjoint write set). Charter
+// frontmatter and this set must agree —
 // scripts/__tests__/skills-harness-integrity.test.ts enforces that.
 const WRITE_AGENTS: ReadonlySet<SpecialistName> = new Set<SpecialistName>([
   "builder",
   "test-engineer",
   "documentation-agent",
+  "judge",
 ]);
 
 // ── Model + effort resolution ───────────────────────────────────────────────

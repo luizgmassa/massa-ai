@@ -1,6 +1,41 @@
 # massa-ai Spec State
 
-## Current — Skill Token Optimization (**VALIDATED PASS 2026-08-05** — T1–T12 done; PR #71 open, CI 5/5 green; ≥20% byte goal MISSED-and-recorded; merge = user decision)
+## Current — Registry Cleanup And Skill Imports (**VALIDATED PASS 2026-08-05** — 24/24 ACs, 4/4 mutations; PR next; merge = user decision)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-registry-cleanup-skill-imports` ·
+  workflow: spec-driven (Large) · persona: Context-Skill Harness Engineer/Architect
+  (pinned) · branch `spec/registry-cleanup-skill-imports` from `main` @ `394770fc`
+  (v1.27.0, after PR #71 merge).
+- Scope (user-directed 2026-08-05): skills/AGENTS.md registry cleanup — deleted
+  §Orchestration Model + §Future Integration + both "symlinked" claims; Capability
+  Packet / Output Contract → pointers to canonical agent-orchestration.md
+  (ORC-06/ORC-08 mirror reversed — recorded; its rationale was factually wrong);
+  judge permission fixed end-to-end (charter `write` v1.2.0; WRITE_AGENTS in
+  generator + parity test + claude-plugin install test — THREE roster copies);
+  bootstrap stack → 3 items (coding-guidelines folded into massa-ai as
+  `references/coding-guidelines.md`, lazy Core Contract load); `!.env.example`
+  ignore carve-out. Imports: to-prd + skill-architect → workflows (WMH
+  frontmatter; skill-architect keeps CC-BY-4.0 + attribution, user decision
+  2026-08-05; WMH gate license allowlist + EXPECTED_WORKFLOW_COUNT 36→38);
+  3 skill-architect references + validate_skill.py. capability-packet-parity
+  test retired; skills-harness-integrity PACKET_FILES 3→2 with AGENTS.md kept
+  in AUTHORITY_SCANNED_FILES; workflow-harness-contract 36→38, complement
+  20→22, intake lines added to both new workflows.
+- Contract: `.specs/features/registry-cleanup-skill-imports/{spec,design,tasks}.md`
+  — `3 Phases = 8 Tasks`. Plan Challenge full (pre_mortem, massa-ai-plan-critic):
+  C1 critical count-lock (folded), C2 authority-scanner narrowing (folded),
+  C3 pointer-clause sensor (folded), C4 CC-BY-4.0 licensing (user decision).
+- Execute: T1–T6 one massa-ai-builder Phase worker (6 commits
+  7e38f3cd..4cdd0175); T7 @ 1e02fcc7 (regen + WRITE_AGENTS both rosters +
+  agent-orchestration stale-citation repoint); T8 @ 3eb83bea (population locks,
+  intake lines, third roster copy, CHANGELOG). Gates: test:scripts exit 0
+  (1414 tests + 8 shell suites), lint 0, test:plugins 96/0, both generators
+  --check clean. Useful-Agent-Skills source repo untouched (porcelain empty).
+- Post-validation: 4th WRITE_AGENTS roster copy fixed (opencode agents-install, CI root cause); validate_skill ported .py→.ts (user directive; Bun.YAML); lessons L-019/L-020 recorded.
+- massa-ai MCP server not used this session; `.specs/` files canonical.
+
+
+## Previous — Skill Token Optimization (**VALIDATED PASS 2026-08-05** — T1–T12 done; merged as PR #71 @ `ef595210`, released v1.27.0)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-skill-token-optimization` ·
   workflow: spec-driven (Large) · persona: AI Engineer (pinned) · branch

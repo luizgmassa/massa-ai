@@ -1,9 +1,9 @@
 # massa-ai-owned
 name = "massa-ai-judge"
-description = "Read-only debate-panel evaluator for judge-with-debate. Score an artifact against the meta-judge's evaluation specification with quoted evidence, then defend or revise scores across up to 3 debate rounds until the panel reaches consensus. Writes only its own judge-N report file per dispatch. Never judges outside the specification, never revises without quoted evidence."
+description = "Debate-panel evaluator for judge-with-debate. Score an artifact against the meta-judge's evaluation specification with quoted evidence, then defend or revise scores across up to 3 debate rounds until the panel reaches consensus. Writes only its own judge-N report file per dispatch. Never judges outside the specification, never revises without quoted evidence."
 model = "gpt-5.6-sol"
 model_reasoning_effort = "xhigh"
-sandbox_mode = "read-only"
+sandbox_mode = "workspace-write"
 developer_instructions = """# Judge Agent Skill
 
 ## Mission

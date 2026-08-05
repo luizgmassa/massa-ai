@@ -57,6 +57,7 @@ const WRITE_AGENTS = new Set<SpecialistName>([
   "builder",
   "test-engineer",
   "documentation-agent",
+  "judge",
 ]);
 
 // ── Model + effort come from the REGISTRY, not a table copied into this file ──

@@ -851,7 +851,7 @@
     {
       "slug": "skill-token-optimization",
       "title": "Skill token optimization — lazy-load mobile/Figma/SonarQube + high-value extractions, validator top pack, caveman compression of 140 skill files",
-      "status": "in-progress",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
@@ -898,7 +898,20 @@
       "spec": ".specs/features/workflow-metadata-headers/spec.md",
       "tasks": ".specs/features/workflow-metadata-headers/tasks.md",
       "notes": "User-directed 2026-08-04, pattern ref https://agentskills.io/specification. Plan Challenge full pre_mortem: F1 critical (unquoted YAML scalars break on 8/36 opening paragraphs) folded — hand-authored double-quoted descriptions + real-parser sensor. 1 Phase = 5 Tasks; T1-T4 batch worker (user-approved), T5 delivery under Execute go-ahead. T2 @ bfddbb69 (recovered via parent cherry-pick after wrong-branch incident — concurrent session checkout; original b98dcbf2 orphaned, sibling branch untouched). T3 @ 32f54c83 (--check exit 0). T4: lint 0; test:scripts 1329/4 — 4 fails are worktree-contamination, AC5 amended (CI authoritative); duplication ceiling 331→471 documented; worker hit API weekly limit, T4 finished inline by main agent."
+    },
+    {
+      "id": "registry-cleanup-skill-imports",
+      "slug": "registry-cleanup-skill-imports",
+      "title": "skills/AGENTS.md registry cleanup + coding-guidelines/skill-architect/to-prd imports",
+      "status": "in-progress",
+      "created": "2026-08-05",
+      "depends_on": [],
+      "artifacts": [
+        "spec.md",
+        "design.md",
+        "tasks.md"
+      ]
     }
   ],
-  "active_feature": "skill-token-optimization"
+  "active_feature": "registry-cleanup-skill-imports"
 }

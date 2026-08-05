@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 19,
+  "next_id": 21,
   "lessons": [
     {
       "id": "L-001",
@@ -24,7 +24,7 @@
       ],
       "created": "2026-07-22T21:39:38Z",
       "last_seen": "2026-08-03T23:36:28Z",
-      "confidence": 1,
+      "confidence": 1.0,
       "project": "massa-ai",
       "session": "spec-da-inventory-closure",
       "workflow": "spec-driven",
@@ -404,6 +404,50 @@
       "session": "spec-skill-token-optimization",
       "workflow": "spec-driven",
       "entity": "skill-token-optimization",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-019",
+      "key": "gate_fail::roster and population literals multiply write agents existed in four files generator subagent parity claude plugin install test opencode agents install test and the workflow count lock in two local test scripts test plugins missed the fourth copy because it runs only under turbo bun run test before changing agent membership or a counted glob sweep repo wide for the literal set count value including inlined filter conditions and run the same aggregate gates ci runs",
+      "text": "Roster and population literals multiply: WRITE_AGENTS existed in FOUR files (generator, subagent-parity, claude-plugin install test, opencode agents-install test) and the workflow count lock in TWO. Local test:scripts+test:plugins missed the fourth copy because it runs only under turbo 'bun run test'. Before changing agent membership or a counted glob, sweep repo-wide for the literal set/count value (including inlined filter conditions) AND run the same aggregate gates CI runs.",
+      "signal": "gate_fail",
+      "scope": "harness-rosters",
+      "status": "candidate",
+      "features": [
+        "registry-cleanup-skill-imports"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "PR #72 CI build+coverage jobs (OPC-02, apps/opencode-plugin/src/__tests__/agents-install.test.ts:195) (harness-rosters)"
+      ],
+      "created": "2026-08-05T17:07:38Z",
+      "last_seen": "2026-08-05T17:07:38Z",
+      "project": "massa-ai",
+      "session": "spec-registry-cleanup-skill-imports",
+      "workflow": "spec-driven",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-020",
+      "key": "spec_deviation::do not ship foreign runtime scripts into the skill surface the repo runtime is bun so an imported python validator was converted to scripts validate skill ts using bun yaml parse repo precedent workflow bun cache test ts when importing third party skill tooling port scripts to the repo runtime instead of adding an interpreter dependency plus an availability fallback",
+      "text": "Do not ship foreign-runtime scripts into the skill surface: the repo runtime is Bun, so an imported Python validator was converted to scripts/validate_skill.ts using Bun.YAML.parse (repo precedent: workflow-bun-cache.test.ts). When importing third-party skill tooling, port scripts to the repo runtime instead of adding an interpreter dependency plus an availability fallback.",
+      "signal": "spec_deviation",
+      "scope": "skill-imports",
+      "status": "candidate",
+      "features": [
+        "registry-cleanup-skill-imports"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "user directive 2026-08-05 superseding spec assumption 'validate_skill.py stays Python' (skill-imports)"
+      ],
+      "created": "2026-08-05T17:07:38Z",
+      "last_seen": "2026-08-05T17:07:38Z",
+      "project": "massa-ai",
+      "session": "spec-registry-cleanup-skill-imports",
+      "workflow": "spec-driven",
       "confidence": 0.62
     }
   ]
