@@ -1,6 +1,39 @@
 # massa-ai Spec State
 
-## Current — Persona Router Token Optimization (**VALIDATED PASS 2026-08-04** — T0–T9 done; PR #68 open, CI 14/14 green; merge = user's decision; PRT-02 live walkthrough pending-restart)
+## Current — Skill Token Optimization (Specify/Design/Tasks done 2026-08-05; Execute approved with Phase workers; Plan Challenge pending)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-skill-token-optimization` ·
+  workflow: spec-driven (Large) · persona: AI Engineer (pinned) · branch
+  `spec/skill-token-optimization`, worktree
+  `.claude/worktrees/skill-token-optimization`, cut from `main` @ `41daeb68`.
+- Scope STO-1..9 (user-directed 2026-08-05): lazy-load extractions — SonarQube
+  MCP protocol → new `references/sonarqube-mcp.md`; mobile/Figma design-source
+  intake gate → `references/mobile-context.md`; high-value set (audit-scope
+  5-branch dedupe across 6 audit workflows, SKILL.md graceful-degradation
+  table → `references/graceful-degradation.md`, brownfield 7-doc table,
+  general.md dupe deletion, judge/meta-judge model-hint dedupe, stacked-branch
+  restatement deletions, spec-driven trims). Validator top pack:
+  `validate_audit_report.ts` + `validate_design.ts` (red-first) wired into
+  9 `*-fix.md` + audit-report-io + spec-driven design step. Then caveman
+  compression of 36 workflows + 87 references + 17 agent charters
+  (prose-only; protected literals/code/tables byte-preserved; no
+  `*.original.md`). Baseline @ 41daeb68: 339,809 / 603,273 / 63,781 B.
+- Contract: `.specs/features/skill-token-optimization/{spec,design,tasks}.md`
+  — `3 Phases = 12 Tasks` (T1 main, T2–T7 + T8–T11 two sequential
+  massa-ai-builder Phase workers, T12 main + verification-agent).
+  validate_spec/validate_tasks green (12 tasks parsed).
+- User decisions 2026-08-05: high-value extraction set IN; validator top pack
+  IN; Execute GO with Phase workers (delivery through PR; merge user's);
+  this feature merges BEFORE `workflow-metadata-headers` (its uncommitted
+  T1–T4 tree in the main checkout stays untouched; prepend-only frontmatter
+  re-runs over compressed bodies). DO-NOT-EXTRACT: dispatch blocks
+  (agent-orchestration.md:92-93 invariant).
+- Investigation reports (2 read-only subagents, 2026-08-05): 27 conditional
+  findings (~15 actionable; marginals deferred), 24 deterministic-check
+  mechanisms (top pack in scope; rest = follow-up backlog candidate).
+- massa-ai MCP server not used this session; `.specs/` files canonical.
+
+## Previous — Persona Router Token Optimization (**VALIDATED PASS 2026-08-04** — T0–T9 done; PR #68 open, CI 14/14 green; merge = user's decision; PRT-02 live walkthrough pending-restart)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-persona-router-token-optimization` ·
   workflow: spec-driven (Large) · branch `spec/persona-router-token-optimization`,
