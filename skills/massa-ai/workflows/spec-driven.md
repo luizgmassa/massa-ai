@@ -87,7 +87,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
    - Run `references/spec-driven/discuss.md` inside Specify when gray areas, implicit requirements, persistence/state, external calls, auth, payments, concurrency, or state transitions affect behavior.
    - For Android, iOS, or KMP Compose Multiplatform UI work, run the optional design-source intake gate from `references/mobile-context.md` (Design-Source Intake Gate).
    - Apply the Requirement Closure Gate: every open requirement question is resolved with the user or recorded as an accepted assumption before execution begins.
-4. Decide whether `Design` is required. If yes, run `references/spec-driven/design.md`; if no, record why the skip is valid. When Design is skipped and a design concern appears later, stop and create `design.md` before continuing.
+4. Decide whether `Design` is required. If yes, run `references/spec-driven/design.md`, including its deterministic validation before presenting `design.md` for confirmation; if no, record why the skip is valid. When Design is skipped and a design concern appears later, stop and create `design.md` before continuing.
 5. Decide whether `Tasks` is required. If yes, run `references/spec-driven/tasks.md`; if no, list the inline atomic execution steps before editing. If the inline list reveals more than 5 steps or complex dependencies, stop and create `tasks.md` — the Tasks phase was wrongly skipped (safety valve).
 6. Run `Execute` with `references/spec-driven/execute.md`.
    - Load `references/spec-driven/coding-principles.md` before implementation.

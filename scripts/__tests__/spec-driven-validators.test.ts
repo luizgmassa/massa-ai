@@ -55,6 +55,7 @@ const SCRIPT_RUNTIME: Record<string, ScriptRuntime> = {
   validate_state: "bun",
   lessons: "bun",
   check_specs_delivered: "bun",
+  validate_design: "bun",
 };
 
 // -B: never write __pycache__ into the source tree — skill-artifact --check
@@ -80,6 +81,7 @@ function runPy(scriptBaseRelPath: string, args: string[], cwd: string = REPO_ROO
 }
 
 const VALIDATE_SPEC = "skills/massa-ai/scripts/validate_spec";
+const VALIDATE_DESIGN = "skills/massa-ai/scripts/validate_design";
 const VALIDATE_TASKS = "skills/massa-ai/scripts/validate_tasks";
 const CHECK_COMMIT = "skills/massa-ai/scripts/check_commit";
 const VALIDATE_STATE = "skills/massa-ai/scripts/validate_state";
@@ -918,5 +920,136 @@ describe("validate_tasks.py fix-task headers (FT4, IT2-01)", () => {
     const r = runPy(VALIDATE_TASKS, ["--root", root]);
     expect(r.exitCode).toBe(1);
     expect(r.stdout).toContain("FT1");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T7: validate_design.ts (STO-9 top validator pack)
+// ---------------------------------------------------------------------------
+
+const FILLED_DESIGN = `# Test Feature Design
+
+**Spec**: \`.specs/features/test-feature/spec.md\`
+**Status**: Draft
+
+## Design Summary
+
+One paragraph describing the approach: extract the shared validator into a
+new script and wire it into the two workflows that currently restate its
+checklist inline.
+
+## Risks & Concerns
+
+| Concern | Location (file:line) | Impact | Mitigation |
+| ------- | -------------------- | ------ | ---------- |
+| Tight coupling between parser and CLI | \`src/tool.ts:42\` | harder to unit test | extract the parser into its own pure function |
+
+## Tech Decisions (only non-obvious ones)
+
+| Decision | Choice | Rationale |
+| -------- | ------ | --------- |
+| Validator placement | \`skills/massa-ai/scripts/\` | ships with the skill, beside validate_spec.ts |
+`;
+
+describe("validate_design.ts (T7, STO-9)", () => {
+  test("filled fixture exits 0", () => {
+    const root = makeTempRoot("validate-design-filled");
+    writeFeatureFile(root, "test-feature", "design.md", FILLED_DESIGN);
+    const r = runPy(VALIDATE_DESIGN, ["--root", root]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("0 error(s)");
+  });
+
+  test("missing Design Summary section exits 1", () => {
+    const root = makeTempRoot("validate-design-missing-summary");
+    const withoutSummary = FILLED_DESIGN.replace(
+      /## Design Summary[\s\S]*?\n\n(?=## Risks)/,
+      "",
+    );
+    expect(withoutSummary).not.toContain("## Design Summary");
+    writeFeatureFile(root, "test-feature", "design.md", withoutSummary);
+    const r = runPy(VALIDATE_DESIGN, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("missing required section: ## Design Summary");
+  });
+
+  test("missing Risks & Concerns section exits 1", () => {
+    const root = makeTempRoot("validate-design-missing-risks");
+    const withoutRisks = FILLED_DESIGN.replace(
+      /## Risks & Concerns[\s\S]*?\n\n(?=## Tech Decisions)/,
+      "",
+    );
+    expect(withoutRisks).not.toContain("## Risks & Concerns");
+    writeFeatureFile(root, "test-feature", "design.md", withoutRisks);
+    const r = runPy(VALIDATE_DESIGN, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("missing required section: ## Risks & Concerns");
+  });
+
+  test("missing Tech Decisions section exits 1", () => {
+    const root = makeTempRoot("validate-design-missing-tech-decisions");
+    const withoutTechDecisions = FILLED_DESIGN.replace(/## Tech Decisions[\s\S]*$/, "");
+    expect(withoutTechDecisions).not.toContain("## Tech Decisions");
+    writeFeatureFile(root, "test-feature", "design.md", withoutTechDecisions);
+    const r = runPy(VALIDATE_DESIGN, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("missing required section: ## Tech Decisions");
+  });
+
+  test("empty mitigation cell in Risks & Concerns exits 1", () => {
+    const root = makeTempRoot("validate-design-empty-mitigation");
+    const emptyMitigation = FILLED_DESIGN.replace(
+      "| Tight coupling between parser and CLI | `src/tool.ts:42` | harder to unit test | extract the parser into its own pure function |",
+      "| Tight coupling between parser and CLI | `src/tool.ts:42` | harder to unit test | |",
+    );
+    writeFeatureFile(root, "test-feature", "design.md", emptyMitigation);
+    const r = runPy(VALIDATE_DESIGN, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("empty or unfilled Mitigation cell");
+  });
+
+  test("placeholder mitigation cell in Risks & Concerns exits 1", () => {
+    const root = makeTempRoot("validate-design-placeholder-mitigation");
+    const placeholderMitigation = FILLED_DESIGN.replace(
+      "| Tight coupling between parser and CLI | `src/tool.ts:42` | harder to unit test | extract the parser into its own pure function |",
+      "| Tight coupling between parser and CLI | `src/tool.ts:42` | harder to unit test | [TODO] |",
+    );
+    writeFeatureFile(root, "test-feature", "design.md", placeholderMitigation);
+    const r = runPy(VALIDATE_DESIGN, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("empty or unfilled Mitigation cell");
+  });
+
+  test("'None found' Risks & Concerns with zero rows is a valid entry (exits 0)", () => {
+    const root = makeTempRoot("validate-design-none-found");
+    const noneFound = FILLED_DESIGN.replace(
+      /## Risks & Concerns[\s\S]*?\n\n(?=## Tech Decisions)/,
+      "## Risks & Concerns\n\n> None found — is a valid entry.\n\n",
+    );
+    writeFeatureFile(root, "test-feature", "design.md", noneFound);
+    const r = runPy(VALIDATE_DESIGN, ["--root", root]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("0 error(s)");
+  });
+
+  test("empty Risks & Concerns with no 'None found' marker warns, does not error", () => {
+    const root = makeTempRoot("validate-design-ambiguous-empty");
+    const ambiguousEmpty = FILLED_DESIGN.replace(
+      /## Risks & Concerns[\s\S]*?\n\n(?=## Tech Decisions)/,
+      "## Risks & Concerns\n\n",
+    );
+    writeFeatureFile(root, "test-feature", "design.md", ambiguousEmpty);
+    const r = runPy(VALIDATE_DESIGN, ["--root", root]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("0 error(s)");
+    expect(r.stdout).toContain("ambiguous");
+  });
+
+  test("auto-detects the sole feature under <root>/.specs/features/", () => {
+    const root = makeTempRoot("validate-design-autodetect");
+    writeFeatureFile(root, "only-feature", "design.md", FILLED_DESIGN);
+    const r = runPy(VALIDATE_DESIGN, ["--root", root]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain(join("only-feature", "design.md"));
   });
 });

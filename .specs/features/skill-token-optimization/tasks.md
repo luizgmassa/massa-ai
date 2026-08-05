@@ -158,13 +158,13 @@ Gate: new test green; coupled `test:scripts` subset green; regen + `--check` 0.
 
 ### T7: validate_design.ts + wiring
 
-- [ ] Requirement: STO-9
-- [ ] `skills/massa-ai/scripts/validate_design.ts`: required sections
+- [x] Requirement: STO-9
+- [x] `skills/massa-ai/scripts/validate_design.ts`: required sections
       (Design summary, Risks & Concerns, Tech Decisions), non-empty
       mitigation per flagged concern — same parse style as `validate_spec.ts`.
-- [ ] Red-first test additions (fixture with missing section / empty
+- [x] Red-first test additions (fixture with missing section / empty
       mitigation observed red).
-- [ ] Wire `references/spec-driven/design.md` + spec-driven workflow step 4 to
+- [x] Wire `references/spec-driven/design.md` + spec-driven workflow step 4 to
       call it.
 Tests: validate_design fixtures — missing-section and empty-mitigation observed red, then green
 Gate: tests green; regen + `--check` 0.
