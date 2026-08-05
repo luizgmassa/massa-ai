@@ -19,6 +19,32 @@ The main agent is the orchestrator. It owns:
 
 Subagents do bounded work only. Do not delegate everything.
 
+## Orchestrator Working Memory
+
+Tokens are spent once; context shapes every decision that follows. The orchestrator's
+working memory is the asset every rule below protects — delegation exists to keep
+disposable reasoning out of the main thread, not only to parallelize.
+
+- **Never poll a running subagent for status, and never ingest a subagent's raw
+  transcript, JSONL, or intermediate reasoning — running or completed.** The
+  orchestrator consumes only the subagent's returned output contract (its completion
+  result). When lifecycle visibility helps the user, report the dispatch itself via
+  conversation-feedback labels, not by fetching agent state.
+- **Wave cap: dispatch at most 4 concurrent subagents.** Before planning 5 or more,
+  run and record a consolidation check — can any two planned agents be merged? — then
+  dispatch in waves of at most 4. Fixed protocols smaller than the cap (e.g. a
+  3-judge panel) are unaffected.
+- **Cognitive locality:** overlapping file/module ownership or a shared knowledge
+  domain between planned subagents — read-only agents included — is a consolidation signal:
+  consolidate into one agent before spawning. Two agents independently reconstructing
+  the same mental model is waste; one agent holding it once is the cheaper and more
+  coherent shape.
+- **Git safety for concurrent work:** no repository-wide git operations (`git stash`,
+  `git checkout`/`git switch` of shared state, `git reset`, `git clean`) inside any
+  concurrently-dispatched subagent's scope. Concurrent writers require disjoint git
+  worktrees. The Verifier's scratch-worktree discrimination sensor keeps its own
+  stricter isolation rules.
+
 ## Delegation Gates
 
 Delegate only when all base requirements are true and at least one dispatch trigger is true.
@@ -107,19 +133,27 @@ only, never a dispatch target.
 
 ## Capability Packet
 
+**This section is the sole canonical Capability Packet definition.** `references/subagent-design.md` and the root `skills/AGENTS.md` registry defer to or mirror this list; `scripts/__tests__/capability-packet-parity.test.ts` fails when the `skills/AGENTS.md` mirror diverges. Bespoke packets (judge panel, FURPS analyst, phase-batch worker) are declared specializations that map onto these fields in their own workflow files.
+
+**A subagent inherits nothing from the parent session** — no skills, no personas, no loaded references, no conversation history. Everything the subagent needs is named explicitly in the packet, including the exact reference file paths it must read itself.
+
 When dispatching a subagent, send a compact capability packet rather than a loose instruction. Include:
 
-- role and purpose for this workflow
-- trigger: why delegation is justified now
-- exact scope: files, modules, diff, report finding, task IDs, or artifact
-- permissions: read-only or write with disjoint ownership
-- inputs: recalled facts, source pointers, constraints, and exclusions
-- sensors: expected commands or concrete checks
-- output: the exact output contract
-- firewall: raw logs, diffs, snapshots, reports, or research that must be summarized
-- memory boundary: whether the subagent may suggest memories and who persists them
+- `role`: the role name from the Agent Table of `skills/AGENTS.md`
+- `purpose`: one sentence tied to this workflow
+- `trigger`: why delegation is justified now
+- `scope`: exact files, modules, diff, report finding, task IDs, or artifact
+- `permissions`: read-only or write with disjoint ownership
+- `inputs`: recalled facts, source pointers, constraints, and exclusions
+- `sensors`: expected commands or concrete checks
+- `output`: the exact output contract
+- `firewall`: raw logs, diffs, snapshots, reports, or research that must be summarized
+- `memory`: whether the subagent may suggest memories and who persists them
 - `persona`: optional. The cataloged persona id in effect for the parent conversation, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions. Pass the id alone, never the persona prompt.
-- exact next step: what the main agent should do with the result
+- `next_use`: what the main agent will do with the result
+- `lens`: conditional — `audit-specialist` dispatches only. One of `bugs | architecture | security | requirements | code-quality | performance`.
+
+The named dispatch block that workflows embed (the quoted block whose header carries the prefixed agent name and role) is the block projection of this packet: `role` and `purpose` live in the block's header line, and `next_use` defaults to "the main agent synthesizes and continues the workflow" when absent. The remaining eight fields — `trigger, scope, permissions, inputs, sensors, output, firewall, memory` — appear as the block's body lines. The optional `persona` field appears there too.
 
 ## Prompt Contract
 
@@ -153,6 +187,11 @@ Every subagent returns:
 Subagents must summarize verbose research, logs, snapshots, diffs, search output,
 and transcripts. The main agent should receive only evidence, findings, risk,
 skipped checks, memory suggestions when allowed, and the next step, not raw dumps.
+
+**Default return bound: at most 40 lines of returned chat text.** A dispatch block's
+`output:` field may override the bound with a stated reason. When a dispatch writes a
+persisted report file, the chat return is the compact verdict only — never the file
+body (dual-channel rule).
 
 ## Conversation Feedback
 
@@ -222,6 +261,8 @@ For delegated tasks that expect repeated searches:
 
 ## Guardrails
 
+- No polling, no transcripts: never poll a running subagent and never ingest its
+  transcript or intermediate reasoning — see Orchestrator Working Memory.
 - No self-evaluation: claims need deterministic sensors or concrete source evidence.
 - No hidden scope expansion: subagents must not improve adjacent code.
 - No context dragging: send only task-specific source pointers and constraints, and receive compact summaries only.

@@ -1,6 +1,23 @@
 # Handoff
 
-## Active — Workflow Policy Updates (spec-driven, Execute complete pending validation)
+## Active — Sub-Agent Orchestration I/O (spec-driven, Execute complete; validation running; push/PR need user go-ahead)
+
+- Session `spec-subagent-orchestration-io`, branch `spec/subagent-orchestration-io`,
+  worktree `.claude/worktrees/subagent-orchestration-io` @ `origin/main` = `d18e7764`
+  (v1.23.0). Scope ORC-01..09: orchestrator-tax rules (no transcript polling, wave cap
+  4, consolidation signal, git safety, non-inheritance, 40-line return bound) +
+  canonical Capability Packet with `skills/AGENTS.md` mirror guarded by
+  `capability-packet-parity.test.ts` + standard dispatch blocks for
+  judge-with-debate/furps-refinement (census 24 → 27).
+- `2 Phases = 8 Tasks`, all committed (activation `3c02462c` … T7 `f380317f`, T8 =
+  close-out commit). Plan Challenge pre_mortem F1-F4 folded; F1 re-measured (input-side
+  `exact next step` = exactly 1 occurrence, renamed `next_use`; output-side return
+  field exempt as a class).
+- Remaining: independent validation (verification-agent, author ≠ verifier) →
+  `validation.md`; then user go-ahead for push + `gh pr create` (Stage 3 authorization
+  was not obtainable — autonomous session), CI watch, merge decision.
+
+## Previous — Workflow Policy Updates (validated, merged PR #66, released v1.23.0)
 
 - Session `spec-workflow-policy-updates`, branch `spec/workflow-policy-updates`,
   worktree `.claude/worktrees/workflow-policy-updates` @ `origin/main` = `07ffa7fd`
