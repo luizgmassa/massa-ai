@@ -7,7 +7,9 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/untracked-generated-bundles/design.md`
-**Status**: Draft
+**Status**: Done — T1-T14 complete (validation pending)
+
+**Results (2026-08-05, 3 batch workers):** T1 `af907544` · T2 `f73da43e` · T3 `1ca1b058` · T4 `9d00ab08` · T5 `a55b5866` · T6 `c83b8749` · T7 `94dd6757` · T8 `a3d6efd1` · T9 `fd9c9d17` · T10 `5749cc16` · T11 `783708a2` · T12 `8b59bd60` · T13 `d9554c42` · T14 `0fe89367`. All observed-red sensors recorded in batch summaries. Untrack census 1141 exact. Accepted interpretations: (1) checkout detection uses `$REPO_ROOT`, not `PLUGIN_SOURCE_ROOT` (copy-mode would misreport tarball); (2) T10/T11 sensor split (ci.yml assertion in T10, publish.yml assertion red-first in T11) keeping every commit green; (3) four pre-existing shell suites scoped with `MASSA_AI_SKIP_ARTIFACT_GENERATION=1` to preserve their discrimination against the new unconditional regeneration.
 
 ---
 
