@@ -7,9 +7,8 @@ For every new conversation involving coding, planning before coding, debugging,
 code review, refactoring, or implementation, activate this stack in order:
 
 1. `caveman full`
-2. `coding-guidelines`
-3. `massa-ai`
-4. `persona-router`
+2. `massa-ai`
+3. `persona-router`
 
 Activation means loading and using each available behavior. Load the installed
 `massa-ai` skill's `SKILL.md` once before substantive work begins. Let it
@@ -52,10 +51,9 @@ activation.
 
 - `caveman full`: keep communication compressed while preserving technical
   accuracy; relax compression when clarity or safety requires it.
-- `coding-guidelines`: think before coding, prefer the simplest complete
-  solution, and keep edits surgical and goal-driven.
 - `massa-ai`: use it as the public workflow router and load internal
-  workflows or references only on demand.
+  workflows or references only on demand, including
+  `references/coding-guidelines.md` before implementation edits.
 - `persona-router`: select one cataloged specialist perspective after
   massa-ai context is available, using progressive disclosure and at most
   one secondary review lens.
@@ -279,6 +277,7 @@ logs/
 .cache/
 tmp/
 .env*
+!.env.example
 *.pem
 *.key
 .ssh/
@@ -294,67 +293,23 @@ Thumbs.db
 
 Single registry for the 17 reusable sub-agent skills in this repo. Workflows remain the orchestrators; these agents are single-purpose specialists any workflow can invoke via the host's task/subagent tool.
 
-**Dispatch names are prefixed.** A charter at `skills/agents/<role>/SKILL.md` is registered by every host as `massa-ai-<role>`. Dispatch `massa-ai-investigator`, not `investigator`; the bare name is the registry key only. See `massa-ai/references/agent-orchestration.md` -> Name Resolution for the convention and for the fallback when a named agent is unavailable.
-
-## Orchestration Model
-
-```
-Workflow (orchestrator)
-  │  owns: routing, memory recall/persistence, user synthesis, Evidence Gate
-  │
-  ├─ dispatch massa-ai-investigator        (read-only: locate, trace, understand)
-  ├─ dispatch massa-ai-navigator           (read-only: index-first navigation)
-  ├─ dispatch massa-ai-context-curator     (read-only: build Context Packet)
-  ├─ dispatch massa-ai-planner             (read-only: produce plan)
-  ├─ dispatch massa-ai-plan-critic         (read-only: challenge the plan)
-  ├─ dispatch massa-ai-meta-judge          (read-only: author evaluation specification, once per evaluation)
-  ├─ dispatch massa-ai-judge               (read-only: score + debate against the specification, 3 per panel)
-  ├─ dispatch massa-ai-builder             (write: implement approved task, disjoint write set)
-  ├─ dispatch massa-ai-reviewer            (read-only: review diff)
-  ├─ dispatch massa-ai-verification-agent  (read-only: run Verification Ladder)
-  └─ Evidence Gate + persist memory
-```
-
-Workflows own routing, memory, user-facing synthesis, and the final Evidence Gate. Agents own one bounded capability. Dispatch follows the gates and capability-packet shape in `references/agent-orchestration.md` (symlinked massa-ai skill).
+**Dispatch names are prefixed.** A charter at `skills/agents/<role>/SKILL.md` is registered by every host as `massa-ai-<role>`. Dispatch `massa-ai-investigator`, not `investigator`; the bare name is the registry key only. See `skills/massa-ai/references/agent-orchestration.md` -> Name Resolution for the convention and for the fallback when a named agent is unavailable.
 
 ## Capability Packet (dispatch contract)
 
-Workflows send this packet when dispatching any agent:
-
-- `role`: agent name from the table below
-- `purpose`: one sentence tied to this workflow
-- `trigger`: why delegation is justified now (must satisfy a dispatch gate from `references/agent-orchestration.md`)
-- `scope`: exact files, modules, diff, report finding, or task IDs
-- `permissions`: read-only or write with disjoint write set
-- `inputs`: recalled facts, source pointers, task/report IDs, constraints, exclusions
-- `sensors`: commands or concrete checks expected
-- `output`: the exact output contract (see below)
-- `firewall`: raw logs, diffs, snapshots, or research that must be summarized, not returned raw
-- `memory`: whether the agent may suggest memory and who persists it (default: suggest only; main agent persists)
-- `persona`: optional. The cataloged persona id in effect for the parent conversation, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions. Pass the id alone, never the persona prompt.
-- `next_use`: what the main agent will do with the result
-- `lens`: conditional — `audit-specialist` dispatches only. One of `bugs | architecture | security | requirements | code-quality | performance`.
-
-This list mirrors the canonical Capability Packet in `references/agent-orchestration.md` (single source; `scripts/__tests__/capability-packet-parity.test.ts` fails when the two field lists diverge). An agent inherits nothing from the parent session — no skills, no personas, no loaded references, no conversation history; everything it needs is named in the packet.
-
-The `persona` field is optional and absent is the valid default. Personas and agents are different layers: a persona shapes the main agent's stance, an agent executes a bounded capability under its own charter. See `skills/persona-router/SKILL.md` -> Persona And Sub-Agents for the boundary rules.
+The canonical field list and dispatch gates live in
+`skills/massa-ai/references/agent-orchestration.md` §Capability Packet. An
+agent inherits nothing from the parent session — no skills, no personas, no
+loaded references, no conversation history; everything it needs is named in
+the packet. Persona-boundary rules live in `skills/persona-router/SKILL.md`.
 
 ## Output Contract (shared by all agents)
 
-Every agent returns:
-
-- **Status**: `Complete` | `Partial` | `Blocked`
-- **Scope**: files checked or changed
-- **Evidence**: commands, source locations, artifacts inspected
-- **Findings**: summary of what was found or implemented
-- **Risks and skipped checks**: with reasons
-- **Exact next step**: what the main agent should do with the result
-
-Agents summarize verbose output. They never return raw logs, diffs, snapshots, or research dumps to the main context (Context Firewall). Default return bound: at most 40 lines of returned chat text unless the dispatch's `output:` field overrides it with a reason; a dispatch that writes a persisted report returns the compact verdict only, never the file body.
+Canonical shape — Status, Scope, Evidence, Findings, Risks and skipped checks,
+Exact next step — lives in `skills/massa-ai/references/agent-orchestration.md`
+§Output Contract.
 
 ## Agent Table
-
-Dispatch each agent as `massa-ai-<Name>`.
 
 This table names no model. Each agent's model is resolved at build time from its
 charter's `metadata.model_tier` plus the host and the selected profile in
@@ -384,7 +339,7 @@ would drift, and did.
 
 ## Mapping — New Agents ↔ Existing Roles
 
-The symlinked massa-ai skill defines the roles in `references/agent-orchestration.md`. This registry maps the agent skills to those roles:
+The massa-ai skill defines the roles in `skills/massa-ai/references/agent-orchestration.md`. This registry maps the agent skills to those roles:
 
 | New agent skill | Existing role | Relationship |
 |---|---|---|
@@ -416,10 +371,6 @@ The symlinked massa-ai skill defines the roles in `references/agent-orchestratio
 
 Steps 4-5 are enforced: the parity test fails on generator drift and `scripts/__tests__/skills-harness-integrity.test.ts` fails if a workflow dispatches an agent with no shipped artifact.
 
-## Future Integration
-
-This pass adds the agents only. A follow-up feature will update massa-ai workflows to replace duplicated inline prompt sections with agent invocations where appropriate. That work is tracked separately and will have its own spec-driven validation. Do not rewrite workflows in this pass.
-
 ## massa-ai Concepts
 
 All agents integrate these concepts (documented per-agent in each charter):
@@ -431,4 +382,4 @@ All agents integrate these concepts (documented per-agent in each charter):
 - **References**: agents point to the relevant massa-ai reference files by name.
 - **Lessons**: agents surface reusable failures for lesson distillation.
 
-<!-- validator anchors: 17 agents | mapping table | capability packet | output contract -->
+<!-- validator anchors: 17 agents | mapping table -->
