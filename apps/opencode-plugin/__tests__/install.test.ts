@@ -500,6 +500,79 @@ describe("opencode-plugin install.sh", () => {
   });
 });
 
+describe("opencode-plugin MCP registration (PAU-01, PAU-03; T3)", () => {
+  test("install registers exactly one MCP entry alongside the plugin entry", async () => {
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const cfg = await readJson(
+      path.join(tmp, ".config/opencode/opencode.jsonc"),
+    );
+    expect((cfg.plugin as string[]).includes("./plugins/massa-ai/index.js")).toBe(
+      true,
+    );
+    const mcp = cfg.mcp as Record<string, unknown> | undefined;
+    expect(mcp).toBeDefined();
+    expect(mcp!["massa-ai"]).toBeDefined();
+  });
+
+  test("uninstall removes only the plugin entry — the MCP entry survives", async () => {
+    runInstall(["--user"], { HOME: tmp });
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const cfg = await readJson(
+      path.join(tmp, ".config/opencode/opencode.jsonc"),
+    );
+    expect((cfg.plugin as string[] | undefined) ?? []).not.toContain(
+      "./plugins/massa-ai/index.js",
+    );
+    const mcp = cfg.mcp as Record<string, unknown> | undefined;
+    expect(mcp).toBeDefined();
+    expect(mcp!["massa-ai"]).toBeDefined();
+  });
+
+  test("missing scripts/install-agents.sh: recovery command printed, overall success not claimed", async () => {
+    // Tarball-shaped tree (mirrors the UGB-06 test below): a real npm tarball
+    // has no scripts/install-agents.sh either, so this doubles as that case.
+    const pkgRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "mt-opencode-no-agents-"),
+    );
+    const pkgDir = path.join(pkgRoot, "apps", "opencode-plugin");
+    try {
+      await fs.cp(path.join(REPO_ROOT, "apps/opencode-plugin"), pkgDir, {
+        recursive: true,
+        filter: (src) =>
+          !/[\\/](node_modules|\.turbo|coverage)($|[\\/])/.test(src),
+      });
+      await fs.mkdir(path.join(pkgRoot, "scripts"), { recursive: true });
+      await fs.copyFile(
+        path.join(REPO_ROOT, "scripts/banner.sh"),
+        path.join(pkgRoot, "scripts/banner.sh"),
+      );
+      // Deliberately no scripts/install-agents.sh under pkgRoot.
+
+      const res = spawnSync("bash", [path.join(pkgDir, "install.sh"), "--user"], {
+        encoding: "utf8",
+        env: { ...process.env, HOME: tmp },
+        cwd: pkgDir,
+        timeout: 30000,
+      });
+      // The plugin file itself still installs — only MCP registration failed.
+      expect(res.status).toBe(0);
+      expect(res.stderr).toContain("scripts/install-agents.sh not found");
+      expect(res.stderr).toContain(
+        "register MCP with: bash scripts/install-agents.sh --agent opencode --yes",
+      );
+      // No success claim: the quiet-mode summary must not report the MCP
+      // registration as done.
+      expect(res.stdout).not.toContain("MCP registered");
+    } finally {
+      await fs.rm(pkgRoot, { recursive: true, force: true });
+    }
+  }, 30_000);
+});
+
 describe("opencode-plugin version recording (PAI-03/07, AC-15)", () => {
   test("install records {version, installedAt}; a plugin-owned uninstall deletes the whole record", async () => {
     const res = runInstall(["--user"], { HOME: tmp });
