@@ -94,8 +94,10 @@ bun run build                             # produces apps/opencode-plugin/dist/i
 bash apps/opencode-plugin/install.sh --user
 ```
 
-That symlinks `~/.config/opencode/plugins/massa-ai/index.js` at the repo's
-`dist/index.js` (so `bun run build` keeps it current), adds
+That installs `~/.config/opencode/plugins/massa-ai/index.js` as a real copy of
+the repo's `dist/index.js` (re-run the installer after `bun run build` to
+refresh it — a symlink here used to go dead whenever the gitignored `dist/`
+vanished, and OpenCode skips an unresolvable local plugin silently), adds
 `"./plugins/massa-ai/index.js"` to the `plugin` array of `opencode.json`, and
 symlinks the 17 specialist agents into `~/.config/opencode/agents/`. Because the
 plugin registers its tools in-process, the installer then drops the redundant

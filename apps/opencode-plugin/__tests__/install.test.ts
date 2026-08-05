@@ -80,10 +80,6 @@ async function isSymlink(p: string): Promise<boolean> {
   }
 }
 
-async function readLink(p: string): Promise<string> {
-  return fs.readlink(p);
-}
-
 const SPECIALIST_NAMES = [
   "investigator",
   "planner",
@@ -100,19 +96,22 @@ const SPECIALIST_NAMES = [
 ];
 
 describe("opencode-plugin install.sh", () => {
-  test("user-scope install creates plugin symlink + config entry + agent symlinks", async () => {
+  test("user-scope install creates plugin copy + config entry + agent symlinks", async () => {
     const res = runInstall(["--user"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
-    // Plugin symlink created
+    // Plugin installed as a REAL COPY of dist/index.js (a symlink here died
+    // in the field whenever the checkout's gitignored dist/ vanished).
     const pluginPath = path.join(
       tmp,
       ".config/opencode/plugins/massa-ai/index.js",
     );
     expect(await pathExists(pluginPath)).toBe(true);
-    expect(await isSymlink(pluginPath)).toBe(true);
-    const target = await readLink(pluginPath);
-    expect(target).toContain("apps/opencode-plugin/dist/index.js");
+    expect(await isSymlink(pluginPath)).toBe(false);
+    const distJs = path.join(REPO_ROOT, "apps/opencode-plugin/dist/index.js");
+    expect(await fs.readFile(pluginPath, "utf8")).toBe(
+      await fs.readFile(distJs, "utf8"),
+    );
 
     // Agent symlinks created
     const agentsDir = path.join(tmp, ".config/opencode/agents");
@@ -249,23 +248,42 @@ describe("opencode-plugin install.sh", () => {
     }
   });
 
-  test("regular file at symlink target is not clobbered", async () => {
+  test("stale regular file at the installer-owned plugin path is refreshed", async () => {
     const pluginPath = path.join(
       tmp,
       ".config/opencode/plugins/massa-ai/index.js",
     );
     await fs.mkdir(path.dirname(pluginPath), { recursive: true });
 
-    // Pre-create a regular file (not a symlink)
-    await fs.writeFile(pluginPath, "user content");
+    // plugins/massa-ai/ is installer-owned: a pre-existing regular file is a
+    // stale copy from a previous install, so re-running refreshes it.
+    await fs.writeFile(pluginPath, "stale copy");
 
     const res = runInstall(["--user"], { HOME: tmp });
-    expect(res.exitCode).not.toBe(0);
-    expect(res.stderr).toContain("exists as a regular file");
+    expect(res.exitCode).toBe(0);
+    const distJs = path.join(REPO_ROOT, "apps/opencode-plugin/dist/index.js");
+    expect(await fs.readFile(pluginPath, "utf8")).toBe(
+      await fs.readFile(distJs, "utf8"),
+    );
+  });
 
-    // File is untouched
-    const content = await fs.readFile(pluginPath, "utf8");
-    expect(content).toBe("user content");
+  test("pre-fix symlink at the plugin path is replaced by a real copy", async () => {
+    const pluginPath = path.join(
+      tmp,
+      ".config/opencode/plugins/massa-ai/index.js",
+    );
+    await fs.mkdir(path.dirname(pluginPath), { recursive: true });
+
+    const distJs = path.join(REPO_ROOT, "apps/opencode-plugin/dist/index.js");
+    await fs.symlink(distJs, pluginPath);
+    expect(await isSymlink(pluginPath)).toBe(true);
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(await isSymlink(pluginPath)).toBe(false);
+    expect(await fs.readFile(pluginPath, "utf8")).toBe(
+      await fs.readFile(distJs, "utf8"),
+    );
   });
 
   test("agent regular file at symlink target is skipped with warning", async () => {
@@ -295,10 +313,10 @@ describe("opencode-plugin install.sh", () => {
     const res = runInstall(["--project"], { HOME: tmp }, projectDir);
     expect(res.exitCode).toBe(0);
 
-    // Project-scoped paths
+    // Project-scoped paths (plugin is a real copy at both scopes)
     const pluginPath = path.join(projectDir, ".opencode/plugins/massa-ai/index.js");
     expect(await pathExists(pluginPath)).toBe(true);
-    expect(await isSymlink(pluginPath)).toBe(true);
+    expect(await isSymlink(pluginPath)).toBe(false);
 
     const agentsDir = path.join(projectDir, ".opencode/agents");
     for (const name of SPECIALIST_NAMES.slice(0, 3)) {

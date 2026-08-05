@@ -10,8 +10,8 @@
 # scripts/install-agents.sh to UNINSTALL the now-redundant MCP entry (if it was
 # previously written).
 #
-# Idempotent: re-running is a no-op when the plugin symlink and config entry are
-# already present.
+# Idempotent: re-running refreshes the installed plugin copy and is a no-op
+# for an already-present config entry.
 # Uninstall removes only ownership-marked entries, preserving user plugins and
 # user top-level keys.
 #
@@ -28,8 +28,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # Marketplace/bundle root resolved once per run by install-harness.sh
 # (--plugin-source local|copy|auto). OpenCode has no marketplace registry — its
-# opencode.json `plugin` array IS the registry — but the symlink below still has
-# to point somewhere that outlives the checkout, so it honours the same root.
+# opencode.json `plugin` array IS the registry — but the installed plugin copy
+# below is sourced from a built bundle, so it honours the same root.
 PLUGIN_SOURCE_ROOT="${MASSA_AI_PLUGIN_SOURCE_ROOT:-$REPO_ROOT}"
 SCOPE="user"
 UNINSTALL=0
@@ -408,10 +408,11 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
   vecho "Uninstalling massa-ai OpenCode plugin (scope: $SCOPE)..."
   uninstall_bundled_skills
 
-  # Remove plugin symlink
-  if [[ -L "$PLUGINS_DIR/index.js" ]]; then
+  # Remove the installed plugin file (a regular copy; pre-fix installs left a
+  # symlink — remove either shape).
+  if [[ -e "$PLUGINS_DIR/index.js" || -L "$PLUGINS_DIR/index.js" ]]; then
     rm -f "$PLUGINS_DIR/index.js"
-    vinfo "removed plugin symlink from $PLUGINS_DIR/"
+    vinfo "removed plugin from $PLUGINS_DIR/"
     if [[ -d "$PLUGINS_DIR" ]]; then
       rmdir "$PLUGINS_DIR" 2>/dev/null || true
     fi
@@ -487,25 +488,32 @@ vinfo "Installing massa-ai OpenCode plugin to: $TARGET"
 # Create plugin directory
 mkdir -p "$PLUGINS_DIR"
 
-# Symlink the plugin bundle (resolve to the bundle's dist/index.js). Under
-# --plugin-source copy this points at the stable copy rather than the checkout,
-# so deleting the checkout no longer breaks the plugin.
+# Install the plugin as a REAL COPY of the resolved dist/index.js, never a
+# symlink. The symlink shape failed in the field: dist/ is gitignored build
+# output (AD-016), so a worktree deletion or a checkout without a fresh
+# `bun run build` leaves the link dangling — OpenCode skips an unresolvable
+# local plugin without logging a load error, and since this installer already
+# withdrew the MCP entry by design (single-writer; the plugin registers its
+# tools in-process), the host silently loses every massa-ai tool. A copy
+# outlives the checkout — the same tradeoff already taken for the hook binary
+# (npm pack drops symlink entries) and by install-skills.sh's real-copy
+# contract. Dev-loop cost: after `bun run build`, re-run this installer (or
+# the harness) to refresh the installed copy.
 resolved_plugin_js="$PLUGIN_SOURCE_ROOT/apps/opencode-plugin/dist/index.js"
 if [[ ! -f "$resolved_plugin_js" ]]; then
-  # The copy is made before `bun run build` has necessarily run in that tree;
-  # the checkout's dist is the only other place it can come from.
+  # The marketplace copy is made before `bun run build` has necessarily run in
+  # that tree; the checkout's dist is the only other place it can come from.
   resolved_plugin_js="$REPO_ROOT/apps/opencode-plugin/dist/index.js"
 fi
 
-# Pre-flight check: refuse to clobber a regular file
-if [[ -e "$PLUGINS_DIR/index.js" && ! -L "$PLUGINS_DIR/index.js" ]]; then
-  echo "Warning: $PLUGINS_DIR/index.js exists as a regular file (not a symlink)" >&2
-  echo "  Refusing to overwrite. Remove it manually if you want to proceed." >&2
-  exit 1
+# A pre-fix install left a symlink here; remove it first so cp writes a new
+# regular file instead of following the link back into the checkout.
+if [[ -L "$PLUGINS_DIR/index.js" ]]; then
+  rm -f "$PLUGINS_DIR/index.js"
+  vinfo "replaced pre-fix symlink at $PLUGINS_DIR/index.js"
 fi
-
-ln -sfn "$resolved_plugin_js" "$PLUGINS_DIR/index.js"
-vinfo "symlink: $PLUGINS_DIR/index.js → $resolved_plugin_js"
+cp "$resolved_plugin_js" "$PLUGINS_DIR/index.js"
+vinfo "copy: $PLUGINS_DIR/index.js ← $resolved_plugin_js"
 
 # Merge into the resolved config file (.jsonc or .json). parseJsonc tolerates an
 # existing .jsonc user's comments/trailing commas; writeConfig backs up BEFORE writing

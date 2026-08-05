@@ -62,7 +62,7 @@ If you are building a VS Code extension for Cursor, you can register the plugin 
 vscode.cursor.plugins.registerPath("/abs/path/to/apps/cursor-plugin");
 ```
 
-Cursor auto-discovers `skills/`, `hooks/hooks.json`, and `agents/` inside the registered directory. MCP is not bundled — Cursor reads `~/.cursor/mcp.json`, which `scripts/install-agents.sh` owns. The `.cursor-plugin/plugin.json` manifest is optional — Cursor discovers the subdirectories without it, but including one aids marketplace submission later.
+Cursor 3.14 loads user-local plugins from `~/.cursor/plugins/local/<name>/` and also bridges Claude marketplace plugins from `~/.claude`, but subagents are discovered only from the flat `~/.cursor/agents/*.md` (or project `.cursor/agents/`) directory — never from a plugin's `agents/` subtree. `install.sh` therefore copies the specialists to `~/.cursor/agents/`; `hooks/hooks.json` entries are merged into `~/.cursor/hooks.json` pointing at the installed hook binary. Cursor reads no global rules file: the AGENTS.md bootstrap must be pasted into Cursor Settings → Rules or provided per project root. MCP is not bundled — Cursor reads `~/.cursor/mcp.json`, which `scripts/install-agents.sh` owns. The `.cursor-plugin/plugin.json` manifest is optional — Cursor discovers the subdirectories without it, but including one aids marketplace submission later.
 
 Use `unregisterPath` to remove:
 

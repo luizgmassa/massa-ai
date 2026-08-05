@@ -92,15 +92,22 @@ if [[ "$SCOPE" == "project" ]]; then
 else
   CURSOR_DIR="$HOME/.cursor"
 fi
-# Cursor discovers locally-installed plugins under plugins/local/<name>/, not
-# plugins/<name>/. Installing to the latter is why massa-ai never appeared in
-# Cursor's plugin list even though every file was written correctly.
-#
-# UNVERIFIED against a running Cursor.app — this path comes from Cursor's
-# plugin documentation, not from an observed load, because Cursor is not
-# installed on the machine this was developed on. Treat it as lower confidence
-# than the Claude/Codex routes, which were verified end-to-end.
+# Two verified Cursor 3.14 load surfaces (observed live in "Cursor Plugins"
+# exthost logs, 2026-08-05): user-local plugins ARE loaded from
+# plugins/local/<name>/ ("loadUserLocalPlugin massa-ai loaded"), and Cursor
+# additionally bridges Claude marketplace plugins from ~/.claude
+# ("loadClaudePlugin massa-ai@massa-ai") — so a machine with the Claude
+# plugin installed loads massa-ai twice. Subagents, however, are discovered
+# only from the flat .cursor/agents/*.md directory (cursor.com/docs/subagents
+# — no subdirectories), and there is no global rules file. So: PLUGIN_DIR
+# carries the manifest, hook binary, and command skills; everything else
+# Cursor must SEE goes to its dedicated read paths — $CURSOR_AGENTS_DIR
+# (subagents), $CURSOR_DIR/skills/ (harness skills), $CURSOR_DIR/hooks.json,
+# and $CURSOR_DIR/mcp.json (install-agents.sh).
 PLUGIN_DIR="$CURSOR_DIR/plugins/local/massa-ai"
+# The only directory Cursor discovers subagents from (project scope:
+# ./.cursor/agents/). Flat .md files, real copies, massa-ai- prefix owned.
+CURSOR_AGENTS_DIR="$CURSOR_DIR/agents"
 # Pre-fix installs wrote here; removed on install so the two cannot both be
 # discovered and register duplicate hooks.
 LEGACY_PLUGIN_DIR="$CURSOR_DIR/plugins/massa-ai"
@@ -429,6 +436,19 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
     merge_hooks_json "$HOOKS_JSON" "uninstall"
     echo "  - removed massa-ai hook entries from $HOOKS_JSON"
   fi
+  # Remove the massa-ai-owned subagents from Cursor's discovery directory.
+  # Prefix glob only: user-authored agents in the same flat dir survive.
+  if [[ -d "$CURSOR_AGENTS_DIR" ]]; then
+    removed_agents=0
+    for agent in "$CURSOR_AGENTS_DIR/"massa-ai-*.md; do
+      [[ -f "$agent" ]] || continue
+      rm -f "$agent"
+      removed_agents=$((removed_agents + 1))
+    done
+    if [[ "$removed_agents" -gt 0 ]]; then
+      echo "  - removed $removed_agents massa-ai subagents from $CURSOR_AGENTS_DIR"
+    fi
+  fi
   # Remove plugin directory
   if [[ -d "$LEGACY_PLUGIN_DIR" ]]; then
     rm -rf "$LEGACY_PLUGIN_DIR"
@@ -452,7 +472,14 @@ if [[ -d "$LEGACY_PLUGIN_DIR" ]]; then
   rm -rf "$LEGACY_PLUGIN_DIR"
   echo -e "  - removed pre-fix plugin copy at $LEGACY_PLUGIN_DIR"
 fi
-mkdir -p "$PLUGIN_DIR/.cursor-plugin" "$PLUGIN_DIR/skills" "$PLUGIN_DIR/hooks" "$PLUGIN_DIR/agents"
+mkdir -p "$PLUGIN_DIR/.cursor-plugin" "$PLUGIN_DIR/skills" "$PLUGIN_DIR/hooks" "$CURSOR_AGENTS_DIR"
+# Migration: pre-fix installs bundled agents inside the plugin dir, which
+# Cursor never reads. Drop that copy so upgraders converge on the one real
+# discovery surface and a future Cursor plugin scan cannot double-register.
+if [[ -d "$PLUGIN_DIR/agents" ]]; then
+  rm -rf "$PLUGIN_DIR/agents"
+  echo -e "  - removed pre-fix agents copy at $PLUGIN_DIR/agents (Cursor reads $CURSOR_AGENTS_DIR)"
+fi
 
 # Copy manifest
 cp "$SCRIPT_DIR/.cursor-plugin/plugin.json" "$PLUGIN_DIR/.cursor-plugin/plugin.json"
@@ -489,14 +516,18 @@ if [[ -f "$PLUGIN_DIR/mcp.json" ]]; then
   echo -e "  - removed stale mcp.json (MCP is now registered in ~/.cursor/mcp.json)"
 fi
 
-# Copy agents — every generated subagent specialist (auto-discovered by Cursor
-# from the plugin's agents/ dir). All of them, navigator included, are generated
-# from skills/agents/*/SKILL.md and owned by the massa-ai- name prefix (CRS-04).
+# Copy agents into the flat directory Cursor actually discovers subagents
+# from ($CURSOR_AGENTS_DIR — see the PLUGIN_DIR comment above; the plugin dir
+# itself is never scanned). Prune-then-copy so a specialist deleted from the
+# bundle cannot linger installed. All of them, navigator included, are
+# generated from skills/agents/*/SKILL.md and owned by the massa-ai- name
+# prefix (CRS-04) — user-authored agents are untouched.
+rm -f "$CURSOR_AGENTS_DIR/"massa-ai-*.md
 specialist_count=0
 for src in "$SCRIPT_DIR/agents/"massa-ai-*.md; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
-  cp "$src" "$PLUGIN_DIR/agents/$name"
+  cp "$src" "$CURSOR_AGENTS_DIR/$name"
   vecho "  + $name"
   specialist_count=$((specialist_count + 1))
 done

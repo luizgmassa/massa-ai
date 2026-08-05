@@ -449,7 +449,9 @@ registration a no-op before this release.
 All four plugin dirs are now workspace packages (`@massa-ai/{claude,codex,cursor,
 opencode}-plugin`, all publishing to npm and GitHub Packages) — each still ships its own
 `install.sh`, alongside the 42 KB root `install.sh`. The OpenCode one needs
-`bun run build` first: it symlinks `dist/index.js` and refuses to run without it; the
+`bun run build` first: it installs a real copy of `dist/index.js` (a symlink went dead
+whenever the gitignored `dist/` vanished, and OpenCode skips an unresolvable local
+plugin with no log line) and refuses to run without it; the
 other three have no build step at all — their entire publishable surface is static
 source (`agents/`, `hooks/`, `skills/`, `install.sh`, `README.md`, the dotdir manifest).
 None of the three new `package.json` files declares a `test` script, deliberately: `apps/*`

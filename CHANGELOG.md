@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cursor subagents now install where Cursor actually reads them.** The
+  Cursor plugin installer copied the 17 specialists into
+  `~/.cursor/plugins/local/massa-ai/agents/`; Cursor 3.x discovers subagents
+  only from the flat `~/.cursor/agents/*.md` (or project `.cursor/agents/`)
+  directory — a plugin's `agents/` subtree is never scanned for subagents,
+  even though Cursor 3.14 does load `plugins/local/<name>/` as a user-local
+  plugin (and separately bridges Claude marketplace plugins from `~/.claude`).
+  Install now writes real copies to `~/.cursor/agents/` (prefix-owned
+  `massa-ai-*.md`, prune-then-copy on upgrade, uninstall leaves user agents
+  untouched) and removes the pre-fix in-plugin copy on upgrade.
+- **`install-skills.sh` now says loudly that Cursor reads no global rules
+  file.** The cursor platform wrote the bootstrap block to
+  `~/.cursor/AGENTS.md` and reported success, but Cursor has no global
+  AGENTS.md surface (open Cursor feature request) — global rules exist only
+  as Cursor Settings → Rules, and AGENTS.md is read per project root. The
+  file is still written for forward-compatibility; the installer now prints
+  the manual step instead of implying the bootstrap took effect.
+- **OpenCode plugin is now a real copy, not a symlink into the checkout.**
+  `~/.config/opencode/plugins/massa-ai/index.js` was a symlink to the repo's
+  gitignored `apps/opencode-plugin/dist/index.js`; whenever that build output
+  vanished (rebuild, worktree deletion, bundle regeneration) the link went
+  dead and OpenCode skipped the plugin with no log line — losing all 14
+  in-process tools *and* the MCP entry the installer had already withdrawn by
+  design (single-writer; the plugin registers tools in-process). The
+  installer now copies the built bundle (both scopes), replaces a pre-fix
+  symlink on upgrade, and refreshes a stale copy on re-run. Re-run the
+  installer (or harness) after `bun run build` to pick up a new build.
+
 ### Changed
 
 - **Generated plugin bundles are no longer checked in.** The `skills/`,

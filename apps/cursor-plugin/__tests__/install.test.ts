@@ -79,7 +79,9 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
 
     const pluginDir = path.join(tmp, ".cursor/plugins/local/massa-ai");
     expect(await pathExists(path.join(pluginDir, ".cursor-plugin/plugin.json"))).toBe(true);
-    expect(await pathExists(path.join(pluginDir, "agents/massa-ai-navigator.md"))).toBe(true);
+    // Agents land in the flat dir Cursor discovers, not inside the plugin dir.
+    expect(await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md"))).toBe(true);
+    expect(await pathExists(path.join(pluginDir, "agents"))).toBe(false);
 
     const cfg = await readJson(path.join(tmp, ".cursor/hooks.json"));
     expect(cfg).toHaveProperty("version");
@@ -219,36 +221,60 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
     "judge",
   ];
 
-  test("CRS-01/CRS-04/DOC-01: install copies all 17 specialists into plugin agents/ + prints summary", async () => {
+  test("CRS-01/CRS-04/DOC-01: install copies all 17 specialists into ~/.cursor/agents/ as regular files + prints summary", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
-    const agentsDir = path.join(tmp, ".cursor/plugins/local/massa-ai/agents");
-    // 17 specialists, navigator included (CRS-01/CRS-04)
+    // Flat ~/.cursor/agents/ is the only directory Cursor discovers
+    // subagents from (CRS-04, corrected); real copies, never symlinks.
+    const agentsDir = path.join(tmp, ".cursor/agents");
     for (const name of SPECIALIST_NAMES) {
-      expect(
-        await pathExists(path.join(agentsDir, `massa-ai-${name}.md`)),
-      ).toBe(true);
+      const agentPath = path.join(agentsDir, `massa-ai-${name}.md`);
+      expect(await pathExists(agentPath)).toBe(true);
+      expect((await fs.lstat(agentPath)).isSymbolicLink()).toBe(false);
     }
-    // Total 17 .md files in agents/
-    const files = (await fs.readdir(agentsDir)).filter((f) => f.endsWith(".md"));
+    // Exactly 17 massa-ai-owned .md files
+    const files = (await fs.readdir(agentsDir)).filter(
+      (f) => f.startsWith("massa-ai-") && f.endsWith(".md"),
+    );
     expect(files.length).toBe(17);
+    // Nothing is bundled into the plugin dir anymore
+    expect(
+      await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai/agents")),
+    ).toBe(false);
 
     // Install output mentions the 17 subagent specialists (DOC-01)
     expect(res.stdout).toContain("17 subagent specialists");
   });
 
-  test("CRS-05: uninstall removes whole plugin dir (all 17 agents gone)", async () => {
+  test("migration: a pre-fix agents copy inside the plugin dir is removed on install", async () => {
+    const staleDir = path.join(tmp, ".cursor/plugins/local/massa-ai/agents");
+    await fs.mkdir(staleDir, { recursive: true });
+    await fs.writeFile(path.join(staleDir, "massa-ai-navigator.md"), "stale");
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(await pathExists(staleDir)).toBe(false);
+    expect(
+      await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),
+    ).toBe(true);
+  });
+
+  test("CRS-05: uninstall removes plugin dir + owned agents; user agents survive", async () => {
     runInstall(["--user"], { HOME: tmp });
-    const agentsDir = path.join(tmp, ".cursor/plugins/local/massa-ai/agents");
-    expect(await pathExists(agentsDir)).toBe(true);
+    const agentsDir = path.join(tmp, ".cursor/agents");
+    expect(await pathExists(path.join(agentsDir, "massa-ai-navigator.md"))).toBe(true);
+    // A user-authored agent in the same flat dir must survive uninstall.
+    await fs.writeFile(path.join(agentsDir, "my-own-agent.md"), "user agent");
 
     const res = runInstall(["--uninstall"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
-    // Whole plugin dir removed (CRS-05: unchanged behavior)
     expect(
       await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai")),
     ).toBe(false);
+    const remaining = await fs.readdir(agentsDir);
+    expect(remaining.filter((f) => f.startsWith("massa-ai-"))).toEqual([]);
+    expect(remaining).toContain("my-own-agent.md");
   });
 });
 
@@ -361,7 +387,7 @@ describe("cursor-plugin generated-bundle contract (T7, UGB-05..08)", () => {
       expect(res.status).toBe(0);
       expect(
         await pathExists(
-          path.join(tmp, ".cursor/plugins/local/massa-ai/agents/massa-ai-navigator.md"),
+          path.join(tmp, ".cursor/agents/massa-ai-navigator.md"),
         ),
       ).toBe(true);
     } finally {
