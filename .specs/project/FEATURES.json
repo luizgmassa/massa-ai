@@ -814,7 +814,7 @@
     {
       "slug": "model-profile-switching",
       "title": "Model Profile Switching — pre-rendered per-profile agent variants in plugin bundles + switch-time re-render engine (MCP profile_set/profile_list, config-cli profile subcommand, OpenCode in-process tool, Claude skill), install-state.json profile record surviving upgrades",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P1",
       "workflow": "spec-driven",
       "branch": "spec/model-profile-switching",
@@ -830,7 +830,8 @@
       ],
       "design": ".specs/features/model-profile-switching/design.md",
       "tasks": ".specs/features/model-profile-switching/tasks.md",
-      "notes": "EXECUTE COMPLETE 2026-08-04: T1-T16 by 3 confirmed batch workers + 2 inline main-agent repairs (security-allowlist entry for lock.ts execFileSync; T17 close-out), 19 commits. Re-measured figures: 374 variant files across 22 (host,profile) pairs at 17 each; MCP tools 52->54 across 3 pinned locations (a third, undocumented pin found in tool-definitions-synapse.test.ts); OpenCode in-process tools 13->14 (closed the stale 13-vs-14 doc gap). Two recorded deviations: publish.yml + package.json files extension (required by MPS-01 AC4); codex/opencode have no marketplace mode -> installRoute unconditionally file. AD-015 appended. Full gate matrix exit 0. Independent validation pending."
+      "notes": "EXECUTE COMPLETE 2026-08-04: T1-T16 by 3 confirmed batch workers + 2 inline main-agent repairs (security-allowlist entry for lock.ts execFileSync; T17 close-out), 19 commits. Re-measured figures: 374 variant files across 22 (host,profile) pairs at 17 each; MCP tools 52->54 across 3 pinned locations (a third, undocumented pin found in tool-definitions-synapse.test.ts); OpenCode in-process tools 13->14 (closed the stale 13-vs-14 doc gap). Two recorded deviations: publish.yml + package.json files extension (required by MPS-01 AC4); codex/opencode have no marketplace mode -> installRoute unconditionally file. AD-015 appended. Full gate matrix exit 0. VALIDATED PASS 2026-08-04 (independent verifier, author != verifier): 22/22 ACs evidenced, 7/7 discrimination mutations killed (0 survivors, 0 exclusions), 9/9 gates green on verifier-owned runs. PR from spec/model-profile-switching; merge = user decision (minor release).",
+      "validation": ".specs/features/model-profile-switching/validation.md"
     }
   ],
   "active_feature": "model-profile-switching"

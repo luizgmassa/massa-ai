@@ -159,18 +159,18 @@ All resolved in the requesting conversation unless marked otherwise.
 
 | Requirement ID | Requirement | Story | Status |
 | --- | --- | --- | --- |
-| MPS-01 | Generator emits per-profile pre-rendered variant trees into every plugin bundle, sibling of `agents/`; active dir byte-equals default variant; `--check` covers variants with full-inventory semantics | P1: Variants ship | Pending |
-| MPS-02 | One switch engine replaces active installed agent files from on-disk variants, per host, both install topologies (file-route copies, marketplace/in-place, OpenCode symlinks), offline-capable, idempotent | P1: Switch | Pending |
-| MPS-03 | Per-host `{profile, switchedAt}` recorded in `install-state.json` as v2-compatible extension (bundle version reported from existing `plugin.version` — Design C1); switch engine is its only writer; all existing writers round-trip it | P1: Upgrades | Pending |
-| MPS-04 | Plugin installers re-apply the recorded profile on install/upgrade; removed-profile fallback is loud | P1: Upgrades | Pending |
-| MPS-05 | MCP tools `profile_list`/`profile_set` via the three-place contract (tool-defs + tools-api route + embedded mapping); tool-count assertions updated (52 → 54) | P1: Switch | Pending |
-| MPS-06 | `profile` subcommand in both config-cli surfaces, switch logic in one shared published location; `--dry-run` | P2 | Pending |
-| MPS-07 | OpenCode in-process profile tool | P2 | Pending |
-| MPS-08 | Claude skill `/massa-ai:profile` | P3 | Pending |
-| MPS-09 | Fail-loud semantics: unknown profile, unsupported host, missing variants, corrupt state — named errors, zero silent fallbacks | P1 (all) | Pending |
-| MPS-10 | UX contract: restart notice, per-host skip reasons (Cursor always) | P1: Switch | Pending |
-| MPS-11 | `model-profile-registry/spec.md` non-goal clause amended in place with reason + pointer (repo amendment convention) | — | Pending |
-| MPS-12 | Guard extensions: subagent-parity (17-files-per-host assertions extended over variants), `verify-package-contents.ts` variant entries, new switch-engine tests observed red first | P1: Variants ship | Pending |
+| MPS-01 | Generator emits per-profile pre-rendered variant trees into every plugin bundle, sibling of `agents/`; active dir byte-equals default variant; `--check` covers variants with full-inventory semantics | P1: Variants ship | Verified |
+| MPS-02 | One switch engine replaces active installed agent files from on-disk variants, per host, both install topologies (file-route copies, marketplace/in-place, OpenCode symlinks), offline-capable, idempotent | P1: Switch | Verified |
+| MPS-03 | Per-host `{profile, switchedAt}` recorded in `install-state.json` as v2-compatible extension (bundle version reported from existing `plugin.version` — Design C1); switch engine is its only writer; all existing writers round-trip it | P1: Upgrades | Verified |
+| MPS-04 | Plugin installers re-apply the recorded profile on install/upgrade; removed-profile fallback is loud | P1: Upgrades | Verified |
+| MPS-05 | MCP tools `profile_list`/`profile_set` via the three-place contract (tool-defs + tools-api route + embedded mapping); tool-count assertions updated (52 → 54) | P1: Switch | Verified |
+| MPS-06 | `profile` subcommand in both config-cli surfaces, switch logic in one shared published location; `--dry-run` | P2 | Verified |
+| MPS-07 | OpenCode in-process profile tool | P2 | Verified |
+| MPS-08 | Claude skill `/massa-ai:profile` | P3 | Verified |
+| MPS-09 | Fail-loud semantics: unknown profile, unsupported host, missing variants, corrupt state — named errors, zero silent fallbacks | P1 (all) | Verified |
+| MPS-10 | UX contract: restart notice, per-host skip reasons (Cursor always) | P1: Switch | Verified |
+| MPS-11 | `model-profile-registry/spec.md` non-goal clause amended in place with reason + pointer (repo amendment convention) | — | Verified |
+| MPS-12 | Guard extensions: subagent-parity (17-files-per-host assertions extended over variants), `verify-package-contents.ts` variant entries, new switch-engine tests observed red first | P1: Variants ship | Verified |
 
 **Coverage:** 12 total, 0 mapped to tasks (Tasks phase pending), 0 unmapped.
 
