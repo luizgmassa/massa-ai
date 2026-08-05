@@ -1,6 +1,32 @@
 # massa-ai Spec State
 
-## Current — Persona Router Token Optimization (**VALIDATED PASS 2026-08-04** — T0–T9 done; PR #68 open, CI 14/14 green; merge = user's decision; PRT-02 live walkthrough pending-restart)
+## Current — Workflow Metadata Headers (Execute in progress — T1–T4 batch worker approved 2026-08-04)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-workflow-metadata-headers` ·
+  workflow: spec-driven (Medium) · persona: AI Engineer (pinned) · branch
+  `spec/workflow-metadata-headers` from `main` @ `41daeb68` (plain branch in main
+  checkout — clean tree, no parallel session; worktree-isolation deviation recorded).
+- Scope WMH-01..06 (user-directed 2026-08-04, pattern ref
+  https://agentskills.io/specification): Agent Skills-style YAML frontmatter on all
+  36 `skills/massa-ai/workflows/**/*.md` — `name` = file stem, hand-authored
+  double-quoted `description`, `license: MIT`, `metadata.version: "1.0.0"`;
+  prepend-only (body byte-identical); new real-YAML-parse gate
+  `scripts/__tests__/workflow-metadata-headers.test.ts` (red-first); bundle regen +
+  `--check` 0; test:scripts + lint green; CHANGELOG entry.
+- Contract: `.specs/features/workflow-metadata-headers/{spec,tasks}.md` — Design
+  skipped (format fixed by external spec + repo SKILL.md convention). `1 Phase = 5
+  Tasks`. Full Plan Challenge (pre_mortem, massa-ai-plan-critic): F1 critical —
+  unquoted YAML plain scalars break on 8/36 opening paragraphs (inline `: `) —
+  folded as quoted-scalar + real-parser sensor; F2 skills.yml validates only
+  SKILL.md, new test is sole backstop (PR note); F3 wrap-truncation moot via
+  hand-authored descriptions; F4 generator byte-copies defects into 4 bundles
+  (PR note); F5 length ceiling 20–1024.
+- Execute: go-ahead given (full delivery incl. push + PR; merge stays user's).
+  T1–T4 via one massa-ai-builder Phase-group worker (user accepted offer);
+  verification-agent + T5 delivery by main agent.
+- massa-ai MCP server not used this session; `.specs/` files canonical.
+
+## Previous — Persona Router Token Optimization (**VALIDATED PASS 2026-08-04** — T0–T9 done; PR #68 open, CI 14/14 green; merge = user's decision; PRT-02 live walkthrough pending-restart)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-persona-router-token-optimization` ·
   workflow: spec-driven (Large) · branch `spec/persona-router-token-optimization`,
