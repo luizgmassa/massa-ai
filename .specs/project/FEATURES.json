@@ -851,7 +851,7 @@
     {
       "slug": "skill-token-optimization",
       "title": "Skill token optimization — lazy-load mobile/Figma/SonarQube + high-value extractions, validator top pack, caveman compression of 140 skill files",
-      "status": "in-progress",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
