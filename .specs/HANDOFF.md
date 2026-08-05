@@ -17,7 +17,7 @@
 - Next: independent validation (verification-agent, author != verifier) -> validation.md ->
   push + PR (user merge decision; minor release on merge).
 
-## Previous — Workflow Policy Updates (spec-driven, Execute complete pending validation; PR #66 merged into main @ d18e7764 per origin/main at this feature's branch cut)
+## Previous — Workflow Policy Updates (spec-driven, Execute complete pending validation; PR #66 MERGED as `563b2a86`, released v1.23.0 @ `d18e7764` — verified via git log)
 
 - Session `spec-workflow-policy-updates`, branch `spec/workflow-policy-updates`,
   worktree `.claude/worktrees/workflow-policy-updates` @ `origin/main` = `07ffa7fd`
