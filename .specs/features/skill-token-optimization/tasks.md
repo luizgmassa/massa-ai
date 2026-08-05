@@ -52,13 +52,13 @@ bun skills/massa-ai/scripts/check_specs_delivered.ts skill-token-optimization --
 
 ### T1: Guard tooling — path resolver + protected-literal inventory
 
-- [ ] Requirement: STO-7, STO-4
-- [ ] `scripts/check-skill-doc-paths.ts`: for every `.md` under
+- [x] Requirement: STO-7, STO-4
+- [x] `scripts/check-skill-doc-paths.ts`: for every `.md` under
       `skills/massa-ai/` and `skills/agents/`, resolve each cited relative
       `references/…`, `workflows/…`, `skills/…`, `scripts/…` path against the
       repo; non-zero exit listing misses. Red-first: plant a bad path in a
       scratch copy, observe failure, remove.
-- [ ] `scripts/skill-protected-literals.ts`: scan `scripts/__tests__/*.ts`,
+- [x] `scripts/skill-protected-literals.ts`: scan `scripts/__tests__/*.ts`,
       `scripts/lib/*.ts`, `skills/massa-ai/scripts/*.ts` for **string literals
       AND regex-literal source text** (≥12 chars; regex source normalized —
       escapes/`\s+` reduced to match-relevant words) that occur in any skill
@@ -69,7 +69,7 @@ bun skills/massa-ai/scripts/check_specs_delivered.ts skill-token-optimization --
       `implementation-delivery.md`) — Plan Challenge F1. Observed-red
       calibration: temporarily remove one string anchor and one regex anchor
       from scratch copies and confirm detection of both.
-- [ ] Test `scripts/__tests__/skill-doc-paths.test.ts` running the resolver
+- [x] Test `scripts/__tests__/skill-doc-paths.test.ts` running the resolver
       repo-wide (green at HEAD).
 Tests: `scripts/__tests__/skill-doc-paths.test.ts` (new); observed-red calibration for both scripts
 Gate: both scripts run green at HEAD; commit.
