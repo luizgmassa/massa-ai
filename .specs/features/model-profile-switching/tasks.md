@@ -54,117 +54,185 @@ Phases sequential; tasks sequential within a phase.
 
 ## Task Breakdown
 
-### T1 (TASK-001): install-state read/modify-write module
+### T1: install-state read/modify-write module
+**Task ID**: TASK-001
 **What**: `state.ts` — typed read/validate/merge-write of `install-state.json` preserving unknown fields; `modelProfile` + `installRoute` types; corrupt/unwritable → named errors.
 **Where**: `packages/shared/src/profile-switch/state.ts` + `__tests__/state.test.ts`
-**Depends on**: none · **Reuses**: `state_replace` semantics (`scripts/install-skills.sh`) as behavioral reference
-**Requirement**: MPS-03, MPS-09 · **Tests**: unit · **Gate**: quick
+**Depends on**: none
+**Reuses**: `state_replace` semantics (`scripts/install-skills.sh`) as behavioral reference
+**Requirement**: MPS-03, MPS-09
+**Tests**: unit
+**Gate**: quick
 **Done when**: round-trip preserves every existing v2 field byte-for-byte; corrupt JSON → named error (observed red first); no writes on validation failure.
 **Commit**: `feat(shared): profile-switch state module`
 
-### T2 (TASK-002): host path table + route detection
+### T2: host path table + route detection
+**Task ID**: TASK-002
 **What**: `hosts.ts` — per-host active/variant path resolution (design table), project-local root overrides, Cursor always-skip row, route rule: `installRoute==="marketplace"` or absent → refuse (F1), `"file"` → proceed.
 **Where**: `packages/shared/src/profile-switch/hosts.ts` + tests
-**Depends on**: T1 · **Requirement**: MPS-02, MPS-09, MPS-10 · **Tests**: unit · **Gate**: quick
+**Depends on**: T1
+**Requirement**: MPS-02, MPS-09, MPS-10
+**Tests**: unit
+**Gate**: quick
 **Done when**: route-absent fixture refuses with named error (test written first, red); Cursor returns skip-with-reason; paths match design table exactly.
 **Commit**: `feat(shared): profile-switch host table + route detection`
 
-### T3 (TASK-003): single-flight lock with stale-owner reclaim
+### T3: single-flight lock with stale-owner reclaim
+**Task ID**: TASK-003
 **What**: `lock.ts` — exclusive lock beside state file; owner PID + process start identity; proven-dead reclaim (F2, M19 semantics ported).
 **Where**: `packages/shared/src/profile-switch/lock.ts` + tests
-**Depends on**: T1 · **Requirement**: MPS-02 (A10) · **Tests**: unit · **Gate**: quick
+**Depends on**: T1
+**Requirement**: MPS-02 (A10)
+**Tests**: unit
+**Gate**: quick
 **Done when**: live-owner contention fails loud; dead-owner lock reclaimed (kill-mid-switch simulation red-first against a no-reclaim stub).
 **Commit**: `feat(shared): profile-switch single-flight lock`
 
-### T4 (TASK-004): switch engine + report
+### T4: switch engine + report
+**Task ID**: TASK-004
 **What**: `engine.ts`/`report.ts` — `listProfiles`, `switchProfile` (dry-run, host filter, deterministic order, copies-first-state-last, opencode symlink **repoint**, massa-ai-owned-files-only overwrite, per-host atomicity, restart notice, idempotent re-run).
 **Where**: `packages/shared/src/profile-switch/{engine,report}.ts` + tests; export from shared index
-**Depends on**: T1, T2, T3 · **Requirement**: MPS-02, MPS-09, MPS-10 · **Tests**: unit (temp-dir fixtures) · **Gate**: full (`cd packages/shared && bun test`)
+**Depends on**: T1, T2, T3
+**Requirement**: MPS-02, MPS-09, MPS-10
+**Tests**: unit (temp-dir fixtures)
+**Gate**: full (`cd packages/shared && bun test`)
 **Done when**: every Error Handling Strategy row has a test; state written only after copies; symlink stays symlink post-switch; unknown profile lists available; dry-run changes nothing.
 **Commit**: `feat(shared): profile switch engine`
 
-### T5 (TASK-005): generator per-profile variant emission
+### T5: generator per-profile variant emission
+**Task ID**: TASK-005
 **What**: `emitAll` loop over `hostsSupportedBy` profiles → `apps/<host>-plugin/agent-profiles/<p>/`; active `agents/` byte-equals default variant.
 **Where**: `scripts/generate-subagent-artifacts.ts` + `scripts/__tests__/` round-trip test
-**Depends on**: none (parallel-safe after P1 but sequenced here) · **Requirement**: MPS-01 · **Tests**: unit (scripts) · **Gate**: full (`bun run test:scripts`)
+**Depends on**: none (parallel-safe after P1 but sequenced here)
+**Requirement**: MPS-01
+**Tests**: unit (scripts)
+**Gate**: full (`bun run test:scripts`)
 **Done when**: sampled (host, profile) variant byte-equals a single-profile emission; unsupported (host, profile) emits nothing.
 **Commit**: `feat(scripts): emit per-profile agent variants`
 
-### T6 (TASK-006): `--check` full-inventory variant diff
+### T6: `--check` full-inventory variant diff
+**Task ID**: TASK-006
 **What**: extend `runCheck`/`diffHost` over variant dirs, stale-entry detection included.
 **Where**: `scripts/generate-subagent-artifacts.ts` + tests
-**Depends on**: T5 · **Requirement**: MPS-01, MPS-12 · **Tests**: unit (scripts) · **Gate**: full
+**Depends on**: T5
+**Requirement**: MPS-01, MPS-12
+**Tests**: unit (scripts)
+**Gate**: full
 **Done when**: red observed on (a) deleted variant file, (b) stale extra variant file, then green on clean tree.
 **Commit**: `feat(scripts): variant drift detection in --check`
 
-### T7 (TASK-007): regenerate bundles + extend parity/package guards
+### T7: regenerate bundles + extend parity/package guards
+**Task ID**: TASK-007
 **What**: regenerate all bundles (checked-in variant trees); re-measure then update exactly-17 assertions table-driven over (host, supported profile); add `agent-profiles` to `verify-package-contents.ts` `requiredTopLevel`.
 **Where**: `apps/*-plugin/agent-profiles/**` (generated), `scripts/__tests__/subagent-parity.test.ts`, `scripts/verify-package-contents.ts`
-**Depends on**: T5, T6 · **Requirement**: MPS-01, MPS-12 · **Tests**: unit (scripts) · **Gate**: build
+**Depends on**: T5, T6
+**Requirement**: MPS-01, MPS-12
+**Tests**: unit (scripts)
+**Gate**: build
 **Done when**: `--check` clean; parity green; package-contents red-first (scratch removal) then green; figures in tests re-measured in-session, not taken from the packet.
 **Commit**: `feat(plugins): ship per-profile agent variant bundles`
 
-### T8 (TASK-008): claude + codex installer re-apply + route recording
+### T8: claude + codex installer re-apply + route recording
+**Task ID**: TASK-008
 **What**: both `install.sh`: write `installRoute` on every install; install variant tree to host variant path; copy active set from recorded profile's variant when present; loud fallback when recorded profile missing from bundle.
 **Where**: `apps/claude-plugin/install.sh`, `apps/codex-plugin/install.sh`, shell suite case(s)
-**Depends on**: T7 · **Requirement**: MPS-04, design F1 · **Tests**: shell suite (scratch `$TARGET_HOME`) · **Gate**: full (`bun run test:scripts`)
+**Depends on**: T7
+**Requirement**: MPS-04, design F1
+**Tests**: shell suite (scratch `$TARGET_HOME`)
+**Gate**: full (`bun run test:scripts`)
 **Done when**: recorded-profile honored; fallback line printed; `installRoute` present post-install; never writes `modelProfile`.
 **Commit**: `feat(installers): profile re-apply + install route recording (claude, codex)`
 
-### T9 (TASK-009): opencode installer re-apply + F3 upgrade case; cursor route recording
+### T9: opencode installer re-apply + F3 upgrade case; cursor route recording
+**Task ID**: TASK-009
 **What**: opencode `install.sh` variant tree install + recorded-profile symlink targets; cursor `install.sh` records `installRoute` only (switch always skips cursor). Shell case: switch → re-run install.sh → agent file still updates (F3).
 **Where**: `apps/opencode-plugin/install.sh`, `apps/cursor-plugin/install.sh`, shell suite
-**Depends on**: T8 · **Requirement**: MPS-04, design F3 · **Tests**: shell suite · **Gate**: full
+**Depends on**: T8
+**Requirement**: MPS-04, design F3
+**Tests**: shell suite
+**Gate**: full
 **Commit**: `feat(installers): profile re-apply (opencode) + route recording (cursor)`
 
-### T10 (TASK-010): state round-trip guards
+### T10: state round-trip guards
+**Task ID**: TASK-010
 **What**: extend `install-state-plugin-version.test.ts` (+ sibling shell assertions if that's where the writer lives): `state_replace` and every `record_plugin_version()` preserve `modelProfile` and `installRoute`.
 **Where**: `scripts/__tests__/install-state-plugin-version.test.ts`, possibly `scripts/tests/`
-**Depends on**: T8, T9 · **Requirement**: MPS-03 · **Tests**: unit (scripts) · **Gate**: full
+**Depends on**: T8, T9
+**Requirement**: MPS-03
+**Tests**: unit (scripts)
+**Gate**: full
 **Done when**: each preservation case observed red against a field-dropping mutation first.
 **Commit**: `test(installers): install-state round-trip guards for profile fields`
 
-### T11 (TASK-011): tools-api profiles routes
+### T11: tools-api profiles routes
+**Task ID**: TASK-011
 **What**: `routes/profiles.ts` — GET `/api/v1/profiles`, POST `/api/v1/profiles/switch`, delegating to shared engine; behind auth; JSON responses asserted over real HTTP.
 **Where**: `apps/tools-api/src/routes/profiles.{ts,test.ts}`, `index.ts` registration
-**Depends on**: T4 · **Requirement**: MPS-05 · **Tests**: route · **Gate**: full (tools-api isolated runner)
+**Depends on**: T4
+**Requirement**: MPS-05
+**Tests**: route
+**Gate**: full (tools-api isolated runner)
 **Done when**: unauthenticated 401 on a registered route; MPS-09 errors surface as structured JSON; content-type is application/json.
 **Commit**: `feat(tools-api): profile list/switch routes`
 
-### T12 (TASK-012): MCP tool-defs + proxy mapping + embedded parity
+### T12: MCP tool-defs + proxy mapping + embedded parity
+**Task ID**: TASK-012
 **What**: `profile_list`/`profile_set` in `tool-defs-project.ts` (local trust note in description); proxy endpoint map; embedded client `case`s calling engine; re-measure tool-count pins (52 expected) then update both count tests; extend both parity suites.
 **Where**: `apps/mcp-client/src/{tool-defs/tool-defs-project.ts,call-tool-proxy.ts,embedded-api-client.ts}`, `src/__tests__/`
-**Depends on**: T11 · **Requirement**: MPS-05 · **Tests**: unit (isolated runner) · **Gate**: full
+**Depends on**: T11
+**Requirement**: MPS-05
+**Tests**: unit (isolated runner)
+**Gate**: full
 **Commit**: `feat(mcp-client): profile_list + profile_set tools`
 
-### T13 (TASK-013): `profile` subcommand in both config-CLIs
+### T13: `profile` subcommand in both config-CLIs
+**Task ID**: TASK-013
 **What**: `profile list|show|set <name> [--host h] [--dry-run]` in mcp-client and opencode-plugin `config-cli.ts`, both delegating to shared engine; cross-CLI surface-parity test.
 **Where**: both `config-cli.ts` + their test files
-**Depends on**: T4 · **Requirement**: MPS-06 · **Tests**: unit · **Gate**: full (`bun run test:plugins` + mcp-client runner)
+**Depends on**: T4
+**Requirement**: MPS-06
+**Tests**: unit
+**Gate**: full (`bun run test:plugins` + mcp-client runner)
 **Commit**: `feat(cli): profile subcommand in both config CLIs`
 
-### T14 (TASK-014): OpenCode in-process profile tool
+### T14: OpenCode in-process profile tool
+**Task ID**: TASK-014
 **What**: one `profile` entry in the plugin `tool({...})` block; re-measure block count first and reconcile the 13-vs-14 CLAUDE.md figure in the same commit.
 **Where**: `apps/opencode-plugin/src/index.ts`, `__tests__/`, `CLAUDE.md` (count line)
-**Depends on**: T12, T13 · **Requirement**: MPS-07 · **Tests**: unit · **Gate**: full (`bun run test:plugins`)
+**Depends on**: T12, T13
+**Requirement**: MPS-07
+**Tests**: unit
+**Gate**: full (`bun run test:plugins`)
 **Commit**: `feat(opencode-plugin): in-process profile tool`
 
-### T15 (TASK-015): Claude profile skill + artifact regen
+### T15: Claude profile skill + artifact regen
+**Task ID**: TASK-015
 **What**: hand-authored profile skill under `skills/`; regenerate skill bundles; `--check` clean.
 **Where**: `skills/` + generated `apps/*-plugin/skills/**`
-**Depends on**: T13 · **Requirement**: MPS-08 · **Tests**: generator check · **Gate**: build
+**Depends on**: T13
+**Requirement**: MPS-08
+**Tests**: generator check
+**Gate**: build
 **Commit**: `feat(skills): profile switch skill`
 
-### T16 (TASK-016): registry-spec amendment + docs + CHANGELOG
+### T16: registry-spec amendment + docs + CHANGELOG
+**Task ID**: TASK-016
 **What**: amend `model-profile-registry/spec.md` non-goal clause in place (reason + pointer, MPS-11); CLAUDE.md agent-harness section note; `.env.example` untouched (no new env); CHANGELOG `[Unreleased]` `### Added`.
 **Where**: `.specs/features/model-profile-registry/spec.md`, `CLAUDE.md`, `FEATURES.md`, `CHANGELOG.md`
-**Depends on**: T14 · **Requirement**: MPS-11 · **Tests**: none (docs — build gate only) · **Gate**: build
+**Depends on**: T14
+**Requirement**: MPS-11
+**Tests**: none (docs — build gate only)
+**Gate**: build
 **Commit**: `docs: amend registry non-goal for switch-time re-render + changelog`
 
-### T17 (TASK-017): close-out
+### T17: close-out
+**Task ID**: TASK-017
 **What**: STATE.md Decisions append (proposed AD — re-check highest ID at append time), FEATURES.json phases, HANDOFF.md, full build gate, dispatch independent validation.
 **Where**: `.specs/**`
-**Depends on**: T16 · **Requirement**: all · **Gate**: build
+**Depends on**: T16
+**Requirement**: all
+**Tests**: none (docs/state — build gate only)
+**Gate**: build
 **Commit**: `docs(specs): model-profile-switching Execute close-out`
 
 ---
