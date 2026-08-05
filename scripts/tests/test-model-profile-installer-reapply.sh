@@ -31,8 +31,13 @@ ROOT="$(mktemp -d "${TMPDIR:-/tmp}/massa-ai-mps-reapply.XXXXXX")"
 trap 'rm -rf "$ROOT"' EXIT
 
 RUNNER="$(command -v node || command -v bun)"
+# T5-T8/UGB-05: both installers now regenerate their bundle in checkout
+# context before anything else runs, and that step requires bun specifically
+# (the generator scripts are Bun scripts) regardless of which runner the line
+# above picked for JSON manipulation.
+BUN_BIN="$(command -v bun)"
 BASE_PATH="/usr/bin:/bin"
-SAFE_PATH="$(dirname "$RUNNER"):$BASE_PATH"
+SAFE_PATH="$(dirname "$RUNNER"):$(dirname "$BUN_BIN"):$BASE_PATH"
 
 state_field() { # state_field STATE_FILE HOST JSONPATH-ish → value or ""
   # JSONPATH-ish: dot-separated keys under platforms[host], e.g. "installRoute"
