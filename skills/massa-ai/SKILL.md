@@ -80,6 +80,8 @@ Before reading any massa-ai file:
   requirement meaning, scope boundaries, destructive/irreversible choices,
   contradictory evidence — ask the user rather than choose silently. Facts
   are looked up; decisions are asked.
+- Before writing or changing implementation code, load
+  `references/coding-guidelines.md` if not already loaded.
 - Complete Evidence Gate before claiming done.
 
 Use internal references only when needed:
