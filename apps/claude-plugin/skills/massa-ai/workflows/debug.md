@@ -3,16 +3,16 @@ name: debug
 description: "Use this workflow for evidence-backed root-cause diagnosis of broken behavior, failures, regressions, or crashes; route new capabilities to feature and broad redesign to spec-driven."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### 🔴 Debug
 
-Use this workflow when the user reports broken behavior, failures, regressions, crashes, unexpected output, flaky behavior, or any issue that needs evidence-backed root-cause diagnosis before a fix. Do not use it for new capabilities; route that to `workflows/feature.md`. Do not use it for broad redesign or unclear cross-boundary changes; route that to `workflows/spec-driven.md`.
+Use when the user reports broken behavior, failures, regressions, crashes, unexpected output, flaky behavior, or any issue needing evidence-backed root-cause diagnosis before a fix. Not for new capabilities — route to `workflows/feature.md`. Not for broad redesign or unclear cross-boundary changes — route to `workflows/spec-driven.md`.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
 1. Generate/reuse `workflowSessionId`: `debug-[entity]`
 2. Load shared references:

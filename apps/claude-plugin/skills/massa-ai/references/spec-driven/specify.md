@@ -1,8 +1,8 @@
 # Spec-Driven Specify
 
-Use this reference for the required Specify phase. **Goal**: Capture WHAT to build with testable, traceable requirements. The output is `.specs/features/<slug>/spec.md`.
+Use for the required Specify phase. **Goal**: Capture WHAT to build with testable, traceable requirements. The output is `.specs/features/<slug>/spec.md`.
 
-If the feature has ambiguous gray areas (multiple valid approaches for user-facing behavior), the agent will automatically trigger the [discuss gray areas](discuss.md) process within this phase. For clear, well-defined features, it goes straight to the next phase.
+If the feature has ambiguous gray areas (multiple valid approaches for user-facing behavior), the agent automatically triggers the [discuss gray areas](discuss.md) process within this phase. Clear, well-defined features go straight to the next phase.
 
 ## Inputs
 
@@ -67,7 +67,7 @@ The table is canonical; the prose is the applied sweep. **Large/Complex** work m
 
 **Load confirmed lessons first:** Before clarifying, load the project's confirmed lessons so past verification failures shape this spec instead of repeating. Run `bun skills/massa-ai/scripts/lessons.ts --root . list --status confirmed` (optionally `--scope [area]` or `--query [term]` for the area this feature touches) and apply what comes back as guidance. Load only `confirmed` — never `candidate` or `quarantined`. If no store exists yet or no code tool is available, skip silently. See [lessons.md](../lessons.md).
 
-**Lightweight context scan first (Knowledge Verification Chain Step 1):** Before asking questions, briefly scan existing code, patterns, and neighboring features relevant to this feature. Prefer massa-ai tooling first (`list_projects`, `search`, `project_map`, `optimized_context`) before `ast-grep`/`rg`/`grep`, honoring freshness and source-precedence (current source overrides stale index/memory). Use what you find to ground your clarifying questions in reality — not to constrain the spec to current implementation. Keep it lightweight (stay within the <40k token budget; reuse the chain, no new machinery). The spec captures WHAT is needed, not only what exists.
+**Lightweight context scan first (Knowledge Verification Chain Step 1):** Before asking questions, briefly scan existing code, patterns, and neighboring features relevant to this feature. Prefer massa-ai tooling first (`list_projects`, `search`, `project_map`, `optimized_context`) before `ast-grep`/`rg`/`grep`, honoring freshness and source-precedence (current source overrides stale index/memory). Use what you find to ground clarifying questions in reality — not to constrain the spec to current implementation. Keep it lightweight (stay within the <40k token budget; reuse the chain, no new machinery). The spec captures WHAT is needed, not only what exists.
 
 You are a thinking partner, not an interviewer. Start open — let the user dump their mental model. Follow the energy: whatever they emphasize, dig into that.
 

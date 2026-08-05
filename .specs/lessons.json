@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 17,
+  "next_id": 19,
   "lessons": [
     {
       "id": "L-001",
@@ -24,7 +24,7 @@
       ],
       "created": "2026-07-22T21:39:38Z",
       "last_seen": "2026-08-03T23:36:28Z",
-      "confidence": 1.0,
+      "confidence": 1,
       "project": "massa-ai",
       "session": "spec-da-inventory-closure",
       "workflow": "spec-driven",
@@ -357,6 +357,53 @@
       "session": "spec-python-to-typescript-scripts",
       "workflow": "spec-driven",
       "entity": "python-to-typescript-scripts",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-017",
+      "key": "ac_gap::byte reduction goals need a pre measured compressible prose denominator on a contract table dense corpus with protected literals prose only compression yields 1 not 20 measure the protected table fraction before committing a percentage",
+      "text": "Byte-reduction goals need a pre-measured compressible-prose denominator: on a contract/table-dense corpus with protected literals, prose-only compression yields ~1%, not 20%; measure the protected+table fraction before committing a percentage.",
+      "signal": "ac_gap",
+      "scope": "skills",
+      "status": "candidate",
+      "features": [
+        "skill-token-optimization"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "spec.md STO-6 / validation.md measurement (skills)"
+      ],
+      "created": "2026-08-05T14:39:17Z",
+      "last_seen": "2026-08-05T14:39:17Z",
+      "project": "massa-ai",
+      "session": "spec-skill-token-optimization",
+      "workflow": "spec-driven",
+      "entity": "skill-token-optimization",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-018",
+      "key": "ac_gap::editing a skill markdown body workflow or agent charter requires bumping its frontmatter metadata version in the same change any feature touching skills massa ai workflows md or skills agents skill md must carry a version bump ac",
+      "text": "Editing a skill markdown body (workflow or agent charter) requires bumping its frontmatter metadata.version in the same change; any feature touching skills/massa-ai/workflows/*.md or skills/agents/*/SKILL.md must carry a version-bump AC.",
+      "signal": "ac_gap",
+      "scope": "skills",
+      "status": "candidate",
+      "features": [
+        "skill-token-optimization"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "user correction post-PR#71: metadata.version left at 1.0.0 on 36 edited workflows (skills/massa-ai/workflows)",
+        "user correction post-PR#71 (2nd pass): judge/meta-judge/navigator charters also body-changed without a version bump"
+      ],
+      "created": "2026-08-05T15:15:33Z",
+      "last_seen": "2026-08-05T15:15:33Z",
+      "project": "massa-ai",
+      "session": "spec-skill-token-optimization",
+      "workflow": "spec-driven",
+      "entity": "skill-token-optimization",
       "confidence": 0.62
     }
   ]

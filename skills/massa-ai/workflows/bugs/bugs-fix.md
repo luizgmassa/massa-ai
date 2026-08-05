@@ -3,18 +3,18 @@ name: bugs-fix
 description: "Executes fixes from a saved bugs audit report; not for findings-only discovery, single known issues without a report, or broad product changes."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Bugs Fix
 
-Use this workflow only to execute fixes from a bugs audit markdown report.
+Execute fixes from a bugs audit markdown report only.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
-Do not use this workflow for findings-only bug discovery; route that to `workflows/bugs/bugs-audit.md`. Do not use it for one known broken behavior without an audit report; route that to `workflows/debug.md`. Do not use it for broad product/design changes; route those to `workflows/spec-driven.md`.
+Not for findings-only bug discovery — route to `workflows/bugs/bugs-audit.md`. Not for one known broken behavior without an audit report — route to `workflows/debug.md`. Not for broad product/design changes — route to `workflows/spec-driven.md`.
 
 1. Resolve/reuse `workflowSessionId`: `bugs-fix-[entity]`
 2. Load shared references:
@@ -31,7 +31,7 @@ Do not use this workflow for findings-only bug discovery; route that to `workflo
    - If the user asks for "latest" or gives no path, require a concrete target focus first; do not run the latest bugs report against an unspecified target.
    - Select the latest `audits/bugs/<YYYY-MM-DD bugs-audit>.md` only after target focus is known, using `references/audit-report-io.md`.
    - Stop if no report exists; do not infer findings from conversation history.
-   - Validate the report with `references/audit-report-io.md`: workflow, `ProjectId`, `Target`, `Target Focus`, scope, git base/head, required fields, `BUG-` IDs, resolved files or material scope evidence, and current file/line evidence. Stop on invalid, stale, target-drifted, or ambiguous reports before editing.
+   - Validate the report deterministically: `bun skills/massa-ai/scripts/validate_audit_report.ts <path> --family bugs` (`references/audit-report-io.md`, Deterministic Validation); non-zero exit blocks editing. Also confirm resolved files or material scope evidence and current file/line evidence; stop on stale, target-drifted, or ambiguous reports.
 5. Extract actionable bug findings:
    - Keep findings with concrete `Bug Class`, `Impacted Flow`, `Trigger or Repro Path`, `Root Cause Hypothesis`, `Regression Risk`, `Location`, `Evidence`, `Simplest Fix Direction`, and `Verification Suggestion`.
    - Ignore ruled-out candidates, no-finding sections, and low-confidence hardening ideas unless the user explicitly asks to include them.

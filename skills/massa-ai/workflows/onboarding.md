@@ -3,14 +3,14 @@ name: onboarding
 description: "Use this workflow on a first session or with missing project context to resolve project identity, establish memory/index state, and capture an architecture overview."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### 🟢 Onboarding (New Project / First Session)
 
-Use this workflow for a first session, missing project context, or repo setup where the agent must resolve the project identity, establish usable memory/index state, and capture a high-level architecture overview before deeper work.
+Use for a first session, missing project context, or repo setup where the agent must resolve the project identity, establish usable memory/index state, and capture a high-level architecture overview before deeper work.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
 1. Resolve `projectId` and `workflowSessionId` (`onboarding-[entity]`).
 2. `recall` -> check for existing project identity and knowledge.

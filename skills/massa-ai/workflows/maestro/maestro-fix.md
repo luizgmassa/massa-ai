@@ -3,16 +3,16 @@ name: maestro-fix
 description: "Child-only workflow to fix confirmed MST-prefixed findings from a saved Maestro audit report or an explicit maestro-audit handoff."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Maestro Fix
 
-Use this child-only workflow to fix confirmed `MST-*` findings from a saved Maestro audit report or an explicit `maestro-audit` handoff.
+Child-only workflow: fix confirmed `MST-*` findings from a saved Maestro audit report or an explicit `maestro-audit` handoff.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
 Reject direct use without a saved `audits/maestro/<YYYY-MM-DD maestro-audit.md>` report or a parent audit handoff that includes the same required metadata. Do not execute from chat summaries, remembered findings, inline comments, or unsaved model analysis. The saved report or parent handoff is the source of truth.
 
@@ -40,7 +40,7 @@ Reject direct use without a saved `audits/maestro/<YYYY-MM-DD maestro-audit.md>`
 3. Select and validate the report:
    - Prefer an exact report path plus optional `MST-*` IDs.
    - For `latest` or omitted path, require a concrete target focus, then select only from `audits/maestro/`.
-   - Validate metadata: `Workflow: maestro-audit`, `ProjectId`, `WorkflowSessionId`, `Target`, `Target Focus`, `Scope`, `Git Base`, `Git Head`, `Scenario Source`, flow inventory, Maestro run matrix, JUnit report/artifact evidence, Verification/Test Fidelity Checklist, and Execution Handoff.
+   - Validate metadata deterministically: `bun skills/massa-ai/scripts/validate_audit_report.ts <path> --family maestro` (`references/audit-report-io.md`, Deterministic Validation); non-zero exit blocks editing. Also confirm flow inventory, Maestro run matrix, JUnit report/artifact evidence, Verification/Test Fidelity Checklist, and Execution Handoff are present.
    - Stop on invalid, stale, target-drifted, or ambiguous reports.
 4. Extract actionable findings:
    - Keep only selected `MST-*` findings with concrete location, scenario source, evidence, impacted journey, flake or coverage risk, simplest sufficient fix, and Verification Suggestion.

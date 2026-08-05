@@ -1,6 +1,6 @@
 # RFC Quality And Lifecycle
 
-Load this reference before challenging, finalizing, saving, updating, or closing an RFC.
+Load before challenging, finalizing, saving, updating, or closing an RFC.
 
 ## Quality Gate
 

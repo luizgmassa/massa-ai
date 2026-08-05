@@ -3,20 +3,20 @@ name: general
 description: "Final fallback workflow for coding, planning, review, or implementation work when no specialized massa-ai workflow is a better match."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### General Coding Workflow
 
-Use this workflow for coding, planning-before-coding, review, or implementation work when no specialized massa-ai workflow is a better match. This is the final fallback, not a replacement for explicit or specialized workflows.
+Use for coding, planning-before-coding, review, or implementation work when no specialized massa-ai workflow is a better match. Final fallback, not a replacement for explicit or specialized workflows.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
 1. Resolve or reuse `projectId` and a stable `workflowSessionId`: `general-[entity]`.
 2. Run General fallback preflight before source work: name the specialized workflow considered, the exact rejected reason, and why fallback does not change verification, mutation behavior, or memory scope. Ask the user only when the rejected workflow would change those behaviors.
-3. Recall relevant durable context with `recall`. Treat recalled memory as a lead until current source confirms it. Confirm recalled memory against current source before relying on it only when the change touches the enumerated risk-domain set: public API, data loss, auth/PII, migrations, or cross-service contracts. Otherwise trust recalled memory and cite it with a one-line source note.
+3. Recall relevant durable context with `recall`. Treat recalled memory as a lead until current source confirms it. Confirm against current source before relying on it only when the change touches the enumerated risk-domain set: public API, data loss, auth/PII, migrations, or cross-service contracts. Otherwise trust recalled memory and cite it with a one-line source note.
 4. Create a Synapse session when planned related `search` calls >=2, following `references/synapse-policy.md`.
 5. Load confirmed project lessons through `references/lessons.md` when `.specs/lessons.json` exists:
    `bun skills/massa-ai/scripts/lessons.ts --root . list --status confirmed`
@@ -38,10 +38,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
 
 ## Failure Handling
 
-- If massa-ai is unavailable, continue with focused shell and file inspection while retaining the project and workflow session concepts.
-- If recall is empty, proceed as a cold start without inventing memory.
-- If Synapse is unavailable, continue with stateless targeted search.
-- If a memory write fails, complete the task and report the durable insight that was not persisted.
+On any tool/index/MCP failure, follow `references/graceful-degradation.md` (also `SKILL.md` Graceful Degradation).
 
 ## Output Contract
 

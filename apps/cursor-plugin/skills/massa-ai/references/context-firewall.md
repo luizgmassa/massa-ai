@@ -1,6 +1,6 @@
 # Context Firewall
 
-Use this reference before loading raw artifacts >200 lines, >20 KB, >50 search hits, generated reports, logs, screenshots, browser snapshots, CSVs, external research, or any source batch likely to exceed the next decision's needs.
+Use before loading raw artifacts >200 lines, >20 KB, >50 search hits, generated reports, logs, screenshots, browser snapshots, CSVs, external research, or any source batch likely to exceed the next decision's needs.
 
 ## Principle
 
@@ -55,6 +55,7 @@ The main agent receives only:
 - exact next step
 
 Subagents should not return raw dumps. Never poll a running subagent for status and never read a subagent transcript — the returned output contract is the only channel back into the main context (canonical rules: `references/agent-orchestration.md`, Orchestrator Working Memory). The main agent still owns memory recall, persistence, synthesis, and the final Evidence Gate.
+
 
 ## Persistence Boundary
 

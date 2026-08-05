@@ -1,6 +1,6 @@
 # Naming Standards
 
-Use this reference when a workflow writes code, drafts implementation contracts, audits code quality, or executes findings that introduce, rename, or preserve identifiers.
+Use when a workflow writes code, drafts implementation contracts, audits code quality, or executes findings that introduce, rename, or preserve identifiers.
 
 ## Goal
 

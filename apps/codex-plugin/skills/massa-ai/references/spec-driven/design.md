@@ -1,6 +1,6 @@
 # Design
 
-Use this reference when the spec-driven flow includes a Design phase. The output is `.specs/features/<slug>/design.md`. **Goal**: define HOW to build it — architecture, components, what to reuse.
+Use when the spec-driven flow includes a Design phase. The output is `.specs/features/<slug>/design.md`. **Goal**: define HOW to build it — architecture, components, what to reuse.
 
 **Skip this phase when:** The change is straightforward — no architectural decisions, no new patterns, no component interactions to plan. For simple features, design happens inline during Execute.
 
@@ -85,6 +85,22 @@ If the feature involves data, define models before implementation.
 
 ---
 
+## Deterministic Validation
+
+Before presenting `design.md` for confirmation, run:
+
+```bash
+bun skills/massa-ai/scripts/validate_design.ts <path-or-feature-or-root> [--root .]
+```
+
+It checks the three structurally-required sections (`## Design Summary`,
+`## Risks & Concerns`, `## Tech Decisions`, heading-prefix match) and that
+every `Risks & Concerns` table row has a non-empty, non-placeholder
+Mitigation cell — a `> None found` marker with zero rows is a valid empty
+risk register, not an unfilled one. A non-zero exit blocks confirmation. If
+no code-execution tool is available, run the same checks by reading the
+artifact (graceful degradation preserved).
+
 ## Required Sections
 
 `design.md` must include:
@@ -100,6 +116,11 @@ If the feature involves data, define models before implementation.
 - Large/Complex approach tradeoffs: 2-3 viable approaches, same scope, recommendation first, user-confirmed chosen approach.
 - Verification design, including how tests or checks prove each high-risk requirement.
 - Risks, concerns, and mitigations.
+- Tech decisions (non-obvious ones only), with rationale.
+
+`## Design Summary`, `## Risks & Concerns`, and `## Tech Decisions` are the
+three headings the deterministic validator above requires structurally;
+the rest of this list is enforced by review, not by the script.
 
 ## Decision Supersession
 

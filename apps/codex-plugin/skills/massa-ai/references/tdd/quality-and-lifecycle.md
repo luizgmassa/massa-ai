@@ -1,6 +1,6 @@
 # TDD Quality And Lifecycle
 
-Load this reference before challenging, finalizing, saving, or updating a TDD.
+Load before challenging, finalizing, saving, or updating a TDD.
 
 ## Quality Gate
 

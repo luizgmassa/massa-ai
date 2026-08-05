@@ -1,6 +1,6 @@
 # Maestro Workflow Patterns
 
-Use this for stable suite design, setup/teardown strategy, validation assets, and workflow output contracts.
+Use for stable suite design, setup/teardown strategy, validation assets, and workflow output contracts.
 
 ## Stable Flow Design
 

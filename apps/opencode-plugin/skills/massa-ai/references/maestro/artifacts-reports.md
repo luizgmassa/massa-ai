@@ -1,6 +1,6 @@
 # Maestro Artifacts And Reports Reference
 
-Use this when running, auditing, or fixing flows that need report paths, artifact directories, screenshots, videos, debug output, or recording.
+Use when running, auditing, or fixing flows that need report paths, artifact directories, screenshots, videos, debug output, or recording.
 
 ## Reports
 

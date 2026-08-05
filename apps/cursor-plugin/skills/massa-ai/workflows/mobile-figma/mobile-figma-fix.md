@@ -3,16 +3,16 @@ name: mobile-figma-fix
 description: "Fixes confirmed MFM-prefixed findings from a saved mobile Figma audit report; the saved audit report is the source of truth, not screenshots or chat summaries."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Mobile Figma Fix
 
-Use this workflow only to fix confirmed `MFM-*` findings from a saved mobile Figma audit report.
+Fix confirmed `MFM-*` findings from a saved mobile Figma audit report only.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
 Do not execute from chat summaries, screenshots alone, remembered findings, or an unsaved comparison table. The saved `audits/mobile-figma/<YYYY-MM-DD mobile-figma-audit>.md` report is the source of truth. Route fresh comparison work to `mobile-figma-audit`.
 
@@ -31,7 +31,7 @@ Do not execute from chat summaries, screenshots alone, remembered findings, or a
 4. Select a report and target focus:
    - Prefer an exact report path plus optional `MFM-*` IDs.
    - For `latest` or omitted path, require a concrete target focus, then select only from `audits/mobile-figma/`.
-   - Stop if no report exists or metadata does not identify `Workflow: mobile-figma-audit`, project/session, target/focus/scope, source timestamp, repository classification, Target Surface Matrix, Figma source/node mappings/timestamp, per-surface platform configurations, capability matrix, and comparison matrix.
+   - Validate metadata deterministically: `bun skills/massa-ai/scripts/validate_audit_report.ts <path> --family mobile-figma` (`references/audit-report-io.md`, Deterministic Validation); non-zero exit blocks editing. Also stop if no report exists or the report lacks Target Surface Matrix, Figma source/node mappings/timestamp, per-surface platform configurations, capability matrix, or comparison matrix.
    - Reject legacy Android-only reports without the Target Surface Matrix and `Surface ID` fields. Require a fresh audit; do not infer or migrate the missing schema.
 5. Validate report freshness before editing:
    - Re-resolve the target files, rebuild the Target Surface Packet, and verify git scope/base/head when relevant.

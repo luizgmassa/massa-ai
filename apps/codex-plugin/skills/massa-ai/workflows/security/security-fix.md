@@ -3,18 +3,18 @@ name: security-fix
 description: "Executes fixes from a saved security audit report; not for findings-only security review or generic correctness fixes outside an exploitable path."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Security Fix
 
-Use this workflow only to execute fixes from a security audit markdown report.
+Execute fixes from a security audit markdown report only.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
-Do not use this workflow for findings-only security review; route that to `workflows/security/security-audit.md`. Do not use it for generic correctness fixes unless the security report identifies the correctness issue as part of an exploitable path.
+Not for findings-only security review — route to `workflows/security/security-audit.md`. Not for generic correctness fixes unless the security report identifies the correctness issue as part of an exploitable path.
 
 1. Resolve/reuse `workflowSessionId`: `security-fix-[entity]`
 2. Load shared references:
@@ -32,7 +32,7 @@ Do not use this workflow for findings-only security review; route that to `workf
    - If the user asks for "latest" or gives no path, require a concrete target focus first; do not run the latest security report against an unspecified target.
    - Select the latest `audits/security/<YYYY-MM-DD security-audit>.md` only after target focus is known, using `references/audit-report-io.md`.
    - Stop if no report exists; do not infer findings from conversation history.
-   - Validate the report with `references/audit-report-io.md`: workflow, `ProjectId`, `Target`, `Target Focus`, scope, git base/head, required fields, `SEC-` IDs, resolved files or material scope evidence, and current file/line evidence. Stop on invalid, stale, target-drifted, or ambiguous reports before editing.
+   - Validate the report deterministically: `bun skills/massa-ai/scripts/validate_audit_report.ts <path> --family security` (`references/audit-report-io.md`, Deterministic Validation); non-zero exit blocks editing. Also confirm resolved files or material scope evidence and current file/line evidence; stop on stale, target-drifted, or ambiguous reports.
 5. Extract actionable findings:
    - Keep findings with concrete `Security Boundary`, `Asset`, `Location`, `Evidence`, exploit path or trigger, `Negative Test Direction`, `Simplest Fix Direction`, and `Verification Suggestion`.
    - Ignore ruled-out candidates, no-finding sections, and low-confidence hardening ideas unless the user explicitly asks to include them.

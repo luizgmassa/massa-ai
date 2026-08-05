@@ -1,6 +1,6 @@
 # Architecture Lenses
 
-Use this reference for architecture audits, architecture-focused reviews, and refactor planning. It is the shared index and vocabulary guard; load the detail references only when a workflow needs that lens:
+Use for architecture audits, architecture-focused reviews, and refactor planning. Shared index and vocabulary guard; load the detail references only when a workflow needs that lens:
 
 - `references/architecture-domain-lens.md` for bounded contexts, ubiquitous language, subdomain classification, cohesion, and integration patterns.
 - `references/architecture-coupling-lens.md` for dependency graphs, strength/distance/volatility, dependency direction, and contract health.

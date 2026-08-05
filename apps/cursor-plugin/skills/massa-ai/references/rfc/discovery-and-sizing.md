@@ -1,6 +1,6 @@
 # RFC Discovery And Classification
 
-Load this reference before source investigation, RFC classification, impact selection, or clarification questions.
+Load before source investigation, RFC classification, impact selection, or clarification questions.
 
 ## Workflow Fit
 

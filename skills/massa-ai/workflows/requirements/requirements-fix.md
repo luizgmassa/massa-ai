@@ -3,18 +3,18 @@ name: requirements-fix
 description: "Executes fixes from a saved requirements audit report; not for findings-only review or broad feature design when acceptance criteria are missing."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Requirements Fix
 
-Use this workflow only to execute fixes from a requirements audit markdown report.
+Execute fixes from a requirements audit markdown report only.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
-Do not use this workflow for findings-only requirements review; route that to `workflows/requirements/requirements-audit.md`. Do not use it for broad feature design when acceptance criteria are missing; route that to `workflows/spec-driven.md`.
+Not for findings-only requirements review — route to `workflows/requirements/requirements-audit.md`. Not for broad feature design when acceptance criteria are missing — route to `workflows/spec-driven.md`.
 
 1. Resolve/reuse `workflowSessionId`: `requirements-fix-[entity]`
 2. Load shared references:
@@ -31,7 +31,7 @@ Do not use this workflow for findings-only requirements review; route that to `w
    - If the user asks for "latest" or gives no path, require a concrete target focus first; do not run the latest requirements report against an unspecified target.
    - Select the latest `audits/requirements/<YYYY-MM-DD requirements-audit>.md` only after target focus is known, using `references/audit-report-io.md`.
    - Stop if no report exists; do not infer findings from conversation history.
-   - Validate the report with `references/audit-report-io.md`: workflow, `ProjectId`, `Target`, `Target Focus`, scope, git base/head, required fields, `REQ-` IDs, requirement source, resolved files or material scope evidence, and current file/line evidence. Stop on invalid, stale, target-drifted, or ambiguous reports before editing.
+   - Validate the report deterministically: `bun skills/massa-ai/scripts/validate_audit_report.ts <path> --family requirements` (`references/audit-report-io.md`, Deterministic Validation, checks `Requirements Source` too); non-zero exit blocks editing. Also confirm resolved files or material scope evidence and current file/line evidence; stop on stale, target-drifted, or ambiguous reports.
 5. Extract actionable findings:
    - Keep findings with concrete `Requirement Source`, `Requirement ID or Quote`, `Requirement Gap Type`, `Location`, `Evidence`, `Impact`, `Simplest Fix Direction`, and `Verification Suggestion`.
    - Ignore ruled-out candidates and no-finding sections.

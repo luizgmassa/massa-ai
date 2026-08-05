@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Lazy-loaded conditional skill definitions + guard tooling.** SonarQube MCP
+  protocol moved from `implementation-audit.md`/`implementation-fix.md` inline
+  bodies into new `skills/massa-ai/references/sonarqube-mcp.md`; the mobile/Figma
+  design-source intake gate moved from `feature.md`/`spec-driven.md` into
+  `references/mobile-context.md` (new "Design-Source Intake Gate" section); the 5
+  audit scope-resolution branches deduped from the 6 `*-audit.md` workflows into
+  `references/audit-scope.md` as the single home; the router SKILL.md
+  Graceful-Degradation table extracted to new `references/graceful-degradation.md`;
+  the spec-driven brownfield 7-doc table to new
+  `references/spec-driven/brownfield-mapping.md`; plus judge/meta-judge model-hint,
+  stacked-branch, and sub-agent-offer dedupes. Trigger sentences stay inline;
+  only conditional bodies moved. Two new guard scripts enforce the surface:
+  `scripts/check-skill-doc-paths.ts` (every relative `references/…`/`workflows/…`
+  citation must resolve, own-skill-first) and `scripts/skill-protected-literals.ts`
+  (string AND regex-literal anchors that content-coupled tests assert against
+  skill files; `--verify` mode detects paraphrase losses), with
+  `scripts/__tests__/skill-doc-paths.test.ts` in `bun run test:scripts`.
+- **Deterministic audit-report and design validators.**
+  `skills/massa-ai/scripts/validate_audit_report.ts` (metadata, Area↔Prefix
+  membership, `PREFIX-N` format/uniqueness/gap-free sequencing, parameterized by
+  report family) and `skills/massa-ai/scripts/validate_design.ts` (required
+  sections + non-empty mitigations) replace the inline model-run checklists in
+  `references/audit-report-io.md`, all 9 `*-fix.md` workflows, and the
+  spec-driven design step; red-first tests in
+  `scripts/__tests__/audit-report-validators.test.ts` and
+  `spec-driven-validators.test.ts`.
+
+### Changed
+
+- **Caveman compression pass over the skill surface.** Prose-only compression of
+  all 36 workflows, 90 references, and 17 agent charters, with code blocks,
+  commands, YAML, dispatch blocks, tables, and protected literals
+  byte-preserved; plus a boilerplate pass tightening the two per-file workflow
+  preamble sentences and deduplicating the Synapse lifecycle sentence to
+  `references/synapse-policy.md`. Net vs pre-feature main: workflows −7.4%
+  (348,591 → 322,689 B); total skill surface −11,405 B. The feature's ≥20%
+  total-byte goal was missed (recorded in the feature's validation report) —
+  the corpus is contract/table-dense; the win is structural (conditional bodies
+  now load only on trigger). Three stale predecessor-repo hook citations in
+  `hook-enforcement.md`/`lessons.md` repointed to `apps/claude-plugin/hooks/`.
+  All 36 edited workflows and the 3 body-changed agent charters
+  (judge, meta-judge, navigator) bumped to frontmatter
+  `metadata.version: "1.1.0"` (body changed ⇒ version bumps — lesson L-018).
+
 ## [1.26.0] - 2026-08-05
 
 ### Added

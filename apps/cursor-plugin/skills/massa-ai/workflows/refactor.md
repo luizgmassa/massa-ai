@@ -3,16 +3,16 @@ name: refactor
 description: "Behavior-preserving structural cleanup, simplification, decoupling, and testability workflow; route broken behavior to debug and broad boundary redesign to architecture-audit or spec-driven."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### 🔨 Refactor
 
-Use this workflow for behavior-preserving structural cleanup, simplification, decoupling, testability improvements, and code organization changes where the intended external behavior stays the same. Do not use it for broken behavior; route that to `workflows/debug.md`. Do not use it for broad boundary redesign, migration, or unclear architecture direction; route that to `workflows/architecture/architecture-audit.md` or `workflows/spec-driven.md`.
+Use for behavior-preserving structural cleanup, simplification, decoupling, testability improvements, and code organization changes where the intended external behavior stays the same. Not for broken behavior — route to `workflows/debug.md`. Not for broad boundary redesign, migration, or unclear architecture direction — route to `workflows/architecture/architecture-audit.md` or `workflows/spec-driven.md`.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
 1. Resolve/reuse `workflowSessionId`: `refactor-[entity]`
 2. `recall` → load architectural decisions and coupling patterns for the area
@@ -45,7 +45,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - Order non-breaking groups by Data, Domain, then Presentation/Navigation, mapping those labels to repository boundaries when needed.
    - Validate each group with the characterization and verification recipe before committing.
    - Invoke `workflows/commit.md` for each verified group; do not duplicate commit staging, message, audit-exclusion, or Jira-prefix rules in this workflow.
-   - When every group has a confirmed Jira key, follow the reference's optional stacked branch flow: ask whether to create stacked task branches, ask for the base branch and a branch pattern containing `<jira-task-key>` if accepted, create each next branch from the previous task branch, never push, and report branches and commits in push order.
+   - When every group has a confirmed Jira key, follow the optional stacked branch flow in `references/pr-task-fix.md` (Jira-Key Stacked Branches).
 10. Include file-integrity checks when tests, specs, benchmarks, fixtures, or snapshots are validation assets. If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
 11. Use `references/agent-orchestration.md` only for isolated implementation slices or independent verification

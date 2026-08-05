@@ -3,16 +3,16 @@ name: implementation-audit
 description: "Findings-only multi-lens audit of a concrete implementation target that dispatches child audit lenses and saves one durable report for implementation-fix."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Implementation Audit
 
-Use this workflow for a findings-only multi-lens audit of a concrete implementation target: modified files, explicit files/globs, commit ranges, branch comparisons or PR diffs, modules/packages, symbols/classes/functions, feature/runtime flows, or an explicitly requested whole-repository sample.
+Findings-only multi-lens audit of a concrete implementation target: modified files, explicit files/globs, commit ranges, branch comparisons or PR diffs, modules/packages, symbols/classes/functions, feature/runtime flows, or an explicitly requested whole-repository sample.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Do not use this parent workflow when the user wants only one audit lens; route directly to that lens. Do not edit code. This workflow resolves one shared implementation scope packet, dispatches selected child lenses, and saves one durable report for `workflows/implementation/implementation-fix.md`.
+Not for a single requested audit lens — route directly to that lens. Do not edit code. This workflow resolves one shared implementation scope packet, dispatches selected child lenses, and saves one durable report for `workflows/implementation/implementation-fix.md`.
 
 1. Resolve/reuse `workflowSessionId`: `implementation-audit-[entity]`.
 2. Load shared references:
@@ -53,18 +53,10 @@ Do not use this parent workflow when the user wants only one audit lens; route d
 
     - Repeated-search children receive isolated Synapse sessions. Durable child tags retain the parent session and workflow-specific session.
 8. Use deterministic sensors when target-relevant commands are expected to finish in <=5 minutes and need no network, destructive action, production credential, or unapproved external service: tests, builds, lint, type checks, static checks, import checks, or focused runtime commands. Record skipped commands with one reason enum: `too-expensive`, `needs-network`, `needs-credentials`, `destructive-risk`, `outside-scope`, `tool-missing`, or `not-applicable`. Model judgment alone is not completion evidence.
-9. Check whether SonarQube MCP is available and useful for the implementation scope:
-   - Detect callable SonarQube MCP tools at runtime, such as project discovery, issue search, file/snippet analysis, advanced code analysis, duplicated-file search, component measures, security hotspots, guidelines, or quality gate status.
-   - If SonarQube MCP is unavailable, no project key can be resolved, required credentials/configuration are missing, or the target files are outside the configured SonarQube project, record `SonarQube MCP: not evaluated` with the skipped-check reason and continue normal lens synthesis.
-   - If available, use `references/context-firewall.md` and pass only the immutable implementation scope packet, resolved files, branch/PR identifiers, project key, and minimal file contents or paths required by the selected SonarQube tools.
-   - Wait for SonarQube MCP execution to finish when a tool starts analysis, capture quality gate status when available, and summarize raw issues/measures/hotspots instead of copying raw tool output into the report.
-   - Normalize actionable SonarQube results into only these implementation audit areas: Architecture, Correctness/Bugs, Code Quality, Security, and Tests. Do not create a Requirements finding from SonarQube output.
-   - Preserve Sonar issue key, rule key, tool name, severity/impact, file/line, quality gate condition, and evidence summary inside the normalized finding.
-   - Use normal source-qualified implementation IDs after normalization, such as `Architecture/ARCH-1`, `Correctness/BUG-1`, `Code Quality/CQ-1`, `Security/SEC-1`, or `Tests/TST-1`; do not invent `SONAR-*` executable finding IDs.
-   - Keep unmapped, duplicate, low-context, or out-of-scope SonarQube results in Scope And Evidence or skipped checks, not in Findings or Execution Handoff.
+9. Check whether SonarQube MCP is available and useful for the implementation scope. If available, use it per `references/sonarqube-mcp.md` (detection, firewall, normalization, ID mapping); otherwise record `SonarQube MCP: not evaluated` with the skipped-check reason and continue.
 10. Synthesize one result:
    - Start with a lens coverage matrix using `run`, `not evaluated`, `skipped`, or `failed`.
-   - Include SonarQube MCP as evidence in the coverage matrix or Scope And Evidence, with quality gate status when available.
+   - Include SonarQube MCP evidence per `references/sonarqube-mcp.md` (Reporting Integration).
    - Preserve each child lens Verification/Test Fidelity Checklist from `references/audit-report-io.md` and summarize checklist proof in the parent lens coverage matrix, Scope And Evidence, and Execution Handoff.
    - Tie every source-qualified finding or no-finding claim to deterministic sensors, commands/artifacts, results, validation assets, or skipped-check reasons. Model judgment alone cannot satisfy verification/testing all-clear.
    - Deduplicate findings by root cause and order them `critical`, `high`, `medium`, then `low`.
@@ -77,8 +69,8 @@ Do not use this parent workflow when the user wants only one audit lens; route d
    - Required metadata: `Workflow: implementation-audit`, `ProjectId`, `WorkflowSessionId`, `Target`, `Target Focus`, `Scope`, `Git Base`, `Git Head`, `Source Evidence Timestamp`, and `Requirements Source` or `n/a`.
    - Required sections: lens coverage matrix, findings, ruled-out candidates when relevant, scope and evidence, Verification/Test Fidelity Checklist, execution handoff, skipped checks, and residual risk.
    - The execution handoff lists ordered source-qualified IDs, dependencies, likely affected files, validation assets, verification commands, and cautions for `implementation-fix`.
-   - Sonar-derived findings enter the execution handoff only after normalization to one of the supported source lens IDs and with enough evidence for `implementation-fix` to revalidate from the saved markdown report.
-12. Persist only durable repeated patterns, approved architecture/requirements interpretations, or accepted exceptions after Importance Calibration. Use `workflow:implementation-audit` and the required project/session/entity/memory tags. Do not persist one-off findings, raw SonarQube output, or raw child output.
+   - Sonar-derived findings: see `references/sonarqube-mcp.md` (Reporting Integration) for execution-handoff eligibility.
+12. Persist only durable repeated patterns, approved architecture/requirements interpretations, or accepted exceptions after Importance Calibration. Use `workflow:implementation-audit` and the required project/session/entity/memory tags. Do not persist one-off findings or raw child output; SonarQube output persistence follows `references/sonarqube-mcp.md`.
 13. Complete `references/evidence-gate.md`.
 
 ## Examples

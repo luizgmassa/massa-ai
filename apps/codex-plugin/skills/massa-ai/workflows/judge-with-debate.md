@@ -3,16 +3,16 @@ name: judge-with-debate
 description: "Explicit-route workflow to evaluate an artifact through multi-judge debate against a tailored specification, converging on a consensus verdict or honest no-consensus."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Judge With Debate
 
-Use this workflow when the user explicitly asks to evaluate an artifact through multi-judge
+Use when the user explicitly asks to evaluate an artifact through multi-judge
 debate — "judge this", "judge-with-debate", "evaluate with debate", "run the judges on X". The
 user supplies artifact path(s) plus a task description (what the artifact was supposed to
-accomplish) and optionally evaluation context. This is a standalone, explicit-route workflow: it
-is never auto-selected by the router for generic review work (use `reviewer`, `*-audit`, or
+accomplish) and optionally evaluation context. Standalone, explicit-route workflow: never
+auto-selected by the router for generic review work (use `reviewer`, `*-audit`, or
 `plan-critic` for those).
 
 The protocol: a meta-judge authors a tailored evaluation specification **once**; three
@@ -21,7 +21,7 @@ disagreements over **up to 3 rounds**; the panel converges on a consensus verdic
 honest no-consensus. Ported from the NeoLabHQ `judge-with-debate` pattern; this file is the
 canonical contract here — repository contracts win on any conflict with the base.
 
-Before the first substantive read, load `references/project-context.md` and run the
+Before the first substantive read, load `references/project-context.md` and run its
 project-context intake sweep for the target repository (the workspace holding the artifact
 under evaluation, which may differ from this repo).
 

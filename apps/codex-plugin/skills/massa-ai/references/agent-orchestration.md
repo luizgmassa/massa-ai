@@ -1,6 +1,6 @@
 # Agent Orchestration
 
-Use this reference when a workflow benefits from isolated context, parallel work, or independent verification.
+Use when a workflow benefits from isolated context, parallel work, or independent verification.
 
 Load `references/context-firewall.md` first when the delegated work may involve verbose logs, snapshots, generated reports, external research, or broad source inspection.
 
@@ -23,7 +23,7 @@ Subagents do bounded work only. Do not delegate everything.
 
 Tokens are spent once; context shapes every decision that follows. The orchestrator's
 working memory is the asset every rule below protects — delegation exists to keep
-disposable reasoning out of the main thread, not only to parallelize.
+disposable reasoning out of the main thread, not just to parallelize.
 
 - **Never poll a running subagent for status, and never ingest a subagent's raw
   transcript, JSONL, or intermediate reasoning — running or completed.** The
@@ -97,6 +97,21 @@ installed, spawning forbidden by platform policy, or the host returns an unknown
 `subagent_type` — do not retry under another name and do not invent one. Run the
 delegated scope locally against the same output contract, and report the skipped
 delegation with its reason in the Evidence Gate.
+
+## Model Diversity Fallback
+
+Applies to any charter whose `metadata.model_tier` is a fallback and whose
+dispatching workflow additionally requests per-invocation model diversity at
+dispatch time (e.g. `judge` — 3 parallel slots; `meta-judge` — one slot).
+
+- The charter's `metadata.model_tier` is the fallback every host runs when
+  dispatch-time model selection is unavailable.
+- The dispatching workflow (e.g. `workflows/judge-with-debate.md`) is the
+  single source for the current slot/model assignment, not the charter file.
+- When dispatch-time selection is unavailable, every affected slot runs the
+  charter default, and the orchestrator records `DIVERSITY DEGRADED`
+  (multi-slot) or an equivalent diversity warning (single-slot) per the
+  dispatching workflow's own contract.
 
 ## Roles
 

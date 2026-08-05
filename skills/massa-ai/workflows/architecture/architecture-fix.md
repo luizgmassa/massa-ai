@@ -3,18 +3,18 @@ name: architecture-fix
 description: "Executes fixes from a saved architecture audit report; not for findings-only review or broad new design work with missing requirements."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Architecture Fix
 
-Use this workflow only to execute fixes from an architecture audit markdown report.
+Execute fixes from an architecture audit markdown report only.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
-Do not use this workflow for findings-only architecture review; route that to `workflows/architecture/architecture-audit.md`. Do not use it for broad new design work with missing requirements; route that to `workflows/spec-driven.md`.
+Not for findings-only architecture review — route to `workflows/architecture/architecture-audit.md`. Not for broad new design work with missing requirements — route to `workflows/spec-driven.md`.
 
 1. Resolve/reuse `workflowSessionId`: `architecture-fix-[entity]`
 2. Load shared references:
@@ -35,7 +35,7 @@ Do not use this workflow for findings-only architecture review; route that to `w
    - If the user asks for "latest" or gives no path, require a concrete target focus first; do not run the latest architecture report against an unspecified target.
    - Select the latest `audits/architecture/<YYYY-MM-DD architecture-audit>.md` only after target focus is known, using `references/audit-report-io.md`.
    - Stop if no report exists; do not infer findings from conversation history.
-   - Validate the report with `references/audit-report-io.md`: workflow, `ProjectId`, `Target`, `Target Focus`, scope, git base/head, required fields, `ARCH-` IDs, resolved files or material scope evidence, and current file/module evidence. Stop on invalid, stale, target-drifted, or ambiguous reports before editing.
+   - Validate the report deterministically: `bun skills/massa-ai/scripts/validate_audit_report.ts <path> --family architecture` (`references/audit-report-io.md`, Deterministic Validation); non-zero exit blocks editing. Also confirm resolved files or material scope evidence and current file/module evidence; stop on stale, target-drifted, or ambiguous reports.
 5. Extract actionable architecture findings:
    - Keep findings with concrete `Lens`, `Boundary/Module`, `Tradeoff`, `Location`, `Evidence`, `Impact`, `Simplest Fix Direction`, and `Verification Suggestion`.
    - Require lens-specific closure evidence: domain findings need language/ownership or integration evidence; coupling findings need strength/distance/volatility or dependency-direction evidence; deepening findings need deletion-test, seam, dependency-category, or test-surface evidence.
@@ -55,7 +55,7 @@ Do not use this workflow for findings-only architecture review; route that to `w
    - Coupling: reduce strength before distance; replace internal model sharing with explicit contracts, remove cross-boundary knowledge of internals, invert dependencies at stable seams, keep cohesive local coupling close, and avoid cycles.
    - Deepening: delete shallow pass-through modules, merge split concepts when locality improves, deepen useful interfaces by hiding invariants and ordering, test through the interface, and clarify seams only where variation, dependency direction, external I/O, or test substitution justifies it.
    - When a deepening candidate has two or more viable interface shapes, load the Interface Design Method from `references/architecture-deepening-lens.md` (Design It Twice) and pick by leverage and locality before editing.
-   - When you decide not to apply a reported refactor, record the load-bearing reason; if it is likely to recur, offer an ADR via `workflows/adr.md` so the rejection is not re-litigated.
+   - When you decide not to apply a reported refactor, record the load-bearing reason; if likely to recur, offer an ADR via `workflows/adr.md` so the rejection is not re-litigated.
    - Prefer move, merge, inline, or clarify existing seams before adding new abstractions.
    - Use ports/adapters or anti-corruption layers only when the report evidence shows real volatility, boundary pressure, external dependency pressure, model leakage, or at least two real adapters such as production plus test.
    - Do not turn a local code-quality concern into an architecture migration; route broad new design, VSA migration, new service boundaries, or unclear ownership to `workflows/spec-driven.md`.

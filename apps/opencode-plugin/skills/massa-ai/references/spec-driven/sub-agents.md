@@ -1,6 +1,6 @@
 # Sub-Agent Delegation
 
-Use this reference during Execute when formal task planning has more than 3 tasks, when the user explicitly asks for delegation, or when final validation needs an independent verifier. Full mechanics for phase-batch workers and the Verifier sub-agent used during Execute.
+Use during Execute when formal task planning has more than 3 tasks, when the user explicitly asks for delegation, or when final validation needs an independent verifier. Full mechanics for phase-batch workers and the Verifier sub-agent used during Execute.
 
 ## Phase-Batch Workers
 

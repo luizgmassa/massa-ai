@@ -1,6 +1,6 @@
 # Spec-Driven Execute
 
-Use this reference for the required Execute phase. Implement ONE task at a time: surgical changes, verify, commit, repeat. Validation is the mandatory final Execute gate, not a separate phase.
+Use for the required Execute phase. Implement ONE task at a time: surgical changes, verify, commit, repeat. Validation is the mandatory final Execute gate, not a separate phase.
 
 <!-- validator anchors: evidence-or-zero mapping -->
 
@@ -473,6 +473,8 @@ Then run `references/spec-driven/validate.md` as the final Execute gate. The ver
 ---
 
 ## Pause / End of Session
+
+**Checkpoints (long-running task sequences):** create a checkpoint via `create_checkpoint` at task boundaries with `taskId`, `description`, `progressPercent`, `currentStep`, `nextAction`, `fileChanges`, and `checkpointType: "manual"` so progress is resumable after interruption. If resuming after interruption, call `list_checkpoints` with the `taskId` and `restore_checkpoint` to recover task state before continuing. If `create_checkpoint` is unavailable (e.g. `task_checkpoints` table missing), continue with `.specs/` artifact state as the fallback.
 
 When work is interrupted, paused, or a session ends before the feature is complete:
 

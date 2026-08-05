@@ -1,6 +1,6 @@
 # FURPS+ Refinement Report Contract
 
-Use this reference from `workflows/refinement/furps-refinement.md` before writing the final report. It extends the shared `references/audit-report-io.md` single-lens contract with FURPS-specific sections and the required refinement outputs (open questions, suggestions, insights, risks, DoR coverage gaps).
+Use from `workflows/refinement/furps-refinement.md` before writing the final report. Extends the shared `references/audit-report-io.md` single-lens contract with FURPS-specific sections and the required refinement outputs (open questions, suggestions, insights, risks, DoR coverage gaps).
 
 ## Report path
 

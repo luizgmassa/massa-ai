@@ -119,9 +119,9 @@ function checkFile(abs: string): FileCheck {
     errors.push(`metadata.version: expected string, got ${typeof metadata.version}`);
   } else if (!SEMVER_RE.test(metadata.version)) {
     errors.push(`metadata.version fails semver /^\\d+\\.\\d+\\.\\d+$/: "${metadata.version}"`);
-  } else if (metadata.version !== "1.0.0") {
-    errors.push(`metadata.version: expected "1.0.0", got "${metadata.version}"`);
   }
+  // No literal-version pin: a workflow body change bumps its version in the
+  // same change (lesson L-018), so any valid semver is acceptable here.
 
   return { relPath, stem, errors };
 }

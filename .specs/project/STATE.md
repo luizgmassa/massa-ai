@@ -1,6 +1,39 @@
 # massa-ai Spec State
 
-## Current — Workflow Metadata Headers (**VALIDATED PASS 2026-08-05** — T1–T5 done; PR #70 open, CI 14/14 green; merge = user decision)
+## Current — Skill Token Optimization (**VALIDATED PASS 2026-08-05** — T1–T12 done; PR #71 open, CI 5/5 green; ≥20% byte goal MISSED-and-recorded; merge = user decision)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-skill-token-optimization` ·
+  workflow: spec-driven (Large) · persona: AI Engineer (pinned) · branch
+  `spec/skill-token-optimization`, worktree
+  `.claude/worktrees/skill-token-optimization`, cut from `main` @ `41daeb68`.
+- Scope STO-1..9 (user-directed 2026-08-05): lazy-load extractions — SonarQube
+  MCP protocol → new `references/sonarqube-mcp.md`; mobile/Figma design-source
+  intake gate → `references/mobile-context.md`; high-value set (audit-scope
+  5-branch dedupe across 6 audit workflows, SKILL.md graceful-degradation
+  table → `references/graceful-degradation.md`, brownfield 7-doc table,
+  general.md dupe deletion, judge/meta-judge model-hint dedupe, stacked-branch
+  restatement deletions, spec-driven trims). Validator top pack:
+  `validate_audit_report.ts` + `validate_design.ts` (red-first) wired into
+  9 `*-fix.md` + audit-report-io + spec-driven design step. Then caveman
+  compression of 36 workflows + 87 references + 17 agent charters
+  (prose-only; protected literals/code/tables byte-preserved; no
+  `*.original.md`). Baseline @ 41daeb68: 339,809 / 603,273 / 63,781 B.
+- Contract: `.specs/features/skill-token-optimization/{spec,design,tasks}.md`
+  — `3 Phases = 12 Tasks` (T1 main, T2–T7 + T8–T11 two sequential
+  massa-ai-builder Phase workers, T12 main + verification-agent).
+  validate_spec/validate_tasks green (12 tasks parsed).
+- User decisions 2026-08-05: high-value extraction set IN; validator top pack
+  IN; Execute GO with Phase workers (delivery through PR; merge user's);
+  merge order INVERTED in practice: `workflow-metadata-headers` merged first
+  (PR #70 @ `519766bc`); origin/main merged into this branch — frontmatter +
+  compressed bodies combined, only .specs state files conflicted. DO-NOT-EXTRACT: dispatch blocks
+  (agent-orchestration.md:92-93 invariant).
+- Investigation reports (2 read-only subagents, 2026-08-05): 27 conditional
+  findings (~15 actionable; marginals deferred), 24 deterministic-check
+  mechanisms (top pack in scope; rest = follow-up backlog candidate).
+- Execute: T1 @ 8ecbeccc (guards, red-calibrated); T2–T7 Phase worker (6 commits, extractions + validators, full test:scripts 1362/0); T8–T11 Phase worker (compression, −3,060 B source); boilerplate pass @ daf7a2c2 (−3.3 KB preambles/Synapse dedupe); origin/main merged @ 69678336 (WMH frontmatter + compressed bodies, only .specs conflicted; both generators --check 0; post-rebuild test:scripts 1424/0, lint 0, test:plugins 96/0). Measurement vs origin/main: workflows 348,591→322,689 (−7.4%); total −11,405 B; ≥20% goal MISSED (corpus contract-dense; win is structural lazy-loading). CHANGELOG entry added.
+- massa-ai MCP server not used this session; `.specs/` files canonical.
+## Previous — Workflow Metadata Headers (**VALIDATED PASS 2026-08-05** — T1–T5 done; PR #70 open, CI 14/14 green; merge = user decision)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-workflow-metadata-headers` ·
   workflow: spec-driven (Medium) · persona: AI Engineer (pinned) · branch

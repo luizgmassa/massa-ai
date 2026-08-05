@@ -3,16 +3,16 @@ name: implementation-fix
 description: "Executes confirmed findings from a saved implementation audit report; the saved audits/implementation report is the source of truth, not chat summaries."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Implementation Fix
 
-Use this workflow only to execute confirmed findings from a saved implementation audit markdown report.
+Execute confirmed findings from a saved implementation audit markdown report only.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
 Do not execute from chat summaries, inline review comments, remembered findings, or old PR audit reports. The saved `audits/implementation/<YYYY-MM-DD implementation-audit.md>` report is the source of truth. Route fresh findings work to `workflows/implementation/implementation-audit.md`.
 
@@ -32,7 +32,7 @@ Do not execute from chat summaries, inline review comments, remembered findings,
    - If the user provides a path, read that exact markdown file.
    - If the user asks for `latest` or omits a path, require a concrete target focus first, then select the latest matching `audits/implementation/<YYYY-MM-DD implementation-audit.md>` using `references/audit-report-io.md`.
    - Stop if no saved report exists. Tell the user to run `implementation-audit` or provide a report path.
-   - Reject reports missing `Workflow: implementation-audit`, `ProjectId`, `WorkflowSessionId`, `Target`, `Target Focus`, `Scope`, `Git Base`, `Git Head`, `Source Evidence Timestamp`, or `Requirements Source`/`n/a`.
+   - Validate the report deterministically: `bun skills/massa-ai/scripts/validate_audit_report.ts <path> --family implementation` (`references/audit-report-io.md`, Deterministic Validation); non-zero exit rejects the report (missing metadata, or malformed/duplicate/gapped/mis-Area'd source-qualified IDs).
 5. Validate freshness before editing:
    - Verify project, target, target focus, scope, base/head, and resolved files match the current execution target.
    - Re-resolve the current target and stop when material drift invalidates the report unless the user explicitly accepts the risk.
@@ -41,7 +41,7 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 6. Extract actionable findings:
    - Require source-qualified IDs of the form `Area/PREFIX-N` (e.g., `Correctness/BUG-1`, `Architecture/ARCH-1`, `Code Quality/CQ-1`, `Security/SEC-2`, `Requirements/REQ-1`, `Tests/TST-1`), plus severity, confidence, source lens, original ID, location, evidence, impact, smallest fix direction, and verification suggestion. The Area must match the source lens that produced the finding; the canonical area/prefix table and discipline live in `references/audit-report-io.md` (Source-Qualified Finding IDs).
    - Ignore ruled-out candidates, skipped-check notes, no-finding summaries, and suspects unless explicitly selected.
-   - Treat SonarQube-derived items as actionable only when the saved implementation report already normalized them to a supported source-qualified ID with source lens, original ID, Sonar issue/rule evidence, location, impact, and verification suggestion. Never execute directly from raw SonarQube MCP output, quality gate summaries, chat summaries, or remembered Sonar findings.
+   - SonarQube-derived items: see `references/sonarqube-mcp.md` (Fix-Time Consumption) — actionable only via normalized report entries, never raw MCP output.
    - If finding IDs are supplied, execute only those IDs after validating target and report membership.
    - Deduplicate findings sharing one root cause while preserving every original ID in the closure matrix.
 7. Build one remediation matrix before editing: finding -> source lens -> severity -> confidence -> root fix -> likely files -> validation assets -> naming/public-contract impact -> verification command -> dependency/order -> status. Prioritize critical/high findings, then dependency order, blast radius, and verification cost. Keep unrelated cleanup out of scope.

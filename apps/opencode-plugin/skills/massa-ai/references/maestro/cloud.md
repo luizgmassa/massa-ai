@@ -1,6 +1,6 @@
 # Maestro Cloud Reference
 
-Use this only when a Maestro task touches Cloud execution, CI upload, Cloud devices, Cloud-auth-backed AI, or app binary reuse.
+Use only when a Maestro task touches Cloud execution, CI upload, Cloud devices, Cloud-auth-backed AI, or app binary reuse.
 
 ## Cloud Command
 

@@ -1,6 +1,6 @@
 # Tasks
 
-Use this reference only when the TLC v3 flow includes Tasks. The output is the `.specs/features/<slug>/tasks.md`.
+Use only when the TLC v3 flow includes Tasks. The output is the `.specs/features/<slug>/tasks.md`.
 
 **Goal**: Break into GRANULAR, ATOMIC tasks. Clear dependencies. Right tools. Sequential phase execution plan.
 

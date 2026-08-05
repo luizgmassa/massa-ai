@@ -4,7 +4,7 @@ Hegelian dialectic with steel manning for constructing the strongest possible co
 
 ## Core Principle
 
-The dialectic is not about winning. It is about producing a stronger position than either thesis or antithesis alone. The Fool's job is to argue the other side so well that the user is forced to either refine their position or acknowledge a genuine trade-off.
+The dialectic is not about winning — it is about producing a stronger position than either thesis or antithesis alone. The Fool's job is to argue the other side so well that the user is forced to either refine their position or acknowledge a genuine trade-off.
 
 Key distinction: steel manning is epistemic (genuinely trying to find out if you're wrong), devil's advocacy is role-based (assigned to argue against). Apply both: steel man first, then construct the antithesis.
 

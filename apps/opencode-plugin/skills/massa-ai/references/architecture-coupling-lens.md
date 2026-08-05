@@ -1,6 +1,6 @@
 # Architecture Coupling Lens
 
-Use this detail reference when an architecture audit or execution task needs dependency health, dependency direction, integration cost, or coupling reduction.
+Use when an architecture audit or execution task needs dependency health, dependency direction, integration cost, or coupling reduction.
 
 ## Contents
 

@@ -1,6 +1,6 @@
 # ADR Authoring
 
-Use this reference from `workflows/adr.md`. It defines how massa-ai creates Architecture Decision Records without delegating orchestration to another ADR skill.
+Use from `workflows/adr.md`. Defines how massa-ai creates Architecture Decision Records without delegating orchestration to another ADR skill.
 
 ## Core Rule
 
@@ -15,9 +15,9 @@ Route matrix:
 | Direction is selected and implementation architecture/contracts/rollout need a blueprint | TDD |
 | Requirements, design, tasks, and execution all need staged approval | Spec-driven |
 
-Source relevance requires the source to name at least one target, constraint, risk, dependency, public contract, rejected option, decision owner, or rollout/rollback consequence for this ADR. Sources that provide only style or adjacent context are examples, not facts.
+Source relevance requires the source to name at least one target, constraint, risk, dependency, public contract, rejected option, decision owner, or rollout/rollback consequence for this ADR. Sources providing only style or adjacent context are examples, not facts.
 
-Do not guess. Missing source facts become questions, source gaps, or a workflow route change.
+Do not guess — missing source facts become questions, source gaps, or a workflow route change.
 
 ## Source Order
 

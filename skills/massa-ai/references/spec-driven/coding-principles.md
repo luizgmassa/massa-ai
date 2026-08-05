@@ -1,6 +1,6 @@
 # Spec-Driven Coding Principles
 
-Use this reference before writing or changing implementation, tests, fixtures, validation assets, scripts, or docs during Execute.
+Use before writing or changing implementation, tests, fixtures, validation assets, scripts, or docs during Execute.
 
 Behavioral bias, not checklist. Read before every implementation.
 

@@ -1,7 +1,7 @@
 # Repo Rules Discovery
 
-Use this reference from `workflows/spec-driven.md` before the first repository
-mutation. It defines how to discover, load, and enforce the target repository's
+Use from `workflows/spec-driven.md` before the first repository
+mutation. Defines how to discover, load, and enforce the target repository's
 own AI-harness rules and implementation conventions, so spec-driven
 implementation conforms to the repo it runs in rather than only to the
 skill's defaults.
@@ -12,8 +12,8 @@ the target repo**: it loads what is present and never invents what is absent.
 ## Principle
 
 A repository's rules live in its own harness files and conventions. spec-driven
-must read them before implementing and enforce conformance, because a change
-that follows the skill's defaults but violates the repo's module layout, test
+must read them before implementing and enforce conformance — a change that
+follows the skill's defaults but violates the repo's module layout, test
 placement, or lint rules is not deliverable. Silence here reads as "the repo
 has no rules", which is almost never true — it means they were not looked up.
 

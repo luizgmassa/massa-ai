@@ -1,6 +1,6 @@
 # Spec-Driven Context Limits
 
-Use this reference when planning context loading for a spec-driven feature or when `.specs/features/<slug>/` artifacts grow large enough to reduce implementation quality.
+Use when planning context loading for a spec-driven feature or when `.specs/features/<slug>/` artifacts grow large enough to reduce implementation quality.
 
 ## Targets
 

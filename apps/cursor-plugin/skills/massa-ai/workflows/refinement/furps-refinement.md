@@ -3,18 +3,18 @@ name: furps-refinement
 description: "Findings-only refinement of a PRD and/or ADR against the FURPS+ quality model before implementation, fanning out one sub-agent per dimension with a structured report."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### FURPS+ Refinement
 
-Use this workflow for findings-only refinement of a Product Requirements Document (PRD) and/or Architecture Decision Record (ADR) against the FURPS+ quality model, before implementation. It runs The Fool as an input-validation pre-pass, then fans out one sub-agent per FURPS+ dimension, and emits a structured refinement report with open questions, suggestions, insights, risks, and Definition-of-Ready coverage gaps.
+Findings-only refinement of a Product Requirements Document (PRD) and/or Architecture Decision Record (ADR) against the FURPS+ quality model, before implementation. It runs The Fool as an input-validation pre-pass, then fans out one sub-agent per FURPS+ dimension, and emits a structured refinement report with open questions, suggestions, insights, risks, and Definition-of-Ready coverage gaps.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Do not use this workflow to author a new PRD (use `to-prd` or `spec-driven` Specify), author an ADR (use `adr`), propose change (use `rfc`), audit implementation against requirements (use `requirements-audit`), or audit code/security/architecture. It refines the document itself; it does not edit code.
+Not for authoring a new PRD (use `to-prd` or `spec-driven` Specify), authoring an ADR (use `adr`), proposing change (use `rfc`), auditing implementation against requirements (use `requirements-audit`), or auditing code/security/architecture. It refines the document itself; it does not edit code.
 
-This workflow is findings-only. Do not edit the PRD/ADR unless the user separately asks.
+Findings-only: do not edit the PRD/ADR unless the user separately asks.
 
 1. Resolve/reuse `workflowSessionId`: `furps-refinement-[entity]`. Resolve `projectId` per the router. Budget `recall` (`limit <= 3`, `minImportance >= 0.7`, `types=["critical","decision","pattern"]`) for prior ADRs, accepted decisions, DoR, and refinement patterns.
 2. Load shared references:

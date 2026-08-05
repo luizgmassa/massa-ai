@@ -3,16 +3,16 @@ name: maestro-audit
 description: "Findings-only audit of existing Maestro mobile E2E flows, fixtures, setup/teardown, reports, selector stability, flake risk, and scenario coverage; does not edit code."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Maestro Audit
 
-Use this workflow for findings-only audit of existing Maestro mobile E2E flows, fixtures, setup/teardown, reports, artifacts, CI invocation, selector stability, flake risk, and scenario coverage.
+Findings-only audit of existing Maestro mobile E2E flows, fixtures, setup/teardown, reports, artifacts, CI invocation, selector stability, flake risk, and scenario coverage.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Do not edit code or flows in this workflow. Do not use it for new flow implementation; route that to `workflows/maestro/maestro.md`. Do not fix findings directly; invoke `workflows/maestro/maestro-fix.md` as a bounded child workflow only after a saved audit report or audit handoff exists.
+Do not edit code or flows in this workflow. Not for new flow implementation — route to `workflows/maestro/maestro.md`. Do not fix findings directly; invoke `workflows/maestro/maestro-fix.md` as a bounded child workflow only after a saved audit report or audit handoff exists.
 
 1. Resolve/reuse `workflowSessionId`: `maestro-audit-[entity]`.
 2. Load shared references:

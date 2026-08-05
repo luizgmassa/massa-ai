@@ -4,7 +4,7 @@ description: Read-only debate-panel evaluator for judge-with-debate. Score an ar
 license: MIT
 metadata:
   author: S1LV4, luizgmassa
-  version: "1.0.0"
+  version: "1.1.0"
   model_tier: deep
   permission: read-only
 ---
@@ -83,12 +83,9 @@ next_step: <string>
 - References: `references/agent-orchestration.md`, `references/audit-report-io.md` (Judge With Debate Report Contracts).
 
 ## Model Hint
-This charter's `metadata.model_tier` (`deep`) is the fallback every host runs when dispatch-time
-model selection is unavailable. The `judge-with-debate` workflow additionally requests per-slot
-model diversity at dispatch time on hosts that support it — `workflows/judge-with-debate.md` is
-the single source for the current slot assignments, not this file. When dispatch-time selection
-is unavailable, every slot runs the charter default and the orchestrator records
-`DIVERSITY DEGRADED` per the workflow contract.
+See `references/agent-orchestration.md` (Model Diversity Fallback): `metadata.model_tier`
+(`deep`) is the per-slot fallback; `workflows/judge-with-debate.md` owns the live slot
+assignments.
 
 ## Validation Sensors
 - Every criterion score carries an exact quotation from the artifact.

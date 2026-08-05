@@ -1,62 +1,58 @@
-# Handoff — workflow-metadata-headers (COMPLETE — validated PASS; PR #70 open, CI 14/14 green; merge = user decision)
+# Handoff — skill-token-optimization (Specify/Design/Tasks done; Execute approved, Plan Challenge next)
 
-Previous handoffs closed: model-profile-switching merged as PR #69 @
-`b334234b` (v1.25.0 cut in between; its CHANGELOG entry restored under
-`[Unreleased]` @ `6e4a9800`); persona-router-token-optimization merged as
-PR #68 @ `41daeb68`.
+Previous handoffs closed: persona-router-token-optimization merged as PR #68 @
+`41daeb68`; workflow-metadata-headers merged as PR #70 @ `519766bc` (its
+frontmatter now combined with this branch via merge of origin/main).
 
-Session `spec-workflow-metadata-headers` · workflow spec-driven (Medium) ·
-persona route: AI Engineer (`context-skill-harness-engineer-architect`, via
-repo `AGENTS.md` persona_pin). massa-ai MCP not used this session; `.specs/`
-files canonical. Contract files:
-`.specs/features/workflow-metadata-headers/{spec,tasks}.md` (Design skipped —
-format fixed by the Agent Skills spec + repo SKILL.md convention). Plan
-Challenge already ran (full, pre_mortem, massa-ai-plan-critic; F1–F5 folded
-into spec/tasks). Do not re-run it for the existing plan. Independent
-validation PASS (6/6 ACs, 5/5 mutants killed) —
-`.specs/features/workflow-metadata-headers/validation.md`.
+Session `spec-skill-token-optimization` · workflow spec-driven (Large) ·
+persona route: AI Engineer (pinned). massa-ai MCP not used this session;
+`.specs/` files canonical. Contract files:
+`.specs/features/skill-token-optimization/{spec,design,tasks}.md`.
+
+## Objective
+
+Cut token cost of the skill surface (STO-1..9): lazy-load conditional
+definitions (SonarQube → `references/sonarqube-mcp.md`; mobile/Figma
+design-source intake gate → `references/mobile-context.md`; high-value
+extraction set incl. audit-scope 5-branch dedupe), validator top pack
+(`validate_audit_report.ts`, `validate_design.ts`, red-first), caveman
+compression of 36 workflows + 87 references + 17 agent charters. Baseline @
+`41daeb68`: 339,809 / 603,273 / 63,781 B.
 
 ## Environment
 
-- Plain branch `spec/workflow-metadata-headers` in the MAIN checkout (not a
-  worktree), cut from `main` @ `41daeb68`; `origin/main` @ `b334234b` (PR #69)
-  merged in during T5 after the PR went `CONFLICTING` (conflict blocked the
-  `pull_request` CI trigger entirely — zero CI checks, not red ones).
-- Sibling worktrees may exist under `.claude/worktrees/`. DO NOT touch them.
+- Branch `spec/skill-token-optimization`, worktree
+  `.claude/worktrees/skill-token-optimization`, cut from `main` @ `41daeb68`.
+- Worktree NOT yet provisioned (no `bun install`); T1 provisions: `bun
+  install`, copy `node_modules/tree-sitter*/build/` from main checkout, verify
+  `bun test scripts/tests/verify-tree-sitter-grammars.test.ts` → 9/0.
+- `spec.md`/`design.md`/`tasks.md` written; validate_spec + validate_tasks
+  exit 0 (12 tasks parsed). FEATURES.json registered + active; STATE rotated
+  (43→44 sections).
 
-## Commit map (branch, oldest first)
+## User decisions (2026-08-05)
 
-| Commit | Task | Content |
-| --- | --- | --- |
-| `f414cdbf` | T0 | activation: spec/tasks + FEATURES.json + STATE.md rotation |
-| `bfddbb69` | T1+T2 | sensor test (`Bun.YAML.parse`, red observed first: 0/36) + frontmatter on all 36 workflow files |
-| `32f54c83` | T3 | 4-host bundle regen (144 files = 36 × 4), `--check` exit 0 |
-| `3b21dd3d` | T4 | CHANGELOG `### Added`, duplication ceiling 331→471, AC5 amendment, spec state |
-| `bfcab362` | — | validation.md (PASS) + STATE heading |
-| (merge) | T5 | merge `origin/main` @ `b334234b`; conflicts: HANDOFF.md + FEATURES.json (union, active = this feature); post-merge regen/gates recorded in STATE |
+- High-value extraction set IN; validator top pack IN; marginals + remaining
+  22 deterministic mechanisms deferred (recorded in STATE).
+- Execute GO with two sequential massa-ai-builder Phase workers (T2–T7,
+  T8–T11); T1 + T12 main agent; delivery through PR; merge stays user's.
+- Merge order: this feature BEFORE `workflow-metadata-headers` — that branch's
+  T1–T4 frontmatter edits sit UNCOMMITTED in the MAIN checkout; never touch
+  that tree from this feature.
 
-## Incident record (closed)
+## Cautions
 
-T2's original commit `b98dcbf2` landed on `spec/skill-token-optimization` — a
-concurrent session's worktree branch that got checked out under the worker
-mid-run (reflog-verified). Parent verified the commit (37 files, 0 outside
-scope) and cherry-picked it here as `bfddbb69`; the sibling branch was left
-untouched. Byte-check re-verified post-recovery: 36/36 byte-identical after
-stripping frontmatter vs `f414cdbf`.
+- rtk-filtered output corrupted a `git status` reading this session — cite
+  only `rtk proxy`/scripted figures.
+- Dispatch blocks stay inline (`agent-orchestration.md:92-93` invariant);
+  trigger sentences stay inline when a conditional body moves.
+- main moved mid-session (model-profile-switching landed; generator now covers
+  `skills/profile/`): T12 rebases onto `origin/main` + re-runs regen.
+- Workers: branch-check before every commit (a shared checkout's branch can
+  move under a running agent).
 
-## Gate state at handoff
+## Exact Next Step
 
-- Sensor: 1 pass / 0 fail, population 36. Lint: exit 0. Validation PASS
-  (verification-agent; mutant kill 5/5; AC5 worktree-contamination mechanism
-  proven — root cause `benchmarks/needles/resolve.ts` `IGNORED_DIRECTORIES`
-  omits `.claude/`; follow-up recorded).
-- `test:scripts` local: 4 known worktree-contamination failures (AC5 amended:
-  CI authoritative). `skills-duplication-metric` ceiling 471 (in-file reason).
-
-## Next
-
-1. Post-merge: regen bundles + `--check` 0, re-run sensor + duplication metric
-   + lint, commit merge, push — CI then starts (the conflict was what held it
-   at zero checks).
-2. Watch PR #70 CI to green. Merge stays the user's; minor release on merge
-   (CHANGELOG `### Added`).
+Full Plan Challenge gate (The Fool + massa-ai-plan-critic), fold serious
+findings, commit spec artifacts, then T1 (guard tooling, main agent), then
+dispatch Phase 1 worker (T2–T7).

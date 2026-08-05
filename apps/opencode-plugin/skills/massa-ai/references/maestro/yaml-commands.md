@@ -1,6 +1,6 @@
 # Maestro YAML Commands Reference
 
-Use this when authoring or auditing Maestro flow commands. Official command inventory lives at https://docs.maestro.dev/reference/commands-available.md.
+Use when authoring or auditing Maestro flow commands. Official command inventory lives at https://docs.maestro.dev/reference/commands-available.md.
 
 ## Flow Header
 

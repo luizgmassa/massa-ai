@@ -4,7 +4,7 @@ Falsificationism and evidence quality assessment for auditing whether claims are
 
 ## Core Principle
 
-Karl Popper's key insight: a claim is only meaningful if you can specify what would disprove it. The Evidence Audit mode extracts claims from proposals, designs falsification criteria, assesses evidence quality, identifies cognitive biases, and surfaces competing explanations. The goal is not to disprove — it is to determine whether the evidence actually supports the conclusion.
+Karl Popper's key insight: a claim is only meaningful if you can specify what would disprove it. The Evidence Audit mode extracts claims from proposals, designs falsification criteria, assesses evidence quality, identifies cognitive biases, and surfaces competing explanations. The goal is not to disprove — it is to determine whether the evidence supports the conclusion.
 
 ## Process
 

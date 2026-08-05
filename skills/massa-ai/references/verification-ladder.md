@@ -1,6 +1,6 @@
 # Verification Ladder
 
-Use this reference before completing work, and before Quick/Standard/Spec-driven sizing, shared-reference loading, or a verification recipe.
+Use before completing work, and before Quick/Standard/Spec-driven sizing, shared-reference loading, or a verification recipe.
 
 ## Task Sizing Gate
 

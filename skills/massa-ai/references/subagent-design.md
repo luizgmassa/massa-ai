@@ -1,8 +1,8 @@
 # Subagent Design
 
-Use this reference only when designing or revising a reusable subagent role, adding a new role to `references/agent-orchestration.md`, or turning repeated delegated work into a stable role charter.
+Use only when designing or revising a reusable subagent role, adding a new role to `references/agent-orchestration.md`, or turning repeated delegated work into a stable role charter.
 
-Do not load this reference for ordinary one-off delegation. For runtime delegation, use `references/agent-orchestration.md`.
+Do not load for ordinary one-off delegation. For runtime delegation, use `references/agent-orchestration.md`.
 
 ## Principle
 
@@ -30,7 +30,7 @@ Is the work recurring, specialized, context-heavy, independently verifiable, and
   -> Design a reusable subagent role with this reference.
 ```
 
-Prefer a skill/reference when the value is procedure or domain knowledge. Prefer a subagent when the value is isolated context, parallel work, or independent verification.
+Prefer a skill/reference for procedure or domain knowledge. Prefer a subagent for isolated context, parallel work, or independent verification.
 
 Reusable role threshold:
 
@@ -94,7 +94,7 @@ Memory boundary:
 **The packet field list lives in one place: `references/agent-orchestration.md`,
 §Capability Packet.** Do not restate it here — a second copy is what let the field
 sets drift into three diverging shapes before the canonical section existed. When a
-workflow dispatches a reusable role, send that canonical packet rather than a loose
+workflow dispatches a reusable role, send that canonical packet, not a loose
 instruction.
 
 The one field this reference still names on its own is `persona`, because a

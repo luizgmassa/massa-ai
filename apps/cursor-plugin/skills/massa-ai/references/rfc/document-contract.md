@@ -1,6 +1,6 @@
 # RFC Document Contract
 
-Load this reference when drafting or revising an RFC. Preserve the full decision structure while tailoring detail to the RFC type and impact.
+Load when drafting or revising an RFC. Preserve the full decision structure while tailoring detail to the RFC type and impact.
 
 ## Section Contract
 

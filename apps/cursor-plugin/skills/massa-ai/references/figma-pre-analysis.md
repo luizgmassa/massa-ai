@@ -1,6 +1,6 @@
 # Figma Pre-Analysis And Sequential Retrieval
 
-Load this reference whenever a workflow receives one or more Figma links, node
+Load whenever a workflow receives one or more Figma links, node
 IDs, or a readable desktop selection as a design source — the Figma audit/fix
 family (`mobile-figma-audit`, `mobile-figma-fix`), `design`, and the
 design-source gates of implementation workflows (`feature`, `spec-driven`).
@@ -14,14 +14,14 @@ restate it.
 
 Full Figma extraction on unscoped links overloads one context with mixed
 screens, buries feature boundaries, and makes evidence non-attributable. A
-cheap pre-analysis pass first maps what the links contain, so each retrieval
+cheap pre-analysis pass maps what the links contain first, so each retrieval
 pass reads one coherent slice.
 
 ## Stage 1 — Pre-Analysis (always first, exactly one subagent)
 
 Dispatch one read-only subagent (investigator-class; Figma MCP — Model Context
 Protocol — access, no repository mutation) over the user-provided Figma links.
-Its job is understanding, **not** extraction:
+Its job: understanding, **not** extraction:
 
 - Summarize composition: pages, screens, frames, component sets, shared tokens.
 - Summarize product context: what the screens are for, the features they serve,

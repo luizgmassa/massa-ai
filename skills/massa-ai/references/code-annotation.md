@@ -1,7 +1,7 @@
 # Code Annotation And Test Coverage
 
-Use this reference in every implementation workflow, before writing or editing
-source. It defines the three things every created or updated unit of code owes
+Use in every implementation workflow, before writing or editing
+source. Defines the three things every created or updated unit of code owes
 the next reader: an API doc block, a rationale comment, and a test.
 
 ## Principle
@@ -46,7 +46,7 @@ Rules:
 
 ## 2. Rationale Comment
 
-Doc blocks describe the contract. They do not explain why the code changed. Add
+Doc blocks describe the contract, not why the code changed. Add
 a rationale block once at the changed unit — the class, the method, or the
 enclosing block — not on every line.
 
@@ -108,8 +108,8 @@ Rules:
 
 Data models and anemic domain models carry state, not behavior. A unit test
 that constructs them and asserts their own getters, setters, fields, or
-constructor defaults mirrors the implementation and cannot detect that the
-model is wrong — it is the "test that mirrors the code" anti-pattern from the
+constructor defaults mirrors the implementation and cannot detect the
+model is wrong — the "test that mirrors the code" anti-pattern from the
 rule above. **Do not write unit tests for these kinds:**
 
 - **Data models** — persistence-layer entities: ORM-mapped classes, database

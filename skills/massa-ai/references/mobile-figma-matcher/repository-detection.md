@@ -1,6 +1,6 @@
 # Mobile Figma Repository Detection
 
-Use this reference before loading any stack-specific matcher reference. Classify the concrete target module and files, not the repository root or repository name.
+Use before loading any stack-specific matcher reference. Classify the concrete target module and files, not the repository root or repository name.
 
 Monorepositories may contain several valid mobile stacks; classify only modules connected to the requested target.
 

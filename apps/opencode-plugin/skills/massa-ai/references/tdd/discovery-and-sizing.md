@@ -1,6 +1,6 @@
 # TDD Discovery And Sizing
 
-Load this reference before source investigation, document sizing, or clarification questions for the TDD workflow.
+Load before source investigation, document sizing, or clarification questions for the TDD workflow.
 
 ## Evidence Order
 

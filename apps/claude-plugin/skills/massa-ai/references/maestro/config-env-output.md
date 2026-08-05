@@ -1,6 +1,6 @@
 # Maestro Config, Env, And Output Boundaries
 
-Use this when deciding whether a fact belongs in a Flow header, `config.yaml`, CLI invocation, report metadata, or artifact output.
+Use when deciding whether a fact belongs in a Flow header, `config.yaml`, CLI invocation, report metadata, or artifact output.
 
 ## Boundary Matrix
 

@@ -18,7 +18,7 @@ A completion report must include:
 
 Completion reports must also state that tests, specs, fixtures, snapshots,
 schemas, public contracts, and validator checks were not weakened unless the
-user explicitly requested a validation-asset change.
+user explicitly requested it.
 
 ## Acceptable Evidence
 

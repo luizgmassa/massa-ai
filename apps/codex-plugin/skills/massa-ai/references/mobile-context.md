@@ -1,6 +1,6 @@
 # Mobile Context
 
-Use this reference when a non-debug workflow touches KMP, iOS, Android, native bridges, mobile app lifecycle, offline sync, permissions, push/background work, local persistence, or backend-mobile contracts.
+Use when a non-debug workflow touches KMP, iOS, Android, native bridges, mobile app lifecycle, offline sync, permissions, push/background work, local persistence, or backend-mobile contracts.
 
 Mobile is a context modifier, not a primary workflow. Keep the selected workflow based on user intent:
 
@@ -19,13 +19,17 @@ Mobile is a context modifier, not a primary workflow. Keep the selected workflow
 - Fix findings from a security audit report -> `workflows/security/security-fix.md`
 - Broad, cross-boundary, unclear, or multi-platform implementation -> `workflows/spec-driven.md`
 
-For `feature`, `spec-driven`, `rfc`, `adr`, and `tdd`, supported mobile UI work can use the optional design-source gate. Ask for one or more Figma links, node IDs, a readable desktop selection, supplied screenshots, or explicit `none` only when the request is Android, iOS, KMP Compose Multiplatform UI, or plausibly mobile UI. Clear backend, CLI, docs, infrastructure, and non-UI requests skip the prompt.
-
 Maestro is a first-class mobile E2E workflow family when the primary target is flow implementation, existing-flow audit, or saved `MST-*` remediation. Generic test coverage, assertion quality, or regression-risk review still belongs to `workflows/tests/tests-audit.md` or `workflows/tests/tests-fix.md` when the target is not Maestro-specific.
 
-When Figma sources or screenshots are supplied for supported Android, iOS, or KMP Compose Multiplatform UI implementation, keep the parent workflow as the lifecycle owner and invoke `workflows/design.md` only for the affected UI slice or visual feasibility context. Use `workflows/mobile-figma/mobile-figma-audit.md` for compare/audit intent and `workflows/mobile-figma/mobile-figma-fix.md` for saved `MFM-*` findings.
+## Design-Source Intake Gate
 
-Treat `none` as a first-class answer: record `Figma Source: none by user choice` and do not re-ask unless the mobile UI scope changes. For unsupported targets such as Flutter, React Native, web, desktop, or generic design exploration, record supplied design sources as outside mobile Figma scope, do not run mobile Figma, and continue the parent workflow. Screenshots are context-only unless paired with structured Figma evidence; do not claim exact Figma parity, tokens, variables, or dimensions from screenshots alone.
+Use this gate for `feature`, `spec-driven`, `rfc`, `adr`, and `tdd` workflows when the target is Android, iOS, KMP Compose Multiplatform UI, or plausibly mobile UI. Clear backend, CLI, docs, infrastructure, or non-UI work skips the gate entirely.
+
+- Ask once for one or more Figma links, node IDs, a readable desktop selection, supplied screenshots, or explicit `none`. Treat `none` as a first-class answer: record `Figma Source: none by user choice` and do not re-ask unless the mobile UI scope changes.
+- When Figma sources or screenshots are supplied for supported Android, iOS, or KMP Compose Multiplatform UI implementation/update work, keep the parent workflow as the lifecycle owner and invoke `workflows/design.md` only for the affected UI slice or visual feasibility context. Preserve mobile Figma routing by intent: compare/audit wording uses `workflows/mobile-figma/mobile-figma-audit.md`; saved `MFM-*` findings use `workflows/mobile-figma/mobile-figma-fix.md`.
+- When Figma links or node IDs are supplied, load `references/figma-pre-analysis.md` and run its two-stage sequential retrieval protocol before consuming the design evidence.
+- For unsupported targets such as Flutter, React Native, web, desktop, or generic design exploration, record supplied design sources as outside mobile Figma scope, do not run mobile Figma, and continue the parent workflow.
+- Figma defines visible design intent and represented variants only. Screenshots are context-only unless paired with structured Figma evidence; do not claim exact Figma parity, tokens, variables, or dimensions from screenshots alone. Product behavior not represented by the design source still requires a separate requirements source.
 
 ## Mobile Context Packet
 

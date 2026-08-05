@@ -1,6 +1,6 @@
 # Spec-Driven Code Analysis
 
-Use this reference when Specify, Design, Tasks, Execute, or Validate needs source inspection or structural code search.
+Use when Specify, Design, Tasks, Execute, or Validate needs source inspection or structural code search.
 
 <!-- validator anchors: current repository source and approved .specs/ artifacts override stale memory -->
 

@@ -1,6 +1,6 @@
 # Project Context Intake
 
-Use this reference at the start of every workflow, before the first substantive
+Use at the start of every workflow, before the first substantive
 read, edit, plan, or answer. It defines the minimum project-context sweep that
 makes agent behavior match this repository's actual conventions instead of
 generic defaults.
@@ -41,7 +41,7 @@ When two sources conflict, the higher tier wins:
 6. Current repository source code.
 7. Recalled memory — context only, never canonical.
 
-A conflict between a doc and current source is a finding: report it rather than
+A conflict between a doc and current source is a finding — report it rather than
 silently picking a side.
 
 ## Dedupe Guard

@@ -1,6 +1,6 @@
 # Spec-Driven Discuss Gray Areas
 
-Use this reference inside Specify when gray areas or implicit requirements affect behavior, scope, data, security/privacy, compatibility, or acceptance criteria. It captures HOW the user envisions the feature when the spec has ambiguous areas — it is NOT a separate phase; it triggers within Specify when the agent detects gray areas that need user input.
+Use inside Specify when gray areas or implicit requirements affect behavior, scope, data, security/privacy, compatibility, or acceptance criteria. It captures HOW the user envisions the feature when the spec has ambiguous areas — it is NOT a separate phase; it triggers within Specify when the agent detects gray areas that need user input.
 
 **Goal:** Capture HOW the user envisions the feature when the spec has ambiguous areas. Specifications capture WHAT to build. Design captures the architecture. But neither captures the user's vision for ambiguous areas — layout preferences, interaction patterns, error handling style, content tone. Without this, the agent guesses. With this, the agent builds what the user actually imagined.
 

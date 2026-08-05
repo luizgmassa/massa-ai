@@ -1,6 +1,6 @@
 # FURPS+ Refinement Intake & Sub-agent Packet Contract
 
-Use this reference from `workflows/refinement/furps-refinement.md` during intake and before dispatching sub-agents. It defines source detection, DoR sourcing, the context-firewall, the bounded document packet, and the sub-agent packet contracts.
+Use from `workflows/refinement/furps-refinement.md` during intake and before dispatching sub-agents. Defines source detection, DoR sourcing, the context-firewall, the bounded document packet, and the sub-agent packet contracts.
 
 ## Source-type detection
 

@@ -3,23 +3,23 @@ name: design
 description: "Implements or updates a concrete mobile UI from structured Figma evidence or screenshots when no saved audit report exists; route comparisons to mobile-figma-audit."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Design
 
-Use this workflow to implement or update a concrete Android, iOS, or KMP Compose Multiplatform UI from structured Figma evidence or supplied screenshot context when no saved mobile Figma audit report is the source of truth. Route findings-only comparison to `mobile-figma-audit` and saved `MFM-*` remediation to `mobile-figma-fix`.
+Implement or update a concrete Android, iOS, or KMP Compose Multiplatform UI from structured Figma evidence or supplied screenshot context when no saved mobile Figma audit report is the source of truth. Route findings-only comparison to `mobile-figma-audit` and saved `MFM-*` remediation to `mobile-figma-fix`.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
-Do not use this workflow for Flutter, React Native, web UI, generic Figma exploration, variable-only queries, or MCP troubleshooting.
+Not for Flutter, React Native, web UI, generic Figma exploration, variable-only queries, or MCP troubleshooting.
 
 1. Resolve/reuse `workflowSessionId`: `design-[entity]`.
 2. Load `references/mobile-figma-matcher/repository-detection.md`, `references/mobile-figma-matcher/core.md`, `references/mobile-context.md`, `references/codebase-investigation.md`, and `references/verification-ladder.md`. When Figma links or node IDs are provided, load `references/figma-pre-analysis.md` and run its two-stage sequential retrieval protocol before building the Figma Evidence Packet. Load `references/context-firewall.md` before large design/runtime artifacts and `references/synapse-policy.md` when repeated massa-ai searches are expected.
 3. `recall` -> load current component conventions, design-system rules, approved platform/accessibility deviations, prior Figma mappings, asset pipelines, and reusable render recipes. Memory is context, not proof.
-4. Require a concrete feature/module target plus at least one design source: readable Figma node/selection or supplied screenshots. Resolve required visual and interactive states plus a requirements source for behavior not represented in the design source. Ask only when target ownership, runtime platforms, platform-frame mappings, or screenshot authority remain ambiguous after source inspection.
+4. Require a concrete feature/module target plus at least one design source: readable Figma node/selection or supplied screenshots. Resolve required visual and interactive states plus a requirements source for behavior not represented in the design source. Ask only when target ownership, runtime platforms, platform-frame mappings, or screenshot authority stay ambiguous after source inspection.
 5. Build the immutable Target Surface Packet before loading stack guidance. Classify each selected surface and load only its contracts:
    - Android Views XML -> `references/mobile-figma-matcher/android-views.md`.
    - Android Jetpack Compose -> `references/mobile-figma-matcher/android-compose.md`.
@@ -27,8 +27,8 @@ Do not use this workflow for Flutter, React Native, web UI, generic Figma explor
    - iOS SwiftUI -> `references/mobile-figma-matcher/ios-swiftui.md`.
    - Shared KMP Compose Multiplatform -> `references/mobile-figma-matcher/kmp-compose-multiplatform.md` plus native contracts only for selected native source sets, hosts, wrappers, or runtime targets.
 6. Build the Figma Evidence Packet with metadata when needed, design context, screenshot, variables, current Code Connect mappings, variants/states, annotations, and asset inventory. For screenshot-only sources, build a Screenshot Context Packet with provenance, target state, visible constraints, uncertainty, and `Design Evidence Class: screenshot-context-only`; do not infer exact Figma tokens, dimensions, variables, variants, or parity from screenshots alone. Stop if neither structured Figma evidence nor supplied screenshot context is available.
-7. Resolve current components, tokens, resources, assets, source-set ownership, platform adapters, requirements, and existing validation sensors. Create the Design-To-Code Mapping Matrix and one comparison configuration for every selected runtime surface; screenshot-only rows must use inferred visual intent rather than `Figma Value`.
-8. Size the work with the Verification Ladder. Route broad application work, unresolved architecture, cross-feature design-system migration, or implementation that will not fit one clean context window to `spec-driven`.
+7. Resolve current components, tokens, resources, assets, source-set ownership, platform adapters, requirements, and existing validation sensors. Create the Design-To-Code Mapping Matrix and one comparison configuration per selected runtime surface; screenshot-only rows use inferred visual intent, not `Figma Value`.
+8. Size the work with the Verification Ladder. Route broad application work, unresolved architecture, cross-feature design-system migration, or implementation that won't fit one clean context window to `spec-driven`.
 9. Establish the verification recipe before editing. Protect tests, snapshots, screenshot baselines, fixtures, previews, accessibility identifiers, test tags, and automation flows from weakening.
 10. Implement coherent slices using the smallest correct ownership boundary:
     - Reuse existing components and tokens only after resolving semantics, states, accessibility, and values.
