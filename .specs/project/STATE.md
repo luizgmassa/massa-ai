@@ -25,6 +25,23 @@
   T1–T4 via one massa-ai-builder Phase-group worker (user accepted offer);
   verification-agent + T5 delivery by main agent.
 - massa-ai MCP server not used this session; `.specs/` files canonical.
+- Progress (2026-08-05): T1 sensor observed red (0 pass / 1 fail — all 36 files
+  missing frontmatter), green post-T2 (1 pass / 0 fail, population 36 printed).
+  T2 @ `bfddbb69` — wrong-branch incident: the worker's commit first landed on
+  `spec/skill-token-optimization` (a concurrent session's worktree branch that had
+  been checked out under us mid-run, reflog-verified); parent verified the commit
+  (37 files, 0 outside scope) and cherry-picked it here; the sibling branch was
+  left untouched. Byte-check re-run by parent: 36/36 byte-identical after
+  stripping frontmatter vs `f414cdbf`. T3 @ `32f54c83` — bundle regen exit 0,
+  `--check` exit 0 (647 files emitted, 144 committed = 36 × 4 hosts).
+  T4 (inline after the worker hit its API weekly limit): lint exit 0;
+  `test:scripts` 1329 pass / 4 fail — all 4 are `needle-resolution`/
+  `check-frozen-anchors` scanning concurrent worktrees under `.claude/worktrees/`
+  (`DAMPING` anchor 3×, 2 in sibling checkouts; `git diff f414cdbf HEAD` empty on
+  those paths — not WMH fallout; AC5 amended in spec.md: CI is the authoritative
+  venue; scanner-boundary fix recorded as follow-up). `skills-duplication-metric`
+  ceiling 331 → 471 with in-file reason (mandated frontmatter uniformity, gate's
+  own documented-raise convention). CHANGELOG entry under [Unreleased] ### Added.
 
 ## Previous — Persona Router Token Optimization (**VALIDATED PASS 2026-08-04** — T0–T9 done; PR #68 open, CI 14/14 green; merge = user's decision; PRT-02 live walkthrough pending-restart)
 

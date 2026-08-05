@@ -64,6 +64,21 @@ workflow files, version `1.0.0`, following the Agent Skills specification
 - AC5: `bun run test:scripts` exit 0 (includes WMH-03 gate green post-change and
   the untouched 36-count + venue + integrity + parity gates); `bun run lint`
   exit 0.
+  **Amended during Execute (2026-08-05, structural requirement wins):** the
+  local run carries 4 failures from `needle-resolution` / `check-frozen-anchors`
+  scanning concurrent sessions' checkouts under `.claude/worktrees/` (anchor
+  `const DAMPING = 0.85;` resolves 3×: the real
+  `packages/core/src/services/symbol/centrality.ts` plus two worktree copies —
+  measured this session). `git diff f414cdbf HEAD` over those paths is empty:
+  not caused by this feature; CI has no worktrees and is the authoritative AC5
+  venue. AC5 therefore reads: all WMH-relevant suites green locally, full
+  `test:scripts` green in CI. Scanner boundary fix (exclude `.claude/worktrees`)
+  recorded as follow-up, out of scope here. The `skills-duplication-metric`
+  ceiling raise 331 → 471 is accepted: the excess is the mandated frontmatter
+  uniformity itself (same 4 structural lines × 36 files), documented in-file per
+  that gate's own ALLWF-03 precedent — the subject cannot change, uniformity is
+  the requirement. **Open question for the verifier:** confirm the 4 failures
+  reproduce only via worktree paths and that CI's run is green.
 - AC6: WMH-03 sensor observed red on the pre-change tree (run log recorded in
   validation.md).
 
