@@ -242,16 +242,20 @@ describe('ceiling', () => {
 // ── 6. Reachability ────────────────────────────────────────────────────────
 
 describe('reachability', () => {
+  // The full-repo reference walk measures ~2 s on Apple Silicon and sits just
+  // under the global 5 s ceiling on the slower ubuntu CI runner (observed
+  // 5001 ms cut on PR #73). Genuinely-slow class: explicit budget, never the
+  // global.
   test('nothing under skills/ is orphaned', () => {
     const r = analyzeReferences(REPO_ROOT);
     expect(r.orphans).toEqual([]);
-  });
+  }, 30_000);
 
   test('the reachability scan actually enumerated the tree', () => {
     // Guard the guard: an empty file list yields zero orphans trivially.
     const r = analyzeReferences(REPO_ROOT);
     expect(r.scanned).toBeGreaterThan(100);
-  });
+  }, 30_000);
 
   test('a file nothing names IS reported as an orphan', () => {
     // The live tree has zero orphans, so "orphans is empty" proves nothing on
