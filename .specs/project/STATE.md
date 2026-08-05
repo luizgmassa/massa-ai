@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Persona Router Token Optimization (Execute in progress)
+## Current — Persona Router Token Optimization (Execute in progress — T0–T5 done, resume at T6; see .specs/HANDOFF.md)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-persona-router-token-optimization` ·
   workflow: spec-driven (Large) · branch `spec/persona-router-token-optimization`,
