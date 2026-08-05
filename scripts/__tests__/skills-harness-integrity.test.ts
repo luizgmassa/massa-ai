@@ -337,10 +337,22 @@ describe("reference integrity: relative harness paths resolve on disk", () => {
     for (const file of files) {
       const content = await read(file);
       const mentions = new Set<string>();
+      // A skill mentions its own references/ first (persona-router grew one in
+      // persona-router-token-optimization T3); files outside a skill root
+      // (e.g. skills/AGENTS.md) resolve against massa-ai as before. A path is
+      // dead only when it resolves in neither the mentioning skill's root nor
+      // massa-ai's.
+      const ownSkill = /skills\/([^/]+)\//.exec(
+        path.relative(REPO_ROOT, file).replace(/\\/g, "/"),
+      )?.[1];
       for (const m of content.matchAll(
         /`((?:references|workflows|personas)\/[A-Za-z0-9._/-]+\.md)`/g,
       )) {
-        mentions.add(path.join(SKILLS_DIR, "massa-ai", m[1]!));
+        const inMassaAi = path.join(SKILLS_DIR, "massa-ai", m[1]!);
+        const inOwnSkill = ownSkill
+          ? path.join(SKILLS_DIR, ownSkill, m[1]!)
+          : inMassaAi;
+        mentions.add((await exists(inOwnSkill)) ? inOwnSkill : inMassaAi);
       }
       for (const m of content.matchAll(
         /`(skills\/[A-Za-z0-9._/-]+\.md)`/g,
@@ -520,6 +532,10 @@ describe("persona / sub-agent boundary", () => {
    */
   const AUTHORITY_SCANNED_FILES = [
     path.join("persona-router", "SKILL.md"),
+    // The reference carries the persona-boundary elaboration moved out of
+    // SKILL.md (persona-router-token-optimization T3); widened after a
+    // seeded-red run proved the scanner reaches it.
+    path.join("persona-router", "references", "routing-details.md"),
     ...PACKET_FILES,
   ];
 

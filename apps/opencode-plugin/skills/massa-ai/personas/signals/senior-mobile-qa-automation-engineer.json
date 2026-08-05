@@ -1,0 +1,18 @@
+{
+  "primary_signals": [
+    "mobile test strategy or automation implementation",
+    "Maestro, Espresso, Compose UI, UIAutomator, Appium, or device tests",
+    "E2E, integration, contract, release-smoke, or device-matrix coverage",
+    "flaky-test diagnosis, synchronization, fixtures, retries, or quarantine",
+    "mobile CI reliability, sharding, artifacts, emulators, or device farms",
+    "test data, environment readiness, API setup, or automation observability"
+  ],
+  "negative_signals": [
+    "tests are only supporting acceptance criteria for a production implementation",
+    "the primary deliverable is app architecture, feature code, or runtime debugging"
+  ],
+  "secondary_lens_signals": [
+    "production mobile work needs deterministic verification, stable selectors, or release-smoke coverage",
+    "feature delivery has material E2E, CI, device-matrix, test-data, or flake risk"
+  ]
+}

@@ -5,7 +5,7 @@
   "features": [
     {
       "slug": "phase-0-quick-wins",
-      "title": "Phase 0 — Quick wins (0a upload gate, 0b reindex cap, 0c memory CRUD, 0d checkpoint MCP)",
+      "title": "Phase 0 \u2014 Quick wins (0a upload gate, 0b reindex cap, 0c memory CRUD, 0d checkpoint MCP)",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -17,7 +17,7 @@
     },
     {
       "slug": "phase-1-memory-foundation",
-      "title": "Phase 1 — Memory-quality foundation (decay fn, LLM consolidation, durable sessions/jobs)",
+      "title": "Phase 1 \u2014 Memory-quality foundation (decay fn, LLM consolidation, durable sessions/jobs)",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -29,7 +29,7 @@
     },
     {
       "slug": "phase-2-query-understanding",
-      "title": "Phase 2 — Query understanding (LLM rewrite + HyDE, config-gated, silent-degrade)",
+      "title": "Phase 2 \u2014 Query understanding (LLM rewrite + HyDE, config-gated, silent-degrade)",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -41,7 +41,7 @@
     },
     {
       "slug": "phase-3-hook-capture",
-      "title": "Phase 3 — Passive memory capture (hook ingestion, Observation store, single-writer queue + 429, consolidation bridge, hook scripts)",
+      "title": "Phase 3 \u2014 Passive memory capture (hook ingestion, Observation store, single-writer queue + 429, consolidation bridge, hook scripts)",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -53,7 +53,7 @@
     },
     {
       "slug": "phase-4-bootstrap",
-      "title": "Phase 4 — Bootstrap from repo (scan git/README/docs/manifests/centrality → LLM/rule-based seed memories, idempotent, bootstrap:completed event)",
+      "title": "Phase 4 \u2014 Bootstrap from repo (scan git/README/docs/manifests/centrality \u2192 LLM/rule-based seed memories, idempotent, bootstrap:completed event)",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -65,7 +65,7 @@
     },
     {
       "slug": "phase-6-handoffs",
-      "title": "Phase 6 — Cross-session handoffs (HandoffStore + HandoffService begin/accept/cancel/listPending + dual-write memory + handoff:accepted event + auto-injector + MCP tools + route)",
+      "title": "Phase 6 \u2014 Cross-session handoffs (HandoffStore + HandoffService begin/accept/cancel/listPending + dual-write memory + handoff:accepted event + auto-injector + MCP tools + route)",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -77,7 +77,7 @@
     },
     {
       "slug": "phase-5-auto-improve",
-      "title": "Phase 5 — Auto-improvement loop (ProposalStore + AutoImproveJob rule-based pattern detection + LLM-optional enrichment + review-gate/auto-approve + apply/reject state machine + memory:auto-improved event + MCP tools + route)",
+      "title": "Phase 5 \u2014 Auto-improvement loop (ProposalStore + AutoImproveJob rule-based pattern detection + LLM-optional enrichment + review-gate/auto-approve + apply/reject state machine + memory:auto-improved event + MCP tools + route)",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -89,7 +89,7 @@
     },
     {
       "slug": "phase-7-retrieval-polish",
-      "title": "Phase 7 — Retrieval + compression polish (reranker, salience-judge, graph BFS stream, LLM compression, chromadb dead-code removal)",
+      "title": "Phase 7 \u2014 Retrieval + compression polish (reranker, salience-judge, graph BFS stream, LLM compression, chromadb dead-code removal)",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -101,7 +101,7 @@
     },
     {
       "slug": "phase-8-web-ui",
-      "title": "Phase 8 — Web UI [G5] (read-only HTML browser over SQLite memories + FTS5 search + handoffs + checkpoints + indexed projects, served via Tools API, vanilla HTML/CSS/JS, markdown + dark mode, no new core logic)",
+      "title": "Phase 8 \u2014 Web UI [G5] (read-only HTML browser over SQLite memories + FTS5 search + handoffs + checkpoints + indexed projects, served via Tools API, vanilla HTML/CSS/JS, markdown + dark mode, no new core logic)",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -125,7 +125,7 @@
     },
     {
       "slug": "installer-environment-hooks-and-web-ui",
-      "title": "Pure Hedgehog — installer, environment, hooks, and UI scripts",
+      "title": "Pure Hedgehog \u2014 installer, environment, hooks, and UI scripts",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -137,7 +137,7 @@
     },
     {
       "slug": "installer-llm-search-quality-toggles",
-      "title": "Woolly Giggling Beaver — installer LLM search-quality toggles",
+      "title": "Woolly Giggling Beaver \u2014 installer LLM search-quality toggles",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -233,7 +233,7 @@
     },
     {
       "slug": "e2e-coverage-side-findings",
-      "title": "E2E coverage side findings A–E",
+      "title": "E2E coverage side findings A\u2013E",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -341,7 +341,7 @@
     },
     {
       "slug": "installer-race-safety",
-      "title": "M19 — installer race safety",
+      "title": "M19 \u2014 installer race safety",
       "status": "complete",
       "priority": "P0",
       "phases": {
@@ -353,7 +353,7 @@
     },
     {
       "slug": "synapse-mcp-parity-discovery-pagination",
-      "title": "M20 + M54 — Synapse MCP parity and discovery pagination",
+      "title": "M20 + M54 \u2014 Synapse MCP parity and discovery pagination",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -365,7 +365,7 @@
     },
     {
       "slug": "tiered-fail-loud-search",
-      "title": "M50 — corruption surfacing and tiered fail-loud search",
+      "title": "M50 \u2014 corruption surfacing and tiered fail-loud search",
       "status": "complete",
       "priority": "P0",
       "phases": {
@@ -377,7 +377,7 @@
     },
     {
       "slug": "transactional-project-identity",
-      "title": "M16 + M17 — project rename, merge, and cache invalidation",
+      "title": "M16 + M17 \u2014 project rename, merge, and cache invalidation",
       "status": "complete",
       "priority": "P0",
       "phases": {
@@ -389,7 +389,7 @@
     },
     {
       "slug": "hook-attribution-repair",
-      "title": "M45 + M47 — sticky hook attribution and repair",
+      "title": "M45 + M47 \u2014 sticky hook attribution and repair",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -401,7 +401,7 @@
     },
     {
       "slug": "linux-native-structural-runtime",
-      "title": "M21 — native Linux glibc x64 support",
+      "title": "M21 \u2014 native Linux glibc x64 support",
       "status": "complete",
       "priority": "P0",
       "phases": {
@@ -413,7 +413,7 @@
     },
     {
       "slug": "native-runtime-rebaseline",
-      "title": "Wave 3 follow-up — native runtime re-baseline to Bun 1.3.14 + six-suite classification + cross-platform re-verification",
+      "title": "Wave 3 follow-up \u2014 native runtime re-baseline to Bun 1.3.14 + six-suite classification + cross-platform re-verification",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -425,7 +425,7 @@
     },
     {
       "slug": "wave-4-correctness-hygiene",
-      "title": "Wave 4 — Correctness, hygiene, and spec reconciliation (N1 generation staleness, N4 clamped-list totals, N6 enum teaching errors, N7 untracked merge + secrets denylist, N8 git-ref guard, N9 read_file cap, N10 SQL bounds, N25 spec reconciliation, M29 sqlite-removal close, N33 dead code sweep, N34 CI grammar gate, N36 xdg extraction, M35 scheduler seam)",
+      "title": "Wave 4 \u2014 Correctness, hygiene, and spec reconciliation (N1 generation staleness, N4 clamped-list totals, N6 enum teaching errors, N7 untracked merge + secrets denylist, N8 git-ref guard, N9 read_file cap, N10 SQL bounds, N25 spec reconciliation, M29 sqlite-removal close, N33 dead code sweep, N34 CI grammar gate, N36 xdg extraction, M35 scheduler seam)",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -437,7 +437,7 @@
     },
     {
       "slug": "wave-5-cross-pollination",
-      "title": "Wave 5 — Cross-pollination features (N2 cycle detection, N3 BFS CTE, N5 grouped tree, N41 cbm drift, N11 lease single-writer, N12 idempotent import, N13 capture policy, N14 persisted scheduler, N26 synapse_task_begin/end, N27 SSE push, N15 Moonshot transport, N16 server-side filter revalidation, N45 hook-attribution confirmation)",
+      "title": "Wave 5 \u2014 Cross-pollination features (N2 cycle detection, N3 BFS CTE, N5 grouped tree, N41 cbm drift, N11 lease single-writer, N12 idempotent import, N13 capture policy, N14 persisted scheduler, N26 synapse_task_begin/end, N27 SSE push, N15 Moonshot transport, N16 server-side filter revalidation, N45 hook-attribution confirmation)",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -449,7 +449,7 @@
     },
     {
       "slug": "wave-6-architecture-features",
-      "title": "Wave 6 — Architecture and medium features (N31 god-files, N32 embedded MCP, N30 hook binary, N20 parallel tests, N21 test-seam, N28 dashboard, N29 scheduler preset, N17 harness protocol, N18 deterministic script, N19 auth, N42 path recovery, M25 name resolution, M26 JSON extraction, M62 tree-sitter GLR)",
+      "title": "Wave 6 \u2014 Architecture and medium features (N31 god-files, N32 embedded MCP, N30 hook binary, N20 parallel tests, N21 test-seam, N28 dashboard, N29 scheduler preset, N17 harness protocol, N18 deterministic script, N19 auth, N42 path recovery, M25 name resolution, M26 JSON extraction, M62 tree-sitter GLR)",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -461,7 +461,7 @@
     },
     {
       "slug": "codex-cursor-plugin-parity",
-      "title": "Codex + Cursor Plugin Parity — Native plugin bundles for Codex and Cursor + four-plugin installer parity (Claude, Codex, Cursor, OpenCode)",
+      "title": "Codex + Cursor Plugin Parity \u2014 Native plugin bundles for Codex and Cursor + four-plugin installer parity (Claude, Codex, Cursor, OpenCode)",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -473,7 +473,7 @@
     },
     {
       "slug": "subagent-skills-plugin-parity",
-      "title": "Subagent Skills Plugin Parity — Ship the 12 sub-agent specialists as host-native subagent definitions across Claude Code, Codex, Cursor, and OpenCode plugins",
+      "title": "Subagent Skills Plugin Parity \u2014 Ship the 12 sub-agent specialists as host-native subagent definitions across Claude Code, Codex, Cursor, and OpenCode plugins",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -486,7 +486,7 @@
     },
     {
       "slug": "workflow-tools-adaptation",
-      "title": "Workflow Tools Adaptation — Adapt massa-ai workflows to use the full 52-tool surface (checkpoints, handoffs, bootstrap, compact_snapshot, trace_path, impact_analysis, code execution, full Synapse, read_file, symbol_snippet, memory ops, analytics) with canonical un-prefixed naming",
+      "title": "Workflow Tools Adaptation \u2014 Adapt massa-ai workflows to use the full 52-tool surface (checkpoints, handoffs, bootstrap, compact_snapshot, trace_path, impact_analysis, code execution, full Synapse, read_file, symbol_snippet, memory ops, analytics) with canonical un-prefixed naming",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -498,7 +498,7 @@
     },
     {
       "slug": "repo-rename-massa-ai-part2",
-      "title": "Repository rename part 2 — residual th0th/massa-th0th references removed across bun.lock, CHANGELOG, .specs, skills, plugin agents, docs, source",
+      "title": "Repository rename part 2 \u2014 residual th0th/massa-th0th references removed across bun.lock, CHANGELOG, .specs, skills, plugin agents, docs, source",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -538,7 +538,7 @@
     },
     {
       "slug": "install-harness-migration",
-      "title": "Install harness migration — TS→bash installers, MCP single writer, unified wiring",
+      "title": "Install harness migration \u2014 TS\u2192bash installers, MCP single writer, unified wiring",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -554,7 +554,7 @@
     },
     {
       "slug": "auto-release-versioning",
-      "title": "Auto release versioning — CHANGELOG-derived bump, GitHub Release, GitHub Packages, no Deployments",
+      "title": "Auto release versioning \u2014 CHANGELOG-derived bump, GitHub Release, GitHub Packages, no Deployments",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -570,7 +570,7 @@
     },
     {
       "slug": "workflow-harness-overhaul",
-      "title": "Workflow harness overhaul — remove chat-restart/context-handoff, add delivery, annotation, root-cause and project-context contracts",
+      "title": "Workflow harness overhaul \u2014 remove chat-restart/context-handoff, add delivery, annotation, root-cause and project-context contracts",
       "status": "in_progress",
       "priority": "P1",
       "phases": {
@@ -586,7 +586,7 @@
     },
     {
       "slug": "audit-remediation-2026-07",
-      "title": "Audit remediation 2026-07 — unauthenticated-RCE fix, CORS lockdown, 6 correctness bugs, and 5 tech-debt items",
+      "title": "Audit remediation 2026-07 \u2014 unauthenticated-RCE fix, CORS lockdown, 6 correctness bugs, and 5 tech-debt items",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -603,7 +603,7 @@
     },
     {
       "slug": "core-layering-god-module-split",
-      "title": "Core layering and god-module split — retire the controllers layer, break the contextual-search-rlm facade, rename rlm-* once",
+      "title": "Core layering and god-module split \u2014 retire the controllers layer, break the contextual-search-rlm facade, rename rlm-* once",
       "status": "complete",
       "priority": "P2",
       "phases": {
@@ -618,12 +618,12 @@
       ],
       "design": ".specs/features/core-layering-god-module-split/design.md",
       "tasks": ".specs/features/core-layering-god-module-split/tasks.md",
-      "notes": "Umbrella over four PRs (AS-05). PR-A sensor-repair-2026-07 complete; PR-B merged #53, v1.16.0; PR-C core-layering-controller-retirement merged #59, v1.17.0; PR-D core-layering-read-file-split EXECUTE COMPLETE 2026-08-03 (was 'in Specify' here — the exact stale-field class its own RFS-05 AC-1 polices). phases.execute was false through PR-B and PR-C and is corrected here — Execute has happened twice. Status flipped to complete at PR-D's T23: GMS-02's headline closed at PR-D's T15 (check-tools-thin PASS 0 of 30, wired into ci.yml's build) and thirty-three corrections C1-C33 are indexed in the spec. PR-D's T25 independent validation ran 2026-08-03 in a fresh conversation (the user's authorship decision) and returned PASS -- validation.md is the record; push, PR and --no-ff merge remain.",
+      "notes": "Umbrella over four PRs (AS-05). PR-A sensor-repair-2026-07 complete; PR-B merged #53, v1.16.0; PR-C core-layering-controller-retirement merged #59, v1.17.0; PR-D core-layering-read-file-split EXECUTE COMPLETE 2026-08-03 (was 'in Specify' here \u2014 the exact stale-field class its own RFS-05 AC-1 polices). phases.execute was false through PR-B and PR-C and is corrected here \u2014 Execute has happened twice. Status flipped to complete at PR-D's T23: GMS-02's headline closed at PR-D's T15 (check-tools-thin PASS 0 of 30, wired into ci.yml's build) and thirty-three corrections C1-C33 are indexed in the spec. PR-D's T25 independent validation ran 2026-08-03 in a fresh conversation (the user's authorship decision) and returned PASS -- validation.md is the record; push, PR and --no-ff merge remain.",
       "validation": ".specs/features/core-layering-god-module-split/validation.md"
     },
     {
       "slug": "core-layering-controller-retirement",
-      "title": "Core layering — controller retirement (PR-C): kernel tier, controllers/ retired into services/, AC-1's import check shipped with the restructuring",
+      "title": "Core layering \u2014 controller retirement (PR-C): kernel tier, controllers/ retired into services/, AC-1's import check shipped with the restructuring",
       "status": "complete",
       "priority": "P2",
       "workflow": "spec-driven",
@@ -645,7 +645,7 @@
     },
     {
       "slug": "core-layering-read-file-split",
-      "title": "Core layering — read_file.ts split (PR-D): GMS-02 AC-1 and its headline, a tools/ thinness gate that did not exist, and the deferrals PR-C could not price",
+      "title": "Core layering \u2014 read_file.ts split (PR-D): GMS-02 AC-1 and its headline, a tools/ thinness gate that did not exist, and the deferrals PR-C could not price",
       "status": "complete",
       "priority": "P2",
       "workflow": "spec-driven",
@@ -666,7 +666,7 @@
     },
     {
       "slug": "sensor-repair-2026-07",
-      "title": "Sensor repair 2026-07 — reset the coverage gate's database, wire it into CI, stop tests reading the real config, content-anchor the needles fixture, honour includePersistent",
+      "title": "Sensor repair 2026-07 \u2014 reset the coverage gate's database, wire it into CI, stop tests reading the real config, content-anchor the needles fixture, honour includePersistent",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -682,7 +682,7 @@
     },
     {
       "slug": "plugin-auto-install",
-      "title": "Plugin auto-install — host detection + version-gated upgrade for the four plugin bundles",
+      "title": "Plugin auto-install \u2014 host detection + version-gated upgrade for the four plugin bundles",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -698,7 +698,7 @@
     },
     {
       "slug": "judge-with-debate",
-      "title": "Judge With Debate — meta-judge eval spec + 3 model-diverse judges debating to consensus; standalone workflow + 2 new sub-agent charters",
+      "title": "Judge With Debate \u2014 meta-judge eval spec + 3 model-diverse judges debating to consensus; standalone workflow + 2 new sub-agent charters",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -714,7 +714,7 @@
     },
     {
       "slug": "model-profile-registry",
-      "title": "Model Profile Registry — central tier/profile registry for agent and workflow model selection across four harness CLIs",
+      "title": "Model Profile Registry \u2014 central tier/profile registry for agent and workflow model selection across four harness CLIs",
       "status": "complete",
       "priority": "P1",
       "phases": {
@@ -731,7 +731,7 @@
     },
     {
       "slug": "skills-directive-dedup",
-      "title": "skills/ directive dedup — single-source restatements, fix drift, and the four correctness defects the duplication was hiding",
+      "title": "skills/ directive dedup \u2014 single-source restatements, fix drift, and the four correctness defects the duplication was hiding",
       "status": "in_progress",
       "workflow": "spec-driven",
       "branch": "refactor/skills-directive-dedup",
@@ -739,7 +739,7 @@
     },
     {
       "slug": "cross-pollination-ports",
-      "title": "Cross-pollination ports & gap closure — implement live PORT-01..07 + DB-05/06/07/08/09/10 fixes + lessons from the 2026-07-29 portability report",
+      "title": "Cross-pollination ports & gap closure \u2014 implement live PORT-01..07 + DB-05/06/07/08/09/10 fixes + lessons from the 2026-07-29 portability report",
       "status": "complete",
       "workflow": "spec-driven",
       "branch": "feature/cross-pollination-ports",
@@ -747,7 +747,7 @@
     },
     {
       "slug": "da-inventory-closure",
-      "title": "DA Inventory Closure — triage DA-01..DA-17 from the cross-pollination report at v1.19.0; fix the 7 live rows, record the rest",
+      "title": "DA Inventory Closure \u2014 triage DA-01..DA-17 from the cross-pollination report at v1.19.0; fix the 7 live rows, record the rest",
       "status": "complete",
       "priority": "P1",
       "workflow": "spec-driven",
@@ -762,7 +762,7 @@
     },
     {
       "slug": "tlc-330-harness-update",
-      "title": "TLC 3.3.0 Harness Update — port TLC's four deterministic validator scripts + check_specs_delivered.py, EARS ACs, discuss pace system, git-stash ban + porcelain baseline, status-before-commit reorder, deliver-specs-before-PR gate, batch-trigger lowering, verification-agent deep-tier pin, lessons.py Unicode dedup fix",
+      "title": "TLC 3.3.0 Harness Update \u2014 port TLC's four deterministic validator scripts + check_specs_delivered.py, EARS ACs, discuss pace system, git-stash ban + porcelain baseline, status-before-commit reorder, deliver-specs-before-PR gate, batch-trigger lowering, verification-agent deep-tier pin, lessons.py Unicode dedup fix",
       "status": "complete",
       "priority": "P1",
       "workflow": "spec-driven",
@@ -780,7 +780,7 @@
     },
     {
       "slug": "python-to-typescript-scripts",
-      "title": "Python → TypeScript scripts migration — port all 8 Python scripts (6 skill validators/lessons + 2 repo dev scripts) to Bun TypeScript with CLI/exit/output parity, dual-run characterization, per-script atomic deletion, and full python3 wiring rewire (sweep-derived work list: 41 python3 lines / 25 skill files + 16 non-literal .py refs + tests + package.json at authoring)",
+      "title": "Python \u2192 TypeScript scripts migration \u2014 port all 8 Python scripts (6 skill validators/lessons + 2 repo dev scripts) to Bun TypeScript with CLI/exit/output parity, dual-run characterization, per-script atomic deletion, and full python3 wiring rewire (sweep-derived work list: 41 python3 lines / 25 skill files + 16 non-literal .py refs + tests + package.json at authoring)",
       "status": "complete",
       "priority": "P2",
       "workflow": "spec-driven",
@@ -795,7 +795,7 @@
     },
     {
       "slug": "workflow-policy-updates",
-      "title": "Workflow policy updates WFP-01..05 — Compose @Preview rule for implementation workflows, PR-description currency after each push, Figma pre-analysis + sequential retrieval subagent protocol, abbreviation expansion, uniform Phase/Task batching vocabulary",
+      "title": "Workflow policy updates WFP-01..05 \u2014 Compose @Preview rule for implementation workflows, PR-description currency after each push, Figma pre-analysis + sequential retrieval subagent protocol, abbreviation expansion, uniform Phase/Task batching vocabulary",
       "status": "complete",
       "priority": "P2",
       "workflow": "spec-driven",
@@ -827,8 +827,27 @@
       "spec": ".specs/features/subagent-orchestration-io/spec.md",
       "design": ".specs/features/subagent-orchestration-io/design.md",
       "tasks": ".specs/features/subagent-orchestration-io/tasks.md",
-      "notes": "T1-T8 complete, independently validated PASS (9/9 ORC ACs, 3/3 discrimination mutations killed, 4 gates green; validation.md). Push/PR deferred pending explicit user delivery go-ahead (autonomous session). Census 24->27 dispatch blocks; parity sensor observed red then green. massa-ai MCP unreachable; .specs/ canonical."
+      "notes": "T1-T8 complete, independently validated PASS (9/9 ORC ACs, 3/3 discrimination mutations killed, 4 gates green; validation.md). Census 24->27 dispatch blocks; parity sensor observed red then green. massa-ai MCP unreachable; .specs/ canonical. Merged as PR #67 @ 5b338af4, released v1.24.0 (its pre-merge 'push/PR deferred' note was stale by the time of that merge; corrected here during the persona-router-token-optimization main merge)."
+    },
+    {
+      "slug": "persona-router-token-optimization",
+      "title": "Persona Router Token Optimization \u2014 pin fast path, SKILL.md slim, catalog v2 two-tier, prompt compression, route memory, machine dedupe, size-budget + double-surface gates",
+      "status": "complete",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/persona-router-token-optimization",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/persona-router-token-optimization/spec.md",
+      "design": ".specs/features/persona-router-token-optimization/design.md",
+      "tasks": ".specs/features/persona-router-token-optimization/tasks.md",
+      "validation": ".specs/features/persona-router-token-optimization/validation.md",
+      "notes": "T0-T9 complete, independently VALIDATED PASS 2026-08-04 (5/5 scratch mutations killed, all six task-listed gates green; PRT-02 AC1-3 live walkthrough pending-restart per Plan Challenge F6, PRT-06 documented-contract only \u2014 MCP unreachable). T7 machine dedupe done with prompt-by-prompt user approvals after a classifier denial; falsifying re-check caught + removed a stale handoff-writer agent (roster exactly 17); dead th0th MCP entry removed (user-approved extra). origin/main v1.24.0 merged in at ad04e953. PR #68 open, CI 14/14 green; merge = user's decision. Full Plan Challenge (pre_mortem): F1-F6 folded before Execute."
     }
   ],
-  "active_feature": "subagent-orchestration-io"
+  "active_feature": "persona-router-token-optimization"
 }

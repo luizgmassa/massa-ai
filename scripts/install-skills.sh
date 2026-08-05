@@ -760,6 +760,39 @@ check_platform() {
     done
   fi
 
+  # Double-surface probe (PRT-08, claude only): a repo-owned skills install
+  # ("$owner" = "repo") plus an enabled massa-ai@massa-ai plugin in
+  # settings.json registers every skill/agent/command twice. Read-only — the
+  # probe only reads state already loaded plus settings.json. An absent state
+  # record (owner "") or absent/malformed settings.json is not a double
+  # surface: unknown owner ≠ double surface (spec edge cases).
+  if [ "$p" = "claude" ] && [ "$owner" = "repo" ]; then
+    local settings_file plugin_enabled
+    settings_file="$root/settings.json"
+    plugin_enabled="$("$RUNNER" - "$settings_file" <<'NODE'
+const fs = require("fs");
+const file = process.argv[2];
+let enabled = "0";
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (
+    data && typeof data === "object" && !Array.isArray(data) &&
+    data.enabledPlugins && typeof data.enabledPlugins === "object" &&
+    data.enabledPlugins["massa-ai@massa-ai"] === true
+  ) {
+    enabled = "1";
+  }
+} catch { /* missing or malformed settings.json → not enabled */ }
+process.stdout.write(enabled);
+NODE
+)"
+    if [ "$plugin_enabled" = "1" ]; then
+      vinfo "Double registration surface: install-state.json records skillsOwner \"repo\" and $settings_file enables massa-ai@massa-ai"
+      drift_count=$((drift_count + 1))
+      record "drift" "$p" "$settings_file" "Double registration surface: install-state.json records skillsOwner \"repo\" and settings.json enables massa-ai@massa-ai"
+    fi
+  fi
+
   # Summary line (quiet mode only; verbose mode prints the per-item detail)
   # Never printed in JSON mode.
   if [ "$MASSA_AI_VERBOSE" = "0" ] && [ "$JSON_OUT" = "0" ]; then

@@ -113,6 +113,10 @@ contradicting Plan Challenge gates.
 `plan_challenge:` / `conversation_feedback:` / `persona_router:` block reappears
 in this file.
 
+## Persona Pin
+
+persona_pin: context-skill-harness-engineer-architect
+
 ## Runtime Contract
 
 After activation, follow `skills/massa-ai/SKILL.md` for all runtime behavior — in

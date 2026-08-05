@@ -1,6 +1,55 @@
 # massa-ai Spec State
 
-## Current — Sub-Agent Orchestration I/O (**VALIDATED PASS 2026-08-04** — 9/9 ORC ACs, 3/3 mutations killed, 1 verification iteration + 1 report-shape amendment; push/PR awaiting user go-ahead)
+## Current — Persona Router Token Optimization (**VALIDATED PASS 2026-08-04** — T0–T9 done; PR #68 open, CI 14/14 green; merge = user's decision; PRT-02 live walkthrough pending-restart)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-persona-router-token-optimization` ·
+  workflow: spec-driven (Large) · branch `spec/persona-router-token-optimization`,
+  worktree `.claude/worktrees/persona-router-token-optimization`, cut from
+  `origin/main` @ `d18e7764` (v1.23.0 release commit).
+- Scope PRT-01..09 (user-directed, 2026-08-04): persona routing measured at ~8k
+  tokens/session (SKILL.md 13,316 B + full catalog 8,871 B + prompt 4,929–8,308 B)
+  plus full double registration on the user machine (user-level installs AND
+  massa-ai@massa-ai local plugin; user-level agent roster stale at 16). Fixes:
+  persona_pin fast path (data line in project AGENTS.md — line-start
+  `persona_router:` outside the bootstrap block is gate-forbidden), SKILL.md slim
+  ≤5,000 B (6 gate-anchored sentences retained), catalog schema_version 2 index
+  ≤2,500 B + per-persona signals/<id>.json, prompt compression ≤4,500 B,
+  persona-route:<projectId> memory contract, machine dedupe (keep installs, drop
+  plugin — user decision), size-budget gate (red-first) + install-skills.sh
+  --check double-surface probe.
+- Contract: `.specs/features/persona-router-token-optimization/{spec,design,tasks}.md`
+  — 2 Phases = 10 Tasks (T0–T6 repo, T7–T9 machine + delivery). Full Plan
+  Challenge (pre_mortem, massa-ai-plan-critic) F1–F6 all folded: F1 critical —
+  `apps/claude-plugin/install.sh` re-registers the plugin and deletes loose
+  `~/.claude/{commands,agents}/massa-ai-*.md` by default; C11 reordered
+  (suppressed refresh first, disable LAST, 3-file falsifying re-check). F3 —
+  `validate-repository.test.ts` hardcodes schema_version 1; C13 repoint task. F4 —
+  settings.json evidence redacted to enabledPlugins/hooks (live OAuth token). F6 —
+  PRT-02 walkthrough restart-gated.
+- massa-ai MCP server unreachable this session; `.specs/` files canonical.
+- T6 landed @ `ef29a3cc` (double-surface probe + shell suite red-then-green 14/0 +
+  CHANGELOG). `origin/main` (v1.24.0, PR #67) merged in @ `ad04e953` — conflicts only in
+  `.specs/` state files + CHANGELOG, resolved keeping both histories; post-merge gates
+  223/0 (integrity, capability-packet parity, size budgets, validate-repository),
+  bundles no-drift. T7 COMPLETE after the user approved prompt-by-prompt retries (the
+  classifier denied the first attempt): 1b file-route plugin install from the MAIN
+  checkout (17 specialists + 6 commands; hooks merge self-skipped — plugin still
+  registered, the C11-order guarantee); 2 broken symlinks removed; 3 LAST
+  `enabledPlugins["massa-ai@massa-ai"] = false` + user-approved removal of the dead
+  `th0th` MCP entry from `~/.claude.json` (backups taken); `installed_plugins.json`
+  has no enablement field → alignment no-op, record retained (F5). Falsifying re-check
+  caught a stale `massa-ai-handoff-writer.md` (file route copies, never prunes) —
+  removed with explicit user approval → roster exactly 17, judge + meta-judge present.
+  Post-merge skills re-refresh (installed copy predated the main merge; `--check` then
+  0 drift, real exit 0). Hooks byte-identical to BEFORE. Evidence (redacted per AC5):
+  `/tmp/prt01-evidence.md`, summarized in validation.md.
+- T8: PR #68 (https://github.com/luizgmassa/massa-ai/pull/68), CI 14/14 green;
+  `test:scripts` exit 0 (1,332/0 TS + all shell suites 0-failed), `test:plugins` 96/0,
+  lint 0. T9: independent verification-agent PASS — 5/5 scratch mutations killed,
+  per-AC evidence in `validation.md`; PRT-02 AC1–3 pending-restart (F6), PRT-06
+  documented-contract only (MCP down). Merge stays the user's.
+
+## Previous — Sub-Agent Orchestration I/O (**VALIDATED PASS 2026-08-04** — 9/9 ORC ACs, 3/3 mutations killed; merged as PR #67 @ `5b338af4`, released v1.24.0)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-subagent-orchestration-io` · workflow:
   spec-driven (Large) · persona: AI Engineer · branch `spec/subagent-orchestration-io`,
@@ -26,10 +75,9 @@
   `d924f7eb` T6, `f380317f` T7, T8 = this commit. Per-task gates:
   `generate-skill-artifacts.ts --check` no-drift + literal grep sensors, populations in
   each commit body.
-- Delivery deviation: push + `gh pr create` deferred — Stage 3 delivery authorization
-  requires an explicit per-feature go-ahead and the user was absent. Branch is local;
-  next session: obtain go-ahead, push, PR, CI watch.
-- massa-ai MCP server unreachable this session; `.specs/` files canonical.
+- Delivery deviation (closed): push + `gh pr create` were deferred pending the user's
+  go-ahead; subsequently delivered and merged as PR #67 @ `5b338af4`, released v1.24.0.
+- massa-ai MCP server unreachable that session; `.specs/` files canonical.
 
 ## Previous — Workflow Policy Updates (VALIDATED, merged via PR #66, released v1.23.0)
 
