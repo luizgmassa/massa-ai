@@ -91,19 +91,18 @@ Memory boundary:
 
 ## Capability Packet
 
-When a workflow dispatches a reusable role, send a capability packet rather than a loose instruction. The packet should include:
+**The packet field list lives in one place: `references/agent-orchestration.md`,
+§Capability Packet.** Do not restate it here — a second copy is what let the field
+sets drift into three diverging shapes before the canonical section existed. When a
+workflow dispatches a reusable role, send that canonical packet rather than a loose
+instruction.
 
-- `role`: the role name from `agent-orchestration.md`
-- `purpose`: one sentence tied to this workflow
-- `trigger`: why delegation is justified now
-- `scope`: exact files, modules, diff, report finding, or task IDs
-- `permissions`: read-only or write with disjoint write set
-- `inputs`: recalled facts, source pointers, task/report IDs, constraints, and exclusions
-- `sensors`: commands or concrete checks expected
-- `output`: the exact output contract
-- `firewall`: raw logs, diffs, snapshots, or research that must be summarized
-- `memory`: whether the subagent may suggest memory and who persists it
-- `persona`: optional. The cataloged persona id in effect for the parent conversation, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions. Pass the id alone, never the persona prompt.
+Design-time additions this reference owns: a new role's charter must be expressible
+as that packet (if a role needs fields the canonical list cannot carry, the role is
+mis-scoped — split it or fix the charter, do not grow a bespoke packet silently), and
+any deliberate bespoke specialization (judge panel, FURPS analyst, phase-batch
+worker) must declare itself a specialization in its own workflow file and map its
+fields onto the canonical ones from `agent-orchestration.md`.
 
 ## Quality Checklist
 
