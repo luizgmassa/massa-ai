@@ -116,6 +116,37 @@ describe("Parity: HTTP vs Embedded result shape (T19)", () => {
   });
 });
 
+describe("Parity: profile_list/profile_set routing (T12)", () => {
+  test("profile_list is GET /api/v1/profiles; profile_set is POST /api/v1/profiles/switch", () => {
+    // Both ApiClient (HTTP) and EmbeddedApiClient dispatch off this same
+    // toolDef.apiEndpoint/apiMethod pair (proxyToolRequest), so pinning it
+    // here is a parity guarantee by construction — the two transports can
+    // never diverge on which endpoint a tool call reaches.
+    const list = getToolDefinition("profile_list");
+    const set = getToolDefinition("profile_set");
+    expect(list?.apiMethod).toBe("GET");
+    expect(list?.apiEndpoint).toBe("/api/v1/profiles");
+    expect(set?.apiMethod).toBe("POST");
+    expect(set?.apiEndpoint).toBe("/api/v1/profiles/switch");
+    expect(set?.inputSchema.required).toEqual(["profile"]);
+  });
+
+  test("both clients route /api/v1/profiles* rather than falling through to the 404 catch-all", async () => {
+    // Safe against both transports without touching a real host filesystem:
+    // an unknown host short-circuits before the switch engine or any HTTP
+    // call. A generic "no GET/POST handler for <endpoint>" 404 would mean
+    // the embedded client never wired the endpoint — that's exactly the
+    // regression this test catches.
+    const embedded = new EmbeddedApiClient();
+    const getResult = (await embedded.get("/api/v1/profiles", { host: "nonesuch" })) as { error?: { code?: string } };
+    expect(getResult.error?.code).toBe("InvalidHostError");
+    const postResult = (await embedded.post("/api/v1/profiles/switch", { profile: "work", host: "nonesuch" })) as {
+      error?: { code?: string };
+    };
+    expect(postResult.error?.code).toBe("InvalidHostError");
+  });
+});
+
 describe("handleIndexTool path-safety in embedded mode (T19 F1)", () => {
   test("EmbeddedApiClient.uploadAndIndex rejects traversal paths (same as HTTP route)", async () => {
     const client = new EmbeddedApiClient();

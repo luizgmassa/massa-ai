@@ -59,6 +59,14 @@ import {
 } from "@massa-ai/core";
 import type { PrefetchEntry } from "@massa-ai/core/services";
 import { SearchSource, logger } from "@massa-ai/shared";
+import {
+  listProfiles as switchEngineListProfiles,
+  switchProfile as switchEngineSwitchProfile,
+  isHost,
+  type Host,
+  InstallStateError,
+  LockError,
+} from "@massa-ai/shared";
 import { WebController } from "@massa-ai/core";
 import fs from "fs/promises";
 import path from "path";
@@ -214,6 +222,23 @@ function compactSnapshotTool(): CompactSnapshotTool {
 /** Build an ApiHttpError-shaped error (same `{success:false, error}` structure) and throw it. */
 function httpError(status: number, message: string): never {
   throw new ApiHttpError(status, { success: false, error: message });
+}
+
+/**
+ * Mirrors `apps/tools-api/src/routes/profiles.ts`'s status-mapping for the
+ * MPS-09 error classes so `switchProfile`/`listProfiles` failures produce the
+ * same `{success:false, error:{code,message}}` body + status over both
+ * transports (T12 embedded/HTTP parity contract). Not importable across the
+ * package boundary — tools-api is not a dependency of mcp-client.
+ */
+function profileEngineError(e: unknown): never {
+  const err = e instanceof Error ? e : new Error(String(e));
+  let status = 500;
+  if (err.name === "UnknownProfileError") status = 400;
+  else if (err.name === "NoHostsDetectedError") status = 404;
+  else if (err instanceof LockError) status = 409;
+  else if (err instanceof InstallStateError) status = 500;
+  throw new ApiHttpError(status, { success: false, error: { code: err.name, message: err.message } });
 }
 
 /** Parse a query-param value to a string (the REST route receives strings). */
@@ -411,6 +436,20 @@ export class EmbeddedApiClient implements ToolProxyApiClient {
         return await analyticsTool().handle(queryParams ?? {});
       }
 
+      // Match /api/v1/profiles (T12 — profile_list, mirrors routes/profiles.ts)
+      if (endpoint === "/api/v1/profiles") {
+        const hostParam = qs(queryParams?.host);
+        if (hostParam !== undefined && !isHost(hostParam)) {
+          return { success: false, error: { code: "InvalidHostError", message: `unknown host "${hostParam}"` } };
+        }
+        try {
+          const inventory = switchEngineListProfiles(hostParam ? { hosts: [hostParam as Host] } : {});
+          return { success: true, data: inventory };
+        } catch (e) {
+          profileEngineError(e);
+        }
+      }
+
       return httpError(404, `EmbeddedApiClient: no GET handler for ${endpoint}`);
     } catch (error) {
       if (error instanceof ApiHttpError) throw error;
@@ -525,6 +564,9 @@ export class EmbeddedApiClient implements ToolProxyApiClient {
 
         case "/api/v1/synapse/session":
           return await this.handleSynapseSession(body as Record<string, unknown>);
+
+        case "/api/v1/profiles/switch":
+          return this.handleProfileSwitch(body as Record<string, unknown>);
 
         case "/api/v1/synapse/sessions":
           // POST to /sessions is not defined in REST; fall through to 404
@@ -692,6 +734,20 @@ export class EmbeddedApiClient implements ToolProxyApiClient {
   }
 
   // ── Private handlers for complex endpoints ─────────────────────────────────
+
+  /** POST /api/v1/profiles/switch (T12 — profile_set, mirrors routes/profiles.ts). */
+  private handleProfileSwitch(body: Record<string, unknown>): unknown {
+    const { profile, host, dryRun } = body as { profile: string; host?: string; dryRun?: boolean };
+    if (host !== undefined && !isHost(host)) {
+      return { success: false, error: { code: "InvalidHostError", message: `unknown host "${host}"` } };
+    }
+    try {
+      const report = switchEngineSwitchProfile({ profile, host: host as Host | undefined, dryRun });
+      return { success: true, data: report };
+    } catch (e) {
+      profileEngineError(e);
+    }
+  }
 
   private async handleMemoryList(body: Record<string, unknown>): Promise<unknown> {
     try {
