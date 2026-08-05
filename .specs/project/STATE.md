@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Skill Token Optimization (Specify/Design/Tasks done 2026-08-05; Execute approved with Phase workers; Plan Challenge pending)
+## Current — Skill Token Optimization (Execute T1–T12 done 2026-08-05; PR pending open; verification-agent next)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-skill-token-optimization` ·
   workflow: spec-driven (Large) · persona: AI Engineer (pinned) · branch
@@ -31,6 +31,7 @@
 - Investigation reports (2 read-only subagents, 2026-08-05): 27 conditional
   findings (~15 actionable; marginals deferred), 24 deterministic-check
   mechanisms (top pack in scope; rest = follow-up backlog candidate).
+- Execute: T1 @ 8ecbeccc (guards, red-calibrated); T2–T7 Phase worker (6 commits, extractions + validators, full test:scripts 1362/0); T8–T11 Phase worker (compression, −3,060 B source); boilerplate pass @ daf7a2c2 (−3.3 KB preambles/Synapse dedupe); origin/main merged @ 69678336 (WMH frontmatter + compressed bodies, only .specs conflicted; both generators --check 0; post-rebuild test:scripts 1424/0, lint 0, test:plugins 96/0). Measurement vs origin/main: workflows 348,591→322,689 (−7.4%); total −11,405 B; ≥20% goal MISSED (corpus contract-dense; win is structural lazy-loading). CHANGELOG entry added.
 - massa-ai MCP server not used this session; `.specs/` files canonical.
 ## Previous — Workflow Metadata Headers (**VALIDATED PASS 2026-08-05** — T1–T5 done; PR #70 open, CI 14/14 green; merge = user decision)
 

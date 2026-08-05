@@ -210,15 +210,15 @@ Gate: tests green; regen + `--check` 0 in-commit.
 
 ### T12: Delivery
 
-- [ ] Requirement: STO-5, STO-6
-- [ ] Rebase onto `origin/main`; re-run regen post-rebase.
-- [ ] Full gates: `bun run test:scripts`, `bun run lint`,
+- [x] Requirement: STO-5, STO-6
+- [x] Rebase onto `origin/main` (done as merge 69678336 — WMH landed first, order inverted by user merge of PR #70); re-run regen post-rebase.
+- [x] Full gates: `bun run test:scripts`, `bun run lint`,
       `generate-skill-artifacts --check` 0, `test:plugins` if plugin bundles
       changed.
-- [ ] Scripted measurement: bytes per class at merge-base vs HEAD → recorded
+- [x] Scripted measurement: bytes per class at merge-base vs HEAD → recorded
       for `validation.md`, with the ≥20% goal stated as an explicit MET or
       MISSED verdict line, not raw numbers alone (Plan Challenge F3).
-- [ ] CHANGELOG `[Unreleased]` entry; `.specs/project/STATE.md`,
+- [x] CHANGELOG `[Unreleased]` entry; `.specs/project/STATE.md`,
       `.specs/project/FEATURES.json`, `.specs/HANDOFF.md` committed on branch;
       `check_specs_delivered.ts` green.
 - [ ] Push branch, open PR (merge stays user's). Then verification-agent runs
