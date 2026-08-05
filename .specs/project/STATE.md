@@ -1,6 +1,37 @@
 # massa-ai Spec State
 
-## Current — Workflow Policy Updates (Execute complete pending validation; PR pending)
+## Current — Sub-Agent Orchestration I/O (Execute complete; validation pending; push/PR awaiting user go-ahead)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-subagent-orchestration-io` · workflow:
+  spec-driven (Large) · persona: AI Engineer · branch `spec/subagent-orchestration-io`,
+  worktree `.claude/worktrees/subagent-orchestration-io`, cut from `origin/main` @
+  `d18e7764` (v1.23.0 release commit).
+- Scope ORC-01..09 (user-directed 2026-08-04, from Fowler "The Orchestrator's Tax"):
+  no-polling/no-transcript-ingestion rule; wave cap 4 + consolidation check;
+  cognitive-locality consolidation signal; git safety for concurrent workers; subagent
+  non-inheritance; canonical Capability Packet (13 backticked fields incl. conditional
+  `lens`, `next_use` renamed from the input-side `exact next step` bullet — output-side
+  `Exact next step` return field unchanged, 251 occurrences exempt as a class);
+  40-line default return bound + dual-channel rule; `skills/AGENTS.md` mirror +
+  `scripts/__tests__/capability-packet-parity.test.ts` (observed red, then green);
+  standard dispatch blocks added to `judge-with-debate.md` (2) and
+  `furps-refinement.md` (1) — census 24 → 27 blocks, 9 field counts = 27 each.
+- Contract: `.specs/features/subagent-orchestration-io/{spec,design,tasks}.md` —
+  `2 Phases = 8 Tasks`. Full Plan Challenge (pre_mortem, massa-ai-plan-critic): F1-F4
+  folded before Execute; F1's 203-hit rename population re-measured to exactly 1
+  input-side occurrence (verify-the-mechanism).
+- Execute ran inline (batch-worker offer not honorable: autonomous session, user absent;
+  recorded deviation — precedent workflow-policy-updates). Commits: `3c02462c`
+  activation, `1e530528` T1, `a9540ddd` T2, `9acdaff4` T3, `e2ee6e72` T4, `0a246af8` T5,
+  `d924f7eb` T6, `f380317f` T7, T8 = this commit. Per-task gates:
+  `generate-skill-artifacts.ts --check` no-drift + literal grep sensors, populations in
+  each commit body.
+- Delivery deviation: push + `gh pr create` deferred — Stage 3 delivery authorization
+  requires an explicit per-feature go-ahead and the user was absent. Branch is local;
+  next session: obtain go-ahead, push, PR, CI watch.
+- massa-ai MCP server unreachable this session; `.specs/` files canonical.
+
+## Previous — Workflow Policy Updates (VALIDATED, merged via PR #66, released v1.23.0)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-workflow-policy-updates` · workflow:
   spec-driven (Medium-Large) · branch `spec/workflow-policy-updates`, worktree

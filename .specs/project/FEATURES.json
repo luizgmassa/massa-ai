@@ -810,7 +810,25 @@
       "design": ".specs/features/workflow-policy-updates/design.md",
       "tasks": ".specs/features/workflow-policy-updates/tasks.md",
       "notes": "T1-T5 complete, independently validated (all 5 WFP ACs PASS, 3/3 mutations killed; validation.md). PR #66, CI 14/14 green. Merge = user's decision. Plan Challenge pre_mortem F1-F6 folded before Execute. massa-ai MCP unreachable this session; .specs/ canonical."
+    },
+    {
+      "slug": "subagent-orchestration-io",
+      "title": "Sub-agent orchestration I/O — orchestrator working-memory rules (no transcript polling, wave cap 4, consolidation signal, git safety, non-inheritance, 40-line return bound), canonical Capability Packet + AGENTS.md parity sensor, standard dispatch blocks for judge-with-debate and furps-refinement",
+      "status": "in_progress",
+      "priority": "P2",
+      "workflow": "spec-driven",
+      "branch": "spec/subagent-orchestration-io",
+      "phases": {
+        "specify": "complete",
+        "design": "complete",
+        "tasks": "complete",
+        "execute": "complete"
+      },
+      "spec": ".specs/features/subagent-orchestration-io/spec.md",
+      "design": ".specs/features/subagent-orchestration-io/design.md",
+      "tasks": ".specs/features/subagent-orchestration-io/tasks.md",
+      "notes": "T1-T8 committed (2 Phases = 8 Tasks). Plan Challenge pre_mortem F1-F4 folded. Validation pending (verification-agent); push/PR deferred pending explicit user delivery go-ahead (autonomous session). Census 24->27 dispatch blocks; parity sensor observed red then green. massa-ai MCP unreachable; .specs/ canonical."
     }
   ],
-  "active_feature": "workflow-policy-updates"
+  "active_feature": "subagent-orchestration-io"
 }
