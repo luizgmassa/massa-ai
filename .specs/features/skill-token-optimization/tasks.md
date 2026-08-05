@@ -88,16 +88,16 @@ Gate: sensors green; `generate-skill-artifacts` regen + `--check` 0 in-commit.
 
 ### T3: Mobile/Figma design-source intake gate extraction
 
-- [ ] Requirement: STO-2, STO-3
-- [ ] Add "Design-Source Intake Gate" section to
+- [x] Requirement: STO-2, STO-3
+- [x] Add "Design-Source Intake Gate" section to
       `references/mobile-context.md` from `feature.md` step 4 block and
       `spec-driven.md` step 3 mobile/Figma paragraph: ask-once rules, `none`
       handling, `design.md`/mobile-figma routing preservation, unsupported
       targets, screenshot-evidence limits, `figma-pre-analysis.md` two-stage
       protocol trigger.
-- [ ] Replace both inline blocks with ≤2-line trigger pointers; keep the
+- [x] Replace both inline blocks with ≤2-line trigger pointers; keep the
       trigger set (platform/scope signals) inline.
-- [ ] Sweep `adr.md`, `rfc.md`, `tdd.md`: clauses ≤3 lines stay; >3 lines move.
+- [x] Sweep `adr.md`, `rfc.md`, `tdd.md`: clauses ≤3 lines stay; >3 lines move.
 Tests: STO-2/STO-3 matrix greps + rule-survival diff
 Gate: sensors green; regen + `--check` 0 in-commit.
 
