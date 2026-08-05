@@ -76,13 +76,13 @@ Gate: both scripts run green at HEAD; commit.
 
 ### T2: SonarQube MCP extraction
 
-- [ ] Requirement: STO-1
-- [ ] Create `references/sonarqube-mcp.md` from `implementation-audit.md`
+- [x] Requirement: STO-1
+- [x] Create `references/sonarqube-mcp.md` from `implementation-audit.md`
       step 9 + normalization clauses in steps 10–12 + `implementation-fix.md`
       SonarQube clause: detection, unavailability skip reasons, firewall
       rules, wait-for-analysis, normalization areas, ID mapping (`Area/PREFIX-N`,
       never `SONAR-*`), preserved fields, exclusion rules.
-- [ ] Replace inline blocks with ≤3-line availability-gated pointers.
+- [x] Replace inline blocks with ≤3-line availability-gated pointers.
 Tests: STO-1 matrix greps + rule-survival diff of extracted reference vs source block
 Gate: sensors green; `generate-skill-artifacts` regen + `--check` 0 in-commit.
 
