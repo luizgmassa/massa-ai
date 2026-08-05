@@ -6,9 +6,14 @@
  * bundle must carry a byte-identical SKILL.md for massa-ai + persona-router plus
  * one SKILL.md per skills/agents/<name>/ charter — no symlinks anywhere, since
  * `npm pack` silently drops them (verified empirically, see design.md D2).
+ *
+ * T4/UGB-13: these bundles are gitignored build output (design.md Component 6) —
+ * a `beforeAll` sentinel guard runs first so a checkout that never ran
+ * `bun run generate:artifacts` fails loudly with an actionable message instead
+ * of every assertion below failing vacuously with a bare ENOENT.
  */
 
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeAll } from "bun:test";
 import { spawnSync } from "child_process";
 import { promises as fs } from "fs";
 import path from "path";
@@ -17,6 +22,28 @@ const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const GEN_SCRIPT = path.join(REPO_ROOT, "scripts/generate-skill-artifacts.ts");
 
 const HOSTS = ["claude", "codex", "cursor", "opencode"] as const;
+
+/**
+ * Fails loudly, naming the missing artifact and the fix, instead of letting
+ * every downstream assertion in this file fail vacuously against a bare
+ * ENOENT (UGB-13).
+ * Why: bundles are generated build output now — a fresh/stale checkout has
+ *      none until `generate:artifacts` runs once.
+ * Impacts: UGB-13, T4; every describe block below.
+ * Test: bun test scripts/__tests__/skill-artifact-parity.test.ts
+ */
+beforeAll(async () => {
+  for (const host of HOSTS) {
+    const sentinel = path.join(REPO_ROOT, `apps/${host}-plugin/skills/massa-ai/SKILL.md`);
+    try {
+      await fs.access(sentinel);
+    } catch {
+      throw new Error(
+        `Generated skill bundle missing at ${sentinel} — run 'bun run generate:artifacts' first.`,
+      );
+    }
+  }
+});
 
 describe("skill-bundle parity — drift gate (PDO-06 AC2)", () => {
   test("generator --check exits 0 (no drift between skills/ and shipped bundles)", () => {

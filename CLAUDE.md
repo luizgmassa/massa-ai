@@ -374,15 +374,23 @@ registry's own finding); see `.specs/features/model-profile-switching/spec.md`.
 `skills/massa-ai/`, `skills/persona-router/`, `skills/profile/`, and the raw
 `skills/agents/<n>/SKILL.md` charters: it emits real, byte-identical files into
 `apps/<host>-plugin/skills/{massa-ai,persona-router,profile,agents}/` for all four hosts (~5 MB /
-580 files, checked in), plus the generated `hooks/massa-ai-hook` copies above and
+580 files). These bundles, plus the generated `hooks/massa-ai-hook` copies above and
 `apps/opencode-plugin/lib/opencode-config.cjs` (mirrored from
-`scripts/lib/opencode-config.cjs`, D1). `--check` diffs full directory inventories per
-managed subtree against freshly-generated output, so it catches both a changed source
-file and a stale bundle entry left behind after a source deletion — a "diff known paths"
-check would miss the latter. Run it after touching anything under `skills/` or
-`scripts/lib/opencode-config.cjs`; CI runs it explicitly in the `build` job (beside
-`verify-package-contents.ts`) and again via `scripts/__tests__/skill-artifact-parity.test.ts`
-in `bun run test:scripts`.
+`scripts/lib/opencode-config.cjs`, D1), are **generated-on-demand, gitignored build output —
+not checked in** (`.gitignore` root-precise entries; AD-016). Both generators prune each
+managed root before emit, so a stale file from a deleted source cannot linger once git no
+longer tracks deletions. `bun run generate:artifacts` is the single entrypoint; it runs
+ahead of every consumer via Bun pre-scripts (`pretest:scripts`, `pretest:plugins`,
+`pretest:coverage`, the opencode package's own `pretest`), an explicit `ci.yml`/`publish.yml`
+build-job step, and a checkout-detected step in every `install.sh`. `--check` diffs full
+directory inventories per managed subtree against freshly-generated output, so it catches
+both a changed source file and a stale bundle entry left behind after a source deletion — a
+"diff known paths" check would miss the latter. Run it after touching anything under
+`skills/` or `scripts/lib/opencode-config.cjs`; CI runs it explicitly in the `build` job
+(beside `verify-package-contents.ts`) and again via
+`scripts/__tests__/skill-artifact-parity.test.ts` in `bun run test:scripts` — the latter's
+`beforeAll` guard fails loudly, naming `bun run generate:artifacts`, if the bundles are
+absent rather than failing vacuously on ENOENT.
 
 The installers are **bash**, not TypeScript: `scripts/install-skills.sh` (real copies,
 not symlinks — nothing installed depends on this repo checkout staying at the path it
@@ -455,8 +463,11 @@ successful` line reports. `bun run test:plugins` (wired into the CI `build` job,
 `bun run test`) remains the single runner for all four plugins' `__tests__/`.
 
 The parity guard is `scripts/__tests__/subagent-parity.test.ts`, reached by
-`bun run test:scripts` (which CI runs). Regenerate and re-run it after touching the
-generator.
+`bun run test:scripts` (which CI runs). Bundles are generated-on-demand and gitignored
+(AD-016), not checked in — `bun run test:scripts`'s `pretest:scripts` regenerates them
+automatically, but after touching the generator itself, run `bun run generate:artifacts`
+and re-run the suite directly (`bun test scripts/__tests__/subagent-parity.test.ts`) to see
+the drift check against your edit in isolation.
 
 Installers, hooks, generated config, and symlinks are public compatibility surfaces —
 treat a change to them as breaking until proven otherwise.

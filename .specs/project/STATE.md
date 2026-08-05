@@ -1,6 +1,36 @@
 # massa-ai Spec State
 
-## Current — Registry Cleanup And Skill Imports (**VALIDATED PASS 2026-08-05** — 24/24 ACs, 4/4 mutations; PR next; merge = user decision)
+## Current — Untracked Generated Bundles (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 7/7 mutations after fix loop 1; PR next; merge = user decision)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-untracked-generated-bundles` ·
+  workflow: spec-driven (Large) · persona: AI Engineer · branch
+  `spec/untracked-generated-bundles` from `main` @ `724ad02d` (post PR #72).
+- Scope (user decisions 2026-08-05): untrack all 1,141 generated bundle files
+  across all four plugins (git-marketplace channel included — documented
+  generation prerequisite + opt-in post-merge hook snippet, never
+  auto-installed); generation-on-demand contract (AD-016). Approach A:
+  prune-before-emit in both generators, root `generate:artifacts` +
+  pre-scripts (`pretest:{scripts,plugins,coverage}` + opencode package
+  `pretest`), checkout-detected install.sh generation with
+  `MASSA_AI_SKIP_ARTIFACT_GENERATION` harness once-only, ci.yml + publish.yml
+  build-job steps (publish jobs are artifact-only — prepack rejected).
+- Pre-mortem (full gate): critical coverage.yml third-entry-point finding →
+  UGB-17; nine .gitignore root-precise entries protect hand-authored
+  codex/cursor quick skills + hooks.json + claude hook source.
+- Contract: `.specs/features/untracked-generated-bundles/{spec,design,tasks}.md`
+  — `3 Phases = 14 Tasks`, 3 massa-ai-builder batch workers, 17 commits
+  `381b48d7`..`247ef8ef`. Accepted interpretations: REPO_ROOT (not
+  PLUGIN_SOURCE_ROOT) checkout detection; T10/T11 sensor split; 4 shell suites
+  scoped with skip env to preserve discrimination.
+- Validation (author ≠ verifier): FAIL iteration 0 (2 surviving mutants:
+  pretest:coverage deletion, .gitignore entry deletion) → fix `247ef8ef`
+  (`generated-bundles-contract.test.ts`, both observed red) → PASS 17/17 ACs,
+  7/7 killed, gates 6/6, validate_state exit 0. Cold path: fresh worktree,
+  bundles absent → test:scripts 1435/0, test:plugins 104/0, opencode 139/0,
+  turbo 11/11.
+- massa-ai MCP server not used this session; `.specs/` files canonical.
+
+## Previous — Registry Cleanup And Skill Imports (**VALIDATED PASS 2026-08-05** — 24/24 ACs, 4/4 mutations; merged as PR #72 @ `724ad02d`)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-registry-cleanup-skill-imports` ·
   workflow: spec-driven (Large) · persona: Context-Skill Harness Engineer/Architect
@@ -3210,6 +3240,7 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 | AD-004 (amendment 2026-07-21, native-runtime-rebaseline) | active; Bun pin moved 1.3.11 → 1.3.14 via merge of main (`e12c4e4`) into `wave-3` | Wave-3 absorbed main's Bun `1.3.14` bump + lock-contract `record.includes` fix via merge commit `b6aa4a4`. Node `25.9.0` unchanged; npm `11.14.1` unchanged (Codespace npm 11.12.1 → 11.14.1 install reconciled). ABI `137` unchanged (confirmed on both platforms). Native load still uses the masked-Bun Node-path (`withMaskedBunVersion` → `node-gyp-build` → `build/Release`). | `verify:tree-sitter-native` PASS on macOS arm64 + Ubuntu Codespace under Bun 1.3.14; `verify-tree-sitter-grammars.test.ts` 9/9; native-structural 152/152 both platforms |
 | AD-005 (amendment 2026-07-21, native-runtime-rebaseline) | active; patch SHA `e79aec7b...` unchanged; only the Bun pin moves | Patch SHA `e79aec7b96eb8114e85ebcb90f0a8b12076bcd8aa08c09bb88929621e1c1446d` unchanged under Bun 1.3.14. Immutable owners, same-tree reset, install-guard, C++20 `binding.gyp`, 33-language manifest, versioned FQN codec, lazy grammar pool, embedded Vue/Markdown all unchanged (FROZEN contract). | 33+33 parses, 27+27 modules, 10 sensors, RSS -188 KB (Codespace) / +589 KB (macOS) < 16 MiB on both platforms under 1.3.14 |
 | AD-006 (amendment 2026-07-21, native-runtime-rebaseline) | active; parser pool contract unchanged; only the Bun pin moves | Parser pool (capacity 4/max 32, timeout 5s/max 60s), cursor-before-tree cleanup, non-empty-success guarantee all unchanged under Bun 1.3.14. | 10 behavior sensors PASS on both platforms; RSS stress gate PASS (100 cycles, median delta well within 16 MiB) under 1.3.14 |
+| AD-016 | active (untracked-generated-bundles, 2026-08-05) | Generated plugin bundles under `apps/*-plugin` (managed skill roots, `agents/`, `agent-profiles/`, generated hook copies, `opencode-config.cjs` mirror) are untracked build output; generation-on-demand is the contract; any new consumer (workflow, script, test entry point) must chain `bun run generate:artifacts` ahead of itself. | Cold-path evidence in validation.md; workflow-generation-order sensor; pre-script chain |
 
 ## Progress
 

@@ -50,8 +50,13 @@ restore_work_variant() {
 trap 'restore_work_variant; rm -rf "$ROOT"' EXIT
 
 RUNNER="$(command -v node || command -v bun)"
+# T5-T8/UGB-05: both installers now regenerate their bundle in checkout
+# context before anything else runs, and that step requires bun specifically
+# (the generator scripts are Bun scripts) regardless of which runner the line
+# above picked for JSON manipulation.
+BUN_BIN="$(command -v bun)"
 BASE_PATH="/usr/bin:/bin"
-SAFE_PATH="$(dirname "$RUNNER"):$BASE_PATH"
+SAFE_PATH="$(dirname "$RUNNER"):$(dirname "$BUN_BIN"):$BASE_PATH"
 
 if [[ ! -f "$PROJECT_ROOT/apps/opencode-plugin/dist/index.js" ]]; then
   echo "SKIP: apps/opencode-plugin/dist/index.js not built — run 'bun run build' first"
@@ -81,16 +86,26 @@ seed_state() { # seed_state HOME — writes stdin as the install state
   cat > "$1/.config/massa-ai/install-state.json"
 }
 
+# T5-T8/UGB-05: both installers now regenerate their bundle in checkout
+# context before anything else runs. This suite deliberately mutates the
+# REAL, checked-in apps/opencode-plugin/agent-profiles/work/massa-ai-builder.md
+# in Section 5 to prove content flows through install.sh's OWN copy logic
+# (F3) — an unconditional regeneration would immediately overwrite that
+# mutation with the deterministic generator output before the copy step ever
+# ran, silently turning the "not frozen" assertion vacuous (both sides would
+# reflect the same regenerated content regardless of the injected marker).
+# This suite's concern is installer re-apply behavior on an assumed-fresh
+# bundle, not UGB-05..08 generation-on-demand, so skip it here.
 run_opencode() { # run_opencode HOME [extra args...] → OUT, RC
   local home="$1"; shift
-  OUT="$(PATH="$SAFE_PATH" HOME="$home" \
+  OUT="$(PATH="$SAFE_PATH" HOME="$home" MASSA_AI_SKIP_ARTIFACT_GENERATION=1 \
     bash "$PROJECT_ROOT/apps/opencode-plugin/install.sh" --user "$@" 2>&1)"
   RC=$?
 }
 
 run_cursor() { # run_cursor HOME [extra args...] → OUT, RC
   local home="$1"; shift
-  OUT="$(PATH="$SAFE_PATH" HOME="$home" \
+  OUT="$(PATH="$SAFE_PATH" HOME="$home" MASSA_AI_SKIP_ARTIFACT_GENERATION=1 \
     bash "$PROJECT_ROOT/apps/cursor-plugin/install.sh" --user "$@" 2>&1)"
   RC=$?
 }

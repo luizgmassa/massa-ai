@@ -234,6 +234,39 @@ async function copyEntries(
 }
 
 /**
+ * Removes a host's prior managed-root contents (and its hook-binary file, if
+ * it is a hookBinaryHosts() member) before emit copies anything back in.
+ *
+ * Why: git no longer tracks deletions once these bundles are gitignored
+ * (UGB-04) — a source file removed from `skills/` must not leave a stale
+ * copy behind in every plugin forever. Removal targets come only from
+ * `managedRootsFor()` (the same table `--check` walks) and
+ * `hookBinaryHosts()`; there is no second literal list to drift, so a
+ * hand-authored file living beside a managed root (a codex/cursor quick
+ * skill under `skills/`, `hooks.json` beside `hooks/massa-ai-hook`) is never
+ * a prune candidate — it is not enumerated by either table.
+ * Impacts: UGB-03/04, T1.
+ * Test: bun test scripts/__tests__/generate-skill-artifacts-prune.test.ts
+ */
+async function pruneManagedRoots(
+  targetRoot: string,
+  host: string,
+  hookBinaryEntries: ManagedEntry[],
+  capsLookup: CapsLookup,
+): Promise<void> {
+  for (const managedRel of managedRootsFor(host, capsLookup)) {
+    await fs.rm(path.join(targetRoot, managedRel), { recursive: true, force: true });
+  }
+  // Pruned unconditionally on host, not gated on current hookBinaryHosts()
+  // membership — a host whose capability entry just flipped away from
+  // "real-copy" must still lose the file it emitted while it held that
+  // capability, or that flip could never observably prune anything.
+  for (const entry of hookBinaryEntries) {
+    await fs.rm(path.join(targetRoot, "hooks", ...entry.relPath.split("/")), { force: true });
+  }
+}
+
+/**
  * `hosts` (default `HOSTS`) and `capsLookup` (default the real
  * capabilitiesFor()) are the seam XP-06 AC-2's fixture-host test drives:
  * injecting an extra host + a fixture capability record proves the "lib"
@@ -253,6 +286,10 @@ export async function emitAll(
 
   let total = 0;
   for (const host of hosts) {
+    // Prune-before-emit (UGB-04): must run before any copy below so a stale
+    // file from a deleted source never survives regeneration.
+    await pruneManagedRoots(targetRoots[host]!, host, hookBinaryEntries, capsLookup);
+
     const skillsDest = path.join(targetRoots[host]!, "skills");
     await copyEntries(skillEntries, skillsDest);
     total += skillEntries.length;

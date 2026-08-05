@@ -469,6 +469,12 @@ async function emitHostProfile(
   charters: readonly Charter[],
   registry: Registry
 ): Promise<void> {
+  // Prune-before-emit (UGB-04, T2): remove this directory's prior contents
+  // before repopulating it, so a file left behind by a renamed or removed
+  // charter does not survive regeneration once git stops tracking deletions.
+  // Shared by both callers (emitAll's active `agents/`, emitVariants'
+  // `agent-profiles/<profile>/`), so the two can never prune inconsistently.
+  await fs.rm(dir, { recursive: true, force: true });
   await fs.mkdir(dir, { recursive: true });
   const emit = EMIT_BY_HOST[host];
   for (const c of charters) {
@@ -532,6 +538,20 @@ export async function emitVariants(
   for (const host of hosts) {
     const profiles = profilesSupporting(registry, host);
     out[host] = profiles;
+
+    // Prune-before-emit (UGB-04, T2): a whole variant directory for a
+    // profile no longer supported by this host — dropped from the registry,
+    // or one that lost this host's support — must not survive regeneration.
+    // Reuses staleVariantDirs(), the same detector `--check` already calls,
+    // rather than re-deriving "which directories are stale".
+    const stale = await staleVariantDirs(pluginRootDirs[host], profiles);
+    for (const staleName of stale) {
+      await fs.rm(path.join(pluginRootDirs[host], AGENT_PROFILES_DIRNAME, staleName), {
+        recursive: true,
+        force: true,
+      });
+    }
+
     for (const profile of profiles) {
       const dir = variantDir(host, profile, pluginRootDirs);
       await emitHostProfile(host, profile, dir, charters, registry);

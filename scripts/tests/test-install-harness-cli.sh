@@ -50,7 +50,11 @@ for host in claude codex cursor opencode; do
   make_stub "$SHADOW/apps/${host}-plugin/install.sh" "plugin-${host}"
 done
 
-harness() { : > "$ARGV_LOG"; bash "$SHADOW/scripts/install-harness.sh" "$@" 2>&1; }
+# T9/UGB-08: install-harness.sh now generates plugin bundles once up front
+# (scripts/generate-*.ts) before the plugin phase — out of scope here (this
+# shadow's tree carries neither script); skip it. The once-only generation
+# contract itself is scripts/tests/test-harness-single-generation.sh's job.
+harness() { : > "$ARGV_LOG"; MASSA_AI_SKIP_ARTIFACT_GENERATION=1 bash "$SHADOW/scripts/install-harness.sh" "$@" 2>&1; }
 logged() { cut -d'|' -f1 "$ARGV_LOG" | tr '\n' ' '; }
 argv_for() { grep "^$1|" "$ARGV_LOG" | head -n1 | cut -d'|' -f2-; }
 

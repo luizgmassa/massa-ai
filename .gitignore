@@ -63,3 +63,14 @@ chromadb/
 
 # Benchmark datasets
 benchmarks/datasets/
+
+# Generated plugin bundles (regenerate via `bun run generate:artifacts`)
+apps/*-plugin/skills/massa-ai/
+apps/*-plugin/skills/persona-router/
+apps/*-plugin/skills/profile/
+apps/*-plugin/skills/agents/
+apps/*-plugin/agents/
+apps/*-plugin/agent-profiles/
+apps/codex-plugin/hooks/massa-ai-hook
+apps/cursor-plugin/hooks/massa-ai-hook
+apps/opencode-plugin/lib/opencode-config.cjs

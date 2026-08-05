@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Generated plugin bundles are no longer checked in.** The `skills/`,
+  `agents/`, and `agent-profiles/` trees under every `apps/*-plugin/`
+  directory (~1,141 files, plus the generated `hooks/massa-ai-hook` copies and
+  the `opencode-config.cjs` mirror) are now gitignored build output;
+  `bun run generate:artifacts` is the on-demand generation contract, chained
+  ahead of every consumer (test entry points via Bun pre-scripts, CI/publish
+  build-job steps, and a checkout-detected step in every `install.sh`). Both
+  generators now prune each managed root before emit so stale files cannot
+  linger. Published npm/tarball installs are unaffected — they still ship the
+  bundles pre-generated. **Install-surface note**: a checkout-based
+  `/plugin marketplace add` or standalone `massa-ai-config agents install`
+  against an ungenerated checkout now needs `bun run generate:artifacts` run
+  first (any installer runs it automatically); see README's Plugin Bundles
+  section for the opt-in `post-merge` regeneration hook. AD-016 records the
+  decision.
+
 ## [1.28.0] - 2026-08-05
 
 ### Added

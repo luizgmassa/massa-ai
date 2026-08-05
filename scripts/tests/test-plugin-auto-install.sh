@@ -38,6 +38,13 @@ trap 'restore_dist; rm -rf "$ROOT"' EXIT
 
 # Absolute runner path: survives the scrubbed PATH used by detection cases.
 RUNNER="$(command -v node || command -v bun)"
+# T9/UGB-08: install-harness.sh's own once-only generation step (unlike the
+# JSON-manipulation runner above) requires bun specifically — the generator
+# scripts are Bun scripts. The shadow-based calls below skip generation via
+# MASSA_AI_SKIP_ARTIFACT_GENERATION (run_shadow), but the two calls that run
+# the REAL scripts/install-harness.sh (2.10, Section 3) generate for real and
+# need bun resolvable even when RUNNER above picked node.
+BUN_BIN="$(command -v bun)"
 # Guaranteed to contain no claude/codex/cursor/cursor-agent/opencode binaries.
 BASE_PATH="/usr/bin:/bin"
 
@@ -179,12 +186,17 @@ for host in claude codex cursor opencode; do make_plugin_stub "$host"; done
 
 # The scrubbed PATH for harness runs: the runner must stay resolvable (the
 # gate reads state through it), so it is BASE_PATH plus the runner's own dir.
-SAFE_PATH="$(dirname "$RUNNER"):$BASE_PATH"
+SAFE_PATH="$(dirname "$RUNNER"):$(dirname "$BUN_BIN"):$BASE_PATH"
 
 run_shadow() { # run_shadow PATH HOME [extra harness args...] → OUT, RC
   local path="$1" home="$2"; shift 2
   : > "$CALL_LOG"
-  OUT="$(PATH="$path" bash "$SHADOW/scripts/install-harness.sh" --plugins --target "$home" --yes "$@" 2>&1)"
+  # T9/UGB-08: install-harness.sh now generates plugin bundles once up front
+  # (scripts/generate-*.ts) before this phase — out of scope for this shadow,
+  # whose tree carries neither script. Skip it here; the once-only generation
+  # contract itself is scripts/tests/test-harness-single-generation.sh's job.
+  OUT="$(PATH="$path" MASSA_AI_SKIP_ARTIFACT_GENERATION=1 \
+    bash "$SHADOW/scripts/install-harness.sh" --plugins --target "$home" --yes "$@" 2>&1)"
   RC=$?
 }
 

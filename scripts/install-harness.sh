@@ -183,6 +183,27 @@ fi
 # The four script-based plugins read $HOME directly, so scope the child
 # environment rather than passing a flag they do not have.
 if [ "$DO_PLUGINS" = "1" ]; then
+  # ── Once-only generation (T9, design Component 4 / UGB-08) ─────────────────
+  # Why: each per-host apps/*-plugin/install.sh regenerates its own bundle in
+  #      checkout context (T5-T8) — necessary when a plugin installer runs
+  #      standalone, but redundant when this harness is about to invoke
+  #      several of them in the loop below. Generating once here and
+  #      exporting the skip flag turns every downstream install.sh call into
+  #      its cheap sentinel-only path, so a harness run over N hosts still
+  #      generates exactly once. Skipped on dry-run: that path (below) never
+  #      invokes an installer at all, so nothing would read the bundle.
+  # Impacts: UGB-08 (generation runs at most once per harness invocation).
+  # Test: bash scripts/tests/test-harness-single-generation.sh
+  if [ "$DRY_RUN" != "1" ] && [ "${MASSA_AI_SKIP_ARTIFACT_GENERATION:-0}" != "1" ]; then
+    if ! command -v bun &>/dev/null; then
+      echo "Error: bun required to generate plugin bundles (scripts/generate-*.ts)" >&2
+      exit 3
+    fi
+    bun "$REPO_ROOT/scripts/generate-skill-artifacts.ts"
+    bun "$REPO_ROOT/scripts/generate-subagent-artifacts.ts"
+  fi
+  export MASSA_AI_SKIP_ARTIFACT_GENERATION=1
+
   runner="$(installer_require_runner "plugin version gating")"
   bundle_version="$(installer_bundle_version "$REPO_ROOT/package.json")"
   state_file="$TARGET_HOME/.config/massa-ai/install-state.json"

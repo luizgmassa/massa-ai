@@ -15,7 +15,7 @@
  *       .specs/features/model-profile-registry/spec.md (MPR-R8..R11)
  */
 
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeAll } from "bun:test";
 import { spawnSync } from "child_process";
 import { promises as fs, readFileSync } from "fs";
 import path from "path";
@@ -31,6 +31,34 @@ import { profilesSupporting } from "../generate-subagent-artifacts.ts";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const GEN_SCRIPT = path.join(REPO_ROOT, "scripts/generate-subagent-artifacts.ts");
+
+const SENTINEL_HOSTS: RegistryHost[] = ["claude", "codex", "cursor", "opencode"];
+
+/**
+ * Fails loudly, naming the missing artifact and the fix, instead of letting
+ * every downstream assertion in this file fail vacuously against a bare
+ * ENOENT (UGB-13).
+ * Why: `agents/` bundles are generated build output now — a fresh/stale
+ *      checkout has none until `generate:artifacts` runs once.
+ * Impacts: UGB-13, T4; every describe block below.
+ * Test: bun test scripts/__tests__/subagent-parity.test.ts
+ */
+beforeAll(async () => {
+  for (const host of SENTINEL_HOSTS) {
+    const dir = path.join(REPO_ROOT, `apps/${host}-plugin/agents`);
+    let entries: string[] = [];
+    try {
+      entries = await fs.readdir(dir);
+    } catch {
+      entries = [];
+    }
+    if (entries.length === 0) {
+      throw new Error(
+        `Generated subagent bundle missing/empty at ${dir} — run 'bun run generate:artifacts' first.`,
+      );
+    }
+  }
+});
 
 const SPECIALIST_NAMES = [
   "investigator",

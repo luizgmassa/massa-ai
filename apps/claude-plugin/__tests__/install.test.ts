@@ -423,3 +423,87 @@ describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
     expect(platforms.claude.skillsOwner).toBe("repo");
   });
 });
+
+// ── T5: generated-bundle contract (design Component 4 / UGB-05..08) ─────────
+describe("claude-plugin generated-bundle contract (T5, UGB-05..08)", () => {
+  // Filters out the workspace's own node_modules/build noise so the copy
+  // stays fast; keeps everything install.sh actually reads (skills/, agents/,
+  // agent-profiles/, hooks/, commands/, install.sh itself).
+  function isNoise(p: string): boolean {
+    return /[\\/](node_modules|\.turbo|coverage)($|[\\/])/.test(p);
+  }
+
+  async function pathWithoutBun(): Promise<string> {
+    const which = spawnSync("which", ["bun"], { encoding: "utf8" });
+    const bunPath = (which.stdout || "").trim();
+    const bunDir = bunPath ? path.dirname(bunPath) : "";
+    const dirs = (process.env.PATH || "").split(path.delimiter);
+    return dirs.filter((d) => d !== bunDir).join(path.delimiter);
+  }
+
+  test("UGB-06: tarball-shaped install (no repo generator sources) skips generation and installs the shipped bundle", async () => {
+    // Mirrors the repo's relative layout (apps/claude-plugin sibling of
+    // scripts/) so install.sh's pre-existing, unconditional
+    // `source .../scripts/lib/installer-shared.sh` / banner.sh still
+    // resolve — that dependency predates this feature and is out of scope.
+    // The ONE thing a real npm tarball lacks, and the ONE thing this test
+    // omits, is scripts/generate-*.ts (UGB-06's actual subject).
+    const pkgRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "mt-claude-tarball-"),
+    );
+    const pkgDir = path.join(pkgRoot, "apps", "claude-plugin");
+    try {
+      await fs.cp(path.join(REPO_ROOT, "apps/claude-plugin"), pkgDir, {
+        recursive: true,
+        filter: (src) => !isNoise(src),
+      });
+      await fs.mkdir(path.join(pkgRoot, "scripts", "lib"), { recursive: true });
+      await fs.copyFile(
+        path.join(REPO_ROOT, "scripts/banner.sh"),
+        path.join(pkgRoot, "scripts/banner.sh"),
+      );
+      await fs.copyFile(
+        path.join(REPO_ROOT, "scripts/lib/installer-shared.sh"),
+        path.join(pkgRoot, "scripts/lib/installer-shared.sh"),
+      );
+
+      const res = spawnSync("bash", [path.join(pkgDir, "install.sh"), "--user"], {
+        encoding: "utf8",
+        env: {
+          MASSA_AI_SKIP_PLUGIN_REGISTRY: "1",
+          ...process.env,
+          HOME: tmp,
+        },
+        cwd: pkgDir,
+        timeout: 30000,
+      });
+      expect(res.status).toBe(0);
+      expect(
+        await pathExists(path.join(tmp, ".claude/agents/massa-ai-navigator.md")),
+      ).toBe(true);
+    } finally {
+      await fs.rm(pkgRoot, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  test("UGB-07: missing bun in a repo-checkout context exits non-zero before any host-config mutation", async () => {
+    const pathNoBun = await pathWithoutBun();
+    const res = spawnSync("bash", [INSTALL_SH, "--user"], {
+      encoding: "utf8",
+      env: {
+        MASSA_AI_SKIP_PLUGIN_REGISTRY: "1",
+        ...process.env,
+        HOME: tmp,
+        PATH: pathNoBun,
+      },
+      cwd: REPO_ROOT,
+      timeout: 30000,
+    });
+    expect(res.status).not.toBe(0);
+    expect(res.status).toBe(3);
+    expect(res.stderr).toContain("bun required");
+    // Nothing under the temp HOME was ever created — the check runs before
+    // SCOPE/TARGET resolution and every subsequent host-config mutation.
+    expect(await pathExists(path.join(tmp, ".claude"))).toBe(false);
+  });
+});
