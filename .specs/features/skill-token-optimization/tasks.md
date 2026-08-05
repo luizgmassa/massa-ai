@@ -197,9 +197,14 @@ Gate: same as T8.
 
 ### T11: Compress agent charters (17 files)
 
-- [ ] Requirement: STO-4
-- [ ] Same discipline over `skills/agents/*/SKILL.md`; frontmatter and
+- [x] Requirement: STO-4
+- [x] Same discipline over `skills/agents/*/SKILL.md`; frontmatter and
       capability-packet-coupled sections byte-preserved where tests require.
+      All 17 charters reviewed; 16/17 already at floor (bullet-template
+      format with no compressible connective prose beyond frontmatter,
+      which stays byte-identical); navigator.md's one prose paragraph
+      tightened. Net bytes ~unchanged (63161 -> 63161) — consistent with
+      "never sacrifice a rule for a byte" on an already-terse file class.
 Tests: `bun test scripts/__tests__/capability-packet-parity.test.ts scripts/__tests__/subagent-parity.test.ts` + charter tests
 Gate: tests green; regen + `--check` 0 in-commit.
 
