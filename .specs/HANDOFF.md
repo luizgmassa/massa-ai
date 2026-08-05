@@ -1,4 +1,4 @@
-# Handoff — untracked-generated-bundles (VALIDATED PASS; PR open next; merge = user decision)
+# Handoff — untracked-generated-bundles (VALIDATED PASS; PR #73 open, CI 14/14 green; merge = user decision)
 
 Previous handoffs closed: registry-cleanup-skill-imports merged as PR #72 @
 `724ad02d` (main).
@@ -36,7 +36,11 @@ snippet (never auto-installed).
 
 ## Next Step
 
-Push branch, open PR (CHANGELOG entry present — merge gate satisfied), watch
-CI. Merge is the user's decision. After merge: nothing further — feature
-closes; installed machines are unaffected (bundles live under host config
-dirs, not the repo).
+PR #73 open, CI 14/14 green (CHANGELOG entry present — merge gate satisfied).
+First CI run failed once: pre-existing `skills-duplication-metric` full-repo
+reachability scan crossed the global 5 s ceiling on the ubuntu runner
+(5001 ms cut; ~2 s on Apple Silicon; scan surface unchanged by this PR —
+walk() is gitignore-blind, bundles were on disk before and after). Fixed with
+the established explicit-budget idiom @ `881b3f84`. Merge is the user's
+decision. After merge: nothing further — installed machines are unaffected
+(bundles live under host config dirs, not the repo).
