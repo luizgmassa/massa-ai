@@ -1,44 +1,42 @@
-# Handoff — registry-cleanup-skill-imports (Execute done; verification-agent gate next, then PR)
+# Handoff — untracked-generated-bundles (VALIDATED PASS; PR open next; merge = user decision)
 
-Previous handoffs closed: skill-token-optimization merged as PR #71 @
-`ef595210`, released v1.27.0.
+Previous handoffs closed: registry-cleanup-skill-imports merged as PR #72 @
+`724ad02d` (main).
 
-Session `spec-registry-cleanup-skill-imports` · workflow spec-driven (Large) ·
-persona route: Context-Skill Harness Engineer/Architect (pinned). massa-ai MCP
-not used this session; `.specs/` files canonical. Contract files:
-`.specs/features/registry-cleanup-skill-imports/{spec,design,tasks}.md`.
+Session `spec-untracked-generated-bundles` · workflow spec-driven (Large) ·
+persona route: AI Engineer (context-skill-harness-engineer-architect). massa-ai
+MCP not used this session; `.specs/` files canonical. Contract files:
+`.specs/features/untracked-generated-bundles/{spec,design,tasks,validation}.md`.
 
 ## Objective
 
-skills/AGENTS.md registry cleanup (stale claims, mirror sections, judge
-permission end-to-end) + import coding-guidelines / skill-architect / to-prd
-into skills/massa-ai as router-owned workflows/references. User decisions
-2026-08-05: convert-to-workflows shape; copy-only (Useful-Agent-Skills
-untouched); lazy coding-guidelines load; branch from main post-#71;
-skill-architect keeps CC-BY-4.0 with attribution (WMH gate license allowlist).
+Stop tracking the 1,141 generated plugin bundle files (4× skills managed
+roots, 4× agents/, 4× agent-profiles/, 2 hook copies, opencode-config.cjs
+mirror); generation-on-demand becomes the contract (AD-016). User decision
+2026-08-05: untrack all four hosts including the git-marketplace channel,
+which gains a documented generation prerequisite + opt-in post-merge hook
+snippet (never auto-installed).
 
 ## State
 
-- Branch `spec/registry-cleanup-skill-imports` from `main` @ `394770fc`.
-  Commits: 65cae03a (contract), 7e38f3cd..4cdd0175 (T1–T6, one
-  massa-ai-builder Phase worker), 1e02fcc7 (T7), 3eb83bea (T8 first half).
-- All gates green: test:scripts exit 0 (1414 tests + 8 shell suites), lint 0,
-  test:plugins 96/0, both generators --check clean, skills-harness-integrity
-  32/0, subagent-parity 65/0.
-- Three WRITE_AGENTS roster copies now list judge: generator, subagent-parity
-  test, claude-plugin install test. Two workflow-count locks now 38:
-  workflow-metadata-headers (+ license allowlist ["MIT","CC-BY-4.0"]) and
-  workflow-harness-contract (+ complement 22, intake lines in both new
-  workflows).
-- Plan Challenge (pre_mortem) findings all folded: C1 count-lock, C2
-  authority-scanner narrowing, C3 pointer clause, C4 licensing.
+- Branch `spec/untracked-generated-bundles` from `main` @ `724ad02d`;
+  17 commits: `381b48d7` specs → T1-T14 (`af907544`..`0fe89367`) →
+  `33171311` results → `247ef8ef` verification fix (contract sensors).
+- Validation: PASS (iteration 1 of 3) — 17/17 ACs, gates 6/6, discrimination
+  sensor 7/7 killed after fix commit `247ef8ef` closed the two survivors
+  (pretest:coverage deletion, .gitignore entry deletion). validate_state
+  exit 0. Accepted-cosmetic: genIndex guard in 2 ci.yml sub-tests of
+  `workflow-generation-order.test.ts`.
+- Pre-mortem gate (full, pre_mortem): critical coverage.yml finding folded as
+  UGB-17 (pretest:coverage + opencode package pretest); marketplace/config-cli
+  ungenerated-checkout path recorded as accepted documented risk.
+- Cold-path evidence (fresh worktree, bundles absent): test:scripts 1435/0,
+  test:plugins 104/0, opencode `bun run test` 139/0, turbo 11/11; deliberate
+  red observed on the parity beforeAll guard.
 
-## Next
+## Next Step
 
-1. Dispatch massa-ai-verification-agent (author ≠ verifier) →
-   `.specs/features/registry-cleanup-skill-imports/validation.md`.
-2. Commit state files; `check_specs_delivered.ts` must exit 0.
-3. Push branch + `gh pr create` (authorized in Execute GO; merge = user).
-4. Post-merge user-run (never agent-run): `bash scripts/install-skills.sh
-   --apply` to refresh installed hosts; optionally remove the orphaned
-   standalone `~/.claude/skills/coding-guidelines`.
+Push branch, open PR (CHANGELOG entry present — merge gate satisfied), watch
+CI. Merge is the user's decision. After merge: nothing further — feature
+closes; installed machines are unaffected (bundles live under host config
+dirs, not the repo).

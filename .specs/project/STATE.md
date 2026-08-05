@@ -1,6 +1,36 @@
 # massa-ai Spec State
 
-## Current — Registry Cleanup And Skill Imports (**VALIDATED PASS 2026-08-05** — 24/24 ACs, 4/4 mutations; PR next; merge = user decision)
+## Current — Untracked Generated Bundles (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 7/7 mutations after fix loop 1; PR next; merge = user decision)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-untracked-generated-bundles` ·
+  workflow: spec-driven (Large) · persona: AI Engineer · branch
+  `spec/untracked-generated-bundles` from `main` @ `724ad02d` (post PR #72).
+- Scope (user decisions 2026-08-05): untrack all 1,141 generated bundle files
+  across all four plugins (git-marketplace channel included — documented
+  generation prerequisite + opt-in post-merge hook snippet, never
+  auto-installed); generation-on-demand contract (AD-016). Approach A:
+  prune-before-emit in both generators, root `generate:artifacts` +
+  pre-scripts (`pretest:{scripts,plugins,coverage}` + opencode package
+  `pretest`), checkout-detected install.sh generation with
+  `MASSA_AI_SKIP_ARTIFACT_GENERATION` harness once-only, ci.yml + publish.yml
+  build-job steps (publish jobs are artifact-only — prepack rejected).
+- Pre-mortem (full gate): critical coverage.yml third-entry-point finding →
+  UGB-17; nine .gitignore root-precise entries protect hand-authored
+  codex/cursor quick skills + hooks.json + claude hook source.
+- Contract: `.specs/features/untracked-generated-bundles/{spec,design,tasks}.md`
+  — `3 Phases = 14 Tasks`, 3 massa-ai-builder batch workers, 17 commits
+  `381b48d7`..`247ef8ef`. Accepted interpretations: REPO_ROOT (not
+  PLUGIN_SOURCE_ROOT) checkout detection; T10/T11 sensor split; 4 shell suites
+  scoped with skip env to preserve discrimination.
+- Validation (author ≠ verifier): FAIL iteration 0 (2 surviving mutants:
+  pretest:coverage deletion, .gitignore entry deletion) → fix `247ef8ef`
+  (`generated-bundles-contract.test.ts`, both observed red) → PASS 17/17 ACs,
+  7/7 killed, gates 6/6, validate_state exit 0. Cold path: fresh worktree,
+  bundles absent → test:scripts 1435/0, test:plugins 104/0, opencode 139/0,
+  turbo 11/11.
+- massa-ai MCP server not used this session; `.specs/` files canonical.
+
+## Previous — Registry Cleanup And Skill Imports (**VALIDATED PASS 2026-08-05** — 24/24 ACs, 4/4 mutations; merged as PR #72 @ `724ad02d`)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-registry-cleanup-skill-imports` ·
   workflow: spec-driven (Large) · persona: Context-Skill Harness Engineer/Architect
