@@ -190,17 +190,17 @@ census from this session's baseline commands.
 
 | Requirement ID | Story | Phase | Status |
 | --- | --- | --- | --- |
-| ORC-01 | P1: Working-memory protection | Design | Pending |
-| ORC-02 | P1: Wave discipline | Design | Pending |
-| ORC-03 | P1: Wave discipline | Design | Pending |
-| ORC-04 | P1: Git safety | Design | Pending |
-| ORC-05 | P2: Canonical packet | Design | Pending |
-| ORC-06 | P2: Canonical packet | Design | Pending |
-| ORC-07 | P1: Working-memory protection | Design | Pending |
-| ORC-08 | P2: Canonical packet (parity sensor) | Design | Pending |
-| ORC-09 | P2: Uniform dispatch blocks | Design | Pending |
+| ORC-01 | P1: Working-memory protection | Design | Verified |
+| ORC-02 | P1: Wave discipline | Design | Verified |
+| ORC-03 | P1: Wave discipline | Design | Verified |
+| ORC-04 | P1: Git safety | Design | Verified |
+| ORC-05 | P2: Canonical packet | Design | Verified |
+| ORC-06 | P2: Canonical packet | Design | Verified |
+| ORC-07 | P1: Working-memory protection | Design | Verified |
+| ORC-08 | P2: Canonical packet (parity sensor) | Design | Verified |
+| ORC-09 | P2: Uniform dispatch blocks | Design | Verified |
 
-**Coverage:** 9 total, 0 mapped to tasks (pending Tasks phase), 9 unmapped ⚠️
+**Coverage:** 9 total, 9 mapped to tasks, 0 unmapped — all Verified (validation.md 2026-08-04)
 
 ## Implicit-Requirement Sweep (Large — every dimension)
 

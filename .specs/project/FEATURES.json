@@ -814,7 +814,7 @@
     {
       "slug": "subagent-orchestration-io",
       "title": "Sub-agent orchestration I/O — orchestrator working-memory rules (no transcript polling, wave cap 4, consolidation signal, git safety, non-inheritance, 40-line return bound), canonical Capability Packet + AGENTS.md parity sensor, standard dispatch blocks for judge-with-debate and furps-refinement",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P2",
       "workflow": "spec-driven",
       "branch": "spec/subagent-orchestration-io",
@@ -827,7 +827,7 @@
       "spec": ".specs/features/subagent-orchestration-io/spec.md",
       "design": ".specs/features/subagent-orchestration-io/design.md",
       "tasks": ".specs/features/subagent-orchestration-io/tasks.md",
-      "notes": "T1-T8 committed (2 Phases = 8 Tasks). Plan Challenge pre_mortem F1-F4 folded. Validation pending (verification-agent); push/PR deferred pending explicit user delivery go-ahead (autonomous session). Census 24->27 dispatch blocks; parity sensor observed red then green. massa-ai MCP unreachable; .specs/ canonical."
+      "notes": "T1-T8 complete, independently validated PASS (9/9 ORC ACs, 3/3 discrimination mutations killed, 4 gates green; validation.md). Push/PR deferred pending explicit user delivery go-ahead (autonomous session). Census 24->27 dispatch blocks; parity sensor observed red then green. massa-ai MCP unreachable; .specs/ canonical."
     }
   ],
   "active_feature": "subagent-orchestration-io"

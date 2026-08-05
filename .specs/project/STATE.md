@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Sub-Agent Orchestration I/O (Execute complete; validation pending; push/PR awaiting user go-ahead)
+## Current — Sub-Agent Orchestration I/O (**VALIDATED PASS 2026-08-04** — 9/9 ORC ACs, 3/3 mutations killed, 1 verification iteration + 1 report-shape amendment; push/PR awaiting user go-ahead)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-subagent-orchestration-io` · workflow:
   spec-driven (Large) · persona: AI Engineer · branch `spec/subagent-orchestration-io`,
