@@ -97,13 +97,13 @@ All resolved in the requesting conversation unless marked otherwise.
 
 **Acceptance Criteria**:
 
-1. WHEN a switch succeeds for a host THEN the system SHALL record `{profile, bundleVersion, switchedAt}` for that host in `install-state.json` as a v2-compatible extension that every existing reader/writer round-trips unchanged (the `plugin` field precedent). (MPS-03)
+1. WHEN a switch succeeds for a host THEN the system SHALL record `{profile, switchedAt}` for that host in `install-state.json` as a v2-compatible extension that every existing reader/writer round-trips unchanged (the `plugin` field precedent). *(Amended at Design C1: the original `bundleVersion` field duplicated `platforms[host].plugin.version`, which the plugin installers already own — two sources for one fact. Bundle version is reported from the existing field instead.)* (MPS-03)
 2. WHEN a plugin `install.sh` installs or upgrades a host that has a recorded profile THEN it SHALL install that profile's variant as the active agent set, not `balanced`. (MPS-04)
 3. WHEN the recorded profile is absent from the new bundle's variant set (profile removed upstream) THEN the installer SHALL fall back to the default variant and say so — fail-loud in output, not silent. (MPS-04, MPS-09)
 4. WHEN no profile record exists (fresh install, pre-feature state file) THEN behavior SHALL be today's: default variant installed, no record written until first switch. (MPS-03)
-5. WHEN `install-state.json` is corrupt or unwritable THEN the switch SHALL fail before copying any files (state-then-files would lie; files-then-state would orphan) — order chosen in Design, either way atomic per host: no host ends half-switched with a wrong record. (MPS-03, MPS-09)
+5. WHEN `install-state.json` is corrupt or unwritable THEN the switch SHALL fail before copying any files. *(Amended at Plan Challenge F4: the state file is one shared JSON blob across hosts, so corruption is a **global** precondition failure — this case is exempt from the per-host-atomicity rule in Edge Cases, which governs per-host copy/apply failures only.)* (MPS-03, MPS-09)
 
-**Independent Test**: Switch to `home`; run the plugin installer at a bumped version; installed deep-tier Claude agent still shows `home`'s model; state shows `home` + new bundleVersion.
+**Independent Test**: Switch to `home`; run the plugin installer at a bumped version; installed deep-tier Claude agent still shows `home`'s model; state shows `modelProfile.profile = "home"` and the bumped `plugin.version`.
 
 ### P2: CLI subcommand + OpenCode in-process tool
 
@@ -161,7 +161,7 @@ All resolved in the requesting conversation unless marked otherwise.
 | --- | --- | --- | --- |
 | MPS-01 | Generator emits per-profile pre-rendered variant trees into every plugin bundle, sibling of `agents/`; active dir byte-equals default variant; `--check` covers variants with full-inventory semantics | P1: Variants ship | Pending |
 | MPS-02 | One switch engine replaces active installed agent files from on-disk variants, per host, both install topologies (file-route copies, marketplace/in-place, OpenCode symlinks), offline-capable, idempotent | P1: Switch | Pending |
-| MPS-03 | Per-host `{profile, bundleVersion, switchedAt}` recorded in `install-state.json` as v2-compatible extension; switch engine is its only writer; all existing writers round-trip it | P1: Upgrades | Pending |
+| MPS-03 | Per-host `{profile, switchedAt}` recorded in `install-state.json` as v2-compatible extension (bundle version reported from existing `plugin.version` — Design C1); switch engine is its only writer; all existing writers round-trip it | P1: Upgrades | Pending |
 | MPS-04 | Plugin installers re-apply the recorded profile on install/upgrade; removed-profile fallback is loud | P1: Upgrades | Pending |
 | MPS-05 | MCP tools `profile_list`/`profile_set` via the three-place contract (tool-defs + tools-api route + embedded mapping); tool-count assertions updated (52 → 54) | P1: Switch | Pending |
 | MPS-06 | `profile` subcommand in both config-cli surfaces, switch logic in one shared published location; `--dry-run` | P2 | Pending |
