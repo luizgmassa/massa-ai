@@ -20,6 +20,7 @@ import path from "path";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const CI_WORKFLOW = path.join(REPO_ROOT, ".github/workflows/ci.yml");
+const PUBLISH_WORKFLOW = path.join(REPO_ROOT, ".github/workflows/publish.yml");
 
 /**
  * Index of a `- name: <label>` step line, or -1 if absent. Matches the exact
@@ -63,5 +64,20 @@ describe("workflow generation order (T10, UGB-10)", () => {
     expect(testPluginsIndex).toBeGreaterThan(-1);
 
     expect(genIndex).toBeLessThan(testPluginsIndex);
+  });
+});
+
+describe("workflow generation order (T11, UGB-11)", () => {
+  test("publish.yml build job: 'Generate plugin bundles' precedes 'Upload build artifacts'", () => {
+    const text = readFileSync(PUBLISH_WORKFLOW, "utf8");
+    const lines = text.split("\n");
+
+    const genIndex = stepIndex(lines, "Generate plugin bundles");
+    expect(genIndex).toBeGreaterThan(-1);
+
+    const uploadIndex = stepIndex(lines, "Upload build artifacts");
+    expect(uploadIndex).toBeGreaterThan(-1);
+
+    expect(genIndex).toBeLessThan(uploadIndex);
   });
 });

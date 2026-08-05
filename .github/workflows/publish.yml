@@ -73,6 +73,14 @@ jobs:
           rm -rf ~/.bun/install/cache node_modules
           bun install --frozen-lockfile --concurrent-scripts 1
 
+      # UGB-11 (design Component 5). Publish jobs below have NO checkout — only
+      # whatever "Upload build artifacts" packs — so a stale or absent
+      # apps/*-plugin bundle here ships that way in the published tarball.
+      # Generated bundles are gitignored build output (UGB-01); this is the
+      # only place in the publish chain that can produce a fresh one.
+      - name: Generate plugin bundles
+        run: bun run generate:artifacts
+
       - name: Build all packages and apps
         run: bun run build
 
