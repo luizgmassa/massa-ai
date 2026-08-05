@@ -142,3 +142,58 @@ describe("profile set", () => {
     expect(r.err).toContain("unknown profile");
   });
 });
+
+// Floor-closure cases (coverage gate flagged config-cli.ts at 89.64% on PR #69):
+// exercise the CLI's own dispatch/validation/print branches — spec outcomes
+// MPS-06 (subcommand surface) and MPS-09/10 (errors + per-host reasons).
+describe("dispatch and validation branches", () => {
+  test("an unknown command exits 1 and prints usage help (MPS-06 surface)", async () => {
+    const r = await captureConsole(() => runCli(["definitely-not-a-command"]));
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("Unknown command: definitely-not-a-command");
+    expect(r.out).toContain("massa-ai-config <command> [options]");
+    expect(r.out).toContain("profile set <name> [--host <h>] [--dry-run]");
+  });
+
+  test("`profile` with an unknown subcommand exits 1 with the profile usage line", async () => {
+    const r = await captureConsole(() => runCli(["profile", "bogus"]));
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("Usage: massa-ai-config profile <list|show|set>");
+  });
+
+  test("`profile set` without a name exits 1 with the set usage line", async () => {
+    const r = await captureConsole(() => runCli(["profile", "set"]));
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("profile set <name>");
+    expect(switchProfile.mock.calls.length).toBe(0);
+  });
+
+  test("`profile set` with an unknown host exits 1 before reaching the engine (MPS-09 fail-loud)", async () => {
+    const r = await captureConsole(() => runCli(["profile", "set", "work", "--host", "not-a-host"]));
+    expect(r.code).toBe(1);
+    expect(r.err).toContain('unknown host "not-a-host"');
+    expect(switchProfile.mock.calls.length).toBe(0);
+  });
+
+  test("`profile list` prints the not-installed row for absent hosts (MPS-10 per-host reasons)", async () => {
+    listProfiles.mockImplementationOnce(() => ({
+      hosts: [
+        { host: "claude", installed: true, activeProfile: "balanced", bundleVersion: "1.24.0", availableProfiles: ["balanced", "work"] },
+        { host: "codex", installed: false, availableProfiles: [] },
+      ],
+    }));
+    const r = await captureConsole(() => runCli(["profile", "list"]));
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("codex: not installed");
+    expect(r.out).toContain("claude: active=balanced bundle=1.24.0 supports=balanced,work");
+  });
+
+  test("`profile list` engine failure is caught and exits 1", async () => {
+    listProfiles.mockImplementationOnce(() => {
+      throw new Error("corrupt install-state.json");
+    });
+    const r = await captureConsole(() => runCli(["profile", "list"]));
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("corrupt install-state.json");
+  });
+});
