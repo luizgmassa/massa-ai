@@ -538,19 +538,30 @@ export async function emitVariants(
   return out;
 }
 
+/**
+ * Full-inventory diff (T6, MPS-01/MPS-12): lists BOTH directories directly
+ * rather than checking a fixed known-name set, so a stray leftover file — one
+ * this generator no longer produces for either the active `agents/` dir or a
+ * variant `agent-profiles/<profile>/` dir — is caught exactly like a missing
+ * or changed file, not just a divergence among the currently-known
+ * `SPECIALIST_NAMES`. Both directories this function is called against
+ * (active agent dirs, variant dirs) are flat — no subdirectories — so a
+ * single `readdir` per side is the whole inventory; `host` is accepted for
+ * call-site symmetry with the rest of this module's per-host API, unused in
+ * the diff itself (a directory this function is pointed at never mixes hosts).
+ */
 export async function diffHost(
   generatedDir: string,
   checkedInDir: string,
-  host: Host
+  _host: Host
 ): Promise<string[]> {
-  // Compare every generated charter file per host. Non-massa-ai files in the
-  // host dir are not generator-owned and are ignored.
-  const ext = capabilitiesFor(host).artifactExtension;
-  const expected = SPECIALIST_NAMES.map(
-    (n) => `massa-ai-${n}.${ext}`
-  );
+  const [genEntries, checkedEntries] = await Promise.all([
+    fs.readdir(generatedDir).catch(() => [] as string[]),
+    fs.readdir(checkedInDir).catch(() => [] as string[]),
+  ]);
+  const all = [...new Set([...genEntries, ...checkedEntries])].sort();
   const diffs: string[] = [];
-  for (const rel of expected) {
+  for (const rel of all) {
     const gp = path.join(generatedDir, rel);
     const cp = path.join(checkedInDir, rel);
     const [gbuf, cbuf] = await Promise.all([
@@ -568,6 +579,27 @@ export async function diffHost(
     }
   }
   return diffs;
+}
+
+/**
+ * Whole-directory staleness (T6, MPS-01 AC2): checked-in `agent-profiles/`
+ * subdirectories under a host's plugin root that are NOT in the host's
+ * currently-supported profile list — i.e. a profile that was removed from the
+ * registry (or lost this host from a profile it used to support), whose
+ * variant directory nonetheless still ships. A per-profile `diffHost` call
+ * alone can never catch this: the moment a profile drops out of
+ * `profilesSupporting`, the caller simply stops diffing that directory.
+ * Returns the stale subdirectory names, sorted; empty when the checked-in
+ * `agent-profiles/` root itself does not exist yet.
+ */
+export async function staleVariantDirs(
+  checkedInPluginRoot: string,
+  supportedProfiles: readonly string[]
+): Promise<string[]> {
+  const root = path.join(checkedInPluginRoot, AGENT_PROFILES_DIRNAME);
+  const entries = await fs.readdir(root).catch(() => [] as string[]);
+  const supported = new Set(supportedProfiles);
+  return entries.filter((e) => !supported.has(e)).sort();
 }
 
 export async function runCheck(opts: EmitOptions = {}): Promise<number> {
@@ -594,6 +626,48 @@ export async function runCheck(opts: EmitOptions = {}): Promise<number> {
         }
       }
     }
+
+    // Variant trees (T6, MPS-01 AC2/MPS-12): full-inventory diff of every
+    // currently-supported (host, profile) variant dir, PLUS detection of a
+    // whole stale variant directory left over after a profile is removed from
+    // the registry (design.md: "catches stale entries after a profile
+    // removal, not just changed files") — a per-profile diff alone would
+    // silently stop looking at a directory the moment its profile is dropped
+    // from `profilesSupporting`.
+    const registry = opts.registry ?? loadRegistry();
+    const tmpPluginDirs: Record<Host, string> = {
+      claude: path.join(tmp, "variants", "claude-plugin"),
+      codex: path.join(tmp, "variants", "codex-plugin"),
+      cursor: path.join(tmp, "variants", "cursor-plugin"),
+      opencode: path.join(tmp, "variants", "opencode-plugin"),
+    };
+    const supportedByHost = await emitVariants(tmpPluginDirs, { registry });
+    for (const host of HOSTS) {
+      for (const profile of supportedByHost[host]) {
+        const genDir = variantDir(host, profile, tmpPluginDirs);
+        const checkedDir = variantDir(host, profile, PLUGIN_ROOT_DIRS);
+        const diffs = await diffHost(genDir, checkedDir, host);
+        if (diffs.length > 0) {
+          drift = true;
+          console.error(
+            `[${host}/${AGENT_PROFILES_DIRNAME}/${profile}] drift detected (${diffs.length} file(s) differ):`
+          );
+          for (const d of diffs) {
+            console.error(`  ${d}`);
+          }
+        }
+      }
+
+      const stale = await staleVariantDirs(PLUGIN_ROOT_DIRS[host], supportedByHost[host]);
+      for (const profileDirName of stale) {
+        drift = true;
+        console.error(
+          `[${host}/${AGENT_PROFILES_DIRNAME}/${profileDirName}] drift detected: stale variant ` +
+            `directory (profile no longer supported by ${host})`
+        );
+      }
+    }
+
     if (drift) {
       console.error(
         "\nDrift detected. Re-run `bun run scripts/generate-subagent-artifacts.ts` and commit the output."
