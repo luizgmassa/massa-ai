@@ -820,14 +820,17 @@
       "branch": "spec/model-profile-switching",
       "phases": {
         "specify": "complete",
-        "design": false,
-        "tasks": false,
+        "design": "complete",
+        "tasks": "complete",
         "execute": false
       },
       "spec": ".specs/features/model-profile-switching/spec.md",
       "depends_on": [
         "model-profile-registry"
-      ]
+      ],
+      "design": ".specs/features/model-profile-switching/design.md",
+      "tasks": ".specs/features/model-profile-switching/tasks.md",
+      "notes": "Specify + Design + Tasks + full Plan Challenge (pre_mortem, 4 findings F1-F4 all folded) complete at 2026-08-04. 17 tasks / 5 phases / 3 batches. Execute pending batch-worker confirmation (user gate)."
     }
   ],
   "active_feature": "model-profile-switching"
