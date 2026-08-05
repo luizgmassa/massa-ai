@@ -1,6 +1,34 @@
 # massa-ai Spec State
 
-## Current — Workflow Policy Updates (Execute complete pending validation; PR pending)
+## Current — Persona Router Token Optimization (Execute in progress)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-persona-router-token-optimization` ·
+  workflow: spec-driven (Large) · branch `spec/persona-router-token-optimization`,
+  worktree `.claude/worktrees/persona-router-token-optimization`, cut from
+  `origin/main` @ `d18e7764` (v1.23.0 release commit).
+- Scope PRT-01..09 (user-directed, 2026-08-04): persona routing measured at ~8k
+  tokens/session (SKILL.md 13,316 B + full catalog 8,871 B + prompt 4,929–8,308 B)
+  plus full double registration on the user machine (user-level installs AND
+  massa-ai@massa-ai local plugin; user-level agent roster stale at 16). Fixes:
+  persona_pin fast path (data line in project AGENTS.md — line-start
+  `persona_router:` outside the bootstrap block is gate-forbidden), SKILL.md slim
+  ≤5,000 B (6 gate-anchored sentences retained), catalog schema_version 2 index
+  ≤2,500 B + per-persona signals/<id>.json, prompt compression ≤4,500 B,
+  persona-route:<projectId> memory contract, machine dedupe (keep installs, drop
+  plugin — user decision), size-budget gate (red-first) + install-skills.sh
+  --check double-surface probe.
+- Contract: `.specs/features/persona-router-token-optimization/{spec,design,tasks}.md`
+  — 2 Phases = 10 Tasks (T0–T6 repo, T7–T9 machine + delivery). Full Plan
+  Challenge (pre_mortem, massa-ai-plan-critic) F1–F6 all folded: F1 critical —
+  `apps/claude-plugin/install.sh` re-registers the plugin and deletes loose
+  `~/.claude/{commands,agents}/massa-ai-*.md` by default; C11 reordered
+  (suppressed refresh first, disable LAST, 3-file falsifying re-check). F3 —
+  `validate-repository.test.ts` hardcodes schema_version 1; C13 repoint task. F4 —
+  settings.json evidence redacted to enabledPlugins/hooks (live OAuth token). F6 —
+  PRT-02 walkthrough restart-gated.
+- massa-ai MCP server unreachable this session; `.specs/` files canonical.
+
+## Previous — Workflow Policy Updates (Execute complete pending validation; PR pending)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-workflow-policy-updates` · workflow:
   spec-driven (Medium-Large) · branch `spec/workflow-policy-updates`, worktree
