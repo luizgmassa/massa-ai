@@ -15,17 +15,24 @@ import { createServer } from "node:net";
 import { Elysia } from "elysia";
 import { node } from "@elysiajs/node";
 
-const listProfiles = mock((): unknown => ({ hosts: [] }));
-const switchProfile = mock((): unknown => ({ profile: "work", dryRun: false, hosts: [], restartRequired: false }));
+const listProfiles = mock((..._args: unknown[]): unknown => ({ hosts: [] }));
+const switchProfile = mock((..._args: unknown[]): unknown => ({
+  profile: "work",
+  dryRun: false,
+  hosts: [],
+  restartRequired: false,
+}));
 
-mock.module("@massa-ai/shared", () => {
-  const actual = require("@massa-ai/shared");
-  return {
-    ...actual,
-    listProfiles: (...args: unknown[]) => listProfiles(...args),
-    switchProfile: (...args: unknown[]) => switchProfile(...args),
-  };
-});
+// Pre-resolved BEFORE registering the mock (not inside the factory): a
+// `require()` of the same specifier from inside a `mock.module` factory can
+// recurse into the not-yet-fully-registered mock and silently drop exports
+// (found and documented in apps/mcp-client's embedded-profiles.test.ts).
+const actualShared = require("@massa-ai/shared");
+mock.module("@massa-ai/shared", () => ({
+  ...actualShared,
+  listProfiles: (...args: unknown[]) => listProfiles(...args),
+  switchProfile: (...args: unknown[]) => switchProfile(...args),
+}));
 
 import { profileRoutes } from "./profiles.js";
 import { UnknownProfileError, NoHostsDetectedError } from "@massa-ai/shared";
@@ -78,7 +85,7 @@ describe("GET /api/v1/profiles", () => {
   test("scopes to the requested host", async () => {
     listProfiles.mockImplementationOnce(() => ({ hosts: [] }));
     await get("/api/v1/profiles?host=codex");
-    expect(listProfiles.mock.calls.at(-1)?.[0]).toMatchObject({ hosts: ["codex"] });
+    expect((listProfiles.mock.calls.at(-1) as any[] | undefined)?.[0]).toMatchObject({ hosts: ["codex"] });
   });
 });
 
@@ -144,7 +151,7 @@ describe("POST /api/v1/profiles/switch — MPS-09 error surfacing", () => {
   test("passes dryRun through", async () => {
     switchProfile.mockImplementationOnce(() => ({ profile: "work", dryRun: true, hosts: [], restartRequired: false }));
     await post("/api/v1/profiles/switch", { profile: "work", dryRun: true });
-    expect(switchProfile.mock.calls.at(-1)?.[0]).toMatchObject({ profile: "work", dryRun: true });
+    expect((switchProfile.mock.calls.at(-1) as any[] | undefined)?.[0]).toMatchObject({ profile: "work", dryRun: true });
   });
 });
 
