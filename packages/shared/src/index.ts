@@ -40,3 +40,57 @@ export {
   type ResolvedApiKey,
   type ApiKeySource,
 } from "./config/index.js";
+
+// Model-profile switch engine
+export {
+  HOSTS,
+  isHost,
+  type Host,
+  resolveHostLayout,
+  detectRoute,
+  type HostFileLayout,
+  type HostSkipLayout,
+  type HostLayout,
+  type ResolveHostLayoutOpts,
+  type RouteDecision,
+} from "./profile-switch/hosts.js";
+export {
+  readInstallState,
+  writeInstallState,
+  updatePlatform,
+  InstallStateError,
+  CorruptInstallStateError,
+  UnwritableInstallStateError,
+  type InstallState,
+  type PlatformRecord,
+  type PluginRecord,
+  type InstallRoute,
+  type ModelProfileRecord,
+} from "./profile-switch/state.js";
+export {
+  acquireLock,
+  LockError,
+  LockHeldError,
+  LockAcquireError,
+  type AcquiredLock,
+  type AcquireLockOptions,
+  type LockIdentity,
+  type LockClock,
+} from "./profile-switch/lock.js";
+export {
+  listProfiles,
+  switchProfile,
+  SwitchEngineError,
+  UnknownProfileError,
+  NoHostsDetectedError,
+  type ListProfilesOptions,
+  type SwitchProfileOptions,
+} from "./profile-switch/engine.js";
+export {
+  reportSucceeded,
+  type HostProfileState,
+  type ProfileInventory,
+  type HostSwitchStatus,
+  type HostSwitchResult,
+  type SwitchReport,
+} from "./profile-switch/report.js";
