@@ -97,6 +97,12 @@ sets drift into three diverging shapes before the canonical section existed. Whe
 workflow dispatches a reusable role, send that canonical packet rather than a loose
 instruction.
 
+The one field this reference still names on its own is `persona`, because a
+persona-agent-boundary guard (`.specs/features/persona-agent-boundary/spec.md`)
+checks its clause byte-for-byte in every packet-defining file, this one included:
+
+`persona`: optional. The cataloged persona id in effect for the parent conversation, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions. Pass the id alone, never the persona prompt.
+
 Design-time additions this reference owns: a new role's charter must be expressible
 as that packet (if a role needs fields the canonical list cannot carry, the role is
 mis-scoped — split it or fix the charter, do not grow a bespoke packet silently), and

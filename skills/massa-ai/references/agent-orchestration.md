@@ -153,7 +153,7 @@ When dispatching a subagent, send a compact capability packet rather than a loos
 - `next_use`: what the main agent will do with the result
 - `lens`: conditional — `audit-specialist` dispatches only. One of `bugs | architecture | security | requirements | code-quality | performance`.
 
-The named dispatch block that workflows embed (the quoted block whose header carries the prefixed agent name and role) is the block projection of this packet: `role` and `purpose` live in the block's header line, `next_use` defaults to "the main agent synthesizes and continues the workflow" when absent, and the remaining nine fields (`trigger, scope, permissions, inputs, sensors, output, firewall, memory, persona`) appear as the block's body lines.
+The named dispatch block that workflows embed (the quoted block whose header carries the prefixed agent name and role) is the block projection of this packet: `role` and `purpose` live in the block's header line, and `next_use` defaults to "the main agent synthesizes and continues the workflow" when absent. The remaining eight fields — `trigger, scope, permissions, inputs, sensors, output, firewall, memory` — appear as the block's body lines. The optional `persona` field appears there too.
 
 ## Prompt Contract
 
