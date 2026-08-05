@@ -335,7 +335,7 @@ would drift, and did.
 | furps-analyst | Analyze one FURPS+ dimension of a PRD/ADR | read-only | `furps-refinement` fans out per-dimension analysis | `skills/agents/furps-analyst/SKILL.md` |
 | navigator | Navigate an indexed codebase index-first | read-only | "where is X", "who calls Y" against a fresh massa-ai index | `skills/agents/navigator/SKILL.md` |
 | meta-judge | Author the evaluation specification YAML a debate panel scores against (once per evaluation) | read-only | `judge-with-debate` opens an evaluation | `skills/agents/meta-judge/SKILL.md` |
-| judge | Score an artifact against the evaluation specification with quoted evidence; debate to consensus | read-only | `judge-with-debate` dispatches the 3-judge panel or a debate round | `skills/agents/judge/SKILL.md` |
+| judge | Score an artifact against the evaluation specification with quoted evidence; debate to consensus | read-only (report-write, own file only) | `judge-with-debate` dispatches the 3-judge panel or a debate round | `skills/agents/judge/SKILL.md` |
 
 ## Mapping — New Agents ↔ Existing Roles
 
