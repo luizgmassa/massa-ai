@@ -114,4 +114,31 @@ process.stdout.write(String(Object.keys(c.mcpServers || {}).filter((k) => k === 
 NODE
 )" "1"
 
+echo ""
+echo "Scenario 11: install-agents.sh writes the opencode MCP entry regardless of plugin listing form (PAU-02)"
+for form in npm local bare; do
+  H11="$ROOT/h11-$form"; mkdir -p "$H11/.config/opencode"
+  case "$form" in
+    npm)   PLUGIN_LISTING='"@massa-ai/opencode-plugin"' ;;
+    local) PLUGIN_LISTING='"./plugins/massa-ai/index.js"' ;;
+    bare)  PLUGIN_LISTING='"massa-ai"' ;;
+  esac
+  printf '{"plugin": [%s]}\n' "$PLUGIN_LISTING" > "$H11/.config/opencode/opencode.json"
+  OUT11="$(bash "$PROJECT_ROOT/scripts/install-agents.sh" --agent opencode --target "$H11" --yes 2>&1)"
+  RC11=$?
+  assert_eq "$form form: install-agents.sh exits 0" "$RC11" "0"
+  assert_eq "$form form: mcp.massa-ai entry written" \
+    "$("$RUNNER" - "$H11/.config/opencode/opencode.json" <<'NODE'
+const fs = require("fs");
+const c = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+process.stdout.write(String(Boolean(c.mcp && c.mcp["massa-ai"])));
+NODE
+)" "true"
+  assert_not_contains "$form form: no skip message printed" "$OUT11" "skipped: @massa-ai/opencode-plugin"
+done
+
+echo ""
+echo "Scenario 12: install-agents.sh header no longer claims the opencode presence skip"
+assert_not_contains "installer header: no opencode-skip claim" "$AGENTS_SRC" "OpenCode MCP registration is skipped when"
+
 summary "MCP single writer"
