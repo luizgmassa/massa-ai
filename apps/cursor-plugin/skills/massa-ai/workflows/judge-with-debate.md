@@ -63,6 +63,21 @@ the capability, per-slot diversity activates automatically with no harness edit.
 Dispatch `massa-ai-meta-judge` (read-only) with the task description, artifact type, context,
 and artifact paths. Model request: `kimi-k3` (see Step 0.5).
 
+> **Dispatch: `massa-ai-meta-judge`** (role: `meta-judge`) — charter `skills/agents/meta-judge/SKILL.md`
+> - trigger: judge-with-debate Step 1; runs exactly once per evaluation
+> - scope: the artifact under evaluation (paths supplied), task description, artifact type
+> - permissions: read-only
+> - inputs: task description, artifact type, context, artifact paths, model request per Step 0.5; inherits nothing — every needed path is named here
+> - sensors: two-stage validation below (syntactic YAML, weights sum 1.0 ± 0.001, semantic shape)
+> - output: the evaluation-specification YAML, returned verbatim for all rounds; nothing else
+> - firewall: no artifact body quotes beyond what the rubric anchors need; no raw dumps
+> - memory: suggest-only; main agent persists
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
+
+This packet is a specialization of the canonical Capability Packet
+(`references/agent-orchestration.md`): the spec YAML is its `output` contract; the
+two-stage validation is its `sensors`.
+
 Validate the returned evaluation specification in two stages, in order; a retry names the
 **first failed check** and nothing else:
 
@@ -83,8 +98,24 @@ then `🤖 [Agent Done]` or `🤖 [Agent Blocked]` with the one-line reason.
 
 Dispatch three `massa-ai-judge` agents **in parallel** (round 0), one per judge number, each
 with: the verbatim specification YAML, task description, artifact paths, its own report path,
-`round: 0`, and its model request (Step 0.5). Each judge writes its own
-`audits/judge/<...> judge-N.md` per the report contract and returns the reply block:
+`round: 0`, and its model request (Step 0.5). The fixed panel of 3 sits inside the wave cap of
+4 concurrent subagents (`references/agent-orchestration.md`, Orchestrator Working Memory).
+Each judge writes its own `audits/judge/<...> judge-N.md` per the report contract and returns
+the reply block:
+
+> **Dispatch: `massa-ai-judge`** (role: `judge`) — charter `skills/agents/judge/SKILL.md` — 3 per panel, rounds 0..3
+> - trigger: judge-with-debate Steps 2 and 4; panel of exactly 3, never more
+> - scope: the artifact under evaluation, the verbatim specification YAML, own report path; debate rounds add all three report paths as peer paths and `round: R`
+> - permissions: read-only except appending to its own judge-N report file
+> - inputs: verbatim spec YAML, task description, artifact paths, own report path, round number, model request; debate rounds add peer report paths; inherits nothing — judges read peer reports from the filesystem paths supplied
+> - sensors: reply-block shape below (malformed or missing `scores` counts as `contest`; same judge malformed twice → Blocked)
+> - output: the YAML reply block below (strengths/weaknesses capped at ≤3 items); report file is the persisted channel — dual-channel rule, the chat return never carries the report body
+> - firewall: quoted evidence snippets only; no artifact or peer-report dumps in the reply
+> - memory: suggest-only; main agent persists
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
+
+This packet is a specialization of the canonical Capability Packet
+(`references/agent-orchestration.md`); the per-round additions are its `inputs` deltas.
 
 ```yaml
 status: Complete | Partial | Blocked

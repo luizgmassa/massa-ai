@@ -29,6 +29,7 @@ Apply the firewall before bringing any of these raw artifacts into the main cont
 - Source, docs, logs, CSV, or reports over 200 lines or 20 KB.
 - Search, grep, MCP, or external research output over 50 hits.
 - Generated audit reports, screenshots, browser snapshots, crash/device logs, or raw NotebookLM/web research dumps.
+- Running or completed subagent transcripts, JSONL session files, and intermediate agent reasoning — these never enter the main context at all; consume only the returned output contract.
 - Any subagent output, tool transcript, or diff where only counts, paths, representative snippets, or failing cases are needed for the next decision.
 
 ## Tool Output Discipline
@@ -53,7 +54,7 @@ The main agent receives only:
 - risks and skipped checks
 - exact next step
 
-Subagents should not return raw dumps. The main agent still owns memory recall, persistence, synthesis, and the final Evidence Gate.
+Subagents should not return raw dumps. Never poll a running subagent for status and never read a subagent transcript — the returned output contract is the only channel back into the main context (canonical rules: `references/agent-orchestration.md`, Orchestrator Working Memory). The main agent still owns memory recall, persistence, synthesis, and the final Evidence Gate.
 
 ## Persistence Boundary
 

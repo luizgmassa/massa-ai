@@ -332,8 +332,10 @@ Workflows send this packet when dispatching any agent:
 - `firewall`: raw logs, diffs, snapshots, or research that must be summarized, not returned raw
 - `memory`: whether the agent may suggest memory and who persists it (default: suggest only; main agent persists)
 - `persona`: optional. The cataloged persona id in effect for the parent conversation, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions. Pass the id alone, never the persona prompt.
+- `next_use`: what the main agent will do with the result
+- `lens`: conditional — `audit-specialist` dispatches only. One of `bugs | architecture | security | requirements | code-quality | performance`.
 
-For `audit-specialist`, the packet also includes `lens`: one of `bugs | architecture | security | requirements | code-quality | performance`.
+This list mirrors the canonical Capability Packet in `references/agent-orchestration.md` (single source; `scripts/__tests__/capability-packet-parity.test.ts` fails when the two field lists diverge). An agent inherits nothing from the parent session — no skills, no personas, no loaded references, no conversation history; everything it needs is named in the packet.
 
 The `persona` field is optional and absent is the valid default. Personas and agents are different layers: a persona shapes the main agent's stance, an agent executes a bounded capability under its own charter. See `skills/persona-router/SKILL.md` -> Persona And Sub-Agents for the boundary rules.
 
@@ -348,7 +350,7 @@ Every agent returns:
 - **Risks and skipped checks**: with reasons
 - **Exact next step**: what the main agent should do with the result
 
-Agents summarize verbose output. They never return raw logs, diffs, snapshots, or research dumps to the main context (Context Firewall).
+Agents summarize verbose output. They never return raw logs, diffs, snapshots, or research dumps to the main context (Context Firewall). Default return bound: at most 40 lines of returned chat text unless the dispatch's `output:` field overrides it with a reason; a dispatch that writes a persisted report returns the compact verdict only, never the file body.
 
 ## Agent Table
 

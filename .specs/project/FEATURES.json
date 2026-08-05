@@ -812,6 +812,24 @@
       "notes": "T1-T5 complete, independently validated (all 5 WFP ACs PASS, 3/3 mutations killed; validation.md). PR #66, CI 14/14 green. Merge = user's decision. Plan Challenge pre_mortem F1-F6 folded before Execute. massa-ai MCP unreachable this session; .specs/ canonical."
     },
     {
+      "slug": "subagent-orchestration-io",
+      "title": "Sub-agent orchestration I/O — orchestrator working-memory rules (no transcript polling, wave cap 4, consolidation signal, git safety, non-inheritance, 40-line return bound), canonical Capability Packet + AGENTS.md parity sensor, standard dispatch blocks for judge-with-debate and furps-refinement",
+      "status": "complete",
+      "priority": "P2",
+      "workflow": "spec-driven",
+      "branch": "spec/subagent-orchestration-io",
+      "phases": {
+        "specify": "complete",
+        "design": "complete",
+        "tasks": "complete",
+        "execute": "complete"
+      },
+      "spec": ".specs/features/subagent-orchestration-io/spec.md",
+      "design": ".specs/features/subagent-orchestration-io/design.md",
+      "tasks": ".specs/features/subagent-orchestration-io/tasks.md",
+      "notes": "T1-T8 complete, independently validated PASS (9/9 ORC ACs, 3/3 discrimination mutations killed, 4 gates green; validation.md). Census 24->27 dispatch blocks; parity sensor observed red then green. massa-ai MCP unreachable; .specs/ canonical. Merged as PR #67 @ 5b338af4, released v1.24.0 (its pre-merge 'push/PR deferred' note was stale by the time of that merge; corrected here during the persona-router-token-optimization main merge)."
+    },
+    {
       "slug": "persona-router-token-optimization",
       "title": "Persona Router Token Optimization \u2014 pin fast path, SKILL.md slim, catalog v2 two-tier, prompt compression, route memory, machine dedupe, size-budget + double-surface gates",
       "status": "in_progress",

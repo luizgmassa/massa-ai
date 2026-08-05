@@ -55,6 +55,16 @@ Batches run strictly sequentially: a batch never starts until the previous batch
 - `references/spec-driven/coding-principles.md`
 - Relevant `spec.md`, `context.md`, and `design.md` sections for the feature (not all specs)
 
+This worker payload is a specialization of the canonical Capability Packet in
+`references/agent-orchestration.md`: the task definitions and spec/design sections are
+its `scope` + `inputs`, the Gate Check Commands are its `sensors`, the structured
+return contract below is its `output`, and write permission is scoped to the batch's
+disjoint task files. Workers inherit nothing from the parent session — every needed
+reference is listed above by path. Inside a worker, repository-wide git operations
+(`git stash`, shared-state `git checkout`/`switch`, `git reset`, `git clean`) are
+prohibited; the only git surface a worker touches is the defined task cycle's atomic
+commits in the feature worktree.
+
 **What a batch worker does:**
 
 Executes ALL tasks in its assigned batch **in order** — finishing every task in one phase before starting the next phase in the batch — following the `references/spec-driven/execute.md` cycle for each task (implement → gate → atomic commit). It does NOT spawn further sub-agents. After completing all tasks in the batch, the worker reports a **compact summary** to the orchestrator using the structured return contract:
@@ -75,6 +85,12 @@ Batch (phases [N]–[M]) return:
 No raw logs, no full test output — only the above fields keep the main context clean.
 
 **No nesting:** Batch workers execute their tasks themselves. They never spawn sub-sub-agents. Execution is strictly sequential within and across batches — there is no intra-phase or intra-batch parallelism.
+
+**Orchestrator context discipline:** the orchestrator consumes only the compact
+summary above. It must never read a worker's transcript, JSONL, or intermediate
+reasoning, and must never poll a running worker for status — the summary at batch
+completion is the only channel back (see `references/agent-orchestration.md`,
+Orchestrator Working Memory).
 
 ## Delegation Activity Table
 
@@ -117,6 +133,12 @@ Delegated work returns through the compact summary contract above. Planning, tas
 - The git diff surface for the feature (scoped to the feature branch or commit range)
 - The test files in scope
 - `references/spec-driven/validate.md` as its operating checklist
+
+This payload is a specialization of the canonical Capability Packet
+(`references/agent-orchestration.md`): spec + diff + tests are its `scope`/`inputs`,
+`validate.md` is its `sensors` source, the compact verdict + `validation.md` report
+below are its dual-channel `output`, and `permissions` are read-only outside the
+scratch sensor state.
 
 **What the Verifier does (full process in `validate.md`):**
 

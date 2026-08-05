@@ -1,7 +1,8 @@
 # Handoff — persona-router-token-optimization (mid-Execute, resume at T6)
 
-Previous handoff (workflow-policy-updates) closed: merged as PR #66, released
-v1.23.0 @ `d18e7764`.
+Previous handoffs closed: workflow-policy-updates merged as PR #66, released
+v1.23.0 @ `d18e7764`; subagent-orchestration-io merged as PR #67 @ `5b338af4`,
+released v1.24.0 (this branch merged origin/main at that point mid-Execute).
 
 Session `spec-persona-router-token-optimization` · workflow spec-driven (Large) ·
 persona route: AI Engineer (`context-skill-harness-engineer-architect`) — the
