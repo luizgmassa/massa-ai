@@ -291,7 +291,7 @@ Consult `references/skill-architect/examples.md` for the full anti-pattern list.
 ### 4.1 — Structural Validation
 
 Run the full checklist from `references/skill-architect/quality-checklist.md` and execute
-`scripts/validate_skill.py` against the generated skill to check:
+`bun scripts/validate_skill.ts <skill-folder>` against the generated skill to check:
 
 - SKILL.md exists with correct casing
 - Frontmatter has required fields with correct format
@@ -300,7 +300,8 @@ Run the full checklist from `references/skill-architect/quality-checklist.md` an
 - No XML angle brackets in frontmatter
 - Description includes trigger phrases
 
-IF Python is unavailable THEN skip `scripts/validate_skill.py` and run the
+IF the script cannot run (no code-execution tool available) THEN skip
+`scripts/validate_skill.ts` and run the
 `references/skill-architect/quality-checklist.md` checklist manually instead.
 
 ### 4.2 — Trigger Testing

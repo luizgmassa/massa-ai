@@ -192,7 +192,7 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
       XDG_CONFIG_HOME: xdgConfig,
     });
     const agentsDir = path.join(xdgConfig, "opencode/agents");
-    const writeAgents = new Set(["builder", "test-engineer", "documentation-agent"]);
+    const writeAgents = new Set(["builder", "test-engineer", "documentation-agent", "judge"]);
 
     for (const name of SPECIALIST_NAMES) {
       const content = await fs.readFile(

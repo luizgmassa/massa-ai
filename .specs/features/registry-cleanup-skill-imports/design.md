@@ -102,8 +102,11 @@ conversation → `to-prd`".
   manually (IMP-06).
 - `skills/massa-ai/references/skill-architect/{examples,patterns,quality-checklist}.md`:
   byte copies (grep for residuals first; fix any `massa-th0th`).
-- `skills/massa-ai/scripts/validate_skill.py`: byte copy. `__pycache__` never
-  copied (generator skips it; we copy only the .py).
+- `skills/massa-ai/scripts/validate_skill.ts`: TypeScript port of the source's
+  Python validator (user directive 2026-08-05, post-validation, superseding the
+  byte-copy plan) — `Bun.YAML.parse` for frontmatter (repo precedent:
+  `workflow-bun-cache.test.ts`), same checks/flags/exit codes; the `.py` is not
+  shipped.
 - Router row:
   `| skill-architect | design and build a new skill through structured conversation | workflows/skill-architect.md |`;
   precedence tier 2 gains "new SKILL.md / skill design → `skill-architect`".

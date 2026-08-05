@@ -133,8 +133,9 @@ Gate: WMH green incl. to-prd.md; commit.
       with `license: CC-BY-4.0` + attribution line — user decision 2026-08-05,
       rewritten reference/script paths, massa-th0th residual fixed, Python
       fallback line), `skills/massa-ai/references/skill-architect/{examples,patterns,quality-checklist}.md`,
-      `skills/massa-ai/scripts/validate_skill.py`. Router row + precedence
-      entry.
+      `skills/massa-ai/scripts/validate_skill.py` (superseded post-validation
+      by user directive 2026-08-05: ported to `validate_skill.ts`, `.py`
+      removed). Router row + precedence entry.
 - [ ] Same commit (crosses the population threshold — plan-critic C1):
       `scripts/__tests__/workflow-metadata-headers.test.ts`
       `EXPECTED_WORKFLOW_COUNT` 36 → 38 and license assertion → allowlist

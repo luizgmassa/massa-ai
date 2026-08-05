@@ -102,3 +102,28 @@ PASS — hand back to the main agent to commit `.specs/HANDOFF.md`,
 follow-up (automated field-bullet regression test) as a lightweight
 post-merge task; it does not block this PR since the live grep sensor
 proves zero occurrences today.
+
+## Addendum — post-validation fixes (2026-08-05, main agent)
+
+The original PASS predates two post-validation events:
+
+1. **CI red on PR #72 (build + coverage): a FOURTH WRITE_AGENTS roster copy**
+   — `apps/opencode-plugin/src/__tests__/agents-install.test.ts:195` (OPC-02).
+   It escaped both the author sweep and this validation because its suite runs
+   only under turbo `bun run test` (CI build job), which neither ran locally;
+   `test:scripts`/`test:plugins` cannot reach it. Fixed by adding `judge`;
+   recorded as lesson L-019. Both CI failures shared this single root cause.
+2. **User directive: `validate_skill.py` → `validate_skill.ts`** (supersedes
+   the spec assumption "stays Python"; spec/design/tasks amended in place with
+   the override recorded). TS port parses frontmatter with `Bun.YAML.parse`;
+   smoke-tested green (skills/persona-router → PASS 21 checks, exit 0) and red
+   (frontmatter-less scratch skill → exit 1). Stale bundled `.py` copies
+   removed; `generate-skill-artifacts --check` caught them first (stale-entry
+   detection working as designed). Lesson L-020.
+
+Re-run evidence: turbo `bun run test` — only remaining red was
+`embedded-api-client-endpoints.test.ts` cold-start flake (96/1 cold with a
+20 s live ETL, 97/0 warm at 864 ms; documented env-sensitivity class, no
+runtime code in this diff), isolation runner then PASS all 10 groups;
+`test:scripts` exit 0; `lint` exit 0; `test:plugins` exit 0; WMH +
+workflow-harness-contract 50/0; both generators `--check` clean.

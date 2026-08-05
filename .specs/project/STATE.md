@@ -31,6 +31,7 @@
   intake lines, third roster copy, CHANGELOG). Gates: test:scripts exit 0
   (1414 tests + 8 shell suites), lint 0, test:plugins 96/0, both generators
   --check clean. Useful-Agent-Skills source repo untouched (porcelain empty).
+- Post-validation: 4th WRITE_AGENTS roster copy fixed (opencode agents-install, CI root cause); validate_skill ported .py→.ts (user directive; Bun.YAML); lessons L-019/L-020 recorded.
 - massa-ai MCP server not used this session; `.specs/` files canonical.
 
 

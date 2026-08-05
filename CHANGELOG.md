@@ -19,7 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `furps-refinement`); `skill-architect` →
   `skills/massa-ai/workflows/skill-architect.md` +
   `references/skill-architect/{examples,patterns,quality-checklist}.md` +
-  `scripts/validate_skill.py`, kept `license: CC-BY-4.0` with attribution
+  `scripts/validate_skill.ts` (TypeScript port of the source's Python
+  validator, parsing frontmatter with `Bun.YAML`; the Python original is not
+  shipped), kept `license: CC-BY-4.0` with attribution
   (author Felipe Rodrigues) — the workflow-metadata-headers gate's license
   assertion widened to the `["MIT", "CC-BY-4.0"]` allowlist and its
   `EXPECTED_WORKFLOW_COUNT` population lock bumped 36 → 38.
