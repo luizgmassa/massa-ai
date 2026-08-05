@@ -3,7 +3,7 @@ name: debug
 description: "Use this workflow for evidence-backed root-cause diagnosis of broken behavior, failures, regressions, or crashes; route new capabilities to feature and broad redesign to spec-driven."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### 🔴 Debug

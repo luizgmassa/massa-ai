@@ -3,7 +3,7 @@ name: code-quality-audit
 description: "Findings-only audit workflow for SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, and code-smell issues in a concrete target; not for architecture concerns."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Code Quality Audit

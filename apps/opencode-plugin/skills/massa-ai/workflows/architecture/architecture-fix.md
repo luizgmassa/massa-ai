@@ -3,7 +3,7 @@ name: architecture-fix
 description: "Executes fixes from a saved architecture audit report; not for findings-only review or broad new design work with missing requirements."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Architecture Fix

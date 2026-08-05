@@ -3,7 +3,7 @@ name: implementation-audit
 description: "Findings-only multi-lens audit of a concrete implementation target that dispatches child audit lenses and saves one durable report for implementation-fix."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Implementation Audit

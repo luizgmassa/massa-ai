@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 18,
+  "next_id": 19,
   "lessons": [
     {
       "id": "L-001",
@@ -376,6 +376,29 @@
       ],
       "created": "2026-08-05T14:39:17Z",
       "last_seen": "2026-08-05T14:39:17Z",
+      "project": "massa-ai",
+      "session": "spec-skill-token-optimization",
+      "workflow": "spec-driven",
+      "entity": "skill-token-optimization",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-018",
+      "key": "ac_gap::editing a workflow body requires bumping its frontmatter metadata version in the same change any feature touching skills massa ai workflows md must carry a version bump ac",
+      "text": "Editing a workflow body requires bumping its frontmatter metadata.version in the same change; any feature touching skills/massa-ai/workflows/*.md must carry a version-bump AC.",
+      "signal": "ac_gap",
+      "scope": "skills/massa-ai/workflows",
+      "status": "candidate",
+      "features": [
+        "skill-token-optimization"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "user correction post-PR#71: metadata.version left at 1.0.0 on 36 edited workflows (skills/massa-ai/workflows)"
+      ],
+      "created": "2026-08-05T15:15:33Z",
+      "last_seen": "2026-08-05T15:15:33Z",
       "project": "massa-ai",
       "session": "spec-skill-token-optimization",
       "workflow": "spec-driven",

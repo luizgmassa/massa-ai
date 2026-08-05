@@ -3,7 +3,7 @@ name: maestro-audit
 description: "Findings-only audit of existing Maestro mobile E2E flows, fixtures, setup/teardown, reports, selector stability, flake risk, and scenario coverage; does not edit code."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Maestro Audit

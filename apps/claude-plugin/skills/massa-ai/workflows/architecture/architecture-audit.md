@@ -3,7 +3,7 @@ name: architecture-audit
 description: "Findings-only audit workflow for domain boundaries, bounded contexts, coupling, and architecture health against a concrete target; not for SOLID or code quality scans."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Architecture Audit

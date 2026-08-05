@@ -3,7 +3,7 @@ name: implementation-fix
 description: "Executes confirmed findings from a saved implementation audit report; the saved audits/implementation report is the source of truth, not chat summaries."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Implementation Fix

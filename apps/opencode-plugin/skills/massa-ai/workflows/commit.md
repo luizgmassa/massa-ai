@@ -3,7 +3,7 @@ name: commit
 description: "Use this workflow to draft a commit message, prepare, or commit current repository changes; not for Jira tickets, release notes, changelogs, or history rewriting."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Commit

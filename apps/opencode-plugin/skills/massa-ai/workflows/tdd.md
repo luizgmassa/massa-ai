@@ -3,7 +3,7 @@ name: tdd
 description: "Use this workflow to write a Technical Design Document once one product direction is selected and no unresolved API, data, security, or rollout decision blocks implementation."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### TDD (Technical Design Document)

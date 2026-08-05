@@ -3,7 +3,7 @@ name: requirements-fix
 description: "Executes fixes from a saved requirements audit report; not for findings-only review or broad feature design when acceptance criteria are missing."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Requirements Fix

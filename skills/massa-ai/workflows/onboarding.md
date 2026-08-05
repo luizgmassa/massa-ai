@@ -3,7 +3,7 @@ name: onboarding
 description: "Use this workflow on a first session or with missing project context to resolve project identity, establish memory/index state, and capture an architecture overview."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### 🟢 Onboarding (New Project / First Session)

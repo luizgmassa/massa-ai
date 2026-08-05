@@ -3,7 +3,7 @@ name: long-session
 description: "Use this workflow for same-session handoff, continuation, or safe stopping when work is unfinished, context budget is low, or verbose context reduces execution quality."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### 🟠 Long Session (Context Growing Large)

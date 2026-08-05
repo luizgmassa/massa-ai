@@ -3,7 +3,7 @@ name: bugs-audit
 description: "Findings-only bug discovery workflow for a concrete target; route known broken behavior to debug and code-quality concerns to code-quality-audit."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Bugs Audit

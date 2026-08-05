@@ -3,7 +3,7 @@ name: feature
 description: "Use this workflow to add a new capability, screen, command, integration, or user-facing improvement with clear intent; route broken behavior to debug and broad work to spec-driven."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### 🟡 Feature

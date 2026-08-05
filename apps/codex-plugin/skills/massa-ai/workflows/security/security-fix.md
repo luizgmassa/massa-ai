@@ -3,7 +3,7 @@ name: security-fix
 description: "Executes fixes from a saved security audit report; not for findings-only security review or generic correctness fixes outside an exploitable path."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Security Fix

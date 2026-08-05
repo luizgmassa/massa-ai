@@ -3,7 +3,7 @@ name: rfc
 description: "Use this workflow when a significant technical, process, product, vendor, tool, or policy decision is still open and stakeholders need a structured proposal before committing."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### RFC (Request for Comments)

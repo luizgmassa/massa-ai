@@ -3,7 +3,7 @@ name: security-audit
 description: "Findings-only security review workflow for a concrete target; routes generic correctness bugs and other audit categories to their dedicated workflows."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Security Audit

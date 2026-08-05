@@ -3,7 +3,7 @@ name: maestro
 description: "Implements new Maestro mobile E2E flows from Jira/Confluence, prompt text, attached scenario files, or inferred scenarios when no explicit source is supplied."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Maestro

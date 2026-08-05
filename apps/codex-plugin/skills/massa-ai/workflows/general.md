@@ -3,7 +3,7 @@ name: general
 description: "Final fallback workflow for coding, planning, review, or implementation work when no specialized massa-ai workflow is a better match."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### General Coding Workflow

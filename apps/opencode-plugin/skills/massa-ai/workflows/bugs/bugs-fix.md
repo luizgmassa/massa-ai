@@ -3,7 +3,7 @@ name: bugs-fix
 description: "Executes fixes from a saved bugs audit report; not for findings-only discovery, single known issues without a report, or broad product changes."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Bugs Fix

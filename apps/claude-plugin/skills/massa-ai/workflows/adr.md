@@ -3,7 +3,7 @@ name: adr
 description: "Use this workflow to record a finalized or being-finalized architecture decision; route open options to rfc and implementation planning to tdd."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### 📜 ADR (Architecture Decision Record)

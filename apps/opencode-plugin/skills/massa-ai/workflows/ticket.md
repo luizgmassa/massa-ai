@@ -3,7 +3,7 @@ name: ticket
 description: "Use this workflow to draft, review, create, or resume creation of Jira Epics, issues, or sub-tasks through Atlassian MCP, the only tracker and mutation path."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Ticket

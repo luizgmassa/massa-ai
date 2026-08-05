@@ -3,7 +3,7 @@ name: design
 description: "Implements or updates a concrete mobile UI from structured Figma evidence or screenshots when no saved audit report exists; route comparisons to mobile-figma-audit."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Design

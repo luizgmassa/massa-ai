@@ -3,7 +3,7 @@ name: tests-audit
 description: "Findings-only audit of test coverage, regression protection, assertion quality, fixture reliability, and missing deterministic sensors in a concrete target."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Tests Audit

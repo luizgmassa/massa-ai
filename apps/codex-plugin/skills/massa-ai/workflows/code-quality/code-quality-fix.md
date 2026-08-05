@@ -3,7 +3,7 @@ name: code-quality-fix
 description: "Executes fixes from a saved code quality audit report; not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, or overengineering analysis."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Code Quality Fix

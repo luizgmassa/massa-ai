@@ -3,7 +3,7 @@ name: judge-with-debate
 description: "Explicit-route workflow to evaluate an artifact through multi-judge debate against a tailored specification, converging on a consensus verdict or honest no-consensus."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Judge With Debate

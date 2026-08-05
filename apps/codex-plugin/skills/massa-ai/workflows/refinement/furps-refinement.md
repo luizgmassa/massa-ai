@@ -3,7 +3,7 @@ name: furps-refinement
 description: "Findings-only refinement of a PRD and/or ADR against the FURPS+ quality model before implementation, fanning out one sub-agent per dimension with a structured report."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### FURPS+ Refinement

@@ -3,7 +3,7 @@ name: mobile-figma-audit
 description: "Findings-only audit comparing an existing mobile UI implementation against Figma MCP evidence for a concrete feature, file set, screen, or commit range; does not edit code."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### Mobile Figma Audit

@@ -3,7 +3,7 @@ name: refactor
 description: "Behavior-preserving structural cleanup, simplification, decoupling, and testability workflow; route broken behavior to debug and broad boundary redesign to architecture-audit or spec-driven."
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 ### 🔨 Refactor
