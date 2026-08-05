@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Workflow Metadata Headers (**VALIDATED PASS 2026-08-05** — T1–T4 done, 6/6 ACs, 5/5 mutants killed; T5 delivery in flight)
+## Current — Workflow Metadata Headers (**VALIDATED PASS 2026-08-05** — T1–T5 done; PR #70 open, CI 14/14 green; merge = user decision)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-workflow-metadata-headers` ·
   workflow: spec-driven (Medium) · persona: AI Engineer (pinned) · branch
@@ -42,6 +42,23 @@
   venue; scanner-boundary fix recorded as follow-up). `skills-duplication-metric`
   ceiling 331 → 471 with in-file reason (mandated frontmatter uniformity, gate's
   own documented-raise convention). CHANGELOG entry under [Unreleased] ### Added.
+- T5 delivery (2026-08-05): validation.md committed @ `bfcab362` (PASS — 6/6 ACs
+  re-derived, 5/5 mutants killed, sha256-verified restores). PR #70
+  (https://github.com/luizgmassa/massa-ai/pull/70) initially CONFLICTING — sibling
+  PR #69 (model-profile-switching) merged to main 6 min before #70 opened, and a
+  conflicted PR never starts `pull_request` checks (zero checks, not red ones).
+  Merged `origin/main` @ `b334234b` in: conflicts HANDOFF.md + FEATURES.json
+  resolved keeping both histories (65 features, active = this); CHANGELOG
+  auto-merge had mis-placed this branch's entry inside released [1.25.0] —
+  relocated to [Unreleased]. Post-merge: regen `--check` 0, sensor 36/36, dup
+  metric 20/0 @ 471, lint 0; local test:scripts residue = known worktree
+  contamination only (DAMPING now 2×, sole live sibling worktree). CI: 14/14
+  green after one coverage re-run — single flaky core `trace_path` MAX_DEPTH
+  test failed then passed on identical commit; not WMH-related. Merge = user's.
+- Follow-up candidates recorded: add `.claude/` to
+  `benchmarks/needles/resolve.ts` IGNORED_DIRECTORIES (kills the local
+  worktree-contamination class); optionally refresh installed
+  `~/.claude/skills/massa-ai` copies post-merge.
 
 ## Previous — Persona Router Token Optimization (**VALIDATED PASS 2026-08-04** — T0–T9 done; PR #68 open, CI 14/14 green; merge = user's decision; PRT-02 live walkthrough pending-restart)
 

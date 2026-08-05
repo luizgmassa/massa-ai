@@ -1,4 +1,4 @@
-# Handoff — workflow-metadata-headers (T1–T4 + validation PASS; T5 delivery in flight — PR #70, post-#69 merge)
+# Handoff — workflow-metadata-headers (COMPLETE — validated PASS; PR #70 open, CI 14/14 green; merge = user decision)
 
 Previous handoffs closed: model-profile-switching merged as PR #69 @
 `b334234b` (v1.25.0 cut in between; its CHANGELOG entry restored under
