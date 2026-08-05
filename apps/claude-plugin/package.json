@@ -4,6 +4,7 @@
   "description": "massa-ai plugin for Claude Code — semantic code search, durable memory, symbol graph, and context compression",
   "files": [
     "agents",
+    "agent-profiles",
     "commands",
     "hooks",
     "!hooks/__tests__",

@@ -9,7 +9,8 @@
   },
   "files": [
     "dist",
-    "agents/*.md"
+    "agents/*.md",
+    "agent-profiles/**/*.md"
   ],
   "scripts": {
     "dev": "bun run --watch src/index.ts",
