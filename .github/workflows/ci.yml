@@ -126,6 +126,14 @@ jobs:
           rm -rf ~/.bun/install/cache node_modules || true
           bun install --frozen-lockfile --concurrent-scripts 1
 
+      # UGB-10 (design Component 5). Generated apps/*-plugin bundles are
+      # gitignored build output (UGB-01) — nothing below this step (Build,
+      # verify-package-contents, the skill-artifact --check drift gate, Test
+      # scripts, Test plugin installers) can see a fresh bundle unless this
+      # runs first. Placed right after install, before every one of them.
+      - name: Generate plugin bundles
+        run: bun run generate:artifacts
+
       - name: Deploy Prisma migrations
         run: cd packages/core && bunx prisma migrate deploy
 
