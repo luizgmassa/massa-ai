@@ -176,6 +176,15 @@ backup + `_massaAiOwned` marker — user hooks are always preserved.
 Claude Code and Codex additionally support their **native plugin managers**,
 which is what makes massa-ai visible in `/plugin` and `/plugins`:
 
+**Generation prerequisite for a checkout (not a tarball install):** the
+`skills/`, `agents/`, and `agent-profiles/` trees under every `apps/*-plugin/`
+directory are generated build output, gitignored rather than checked in. Run
+`bun run generate:artifacts` once before `marketplace add` against a checkout
+— any of the `install.sh` scripts or `install-harness.sh` already run it for
+you, so this only matters if you point the marketplace at a checkout without
+running an installer first. A published npm/tarball install ships the bundles
+pre-generated and needs nothing extra.
+
 ```
 # Claude Code
 /plugin marketplace add ~/Projects/massa-ai
@@ -187,6 +196,23 @@ which is what makes massa-ai visible in `/plugin` and `/plugins`:
 codex plugin marketplace add ~/Projects/massa-ai
 codex plugin add massa-ai@massa-ai
 ```
+
+**After every `git pull`**, regenerate the bundles a checkout-based
+marketplace entry serves — `bun run generate:artifacts` — or the plugin
+manager keeps serving the pre-pull skills/agents until you do. This is opt-in,
+not automatic; the repo does not install a hook for you. If you want it
+automated, copy this into `.git/hooks/post-merge` (and `chmod +x` it):
+
+```bash
+#!/bin/sh
+# Optional: keep checkout-based plugin bundles fresh after every pull.
+cd "$(git rev-parse --show-toplevel)" && bun run generate:artifacts
+```
+
+Standalone `massa-ai-config agents install` run against an ungenerated
+checkout fails (the source `agents/`/`agent-profiles/` directories it copies
+from do not exist yet) until `bun run generate:artifacts` has run at least
+once. Tarball installs are unaffected — they ship pre-generated.
 
 On Claude Code the plugin ships its own hooks, so running `install.sh` after a
 plugin install skips the hook merge instead of double-firing. On Codex the two
