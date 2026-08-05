@@ -33,7 +33,20 @@ This workflow is findings-only. Do not edit the PRD/ADR unless the user separate
    - Dispatch six `massa-ai-furps-analyst` sub-agents: F, U, R, P, S, X (X = FURPS+ Extensions).
    - Each receives its `checklist.md` section, the bounded document packet, the DoR, and the Fool summary.
    - Each returns per check-item status (`covered|partial|missing|unclear`), `FR-<letter>-<N>` findings, and contributions to Open Questions / Suggestions / Insights / Risks / DoR-gaps.
-   - Run in parallel; batch if a concurrency cap applies. Each gets its own ephemeral Synapse session only if it performs >=2 searches.
+   - Dispatch the six dimensions in waves of at most 4 concurrent analysts (e.g. 4 then 2), per the wave cap in `references/agent-orchestration.md` (Orchestrator Working Memory). Dimension analyses are order-independent, so wave order does not matter. Each gets its own ephemeral Synapse session only if it performs >=2 searches.
+
+> **Dispatch: `massa-ai-furps-analyst`** (role: `furps-analyst`) — charter `skills/agents/furps-analyst/SKILL.md` — 6 dispatches, one per dimension, waves of ≤4
+> - trigger: furps-refinement step 5; one analyst per FURPS+ dimension (F, U, R, P, S, X)
+> - scope: exactly one dimension's `checklist.md` section against the bounded document packet
+> - permissions: read-only
+> - inputs: the dimension's checklist section, bounded document packet, DoR, Fool summary; inherits nothing — the packet names every artifact
+> - sensors: per check-item status must be one of `covered|partial|missing|unclear`; findings carry `FR-<letter>-<N>` IDs
+> - output: per check-item statuses, findings, and Open Questions / Suggestions / Insights / Risks / DoR-gap contributions — compact structured return, no document quotes beyond evidence snippets
+> - firewall: document bodies summarized; no raw section dumps in the return
+> - memory: suggest-only; main agent persists
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
+
+   This packet is a specialization of the canonical Capability Packet (`references/agent-orchestration.md`); the per-dimension checklist section is its `scope` delta.
 6. Synthesis (main):
    - Collect the six dimension analyses and the Fool summary.
    - Deduplicate, cross-check, and reconcile cross-dimension concerns (e.g., error flows span F3+R2+U1; components span F2+S2).
@@ -55,7 +68,7 @@ This workflow is findings-only. Do not edit the PRD/ADR unless the user separate
 | Sub-agent spawning unavailable | Run dimensions sequentially in the main agent; record the skipped-delegation reason |
 | DoR not supplied | Use the built-in fallback; mark DoR-gaps explicitly |
 | Document too large | context-firewall: section summaries plus pointers to sub-agents |
-| Concurrency cap on six FURPS agents | Batch dispatch; preserve order-independence |
+| Host concurrency cap tighter than the wave cap of 4 | Smaller waves; preserve order-independence |
 
 ## Examples
 
