@@ -47,6 +47,14 @@ describe("skill-bundle parity — byte identity (PDO-06 AC7)", () => {
     expect(bundled.equals(source)).toBe(true);
   });
 
+  test.each(HOSTS)("%s: skills/profile/SKILL.md is byte-identical to the source (T15)", async (host) => {
+    const source = await fs.readFile(path.join(REPO_ROOT, "skills/profile/SKILL.md"));
+    const bundled = await fs.readFile(
+      path.join(REPO_ROOT, `apps/${host}-plugin/skills/profile/SKILL.md`),
+    );
+    expect(bundled.equals(source)).toBe(true);
+  });
+
   test.each(HOSTS)("%s: every skills/agents/<name>/SKILL.md charter is bundled byte-identical", async (host) => {
     const agentsDir = path.join(REPO_ROOT, "skills/agents");
     const names = (await fs.readdir(agentsDir, { withFileTypes: true }))
