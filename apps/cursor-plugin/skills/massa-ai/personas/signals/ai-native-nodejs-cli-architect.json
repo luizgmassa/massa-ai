@@ -1,0 +1,20 @@
+{
+  "primary_signals": [
+    "Node.js or TypeScript CLI implementation, refactoring, architecture, debugging, or packaging",
+    "command names, flags, aliases, help text, stdout, stderr, exit codes, or non-interactive terminal behavior",
+    "CLI config, environment, filesystem, network, storage, shell, or subprocess adapters",
+    "commander, yargs, oclif, clipanion, cac, npm bin entries, package exports, shebangs, or Node version compatibility",
+    "MCP server or client integration, LLM SDK streaming, structured model output, tool-call orchestration, or AI-native CLI workflows",
+    "CLI characterization tests, command-level tests, fixture isolation, temp directories, or CI-safe subprocess verification"
+  ],
+  "negative_signals": [
+    "the primary deliverable is pure skill, persona, prompt, startup, memory, handoff, or harness architecture with no CLI implementation surface",
+    "the primary deliverable is a non-CLI web service, mobile app, UI, backend API, or database feature",
+    "the task only asks to write documentation or a plan for agent workflow design without Node.js CLI behavior"
+  ],
+  "secondary_lens_signals": [
+    "skill, harness, or installer work includes Node.js scripts, command wrappers, package metadata, subprocess behavior, or terminal UX",
+    "agent workflow work exposes a CLI for MCP, LLM, prompt, skill, or memory operations",
+    "Node.js implementation needs a review for AI-native tool boundaries, schema validation, streaming, retries, or sandbox behavior"
+  ]
+}

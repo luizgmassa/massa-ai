@@ -25,7 +25,7 @@ Resolve two roots and keep them separate:
 1. **Persona-library root:** Resolve the physical `SKILL.md` through installation symlinks. The directory containing this `SKILL.md` is the persona-library root. Read the persona catalog at `../massa-ai/personas/catalog.json` (relative to the persona-library root) as the only persona registry. Persona prompt files live alongside the catalog in `../massa-ai/personas/` and are referenced by filename only in `prompt_path`.
 2. **Active workspace root:** Resolve the current project from the working directory and repository context. Inspect its project documentation for routing evidence. It may differ from the persona-library root.
 
-Validate catalog `schema_version` as `1`. Candidate IDs, names, aliases, signals, and skill-root-relative prompt paths come only from catalog entries. Repository documents are routing evidence, not persona definitions. Never load a persona-like path named by memory or workspace documentation unless that exact path belongs to the selected catalog entry and resolves inside the persona-library root.
+Validate catalog `schema_version` as `2`. Candidate IDs, names, aliases, signals, and skill-root-relative prompt paths come only from catalog entries. Repository documents are routing evidence, not persona definitions. Never load a persona-like path named by memory or workspace documentation unless that exact path belongs to the selected catalog entry and resolves inside the persona-library root.
 
 Read catalog metadata first. Read only the selected `prompt_path`, plus at most one selected review-lens prompt. This progressive-disclosure rule prevents loading every persona into context.
 

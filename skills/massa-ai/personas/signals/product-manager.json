@@ -1,0 +1,21 @@
+{
+  "primary_signals": [
+    "PRD, product requirements, product brief, or roadmap-to-requirements artifact",
+    "user stories, acceptance criteria, MVP definition, scope boundaries, or non-goals",
+    "product problem framing, users, jobs to be done, success metrics, or hypothesis",
+    "capability contract, implementation-ready product requirements, or product-to-engineering handoff",
+    "product risk, launch readiness, stakeholder alignment, or feature prioritization",
+    "analysis of exploration findings into product specifications"
+  ],
+  "negative_signals": [
+    "the primary deliverable is implementation, debugging, refactoring, or test automation",
+    "the primary deliverable is pure skill, persona, startup, memory, handoff, or harness architecture",
+    "the primary deliverable is Node.js CLI architecture, mobile app architecture, or mobile QA automation",
+    "the task asks for code review findings rather than product requirements"
+  ],
+  "secondary_lens_signals": [
+    "engineering plans need a check for product scope, MVP clarity, non-goals, success metrics, or user-visible acceptance criteria",
+    "workflow or harness changes need product-facing requirements before implementation",
+    "technical exploration needs synthesis into a stakeholder-readable requirement artifact"
+  ]
+}
