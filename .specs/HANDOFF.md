@@ -17,6 +17,22 @@
 - Next: independent validation (verification-agent, author != verifier) -> validation.md ->
   push + PR (user merge decision; minor release on merge).
 
+## Previous — Workflow Policy Updates (spec-driven, Execute complete pending validation; PR #66 merged into main @ d18e7764 per origin/main at this feature's branch cut)
+
+- Session `spec-workflow-policy-updates`, branch `spec/workflow-policy-updates`,
+  worktree `.claude/worktrees/workflow-policy-updates` @ `origin/main` = `07ffa7fd`
+  (v1.22.0). Scope WFP-01..05: Compose `@Preview` rule, PR-description currency,
+  Figma pre-analysis + sequential retrieval protocol, abbreviation expansion,
+  Phase/Task vocabulary. 2 Phases = 5 Tasks; Phase 1 (T1-T4) committed with per-task
+  bundle regen + literal grep sensors; T5 = close-out/validation/PR.
+- Plan Challenge pre_mortem F1-F6 folded (see design.md Plan Challenge Record).
+  Key placements: normative texts live once — `mobile-context.md` (WFP-01),
+  `implementation-delivery.md` (WFP-02), `figma-pre-analysis.md` (WFP-03), SKILL.md
+  Core Contract (WFP-04/05); workflows carry pointers only; `mobile-context.md` has
+  zero `figma-pre-analysis` mentions (rfc/adr/tdd scope guard).
+- Remaining at handoff time: independent validation (verification-agent), PR, CI
+  watch. Merge is the user's decision.
+
 ## Previous — Python→TypeScript Scripts + Lessons Single-Store (VALIDATED PASS 2026-08-04 — T1-T12 + FT1-FT3 (FT2-FT3 = delivery repairs 1-2), 2 verification iterations; PR #65 open, merge = user's decision)
 
 - **Validation:** iteration 1 FAIL (critical: round-half-even sensor not standing after
