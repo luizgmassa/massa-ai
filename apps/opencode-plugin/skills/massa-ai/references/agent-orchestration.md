@@ -98,6 +98,21 @@ installed, spawning forbidden by platform policy, or the host returns an unknown
 delegated scope locally against the same output contract, and report the skipped
 delegation with its reason in the Evidence Gate.
 
+## Model Diversity Fallback
+
+Applies to any charter whose `metadata.model_tier` is a fallback and whose
+dispatching workflow additionally requests per-invocation model diversity at
+dispatch time (e.g. `judge` — 3 parallel slots; `meta-judge` — one slot).
+
+- The charter's `metadata.model_tier` is the fallback every host runs when
+  dispatch-time model selection is unavailable.
+- The dispatching workflow (e.g. `workflows/judge-with-debate.md`) is the
+  single source for the current slot/model assignment, not the charter file.
+- When dispatch-time selection is unavailable, every affected slot runs the
+  charter default, and the orchestrator records `DIVERSITY DEGRADED`
+  (multi-slot) or an equivalent diversity warning (single-slot) per the
+  dispatching workflow's own contract.
+
 ## Roles
 
 Use the role names in prompts and memory tags; use the host agent names to

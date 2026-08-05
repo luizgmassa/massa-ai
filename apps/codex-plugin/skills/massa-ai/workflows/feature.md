@@ -35,7 +35,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - Order non-breaking groups by Data, Domain, then Presentation/Navigation, mapping those labels to repository boundaries when needed.
    - Validate each group with the verification recipe before committing.
    - Invoke `workflows/commit.md` for each verified group; do not duplicate commit staging, message, audit-exclusion, or Jira-prefix rules in this workflow.
-   - When every group has a confirmed Jira key, follow the reference's optional stacked branch flow: ask whether to create stacked task branches, ask for the base branch and a branch pattern containing `<jira-task-key>` if accepted, create each next branch from the previous task branch, never push, and report branches and commits in push order.
+   - When every group has a confirmed Jira key, follow the optional stacked branch flow in `references/pr-task-fix.md` (Jira-Key Stacked Branches).
 12. Run the verification recipe and report skipped checks explicitly. If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
 13. At completion, persist (run the scoring rubric from `references/decision-engine.md` for each):

@@ -118,20 +118,20 @@ Gate: diffs rule-complete, term check clean-or-accepted; regen + `--check` 0 in-
 
 ### T5: Misc high-value dedupes
 
-- [ ] Requirement: STO-8
-- [ ] `skills/massa-ai/SKILL.md` Graceful Degradation table → new
+- [x] Requirement: STO-8
+- [x] `skills/massa-ai/SKILL.md` Graceful Degradation table → new
       `references/graceful-degradation.md`; SKILL.md keeps 2-line
       load-on-failure rule. (Extraction only — no other SKILL.md edits.)
-- [ ] `spec-driven.md` brownfield 7-doc table →
+- [x] `spec-driven.md` brownfield 7-doc table →
       `references/spec-driven/brownfield-mapping.md` (keep trigger + minimum
       bar line inline).
-- [ ] `general.md` failure-handling bullets: delete (duplicate of SKILL.md
+- [x] `general.md` failure-handling bullets: delete (duplicate of SKILL.md
       table rows), keep pointer.
-- [ ] Judge + meta-judge duplicated model-hint block →
+- [x] Judge + meta-judge duplicated model-hint block →
       `references/agent-orchestration.md` "Model Diversity Fallback" section.
-- [ ] `feature.md`/`refactor.md` stacked-branch restatements → pointer to
+- [x] `feature.md`/`refactor.md` stacked-branch restatements → pointer to
       `references/pr-task-fix.md`.
-- [ ] `spec-driven.md`: trim sub-agent-offer restatement (keep >3-Task trigger
+- [x] `spec-driven.md`: trim sub-agent-offer restatement (keep >3-Task trigger
       + single-Phase-group nuance); move checkpoint field list into
       `references/spec-driven/execute.md`.
 Tests: rule-survival diffs; `bun test scripts/__tests__/skill-size-budgets.test.ts scripts/__tests__/skills-harness-integrity.test.ts`

@@ -94,10 +94,9 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
    - Run repo-rules discovery from `references/repo-rules-discovery.md` before the first repository mutation: record the harness sources loaded (or `repo-rules: none present`), and implement so every new or changed file conforms to the target repo's module layout, unit-test location, and testing-area conventions. A repo rule wins over a skill default for placement and gate commands; record any deviation with an explicit reason. Never fabricate rules or create `.claude/`/`.cursor/` directories the repo lacks.
    - Use the Test Coverage Matrix and Gate Check Commands from `tasks.md`, or state their inline equivalents when Tasks was skipped.
    - Ask the MCP and skill question in Tasks or inline Execute when tool choice can change correctness or verification.
-   - If a formal `tasks.md` has more than 3 Tasks, present the sub-agent offer from `references/spec-driven/sub-agents.md` before starting Execute — even when packing yields a single Phase group (a 4–8-Task feature is offered as one Phase-group worker). Offer-then-confirm — never auto-spawn; the user must accept before any sub-agent is dispatched. One worker per Phase group (~7 Tasks, whole Phases): each worker executes all its Tasks in order (implement → gate → atomic commit), then reports a compact summary (Tasks done, commit hashes, test counts, deviations). Workers never spawn further sub-agents.
+   - If a formal `tasks.md` has more than 3 Tasks, present the sub-agent offer from `references/spec-driven/sub-agents.md` before starting Execute — even when packing yields a single Phase group (a 4–8-Task feature is offered as one Phase-group worker).
    - Implement one atomic step or approved task at a time.
-   - For long-running task sequences, create a checkpoint via `create_checkpoint` at task boundaries with `taskId`, `description`, `progressPercent`, `currentStep`, `nextAction`, `fileChanges`, and `checkpointType: "manual"` so progress is resumable after interruption.
-   - If resuming after interruption, call `list_checkpoints` with the `taskId` and `restore_checkpoint` to recover task state before continuing. If `create_checkpoint` is unavailable (e.g. `task_checkpoints` table missing), continue with `.specs/` artifact state as the fallback.
+   - For long-running task sequences, use the checkpoint mechanism in `references/spec-driven/execute.md` (Pause / End of Session) so progress is resumable after interruption.
    - Use per-task commits when the environment and user permissions allow commits; otherwise record the skipped reason.
    - Keep validation assets protected.
    - Update logical feature artifacts in `.specs/features/<slug>/` and `.specs/project/STATE.md` after meaningful progress.
@@ -166,17 +165,7 @@ Step 5: Flag as uncertain → "I'm not certain about X — here's my reasoning, 
 
 ## Brownfield Onboarding — 7-Doc Codebase Mapping
 
-When the spec-driven work targets a codebase the agent has not yet mapped (brownfield, new repo, or cold project), derive a 7-doc codebase map before Specify closes. The map is the shared factual ground for requirements, design, and task derivation; it is not busywork — each doc feeds a downstream phase.
-
-| Doc | Derives | Feeds |
-| --- | --- | --- |
-| `STACK.md` | languages, runtimes, frameworks, key libraries | Design constraints, verification commands |
-| `ARCHITECTURE.md` | layers, modules, boundaries, data flow | Design, risk surface |
-| `CONVENTIONS.md` | naming, file layout, commit/test conventions | Tasks, Execute |
-| `STRUCTURE.md` | directory map, where new code goes | Tasks, file placement |
-| `TESTING.md` | test runner, how to run gates, coverage tooling | Gate Check Commands, verification recipe |
-| `INTEGRATIONS.md` | external services, APIs, contracts, auth | Discuss, risk escalation |
-| `CONCERNS.md` | known risks, tech debt, migration landmines, security/privacy hotspots | Risk-domain escalation, validation focus |
+When the spec-driven work targets a codebase the agent has not yet mapped (brownfield, new repo, or cold project), derive the 7-doc codebase map from `references/spec-driven/brownfield-mapping.md` before Specify closes; it is not busywork — each doc feeds a downstream phase.
 
 Minimum bar: derive at least **`CONCERNS.md`** (risk surface — drives risk-domain escalation and validation focus) and **`TESTING.md`** (gate derivation — exact commands the Execute gate will run). If time or access is constrained, these two are non-negotiable; the other five are derived as the work needs them. Record the map under `.specs/features/<slug>/` (or the project onboarding dir) and confirm it against current source, not memory or external summaries.
 

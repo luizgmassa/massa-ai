@@ -30,10 +30,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
 
 ## Failure Handling
 
-- If massa-ai is unavailable, continue with focused shell and file inspection while retaining the project and workflow session concepts.
-- If recall is empty, proceed as a cold start without inventing memory.
-- If Synapse is unavailable, continue with stateless targeted search.
-- If a memory write fails, complete the task and report the durable insight that was not persisted.
+On any tool/index/MCP failure, follow `references/graceful-degradation.md` (also `SKILL.md` Graceful Degradation).
 
 ## Output Contract
 

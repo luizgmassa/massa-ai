@@ -74,11 +74,8 @@ overall: weighted-mean
 - References: `references/agent-orchestration.md`, `references/audit-report-io.md` (Judge With Debate Report Contracts).
 
 ## Model Hint
-This charter's `metadata.model_tier` (`deep`) is the fallback every host runs when dispatch-time
-model selection is unavailable. The `judge-with-debate` workflow additionally requests a specific
-model for this slot at dispatch time on hosts that support it — `workflows/judge-with-debate.md`
-is the single source for the current assignment, not this file. When dispatch-time selection is
-unavailable, the orchestrator records a diversity warning per the workflow contract.
+See `references/agent-orchestration.md` (Model Diversity Fallback): `metadata.model_tier`
+(`deep`) is the fallback; `workflows/judge-with-debate.md` owns the live model assignment.
 
 ## Validation Sensors
 - Output parses as YAML; weights sum to 1.0 (±0.001); every criterion carries id, name, weight, scale (min 1, max 5), rubric anchors for 1/3/5, and a non-empty checklist.
