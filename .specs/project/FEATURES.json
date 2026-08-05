@@ -822,7 +822,7 @@
         "specify": "complete",
         "design": "complete",
         "tasks": "complete",
-        "execute": false
+        "execute": "complete"
       },
       "spec": ".specs/features/model-profile-switching/spec.md",
       "depends_on": [
@@ -830,7 +830,7 @@
       ],
       "design": ".specs/features/model-profile-switching/design.md",
       "tasks": ".specs/features/model-profile-switching/tasks.md",
-      "notes": "Specify + Design + Tasks + full Plan Challenge (pre_mortem, 4 findings F1-F4 all folded) complete at 2026-08-04. 17 tasks / 5 phases / 3 batches. Execute pending batch-worker confirmation (user gate)."
+      "notes": "EXECUTE COMPLETE 2026-08-04: T1-T16 by 3 confirmed batch workers + 2 inline main-agent repairs (security-allowlist entry for lock.ts execFileSync; T17 close-out), 19 commits. Re-measured figures: 374 variant files across 22 (host,profile) pairs at 17 each; MCP tools 52->54 across 3 pinned locations (a third, undocumented pin found in tool-definitions-synapse.test.ts); OpenCode in-process tools 13->14 (closed the stale 13-vs-14 doc gap). Two recorded deviations: publish.yml + package.json files extension (required by MPS-01 AC4); codex/opencode have no marketplace mode -> installRoute unconditionally file. AD-015 appended. Full gate matrix exit 0. Independent validation pending."
     }
   ],
   "active_feature": "model-profile-switching"

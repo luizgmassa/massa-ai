@@ -1,20 +1,21 @@
 # Handoff
 
-## Active — Workflow Policy Updates (spec-driven, Execute complete pending validation)
+## Active — Model Profile Switching (spec-driven, Execute complete, validation in flight)
 
-- Session `spec-workflow-policy-updates`, branch `spec/workflow-policy-updates`,
-  worktree `.claude/worktrees/workflow-policy-updates` @ `origin/main` = `07ffa7fd`
-  (v1.22.0). Scope WFP-01..05: Compose `@Preview` rule, PR-description currency,
-  Figma pre-analysis + sequential retrieval protocol, abbreviation expansion,
-  Phase/Task vocabulary. 2 Phases = 5 Tasks; Phase 1 (T1-T4) committed with per-task
-  bundle regen + literal grep sensors; T5 = close-out/validation/PR.
-- Plan Challenge pre_mortem F1-F6 folded (see design.md Plan Challenge Record).
-  Key placements: normative texts live once — `mobile-context.md` (WFP-01),
-  `implementation-delivery.md` (WFP-02), `figma-pre-analysis.md` (WFP-03), SKILL.md
-  Core Contract (WFP-04/05); workflows carry pointers only; `mobile-context.md` has
-  zero `figma-pre-analysis` mentions (rfc/adr/tdd scope guard).
-- Remaining at handoff time: independent validation (verification-agent), PR, CI
-  watch. Merge is the user's decision.
+- Session `spec-model-profile-switching`, branch `spec/model-profile-switching`,
+  worktree `.claude/worktrees/model-profile-switching` @ `origin/main` = `d18e7764`.
+  Contract: `.specs/features/model-profile-switching/{spec,design,tasks}.md` — read those,
+  not this file, for requirements (MPS-01..12), per-task write sets and gates.
+- Specify + Design + Tasks + full Plan Challenge (pre_mortem, F1-F4 all folded: installRoute
+  data source, TS lock stale-owner reclaim, OpenCode symlink repoint, AC5 global-fail
+  exemption) + Execute T1-T16 via 3 confirmed batch workers + 2 inline repairs
+  (security-allowlist entry for lock.ts; tools-api type-check fix rode B3). One atomic
+  commit per task. AD-015 appended (modelProfile single-writer).
+- Gates at close-out, re-measured by main agent: lint 0, both generators --check 0,
+  test:plugins 96/96, test:scripts 0, build 0, both isolated runners 0 (B3 matrix).
+- massa-ai MCP unreachable this session; `.specs/` canonical.
+- Next: independent validation (verification-agent, author != verifier) -> validation.md ->
+  push + PR (user merge decision; minor release on merge).
 
 ## Previous — Python→TypeScript Scripts + Lessons Single-Store (VALIDATED PASS 2026-08-04 — T1-T12 + FT1-FT3 (FT2-FT3 = delivery repairs 1-2), 2 verification iterations; PR #65 open, merge = user's decision)
 
