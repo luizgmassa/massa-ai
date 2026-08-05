@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   symlink on upgrade, and refreshes a stale copy on re-run. Re-run the
   installer (or harness) after `bun run build` to pick up a new build.
 
+## [1.29.0] - 2026-08-05
+
 ### Changed
 
 - **Generated plugin bundles are no longer checked in.** The `skills/`,
