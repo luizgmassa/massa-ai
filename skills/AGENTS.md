@@ -123,6 +123,21 @@ Supported values:
   changes ownership or a new task begins; `explicit_only` changes the route
   only when the user requests it.
 
+A project `AGENTS.md` may additionally declare a persona pin as a single data
+line (not a policy block):
+
+```text
+persona_pin: <catalog-id> | no_persona
+```
+
+A valid pin is a routing fast path: the router reads only the pinned persona's
+prompt — no memory recall, no workspace-doc inspection, no signals loading, no
+classification. `no_persona` completes routing silently. A pin naming an id
+absent from the catalog is reported in one line and routing continues normally.
+Precedence: explicit prompt-level choice > pin > automatic inference. With no
+pin, a `persona-route:<projectId>` pattern memory from a prior successful
+inferred route may skip doc inspection and classification the same way.
+
 Prompt-level explicit persona or no-persona instructions override this policy
 for the current task. Applicable system, developer, and project instructions
 remain higher priority than persona behavior.
