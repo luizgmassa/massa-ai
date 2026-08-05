@@ -5,8 +5,9 @@
  * facade split so any drift (dropped tool, renamed, reordered, changed
  * schema) is caught. These tests are mutation-killing anchors.
  *
- * NOTE: The spec design.md said "57 tools" — actual roster count is 52.
- * This characterization pins the ACTUAL count (52), not the spec number.
+ * NOTE: The spec design.md said "57 tools" — actual roster count was 52,
+ * then 54 after model-profile-switching (T12) added profile_list/profile_set.
+ * This characterization pins the ACTUAL count (54), not the spec number.
  * A future task that adds/removes a tool MUST update this test
  * intentionally (never silently).
  *
@@ -71,11 +72,13 @@ const EXPECTED_NAMES = [
   "fetch_and_index",
   "rename_project",
   "merge_projects",
+  "profile_list",
+  "profile_set",
 ] as const;
 
 describe("ToolDefinitions — characterization (T02)", () => {
-  test("TOOL_DEFINITIONS count is exactly 52 (spec said 57 — actual is 52)", () => {
-    expect(TOOL_DEFINITIONS.length).toBe(52);
+  test("TOOL_DEFINITIONS count is exactly 54 (spec said 57 — actual is 54)", () => {
+    expect(TOOL_DEFINITIONS.length).toBe(54);
   });
 
   test("every tool name matches the pinned roster in order", () => {

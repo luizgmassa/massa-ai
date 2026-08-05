@@ -8,6 +8,15 @@ import {
   initConfig,
   defaultMassaAiConfig,
 } from "@massa-ai/shared/config";
+import {
+  listProfiles,
+  switchProfile,
+  reportSucceeded,
+  isHost,
+  type Host,
+  type ProfileInventory,
+  type SwitchReport,
+} from "@massa-ai/shared";
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
@@ -40,6 +49,11 @@ Commands:
     agents install [--user|--project]   Write 17 agent .md files
     agents uninstall [--user|--project] Remove only massa-ai-owned agents
 
+  profile list      List shipped model profiles + per-host active profile
+  profile show      Same as 'profile list'
+  profile set <name> [--host <h>] [--dry-run]
+                    Switch installed agents to a profile (restart required after)
+
 Examples:
   massa-ai-config init
   massa-ai-config init --mistral your-api-key
@@ -47,6 +61,7 @@ Examples:
   massa-ai-config use mistral --api-key your-key
   massa-ai-config set embedding.dimensions 1024
   massa-ai-config agents install --user
+  massa-ai-config profile set work --dry-run
 `);
 }
 
@@ -64,6 +79,38 @@ export function parseOptions(args: string[]): Record<string, string | boolean> {
     }
   }
   return options;
+}
+
+/** Thin formatting over the shared switch engine's ProfileInventory (P2 AC2 —
+ * `profile list`/`profile show` print the same data `profile_list` returns). */
+function formatProfileInventory(inventory: ProfileInventory): void {
+  for (const h of inventory.hosts) {
+    if (h.skipped) {
+      console.log(`  ${h.host}: skipped (${h.skipReason})`);
+      continue;
+    }
+    if (!h.installed) {
+      console.log(`  ${h.host}: not installed`);
+      continue;
+    }
+    console.log(
+      `  ${h.host}: active=${h.activeProfile} bundle=${h.bundleVersion ?? "unknown"} supports=${
+        h.availableProfiles.length > 0 ? h.availableProfiles.join(",") : "none"
+      }`,
+    );
+  }
+}
+
+/** Thin formatting over the shared switch engine's SwitchReport. */
+function formatSwitchReport(report: SwitchReport): void {
+  console.log(`profile: ${report.profile}${report.dryRun ? " (dry run — no files changed)" : ""}`);
+  for (const row of report.hosts) {
+    const detail = row.reason ? `: ${row.reason}` : row.filesChanged !== undefined ? ` (${row.filesChanged} files changed)` : "";
+    console.log(`  ${row.host}: ${row.status}${detail}`);
+  }
+  if (report.restartRequired) {
+    console.log("\nA host session restart is required for the change to take effect.");
+  }
 }
 
 export async function runCli(argv: string[]): Promise<number> {
@@ -257,6 +304,48 @@ export async function runCli(argv: string[]): Promise<number> {
       console.log("  User agents preserved.");
     }
     break;
+  }
+
+  case "profile": {
+    const subcommand = args[1];
+
+    if (subcommand === "list" || subcommand === "show") {
+      try {
+        formatProfileInventory(listProfiles());
+      } catch (e) {
+        console.error(`Error: ${(e as Error).message}`);
+        return 1;
+      }
+      return 0;
+    }
+
+    if (subcommand === "set") {
+      const name = args[2];
+      if (!name) {
+        console.error("Usage: massa-ai-config profile set <name> [--host <h>] [--dry-run]");
+        return 1;
+      }
+      const hostOpt = typeof options.host === "string" ? options.host : undefined;
+      if (hostOpt !== undefined && !isHost(hostOpt)) {
+        console.error(`Error: unknown host "${hostOpt}"`);
+        return 1;
+      }
+      try {
+        const report = switchProfile({
+          profile: name,
+          host: hostOpt as Host | undefined,
+          dryRun: options["dry-run"] === true,
+        });
+        formatSwitchReport(report);
+        return reportSucceeded(report) ? 0 : 1;
+      } catch (e) {
+        console.error(`Error: ${(e as Error).message}`);
+        return 1;
+      }
+    }
+
+    console.error("Usage: massa-ai-config profile <list|show|set> ...");
+    return 1;
   }
 
   default:

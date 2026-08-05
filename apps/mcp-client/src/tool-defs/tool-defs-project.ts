@@ -3,7 +3,8 @@
  *
  * Extracted from tool-definitions.ts (Wave 6 N31, T12).
  * Tools: index, index_status, list_projects, project_map, get_architecture,
- *        reset_project, reindex, read_file, rename_project, merge_projects
+ *        reset_project, reindex, read_file, rename_project, merge_projects,
+ *        profile_list, profile_set (model-profile-switching, T12)
  */
 
 import type { ToolDefinition } from "../tool-definitions.js";
@@ -301,6 +302,56 @@ export const PROJECT_TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["sourceProjectId", "targetProjectId"],
+    },
+  },
+  {
+    name: "profile_list",
+    description:
+      "List shipped model profiles and, per detected host, the currently active profile (from recorded state; " +
+      "'balanced' shown when unrecorded) and bundle version. Offline — reads on-disk variant directories only, " +
+      "never the registry.",
+    apiEndpoint: "/api/v1/profiles",
+    apiMethod: "GET",
+    inputSchema: {
+      type: "object",
+      properties: {
+        host: {
+          type: "string",
+          enum: ["claude", "codex", "cursor", "opencode"],
+          description: "Limit the inventory to a single host. Omit to report every detected host.",
+        },
+      },
+    },
+  },
+  {
+    name: "profile_set",
+    description:
+      "Switch the installed massa-ai agents to a registry profile (e.g. 'work', 'cheap'). Local trust model — " +
+      "same as the code-execution tools: this mutates the machine the MCP server runs on, replacing the active " +
+      "installed agent files for every detected, supported host with the chosen profile's variant. Reports per " +
+      "host: switched / skipped (reason) / failed (reason). A host session restart is required for the change to " +
+      "take effect. Use dryRun to preview the per-host plan without changing any files.",
+    apiEndpoint: "/api/v1/profiles/switch",
+    apiMethod: "POST",
+    inputSchema: {
+      type: "object",
+      properties: {
+        profile: {
+          type: "string",
+          description: "Target profile name (must be a profile shipped in the installed bundle).",
+        },
+        host: {
+          type: "string",
+          enum: ["claude", "codex", "cursor", "opencode"],
+          description: "Limit the switch to a single host. Omit to switch every detected, supported host.",
+        },
+        dryRun: {
+          type: "boolean",
+          description: "Preview the per-host plan; change nothing.",
+          default: false,
+        },
+      },
+      required: ["profile"],
     },
   },
 ];

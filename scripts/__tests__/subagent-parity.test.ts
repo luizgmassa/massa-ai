@@ -27,6 +27,7 @@ import {
   selectProfile,
   type Host as RegistryHost,
 } from "../lib/model-profiles.ts";
+import { profilesSupporting } from "../generate-subagent-artifacts.ts";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const GEN_SCRIPT = path.join(REPO_ROOT, "scripts/generate-subagent-artifacts.ts");
@@ -218,6 +219,81 @@ describe("subagent parity — exact 17 names per host (CLA-09/CRS-07/OPC-09)", (
     expect(files.length).toBe(17);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
+  });
+});
+
+// ── T7: variant bundles, table-driven over (host, supported profile) ────────
+//
+// Population re-measured in-session (`bun -e` against loadRegistry/hostsSupportedBy,
+// see the commit message), not copied from design.md/tasks.md — the standing lesson
+// ("subagent numbers need re-measuring") applies to a NEW population exactly as much
+// as an edited one.
+describe("subagent parity — variant bundles: exact 17 per (host, supported profile) (MPS-01/MPS-12)", () => {
+  const HOST_EXT: Record<RegistryHost, string> = {
+    claude: "md",
+    codex: "toml",
+    cursor: "md",
+    opencode: "md",
+  };
+  const HOSTS_LIST: RegistryHost[] = ["claude", "codex", "cursor", "opencode"];
+
+  const cases = HOSTS_LIST.flatMap((host) =>
+    profilesSupporting(REGISTRY, host).map((profile) => ({ host, profile })),
+  );
+
+  test("re-measured population: 22 (host, profile) pairs (5 general profiles x 3 general hosts + 7 profiles for opencode)", () => {
+    expect(cases.length).toBe(22);
+    expect(cases.filter((c) => c.host === "claude").length).toBe(5);
+    expect(cases.filter((c) => c.host === "codex").length).toBe(5);
+    expect(cases.filter((c) => c.host === "cursor").length).toBe(5);
+    expect(cases.filter((c) => c.host === "opencode").length).toBe(7);
+  });
+
+  for (const { host, profile } of cases) {
+    test(`${host}/${profile}: exactly 17 specialist .${HOST_EXT[host]} files with the registry names`, async () => {
+      const ext = HOST_EXT[host];
+      const dir = path.join(REPO_ROOT, `apps/${host}-plugin/agent-profiles/${profile}`);
+      const files = (await fs.readdir(dir)).filter(
+        (f) => f.startsWith("massa-ai-") && f.endsWith(`.${ext}`),
+      );
+      expect(files.length).toBe(17);
+      const names = files.map((f) =>
+        f.replace(/^massa-ai-/, "").replace(new RegExp(`\\.${ext}$`), ""),
+      );
+      expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
+    });
+  }
+
+  test("unsupported (host, profile) pairs ship no variant directory at all (MPS-01 AC3)", async () => {
+    for (const host of ["claude", "codex", "cursor"] as RegistryHost[]) {
+      for (const profile of ["open_models", "local_models"]) {
+        const dir = path.join(REPO_ROOT, `apps/${host}-plugin/agent-profiles/${profile}`);
+        await expect(fs.access(dir)).rejects.toThrow();
+      }
+    }
+  });
+
+  test("active agents/ byte-equals agent-profiles/<hostDefaults[host]>/ for every host (MPS-01 AC5)", async () => {
+    for (const host of HOSTS_LIST) {
+      const activeDir = path.join(REPO_ROOT, `apps/${host}-plugin/agents`);
+      const defaultProfile = REGISTRY.hostDefaults[host]!;
+      const variantDirPath = path.join(
+        REPO_ROOT,
+        `apps/${host}-plugin/agent-profiles/${defaultProfile}`,
+      );
+      const [activeFiles, variantFiles] = await Promise.all([
+        fs.readdir(activeDir),
+        fs.readdir(variantDirPath),
+      ]);
+      expect(activeFiles.sort()).toEqual(variantFiles.sort());
+      for (const f of activeFiles) {
+        const [a, b] = await Promise.all([
+          fs.readFile(path.join(activeDir, f)),
+          fs.readFile(path.join(variantDirPath, f)),
+        ]);
+        expect(a.equals(b)).toBe(true);
+      }
+    }
   });
 });
 

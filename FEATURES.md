@@ -16,6 +16,7 @@ Every feature in massa-ai, what it does, why it exists, and how to use it.
 - [Persistent Memory](#persistent-memory)
 - [Passive Capture (Hooks)](#passive-capture-hooks)
 - [Plugins (4-Tool Parity)](#plugins-4-tool-parity)
+- [Model Profile Switching](#model-profile-switching)
 - [Workflow Tools (52-Tool Adoption)](#workflow-tools-52-tool-adoption)
 - [Bootstrap](#bootstrap)
 - [Cross-session Handoffs](#cross-session-handoffs)
@@ -513,6 +514,50 @@ Write-permitted agents: `builder`, `test-engineer`, `documentation-agent` (the l
 **Spec:** `.specs/features/subagent-skills-plugin-parity/` (the specialists and the four host
 bundles) and `.specs/features/model-profile-registry/` (the model/effort registry, per-host
 schema conformance, and profile selection).
+
+---
+
+## Model Profile Switching
+
+**What:** Switch the *installed* massa-ai agents to a different registry profile (e.g.
+`work`, `cheap`, `home`) without a repo checkout — one switch engine
+(`packages/shared/src/profile-switch/`, published in `@massa-ai/shared`), fronted by
+MCP tools (`profile_list`, `profile_set`), a `profile list|show|set <name> [--host <h>]
+[--dry-run]` subcommand in both `massa-ai-config` CLIs (mcp-client, opencode-plugin),
+an OpenCode in-process `profile` tool, and a Claude skill (`skills/profile/`,
+`/massa-ai:profile`). Every registry profile ships pre-rendered per host inside the
+plugin bundle (`agent-profiles/<profile>/`, sibling of `agents/`); switching copies the
+chosen profile's already-built files over the installed active agent set — offline, on
+an npm-only install, no resolver or repo checkout involved.
+
+**Why:** The model-profile registry (above) resolves and bakes in one profile
+(`balanced`) at build time. A user who installs from npm with no repo checkout had no
+way to change it short of regenerating and reinstalling from source. This closes that
+gap for the common case — one machine, two billing contexts (e.g. a subscription-backed
+profile during work hours, a cheap-where-mechanical profile on personal time) — switched
+conversationally from any host.
+
+**How it works:**
+- The chosen profile is recorded per host in `install-state.json`
+  (`platforms[host].modelProfile: {profile, switchedAt}`) and survives plugin upgrades —
+  the switch engine is its only writer; installers only read it to re-apply on install/
+  upgrade.
+- A new installer-owned `installRoute: "file" | "marketplace"` field lets the engine
+  refuse loud on a marketplace-route Claude/Codex install (bundle read in place, possibly
+  a git checkout) rather than risk dirtying a checkout or breaking the drift gate; an
+  absent field (pre-feature install) also refuses loud rather than guessing.
+- OpenCode's installed agent files stay symlinks — a switch repoints each symlink at the
+  new profile's variant file rather than normalizing to a copy, because the installer's
+  own upgrade pre-flight reads "symlink" as "massa-ai-owned" and would otherwise freeze
+  that agent's future upgrades.
+- Cursor is always reported `skipped` — every tier resolves to `inherit` (see Model
+  pinning above), so switching it is a documented no-op, not silently dropped.
+- **A host session restart is required for a switch to take effect.** No host supports
+  per-agent runtime indirection (unchanged from the registry's own finding) — this is
+  switch-time re-render between sessions, not live in-session switching.
+
+**Spec:** `.specs/features/model-profile-switching/` (amends the "Runtime model
+switching" non-goal in `.specs/features/model-profile-registry/spec.md` in place).
 
 ---
 

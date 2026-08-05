@@ -41,6 +41,7 @@ import { webRoutes } from "./routes/web.js";
 import { webUiRoutes } from "./routes/web-ui.js";
 import { architectureRoutes } from "./routes/architecture.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
+import { profileRoutes } from "./routes/profiles.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
 import { getHealthChecker, searchSessionHook, coRetrievalHook } from "@massa-ai/core";
@@ -104,6 +105,7 @@ const app = new Elysia({ adapter: node() })
           { name: "executor", description: "Polyglot sandbox: execute code, run code over files, batch shell commands" },
           { name: "web", description: "SSRF-guarded web fetch + HTML→md + index (fetch_and_index)" },
           { name: "webUi", description: "Read-only memory/search web browser (Phase 8)" },
+          { name: "profiles", description: "Model-profile switch: list shipped profiles, switch installed agents" },
         ],
         components: {
           securitySchemes: {
@@ -141,6 +143,7 @@ const app = new Elysia({ adapter: node() })
   .use(webUiRoutes)
   .use(architectureRoutes)
   .use(dashboardRoutes)
+  .use(profileRoutes)
   .get("/health", () => buildHealthResponse(getParserReadiness()));
 
 // SEC-01: resolve (and if necessary provision) the API key BEFORE the port

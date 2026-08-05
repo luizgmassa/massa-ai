@@ -200,6 +200,45 @@ describe("MassaAiPlugin tools", () => {
     expect(requests[0]!.url).toContain("fromFile=a.ts");
   });
 
+  test("profile tool (action:list) GETs /api/v1/profiles", async () => {
+    const requests = mockFetchCapture();
+    const plugin = await setup();
+    await plugin.tool.profile.execute({ action: "list" } as any);
+    expect(requests[0]!.url).toContain("/api/v1/profiles");
+    expect(requests[0]!.init?.method ?? "GET").toBe("GET");
+  });
+
+  test("profile tool (action:list, host) scopes the query", async () => {
+    const requests = mockFetchCapture();
+    const plugin = await setup();
+    await plugin.tool.profile.execute({ action: "list", host: "codex" } as any);
+    expect(requests[0]!.url).toContain("host=codex");
+  });
+
+  test("profile tool (action:set) POSTs to /api/v1/profiles/switch", async () => {
+    const requests = mockFetchCapture();
+    const plugin = await setup();
+    await plugin.tool.profile.execute({ action: "set", profile: "work", host: "claude", dryRun: true } as any);
+    expect(requests[0]!.url).toContain("/api/v1/profiles/switch");
+    const body = JSON.parse(requests[0]!.init!.body as string);
+    expect(body).toMatchObject({ profile: "work", host: "claude", dryRun: true });
+  });
+
+  test("profile tool (action:set) without a profile name → structured error, no HTTP call", async () => {
+    const requests = mockFetchCapture();
+    const plugin = await setup();
+    const result = await plugin.tool.profile.execute({ action: "set" } as any);
+    expect(requests.length).toBe(0);
+    expect(JSON.parse(result as string)).toMatchObject({ success: false, error: { code: "InvalidRequest" } });
+  });
+
+  test("profile tool (action:set) surfaces a non-ok response (massaAiFetch error path)", async () => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ success: false, error: { code: "UnknownProfileError" } }), { status: 400 })) as typeof fetch;
+    const plugin = await setup();
+    await expect(plugin.tool.profile.execute({ action: "set", profile: "nope" } as any)).rejects.toThrow();
+  });
+
   test("tool execute throws on non-ok response (massaAiFetch error path)", async () => {
     globalThis.fetch = (async () => new Response("err", { status: 500 })) as typeof fetch;
     const plugin = await setup();

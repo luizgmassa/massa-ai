@@ -1,9 +1,10 @@
 {
   "name": "@massa-ai/codex-plugin",
-  "version": "1.24.0",
+  "version": "1.25.0",
   "description": "massa-ai plugin for Codex — semantic code search, memory, and context compression",
   "files": [
     "agents",
+    "agent-profiles",
     "hooks",
     "skills",
     "install.sh",

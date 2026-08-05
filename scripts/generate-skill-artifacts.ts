@@ -13,6 +13,9 @@
  *
  *   skills/massa-ai/**            -> apps/<host>-plugin/skills/massa-ai/**
  *   skills/persona-router/**      -> apps/<host>-plugin/skills/persona-router/**
+ *   skills/profile/**             -> apps/<host>-plugin/skills/profile/**
+ *     (model-profile-switching T15 — a whole-directory bundle, same as massa-ai/
+ *     and persona-router/, not an agents/<n>/SKILL.md charter)
  *   skills/agents/<n>/SKILL.md    -> apps/<host>-plugin/skills/agents/<n>/SKILL.md
  *   scripts/lib/opencode-config.cjs -> apps/opencode-plugin/lib/opencode-config.cjs
  *   apps/claude-plugin/hooks/massa-ai-hook.ts -> apps/{codex,cursor}-plugin/hooks/massa-ai-hook
@@ -126,7 +129,7 @@ async function walkFiles(dir: string): Promise<string[]> {
 export async function collectSkillEntries(): Promise<ManagedEntry[]> {
   const entries: ManagedEntry[] = [];
 
-  for (const bundleName of ["massa-ai", "persona-router"] as const) {
+  for (const bundleName of ["massa-ai", "persona-router", "profile"] as const) {
     const sourceDir = path.join(SKILLS_DIR, bundleName);
     const files = await walkFiles(sourceDir);
     for (const rel of files) {
@@ -208,6 +211,7 @@ export function managedRootsFor(host: string, capsLookup: CapsLookup = REAL_CAPS
   const common = [
     path.join("skills", "massa-ai"),
     path.join("skills", "persona-router"),
+    path.join("skills", "profile"),
     path.join("skills", "agents"),
   ];
   const extra = capsLookup(host)?.extraManagedRoots ?? [];

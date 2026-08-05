@@ -1,5 +1,6 @@
 /**
- * install-state-plugin-version.test.ts — PAI-06 state round-trip coverage.
+ * install-state-plugin-version.test.ts — PAI-06 state round-trip coverage,
+ * extended by T10 (MPS-03) to the model-profile-switching fields.
  *
  * install-state.json v2 gains an optional per-platform `plugin` subfield
  * ({version, installedAt}) written by the plugin installers. install-skills.sh
@@ -8,13 +9,24 @@
  * round-trip with the key still absent (never {version: "", installedAt: ""}),
  * and the strict skills reader must keep hard-failing on a corrupt file.
  *
+ * T10 adds the same round-trip obligation for two more optional fields:
+ * `installRoute` (installer-owned, "file" | "marketplace") and `modelProfile`
+ * ({profile, switchedAt}, switch-engine-owned). install-skills.sh's TSV
+ * intermediate originally carried only 6 columns (platform/root/csv/owner/
+ * plugin-version/plugin-installedAt) — extending state with two more optional
+ * fields that TSV never parsed would have silently dropped them on every
+ * `--apply`/`--uninstall` run, which is exactly the defect this file's
+ * existing plugin-subfield tests exist to catch for the `plugin` field. The
+ * TSV now carries 9 columns (fields 7-9: installRoute, modelProfile.profile,
+ * modelProfile.switchedAt).
+ *
  * Every case drives the REAL scripts/install-skills.sh against a scratch
  * --target HOME with a mock `cursor-agent` binary on the child PATH, so the
  * cursor platform is detected deterministically on any machine.
  */
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { spawnSync } from "child_process";
-import { promises as fs } from "fs";
+import { promises as fs, existsSync } from "fs";
 import path from "path";
 import os from "os";
 
@@ -22,6 +34,7 @@ const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const INSTALL_SKILLS = path.join(REPO_ROOT, "scripts", "install-skills.sh");
 
 const PLUGIN_RECORD = { version: "1.9.1", installedAt: "2026-07-29T12:00:00Z" };
+const MODEL_PROFILE_RECORD = { profile: "work", switchedAt: "2026-01-01T00:00:00Z" };
 const TEST_TIMEOUT = 30000;
 
 interface PlatformRecord {
@@ -29,6 +42,8 @@ interface PlatformRecord {
   skills: string[];
   skillsOwner: string;
   plugin?: { version: string; installedAt: string };
+  installRoute?: string;
+  modelProfile?: { profile: string; switchedAt: string };
 }
 
 async function writeState(home: string, platforms: Record<string, PlatformRecord>): Promise<string> {
@@ -95,6 +110,9 @@ describe("plugin version record parity (PAI-03, R7, F)", () => {
         expect(Object.keys(plugin).sort()).toEqual(["installedAt", "version"]);
         expect(plugin.version).toBe(rootVersion);
         expect(plugin.installedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+        // T10 (MPS-03, design F1): installRoute is written on every install
+        // path, all three of these installers pinned to the file route above.
+        expect(state.platforms[host].installRoute).toBe("file");
         await fs.rm(path.join(home, ".config"), { recursive: true, force: true });
       }
     },
@@ -197,4 +215,171 @@ describe("install-state v2 plugin-version round-trip (PAI-06)", () => {
     },
     TEST_TIMEOUT,
   );
+});
+
+// ── T10 (MPS-03): installRoute + modelProfile round-trip through install-skills.sh ──
+//
+// Mirrors the PAI-06 describe block above exactly, for the two fields T10
+// adds: `installRoute` (installer-owned) and `modelProfile` (engine-owned,
+// {profile, switchedAt}). install-skills.sh is not the writer of either field
+// — it must round-trip whatever is already there byte-identically, the same
+// pass-through discipline `plugin` already had.
+describe("install-state v2 model-profile-switching round-trip (T10, MPS-03)", () => {
+  let home: string;
+  let mockBin: string;
+
+  beforeEach(async () => {
+    home = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-mps-state-home-"));
+    mockBin = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-mps-state-bin-"));
+    await fs.writeFile(path.join(mockBin, "cursor-agent"), "#!/usr/bin/env bash\nexit 0\n", { mode: 0o755 });
+  });
+
+  afterEach(async () => {
+    await fs.rm(home, { recursive: true, force: true });
+    await fs.rm(mockBin, { recursive: true, force: true });
+  });
+
+  test(
+    "--apply preserves seeded installRoute + modelProfile byte-identically; an untouched platform keeps its record exactly",
+    async () => {
+      const stateFile = await writeState(home, {
+        cursor: {
+          root: path.join(home, ".cursor"),
+          skills: ["massa-ai"],
+          skillsOwner: "repo",
+          installRoute: "file",
+          modelProfile: MODEL_PROFILE_RECORD,
+        },
+        claude: {
+          root: path.join(home, ".claude"),
+          skills: ["massa-ai"],
+          skillsOwner: "plugin",
+          installRoute: "marketplace",
+          modelProfile: { profile: "home", switchedAt: "2026-02-02T00:00:00Z" },
+        },
+      });
+
+      const res = runInstallSkills(home, mockBin, ["--apply", "--platform", "cursor"]);
+      expect(res.status).toBe(0);
+
+      const after = await readState(stateFile);
+      // The touched platform's fields survive byte-identically.
+      expect(after.platforms.cursor.installRoute).toBe("file");
+      expect(JSON.stringify(after.platforms.cursor.modelProfile)).toBe(JSON.stringify(MODEL_PROFILE_RECORD));
+      expect(after.platforms.cursor.skillsOwner).toBe("repo");
+      // A platform this run never touched keeps ITS fields exactly too.
+      expect(after.platforms.claude.installRoute).toBe("marketplace");
+      expect(JSON.stringify(after.platforms.claude.modelProfile)).toBe(
+        JSON.stringify({ profile: "home", switchedAt: "2026-02-02T00:00:00Z" }),
+      );
+    },
+    TEST_TIMEOUT,
+  );
+
+  test(
+    "pre-feature v2 file (no installRoute/modelProfile) round-trips with both fields still absent",
+    async () => {
+      const stateFile = await writeState(home, {
+        cursor: { root: path.join(home, ".cursor"), skills: ["massa-ai"], skillsOwner: "repo" },
+      });
+
+      const res = runInstallSkills(home, mockBin, ["--apply", "--platform", "cursor"]);
+      expect(res.status).toBe(0);
+
+      const after = await readState(stateFile);
+      expect("installRoute" in after.platforms.cursor).toBe(false);
+      expect("modelProfile" in after.platforms.cursor).toBe(false);
+    },
+    TEST_TIMEOUT,
+  );
+
+  test(
+    "--uninstall on a plugin-owned platform keeps installRoute + modelProfile byte-identical",
+    async () => {
+      const stateFile = await writeState(home, {
+        cursor: {
+          root: path.join(home, ".cursor"),
+          skills: ["massa-ai"],
+          skillsOwner: "plugin",
+          plugin: PLUGIN_RECORD,
+          installRoute: "file",
+          modelProfile: MODEL_PROFILE_RECORD,
+        },
+      });
+
+      const res = runInstallSkills(home, mockBin, ["--uninstall", "--platform", "cursor"]);
+      expect(res.status).toBe(0);
+
+      const after = await readState(stateFile);
+      expect(after.platforms.cursor.installRoute).toBe("file");
+      expect(JSON.stringify(after.platforms.cursor.modelProfile)).toBe(JSON.stringify(MODEL_PROFILE_RECORD));
+      expect(JSON.stringify(after.platforms.cursor.plugin)).toBe(JSON.stringify(PLUGIN_RECORD));
+    },
+    TEST_TIMEOUT,
+  );
+});
+
+// ── T10: every record_plugin_version() preserves a pre-existing modelProfile ──
+//
+// Exercises the FULL install path (install_bundled_skills's whole-record
+// replace, then record_plugin_version's own write) end to end for all four
+// installers, proving neither step silently drops a profile a prior switch
+// recorded — the exact defect a fresh install.sh install with a recorded
+// profile has actually exhibited (T8/T9 commit messages) before the
+// whole-record-replace fix. OpenCode is skipped when unbuilt, same guard
+// convention as verify-package-contents.test.ts.
+describe("record_plugin_version() preserves a pre-existing modelProfile (T10, MPS-03)", () => {
+  let home: string;
+
+  beforeEach(async () => {
+    home = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-mps-record-home-"));
+  });
+
+  afterEach(async () => {
+    await fs.rm(home, { recursive: true, force: true });
+  });
+
+  const HOSTS: Array<{ host: string; configDir: string }> = [
+    { host: "claude", configDir: ".claude" },
+    { host: "codex", configDir: ".codex" },
+    { host: "cursor", configDir: ".cursor" },
+    { host: "opencode", configDir: path.join(".config", "opencode") },
+  ];
+
+  for (const { host, configDir } of HOSTS) {
+    const opencodeBuilt = existsSync(path.join(REPO_ROOT, "apps/opencode-plugin/dist/index.js"));
+    const maybeTest = host === "opencode" && !opencodeBuilt ? test.skip : test;
+
+    maybeTest(
+      `${host}: a pre-existing modelProfile survives a full install run`,
+      async () => {
+        await writeState(home, {
+          [host]: {
+            root: path.join(home, configDir),
+            skills: [],
+            skillsOwner: "plugin",
+            modelProfile: MODEL_PROFILE_RECORD,
+          },
+        });
+        await fs.mkdir(path.join(home, configDir), { recursive: true });
+
+        const res = spawnSync(
+          "bash",
+          [path.join(REPO_ROOT, "apps", `${host}-plugin`, "install.sh"), "--user"],
+          {
+            encoding: "utf8",
+            cwd: REPO_ROOT,
+            timeout: TEST_TIMEOUT,
+            env: { ...process.env, HOME: home, MASSA_AI_SKIP_PLUGIN_REGISTRY: "1" },
+          },
+        );
+        expect(res.status).toBe(0);
+
+        const state = await readState(path.join(home, ".config", "massa-ai", "install-state.json"));
+        expect(JSON.stringify(state.platforms[host].modelProfile)).toBe(JSON.stringify(MODEL_PROFILE_RECORD));
+        expect(state.platforms[host].installRoute).toBe("file");
+      },
+      TEST_TIMEOUT,
+    );
+  }
 });
