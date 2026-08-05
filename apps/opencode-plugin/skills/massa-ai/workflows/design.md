@@ -1,3 +1,11 @@
+---
+name: design
+description: "Implements or updates a concrete mobile UI from structured Figma evidence or screenshots when no saved audit report exists; route comparisons to mobile-figma-audit."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Design
 
 Use this workflow to implement or update a concrete Android, iOS, or KMP Compose Multiplatform UI from structured Figma evidence or supplied screenshot context when no saved mobile Figma audit report is the source of truth. Route findings-only comparison to `mobile-figma-audit` and saved `MFM-*` remediation to `mobile-figma-fix`.

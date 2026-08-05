@@ -1,3 +1,11 @@
+---
+name: requirements-audit
+description: "Findings-only review of whether a concrete target matches stated requirements without out-of-scope drift; routes correctness, security, and quality findings elsewhere."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Requirements Audit
 
 Use this workflow for findings-only review of whether a concrete target matches stated requirements without out-of-scope drift. Accepted targets include modified files, explicit files/globs, commit ranges, branch comparisons, modules/packages, symbols/classes/functions, feature/runtime flows, explicitly requested whole-repo scope, or an implementation scope packet supplied by `workflows/implementation/implementation-audit.md`.

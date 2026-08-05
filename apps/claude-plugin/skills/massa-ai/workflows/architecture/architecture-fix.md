@@ -1,3 +1,11 @@
+---
+name: architecture-fix
+description: "Executes fixes from a saved architecture audit report; not for findings-only review or broad new design work with missing requirements."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Architecture Fix
 
 Use this workflow only to execute fixes from an architecture audit markdown report.

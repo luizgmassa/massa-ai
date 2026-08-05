@@ -1,3 +1,11 @@
+---
+name: security-audit
+description: "Findings-only security review workflow for a concrete target; routes generic correctness bugs and other audit categories to their dedicated workflows."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Security Audit
 
 Use this workflow for findings-only security review in a concrete target: modified files, explicit files/globs, commit ranges, branch comparisons, modules/packages, symbols/classes/functions, feature/runtime flows, explicitly requested whole-repo scope, or an implementation scope packet supplied by `workflows/implementation/implementation-audit.md`.

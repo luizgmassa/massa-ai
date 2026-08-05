@@ -1,3 +1,11 @@
+---
+name: furps-refinement
+description: "Findings-only refinement of a PRD and/or ADR against the FURPS+ quality model before implementation, fanning out one sub-agent per dimension with a structured report."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### FURPS+ Refinement
 
 Use this workflow for findings-only refinement of a Product Requirements Document (PRD) and/or Architecture Decision Record (ADR) against the FURPS+ quality model, before implementation. It runs The Fool as an input-validation pre-pass, then fans out one sub-agent per FURPS+ dimension, and emits a structured refinement report with open questions, suggestions, insights, risks, and Definition-of-Ready coverage gaps.

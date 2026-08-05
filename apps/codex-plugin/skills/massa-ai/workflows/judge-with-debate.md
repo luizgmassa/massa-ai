@@ -1,3 +1,11 @@
+---
+name: judge-with-debate
+description: "Explicit-route workflow to evaluate an artifact through multi-judge debate against a tailored specification, converging on a consensus verdict or honest no-consensus."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Judge With Debate
 
 Use this workflow when the user explicitly asks to evaluate an artifact through multi-judge
