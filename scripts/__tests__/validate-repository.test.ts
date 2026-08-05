@@ -322,10 +322,10 @@ describe("persona catalog", () => {
     expect(() => JSON.parse(content)).not.toThrow();
   });
 
-  test("schema_version is 1", async () => {
+  test("schema_version is 2", async () => {
     const content = await readFile(catalogPath);
     const catalog = JSON.parse(content);
-    expect(catalog.schema_version).toBe(1);
+    expect(catalog.schema_version).toBe(2);
   });
 
   test("all prompt_path values resolve to existing files", async () => {
@@ -402,9 +402,9 @@ describe("persona catalog deep validation", () => {
     expect(() => JSON.parse(content)).not.toThrow();
   });
 
-  test("catalog schema_version is present and 1", async () => {
+  test("catalog schema_version is present and 2", async () => {
     const catalog = JSON.parse(await readFile(catalogPath));
-    expect(catalog.schema_version).toBe(1);
+    expect(catalog.schema_version).toBe(2);
   });
 
   test("catalog has required top-level shape (personas array)", async () => {
@@ -413,9 +413,9 @@ describe("persona catalog deep validation", () => {
     expect(catalog.personas.length).toBeGreaterThanOrEqual(1);
   });
 
-  test("every persona entry has required fields (id, display_name, prompt_path, summary, aliases, primary_signals, negative_signals, secondary_lens_signals)", async () => {
+  test("every persona entry has required v2 fields (id, display_name, prompt_path, signals_path, summary, aliases) and no inline signal arrays", async () => {
     const catalog = JSON.parse(await readFile(catalogPath));
-    const requiredFields = ["id", "display_name", "prompt_path", "summary", "aliases", "primary_signals", "negative_signals", "secondary_lens_signals"];
+    const requiredFields = ["id", "display_name", "prompt_path", "signals_path", "summary", "aliases"];
     for (const persona of catalog.personas) {
       for (const field of requiredFields) {
         expect(persona[field]).toBeDefined();
@@ -423,11 +423,29 @@ describe("persona catalog deep validation", () => {
       expect(typeof persona.id).toBe("string");
       expect(typeof persona.display_name).toBe("string");
       expect(typeof persona.prompt_path).toBe("string");
+      expect(typeof persona.signals_path).toBe("string");
       expect(typeof persona.summary).toBe("string");
       expect(Array.isArray(persona.aliases)).toBe(true);
-      expect(Array.isArray(persona.primary_signals)).toBe(true);
-      expect(Array.isArray(persona.negative_signals)).toBe(true);
-      expect(Array.isArray(persona.secondary_lens_signals)).toBe(true);
+      // v2 moved the signal arrays out of the index — an inline array is drift back to v1.
+      expect(persona.primary_signals).toBeUndefined();
+      expect(persona.negative_signals).toBeUndefined();
+      expect(persona.secondary_lens_signals).toBeUndefined();
+    }
+  });
+
+  test("every signals_path is signals/<id>.json, resolves, and carries the three signal arrays (v2 split — every v1 assertion kept, repointed)", async () => {
+    const catalog = JSON.parse(await readFile(catalogPath));
+    for (const persona of catalog.personas) {
+      expect(persona.signals_path).toBe(`signals/${persona.id}.json`);
+      expect(persona.signals_path).not.toMatch(/^\//);
+      expect(persona.signals_path).not.toContain("..");
+      const signalsFile = path.join(personasDir, persona.signals_path);
+      expect(await fileExists(signalsFile)).toBe(true);
+      const signals = JSON.parse(await readFile(signalsFile));
+      expect(Array.isArray(signals.primary_signals)).toBe(true);
+      expect(Array.isArray(signals.negative_signals)).toBe(true);
+      expect(Array.isArray(signals.secondary_lens_signals)).toBe(true);
+      expect(signals.primary_signals.length).toBeGreaterThan(0);
     }
   });
 

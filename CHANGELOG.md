@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Persona routing chain cut from ~8k to ~2k tokens on a pinned project.**
+  `skills/persona-router/SKILL.md` slimmed 13,316 → 5,484 B with two new fast paths — a
+  project `AGENTS.md` `persona_pin` line (valid pin reads only the pinned prompt;
+  `no_persona` completes silently; invalid pin reports once and falls back) and a recalled
+  `persona-route:<projectId>` pattern memory that skips doc inspection and classification.
+  Moved detail lives in `skills/persona-router/references/routing-details.md` with explicit
+  load conditions. `skills/massa-ai/personas/catalog.json` is now a schema_version 2
+  two-tier index (8,871 → ≤2,500 B): entries carry only id/display_name/aliases/summary/
+  prompt_path/signals_path, with the routing-signal arrays moved verbatim into per-persona
+  `personas/signals/<id>.json` files loaded only when classification actually runs. All
+  five persona prompts compressed to ≤4,500 B with their original top-level themes
+  retained. The `persona_pin` policy is documented in the `skills/AGENTS.md` bootstrap
+  block, and this repo pins `context-skill-harness-engineer-architect`. Host skill bundles
+  regenerated for all four plugins.
+
 ### Added
 
 - **Model-profile switching: switch installed agents to a registry profile without a
@@ -26,6 +43,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runtime indirection; this is switch-time re-render between sessions, not live
   in-session switching (see the amended non-goal in
   `.specs/features/model-profile-registry/spec.md`).
+
+- **Skill size-budget gate.** `scripts/__tests__/skill-size-budgets.test.ts` fails
+  `bun run test:scripts` when persona-router artifacts regrow past their byte budgets
+  (SKILL.md 5,500; catalog.json 2,500; prompts 4,500; references 8,000; signals 2,500) or
+  `skills/massa-ai/SKILL.md` exceeds its 21,000 B freeze ceiling. Prints the resolved file
+  population beside verdicts and fails on an empty glob, so a moved subject cannot pass
+  vacuously.
+- **`install-skills.sh --check` double-surface probe.** On the claude platform, when
+  `install-state.json` records `skillsOwner: "repo"` and `~/.claude/settings.json` enables
+  the `massa-ai@massa-ai` plugin, `--check` now reports the double registration surface
+  (naming both files) and exits non-zero. Missing state file or missing `enabledPlugins`
+  key stays exit 0. Covered by `scripts/tests/test-skills-check-double-surface.sh`.
+
+## [1.24.0] - 2026-08-05
+
+### Added
+
+- **Orchestrator working-memory contract for sub-agent dispatch (ORC-01..09).** The
+  dispatch-mechanics references now encode the orchestrator-tax findings: never poll a
+  running subagent or ingest its transcript/JSONL (the returned output contract is the
+  only channel back), a wave cap of 4 concurrent subagents with a recorded
+  consolidation check before larger fan-outs, an explicit cognitive-locality
+  consolidation signal covering read-only agents, a repository-wide git-operation
+  prohibition for concurrent workers, an explicit subagent non-inheritance rule, and a
+  default 40-line return bound with a dual-channel rule for report-writing dispatches.
+  The Capability Packet now has a single canonical definition in
+  `references/agent-orchestration.md` (13 fields, incl. the conditional
+  `audit-specialist` `lens` and `next_use`, renamed from the input-side "exact next
+  step" bullet); `references/subagent-design.md` defers to it and the self-contained
+  `skills/AGENTS.md` mirror is guarded by the new
+  `scripts/__tests__/capability-packet-parity.test.ts`. `judge-with-debate` and
+  `furps-refinement` now carry standard 9-field dispatch blocks (dispatch-block census
+  24 → 27), and the FURPS six-dimension fan-out runs in waves of at most 4. Host skill
+  bundles regenerated for all four plugins.
 
 ## [1.23.0] - 2026-08-05
 

@@ -1,0 +1,20 @@
+{
+  "primary_signals": [
+    "skill, persona, prompt, or agent workflow architecture",
+    "context engineering, progressive disclosure, memory, compaction, or handoff design",
+    "agent harness startup, bootstrap, installation, SessionStart, or cross-agent integration contracts",
+    "persona-router catalog, routing signals, ambiguity policy, no-match behavior, or review-lens boundaries",
+    "MCP/tool boundary design for agent workflows, skill validation, or deterministic evidence gates",
+    "repository harness state, active feature tracking, completion gates, or restartability rules"
+  ],
+  "negative_signals": [
+    "the primary deliverable is Node.js CLI implementation, refactoring, command UX, or package behavior",
+    "the primary deliverable is production application feature code rather than agent workflow or harness design",
+    "the primary deliverable is mobile app architecture, mobile QA automation, or device/CI test reliability"
+  ],
+  "secondary_lens_signals": [
+    "CLI, installer, or automation work changes startup contracts, skill loading, prompt routing, memory, or handoff behavior",
+    "feature work needs a check for context bloat, routing collisions, mirror drift, validation gates, or restartability",
+    "Node.js tooling work packages or exposes skills, personas, prompts, MCP resources, or agent harness rules"
+  ]
+}
