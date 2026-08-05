@@ -17,6 +17,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { tmpdir } from "os";
 import {
+  hostsSupportedBy,
   loadRegistry,
   profileFlagFrom,
   resolveTier,
@@ -38,6 +39,35 @@ const HOST_DIRS: Record<Host, string> = {
   cursor: path.join(APPS_DIR, "cursor-plugin", "agents"),
   opencode: path.join(APPS_DIR, "opencode-plugin", "agents"),
 };
+
+// Per-host plugin bundle root (parent of both `agents/` and `agent-profiles/`).
+// design.md Component 1: variant dirs are a SIBLING of `agents/`, at the bundle
+// top level — never nested inside it (A5).
+const PLUGIN_ROOT_DIRS: Record<Host, string> = {
+  claude: path.join(APPS_DIR, "claude-plugin"),
+  codex: path.join(APPS_DIR, "codex-plugin"),
+  cursor: path.join(APPS_DIR, "cursor-plugin"),
+  opencode: path.join(APPS_DIR, "opencode-plugin"),
+};
+export { PLUGIN_ROOT_DIRS };
+
+/** Directory name variant trees live under, sibling of `agents/` (A5). */
+export const AGENT_PROFILES_DIRNAME = "agent-profiles";
+
+/** Full path to a given (host, profile) variant directory. */
+export function variantDir(
+  host: Host,
+  profile: string,
+  pluginRootDirs: Record<Host, string> = PLUGIN_ROOT_DIRS,
+): string {
+  return path.join(pluginRootDirs[host], AGENT_PROFILES_DIRNAME, profile);
+}
+
+/** Registry profile names that support a given host, in registry-declared order
+ *  (built on `hostsSupportedBy`, never a re-derivation of its membership rule). */
+export function profilesSupporting(registry: Registry, host: Host): string[] {
+  return Object.keys(registry.profiles).filter((p) => hostsSupportedBy(registry, p).includes(host));
+}
 
 // ── Charter registry (every charter under skills/agents/) ───────────────────
 const SPECIALIST_NAMES = [
@@ -425,6 +455,32 @@ export function profilesPerHost(
   return out;
 }
 
+/** Emits the full charter set for one (host, profile) pair into `dir`. Shared by
+ *  `emitAll` (active `agents/`, selected profile) and `emitVariants` (every
+ *  supported profile, `agent-profiles/<profile>/`) so the two never drift apart —
+ *  it is the reason active `agents/` byte-equals `agent-profiles/<default>/`
+ *  (MPS-01 AC5). */
+async function emitHostProfile(
+  host: Host,
+  profile: string,
+  dir: string,
+  charters: readonly Charter[],
+  registry: Registry
+): Promise<void> {
+  await fs.mkdir(dir, { recursive: true });
+  const emit = EMIT_BY_HOST[host];
+  for (const c of charters) {
+    // Resolution is (charter tier) x host x profile. A tier the profile does not
+    // define, or a profile that does not support this host, throws by design.
+    const resolved = resolveTier(registry, host, profile, c.modelTier);
+    const ext = capabilitiesFor(host).artifactExtension;
+    const fileName = `massa-ai-${c.name}.${ext}`;
+    const filePath = path.join(dir, fileName);
+    const content = emit(c, resolved);
+    await fs.writeFile(filePath, content, "utf8");
+  }
+}
+
 /**
  * `hosts` is an APPENDED third parameter (default `HOSTS`) — every existing
  * 2-arg call site (2 production + 6 in generate-subagent-artifacts.test.ts)
@@ -441,22 +497,45 @@ export async function emitAll(
   const registry = opts.registry ?? loadRegistry();
   const profiles = profilesPerHost(registry, opts, hosts);
   for (const host of hosts) {
-    const dir = targetDirs[host];
-    await fs.mkdir(dir, { recursive: true });
-    const profile = profiles[host];
-    const emit = EMIT_BY_HOST[host];
-    for (const c of charters) {
-      // Resolution is (charter tier) x host x profile. A tier the profile does not
-      // define, or a profile that does not support this host, throws by design.
-      const resolved = resolveTier(registry, host, profile, c.modelTier);
-      const ext = capabilitiesFor(host).artifactExtension;
-      const fileName = `massa-ai-${c.name}.${ext}`;
-      const filePath = path.join(dir, fileName);
-      const content = emit(c, resolved);
-      await fs.writeFile(filePath, content, "utf8");
-    }
+    await emitHostProfile(host, profiles[host], targetDirs[host], charters, registry);
   }
   return profiles;
+}
+
+export interface EmitVariantsOptions {
+  /** Pre-loaded registry; loaded from disk when omitted. */
+  readonly registry?: Registry;
+}
+
+/**
+ * design.md Component 1 — for each host, for each registry profile supporting
+ * that host (`profilesSupporting`, registry-declared order), emit the full
+ * charter set into `pluginRootDirs[host]/agent-profiles/<profile>/`. A profile
+ * that does not support a host gets no directory for that host at all — the
+ * switch engine (packages/shared/src/profile-switch/) reads that absence as
+ * "unsupported by profile" (MPS-01 AC3), so this function must never create an
+ * empty placeholder for an unsupported (host, profile) pair.
+ *
+ * Returns the per-host list of profile names emitted, for callers/tests that
+ * want to assert the shape without re-deriving it.
+ */
+export async function emitVariants(
+  pluginRootDirs: Record<Host, string> = PLUGIN_ROOT_DIRS,
+  opts: EmitVariantsOptions = {},
+  hosts: readonly Host[] = HOSTS
+): Promise<Record<Host, string[]>> {
+  const charters = await loadAllCharters();
+  const registry = opts.registry ?? loadRegistry();
+  const out = {} as Record<Host, string[]>;
+  for (const host of hosts) {
+    const profiles = profilesSupporting(registry, host);
+    out[host] = profiles;
+    for (const profile of profiles) {
+      const dir = variantDir(host, profile, pluginRootDirs);
+      await emitHostProfile(host, profile, dir, charters, registry);
+    }
+  }
+  return out;
 }
 
 export async function diffHost(
@@ -548,6 +627,16 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   for (const [host, profile] of Object.entries(profiles)) {
     console.log(`  ${host.padEnd(9)} profile: ${profile}`);
   }
+  // Variant trees (design.md Component 1, MPS-01): every profile a host supports,
+  // pre-rendered under agent-profiles/<profile>/ — independent of --profile/env,
+  // which only picks the ACTIVE profile above.
+  const variantProfiles = await emitVariants(PLUGIN_ROOT_DIRS, { registry: opts.registry });
+  let variantTotal = 0;
+  for (const [host, ps] of Object.entries(variantProfiles)) {
+    variantTotal += ps.length * SPECIALIST_NAMES.length;
+    console.log(`  ${host.padEnd(9)} variants: ${ps.join(", ")}`);
+  }
+  console.log(`Emitted ${variantTotal} variant agent files.`);
   return 0;
 }
 
