@@ -181,7 +181,7 @@ trap cleanup EXIT
 RESULTS_FILE="$WORK_DIR/results.tsv"   # status<TAB>platform<TAB>target<TAB>message
 : > "$RESULTS_FILE"
 BOOTSTRAP_FILE="$WORK_DIR/bootstrap.md"
-STATE_IN="$WORK_DIR/state-in.tsv"      # platform<TAB>root<TAB>csv-skills<TAB>owner<TAB>plugin-version<TAB>plugin-installed-at
+STATE_IN="$WORK_DIR/state-in.tsv"      # platform<TAB>root<TAB>csv-skills<TAB>owner<TAB>plugin-version<TAB>plugin-installed-at<TAB>install-route<TAB>model-profile<TAB>model-profile-switched-at
 STATE_OUT="$WORK_DIR/state-out.tsv"
 
 record() { printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" >> "$RESULTS_FILE"; }
@@ -275,8 +275,13 @@ fi
 # Why: plugin auto-install (PAI-03/06) extends v2 state with an optional
 #      per-platform `plugin` record ({version, installedAt}) that skills runs
 #      must round-trip byte-identically but never write — the TSV intermediate
-#      carries it as fields 5-6 (design C5).
-# Impacts: PAI-06 state compatibility, AC-7; plugin records survive skills runs.
+#      carries it as fields 5-6 (design C5). Model-profile-switching (T10,
+#      MPS-03) extends v2 further with `installRoute` (installer-owned) and
+#      `modelProfile` ({profile, switchedAt}, engine-owned) — fields 7-9,
+#      same pass-through discipline: a skills run must round-trip both
+#      byte-identically and never write either.
+# Impacts: PAI-06 state compatibility, AC-7; plugin records survive skills
+#      runs; MPS-03 installRoute/modelProfile survive skills runs.
 # Test: bun test scripts/__tests__/install-state-plugin-version.test.ts
 : > "$STATE_IN"
 if ! "$RUNNER" - "$STATE_PATH" "$TARGET_HOME" "$CODEX_HOME" > "$STATE_IN" <<'NODE'
@@ -327,8 +332,9 @@ if (version === 1) {
       process.exit(2);
     }
     // v1 predates the plugin-writer concept — everything it recorded was a
-    // repo-owned symlink install. Plugin fields (5-6) are always empty.
-    out.push([p, rootFor(p), "", "repo", "", ""]);
+    // repo-owned symlink install. Plugin fields (5-6) and the model-profile-
+    // switching fields (7-9) are always empty.
+    out.push([p, rootFor(p), "", "repo", "", "", "", "", ""]);
   }
 } else if (version === 2) {
   const platforms = data.platforms;
@@ -365,7 +371,29 @@ if (version === 1) {
     const plugin = rec.plugin && typeof rec.plugin === "object" && !Array.isArray(rec.plugin) ? rec.plugin : null;
     const pluginVersion = plugin && typeof plugin.version === "string" ? plugin.version : "";
     const pluginInstalledAt = plugin && typeof plugin.installedAt === "string" ? plugin.installedAt : "";
-    out.push([p, rec.root, [...new Set(skills)].join(","), owner, pluginVersion, pluginInstalledAt]);
+    // installRoute + modelProfile (T10, MPS-03): the same optional
+    // pass-through discipline as plugin above — a skills run is not their
+    // writer (installRoute is installer-owned, modelProfile is engine-owned),
+    // but it must round-trip whatever is already there byte-identically.
+    const installRoute = typeof rec.installRoute === "string" ? rec.installRoute : "";
+    const modelProfile =
+      rec.modelProfile && typeof rec.modelProfile === "object" && !Array.isArray(rec.modelProfile)
+        ? rec.modelProfile
+        : null;
+    const modelProfileProfile = modelProfile && typeof modelProfile.profile === "string" ? modelProfile.profile : "";
+    const modelProfileSwitchedAt =
+      modelProfile && typeof modelProfile.switchedAt === "string" ? modelProfile.switchedAt : "";
+    out.push([
+      p,
+      rec.root,
+      [...new Set(skills)].join(","),
+      owner,
+      pluginVersion,
+      pluginInstalledAt,
+      installRoute,
+      modelProfileProfile,
+      modelProfileSwitchedAt,
+    ]);
   }
 } else {
   console.error(`Unsupported installer state version in ${file}`);
@@ -397,19 +425,28 @@ state_owner_for() {
 cp "$STATE_IN" "$STATE_OUT"
 
 # state_replace PLATFORM ROOT CSV [OWNER]
-# Rewrites the platform's outgoing row. Plugin-version fields (5-6) are
-# pass-through: preserved from the existing row, never written here — a skills
-# run must not create or destroy plugin records (design C5).
+# Rewrites the platform's outgoing row. Plugin-version fields (5-6) and the
+# model-profile-switching fields (7-9: installRoute, modelProfile.profile,
+# modelProfile.switchedAt — T10, MPS-03) are all pass-through: preserved from
+# the existing row, never written here — a skills run must not create,
+# destroy, or edit a plugin record, an installer-recorded route, or an
+# engine-recorded profile (design C5, extended).
 state_replace() {
   local p="$1" root="$2" csv="$3" owner="${4:-repo}" tmp="$WORK_DIR/state.tmp"
   local existing plugin_version="" plugin_installed_at=""
+  local install_route="" model_profile="" model_profile_switched_at=""
   existing="$(grep "^$p$TAB" "$STATE_OUT" 2>/dev/null | head -n1 || true)"
   if [ -n "$existing" ]; then
     plugin_version="$(printf '%s' "$existing" | cut -f5)"
     plugin_installed_at="$(printf '%s' "$existing" | cut -f6)"
+    install_route="$(printf '%s' "$existing" | cut -f7)"
+    model_profile="$(printf '%s' "$existing" | cut -f8)"
+    model_profile_switched_at="$(printf '%s' "$existing" | cut -f9)"
   fi
   grep -v "^$p$TAB" "$STATE_OUT" > "$tmp" 2>/dev/null || true
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$p" "$root" "$csv" "$owner" "$plugin_version" "$plugin_installed_at" >> "$tmp"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$p" "$root" "$csv" "$owner" "$plugin_version" "$plugin_installed_at" \
+    "$install_route" "$model_profile" "$model_profile_switched_at" >> "$tmp"
   mv "$tmp" "$STATE_OUT"
 }
 
@@ -791,7 +828,8 @@ const raw = fs.readFileSync(tsvFile, "utf8");
 const platforms = {};
 for (const line of raw.split("\n")) {
   if (!line.trim()) continue;
-  const [p, root, csv, owner, pluginVersion, pluginInstalledAt] = line.split("\t");
+  const [p, root, csv, owner, pluginVersion, pluginInstalledAt, installRoute, modelProfileProfile, modelProfileSwitchedAt] =
+    line.split("\t");
   const rec = {
     root,
     skills: csv ? csv.split(",").filter(Boolean) : [],
@@ -802,6 +840,15 @@ for (const line of raw.split("\n")) {
   // {version: "", installedAt: ""}.
   if (pluginVersion && pluginInstalledAt) {
     rec.plugin = { version: pluginVersion, installedAt: pluginInstalledAt };
+  }
+  // installRoute + modelProfile (T10, MPS-03): same pass-through discipline.
+  // An absent modelProfile must round-trip as absent — never as
+  // {profile: "", switchedAt: ""}.
+  if (installRoute) {
+    rec.installRoute = installRoute;
+  }
+  if (modelProfileProfile && modelProfileSwitchedAt) {
+    rec.modelProfile = { profile: modelProfileProfile, switchedAt: modelProfileSwitchedAt };
   }
   platforms[p] = rec;
 }
