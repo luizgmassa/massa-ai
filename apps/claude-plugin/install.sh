@@ -84,6 +84,15 @@ HOOK_BIN="$SCRIPT_DIR/hooks/massa-ai-hook.ts"
 # for --project, so this resolves from $HOME, never from $SCOPE.
 PLUGIN_REGISTRY="$HOME/.claude/plugins/installed_plugins.json"
 
+# Model-profile variant tree (T8, design Component 3 / MPS-04). Source is the
+# bundle's per-profile agent-profiles/<p>/ (sibling of agents/, A5); dest is
+# the engine's own host path table (packages/shared/src/profile-switch/
+# hosts.ts): $TARGET/massa-ai/agent-profiles/<p>/. File-route only — the
+# marketplace route serves agents in place and switching is refused there
+# regardless (Component 2 topology rules), so there is nothing to install to.
+VARIANTS_SRC="$SCRIPT_DIR/agent-profiles"
+VARIANTS_DEST="$TARGET/massa-ai/agent-profiles"
+
 # The 5 Claude Code events → binary subcommands. The matcher-group entry shape:
 #   { "hooks": [{ "type": "command", "command": "bun run \"<HOOK_BIN>\" <sub>" }],
 #     "_massaAiOwned": true }
@@ -293,10 +302,22 @@ if (typeof data.platforms !== "object" || data.platforms === null || Array.isArr
 data.version = 2;
 const prev = data.platforms[host];
 data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router"] };
-// The whole-record replace must not drop the plugin version record a previous
-// successful install wrote (R2) — re-attach it.
-if (prev && typeof prev === "object" && !Array.isArray(prev) && prev.plugin && typeof prev.plugin === "object") {
-  data.platforms[host].plugin = prev.plugin;
+// The whole-record replace must not drop fields a previous successful install
+// wrote (R2) — re-attach them. modelProfile (T10, MPS-03 round-trip
+// obligation) is engine-owned; installRoute is installer-owned but written by
+// a LATER step of this same install (record_plugin_version) — both must
+// survive this earlier whole-record replace or a switched profile / recorded
+// route silently vanishes on the next skills-bundling pass.
+if (prev && typeof prev === "object" && !Array.isArray(prev)) {
+  if (prev.plugin && typeof prev.plugin === "object") {
+    data.platforms[host].plugin = prev.plugin;
+  }
+  if (prev.modelProfile && typeof prev.modelProfile === "object") {
+    data.platforms[host].modelProfile = prev.modelProfile;
+  }
+  if (typeof prev.installRoute === "string") {
+    data.platforms[host].installRoute = prev.installRoute;
+  }
 }
 fs.mkdirSync(path.dirname(file), { recursive: true });
 fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
@@ -372,18 +393,24 @@ record_plugin_version() {
     return 0
   fi
 
-  local version installed_at
+  local version installed_at route
   version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$SCRIPT_DIR/package.json" | head -n 1)"
   installed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  # installRoute (T8, design F1): installer-owned, engine-read-only. The
+  # marketplace route (register_claude_plugin succeeded) serves agents in
+  # place from the bundle; the file route copies them into $TARGET/agents.
+  # Written on EVERY install path — an absent field is what makes the switch
+  # engine refuse loud rather than guess (hosts.ts detectRoute).
+  if [[ "$PLUGIN_ROUTE" -eq 1 ]]; then route="marketplace"; else route="file"; fi
 
   # Tolerant of a corrupt/missing state file (rewrites a minimal valid one —
   # AC-8). A record-write failure warns but never fails the install: the next
   # run treats the host as unknown-version and reinstalls.
-  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" "$TARGET" "$version" "$installed_at" <<'NODE' || \
+  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" "$TARGET" "$version" "$installed_at" "$route" <<'NODE' || \
     echo "  ⚠ could not record the plugin version — next run will reinstall (unknown version)" >&2
 const fs = require("fs");
 const path = require("path");
-const [, , file, host, root, version, installedAt] = process.argv;
+const [, , file, host, root, version, installedAt, installRoute] = process.argv;
 let data = { version: 2, platforms: {} };
 try {
   const existing = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -400,9 +427,51 @@ const rec =
     ? data.platforms[host]
     : { root, skillsOwner: "plugin", skills: [] };
 rec.plugin = { version, installedAt };
+// installRoute is installer-owned (like plugin above); modelProfile is NEVER
+// written here — the switch engine (packages/shared/src/profile-switch/) is
+// its sole writer, and this installer only ever reads it (see
+// apply_recorded_profile below).
+rec.installRoute = installRoute;
 data.platforms[host] = rec;
 fs.mkdirSync(path.dirname(file), { recursive: true });
 fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+NODE
+}
+
+# ── Model-profile variant tree + recorded-profile re-apply (T8, MPS-04) ─────
+# Read-side only: this installer never writes platforms[host].modelProfile —
+# see the comment above record_plugin_version's NODE block. It only (a)
+# refreshes the on-disk variant tree so an offline switch has files to copy
+# from, and (b) re-applies a previously recorded profile's active agent set on
+# install/upgrade, so a plugin upgrade never silently reverts a switched
+# profile back to the shipped default.
+install_variant_tree() {
+  [[ -d "$VARIANTS_SRC" ]] || return 0
+  rm -rf "$VARIANTS_DEST"
+  mkdir -p "$VARIANTS_DEST"
+  cp -R "$VARIANTS_SRC/." "$VARIANTS_DEST/"
+  vecho "  + model-profile variant tree refreshed at $VARIANTS_DEST"
+}
+
+# Prints the recorded profile name (platforms[claude].modelProfile.profile),
+# or an empty string when unset/unreadable. Never throws — a corrupt or
+# missing state file just means "no recorded profile", not an install failure.
+recorded_profile() {
+  local runner="$1"
+  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" <<'NODE'
+const fs = require("fs");
+const [, , file, host] = process.argv;
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  const rec = data && data.platforms && data.platforms[host];
+  const profile =
+    rec && rec.modelProfile && typeof rec.modelProfile.profile === "string"
+      ? rec.modelProfile.profile
+      : "";
+  process.stdout.write(profile);
+} catch {
+  process.stdout.write("");
+}
 NODE
 }
 
@@ -541,7 +610,31 @@ else
 
   # Subagent specialists (generated from skills/agents/*/SKILL.md, navigator
   # included). The massa-ai- name prefix is the ownership marker used by uninstall.
-  for src in "$SCRIPT_DIR/agents/"massa-ai-*.md; do
+  #
+  # Model-profile re-apply (T8, MPS-04): if a switch previously recorded a
+  # profile for this host, and the bundle ships that profile's variant, the
+  # ACTIVE set comes from agent-profiles/<profile>/ instead of the shipped
+  # default — an upgrade must never silently revert a switched profile.
+  # Recorded-but-missing-from-bundle is a loud fallback to the default, never
+  # a silent one.
+  ACTIVE_AGENTS_SRC="$SCRIPT_DIR/agents"
+  json_runner=""
+  if command -v node &>/dev/null; then json_runner="node"
+  elif command -v bun &>/dev/null; then json_runner="bun"
+  fi
+  if [[ -n "$json_runner" ]]; then
+    RECORDED_PROFILE="$(recorded_profile "$json_runner")"
+    if [[ -n "$RECORDED_PROFILE" ]]; then
+      if [[ -d "$VARIANTS_SRC/$RECORDED_PROFILE" ]]; then
+        ACTIVE_AGENTS_SRC="$VARIANTS_SRC/$RECORDED_PROFILE"
+        echo "  ↷ re-applying recorded model profile '$RECORDED_PROFILE'"
+      else
+        echo "  ⚠ recorded model profile '$RECORDED_PROFILE' is not in this bundle — falling back to the default profile" >&2
+      fi
+    fi
+  fi
+
+  for src in "$ACTIVE_AGENTS_SRC/"massa-ai-*.md; do
     [[ -f "$src" ]] || continue
     name="$(basename "$src")"
     cp "$src" "$TARGET/agents/$name"
@@ -549,6 +642,8 @@ else
     specialist_count=$((specialist_count + 1))
   done
   vecho "  + ${specialist_count} subagent specialists (generated from skills/agents/*/SKILL.md)"
+
+  install_variant_tree
 fi
 
 # Skills bundling (PDO-08, 09): install massa-ai/persona-router into the

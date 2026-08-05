@@ -4,6 +4,7 @@
   "description": "massa-ai plugin for Codex — semantic code search, memory, and context compression",
   "files": [
     "agents",
+    "agent-profiles",
     "hooks",
     "skills",
     "install.sh",
