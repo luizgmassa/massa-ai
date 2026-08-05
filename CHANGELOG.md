@@ -49,8 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the corpus is contract/table-dense; the win is structural (conditional bodies
   now load only on trigger). Three stale predecessor-repo hook citations in
   `hook-enforcement.md`/`lessons.md` repointed to `apps/claude-plugin/hooks/`.
-  All 36 edited workflows bumped to frontmatter `metadata.version: "1.1.0"`
-  (body changed ⇒ version bumps — recorded as lesson L-018).
+  All 36 edited workflows and the 3 body-changed agent charters
+  (judge, meta-judge, navigator) bumped to frontmatter
+  `metadata.version: "1.1.0"` (body changed ⇒ version bumps — lesson L-018).
 
 ## [1.26.0] - 2026-08-05
 

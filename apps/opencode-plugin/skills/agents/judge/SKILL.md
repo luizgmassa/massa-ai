@@ -4,7 +4,7 @@ description: Read-only debate-panel evaluator for judge-with-debate. Score an ar
 license: MIT
 metadata:
   author: S1LV4, luizgmassa
-  version: "1.0.0"
+  version: "1.1.0"
   model_tier: deep
   permission: read-only
 ---

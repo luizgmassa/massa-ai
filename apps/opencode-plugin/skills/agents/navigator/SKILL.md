@@ -4,7 +4,7 @@ description: Code exploration specialist that leverages the massa-ai semantic in
 license: MIT
 metadata:
   author: S1LV4, luizgmassa
-  version: "1.0.0"
+  version: "1.1.0"
   model_tier: deep
   permission: read-only
   tools: mcp-index
