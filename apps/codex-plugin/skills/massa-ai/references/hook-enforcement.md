@@ -1,6 +1,6 @@
 # Hook Enforcement
 
-Maps the runtime hook layer (`scripts/hooks/`, `hooks/hooks.json`) to massa-ai
+Maps the runtime hook layer (`apps/claude-plugin/hooks/`, its `hooks.json`) to massa-ai
 workflows and references, and documents the massa-ai dual-write/tag contract.
 Hooks **enforce** existing references and the gate the router already selected;
 they never re-author policy and never re-route. One canonical location per rule.
@@ -9,7 +9,7 @@ they never re-author policy and never re-route. One canonical location per rule.
 
 The full hook graph installs for **Claude Code, Codex, and Cursor**. OpenCode has
 no hook model and keeps the `AGENTS.md` bootstrap only. The installer
-(`scripts/agent_integrations.py`) preserves unrelated user hooks on install and
+(each host plugin's `install.sh`) preserves unrelated user hooks on install and
 uninstall via managed-command tracking.
 
 Platform hook formats differ; the installer translates one canonical graph

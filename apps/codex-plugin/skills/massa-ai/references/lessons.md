@@ -73,7 +73,7 @@ If `lessons.ts` is unavailable or cannot run, record `Lessons: skipped - script 
 ## Continuous-Learning Loop (hook-fed)
 
 The lessons layer is a closed loop, not manual-only. Two runtime hooks
-(`scripts/hooks/`, installed for Claude Code by the installer) feed it:
+(`apps/claude-plugin/hooks/`, installed for Claude Code by the plugin installer) feed it:
 
 1. **observe** — `observe_runner.py` (PostToolUse) captures raw tool-use
    observations into the gitignored `.specs/observations.json` buffer. Grounding
