@@ -23,7 +23,7 @@ Do not execute from chat summaries, screenshots alone, remembered findings, or a
 4. Select a report and target focus:
    - Prefer an exact report path plus optional `MFM-*` IDs.
    - For `latest` or omitted path, require a concrete target focus, then select only from `audits/mobile-figma/`.
-   - Stop if no report exists or metadata does not identify `Workflow: mobile-figma-audit`, project/session, target/focus/scope, source timestamp, repository classification, Target Surface Matrix, Figma source/node mappings/timestamp, per-surface platform configurations, capability matrix, and comparison matrix.
+   - Validate metadata deterministically: `bun skills/massa-ai/scripts/validate_audit_report.ts <path> --family mobile-figma` (`references/audit-report-io.md`, Deterministic Validation); non-zero exit blocks editing. Also stop if no report exists or the report lacks Target Surface Matrix, Figma source/node mappings/timestamp, per-surface platform configurations, capability matrix, or comparison matrix.
    - Reject legacy Android-only reports without the Target Surface Matrix and `Surface ID` fields. Require a fresh audit; do not infer or migrate the missing schema.
 5. Validate report freshness before editing:
    - Re-resolve the target files, rebuild the Target Surface Packet, and verify git scope/base/head when relevant.

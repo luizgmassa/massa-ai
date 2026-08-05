@@ -557,10 +557,40 @@ Before editing:
 
 - Verify workflow, project, target, target focus, scope, base/head, and resolved files match the current request.
 - Reinspect each finding's current location and evidence. Stop or re-audit when schema v2 drift rules invalidate any selected finding.
-- Verify every finding has common and workflow-specific fields plus the correct ID form.
+- Verify every finding has common and workflow-specific fields plus the correct ID form (deterministic backing below).
 - For implementation reports, require source-qualified IDs and child-lens fields.
 - For mobile Figma reports, re-read the Figma node and reject stale design/source/configuration evidence.
 - Ignore ruled-out candidates, skipped checks, no-finding summaries, `NOT EVALUATED` rows, constraint deviations, and low-confidence suspects unless the user explicitly changes scope after revalidation.
 - Build verification from report suggestions plus current project sensors.
 
 Do not execute from chat summaries, inline comments, screenshots alone, or remembered audit content. The saved markdown report is the source of truth.
+
+## Deterministic Validation
+
+`skills/massa-ai/scripts/validate_audit_report.ts` replaces the model-run
+metadata/ID checklist with a scripted check, run before any `*-fix` workflow
+edits code:
+
+```bash
+bun skills/massa-ai/scripts/validate_audit_report.ts <path-to-report.md> --family <family>
+```
+
+`--family` is one of `architecture`, `bugs`, `code-quality`, `security`,
+`requirements`, `tests`, `maestro`, `mobile-figma`, or `implementation`
+(auto-detected from the report's `Workflow:` field when omitted). It checks:
+
+- required freshness-header metadata fields for that family (common fields
+  plus family-specific extras — `Requirements Source` for single-lens and
+  implementation reports; `Scenario Source`/`Maestro CLI`/`Device/Emulator
+  Readiness` for Maestro; the mobile Figma identity fields for Mobile Figma)
+- finding-ID format (`PREFIX-N`, or `<Area>/<PREFIX>-N` for the
+  implementation composite family)
+- Area<->Prefix table membership for implementation reports (rejects an
+  unrecognized Area, a mismatched Area/Prefix pair, and any raw `SONAR-*`
+  executable ID)
+- finding-ID uniqueness and gap-free per-prefix/per-area sequencing
+
+A non-zero exit blocks editing. The script does **not** re-check drift
+against current source, table-structure presence (Target Surface Matrix,
+Maestro Run Matrix, etc.), or Figma-node freshness — those stay a manual
+step per the "Before editing" list above.

@@ -23,7 +23,7 @@ Do not use this workflow for findings-only requirements review; route that to `w
    - If the user asks for "latest" or gives no path, require a concrete target focus first; do not run the latest requirements report against an unspecified target.
    - Select the latest `audits/requirements/<YYYY-MM-DD requirements-audit>.md` only after target focus is known, using `references/audit-report-io.md`.
    - Stop if no report exists; do not infer findings from conversation history.
-   - Validate the report with `references/audit-report-io.md`: workflow, `ProjectId`, `Target`, `Target Focus`, scope, git base/head, required fields, `REQ-` IDs, requirement source, resolved files or material scope evidence, and current file/line evidence. Stop on invalid, stale, target-drifted, or ambiguous reports before editing.
+   - Validate the report deterministically: `bun skills/massa-ai/scripts/validate_audit_report.ts <path> --family requirements` (`references/audit-report-io.md`, Deterministic Validation, checks `Requirements Source` too); non-zero exit blocks editing. Also confirm resolved files or material scope evidence and current file/line evidence; stop on stale, target-drifted, or ambiguous reports.
 5. Extract actionable findings:
    - Keep findings with concrete `Requirement Source`, `Requirement ID or Quote`, `Requirement Gap Type`, `Location`, `Evidence`, `Impact`, `Simplest Fix Direction`, and `Verification Suggestion`.
    - Ignore ruled-out candidates and no-finding sections.

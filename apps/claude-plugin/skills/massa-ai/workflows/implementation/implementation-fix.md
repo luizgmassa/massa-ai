@@ -24,7 +24,7 @@ Do not execute from chat summaries, inline review comments, remembered findings,
    - If the user provides a path, read that exact markdown file.
    - If the user asks for `latest` or omits a path, require a concrete target focus first, then select the latest matching `audits/implementation/<YYYY-MM-DD implementation-audit.md>` using `references/audit-report-io.md`.
    - Stop if no saved report exists. Tell the user to run `implementation-audit` or provide a report path.
-   - Reject reports missing `Workflow: implementation-audit`, `ProjectId`, `WorkflowSessionId`, `Target`, `Target Focus`, `Scope`, `Git Base`, `Git Head`, `Source Evidence Timestamp`, or `Requirements Source`/`n/a`.
+   - Validate the report deterministically: `bun skills/massa-ai/scripts/validate_audit_report.ts <path> --family implementation` (`references/audit-report-io.md`, Deterministic Validation); non-zero exit rejects the report (missing metadata, or malformed/duplicate/gapped/mis-Area'd source-qualified IDs).
 5. Validate freshness before editing:
    - Verify project, target, target focus, scope, base/head, and resolved files match the current execution target.
    - Re-resolve the current target and stop when material drift invalidates the report unless the user explicitly accepts the risk.

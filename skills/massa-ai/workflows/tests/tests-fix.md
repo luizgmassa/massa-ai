@@ -24,7 +24,7 @@ Do not use this workflow for findings-only test coverage, assertion quality, fix
    - If the user asks for "latest" or gives no path, require a concrete target focus first; do not run the latest tests report against an unspecified target.
    - Select the latest `audits/tests/<YYYY-MM-DD tests-audit>.md` only after target focus is known, using `references/audit-report-io.md`.
    - Stop if no report exists; do not infer findings from conversation history.
-   - Validate the report with `references/audit-report-io.md`: workflow, `ProjectId`, `Target`, `Target Focus`, scope, git base/head, required fields, `TST-` IDs, resolved files or material scope evidence, and current file/line evidence. Stop on invalid, stale, target-drifted, or ambiguous reports before editing.
+   - Validate the report deterministically: `bun skills/massa-ai/scripts/validate_audit_report.ts <path> --family tests` (`references/audit-report-io.md`, Deterministic Validation); non-zero exit blocks editing. Also confirm resolved files or material scope evidence and current file/line evidence; stop on stale, target-drifted, or ambiguous reports.
 5. Extract actionable test findings:
    - Keep findings with concrete `Location`, `Evidence`, impacted behavior, regression risk, `Simplest Test Direction`, `Deterministic Sensor`, and `Verification Suggestion`.
    - Ignore ruled-out candidates, no-finding sections, and low-confidence hardening ideas unless the user explicitly asks to include them.

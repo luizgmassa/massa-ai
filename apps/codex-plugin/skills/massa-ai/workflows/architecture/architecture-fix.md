@@ -27,7 +27,7 @@ Do not use this workflow for findings-only architecture review; route that to `w
    - If the user asks for "latest" or gives no path, require a concrete target focus first; do not run the latest architecture report against an unspecified target.
    - Select the latest `audits/architecture/<YYYY-MM-DD architecture-audit>.md` only after target focus is known, using `references/audit-report-io.md`.
    - Stop if no report exists; do not infer findings from conversation history.
-   - Validate the report with `references/audit-report-io.md`: workflow, `ProjectId`, `Target`, `Target Focus`, scope, git base/head, required fields, `ARCH-` IDs, resolved files or material scope evidence, and current file/module evidence. Stop on invalid, stale, target-drifted, or ambiguous reports before editing.
+   - Validate the report deterministically: `bun skills/massa-ai/scripts/validate_audit_report.ts <path> --family architecture` (`references/audit-report-io.md`, Deterministic Validation); non-zero exit blocks editing. Also confirm resolved files or material scope evidence and current file/module evidence; stop on stale, target-drifted, or ambiguous reports.
 5. Extract actionable architecture findings:
    - Keep findings with concrete `Lens`, `Boundary/Module`, `Tradeoff`, `Location`, `Evidence`, `Impact`, `Simplest Fix Direction`, and `Verification Suggestion`.
    - Require lens-specific closure evidence: domain findings need language/ownership or integration evidence; coupling findings need strength/distance/volatility or dependency-direction evidence; deepening findings need deletion-test, seam, dependency-category, or test-surface evidence.

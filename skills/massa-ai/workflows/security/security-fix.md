@@ -24,7 +24,7 @@ Do not use this workflow for findings-only security review; route that to `workf
    - If the user asks for "latest" or gives no path, require a concrete target focus first; do not run the latest security report against an unspecified target.
    - Select the latest `audits/security/<YYYY-MM-DD security-audit>.md` only after target focus is known, using `references/audit-report-io.md`.
    - Stop if no report exists; do not infer findings from conversation history.
-   - Validate the report with `references/audit-report-io.md`: workflow, `ProjectId`, `Target`, `Target Focus`, scope, git base/head, required fields, `SEC-` IDs, resolved files or material scope evidence, and current file/line evidence. Stop on invalid, stale, target-drifted, or ambiguous reports before editing.
+   - Validate the report deterministically: `bun skills/massa-ai/scripts/validate_audit_report.ts <path> --family security` (`references/audit-report-io.md`, Deterministic Validation); non-zero exit blocks editing. Also confirm resolved files or material scope evidence and current file/line evidence; stop on stale, target-drifted, or ambiguous reports.
 5. Extract actionable findings:
    - Keep findings with concrete `Security Boundary`, `Asset`, `Location`, `Evidence`, exploit path or trigger, `Negative Test Direction`, `Simplest Fix Direction`, and `Verification Suggestion`.
    - Ignore ruled-out candidates, no-finding sections, and low-confidence hardening ideas unless the user explicitly asks to include them.

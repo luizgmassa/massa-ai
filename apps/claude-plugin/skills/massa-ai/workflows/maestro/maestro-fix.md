@@ -32,7 +32,7 @@ Reject direct use without a saved `audits/maestro/<YYYY-MM-DD maestro-audit.md>`
 3. Select and validate the report:
    - Prefer an exact report path plus optional `MST-*` IDs.
    - For `latest` or omitted path, require a concrete target focus, then select only from `audits/maestro/`.
-   - Validate metadata: `Workflow: maestro-audit`, `ProjectId`, `WorkflowSessionId`, `Target`, `Target Focus`, `Scope`, `Git Base`, `Git Head`, `Scenario Source`, flow inventory, Maestro run matrix, JUnit report/artifact evidence, Verification/Test Fidelity Checklist, and Execution Handoff.
+   - Validate metadata deterministically: `bun skills/massa-ai/scripts/validate_audit_report.ts <path> --family maestro` (`references/audit-report-io.md`, Deterministic Validation); non-zero exit blocks editing. Also confirm flow inventory, Maestro run matrix, JUnit report/artifact evidence, Verification/Test Fidelity Checklist, and Execution Handoff are present.
    - Stop on invalid, stale, target-drifted, or ambiguous reports.
 4. Extract actionable findings:
    - Keep only selected `MST-*` findings with concrete location, scenario source, evidence, impacted journey, flake or coverage risk, simplest sufficient fix, and Verification Suggestion.

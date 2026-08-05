@@ -139,19 +139,19 @@ Gate: tests green; regen + `--check` 0 in-commit.
 
 ### T6: validate_audit_report.ts + wiring
 
-- [ ] Requirement: STO-9
-- [ ] `skills/massa-ai/scripts/validate_audit_report.ts`: metadata fields,
+- [x] Requirement: STO-9
+- [x] `skills/massa-ai/scripts/validate_audit_report.ts`: metadata fields,
       Area↔Prefix table membership, `PREFIX-N` format, uniqueness, gap-free
       sequencing; parameterized by report family (ARCH/BUG/CQ/SEC/REQ/TST/
       MST/MFM/implementation composite).
-- [ ] Red-first `scripts/__tests__/audit-report-validators.test.ts`: valid
+- [x] Red-first `scripts/__tests__/audit-report-validators.test.ts`: valid
       fixture + one fixture per violation class; observe red on planted
       violations before wiring. Source at least one fixture per report family
       from a real historical report artifact (`audits/**` or git history) when
       one exists; hand-author only families with no real sample (Plan
       Challenge F4 — vacuous-fixture guard: assert parsed finding count > 0
       per fixture).
-- [ ] Wire `references/audit-report-io.md` + 9 `*-fix.md` workflows to run the
+- [x] Wire `references/audit-report-io.md` + 9 `*-fix.md` workflows to run the
       script instead of inline checklist prose (removed, pointer retained).
 Tests: `scripts/__tests__/audit-report-validators.test.ts` — observed red on planted violations, then green
 Gate: new test green; coupled `test:scripts` subset green; regen + `--check` 0.
