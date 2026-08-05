@@ -832,7 +832,7 @@
     {
       "slug": "persona-router-token-optimization",
       "title": "Persona Router Token Optimization \u2014 pin fast path, SKILL.md slim, catalog v2 two-tier, prompt compression, route memory, machine dedupe, size-budget + double-surface gates",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P1",
       "workflow": "spec-driven",
       "branch": "spec/persona-router-token-optimization",
@@ -840,12 +840,13 @@
         "specify": true,
         "design": true,
         "tasks": true,
-        "execute": false
+        "execute": true
       },
       "spec": ".specs/features/persona-router-token-optimization/spec.md",
       "design": ".specs/features/persona-router-token-optimization/design.md",
       "tasks": ".specs/features/persona-router-token-optimization/tasks.md",
-      "notes": "Full Plan Challenge (pre_mortem, massa-ai-plan-critic): F1-F6 folded before Execute \u2014 F1 critical (claude-plugin install.sh re-registers plugin + deletes loose artifacts; C11 reordered, MASSA_AI_SKIP_PLUGIN_REGISTRY=1, disable-last + 3-file falsifying re-check), F3 (validate-repository.test.ts hardcodes schema_version 1 \u2014 C13 repoint task added). massa-ai MCP unreachable this session; .specs/ canonical."
+      "validation": ".specs/features/persona-router-token-optimization/validation.md",
+      "notes": "T0-T9 complete, independently VALIDATED PASS 2026-08-04 (5/5 scratch mutations killed, all six task-listed gates green; PRT-02 AC1-3 live walkthrough pending-restart per Plan Challenge F6, PRT-06 documented-contract only \u2014 MCP unreachable). T7 machine dedupe done with prompt-by-prompt user approvals after a classifier denial; falsifying re-check caught + removed a stale handoff-writer agent (roster exactly 17); dead th0th MCP entry removed (user-approved extra). origin/main v1.24.0 merged in at ad04e953. PR #68 open, CI 14/14 green; merge = user's decision. Full Plan Challenge (pre_mortem): F1-F6 folded before Execute."
     }
   ],
   "active_feature": "persona-router-token-optimization"

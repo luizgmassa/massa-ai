@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Persona Router Token Optimization (Execute in progress — T0–T6 done; T7 machine dedupe partially blocked on user permission; T8 PR delivery in progress; see .specs/HANDOFF.md)
+## Current — Persona Router Token Optimization (**VALIDATED PASS 2026-08-04** — T0–T9 done; PR #68 open, CI 14/14 green; merge = user's decision; PRT-02 live walkthrough pending-restart)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-persona-router-token-optimization` ·
   workflow: spec-driven (Large) · branch `spec/persona-router-token-optimization`,
@@ -31,11 +31,23 @@
   CHANGELOG). `origin/main` (v1.24.0, PR #67) merged in @ `ad04e953` — conflicts only in
   `.specs/` state files + CHANGELOG, resolved keeping both histories; post-merge gates
   223/0 (integrity, capability-packet parity, size budgets, validate-repository),
-  bundles no-drift. T7: step 1a (skills refresh, registry suppressed) done; steps 1b–4
-  (agents/commands refresh, symlink rm, plugin disable) denied by the host permission
-  classifier — awaiting the user's explicit go-ahead or manual run. Both `~/.claude.json`
-  MCP entries observed during T7 prep: dead `th0th` (old checkout path) + owned
-  `massa-ai` (main checkout) — the dead entry is outside PRT-01 scope, flagged to user.
+  bundles no-drift. T7 COMPLETE after the user approved prompt-by-prompt retries (the
+  classifier denied the first attempt): 1b file-route plugin install from the MAIN
+  checkout (17 specialists + 6 commands; hooks merge self-skipped — plugin still
+  registered, the C11-order guarantee); 2 broken symlinks removed; 3 LAST
+  `enabledPlugins["massa-ai@massa-ai"] = false` + user-approved removal of the dead
+  `th0th` MCP entry from `~/.claude.json` (backups taken); `installed_plugins.json`
+  has no enablement field → alignment no-op, record retained (F5). Falsifying re-check
+  caught a stale `massa-ai-handoff-writer.md` (file route copies, never prunes) —
+  removed with explicit user approval → roster exactly 17, judge + meta-judge present.
+  Post-merge skills re-refresh (installed copy predated the main merge; `--check` then
+  0 drift, real exit 0). Hooks byte-identical to BEFORE. Evidence (redacted per AC5):
+  `/tmp/prt01-evidence.md`, summarized in validation.md.
+- T8: PR #68 (https://github.com/luizgmassa/massa-ai/pull/68), CI 14/14 green;
+  `test:scripts` exit 0 (1,332/0 TS + all shell suites 0-failed), `test:plugins` 96/0,
+  lint 0. T9: independent verification-agent PASS — 5/5 scratch mutations killed,
+  per-AC evidence in `validation.md`; PRT-02 AC1–3 pending-restart (F6), PRT-06
+  documented-contract only (MCP down). Merge stays the user's.
 
 ## Previous — Sub-Agent Orchestration I/O (**VALIDATED PASS 2026-08-04** — 9/9 ORC ACs, 3/3 mutations killed; merged as PR #67 @ `5b338af4`, released v1.24.0)
 

@@ -1,4 +1,4 @@
-# Handoff — persona-router-token-optimization (mid-Execute: T0–T6 done, T7 partially blocked, T8 delivering, T9 pending)
+# Handoff — persona-router-token-optimization (T0–T9 COMPLETE, validated PASS; PR #68 open, CI 14/14 green; merge = user's decision)
 
 Previous handoffs closed: workflow-policy-updates merged as PR #66, released
 v1.23.0 @ `d18e7764`; subagent-orchestration-io merged as PR #67 @ `5b338af4`,
@@ -77,7 +77,19 @@ observed first (scenario 1 failed 5/5 probe-less), then 14/0; CHANGELOG entries
 under `[Unreleased]`. Gates at commit: install-skills suites 130/0 total,
 integrity 32/0, size budgets 6/0, `--check` no-drift, oxlint 0.
 
-## T7 — partially done; steps 1b–4 BLOCKED on user permission
+## T7 — COMPLETE (user approved prompt-by-prompt after an initial classifier denial)
+
+Final state: 17-agent roster (judge + meta-judge present, handoff-writer
+removed — the falsifying re-check caught it at 18: the file route copies but
+never prunes; removal user-approved), 6 commands current, broken symlinks gone,
+`enabledPlugins["massa-ai@massa-ai"] = false` set LAST with backups,
+`installed_plugins.json` alignment no-op (no enablement field; record retained
+per F5), hooks byte-identical to BEFORE, dead `th0th` MCP entry removed from
+`~/.claude.json` (user-approved extra), post-merge skills re-refresh then
+`--check` 0 drift with real exit 0. Evidence: `/tmp/prt01-evidence.md`
+(BEFORE / AFTER / AFTER-FINAL), summarized in validation.md.
+
+The original block record follows for context:
 
 Provenance verified per design risk row: `apps/claude-plugin/install.sh --user`
 (file route when `MASSA_AI_SKIP_PLUGIN_REGISTRY=1`) is what writes
@@ -116,16 +128,22 @@ Remaining T7 commands (order load-bearing, run after go-ahead):
     alignment as no-op, record stays (F5: cache inert once disabled).
 4.  Falsifying 3-file re-check + AFTER capture; evidence → validation.md.
 
-## T8 — in progress this session
+## T8 — COMPLETE
 
-Merge of main done pre-push (`ad04e953`). Sweep: test:plugins 96/0, lint 0,
-`--check` no-drift, contract gates 223/0; `test:scripts` full run + push + PR
-next. PR description per `references/implementation-delivery.md`; user's resume
-instructions carry the Stage-3 delivery authorization; merge stays the user's.
+Merge of main pre-push (`ad04e953`). Sweep: `test:scripts` exit 0 unmasked
+(1,332/0 TS across 59 files + all shell suites 0-failed), test:plugins 96/0,
+lint 0, `--check` no-drift, contract gates 223/0, `check_specs_delivered` 0
+errors. Pushed; PR #68 https://github.com/luizgmassa/massa-ai/pull/68 — CI
+14/14 green. Stage-3 delivery authorization came from the user's resume
+instructions ("PR at T8; merge is my decision").
 
-## T9
+## T9 — COMPLETE (PASS)
 
-Independent verification-agent (author ≠ verifier) writes `validation.md`;
-PRT-02 walkthrough is restart-gated (F6) — record pending-restart if
-same-session. Machine dedupe evidence from T7 goes into validation.md, not a
-repo commit. T1 red-run figures for validation.md are in "Deviations" above.
+Independent verification-agent (author ≠ verifier) wrote `validation.md`:
+PASS, 5/5 scratch-copy mutations killed (populations printed), per-AC
+evidence. Pending items recorded there: PRT-02 AC1–3 live walkthrough
+**pending-restart** (F6 — run in a fresh session against the installed slim
+skills and append the result); PRT-06 verified as documented contract only
+(MCP unreachable); PRT-01 AC4 not independently re-executed (avoids a second
+live `~/.claude` mutation). Next session: merge decision is the user's; after
+merge, delete the worktree and run the pending-restart walkthrough.
