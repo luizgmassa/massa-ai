@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Model-profile switching: switch installed agents to a registry profile without a
+  repo checkout.** One switch engine (`@massa-ai/shared`'s `packages/shared/src/profile-switch/`)
+  fronted by three surfaces — MCP tools (`profile_list`, `profile_set`), a `profile
+  list|show|set <name> [--host h] [--dry-run]` subcommand in both `massa-ai-config` CLIs
+  (mcp-client, opencode-plugin), and an OpenCode in-process `profile` tool — plus a Claude
+  skill (`/massa-ai:profile`, `skills/profile/`). Every registry profile now ships
+  pre-rendered inside each plugin bundle (`agent-profiles/<profile>/`, sibling of
+  `agents/`); switching copies the chosen profile's already-built files over the
+  installed active agent set, offline, on an npm-only install — no resolver, no repo
+  checkout, no network. The chosen profile is recorded per host in
+  `install-state.json` (`platforms[host].modelProfile`) and survives plugin upgrades; a
+  new `installRoute` field (installer-owned) lets the switch engine refuse loud on a
+  marketplace-route Claude/Codex install rather than risk dirtying a checkout. A host
+  session restart is required for a switch to take effect — no host supports per-agent
+  runtime indirection; this is switch-time re-render between sessions, not live
+  in-session switching (see the amended non-goal in
+  `.specs/features/model-profile-registry/spec.md`).
+
 ## [1.23.0] - 2026-08-05
 
 ### Added

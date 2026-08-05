@@ -168,6 +168,21 @@ model does not currently have) is a design decision for `judge-with-debate`, not
   `CLAUDE_CODE_SUBAGENT_MODEL` to a real model **silently defeats every registry pin on
   Claude**, because it outranks frontmatter. Setting it to `inherit` restores normal
   resolution.
+
+  **Amendment (2026-08-04, `model-profile-switching`):** the finding above stands —
+  no host supports per-agent runtime indirection, and the two global knobs in the table
+  are still not per-agent, so neither can express a profile in a live session. What
+  changed is the gap this non-goal originally implied: "build-time; switching profiles
+  means regenerating" read as requiring a full repo checkout and regeneration to switch
+  at all. `model-profile-switching` (`.specs/features/model-profile-switching/spec.md`)
+  closes that specific gap by shipping every registry profile **pre-rendered** in each
+  installed plugin bundle and adding a switch-time re-render step — a command that
+  copies the chosen profile's already-built files over the installed active agent set
+  between host sessions, on an npm-only install, with no repo checkout, resolver, or
+  network access required. This is switch-time re-render, not runtime indirection: the
+  host still loads whichever files are on disk when its session starts, and the
+  switched agents only take effect after that host's *next* session start — the
+  structural floor this non-goal identifies is unchanged and remains a real limit.
 - **`packages/core` LLM configuration** (`MASSA_AI_LLM_MODEL`, `MASSA_AI_LLM_CODE_MODEL`,
   `modelRole`). A different subsystem — retrieval-time inference, not agent dispatch.
 - **Embedding models** (`OLLAMA_EMBEDDING_MODEL` and friends).
