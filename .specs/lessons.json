@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 17,
+  "next_id": 18,
   "lessons": [
     {
       "id": "L-001",
@@ -357,6 +357,29 @@
       "session": "spec-python-to-typescript-scripts",
       "workflow": "spec-driven",
       "entity": "python-to-typescript-scripts",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-017",
+      "key": "ac_gap::byte reduction goals need a pre measured compressible prose denominator on a contract table dense corpus with protected literals prose only compression yields 1 not 20 measure the protected table fraction before committing a percentage",
+      "text": "Byte-reduction goals need a pre-measured compressible-prose denominator: on a contract/table-dense corpus with protected literals, prose-only compression yields ~1%, not 20%; measure the protected+table fraction before committing a percentage.",
+      "signal": "ac_gap",
+      "scope": "skills",
+      "status": "candidate",
+      "features": [
+        "skill-token-optimization"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "spec.md STO-6 / validation.md measurement (skills)"
+      ],
+      "created": "2026-08-05T14:39:17Z",
+      "last_seen": "2026-08-05T14:39:17Z",
+      "project": "massa-ai",
+      "session": "spec-skill-token-optimization",
+      "workflow": "spec-driven",
+      "entity": "skill-token-optimization",
       "confidence": 0.62
     }
   ]

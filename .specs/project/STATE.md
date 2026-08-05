@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Skill Token Optimization (Execute T1–T12 done 2026-08-05; PR pending open; verification-agent next)
+## Current — Skill Token Optimization (**VALIDATED PASS 2026-08-05** — T1–T12 done; PR #71 open, CI 5/5 green; ≥20% byte goal MISSED-and-recorded; merge = user decision)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-skill-token-optimization` ·
   workflow: spec-driven (Large) · persona: AI Engineer (pinned) · branch

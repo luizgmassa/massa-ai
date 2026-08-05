@@ -221,7 +221,8 @@ Gate: tests green; regen + `--check` 0 in-commit.
 - [x] CHANGELOG `[Unreleased]` entry; `.specs/project/STATE.md`,
       `.specs/project/FEATURES.json`, `.specs/HANDOFF.md` committed on branch;
       `check_specs_delivered.ts` green.
-- [ ] Push branch, open PR (merge stays user's). Then verification-agent runs
-      automatically and writes `validation.md`.
+- [x] Push branch, open PR (merge stays user's). Then verification-agent runs
+      automatically and writes `validation.md`. (PR #71 open, CI 5/5 green;
+      verification PASS 2026-08-05.)
 Tests: full `bun run test:scripts` + `bun run lint` + measurement reproduction
 Gate: all Gate Check Commands exit 0; PR opened; verification-agent PASS.
