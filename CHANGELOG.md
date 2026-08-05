@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Agent Skills metadata frontmatter on every workflow file.** All 36
+  `skills/massa-ai/workflows/**/*.md` files now open with YAML frontmatter modeled on the
+  Agent Skills specification (agentskills.io): `name` (file stem), a hand-authored
+  double-quoted `description` (what the workflow does + when to route to it),
+  `license: MIT`, and `metadata.version: "1.0.0"`. Prepend-only — every body is
+  byte-identical after stripping the block. A new gate,
+  `scripts/__tests__/workflow-metadata-headers.test.ts` (in `bun run test:scripts`),
+  parses each block with a real YAML parser (`Bun.YAML.parse`, never regex key-presence),
+  locks the 36-file population with a printed roster, and validates name charset/stem
+  match, description length 20–1024, semver `metadata.version`, and license. This test is
+  the sole backstop for workflow frontmatter — `skills.yml` CI validates `SKILL.md` files
+  only, and `generate-skill-artifacts.ts` byte-copies workflows into all four host
+  bundles, so an invalid block would otherwise ship unseen. The
+  `skills-duplication-metric` ceiling moved 331 → 471 with an in-file reason: the excess
+  is the mandated frontmatter uniformity itself (the same four structural lines × 36
+  files), not prose drift.
+
 - **Model-profile switching: switch installed agents to a registry profile without a
   repo checkout.** One switch engine (`@massa-ai/shared`'s `packages/shared/src/profile-switch/`)
   fronted by three surfaces — MCP tools (`profile_list`, `profile_set`), a `profile

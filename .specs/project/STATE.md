@@ -1,6 +1,66 @@
 # massa-ai Spec State
 
-## Current — Persona Router Token Optimization (**VALIDATED PASS 2026-08-04** — T0–T9 done; PR #68 open, CI 14/14 green; merge = user's decision; PRT-02 live walkthrough pending-restart)
+## Current — Workflow Metadata Headers (**VALIDATED PASS 2026-08-05** — T1–T5 done; PR #70 open, CI 14/14 green; merge = user decision)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-workflow-metadata-headers` ·
+  workflow: spec-driven (Medium) · persona: AI Engineer (pinned) · branch
+  `spec/workflow-metadata-headers` from `main` @ `41daeb68` (plain branch in main
+  checkout — clean tree, no parallel session; worktree-isolation deviation recorded).
+- Scope WMH-01..06 (user-directed 2026-08-04, pattern ref
+  https://agentskills.io/specification): Agent Skills-style YAML frontmatter on all
+  36 `skills/massa-ai/workflows/**/*.md` — `name` = file stem, hand-authored
+  double-quoted `description`, `license: MIT`, `metadata.version: "1.0.0"`;
+  prepend-only (body byte-identical); new real-YAML-parse gate
+  `scripts/__tests__/workflow-metadata-headers.test.ts` (red-first); bundle regen +
+  `--check` 0; test:scripts + lint green; CHANGELOG entry.
+- Contract: `.specs/features/workflow-metadata-headers/{spec,tasks}.md` — Design
+  skipped (format fixed by external spec + repo SKILL.md convention). `1 Phase = 5
+  Tasks`. Full Plan Challenge (pre_mortem, massa-ai-plan-critic): F1 critical —
+  unquoted YAML plain scalars break on 8/36 opening paragraphs (inline `: `) —
+  folded as quoted-scalar + real-parser sensor; F2 skills.yml validates only
+  SKILL.md, new test is sole backstop (PR note); F3 wrap-truncation moot via
+  hand-authored descriptions; F4 generator byte-copies defects into 4 bundles
+  (PR note); F5 length ceiling 20–1024.
+- Execute: go-ahead given (full delivery incl. push + PR; merge stays user's).
+  T1–T4 via one massa-ai-builder Phase-group worker (user accepted offer);
+  verification-agent + T5 delivery by main agent.
+- massa-ai MCP server not used this session; `.specs/` files canonical.
+- Progress (2026-08-05): T1 sensor observed red (0 pass / 1 fail — all 36 files
+  missing frontmatter), green post-T2 (1 pass / 0 fail, population 36 printed).
+  T2 @ `bfddbb69` — wrong-branch incident: the worker's commit first landed on
+  `spec/skill-token-optimization` (a concurrent session's worktree branch that had
+  been checked out under us mid-run, reflog-verified); parent verified the commit
+  (37 files, 0 outside scope) and cherry-picked it here; the sibling branch was
+  left untouched. Byte-check re-run by parent: 36/36 byte-identical after
+  stripping frontmatter vs `f414cdbf`. T3 @ `32f54c83` — bundle regen exit 0,
+  `--check` exit 0 (647 files emitted, 144 committed = 36 × 4 hosts).
+  T4 (inline after the worker hit its API weekly limit): lint exit 0;
+  `test:scripts` 1329 pass / 4 fail — all 4 are `needle-resolution`/
+  `check-frozen-anchors` scanning concurrent worktrees under `.claude/worktrees/`
+  (`DAMPING` anchor 3×, 2 in sibling checkouts; `git diff f414cdbf HEAD` empty on
+  those paths — not WMH fallout; AC5 amended in spec.md: CI is the authoritative
+  venue; scanner-boundary fix recorded as follow-up). `skills-duplication-metric`
+  ceiling 331 → 471 with in-file reason (mandated frontmatter uniformity, gate's
+  own documented-raise convention). CHANGELOG entry under [Unreleased] ### Added.
+- T5 delivery (2026-08-05): validation.md committed @ `bfcab362` (PASS — 6/6 ACs
+  re-derived, 5/5 mutants killed, sha256-verified restores). PR #70
+  (https://github.com/luizgmassa/massa-ai/pull/70) initially CONFLICTING — sibling
+  PR #69 (model-profile-switching) merged to main 6 min before #70 opened, and a
+  conflicted PR never starts `pull_request` checks (zero checks, not red ones).
+  Merged `origin/main` @ `b334234b` in: conflicts HANDOFF.md + FEATURES.json
+  resolved keeping both histories (65 features, active = this); CHANGELOG
+  auto-merge had mis-placed this branch's entry inside released [1.25.0] —
+  relocated to [Unreleased]. Post-merge: regen `--check` 0, sensor 36/36, dup
+  metric 20/0 @ 471, lint 0; local test:scripts residue = known worktree
+  contamination only (DAMPING now 2×, sole live sibling worktree). CI: 14/14
+  green after one coverage re-run — single flaky core `trace_path` MAX_DEPTH
+  test failed then passed on identical commit; not WMH-related. Merge = user's.
+- Follow-up candidates recorded: add `.claude/` to
+  `benchmarks/needles/resolve.ts` IGNORED_DIRECTORIES (kills the local
+  worktree-contamination class); optionally refresh installed
+  `~/.claude/skills/massa-ai` copies post-merge.
+
+## Previous — Persona Router Token Optimization (**VALIDATED PASS 2026-08-04** — T0–T9 done; PR #68 open, CI 14/14 green; merge = user's decision; PRT-02 live walkthrough pending-restart)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-persona-router-token-optimization` ·
   workflow: spec-driven (Large) · branch `spec/persona-router-token-optimization`,

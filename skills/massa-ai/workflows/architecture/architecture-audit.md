@@ -1,3 +1,11 @@
+---
+name: architecture-audit
+description: "Findings-only audit workflow for domain boundaries, bounded contexts, coupling, and architecture health against a concrete target; not for SOLID or code quality scans."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Architecture Audit
 
 Use this workflow for findings-only audit of domain boundaries, bounded contexts, DDD strategic design, coupling, dependency health, architecture review, deepening opportunities, seams, adapters, module depth, and architecture-focused refactor planning in a concrete target: modified files, explicit files/globs, commit ranges, branch comparisons, modules/packages, symbols/classes/functions, feature/runtime flows, explicitly requested whole-repo scope, or an implementation scope packet supplied by `workflows/implementation/implementation-audit.md`.

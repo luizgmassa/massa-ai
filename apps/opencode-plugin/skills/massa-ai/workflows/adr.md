@@ -1,3 +1,11 @@
+---
+name: adr
+description: "Use this workflow to record a finalized or being-finalized architecture decision; route open options to rfc and implementation planning to tdd."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### 📜 ADR (Architecture Decision Record)
 
 Use this workflow to record a finalized or being-finalized architecture decision. Do not use it to decide among open options; route undecided proposals to `workflows/rfc.md`. Do not use it for implementation planning; route that to `workflows/tdd.md`.

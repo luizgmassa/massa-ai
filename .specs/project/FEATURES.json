@@ -869,7 +869,24 @@
       "tasks": ".specs/features/model-profile-switching/tasks.md",
       "notes": "EXECUTE COMPLETE 2026-08-04: T1-T16 by 3 confirmed batch workers + 2 inline main-agent repairs (security-allowlist entry for lock.ts execFileSync; T17 close-out), 19 commits. Re-measured figures: 374 variant files across 22 (host,profile) pairs at 17 each; MCP tools 52->54 across 3 pinned locations (a third, undocumented pin found in tool-definitions-synapse.test.ts); OpenCode in-process tools 13->14 (closed the stale 13-vs-14 doc gap). Two recorded deviations: publish.yml + package.json files extension (required by MPS-01 AC4); codex/opencode have no marketplace mode -> installRoute unconditionally file. AD-015 appended. Full gate matrix exit 0. VALIDATED PASS 2026-08-04 (independent verifier, author != verifier): 22/22 ACs evidenced, 7/7 discrimination mutations killed (0 survivors, 0 exclusions), 9/9 gates green on verifier-owned runs. PR from spec/model-profile-switching; merge = user decision (minor release).",
       "validation": ".specs/features/model-profile-switching/validation.md"
+    },
+    {
+      "slug": "workflow-metadata-headers",
+      "title": "Agent Skills-style YAML frontmatter (name, description, license, metadata.version \"1.0.0\") on all 36 skills/massa-ai/workflows files, real-YAML-parse gate, bundle regen",
+      "status": "active",
+      "priority": "P3",
+      "workflow": "spec-driven",
+      "branch": "spec/workflow-metadata-headers",
+      "phases": {
+        "specify": "complete",
+        "design": "skipped — format fixed by agentskills.io spec + repo SKILL.md convention; safety valve armed",
+        "tasks": "complete",
+        "execute": "complete (T1–T4; validation pending)"
+      },
+      "spec": ".specs/features/workflow-metadata-headers/spec.md",
+      "tasks": ".specs/features/workflow-metadata-headers/tasks.md",
+      "notes": "User-directed 2026-08-04, pattern ref https://agentskills.io/specification. Plan Challenge full pre_mortem: F1 critical (unquoted YAML scalars break on 8/36 opening paragraphs) folded — hand-authored double-quoted descriptions + real-parser sensor. 1 Phase = 5 Tasks; T1-T4 batch worker (user-approved), T5 delivery under Execute go-ahead. T2 @ bfddbb69 (recovered via parent cherry-pick after wrong-branch incident — concurrent session checkout; original b98dcbf2 orphaned, sibling branch untouched). T3 @ 32f54c83 (--check exit 0). T4: lint 0; test:scripts 1329/4 — 4 fails are worktree-contamination, AC5 amended (CI authoritative); duplication ceiling 331→471 documented; worker hit API weekly limit, T4 finished inline by main agent."
     }
   ],
-  "active_feature": "model-profile-switching"
+  "active_feature": "workflow-metadata-headers"
 }

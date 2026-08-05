@@ -1,3 +1,11 @@
+---
+name: requirements-fix
+description: "Executes fixes from a saved requirements audit report; not for findings-only review or broad feature design when acceptance criteria are missing."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Requirements Fix
 
 Use this workflow only to execute fixes from a requirements audit markdown report.

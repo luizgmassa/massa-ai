@@ -1,3 +1,11 @@
+---
+name: commit
+description: "Use this workflow to draft a commit message, prepare, or commit current repository changes; not for Jira tickets, release notes, changelogs, or history rewriting."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Commit
 
 Use this workflow when the user wants to draft a commit message, prepare a commit, or commit current repository changes. This workflow adapts the local caveman-commit rules into a safe Git workflow for changed files.

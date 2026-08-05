@@ -1,3 +1,11 @@
+---
+name: debug
+description: "Use this workflow for evidence-backed root-cause diagnosis of broken behavior, failures, regressions, or crashes; route new capabilities to feature and broad redesign to spec-driven."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### 🔴 Debug
 
 Use this workflow when the user reports broken behavior, failures, regressions, crashes, unexpected output, flaky behavior, or any issue that needs evidence-backed root-cause diagnosis before a fix. Do not use it for new capabilities; route that to `workflows/feature.md`. Do not use it for broad redesign or unclear cross-boundary changes; route that to `workflows/spec-driven.md`.

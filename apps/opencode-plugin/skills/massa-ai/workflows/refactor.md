@@ -1,3 +1,11 @@
+---
+name: refactor
+description: "Behavior-preserving structural cleanup, simplification, decoupling, and testability workflow; route broken behavior to debug and broad boundary redesign to architecture-audit or spec-driven."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### 🔨 Refactor
 
 Use this workflow for behavior-preserving structural cleanup, simplification, decoupling, testability improvements, and code organization changes where the intended external behavior stays the same. Do not use it for broken behavior; route that to `workflows/debug.md`. Do not use it for broad boundary redesign, migration, or unclear architecture direction; route that to `workflows/architecture/architecture-audit.md` or `workflows/spec-driven.md`.

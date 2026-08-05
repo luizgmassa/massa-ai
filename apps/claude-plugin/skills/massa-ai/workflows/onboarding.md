@@ -1,3 +1,11 @@
+---
+name: onboarding
+description: "Use this workflow on a first session or with missing project context to resolve project identity, establish memory/index state, and capture an architecture overview."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### 🟢 Onboarding (New Project / First Session)
 
 Use this workflow for a first session, missing project context, or repo setup where the agent must resolve the project identity, establish usable memory/index state, and capture a high-level architecture overview before deeper work.

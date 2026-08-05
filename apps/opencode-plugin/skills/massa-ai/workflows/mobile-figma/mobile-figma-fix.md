@@ -1,3 +1,11 @@
+---
+name: mobile-figma-fix
+description: "Fixes confirmed MFM-prefixed findings from a saved mobile Figma audit report; the saved audit report is the source of truth, not screenshots or chat summaries."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Mobile Figma Fix
 
 Use this workflow only to fix confirmed `MFM-*` findings from a saved mobile Figma audit report.
