@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Three skills imported into the massa-ai router** (from the
+  Useful-Agent-Skills checkout; sources untouched). `coding-guidelines` →
+  `skills/massa-ai/references/coding-guidelines.md`, loaded lazily before
+  implementation edits via a Core Contract bullet (dropped from the bootstrap
+  activation stack, which is now 3 items); `to-prd` →
+  `skills/massa-ai/workflows/to-prd.md` (explicit-request-only route: synthesize
+  a PRD from the current conversation; refining an existing PRD stays
+  `furps-refinement`); `skill-architect` →
+  `skills/massa-ai/workflows/skill-architect.md` +
+  `references/skill-architect/{examples,patterns,quality-checklist}.md` +
+  `scripts/validate_skill.py`, kept `license: CC-BY-4.0` with attribution
+  (author Felipe Rodrigues) — the workflow-metadata-headers gate's license
+  assertion widened to the `["MIT", "CC-BY-4.0"]` allowlist and its
+  `EXPECTED_WORKFLOW_COUNT` population lock bumped 36 → 38.
+
+### Changed
+
+- **`skills/AGENTS.md` registry cleanup.** Deleted the partial Orchestration
+  Model diagram, the stale Future Integration section, and both false
+  "symlinked" claims; the Capability Packet and Output Contract sections are
+  now pointers to the canonical
+  `skills/massa-ai/references/agent-orchestration.md` (mirror deleted, reversing
+  ORC-06/ORC-08 — the mirror's stated rationale was wrong: the installer copies
+  only the bootstrap block, so the registry never reaches hosts);
+  `capability-packet-parity.test.ts` retired with its subject;
+  `skills-harness-integrity.test.ts` keeps `AGENTS.md` under the
+  persona-authority prose scanner via a direct `AUTHORITY_SCANNED_FILES` entry.
+  Bootstrap ignore list now carves out `!.env.example` (the annotated env
+  reference stays indexable).
+
+### Fixed
+
+- **Judge agent could not write the report file its own charter mandates.**
+  `skills/agents/judge/SKILL.md` now declares `permission: write` (v1.2.0) and
+  judge joined `WRITE_AGENTS` in the generator and parity roster, so generated
+  artifacts ship Write/Edit tools (Claude), `workspace-write` sandbox (Codex),
+  no `readonly` pin (Cursor), and `edit: allow` (OpenCode). The Agent Table row
+  reads `read-only (report-write, own file only)`; charter Restrictions still
+  bound writes to the agent's own judge-N report.
+
 ## [1.27.0] - 2026-08-05
 
 ### Added

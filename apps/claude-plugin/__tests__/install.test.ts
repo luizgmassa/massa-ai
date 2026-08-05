@@ -267,9 +267,10 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
   test("CLA-02: read-only agents lack Write/Edit; write agents include them", async () => {
     runInstall(["--user"], { HOME: tmp });
     const readOnlyAgents = SPECIALIST_NAMES.filter(
-      (n) => n !== "builder" && n !== "test-engineer" && n !== "documentation-agent",
+      (n) =>
+        n !== "builder" && n !== "test-engineer" && n !== "documentation-agent" && n !== "judge",
     );
-    const writeAgents = ["builder", "test-engineer", "documentation-agent"];
+    const writeAgents = ["builder", "test-engineer", "documentation-agent", "judge"];
 
     for (const name of readOnlyAgents) {
       const content = await fs.readFile(

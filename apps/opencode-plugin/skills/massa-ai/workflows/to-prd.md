@@ -12,6 +12,8 @@ This skill takes the current conversation context and codebase understanding and
 
 Route here only on explicit user request to convert the current conversation into a PRD (Product Requirements Document); refining an existing PRD stays `furps-refinement`.
 
+Load `references/project-context.md` (intake sweep) before the first substantive read.
+
 ## Process
 
 1. Explore the repo to understand the current state of the codebase, if you haven't already. Use the project's domain glossary vocabulary throughout the PRD, and respect any ADRs in the area you're touching.
