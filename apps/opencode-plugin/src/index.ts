@@ -530,6 +530,48 @@ export const MassaAiPlugin: Plugin = async ({ project, directory, worktree, clie
           return JSON.stringify(result)
         },
       }),
+
+      // ── Model-profile switch tool (T14 — same routes/profiles.ts endpoints
+      // the MCP tools and both config-CLIs front) ─────────────────────────────
+
+      "profile": tool({
+        description:
+          "List shipped model profiles or switch the installed massa-ai agents to one. Local trust model — " +
+          "same as any tool that mutates local state: 'set' replaces the active installed agent files on the " +
+          "machine this host runs on and requires a session restart to take effect. Use action:'list' first " +
+          "to see available profiles and each host's current state.",
+        args: {
+          action: tool.schema.enum(["list", "set"]).describe("'list' reports profiles/state; 'set' switches"),
+          profile: tool.schema
+            .string()
+            .optional()
+            .describe("Target profile name — required when action is 'set'"),
+          host: tool.schema
+            .enum(["claude", "codex", "cursor", "opencode"])
+            .optional()
+            .describe("Limit to a single host. Omit to cover every detected host."),
+          dryRun: tool.schema
+            .boolean()
+            .optional()
+            .default(false)
+            .describe("With action:'set' — preview the per-host plan; change nothing"),
+        },
+        async execute(args) {
+          if (args.action === "list") {
+            const result = await massaAiGetWithQuery("/api/v1/profiles", { host: args.host })
+            return JSON.stringify(result)
+          }
+          if (!args.profile) {
+            return JSON.stringify({ success: false, error: { code: "InvalidRequest", message: "profile is required when action is 'set'" } })
+          }
+          const result = await massaAiFetch("/api/v1/profiles/switch", {
+            profile: args.profile,
+            host: args.host,
+            dryRun: args.dryRun ?? false,
+          })
+          return JSON.stringify(result)
+        },
+      }),
     },
 
     // -----------------------------------------------------------------------

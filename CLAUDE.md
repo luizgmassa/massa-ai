@@ -397,7 +397,9 @@ plugin-local `.mcp.json`/`mcp.json` would reintroduce a second registration path
 `scripts/tests/test-mcp-single-writer.sh` guards that. OpenCode is the one host where the
 MCP write is *skipped* — when `opencode.json` lists the plugin in any accepted form (npm
 name `@massa-ai/opencode-plugin`, local path `./plugins/massa-ai/index.js`, or bare dir
-`massa-ai`), because the plugin registers 14 tools in-process. The harness order is skills
+`massa-ai`), because the plugin registers 14 tools in-process (`grep -cE '^\s*"[a-z_]+"\s*:\s*tool\(\{'
+apps/opencode-plugin/src/index.ts` — 13 through model-profile-switching's T13, 14 after T14
+added the `profile` tool, closing what had been a stale 13-vs-14 doc/code gap). The harness order is skills
 → MCP → plugins, so at MCP time that entry may not exist yet; the OpenCode installer
 therefore calls `install-agents.sh --agent opencode --uninstall` after registering itself,
 which keeps the single-writer invariant intact.
