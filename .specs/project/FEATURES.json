@@ -903,7 +903,7 @@
       "id": "registry-cleanup-skill-imports",
       "slug": "registry-cleanup-skill-imports",
       "title": "skills/AGENTS.md registry cleanup + coding-guidelines/skill-architect/to-prd imports",
-      "status": "in-progress",
+      "status": "complete",
       "created": "2026-08-05",
       "depends_on": [],
       "artifacts": [
@@ -911,7 +911,15 @@
         "design.md",
         "tasks.md"
       ]
+    },
+    {
+      "id": "untracked-generated-bundles",
+      "slug": "untracked-generated-bundles",
+      "status": "in-progress",
+      "created": "2026-08-05",
+      "description": "Stop tracking generated plugin bundles; generate at pack/install/CI time",
+      "dependencies": []
     }
   ],
-  "active_feature": "registry-cleanup-skill-imports"
+  "active_feature": "untracked-generated-bundles"
 }
