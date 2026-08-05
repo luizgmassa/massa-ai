@@ -810,7 +810,25 @@
       "design": ".specs/features/workflow-policy-updates/design.md",
       "tasks": ".specs/features/workflow-policy-updates/tasks.md",
       "notes": "T1-T5 complete, independently validated (all 5 WFP ACs PASS, 3/3 mutations killed; validation.md). PR #66, CI 14/14 green. Merge = user's decision. Plan Challenge pre_mortem F1-F6 folded before Execute. massa-ai MCP unreachable this session; .specs/ canonical."
+    },
+    {
+      "slug": "model-profile-switching",
+      "title": "Model Profile Switching — pre-rendered per-profile agent variants in plugin bundles + switch-time re-render engine (MCP profile_set/profile_list, config-cli profile subcommand, OpenCode in-process tool, Claude skill), install-state.json profile record surviving upgrades",
+      "status": "in_progress",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/model-profile-switching",
+      "phases": {
+        "specify": "complete",
+        "design": false,
+        "tasks": false,
+        "execute": false
+      },
+      "spec": ".specs/features/model-profile-switching/spec.md",
+      "depends_on": [
+        "model-profile-registry"
+      ]
     }
   ],
-  "active_feature": "workflow-policy-updates"
+  "active_feature": "model-profile-switching"
 }
