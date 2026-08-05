@@ -359,10 +359,21 @@ is the opposite, a fallback the agent file wins against. `bun run verify:model-i
 the installed harness CLIs and is advisory, not a CI gate — CI has no harness CLI, so it
 would either fail always or pass vacuously.
 
+**Switching an already-installed machine to a different profile is a separate,
+runtime concern from the build-time registry above.** Every profile ships
+pre-rendered per host (`agent-profiles/<profile>/`, sibling of `agents/`, generated
+alongside the default `agents/` set); one switch engine
+(`packages/shared/src/profile-switch/`) copies a chosen variant over the installed
+active agent files, fronted by MCP tools (`profile_list`/`profile_set`), both
+`massa-ai-config profile list|show|set` CLIs, the OpenCode in-process `profile` tool,
+and the Claude `skills/profile/` skill. A host session restart is always required
+after a switch — no host supports per-agent runtime indirection (unchanged from the
+registry's own finding); see `.specs/features/model-profile-switching/spec.md`.
+
 `scripts/generate-skill-artifacts.ts` is the analogous generator for
-`skills/massa-ai/`, `skills/persona-router/`, and the raw `skills/agents/<n>/SKILL.md`
-charters: it emits real, byte-identical files into
-`apps/<host>-plugin/skills/{massa-ai,persona-router,agents}/` for all four hosts (~5 MB /
+`skills/massa-ai/`, `skills/persona-router/`, `skills/profile/`, and the raw
+`skills/agents/<n>/SKILL.md` charters: it emits real, byte-identical files into
+`apps/<host>-plugin/skills/{massa-ai,persona-router,profile,agents}/` for all four hosts (~5 MB /
 580 files, checked in), plus the generated `hooks/massa-ai-hook` copies above and
 `apps/opencode-plugin/lib/opencode-config.cjs` (mirrored from
 `scripts/lib/opencode-config.cjs`, D1). `--check` diffs full directory inventories per
@@ -397,7 +408,9 @@ plugin-local `.mcp.json`/`mcp.json` would reintroduce a second registration path
 `scripts/tests/test-mcp-single-writer.sh` guards that. OpenCode is the one host where the
 MCP write is *skipped* — when `opencode.json` lists the plugin in any accepted form (npm
 name `@massa-ai/opencode-plugin`, local path `./plugins/massa-ai/index.js`, or bare dir
-`massa-ai`), because the plugin registers 14 tools in-process. The harness order is skills
+`massa-ai`), because the plugin registers 14 tools in-process (`grep -cE '^\s*"[a-z_]+"\s*:\s*tool\(\{'
+apps/opencode-plugin/src/index.ts` — 13 through model-profile-switching's T13, 14 after T14
+added the `profile` tool, closing what had been a stale 13-vs-14 doc/code gap). The harness order is skills
 → MCP → plugins, so at MCP time that entry may not exist yet; the OpenCode installer
 therefore calls `install-agents.sh --agent opencode --uninstall` after registering itself,
 which keeps the single-writer invariant intact.

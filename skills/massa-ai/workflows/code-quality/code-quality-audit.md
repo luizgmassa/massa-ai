@@ -1,3 +1,11 @@
+---
+name: code-quality-audit
+description: "Findings-only audit workflow for SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, and code-smell issues in a concrete target; not for architecture concerns."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Code Quality Audit
 
 Findings-only audit of SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, overengineering, code smell, or violations-check issues, scoped to a concrete target: modified files, explicit files/globs, commit ranges, branch comparisons, modules/packages, symbols/classes/functions, feature/runtime flows, explicitly requested whole-repo scope, or an implementation scope packet supplied by `workflows/implementation/implementation-audit.md`.

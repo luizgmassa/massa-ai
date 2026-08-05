@@ -24,14 +24,73 @@
   validate_spec/validate_tasks green (12 tasks parsed).
 - User decisions 2026-08-05: high-value extraction set IN; validator top pack
   IN; Execute GO with Phase workers (delivery through PR; merge user's);
-  this feature merges BEFORE `workflow-metadata-headers` (its uncommitted
-  T1–T4 tree in the main checkout stays untouched; prepend-only frontmatter
-  re-runs over compressed bodies). DO-NOT-EXTRACT: dispatch blocks
+  merge order INVERTED in practice: `workflow-metadata-headers` merged first
+  (PR #70 @ `519766bc`); origin/main merged into this branch — frontmatter +
+  compressed bodies combined, only .specs state files conflicted. DO-NOT-EXTRACT: dispatch blocks
   (agent-orchestration.md:92-93 invariant).
 - Investigation reports (2 read-only subagents, 2026-08-05): 27 conditional
   findings (~15 actionable; marginals deferred), 24 deterministic-check
   mechanisms (top pack in scope; rest = follow-up backlog candidate).
 - massa-ai MCP server not used this session; `.specs/` files canonical.
+## Previous — Workflow Metadata Headers (**VALIDATED PASS 2026-08-05** — T1–T5 done; PR #70 open, CI 14/14 green; merge = user decision)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-workflow-metadata-headers` ·
+  workflow: spec-driven (Medium) · persona: AI Engineer (pinned) · branch
+  `spec/workflow-metadata-headers` from `main` @ `41daeb68` (plain branch in main
+  checkout — clean tree, no parallel session; worktree-isolation deviation recorded).
+- Scope WMH-01..06 (user-directed 2026-08-04, pattern ref
+  https://agentskills.io/specification): Agent Skills-style YAML frontmatter on all
+  36 `skills/massa-ai/workflows/**/*.md` — `name` = file stem, hand-authored
+  double-quoted `description`, `license: MIT`, `metadata.version: "1.0.0"`;
+  prepend-only (body byte-identical); new real-YAML-parse gate
+  `scripts/__tests__/workflow-metadata-headers.test.ts` (red-first); bundle regen +
+  `--check` 0; test:scripts + lint green; CHANGELOG entry.
+- Contract: `.specs/features/workflow-metadata-headers/{spec,tasks}.md` — Design
+  skipped (format fixed by external spec + repo SKILL.md convention). `1 Phase = 5
+  Tasks`. Full Plan Challenge (pre_mortem, massa-ai-plan-critic): F1 critical —
+  unquoted YAML plain scalars break on 8/36 opening paragraphs (inline `: `) —
+  folded as quoted-scalar + real-parser sensor; F2 skills.yml validates only
+  SKILL.md, new test is sole backstop (PR note); F3 wrap-truncation moot via
+  hand-authored descriptions; F4 generator byte-copies defects into 4 bundles
+  (PR note); F5 length ceiling 20–1024.
+- Execute: go-ahead given (full delivery incl. push + PR; merge stays user's).
+  T1–T4 via one massa-ai-builder Phase-group worker (user accepted offer);
+  verification-agent + T5 delivery by main agent.
+- massa-ai MCP server not used this session; `.specs/` files canonical.
+- Progress (2026-08-05): T1 sensor observed red (0 pass / 1 fail — all 36 files
+  missing frontmatter), green post-T2 (1 pass / 0 fail, population 36 printed).
+  T2 @ `bfddbb69` — wrong-branch incident: the worker's commit first landed on
+  `spec/skill-token-optimization` (a concurrent session's worktree branch that had
+  been checked out under us mid-run, reflog-verified); parent verified the commit
+  (37 files, 0 outside scope) and cherry-picked it here; the sibling branch was
+  left untouched. Byte-check re-run by parent: 36/36 byte-identical after
+  stripping frontmatter vs `f414cdbf`. T3 @ `32f54c83` — bundle regen exit 0,
+  `--check` exit 0 (647 files emitted, 144 committed = 36 × 4 hosts).
+  T4 (inline after the worker hit its API weekly limit): lint exit 0;
+  `test:scripts` 1329 pass / 4 fail — all 4 are `needle-resolution`/
+  `check-frozen-anchors` scanning concurrent worktrees under `.claude/worktrees/`
+  (`DAMPING` anchor 3×, 2 in sibling checkouts; `git diff f414cdbf HEAD` empty on
+  those paths — not WMH fallout; AC5 amended in spec.md: CI is the authoritative
+  venue; scanner-boundary fix recorded as follow-up). `skills-duplication-metric`
+  ceiling 331 → 471 with in-file reason (mandated frontmatter uniformity, gate's
+  own documented-raise convention). CHANGELOG entry under [Unreleased] ### Added.
+- T5 delivery (2026-08-05): validation.md committed @ `bfcab362` (PASS — 6/6 ACs
+  re-derived, 5/5 mutants killed, sha256-verified restores). PR #70
+  (https://github.com/luizgmassa/massa-ai/pull/70) initially CONFLICTING — sibling
+  PR #69 (model-profile-switching) merged to main 6 min before #70 opened, and a
+  conflicted PR never starts `pull_request` checks (zero checks, not red ones).
+  Merged `origin/main` @ `b334234b` in: conflicts HANDOFF.md + FEATURES.json
+  resolved keeping both histories (65 features, active = this); CHANGELOG
+  auto-merge had mis-placed this branch's entry inside released [1.25.0] —
+  relocated to [Unreleased]. Post-merge: regen `--check` 0, sensor 36/36, dup
+  metric 20/0 @ 471, lint 0; local test:scripts residue = known worktree
+  contamination only (DAMPING now 2×, sole live sibling worktree). CI: 14/14
+  green after one coverage re-run — single flaky core `trace_path` MAX_DEPTH
+  test failed then passed on identical commit; not WMH-related. Merge = user's.
+- Follow-up candidates recorded: add `.claude/` to
+  `benchmarks/needles/resolve.ts` IGNORED_DIRECTORIES (kills the local
+  worktree-contamination class); optionally refresh installed
+  `~/.claude/skills/massa-ai` copies post-merge.
 
 ## Previous — Persona Router Token Optimization (**VALIDATED PASS 2026-08-04** — T0–T9 done; PR #68 open, CI 14/14 green; merge = user's decision; PRT-02 live walkthrough pending-restart)
 
@@ -3004,6 +3063,7 @@ Also update the feature block above: **Phase 0 is done, remaining Execute is ~21
 | AD-012 | proposed (core-layering-god-module-split AS-01, closed 2026-07-28; **not yet implemented**) | **The `controllers/` layer is retired. `packages/core` is `tools → services (some of which orchestrate) → data`, enforced by a CI import-direction check.** The four-layer contract stated in `src/index.ts` and `CLAUDE.md` was never adopted: 31 tools, 6 controllers, and `tools → services` 34× against `tools → controllers` 6×. Only **3 of the 6** controllers hold what the contract claims for them — `MemoryController.store` publishes a domain event and fires two background side-effects (`memory-controller.ts:164-171,184-186`), `SearchController.searchProject` emits `search:completed`/`search:reranked` (`search-controller.ts:239-250,282-295`), `ContextController` composes two controllers plus a graph service, compressor and metrics singleton (`context-controller.ts:120-171`). The other three do not: `GraphController` is a validate→call-one-service→reshape wrapper that `tools/trace_path.ts:161` duplicates, `ExecutorController.execute`/`executeFile` are 1:1 wraps whose only addition is error mapping, and `index.ts` is a barrel. Those 3 move into `services/` as named orchestrators, following the precedent **already in the tree**: `WebController` lives at `services/web/web-controller.ts` and both transports instantiate it. `ExecutorController` keeps its exported symbol name because `apps/tools-api/src/routes/executor.ts:13` and `apps/mcp-client/src/embedded-api-client.ts:43` import it directly from the root barrel — it is public surface despite its directory. Rejected alternatives: (a) **adopt controllers for all 31 tools** — rejected on evidence, it is ~7-9 genuinely new orchestration controllers plus ~11 pure pass-throughs written as ceremony, for 34 import rewrites; (b) **keep controllers optional and only fix import direction** — rejected because it leaves "controller" naming nothing precise while `WebController` already contradicts it. Note the layer contract's dominant violation is elsewhere entirely: **24 of the 36 backward imports are `data → services`**, mostly `getPrismaClient`, and are unrelated to this decision. Breaking change: no — the published MCP/REST surface binds to Tool classes, and the one directly-imported controller keeps its name. | `packages/core/src/{index.ts,controllers/,services/}`, `packages/core/package.json` `"./controllers"` exports subpath, `CLAUDE.md` Architecture section |
 | AD-013 | active (sensor-repair-2026-07 SEN-04, implemented 2026-07-28, commits `27dda6c` / `5e018e5` / `d5b5813`) | **A retrieval-benchmark needle is identified by content, not by file position, and an unresolvable needle is a hard failure.** The needles gate scores a hit only on `filePath` equality **and** line-range intersection within `lineTolerance` (5) — `benchmarks/needles/scorer.ts:94-104`, replicated verbatim in `benchmarks/needles/run.ts:85-96` and again in `packages/core/src/__tests__/e2e/14.needles.test.ts:119-133`. `run.ts:233-236` skips a missing target with a `[warn]` and scores the needle **zero**, and `scorer.ts:111,124,135` average that zero over the full needle count rather than dropping it. The consequence is not a weak sensor but an inverted one: 7 of 14 needles sit in `services/search/`, so any refactor that moves them caps `MRR` at 0.50 against a **0.65** floor — a guaranteed failure independent of retrieval quality, indistinguishable from a real regression. Positional pinning is the root defect, not the filename: with `lineTolerance` at 5, a span that moves more than 5 lines inside a file of the same name breaks its needle too. Rejected alternatives: (a) **baseline then mechanically re-point the fixture after the refactor** — rejected because the sensor would be edited by the change it validates, and a re-point landing on subtly different code hides exactly the regression the gate exists to catch; (b) **drop the needles clause and rely on characterization tests** — rejected because it leaves retrieval quality with no sensor at all across the riskiest change in the backlog. The loud-failure half matters more than the anchoring half: a silent skip is what made the gate untrustworthy. **Implemented.** Needles carry a unique code `anchor` plus signed `startOffset`/`endOffset`; `{anchor, endAnchor}` was measured unbuildable (only 3 of 11 needles have both boundaries on a repo-wide-unique code line; N03 ends on a blank line and N13 starts on one) — see `design.md`, Second fork. Resolution runs before any embedding, so a stale fixture costs seconds, not a wrong number. Three consumers became one: `resolve.ts` owns `intersects`/`findRank`. The predicted failure was confirmed by measurement, not reasoning — the gate had been red since `56c84d1` because N07/N08/N09 pointed past EOF of an 81-line file, and repairing the *instrument* alone took MRR from 0.569 to 0.736 with no retrieval code, chunker parameter or floor touched. `scorer.ts` keeps a positional path for external corpora (`sicad`) whose sources are not in this repo; the pass/fail gate `run.ts` does not. | `benchmarks/needles/{resolve.ts,run.ts,scorer.ts,fixtures/massa-ai.json}`, `packages/core/src/__tests__/e2e/{14.needles.test.ts,_helpers.ts}`, `scripts/__tests__/needle-resolution.test.ts` |
 | AD-014 | active (cross-pollination-ports T4, implemented 2026-08-03, commit `a6fdafb`; renumbered from the design's pre-assigned "AD-013" at close-out — that slot was already taken, re-check the highest AD at append time) | **Every durable Observation write passes the kernel credential-scrub boundary.** `ObservationStore.insert` takes `InsertableObservation`, whose `payloadJson` is the branded `SanitizedPayloadJson` — only constructible via `scrubCredentials()` (`packages/core/src/kernel/sanitize/credential-scrub.ts`: 7 narrow credential-shape rules, non-growth invariant, no escape-hatch constructor). Both production writers (`hook-service.ts:246`, `tools/compact_snapshot.ts`) construct through it; read shapes stay plain `string`, and pre-existing rows remain unsanitized (accepted limitation, spec'd). Because `packages/core/src/__tests__` is excluded from every type-check, the compile-time claim is enforced by the compile-fixture gate `scripts/__tests__/xp02-branded-type.test.ts`, not by an in-tree `@ts-expect-error`. | `.specs/features/cross-pollination-ports/{spec,design,validation}.md`; discrimination sensor 6/6 mutations killed |
+| AD-015 | active (model-profile-switching T17, implemented 2026-08-04, branch `spec/model-profile-switching`) | **Installed model-profile state is `platforms[host].modelProfile = {profile, switchedAt}` in `install-state.json`, and the switch engine (`packages/shared/src/profile-switch/`) is its only writer.** Installers read it to re-apply the recorded profile on install/upgrade and write the installer-owned `installRoute: "file"\|"marketplace"` field, but never invent or edit `modelProfile`. Bundle version is reported from the existing `platforms[host].plugin.version` — never duplicated into the profile record (two sources for one fact is the defect the registry removed). Runtime profile selection is an explicit argument, never an env read (AD-010 passThroughEnv tax; a second resolution surface is the registry-named defect). | `.specs/features/model-profile-switching/{spec,design}.md`; round-trip guards `scripts/__tests__/install-state-plugin-version.test.ts` |
 
 ---
 

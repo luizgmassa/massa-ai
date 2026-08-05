@@ -1,3 +1,11 @@
+---
+name: general
+description: "Final fallback workflow for coding, planning, review, or implementation work when no specialized massa-ai workflow is a better match."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### General Coding Workflow
 
 Use for coding, planning-before-coding, review, or implementation work when no specialized massa-ai workflow is a better match. Final fallback, not a replacement for explicit or specialized workflows.

@@ -1,3 +1,11 @@
+---
+name: tests-fix
+description: "Executes fixes from a saved tests audit report; not for findings-only coverage review or generic test-writing work without an audit report."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Tests Fix
 
 Execute fixes from a tests audit markdown report only.

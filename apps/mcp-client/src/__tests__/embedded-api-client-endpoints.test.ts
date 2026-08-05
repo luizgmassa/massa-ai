@@ -525,3 +525,22 @@ describe("EmbeddedApiClient additional endpoint coverage", () => {
     await call(() => client.get("/api/v1/synapse/sessions"));
   });
 });
+
+// T12 — profile_list/profile_set (model-profile-switching). The invalid-host
+// guard is exercised directly against the real `EmbeddedApiClient` (safe: it
+// returns before touching the switch engine or any filesystem path). Success
+// and MPS-09 error-mapping paths are covered in `embedded-profiles.test.ts`,
+// which mocks `@massa-ai/shared` — the real engine defaults `targetHome` to
+// `os.homedir()`, and this suite must never risk mutating the machine it runs
+// on (unlike the DB-scoped calls above, this is real host filesystem state).
+describe("EmbeddedApiClient GET/POST /api/v1/profiles — invalid-host guard", () => {
+  test("GET /api/v1/profiles?host=nonesuch → InvalidHostError, no engine call", async () => {
+    const result = await client.get("/api/v1/profiles", { host: "nonesuch" });
+    expect(result).toMatchObject({ success: false, error: { code: "InvalidHostError" } });
+  });
+
+  test("POST /api/v1/profiles/switch with an unknown host → InvalidHostError, no engine call", async () => {
+    const result = await client.post("/api/v1/profiles/switch", { profile: "work", host: "nonesuch" });
+    expect(result).toMatchObject({ success: false, error: { code: "InvalidHostError" } });
+  });
+});

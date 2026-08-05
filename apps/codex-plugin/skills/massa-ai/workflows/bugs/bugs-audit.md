@@ -1,3 +1,11 @@
+---
+name: bugs-audit
+description: "Findings-only bug discovery workflow for a concrete target; route known broken behavior to debug and code-quality concerns to code-quality-audit."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Bugs Audit
 
 Findings-only bug discovery scoped to a concrete target: modified files, explicit files/globs, commit ranges, branch comparisons, modules/packages, symbols/classes/functions, feature/runtime flows, explicitly requested whole-repo scope, or an implementation scope packet supplied by `workflows/implementation/implementation-audit.md`.

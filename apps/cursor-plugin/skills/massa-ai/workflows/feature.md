@@ -1,3 +1,11 @@
+---
+name: feature
+description: "Use this workflow to add a new capability, screen, command, integration, or user-facing improvement with clear intent; route broken behavior to debug and broad work to spec-driven."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### 🟡 Feature
 
 Use when the user wants to add a new capability, screen, command, integration, behavior, or user-facing improvement with clear intent or acceptance criteria. Not for broken behavior — route to `workflows/debug.md`. Not for broad, ambiguous, migration-heavy, or cross-boundary work — route to `workflows/spec-driven.md`.

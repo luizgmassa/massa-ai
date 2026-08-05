@@ -1,3 +1,11 @@
+---
+name: exploration
+description: "Read-only workflow for understanding a codebase, module, data flow, runtime behavior, schema, dependency, or architecture area before requesting changes."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### 🔵 Exploration
 
 Use when the user wants to understand a codebase, module, data flow, runtime behavior, schema, dependency, or architecture area before asking for changes. Exploration is read-only: do not implement, refactor, rewrite docs, or mutate project files unless the user explicitly changes workflows or asks for edits.

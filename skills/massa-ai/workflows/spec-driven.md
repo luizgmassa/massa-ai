@@ -1,3 +1,11 @@
+---
+name: spec-driven
+description: "Use this workflow for explicit spec-driven requests and broad, ambiguous, migration-heavy, or cross-boundary delivery needing requirements-through-verification control."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Spec-Driven
 
 Use for explicit spec-driven requests and broad, ambiguous, migration-heavy, cross-boundary, public-contract, or long-running delivery that needs requirements-through-verification control. Ordinary localized fixes and clear small features stay in `debug`, `feature`, `refactor`, or `general` unless the user explicitly requests this workflow.

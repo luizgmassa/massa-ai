@@ -1,9 +1,8 @@
 # Handoff — skill-token-optimization (Specify/Design/Tasks done; Execute approved, Plan Challenge next)
 
 Previous handoffs closed: persona-router-token-optimization merged as PR #68 @
-`41daeb68` (T0–T9 validated PASS; PRT-02 live walkthrough remains
-pending-restart, tracked in that feature's validation.md; provisioning recipe
-for its worktree preserved in git history of this file @ `41daeb68`).
+`41daeb68`; workflow-metadata-headers merged as PR #70 @ `519766bc` (its
+frontmatter now combined with this branch via merge of origin/main).
 
 Session `spec-skill-token-optimization` · workflow spec-driven (Large) ·
 persona route: AI Engineer (pinned). massa-ai MCP not used this session;

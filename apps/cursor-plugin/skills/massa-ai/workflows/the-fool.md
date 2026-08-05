@@ -1,3 +1,11 @@
+---
+name: the-fool
+description: "Use this workflow for direct requests to challenge ideas, plans, decisions, or evidence, and as the configured post-plan challenge gate after other workflows construct a plan."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### The Fool
 
 Use for direct requests to challenge ideas, plans, decisions, proposals, architectures, evidence, or assumptions. Also use as the configured post-plan challenge gate after other massa-ai workflows construct a plan.

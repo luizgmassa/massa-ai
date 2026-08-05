@@ -1,3 +1,11 @@
+---
+name: implementation-audit
+description: "Findings-only multi-lens audit of a concrete implementation target that dispatches child audit lenses and saves one durable report for implementation-fix."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Implementation Audit
 
 Findings-only multi-lens audit of a concrete implementation target: modified files, explicit files/globs, commit ranges, branch comparisons or PR diffs, modules/packages, symbols/classes/functions, feature/runtime flows, or an explicitly requested whole-repository sample.

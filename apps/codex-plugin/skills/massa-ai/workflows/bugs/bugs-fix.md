@@ -1,3 +1,11 @@
+---
+name: bugs-fix
+description: "Executes fixes from a saved bugs audit report; not for findings-only discovery, single known issues without a report, or broad product changes."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Bugs Fix
 
 Execute fixes from a bugs audit markdown report only.

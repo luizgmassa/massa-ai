@@ -121,8 +121,10 @@ jobs:
             apps/mcp-client/package.json
             apps/opencode-plugin/dist
             apps/opencode-plugin/agents
+            apps/opencode-plugin/agent-profiles
             apps/opencode-plugin/package.json
             apps/claude-plugin/agents
+            apps/claude-plugin/agent-profiles
             apps/claude-plugin/commands
             apps/claude-plugin/hooks
             apps/claude-plugin/skills
@@ -131,6 +133,7 @@ jobs:
             apps/claude-plugin/.claude-plugin/plugin.json
             apps/claude-plugin/package.json
             apps/codex-plugin/agents
+            apps/codex-plugin/agent-profiles
             apps/codex-plugin/hooks
             apps/codex-plugin/skills
             apps/codex-plugin/install.sh
@@ -138,6 +141,7 @@ jobs:
             apps/codex-plugin/.codex-plugin/plugin.json
             apps/codex-plugin/package.json
             apps/cursor-plugin/agents
+            apps/cursor-plugin/agent-profiles
             apps/cursor-plugin/hooks
             apps/cursor-plugin/skills
             apps/cursor-plugin/install.sh

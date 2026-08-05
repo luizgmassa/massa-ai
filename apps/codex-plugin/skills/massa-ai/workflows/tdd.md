@@ -1,3 +1,11 @@
+---
+name: tdd
+description: "Use this workflow to write a Technical Design Document once one product direction is selected and no unresolved API, data, security, or rollout decision blocks implementation."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### TDD (Technical Design Document)
 
 Use when the readiness checklist is true: one product direction is selected, a named requirements source exists, and no unresolved API, data, security/privacy, migration, rollout, or public compatibility decision blocks implementation design. Route unresolved proposals or competing directions to `workflows/rfc.md`, isolated finalized architecture decisions to `workflows/adr.md`, and broad requirements-to-delivery work to `workflows/spec-driven.md`.

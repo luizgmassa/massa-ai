@@ -249,10 +249,23 @@ if (typeof data.platforms !== "object" || data.platforms === null || Array.isArr
 data.version = 2;
 const prev = data.platforms[host];
 data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router"] };
-// The whole-record replace must not drop the plugin version record a previous
-// successful install wrote (R2) — re-attach it.
-if (prev && typeof prev === "object" && !Array.isArray(prev) && prev.plugin && typeof prev.plugin === "object") {
-  data.platforms[host].plugin = prev.plugin;
+// The whole-record replace must not drop fields a previous successful install
+// wrote (R2) — re-attach them. installRoute (T9) is installer-owned but
+// written by a LATER step of this same install (record_plugin_version), so it
+// must survive this earlier whole-record replace or the recorded route
+// silently vanishes on the next skills-bundling pass. modelProfile is
+// preserved defensively too, though the switch engine never targets Cursor
+// (every tier resolves to inherit — hosts.ts skips it unconditionally).
+if (prev && typeof prev === "object" && !Array.isArray(prev)) {
+  if (prev.plugin && typeof prev.plugin === "object") {
+    data.platforms[host].plugin = prev.plugin;
+  }
+  if (prev.modelProfile && typeof prev.modelProfile === "object") {
+    data.platforms[host].modelProfile = prev.modelProfile;
+  }
+  if (typeof prev.installRoute === "string") {
+    data.platforms[host].installRoute = prev.installRoute;
+  }
 }
 fs.mkdirSync(path.dirname(file), { recursive: true });
 fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
@@ -326,18 +339,25 @@ record_plugin_version() {
     return 0
   fi
 
-  local version installed_at
+  local version installed_at route
   version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$SCRIPT_DIR/package.json" | head -n 1)"
   installed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  # installRoute (T9, design F1): installer-owned, engine-read-only. Cursor
+  # has one install shape (file copy) and no marketplace distinction, so this
+  # is unconditionally "file" — recorded for data-model consistency with the
+  # other three hosts even though the switch engine never reads it for Cursor
+  # (hosts.ts skips Cursor unconditionally: every tier resolves to inherit).
+  # Written on EVERY install path.
+  route="file"
 
   # Tolerant of a corrupt/missing state file (rewrites a minimal valid one —
   # AC-8). A record-write failure warns but never fails the install: the next
   # run treats the host as unknown-version and reinstalls.
-  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" "$CURSOR_DIR" "$version" "$installed_at" <<'NODE' || \
+  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" "$CURSOR_DIR" "$version" "$installed_at" "$route" <<'NODE' || \
     echo "  ⚠ could not record the plugin version — next run will reinstall (unknown version)" >&2
 const fs = require("fs");
 const path = require("path");
-const [, , file, host, root, version, installedAt] = process.argv;
+const [, , file, host, root, version, installedAt, installRoute] = process.argv;
 let data = { version: 2, platforms: {} };
 try {
   const existing = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -354,6 +374,11 @@ const rec =
     ? data.platforms[host]
     : { root, skillsOwner: "plugin", skills: [] };
 rec.plugin = { version, installedAt };
+// installRoute is installer-owned (like plugin above); modelProfile is NEVER
+// written by any installer — the switch engine (packages/shared/src/
+// profile-switch/) is its sole writer (moot for Cursor in practice, since it
+// is always skipped, but the invariant holds repo-wide).
+rec.installRoute = installRoute;
 data.platforms[host] = rec;
 fs.mkdirSync(path.dirname(file), { recursive: true });
 fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");

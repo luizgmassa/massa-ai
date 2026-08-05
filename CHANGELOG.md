@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-08-05
+
+### Added
+
+- **Agent Skills metadata frontmatter on every workflow file.** All 36
+  `skills/massa-ai/workflows/**/*.md` files now open with YAML frontmatter modeled on the
+  Agent Skills specification (agentskills.io): `name` (file stem), a hand-authored
+  double-quoted `description` (what the workflow does + when to route to it),
+  `license: MIT`, and `metadata.version: "1.0.0"`. Prepend-only — every body is
+  byte-identical after stripping the block. A new gate,
+  `scripts/__tests__/workflow-metadata-headers.test.ts` (in `bun run test:scripts`),
+  parses each block with a real YAML parser (`Bun.YAML.parse`, never regex key-presence),
+  locks the 36-file population with a printed roster, and validates name charset/stem
+  match, description length 20–1024, semver `metadata.version`, and license. This test is
+  the sole backstop for workflow frontmatter — `skills.yml` CI validates `SKILL.md` files
+  only, and `generate-skill-artifacts.ts` byte-copies workflows into all four host
+  bundles, so an invalid block would otherwise ship unseen. The
+  `skills-duplication-metric` ceiling moved 331 → 471 with an in-file reason: the excess
+  is the mandated frontmatter uniformity itself (the same four structural lines × 36
+  files), not prose drift.
+
+- **Model-profile switching: switch installed agents to a registry profile without a
+  repo checkout.** One switch engine (`@massa-ai/shared`'s `packages/shared/src/profile-switch/`)
+  fronted by three surfaces — MCP tools (`profile_list`, `profile_set`), a `profile
+  list|show|set <name> [--host h] [--dry-run]` subcommand in both `massa-ai-config` CLIs
+  (mcp-client, opencode-plugin), and an OpenCode in-process `profile` tool — plus a Claude
+  skill (`/massa-ai:profile`, `skills/profile/`). Every registry profile now ships
+  pre-rendered inside each plugin bundle (`agent-profiles/<profile>/`, sibling of
+  `agents/`); switching copies the chosen profile's already-built files over the
+  installed active agent set, offline, on an npm-only install — no resolver, no repo
+  checkout, no network. The chosen profile is recorded per host in
+  `install-state.json` (`platforms[host].modelProfile`) and survives plugin upgrades; a
+  new `installRoute` field (installer-owned) lets the switch engine refuse loud on a
+  marketplace-route Claude/Codex install rather than risk dirtying a checkout. A host
+  session restart is required for a switch to take effect — no host supports per-agent
+  runtime indirection; this is switch-time re-render between sessions, not live
+  in-session switching (see the amended non-goal in
+  `.specs/features/model-profile-registry/spec.md`).
+
+## [1.25.0] - 2026-08-05
+
 ### Changed
 
 - **Persona routing chain cut from ~8k to ~2k tokens on a pinned project.**

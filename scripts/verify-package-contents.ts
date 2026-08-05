@@ -85,7 +85,12 @@ export const EXPECTED_PACKAGES: readonly PackageExpectation[] = [
     name: "@massa-ai/opencode-plugin",
     // "agents" here stands for the `agents/*.md` glob in package.json#files — npm packs
     // the matching files under an "agents/" top-level directory in the tarball.
-    requiredTopLevel: ["dist", "agents", "package.json"],
+    // "agent-profiles" (MPS-01/MPS-12) is the per-profile variant tree the switch
+    // engine's installer read-side copies from on a file-route install/upgrade — without
+    // it in publish.yml's artifact list AND package.json#files, an npm-only user's
+    // installer has nothing to switch to (same defect class this gate was built for:
+    // a declared glob that the artifact list silently never uploads).
+    requiredTopLevel: ["dist", "agents", "agent-profiles", "package.json"],
   },
   // apps/{claude,codex,cursor}-plugin (PDO-10, PDO-25) have NO dist/ — their entire
   // publishable surface is static source, so requiredTopLevel is exactly each
@@ -93,17 +98,17 @@ export const EXPECTED_PACKAGES: readonly PackageExpectation[] = [
   {
     dir: "apps/claude-plugin",
     name: "@massa-ai/claude-plugin",
-    requiredTopLevel: ["agents", "commands", "hooks", "skills", "install.sh", "README.md", ".claude-plugin", "package.json"],
+    requiredTopLevel: ["agents", "agent-profiles", "commands", "hooks", "skills", "install.sh", "README.md", ".claude-plugin", "package.json"],
   },
   {
     dir: "apps/codex-plugin",
     name: "@massa-ai/codex-plugin",
-    requiredTopLevel: ["agents", "hooks", "skills", "install.sh", "README.md", ".codex-plugin", "package.json"],
+    requiredTopLevel: ["agents", "agent-profiles", "hooks", "skills", "install.sh", "README.md", ".codex-plugin", "package.json"],
   },
   {
     dir: "apps/cursor-plugin",
     name: "@massa-ai/cursor-plugin",
-    requiredTopLevel: ["agents", "hooks", "skills", "install.sh", "README.md", ".cursor-plugin", "package.json"],
+    requiredTopLevel: ["agents", "agent-profiles", "hooks", "skills", "install.sh", "README.md", ".cursor-plugin", "package.json"],
   },
 ];
 

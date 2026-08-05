@@ -1,3 +1,11 @@
+---
+name: mobile-figma-audit
+description: "Findings-only audit comparing an existing mobile UI implementation against Figma MCP evidence for a concrete feature, file set, screen, or commit range; does not edit code."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Mobile Figma Audit
 
 Findings-only audit of whether an existing Android Views XML, Android Jetpack Compose, iOS UIKit, iOS SwiftUI, KMP Compose Multiplatform, or mixed KMP/native implementation matches a specific Figma design. It compares Figma MCP evidence with a concrete feature, file set, screen, class/composable/view, commit range, branch comparison, or modified-file target.

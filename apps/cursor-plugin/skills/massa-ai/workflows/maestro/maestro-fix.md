@@ -1,3 +1,11 @@
+---
+name: maestro-fix
+description: "Child-only workflow to fix confirmed MST-prefixed findings from a saved Maestro audit report or an explicit maestro-audit handoff."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Maestro Fix
 
 Child-only workflow: fix confirmed `MST-*` findings from a saved Maestro audit report or an explicit `maestro-audit` handoff.

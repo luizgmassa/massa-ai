@@ -272,6 +272,7 @@ describe("verifyPackageContents (end-to-end, PDO-26 AC10)", () => {
 
     const fullArtifactPaths = [
       "apps/claude-plugin/agents",
+      "apps/claude-plugin/agent-profiles",
       "apps/claude-plugin/commands",
       "apps/claude-plugin/hooks",
       "apps/claude-plugin/skills",
@@ -294,5 +295,38 @@ describe("verifyPackageContents (end-to-end, PDO-26 AC10)", () => {
     const result = diffInventory(claudePlugin, actualDropped);
     expect(result.ok).toBe(false);
     expect(result.missing).toEqual(["skills"]);
+  });
+
+  // T7 (MPS-01/MPS-12): agent-profiles is the switch engine's shipped variant tree —
+  // dropped from publish.yml's artifact list or a plugin's package.json#files, an
+  // npm-only user's installer has nothing to switch to (same defect shape as the
+  // opencode-plugin `agents` glob PDO-26 fixed). Observed red BEFORE requiredTopLevel
+  // gained "agent-profiles": a staged copy that has it (current reality, post-T7)
+  // reported an UNEXPECTED "agent-profiles" entry against the pre-fix expectation,
+  // exactly the "maintainer forgot to update requiredTopLevel after adding a new
+  // directory" shape — see this task's commit message for the captured red-state run.
+  test("mutation: a staged copy WITHOUT agent-profiles fails every one of the 4 plugin packages that require it", () => {
+    const variantShipping = EXPECTED_PACKAGES.filter((pkg) =>
+      pkg.requiredTopLevel.includes("agent-profiles"),
+    );
+    expect(variantShipping.map((pkg) => pkg.name).sort()).toEqual(
+      [
+        "@massa-ai/claude-plugin",
+        "@massa-ai/codex-plugin",
+        "@massa-ai/cursor-plugin",
+        "@massa-ai/opencode-plugin",
+      ].sort(),
+    );
+    for (const pkg of variantShipping) {
+      const withVariants = new Set(pkg.requiredTopLevel);
+      expect(diffInventory(pkg, withVariants).ok).toBe(true);
+
+      // Mutation: the staged copy (what publish.yml's artifact list actually
+      // produced) is missing agent-profiles — the pre-T7 / a regressed state.
+      const withoutVariants = new Set(pkg.requiredTopLevel.filter((e) => e !== "agent-profiles"));
+      const result = diffInventory(pkg, withoutVariants);
+      expect(result.ok).toBe(false);
+      expect(result.missing).toEqual(["agent-profiles"]);
+    }
   });
 });
