@@ -56,6 +56,19 @@ alter those spans).
 | Worker weakens a gate to pass | Charter forbids; verification-agent discrimination sensor; protected validation assets listed in worker packets |
 | validate_audit_report false-positives on the 9 existing report formats | Red-first tests include fixture reports (valid + each violation class) before wiring workflows |
 
+## Plan Challenge (full, pre_mortem, massa-ai-plan-critic, 2026-08-05)
+
+F1 high — content-coupled tests anchor skill prose via **regex literals**
+(`workflow-harness-contract.test.ts` → `root-cause-scripts.md`,
+`implementation-delivery.md`, `code-annotation.md`, `project-context.md`);
+string-literal-only scanner would miss them → T1 scanner extracts regex source
+too; T8–T11 name the coupled tests explicitly. F2 med — manual rule-survival
+diff too weak for AC S1.4 → scripted branch-term check added to T4; residual
+semantic-equivalence risk accepted and re-checked by verification-agent.
+F4 med — hand-authored fixtures can pass vacuously → T6 sources real report
+artifacts where available + parsed-population assertion. F3 low — ≥20% goal
+needs explicit MET/MISSED verdict in validation.md → T12. All folded.
+
 ## Verification Recipe
 
 Per task: targeted coupled tests + `bun scripts/generate-skill-artifacts.ts`

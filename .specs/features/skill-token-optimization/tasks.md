@@ -59,11 +59,16 @@ bun skills/massa-ai/scripts/check_specs_delivered.ts skill-token-optimization --
       repo; non-zero exit listing misses. Red-first: plant a bad path in a
       scratch copy, observe failure, remove.
 - [ ] `scripts/skill-protected-literals.ts`: scan `scripts/__tests__/*.ts`,
-      `scripts/lib/*.ts`, `skills/massa-ai/scripts/*.ts` for string literals
-      (≥12 chars) that occur in any skill `.md`; emit JSON `{file: [spans]}`.
-      Must list the known `spec-driven.md` validator anchors (observed-red
-      calibration: temporarily remove one anchor from a scratch copy and
-      confirm detection).
+      `scripts/lib/*.ts`, `skills/massa-ai/scripts/*.ts` for **string literals
+      AND regex-literal source text** (≥12 chars; regex source normalized —
+      escapes/`\s+` reduced to match-relevant words) that occur in any skill
+      `.md`; emit JSON `{file: [spans]}`. Must list the known `spec-driven.md`
+      validator anchors AND the `workflow-harness-contract.test.ts` regex
+      anchors (e.g. "two consecutive failed fix attempts" in
+      `root-cause-scripts.md`, "merge is never automatic" in
+      `implementation-delivery.md`) — Plan Challenge F1. Observed-red
+      calibration: temporarily remove one string anchor and one regex anchor
+      from scratch copies and confirm detection of both.
 - [ ] Test `scripts/__tests__/skill-doc-paths.test.ts` running the resolver
       repo-wide (green at HEAD).
 Tests: `scripts/__tests__/skill-doc-paths.test.ts` (new); observed-red calibration for both scripts
@@ -104,8 +109,12 @@ Gate: sensors green; regen + `--check` 0 in-commit.
       codebase-area, implementation-parent) into `references/audit-scope.md`
       as the single home; resolve conflicts in favor of the richer text.
 - [ ] The 6 `*-audit.md` files keep branch names + one pointer line each.
-Tests: rule-survival diff per scope branch (5 branches × 6 files vs single home)
-Gate: diffs rule-complete; regen + `--check` 0 in-commit.
+- [ ] Scripted branch-term check (Plan Challenge F2): extract per-branch
+      distinctive terms from the 6 pre-move blocks (T1 machinery); every term
+      present pre-move must be present post-move in `audit-scope.md` or the
+      pointer line; misses listed, each resolved or explicitly accepted.
+Tests: rule-survival diff per scope branch (5 branches × 6 files vs single home) + scripted branch-term check
+Gate: diffs rule-complete, term check clean-or-accepted; regen + `--check` 0 in-commit.
 
 ### T5: Misc high-value dedupes
 
@@ -137,7 +146,11 @@ Gate: tests green; regen + `--check` 0 in-commit.
       MST/MFM/implementation composite).
 - [ ] Red-first `scripts/__tests__/audit-report-validators.test.ts`: valid
       fixture + one fixture per violation class; observe red on planted
-      violations before wiring.
+      violations before wiring. Source at least one fixture per report family
+      from a real historical report artifact (`audits/**` or git history) when
+      one exists; hand-author only families with no real sample (Plan
+      Challenge F4 — vacuous-fixture guard: assert parsed finding count > 0
+      per fixture).
 - [ ] Wire `references/audit-report-io.md` + 9 `*-fix.md` workflows to run the
       script instead of inline checklist prose (removed, pointer retained).
 Tests: `scripts/__tests__/audit-report-validators.test.ts` — observed red on planted violations, then green
@@ -162,7 +175,7 @@ Gate: tests green; regen + `--check` 0.
 - [ ] Caveman-compress prose in every `skills/massa-ai/workflows/**/*.md`;
       byte-preserve code blocks, commands, YAML, dispatch blocks, tables,
       paths, protected literals (T1 inventory in packet). No `*.original.md`.
-Tests: coupled content-test set + `bun scripts/check-skill-doc-paths.ts`
+Tests: `bun test scripts/__tests__/workflow-harness-contract.test.ts scripts/__tests__/skills-harness-integrity.test.ts scripts/__tests__/validate-repository.test.ts scripts/__tests__/skill-size-budgets.test.ts` + `bun scripts/check-skill-doc-paths.ts` (Plan Challenge F1: named per-batch, not "coupled set")
 Gate: tests + resolver green; regen + `--check` 0 in-commit.
 
 ### T9: Compress references — top level (~40 files)
@@ -197,7 +210,8 @@ Gate: tests green; regen + `--check` 0 in-commit.
       `generate-skill-artifacts --check` 0, `test:plugins` if plugin bundles
       changed.
 - [ ] Scripted measurement: bytes per class at merge-base vs HEAD → recorded
-      for `validation.md`.
+      for `validation.md`, with the ≥20% goal stated as an explicit MET or
+      MISSED verdict line, not raw numbers alone (Plan Challenge F3).
 - [ ] CHANGELOG `[Unreleased]` entry; `.specs/project/STATE.md`,
       `.specs/project/FEATURES.json`, `.specs/HANDOFF.md` committed on branch;
       `check_specs_delivered.ts` green.
