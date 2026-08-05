@@ -482,15 +482,21 @@ describe("charter permission matches the shipped artifact", () => {
 // .specs/features/persona-agent-boundary/spec.md.
 
 describe("persona / sub-agent boundary", () => {
-  /** The three files that define the Capability Packet, by design (see design.md A1). */
+  /**
+   * The two files that define the Capability Packet, by design (see
+   * design.md A1). `skills/AGENTS.md` was a third copy; its recorded
+   * rationale ("installer copies it to hosts") was factually wrong —
+   * `install-skills.sh` extracts only the bootstrap block, so the registry
+   * never reaches hosts — and the mirror is deleted (see
+   * .specs/features/registry-cleanup-skill-imports/design.md D4).
+   */
   const PACKET_FILES = [
-    "AGENTS.md",
     path.join("massa-ai", "references", "agent-orchestration.md"),
     path.join("massa-ai", "references", "subagent-design.md"),
   ];
 
   /**
-   * The persona field's semantics, byte-identical across all three packet
+   * The persona field's semantics, byte-identical across both packet
    * copies. Uniform text is what makes a substring gate meaningful — a
    * per-file paraphrase cannot be distinguished from a weakened one.
    */
@@ -525,10 +531,13 @@ describe("persona / sub-agent boundary", () => {
   }
 
   /**
-   * Files whose persona prose must never grant authority. The three packet
+   * Files whose persona prose must never grant authority. The two packet
    * definitions join persona-router here: PE-02 left them presence-only, so a
    * contradicting sentence could be added to a *definition* — the worst place
-   * for one — and every gate would stay green.
+   * for one — and every gate would stay green. `AGENTS.md` is re-added
+   * directly (not spread from `PACKET_FILES`) so shrinking the packet-file
+   * list does not silently drop persona-authority prose scanning over the
+   * bootstrap Persona Router Policy the file still carries.
    */
   const AUTHORITY_SCANNED_FILES = [
     path.join("persona-router", "SKILL.md"),
@@ -536,6 +545,7 @@ describe("persona / sub-agent boundary", () => {
     // SKILL.md (persona-router-token-optimization T3); widened after a
     // seeded-red run proved the scanner reaches it.
     path.join("persona-router", "references", "routing-details.md"),
+    "AGENTS.md",
     ...PACKET_FILES,
   ];
 
@@ -574,7 +584,7 @@ describe("persona / sub-agent boundary", () => {
   }
 
   // PAB-01
-  test("all three Capability Packet copies declare the optional persona field", async () => {
+  test("both Capability Packet copies declare the optional persona field", async () => {
     const missing: string[] = [];
     for (const rel of PACKET_FILES) {
       const content = await read(path.join(SKILLS_DIR, rel));
@@ -585,13 +595,13 @@ describe("persona / sub-agent boundary", () => {
     expect(missing).toEqual([]);
   });
 
-  // PAB-01/AC3 — a fourth packet *definition* would fork the contract
+  // PAB-01/AC3 — a third packet *definition* would fork the contract
   // silently. Workflow dispatch blocks are packet *uses*, not definitions:
   // every `Dispatch:` block also carries this clause (see the dispatch
   // persona-emission describe block below), so this assertion strips
   // blockquote (`> `) lines — the format every dispatch block uses
   // exclusively — before scanning, isolating definitions from uses.
-  test("the canonical persona clause appears in exactly those three files, outside dispatch-block uses", async () => {
+  test("the canonical persona clause appears in exactly those two files, outside dispatch-block uses", async () => {
     const files = await skillMarkdownFiles();
     const found: string[] = [];
     for (const file of files) {
@@ -693,7 +703,7 @@ describe("persona / sub-agent boundary", () => {
   // Negative structural assertion — closes the contradiction-by-addition
   // residual accepted in design.md § Test design for cases 6, 8, 9, and PE-02
   // for cases 1 and 2. A future edit granting persona authority in the router
-  // OR in any of the three packet definitions now fails the gate, instead of
+  // OR in any of the two packet definitions now fails the gate, instead of
   // passing alongside the still-present denial prose.
   test("no file grants persona authority in prose", async () => {
     const offenders: string[] = [];
