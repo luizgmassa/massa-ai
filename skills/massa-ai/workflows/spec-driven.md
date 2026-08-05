@@ -2,9 +2,9 @@
 
 Use for explicit spec-driven requests and broad, ambiguous, migration-heavy, cross-boundary, public-contract, or long-running delivery that needs requirements-through-verification control. Ordinary localized fixes and clear small features stay in `debug`, `feature`, `refactor`, or `general` unless the user explicitly requests this workflow.
 
-Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit, and `references/repo-rules-discovery.md` to discover and enforce the target repository's own `.claude/`, `.cursor/`, and module/unit-test/testing-area conventions. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate), `references/code-annotation.md` (doc blocks, rationale, test coverage), and `references/repo-rules-discovery.md` (enforce the target repo's own `.claude/`/`.cursor/` and module/test conventions). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
 ## TLC v3 Flow
 
@@ -74,7 +74,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
 2. Restore context before planning:
    - `recall` for exact-session continuity, durable decisions, rejected approaches, patterns, blockers, and handoffs.
    - Load `references/spec-driven/artifact-store.md` before reading or writing feature registry, state, handoff, phase artifacts, validation reports, or lessons.
-   - Load `references/synapse-policy.md` when two or more related searches are expected. When the investigation involves multi-search, call `synapse_task_begin` with `id` (the `synapseSessionId`) and `taskContext` before the first search to open a task envelope; call `synapse_prefetch` with `id` and `filePath` after opening a file for deep investigation to warm the buffer; call `synapse_task_end` with `id` when the investigation phase completes. `synapse_task_begin`/`synapse_task_end` require an existing `synapse_session` id.
+   - Load `references/synapse-policy.md` when two or more related searches are expected. For multi-search investigations, run the Synapse task envelope per that reference: `synapse_task_begin` before the first search, `synapse_prefetch` on deep file open, `synapse_task_end` at completion (both `task` calls require an existing `synapse_session` id).
    - Load `references/context-firewall.md` before broad source inspection, generated reports, external research, or verbose tool output.
    - Keep the loaded context budget under the `references/spec-driven/context-limits.md` target; summarize or narrow before loading bulky artifacts.
    - Use `references/spec-driven/code-analysis.md` when source inspection needs structural search or tool fallback.

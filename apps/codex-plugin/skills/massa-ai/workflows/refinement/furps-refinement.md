@@ -2,7 +2,7 @@
 
 Findings-only refinement of a Product Requirements Document (PRD) and/or Architecture Decision Record (ADR) against the FURPS+ quality model, before implementation. It runs The Fool as an input-validation pre-pass, then fans out one sub-agent per FURPS+ dimension, and emits a structured refinement report with open questions, suggestions, insights, risks, and Definition-of-Ready coverage gaps.
 
-Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
 Not for authoring a new PRD (use `to-prd` or `spec-driven` Specify), authoring an ADR (use `adr`), proposing change (use `rfc`), auditing implementation against requirements (use `requirements-audit`), or auditing code/security/architecture. It refines the document itself; it does not edit code.
 

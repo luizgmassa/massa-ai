@@ -2,7 +2,7 @@
 
 Record a finalized or being-finalized architecture decision. Not for deciding among open options — route undecided proposals to `workflows/rfc.md`. Not for implementation planning — route that to `workflows/tdd.md`.
 
-Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
 1. Resolve/reuse `projectId` and `workflowSessionId`: `adr-[entity]`.
 2. Load shared references:

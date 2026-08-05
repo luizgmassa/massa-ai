@@ -2,7 +2,7 @@
 
 Use when a significant technical, process, product, vendor, tool, or policy decision is still open and stakeholders need a structured proposal before committing to a direction. Route a finalized architecture decision to `workflows/adr.md`, settled implementation design to `workflows/tdd.md`, and broad requirements-through-delivery work to `workflows/spec-driven.md`.
 
-Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
 ## Workflow
 

@@ -2,9 +2,9 @@
 
 Execute fixes from an architecture audit markdown report only.
 
-Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
 Not for findings-only architecture review — route to `workflows/architecture/architecture-audit.md`. Not for broad new design work with missing requirements — route to `workflows/spec-driven.md`.
 

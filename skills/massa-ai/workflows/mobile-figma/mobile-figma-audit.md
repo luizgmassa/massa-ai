@@ -2,7 +2,7 @@
 
 Findings-only audit of whether an existing Android Views XML, Android Jetpack Compose, iOS UIKit, iOS SwiftUI, KMP Compose Multiplatform, or mixed KMP/native implementation matches a specific Figma design. It compares Figma MCP evidence with a concrete feature, file set, screen, class/composable/view, commit range, branch comparison, or modified-file target.
 
-Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
 Do not edit code. Route direct design implementation to `design`. Not for Flutter, React Native, web styling, generic Figma exploration, or MCP troubleshooting.
 

@@ -2,7 +2,7 @@
 
 Findings-only bug discovery scoped to a concrete target: modified files, explicit files/globs, commit ranges, branch comparisons, modules/packages, symbols/classes/functions, feature/runtime flows, explicitly requested whole-repo scope, or an implementation scope packet supplied by `workflows/implementation/implementation-audit.md`.
 
-Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
 Not to fix a known broken behavior — route to `workflows/debug.md`. Not for SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or overengineering analysis — route to `workflows/code-quality/code-quality-audit.md`. For a multi-lens implementation review, route to `workflows/implementation/implementation-audit.md`. When invoked by implementation audit, this workflow is the Correctness lens only.
 

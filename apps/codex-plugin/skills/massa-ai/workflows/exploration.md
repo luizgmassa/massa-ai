@@ -2,7 +2,7 @@
 
 Use when the user wants to understand a codebase, module, data flow, runtime behavior, schema, dependency, or architecture area before asking for changes. Exploration is read-only: do not implement, refactor, rewrite docs, or mutate project files unless the user explicitly changes workflows or asks for edits.
 
-Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
 ## Golden Rules
 

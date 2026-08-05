@@ -2,7 +2,7 @@
 
 Findings-only audit of existing Maestro mobile E2E flows, fixtures, setup/teardown, reports, artifacts, CI invocation, selector stability, flake risk, and scenario coverage.
 
-Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
 Do not edit code or flows in this workflow. Not for new flow implementation — route to `workflows/maestro/maestro.md`. Do not fix findings directly; invoke `workflows/maestro/maestro-fix.md` as a bounded child workflow only after a saved audit report or audit handoff exists.
 

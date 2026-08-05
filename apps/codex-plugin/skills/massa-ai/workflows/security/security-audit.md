@@ -2,7 +2,7 @@
 
 Findings-only security review scoped to a concrete target: modified files, explicit files/globs, commit ranges, branch comparisons, modules/packages, symbols/classes/functions, feature/runtime flows, explicitly requested whole-repo scope, or an implementation scope packet supplied by `workflows/implementation/implementation-audit.md`.
 
-Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
 Not for generic correctness bugs — route to `workflows/bugs/bugs-audit.md`. Not for broad architecture, code quality, requirements, or test coverage audits — route to their dedicated workflows.
 

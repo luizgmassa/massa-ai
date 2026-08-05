@@ -2,7 +2,7 @@
 
 Use when the user wants to draft a commit message, prepare a commit, or commit current repository changes. Adapts the local caveman-commit rules into a safe Git workflow for changed files.
 
-Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
 Not for Jira ticket creation, release notes, changelogs, PR descriptions, or history rewriting. Route Jira issue work to `workflows/ticket.md`. Route broad release documentation to the relevant feature, RFC, or general workflow.
 

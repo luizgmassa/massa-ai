@@ -2,9 +2,9 @@
 
 Implement new Maestro mobile E2E flows from Jira/Confluence, prompt text, attached or local scenario files, or inferred scenarios when no explicit source is supplied.
 
-Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
 Not for findings-only review of existing flows — route to `workflows/maestro/maestro-audit.md`. Not to execute saved audit findings — route to `workflows/maestro/maestro-fix.md`. Not for app bug fixes or product behavior changes — route to `workflows/debug.md`, `workflows/feature.md`, or `workflows/requirements/requirements-audit.md`.
 

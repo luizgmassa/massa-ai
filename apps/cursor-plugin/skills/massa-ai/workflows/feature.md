@@ -2,9 +2,9 @@
 
 Use when the user wants to add a new capability, screen, command, integration, behavior, or user-facing improvement with clear intent or acceptance criteria. Not for broken behavior — route to `workflows/debug.md`. Not for broad, ambiguous, migration-heavy, or cross-boundary work — route to `workflows/spec-driven.md`.
 
-Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
+Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
 1. Resolve/reuse `projectId` and `workflowSessionId` (`feature-[entity]`)
 2. `recall` → load prior decisions and patterns for this area
@@ -25,7 +25,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - For Standard work or Quick work over 3 files/200 LOC, load `references/pr-task-fix.md`, run its ADR/TDD input gate, decompose work into Small-first independently buildable PR groups, and keep Medium groups only when splitting would break build, tests, UI, or review coherence.
 6. Follow the shared retrieval order from `references/codebase-investigation.md`
    to find related code; pass only `synapseSessionId` to
-   `search.sessionId`. When the investigation involves multi-search, call `synapse_task_begin` with `id` (the `synapseSessionId`) and `taskContext` before the first search to open a task envelope; call `synapse_prefetch` with `id` and `filePath` after opening a file for deep investigation to warm the buffer; call `synapse_task_end` with `id` when the investigation completes. `synapse_task_begin`/`synapse_task_end` require an existing `synapse_session` id.
+   `search.sessionId`. For multi-search investigations, run the Synapse task envelope per `references/synapse-policy.md`: `synapse_task_begin` before the first search, `synapse_prefetch` on deep file open, `synapse_task_end` at completion (both `task` calls require an existing `synapse_session` id).
 7. Follow existing patterns discovered from recall
 8. Establish the verification recipe before Standard edits and before Quick edits that touch validation assets, including file-integrity checks for tests, specs, benchmarks, fixtures, and snapshots used as validation assets
    - Include a focused naming review when the feature introduces or renames identifiers. New names should use domain or precise role vocabulary, and public/persisted names should not change without explicit compatibility handling.
