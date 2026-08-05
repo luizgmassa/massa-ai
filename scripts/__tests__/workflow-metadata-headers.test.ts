@@ -1,18 +1,20 @@
 /**
  * Workflow metadata-header gate (workflow-metadata-headers, WMH-03).
  *
- * The 36 workflow files under `skills/massa-ai/workflows/` carry Agent
+ * The 38 workflow files under `skills/massa-ai/workflows/` carry Agent
  * Skills-style YAML frontmatter (`name` / `description` / `license` /
  * `metadata.version`), mirroring the convention already used by every
  * SKILL.md in this repo. `skills.yml` CI validates only `SKILL.md`
  * frontmatter — this test is the sole backstop for `workflows/*.md`.
+ * License is normally `MIT`; imported third-party content that must keep
+ * its own attribution (skill-architect) may use `CC-BY-4.0` instead.
  *
  * Two structural rules (memory-lesson classes this repo has hit):
  * - The resolved file population is printed beside the verdict — a glob
  *   that resolves to nothing would otherwise be indistinguishable from a
  *   passing gate.
  * - An empty population FAILS, and the population is asserted to be
- *   exactly 36 (locked count) so a silently added/removed workflow file is
+ *   exactly 38 (locked count) so a silently added/removed workflow file is
  *   caught here rather than discovered elsewhere.
  *
  * Frontmatter is parsed with Bun's built-in real YAML parser
@@ -27,7 +29,7 @@ import path from "path";
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const WORKFLOWS_DIR = path.join(REPO_ROOT, "skills/massa-ai/workflows");
 
-const EXPECTED_WORKFLOW_COUNT = 36;
+const EXPECTED_WORKFLOW_COUNT = 38;
 
 const NAME_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
@@ -106,9 +108,13 @@ function checkFile(abs: string): FileCheck {
     }
   }
 
-  // license
-  if (fm.license !== "MIT") {
-    errors.push(`license: expected "MIT", got ${JSON.stringify(fm.license)}`);
+  // license — MIT is the repo default; CC-BY-4.0 is allowed for imported
+  // third-party content that must keep its own attribution (skill-architect).
+  const ALLOWED_LICENSES = ["MIT", "CC-BY-4.0"];
+  if (typeof fm.license !== "string" || !ALLOWED_LICENSES.includes(fm.license)) {
+    errors.push(
+      `license: expected one of ${JSON.stringify(ALLOWED_LICENSES)}, got ${JSON.stringify(fm.license)}`,
+    );
   }
 
   // metadata.version
