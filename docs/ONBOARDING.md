@@ -35,7 +35,7 @@ sessions, and costs less to run.
 | **ORM** | Prisma |
 | **Embeddings** | Ollama, `qwen3-embedding:8b` (4096-dim) |
 | **REST** | Elysia on :3333 — Swagger at `/swagger`, Web UI at `/ui` |
-| **MCP** | stdio server exposing 52 tools |
+| **MCP** | stdio server exposing 54 tools |
 | **Monorepo** | Turborepo; workspaces `packages/*` + `apps/*` |
 | **Graph size** | 1847 nodes, 4226 edges, 9 layers |
 
@@ -98,7 +98,7 @@ inventory of that structure, not a third statement of it.
 | **Test** (everywhere) | 371 | All test files. Kept as one cross-cutting layer because core's dominant test tree is **flat and unmirrored** (see below). |
 | **Shared Utility** (`packages/shared/src/`) | 18 | Cross-cutting logger, runtime config loader, env handling, shared types. Consumed by core *and* every transport. |
 | **REST API Transport** (`apps/tools-api/src/`) | 26 | Elysia server on :3333 — routes, middleware, startup/health wiring. Mounts the Web UI at `/ui`. |
-| **MCP Stdio Transport** (`apps/mcp-client/src/`) | 15 | MCP stdio server, 52 tools, tool-def JSON Schemas, and the dual-client contract. |
+| **MCP Stdio Transport** (`apps/mcp-client/src/`) | 15 | MCP stdio server, 54 tools, tool-def JSON Schemas, and the dual-client contract. |
 | **Auxiliary App Surfaces** | 9 | `apps/web-ui` static dashboard + `apps/opencode-plugin` in-process handlers. |
 
 ---
