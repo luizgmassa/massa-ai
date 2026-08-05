@@ -1,3 +1,11 @@
+---
+name: security-fix
+description: "Executes fixes from a saved security audit report; not for findings-only security review or generic correctness fixes outside an exploitable path."
+license: MIT
+metadata:
+  version: "1.0.0"
+---
+
 ### Security Fix
 
 Use this workflow only to execute fixes from a security audit markdown report.
