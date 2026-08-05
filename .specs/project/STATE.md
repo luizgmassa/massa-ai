@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Workflow Metadata Headers (Execute in progress — T1–T4 batch worker approved 2026-08-04)
+## Current — Workflow Metadata Headers (**VALIDATED PASS 2026-08-05** — T1–T4 done, 6/6 ACs, 5/5 mutants killed; T5 delivery in flight)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-workflow-metadata-headers` ·
   workflow: spec-driven (Medium) · persona: AI Engineer (pinned) · branch
