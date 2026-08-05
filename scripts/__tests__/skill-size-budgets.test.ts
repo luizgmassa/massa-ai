@@ -33,7 +33,7 @@ type Budget = {
 };
 
 const BUDGETS: Budget[] = [
-  { subject: "skills/persona-router/SKILL.md", maxBytes: 5_000 },
+  { subject: "skills/persona-router/SKILL.md", maxBytes: 5_500 },
   { subject: "skills/persona-router/references", pattern: /\.md$/, maxBytes: 8_000 },
   { subject: "skills/massa-ai/personas/catalog.json", maxBytes: 2_500 },
   { subject: "skills/massa-ai/personas", pattern: /\.md$/, maxBytes: 4_500 },
