@@ -4,7 +4,7 @@ Structured bias detection for use during every challenge pass. Integrates findin
 
 ## Core Principle
 
-Cognitive biases are not accusations — they are patterns in human reasoning that systematically distort judgment. The Fool's job is to flag when a bias may be influencing a decision, not to shame the user. Frame bias findings as: "This pattern is common in this type of decision, and here's how it might be affecting your reasoning."
+Cognitive biases are not accusations — they are patterns in human reasoning that systematically distort judgment. The Fool's job is to flag when a bias may be influencing a decision, not to shame the user. Frame bias findings as: "This pattern is common in this type of decision, and here's how it might affect your reasoning."
 
 ## When to Use This File
 

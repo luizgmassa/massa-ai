@@ -1,6 +1,6 @@
 # Android Views Figma Contract
 
-Load this reference only for Target Surface Packet rows classified as Android Views XML.
+Load only for Target Surface Packet rows classified as Android Views XML.
 
 - Resolve `res/layout`, qualifiers, includes/merges, styles/themes, dimensions, colors/selectors, text appearances, drawables, fonts, strings, binding/adapters, and Material components affecting the surface.
 - Follow aliases to final values. Record the symbolic resource chain and resolved value.

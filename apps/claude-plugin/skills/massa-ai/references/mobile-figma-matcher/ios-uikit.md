@@ -1,6 +1,6 @@
 # iOS UIKit Figma Contract
 
-Load this reference only for Target Surface Packet rows classified as iOS UIKit.
+Load only for Target Surface Packet rows classified as iOS UIKit.
 
 - Resolve storyboards, XIBs, programmatic views, view controllers, reusable views/cells, Auto Layout constraints, appearance APIs, trait-dependent resources, asset catalogs, fonts, strings, and state configuration.
 - Compare Figma coordinates with UIKit points, then account for device display scale only when validating rendered pixels.

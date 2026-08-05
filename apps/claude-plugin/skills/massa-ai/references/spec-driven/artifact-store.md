@@ -1,6 +1,6 @@
 # Spec-Driven Artifact Store
 
-Use this reference before any spec-driven workflow reads or writes feature registry, progress, handoff, phase artifacts, validation reports, or lessons. `.specs/` files are the canonical state layer for spec-driven logical artifacts.
+Use before any spec-driven workflow reads or writes feature registry, progress, handoff, phase artifacts, validation reports, or lessons. `.specs/` files are the canonical state layer for spec-driven logical artifacts.
 
 ## Source Of Truth
 

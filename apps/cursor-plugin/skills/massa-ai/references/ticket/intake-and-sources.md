@@ -1,6 +1,6 @@
 # Ticket Intake And Sources
 
-Use this reference from `workflows/ticket.md` before drafting. Gather only missing decisions, keep source roles explicit, and avoid repository-derived ticket conventions.
+Use from `workflows/ticket.md` before drafting. Gather only missing decisions, keep source roles explicit, and avoid repository-derived ticket conventions.
 
 ## Ordered Intake
 

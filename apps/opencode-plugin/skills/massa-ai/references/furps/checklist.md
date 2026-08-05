@@ -1,6 +1,6 @@
 # FURPS+ Refinement Checklist
 
-Use this reference from `workflows/refinement/furps-refinement.md` when analyzing a PRD and/or ADR against the FURPS+ quality model. One `furps-analyst` sub-agent loads only its assigned dimension section; the main agent loads the full file only when synthesizing or when no dimension split is used.
+Use from `workflows/refinement/furps-refinement.md` when analyzing a PRD and/or ADR against the FURPS+ quality model. One `furps-analyst` sub-agent loads only its assigned dimension section; the main agent loads the full file only when synthesizing or when no dimension split is used.
 
 ## Source
 

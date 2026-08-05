@@ -2,7 +2,7 @@
 
 The values below are starting reference values, not requirements. They are calibration anchors, not mandates. Treat every number as a starting-point reference to be confirmed against the project's own SLOs, load profile, and regulatory scope; override per project and record the override in the TDD. None of these tables restore a prescriptive count schema or a fixed section-count mandate.
 
-Load this reference only when the TDD's conditional concerns (rollback, rollout, latency, compliance) apply and the team needs a concrete starting point. It complements `references/tdd/document-contract.md` (which owns the Conditional Concerns trigger table) by giving example budgets; it does not replace project-verified SLOs or legal obligations.
+Load only when the TDD's conditional concerns (rollback, rollout, latency, compliance) apply and the team needs a concrete starting point. It complements `references/tdd/document-contract.md` (which owns the Conditional Concerns trigger table) by giving example budgets; it does not replace project-verified SLOs or legal obligations.
 
 ## Rollback-Trigger Table
 

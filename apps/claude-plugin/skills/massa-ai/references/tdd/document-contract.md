@@ -1,6 +1,6 @@
 # TDD Document Contract
 
-Load this reference when drafting or revising a TDD. Use the smallest set of sections that makes the design decision-complete; headings may be renamed to match the user's language and project conventions.
+Load when drafting or revising a TDD. Use the smallest set of sections that makes the design decision-complete; headings may be renamed to match the user's language and project conventions.
 
 ## Core Sections
 

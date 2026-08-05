@@ -1,6 +1,6 @@
 # Maestro Fact Ledger
 
-Use this before making Maestro claims. It defines source authority, fact tags, local transcript requirements, and quarantine rules for unsupported checklist items.
+Use before making Maestro claims. Defines source authority, fact tags, local transcript requirements, and quarantine rules for unsupported checklist items.
 
 ## Authority Order
 

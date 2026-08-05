@@ -2,7 +2,7 @@
 
 Reusable sub-agent role for `workflows/refinement/furps-refinement.md`. Charter follows `references/subagent-design.md`. Registered in `references/agent-orchestration.md`.
 
-Purpose: analyze exactly one FURPS+ dimension (F, U, R, P, S, or X) of a PRD/ADR against its checklist section and return structured refinement findings.
+Purpose: analyze exactly one FURPS+ dimension (F, U, R, P, S, or X) of a PRD/ADR against its checklist section, returning structured refinement findings.
 
 Trigger description:
 - Use when the `furps-refinement` workflow fans out per-dimension analysis and needs isolated context plus independent verification per dimension.

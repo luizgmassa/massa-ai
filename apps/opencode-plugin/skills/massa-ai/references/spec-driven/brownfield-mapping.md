@@ -1,6 +1,6 @@
 # Brownfield Onboarding — 7-Doc Codebase Mapping
 
-Use this reference from `workflows/spec-driven.md` when the target codebase
+Use from `workflows/spec-driven.md` when the target codebase
 has not yet been mapped (brownfield, new repo, or cold project). The map is
 the shared factual ground for requirements, design, and task derivation;
 each doc feeds a downstream phase.

@@ -1,6 +1,6 @@
 # Spec-Driven Validate
 
-Use this reference for the mandatory final Execute validation gate. This is not a separate phase — verification is part of every task's completion within Execute and runs automatically after the final task or inline step is complete.
+Use for the mandatory final Execute validation gate. This is not a separate phase — verification is part of every task's completion within Execute and runs automatically after the final task or inline step is complete.
 
 <!-- validator anchors: reject shallow assertions | payload/conjunction rule | per-task test adequacy review summary | fix-loop iteration count | 3 verification iterations -->
 

@@ -1,6 +1,6 @@
 # Maestro CLI And Device Reference
 
-Use this for CLI preflight, local command syntax, device/platform readiness, and local execution constraints.
+Use for CLI preflight, local command syntax, device/platform readiness, and local execution constraints.
 
 ## Mandatory Preflight
 

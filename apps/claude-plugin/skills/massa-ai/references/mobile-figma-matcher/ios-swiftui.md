@@ -1,6 +1,6 @@
 # iOS SwiftUI Figma Contract
 
-Load this reference only for Target Surface Packet rows classified as iOS SwiftUI.
+Load only for Target Surface Packet rows classified as iOS SwiftUI.
 
 - Resolve `View` composition, modifiers, layout containers, environment values, state selection, navigation entry, styles, asset catalogs, symbols, fonts, previews, accessibility modifiers, and UIKit hosting/interoperability affecting the surface.
 - Compare Figma coordinates with SwiftUI points, then account for display scale only for rendered-pixel evidence.

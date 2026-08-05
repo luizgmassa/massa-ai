@@ -1,6 +1,6 @@
 # Atlassian Ticket Execution
 
-Use this reference before any Atlassian tool call that reads creation metadata or mutates Jira.
+Use before any Atlassian tool call that reads creation metadata or mutates Jira.
 
 ## Capability Discovery
 

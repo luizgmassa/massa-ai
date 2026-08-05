@@ -187,10 +187,11 @@ Gate: same as T8.
 
 ### T10: Compress references — subdirectories (~47 files)
 
-- [ ] Requirement: STO-4
-- [ ] Same discipline over `skills/massa-ai/references/*/**.md`
+- [x] Requirement: STO-4
+- [x] Same discipline over `skills/massa-ai/references/*/**.md`
       (mobile-figma-matcher, the-fool, spec-driven, tdd, rfc, ticket, furps,
-      maestro).
+      maestro). 2 ATTRIBUTION.md files (mobile-figma-matcher, rfc) left
+      byte-identical by design — third-party license/attribution text.
 Tests: same as T8
 Gate: same as T8.
 

@@ -1,6 +1,6 @@
 # Design
 
-Use this reference when the spec-driven flow includes a Design phase. The output is `.specs/features/<slug>/design.md`. **Goal**: define HOW to build it — architecture, components, what to reuse.
+Use when the spec-driven flow includes a Design phase. The output is `.specs/features/<slug>/design.md`. **Goal**: define HOW to build it — architecture, components, what to reuse.
 
 **Skip this phase when:** The change is straightforward — no architectural decisions, no new patterns, no component interactions to plan. For simple features, design happens inline during Execute.
 

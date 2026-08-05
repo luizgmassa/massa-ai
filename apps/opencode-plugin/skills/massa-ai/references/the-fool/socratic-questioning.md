@@ -4,7 +4,7 @@ Structured question frameworks for exposing assumptions and deepening understand
 
 ## Core Principle
 
-Socratic questioning does not argue. It asks. The goal is to help the user discover gaps in their own reasoning by surfacing what they have not examined. Every question should create a moment of "I hadn't thought about that."
+Socratic questioning does not argue — it asks. The goal is to help the user discover gaps in their own reasoning by surfacing what they have not examined. Every question should create a moment of "I hadn't thought about that."
 
 The agent must never answer the questions itself. Present them, let the user sit with them.
 

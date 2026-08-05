@@ -1,6 +1,6 @@
 # Maestro Workspace And Execution Reference
 
-Use this when discovering Maestro roots, config files, tags, execution order, suite isolation, and CI invocation.
+Use when discovering Maestro roots, config files, tags, execution order, suite isolation, and CI invocation.
 
 ## Discovery
 

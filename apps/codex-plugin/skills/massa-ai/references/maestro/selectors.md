@@ -1,6 +1,6 @@
 # Maestro Selectors Reference
 
-Use this when choosing or auditing selectors. Official selector index: https://docs.maestro.dev/reference/selectors.md.
+Use when choosing or auditing selectors. Official selector index: https://docs.maestro.dev/reference/selectors.md.
 
 ## Source Basis
 

@@ -1,6 +1,6 @@
 # KMP Compose Multiplatform Figma Contract
 
-Load this reference only for shared Compose Multiplatform Target Surface Packet rows.
+Load only for shared Compose Multiplatform Target Surface Packet rows.
 
 - Resolve common composables, shared state, theme/design tokens, Compose resources, adaptive layout, accessibility semantics, platform adapters, and `expect`/`actual` declarations affecting presentation.
 - Keep business/domain behavior in established shared boundaries. Do not move platform-only UI behavior into common code merely to reduce duplication.

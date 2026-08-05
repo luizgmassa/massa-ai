@@ -4,7 +4,7 @@ Pre-mortem methodology (Gary Klein) with second-order thinking for identifying h
 
 ## Core Principle
 
-A pre-mortem inverts the question. Instead of "Will this work?" ask: **"It's 6 months from now and this has failed. Why?"** This psychological shift bypasses optimism bias by making failure the starting point, not the thing to be argued against.
+A pre-mortem inverts the question. Instead of "Will this work?" ask: **"It's 6 months from now and this has failed. Why?"** This psychological shift bypasses optimism bias by making failure the starting point, not the thing being argued against.
 
 Research shows prospective hindsight increases correct failure identification by 30% compared to asking "what could go wrong?" directly.
 

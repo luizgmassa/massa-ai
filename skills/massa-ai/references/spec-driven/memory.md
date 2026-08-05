@@ -1,6 +1,6 @@
 # Spec-Driven Memory And State
 
-Use this reference when recording decisions, progress, blockers, handoff, or completion evidence for a spec-driven feature.
+Use when recording decisions, progress, blockers, handoff, or completion evidence for a spec-driven feature.
 
 This memory layer is split across two artifacts with distinct lifecycles. Each has its own write triggers; writes are always section-scoped — never whole-file overwrites.
 

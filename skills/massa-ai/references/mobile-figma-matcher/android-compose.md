@@ -1,6 +1,6 @@
 # Android Jetpack Compose Figma Contract
 
-Load this reference only for Target Surface Packet rows classified as Android Jetpack Compose.
+Load only for Target Surface Packet rows classified as Android Jetpack Compose.
 
 - Resolve composables, modifiers, layout primitives, Material/theme tokens, typography, shapes, painters/assets, state holders, previews/providers, navigation entry, semantics, and test tags affecting the surface.
 - Distinguish Android-only Compose from Compose Multiplatform using module and source-set evidence.

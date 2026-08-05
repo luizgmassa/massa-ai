@@ -1,6 +1,6 @@
 # Spec-Driven Execute
 
-Use this reference for the required Execute phase. Implement ONE task at a time: surgical changes, verify, commit, repeat. Validation is the mandatory final Execute gate, not a separate phase.
+Use for the required Execute phase. Implement ONE task at a time: surgical changes, verify, commit, repeat. Validation is the mandatory final Execute gate, not a separate phase.
 
 <!-- validator anchors: evidence-or-zero mapping -->
 

@@ -1,6 +1,6 @@
 # Maestro MCP Reference
 
-Use this only when the task mentions Maestro MCP, agent/device automation through MCP tools, Maestro Viewer, or Cloud MCP tooling.
+Use only when the task mentions Maestro MCP, agent/device automation through MCP tools, Maestro Viewer, or Cloud MCP tooling.
 
 ## MCP Surface
 

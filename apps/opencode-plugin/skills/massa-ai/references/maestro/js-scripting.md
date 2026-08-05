@@ -1,6 +1,6 @@
 # Maestro JavaScript Reference
 
-Use this for `evalScript`, `runScript`, inline expressions, generated data, shared state, and JavaScript logging.
+Use for `evalScript`, `runScript`, inline expressions, generated data, shared state, and JavaScript logging.
 
 ## Execution Methods
 

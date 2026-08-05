@@ -1,6 +1,6 @@
 # Ticket Templates And Quality
 
-Use this reference when decomposing work, selecting prefixes, drafting descriptions, and validating the review artifact.
+Use when decomposing work, selecting prefixes, drafting descriptions, and validating the review artifact.
 
 ## Title Prefixes
 

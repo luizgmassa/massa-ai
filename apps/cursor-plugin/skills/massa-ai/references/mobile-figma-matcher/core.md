@@ -1,6 +1,6 @@
 # Mobile Figma Core
 
-Use this shared reference after `repository-detection.md` identifies one or more target surfaces. It defines Figma evidence, requirements boundaries, asset handling, mapping and comparison semantics, runtime evidence, and parity-claim limits. Load only the platform references named by the Target Surface Packet.
+Use after `repository-detection.md` identifies one or more target surfaces. Defines Figma evidence, requirements boundaries, asset handling, mapping and comparison semantics, runtime evidence, and parity-claim limits. Load only the platform references named by the Target Surface Packet.
 
 ## Boundaries
 
