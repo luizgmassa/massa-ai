@@ -1,8 +1,8 @@
 ### RFC (Request for Comments)
 
-Use this workflow when a significant technical, process, product, vendor, tool, or policy decision is still open and stakeholders need a structured proposal before committing to a direction. Route a finalized architecture decision to `workflows/adr.md`, settled implementation design to `workflows/tdd.md`, and broad requirements-through-delivery work to `workflows/spec-driven.md`.
+Use when a significant technical, process, product, vendor, tool, or policy decision is still open and stakeholders need a structured proposal before committing to a direction. Route a finalized architecture decision to `workflows/adr.md`, settled implementation design to `workflows/tdd.md`, and broad requirements-through-delivery work to `workflows/spec-driven.md`.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
 
 ## Workflow
 

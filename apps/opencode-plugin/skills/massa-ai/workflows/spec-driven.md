@@ -1,8 +1,8 @@
 ### Spec-Driven
 
-Use this workflow for explicit spec-driven requests and broad, ambiguous, migration-heavy, cross-boundary, public-contract, or long-running delivery that needs requirements-through-verification control. Ordinary localized fixes and clear small features stay in `debug`, `feature`, `refactor`, or `general` unless the user explicitly requests this workflow.
+Use for explicit spec-driven requests and broad, ambiguous, migration-heavy, cross-boundary, public-contract, or long-running delivery that needs requirements-through-verification control. Ordinary localized fixes and clear small features stay in `debug`, `feature`, `refactor`, or `general` unless the user explicitly requests this workflow.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
 
 Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit, and `references/repo-rules-discovery.md` to discover and enforce the target repository's own `.claude/`, `.cursor/`, and module/unit-test/testing-area conventions. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
 
@@ -40,7 +40,7 @@ Complexity determines depth, not a fixed pipeline. Assess scope first, apply onl
 | Large | >10 tasks OR multi-component feature | Full spec + requirement IDs | Architecture + components | Full breakdown + deps | Implement + verify per task |
 | Complex | Ambiguity or new domain (unfamiliar vocabulary, no prior pattern) | Full spec + discuss gray areas | Research + architecture | Breakdown + phase plan | Implement + interactive UAT |
 
-A "Phase" is an ordered group of Tasks sharing a dependency boundary or a checkpoint commit — it is distinct from a single Task or atomic step. Report sizing in the uniform vocabulary: `1 Phase = X Tasks`; the whole plan is `Y Phases = Z Tasks`. The sub-agent offer fires when a formal `tasks.md` has more than 3 Tasks — packing itself still uses ~7-Task Phase groups; a 4–8-Task feature is offered as a single Phase-group worker.
+A "Phase" is an ordered group of Tasks sharing a dependency boundary or a checkpoint commit — distinct from a single Task or atomic step. Report sizing in the uniform vocabulary: `1 Phase = X Tasks`; the whole plan is `Y Phases = Z Tasks`. The sub-agent offer fires when a formal `tasks.md` has more than 3 Tasks — packing itself still uses ~7-Task Phase groups; a 4–8-Task feature is offered as a single Phase-group worker.
 
 - Specify and Execute are always required.
 - Design is skipped when straightforward (no architectural decisions, no new patterns).
@@ -50,7 +50,7 @@ A "Phase" is an ordered group of Tasks sharing a dependency boundary or a checkp
 
 ## Quick Mode Guardrails
 
-Quick mode is the Small/auto-sized path: a single change touching **max 3 files** with no new dependency and no design decision. It is the fast lane, not a parallel pipeline — it still closes requirements and runs the Execute gate.
+Quick mode is the Small/auto-sized path: a single change touching **max 3 files** with no new dependency and no design decision. Fast lane, not a parallel pipeline — it still closes requirements and runs the Execute gate.
 
 Enter Quick mode only when **all** hold:
 
@@ -116,7 +116,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
     - The verification-agent re-derives coverage independently using evidence-or-zero and does not inherit the author's mental model.
    - The fix → re-verify loop is capped at 3 iterations before escalating to `Blocked`.
    - Distill lesson signals through `references/lessons.md` when validation produces grounded reusable failures.
-7. Before the delivery chain's Propose stage (PR creation), write and commit `.specs/project/STATE.md`, `.specs/HANDOFF.md`, and `.specs/project/FEATURES.json` on the branch — not merely "after meaningful progress" during Execute, but committed before `gh pr create`. **Deterministic backing (run it, do not eyeball it):** `bun skills/massa-ai/scripts/check_specs_delivered.ts <feature> [--root .]` — a non-zero exit blocks Propose (see `references/implementation-delivery.md` stage 3.5 and GATE-02). If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved). Record `references/spec-driven/memory.md` decisions, blockers, handoff, and completion evidence per that reference's write triggers.
+7. Before the delivery chain's Propose stage (PR creation), write and commit `.specs/project/STATE.md`, `.specs/HANDOFF.md`, and `.specs/project/FEATURES.json` on the branch — not merely "after meaningful progress" during Execute, but committed before `gh pr create`. **Deterministic backing (run it, do not eyeball it):** `bun skills/massa-ai/scripts/check_specs_delivered.ts <feature> [--root .]` — a non-zero exit blocks Propose (see `references/implementation-delivery.md` stage 3.5 and GATE-02). If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved). Record decisions, blockers, handoff, and completion evidence per `references/spec-driven/memory.md`'s write triggers.
 8. When the user splits planning and implementation across clean chats, resume from the canonical `.specs/` artifacts — `.specs/project/STATE.md`, `.specs/project/FEATURES.json`, `.specs/HANDOFF.md`, and the feature's phase files. This workflow owns the spec phase contracts on both sides of the split; there is no separate save/load procedure.
 9. Complete the configured Plan Challenge Gate for non-trivial plans and complete `references/evidence-gate.md` before claiming completion.
 
@@ -165,7 +165,7 @@ Step 5: Flag as uncertain → "I'm not certain about X — here's my reasoning, 
 
 ## Brownfield Onboarding — 7-Doc Codebase Mapping
 
-When the spec-driven work targets a codebase the agent has not yet mapped (brownfield, new repo, or cold project), derive the 7-doc codebase map from `references/spec-driven/brownfield-mapping.md` before Specify closes; it is not busywork — each doc feeds a downstream phase.
+When the spec-driven work targets a codebase the agent has not yet mapped (brownfield, new repo, or cold project), derive the 7-doc codebase map from `references/spec-driven/brownfield-mapping.md` before Specify closes — not busywork, each doc feeds a downstream phase.
 
 Minimum bar: derive at least **`CONCERNS.md`** (risk surface — drives risk-domain escalation and validation focus) and **`TESTING.md`** (gate derivation — exact commands the Execute gate will run). If time or access is constrained, these two are non-negotiable; the other five are derived as the work needs them. Record the map under `.specs/features/<slug>/` (or the project onboarding dir) and confirm it against current source, not memory or external summaries.
 

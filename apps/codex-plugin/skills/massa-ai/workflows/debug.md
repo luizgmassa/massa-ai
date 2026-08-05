@@ -1,8 +1,8 @@
 ### 🔴 Debug
 
-Use this workflow when the user reports broken behavior, failures, regressions, crashes, unexpected output, flaky behavior, or any issue that needs evidence-backed root-cause diagnosis before a fix. Do not use it for new capabilities; route that to `workflows/feature.md`. Do not use it for broad redesign or unclear cross-boundary changes; route that to `workflows/spec-driven.md`.
+Use when the user reports broken behavior, failures, regressions, crashes, unexpected output, flaky behavior, or any issue needing evidence-backed root-cause diagnosis before a fix. Not for new capabilities — route to `workflows/feature.md`. Not for broad redesign or unclear cross-boundary changes — route to `workflows/spec-driven.md`.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
 
 Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
 

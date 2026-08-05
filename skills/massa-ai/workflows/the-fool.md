@@ -1,10 +1,10 @@
 ### The Fool
 
-Use this workflow for direct requests to challenge ideas, plans, decisions, proposals, architectures, evidence, or assumptions. Also use it as the configured post-plan challenge gate after other massa-ai workflows construct a plan.
+Use for direct requests to challenge ideas, plans, decisions, proposals, architectures, evidence, or assumptions. Also use as the configured post-plan challenge gate after other massa-ai workflows construct a plan.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
 
-Do not use this workflow to build the initial plan, make the decision, or execute implementation work. It critiques and strengthens existing thinking.
+Not to build the initial plan, make the decision, or execute implementation work. It critiques and strengthens existing thinking.
 
 ## Configuration
 

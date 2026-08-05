@@ -1,12 +1,12 @@
 ### Architecture Audit
 
-Use this workflow for findings-only audit of domain boundaries, bounded contexts, DDD strategic design, coupling, dependency health, architecture review, deepening opportunities, seams, adapters, module depth, and architecture-focused refactor planning in a concrete target: modified files, explicit files/globs, commit ranges, branch comparisons, modules/packages, symbols/classes/functions, feature/runtime flows, explicitly requested whole-repo scope, or an implementation scope packet supplied by `workflows/implementation/implementation-audit.md`.
+Findings-only audit of domain boundaries, bounded contexts, DDD strategic design, coupling, dependency health, architecture review, deepening opportunities, seams, adapters, module depth, and architecture-focused refactor planning, scoped to a concrete target: modified files, explicit files/globs, commit ranges, branch comparisons, modules/packages, symbols/classes/functions, feature/runtime flows, explicitly requested whole-repo scope, or an implementation scope packet supplied by `workflows/implementation/implementation-audit.md`.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
 
-Do not use this workflow for plain SOLID, Clean Code, KISS, YAGNI, DRY, or code smell scans; use `workflows/code-quality/code-quality-audit.md` for those.
+Not for plain SOLID, Clean Code, KISS, YAGNI, DRY, or code smell scans — use `workflows/code-quality/code-quality-audit.md` for those.
 
-This workflow is findings-only. Do not edit code unless the user separately asks for fixes.
+Findings-only: do not edit code unless the user separately asks for fixes.
 
 1. Resolve/reuse `workflowSessionId`: `architecture-[entity]`
 2. Load shared references:
@@ -36,7 +36,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - Build the shared scope packet from `references/audit-scope.md` and carry it into the report.
 5. Resolve the selected branch's mechanics (modified files, commit range, codebase area, explicit-files/branch/symbol/feature/whole-repo, or implementation parent scope) per `references/audit-scope.md` (Lens Audit Scope Resolution Procedure, Architecture row of Per-Lens Scope Deltas).
 6. Investigation pass:
-   - Call `get_architecture` with `id` (projectId) for the architecture-specific deep map: packages, entry points, routes, hotspots, communities, layers, and opt-in cycles (pass `aspects:["cycles"]` for Tarjan SCC over CALL edges). `get_architecture` is distinct from `project_map` (general overview: PageRank backbone + symbol counts) — use `get_architecture` for architecture-specific structure and `project_map` for the general overview. Both only count as evidence when the index is fresh for the current repository path and commit/worktree state; fall back to `search`/`get_references` and record reduced retrieval confidence when the index is stale or unavailable.
+   - Call `get_architecture` with `id` (projectId) for the architecture-specific deep map: packages, entry points, routes, hotspots, communities, layers, and opt-in cycles (pass `aspects:["cycles"]` for Tarjan SCC over CALL edges). `get_architecture` differs from `project_map` (general overview: PageRank backbone + symbol counts) — use `get_architecture` for architecture-specific structure, `project_map` for the general overview. Both count as evidence only when the index is fresh for the current repository path and commit/worktree state; otherwise fall back to `search`/`get_references` and record reduced retrieval confidence.
    - Call `impact_analysis` with `project`, `projectPath`, and `scope` (unstaged/staged/committed/all) to assess the centrality-ranked blast radius of a change set. An empty diff returns an empty impact set (not an error).
    - Apply the smallest relevant lens set from `references/architecture-lenses.md` and load detail references only when their evidence is needed:
      - Domain lens: subdomains, bounded contexts, ubiquitous language, cohesion score, colliding concepts, cross-domain ownership, and integration pattern fit.
@@ -53,7 +53,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - Do not report strong coupling as a defect when strength is local, stable, or cohesive and no change friction is shown.
    - Do not recommend ports/adapters, service extraction, VSA migration, or new seams unless evidence shows real variation, volatility, external dependency pressure, or boundary friction.
    - Drop candidates disproven by evidence, downgrade candidates with partial mitigation, and mark judgment-heavy conclusions as `suspect`.
-   - When you reject a refactor candidate, record its load-bearing reason in ruled-out candidates; if it is likely to be re-proposed, offer an ADR via `workflows/adr.md` so the rejection is not re-litigated next audit.
+   - When you reject a refactor candidate, record its load-bearing reason in ruled-out candidates; if likely to be re-proposed, offer an ADR via `workflows/adr.md` so the rejection is not re-litigated next audit.
 8. Use agent orchestration only when it improves signal. Dispatch per `references/agent-orchestration.md`:
 
 > **Dispatch: `massa-ai-architecture-specialist`** (role: `architecture-specialist`) — charter `skills/agents/architecture-specialist/SKILL.md`
@@ -88,7 +88,7 @@ This workflow is findings-only. Do not edit code unless the user separately asks
    - Mark uncertain or judgment-heavy conclusions as `suspect`.
    - Do not relitigate ADR-backed decisions unless current evidence shows real friction worth reopening.
    - Prefer merge, inline, move, or clarify-seam recommendations before adding new abstractions.
-   - Include lens-specific evidence in existing fields: domain findings should name language/cohesion/integration evidence; coupling findings should name strength/distance/volatility and dependency direction; deepening findings should name interface complexity, deletion-test result, dependency category, and test-surface impact.
+   - Include lens-specific evidence in existing fields: domain findings name language/cohesion/integration evidence; coupling findings name strength/distance/volatility and dependency direction; deepening findings name interface complexity, deletion-test result, dependency category, and test-surface impact.
    - If no architecture findings are found, say that clearly and list scope checked plus skipped checks.
    - Include ruled-out candidates when they were plausible enough to matter.
    - Include scope checked, deterministic evidence or skipped-check notes, memory outcome, and residual risk.

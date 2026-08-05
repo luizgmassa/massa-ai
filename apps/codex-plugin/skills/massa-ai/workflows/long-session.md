@@ -1,8 +1,8 @@
 ### 🟠 Long Session (Context Growing Large)
 
-Use this workflow when the user asks for same-session handoff/continuation/safe stopping, work remains unfinished at session end, context budget falls below 40% remaining, context usage reaches 60% with more than one PR group/task still open, or verbose source/log/research context is reducing execution quality. Preserve the exact existing `projectId` and `workflowSessionId`; this workflow packages continuity rather than starting a new task. Do not persist an ephemeral `synapseSessionId` as continuation state.
+Use when the user asks for same-session handoff/continuation/safe stopping, work remains unfinished at session end, context budget falls below 40% remaining, context usage reaches 60% with more than one PR group/task still open, or verbose source/log/research context is reducing execution quality. Preserve the exact existing `projectId` and `workflowSessionId`; this workflow packages continuity rather than starting a new task. Do not persist an ephemeral `synapseSessionId` as continuation state.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
 
 This workflow owns the Session Guide. Canonical resumable state still lives in `.specs/` files — `.specs/project/FEATURES.json`, `.specs/project/STATE.md`, `.specs/HANDOFF.md`, and `.specs/features/<slug>/` — and the Session Guide points at them rather than restating or replacing them.
 

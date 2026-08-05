@@ -171,8 +171,8 @@ Gate: tests green; regen + `--check` 0.
 
 ### T8: Compress workflows (36 files)
 
-- [ ] Requirement: STO-4
-- [ ] Caveman-compress prose in every `skills/massa-ai/workflows/**/*.md`;
+- [x] Requirement: STO-4
+- [x] Caveman-compress prose in every `skills/massa-ai/workflows/**/*.md`;
       byte-preserve code blocks, commands, YAML, dispatch blocks, tables,
       paths, protected literals (T1 inventory in packet). No `*.original.md`.
 Tests: `bun test scripts/__tests__/workflow-harness-contract.test.ts scripts/__tests__/skills-harness-integrity.test.ts scripts/__tests__/validate-repository.test.ts scripts/__tests__/skill-size-budgets.test.ts` + `bun scripts/check-skill-doc-paths.ts` (Plan Challenge F1: named per-batch, not "coupled set")

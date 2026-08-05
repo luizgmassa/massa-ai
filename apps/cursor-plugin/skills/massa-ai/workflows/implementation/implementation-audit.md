@@ -1,10 +1,10 @@
 ### Implementation Audit
 
-Use this workflow for a findings-only multi-lens audit of a concrete implementation target: modified files, explicit files/globs, commit ranges, branch comparisons or PR diffs, modules/packages, symbols/classes/functions, feature/runtime flows, or an explicitly requested whole-repository sample.
+Findings-only multi-lens audit of a concrete implementation target: modified files, explicit files/globs, commit ranges, branch comparisons or PR diffs, modules/packages, symbols/classes/functions, feature/runtime flows, or an explicitly requested whole-repository sample.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
 
-Do not use this parent workflow when the user wants only one audit lens; route directly to that lens. Do not edit code. This workflow resolves one shared implementation scope packet, dispatches selected child lenses, and saves one durable report for `workflows/implementation/implementation-fix.md`.
+Not for a single requested audit lens — route directly to that lens. Do not edit code. This workflow resolves one shared implementation scope packet, dispatches selected child lenses, and saves one durable report for `workflows/implementation/implementation-fix.md`.
 
 1. Resolve/reuse `workflowSessionId`: `implementation-audit-[entity]`.
 2. Load shared references:

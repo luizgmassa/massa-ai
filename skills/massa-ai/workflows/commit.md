@@ -1,10 +1,10 @@
 ### Commit
 
-Use this workflow when the user wants to draft a commit message, prepare a commit, or commit current repository changes. This workflow adapts the local caveman-commit rules into a safe Git workflow for changed files.
+Use when the user wants to draft a commit message, prepare a commit, or commit current repository changes. Adapts the local caveman-commit rules into a safe Git workflow for changed files.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
 
-Do not use this workflow for Jira ticket creation, release notes, changelogs, PR descriptions, or history rewriting. Route Jira issue work to `workflows/ticket.md`. Route broad release documentation to the relevant feature, RFC, or general workflow.
+Not for Jira ticket creation, release notes, changelogs, PR descriptions, or history rewriting. Route Jira issue work to `workflows/ticket.md`. Route broad release documentation to the relevant feature, RFC, or general workflow.
 
 ## Workflow
 
@@ -16,8 +16,8 @@ Do not use this workflow for Jira ticket creation, release notes, changelogs, PR
    - unstaged changed paths from `git diff --name-only`
    - status summary from `git status --short`
    - staged diff when anything is staged; otherwise the unstaged diff for allowed paths
-4. Extract the first Jira key from the branch with case-insensitive regex `(?<![A-Z0-9])([A-Z][A-Z0-9]{1,9}-[0-9]+)(?![A-Z0-9])`. Normalize the key to uppercase. If no key is found, proceed without a prefix and do not ask. When an explicit task key is supplied (from `workflows/ticket.md` for phased work, or by the user), it takes precedence over the branch-derived key.
-   - **Phased work — one commit per task, prefixed with the task's sub-task key.** When committing phased work sourced from `workflows/ticket.md`, each Task inside a Phase/Wave is exactly **one atomic commit** (never batched; the one-commit-per-task cadence is owned by the Implementation Delivery Protocol, Stage 2). That commit's subject is prefixed with the Task's Jira **sub-task** key as `[XXX-YYYY]`, for example `[SA-142] feat(auth): reject expired tokens`. The prefix format is the same `[<KEY>] ` rule below; the sub-task key simply replaces the generic branch key.
+4. Extract the first Jira key from the branch with case-insensitive regex `(?<![A-Z0-9])([A-Z][A-Z0-9]{1,9}-[0-9]+)(?![A-Z0-9])`. Normalize to uppercase. If no key is found, proceed without a prefix and do not ask. An explicit task key (from `workflows/ticket.md` for phased work, or from the user) takes precedence over the branch-derived key.
+   - **Phased work — one commit per task, prefixed with the task's sub-task key.** When committing phased work sourced from `workflows/ticket.md`, each Task inside a Phase/Wave is exactly **one atomic commit** (never batched; the one-commit-per-task cadence is owned by the Implementation Delivery Protocol, Stage 2). Prefix that commit's subject with the Task's Jira **sub-task** key as `[XXX-YYYY]`, e.g. `[SA-142] feat(auth): reject expired tokens` — same `[<KEY>] ` rule below, sub-task key replacing the generic branch key.
 5. Resolve commit scope:
    - If files are already staged, treat staged files as the user-selected commit scope and do not stage additional files.
    - If nothing is staged and the user explicitly asked to commit, stage only allowed changed files one path at a time with pathspec-safe commands.

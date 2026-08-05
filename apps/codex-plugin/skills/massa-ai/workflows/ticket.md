@@ -1,8 +1,8 @@
 ### Ticket
 
-Use this workflow when the user wants to draft, review, create, or resume creation of Jira Epics, standard issues, or sub-tasks. Jira through Atlassian MCP is the only tracker and mutation path. Do not use Jira CLI, browser automation, another tracker, or repository backlog files as fallbacks.
+Use when the user wants to draft, review, create, or resume creation of Jira Epics, standard issues, or sub-tasks. Jira through Atlassian MCP is the only tracker and mutation path. Do not use Jira CLI, browser automation, another tracker, or repository backlog files as fallbacks.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
 
 ## Workflow
 

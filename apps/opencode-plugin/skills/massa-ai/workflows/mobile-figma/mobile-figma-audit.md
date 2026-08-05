@@ -1,10 +1,10 @@
 ### Mobile Figma Audit
 
-Use this workflow for a findings-only audit of whether an existing Android Views XML, Android Jetpack Compose, iOS UIKit, iOS SwiftUI, KMP Compose Multiplatform, or mixed KMP/native implementation matches a specific Figma design. It compares Figma MCP evidence with a concrete feature, file set, screen, class/composable/view, commit range, branch comparison, or modified-file target.
+Findings-only audit of whether an existing Android Views XML, Android Jetpack Compose, iOS UIKit, iOS SwiftUI, KMP Compose Multiplatform, or mixed KMP/native implementation matches a specific Figma design. It compares Figma MCP evidence with a concrete feature, file set, screen, class/composable/view, commit range, branch comparison, or modified-file target.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
 
-Do not edit code. Route direct design implementation to `design`. Do not use this workflow for Flutter, React Native, web styling, generic Figma exploration, or MCP troubleshooting.
+Do not edit code. Route direct design implementation to `design`. Not for Flutter, React Native, web styling, generic Figma exploration, or MCP troubleshooting.
 
 1. Resolve/reuse `workflowSessionId`: `mobile-figma-audit-[entity]`.
 2. Load shared references:

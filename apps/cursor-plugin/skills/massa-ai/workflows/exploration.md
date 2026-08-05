@@ -1,20 +1,20 @@
 ### 🔵 Exploration
 
-Use this workflow when the user wants to understand a codebase, module, data flow, runtime behavior, schema, dependency, or architecture area before asking for changes. Exploration is read-only: do not implement, refactor, rewrite docs, or mutate project files unless the user explicitly changes workflows or asks for edits.
+Use when the user wants to understand a codebase, module, data flow, runtime behavior, schema, dependency, or architecture area before asking for changes. Exploration is read-only: do not implement, refactor, rewrite docs, or mutate project files unless the user explicitly changes workflows or asks for edits.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
 
 ## Golden Rules
 
 Inviolable across every exploration:
 
-1. **Never assume or invent.** Uncertainty is always preferable to fabrication; invented APIs, symbols, or patterns cascade into wrong answers.
+1. **Never assume or invent.** Uncertainty always beats fabrication; invented APIs, symbols, or patterns cascade into wrong answers.
 2. **Deserves-a-note.** When understanding is worth persisting, record what is durable — not trivia.
 3. **Pointers, not copies.** Link/reference source (`path`, symbol, line); do not duplicate bulk content into notes or reports.
 4. **Surgical precision.** Make the smallest sufficient change; in Exploration, that usually means the smallest sufficient read set.
 5. **Verify against source.** Treat indexed context, memories, and external summaries as leads until confirmed against current source.
 
-Write and search in the user's human language. Match the language of the user's prompt for explanations, notes, and questions; match the language of the codebase for identifiers, paths, and commands.
+Write and search in the user's human language. Match the user's prompt language for explanations, notes, and questions; match the codebase's language for identifiers, paths, and commands.
 
 ## Knowledge Verification Chain
 

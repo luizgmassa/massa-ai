@@ -1,12 +1,12 @@
 ### Bugs Audit
 
-Use this workflow for findings-only bug discovery in a concrete target: modified files, explicit files/globs, commit ranges, branch comparisons, modules/packages, symbols/classes/functions, feature/runtime flows, explicitly requested whole-repo scope, or an implementation scope packet supplied by `workflows/implementation/implementation-audit.md`.
+Findings-only bug discovery scoped to a concrete target: modified files, explicit files/globs, commit ranges, branch comparisons, modules/packages, symbols/classes/functions, feature/runtime flows, explicitly requested whole-repo scope, or an implementation scope packet supplied by `workflows/implementation/implementation-audit.md`.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
 
-Do not use this workflow to fix a known broken behavior; route that to `workflows/debug.md`. Do not use it for SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or overengineering analysis; route that to `workflows/code-quality/code-quality-audit.md`. For a multi-lens implementation review, route to `workflows/implementation/implementation-audit.md`. When invoked by implementation audit, this workflow is the Correctness lens only.
+Not to fix a known broken behavior — route to `workflows/debug.md`. Not for SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or overengineering analysis — route to `workflows/code-quality/code-quality-audit.md`. For a multi-lens implementation review, route to `workflows/implementation/implementation-audit.md`. When invoked by implementation audit, this workflow is the Correctness lens only.
 
-This workflow is findings-only. Do not edit code unless the user separately asks for fixes.
+Findings-only: do not edit code unless the user separately asks for fixes.
 
 1. Resolve/reuse `workflowSessionId`: `bugs-audit-[entity]`
 2. Load shared references:

@@ -1,12 +1,12 @@
 ### Architecture Fix
 
-Use this workflow only to execute fixes from an architecture audit markdown report.
+Execute fixes from an architecture audit markdown report only.
 
-Before the first substantive read, load `references/project-context.md` and run the project-context intake sweep for this repository.
+Before the first substantive read, load `references/project-context.md` and run its project-context intake sweep for this repository.
 
 Before the first repository mutation, load `references/implementation-delivery.md` for worktree isolation, atomic commits, PR creation, CI watch, and the merge gate, and `references/code-annotation.md` for doc blocks, rationale comments, and test coverage on every created or updated unit. If two consecutive fix attempts fail on the same symptom, stop editing and load `references/root-cause-scripts.md`.
 
-Do not use this workflow for findings-only architecture review; route that to `workflows/architecture/architecture-audit.md`. Do not use it for broad new design work with missing requirements; route that to `workflows/spec-driven.md`.
+Not for findings-only architecture review — route to `workflows/architecture/architecture-audit.md`. Not for broad new design work with missing requirements — route to `workflows/spec-driven.md`.
 
 1. Resolve/reuse `workflowSessionId`: `architecture-fix-[entity]`
 2. Load shared references:
@@ -47,7 +47,7 @@ Do not use this workflow for findings-only architecture review; route that to `w
    - Coupling: reduce strength before distance; replace internal model sharing with explicit contracts, remove cross-boundary knowledge of internals, invert dependencies at stable seams, keep cohesive local coupling close, and avoid cycles.
    - Deepening: delete shallow pass-through modules, merge split concepts when locality improves, deepen useful interfaces by hiding invariants and ordering, test through the interface, and clarify seams only where variation, dependency direction, external I/O, or test substitution justifies it.
    - When a deepening candidate has two or more viable interface shapes, load the Interface Design Method from `references/architecture-deepening-lens.md` (Design It Twice) and pick by leverage and locality before editing.
-   - When you decide not to apply a reported refactor, record the load-bearing reason; if it is likely to recur, offer an ADR via `workflows/adr.md` so the rejection is not re-litigated.
+   - When you decide not to apply a reported refactor, record the load-bearing reason; if likely to recur, offer an ADR via `workflows/adr.md` so the rejection is not re-litigated.
    - Prefer move, merge, inline, or clarify existing seams before adding new abstractions.
    - Use ports/adapters or anti-corruption layers only when the report evidence shows real volatility, boundary pressure, external dependency pressure, model leakage, or at least two real adapters such as production plus test.
    - Do not turn a local code-quality concern into an architecture migration; route broad new design, VSA migration, new service boundaries, or unclear ownership to `workflows/spec-driven.md`.
