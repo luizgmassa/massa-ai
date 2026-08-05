@@ -17,6 +17,7 @@
     "start": "bun run src/index.ts",
     "build": "bun build src/index.ts src/config-cli.ts --outdir=dist --target=bun",
     "type-check": "tsc --noEmit",
+    "pretest": "bun ../../scripts/generate-skill-artifacts.ts && bun ../../scripts/generate-subagent-artifacts.ts",
     "test": "bun test __tests__ src/__tests__"
   },
   "dependencies": {
