@@ -502,6 +502,56 @@ async function diffManagedRoot(
   return { root: label, missing, unexpected, modified };
 }
 
+/**
+ * Marker-scoped counterpart to diffManagedRoot() (T3, WFC-07): the
+ * checked-in side is filtered to marker-bearing candidates only, so the
+ * hand-authored quick-command siblings living in the same directory
+ * (def.md, skills/def/SKILL.md, ...) never register as `unexpected`. The
+ * generated side needs no filtering — everything emitSharedWorkflowCommands()
+ * writes already carries the marker (T2) — but is filtered anyway,
+ * defensively, so this function's correctness never depends on that
+ * invariant holding in the caller.
+ * Test: bun test scripts/__tests__/workflow-command-check.test.ts
+ */
+async function diffMarkerScopedWorkflowCommands(
+  generatedRoot: string,
+  checkedInRoot: string,
+  shape: MarkerScopedShape,
+  label: string,
+): Promise<RootDiff> {
+  async function markerScopedInventory(dirAbs: string): Promise<Map<string, Buffer>> {
+    const out = new Map<string, Buffer>();
+    for (const candidate of await markerScopedCandidates(dirAbs, shape)) {
+      let buf: Buffer;
+      try {
+        buf = await fs.readFile(candidate.absPath);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw err;
+      }
+      if (!buf.toString("utf8").includes(WORKFLOW_COMMAND_MARKER)) continue;
+      out.set(candidate.relPath, buf);
+    }
+    return out;
+  }
+
+  const [generated, checkedIn] = await Promise.all([
+    markerScopedInventory(generatedRoot),
+    markerScopedInventory(checkedInRoot),
+  ]);
+
+  const missing = [...generated.keys()].filter((r) => !checkedIn.has(r)).sort();
+  const unexpected = [...checkedIn.keys()].filter((r) => !generated.has(r)).sort();
+  const modified: string[] = [];
+  for (const [rel, gBuf] of generated) {
+    const cBuf = checkedIn.get(rel);
+    if (cBuf && !gBuf.equals(cBuf)) modified.push(rel);
+  }
+  modified.sort();
+
+  return { root: label, missing, unexpected, modified };
+}
+
 export async function runCheck(): Promise<number> {
   const tmp = await fs.mkdtemp(path.join(tmpdir(), "massa-ai-skill-gen-"));
   try {
@@ -528,6 +578,32 @@ export async function runCheck(): Promise<number> {
         for (const f of diff.missing) console.error(`  + ${f} (missing — regenerate and commit)`);
         for (const f of diff.unexpected) console.error(`  - ${f} (unexpected — stale file, source was likely deleted)`);
         for (const f of diff.modified) console.error(`  M ${f} (content differs from source)`);
+      }
+
+      // Workflow commands (T3, WFC-07): marker-scoped, not a directory-root
+      // walk — commands/ (claude) and skills/ (codex, cursor) also hold the
+      // 6 hand-authored quick-command files, which a plain diffManagedRoot()
+      // would wrongly flag as `unexpected`. OpenCode's command/ root has no
+      // hand-authored siblings and already flows through the managedRootsFor
+      // loop above via extraManagedRoots.
+      const workflowTarget = SHARED_WORKFLOW_HOST_DIRS[host];
+      if (workflowTarget) {
+        const generatedRoot = path.join(tmpRoots[host], workflowTarget.rel);
+        const checkedInRoot = path.join(pluginRoot(host), workflowTarget.rel);
+        const label = `${host}-plugin/${workflowTarget.rel} (workflow commands)`;
+        const diff = await diffMarkerScopedWorkflowCommands(
+          generatedRoot,
+          checkedInRoot,
+          workflowTarget.shape,
+          label,
+        );
+        if (diff.missing.length > 0 || diff.unexpected.length > 0 || diff.modified.length > 0) {
+          drift = true;
+          console.error(`[${label}] drift detected:`);
+          for (const f of diff.missing) console.error(`  + ${f} (missing — regenerate and commit)`);
+          for (const f of diff.unexpected) console.error(`  - ${f} (unexpected — stale file, source was likely deleted)`);
+          for (const f of diff.modified) console.error(`  M ${f} (content differs from source)`);
+        }
       }
 
       // hooks/massa-ai-hook lives beside hand-maintained hooks.json, so this is
