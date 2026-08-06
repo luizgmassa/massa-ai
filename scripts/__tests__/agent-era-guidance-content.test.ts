@@ -310,3 +310,18 @@ describe("references/implementation-delivery.md: advisory trust-status context (
     expect(content).toContain("Approval for one PR does not carry to the next.");
   });
 });
+
+// ---------------------------------------------------------------------------
+// AEH-05: references/spec-driven/validate.md metric-snapshot recording (T14)
+// ---------------------------------------------------------------------------
+
+describe("references/spec-driven/validate.md: post-validation metric snapshot recording (AEH-05)", () => {
+  const content = readSkill("references/spec-driven/validate.md");
+
+  test("recording step present with the exact metrics add CLI", () => {
+    expect(content).toContain("Record Metric Snapshot (MANDATORY)");
+    expect(content).toContain(
+      "bun skills/massa-ai/scripts/lessons.ts --root . metrics add --feature <slug> --result PASS|FAIL --fix-iterations <n> --surviving-mutants <n> --acs-total <n> --acs-covered <n>",
+    );
+  });
+});
