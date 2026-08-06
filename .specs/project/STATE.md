@@ -1,6 +1,56 @@
 # massa-ai Spec State
 
-## Current — PR Review Workflow (**VALIDATED PASS 2026-08-05** — 26/26 ACs, 5/5 mutations killed, iteration 1; push/PR = user decision)
+## Current — Discovery Workflow (Execute T1–T5 complete 2026-08-05; T6 validation in flight)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-discovery-workflow` ·
+  workflow: spec-driven (full artifacts by pr-review precedent) · branch
+  `spec/discovery-workflow` STACKED on `spec/pr-review-workflow` @ `975a020d`
+  (A1: same three contended surfaces).
+- **Cross-session incident (recorded):** the sibling pr-review session
+  committed its T6 close-out `c4b4d6cb` (validation PASS, registry complete,
+  state/handoff stamped) into this shared checkout while it was on
+  `spec/discovery-workflow` — so that commit is an ancestor of this branch,
+  and `spec/pr-review-workflow`'s own tip (`975a020d`) lacks it. It also
+  swept this feature's then-uncommitted `spec.md`/`design.md` drafts into
+  itself. Linear history, nothing lost. Suggested user-level repair:
+  `git branch -f spec/pr-review-workflow c4b4d6cb` (fast-forward to its own
+  T6 commit) before pushing either branch; discovery's PR then targets
+  `base=spec/pr-review-workflow`.
+- Scope (user-directed 2026-08-05): new routed workflow `discovery` — product
+  brainstorming thinking partner adapted from the `product-brainstorming`
+  skill in `anthropics/knowledge-work-plugins` (Apache-2.0; provenance
+  established by unique-phrase web search + GitHub API per Plan Challenge F3,
+  which had flagged it user-decision — measurement resolved it). Four modes,
+  seven frameworks-as-tools, Frame→Diverge→Provoke→Converge→Capture,
+  conduct contract + six anti-patterns, massa-ai session/memory binding,
+  mandatory to-prd PRD offer at Capture (acceptance = to-prd's explicit
+  request).
+- Contract: `.specs/features/discovery-workflow/{spec,design,tasks}.md` —
+  `2 Phases = 6 Tasks`, inline execution (batch-worker offer declined: one
+  dominant prose file, sequential deps — pr-review precedent). Plan Challenge
+  full pre_mortem (massa-ai-plan-critic): F1 merge-path explicit (recorded in
+  A1 + tasks delivery note), F2 open-PR sweep (PR #74 touches
+  SKILL.md/CHANGELOG, no line collision), F3 provenance resolved by
+  measurement (Apache-2.0), F4 voice-mitigation corrected to T6 clause read,
+  F5 size figure reworded authoring-target.
+- Commits: `e67700d1` specs → `f83fe38a` T1 discovery.md (12,497 B,
+  frontmatter parses; attribution + intake + no-delivery-ref + to-prd
+  literals green) → `231a9357` T2 router row before `to-prd` + tier-4 clause
+  (SKILL.md 20,293 B ≤ 21,000) → `5330337f` T3 count locks 39→40 +
+  complement 23→24 (observed red: 3 fails before, 50/0 after) → `01073577`
+  T3 amendment: WMH license allowlist +Apache-2.0 (observed red first;
+  discrimination preserved) → `1e14716a` T4 CHANGELOG.
+- Gates: `generate:artifacts` + `--check` no drift; integrity 32/0; size 6/0;
+  duplication 20/0; parity 23/0; doc-paths 160 files / 1167 citations /
+  0 misses; lint 0; `test:scripts` 1451/4 — the 4 are the documented
+  `.claude/worktrees/` needle-anchor contamination class (CI authoritative).
+- massa-ai MCP unreachable this session (recall aborted at 120 s);
+  `.specs/` files canonical.
+- Next: T6 — check_specs_delivered, independent verification-agent →
+  validation.md; push/PR = user decision (see delivery note in tasks.md and
+  the incident repair above).
+
+## Previous — PR Review Workflow (**VALIDATED PASS 2026-08-05** — 26/26 ACs, 5/5 mutations killed, iteration 1; push/PR = user decision)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-pr-review-workflow` ·
   workflow: spec-driven (Large) · branch `spec/pr-review-workflow` from

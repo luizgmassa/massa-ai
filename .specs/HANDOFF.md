@@ -1,4 +1,66 @@
-# Handoff — pr-review-workflow (VALIDATED PASS 2026-08-05 — 26/26 ACs, 5/5 mutations killed; push/PR = user decision)
+# Handoff — discovery-workflow (Execute complete through T5; T6 validation in flight; push/PR = user decision)
+
+Previous handoff: pr-review-workflow VALIDATED PASS (preserved below as
+Previous). Cross-session incident: its T6 commit `c4b4d6cb` landed on THIS
+feature's branch (shared checkout — the sibling committed while the checkout
+was on `spec/discovery-workflow`), so `spec/pr-review-workflow`'s tip
+(`975a020d`) lacks its own close-out. Suggested repair before any push:
+`git branch -f spec/pr-review-workflow c4b4d6cb` (fast-forward, linear
+ancestor), then discovery's PR targets `base=spec/pr-review-workflow`.
+
+Session `spec-discovery-workflow` · workflow spec-driven · massa-ai MCP
+unreachable this session (recall aborted at 120 s); `.specs/` files
+canonical. Contract files:
+`.specs/features/discovery-workflow/{spec,design,tasks}.md`
+(+ `validation.md` at T6).
+
+## Objective
+
+New routed workflow `discovery`: product brainstorming / problem-space
+thinking partner — four modes (problem exploration, solution ideation,
+assumption testing, strategy exploration), seven frameworks-as-tools,
+Frame → Diverge → Provoke → Converge → Capture rhythm, conduct contract with
+six anti-patterns, massa-ai session/memory binding, and a mandatory Capture
+offer to synthesize the conversation into a PRD (Product Requirements
+Document) via the existing `to-prd` workflow (acceptance = the explicit
+request to-prd requires). Adapted from the `product-brainstorming` skill in
+`anthropics/knowledge-work-plugins` (Apache-2.0, attributed; provenance
+established by web search + GitHub API per Plan Challenge F3).
+
+## State
+
+- Branch `spec/discovery-workflow` stacked on `spec/pr-review-workflow` @
+  `975a020d`; history linear through `c4b4d6cb` (sibling's pr-review T6).
+  Commits: `e67700d1` specs (Plan Challenge F1–F5 folded) → `f83fe38a` T1
+  workflow file (12,497 B) → `231a9357` T2 router row + tier-4 clause
+  (SKILL.md 20,293 B of 21,000) → `5330337f` T3 count locks 39→40 +
+  complement 23→24 (observed red→green) → `01073577` T3 amendment WMH
+  license allowlist +Apache-2.0 (observed red first) → `1e14716a` T4
+  CHANGELOG → state commit (T6 partial).
+- Gates green: `generate:artifacts` + `--check` no drift; integrity 32/0;
+  size 6/0 (SKILL.md ceiling); duplication 20/0; parity 23/0; doc-paths
+  1167 citations 0 misses; lint 0; count suites 50/0 at 40/24;
+  `test:scripts` 1451/4 — the 4 are the documented `.claude/worktrees/`
+  needle-anchor contamination class (3 sibling worktrees duplicate
+  `const DAMPING = 0.85;`; CI authoritative).
+- Plan Challenge (full pre_mortem, massa-ai-plan-critic): F1 merge path made
+  explicit; F2 open-PR sweep (PR #74 no line collision); F3 provenance
+  resolved by measurement (Apache-2.0 — was flagged user-decision, search
+  settled it); F4 voice mitigation = T6 clause read; F5 size figure is an
+  authoring target, no gate senses workflow file size.
+
+## Next Step
+
+T6 close-out: check_specs_delivered, independent verification-agent
+(author ≠ verifier) → `.specs/features/discovery-workflow/validation.md`;
+flip FEATURES.json status on PASS; final state commit. Then the incident
+repair + push + PRs are the user's decision (outward-facing; not taken
+unattended). The workflow ships with the skills bundles on the next
+release/install.
+
+---
+
+# Previous — Handoff — pr-review-workflow (VALIDATED PASS 2026-08-05 — 26/26 ACs, 5/5 mutations killed; push/PR = user decision)
 
 Previous handoffs closed: untracked-generated-bundles merged as PR #73 @
 `40ec631a`, released v1.29.0 (its full handoff is preserved below as Previous);
