@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.34.0] - 2026-08-06
-
 ### Added
 
 - **Explicit Isolation Gate line in all 16 implementation workflows.** Each
@@ -27,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   absence from read-only workflows, and byte-identical wording naming the
   mechanism. Hook-level blocking was evaluated and deferred: the hook binary's
   contract is observation-only ("never blocks the agent").
+
+## [1.34.0] - 2026-08-06
+
+### Added
+
 - **Generated workflow slash commands (40 at merge), one per `skills/massa-ai/workflows/**/*.md`,
   across all four plugins.** Every massa-ai workflow is now directly invocable —
   `/massa-ai:debug` / `/massa-ai-debug` (Claude Code marketplace / file route),
