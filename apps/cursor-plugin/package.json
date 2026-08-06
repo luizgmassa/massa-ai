@@ -1,6 +1,6 @@
 {
   "name": "@massa-ai/cursor-plugin",
-  "version": "1.30.0",
+  "version": "1.31.0",
   "description": "massa-ai plugin for Cursor — semantic code search, memory, and context compression",
   "files": [
     "agents",
