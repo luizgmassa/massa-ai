@@ -20,7 +20,10 @@ import {
 
 const MASSA_AI_API_URL = process.env.MASSA_AI_API_URL || "http://localhost:3333"
 const FETCH_TIMEOUT_MS = 5_000
-const REINDEX_DEBOUNCE_MS = 60_000
+// Env-tunable for tests only (10 ms there); 60 s in production. Read once at
+// module load — a runtime change has no effect (AD-010: listed in turbo.json
+// tasks.test.passThroughEnv).
+const REINDEX_DEBOUNCE_MS = Number(process.env.MASSA_AI_REINDEX_DEBOUNCE_MS || 60_000)
 const REINDEX_FILE_THRESHOLD = 15
 const MAX_EDITED_FILES_TRACKED = 200
 

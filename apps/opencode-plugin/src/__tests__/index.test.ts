@@ -9,7 +9,10 @@
  * real API or filesystem config is needed.
  */
 
+import "./env-setup"; // MUST stay the first import — freezes scratch XDG_CONFIG_HOME + 10 ms reindex debounce before ../index loads
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { MassaAiPlugin } from "../index";
 
 const originalFetch = globalThis.fetch;
@@ -382,5 +385,90 @@ describe("MassaAiPlugin auto-configuration", () => {
     const { input } = makePluginInput();
     const plugin = await MassaAiPlugin(input);
     expect(typeof plugin["session.created"]).toBe("function");
+  });
+});
+
+describe("MassaAiPlugin config bootstrap + HTTP edge branches", () => {
+  test("first run under a fresh XDG_CONFIG_HOME initializes config (ensureConfig init branch)", async () => {
+    mockFetchCapture();
+    const { input } = makePluginInput();
+    await MassaAiPlugin(input);
+    // env-setup.ts pointed XDG_CONFIG_HOME at a scratch dir before ../index
+    // loaded, so the first plugin construction in this suite ran initConfig().
+    expect(existsSync(join(process.env.XDG_CONFIG_HOME!, "massa-ai", "config.json"))).toBe(true);
+  });
+
+  test("compacting: non-ok memory search response → debug log, snapshot still attempted", async () => {
+    const { input, logs } = makePluginInput();
+    const requests = mockFetchCapture((req) => {
+      if (req.url.includes("/api/v1/memory/search")) {
+        return new Response("overloaded", { status: 503 });
+      }
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    });
+    const plugin = await MassaAiPlugin(input);
+    await plugin["session.created"]!();
+    requests.length = 0;
+    const output = { context: [] as string[] };
+    await plugin["experimental.session.compacting"]!({ sessionID: "sx" } as any, output as any);
+    // massaAiFetch threw its non-ok Error (status + body slice) → caught → debug log
+    expect(output.context.length).toBe(0);
+    expect(logs.some((l) => l.level === "debug" && /Failed to fetch memories/.test(l.message))).toBe(true);
+    expect(requests.some((r) => r.url.includes("/api/v1/hook/compact-snapshot"))).toBe(true);
+  });
+
+  test("toast tolerates a rejecting client.tui.showToast", async () => {
+    const { input } = makePluginInput({
+      client: {
+        app: { log: async () => {} },
+        tui: { showToast: async () => { throw new Error("tui gone"); } },
+      },
+    });
+    // Unhealthy health response → session.created calls toast(); the rejection
+    // must be swallowed by toast()'s catch arm.
+    globalThis.fetch = (async () => new Response("down", { status: 503 })) as typeof fetch;
+    const plugin = await MassaAiPlugin(input);
+    await plugin["session.created"]!();
+    // reaching here without an unhandled rejection is the assertion; give the
+    // fire-and-forget rejection a tick to surface if the catch arm were missing
+    await new Promise((r) => setTimeout(r, 10));
+    expect(typeof plugin["event"]).toBe("function");
+  });
+});
+
+describe("MassaAiPlugin debounced incremental reindex", () => {
+  test("15 edited files trigger one debounced /project/index call (10 ms test debounce)", async () => {
+    const { input, logs } = makePluginInput();
+    const requests = mockFetchCapture();
+    const plugin = await MassaAiPlugin(input);
+    await plugin["session.created"]!();
+    requests.length = 0;
+    // 20 edits: crosses REINDEX_FILE_THRESHOLD (15) and re-schedules the
+    // timer several times (covers the clearTimeout-on-reschedule branch).
+    for (let i = 0; i < 20; i++) {
+      await plugin["event"]!({ event: { type: "file.edited", properties: { file: `src/f${i}.ts` } } } as any);
+    }
+    await new Promise((r) => setTimeout(r, 120));
+    const reindex = requests.filter((r) => r.url.includes("/api/v1/project/index"));
+    expect(reindex.length).toBe(1);
+    expect(JSON.parse(String(reindex[0]!.init?.body))).toMatchObject({ forceReindex: false, warmCache: false });
+    expect(logs.some((l) => l.level === "info" && /Incremental reindex completed \(20 files changed\)/.test(l.message))).toBe(true);
+  });
+
+  test("reindex failure → warn log, in-flight flag released", async () => {
+    const { input, logs } = makePluginInput();
+    mockFetchCapture((req) => {
+      if (req.url.includes("/api/v1/project/index")) {
+        return new Response("boom", { status: 500 });
+      }
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    });
+    const plugin = await MassaAiPlugin(input);
+    await plugin["session.created"]!();
+    for (let i = 0; i < 15; i++) {
+      await plugin["event"]!({ event: { type: "file.watcher.updated", properties: { file: `w${i}.ts` } } } as any);
+    }
+    await new Promise((r) => setTimeout(r, 120));
+    expect(logs.some((l) => l.level === "warn" && /Reindex failed/.test(l.message))).toBe(true);
   });
 });
