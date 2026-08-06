@@ -26,22 +26,7 @@ Write and search in the user's human language. Match the user's prompt language 
 
 ## Knowledge Verification Chain
 
-When researching or resolving any technical question during exploration, follow this chain in strict order. Never skip steps.
-
-```
-Step 1: Codebase → existing code, conventions, patterns already in use
-Step 2: Project docs (leads, not truth) → README, docs/, inline comments, .specs/project/STATE.md (Decisions) — verify against current source before relying
-Step 3: Context7 MCP → resolve library ID, then query for current API/patterns
-Step 4: Web search → official docs, reputable sources, community patterns
-Step 5: Flag as uncertain → "I'm not certain about X — here's my reasoning, but verify"
-```
-
-- If a chain step's tool is unavailable (Context7 MCP not registered, no web
-  access), record it as a skipped sensor with its reason and continue to the next
-  step. An unavailable step is skipped, never silently treated as answered.
-- Never skip to Step 5 if Steps 1-4 are available.
-- Step 5 is always flagged uncertain — never presented as fact.
-- Never assume or fabricate. If no answer is found, say "I don't know" or "I couldn't find documentation for this". "I don't know" beats invention.
+When researching or resolving any technical question during exploration, follow the 5-step chain in `references/knowledge-verification-chain.md` in strict order — codebase, project docs, Context7 MCP, web search, then flag-as-uncertain. Never skip steps, record an unavailable step as a skipped sensor with its reason, and never present Step 5 output as fact. "I don't know" beats invention.
 
 1. Resolve/reuse `projectId` and `workflowSessionId`: `explore-[entity]`.
 2. Load shared references:

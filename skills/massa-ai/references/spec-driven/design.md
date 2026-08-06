@@ -41,7 +41,7 @@ Silently ignoring an active decision is not an option — it creates invisible i
 
 If the feature involves unfamiliar technology, patterns, or integrations, research before designing. Document findings briefly in the design doc or as inline notes. This prevents incorrect assumptions from propagating into tasks.
 
-Follow the **Knowledge Verification Chain** (see SKILL.md) in strict order:
+Follow the **Knowledge Verification Chain** (see `references/knowledge-verification-chain.md`) in strict order:
 
 ```
 Codebase → Project docs (leads, not truth) → Context7 MCP → Web search → Flag as uncertain

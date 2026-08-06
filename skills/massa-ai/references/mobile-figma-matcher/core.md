@@ -9,6 +9,7 @@ Use after `repository-detection.md` identifies one or more target surfaces. Defi
 - Figma MCP is mandatory design evidence. A screenshot or pasted description alone is not a design contract.
 - Figma defines visible design intent and represented variants. Product behavior, navigation, data, analytics, error handling, and state transitions require a separate requirements source.
 - Accessibility, platform conventions, localization, safe areas/insets, minimum touch targets, Dynamic Type/font scale, and explicit product requirements outrank literal replication when supported by evidence. Record these as `CONSTRAINT DEVIATION`.
+- Figma defines the target **value**; it never defines the platform-API **technique**. The `references/knowledge-verification-chain.md` chain answers "how do I express this on the platform"; a fresh Figma node re-read answers "what value must render". Never let a platform-API lookup redefine the design contract.
 
 ## Figma Evidence Packet
 
@@ -95,6 +96,18 @@ Evidence classes:
 - `deterministic-runtime`: measured hierarchy, geometry, snapshot result, UI assertion, or fixed-configuration artifact.
 - `inferential-visual`: labeled visual comparison without deterministic measurement.
 - `missing`: required evidence is unavailable or unsafe to obtain.
+
+### Discrimination Sensor for Visual Parity (what a mutation is)
+
+The mobile-Figma instantiation of `references/discrimination-sensor.md` — mutations run only where a deterministic runtime sensor exists to kill them:
+
+| Evidence class of the row | Mutation | Expectation |
+|---|---|---|
+| `deterministic-runtime` | Perturb the implementation's token/value in a scratch copy (wrong color token, ±2dp spacing, wrong font scale) | The runtime sensor (snapshot/screenshot/render test) FAILS — mutant killed |
+| `deterministic-source` only | No runtime kill-check exists | Record `mutation: not available — no deterministic-runtime sensor for this row` |
+| `inferential-visual` / `missing` | Never mutate | Record `mutation: not available — <evidence class>` |
+
+A surviving token/value mutant means the render sensor does not discriminate for that property — the parity claim for that row is unproven.
 
 Statuses:
 

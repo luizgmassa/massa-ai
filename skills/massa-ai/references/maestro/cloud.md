@@ -65,3 +65,5 @@ Official Cloud limit: 15-minute soft execution limit per test execution. After t
 ## Cloud Boundary
 
 Use Cloud for hosted device execution, device matrix coverage, PR checks, and Cloud-only platform settings. Keep local CLI checks, static YAML checks, and repository validation as separate evidence.
+
+Authorization boundary: Cloud execution, binary upload, and `maestro test --analyze` are externally-visible operations — each needs its own explicit go-ahead, separate from the Execute authorization. Local `maestro test` against a local device/emulator stays inside the Execute authorization.

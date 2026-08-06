@@ -379,4 +379,5 @@ if (import.meta.main) {
   process.exit(main(process.argv.slice(2)));
 }
 
-export { check, FAMILIES, AREA_PREFIX };
+export { check, FAMILIES, AREA_PREFIX, parseFindings, splitLines };
+export type { RawFinding };

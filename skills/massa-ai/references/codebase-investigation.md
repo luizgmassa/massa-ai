@@ -40,7 +40,7 @@ Prefer sources in this order:
    than exact source.
 7. Local `.notebook/INDEX.md` only if the project already uses `.notebook/`.
 8. Focused shell search/read fallback when massa-ai is unavailable, stale, incomplete, or unindexed.
-9. Official docs or web search only when current external API behavior matters.
+9. External sources only when current external library/API behavior matters — and then strictly through the ordered chain in `references/knowledge-verification-chain.md` (project docs → Context7 MCP → web search → flag-as-uncertain, unavailable steps recorded as skipped sensors).
 
 Project maps, search results, and optimized context are leads until confirmed
 against source files read in the current session or returned with current

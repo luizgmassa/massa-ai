@@ -17,7 +17,7 @@ Use for the mandatory final Execute validation gate. This is not a separate phas
    - Runs the **spec-anchored outcome check** and the **discrimination sensor** (both described below)
    - Writes `.specs/features/<slug>/validation.md` with the full evidence report
    - Returns a compact verdict + ranked gap list to the orchestrator in chat
-   - Gaps become **fix tasks** routed back to an implementer; re-verification follows with a maximum of **3 fix→re-verify iterations** before escalating to the user
+   - Gaps become **fix tasks** routed back to an implementer; re-verification follows, bounded by the Bounded Fix→Re-verify Loop in `references/verification-ladder.md`
 
 3. **Interactive UAT (for user-facing features only):** The feature has complex user-facing behavior where human judgment matters (UI flows, interaction patterns, visual design). For backend-only, harness-only, or infrastructure work, automated checks are sufficient — record `UAT: not applicable` with reason.
 
@@ -96,35 +96,14 @@ Run the Build-level gate check from the **Gate Check Commands** section in tasks
 
 ### 5. Discrimination Sensor (MANDATORY — always runs after gate check passes)
 
-The sensor provides the empirical guarantee that the tests can actually detect regressions. It runs in a scratch/throwaway state — the real working tree is never modified.
+The sensor provides the empirical guarantee that the tests can actually detect regressions. Run the full mechanics from `references/discrimination-sensor.md` — scratch git-worktree isolation (never `git stash`), porcelain baseline before/after, behavior-level mutation forms, and the lightweight/P0 tier table.
 
-**How it works:**
+Spec-driven specifics on top of that shared mechanic:
 
-1. **Prepare an isolated scratch.** Never mutate the real worktree. Choose one:
-   - Preferred: a temporary git worktree (`git worktree add <scratch-path> HEAD`), mutate and run tests there, then `git worktree remove --force <scratch-path>`.
-   - Fallback (no git / worktree unavailable): copy only the affected file(s) to a temp directory, mutate the copies, point the test runner at those copies (or restore originals from the copies' backups), then delete the temp directory.
-   - **Forbidden:** `git stash` / `git stash pop`. A stash records state *before* the mutation; popping it does not reverse a mutation applied afterward, and on a clean tree `git stash` creates no entry at all — so the fault is left in the real worktree.
-2. **Capture a baseline.** Record `git status --porcelain` (or equivalent) of the real worktree *before* any sensor work. It must be unchanged after cleanup.
-3. **Inject a behavior-level fault** into the scratch copy of the new code introduced by this feature. Choose a mutation proportional to the code's risk:
-   - Flip a boolean condition (`if (x)` → `if (!x)`, `>` → `>=`)
-   - Change a return value (return a wrong status code, wrong field, zero instead of a computed value)
-   - Off-by-one (shift a loop bound, change a slice index)
-   - Remove a required side effect (delete a method call that the spec requires)
-4. **Run the tests** that cover the mutated code (against the scratch). Use the Quick or Full gate command from tasks.md.
-5. **Confirm the mutant is killed** (tests FAIL). Discard the scratch (remove worktree or delete temp copies).
-6. **Verify isolation.** Re-run `git status --porcelain` on the real worktree and confirm it matches the baseline from step 2. If it differs, STOP — restore the real tree before continuing, and treat the sensor run as invalid.
-7. **If a mutant survives** (tests still pass after the fault), the tests are not discriminating for that behavior — add a fix task to strengthen the assertion.
-
-**Tiering (proportional, not optional):**
-
-| Context | Sensor depth |
-| ------- | ------------ |
-| Default (all features) | Lightweight fault-injection: 1–3 targeted behavior-level mutations per feature, focused on the highest-risk new code |
-| P0 / critical paths (payment, auth, data integrity) | Full mutation run: use language-appropriate mutation tooling if available (e.g., Stryker, mutmut, cargo-mutants, pitest); otherwise increase the number of manual fault-injection mutations to ≥5 covering all branches |
-
-**Stack-agnostic:** The sensor targets behavior-level semantics (what the code does), not a specific tool. Any language, any framework.
-
-**Report:** Record killed/survived for each mutation attempt. Surviving mutants → create fix tasks before marking the feature done.
+- The mutation target is the **new code introduced by this feature** (the "code under the claim" for a spec-driven change).
+- Use the Quick or Full gate command from tasks.md as the sensor's test run.
+- **Surviving mutants → create fix tasks** to strengthen the assertion before marking the feature done.
+- Record killed/survived per mutation in the validation report's Discrimination Sensor table below.
 
 If a safe reversible mutant cannot be made, record why and mark `Blocked` unless equivalent existing mutation evidence proves discrimination.
 
@@ -195,7 +174,7 @@ For each issue found during UAT or from the Verifier:
 
 Fix tasks follow the same format as regular tasks and can be executed with the implement phase (see [references/spec-driven/execute.md](execute.md)).
 
-**Guardrail:** Maximum 3 diagnostic iterations per issue. If root cause isn't found after 3 attempts, flag for human investigation. The same 3-iteration bound applies to the Verifier's fix→re-verify cycle: if gaps persist after 3 rounds, escalate to the user rather than continuing to loop.
+**Guardrail:** Maximum 3 diagnostic iterations per issue. If root cause isn't found after 3 attempts, flag for human investigation. The Verifier's fix→re-verify cycle is separately bounded by the Bounded Fix→Re-verify Loop in `references/verification-ladder.md`.
 
 ### 9. Write Validation Report File + Return Chat Summary (MANDATORY)
 
@@ -239,8 +218,7 @@ Derive the flags from this validation's own evidence: `--result` from the Verdic
 ## Fix Loop
 
 - Return `Needs Fix` findings to Execute as fix tasks.
-- Cap the loop at 3 verification iterations.
-- After 3 unsuccessful iterations, mark `Blocked` with remaining findings and exact next step.
+- Cap: 3 verification iterations, per the Bounded Fix→Re-verify Loop in `references/verification-ladder.md`; at the cap, mark `Blocked` with remaining findings and exact next step.
 
 ---
 

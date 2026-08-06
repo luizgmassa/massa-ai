@@ -4,14 +4,7 @@ Use before any spec-driven workflow reads or writes feature registry, progress, 
 
 ## Source Of Truth
 
-- Canonical state lives in `.specs/` files tracked in the repository, not massa-ai records, semantic memories, or root aliases.
-- Current repository source remains authoritative for implementation/code evidence.
-- `search`, `recall`, and durable memories may discover context, decisions, or reusable patterns, but must never reconstruct canonical artifact state.
-- If `.specs/` is unavailable or not writable, block spec-driven state mutation and record the blocker.
-
-## STATE Precedence Chain
-
-Artifact reads resolve conflicts in this strict order (first match wins): fresh user instruction > approved `.specs/` artifact > STATE/HANDOFF > massa-ai memory. massa-ai memory and external summaries are discovery, not authority. Canonical ownership and full section rules live in `references/spec-driven/memory.md`; this store mirrors the chain so reads and writes stay consistent.
+The canonical-store principle, the STATE Precedence Chain, and the unwritable-→-block rule live in `references/artifact-persistence.md` — they apply to every workflow family, not just spec-driven. This store applies them to spec-driven's logical paths below. Canonical ownership and full section rules live in `references/spec-driven/memory.md`.
 
 ## Logical Paths
 
@@ -31,30 +24,7 @@ Use these logical paths:
 
 ## Quick Artifacts
 
-Quick-mode tasks (Quick mode guardrails in `workflows/spec-driven.md`) live under `.specs/quick/NNN-slug/`. `NNN` is zero-padded and sequential per project; `slug` is the short kebab-case intent. Each quick task has exactly two files:
-
-**`.specs/quick/NNN-slug/TASK.md`:**
-
-```markdown
-# Quick NNN: <one-line intent>
-
-## Acceptance
-- <single testable criterion — the gate the Execute step must pass>
-```
-
-**`.specs/quick/NNN-slug/SUMMARY.md`:**
-
-```markdown
-# Quick NNN: <one-line intent>
-
-## Result
-- Status: Complete | Blocked | Partial
-- Files changed: <list or "none">
-- Gate: <command + pass/fail evidence>
-- SPEC_DEVIATION: <none | what diverged and why>
-```
-
-Quick tasks are also listed in the STATE.md Quick Tasks table (see `references/spec-driven/memory.md`). When 5+ quick tasks accumulate in one area, promote to a feature: move the work under `.specs/features/<slug>/` and record the promotion in STATE. Quick artifacts are canonical `.specs/` state — same precedence chain, same section-scoped write rules; they are not a second store.
+Quick-mode tasks (Quick mode guardrails in `workflows/spec-driven.md`) live under `.specs/quick/NNN-slug/` with the two-file templates in `references/artifact-persistence.md` (Quick Artifact Templates). Spec-driven specifics on top: quick tasks are also listed in the STATE.md Quick Tasks table (see `references/spec-driven/memory.md`), and when 5+ quick tasks accumulate in one area, promote to a feature — move the work under `.specs/features/<slug>/` and record the promotion in STATE.
 
 ## Reading Artifacts
 

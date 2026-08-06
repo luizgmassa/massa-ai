@@ -3,7 +3,7 @@ name: architecture-fix
 description: "Executes fixes from a saved architecture audit report; not for findings-only review or broad new design work with missing requirements."
 license: MIT
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 ### Architecture Fix
@@ -12,7 +12,7 @@ Execute fixes from an architecture audit markdown report only.
 
 Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) — its Stage 3 delivery-authorization scope covers one go-ahead through PR creation; force-push/deploy/merge stay separately gated — and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
 Not for findings-only architecture review — route to `workflows/architecture/architecture-audit.md`. Not for broad new design work with missing requirements — route to `workflows/spec-driven.md`.
 
@@ -28,6 +28,9 @@ Not for findings-only architecture review — route to `workflows/architecture/a
    - `references/verification-ladder.md` before non-trivial edits
    - `references/context-firewall.md` before inspecting large diffs, dependency graphs, generated reports, or broad search output
    - `references/agent-orchestration.md` only for large/high-risk findings, disjoint implementation slices, or independent verification
+   - `references/discrimination-sensor.md` before marking any Standard+/Spec-driven-sized or high/critical-severity finding `fixed`
+   - `references/knowledge-verification-chain.md` when a fix leans on an external library or API — the trigger is step 8's ports/adapters clause on "external dependency pressure"
+   - `references/brownfield-mapping.md` (Minimum Bar only, Standard+ findings) when step 3's recall returns no hit for the target and no gate command is derivable from the report's evidence; its CONCERNS.md is satisfied by citation when the report's lens evidence already maps the risk surface — cite that evidence rather than deriving CONCERNS.md fresh
 3. `recall` -> load ADRs, known boundaries, coupling patterns, accepted exceptions, rejected refactors, verification recipes, and project constraints for the report target.
 4. Select the architecture audit report with execution focus:
    - Establish the report selector, target focus, and optional finding selector before selecting a report. Target focus can be a module, boundary, flow, files/globs, branch comparison, commit range, symbol/class/function, or explicit whole-repo target.
@@ -63,7 +66,7 @@ Not for findings-only architecture review — route to `workflows/architecture/a
    - Characterize current behavior before moving code with tests, static checks, import graphs, source inspection, or artifact snapshots.
    - Keep public contracts stable unless the audit finding explicitly requires contract change.
    - Update tests, docs, and imports only where required by the architecture fix.
-10. Use agent orchestration only when it improves signal. Dispatch per `references/agent-orchestration.md`:
+10. Use agent orchestration only when it improves signal — except the verifier dispatch below, which is tier-gated mandatory rather than discretionary, carved out under `references/agent-orchestration.md`'s Independent Verification Exception. Dispatch per `references/agent-orchestration.md`:
 
 > **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
@@ -76,33 +79,37 @@ Not for findings-only architecture review — route to `workflows/architecture/a
 > - memory: suggest-only; main agent persists reusable architecture patterns
 > - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
-> - trigger: independent verification of a high-risk or multi-file architecture fix
-> - scope: the fixed finding's dependency direction, tests, imports, and report claim closure
-> - permissions: read-only
-> - inputs: the finding, the applied fix, the verification suggestion, and validation assets
-> - sensors: deterministic command (targeted tests, import-cycle check, dependency-direction check) and report claim closure check
-> - output: confirmed/disproven closure verdict with evidence
-> - firewall: raw test output/logs summarized
-> - memory: suggest-only; main agent persists reusable verification recipes
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
-
 > **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
-> - trigger: implementation complete, before the verification gate — never optional
+> - trigger: implementation of the architecture finding complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
 > - permissions: read-only
-> - inputs: diff, acceptance context, recalled code-quality conventions
+> - inputs: diff, ARCH acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
-> - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
+> - output: ranked findings, blocking vs advisory; blocking findings become architecture fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
-> - memory: suggest-only; main agent persists
+> - memory: suggest-only; main agent persists review outcomes for the architecture fix
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
+
+> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> - trigger: mandatory at Standard+/Spec-driven-sized findings or high/critical severity, per the Independent Verification Mandate in `references/verification-ladder.md`'s Mandatory Verification Fix Gate; Quick-tier findings take the fallback below instead
+> - scope: the fixed finding's dependency direction, seam/adapter shape, tests, imports, and report claim closure
+> - permissions: read-only
+> - inputs: the finding, the applied fix, the verification suggestion, dependency-direction/import-cycle evidence, and validation assets
+> - sensors: deterministic command (targeted tests, import-cycle check, dependency-direction check), report claim closure check; discrimination sensor per `references/discrimination-sensor.md` (mutate the fixed dependency direction, seam, or boundary contract in a scratch worktree)
+> - output: confirmed/disproven closure verdict with evidence, feeding the Fix Closure Report's Independent Verifier column
+> - firewall: raw test output/logs summarized
+> - memory: suggest-only; main agent persists architecture verification outcomes
+> - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of the architecture closure evidence against this output contract and record the skipped-delegation reason
 > - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 11. Verify each completed finding:
    - If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
    - Apply the Mandatory Verification Fix Gate from `references/verification-ladder.md`: run the report's Verification Suggestion or an equivalent deterministic command/artifact check for each selected finding or coherent group.
+   - Run the sensors at the mandate's own tier gate: dispatch the verification-agent block above at Standard+/Spec-driven size or high/critical severity; a Quick-tier finding runs its fallback fresh-eyes self-check instead — the hop is skippable, the check never is.
+   - A surviving mutant on the discrimination sensor marks the finding's Closure Matrix row `blocked` and records a `surviving_mutant` signal via `references/lessons.md`.
+   - The fix→re-verify loop is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; exhausting it also marks the row `blocked`. That cap counts re-verify cycles across the whole finding and is a different counter from the two-consecutive-failed-fixes breaker in this file's preamble, which fires inside a single edit iteration.
    - A finding cannot be marked `fixed` when a target-relevant command or artifact check exists but was not attempted; if verification cannot run, mark it `blocked`, `deferred`, or `skipped` with an allowed skipped-check reason.
    - Run the report's verification suggestion when available.
    - Add static checks for dependency direction/import cycles when feasible.
@@ -114,7 +121,8 @@ Not for findings-only architecture review — route to `workflows/architecture/a
 12. At completion, persist only durable knowledge:
    - Accepted architecture constraints, new seams, rejected broad refactors, reusable dependency checks, or recurring coupling patterns after scoring with the Importance Calibration System.
    - Use required tags: `project:<projectId>`, `session:<workflowSessionId>`, `workflow:architecture-fix`, `entity:<entity>`, and one `memory:<tier>` tag.
-13. Complete the Evidence Gate from `references/evidence-gate.md`.
+13. Write the Fix Closure Report per `references/audit-report-io.md`'s Fix Closure Report Contract, at `audits/architecture/<YYYY-MM-DD architecture-fix-closure>.md`, sibling of the consumed audit report. Then run `bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family architecture` before the Propose/Evidence Gate step below; a non-zero exit blocks completion. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
+14. Complete the Evidence Gate from `references/evidence-gate.md`.
 
 ## Examples
 
@@ -131,3 +139,5 @@ User asks: "Fix finding ARCH-2 from audits/architecture/2026-06-06 architecture-
 1. Read the specified report and only execute `ARCH-2`.
 2. Preserve unaffected architecture findings for later.
 3. Report evidence for `ARCH-2` closure and residual risks.
+
+<!-- validator anchors: Stage 3 delivery-authorization scope | Independent Verification Exception | surviving_mutant | Bounded Fix→Re-verify Loop | Fix Closure Report Contract | CONCERNS.md is satisfied by citation | graceful degradation preserved -->
