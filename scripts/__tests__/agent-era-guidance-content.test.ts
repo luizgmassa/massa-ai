@@ -388,3 +388,19 @@ describe("massa-ai-reviewer dispatch block: 5 implementing workflows (T15, AEH-0
     expect(reviewerIdx).toBeLessThan(verificationIdx);
   });
 });
+
+const FIX_WORKFLOW_BATCH_1_TARGETS: ReviewerDispatchTarget[] = [
+  "workflows/bugs/bugs-fix.md",
+  "workflows/code-quality/code-quality-fix.md",
+  "workflows/architecture/architecture-fix.md",
+  "workflows/security/security-fix.md",
+  "workflows/requirements/requirements-fix.md",
+].map((file) => ({ file, scope: "the fix's diff surface and its task/AC context" }));
+
+describe("massa-ai-reviewer dispatch block: fix workflows batch 1 (T16, AEH-06)", () => {
+  for (const target of FIX_WORKFLOW_BATCH_1_TARGETS) {
+    test(`${target.file} carries the reviewer dispatch block with fallback and persona bullets`, () => {
+      expectReviewerDispatchBlock(target);
+    });
+  }
+});
