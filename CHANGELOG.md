@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.30.0] - 2026-08-06
-
 ### Added
 
 - **`discovery` workflow** — product brainstorming / problem-space thinking
@@ -27,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   precedence; codebase understanding stays `exploration`); read-only
   complement grows 23 → 24, workflow population 39 → 40; the workflow
   frontmatter license allowlist gains Apache-2.0.
+
+## [1.30.0] - 2026-08-06
+
+### Added
+
 - **`pr-review` workflow** — six-dimension hosted code review for GitHub Pull
   Requests (`gh`) and GitLab Merge Requests (`glab`), adapted from the TLC
   `pr-review` skill (CC-BY-4.0, github.com/augusto-dmh). One host command map
