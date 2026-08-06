@@ -915,11 +915,19 @@
     {
       "id": "untracked-generated-bundles",
       "slug": "untracked-generated-bundles",
-      "status": "in-progress",
+      "status": "complete",
       "created": "2026-08-05",
       "description": "Stop tracking generated plugin bundles; generate at pack/install/CI time",
       "dependencies": []
+    },
+    {
+      "id": "workflow-commands",
+      "slug": "workflow-commands",
+      "status": "in-progress",
+      "created": "2026-08-05",
+      "description": "Per-workflow slash commands on all four hosts (e.g. /massa-ai:debug), generated from the workflow inventory",
+      "dependencies": []
     }
   ],
-  "active_feature": "untracked-generated-bundles"
+  "active_feature": "workflow-commands"
 }
