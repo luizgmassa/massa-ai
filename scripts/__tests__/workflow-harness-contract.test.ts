@@ -328,6 +328,15 @@ describe("invariants: the references still encode the decisions that were made",
     expect(body).toMatch(/only two legal skip reasons/i);
   });
 
+  test("implementation-delivery.md Stage 1 records isolation evidence and forbids shared-checkout branch switches", async () => {
+    // AC4 (worktree-isolation-gate): the cross-session rule the Isolation Gate
+    // line invokes. Distinct from agent-orchestration.md's cross-subagent rule.
+    const body = await readReference("implementation-delivery.md");
+    expect(body).toContain("Record the isolation evidence immediately after creation");
+    expect(body).toMatch(/Never switch branches in a\s+checkout another session may share/i);
+    expect(body).toMatch(/cross-\*\*session\*\*/);
+  });
+
   test("implementation-delivery.md documents the gh-absent degraded path", async () => {
     const body = await readReference("implementation-delivery.md");
     expect(body).toContain("Degraded Paths");
