@@ -29,7 +29,7 @@ import path from "path";
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const WORKFLOWS_DIR = path.join(REPO_ROOT, "skills/massa-ai/workflows");
 
-const EXPECTED_WORKFLOW_COUNT = 39;
+const EXPECTED_WORKFLOW_COUNT = 40;
 
 const NAME_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
