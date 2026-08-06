@@ -60,6 +60,12 @@ describe("managed subtrees stay gitignored (UGB-01)", () => {
     "apps/codex-plugin/hooks/massa-ai-hook",
     "apps/cursor-plugin/hooks/massa-ai-hook",
     "apps/opencode-plugin/lib/opencode-config.cjs",
+    // Generated workflow commands (workflow-commands feature): one untracked
+    // representative per host locks each star/dir pattern behaviorally.
+    "apps/claude-plugin/commands/debug.md",
+    "apps/codex-plugin/skills/debug.md",
+    "apps/cursor-plugin/skills/debug/SKILL.md",
+    "apps/opencode-plugin/command/massa-ai-debug.md",
   ];
 
   const trackedSurvivors = [

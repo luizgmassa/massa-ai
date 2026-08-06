@@ -218,6 +218,39 @@ describe("workflow-command parity — the 6×3 quick files stay tracked and mark
   }
 });
 
+describe("workflow-command parity — .gitignore negation lines are text-locked (WFC-09)", () => {
+  // Text-level on purpose: `git check-ignore` reports an already-TRACKED path
+  // as not-ignored regardless of pattern, so removing a `!` negation for a
+  // tracked quick file is behaviorally invisible until a fresh clone. The
+  // literal lines are the only discriminating surface (validation.md gap 1).
+  const negationBlocks: Array<[star: string, negations: string[]]> = [
+    [
+      "apps/claude-plugin/commands/*.md",
+      QUICK_COMMAND_NAMES.map((n) => `!apps/claude-plugin/commands/${n}.md`),
+    ],
+    [
+      "apps/codex-plugin/skills/*.md",
+      QUICK_COMMAND_NAMES.map((n) => `!apps/codex-plugin/skills/${n}.md`),
+    ],
+    [
+      "apps/cursor-plugin/skills/*/SKILL.md",
+      QUICK_COMMAND_NAMES.map((n) => `!apps/cursor-plugin/skills/${n}/SKILL.md`),
+    ],
+  ];
+
+  test("every star pattern and all 6 quick-file negations per shared dir are present verbatim", async () => {
+    const gitignore = await fs.readFile(path.join(REPO_ROOT, ".gitignore"), "utf8");
+    const lines = new Set(gitignore.split("\n").map((l) => l.trim()));
+    for (const [star, negations] of negationBlocks) {
+      expect(lines.has(star)).toBe(true);
+      for (const neg of negations) {
+        expect(lines.has(neg)).toBe(true);
+      }
+    }
+    expect(lines.has("apps/opencode-plugin/command/")).toBe(true);
+  });
+});
+
 describe("workflow-command parity — generator --check drift gate is clean (WFC-07/WFC-09)", () => {
   test("bun run scripts/generate-skill-artifacts.ts --check exits 0", () => {
     const res = spawnSync(
