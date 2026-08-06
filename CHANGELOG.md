@@ -7,7 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.31.0] - 2026-08-06
 
 ### Added
 
@@ -73,6 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   across N files costs N reads with per-hop loss) and framing it as read
   mechanics, not module depth, citing `architecture-deepening-lens.md`'s
   Rejected Framings rather than restating them.
+
+## [1.31.0] - 2026-08-06
+
+### Added
 
 - **`discovery` workflow** — product brainstorming / problem-space thinking
   partner, adapted from the `product-brainstorming` skill in
