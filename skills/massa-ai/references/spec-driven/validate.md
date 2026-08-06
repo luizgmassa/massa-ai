@@ -218,6 +218,16 @@ The script enforces grounding (mandatory `--source`) and owns all bookkeeping. A
 
 Persist durable memory for verified outcomes worth reusing via `remember` with tags `workflow:spec-driven`, `entity:<slug>`, and `memory:episodic|procedural` as appropriate.
 
+### 11. Record Metric Snapshot (MANDATORY)
+
+Immediately after validation completes, record this run's quality-metric snapshot so "is the harness improving or degrading" is answerable from data, not memory:
+
+```bash
+bun skills/massa-ai/scripts/lessons.ts --root . metrics add --feature <slug> --result PASS|FAIL --fix-iterations <n> --surviving-mutants <n> --acs-total <n> --acs-covered <n>
+```
+
+Derive the flags from this validation's own evidence: `--result` from the Verdict, `--acs-total`/`--acs-covered` from the Spec-Anchored Acceptance Criteria check, `--surviving-mutants` from the Discrimination Sensor's survived count, and `--fix-iterations` from the fix-loop iteration count used this run.
+
 ---
 
 ## Verdicts

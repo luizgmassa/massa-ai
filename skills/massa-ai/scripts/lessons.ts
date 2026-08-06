@@ -23,6 +23,9 @@
  *   export     Export the lessons store as JSON (round-trips with import).
  *   import     Import lessons from JSON (merge by dedup key; best-effort massa-ai memory).
  *   selftest   Run stdlib regressions (normalization).
+ *   review     Append reviewer-feedback records and derive per-category trust streaks.
+ *   trust      Print derived per-category trust status (advisory only, AEH-03).
+ *   metrics    Append quality-metric snapshots and print the derived trend verdict (AEH-05).
  *
  * Exit codes: 0 ok, 2 usage/validation error (e.g. missing grounding).
  */
@@ -43,6 +46,7 @@ const SIGNALS: Record<string, string> = {
 const SIGNAL_KEYS_SORTED = Object.keys(SIGNALS).sort();
 
 const DEFAULTS = { promote_threshold: 2, window_days: 45, quarantine_threshold: 2 };
+const RAMP_DEFAULTS = { trust_threshold: 30 };
 
 // massa-ai supported memory types (references/mcp-tools.md). `procedural` is a
 // TAG, never a type. Lessons are procedural knowledge -> type `pattern`.
@@ -69,6 +73,25 @@ interface Lesson {
   [key: string]: unknown;
 }
 
+/** Reviewer-feedback event (AEH-03). Append-only; category is a free-form kebab-case label. */
+interface ReviewRecord {
+  category: string;
+  feedback: "none" | "minor" | "major";
+  source: string;
+  recordedAt: string;
+}
+
+/** Per-validation quality-metric snapshot (AEH-05). Append-only. */
+interface MetricSnapshot {
+  feature: string;
+  result: "PASS" | "FAIL";
+  fixLoopIterations: number;
+  survivingMutants: number;
+  acsTotal: number;
+  acsCovered: number;
+  recordedAt: string;
+}
+
 interface Store {
   schema: number;
   promote_threshold: number;
@@ -76,6 +99,13 @@ interface Store {
   quarantine_threshold: number;
   next_id: number;
   lessons: Lesson[];
+  // Ramp-only fields (AEH-03/05) - absent on legacy stores, lazily backfilled by
+  // ensureRampFields() inside the new review/trust/metrics commands only, NEVER in
+  // load(), so every legacy command keeps reading/writing the store byte-identically
+  // to before this feature (pyts-golden protection).
+  trust_threshold?: number;
+  reviews?: ReviewRecord[];
+  metrics?: MetricSnapshot[];
   [key: string]: unknown;
 }
 
@@ -434,6 +464,60 @@ function find(data: Store, signal: string, text: string): Lesson | null {
 }
 
 // ---------------------------------------------------------------------------
+// Trust ramp + metric-trend derivations (AEH-03, AEH-05)
+//
+// review/metrics records are append-only events; streak, trusted, and trend
+// verdict are all derived at read time from the log (design Approach A) - no
+// cached state, so demotion on a `major` record is emergent rather than a
+// write-path invariant that needs its own tests.
+// ---------------------------------------------------------------------------
+
+/**
+ * Lazily backfills the ramp-only fields (`trust_threshold`, `reviews`, `metrics`)
+ * onto an in-memory store. Called ONLY from the new review/trust/metrics commands -
+ * NEVER from `load()` - so every legacy command keeps reading/writing the store
+ * byte-identically to before this feature (pyts-golden protection).
+ */
+function ensureRampFields(data: Store): void {
+  pySetDefault(data as unknown as Record<string, unknown>, "trust_threshold", RAMP_DEFAULTS.trust_threshold);
+  pySetDefault(data as unknown as Record<string, unknown>, "reviews", []);
+  pySetDefault(data as unknown as Record<string, unknown>, "metrics", []);
+}
+
+/** Count of trailing none|minor records for `category`, scanning newest-first until a major. */
+function categoryStreak(data: Store, category: string): number {
+  const records = (data.reviews ?? []).filter((r) => r.category === category);
+  let count = 0;
+  for (let i = records.length - 1; i >= 0; i--) {
+    if (records[i]!.feedback === "major") break;
+    count++;
+  }
+  return count;
+}
+
+function isTrusted(data: Store, category: string): boolean {
+  const threshold = data.trust_threshold ?? RAMP_DEFAULTS.trust_threshold;
+  return categoryStreak(data, category) >= threshold;
+}
+
+/** Scalar trend score for one snapshot - lower is better. FAIL*100 + mutants*10 + fixIters + uncoveredACs. */
+function trendScore(s: MetricSnapshot): number {
+  return (s.result === "FAIL" ? 100 : 0) + s.survivingMutants * 10 + s.fixLoopIterations + (s.acsTotal - s.acsCovered);
+}
+
+/** Compares the last two snapshots' scores (lower = better). <2 snapshots -> "insufficient data". */
+function trendVerdict(snapshots: MetricSnapshot[]): string {
+  if (snapshots.length < 2) return "insufficient data";
+  const last = snapshots[snapshots.length - 1]!;
+  const prev = snapshots[snapshots.length - 2]!;
+  const lastScore = trendScore(last);
+  const prevScore = trendScore(prev);
+  if (lastScore < prevScore) return "improving";
+  if (lastScore > prevScore) return "degrading";
+  return "stable";
+}
+
+// ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
 
@@ -737,6 +821,108 @@ function cmdStatus(root: string): number {
   return 0;
 }
 
+interface ReviewAddArgs {
+  category: string;
+  feedback: string;
+  source: string;
+  project: string;
+}
+
+function cmdReviewAdd(root: string, args: ReviewAddArgs): number {
+  const category = (args.category || "").trim();
+  const source = (args.source || "").trim();
+  const data = load(root);
+  ensureRampFields(data);
+  const record: ReviewRecord = {
+    category,
+    feedback: args.feedback as ReviewRecord["feedback"],
+    source,
+    recordedAt: now(),
+  };
+  data.reviews!.push(record);
+  save(root, data);
+  const streak = categoryStreak(data, category);
+  console.log(`REVIEW ${category} (streak=${streak}, trusted=${isTrusted(data, category)})`);
+  return 0;
+}
+
+function cmdTrustStatus(root: string, categoryFilter: string): number {
+  const data = load(root);
+  ensureRampFields(data);
+  const reviews = data.reviews ?? [];
+  let categories = Array.from(new Set(reviews.map((r) => r.category)));
+  if (categoryFilter) {
+    categories = categories.filter((c) => c === categoryFilter);
+  }
+  categories.sort(pyStringCompare);
+  if (!categories.length) {
+    console.log("(no review records)");
+    return 0;
+  }
+  const threshold = data.trust_threshold ?? RAMP_DEFAULTS.trust_threshold;
+  for (const category of categories) {
+    const total = reviews.filter((r) => r.category === category).length;
+    const streak = categoryStreak(data, category);
+    const trusted = streak >= threshold;
+    console.log(`${category}: streak=${streak}/${threshold} total=${total} trusted=${trusted ? "yes" : "no"}`);
+  }
+  return 0;
+}
+
+/** Parses a required non-negative-integer flag value; prints an error naming `flagName` on failure. */
+function parseNonNegativeInt(value: string, flagName: string): number | null {
+  const n = Number(value);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
+    console.error(`ERROR: ${flagName} must be a non-negative integer, got ${pyRepr(value)}`);
+    return null;
+  }
+  return n;
+}
+
+function cmdMetricsAdd(root: string, raw: Record<string, string>): number {
+  const feature = (raw.feature || "").trim();
+  const result = raw.result as MetricSnapshot["result"];
+  const fixLoopIterations = parseNonNegativeInt(raw["fix-iterations"]!, "--fix-iterations");
+  if (fixLoopIterations === null) return 2;
+  const survivingMutants = parseNonNegativeInt(raw["surviving-mutants"]!, "--surviving-mutants");
+  if (survivingMutants === null) return 2;
+  const acsTotal = parseNonNegativeInt(raw["acs-total"]!, "--acs-total");
+  if (acsTotal === null) return 2;
+  const acsCovered = parseNonNegativeInt(raw["acs-covered"]!, "--acs-covered");
+  if (acsCovered === null) return 2;
+
+  const data = load(root);
+  ensureRampFields(data);
+  const snapshot: MetricSnapshot = {
+    feature,
+    result,
+    fixLoopIterations,
+    survivingMutants,
+    acsTotal,
+    acsCovered,
+    recordedAt: now(),
+  };
+  data.metrics!.push(snapshot);
+  save(root, data);
+  console.log(
+    `METRICS ${feature} (result=${result}, survivingMutants=${survivingMutants}, fixIters=${fixLoopIterations}, acs=${acsCovered}/${acsTotal})`,
+  );
+  return 0;
+}
+
+function cmdMetricsTrend(root: string): number {
+  const data = load(root);
+  ensureRampFields(data);
+  const snapshots = data.metrics ?? [];
+  for (const s of snapshots) {
+    console.log(
+      `${s.feature} result=${s.result} fixIters=${s.fixLoopIterations} survivingMutants=${s.survivingMutants} acs=${s.acsCovered}/${s.acsTotal} recordedAt=${s.recordedAt}`,
+    );
+  }
+  console.log(`trend: ${trendVerdict(snapshots)}`);
+  return 0;
+}
+
 // ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
@@ -744,7 +930,9 @@ function cmdStatus(root: string): number {
 const PROG = "lessons.ts";
 
 function usageError(msg: string): void {
-  process.stderr.write(`usage: ${PROG} [-h] [--root ROOT] {init,add,penalize,list,observe,export,import,prune,status,selftest} ...\n${PROG}: error: ${msg}\n`);
+  process.stderr.write(
+    `usage: ${PROG} [-h] [--root ROOT] {init,add,penalize,list,observe,export,import,prune,status,selftest,review,trust,metrics} ...\n${PROG}: error: ${msg}\n`,
+  );
 }
 
 interface FlagSpec {
@@ -894,9 +1082,57 @@ async function main(argv: string[]): Promise<number> {
     case "selftest":
       return selftestNorm();
 
+    case "review": {
+      const sub = rest[0];
+      if (sub === "add") {
+        const parsed = parseFlags(rest.slice(1), [
+          { name: "--category", required: true },
+          { name: "--feedback", required: true, choices: ["none", "minor", "major"] },
+          { name: "--source", required: true },
+          { name: "--project", default: "" },
+        ]);
+        if (!parsed) return 2;
+        return cmdReviewAdd(absRoot, parsed as unknown as ReviewAddArgs);
+      }
+      usageError(`argument cmd: invalid choice: ${pyRepr(sub ?? "")} (choose from 'add')`);
+      return 2;
+    }
+
+    case "trust": {
+      const sub = rest[0];
+      if (sub === "status") {
+        const parsed = parseFlags(rest.slice(1), [{ name: "--category", default: "" }]);
+        if (!parsed) return 2;
+        return cmdTrustStatus(absRoot, parsed.category!);
+      }
+      usageError(`argument cmd: invalid choice: ${pyRepr(sub ?? "")} (choose from 'status')`);
+      return 2;
+    }
+
+    case "metrics": {
+      const sub = rest[0];
+      if (sub === "add") {
+        const parsed = parseFlags(rest.slice(1), [
+          { name: "--feature", required: true },
+          { name: "--result", required: true, choices: ["PASS", "FAIL"] },
+          { name: "--fix-iterations", required: true },
+          { name: "--surviving-mutants", required: true },
+          { name: "--acs-total", required: true },
+          { name: "--acs-covered", required: true },
+        ]);
+        if (!parsed) return 2;
+        return cmdMetricsAdd(absRoot, parsed);
+      }
+      if (sub === "trend") {
+        return cmdMetricsTrend(absRoot);
+      }
+      usageError(`argument cmd: invalid choice: ${pyRepr(sub ?? "")} (choose from 'add', 'trend')`);
+      return 2;
+    }
+
     default:
       usageError(
-        `argument cmd: invalid choice: ${pyRepr(cmd)} (choose from 'init', 'add', 'penalize', 'list', 'observe', 'export', 'import', 'prune', 'status', 'selftest')`,
+        `argument cmd: invalid choice: ${pyRepr(cmd)} (choose from 'init', 'add', 'penalize', 'list', 'observe', 'export', 'import', 'prune', 'status', 'selftest', 'review', 'trust', 'metrics')`,
       );
       return 2;
   }

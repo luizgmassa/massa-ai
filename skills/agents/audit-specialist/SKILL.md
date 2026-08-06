@@ -38,12 +38,13 @@ The `lens` field in the capability packet selects the audit behavior:
 | `requirements` | Requirements, spec, acceptance, scope alignment | `workflows/requirements/requirements-audit.md` |
 | `code-quality` | SOLID, Clean Code, KISS, YAGNI, DRY, maintainability | `workflows/code-quality/code-quality-audit.md` |
 | `performance` | Performance hotspots, allocation, latency, throughput | Domain-specific; no fixed reference |
+| `tests` | Coverage, regression protection, assertion quality, variation | `workflows/tests/tests-audit.md` |
 
 All lenses share `references/audit-scope.md` (scope rules) and `references/audit-report-io.md` (report format).
 
 ## Inputs
 - `scope`: the target area, diff, or module to audit.
-- `lens`: one of `bugs | architecture | security | requirements | code-quality | performance` (required).
+- `lens`: one of `bugs | architecture | security | requirements | code-quality | performance | tests` (required).
 - `inputs`: recalled facts, existing audit reports, source pointers.
 - `sensors`: static checks available for the lens (lint, typecheck, security scanners).
 

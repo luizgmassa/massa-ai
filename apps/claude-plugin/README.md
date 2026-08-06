@@ -15,7 +15,7 @@ Slash commands (installed as `/massa-ai-*`):
 | `/massa-ai-graph <symbol>` | Reference graph (who calls / imports / extends) |
 | `/massa-ai-status` | Workspaces health + search analytics |
 
-Plus 38 generated workflow commands, one per massa-ai workflow (`/massa-ai:debug` on the marketplace route, `/massa-ai-debug` on the file route, etc.) — see [Workflow Commands](../../FEATURES.md#workflow-commands-38-generated-slash-commands) in the root feature reference for the full naming table.
+Plus 40 generated workflow commands, one per massa-ai workflow (`/massa-ai:debug` on the marketplace route, `/massa-ai-debug` on the file route, etc.) — see [Workflow Commands](../../FEATURES.md#workflow-commands-generated-slash-commands) in the root feature reference for the full naming table.
 
 Subagent:
 

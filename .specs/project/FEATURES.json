@@ -921,6 +921,79 @@
       "dependencies": []
     },
     {
+      "id": "plugin-architecture-unification",
+      "slug": "plugin-architecture-unification",
+      "title": "AD-017: plugins deliver, MCP serves tools, hooks observe — OpenCode MCP re-registration, sentinel-gated harness skip, Cursor bridge dedupe, hooks-only OpenCode plugin",
+      "status": "complete",
+      "created": "2026-08-05",
+      "depends_on": [],
+      "artifacts": [
+        "spec.md",
+        "design.md",
+        "tasks.md",
+        "context.md",
+        "validation.md"
+      ],
+      "notes": "Merged as PR #74 @ 46e7af97 (status flipped from in-progress during the pr-review-workflow main merge)."
+    },
+    {
+      "id": "pr-review-workflow",
+      "slug": "pr-review-workflow",
+      "title": "PR Review Workflow — six-dimension hosted GitHub PR / GitLab MR review posting inline findings + consolidated summary via gh/glab, massa-ai roster dispatches, .specs/ requirements integration",
+      "status": "complete",
+      "created": "2026-08-05",
+      "workflow": "spec-driven",
+      "branch": "spec/pr-review-workflow",
+      "depends_on": [],
+      "artifacts": [
+        "spec.md",
+        "design.md",
+        "tasks.md",
+        "validation.md"
+      ],
+      "notes": "VALIDATED PASS 2026-08-05 (independent verifier, author != verifier): 26/26 lettered ACs, 5/5 discrimination mutations killed (0 survivors), 6 suites 131/0 on verifier-owned runs, parity no drift, SKILL.md 20091 B. test:scripts 1451/4 — 4 fails are the .claude/worktrees needle-anchor contamination class, CI authoritative. Push/PR = user decision. NOTE: its T6 commit c4b4d6cb landed on spec/discovery-workflow (shared-checkout incident, recorded in STATE); suggested repair: git branch -f spec/pr-review-workflow c4b4d6cb before push."
+    },
+    {
+      "id": "discovery-workflow",
+      "slug": "discovery-workflow",
+      "title": "Discovery Workflow — product brainstorming thinking partner (four modes, seven frameworks, five-stage session rhythm, conduct contract) adapted from anthropics/knowledge-work-plugins product-brainstorming (Apache-2.0), mandatory to-prd PRD offer at Capture, router row + tier-4 clause, count locks 39→40 / complement 23→24, WMH license allowlist +Apache-2.0",
+      "status": "complete",
+      "created": "2026-08-05",
+      "workflow": "spec-driven",
+      "branch": "spec/discovery-workflow",
+      "depends_on": [
+        "pr-review-workflow"
+      ],
+      "artifacts": [
+        "spec.md",
+        "design.md",
+        "tasks.md",
+        "validation.md"
+      ],
+      "notes": "VALIDATED PASS 2026-08-05 (independent verifier, author != verifier): 15/15 lettered ACs, 4/4 discrimination mutations killed (0 survivors, hash-verified restores), named suites 131/0 + parity no drift + SKILL.md 20293 B + doc-paths 0 misses + lint 0 on verifier-owned re-runs; observed-red 39/23 reproduced in a scratch worktree at 231a9357. test:scripts 1451/4 — 4 fails are the .claude/worktrees needle-anchor contamination class, CI authoritative. Push/PR = user decision; see STATE for the c4b4d6cb shared-checkout incident repair (fast-forward spec/pr-review-workflow first)."
+    },
+    {
+      "id": "agent-era-harness-upgrades",
+      "slug": "agent-era-harness-upgrades",
+      "title": "Agent-Era Harness Upgrades — lessons.ts trust ramp + metric trend, massa-ai-reviewer dispatch in 14 workflows, tests five-gate error-class model + tests lens, feature-workflow AC anchor, code-quality/refactor/coding-guidelines agent-read-aware rewrites (file-size ~500/~600 per user amendment)",
+      "status": "complete",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/agent-era-harness-upgrades",
+      "notes": "Merged (main released v1.31.0/v1.32.0 with its entries); status flipped from stale in-progress during the workflow-commands main merge.",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/agent-era-harness-upgrades/spec.md",
+      "design": ".specs/features/agent-era-harness-upgrades/design.md",
+      "tasks": ".specs/features/agent-era-harness-upgrades/tasks.md",
+      "created": "2026-08-05",
+      "dependencies": []
+    },
+    {
       "id": "workflow-commands",
       "slug": "workflow-commands",
       "status": "in-progress",

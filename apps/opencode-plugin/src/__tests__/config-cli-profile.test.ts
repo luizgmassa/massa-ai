@@ -10,6 +10,7 @@
  * `scripts/__tests__/profile-cli-parity.test.ts`.
  */
 
+import "./env-setup"; // FIRST import — freezes scratch XDG_CONFIG_HOME before require("@massa-ai/shared") pins CONFIG_DIR
 import { describe, test, expect, mock, beforeEach } from "bun:test";
 
 const listProfiles = mock((..._args: unknown[]): unknown => ({ hosts: [] }));

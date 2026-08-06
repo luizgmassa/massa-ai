@@ -111,6 +111,7 @@ report:
 - the PR URL,
 - the check names that passed,
 - what is still unverified (skipped jobs, absent checks),
+- the change's category trust status (`bun skills/massa-ai/scripts/lessons.ts --root . trust status --category <kebab>`) as advisory reading-depth context — it never substitutes for the approval decision below,
 
 then stop and ask. If the user approves, merge with the repository's configured
 strategy and delete the branch. If the repository auto-releases on merge, say so

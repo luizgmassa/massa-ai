@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **38 generated workflow slash commands, one per `skills/massa-ai/workflows/**/*.md`,
+- **Generated workflow slash commands (40 at merge), one per `skills/massa-ai/workflows/**/*.md`,
   across all four plugins.** Every massa-ai workflow is now directly invocable —
   `/massa-ai:debug` / `/massa-ai-debug` (Claude Code marketplace / file route),
   `$debug` (Codex), an auto-loaded `skills/debug/SKILL.md` (Cursor), and
@@ -25,8 +25,194 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installed directory by the `massa-ai-` prefix rather than deriving removals
   from the source bundle, which previously left owned commands behind
   whenever the bundle was absent or stale at uninstall time. See
-  [Workflow Commands](./FEATURES.md#workflow-commands-38-generated-slash-commands)
+  [Workflow Commands](./FEATURES.md#workflow-commands-generated-slash-commands)
   for the full per-host reference.
+## [1.32.0] - 2026-08-06
+
+### Added
+
+- **`lessons.ts` review-feedback trust ramp and metric-snapshot trend
+  commands.** `review add --category --feedback none|minor|major --source`
+  appends to `data.reviews`; `trust status` derives a per-category trailing
+  streak (`trusted` at `trust_threshold`, default 30, comparison `>=`; a
+  `major` record resets the streak to 0 and demotes) via lazy
+  `ensureRampFields`, never touched by `load()`, so legacy stores load clean
+  with an empty trust view. `metrics add` (enum + non-negative-integer
+  validated) appends a `PASS|FAIL` + `fix-iterations` + `surviving-mutants` +
+  `acs-total`/`acs-covered` snapshot to `data.metrics`; `metrics trend`
+  compares the last two snapshots on a scalar score
+  (`FAIL*100 + mutants*10 + fixIters + uncoveredACs`) and reports
+  improving/stable/degrading, or `insufficient data` under two snapshots.
+  Both surfaces are documented in `references/lessons.md`; the human-review
+  stage of `references/implementation-delivery.md` reports the change's
+  category trust status as advisory reading-depth context only — the per-PR
+  merge-approval clause is unchanged.
+- **`massa-ai-reviewer` dispatch wired into 14 workflows.** `feature.md`,
+  `spec-driven.md` (Execute step 6, before the verification-agent dispatch),
+  `general.md`, `debug.md`, `refactor.md`, and the 9 `*-fix.md` workflows
+  each gain a post-implementation, pre-verification read-only reviewer
+  dispatch block (fallback: standalone fresh-eyes review when the subagent
+  is unavailable) per `references/agent-orchestration.md`'s format; existing
+  verification gates are unchanged.
+- **Tests lens on `audit-specialist` and a five-gate error-class model in
+  `tests-audit.md`.** The audit-specialist lens table gains a `tests` row
+  (coverage, regression protection, assertion quality, variation) routing to
+  `workflows/tests/tests-audit.md`; `tests-audit.md` gains a five-row
+  gate/error-class table (unit→logic, coverage→holes, variation→brittleness,
+  AC-mapping→wrong-thing, trend→drift), a variation sensor (flags
+  single-fixture-example coverage), and a trend sensor reading
+  `lessons.ts metrics trend`; the dispatch lens `performance` no longer
+  files coverage findings — they route to `tests`. `tests-fix.md` gains a
+  matching variation fix method (varied-input cases, never a second copy of
+  the fixture example) and `test-engineer`'s charter mission now names the
+  five error classes plus variation/property-style test design.
+- **Feature-workflow AC anchor.** `feature.md` gains a pre-implementation
+  step capturing 1-5 testable acceptance criteria (or referencing an
+  existing spec artifact), and its verification step checks outcomes
+  against those captured ACs instead of only a generic verification recipe.
+- **Metric-snapshot recording in the validate reference.** `references/spec-driven/validate.md`
+  gains a mandatory post-validation step recording the run's snapshot via
+  `lessons.ts metrics add`.
+
+### Changed
+
+- **Code-quality and refactor split/extraction guidance rewritten to be
+  agent-read-aware.** `code-quality-audit.md` and `code-quality-fix.md`
+  replace the split-on-"does more than one thing"/size-alone lead with a
+  discoverability-or-change-risk criterion (split only when the result
+  yields an externally-findable named unit or measurably reduces change
+  risk); static leads in `code-quality-audit.md` gain multi-subject-file and
+  >~600-line flags with an explicit no-flag-below-bound guard.
+  `refactor.md` step 8 now names extract-for-findability (an
+  externally-searchable named unit) as the primary extraction payoff.
+- **`coding-guidelines.md` gains a "File shape for agent readers" section**
+  stating the read-mechanics guidance explicitly (one-subject files up to
+  ~500 lines are fine, over ~600 must be flagged for splitting — a
+  working-context-headroom bound, amended by user from the initial
+  ~1000/~2000 — one subject split
+  across N files costs N reads with per-hop loss) and framing it as read
+  mechanics, not module depth, citing `architecture-deepening-lens.md`'s
+  Rejected Framings rather than restating them.
+
+## [1.31.0] - 2026-08-06
+
+### Added
+
+- **`discovery` workflow** — product brainstorming / problem-space thinking
+  partner, adapted from the `product-brainstorming` skill in
+  `anthropics/knowledge-work-plugins` (Apache-2.0, attributed). Four
+  brainstorming modes (problem exploration, solution ideation, assumption
+  testing, strategy exploration), seven frameworks-as-tools (HMW, JTBD,
+  Opportunity Solution Trees, first principles, SCAMPER, OODA, reverse
+  brainstorming), the Frame → Diverge → Provoke → Converge → Capture session
+  rhythm, and a thinking-partner conduct contract with six named
+  anti-patterns. Binds to the massa-ai runtime (budgeted `recall` at start,
+  durable `decision`/`pattern` memories at Capture, graceful degradation) and
+  ends every session with a mandatory offer to synthesize the conversation
+  into a PRD via the existing `to-prd` workflow — acceptance is the explicit
+  request `to-prd` requires. Registered in the router (tier-4 primary-verb
+  precedence; codebase understanding stays `exploration`); read-only
+  complement grows 23 → 24, workflow population 39 → 40; the workflow
+  frontmatter license allowlist gains Apache-2.0.
+
+## [1.30.0] - 2026-08-06
+
+### Added
+
+- **`pr-review` workflow** — six-dimension hosted code review for GitHub Pull
+  Requests (`gh`) and GitLab Merge Requests (`glab`), adapted from the TLC
+  `pr-review` skill (CC-BY-4.0, github.com/augusto-dmh). One host command map
+  (identity, metadata/`diff_refs`, diff, changed files, paginated discussion
+  inventory, added-line-anchored inline comments, thread replies, summary) with
+  every GitLab command verified against official CLI/API documentation; the
+  stable `glab api` Discussions/Notes endpoints are the contract (the
+  experimental `glab mr note` inline flags are noted only as an alternative).
+  Review dimensions run as read-only massa-ai roster dispatches in two waves
+  (`massa-ai-audit-specialist` lenses security/requirements/architecture/
+  performance + a coverage-scoped performance dispatch, `massa-ai-reviewer` for
+  regression/hallucination); subagents never touch the host — the orchestrator
+  posts, dedupes (±3 lines), replies `[RESOLVED]`, and assembles one
+  consolidated summary. Integrates budgeted `recall`, freshness-gated index
+  retrieval (`project_map`/`get_architecture`/`impact_analysis`), and
+  `.specs/` acceptance criteria as a requirements source. Registered in the
+  router (table row + target-type precedence clause); workflow count locks move
+  38 → 39, read-only complement 22 → 23. Comment-only by contract: approve/
+  request-changes/merge commands on both hosts are named forbidden.
+### Changed
+
+- **AD-017: plugins deliver, MCP serves tools, hooks observe.** The OpenCode
+  installer no longer removes its own MCP entry as "redundant" — it delegates
+  registration to `scripts/install-agents.sh --agent opencode` on every
+  install, the same single-writer pattern Codex already used, so OpenCode
+  users get all 54 MCP tools instead of the 14 the plugin used to expose
+  in-process. Uninstalling the plugin (`apps/opencode-plugin/install.sh
+  --uninstall`) now leaves the MCP entry in place — plugin lifecycle is
+  independent of MCP tool-surface lifecycle; remove the entry separately with
+  `bash scripts/install-agents.sh --agent opencode --uninstall` if wanted. See
+  `docs/adr/0002-plugins-deliver-mcp-serves-tools-hooks-observe.md`.
+- **The harness plugin phase no longer trusts a version record it never
+  verified against disk.** `skip-current` now requires an on-disk per-host
+  sentinel (flat agent files, a plugin file, or a registry entry, depending on
+  host) in addition to a matching recorded version; an external wipe of
+  installed artifacts (observed live 2026-08-05 against this machine's
+  `~/.cursor`) now triggers a self-healing reinstall — logged by name — instead
+  of reporting `skip-current` forever against zero artifacts. `--dry-run`
+  reports the would-be reinstall without writing; `skip-newer`, `skip-absent`,
+  and `--uninstall` are unchanged.
+- **Cursor no longer loads massa-ai twice.** Cursor 3.14 bridges the Claude
+  marketplace plugin from `~/.claude` in addition to loading a local plugin
+  copy from `~/.cursor/plugins/local/massa-ai/`, risking double hook firing.
+  The Cursor installer now detects an installed-and-enabled Claude massa-ai
+  plugin and prefers that bridge — skipping the local plugin copy and its hook
+  wiring, and removing a pre-existing local copy + its owned hook entries so a
+  double-installed machine converges to a single load on the next run. No
+  bridge detected → local install as before (fallback, unchanged behavior).
+  Flat subagents and MCP registration are written in both branches. The
+  installed route is recorded as `installRoute: "bridge" | "local"` in
+  `install-state.json`.
+
+### Removed
+
+- **The OpenCode plugin's 14 in-process tools.** (`search`, `remember`,
+  `recall`, `index`, `compress`, `optimized_context`, `read`, `index_status`,
+  `analytics`, `list_projects`, `search_definitions`, `get_references`,
+  `go_to_definition`, `profile`) `apps/opencode-plugin/src/index.ts` is now
+  hooks-only — event handlers (`session.created`, `tool.execute.after`,
+  `experimental.session.compacting`, `shell.env`, `event`, `dispose`) are
+  unchanged. **Breaking** for anyone invoking these tool names bare (without
+  the MCP client's naming). The massa-ai MCP server serves the equivalent (and
+  40 more) tools under the same names — 54 total — registered alongside the
+  plugin as of the `### Changed` entry above (AD-017).
+
+### Fixed
+
+- **Cursor subagents now install where Cursor actually reads them.** The
+  Cursor plugin installer copied the 17 specialists into
+  `~/.cursor/plugins/local/massa-ai/agents/`; Cursor 3.x discovers subagents
+  only from the flat `~/.cursor/agents/*.md` (or project `.cursor/agents/`)
+  directory — a plugin's `agents/` subtree is never scanned for subagents,
+  even though Cursor 3.14 does load `plugins/local/<name>/` as a user-local
+  plugin (and separately bridges Claude marketplace plugins from `~/.claude`).
+  Install now writes real copies to `~/.cursor/agents/` (prefix-owned
+  `massa-ai-*.md`, prune-then-copy on upgrade, uninstall leaves user agents
+  untouched) and removes the pre-fix in-plugin copy on upgrade.
+- **`install-skills.sh` now says loudly that Cursor reads no global rules
+  file.** The cursor platform wrote the bootstrap block to
+  `~/.cursor/AGENTS.md` and reported success, but Cursor has no global
+  AGENTS.md surface (open Cursor feature request) — global rules exist only
+  as Cursor Settings → Rules, and AGENTS.md is read per project root. The
+  file is still written for forward-compatibility; the installer now prints
+  the manual step instead of implying the bootstrap took effect.
+- **OpenCode plugin is now a real copy, not a symlink into the checkout.**
+  `~/.config/opencode/plugins/massa-ai/index.js` was a symlink to the repo's
+  gitignored `apps/opencode-plugin/dist/index.js`; whenever that build output
+  vanished (rebuild, worktree deletion, bundle regeneration) the link went
+  dead and OpenCode skipped the plugin with no log line — losing all 14
+  in-process tools *and* the MCP entry the installer had already withdrawn by
+  design (single-writer; the plugin registers tools in-process). The
+  installer now copies the built bundle (both scopes), replaces a pre-fix
+  symlink on upgrade, and refreshes a stale copy on re-run. Re-run the
+  installer (or harness) after `bun run build` to pick up a new build.
 
 ## [1.29.0] - 2026-08-05
 

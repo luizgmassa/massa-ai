@@ -16,7 +16,7 @@ Every feature in massa-ai, what it does, why it exists, and how to use it.
 - [Persistent Memory](#persistent-memory)
 - [Passive Capture (Hooks)](#passive-capture-hooks)
 - [Plugins (4-Tool Parity)](#plugins-4-tool-parity)
-- [Workflow Commands (38 Generated Slash Commands)](#workflow-commands-38-generated-slash-commands)
+- [Workflow Commands (Generated Slash Commands)](#workflow-commands-generated-slash-commands)
 - [Model Profile Switching](#model-profile-switching)
 - [Workflow Tools (52-Tool Adoption)](#workflow-tools-52-tool-adoption)
 - [Bootstrap](#bootstrap)
@@ -34,7 +34,7 @@ Every feature in massa-ai, what it does, why it exists, and how to use it.
 - [Query Understanding (Rewrite + HyDE)](#query-understanding-rewrite--hyde)
 - [Rerank (LLM-judge)](#rerank-llm-judge)
 - [Fetch and Index](#fetch-and-index)
-- [MCP Server (52 Tools)](#mcp-server-52-tools)
+- [MCP Server (54 Tools)](#mcp-server-54-tools)
 - [REST API](#rest-api)
 - [API Authentication](#api-authentication)
 - [Configuration](#configuration)
@@ -275,7 +275,7 @@ bash apps/cursor-plugin/install.sh --uninstall
 
 ### OpenCode plugin (`apps/opencode-plugin/`)
 
-**What it bundles:** 14 in-process tools (search, remember, recall, index, compress, optimized_context, read, index_status, analytics, list_projects, search_definitions, get_references, go_to_definition) + 6 in-process lifecycle handlers. It is published as `@massa-ai/opencode-plugin`, and unlike the other three it registers its tools in-process rather than over MCP. All four plugins are now published npm packages (`@massa-ai/{claude,codex,cursor,opencode}-plugin`), each shipping its own copy of the `massa-ai` and `persona-router` skills plus the 17 agent charters, so a registry install needs no repository checkout.
+**What it bundles:** hooks only (AD-017: plugins deliver, MCP serves tools, hooks observe) — 6 in-process lifecycle handlers and 17 subagent specialists. It registers zero in-process tools; the massa-ai MCP server (54 tools) is registered alongside it via `scripts/install-agents.sh --agent opencode`, same as every other host. It is published as `@massa-ai/opencode-plugin`. All four plugins are now published npm packages (`@massa-ai/{claude,codex,cursor,opencode}-plugin`), each shipping its own copy of the `massa-ai` and `persona-router` skills plus the 17 agent charters, so a registry install needs no repository checkout.
 
 **Hook events (in-process, 6 lifecycle handlers):** `session.created`, `tool.execute.after`, `experimental.session.compacting`, `shell.env`, `event`, `dispose` — all registered in-process by the plugin. No external hooks file needed.
 
@@ -325,9 +325,9 @@ bundle, via `scripts/install-harness.sh`:
 
 **Shared binary:** all shell-script-based plugins (Claude Code, Codex, Cursor) use the same `massa-ai-hook.ts` Bun binary from `apps/claude-plugin/hooks/`. Codex and Cursor carry a **generated real copy** at `hooks/massa-ai-hook`, kept in sync by `scripts/generate-skill-artifacts.ts --check`. They used to symlink to it; that could not survive publishing, because `npm pack` silently drops symlinks — the linked file *and its containing directory* vanish from the tarball with no error. The binary resolves the project ID via: existing pin → `MASSA_AI_PROJECT_ID` env → git toplevel basename → cwd basename.
 
-**MCP single writer:** `scripts/install-agents.sh` owns every host's MCP config. The three script-based plugin installers call it (`--agent claude-code` / `codex` / `cursor`) instead of shipping their own MCP file, so installing a plugin and running the installer directly cannot double-register. MCP is always written at **user** scope, even for a `--project` plugin install.
+**MCP single writer:** `scripts/install-agents.sh` owns every host's MCP config. All four plugin installers call it (`--agent claude-code` / `codex` / `cursor` / `opencode`) instead of shipping their own MCP file, so installing a plugin and running the installer directly cannot double-register. MCP is always written at **user** scope, even for a `--project` plugin install.
 
-OpenCode is the exception: `@massa-ai/opencode-plugin` registers 14 tools in-process, so the installer skips the OpenCode MCP entry when that plugin is listed in the resolved OpenCode config — and still writes it for users who do not have the plugin. That config is resolved as `opencode.jsonc` → `opencode.json` → create `opencode.jsonc`, and parsed comment-tolerantly. When both files exist the installer edits `opencode.json` and warns, because OpenCode merges `.json` over `.jsonc`, so writing to the other one would be a silent no-op.
+OpenCode is no longer an exception (AD-017): `install-agents.sh` always writes the OpenCode MCP entry regardless of which form `opencode.json` lists the plugin in — `@massa-ai/opencode-plugin` registers zero in-process tools, so there is nothing for the entry to duplicate. That config is resolved as `opencode.jsonc` → `opencode.json` → create `opencode.jsonc`, and parsed comment-tolerantly. When both files exist the installer edits `opencode.json` and warns, because OpenCode merges `.json` over `.jsonc`, so writing to the other one would be a silent no-op.
 
 Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/plugins/massa-ai/` and `~/.cursor/plugins/massa-ai/`. Neither was a host read path; reinstalling a plugin removes the stale file.
 
@@ -335,9 +335,9 @@ Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/p
 
 ---
 
-## Workflow Commands (38 Generated Slash Commands)
+## Workflow Commands (Generated Slash Commands)
 
-**What:** massa-ai generates one host-native slash command per workflow skill under `skills/massa-ai/workflows/**/*.md` (38 at last count, scan-derived — never hardcoded). Every workflow the massa-ai router can dispatch becomes directly invocable, skipping the router's own classification step for the explicit case.
+**What:** massa-ai generates one host-native slash command per workflow skill under `skills/massa-ai/workflows/**/*.md` (40 at last count, scan-derived — never hardcoded). Every workflow the massa-ai router can dispatch becomes directly invocable, skipping the router's own classification step for the explicit case.
 
 **Why:** Without a dedicated command, invoking a specific workflow (e.g. `debug`, `tdd`, `security-audit`) means describing intent in prose and trusting the router's classifier. A generated command makes the choice explicit and one keystroke away, on every host, for every workflow — not just the 6 hand-authored "quick" commands (`map`/`index`/`find`/`def`/`graph`/`status`).
 
@@ -553,8 +553,9 @@ schema conformance, and profile selection).
 (`packages/shared/src/profile-switch/`, published in `@massa-ai/shared`), fronted by
 MCP tools (`profile_list`, `profile_set`), a `profile list|show|set <name> [--host <h>]
 [--dry-run]` subcommand in both `massa-ai-config` CLIs (mcp-client, opencode-plugin),
-an OpenCode in-process `profile` tool, and a Claude skill (`skills/profile/`,
-`/massa-ai:profile`). Every registry profile ships pre-rendered per host inside the
+and a Claude skill (`skills/profile/`, `/massa-ai:profile`). The former OpenCode
+in-process `profile` tool was retired with the plugin's tool surface (AD-017) —
+OpenCode switches via the MCP pair or its `massa-ai-config` CLI. Every registry profile ships pre-rendered per host inside the
 plugin bundle (`agent-profiles/<profile>/`, sibling of `agents/`); switching copies the
 chosen profile's already-built files over the installed active agent set — offline, on
 an npm-only install, no resolver or repo checkout involved.
@@ -592,7 +593,7 @@ switching" non-goal in `.specs/features/model-profile-registry/spec.md` in place
 
 ## Workflow Tools (52-Tool Adoption)
 
-**What:** The massa-ai workflow skill (`skills/massa-ai/`) references the full 52-tool surface from `apps/mcp-client/src/tool-definitions.ts` CANONICAL_ORDER. Every tool name uses the canonical un-prefixed form (e.g. `recall`, not `recall`), matching what the MCP server and OpenCode plugin actually expose. The tool-contract reference (`references/mcp-tools.md`) contains a complete MCP Capability Matrix for all 52 tools grouped by category, and each workflow adopts the tools that materially benefit its flow.
+**What:** The massa-ai workflow skill (`skills/massa-ai/`) references the full 54-tool surface from `apps/mcp-client/src/tool-definitions.ts` CANONICAL_ORDER (52 at the time of adoption; grown to 54 since). Every tool name uses the canonical un-prefixed form (e.g. `recall`, not `recall`), matching what the MCP server exposes (AD-017: MCP is the one canonical tool surface across all four host plugins). The tool-contract reference (`references/mcp-tools.md`) contains a complete MCP Capability Matrix for all 54 tools grouped by category, and each workflow adopts the tools that materially benefit its flow.
 
 **Why:** The workflows previously referenced only ~11 of 52+ shipped tools and used stale `th0th_*`-prefixed names that diverged from the actual MCP tool declarations. Powerful shipped features — checkpoints, cross-session handoffs, bootstrap, compact_snapshot, trace_path, impact_analysis, code execution, the full Synapse lifecycle, read_file, symbol_snippet, memory_update/delete, analytics, fetch_and_index — were unguided by the workflow router. Agents following massa-ai workflows missed deterministic, first-class tool support for long-running task save/resume, cross-session continuity, code-path tracing, impact analysis, and code execution for analysis.
 
@@ -970,9 +971,9 @@ fetch_and_index { requests: [{ url: "https://..." }, { url: "https://..." }], co
 
 ---
 
-## MCP Server (52 Tools)
+## MCP Server (54 Tools)
 
-**What:** A stdio MCP server (`@massa-ai/mcp-client`) exposing 52 tools across indexing, search, symbol graph, memory, lifecycle, Synapse, passive capture, handoffs, auto-improvement, checkpoints, and code execution. Connects to the Tools API via HTTP. The current roster fits in one MCP `tools/list` page (pagination via `nextCursor` activates over 100 tools).
+**What:** A stdio MCP server (`@massa-ai/mcp-client`) exposing 54 tools across indexing, search, symbol graph, memory, lifecycle, Synapse, passive capture, handoffs, auto-improvement, checkpoints, and code execution. Connects to the Tools API via HTTP. The current roster fits in one MCP `tools/list` page (pagination via `nextCursor` activates over 100 tools).
 
 **Why:** MCP is the standard protocol for connecting AI tools to external services. The MCP server makes massa-ai's full capability set available to any MCP-compatible client (Claude Code, Codex, Cursor, OpenCode).
 

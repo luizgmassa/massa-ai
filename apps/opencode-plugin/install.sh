@@ -6,12 +6,14 @@
 # registers it with OpenCode's plugin configuration. Also installs the 12
 # subagent specialist agents.
 #
-# The plugin registers massa-ai tools in-process, so this installer delegates to
-# scripts/install-agents.sh to UNINSTALL the now-redundant MCP entry (if it was
-# previously written).
+# MCP registration is delegated to scripts/install-agents.sh, the single writer
+# of host MCP config — same pattern as the Claude/Codex/Cursor installers
+# (AD-017: plugins deliver, MCP serves tools, hooks observe). This installer no
+# longer removes the MCP entry; the plugin and the MCP server are independent
+# surfaces, and uninstalling the plugin does not withdraw MCP registration.
 #
-# Idempotent: re-running is a no-op when the plugin symlink and config entry are
-# already present.
+# Idempotent: re-running refreshes the installed plugin copy and is a no-op
+# for an already-present config entry.
 # Uninstall removes only ownership-marked entries, preserving user plugins and
 # user top-level keys.
 #
@@ -28,8 +30,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # Marketplace/bundle root resolved once per run by install-harness.sh
 # (--plugin-source local|copy|auto). OpenCode has no marketplace registry — its
-# opencode.json `plugin` array IS the registry — but the symlink below still has
-# to point somewhere that outlives the checkout, so it honours the same root.
+# opencode.json `plugin` array IS the registry — but the installed plugin copy
+# below is sourced from a built bundle, so it honours the same root.
 PLUGIN_SOURCE_ROOT="${MASSA_AI_PLUGIN_SOURCE_ROOT:-$REPO_ROOT}"
 SCOPE="user"
 UNINSTALL=0
@@ -415,10 +417,11 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
   vecho "Uninstalling massa-ai OpenCode plugin (scope: $SCOPE)..."
   uninstall_bundled_skills
 
-  # Remove plugin symlink
-  if [[ -L "$PLUGINS_DIR/index.js" ]]; then
+  # Remove the installed plugin file (a regular copy; pre-fix installs left a
+  # symlink — remove either shape).
+  if [[ -e "$PLUGINS_DIR/index.js" || -L "$PLUGINS_DIR/index.js" ]]; then
     rm -f "$PLUGINS_DIR/index.js"
-    vinfo "removed plugin symlink from $PLUGINS_DIR/"
+    vinfo "removed plugin from $PLUGINS_DIR/"
     if [[ -d "$PLUGINS_DIR" ]]; then
       rmdir "$PLUGINS_DIR" 2>/dev/null || true
     fi
@@ -488,21 +491,15 @@ NODE
     vinfo "backup: $backup_path"
   fi
 
-  # Delegate to install-agents.sh to remove the MCP entry (if it exists). No
-  # --target override: MCP is always registered at user scope, and --target
-  # takes a $HOME root rather than a config dir.
-  if [[ -f "$REPO_ROOT/scripts/install-agents.sh" ]]; then
-    if agents_out="$(bash "$REPO_ROOT/scripts/install-agents.sh" \
-      --agent opencode --uninstall --yes 2>&1)"; then
-      vecho "$agents_out"
-    else
-      echo "$agents_out" >&2
-      echo "  ⚠ MCP cleanup failed — run: bash scripts/install-agents.sh --agent opencode --uninstall --yes" >&2
-    fi
-  fi
+  # MCP registration is NOT withdrawn here (AD-017): the plugin and the MCP
+  # tool surface are independent — uninstalling the plugin must not repeat the
+  # exact defect item 1 fixes (an OpenCode user silently losing MCP tools).
+  # scripts/install-agents.sh --agent opencode --uninstall remains the explicit
+  # opt-in to remove the MCP entry too.
 
   vecho ""
-  vecho "Done. User plugins and top-level keys preserved."
+  vecho "Done. User plugins and top-level keys preserved. MCP registration untouched —"
+  vecho "run 'bash scripts/install-agents.sh --agent opencode --uninstall' to remove it too."
   exit 0
 fi
 
@@ -512,25 +509,31 @@ vinfo "Installing massa-ai OpenCode plugin to: $TARGET"
 # Create plugin directory
 mkdir -p "$PLUGINS_DIR"
 
-# Symlink the plugin bundle (resolve to the bundle's dist/index.js). Under
-# --plugin-source copy this points at the stable copy rather than the checkout,
-# so deleting the checkout no longer breaks the plugin.
+# Install the plugin as a REAL COPY of the resolved dist/index.js, never a
+# symlink. The symlink shape failed in the field: dist/ is gitignored build
+# output (AD-016), so a worktree deletion or a checkout without a fresh
+# `bun run build` leaves the link dangling — OpenCode skips an unresolvable
+# local plugin without logging a load error, so the host silently loses every
+# event handler this plugin registers. A copy outlives the checkout — the same
+# tradeoff already taken for the hook binary (npm pack drops symlink entries)
+# and by install-skills.sh's real-copy contract. Dev-loop cost: after
+# `bun run build`, re-run this installer (or the harness) to refresh the
+# installed copy.
 resolved_plugin_js="$PLUGIN_SOURCE_ROOT/apps/opencode-plugin/dist/index.js"
 if [[ ! -f "$resolved_plugin_js" ]]; then
-  # The copy is made before `bun run build` has necessarily run in that tree;
-  # the checkout's dist is the only other place it can come from.
+  # The marketplace copy is made before `bun run build` has necessarily run in
+  # that tree; the checkout's dist is the only other place it can come from.
   resolved_plugin_js="$REPO_ROOT/apps/opencode-plugin/dist/index.js"
 fi
 
-# Pre-flight check: refuse to clobber a regular file
-if [[ -e "$PLUGINS_DIR/index.js" && ! -L "$PLUGINS_DIR/index.js" ]]; then
-  echo "Warning: $PLUGINS_DIR/index.js exists as a regular file (not a symlink)" >&2
-  echo "  Refusing to overwrite. Remove it manually if you want to proceed." >&2
-  exit 1
+# A pre-fix install left a symlink here; remove it first so cp writes a new
+# regular file instead of following the link back into the checkout.
+if [[ -L "$PLUGINS_DIR/index.js" ]]; then
+  rm -f "$PLUGINS_DIR/index.js"
+  vinfo "replaced pre-fix symlink at $PLUGINS_DIR/index.js"
 fi
-
-ln -sfn "$resolved_plugin_js" "$PLUGINS_DIR/index.js"
-vinfo "symlink: $PLUGINS_DIR/index.js → $resolved_plugin_js"
+cp "$resolved_plugin_js" "$PLUGINS_DIR/index.js"
+vinfo "copy: $PLUGINS_DIR/index.js ← $resolved_plugin_js"
 
 # Merge into the resolved config file (.jsonc or .json). parseJsonc tolerates an
 # existing .jsonc user's comments/trailing commas; writeConfig backs up BEFORE writing
@@ -633,32 +636,50 @@ vecho ""
 install_bundled_skills
 vecho ""
 
-# Delegate to install-agents.sh to REMOVE the MCP entry (since the plugin registers tools in-process)
+# ── MCP registration (delegated) ─────────────────────────────────────────────
+# scripts/install-agents.sh is the single writer of host MCP config. It writes
+# the massa-ai entry into the resolved opencode config at USER scope — a
+# --project plugin install still registers MCP for the whole user (mirrors
+# apps/codex-plugin/install.sh:699-715).
+vecho ""
+vecho "Registering MCP server (user scope) via scripts/install-agents.sh..."
+MCP_ROUTE=0
 if [[ -f "$REPO_ROOT/scripts/install-agents.sh" ]]; then
-  vecho "Removing redundant MCP entry (plugin registers tools in-process) via scripts/install-agents.sh..."
-
-  # No --target override: MCP is always registered at *user* scope, even for a
-  # --project plugin install, so the entry to withdraw is always the user one.
-  # install-agents.sh --target takes a $HOME root, not a config dir.
-  # Never gated on failure: leaving the MCP entry in place would double the
-  # entire 14-tool surface, since the plugin also registers them in-process.
-  if agents_out="$(bash "$REPO_ROOT/scripts/install-agents.sh" \
-    --agent opencode --uninstall --yes 2>&1)"; then
+  # On success the delegated output is detail (usually "up to date"), so it is
+  # gated. On failure it is never gated: a silently-failed MCP registration is
+  # exactly the bug this change set exists to fix — every one of OpenCode's 54
+  # tools is reached through this entry, unlike Codex/Cursor, whose plugins
+  # never carried an in-process tool surface to begin with.
+  if agents_out="$(MASSA_AI_SUPPRESS_SPECIALIST_HINT=1 bash "$REPO_ROOT/scripts/install-agents.sh" --agent opencode --yes 2>&1)"; then
     vecho "$agents_out"
+    MCP_ROUTE=1
   else
     echo "$agents_out" >&2
-    echo "  ⚠ Could not withdraw the redundant OpenCode MCP entry — tools may be" >&2
-    echo "    registered twice. Run: bash scripts/install-agents.sh --agent opencode --uninstall --yes" >&2
+    echo "  ⚠ MCP wiring failed — run: bash scripts/install-agents.sh --agent opencode --yes" >&2
   fi
+else
+  echo "  ⚠ scripts/install-agents.sh not found — register MCP with: bash scripts/install-agents.sh --agent opencode --yes" >&2
 fi
 
+# PAU-01 AC5: a failed/missing MCP registration prints the recovery command
+# above and never claims overall success — the plugin file installed, but the
+# feature this release exists to ship (54 tools via MCP) did not.
 if [ "${MASSA_AI_VERBOSE:-0}" = "1" ]; then
   vecho ""
   vecho "Done. Restart OpenCode to pick up the plugin."
   vecho ""
-  vecho "💡 Agents are installed in $TARGET/agents/; plugin tools are registered in-process."
+  if [[ "$MCP_ROUTE" -eq 1 ]]; then
+    vecho "💡 Agents are installed in $TARGET/agents/; MCP is registered by scripts/install-agents.sh (single writer)."
+  else
+    warn "MCP registration did not complete — tools will be unavailable until it is registered manually."
+  fi
 else
-  ok "opencode plugin installed (${specialist_count} specialists, ${command_count} workflow commands, 14 in-process tools)"
+  if [[ "$MCP_ROUTE" -eq 1 ]]; then
+    ok "opencode plugin installed (${specialist_count} specialists, ${command_count} workflow commands) — MCP registered (single writer)"
+  else
+    warn "opencode plugin installed (${specialist_count} specialists, ${command_count} workflow commands) — MCP registration failed, tools unavailable"
+    warn "  run: bash scripts/install-agents.sh --agent opencode --yes"
+  fi
 fi
 
 # Final step of the install path: record the bundle version. Reached only when

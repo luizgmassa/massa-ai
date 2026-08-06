@@ -11,8 +11,19 @@
 # MCP registration is delegated to scripts/install-agents.sh, the single writer
 # of host MCP config. This installer no longer ships a plugin-local mcp.json.
 #
+# Cursor 3.14 also bridges the Claude marketplace registry from ~/.claude and
+# loads any plugin listed there IN ADDITION to a local install — a machine
+# with both would load massa-ai twice and fire every hook twice (AD-017). At
+# USER scope, this installer prefers the bridge: when ~/.claude lists massa-ai
+# as installed and enabled, it skips its own local plugin copy and hook
+# wiring (removing a pre-existing local copy so one run converges), while
+# still writing the flat subagents, harness skills, and MCP registration this
+# installer always owns. Project-scope installs are unaffected — ~/.claude is
+# a user surface, never a project one.
+#
 # Idempotent: re-running is a no-op when owned entries already present.
-# Uninstall removes only ownership-marked entries + the plugin directory.
+# Uninstall removes only ownership-marked entries + the plugin directory,
+# regardless of which route (bridge or local) installed them.
 #
 # Usage:
 #   apps/cursor-plugin/install.sh             # install at user scope (~/.cursor)
@@ -92,19 +103,79 @@ if [[ "$SCOPE" == "project" ]]; then
 else
   CURSOR_DIR="$HOME/.cursor"
 fi
-# Cursor discovers locally-installed plugins under plugins/local/<name>/, not
-# plugins/<name>/. Installing to the latter is why massa-ai never appeared in
-# Cursor's plugin list even though every file was written correctly.
-#
-# UNVERIFIED against a running Cursor.app — this path comes from Cursor's
-# plugin documentation, not from an observed load, because Cursor is not
-# installed on the machine this was developed on. Treat it as lower confidence
-# than the Claude/Codex routes, which were verified end-to-end.
+# Two verified Cursor 3.14 load surfaces (observed live in "Cursor Plugins"
+# exthost logs, 2026-08-05): user-local plugins ARE loaded from
+# plugins/local/<name>/ ("loadUserLocalPlugin massa-ai loaded"), and Cursor
+# additionally bridges Claude marketplace plugins from ~/.claude
+# ("loadClaudePlugin massa-ai@massa-ai") — so a machine with the Claude
+# plugin installed loads massa-ai twice. Subagents, however, are discovered
+# only from the flat .cursor/agents/*.md directory (cursor.com/docs/subagents
+# — no subdirectories), and there is no global rules file. So: PLUGIN_DIR
+# carries the manifest, hook binary, and command skills; everything else
+# Cursor must SEE goes to its dedicated read paths — $CURSOR_AGENTS_DIR
+# (subagents), $CURSOR_DIR/skills/ (harness skills), $CURSOR_DIR/hooks.json,
+# and $CURSOR_DIR/mcp.json (install-agents.sh).
 PLUGIN_DIR="$CURSOR_DIR/plugins/local/massa-ai"
+# The only directory Cursor discovers subagents from (project scope:
+# ./.cursor/agents/). Flat .md files, real copies, massa-ai- prefix owned.
+CURSOR_AGENTS_DIR="$CURSOR_DIR/agents"
 # Pre-fix installs wrote here; removed on install so the two cannot both be
 # discovered and register duplicate hooks.
 LEGACY_PLUGIN_DIR="$CURSOR_DIR/plugins/massa-ai"
 HOOKS_JSON="$CURSOR_DIR/hooks.json"
+
+# ── Claude-bridge detection (PAU-08/09/10) ──────────────────────────────────
+# Probe contract pinned against a read-only capture of this machine's live
+# ~/.claude registry files (2026-08-05) — never invented:
+#   - $CLAUDE_PLUGIN_REGISTRY must parse and list a non-empty
+#     plugins["massa-ai@massa-ai"] array
+#   - $CLAUDE_SETTINGS_JSON's enabledPlugins["massa-ai@massa-ai"] must not be
+#     literal false — an absent settings.json, or an absent key, is treated
+#     as enabled (matching Claude's own default)
+#   - any parse failure on either file → NOT detected (local fallback)
+# User-scope only: ~/.claude is a per-user surface, so a --project plugin
+# install always keeps the local branch regardless of what ~/.claude holds.
+CLAUDE_PLUGIN_REGISTRY="$HOME/.claude/plugins/installed_plugins.json"
+CLAUDE_SETTINGS_JSON="$HOME/.claude/settings.json"
+
+claude_bridge_detected() {
+  [[ "$SCOPE" == "project" ]] && return 1
+  [[ -f "$CLAUDE_PLUGIN_REGISTRY" ]] || return 1
+
+  local runner=""
+  if command -v node &>/dev/null; then runner="node"
+  elif command -v bun &>/dev/null; then runner="bun"
+  else return 1
+  fi
+
+  "$runner" - "$CLAUDE_PLUGIN_REGISTRY" "$CLAUDE_SETTINGS_JSON" <<'NODE'
+const fs = require("fs");
+const [, , registryFile, settingsFile] = process.argv;
+
+try {
+  const registry = JSON.parse(fs.readFileSync(registryFile, "utf8"));
+  const listed = registry && registry.plugins && registry.plugins["massa-ai@massa-ai"];
+  if (!Array.isArray(listed) || listed.length === 0) process.exit(1);
+} catch {
+  process.exit(1);
+}
+
+try {
+  const raw = fs.readFileSync(settingsFile, "utf8");
+  if (raw.trim()) {
+    const settings = JSON.parse(raw);
+    const enabled = settings && settings.enabledPlugins && settings.enabledPlugins["massa-ai@massa-ai"];
+    if (enabled === false) process.exit(1);
+  }
+} catch (e) {
+  // Absent settings.json is treated as enabled (Claude's own default); any
+  // other read/parse failure means the probe cannot trust this surface.
+  if (e.code !== "ENOENT") process.exit(1);
+}
+
+process.exit(0);
+NODE
+}
 
 # The 7 Cursor events → binary subcommands. The command path uses the
 # INSTALLED plugin dir (not the placeholder), so Cursor invokes the copy.
@@ -377,13 +448,15 @@ record_plugin_version() {
   local version installed_at route
   version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$SCRIPT_DIR/package.json" | head -n 1)"
   installed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  # installRoute (T9, design F1): installer-owned, engine-read-only. Cursor
-  # has one install shape (file copy) and no marketplace distinction, so this
-  # is unconditionally "file" — recorded for data-model consistency with the
-  # other three hosts even though the switch engine never reads it for Cursor
-  # (hosts.ts skips Cursor unconditionally: every tier resolves to inherit).
-  # Written on EVERY install path.
-  route="file"
+  # installRoute (T6, design Component 4): installer-owned, engine-read-only.
+  # "bridge" when ~/.claude's Claude marketplace plugin is what Cursor
+  # actually loads (this run skipped its own local copy); "local" otherwise.
+  # The switch engine still never reads it for Cursor (hosts.ts skips Cursor
+  # unconditionally: every tier resolves to inherit) — recorded for
+  # data-model consistency with the other three hosts, and now also read by
+  # the harness sentinel probe (T4/T5), which treats both routes alike (same
+  # flat-agents glob). Written on EVERY install path.
+  if [[ "$IS_BRIDGE" -eq 1 ]]; then route="bridge"; else route="local"; fi
 
   # Tolerant of a corrupt/missing state file (rewrites a minimal valid one —
   # AC-8). A record-write failure warns but never fails the install: the next
@@ -429,6 +502,19 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
     merge_hooks_json "$HOOKS_JSON" "uninstall"
     echo "  - removed massa-ai hook entries from $HOOKS_JSON"
   fi
+  # Remove the massa-ai-owned subagents from Cursor's discovery directory.
+  # Prefix glob only: user-authored agents in the same flat dir survive.
+  if [[ -d "$CURSOR_AGENTS_DIR" ]]; then
+    removed_agents=0
+    for agent in "$CURSOR_AGENTS_DIR/"massa-ai-*.md; do
+      [[ -f "$agent" ]] || continue
+      rm -f "$agent"
+      removed_agents=$((removed_agents + 1))
+    done
+    if [[ "$removed_agents" -gt 0 ]]; then
+      echo "  - removed $removed_agents massa-ai subagents from $CURSOR_AGENTS_DIR"
+    fi
+  fi
   # Remove plugin directory
   if [[ -d "$LEGACY_PLUGIN_DIR" ]]; then
     rm -rf "$LEGACY_PLUGIN_DIR"
@@ -444,61 +530,103 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
 fi
 
 # ── Install ──────────────────────────────────────────────────────────────────
-vecho "Installing massa-ai Cursor plugin to: $PLUGIN_DIR"
-# Migration: a pre-fix install left a copy at plugins/massa-ai. Leaving it in
-# place risks Cursor discovering both and firing every hook twice, so it goes
-# before the new location is written.
-if [[ -d "$LEGACY_PLUGIN_DIR" ]]; then
-  rm -rf "$LEGACY_PLUGIN_DIR"
-  echo -e "  - removed pre-fix plugin copy at $LEGACY_PLUGIN_DIR"
+# PAU-08/09: bridge-preferred, local-fallback. Computed once, used to decide
+# both which artifacts this run writes and what installRoute gets recorded.
+IS_BRIDGE=0
+if claude_bridge_detected; then
+  IS_BRIDGE=1
 fi
-mkdir -p "$PLUGIN_DIR/.cursor-plugin" "$PLUGIN_DIR/skills" "$PLUGIN_DIR/hooks" "$PLUGIN_DIR/agents"
 
-# Copy manifest
-cp "$SCRIPT_DIR/.cursor-plugin/plugin.json" "$PLUGIN_DIR/.cursor-plugin/plugin.json"
-vecho "  + .cursor-plugin/plugin.json"
-
-# Copy the host-command skills (each in a subdirectory: skills/<name>/SKILL.md),
-# quick + generated workflow commands alike. massa-ai/, persona-router/,
-# agents/, and profile/ are the PDO-06 harness bundle, not a Cursor command
-# skill — they are installed separately, into the shared harness skills
-# directory (see "Skills bundling" below), not into this plugin-cache
-# skills/ tree. `profile` was missing from this exclusion pre-fix, which
-# leaked it into the command-skill cache mislabeled as `/profile`.
 skill_count=0
-for src in "$SCRIPT_DIR/skills/"*/SKILL.md; do
-  name="$(basename "$(dirname "$src")")"
-  case "$name" in
-    massa-ai|persona-router|agents|profile) continue ;;
-  esac
-  mkdir -p "$PLUGIN_DIR/skills/$name"
-  cp "$src" "$PLUGIN_DIR/skills/$name/SKILL.md"
-  vecho "  + skills/$name/SKILL.md"
-  skill_count=$((skill_count + 1))
-done
+specialist_count=0
 
-# Copy hooks.json (the placeholder version — installer replaces paths)
-cp "$SCRIPT_DIR/hooks/hooks.json" "$PLUGIN_DIR/hooks/hooks.json"
-vecho "  + hooks/hooks.json"
+if [[ "$IS_BRIDGE" -eq 1 ]]; then
+  vecho "Installing massa-ai Cursor plugin (Claude-bridge route): ~/.claude already lists massa-ai as installed and enabled, so Cursor loads it via the bridge."
+  # Converge (PAU-08, spec edge case): a pre-existing local install (current
+  # or pre-fix legacy location) must not double-load alongside the bridge, so
+  # one run here ends with exactly one load path. Owned hook entries are
+  # stripped with the SAME filter merge_hooks_json's "uninstall" mode already
+  # uses — the bridge delivers hooks instead.
+  if [[ -d "$LEGACY_PLUGIN_DIR" ]]; then
+    rm -rf "$LEGACY_PLUGIN_DIR"
+    echo -e "  - removed pre-fix plugin copy at $LEGACY_PLUGIN_DIR"
+  fi
+  if [[ -d "$PLUGIN_DIR" ]]; then
+    rm -rf "$PLUGIN_DIR"
+    echo -e "  - removed local plugin copy at $PLUGIN_DIR (Claude bridge already loads massa-ai)"
+  fi
+  if [[ -f "$HOOKS_JSON" ]]; then
+    merge_hooks_json "$HOOKS_JSON" "uninstall"
+    echo -e "  - removed massa-ai hook entries from $HOOKS_JSON (the bridge delivers hooks instead)"
+  fi
+else
+  vecho "Installing massa-ai Cursor plugin to: $PLUGIN_DIR"
+  # Migration: a pre-fix install left a copy at plugins/massa-ai. Leaving it in
+  # place risks Cursor discovering both and firing every hook twice, so it goes
+  # before the new location is written.
+  if [[ -d "$LEGACY_PLUGIN_DIR" ]]; then
+    rm -rf "$LEGACY_PLUGIN_DIR"
+    echo -e "  - removed pre-fix plugin copy at $LEGACY_PLUGIN_DIR"
+  fi
+  mkdir -p "$PLUGIN_DIR/.cursor-plugin" "$PLUGIN_DIR/skills" "$PLUGIN_DIR/hooks"
+  # Migration: pre-fix installs bundled agents inside the plugin dir, which
+  # Cursor never reads. Drop that copy so upgraders converge on the one real
+  # discovery surface and a future Cursor plugin scan cannot double-register.
+  if [[ -d "$PLUGIN_DIR/agents" ]]; then
+    rm -rf "$PLUGIN_DIR/agents"
+    echo -e "  - removed pre-fix agents copy at $PLUGIN_DIR/agents (Cursor reads $CURSOR_AGENTS_DIR)"
+  fi
 
-# Older installs shipped a plugin-local mcp.json here. Cursor reads
-# ~/.cursor/mcp.json, not the plugin dir, and MCP is now owned by
-# scripts/install-agents.sh — drop the residue so upgraders converge.
-if [[ -f "$PLUGIN_DIR/mcp.json" ]]; then
-  rm -f "$PLUGIN_DIR/mcp.json"
-  # Not gated by --quiet: this deletes a file in the user's home, so it is a
-  # mutation notice rather than per-file chatter.
-  echo -e "  - removed stale mcp.json (MCP is now registered in ~/.cursor/mcp.json)"
+  # Copy manifest
+  cp "$SCRIPT_DIR/.cursor-plugin/plugin.json" "$PLUGIN_DIR/.cursor-plugin/plugin.json"
+  vecho "  + .cursor-plugin/plugin.json"
+
+  # Copy the host-command skills (each in a subdirectory: skills/<name>/SKILL.md),
+  # quick + generated workflow commands alike. massa-ai/, persona-router/,
+  # agents/, and profile/ are the PDO-06 harness bundle, not a Cursor command
+  # skill — they are installed separately, into the shared harness skills
+  # directory (see "Skills bundling" below), not into this plugin-cache
+  # skills/ tree. `profile` was missing from this exclusion pre-fix, which
+  # leaked it into the command-skill cache mislabeled as `/profile`.
+  for src in "$SCRIPT_DIR/skills/"*/SKILL.md; do
+    name="$(basename "$(dirname "$src")")"
+    case "$name" in
+      massa-ai|persona-router|agents|profile) continue ;;
+    esac
+    mkdir -p "$PLUGIN_DIR/skills/$name"
+    cp "$src" "$PLUGIN_DIR/skills/$name/SKILL.md"
+    vecho "  + skills/$name/SKILL.md"
+    skill_count=$((skill_count + 1))
+  done
+
+  # Copy hooks.json (the placeholder version — installer replaces paths)
+  cp "$SCRIPT_DIR/hooks/hooks.json" "$PLUGIN_DIR/hooks/hooks.json"
+  vecho "  + hooks/hooks.json"
+
+  # Older installs shipped a plugin-local mcp.json here. Cursor reads
+  # ~/.cursor/mcp.json, not the plugin dir, and MCP is now owned by
+  # scripts/install-agents.sh — drop the residue so upgraders converge.
+  if [[ -f "$PLUGIN_DIR/mcp.json" ]]; then
+    rm -f "$PLUGIN_DIR/mcp.json"
+    # Not gated by --quiet: this deletes a file in the user's home, so it is a
+    # mutation notice rather than per-file chatter.
+    echo -e "  - removed stale mcp.json (MCP is now registered in ~/.cursor/mcp.json)"
+  fi
 fi
 
-# Copy agents — every generated subagent specialist (auto-discovered by Cursor
-# from the plugin's agents/ dir). All of them, navigator included, are generated
-# from skills/agents/*/SKILL.md and owned by the massa-ai- name prefix (CRS-04).
-specialist_count=0
+# Flat agents and harness skills are written in BOTH branches (PAU-08/09):
+# Cursor discovers subagents only from the flat directory regardless of which
+# plugin-load path is active, and MCP/harness-skills ownership is independent
+# of it too. Prune-then-copy so a specialist deleted from the bundle cannot
+# linger installed. All of them, navigator included, are generated from
+# skills/agents/*/SKILL.md and owned by the massa-ai- name prefix (CRS-04) —
+# user-authored agents are untouched.
+mkdir -p "$CURSOR_AGENTS_DIR"
+rm -f "$CURSOR_AGENTS_DIR/"massa-ai-*.md
 for src in "$SCRIPT_DIR/agents/"massa-ai-*.md; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
-  cp "$src" "$PLUGIN_DIR/agents/$name"
+  cp "$src" "$CURSOR_AGENTS_DIR/$name"
   vecho "  + $name"
   specialist_count=$((specialist_count + 1))
 done
@@ -506,31 +634,33 @@ vecho "  + ${specialist_count} subagent specialists (generated from skills/agent
 
 # Skills bundling (PDO-08, 09): install massa-ai/persona-router into the
 # shared harness skills directory, unless scripts/install-skills.sh already
-# owns it for this platform.
+# owns it for this platform. Runs in both branches (same reasoning as above).
 vecho ""
 install_bundled_skills
 
-# Copy the real hooks/massa-ai-hook this plugin already ships (T14/PDO-14: a
-# generated real file, no longer a symlink into apps/claude-plugin/ — that
-# path does not exist in a registry tarball install, where $REPO_ROOT is not
-# this monorepo. $CLAUDE_PLUGIN_BIN is kept only as a repo-checkout fallback.
-if [[ -f "$SCRIPT_DIR/hooks/massa-ai-hook" ]]; then
-  cp "$SCRIPT_DIR/hooks/massa-ai-hook" "$PLUGIN_DIR/hooks/massa-ai-hook"
-  chmod +x "$PLUGIN_DIR/hooks/massa-ai-hook"
-  vecho "  + hooks/massa-ai-hook"
-elif [[ -f "$CLAUDE_PLUGIN_BIN" ]]; then
-  ln -sfn "$CLAUDE_PLUGIN_BIN" "$PLUGIN_DIR/hooks/massa-ai-hook"
-  vecho "  + hooks/massa-ai-hook → $CLAUDE_PLUGIN_BIN"
-else
-  echo "  ⚠ Warning: no massa-ai-hook binary found" >&2
-  echo "    Hooks will not fire until the binary is available." >&2
-fi
+if [[ "$IS_BRIDGE" -ne 1 ]]; then
+  # Copy the real hooks/massa-ai-hook this plugin already ships (T14/PDO-14: a
+  # generated real file, no longer a symlink into apps/claude-plugin/ — that
+  # path does not exist in a registry tarball install, where $REPO_ROOT is not
+  # this monorepo. $CLAUDE_PLUGIN_BIN is kept only as a repo-checkout fallback.
+  if [[ -f "$SCRIPT_DIR/hooks/massa-ai-hook" ]]; then
+    cp "$SCRIPT_DIR/hooks/massa-ai-hook" "$PLUGIN_DIR/hooks/massa-ai-hook"
+    chmod +x "$PLUGIN_DIR/hooks/massa-ai-hook"
+    vecho "  + hooks/massa-ai-hook"
+  elif [[ -f "$CLAUDE_PLUGIN_BIN" ]]; then
+    ln -sfn "$CLAUDE_PLUGIN_BIN" "$PLUGIN_DIR/hooks/massa-ai-hook"
+    vecho "  + hooks/massa-ai-hook → $CLAUDE_PLUGIN_BIN"
+  else
+    echo "  ⚠ Warning: no massa-ai-hook binary found" >&2
+    echo "    Hooks will not fire until the binary is available." >&2
+  fi
 
-# Merge hooks.json (array-append, backup, idempotent)
-vecho ""
-vecho "Merging hooks into $HOOKS_JSON..."
-merge_hooks_json "$HOOKS_JSON" "install"
-vecho "  + 7 massa-ai hook events wired (array-append, user hooks preserved)"
+  # Merge hooks.json (array-append, backup, idempotent)
+  vecho ""
+  vecho "Merging hooks into $HOOKS_JSON..."
+  merge_hooks_json "$HOOKS_JSON" "install"
+  vecho "  + 7 massa-ai hook events wired (array-append, user hooks preserved)"
+fi
 
 # ── MCP registration (delegated) ─────────────────────────────────────────────
 # scripts/install-agents.sh is the single writer of host MCP config. It writes
@@ -554,10 +684,17 @@ fi
 
 # Summary line in quiet mode
 if [ "${MASSA_AI_VERBOSE:-0}" != "1" ]; then
-  ok "cursor plugin installed (${skill_count} skills, ${specialist_count} specialists, 7 hooks)"
+  if [[ "$IS_BRIDGE" -eq 1 ]]; then
+    ok "cursor plugin: using the Claude bridge (${specialist_count} specialists) — hooks delivered by the bridge, not installed locally"
+  else
+    ok "cursor plugin installed (${skill_count} skills, ${specialist_count} specialists, 7 hooks)"
+  fi
 else
   vecho ""
   vecho "Done. Restart Cursor to pick up the plugin."
+  if [[ "$IS_BRIDGE" -eq 1 ]]; then
+    vecho "💡 massa-ai loads via the Claude bridge (~/.claude) — local plugin/hook install skipped."
+  fi
   vecho "💡 MCP is registered in ~/.cursor/mcp.json by scripts/install-agents.sh (single writer)."
 fi
 

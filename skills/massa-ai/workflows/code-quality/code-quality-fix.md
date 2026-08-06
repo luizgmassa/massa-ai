@@ -48,9 +48,9 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
    - Standard: multi-file consolidation, shared behavior cleanup, public helper contract change, or meaningful test impact; define characterization checks first.
    - Spec-driven: broad redesign, unclear behavior, cross-boundary migration, or user-visible behavior change; pause and route to `workflows/spec-driven.md` or ask for approval.
 8. Apply code quality fixing methods:
-   - SOLID: separate mixed responsibilities only when the split reduces change risk; replace caller-side type switches with polymorphism or data maps only when new variants are real; preserve base contracts; narrow fat interfaces; inject dependencies when hardcoded concretes block testing or substitution.
-   - Clean Code: name domain concepts precisely using `references/naming-standards.md`, replace repeated magic values with named constants, split functions that truly do multiple things, remove code-restating comments, finish or delete stubs, and convert long positional parameter lists to options objects when it improves call-site clarity.
-   - KISS: inline shallow helpers, collapse needless layers, choose direct control flow over clever indirection, and remove configuration that hides rather than expresses behavior.
+   - SOLID: separate mixed responsibilities only when the split yields an externally-findable named unit (locatable by search or grep from outside the file) or reduces change risk; replace caller-side type switches with polymorphism or data maps only when new variants are real; preserve base contracts; narrow fat interfaces; inject dependencies when hardcoded concretes block testing or substitution.
+   - Clean Code: name domain concepts precisely using `references/naming-standards.md`, replace repeated magic values with named constants, split functions only when the result yields an externally-findable named unit (locatable by search or grep from outside the file) or measurably reduces change risk — never split on size or "more than one thing" alone — remove code-restating comments, finish or delete stubs, and convert long positional parameter lists to options objects when it improves call-site clarity.
+   - KISS: inline shallow helpers, collapse needless layers, choose direct control flow over clever indirection, and remove configuration that hides rather than expresses behavior. When choosing whether to split instead of inline, apply the same discoverability-or-change-risk criterion used for the Clean Code split direction above.
    - YAGNI: delete unused extension points, future hooks, unused options, one-implementation factories, and speculative public APIs when usage evidence is absent.
    - DRY: consolidate duplicated domain rules or transformations into one clear source of truth, but avoid abstractions that make trivial duplication harder to read.
    - AI-slop cleanup: remove generic wrappers, fabricated-looking abstractions, one-call factories, code-restating comments, and unused configurability when current usage evidence does not justify them.
@@ -83,6 +83,19 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
 > - memory: suggest-only; main agent persists reusable verification recipes
 > - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
    - Main agent owns report parsing, prioritization, memory writes, final synthesis, and Evidence Gate.
+
+> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> - trigger: implementation complete, before the verification gate — never optional
+> - scope: the fix's diff surface and its task/AC context
+> - permissions: read-only
+> - inputs: diff, acceptance context, recalled code-quality conventions
+> - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
+> - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
+> - firewall: summarized findings only, never raw diff dumps
+> - memory: suggest-only; main agent persists
+> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
+
 11. Verify each completed finding:
    - If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`

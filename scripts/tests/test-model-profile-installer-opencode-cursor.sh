@@ -266,7 +266,11 @@ H="$ROOT/6"; mkdir -p "$H/.cursor"
 STATE="$H/.config/massa-ai/install-state.json"
 run_cursor "$H"
 assert_eq "cursor fresh install → exit 0" "$RC" "0"
-assert_eq "cursor always-file → installRoute=file" "$(state_field "$STATE" cursor installRoute)" "file"
+# AD-017/T6 (plugin-architecture-unification): cursor's installRoute is its
+# own "bridge" | "local" vocabulary, not claude's "file" | "marketplace". No
+# ~/.claude/plugins/installed_plugins.json exists in this sandboxed HOME, so
+# the bridge probe reports absent and the installer falls back to "local".
+assert_eq "cursor local-fallback → installRoute=local" "$(state_field "$STATE" cursor installRoute)" "local"
 assert_eq "cursor never writes modelProfile on a fresh install" \
   "$(state_field "$STATE" cursor modelProfile.profile)" ""
 assert_no_file "cursor: no agent-profiles variant tree is installed" \
@@ -277,6 +281,6 @@ assert_no_file "cursor: no agent-profiles variant tree is installed" \
 # claude/codex, exercised here for cursor's own writer.
 run_cursor "$H"
 assert_eq "cursor re-run → exit 0" "$RC" "0"
-assert_eq "cursor installRoute survives a second install" "$(state_field "$STATE" cursor installRoute)" "file"
+assert_eq "cursor installRoute survives a second install" "$(state_field "$STATE" cursor installRoute)" "local"
 
 summary "model-profile-installer-opencode-cursor"

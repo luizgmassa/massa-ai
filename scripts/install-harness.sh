@@ -221,6 +221,20 @@ if [ "$DO_PLUGINS" = "1" ]; then
     done
   }
 
+  # plugin_sentinel_hint <host> — human-readable description of the sentinel
+  # path installer_plugin_sentinel_present probes for <host>, used only in the
+  # reinstall log line below (never in a filesystem check — the probe itself
+  # is the single source of truth for what "present" means).
+  plugin_sentinel_hint() {
+    case "$1" in
+      claude)   echo "~/.claude/agents/massa-ai-*.md (or installed_plugins.json on the marketplace route)" ;;
+      codex)    echo "~/.codex/agents/massa-ai-*.toml" ;;
+      cursor)   echo "~/.cursor/agents/massa-ai-*.md" ;;
+      opencode) echo "~/.config/opencode/plugins/massa-ai/index.js" ;;
+      *) echo "" ;;
+    esac
+  }
+
   # Phase 1: decide per host. --uninstall is deliberately ungated (covers
   # host-removed-after-install; the installers are no-op safe on absent hosts).
   plugin_plan=""
@@ -239,8 +253,19 @@ if [ "$DO_PLUGINS" = "1" ]; then
       vinfo "detected ${host} (${signal})"
       rec="$(recorded_version_for "$host")"
       if [ -n "$rec" ] && [ "$rec" = "$bundle_version" ]; then
-        plugin_plan="${plugin_plan}${host}|skip-current|${rec}
+        # PAU-05/06: a version-current record is only a true skip when the
+        # host's installed-artifact sentinel is still on disk. An external
+        # wipe (observed live 2026-08-05: ~/.cursor/agents +
+        # plugins/local/massa-ai deleted minutes after install) must
+        # self-heal via reinstall instead of skipping forever.
+        if installer_plugin_sentinel_present "$host" "$TARGET_HOME" "$state_file"; then
+          plugin_plan="${plugin_plan}${host}|skip-current|${rec}|
 "
+        else
+          hint="$(plugin_sentinel_hint "$host")"
+          plugin_plan="${plugin_plan}${host}|reinstall|${rec}|${hint}
+"
+        fi
       elif [ "$(installer_compare_versions "$runner" "$rec" "$bundle_version")" = "1" ]; then
         plugin_plan="${plugin_plan}${host}|skip-newer|${rec}
 "
@@ -258,11 +283,12 @@ if [ "$DO_PLUGINS" = "1" ]; then
     # Steps 1-3 above are read-only; report the would-be action per host and
     # stop — no marketplace copy, no installer calls (PAI-09, AC-10).
     compact_phase "Plugin bundle decisions (dry-run):"
-    while IFS='|' read -r host action rec; do
+    while IFS='|' read -r host action rec extra; do
       [ -n "$host" ] || continue
       case "$action" in
         install) info "install ${host}@${bundle_version}" ;;
         upgrade) info "upgrade ${host}: ${rec} → ${bundle_version}" ;;
+        reinstall) info "reinstall ${host}: sentinel missing at ${extra} (recorded ${rec})" ;;
         skip-current) info "skip-current ${host}: already at ${rec}" ;;
         skip-absent) info "skip-absent ${host}: host not detected" ;;
         skip-newer) info "skip-newer ${host}: installed ${rec} newer than bundle ${bundle_version}" ;;
@@ -285,7 +311,7 @@ PLUGIN_PLAN_EOF
     # plugins, so a per-host partial copy could strand a registered
     # marketplace on missing dirs (spec assumption, Plan Challenge C-3).
     plugin_source_root=""
-    if [ "$UNINSTALL" != "1" ] && printf '%s' "$plugin_plan" | grep -q '|install\||upgrade'; then
+    if [ "$UNINSTALL" != "1" ] && printf '%s' "$plugin_plan" | grep -q '|install\||upgrade\||reinstall'; then
       if ! plugin_mode="$(installer_plugin_source_mode "$PLUGIN_SOURCE" "$REPO_ROOT")"; then
         exit 2
       fi
@@ -293,13 +319,13 @@ PLUGIN_PLAN_EOF
       vinfo "Plugin marketplace source: ${plugin_mode} (${plugin_source_root})"
     fi
 
-    while IFS='|' read -r host action rec; do
+    while IFS='|' read -r host action rec extra; do
       [ -n "$host" ] || continue
       case "$action" in
         skip-absent) info "skip ${host}: host not detected" ;;
         skip-current) info "skip ${host}: already at ${rec}" ;;
         skip-newer) info "skip ${host}: installed ${rec} newer than bundle ${bundle_version}" ;;
-        install|upgrade|uninstall)
+        install|upgrade|reinstall|uninstall)
           installer="$REPO_ROOT/apps/${host}-plugin/install.sh"
           if [ ! -f "$installer" ]; then
             warn "${host} plugin installer not found at ${installer}"
@@ -308,6 +334,7 @@ PLUGIN_PLAN_EOF
           case "$action" in
             install) info "install ${host}@${bundle_version}" ;;
             upgrade) info "upgrade ${host}: ${rec} → ${bundle_version}" ;;
+            reinstall) info "reinstall ${host}: sentinel missing at ${extra} (recorded ${rec})" ;;
           esac
           set +e
           if [ "$action" = "uninstall" ]; then

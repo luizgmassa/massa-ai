@@ -40,6 +40,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
 8. Focus on pragmatic refactoring:
    - Identify over-abstracted code and propose Modular Monoliths
    - Reduce "abstraction cost" to make code more AI-navigable
+   - The primary payoff of extraction is extract-for-findability: create a named unit locatable by search or grep from outside the file — that is what makes code AI-navigable, not extraction volume alone
    - Verify changes do not break existing behavior using the verification recipe
 9. Execute by PR group when `references/pr-task-fix.md` applies:
    - Order non-breaking groups by Data, Domain, then Presentation/Navigation, mapping those labels to repository boundaries when needed.
@@ -52,4 +53,17 @@ Before the first repository mutation, load `references/implementation-delivery.m
 12. At completion, persist (run the scoring rubric from `references/decision-engine.md`):
    - Refactored architectural decisions via `remember` as scored `decision` memories
    - Identified and decoupled anti-patterns via `remember` as scored `pattern` memories
+
+> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> - trigger: implementation complete, before the verification gate — never optional
+> - scope: the change's diff surface and its task/AC context
+> - permissions: read-only
+> - inputs: diff, acceptance context, recalled code-quality conventions
+> - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
+> - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
+> - firewall: summarized findings only, never raw diff dumps
+> - memory: suggest-only; main agent persists
+> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
+
 13. Complete the Evidence Gate from `references/evidence-gate.md`

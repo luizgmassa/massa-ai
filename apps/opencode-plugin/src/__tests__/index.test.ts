@@ -1,12 +1,17 @@
 /**
  * Unit tests for the opencode-plugin entrypoint (MassaAiPlugin).
  *
- * Exercises every exported tool's execute(), every lifecycle hook, the
- * event handler, and the HTTP helpers — with mocked fetch + mocked config so
- * no real API or filesystem config is needed.
+ * Hooks-only (AD-017): the plugin registers zero in-process tools — the MCP
+ * server registered by scripts/install-agents.sh is the one canonical tool
+ * surface (54 tools). This suite asserts the hooks-only contract (zero
+ * `tool` map entries) and exercises every lifecycle hook, the event
+ * handler, and the HTTP helpers — with mocked fetch + mocked config so no
+ * real API or filesystem config is needed.
  */
 
+import "./env-setup"; // MUST stay the first import — freezes scratch XDG_CONFIG_HOME + 10 ms reindex debounce before ../index loads
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { configExists } from "@massa-ai/shared/config";
 import { MassaAiPlugin } from "../index";
 
 const originalFetch = globalThis.fetch;
@@ -65,190 +70,40 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-describe("MassaAiPlugin tools", () => {
+describe("MassaAiPlugin hooks-only contract (AD-017)", () => {
   async function setup() {
     const { input } = makePluginInput();
     const plugin = await MassaAiPlugin(input);
     return plugin;
   }
 
-  test("search tool POSTs to /api/v1/search/project", async () => {
-    const requests = mockFetchCapture();
+  test("plugin registers zero in-process tools", async () => {
+    mockFetchCapture();
     const plugin = await setup();
-    const result = await plugin.tool.search.execute(
-      { query: "foo", maxResults: 5, minScore: 0.3, format: "json" } as any,
-      { sessionID: "s1", worktree: "/w", agent: "a1" } as any,
-    );
-    const body = JSON.parse(requests[0]!.init!.body as string);
-    expect(body.query).toBe("foo");
-    expect(body.projectPath).toBe("/w"); // ctx.worktree overrides
-    expect(body.format).toBe("json");
-    expect(JSON.parse(result as string).success).toBe(true);
+    expect(plugin.tool).toBeUndefined();
   });
 
-  test("remember tool POSTs to /api/v1/memory/store", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    await plugin.tool.remember.execute(
-      { content: "x", type: "decision", importance: 0.9 } as any,
-      { sessionID: "s", agent: "ag" } as any,
-    );
-    const body = JSON.parse(requests[0]!.init!.body as string);
-    expect(body.content).toBe("x");
-    expect(body.type).toBe("decision");
-    expect(body.sessionId).toBe("s");
-  });
-
-  test("recall tool POSTs to /api/v1/memory/search", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    await plugin.tool.recall.execute(
-      { query: "q", limit: 3, minImportance: 0.5 } as any,
-      { sessionID: "s2" } as any,
-    );
-    const body = JSON.parse(requests[0]!.init!.body as string);
-    expect(body.query).toBe("q");
-    expect(body.includePersistent).toBe(true);
-  });
-
-  test("index tool POSTs to /api/v1/project/index and toasts", async () => {
-    const { input, toasts } = makePluginInput();
-    const requests = mockFetchCapture();
-    const plugin = await MassaAiPlugin(input);
-    await plugin.tool.index.execute(
-      { forceReindex: true, warmCache: false } as any,
-      { worktree: "/wt" } as any,
-    );
-    const body = JSON.parse(requests[0]!.init!.body as string);
-    expect(body.forceReindex).toBe(true);
-    expect(toasts.some((t) => t.message.includes("Indexing"))).toBe(true);
-  });
-
-  test("compress tool POSTs to /api/v1/context/compress", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    await plugin.tool.compress.execute({ content: "abc", strategy: "semantic_dedup" } as any);
-    const body = JSON.parse(requests[0]!.init!.body as string);
-    expect(body.strategy).toBe("semantic_dedup");
-  });
-
-  test("optimized_context tool POSTs to /api/v1/context/optimized", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    await plugin.tool.optimized_context.execute({ query: "q", maxTokens: 100 } as any, { worktree: "/w" } as any);
-    expect(requests[0]!.url).toContain("/api/v1/context/optimized");
-  });
-
-  test("read tool POSTs to /api/v1/file/read", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    await plugin.tool.read.execute({ filePath: "/a.ts" } as any, {} as any);
-    const body = JSON.parse(requests[0]!.init!.body as string);
-    expect(body.filePath).toBe("/a.ts");
-  });
-
-  test("index_status tool GETs /api/v1/project/index/status/:jobId", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    await plugin.tool.index_status.execute({ jobId: "job-99" } as any);
-    expect(requests[0]!.url).toContain("/api/v1/project/index/status/job-99");
-    expect(requests[0]!.init?.method).toBe("GET");
-  });
-
-  test("analytics tool POSTs to /api/v1/analytics/", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    await plugin.tool.analytics.execute({ type: "cache", limit: 5 } as any);
-    const body = JSON.parse(requests[0]!.init!.body as string);
-    expect(body.type).toBe("cache");
-  });
-
-  test("list_projects tool GETs /api/v1/workspace/list with status query", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    await plugin.tool.list_projects.execute({ status: "indexed" } as any);
-    expect(requests[0]!.url).toContain("/api/v1/workspace/list");
-    expect(requests[0]!.url).toContain("status=indexed");
-  });
-
-  test("search_definitions tool GETs /api/v1/symbol/definitions", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    await plugin.tool.search_definitions.execute(
-      { query: "foo", kind: ["function", "class"], maxResults: 5 } as any,
-      {} as any,
-    );
-    expect(requests[0]!.url).toContain("/api/v1/symbol/definitions");
-    expect(requests[0]!.url).toContain("search=foo");
-    expect(requests[0]!.url).toContain("kind=function");
-  });
-
-  test("get_references tool GETs /api/v1/symbol/references", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    await plugin.tool.get_references.execute({ symbolName: "bar", maxResults: 10 } as any);
-    expect(requests[0]!.url).toContain("/api/v1/symbol/references");
-    expect(requests[0]!.url).toContain("symbolName=bar");
-  });
-
-  test("go_to_definition tool GETs /api/v1/symbol/definition", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    await plugin.tool.go_to_definition.execute({ symbolName: "baz", fromFile: "a.ts" } as any);
-    expect(requests[0]!.url).toContain("/api/v1/symbol/definition");
-    expect(requests[0]!.url).toContain("symbolName=baz");
-    expect(requests[0]!.url).toContain("fromFile=a.ts");
-  });
-
-  test("profile tool (action:list) GETs /api/v1/profiles", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    await plugin.tool.profile.execute({ action: "list" } as any);
-    expect(requests[0]!.url).toContain("/api/v1/profiles");
-    expect(requests[0]!.init?.method ?? "GET").toBe("GET");
-  });
-
-  test("profile tool (action:list, host) scopes the query", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    await plugin.tool.profile.execute({ action: "list", host: "codex" } as any);
-    expect(requests[0]!.url).toContain("host=codex");
-  });
-
-  test("profile tool (action:set) POSTs to /api/v1/profiles/switch", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    await plugin.tool.profile.execute({ action: "set", profile: "work", host: "claude", dryRun: true } as any);
-    expect(requests[0]!.url).toContain("/api/v1/profiles/switch");
-    const body = JSON.parse(requests[0]!.init!.body as string);
-    expect(body).toMatchObject({ profile: "work", host: "claude", dryRun: true });
-  });
-
-  test("profile tool (action:set) without a profile name → structured error, no HTTP call", async () => {
-    const requests = mockFetchCapture();
-    const plugin = await setup();
-    const result = await plugin.tool.profile.execute({ action: "set" } as any);
-    expect(requests.length).toBe(0);
-    expect(JSON.parse(result as string)).toMatchObject({ success: false, error: { code: "InvalidRequest" } });
-  });
-
-  test("profile tool (action:set) surfaces a non-ok response (massaAiFetch error path)", async () => {
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ success: false, error: { code: "UnknownProfileError" } }), { status: 400 })) as typeof fetch;
-    const plugin = await setup();
-    await expect(plugin.tool.profile.execute({ action: "set", profile: "nope" } as any)).rejects.toThrow();
-  });
-
-  test("tool execute throws on non-ok response (massaAiFetch error path)", async () => {
-    globalThis.fetch = (async () => new Response("err", { status: 500 })) as typeof fetch;
-    const plugin = await setup();
-    await expect(plugin.tool.search.execute({ query: "x" } as any, {} as any)).rejects.toThrow();
-  });
-
-  test("GET-based tool throws on non-ok response (massaAiGet error path)", async () => {
-    globalThis.fetch = (async () => new Response("err", { status: 404 })) as typeof fetch;
-    const plugin = await setup();
-    await expect(plugin.tool.index_status.execute({ jobId: "j" } as any)).rejects.toThrow();
+  test("every design-named event handler is present and invokable", async () => {
+    mockFetchCapture();
+    const plugin: any = await setup();
+    const namedHandlers = [
+      "session.created",
+      "tool.execute.after",
+      "experimental.session.compacting",
+      "shell.env",
+      "event",
+      "dispose",
+    ];
+    for (const name of namedHandlers) {
+      expect(typeof plugin[name]).toBe("function");
+    }
+    // Invokable smoke check — each handler runs without throwing given a
+    // minimal well-typed input (full behavioral coverage lives in the
+    // "lifecycle hooks" and "event handler" describe blocks below).
+    await plugin["session.created"]();
+    await plugin["shell.env"]({ cwd: "/p", sessionID: "s" }, { env: {} });
+    await plugin["event"]({ event: { type: "unhandled.smoke", properties: {} } });
+    await plugin.dispose();
   });
 });
 
@@ -524,10 +379,100 @@ describe("MassaAiPlugin event handler", () => {
 });
 
 describe("MassaAiPlugin auto-configuration", () => {
-  test("plugin constructs and exposes tools (ensureConfig is a no-op when config exists)", async () => {
+  test("plugin constructs and exposes its hooks (ensureConfig is a no-op when config exists)", async () => {
     mockFetchCapture();
     const { input } = makePluginInput();
     const plugin = await MassaAiPlugin(input);
-    expect(typeof plugin.tool.search.execute).toBe("function");
+    expect(typeof plugin["session.created"]).toBe("function");
+  });
+});
+
+describe("MassaAiPlugin config bootstrap + HTTP edge branches", () => {
+  test("first run under a fresh XDG_CONFIG_HOME initializes config (ensureConfig init branch)", async () => {
+    mockFetchCapture();
+    const { input } = makePluginInput();
+    await MassaAiPlugin(input);
+    // env-setup.ts pointed XDG_CONFIG_HOME at a scratch dir before any file
+    // in this package could freeze CONFIG_DIR (every shared/config importer
+    // pulls env-setup first), so the suite's first plugin construction ran
+    // initConfig() into the scratch. Assert through the config module's own
+    // frozen view — order-independent, unlike a hand-built scratch path.
+    expect(configExists()).toBe(true);
+  });
+
+  test("compacting: non-ok memory search response → debug log, snapshot still attempted", async () => {
+    const { input, logs } = makePluginInput();
+    const requests = mockFetchCapture((req) => {
+      if (req.url.includes("/api/v1/memory/search")) {
+        return new Response("overloaded", { status: 503 });
+      }
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    });
+    const plugin = await MassaAiPlugin(input);
+    await plugin["session.created"]!();
+    requests.length = 0;
+    const output = { context: [] as string[] };
+    await plugin["experimental.session.compacting"]!({ sessionID: "sx" } as any, output as any);
+    // massaAiFetch threw its non-ok Error (status + body slice) → caught → debug log
+    expect(output.context.length).toBe(0);
+    expect(logs.some((l) => l.level === "debug" && /Failed to fetch memories/.test(l.message))).toBe(true);
+    expect(requests.some((r) => r.url.includes("/api/v1/hook/compact-snapshot"))).toBe(true);
+  });
+
+  test("toast tolerates a rejecting client.tui.showToast", async () => {
+    const { input } = makePluginInput({
+      client: {
+        app: { log: async () => {} },
+        tui: { showToast: async () => { throw new Error("tui gone"); } },
+      },
+    });
+    // Unhealthy health response → session.created calls toast(); the rejection
+    // must be swallowed by toast()'s catch arm.
+    globalThis.fetch = (async () => new Response("down", { status: 503 })) as typeof fetch;
+    const plugin = await MassaAiPlugin(input);
+    await plugin["session.created"]!();
+    // reaching here without an unhandled rejection is the assertion; give the
+    // fire-and-forget rejection a tick to surface if the catch arm were missing
+    await new Promise((r) => setTimeout(r, 10));
+    expect(typeof plugin["event"]).toBe("function");
+  });
+});
+
+describe("MassaAiPlugin debounced incremental reindex", () => {
+  test("15 edited files trigger one debounced /project/index call (10 ms test debounce)", async () => {
+    const { input, logs } = makePluginInput();
+    const requests = mockFetchCapture();
+    const plugin = await MassaAiPlugin(input);
+    await plugin["session.created"]!();
+    requests.length = 0;
+    // 20 edits: crosses REINDEX_FILE_THRESHOLD (15) and re-schedules the
+    // timer several times (covers the clearTimeout-on-reschedule branch).
+    for (let i = 0; i < 20; i++) {
+      await plugin["event"]!({ event: { type: "file.edited", properties: { file: `src/f${i}.ts` } } } as any);
+    }
+    await new Promise((r) => setTimeout(r, 120));
+    const reindex = requests.filter((r) => r.url.includes("/api/v1/project/index"));
+    expect(reindex.length).toBe(1);
+    expect(JSON.parse(String(reindex[0]!.init?.body))).toMatchObject({ forceReindex: false, warmCache: false });
+    // Count left loose (\d+): under coverage instrumentation the 10 ms timer
+    // can fire mid-dispatch-loop, flushing before all 20 edits accumulate.
+    expect(logs.some((l) => l.level === "info" && /Incremental reindex completed \(\d+ files changed\)/.test(l.message))).toBe(true);
+  });
+
+  test("reindex failure → warn log, in-flight flag released", async () => {
+    const { input, logs } = makePluginInput();
+    mockFetchCapture((req) => {
+      if (req.url.includes("/api/v1/project/index")) {
+        return new Response("boom", { status: 500 });
+      }
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    });
+    const plugin = await MassaAiPlugin(input);
+    await plugin["session.created"]!();
+    for (let i = 0; i < 15; i++) {
+      await plugin["event"]!({ event: { type: "file.watcher.updated", properties: { file: `w${i}.ts` } } } as any);
+    }
+    await new Promise((r) => setTimeout(r, 120));
+    expect(logs.some((l) => l.level === "warn" && /Reindex failed/.test(l.message))).toBe(true);
   });
 });

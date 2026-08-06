@@ -1,7 +1,7 @@
 /**
  * T1 smoke — proves the E2E harness end-to-end:
  *   1. HTTP transport reaches the live API.
- *   2. MCP subprocess boots, advertises all 52 tools.
+ *   2. MCP subprocess boots, advertises all 54 tools.
  *   3. Matrix machinery holds for a read-only tool (list_projects).
  *
  * Skipped unless RUN_E2E=1, the API is up, the MCP dist is built, and the
@@ -17,7 +17,7 @@ import {
 } from "./_helpers";
 import { startMcp, mcpCall, type McpHandle } from "./_mcp";
 
-// The 52 tools declared in apps/mcp-client/src/tool-definitions.ts (in
+// The 54 tools declared in apps/mcp-client/src/tool-definitions.ts (in
 // declaration order). SF3: this list must mirror tool-definitions.ts exactly —
 // the assertion below is strict (===), so a missing tool fails loudly instead
 // of being hidden by the old leaky >= check. When a tool is added upstream,
@@ -36,6 +36,7 @@ const EXPECTED_TOOLS = [
   "list_proposals", "approve_proposal", "reject_proposal", "execute", "execute_file",
   "batch_execute", "fetch_and_index",
   "rename_project", "merge_projects",
+  "profile_list", "profile_set",
 ];
 
 let avail: Availability;
@@ -63,7 +64,7 @@ describe.skipIf(!READY)("T1 harness smoke", () => {
     expect(res.service).toBe("massa-ai-tools-api");
   }, 10_000);
 
-  test("MCP advertises all 52 tools", async () => {
+  test("MCP advertises all 54 tools", async () => {
     expect(mcp).not.toBeNull();
     const names = mcp!.toolNames;
     // SF3: strict equality — the MCP tool roster must match

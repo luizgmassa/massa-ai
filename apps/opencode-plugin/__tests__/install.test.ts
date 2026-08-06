@@ -80,10 +80,6 @@ async function isSymlink(p: string): Promise<boolean> {
   }
 }
 
-async function readLink(p: string): Promise<string> {
-  return fs.readlink(p);
-}
-
 const SPECIALIST_NAMES = [
   "investigator",
   "planner",
@@ -100,19 +96,22 @@ const SPECIALIST_NAMES = [
 ];
 
 describe("opencode-plugin install.sh", () => {
-  test("user-scope install creates plugin symlink + config entry + agent symlinks", async () => {
+  test("user-scope install creates plugin copy + config entry + agent symlinks", async () => {
     const res = runInstall(["--user"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
-    // Plugin symlink created
+    // Plugin installed as a REAL COPY of dist/index.js (a symlink here died
+    // in the field whenever the checkout's gitignored dist/ vanished).
     const pluginPath = path.join(
       tmp,
       ".config/opencode/plugins/massa-ai/index.js",
     );
     expect(await pathExists(pluginPath)).toBe(true);
-    expect(await isSymlink(pluginPath)).toBe(true);
-    const target = await readLink(pluginPath);
-    expect(target).toContain("apps/opencode-plugin/dist/index.js");
+    expect(await isSymlink(pluginPath)).toBe(false);
+    const distJs = path.join(REPO_ROOT, "apps/opencode-plugin/dist/index.js");
+    expect(await fs.readFile(pluginPath, "utf8")).toBe(
+      await fs.readFile(distJs, "utf8"),
+    );
 
     // Agent symlinks created
     const agentsDir = path.join(tmp, ".config/opencode/agents");
@@ -249,23 +248,42 @@ describe("opencode-plugin install.sh", () => {
     }
   });
 
-  test("regular file at symlink target is not clobbered", async () => {
+  test("stale regular file at the installer-owned plugin path is refreshed", async () => {
     const pluginPath = path.join(
       tmp,
       ".config/opencode/plugins/massa-ai/index.js",
     );
     await fs.mkdir(path.dirname(pluginPath), { recursive: true });
 
-    // Pre-create a regular file (not a symlink)
-    await fs.writeFile(pluginPath, "user content");
+    // plugins/massa-ai/ is installer-owned: a pre-existing regular file is a
+    // stale copy from a previous install, so re-running refreshes it.
+    await fs.writeFile(pluginPath, "stale copy");
 
     const res = runInstall(["--user"], { HOME: tmp });
-    expect(res.exitCode).not.toBe(0);
-    expect(res.stderr).toContain("exists as a regular file");
+    expect(res.exitCode).toBe(0);
+    const distJs = path.join(REPO_ROOT, "apps/opencode-plugin/dist/index.js");
+    expect(await fs.readFile(pluginPath, "utf8")).toBe(
+      await fs.readFile(distJs, "utf8"),
+    );
+  });
 
-    // File is untouched
-    const content = await fs.readFile(pluginPath, "utf8");
-    expect(content).toBe("user content");
+  test("pre-fix symlink at the plugin path is replaced by a real copy", async () => {
+    const pluginPath = path.join(
+      tmp,
+      ".config/opencode/plugins/massa-ai/index.js",
+    );
+    await fs.mkdir(path.dirname(pluginPath), { recursive: true });
+
+    const distJs = path.join(REPO_ROOT, "apps/opencode-plugin/dist/index.js");
+    await fs.symlink(distJs, pluginPath);
+    expect(await isSymlink(pluginPath)).toBe(true);
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(await isSymlink(pluginPath)).toBe(false);
+    expect(await fs.readFile(pluginPath, "utf8")).toBe(
+      await fs.readFile(distJs, "utf8"),
+    );
   });
 
   test("agent regular file at symlink target is skipped with warning", async () => {
@@ -295,10 +313,10 @@ describe("opencode-plugin install.sh", () => {
     const res = runInstall(["--project"], { HOME: tmp }, projectDir);
     expect(res.exitCode).toBe(0);
 
-    // Project-scoped paths
+    // Project-scoped paths (plugin is a real copy at both scopes)
     const pluginPath = path.join(projectDir, ".opencode/plugins/massa-ai/index.js");
     expect(await pathExists(pluginPath)).toBe(true);
-    expect(await isSymlink(pluginPath)).toBe(true);
+    expect(await isSymlink(pluginPath)).toBe(false);
 
     const agentsDir = path.join(projectDir, ".opencode/agents");
     for (const name of SPECIALIST_NAMES.slice(0, 3)) {
@@ -480,6 +498,79 @@ describe("opencode-plugin install.sh", () => {
     );
     expect(await pathExists(path.join(configDir, "opencode.json"))).toBe(false);
   });
+});
+
+describe("opencode-plugin MCP registration (PAU-01, PAU-03; T3)", () => {
+  test("install registers exactly one MCP entry alongside the plugin entry", async () => {
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const cfg = await readJson(
+      path.join(tmp, ".config/opencode/opencode.jsonc"),
+    );
+    expect((cfg.plugin as string[]).includes("./plugins/massa-ai/index.js")).toBe(
+      true,
+    );
+    const mcp = cfg.mcp as Record<string, unknown> | undefined;
+    expect(mcp).toBeDefined();
+    expect(mcp!["massa-ai"]).toBeDefined();
+  });
+
+  test("uninstall removes only the plugin entry — the MCP entry survives", async () => {
+    runInstall(["--user"], { HOME: tmp });
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const cfg = await readJson(
+      path.join(tmp, ".config/opencode/opencode.jsonc"),
+    );
+    expect((cfg.plugin as string[] | undefined) ?? []).not.toContain(
+      "./plugins/massa-ai/index.js",
+    );
+    const mcp = cfg.mcp as Record<string, unknown> | undefined;
+    expect(mcp).toBeDefined();
+    expect(mcp!["massa-ai"]).toBeDefined();
+  });
+
+  test("missing scripts/install-agents.sh: recovery command printed, overall success not claimed", async () => {
+    // Tarball-shaped tree (mirrors the UGB-06 test below): a real npm tarball
+    // has no scripts/install-agents.sh either, so this doubles as that case.
+    const pkgRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "mt-opencode-no-agents-"),
+    );
+    const pkgDir = path.join(pkgRoot, "apps", "opencode-plugin");
+    try {
+      await fs.cp(path.join(REPO_ROOT, "apps/opencode-plugin"), pkgDir, {
+        recursive: true,
+        filter: (src) =>
+          !/[\\/](node_modules|\.turbo|coverage)($|[\\/])/.test(src),
+      });
+      await fs.mkdir(path.join(pkgRoot, "scripts"), { recursive: true });
+      await fs.copyFile(
+        path.join(REPO_ROOT, "scripts/banner.sh"),
+        path.join(pkgRoot, "scripts/banner.sh"),
+      );
+      // Deliberately no scripts/install-agents.sh under pkgRoot.
+
+      const res = spawnSync("bash", [path.join(pkgDir, "install.sh"), "--user"], {
+        encoding: "utf8",
+        env: { ...process.env, HOME: tmp },
+        cwd: pkgDir,
+        timeout: 30000,
+      });
+      // The plugin file itself still installs — only MCP registration failed.
+      expect(res.status).toBe(0);
+      expect(res.stderr).toContain("scripts/install-agents.sh not found");
+      expect(res.stderr).toContain(
+        "register MCP with: bash scripts/install-agents.sh --agent opencode --yes",
+      );
+      // No success claim: the quiet-mode summary must not report the MCP
+      // registration as done.
+      expect(res.stdout).not.toContain("MCP registered");
+    } finally {
+      await fs.rm(pkgRoot, { recursive: true, force: true });
+    }
+  }, 30_000);
 });
 
 describe("opencode-plugin version recording (PAI-03/07, AC-15)", () => {

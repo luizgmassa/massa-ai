@@ -1,7 +1,7 @@
 /**
  * Workflow metadata-header gate (workflow-metadata-headers, WMH-03).
  *
- * The 38 workflow files under `skills/massa-ai/workflows/` carry Agent
+ * The 39 workflow files under `skills/massa-ai/workflows/` carry Agent
  * Skills-style YAML frontmatter (`name` / `description` / `license` /
  * `metadata.version`), mirroring the convention already used by every
  * SKILL.md in this repo. `skills.yml` CI validates only `SKILL.md`
@@ -14,7 +14,7 @@
  *   that resolves to nothing would otherwise be indistinguishable from a
  *   passing gate.
  * - An empty population FAILS, and the population is asserted to be
- *   exactly 38 (locked count) so a silently added/removed workflow file is
+ *   exactly 39 (locked count) so a silently added/removed workflow file is
  *   caught here rather than discovered elsewhere.
  *
  * Frontmatter is parsed with Bun's built-in real YAML parser
@@ -29,7 +29,7 @@ import path from "path";
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const WORKFLOWS_DIR = path.join(REPO_ROOT, "skills/massa-ai/workflows");
 
-const EXPECTED_WORKFLOW_COUNT = 38;
+const EXPECTED_WORKFLOW_COUNT = 40;
 
 const NAME_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
@@ -110,7 +110,9 @@ function checkFile(abs: string): FileCheck {
 
   // license — MIT is the repo default; CC-BY-4.0 is allowed for imported
   // third-party content that must keep its own attribution (skill-architect).
-  const ALLOWED_LICENSES = ["MIT", "CC-BY-4.0"];
+  // Apache-2.0 is allowed for content adapted from Apache-2.0 upstreams
+  // (discovery, from anthropics/knowledge-work-plugins).
+  const ALLOWED_LICENSES = ["MIT", "CC-BY-4.0", "Apache-2.0"];
   if (typeof fm.license !== "string" || !ALLOWED_LICENSES.includes(fm.license)) {
     errors.push(
       `license: expected one of ${JSON.stringify(ALLOWED_LICENSES)}, got ${JSON.stringify(fm.license)}`,

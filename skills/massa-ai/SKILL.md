@@ -46,7 +46,7 @@ Before reading any massa-ai file:
   Never pass `workflowSessionId` in that field. Use `synapse_task_begin`/`synapse_task_end`
   for task envelopes and `synapse_prefetch` to warm the buffer on file open.
 - Prefer the shared v2 retrieval order; fall back gracefully if the massa-ai
-  server or Synapse is unavailable. The full tool surface includes 52 tools
+  server or Synapse is unavailable. The full tool surface includes 54 tools
   (see `references/mcp-tools.md`): indexing, search, symbol graph
   (`trace_path`, `impact_analysis`, `get_architecture`), memory CRUD
   (`remember`, `recall`, `memory_update`, `memory_delete`), checkpoints
@@ -166,6 +166,8 @@ current context already contains it.
 | `commit` | draft or create safe Conventional Commits with Jira branch prefixes and audit report exclusions | `workflows/commit.md` |
 | `the-fool` | direct challenge, red-team, pre-mortem, evidence audit | `workflows/the-fool.md` |
 | `judge-with-debate` | standalone multi-judge debate evaluation of user-supplied artifacts | `workflows/judge-with-debate.md` |
+| `pr-review` | review a hosted GitHub PR / GitLab MR and post findings via `gh`/`glab` | `workflows/pr-review.md` |
+| `discovery` | product brainstorming / problem-space thinking partner | `workflows/discovery.md` |
 | `to-prd` | turn the current conversation into a PRD without a new interview | `workflows/to-prd.md` |
 | `skill-architect` | design and build a new skill through structured conversation | `workflows/skill-architect.md` |
 | `furps-refinement` | FURPS+ refinement of a PRD and/or ADR before implementation, with The Fool pre-validation and DoR coverage | `workflows/refinement/furps-refinement.md` |
@@ -181,8 +183,8 @@ Deterministic routing precedence, first match wins:
 
 1. **Explicit route:** user names a massa-ai workflow, report family, saved finding type, or asks for a direct challenge.
 2. **Requested artifact:** ADR, RFC, TDD, Jira ticket, commit, session guide, audit report, implementation audit report, mobile Figma report, FURPS refinement report, PRD synthesized from the current conversation -> `to-prd` (explicit request only; refining an existing PRD stays `furps-refinement`), or new SKILL.md / skill design -> `skill-architect`.
-3. **Target type:** broken behavior/error -> `debug`; saved audit finding -> matching `*-fix`; implementation scope review -> `implementation-audit`; Maestro E2E/device automation target -> `maestro`, `maestro-audit`, or child-only `maestro-fix` before generic tests workflows; security/privacy/auth finding -> security workflow; tests/flakes/coverage finding -> tests workflow; supplied Figma/screenshot mobile UI design -> `design`; mobile Figma compare/audit -> `mobile-figma-audit`; saved `MFM-*` findings -> `mobile-figma-fix`.
-4. **Primary verb:** create/add/implement -> `feature` unless the concrete target is new Maestro flow work, which routes to `maestro`; restructure without behavior change -> `refactor`; inspect/understand only -> `exploration`; record selected decision -> `adr`; compare open options -> `rfc`; design settled implementation -> `tdd`; refine/quality-check an existing PRD or ADR document (not implementation auditing) -> `furps-refinement`.
+3. **Target type:** broken behavior/error -> `debug`; hosted PR/MR reference (number or URL) to review with posted findings -> `pr-review` (local working diff stays with audit routes); saved audit finding -> matching `*-fix`; implementation scope review -> `implementation-audit`; Maestro E2E/device automation target -> `maestro`, `maestro-audit`, or child-only `maestro-fix` before generic tests workflows; security/privacy/auth finding -> security workflow; tests/flakes/coverage finding -> tests workflow; supplied Figma/screenshot mobile UI design -> `design`; mobile Figma compare/audit -> `mobile-figma-audit`; saved `MFM-*` findings -> `mobile-figma-fix`.
+4. **Primary verb:** create/add/implement -> `feature` unless the concrete target is new Maestro flow work, which routes to `maestro`; restructure without behavior change -> `refactor`; inspect/understand only -> `exploration`; brainstorm/explore a product problem, idea, or direction with no concrete code target -> `discovery`; record selected decision -> `adr`; compare open options -> `rfc`; design settled implementation -> `tdd`; refine/quality-check an existing PRD or ADR document (not implementation auditing) -> `furps-refinement`.
 5. **Risk domain escalation:** migrations, irreversible operations, auth/privacy, cross-service contracts, public compatibility, or work over 10 files routes to `spec-driven` unless the user explicitly requests a narrower workflow and accepts the containment.
 6. **General fallback:** use `general` only after a one-line General fallback preflight names the specialized workflow considered, rejected reason, and why fallback does not change verification or mutation behavior.
 

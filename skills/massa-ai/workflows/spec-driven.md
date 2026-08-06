@@ -110,6 +110,18 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
    - Update logical feature artifacts in `.specs/features/<slug>/` and `.specs/project/STATE.md` after meaningful progress.
     - Finish Execute by running `references/spec-driven/validate.md`. Dispatch `verification-agent` (author ≠ verifier) per `references/agent-orchestration.md`; the verification-agent always runs automatically and writes `.specs/features/<slug>/validation.md`. Without subagents, run the standalone fresh-eyes fallback in `validate.md`.
 
+> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> - trigger: implementation complete, before the verification gate — never optional
+> - scope: the task's diff surface and its task/AC context
+> - permissions: read-only
+> - inputs: diff, acceptance context, recalled code-quality conventions
+> - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
+> - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
+> - firewall: summarized findings only, never raw diff dumps
+> - memory: suggest-only; main agent persists
+> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
+
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: spec-driven Execute final gate; author ≠ verifier independence required
 > - scope: the feature's git diff surface, test files, and spec ACs

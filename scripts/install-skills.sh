@@ -619,6 +619,17 @@ apply_platform() {
 
   state_replace "$p" "$root" "$installed" "repo"
 
+  # Cursor reads no global rules file: ~/.cursor/AGENTS.md is written for
+  # forward-compatibility (a global AGENTS.md is an open Cursor feature
+  # request), but Cursor 3.x applies global rules only from Cursor Settings →
+  # Rules, and auto-reads AGENTS.md per project root. Without this warning
+  # the bootstrap silently never reaches any Cursor session.
+  if [ "$p" = "cursor" ] && [ "$DRY_RUN" != "1" ] && [ "$JSON_OUT" = "0" ]; then
+    warn "Cursor does not read ~/.cursor/AGENTS.md — it has no global rules file."
+    warn "  Global: paste the bootstrap block from ~/.cursor/AGENTS.md into Cursor Settings → Rules."
+    warn "  Per project: Cursor auto-reads AGENTS.md at the project root."
+  fi
+
   # Summary line (quiet mode only; verbose mode prints the per-item detail)
   # Never printed in JSON mode.
   if [ "$MASSA_AI_VERBOSE" = "0" ] && [ "$JSON_OUT" = "0" ]; then

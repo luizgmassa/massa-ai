@@ -56,7 +56,18 @@ const REPO_ROOT = path.resolve(import.meta.dir, '../..');
 // `---` structural shape — +140 excess of mandated frontmatter uniformity,
 // not prose drift. Measured differentially against the pre-header tree
 // (f414cdbf, the pre-WMH activation commit): 331 → 471.
-const EXCESS_CEILING = 471;
+//
+// 483 since AEH-06 (agent-era-harness-upgrades): the `massa-ai-reviewer`
+// dispatch block instantiated in all 14 implementing workflows must be
+// structurally identical per the dispatch contract (`persona:` bullet and
+// all — skills-harness-integrity enforces the shape), so its shared runs are
+// mandated uniformity, not prose drift. Measured differentially against
+// origin/main @ eeef4f4e (post PR #77, excess 414): branch 483; every NEW
+// duplicated block in the diff is the reviewer dispatch template (11-line
+// runs x5 and x2 copies, one 17-line run, one 8-line `permissions:
+// read-only` run) — attribution printed block-by-block during the merge of
+// v1.30.0, recorded in the raising commit.
+const EXCESS_CEILING = 483;
 const CEILING_WINDOW = 4;
 
 let dir: string;

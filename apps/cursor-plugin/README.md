@@ -15,7 +15,7 @@ Skills (auto-loaded from `skills/<name>/SKILL.md`):
 | `graph` | Reference graph (who calls / imports / extends) |
 | `status` | Workspaces health + search analytics |
 
-Plus 38 generated workflow commands, one per massa-ai workflow, each auto-loaded the same way (`skills/debug/SKILL.md`, etc.) — see [Workflow Commands](../../FEATURES.md#workflow-commands-38-generated-slash-commands) in the root feature reference for the full naming table.
+Plus 40 generated workflow commands, one per massa-ai workflow, each auto-loaded the same way (`skills/debug/SKILL.md`, etc.) — see [Workflow Commands](../../FEATURES.md#workflow-commands-generated-slash-commands) in the root feature reference for the full naming table.
 
 MCP server: `massa-ai` (`npx @massa-ai/mcp-client` with `MASSA_AI_API_URL`) — registered into `~/.cursor/mcp.json` by `scripts/install-agents.sh`, which this installer calls for you. That script is the single writer of host MCP config; the plugin ships no `mcp.json`.
 
@@ -64,7 +64,7 @@ If you are building a VS Code extension for Cursor, you can register the plugin 
 vscode.cursor.plugins.registerPath("/abs/path/to/apps/cursor-plugin");
 ```
 
-Cursor auto-discovers `skills/`, `hooks/hooks.json`, and `agents/` inside the registered directory. MCP is not bundled — Cursor reads `~/.cursor/mcp.json`, which `scripts/install-agents.sh` owns. The `.cursor-plugin/plugin.json` manifest is optional — Cursor discovers the subdirectories without it, but including one aids marketplace submission later.
+Cursor 3.14 loads user-local plugins from `~/.cursor/plugins/local/<name>/` and also bridges Claude marketplace plugins from `~/.claude`, but subagents are discovered only from the flat `~/.cursor/agents/*.md` (or project `.cursor/agents/`) directory — never from a plugin's `agents/` subtree. `install.sh` therefore copies the specialists to `~/.cursor/agents/`; `hooks/hooks.json` entries are merged into `~/.cursor/hooks.json` pointing at the installed hook binary. Cursor reads no global rules file: the AGENTS.md bootstrap must be pasted into Cursor Settings → Rules or provided per project root. MCP is not bundled — Cursor reads `~/.cursor/mcp.json`, which `scripts/install-agents.sh` owns. The `.cursor-plugin/plugin.json` manifest is optional — Cursor discovers the subdirectories without it, but including one aids marketplace submission later.
 
 Use `unregisterPath` to remove:
 

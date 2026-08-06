@@ -118,7 +118,7 @@ graph TD
 | --- | --- | --- |
 | `massa-ai-hook.ts` binary | `apps/claude-plugin/hooks/massa-ai-hook.ts` | Symlink or path-reference from both new plugin dirs; no code change needed (EVENT_MAP already covers the 5 mappable Claude events; Codex/Cursor map onto the same 5 subcommands) |
 | 6 slash command `.md` files | `apps/claude-plugin/commands/{map,index,find,def,graph,status}.md` | Copy content into `skills/` as `SKILL.md` files (Codex skill format) and `skills/<name>/SKILL.md` (Cursor skill format); adapt frontmatter per host |
-| `massa-ai-navigator.md` subagent | `apps/claude-plugin/agents/massa-ai-navigator.md` | Copy into `apps/cursor-plugin/agents/` (Cursor auto-discovers `agents/`); Codex has no subagent concept → skip |
+| `massa-ai-navigator.md` subagent | `apps/claude-plugin/agents/massa-ai-navigator.md` | Copy into `apps/cursor-plugin/agents/` (bundle source; at install time the specialists are copied to `~/.cursor/agents/` — *corrected 2026-08-05: Cursor discovers subagents only from that flat directory, never from a plugin dir*); Codex has no subagent concept → skip |
 | `OWNED_MARKER` + backup + consent pattern | `scripts/install-agents.ts:40-42,194-294,493-522` | Extract the backup + ownership-marker + `assertHomeWriteConsent` logic into a shared helper sourced by both new `install.sh` scripts; for hooks.json specifically, use array-append merge instead of `deepMerge` |
 | `print_hooks_guide` Codex/Cursor blocks | root `install.sh:537-567` | Replace the print-only guide with auto-write in the new installers; the root `print_hooks_guide` can still print as a fallback for users who don't run the plugin installer |
 
