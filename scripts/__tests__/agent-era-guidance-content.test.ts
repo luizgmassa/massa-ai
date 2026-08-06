@@ -103,3 +103,30 @@ describe("refactor.md: extract-for-findability payoff (AEH-01)", () => {
     expect(content).toContain("that is what makes code AI-navigable, not extraction volume alone");
   });
 });
+
+// ---------------------------------------------------------------------------
+// AEH-02: coding-guidelines.md "File shape for agent readers" section (T6)
+// ---------------------------------------------------------------------------
+
+describe("coding-guidelines.md: file shape for agent readers (AEH-02)", () => {
+  const content = readSkill("references/coding-guidelines.md");
+
+  test("section exists with the ~1000-line one-subject-file number", () => {
+    expect(content).toContain("File Shape for Agent Readers");
+    expect(content).toContain("~1000 lines is fine");
+  });
+
+  test("section states the ~2000-line single-agent-read bound", () => {
+    expect(content).toContain("over ~2000 lines exceeds a single agent read");
+  });
+
+  test("section states the per-hop navigation cost of splitting one subject across files", () => {
+    expect(content).toContain("one subject spread over N files costs N reads");
+  });
+
+  test("section is framed as read mechanics, not a module-depth metric", () => {
+    expect(content).toContain("This guidance derives from agent read mechanics, not from module depth.");
+    expect(content).toContain("Do not phrase file-size guidance as a depth metric");
+    expect(content).toContain("depth is NOT a lines-of-code ratio");
+  });
+});
