@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`setup-local-first.sh` skipped pulling a requested Ollama model whenever a
+  sibling tag was installed.** `ollama_model_exists` stripped the tag before
+  matching (`search="${1%%:*}"`), so an installed `qwen3-embedding:8b` made
+  `qwen3-embedding:4b` read "already available" and the pull was silently
+  skipped — in all three detection branches (CLI list, python3 JSON parse, grep
+  fallback). Matching is now exact on `name:tag`, with a bare name normalizing
+  to `:latest` (mirroring Ollama itself), so the wizard actually downloads the
+  configured `OLLAMA_EMBEDDING_MODEL`, `MASSA_AI_LLM_MODEL`, and
+  `MASSA_AI_LLM_CODE_MODEL` tags. Regression suite:
+  `scripts/tests/test-setup-ollama-model-exists.sh` runs the extracted function
+  against stubbed `ollama`/`curl`/`python3` binaries, one sibling-tag,
+  name-prefix, and bare-name case per branch (observed red 6 of 13 cases on
+  the old implementation). The identical defect shape in
+  `scripts/validate-vscode-integration.sh` (tag-stripped substring match in
+  its embedding-model check) is fixed the same way, and both python3 checks
+  now pass the model via `argv` instead of interpolating it into the code
+  string.
+
 ## [1.35.0] - 2026-08-06
 
 ### Added
