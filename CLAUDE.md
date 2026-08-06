@@ -288,7 +288,7 @@ Repositories and services are reached through `get*()` factory functions with ma
   "this path must 401" test proves nothing unless a real route is registered; and HTTP
   strips whitespace from header values, so a `"   "` key arrives as `""`.
 
-- `apps/mcp-client` — MCP stdio server exposing 52 tools. Tool schemas are plain
+- `apps/mcp-client` — MCP stdio server exposing 54 tools. Tool schemas are plain
   `ToolDefinition[]` JSON Schema arrays in `src/tool-defs/tool-defs-*.ts`;
   `call-tool-proxy.ts` maps a tool call onto an HTTP method + endpoint template.
 
@@ -365,8 +365,9 @@ pre-rendered per host (`agent-profiles/<profile>/`, sibling of `agents/`, genera
 alongside the default `agents/` set); one switch engine
 (`packages/shared/src/profile-switch/`) copies a chosen variant over the installed
 active agent files, fronted by MCP tools (`profile_list`/`profile_set`), both
-`massa-ai-config profile list|show|set` CLIs, the OpenCode in-process `profile` tool,
-and the Claude `skills/profile/` skill. A host session restart is always required
+`massa-ai-config profile list|show|set` CLIs, and the Claude `skills/profile/` skill
+(the OpenCode in-process `profile` tool was retired with the rest of the in-process
+tool surface — AD-017; OpenCode switches via the MCP pair or its `massa-ai-config` CLI). A host session restart is always required
 after a switch — no host supports per-agent runtime indirection (unchanged from the
 registry's own finding); see `.specs/features/model-profile-switching/spec.md`.
 
@@ -410,18 +411,22 @@ version, upgrades older records, never downgrades, and records each successful
 install as `platforms[host].plugin = {version, installedAt}` in `install-state.json`
 (a v2 extension `install-skills.sh` round-trips but never writes).
 
-**`scripts/install-agents.sh` is the only writer of host MCP config.** The plugin
-installers call it rather than shipping their own MCP file; a manifest `mcp` pointer or a
-plugin-local `.mcp.json`/`mcp.json` would reintroduce a second registration path.
-`scripts/tests/test-mcp-single-writer.sh` guards that. OpenCode is the one host where the
-MCP write is *skipped* — when `opencode.json` lists the plugin in any accepted form (npm
-name `@massa-ai/opencode-plugin`, local path `./plugins/massa-ai/index.js`, or bare dir
-`massa-ai`), because the plugin registers 14 tools in-process (`grep -cE '^\s*"[a-z_]+"\s*:\s*tool\(\{'
-apps/opencode-plugin/src/index.ts` — 13 through model-profile-switching's T13, 14 after T14
-added the `profile` tool, closing what had been a stale 13-vs-14 doc/code gap). The harness order is skills
-→ MCP → plugins, so at MCP time that entry may not exist yet; the OpenCode installer
-therefore calls `install-agents.sh --agent opencode --uninstall` after registering itself,
-which keeps the single-writer invariant intact.
+**`scripts/install-agents.sh` is the only writer of host MCP config, and it always writes
+the entry for every host, including OpenCode (AD-017: plugins deliver, MCP serves tools,
+hooks observe).** The plugin installers call it rather than shipping their own MCP file; a
+manifest `mcp` pointer or a plugin-local `.mcp.json`/`mcp.json` would reintroduce a second
+registration path. `scripts/tests/test-mcp-single-writer.sh` guards that. OpenCode used to
+be the one host where the MCP write was skipped whenever `opencode.json` listed the plugin
+in any accepted form — a false "redundant" premise that cost OpenCode users 40 of the 54
+MCP tools, since the plugin's own in-process tool set never covered more than a subset. The
+skip is removed: `apps/opencode-plugin/install.sh` now delegates registration to
+`install-agents.sh --agent opencode` on every install (mirroring the Codex delegation
+pattern), and its `--uninstall` path no longer calls `install-agents.sh --uninstall` —
+plugin lifecycle is independent of MCP tool-surface lifecycle, so a standalone plugin
+uninstall leaves the MCP entry in place (removal, if wanted:
+`bash scripts/install-agents.sh --agent opencode --uninstall`). The OpenCode plugin itself
+is hooks-only (`apps/opencode-plugin/src/index.ts` registers zero `tool({...})` entries —
+only event handlers); see `docs/adr/0002-plugins-deliver-mcp-serves-tools-hooks-observe.md`.
 
 The registered MCP command depends on `--mcp-source` (`local` | `npx` | `auto`, default
 `auto`; also read from `MASSA_AI_MCP_SOURCE`, flag wins). `setup-local-first.sh` passes
@@ -449,7 +454,9 @@ registration a no-op before this release.
 All four plugin dirs are now workspace packages (`@massa-ai/{claude,codex,cursor,
 opencode}-plugin`, all publishing to npm and GitHub Packages) — each still ships its own
 `install.sh`, alongside the 42 KB root `install.sh`. The OpenCode one needs
-`bun run build` first: it symlinks `dist/index.js` and refuses to run without it; the
+`bun run build` first: it installs a real copy of `dist/index.js` (a symlink went dead
+whenever the gitignored `dist/` vanished, and OpenCode skips an unresolvable local
+plugin with no log line) and refuses to run without it; the
 other three have no build step at all — their entire publishable surface is static
 source (`agents/`, `hooks/`, `skills/`, `install.sh`, `README.md`, the dotdir manifest).
 None of the three new `package.json` files declares a `test` script, deliberately: `apps/*`

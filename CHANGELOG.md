@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **AD-017: plugins deliver, MCP serves tools, hooks observe.** The OpenCode
+  installer no longer removes its own MCP entry as "redundant" — it delegates
+  registration to `scripts/install-agents.sh --agent opencode` on every
+  install, the same single-writer pattern Codex already used, so OpenCode
+  users get all 54 MCP tools instead of the 14 the plugin used to expose
+  in-process. Uninstalling the plugin (`apps/opencode-plugin/install.sh
+  --uninstall`) now leaves the MCP entry in place — plugin lifecycle is
+  independent of MCP tool-surface lifecycle; remove the entry separately with
+  `bash scripts/install-agents.sh --agent opencode --uninstall` if wanted. See
+  `docs/adr/0002-plugins-deliver-mcp-serves-tools-hooks-observe.md`.
+- **The harness plugin phase no longer trusts a version record it never
+  verified against disk.** `skip-current` now requires an on-disk per-host
+  sentinel (flat agent files, a plugin file, or a registry entry, depending on
+  host) in addition to a matching recorded version; an external wipe of
+  installed artifacts (observed live 2026-08-05 against this machine's
+  `~/.cursor`) now triggers a self-healing reinstall — logged by name — instead
+  of reporting `skip-current` forever against zero artifacts. `--dry-run`
+  reports the would-be reinstall without writing; `skip-newer`, `skip-absent`,
+  and `--uninstall` are unchanged.
+- **Cursor no longer loads massa-ai twice.** Cursor 3.14 bridges the Claude
+  marketplace plugin from `~/.claude` in addition to loading a local plugin
+  copy from `~/.cursor/plugins/local/massa-ai/`, risking double hook firing.
+  The Cursor installer now detects an installed-and-enabled Claude massa-ai
+  plugin and prefers that bridge — skipping the local plugin copy and its hook
+  wiring, and removing a pre-existing local copy + its owned hook entries so a
+  double-installed machine converges to a single load on the next run. No
+  bridge detected → local install as before (fallback, unchanged behavior).
+  Flat subagents and MCP registration are written in both branches. The
+  installed route is recorded as `installRoute: "bridge" | "local"` in
+  `install-state.json`.
+
+### Removed
+
+- **The OpenCode plugin's 14 in-process tools.** (`search`, `remember`,
+  `recall`, `index`, `compress`, `optimized_context`, `read`, `index_status`,
+  `analytics`, `list_projects`, `search_definitions`, `get_references`,
+  `go_to_definition`, `profile`) `apps/opencode-plugin/src/index.ts` is now
+  hooks-only — event handlers (`session.created`, `tool.execute.after`,
+  `experimental.session.compacting`, `shell.env`, `event`, `dispose`) are
+  unchanged. **Breaking** for anyone invoking these tool names bare (without
+  the MCP client's naming). The massa-ai MCP server serves the equivalent (and
+  40 more) tools under the same names — 54 total — registered alongside the
+  plugin as of the `### Changed` entry above (AD-017).
+
+### Fixed
+
+- **Cursor subagents now install where Cursor actually reads them.** The
+  Cursor plugin installer copied the 17 specialists into
+  `~/.cursor/plugins/local/massa-ai/agents/`; Cursor 3.x discovers subagents
+  only from the flat `~/.cursor/agents/*.md` (or project `.cursor/agents/`)
+  directory — a plugin's `agents/` subtree is never scanned for subagents,
+  even though Cursor 3.14 does load `plugins/local/<name>/` as a user-local
+  plugin (and separately bridges Claude marketplace plugins from `~/.claude`).
+  Install now writes real copies to `~/.cursor/agents/` (prefix-owned
+  `massa-ai-*.md`, prune-then-copy on upgrade, uninstall leaves user agents
+  untouched) and removes the pre-fix in-plugin copy on upgrade.
+- **`install-skills.sh` now says loudly that Cursor reads no global rules
+  file.** The cursor platform wrote the bootstrap block to
+  `~/.cursor/AGENTS.md` and reported success, but Cursor has no global
+  AGENTS.md surface (open Cursor feature request) — global rules exist only
+  as Cursor Settings → Rules, and AGENTS.md is read per project root. The
+  file is still written for forward-compatibility; the installer now prints
+  the manual step instead of implying the bootstrap took effect.
+- **OpenCode plugin is now a real copy, not a symlink into the checkout.**
+  `~/.config/opencode/plugins/massa-ai/index.js` was a symlink to the repo's
+  gitignored `apps/opencode-plugin/dist/index.js`; whenever that build output
+  vanished (rebuild, worktree deletion, bundle regeneration) the link went
+  dead and OpenCode skipped the plugin with no log line — losing all 14
+  in-process tools *and* the MCP entry the installer had already withdrawn by
+  design (single-writer; the plugin registers tools in-process). The
+  installer now copies the built bundle (both scopes), replaces a pre-fix
+  symlink on upgrade, and refreshes a stale copy on re-run. Re-run the
+  installer (or harness) after `bun run build` to pick up a new build.
+
 ## [1.29.0] - 2026-08-05
 
 ### Changed

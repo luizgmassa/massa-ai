@@ -72,6 +72,72 @@ async function pathExists(p: string): Promise<boolean> {
   }
 }
 
+// ── T6: Claude-bridge fixture helpers ────────────────────────────────────
+// Shapes mirror the live-machine capture in
+// .specs/features/plugin-architecture-unification/context.md (2026-08-05) —
+// never invented.
+interface RegistryOpts {
+  /** plugins["massa-ai@massa-ai"] is a non-empty array (default) vs []. */
+  listed?: boolean;
+  /** enabledPlugins["massa-ai@massa-ai"]: true (default) | false | "absent-key" | "absent-file". */
+  enabled?: boolean | "absent-key" | "absent-file";
+  /** Write unparsable JSON to installed_plugins.json instead. */
+  corrupt?: boolean;
+}
+
+async function writeClaudeRegistry(home: string, opts: RegistryOpts = {}) {
+  const claudeDir = path.join(home, ".claude");
+  await fs.mkdir(path.join(claudeDir, "plugins"), { recursive: true });
+  const registryPath = path.join(claudeDir, "plugins", "installed_plugins.json");
+
+  if (opts.corrupt) {
+    await fs.writeFile(registryPath, "{ not json");
+  } else {
+    const listed = opts.listed ?? true;
+    const registry = {
+      version: 2,
+      plugins: {
+        "massa-ai@massa-ai": listed
+          ? [
+              {
+                scope: "user",
+                installPath:
+                  "/Users/x/.claude/plugins/cache/massa-ai/massa-ai/1.28.0",
+                version: "1.28.0",
+                installedAt: "2026-08-05T21:11:52.743Z",
+                lastUpdated: "2026-08-05T21:11:52.743Z",
+                gitCommitSha: "96ee1850a984169dad07366790acc4a08cf17825",
+              },
+            ]
+          : [],
+      },
+    };
+    await fs.writeFile(registryPath, JSON.stringify(registry));
+  }
+
+  if (opts.enabled === "absent-file") return;
+  const settingsPath = path.join(claudeDir, "settings.json");
+  if (opts.enabled === "absent-key") {
+    await fs.writeFile(settingsPath, JSON.stringify({ someOtherKey: true }));
+  } else {
+    await fs.writeFile(
+      settingsPath,
+      JSON.stringify({
+        enabledPlugins: { "massa-ai@massa-ai": opts.enabled ?? true },
+      }),
+    );
+  }
+}
+
+async function ownedHookCount(hooksJsonPath: string): Promise<number> {
+  if (!(await pathExists(hooksJsonPath))) return 0;
+  const cfg = await readJson(hooksJsonPath);
+  const hooks = (cfg.hooks ?? {}) as Record<string, Record<string, unknown>[]>;
+  return Object.values(hooks)
+    .flat()
+    .filter((e) => (e as Record<string, unknown>)._massaAiOwned === true).length;
+}
+
 describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
   test("user-scope install creates ~/.cursor/plugins/local/massa-ai/ + merges hooks.json with 7 events", async () => {
     const res = runInstall(["--user"], { HOME: tmp });
@@ -79,7 +145,9 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
 
     const pluginDir = path.join(tmp, ".cursor/plugins/local/massa-ai");
     expect(await pathExists(path.join(pluginDir, ".cursor-plugin/plugin.json"))).toBe(true);
-    expect(await pathExists(path.join(pluginDir, "agents/massa-ai-navigator.md"))).toBe(true);
+    // Agents land in the flat dir Cursor discovers, not inside the plugin dir.
+    expect(await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md"))).toBe(true);
+    expect(await pathExists(path.join(pluginDir, "agents"))).toBe(false);
 
     const cfg = await readJson(path.join(tmp, ".cursor/hooks.json"));
     expect(cfg).toHaveProperty("version");
@@ -219,35 +287,258 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
     "judge",
   ];
 
-  test("CRS-01/CRS-04/DOC-01: install copies all 17 specialists into plugin agents/ + prints summary", async () => {
+  test("CRS-01/CRS-04/DOC-01: install copies all 17 specialists into ~/.cursor/agents/ as regular files + prints summary", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
-    const agentsDir = path.join(tmp, ".cursor/plugins/local/massa-ai/agents");
-    // 17 specialists, navigator included (CRS-01/CRS-04)
+    // Flat ~/.cursor/agents/ is the only directory Cursor discovers
+    // subagents from (CRS-04, corrected); real copies, never symlinks.
+    const agentsDir = path.join(tmp, ".cursor/agents");
     for (const name of SPECIALIST_NAMES) {
-      expect(
-        await pathExists(path.join(agentsDir, `massa-ai-${name}.md`)),
-      ).toBe(true);
+      const agentPath = path.join(agentsDir, `massa-ai-${name}.md`);
+      expect(await pathExists(agentPath)).toBe(true);
+      expect((await fs.lstat(agentPath)).isSymbolicLink()).toBe(false);
     }
-    // Total 17 .md files in agents/
-    const files = (await fs.readdir(agentsDir)).filter((f) => f.endsWith(".md"));
+    // Exactly 17 massa-ai-owned .md files
+    const files = (await fs.readdir(agentsDir)).filter(
+      (f) => f.startsWith("massa-ai-") && f.endsWith(".md"),
+    );
     expect(files.length).toBe(17);
+    // Nothing is bundled into the plugin dir anymore
+    expect(
+      await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai/agents")),
+    ).toBe(false);
 
     // Install output mentions the 17 subagent specialists (DOC-01)
     expect(res.stdout).toContain("17 subagent specialists");
   });
 
-  test("CRS-05: uninstall removes whole plugin dir (all 17 agents gone)", async () => {
+  test("migration: a pre-fix agents copy inside the plugin dir is removed on install", async () => {
+    const staleDir = path.join(tmp, ".cursor/plugins/local/massa-ai/agents");
+    await fs.mkdir(staleDir, { recursive: true });
+    await fs.writeFile(path.join(staleDir, "massa-ai-navigator.md"), "stale");
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(await pathExists(staleDir)).toBe(false);
+    expect(
+      await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),
+    ).toBe(true);
+  });
+
+  test("CRS-05: uninstall removes plugin dir + owned agents; user agents survive", async () => {
     runInstall(["--user"], { HOME: tmp });
-    const agentsDir = path.join(tmp, ".cursor/plugins/local/massa-ai/agents");
-    expect(await pathExists(agentsDir)).toBe(true);
+    const agentsDir = path.join(tmp, ".cursor/agents");
+    expect(await pathExists(path.join(agentsDir, "massa-ai-navigator.md"))).toBe(true);
+    // A user-authored agent in the same flat dir must survive uninstall.
+    await fs.writeFile(path.join(agentsDir, "my-own-agent.md"), "user agent");
 
     const res = runInstall(["--uninstall"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
-    // Whole plugin dir removed (CRS-05: unchanged behavior)
     expect(
       await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai")),
+    ).toBe(false);
+    const remaining = await fs.readdir(agentsDir);
+    expect(remaining.filter((f) => f.startsWith("massa-ai-"))).toEqual([]);
+    expect(remaining).toContain("my-own-agent.md");
+  });
+});
+
+describe("cursor-plugin Claude-bridge preference (T6, PAU-08..11)", () => {
+  test("bridge detected: no local plugin dir, zero owned hook entries, agents+skills present, installRoute=bridge", async () => {
+    await writeClaudeRegistry(tmp);
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    expect(
+      await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai")),
+    ).toBe(false);
+    expect(await ownedHookCount(path.join(tmp, ".cursor/hooks.json"))).toBe(0);
+    expect(
+      await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),
+    ).toBe(true);
+    expect(
+      await pathExists(path.join(tmp, ".cursor/skills/massa-ai/SKILL.md")),
+    ).toBe(true);
+
+    const state = await readJson(
+      path.join(tmp, ".config/massa-ai/install-state.json"),
+    );
+    const platforms = state.platforms as Record<
+      string,
+      { installRoute?: string }
+    >;
+    expect(platforms.cursor.installRoute).toBe("bridge");
+  });
+
+  test("no Claude registry: full local install, installRoute=local", async () => {
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    expect(
+      await pathExists(
+        path.join(tmp, ".cursor/plugins/local/massa-ai/.cursor-plugin/plugin.json"),
+      ),
+    ).toBe(true);
+    expect(
+      await ownedHookCount(path.join(tmp, ".cursor/hooks.json")),
+    ).toBeGreaterThan(0);
+
+    const state = await readJson(
+      path.join(tmp, ".config/massa-ai/install-state.json"),
+    );
+    const platforms = state.platforms as Record<
+      string,
+      { installRoute?: string }
+    >;
+    expect(platforms.cursor.installRoute).toBe("local");
+  });
+
+  test("massa-ai listed but enabledPlugins is false: local fallback", async () => {
+    await writeClaudeRegistry(tmp, { enabled: false });
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    expect(
+      await pathExists(
+        path.join(tmp, ".cursor/plugins/local/massa-ai/.cursor-plugin/plugin.json"),
+      ),
+    ).toBe(true);
+    const state = await readJson(
+      path.join(tmp, ".config/massa-ai/install-state.json"),
+    );
+    const platforms = state.platforms as Record<
+      string,
+      { installRoute?: string }
+    >;
+    expect(platforms.cursor.installRoute).toBe("local");
+  });
+
+  test("absent settings.json / absent enabledPlugins key: treated as enabled → bridge", async () => {
+    await writeClaudeRegistry(tmp, { enabled: "absent-file" });
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    const state = await readJson(
+      path.join(tmp, ".config/massa-ai/install-state.json"),
+    );
+    const platforms = state.platforms as Record<
+      string,
+      { installRoute?: string }
+    >;
+    expect(platforms.cursor.installRoute).toBe("bridge");
+  });
+
+  test("empty massa-ai@massa-ai array in registry: local fallback", async () => {
+    await writeClaudeRegistry(tmp, { listed: false });
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    const state = await readJson(
+      path.join(tmp, ".config/massa-ai/install-state.json"),
+    );
+    const platforms = state.platforms as Record<
+      string,
+      { installRoute?: string }
+    >;
+    expect(platforms.cursor.installRoute).toBe("local");
+  });
+
+  test("corrupt installed_plugins.json: local fallback, not a crash", async () => {
+    await writeClaudeRegistry(tmp, { corrupt: true });
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(
+      await pathExists(
+        path.join(tmp, ".cursor/plugins/local/massa-ai/.cursor-plugin/plugin.json"),
+      ),
+    ).toBe(true);
+    const state = await readJson(
+      path.join(tmp, ".config/massa-ai/install-state.json"),
+    );
+    const platforms = state.platforms as Record<
+      string,
+      { installRoute?: string }
+    >;
+    expect(platforms.cursor.installRoute).toBe("local");
+  });
+
+  test("pre-existing local install + bridge appears: one run converges (local dir gone, owned hooks stripped)", async () => {
+    runInstall(["--user"], { HOME: tmp });
+    expect(
+      await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai")),
+    ).toBe(true);
+    expect(
+      await ownedHookCount(path.join(tmp, ".cursor/hooks.json")),
+    ).toBeGreaterThan(0);
+
+    await writeClaudeRegistry(tmp);
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    expect(
+      await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai")),
+    ).toBe(false);
+    expect(await ownedHookCount(path.join(tmp, ".cursor/hooks.json"))).toBe(0);
+    expect(
+      await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),
+    ).toBe(true);
+
+    const state = await readJson(
+      path.join(tmp, ".config/massa-ai/install-state.json"),
+    );
+    const platforms = state.platforms as Record<
+      string,
+      { installRoute?: string }
+    >;
+    expect(platforms.cursor.installRoute).toBe("bridge");
+  });
+
+  test("project scope keeps the local branch even when a user-scope bridge is present", async () => {
+    await writeClaudeRegistry(tmp);
+    const res = runInstall(["--project"], { HOME: tmp }, tmp);
+    expect(res.exitCode).toBe(0);
+    expect(
+      await pathExists(
+        path.join(tmp, ".cursor/plugins/local/massa-ai/.cursor-plugin/plugin.json"),
+      ),
+    ).toBe(true);
+    const state = await readJson(
+      path.join(tmp, ".config/massa-ai/install-state.json"),
+    );
+    const platforms = state.platforms as Record<
+      string,
+      { installRoute?: string }
+    >;
+    expect(platforms.cursor.installRoute).toBe("local");
+  });
+
+  test("uninstall after a local install removes plugin dir, owned hooks, and flat agents", async () => {
+    runInstall(["--user"], { HOME: tmp });
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    expect(
+      await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai")),
+    ).toBe(false);
+    expect(
+      await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),
+    ).toBe(false);
+    expect(await ownedHookCount(path.join(tmp, ".cursor/hooks.json"))).toBe(0);
+  });
+
+  test("uninstall after a bridge install removes owned agents (no local dir ever existed)", async () => {
+    await writeClaudeRegistry(tmp);
+    runInstall(["--user"], { HOME: tmp });
+    expect(
+      await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),
+    ).toBe(true);
+
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(
+      await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai")),
+    ).toBe(false);
+    expect(
+      await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),
     ).toBe(false);
   });
 });
@@ -361,7 +652,7 @@ describe("cursor-plugin generated-bundle contract (T7, UGB-05..08)", () => {
       expect(res.status).toBe(0);
       expect(
         await pathExists(
-          path.join(tmp, ".cursor/plugins/local/massa-ai/agents/massa-ai-navigator.md"),
+          path.join(tmp, ".cursor/agents/massa-ai-navigator.md"),
         ),
       ).toBe(true);
     } finally {

@@ -1,46 +1,53 @@
-# Handoff — untracked-generated-bundles (VALIDATED PASS; PR #73 open, CI 14/14 green; merge = user decision)
+# Handoff — plugin-architecture-unification (VALIDATED PASS; PR #74 open, CI 14/14 green; merge = user decision)
 
-Previous handoffs closed: registry-cleanup-skill-imports merged as PR #72 @
-`724ad02d` (main).
+Previous handoffs closed: untracked-generated-bundles merged as PR #73 @
+`40ec631a` (main, released v1.29.0).
 
-Session `spec-untracked-generated-bundles` · workflow spec-driven (Large) ·
-persona route: AI Engineer (context-skill-harness-engineer-architect). massa-ai
-MCP not used this session; `.specs/` files canonical. Contract files:
-`.specs/features/untracked-generated-bundles/{spec,design,tasks,validation}.md`.
+Session `spec-plugin-architecture-unification` · workflow spec-driven (Large) ·
+branch `spec/plugin-architecture-unification` from `96ee1850` with origin/main
+(v1.29.0) merged at `bb3e90bf`. Contract files:
+`.specs/features/plugin-architecture-unification/{spec,design,tasks,context,validation}.md`.
 
 ## Objective
 
-Stop tracking the 1,141 generated plugin bundle files (4× skills managed
-roots, 4× agents/, 4× agent-profiles/, 2 hook copies, opencode-config.cjs
-mirror); generation-on-demand becomes the contract (AD-016). User decision
-2026-08-05: untrack all four hosts including the git-marketplace channel,
-which gains a documented generation prerequisite + opt-in post-merge hook
-snippet (never auto-installed).
+AD-017 — plugins deliver, MCP serves tools, hooks observe. Four coordinated
+changes: OpenCode installer registers MCP alongside the plugin (54 tools; skip
+rule removed; uninstall preserves the entry), harness skip-current gated on
+per-host on-disk sentinels (wiped installs self-heal), Cursor prefers the
+Claude-bridge load with local fallback (hooks fire exactly once,
+installRoute bridge|local recorded), OpenCode plugin hooks-only (14 in-process
+tools removed). Folded baseline: cursor flat agents, opencode real-copy
+plugin, install-skills cursor warning.
 
 ## State
 
-- Branch `spec/untracked-generated-bundles` from `main` @ `724ad02d`;
-  17 commits: `381b48d7` specs → T1-T14 (`af907544`..`0fe89367`) →
-  `33171311` results → `247ef8ef` verification fix (contract sensors).
-- Validation: PASS (iteration 1 of 3) — 17/17 ACs, gates 6/6, discrimination
-  sensor 7/7 killed after fix commit `247ef8ef` closed the two survivors
-  (pretest:coverage deletion, .gitignore entry deletion). validate_state
-  exit 0. Accepted-cosmetic: genIndex guard in 2 ci.yml sub-tests of
-  `workflow-generation-order.test.ts`.
-- Pre-mortem gate (full, pre_mortem): critical coverage.yml finding folded as
-  UGB-17 (pretest:coverage + opencode package pretest); marketplace/config-cli
-  ungenerated-checkout path recorded as accepted documented risk.
-- Cold-path evidence (fresh worktree, bundles absent): test:scripts 1435/0,
-  test:plugins 104/0, opencode `bun run test` 139/0, turbo 11/11; deliberate
-  red observed on the parity beforeAll guard.
+- Commits: `f0d84a7e` specs → `0a81f85d` T1 → `bb3e90bf` merge → T2–T6
+  (`7efd1633`, `4f198e82`, `251621ec`, `3b1a5642`, `c9aee7c3`) → T7–T10
+  (`fca8e995`, `3fb8c44c`, `dc18ed30`, `186bbd12`) → `8376dee6` validation fix.
+- Validation: PASS (iteration 2 of 3) — 17/17 ACs, 6/6 mutations killed,
+  gates green (single-writer 57/0, plugin-auto-install 201/0, cursor 25/0,
+  opencode 27/0 + package 125/0, parity 88/0, lint 0, test:plugins 119/0,
+  test:scripts 1455/0). Iteration-1 gap: PAU-14 "in-process `profile` tool"
+  phrase outside the T9 sweep literals — class enumerated (pop 142), 2 live
+  rows fixed; verifier re-derived independently (184-row superset, 0 live).
+- ADR: `docs/adr/0002-plugins-deliver-mcp-serves-tools-hooks-observe.md` +
+  AD-017 row in STATE.md Decisions (duplicate `## Decisions` heading noted,
+  canonical = the AD-016 table).
+- Lessons: L-021 recorded by verifier (sweep-literal class gap).
 
 ## Next Step
 
-PR #73 open, CI 14/14 green (CHANGELOG entry present — merge gate satisfied).
-First CI run failed once: pre-existing `skills-duplication-metric` full-repo
-reachability scan crossed the global 5 s ceiling on the ubuntu runner
-(5001 ms cut; ~2 s on Apple Silicon; scan surface unchanged by this PR —
-walk() is gitignore-blind, bundles were on disk before and after). Fixed with
-the established explicit-budget idiom @ `881b3f84`. Merge is the user's
-decision. After merge: nothing further — installed machines are unaffected
-(bundles live under host config dirs, not the repo).
+PR #74 open, CI 14/14 green (post-PR commits `c1334397` coverage floor +
+`7aef1eba` config-pollution race; one infra rerun). Merge = user decision.
+After merge, the user runs the staged machine repairs (this machine's
+wiped `~/.cursor` artifacts + opencode plugin/MCP refresh):
+
+```bash
+bun run build                       # fresh opencode dist for the real-copy install
+bash scripts/install-harness.sh     # sentinel probe now sees the wipe → reinstalls cursor; re-registers opencode MCP
+# then verify: ls ~/.cursor/agents/massa-ai-*.md | wc -l   (expect 17)
+#              /usr/bin/grep -c '"massa-ai"' ~/.config/opencode/opencode.json*  (MCP entry present)
+```
+
+Live once-only Cursor hook check (bridge route): restart Cursor, confirm one
+massa-ai load line in the "Cursor Plugins" exthost log and single hook events.

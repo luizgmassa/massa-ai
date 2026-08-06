@@ -105,14 +105,14 @@ assert_eq "env key is environment" "$(jq_get "$CFG5" 'c.mcp["massa-ai"].environm
 assert_eq "no env key present" "$(jq_get "$CFG5" 'c.mcp["massa-ai"].env === undefined ? "absent" : "present"')" "absent"
 
 echo ""
-echo "Scenario 6: opencode is skipped when the plugin is installed"
+echo "Scenario 6: opencode still gets the MCP entry when the plugin is installed (AD-017)"
 H6="$ROOT/h6"; mkdir -p "$H6/.config/opencode"
 printf '{"plugin":["@massa-ai/opencode-plugin"]}\n' > "$H6/.config/opencode/opencode.json"
-BEFORE6="$(shasum -a 256 "$H6/.config/opencode/opencode.json" | cut -d' ' -f1)"
-OUT6="$(run "$H6" opencode)"
-AFTER6="$(shasum -a 256 "$H6/.config/opencode/opencode.json" | cut -d' ' -f1)"
-assert_contains "skip is explained" "$OUT6" "registers tools in-process"
-assert_eq "config untouched" "$AFTER6" "$BEFORE6"
+run "$H6" opencode >/dev/null
+assert_eq "plugin-installed user still gets MCP" \
+  "$(jq_get "$H6/.config/opencode/opencode.json" 'c.mcp["massa-ai"] ? "yes" : "no"')" "yes"
+assert_eq "their plugin list survives" \
+  "$(jq_get "$H6/.config/opencode/opencode.json" 'c.plugin.join(",")')" "@massa-ai/opencode-plugin"
 
 echo ""
 echo "Scenario 7: opencode is NOT skipped without the plugin"
@@ -176,14 +176,14 @@ assert_eq "projects key survives" "$(jq_get "$CFG12" 'c.projects.key')" "value"
 assert_eq "massa-ai added" "$(jq_get "$CFG12" 'c.mcpServers["massa-ai"] ? "yes" : "no"')" "yes"
 
 echo ""
-echo "Scenario 13: opencode with local symlink registration skips MCP"
+echo "Scenario 13: opencode with local symlink registration still gets MCP (AD-017)"
 H13="$ROOT/h13"; mkdir -p "$H13/.config/opencode"
 printf '{"plugin":["./plugins/massa-ai/index.js"]}\n' > "$H13/.config/opencode/opencode.json"
-BEFORE13="$(shasum -a 256 "$H13/.config/opencode/opencode.json" | cut -d' ' -f1)"
-OUT13="$(run "$H13" opencode)"
-AFTER13="$(shasum -a 256 "$H13/.config/opencode/opencode.json" | cut -d' ' -f1)"
-assert_contains "skip is explained" "$OUT13" "registers tools in-process"
-assert_eq "config untouched" "$AFTER13" "$BEFORE13"
+run "$H13" opencode >/dev/null
+assert_eq "local-symlink-form user still gets MCP" \
+  "$(jq_get "$H13/.config/opencode/opencode.json" 'c.mcp["massa-ai"] ? "yes" : "no"')" "yes"
+assert_eq "their plugin list survives" \
+  "$(jq_get "$H13/.config/opencode/opencode.json" 'c.plugin.join(",")')" "./plugins/massa-ai/index.js"
 
 # ── PDO-01/02/04/05: the four opencode config existence combinations ─────────
 # scripts/lib/opencode-config.cjs's resolveConfigPath contract, exercised through the
