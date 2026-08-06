@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Default embedding model: `qwen3-embedding:8b` → `qwen3-embedding:4b`, with
+  a bounded runner footprint** — the 8b default at its full 40960 context makes
+  Ollama size the runner at ~10 GiB, which cannot stay resident beside a
+  ~6 GiB chat model on a 24 GB host: the two evict each other on every
+  embed↔chat alternation (545 evict/reload cycles measured in one server log
+  over 9 days) and the resulting queueing blows the 90 s LLM client timeout.
+  The 4b model (2.5 GB download, 2560 dims) embeds the full needle fixture
+  ~5-10× faster on constrained hardware, and every native Ollama embed call now
+  sends `options.num_ctx` (default 8192, `OLLAMA_EMBEDDING_NUM_CTX` to
+  override) so the runner loads at ~5 GB and coexists with a chat model —
+  inputs are truncated to ≤8000 chars (~2k tokens) long before that limit
+  matters. Swept across code defaults, `.env.example`, docker-compose,
+  installers, WSL setup, diagnose, config CLI, needles harness, and docs.
+  Dimension change means existing indexes re-embed on next reindex (the
+  pgvector table is per-dimension, no migration needed). Measured on the
+  14-needle fixture: hit@1 42.9%, MRR 0.595; the needle-gate floors, set in
+  the 8b era, are recalibrated 0.5/0.65 → 0.4/0.55 to sit just under the new
+  default's measured baseline (gate re-run: PASS).
+
+### Fixed
+
+- **config.json `embedding` block is now wired into the provider factory** —
+  it was typed, documented, and silently dead: `services/embeddings/config.ts`
+  read only env vars, so a user setting `embedding.provider`/`model`/
+  `dimensions` in `~/.config/massa-ai/config.json` kept running the Ollama
+  default (`getConfigForEnv`, the half-built bridge, had zero production
+  callers). The block now supplies the middle layer of the documented
+  env > config.json > defaults precedence: its fields overlay the provider
+  entry it names, `EMBEDDING_PROVIDER` env still wins provider selection, and
+  explicit env vars still win every field they set. An `openai` provider entry
+  now exists (the block's provider union always named it while no runtime
+  entry did), a config naming a provider with no runtime entry warns instead
+  of silently falling through, and the stale shared default
+  (`nomic-embed-text:latest`/768) is aligned to the factory's real default so
+  the merge is behavior-neutral when the block is absent. Guarded by a
+  subprocess-isolated suite (`embeddings-config-file-layer.test.ts`) that pins
+  the precedence chain.
+- **LLM abort/timeout no longer logs the misleading reasoning-recovery pair** —
+  `llmObject`'s catch attempted reasoning-channel recovery on *every* error,
+  so each client-side timeout (`AbortSignal.timeout`, 90 s default) emitted
+  `llm reasoning-recovery empty` — the "#7 safety net" that exists to flag
+  thinking-model shape shifts — followed by the real degradation warning. A
+  timed-out call carries no model response, so there is nothing to recover:
+  abort/timeout errors (name or `cause`-chain `TimeoutError`/`AbortError`, or
+  the equivalent message text from SDK retry wrappers) now skip recovery and
+  the safety net, keeping only the honest `llmObject failed — degrading`
+  signal. Non-timeout errors still reach the safety net unchanged.
+- **Needles gate no longer false-positives on agent worktrees** — anchor
+  resolution walked `.claude/worktrees/`, whose sibling checkouts are full
+  repo copies, so every anchored needle resolved to N locations and the gate
+  died with `NEEDLE_ANCHOR_AMBIGUOUS` on any machine with an active agent
+  worktree. `.claude` joins `IGNORED_DIRECTORIES`, which already excludes run
+  artifacts by intent.
+
 ## [1.32.0] - 2026-08-06
 
 ### Added
