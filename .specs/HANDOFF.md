@@ -1,4 +1,36 @@
-# Handoff — agent-era-harness-upgrades (VALIDATED PASS 2026-08-06 — 28/28 ACs, 8/8 mutants; PR #76 open, main v1.30.0 merged, merge authorized pending CI green)
+# Handoff — worktree-isolation-gate (implemented 2026-08-06; validation pending; push/PR = user decision)
+
+Session `spec-worktree-isolation-gate` · workflow spec-driven (Medium) · branch
+`spec/worktree-isolation-gate` from origin/main @ v1.32.0 (`5c66e813`) ·
+worktree `/Users/luizmassa/Projects/massa-ai-wt-worktree-isolation-step`
+(isolated; main checkout untouched — it holds unrelated uncommitted work).
+massa-ai MCP not used this session; `.specs/` files canonical. Contract:
+`.specs/features/worktree-isolation-gate/{spec,design,tasks}.md`.
+
+## Objective — worktree-isolation-gate
+
+User asked for worktree+branch creation before edits in every implementation
+workflow via a shared reference; measurement showed the contract already exists
+(delivery clause + Stage 1, all 16 workflows, since `93c1ee1c`), user
+redirected to strengthening enforcement. Delivered: one identical **Isolation
+Gate** action line after the delivery clause in all 16 implementation
+workflows; `implementation-delivery.md` Stage 1 record-evidence +
+never-switch-branches-in-shared-checkout cross-session paragraph; per-file +
+read-only-absence + uniformity sensor in `workflow-harness-contract.test.ts`
+(observed red 17 before subject); CHANGELOG Added entry. Hook-level blocking
+deferred with reason (design D2: hook binary is observation-only, no
+PreToolUse registered); efficacy accepted-risk recorded in spec Assumptions
+(Plan Challenge F1).
+
+## State — worktree-isolation-gate
+
+Commits: specs `11d93062` → T1 Stage 1 paragraph → T2 sensor (red-by-design
+commit) → T3 gate lines (16 files, 67/0, duplication excess 483 ≤ 483 @ w4,
+zero headroom untouched) → T4 CHANGELOG → T5 close-out (this commit). Gates
+all green in worktree incl. `generate:artifacts --check` no drift. Next:
+verification-agent → validation.md, then push/PR on user go-ahead.
+
+## Previous — agent-era-harness-upgrades (VALIDATED PASS 2026-08-06 — 28/28 ACs, 8/8 mutants; PR #76 open, main v1.30.0 merged, merge authorized pending CI green)
 
 Previous handoffs closed: untracked-generated-bundles (PR #73 open at the time
 of this handoff, CI 14/14 green; merge remains the user's decision — see

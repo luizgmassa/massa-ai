@@ -991,7 +991,27 @@
       "tasks": ".specs/features/agent-era-harness-upgrades/tasks.md",
       "created": "2026-08-05",
       "dependencies": []
+    },
+    {
+      "id": "worktree-isolation-gate",
+      "slug": "worktree-isolation-gate",
+      "title": "Worktree Isolation Gate — one identical explicit action line (execute implementation-delivery.md Stage 0–1 before the first file edit, record worktree path + branch or a verbatim legal skip reason) in all 16 implementation workflows; Stage 1 record-evidence + never-switch-branches-in-shared-checkout cross-session rule; per-file + uniformity sensor in workflow-harness-contract; hook-level blocking deferred (observation-only hook contract)",
+      "status": "in-progress",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/worktree-isolation-gate",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/worktree-isolation-gate/spec.md",
+      "design": ".specs/features/worktree-isolation-gate/design.md",
+      "tasks": ".specs/features/worktree-isolation-gate/tasks.md",
+      "created": "2026-08-06",
+      "dependencies": []
     }
   ],
-  "active_feature": "agent-era-harness-upgrades"
+  "active_feature": "worktree-isolation-gate"
 }
