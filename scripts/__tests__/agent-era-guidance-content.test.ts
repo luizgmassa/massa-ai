@@ -199,3 +199,17 @@ describe("test-engineer/SKILL.md: five error classes and variation test design (
     expect(content).toContain("technique-level, library-neutral");
   });
 });
+
+// ---------------------------------------------------------------------------
+// AEH-08: audit-specialist/SKILL.md tests lens (T10)
+// ---------------------------------------------------------------------------
+
+describe("audit-specialist/SKILL.md: tests lens row (AEH-08)", () => {
+  const content = readAgentCharter("audit-specialist");
+
+  test("lens table gains a tests row routing to tests-audit.md", () => {
+    expect(content).toContain(
+      "| `tests` | Coverage, regression protection, assertion quality, variation | `workflows/tests/tests-audit.md` |",
+    );
+  });
+});
