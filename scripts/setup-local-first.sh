@@ -113,37 +113,43 @@ if [ "$OLLAMA_API_REACHABLE" = false ]; then
 fi
 
 # Detect whether a named Ollama model is already pulled, without silently
-# returning "no" (which would trigger a multi-GB re-pull). Preference order:
+# returning "no" (which would trigger a multi-GB re-pull). Matching is exact
+# on name:tag — a bare name normalizes to :latest, mirroring Ollama itself. A
+# sibling tag must never satisfy the check: an installed qwen3-embedding:8b
+# used to make qwen3-embedding:4b read "already available" and skip the pull.
+# Preference order:
 #   1. `ollama list` CLI (no python3 dependency, works offline once pulled)
 #   2. /api/tags parsed with python3 (if python3 is present)
 #   3. /api/tags body scanned with grep (last-resort, no python3)
 # Each branch prints exactly "yes" or "no".
 ollama_model_exists() {
-    local model="$1" search="${1%%:*}" body
+    local model="$1" body
+    case "$model" in *:*) ;; *) model="${model}:latest" ;; esac
     # 1. CLI
     if [ "$OLLAMA_HAS_CLI" = true ]; then
-        if ollama list 2>/dev/null | grep -Eq "(^|[[:space:]])${search}(:|[[:space:]])"; then
+        if ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq "$model"; then
             echo "yes"; return 0
         fi
     fi
     # Fetch the tags payload once for the fallbacks.
     body="$(curl -s "${OLLAMA_URL}/api/tags" 2>/dev/null || true)"
     if [ -z "$body" ]; then echo "no"; return 0; fi
-    # 2. python3 JSON parse
+    # 2. python3 JSON parse (model passed via argv — never interpolated into code)
     if command -v python3 >/dev/null 2>&1; then
-        printf '%s' "$body" | python3 -c "
+        printf '%s' "$body" | python3 -c '
 import sys, json
 try:
     data = json.load(sys.stdin)
 except Exception:
-    print('no'); sys.exit(0)
-models = [m.get('name','') for m in data.get('models', [])]
-search = '${search}'
-print('yes' if any(search in m for m in models) else 'no')
-" 2>/dev/null && return 0
+    print("no"); sys.exit(0)
+models = [m.get("name","") for m in data.get("models", [])]
+print("yes" if sys.argv[1] in models else "no")
+' "$model" 2>/dev/null && return 0
     fi
-    # 3. grep fallback: match \"name\":\"qwen3-embedding...
-    if printf '%s' "$body" | grep -Eq "\"name\"[[:space:]]*:[[:space:]]*\"${search}"; then
+    # 3. grep fallback: match \"name\":\"<model>\" exactly, closing quote included.
+    local model_re
+    model_re="$(printf '%s' "$model" | sed 's/[][\.*^$+?(){}|/]/\\&/g')"
+    if printf '%s' "$body" | grep -Eq "\"name\"[[:space:]]*:[[:space:]]*\"${model_re}\""; then
         echo "yes"
     else
         echo "no"

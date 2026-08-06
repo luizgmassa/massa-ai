@@ -49,15 +49,16 @@ if curl -s --max-time 2 "${OLLAMA_URL}/api/tags" > /dev/null 2>&1; then
     OLLAMA_VERSION=$(curl -s "${OLLAMA_URL}/api/version" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','unknown'))" 2>/dev/null || echo "unknown")
     echo -e "  ${GREEN}✓${NC} Ollama: healthy (v${OLLAMA_VERSION})"
     
-    # Check embedding model
+    # Check embedding model — exact name:tag match (a bare name normalizes to
+    # :latest, mirroring Ollama); a sibling tag must not read as present.
     MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:4b}"
-    MODEL_EXISTS=$(curl -s "${OLLAMA_URL}/api/tags" 2>/dev/null | python3 -c "
+    case "$MODEL" in *:*) MODEL_FULL="$MODEL" ;; *) MODEL_FULL="${MODEL}:latest" ;; esac
+    MODEL_EXISTS=$(curl -s "${OLLAMA_URL}/api/tags" 2>/dev/null | python3 -c '
 import sys, json
 data = json.load(sys.stdin)
-models = [m['name'] for m in data.get('models', [])]
-search = '${MODEL%%:*}'
-print('yes' if any(search in m for m in models) else 'no')
-" 2>/dev/null || echo "no")
+models = [m["name"] for m in data.get("models", [])]
+print("yes" if sys.argv[1] in models else "no")
+' "$MODEL_FULL" 2>/dev/null || echo "no")
     
     if [ "$MODEL_EXISTS" = "yes" ]; then
         echo -e "  ${GREEN}✓${NC} Embedding model: ${MODEL}"
