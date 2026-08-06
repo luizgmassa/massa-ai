@@ -207,3 +207,23 @@ Neither gap blocks merge.
 `spec/agent-era-harness-upgrades`. All discrimination mutations above were applied to
 and reverted from the working tree at `d39fb040`; `git status --short` was empty both
 before verification began and after the final restore.
+
+---
+
+## Amendment 2026-08-06 — file-size thresholds (user decision)
+
+AEH-02 ACs 4/5 amended by the user after the PASS above: ~500 lines fine / over ~600
+flag for splitting, superseding the transcript-derived ~1000/~2000 (~2000 judged too
+much; bound reframed as working-context headroom, not the host single-read cap).
+
+Re-verified against the amended ACs:
+
+| AC | Evidence | Verdict |
+| --- | --- | --- |
+| 4 (amended) | `skills/massa-ai/references/coding-guidelines.md:73-74` — "~500 lines is fine" / "over ~600 lines must be flagged for splitting"; per-hop cost line unchanged | PASS |
+| 5 (amended) | `skills/massa-ai/workflows/code-quality/code-quality-audit.md:79` — "over ~600 lines" + "Do NOT flag a single-subject file for line count alone below that bound" | PASS |
+
+Sensors repointed (`~500 lines is fine`, `over ~600 lines must be flagged for splitting`,
+`over ~600 lines` static lead); each observed red under number-mutation before trusting
+(evidence in the amendment commit). Historical rows 4/5 above describe the pre-amendment
+state and are retained as the record of the original verification.

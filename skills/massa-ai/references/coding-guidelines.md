@@ -70,7 +70,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **Read mechanics, not module depth.**
 
-- A one-subject file up to ~1000 lines is fine — a single agent read stays coherent and a coding agent can hold the whole file in context in one pass.
-- A file over ~2000 lines exceeds a single agent read (Claude Code's Read tool caps around 2000 lines per call) and must be flagged for splitting.
+- A one-subject file up to ~500 lines is fine — a single agent read stays coherent, cheap in tokens, and a coding agent can hold the whole file in context with headroom for the rest of the task.
+- A file over ~600 lines must be flagged for splitting — even one-subject, it crowds out the rest of the working context and pushes reads toward pagination.
 - Splitting one subject across many files does not reduce read cost — it multiplies it: one subject spread over N files costs N reads, and each file boundary loses context (per-hop navigation cost).
 - This guidance derives from agent read mechanics, not from module depth. Depth is a separate concept, and this section makes no depth claim: depth is NOT a lines-of-code ratio (`references/architecture-deepening-lens.md` Rejected Framings) — a deep module can be tiny and a shallow wrapper can be long. Do not phrase file-size guidance as a depth metric; it is scoped to single-agent read cost only.

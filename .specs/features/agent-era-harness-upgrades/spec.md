@@ -18,7 +18,7 @@ class.
 
 ## Goals
 
-- [ ] Extraction and file-size guidance in code-quality/refactor/coding-guidelines is agent-read-cost aware (discoverability rationale, ~1000/2000-line thresholds) without reintroducing size dogma.
+- [ ] Extraction and file-size guidance in code-quality/refactor/coding-guidelines is agent-read-cost aware (discoverability rationale, ~500/~600-line thresholds) without reintroducing size dogma.
 - [ ] `lessons.ts` accumulates per-category review-feedback streaks (advisory trust ramp) and per-validation quality-metric snapshots (trend), with discriminating tests.
 - [ ] Every implementing workflow dispatches the `massa-ai-reviewer` agent (with standalone fallback) between implementation and verification.
 - [ ] `tests-audit`/`tests-fix`/`test-engineer` express the five-gate error-class model (logic, untouched code, brittleness, built-the-right-thing, drift).
@@ -41,7 +41,7 @@ class.
 
 | Assumption / decision | Chosen default | Rationale | Confirmed? |
 | --------------------- | -------------- | --------- | ---------- |
-| File-size numbers | ~1000 lines safe for a one-subject file; ~2000 = host single-read cap, flag | Claude Code Read tool caps at 2000 lines/call; transcript's practical numbers | y (from approved analysis) |
+| File-size numbers | ~500 lines fine for a one-subject file; over ~600 flag for splitting | **Amended by user 2026-08-06** (superseding the transcript-derived ~1000/~2000; ~2000 judged too much): bound is working-context headroom, not the host single-read cap | y (user decision) |
 | Trust streak threshold | 30 consecutive reviews with feedback level `none`/`minor` marks a category trusted; configurable `trust_threshold` in lessons config | Transcript's ~30-PR operational rule; config mirrors existing `promote_threshold` pattern | n (default accepted via advisory-only answer) |
 | Feedback levels | `none` and `minor` extend the streak; `major` resets streak to 0 and demotes a trusted category | Transcript: "quase nada de feedback" — near-zero, not literally zero | n (logged) |
 | Trust category identity | Free-form kebab-case label supplied at record time (e.g. `installer`, `admin-ui`), same convention as lessons `--scope` | Reuses existing vocabulary; no fixed taxonomy exists | n (logged) |
@@ -67,8 +67,8 @@ class.
 1. WHEN `code-quality-audit.md` describes a function-split lead THEN the workflow SHALL require the finding to cite an external-discoverability or change-risk rationale, and SHALL prohibit recommending a split on size or "does more than one thing" grounds alone. <!-- AEH-01 -->
 2. WHEN `code-quality-fix.md` executes a split finding THEN it SHALL apply the same discoverability-or-change-risk criterion. <!-- AEH-01 -->
 3. The `refactor.md` workflow SHALL name extract-for-findability (a named unit findable by search from outside the file) as the primary payoff of extraction. <!-- AEH-01 -->
-4. The `coding-guidelines.md` reference SHALL state: a one-subject file up to ~1000 lines is acceptable; a file over ~2000 lines exceeds a single agent read and must be flagged; splitting one subject across many files adds per-hop navigation cost. <!-- AEH-02 -->
-5. WHEN `code-quality-audit.md` scans static leads THEN it SHALL flag multi-subject files and files over ~2000 lines, and SHALL NOT flag a single-subject file on line count below that bound. <!-- AEH-02 -->
+4. The `coding-guidelines.md` reference SHALL state: a one-subject file up to ~500 lines is acceptable; a file over ~600 lines must be flagged for splitting; splitting one subject across many files adds per-hop navigation cost. <!-- AEH-02, amended by user 2026-08-06: was ~1000/~2000 -->
+5. WHEN `code-quality-audit.md` scans static leads THEN it SHALL flag multi-subject files and files over ~600 lines, and SHALL NOT flag a single-subject file on line count below that bound. <!-- AEH-02, amended by user 2026-08-06: was ~2000 -->
 6. The file-size guidance SHALL state it derives from agent read mechanics and SHALL NOT be phrased as a module-depth metric (deepening lens L100 rejects LOC-as-depth). <!-- AEH-02 -->
 
 **Independent Test**: Read the four edited files; every split/size rule cites discoverability, change risk, or read mechanics; grep finds no remaining split-on-"and"-alone rule.

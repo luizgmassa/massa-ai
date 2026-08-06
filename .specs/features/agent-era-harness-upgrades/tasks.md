@@ -230,7 +230,7 @@ T18 → T19
 ### T6: Add file-shape-for-agent-readers section to coding-guidelines
 
 **Task ID**: TASK-006
-**What**: New section: one-subject file up to ~1000 lines fine; >2000 exceeds a single agent read; one subject across N files costs N reads with per-hop loss; explicitly framed as read mechanics, not module depth (names the deepening-lens rejected framing).
+**What**: New section: one-subject file up to ~500 lines fine; over ~600 flag for splitting (amended by user 2026-08-06: originally shipped as ~1000/~2000); one subject across N files costs N reads with per-hop loss; explicitly framed as read mechanics, not module depth (names the deepening-lens rejected framing).
 **Where**: `skills/massa-ai/references/coding-guidelines.md`, `scripts/__tests__/agent-era-guidance-content.test.ts`
 **Depends on**: T5
 **Reuses**: `architecture-deepening-lens.md` Rejected Framings phrasing (cited, not restated)

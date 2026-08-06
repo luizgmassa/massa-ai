@@ -76,7 +76,7 @@ Findings-only: do not edit code unless the user separately asks for fixes.
    - Magic values: repeated strings, event names, timeouts, numeric thresholds, status codes.
    - Generic names: `data`, `info`, `result`, `value`, `temp`, `manager`, `handler`, `helper` without useful qualification, using `references/naming-standards.md` to filter conventional short-scope or framework-required names.
    - Long parameter lists: more than 3-4 positional parameters.
-   - File shape: flag multi-subject files (unrelated exported surfaces bundled together) and any file over ~2000 lines, regardless of subject count — that exceeds a single agent read (see `references/coding-guidelines.md` "File shape for agent readers"). Do NOT flag a single-subject file for line count alone below that bound.
+   - File shape: flag multi-subject files (unrelated exported surfaces bundled together) and any file over ~600 lines, regardless of subject count — it crowds out working context for the rest of the task (see `references/coding-guidelines.md` "File shape for agent readers"). Do NOT flag a single-subject file for line count alone below that bound.
    - Needlessly indirect code: pass-through wrappers, one-use abstractions, helper layers with no behavior, factories/builders that only hide one constructor call.
    - Speculative surfaces: unused options, future-oriented hooks, extension points with one implementation, exported APIs with no evidence of use.
    - Complexity without payoff: deep nesting, miniature state machines, or polymorphism where a direct branch or data map would preserve clarity.

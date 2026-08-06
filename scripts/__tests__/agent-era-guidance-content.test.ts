@@ -49,9 +49,9 @@ describe("code-quality-audit.md: agent-read-aware split and file-size leads (AEH
     expect(content).toContain("never on concern-count or size alone");
   });
 
-  test("static leads flag multi-subject files and files over ~2000 lines", () => {
+  test("static leads flag multi-subject files and files over ~600 lines", () => {
     expect(content).toContain("flag multi-subject files");
-    expect(content).toContain("over ~2000 lines");
+    expect(content).toContain("over ~600 lines");
   });
 
   test("static leads SHALL NOT flag a single-subject file below the line-count bound", () => {
@@ -120,13 +120,13 @@ describe("refactor.md: extract-for-findability payoff (AEH-01)", () => {
 describe("coding-guidelines.md: file shape for agent readers (AEH-02)", () => {
   const content = readSkill("references/coding-guidelines.md");
 
-  test("section exists with the ~1000-line one-subject-file number", () => {
+  test("section exists with the ~500-line one-subject-file number", () => {
     expect(content).toContain("File Shape for Agent Readers");
-    expect(content).toContain("~1000 lines is fine");
+    expect(content).toContain("~500 lines is fine");
   });
 
-  test("section states the ~2000-line single-agent-read bound", () => {
-    expect(content).toContain("over ~2000 lines exceeds a single agent read");
+  test("section states the ~600-line split bound", () => {
+    expect(content).toContain("over ~600 lines must be flagged for splitting");
   });
 
   test("section states the per-hop navigation cost of splitting one subject across files", () => {

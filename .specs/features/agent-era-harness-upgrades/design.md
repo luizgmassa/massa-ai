@@ -132,10 +132,10 @@ agent), `general.md`, `debug.md`, `refactor.md`, and the 9 `*-fix` workflows
 
 | File | Edit |
 | --- | --- |
-| `workflows/code-quality/code-quality-audit.md` | L94 split lead → "recommend splitting only when the split yields an externally-findable named unit (search/grep from outside the file) or reduces change risk; never on size or 'more than one thing' alone"; static leads gain multi-subject-file + >2000-line flags with the SHALL-NOT-flag-below-bound guard |
+| `workflows/code-quality/code-quality-audit.md` | L94 split lead → "recommend splitting only when the split yields an externally-findable named unit (search/grep from outside the file) or reduces change risk; never on size or 'more than one thing' alone"; static leads gain multi-subject-file + >~600-line flags with the SHALL-NOT-flag-below-bound guard (amended by user 2026-08-06: was >2000) |
 | `workflows/code-quality/code-quality-fix.md` | L51-52 same criterion on the fix side |
 | `workflows/refactor.md` | Step 8 names extract-for-findability as the primary extraction payoff |
-| `references/coding-guidelines.md` | New "File shape for agent readers" section: ~1000-line one-subject file fine; >2000 exceeds one read; one subject split across N files = N reads with per-hop loss; explicitly framed as read mechanics, not depth (cites deepening-lens rejected framing) |
+| `references/coding-guidelines.md` | New "File shape for agent readers" section: ~500-line one-subject file fine; over ~600 flag for splitting (amended by user 2026-08-06: was ~1000/~2000 — context-headroom bound, not the host read cap); one subject split across N files = N reads with per-hop loss; explicitly framed as read mechanics, not depth (cites deepening-lens rejected framing) |
 | `workflows/tests/tests-audit.md` | Gate/error-class table (5 rows); variation sensor; trend sensor (reads `metrics trend`); dispatch lens `performance` → `tests` |
 | `workflows/tests/tests-fix.md` | Variation fix method (varied-input cases, not fixture copies) |
 | `agents/test-engineer/SKILL.md` | Mission names 5 error classes; responsibilities gain variation/property-style design (library-neutral) |
