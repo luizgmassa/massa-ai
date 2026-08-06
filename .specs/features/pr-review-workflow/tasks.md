@@ -148,6 +148,6 @@ Gate: full matrix green; commit any needed repairs atomically.
       `.specs/features/pr-review-workflow/validation.md`; fix loop ≤3.
 - [ ] Sensor: `check_specs_delivered` exit 0; validation.md verdict recorded.
 Where: .specs/project/STATE.md, .specs/project/FEATURES.json, .specs/HANDOFF.md, .specs/features/pr-review-workflow/validation.md
-Tests: `bun skills/massa-ai/scripts/check_specs_delivered.ts pr-review-workflow --root .` exit 0; `bun skills/massa-ai/scripts/validate_state.ts --root .` exit 0
+Tests: `bun skills/massa-ai/scripts/check_specs_delivered.ts pr-review-workflow --root .` exit 0; `bun skills/massa-ai/scripts/validate_state.ts --root .` adds no new errors vs the origin/main baseline (51 pre-existing errors across historical features, measured 2026-08-05 in a scratch worktree; `pr-review-workflow` contributes 0 — amended from "exit 0", which no branch can reach without out-of-scope historical repairs)
 Gate: validation PASS (or Blocked with evidence); commit.
 - Depends on: T5

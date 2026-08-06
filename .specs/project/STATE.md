@@ -1,6 +1,40 @@
 # massa-ai Spec State
 
-## Current — Untracked Generated Bundles (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 7/7 mutations after fix loop 1; PR next; merge = user decision)
+## Current — PR Review Workflow (Execute T1–T5 complete 2026-08-05; T6 validation in flight)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-pr-review-workflow` ·
+  workflow: spec-driven (Large) · branch `spec/pr-review-workflow` from
+  origin/main @ `1906a04e` (v1.29.0).
+- Scope (user-directed 2026-08-05): new routed workflow `pr-review` adapting the
+  TLC pr-review skill (CC-BY-4.0, github.com/augusto-dmh) — six-dimension hosted
+  PR/MR review posting inline comments + one consolidated summary, GitHub `gh` +
+  GitLab `glab`, massa-ai roster dispatches (audit-specialist ×5 by lens incl.
+  coverage-under-performance per tests-audit precedent, reviewer for regression),
+  orchestrator-posts channel discipline, `.specs/` as requirements Track B,
+  freshness-gated index retrieval. glab commands verified against official
+  GitLab CLI/API docs by a research subagent (citations in design.md D1); stable
+  `glab api` Discussions/Notes endpoints are the contract, experimental
+  `glab mr note` inline flags noted only as alternative.
+- Contract: `.specs/features/pr-review-workflow/{spec,design,tasks}.md` —
+  `2 Phases = 6 Tasks`, inline execution (batch worker declined: one dominant
+  prose file, sequential deps). Plan Challenge full pre_mortem
+  (massa-ai-plan-critic): F1 consolidation check recorded (D2b, six dispatches
+  stand), F2 live read-only dry run added (gh side executed against PR #73:
+  identity/metadata/diff/files/comments all resolve; glab skipped-with-reason —
+  not installed), F3 80% confidence gate → qualitative bar, F4 accepted
+  (read-only classification with outward posting), F5 byte ceiling measured.
+- Commits: `55ed20e2` (specs) `18e0dbe6` (T1 workflow file, 17,424 B)
+  `T2` router row + tier-3 clause (SKILL.md 20,091 B ≤ 21,000)
+  `T3` count locks 38→39 + complement 22→23 (observed red→green)
+  `T4` CHANGELOG. Gates: generate:artifacts --check no drift; integrity +
+  duplication + parity + size 81/0; doc-paths 0 misses; lint 0; test:scripts
+  1451/4 — the 4 fails are the documented `.claude/worktrees/` needle-anchor
+  contamination class (3 sibling checkouts duplicate `const DAMPING = 0.85;`;
+  same class as workflow-metadata-headers AC5 amendment; CI authoritative).
+- Next: T6 — FEATURES.json entry, HANDOFF rotation, check_specs_delivered,
+  independent verification-agent → validation.md; push/PR = user decision.
+
+## Previous — Untracked Generated Bundles (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 7/7 mutations after fix loop 1; merged as PR #73, released v1.29.0)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-untracked-generated-bundles` ·
   workflow: spec-driven (Large) · persona: AI Engineer · branch

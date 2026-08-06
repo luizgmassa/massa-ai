@@ -919,7 +919,22 @@
       "created": "2026-08-05",
       "description": "Stop tracking generated plugin bundles; generate at pack/install/CI time",
       "dependencies": []
+    },
+    {
+      "id": "pr-review-workflow",
+      "slug": "pr-review-workflow",
+      "title": "PR Review Workflow — six-dimension hosted GitHub PR / GitLab MR review posting inline findings + consolidated summary via gh/glab, massa-ai roster dispatches, .specs/ requirements integration",
+      "status": "in-progress",
+      "created": "2026-08-05",
+      "workflow": "spec-driven",
+      "branch": "spec/pr-review-workflow",
+      "depends_on": [],
+      "artifacts": [
+        "spec.md",
+        "design.md",
+        "tasks.md"
+      ]
     }
   ],
-  "active_feature": "untracked-generated-bundles"
+  "active_feature": "pr-review-workflow"
 }
