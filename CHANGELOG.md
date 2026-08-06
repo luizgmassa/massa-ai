@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-08-06
+
 ### Changed
 
 - **Default embedding model: `qwen3-embedding:8b` → `qwen3-embedding:4b`, with
