@@ -52,6 +52,7 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
    - Fixture drift: repair fixtures/builders to match current contracts while keeping them minimal and explicit.
    - Flakiness: prove root cause first; control time, randomness, async scheduling, filesystem, network, and global state with deterministic seams.
    - Missing sensor: add or document the focused command needed to prove the regression cannot recur.
+   - Variation: add varied-input cases (bounds, parameter changes) that exercise the behavior beyond the fixture example — never add a second copy of the fixture example.
    - Mobile coverage: prefer KMP/shared tests before device loops when the behavior is shared; use Android/iOS harnesses, bridge contract tests, screenshot/snapshot checks, lifecycle or permission simulations, and parity validation when the report finding requires them.
 9. Guard validation assets:
    - Never weaken assertions only to make the suite pass.

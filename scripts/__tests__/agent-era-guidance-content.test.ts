@@ -163,3 +163,18 @@ describe("tests-audit.md: five-gate error-class model, variation and trend senso
     expect(content).not.toContain("test coverage is under the performance lens");
   });
 });
+
+// ---------------------------------------------------------------------------
+// AEH-04: tests-fix.md variation fix method (T8)
+// ---------------------------------------------------------------------------
+
+describe("tests-fix.md: variation finding fix method (AEH-04)", () => {
+  const content = readSkill("workflows/tests/tests-fix.md");
+
+  test("variation fix method adds varied-input cases, never a fixture-example copy", () => {
+    expect(content).toContain(
+      "Variation: add varied-input cases (bounds, parameter changes)",
+    );
+    expect(content).toContain("never add a second copy of the fixture example");
+  });
+});
