@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Discovery Workflow (Execute T1–T5 complete 2026-08-05; T6 validation in flight)
+## Current — Discovery Workflow (**VALIDATED PASS 2026-08-05** — 15/15 ACs, 4/4 mutations killed; push/PR = user decision)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-discovery-workflow` ·
   workflow: spec-driven (full artifacts by pr-review precedent) · branch

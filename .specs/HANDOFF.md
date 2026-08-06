@@ -1,4 +1,4 @@
-# Handoff — discovery-workflow (Execute complete through T5; T6 validation in flight; push/PR = user decision)
+# Handoff — discovery-workflow (VALIDATED PASS 2026-08-05 — 15/15 ACs, 4/4 mutations killed; push/PR = user decision)
 
 Previous handoff: pr-review-workflow VALIDATED PASS (preserved below as
 Previous). Cross-session incident: its T6 commit `c4b4d6cb` landed on THIS
@@ -51,11 +51,16 @@ established by web search + GitHub API per Plan Challenge F3).
 
 ## Next Step
 
-T6 close-out: check_specs_delivered, independent verification-agent
-(author ≠ verifier) → `.specs/features/discovery-workflow/validation.md`;
-flip FEATURES.json status on PASS; final state commit. Then the incident
-repair + push + PRs are the user's decision (outward-facing; not taken
-unattended). The workflow ships with the skills bundles on the next
+Done through T6: check_specs_delivered exit 0; independent validation PASS
+(15/15 ACs, 4/4 mutations killed, 0 gaps —
+`.specs/features/discovery-workflow/validation.md`); FEATURES.json status
+`complete`. Remaining (all user decisions, outward-facing, not taken
+unattended): (1) incident repair `git branch -f spec/pr-review-workflow
+c4b4d6cb`; (2) push both branches; (3) PR for pr-review-workflow → main,
+then PR for discovery-workflow with `base=spec/pr-review-workflow` (or
+retarget to main after the first merges). CHANGELOG entries present for
+both, so the merge gate needs no `no-changelog` label. No installed-machine
+actions — the workflow ships with the skills bundles on the next
 release/install.
 
 ---

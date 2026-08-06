@@ -941,7 +941,7 @@
       "id": "discovery-workflow",
       "slug": "discovery-workflow",
       "title": "Discovery Workflow — product brainstorming thinking partner (four modes, seven frameworks, five-stage session rhythm, conduct contract) adapted from anthropics/knowledge-work-plugins product-brainstorming (Apache-2.0), mandatory to-prd PRD offer at Capture, router row + tier-4 clause, count locks 39→40 / complement 23→24, WMH license allowlist +Apache-2.0",
-      "status": "in-progress",
+      "status": "complete",
       "created": "2026-08-05",
       "workflow": "spec-driven",
       "branch": "spec/discovery-workflow",
@@ -951,8 +951,10 @@
       "artifacts": [
         "spec.md",
         "design.md",
-        "tasks.md"
-      ]
+        "tasks.md",
+        "validation.md"
+      ],
+      "notes": "VALIDATED PASS 2026-08-05 (independent verifier, author != verifier): 15/15 lettered ACs, 4/4 discrimination mutations killed (0 survivors, hash-verified restores), named suites 131/0 + parity no drift + SKILL.md 20293 B + doc-paths 0 misses + lint 0 on verifier-owned re-runs; observed-red 39/23 reproduced in a scratch worktree at 231a9357. test:scripts 1451/4 — 4 fails are the .claude/worktrees needle-anchor contamination class, CI authoritative. Push/PR = user decision; see STATE for the c4b4d6cb shared-checkout incident repair (fast-forward spec/pr-review-workflow first)."
     }
   ],
   "active_feature": "discovery-workflow"
