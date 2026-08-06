@@ -130,3 +130,36 @@ describe("coding-guidelines.md: file shape for agent readers (AEH-02)", () => {
     expect(content).toContain("depth is NOT a lines-of-code ratio");
   });
 });
+
+// ---------------------------------------------------------------------------
+// AEH-04/05/08/09: tests-audit.md gate table, variation/trend sensors, tests lens (T7)
+// ---------------------------------------------------------------------------
+
+describe("tests-audit.md: five-gate error-class model, variation and trend sensors, tests lens (AEH-04, AEH-05, AEH-08, AEH-09)", () => {
+  const content = readSkill("workflows/tests/tests-audit.md");
+
+  test("gate table maps all five gates to their error class", () => {
+    expect(content).toContain("| Unit | Business-logic errors |");
+    expect(content).toContain("| Coverage | Code no test touched |");
+    expect(content).toContain("| Variation | Hardcoded-example brittleness |");
+    expect(content).toContain("| Acceptance-criteria mapping | Built-the-wrong-thing |");
+    expect(content).toContain("| Quality-metric trend | Drift over time |");
+  });
+
+  test("variation sensor flags tests exercising only the single fixture example", () => {
+    expect(content).toContain(
+      "Variation check: flag tests exercising only the single fixture example where input bounds or parameters can vary",
+    );
+  });
+
+  test("trend sensor reads metrics trend and reports direction when snapshots exist", () => {
+    expect(content).toContain("Trend check: read `bun skills/massa-ai/scripts/lessons.ts --root . metrics trend`");
+    expect(content).toContain("report the direction (improving, stable, degrading) when two or more snapshots exist");
+  });
+
+  test("dispatch names the tests lens and no longer files coverage under performance", () => {
+    expect(content).toContain("`lens: tests`");
+    expect(content).not.toContain("lens: performance");
+    expect(content).not.toContain("test coverage is under the performance lens");
+  });
+});
