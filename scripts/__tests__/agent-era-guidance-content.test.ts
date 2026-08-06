@@ -291,3 +291,22 @@ describe("references/lessons.md: trust-ramp and metrics policy (AEH-03)", () => 
     expect(flat).toContain("there is no cached `streak`/`trusted` flag anywhere in the store");
   });
 });
+
+// ---------------------------------------------------------------------------
+// AEH-03: references/implementation-delivery.md advisory trust-status line (T13)
+// ---------------------------------------------------------------------------
+
+describe("references/implementation-delivery.md: advisory trust-status context (AEH-03)", () => {
+  const content = readSkill("references/implementation-delivery.md");
+
+  test("advisory trust-status line present at the human-review stage", () => {
+    expect(content).toContain(
+      "the change's category trust status (`bun skills/massa-ai/scripts/lessons.ts --root . trust status --category <kebab>`) as advisory reading-depth context",
+    );
+    expect(content).toContain("it never substitutes for the approval decision below");
+  });
+
+  test("the per-PR merge-approval clause stays byte-identical", () => {
+    expect(content).toContain("Approval for one PR does not carry to the next.");
+  });
+});
