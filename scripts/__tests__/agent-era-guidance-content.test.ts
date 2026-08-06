@@ -325,3 +325,66 @@ describe("references/spec-driven/validate.md: post-validation metric snapshot re
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// AEH-06: massa-ai-reviewer dispatch block wired into the 14 implementing/fix
+// workflows (T15-T17). Shared constants and target lists below are reused
+// across the T15/T16/T17 describe blocks as each batch lands.
+// ---------------------------------------------------------------------------
+
+const REVIEWER_DISPATCH_HEADER =
+  "> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`";
+const REVIEWER_FALLBACK_CLAUSE =
+  "> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason";
+const REVIEWER_PERSONA_BULLET =
+  "> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed";
+
+interface ReviewerDispatchTarget {
+  file: string;
+  scope: string;
+}
+
+/** Asserts one file carries the full reviewer dispatch block: header, scope, fallback, and the mandatory persona bullet. */
+function expectReviewerDispatchBlock({ file, scope }: ReviewerDispatchTarget): void {
+  const content = readSkill(file);
+  expect(content).toContain(REVIEWER_DISPATCH_HEADER);
+  expect(content).toContain(`> - scope: ${scope}`);
+  expect(content).toContain(REVIEWER_FALLBACK_CLAUSE);
+  expect(content).toContain(REVIEWER_PERSONA_BULLET);
+}
+
+const IMPLEMENTING_WORKFLOW_TARGETS: ReviewerDispatchTarget[] = [
+  { file: "workflows/feature.md", scope: "the feature's diff surface and its task/AC context" },
+  { file: "workflows/general.md", scope: "the change's diff surface and its task/AC context" },
+  { file: "workflows/debug.md", scope: "the fix's diff surface and its task/AC context" },
+  { file: "workflows/refactor.md", scope: "the change's diff surface and its task/AC context" },
+  { file: "workflows/spec-driven.md", scope: "the task's diff surface and its task/AC context" },
+];
+
+describe("massa-ai-reviewer dispatch block: 5 implementing workflows (T15, AEH-06)", () => {
+  for (const target of IMPLEMENTING_WORKFLOW_TARGETS) {
+    test(`${target.file} carries the reviewer dispatch block with fallback and persona bullets`, () => {
+      expectReviewerDispatchBlock(target);
+    });
+  }
+
+  test("spec-driven.md's existing verification-agent dispatch block stays intact", () => {
+    const content = readSkill("workflows/spec-driven.md");
+    expect(content).toContain(
+      "> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`",
+    );
+    expect(content).toContain("> - scope: the feature's git diff surface, test files, and spec ACs");
+    expect(content).toContain(
+      "the verification-agent always runs automatically and writes `.specs/features/<slug>/validation.md`",
+    );
+  });
+
+  test("the reviewer dispatch block precedes the verification-agent dispatch block in spec-driven.md", () => {
+    const content = readSkill("workflows/spec-driven.md");
+    const reviewerIdx = content.indexOf(REVIEWER_DISPATCH_HEADER);
+    const verificationIdx = content.indexOf("> **Dispatch: `massa-ai-verification-agent`**");
+    expect(reviewerIdx).toBeGreaterThan(-1);
+    expect(verificationIdx).toBeGreaterThan(-1);
+    expect(reviewerIdx).toBeLessThan(verificationIdx);
+  });
+});
