@@ -30,8 +30,9 @@ Do-Not conduct lists; all six anti-patterns with counters. Cut: the long OODA
 strategy digression, duplicated examples, and the generic "Session Structure"
 prose that repeats mode guidance. Rationale: the workflow file is loaded into
 context on route — target ≤ ~14 KB, comparable to pr-review.md's 17.4 KB
-and well under any suite ceiling; unique prose, so the duplication metric is
-untouched.
+(authoring target, not a gated ceiling — `skill-size-budgets.test.ts` has no
+`workflows/*.md` entry, so no automated gate senses this file's size; Plan
+Challenge F5); unique prose, so the duplication metric is untouched.
 
 ### D2 — Read-only complement membership
 
@@ -62,13 +63,14 @@ holds — discovery already did the questioning). On declination the capture
 summary stays in conversation and durable decisions persist per D6. The
 workflow states all three branches (offer, accept, decline).
 
-### D5 — Provenance without invented attribution
+### D5 — Provenance measured, Apache-2.0 attribution (amended per F3)
 
-The base document is user-supplied with no license/attribution header. The
-workflow records "adapted from a user-supplied product-brainstorming skill
-document (2026-08-05)" and ships MIT like the other 38 workflows. Contrast
-pr-review (CC-BY-4.0 with named upstream): no upstream is known here, and
-inventing one would be worse than recording the true provenance.
+The base document carried no license header; a unique-phrase web search
+(Plan Challenge F3) located it as the `product-brainstorming` skill in
+`anthropics/knowledge-work-plugins`, Apache-2.0 (GitHub API, 2026-08-05).
+The workflow ships `license: Apache-2.0` frontmatter plus an attribution
+line naming the upstream skill and repo — the exact pattern pr-review.md
+established for its CC-BY-4.0 base. MIT relabeling is off the table.
 
 ### D6 — Memory capture policy
 
@@ -99,5 +101,6 @@ aborted after 120 s; the degradation path is live, not theoretical).
   new file.
 - R5 Base document is itself a skill prompt: risk of shipping second-person
   skill voice that clashes with workflow conventions. Mitigation: D1
-  rewrites into workflow imperative voice; WMH frontmatter + integrity
-  suites gate the format.
+  rewrites into workflow imperative voice; the sensing mechanism is T6's
+  independent clause-by-clause read (no automated suite asserts voice —
+  Plan Challenge F4 corrected the earlier suite-based claim).

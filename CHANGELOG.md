@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`discovery` workflow** — product brainstorming / problem-space thinking
+  partner, adapted from the `product-brainstorming` skill in
+  `anthropics/knowledge-work-plugins` (Apache-2.0, attributed). Four
+  brainstorming modes (problem exploration, solution ideation, assumption
+  testing, strategy exploration), seven frameworks-as-tools (HMW, JTBD,
+  Opportunity Solution Trees, first principles, SCAMPER, OODA, reverse
+  brainstorming), the Frame → Diverge → Provoke → Converge → Capture session
+  rhythm, and a thinking-partner conduct contract with six named
+  anti-patterns. Binds to the massa-ai runtime (budgeted `recall` at start,
+  durable `decision`/`pattern` memories at Capture, graceful degradation) and
+  ends every session with a mandatory offer to synthesize the conversation
+  into a PRD via the existing `to-prd` workflow — acceptance is the explicit
+  request `to-prd` requires. Registered in the router (tier-4 primary-verb
+  precedence; codebase understanding stays `exploration`); read-only
+  complement grows 23 → 24, workflow population 39 → 40; the workflow
+  frontmatter license allowlist gains Apache-2.0.
+
 ## [1.30.0] - 2026-08-06
 
 ### Added
