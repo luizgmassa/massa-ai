@@ -14,6 +14,8 @@ Load `references/project-context.md` (intake sweep) before the first substantive
 
 Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) — its Stage 3 delivery-authorization scope covers one go-ahead through PR creation; force-push/deploy/merge stay separately gated — and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
+**Isolation Gate — before the first file edit:** execute `references/implementation-delivery.md` Stage 0–1 now (fetch base, create the worktree + branch, work inside it) and record the worktree path + branch — or one of Stage 1's two legal skip reasons, verbatim — before any repository mutation.
+
 Not for findings-only architecture review — route to `workflows/architecture/architecture-audit.md`. Not for broad new design work with missing requirements — route to `workflows/spec-driven.md`.
 
 1. Resolve/reuse `workflowSessionId`: `architecture-fix-[entity]`

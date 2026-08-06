@@ -14,6 +14,8 @@ Load `references/project-context.md` (intake sweep) before the first substantive
 
 Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage) — one user go-ahead carries this fix through PR creation only, force-push, deploy, and merge stay separately gated, and Maestro Cloud execution/upload is gated again, separately, per `references/maestro/cloud.md`. After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
+**Isolation Gate — before the first file edit:** execute `references/implementation-delivery.md` Stage 0–1 now (fetch base, create the worktree + branch, work inside it) and record the worktree path + branch — or one of Stage 1's two legal skip reasons, verbatim — before any repository mutation.
+
 Reject direct use without a saved `audits/maestro/<YYYY-MM-DD maestro-audit.md>` report or a parent audit handoff that includes the same required metadata. Do not execute from chat summaries, remembered findings, inline comments, or unsaved model analysis. The saved report or parent handoff is the source of truth.
 
 1. Resolve/reuse `workflowSessionId`: `maestro-fix-[entity]`.

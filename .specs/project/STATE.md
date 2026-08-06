@@ -1,6 +1,55 @@
 # massa-ai Spec State
 
-## Current — Workflow Commands (**VALIDATED PASS 2026-08-06** — 14/14 WFC ACs, 8/8 mutations killed, fix loop iteration 2; PR #78 open, main v1.32.0 merged in; merge = user decision)
+## Current — Worktree Isolation Gate (**VALIDATED PASS 2026-08-06** — 6/6 ACs, 3/3 mutations killed, iteration 1; push/PR = user decision)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-worktree-isolation-gate` ·
+  workflow: spec-driven (Medium) · branch `spec/worktree-isolation-gate` from
+  origin/main @ v1.32.0 (`5c66e813`), worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-worktree-isolation-step` (isolated —
+  dogfooding the feature itself; main checkout untouched).
+- Scope (user-directed 2026-08-06): user asked for worktree+branch creation in
+  every implementation workflow via a shared reference; premise measured
+  already-satisfied (the delivery clause + Stage 1 have been in all 16 since
+  `93c1ee1c`), user redirected to **strengthen enforcement**. Delivered: one
+  identical **Isolation Gate** action line after the delivery clause in all 16
+  implementation workflows; Stage 1 gains record-evidence + never-switch-
+  branches-in-shared-checkout (cross-session rule, distinct from
+  agent-orchestration.md's cross-subagent bullet); hook-level blocking deferred
+  (hook binary contract is observation-only; no PreToolUse registered) — see
+  `.specs/features/worktree-isolation-gate/design.md` D2.
+- Contract: `.specs/features/worktree-isolation-gate/{spec,design,tasks}.md` —
+  `2 Phases = 5 Tasks`, inline (batch-worker offer declined by precedent).
+  Plan Challenge full pre_mortem (massa-ai-plan-critic): F1 efficacy accepted-
+  risk recorded in spec Assumptions (textual gate is unfalsifiable for behavior
+  change; falsifier = future repeat incident), F2 cross-reference distinction +
+  post-T1 duplication measure, F3 critic pre-measured duplication delta 0
+  (483→483 @ window 4, zero-headroom ceiling untouched), F4 per-file sensor
+  loop, F5 CONTRIBUTING 7-step mapping added to spec, F6 size-budgets citation
+  corrected (no budget covers workflows/**).
+- Commits: `11d93062` specs → T1 Stage 1 paragraph → T2 sensor (observed red
+  17 = 16 per-file + uniformity; committed red-by-design, gates green at T3) →
+  T3 gate lines 16 files ×2 insertions (sensor 67/0, excess 483 ≤ 483) → T4
+  CHANGELOG (Added → minor).
+- Gates: workflow-harness-contract 67/0; duplication 20/0 (excess 483 ≤ 483 @
+  w4); size 6/0; metadata-headers 40 files; doc-paths green; venue-parity
+  green; integrity 32/0 (after `generate:artifacts` in fresh worktree);
+  `generate:artifacts --check` no drift (707 skill-bundle files, 374 variant
+  agents).
+- massa-ai MCP not consulted this session (recall unavailable); `.specs/`
+  files canonical.
+- Validation (independent verifier, author ≠ verifier, iteration 1 of 3 —
+  closed): 6/6 ACs; 3 mutations, 3/3 killed. Pass-1 survivor was real: the
+  coverage matrix claimed a Stage 1 sensor T2 never wrote (AC4); fixed
+  `a8360f18` (observed red in scratch, copy-count verified), re-injected pass 2,
+  killed, porcelain byte-identical before/after. Verifier gates: 68/0
+  harness-contract, validate_state exit 0. Lesson class: a tasks.md
+  coverage-matrix row naming a sensor is a claim to falsify, not trust.
+- Next: push/PR = user decision (branch `spec/worktree-isolation-gate`, 8
+  commits ahead of origin/main).
+
+## Previous — Agent-Era Harness Upgrades (**VALIDATED PASS 2026-08-06** — 28/28 ACs, 8/8 mutants killed; PR #76 open; file-size thresholds amended ~500/~600 by user @ `eb23dd0a`; main v1.30.0 + PR #77 merged in; merge authorized, CI watch)
+
+## Previous — Workflow Commands (**VALIDATED PASS 2026-08-06** — 14/14 WFC ACs, 8/8 mutations killed, fix loop iteration 2; merged to main 2026-08-06)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-workflow-commands` · workflow:
   spec-driven (Large) · branch `spec/workflow-commands` from main @ `1906a04e`

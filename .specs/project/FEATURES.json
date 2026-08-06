@@ -996,11 +996,33 @@
     {
       "id": "workflow-commands",
       "slug": "workflow-commands",
-      "status": "in-progress",
+      "status": "complete",
       "created": "2026-08-05",
       "description": "Per-workflow slash commands on all four hosts (e.g. /massa-ai:debug), generated from the workflow inventory",
       "dependencies": []
+    },
+    {
+      "id": "worktree-isolation-gate",
+      "slug": "worktree-isolation-gate",
+      "title": "Worktree Isolation Gate — one identical explicit action line (execute implementation-delivery.md Stage 0–1 before the first file edit, record worktree path + branch or a verbatim legal skip reason) in all 16 implementation workflows; Stage 1 record-evidence + never-switch-branches-in-shared-checkout cross-session rule; per-file + uniformity sensor in workflow-harness-contract; hook-level blocking deferred (observation-only hook contract)",
+      "status": "complete",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/worktree-isolation-gate",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/worktree-isolation-gate/spec.md",
+      "design": ".specs/features/worktree-isolation-gate/design.md",
+      "tasks": ".specs/features/worktree-isolation-gate/tasks.md",
+      "created": "2026-08-06",
+      "dependencies": [],
+      "validation": ".specs/features/worktree-isolation-gate/validation.md",
+      "notes": "VALIDATED PASS 2026-08-06 (independent verifier, author != verifier, iteration 1 of 3): 6/6 ACs, 3/3 discrimination mutations killed (pass-1 survivor was the AC4 Stage 1 sensor the coverage matrix claimed but never wrote — fixed a8360f18, re-injected, killed). Gates: harness-contract 68/0, duplication excess 483 <= 483 @ w4, integrity 32/0, venue-parity 21/0, generate:artifacts --check clean, validate_state exit 0. Push/PR = user decision."
     }
   ],
-  "active_feature": "workflow-commands"
+  "active_feature": "worktree-isolation-gate"
 }

@@ -14,6 +14,8 @@ Load `references/project-context.md` (intake sweep) before the first substantive
 
 Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
+**Isolation Gate — before the first file edit:** execute `references/implementation-delivery.md` Stage 0–1 now (fetch base, create the worktree + branch, work inside it) and record the worktree path + branch — or one of Stage 1's two legal skip reasons, verbatim — before any repository mutation.
+
 1. Resolve/reuse `workflowSessionId`: `refactor-[entity]`
 2. `recall` → load architectural decisions and coupling patterns for the area
    - Canonical artifact home: Standard+ refactors write to `.specs/refactors/<slug>/` (`CHARACTERIZATION.md` required; `PLAN.md` and `SENSOR.md` optional); Quick-sized refactors reuse `.specs/quick/NNN-slug/` verbatim. If the target directory is unwritable, block the write per `references/artifact-persistence.md`.

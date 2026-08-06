@@ -1,4 +1,39 @@
-# Handoff — workflow-commands (VALIDATED PASS; PR #78 open, main v1.32.0 merged in; merge = user decision)
+# Handoff — worktree-isolation-gate (VALIDATED PASS 2026-08-06 — 6/6 ACs, 3/3 mutations killed, iteration 1; push/PR = user decision)
+
+Session `spec-worktree-isolation-gate` · workflow spec-driven (Medium) · branch
+`spec/worktree-isolation-gate` from origin/main @ v1.32.0 (`5c66e813`) ·
+worktree `/Users/luizmassa/Projects/massa-ai-wt-worktree-isolation-step`
+(isolated; main checkout untouched — it holds unrelated uncommitted work).
+massa-ai MCP not used this session; `.specs/` files canonical. Contract:
+`.specs/features/worktree-isolation-gate/{spec,design,tasks}.md`.
+
+## Objective — worktree-isolation-gate
+
+User asked for worktree+branch creation before edits in every implementation
+workflow via a shared reference; measurement showed the contract already exists
+(delivery clause + Stage 1, all 16 workflows, since `93c1ee1c`), user
+redirected to strengthening enforcement. Delivered: one identical **Isolation
+Gate** action line after the delivery clause in all 16 implementation
+workflows; `implementation-delivery.md` Stage 1 record-evidence +
+never-switch-branches-in-shared-checkout cross-session paragraph; per-file +
+read-only-absence + uniformity sensor in `workflow-harness-contract.test.ts`
+(observed red 17 before subject); CHANGELOG Added entry. Hook-level blocking
+deferred with reason (design D2: hook binary is observation-only, no
+PreToolUse registered); efficacy accepted-risk recorded in spec Assumptions
+(Plan Challenge F1).
+
+## State — worktree-isolation-gate
+
+Commits: specs `11d93062` → T1 Stage 1 paragraph → T2 sensor (red-by-design
+commit) → T3 gate lines (16 files, 67/0, duplication excess 483 ≤ 483 @ w4,
+zero headroom untouched) → T4 CHANGELOG → T5 close-out → `a8360f18` AC4
+Stage 1 sensor (validation iteration 1: verifier's scratch mutation proved the
+coverage-matrix-claimed sensor was never written; fixed, observed red, killed
+on re-injection) → validation.md PASS committed. Gates all green in worktree
+incl. `generate:artifacts --check` no drift; validate_state exit 0. Next:
+push/PR on user go-ahead.
+
+# Previous — Handoff — workflow-commands (VALIDATED PASS; merged to main 2026-08-06)
 
 Session `spec-workflow-commands` · workflow spec-driven (Large) · branch
 `spec/workflow-commands` from main @ `1906a04e` (v1.29.0), worktree
