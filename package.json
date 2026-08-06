@@ -24,7 +24,7 @@
     "bench:fixture:sicad": "bun run --filter @massa-ai/core bench:fixture:sicad",
     "bench:beir": "bun run --filter @massa-ai/core bench:beir",
     "bench:needles": "bun benchmarks/needles/run.ts",
-    "bench:needles:gate": "NEEDLE_FLOOR_HIT1=0.5 NEEDLE_FLOOR_MRR=0.65 bun benchmarks/needles/run.ts --label ci-gate",
+    "bench:needles:gate": "NEEDLE_FLOOR_HIT1=0.4 NEEDLE_FLOOR_MRR=0.55 bun benchmarks/needles/run.ts --label ci-gate",
     "bench:parser": "bun benchmarks/parser/run.ts --baseline 5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",

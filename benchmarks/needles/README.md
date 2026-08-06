@@ -42,7 +42,7 @@ fixtures/<project>.json ──┐
 `run.ts` is a self-contained chunker-quality harness that does NOT need the
 live tools-api stack or a database. It chunks each referenced source file with
 `smartChunk`, embeds the query + every chunk via the Ollama embedding endpoint
-(`qwen3-embedding:8b` by default — the same model as the E2E baseline), and
+(`qwen3-embedding:4b` by default — the same model as the E2E baseline), and
 cosine-ranks chunks per query. This isolates chunker effects from API/DB/RRF
 variance, giving stable, reproducible before/after numbers for tuning.
 
@@ -59,7 +59,7 @@ bun run bench:needles:gate
 ```
 
 Env: `OLLAMA_HOST` (default `http://localhost:11434`), `NEEDLE_MODEL` (default
-`qwen3-embedding:8b`), `NEEDLE_FLOOR_HIT1`, `NEEDLE_FLOOR_MRR`. Results are
+`qwen3-embedding:4b`), `NEEDLE_FLOOR_HIT1`, `NEEDLE_FLOOR_MRR`. Results are
 written under `reports/` (gitignored).
 
 The full-stack gate (live API + Postgres + RRF) lives in the E2E suite:

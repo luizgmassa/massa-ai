@@ -115,7 +115,7 @@ import { smartChunk } from "../packages/core/src/services/search/smart-chunker.t
 const REPO_ROOT = resolve(import.meta.dir, "..");
 const DEFAULT_FIXTURE = "benchmarks/needles/fixtures/massa-ai.json";
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? "http://localhost:11434";
-const DEFAULT_MODEL = process.env.NEEDLE_MODEL ?? "qwen3-embedding:8b";
+const DEFAULT_MODEL = process.env.NEEDLE_MODEL ?? "qwen3-embedding:4b";
 
 export interface ReportResult {
   needleId: string;

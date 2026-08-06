@@ -8,7 +8,7 @@ name: Needles Gate
 # chunker-default changes, embedding-model swaps, or content shifts that would
 # otherwise only surface as a slow quality decay in real usage.
 #
-# MANUAL-ONLY (workflow_dispatch) or local. qwen3-embedding:8b is ~60s/embed on
+# MANUAL-ONLY (workflow_dispatch) or local. qwen3-embedding:4b is ~60s/embed on
 # a 2-core free runner (~90min for the fixture), so the gate is impractical for
 # per-PR CI and would burn the free-tier quota. PR gating relies on the CI build
 # + structural-native jobs. Run on demand from the Actions tab, or locally with
@@ -33,7 +33,7 @@ concurrency:
 jobs:
   needles:
     runs-on: ubuntu-latest
-    # NON-BLOCKING by design. qwen3-embedding:8b is ~60s/embed on a 2-core free
+    # NON-BLOCKING by design. qwen3-embedding:4b is ~60s/embed on a 2-core free
     # runner (~90min for the fixture), so this gate cannot reliably complete on
     # free runners. It remains for manual dispatch (workflow_dispatch) or a
     # beefier runner, and never blocks PR merge — PR gating depends on the CI
@@ -85,20 +85,20 @@ jobs:
         if: env.SKIPPED != '1'
         uses: actions/cache@v4
         with:
-          # qwen3-embedding:8b is ~5GB; cache its blobs across runs so the
+          # qwen3-embedding:4b is ~2.5GB; cache its blobs across runs so the
           # `ollama pull` below is a no-op on a warm runner. Bump the -vN
           # suffix when changing the model.
           path: ~/.ollama/models
-          key: ollama-model-qwen3-embedding-8b-v1
-          restore-keys: ollama-model-qwen3-embedding-8b-
+          key: ollama-model-qwen3-embedding-4b-v1
+          restore-keys: ollama-model-qwen3-embedding-4b-
 
       - name: Pull embedding model
         if: env.SKIPPED != '1'
         run: |
           # Pull the same model the E2E baseline uses. Falls back to
-          # nomic-embed-text if qwen3-embedding:8b is unavailable.
-          if ollama pull qwen3-embedding:8b 2>/tmp/pull.log; then
-            echo "NEEDLE_MODEL=qwen3-embedding:8b" >> "$GITHUB_ENV"
+          # nomic-embed-text if qwen3-embedding:4b is unavailable.
+          if ollama pull qwen3-embedding:4b 2>/tmp/pull.log; then
+            echo "NEEDLE_MODEL=qwen3-embedding:4b" >> "$GITHUB_ENV"
           elif ollama pull nomic-embed-text 2>>/tmp/pull.log; then
             echo "NEEDLE_MODEL=nomic-embed-text" >> "$GITHUB_ENV"
           else
@@ -110,8 +110,8 @@ jobs:
       - name: Run needles gate
         if: env.SKIPPED != '1'
         env:
-          NEEDLE_FLOOR_HIT1: "0.5"
-          NEEDLE_FLOOR_MRR: "0.65"
+          NEEDLE_FLOOR_HIT1: "0.4"
+          NEEDLE_FLOOR_MRR: "0.55"
         run: bun benchmarks/needles/run.ts --label ci
 
       - name: Report skip

@@ -71,6 +71,12 @@ const IGNORED_DIRECTORIES = new Set([
   "reports",
   ".turbo",
   ".next",
+  // Harness-session artifacts. `.claude/worktrees/` holds full sibling copies
+  // of the repo, so scanning it makes every anchor resolve to N locations and
+  // fails the gate with NEEDLE_ANCHOR_AMBIGUOUS on any machine with an active
+  // agent worktree — a false positive the docblock's "run artifacts" already
+  // means to exclude.
+  ".claude",
 ]);
 
 /**

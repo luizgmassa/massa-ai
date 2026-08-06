@@ -305,6 +305,27 @@ function timeoutSignal(timeoutMs: number): AbortSignal {
 }
 
 /**
+ * True when `err` (or anything on its `cause` chain) is a client-side
+ * abort/timeout: AbortSignal.timeout throws DOMException("TimeoutError",
+ * "The operation timed out."), manual aborts throw "AbortError", and SDK
+ * retry wrappers carry the same text in `message`. A timed-out call has no
+ * model response, so reasoning-channel recovery has nothing to recover and
+ * the "#7 safety net" warning (which exists to flag thinking-model shape
+ * shifts) would fire as pure noise on every slow-backend timeout.
+ * @internal
+ */
+export function _isAbortOrTimeoutError(err: unknown): boolean {
+  let cur: any = err;
+  for (let hops = 0; cur && hops < 5; hops++, cur = cur.cause) {
+    const name = typeof cur.name === "string" ? cur.name : "";
+    if (name === "TimeoutError" || name === "AbortError") return true;
+    const message = typeof cur.message === "string" ? cur.message : "";
+    if (/timed out|operation was aborted/i.test(message)) return true;
+  }
+  return false;
+}
+
+/**
  * Generate a free-form text completion. Returns `{ ok: false }` (never throws)
  * when the LLM is disabled, times out, or errors. When the content channel is
  * empty (qwen3 thinking-model failure mode), falls back to the reasoning
@@ -441,8 +462,10 @@ export async function llmObject<T>(
     // generateObject throws AI_NoObjectGeneratedError on schema mismatch / empty
     // parse — the thrown error carries the raw response (with reasoning). The
     // successful-but-empty case is covered by `result` above; here recover from
-    // the error itself before degrading.
-    if (llm.disableThink) {
+    // the error itself before degrading. Aborts/timeouts carry no response at
+    // all — skip recovery and the safety net for them, or every slow-backend
+    // timeout logs a misleading "reasoning-recovery empty" pair.
+    if (llm.disableThink && !_isAbortOrTimeoutError(e)) {
       const reasoning =
         _reasoningToText(result).length > 0 ? _reasoningToText(result) : _reasoningToText(e);
       if (reasoning.length > 0) {
