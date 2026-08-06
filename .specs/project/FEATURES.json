@@ -915,10 +915,26 @@
     {
       "id": "untracked-generated-bundles",
       "slug": "untracked-generated-bundles",
-      "status": "in-progress",
+      "status": "complete",
       "created": "2026-08-05",
       "description": "Stop tracking generated plugin bundles; generate at pack/install/CI time",
       "dependencies": []
+    },
+    {
+      "id": "plugin-architecture-unification",
+      "slug": "plugin-architecture-unification",
+      "title": "AD-017: plugins deliver, MCP serves tools, hooks observe — OpenCode MCP re-registration, sentinel-gated harness skip, Cursor bridge dedupe, hooks-only OpenCode plugin",
+      "status": "complete",
+      "created": "2026-08-05",
+      "depends_on": [],
+      "artifacts": [
+        "spec.md",
+        "design.md",
+        "tasks.md",
+        "context.md",
+        "validation.md"
+      ],
+      "notes": "Merged as PR #74 @ 46e7af97 (status flipped from in-progress during the pr-review-workflow main merge)."
     },
     {
       "id": "pr-review-workflow",

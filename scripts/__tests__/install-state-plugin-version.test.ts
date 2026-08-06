@@ -10,7 +10,9 @@
  * and the strict skills reader must keep hard-failing on a corrupt file.
  *
  * T10 adds the same round-trip obligation for two more optional fields:
- * `installRoute` (installer-owned, "file" | "marketplace") and `modelProfile`
+ * `installRoute` (installer-owned, "file" | "marketplace" for claude; codex/
+ * opencode are unconditionally "file"; cursor has its own "local" | "bridge"
+ * vocabulary — AD-017/T6, plugin-architecture-unification) and `modelProfile`
  * ({profile, switchedAt}, switch-engine-owned). install-skills.sh's TSV
  * intermediate originally carried only 6 columns (platform/root/csv/owner/
  * plugin-version/plugin-installedAt) — extending state with two more optional
@@ -111,8 +113,14 @@ describe("plugin version record parity (PAI-03, R7, F)", () => {
         expect(plugin.version).toBe(rootVersion);
         expect(plugin.installedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
         // T10 (MPS-03, design F1): installRoute is written on every install
-        // path, all three of these installers pinned to the file route above.
-        expect(state.platforms[host].installRoute).toBe("file");
+        // path. claude/codex are pinned to the file route by the SKIP env
+        // above. Cursor has its own two-value vocabulary (AD-017/T6:
+        // "bridge" | "local", joining claude's "marketplace" | "file" rather
+        // than reusing it) and needs no SKIP var — its bridge probe is a
+        // plain read of $HOME/.claude/plugins/installed_plugins.json, already
+        // sandboxed by the redirected HOME above with no live-CLI risk; with
+        // no registry file present it falls back to "local".
+        expect(state.platforms[host].installRoute).toBe(host === "cursor" ? "local" : "file");
         await fs.rm(path.join(home, ".config"), { recursive: true, force: true });
       }
     },
@@ -377,7 +385,9 @@ describe("record_plugin_version() preserves a pre-existing modelProfile (T10, MP
 
         const state = await readState(path.join(home, ".config", "massa-ai", "install-state.json"));
         expect(JSON.stringify(state.platforms[host].modelProfile)).toBe(JSON.stringify(MODEL_PROFILE_RECORD));
-        expect(state.platforms[host].installRoute).toBe("file");
+        // Cursor's fallback route is "local", not "file" — see the identical
+        // note in the "record shape is identical" test above (AD-017/T6).
+        expect(state.platforms[host].installRoute).toBe(host === "cursor" ? "local" : "file");
       },
       TEST_TIMEOUT,
     );

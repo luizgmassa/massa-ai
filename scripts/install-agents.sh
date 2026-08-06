@@ -39,9 +39,6 @@
 #   - Writing to real $HOME requires --yes (or an interactive "y" on a TTY).
 #   - Deep merge preserves every existing user key; only the massa-ai entry is
 #     written, and uninstall removes only entries carrying _massaAiOwned: true.
-#   - OpenCode MCP registration is skipped when @massa-ai/opencode-plugin is
-#     already listed in opencode.json — that plugin registers tools in-process,
-#     so an MCP entry would duplicate the whole tool surface.
 #
 # Exit codes:
 #   0  success
@@ -570,36 +567,6 @@ finish(true, bak, 1);
 NODE
 }
 
-# ── OpenCode plugin detection ──────────────────────────────────────────────
-# The OpenCode plugin registers massa-ai tools in-process, so an MCP entry there
-# duplicates the entire tool surface. Skip the write only when the plugin is
-# actually listed — users without it still need MCP for any tool access at all.
-opencode_plugin_present() {
-  local cfg="$1"
-  [ -f "$cfg" ] || return 1
-  "$RUNNER" - "$cfg" "$CONFIG_LIB" <<'NODE'
-const fs = require("fs");
-const { parseJsonc } = require(process.argv[3]);
-try {
-  const raw = fs.readFileSync(process.argv[2], "utf8");
-  // Checked against the RESOLVED path (agent_config_path already picked .jsonc vs
-  // .json), so a .jsonc user's plugin listing is detected too — before this fix a
-  // .jsonc user always got a redundant MCP registration (design.md D1).
-  const cfg = raw.trim() ? parseJsonc(raw) : {};
-  const plugins = Array.isArray(cfg.plugin) ? cfg.plugin : [];
-  // Match npm package or local symlink path or bare directory name
-  process.exit(plugins.some((p) => {
-    if (typeof p !== "string") return false;
-    return p.includes("@massa-ai/opencode-plugin") ||
-           p.includes("plugins/massa-ai/index.js") ||
-           p === "massa-ai";
-  }) ? 0 : 1);
-} catch {
-  process.exit(1);
-}
-NODE
-}
-
 # ── Advisory: where the 17 subagent specialists come from ──────────────────
 # Suppressed when a plugin installer is the caller (it just ran that command).
 # Gated behind verbose.
@@ -637,11 +604,6 @@ HINTS=""
 for agent in $AGENTS; do
   cfg="$(agent_config_path "$agent")" || continue
   [ -n "$cfg" ] || continue
-
-  if [ "$agent" = "opencode" ] && [ "$MODE" != "uninstall" ] && opencode_plugin_present "$cfg"; then
-    echo "  [opencode] ${cfg} — skipped: @massa-ai/opencode-plugin registers tools in-process; an MCP entry would duplicate them"
-    continue
-  fi
 
   if [ "$agent" = "codex" ]; then
     toml_op "$MODE" "$cfg" "$MCP_SOURCE"

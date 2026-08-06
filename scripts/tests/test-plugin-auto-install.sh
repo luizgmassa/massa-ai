@@ -239,7 +239,13 @@ assert_no_file "no config dir fabricated for opencode" "$H/.config/opencode"
 
 echo ""
 echo "2.4 same-version no-op: seeded equal version skips the installer (PAI-05)"
-H="$ROOT/m24"; mkdir -p "$H/.cursor"
+# PAU-05/06 amendment: a version-current record is only a true skip when the
+# host's installed-artifact sentinel is present on disk too — this fixture now
+# creates it (~/.cursor/agents/massa-ai-*.md), matching what a real install
+# actually leaves behind. Without it, 2.14 below shows the same seed state
+# reinstalling instead.
+H="$ROOT/m24"; mkdir -p "$H/.cursor/agents"
+touch "$H/.cursor/agents/massa-ai-navigator.md"
 seed_state "$H" <<'JSON'
 { "version": 2, "repository": "/x",
   "platforms": { "cursor": { "root": "/x/.cursor", "skills": ["massa-ai"], "skillsOwner": "plugin",
@@ -287,6 +293,11 @@ assert_contains "install log line" "$OUT" "install cursor@2.0.0"
 echo ""
 echo "2.8 dry-run: per-host decision lines, nothing written (PAI-09, AC-10)"
 H="$ROOT/m28"; mkdir -p "$H/.claude" "$H/.cursor"
+# PAU-05/06 amendment: opencode's recorded version is current, so its sentinel
+# (the installed plugin file, not an agents glob) must exist too or this
+# becomes a reinstall — see the sentinel table in installer-shared.sh.
+mkdir -p "$H/.config/opencode/plugins/massa-ai"
+touch "$H/.config/opencode/plugins/massa-ai/index.js"
 seed_state "$H" <<'JSON'
 { "version": 2, "repository": "/x",
   "platforms": {
@@ -307,6 +318,23 @@ assert_contains "dry-run names skip-absent" "$OUT" "skip-absent codex: host not 
 assert_eq "dry-run → no installer ran" "$(called_hosts)" ""
 assert_eq "dry-run → nothing under HOME modified" "$AFTER" "$BEFORE"
 assert_no_file "dry-run → no marketplace copy" "$H/.config/massa-ai/marketplace"
+
+echo ""
+echo "2.8b PAU-06: dry-run reports reinstall (not skip-current) for a wiped sentinel, and writes nothing"
+H="$ROOT/m28b"; mkdir -p "$H/.cursor"
+seed_state "$H" <<'JSON'
+{ "version": 2, "repository": "/x",
+  "platforms": { "cursor": { "root": "/x/.cursor", "skills": ["massa-ai"], "skillsOwner": "plugin",
+                             "plugin": { "version": "2.0.0", "installedAt": "2026-07-29T12:00:00Z" } } } }
+JSON
+BEFORE="$(tree_fingerprint "$H")"
+run_shadow "$SAFE_PATH" "$H" --dry-run
+AFTER="$(tree_fingerprint "$H")"
+assert_eq "dry-run wiped-sentinel → exit 0" "$RC" "0"
+assert_contains "dry-run names reinstall, naming the sentinel" "$OUT" "reinstall cursor: sentinel missing"
+assert_not_contains "dry-run does NOT name skip-current for a wiped sentinel" "$OUT" "skip-current cursor"
+assert_eq "dry-run wiped-sentinel → no installer ran" "$(called_hosts)" ""
+assert_eq "dry-run wiped-sentinel → nothing under HOME modified" "$AFTER" "$BEFORE"
 
 echo ""
 echo "2.9 failure isolation: a failing host never aborts the rest (PAI-10, AC-9)"
@@ -368,6 +396,36 @@ assert_eq "missing installer → exit 0 (warn-and-continue)" "$RC" "0"
 assert_contains "missing installer warning" "$OUT" "cursor plugin installer not found"
 assert_eq "remaining detected host still installed" "$(called_hosts)" "claude "
 make_plugin_stub cursor
+
+echo ""
+echo "2.14 PAI-11: a version-current record with the sentinel wiped reinstalls instead of skipping forever (PAU-05/06)"
+H="$ROOT/m214"; mkdir -p "$H/.cursor"
+# No ~/.cursor/agents/massa-ai-*.md on disk — simulates the observed live
+# external wipe (2026-08-05): the version record says current, disk says absent.
+seed_state "$H" <<'JSON'
+{ "version": 2, "repository": "/x",
+  "platforms": { "cursor": { "root": "/x/.cursor", "skills": ["massa-ai"], "skillsOwner": "plugin",
+                             "plugin": { "version": "2.0.0", "installedAt": "2026-07-29T12:00:00Z" } } } }
+JSON
+run_shadow "$SAFE_PATH" "$H"
+assert_eq "wiped-sentinel reinstall → exit 0" "$RC" "0"
+assert_eq "wiped-sentinel reinstall → installer ran" "$(called_hosts)" "cursor "
+assert_contains "reinstall log line names host + missing sentinel" "$OUT" "reinstall cursor: sentinel missing"
+assert_not_contains "wiped-sentinel run never claims skip-current" "$OUT" "skip cursor: already at"
+
+echo ""
+echo "2.15 PAI-11 counterpart: sentinel present + version current → true skip is preserved (PAU-05)"
+H="$ROOT/m215"; mkdir -p "$H/.cursor/agents"
+touch "$H/.cursor/agents/massa-ai-navigator.md"
+seed_state "$H" <<'JSON'
+{ "version": 2, "repository": "/x",
+  "platforms": { "cursor": { "root": "/x/.cursor", "skills": ["massa-ai"], "skillsOwner": "plugin",
+                             "plugin": { "version": "2.0.0", "installedAt": "2026-07-29T12:00:00Z" } } } }
+JSON
+run_shadow "$SAFE_PATH" "$H"
+assert_eq "sentinel-present skip → exit 0" "$RC" "0"
+assert_eq "sentinel-present skip → installer NOT run" "$(called_hosts)" ""
+assert_contains "sentinel-present skip → unchanged skip-current log shape" "$OUT" "skip cursor: already at 2.0.0"
 
 # ================================================================
 echo ""
@@ -465,6 +523,21 @@ for host in claude codex cursor; do
   assert_eq "$host re-run → exit 0" "$RC" "0"
   assert_contains "$host re-run skips at same version" "$OUT" "skip ${host}: already at ${REAL_VERSION}"
   assert_eq "$host re-run left the host config dir untouched" "$(tree_fingerprint "$H/$cfg_dir")" "$FP_BEFORE"
+
+  # (b2) PAI-11/AC (Independent Test): wiping the installed sentinel artifacts
+  # (external wipe, observed live 2026-08-05) while the version record stays
+  # current forces a reinstall on the next run instead of a permanent skip —
+  # and the artifacts are genuinely back on disk afterward, not just logged.
+  rm -f "$H/$cfg_dir/agents/"massa-ai-*
+  FP_WIPED="$(tree_fingerprint "$H/$cfg_dir")"
+  run_harness "$H"
+  assert_eq "$host wiped-sentinel reinstall → exit 0" "$RC" "0"
+  assert_contains "$host wiped-sentinel reinstall log line" "$OUT" "reinstall ${host}: sentinel missing"
+  assert_ne "$host wiped-sentinel reinstall → host config dir changed" "$(tree_fingerprint "$H/$cfg_dir")" "$FP_WIPED"
+  ls "$H/$cfg_dir/agents/"massa-ai-* >/dev/null 2>&1
+  check "$host wiped-sentinel reinstall → sentinel artifacts restored on disk" "$?"
+  assert_eq "$host record still current after reinstall" \
+    "$(state_plugin_field "$STATE" "$host" version)" "$REAL_VERSION"
 
   # (c) PAI-04/AC-5: an older recorded version upgrades and updates the record
   seed_older_version "$STATE"

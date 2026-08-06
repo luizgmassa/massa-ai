@@ -1,4 +1,4 @@
-# massa-ai Tool Contracts (52 Tools)
+# massa-ai Tool Contracts (54 Tools)
 
 Load when exact MCP schemas, REST fallbacks, response modes, or
 polling rules are needed. Prefer the active tool declaration over copied
@@ -138,6 +138,8 @@ depends on exact content.
 |---|---|---|
 | `rename_project` | Rename a project identity transactionally | Req: `sourceProjectId`, `targetProjectId`. Default `dryRun=true`; apply with `dryRun=false` + `operationId` + `expectedPlanHash`. Administrative, not workflow-recurring. |
 | `merge_projects` | Merge one project identity into another | Req: `sourceProjectId`, `targetProjectId`. Same dryRun/planHash contract as `rename_project`. Administrative, not workflow-recurring. |
+| `profile_list` | List shipped model profiles and each detected host's current profile + bundle version | No required args; optional `host` to scope to one. Offline — reads on-disk variant directories only, never the registry. |
+| `profile_set` | Switch the installed massa-ai agents to a registry model profile | Req: `profile`. Optional `host` (default: every detected, supported host), `dryRun` (default `false`) to preview without writing. Local trust model — mutates installed agent files on the machine the MCP server runs on; a host session restart is required to take effect. |
 
 ## Retrieval Order
 
