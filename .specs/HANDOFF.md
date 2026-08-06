@@ -1,4 +1,4 @@
-# Handoff — plugin-architecture-unification (VALIDATED PASS; PR next — creation authorized this session, merge = user decision)
+# Handoff — plugin-architecture-unification (VALIDATED PASS; PR #74 open, CI 14/14 green; merge = user decision)
 
 Previous handoffs closed: untracked-generated-bundles merged as PR #73 @
 `40ec631a` (main, released v1.29.0).
@@ -37,8 +37,9 @@ plugin, install-skills cursor warning.
 
 ## Next Step
 
-Push branch + `gh pr create` (authorized at Execute start this session), CI
-watch. After merge, the user runs the staged machine repairs (this machine's
+PR #74 open, CI 14/14 green (post-PR commits `c1334397` coverage floor +
+`7aef1eba` config-pollution race; one infra rerun). Merge = user decision.
+After merge, the user runs the staged machine repairs (this machine's
 wiped `~/.cursor` artifacts + opencode plugin/MCP refresh):
 
 ```bash

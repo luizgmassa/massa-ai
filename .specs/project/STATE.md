@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Plugin Architecture Unification (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 6/6 mutations, fix loop iteration 2; PR next; merge = user decision)
+## Current — Plugin Architecture Unification (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 6/6 mutations, fix loop iteration 2; PR #74 open, CI 14/14 green; merge = user decision)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-plugin-architecture-unification` ·
   workflow: spec-driven (Large) · branch `spec/plugin-architecture-unification` from
@@ -29,6 +29,7 @@
   Verifier independently re-derived the sweep (184-row superset, 0 live). L-021
   recorded by verifier. Known post-merge user actions: machine repair commands
   staged in the session final report (live ~/.cursor + ~/.config/opencode re-run).
+- Post-PR: coverage floor caught index.ts at 88.93% after the hooks-only slimming → `c1334397` (coverage to 99.63%, MASSA_AI_REINDEX_DEBOUNCE_MS knob + turbo passthrough) and `7aef1eba` (closed a LATENT real-config pollution race: config-cli-profile's module-scope require froze CONFIG_DIR before any scratch XDG existed, so CI suites initialized the runner's real ~/.config/massa-ai — also the mechanism behind the build job's api-key flake; every shared/config importer now pulls env-setup first, verified zero writes under a scratch HOME). One coverage run also died in runner bunx-cache corruption (infra, rerun green). Main-checkout branch moved mid-session to a sibling session's branch — delivery continued from worktree .claude/worktrees/pau.
 - Deviations recorded: T10 split (worker CHANGELOG+gates / orchestrator state files);
   T9 repaired 3 suites left stale by Batch 1 behavior changes + latent
   00.harness.smoke EXPECTED_TOOLS 52→54 gap; FEATURES.json untracked-generated-bundles
