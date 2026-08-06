@@ -10,7 +10,8 @@
   "files": [
     "dist",
     "agents/*.md",
-    "agent-profiles/**/*.md"
+    "agent-profiles/**/*.md",
+    "command/*.md"
   ],
   "scripts": {
     "dev": "bun run --watch src/index.ts",

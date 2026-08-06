@@ -108,6 +108,13 @@ else
 fi
 PLUGINS_DIR="$TARGET/plugins/massa-ai"
 AGENTS_DIR="$TARGET/agents"
+# Generated workflow commands (T10, WFC-08/12). OpenCode's binary discovers
+# both `command/` and `commands/` recursively (glob {command,commands}/**/*.md,
+# probed against v1.18.14) — `command/` is the docs-canonical name and the one
+# this plugin bundle ships (apps/opencode-plugin/command/massa-ai-<stem>.md,
+# design Component 4). This host has no hand-authored quick commands, so
+# every massa-ai-*.md delivered here is generated.
+COMMANDS_DIR="$TARGET/command"
 PLUGIN_JS="$REPO_ROOT/apps/opencode-plugin/dist/index.js"
 # Model-profile variant tree (T9, design Component 3 / MPS-04). Source is the
 # bundle's per-profile agent-profiles/<p>/ (sibling of agents/, A5); dest is
@@ -436,6 +443,24 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
     fi
   fi
 
+  # Remove owned workflow commands (T10, WFC-08/12). Prefix-glob against the
+  # INSTALLED directory, not the source bundle — same reasoning as the
+  # claude-plugin uninstall hardening (T7): deriving removals from
+  # $SCRIPT_DIR/command/*.md would miss installed copies whenever the bundle
+  # is absent or stale at uninstall time (normal under AD-016).
+  if [[ -d "$COMMANDS_DIR" ]]; then
+    removed=0
+    for f in "$COMMANDS_DIR/"massa-ai-*.md; do
+      [[ -f "$f" ]] || continue
+      rm -f "$f"
+      removed=$((removed + 1))
+    done
+    if [[ "$removed" -gt 0 ]]; then
+      vinfo "removed $removed workflow commands from $COMMANDS_DIR/"
+    fi
+    rmdir "$COMMANDS_DIR" 2>/dev/null || true
+  fi
+
   # Remove plugin entry from the resolved config file (.jsonc or .json — see the
   # resolution block above). parseJsonc tolerates the comments/trailing commas a
   # .jsonc user's file may have; writeConfig backs up before writing and returns the
@@ -591,6 +616,20 @@ done
 vecho "  + ${specialist_count} subagent specialists (generated from skills/agents/*/SKILL.md)"
 vecho ""
 
+# Install generated workflow commands (T10, WFC-08/12) — copy, not symlink,
+# mirroring the harness-skills copy below rather than the agent-symlink loop
+# above (no per-profile variant concept for commands).
+mkdir -p "$COMMANDS_DIR"
+command_count=0
+for src in "$SCRIPT_DIR/command/"massa-ai-*.md; do
+  [[ -f "$src" ]] || continue
+  name="$(basename "$src")"
+  cp "$src" "$COMMANDS_DIR/$name"
+  command_count=$((command_count + 1))
+done
+vecho "  + ${command_count} workflow commands installed to $COMMANDS_DIR"
+vecho ""
+
 # Skills bundling (PDO-08, 09): install massa-ai/persona-router into the
 # shared harness skills directory, unless scripts/install-skills.sh already
 # owns it for this platform.
@@ -636,9 +675,9 @@ if [ "${MASSA_AI_VERBOSE:-0}" = "1" ]; then
   fi
 else
   if [[ "$MCP_ROUTE" -eq 1 ]]; then
-    ok "opencode plugin installed (${specialist_count} specialists) — MCP registered (single writer)"
+    ok "opencode plugin installed (${specialist_count} specialists, ${command_count} workflow commands) — MCP registered (single writer)"
   else
-    warn "opencode plugin installed (${specialist_count} specialists) — MCP registration failed, tools unavailable"
+    warn "opencode plugin installed (${specialist_count} specialists, ${command_count} workflow commands) — MCP registration failed, tools unavailable"
     warn "  run: bash scripts/install-agents.sh --agent opencode --yes"
   fi
 fi

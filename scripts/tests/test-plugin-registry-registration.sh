@@ -33,6 +33,11 @@ trap 'rm -rf "$ROOT"' EXIT
 
 skip() { echo -e "  ↷ SKIP $*"; }
 
+# File-route command count = 6 hand-authored quick commands + N generated
+# workflow commands (WFC-02). Scan-derived, never hardcoded — a generator
+# change to the workflow inventory must not silently desync this expectation.
+WANT_COMMAND_COUNT="$(find "$PROJECT_ROOT/apps/claude-plugin/commands" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
+
 # A PATH with node/bun but deliberately without the host CLIs, used to prove
 # the fallback. Derived from the live PATH minus the dir holding each CLI.
 path_without() { # path_without <cli>...
@@ -96,7 +101,7 @@ FB_OUT="$(env -i HOME="$FB" PATH="$(path_without claude)" MASSA_AI_VERBOSE=0 \
   bash "$PROJECT_ROOT/apps/claude-plugin/install.sh" --user 2>&1)"
 assert_file "file-route settings.json written" "$FB/.claude/settings.json"
 assert_eq "loose commands installed" \
-  "$(find "$FB/.claude/commands" -name 'massa-ai-*.md' 2>/dev/null | wc -l | tr -d ' ')" "6"
+  "$(find "$FB/.claude/commands" -name 'massa-ai-*.md' 2>/dev/null | wc -l | tr -d ' ')" "$WANT_COMMAND_COUNT"
 assert_contains "prints the manual registration command" "$FB_OUT" "claude plugin marketplace add"
 assert_no_file "no registry written without the CLI" "$FB/.claude/plugins/installed_plugins.json"
 
@@ -156,7 +161,7 @@ else
   env -i HOME="$MIG" PATH="$(path_without claude)" MASSA_AI_VERBOSE=0 \
     bash "$PROJECT_ROOT/apps/claude-plugin/install.sh" --user >/dev/null 2>&1
   assert_eq "seeded file-route commands" \
-    "$(find "$MIG/.claude/commands" -name 'massa-ai-*.md' | wc -l | tr -d ' ')" "6"
+    "$(find "$MIG/.claude/commands" -name 'massa-ai-*.md' | wc -l | tr -d ' ')" "$WANT_COMMAND_COUNT"
   env HOME="$MIG" CLAUDE_CONFIG_DIR="$MIG/.claude" MASSA_AI_VERBOSE=0 \
     bash "$PROJECT_ROOT/apps/claude-plugin/install.sh" --user >/dev/null 2>&1
   assert_eq "upgrade removes orphaned loose commands" \
