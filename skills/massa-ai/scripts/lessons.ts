@@ -500,6 +500,23 @@ function isTrusted(data: Store, category: string): boolean {
   return categoryStreak(data, category) >= threshold;
 }
 
+/** Scalar trend score for one snapshot - lower is better. FAIL*100 + mutants*10 + fixIters + uncoveredACs. */
+function trendScore(s: MetricSnapshot): number {
+  return (s.result === "FAIL" ? 100 : 0) + s.survivingMutants * 10 + s.fixLoopIterations + (s.acsTotal - s.acsCovered);
+}
+
+/** Compares the last two snapshots' scores (lower = better). <2 snapshots -> "insufficient data". */
+function trendVerdict(snapshots: MetricSnapshot[]): string {
+  if (snapshots.length < 2) return "insufficient data";
+  const last = snapshots[snapshots.length - 1]!;
+  const prev = snapshots[snapshots.length - 2]!;
+  const lastScore = trendScore(last);
+  const prevScore = trendScore(prev);
+  if (lastScore < prevScore) return "improving";
+  if (lastScore > prevScore) return "degrading";
+  return "stable";
+}
+
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
@@ -852,6 +869,60 @@ function cmdTrustStatus(root: string, categoryFilter: string): number {
   return 0;
 }
 
+/** Parses a required non-negative-integer flag value; prints an error naming `flagName` on failure. */
+function parseNonNegativeInt(value: string, flagName: string): number | null {
+  const n = Number(value);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
+    console.error(`ERROR: ${flagName} must be a non-negative integer, got ${pyRepr(value)}`);
+    return null;
+  }
+  return n;
+}
+
+function cmdMetricsAdd(root: string, raw: Record<string, string>): number {
+  const feature = (raw.feature || "").trim();
+  const result = raw.result as MetricSnapshot["result"];
+  const fixLoopIterations = parseNonNegativeInt(raw["fix-iterations"]!, "--fix-iterations");
+  if (fixLoopIterations === null) return 2;
+  const survivingMutants = parseNonNegativeInt(raw["surviving-mutants"]!, "--surviving-mutants");
+  if (survivingMutants === null) return 2;
+  const acsTotal = parseNonNegativeInt(raw["acs-total"]!, "--acs-total");
+  if (acsTotal === null) return 2;
+  const acsCovered = parseNonNegativeInt(raw["acs-covered"]!, "--acs-covered");
+  if (acsCovered === null) return 2;
+
+  const data = load(root);
+  ensureRampFields(data);
+  const snapshot: MetricSnapshot = {
+    feature,
+    result,
+    fixLoopIterations,
+    survivingMutants,
+    acsTotal,
+    acsCovered,
+    recordedAt: now(),
+  };
+  data.metrics!.push(snapshot);
+  save(root, data);
+  console.log(
+    `METRICS ${feature} (result=${result}, survivingMutants=${survivingMutants}, fixIters=${fixLoopIterations}, acs=${acsCovered}/${acsTotal})`,
+  );
+  return 0;
+}
+
+function cmdMetricsTrend(root: string): number {
+  const data = load(root);
+  ensureRampFields(data);
+  const snapshots = data.metrics ?? [];
+  for (const s of snapshots) {
+    console.log(
+      `${s.feature} result=${s.result} fixIters=${s.fixLoopIterations} survivingMutants=${s.survivingMutants} acs=${s.acsCovered}/${s.acsTotal} recordedAt=${s.recordedAt}`,
+    );
+  }
+  console.log(`trend: ${trendVerdict(snapshots)}`);
+  return 0;
+}
+
 // ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
@@ -1035,6 +1106,27 @@ async function main(argv: string[]): Promise<number> {
         return cmdTrustStatus(absRoot, parsed.category!);
       }
       usageError(`argument cmd: invalid choice: ${pyRepr(sub ?? "")} (choose from 'status')`);
+      return 2;
+    }
+
+    case "metrics": {
+      const sub = rest[0];
+      if (sub === "add") {
+        const parsed = parseFlags(rest.slice(1), [
+          { name: "--feature", required: true },
+          { name: "--result", required: true, choices: ["PASS", "FAIL"] },
+          { name: "--fix-iterations", required: true },
+          { name: "--surviving-mutants", required: true },
+          { name: "--acs-total", required: true },
+          { name: "--acs-covered", required: true },
+        ]);
+        if (!parsed) return 2;
+        return cmdMetricsAdd(absRoot, parsed);
+      }
+      if (sub === "trend") {
+        return cmdMetricsTrend(absRoot);
+      }
+      usageError(`argument cmd: invalid choice: ${pyRepr(sub ?? "")} (choose from 'add', 'trend')`);
       return 2;
     }
 
