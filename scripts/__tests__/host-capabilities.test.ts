@@ -128,14 +128,17 @@ describe("per-host expected capability values", () => {
     expect(c.handoffInjectionPoint).toBe("session-start");
   });
 
-  test("opencode: md, filename identity (no name key), body-scoped ownership, forwards unknown frontmatter, no hook binary, extra 'lib' root", () => {
+  test("opencode: md, filename identity (no name key), body-scoped ownership, forwards unknown frontmatter, no hook binary, extra 'lib'+'command' roots", () => {
     const c = capabilitiesFor("opencode");
     expect(c.artifactExtension).toBe("md");
     expect(c.agentIdentity).toBe("filename");
     expect(c.ownershipMarker).toBe("body");
     expect(c.forwardsUnknownFrontmatter).toBe(true);
     expect(c.hookBinaryDelivery).toBe("none");
-    expect(c.extraManagedRoots).toEqual(["lib"]);
+    // "lib" = the vendored opencode-config.cjs copy; "command" = the
+    // generated workflow-command directory (T2/WFC-02) — both wholly
+    // generated, no hand-authored siblings on this host.
+    expect(c.extraManagedRoots).toEqual(["lib", "command"]);
     expect(c.handoffInjectionPoint).toBeNull();
   });
 
