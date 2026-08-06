@@ -357,6 +357,129 @@ describe("codex-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
   });
 });
 
+// ── T8: generated workflow-command delivery + uninstall coverage ────────────
+describe("codex-plugin generated workflow-command delivery (T8, WFC-08)", () => {
+  const QUICK_SKILL_FILES = ["def", "find", "graph", "index", "map", "status"].map(
+    (n) => `${n}.md`,
+  );
+
+  test("install delivers every skills/*.md source file (quick + generated), scan-derived count", async () => {
+    const sourceSkillsDir = path.join(REPO_ROOT, "apps/codex-plugin/skills");
+    const sourceFiles = (await fs.readdir(sourceSkillsDir)).filter((f) =>
+      f.endsWith(".md"),
+    );
+    const generatedFiles = sourceFiles.filter(
+      (f) => !QUICK_SKILL_FILES.includes(f),
+    );
+    // Sanity: workflow commands must actually be generated for this test to
+    // discriminate anything (bun run generate:artifacts ran via pretest:plugins).
+    expect(generatedFiles.length).toBeGreaterThan(0);
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const installedSkillsDir = path.join(tmp, ".codex/plugins/massa-ai/skills");
+    const installedFiles = (await fs.readdir(installedSkillsDir)).filter((f) =>
+      f.endsWith(".md"),
+    );
+    expect(installedFiles.sort()).toEqual(sourceFiles.sort());
+
+    // Spot-check: a generated file carries the ownership marker and reaches
+    // the installed copy byte-identical to source.
+    const sampleStem = generatedFiles[0]!;
+    const sourceBody = await fs.readFile(
+      path.join(sourceSkillsDir, sampleStem),
+      "utf8",
+    );
+    expect(sourceBody).toContain("<!-- massa-ai:generated workflow-command -->");
+    const installedBody = await fs.readFile(
+      path.join(installedSkillsDir, sampleStem),
+      "utf8",
+    );
+    expect(installedBody).toBe(sourceBody);
+  });
+
+  test("delivery is source-driven, not a fixed list: a skill excluded from the bundle is not installed", async () => {
+    // Mirrors the UGB-06 tarball-shaped-install pattern: copy the plugin into
+    // a scratch tree, then remove one generated workflow-command skill from
+    // the scratch bundle before installing from it. A hardcoded delivery list
+    // would still "deliver" the excluded name (nothing to copy, silently
+    // skipped by a stale reference) or over/under count; the real copy loop
+    // enumerates the live directory, so the excluded file is provably absent
+    // and every other file is provably present.
+    const sourceSkillsDir = path.join(REPO_ROOT, "apps/codex-plugin/skills");
+    const sourceFiles = (await fs.readdir(sourceSkillsDir)).filter((f) =>
+      f.endsWith(".md"),
+    );
+    const excluded = sourceFiles.find((f) => !QUICK_SKILL_FILES.includes(f));
+    expect(excluded).toBeDefined();
+
+    const pkgRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "mt-codex-skill-exclude-"),
+    );
+    try {
+      const pkgDir = path.join(pkgRoot, "apps", "codex-plugin");
+      await fs.cp(path.join(REPO_ROOT, "apps/codex-plugin"), pkgDir, {
+        recursive: true,
+        filter: (src) => !/[\\/](node_modules|\.turbo|coverage)($|[\\/])/.test(src),
+      });
+      await fs.rm(path.join(pkgDir, "skills", excluded!));
+      await fs.mkdir(path.join(pkgRoot, "scripts", "lib"), { recursive: true });
+      await fs.copyFile(
+        path.join(REPO_ROOT, "scripts/banner.sh"),
+        path.join(pkgRoot, "scripts/banner.sh"),
+      );
+      await fs.copyFile(
+        path.join(REPO_ROOT, "scripts/lib/installer-shared.sh"),
+        path.join(pkgRoot, "scripts/lib/installer-shared.sh"),
+      );
+
+      const res = spawnSync("bash", [path.join(pkgDir, "install.sh"), "--user"], {
+        encoding: "utf8",
+        env: { ...process.env, HOME: tmp },
+        cwd: pkgDir,
+        timeout: 30000,
+      });
+      expect(res.status).toBe(0);
+
+      const installedSkillsDir = path.join(tmp, ".codex/plugins/massa-ai/skills");
+      const installedFiles = (await fs.readdir(installedSkillsDir)).filter((f) =>
+        f.endsWith(".md"),
+      );
+      expect(installedFiles).not.toContain(excluded);
+      expect(installedFiles.sort()).toEqual(
+        sourceFiles.filter((f) => f !== excluded).sort(),
+      );
+    } finally {
+      await fs.rm(pkgRoot, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  test("uninstall removes the owned set only: whole plugin skills dir gone, harness skill dirs (~/.codex/skills) unaffected by the generated-command surface", async () => {
+    runInstall(["--user"], { HOME: tmp });
+    const installedSkillsDir = path.join(tmp, ".codex/plugins/massa-ai/skills");
+    expect(await pathExists(installedSkillsDir)).toBe(true);
+
+    // Sanity: generated commands never leaked into the harness skills dir —
+    // only massa-ai/persona-router (the two names install_bundled_skills
+    // copies) live there, never a workflow-command stem.
+    const harnessSkillsDir = path.join(tmp, ".codex/skills");
+    if (await pathExists(harnessSkillsDir)) {
+      const harnessEntries = await fs.readdir(harnessSkillsDir);
+      expect(harnessEntries.sort()).toEqual(["massa-ai", "persona-router"].sort());
+    }
+
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    // Entire plugin dir (including its skills/*.md, quick + generated) is gone.
+    expect(await pathExists(installedSkillsDir)).toBe(false);
+    expect(
+      await pathExists(path.join(tmp, ".codex/plugins/massa-ai")),
+    ).toBe(false);
+  });
+});
+
 // ── T6: generated-bundle contract (design Component 4 / UGB-05..08) ─────────
 describe("codex-plugin generated-bundle contract (T6, UGB-05..08)", () => {
   function isNoise(p: string): boolean {
