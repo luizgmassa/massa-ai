@@ -84,3 +84,22 @@ describe("code-quality-fix.md: discoverability-or-change-risk split criterion (A
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// AEH-01: refactor.md extract-for-findability payoff (T5)
+// ---------------------------------------------------------------------------
+
+describe("refactor.md: extract-for-findability payoff (AEH-01)", () => {
+  const content = readSkill("workflows/refactor.md");
+
+  test("step 8 names extract-for-findability as the primary extraction payoff", () => {
+    expect(content).toContain(
+      "The primary payoff of extraction is extract-for-findability: create a named unit locatable by search or grep from outside the file",
+    );
+  });
+
+  test("extract-for-findability is tied to the existing AI-navigable goal", () => {
+    expect(content).toContain('Reduce "abstraction cost" to make code more AI-navigable');
+    expect(content).toContain("that is what makes code AI-navigable, not extraction volume alone");
+  });
+});
