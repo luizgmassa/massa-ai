@@ -58,3 +58,29 @@ describe("code-quality-audit.md: agent-read-aware split and file-size leads (AEH
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// AEH-01: code-quality-fix.md split directive (T4)
+// ---------------------------------------------------------------------------
+
+describe("code-quality-fix.md: discoverability-or-change-risk split criterion (AEH-01)", () => {
+  const content = readSkill("workflows/code-quality/code-quality-fix.md");
+
+  test("Clean Code split directive cites the same discoverability-or-change-risk criterion", () => {
+    expect(content).toContain(
+      "split functions only when the result yields an externally-findable named unit (locatable by search or grep from outside the file) or measurably reduces change risk — never split on size or \"more than one thing\" alone",
+    );
+  });
+
+  test("SOLID split directive cites the discoverability-or-change-risk criterion", () => {
+    expect(content).toContain(
+      "separate mixed responsibilities only when the split yields an externally-findable named unit (locatable by search or grep from outside the file) or reduces change risk",
+    );
+  });
+
+  test("KISS fix direction cross-references the split criterion", () => {
+    expect(content).toContain(
+      "When choosing whether to split instead of inline, apply the same discoverability-or-change-risk criterion used for the Clean Code split direction above.",
+    );
+  });
+});
