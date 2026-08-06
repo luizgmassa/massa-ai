@@ -76,6 +76,7 @@ Findings-only: do not edit code unless the user separately asks for fixes.
    - Magic values: repeated strings, event names, timeouts, numeric thresholds, status codes.
    - Generic names: `data`, `info`, `result`, `value`, `temp`, `manager`, `handler`, `helper` without useful qualification, using `references/naming-standards.md` to filter conventional short-scope or framework-required names.
    - Long parameter lists: more than 3-4 positional parameters.
+   - File shape: flag multi-subject files (unrelated exported surfaces bundled together) and any file over ~2000 lines, regardless of subject count — that exceeds a single agent read (see `references/coding-guidelines.md` "File shape for agent readers"). Do NOT flag a single-subject file for line count alone below that bound.
    - Needlessly indirect code: pass-through wrappers, one-use abstractions, helper layers with no behavior, factories/builders that only hide one constructor call.
    - Speculative surfaces: unused options, future-oriented hooks, extension points with one implementation, exported APIs with no evidence of use.
    - Complexity without payoff: deep nesting, miniature state machines, or polymorphism where a direct branch or data map would preserve clarity.
@@ -84,20 +85,20 @@ Findings-only: do not edit code unless the user separately asks for fixes.
 9. Investigation pass:
    - Use summary/enriched search, symbol tools, and targeted file reads to inspect target modules, semantic hotspots, public classes, interfaces, functions, and exported API surface.
    - Apply SOLID checks to non-test source only:
-     - Single Responsibility: flag classes/modules with distinct concern groups, such as validation plus persistence or formatting plus dispatch.
+     - Single Responsibility: flag classes/modules bundling distinct concern groups, such as validation plus persistence or formatting plus dispatch, only when separating them yields an externally-findable named unit (locatable by search or grep from outside the file) or measurably reduces change risk — never on concern-count or size alone.
      - Open/Closed: flag caller-side switches or if/else chains on type tags where adding a variant requires modifying existing files.
      - Liskov: flag subtypes that throw where the base does not, ignore required methods, or narrow the base contract.
      - Interface Segregation: flag interfaces that force implementors to define unused methods.
      - Dependency Inversion: flag hardcoded `new ConcreteType()` inside class bodies where abstraction or injection would be natural.
    - Apply Clean Code checks to test and non-test source:
      - Magic values: meaningful bare literals should be named constants, especially repeated strings, timeouts, thresholds, and event names.
-     - Function does more than one thing: if accurate description needs "and", recommend splitting.
+     - Function does more than one thing: split only when the result yields an externally-findable named unit (locatable by search or grep from outside the file) or measurably reduces change risk; never split on size or "more than one thing" alone.
      - Unqualified generic names: flag vague names without domain or role qualification.
      - What-comments: flag comments that restate code; keep only why comments for constraints, workarounds, or non-obvious invariants.
      - Half-finished surfaces: flag exported TODOs, stubs, placeholder returns, and "implement later" code.
      - Long parameter lists: flag more than 3-4 positional parameters; suggest an options object.
    - Apply KISS/YAGNI/DRY checks:
-     - KISS: flag abstractions, layers, indirection, or control flow that raise cognitive load without clearly improving readability, correctness, or constraint handling. Call out premature generalization, deep call chains, excessive configuration, and clever patterns that obscure intent. Prefer straightforward, explicit code a new reader can follow end-to-end: inline trivial abstractions, collapse unnecessary layers, choose boring solutions unless complexity is justified (real variability, hard constraints, or measured bottlenecks).
+     - KISS: flag abstractions, layers, indirection, or control flow that raise cognitive load without clearly improving readability, correctness, or constraint handling. Call out premature generalization, deep call chains, excessive configuration, and clever patterns that obscure intent. Prefer straightforward, explicit code a new reader can follow end-to-end: inline trivial abstractions, collapse unnecessary layers, choose boring solutions unless complexity is justified (real variability, hard constraints, or measured bottlenecks). When weighing whether to split instead of inline, apply the same discoverability-or-change-risk criterion used for the split lead above.
      - YAGNI: flag speculative features, extension points, and generic infrastructure with no concrete caller, requirement, or near-term use. Call out "just in case" hooks, over-parameterization, unused toggles, and frameworks introduced ahead of need. Prefer implementing only what current use cases demand, structured to evolve when real requirements appear. Defer generalization until duplication or constraints force it, and remove dead or unused paths aggressively.
      - DRY: flag duplicated logic, data transformations, or domain rules repeated without a strong reason (e.g., performance isolation or explicit decoupling). Highlight copy-paste patterns, parallel conditionals, and repeated constants that raise maintenance cost or inconsistency risk. Recommend consolidation into a single source of truth when it improves clarity and reduces bugs, but avoid over-abstraction that harms readability or adds indirection for trivial reuse.
      - Prefer delete, inline, or merge recommendations over replacement abstractions when simpler code preserves behavior.
