@@ -5,7 +5,8 @@
  * Supports: OpenAI, Google, Cohere, Ollama (local), Mistral
  */
 
-import { parsePositiveIntEnv } from "@massa-ai/shared/config";
+import { parsePositiveIntEnv, loadConfigSafe } from "@massa-ai/shared/config";
+import { logger } from "@massa-ai/shared";
 
 export interface EmbeddingProviderConfig {
   provider: "openai" | "google" | "cohere" | "ollama" | "mistral" | "vercel" | "custom" | "litellm" | string;
@@ -121,6 +122,54 @@ export function getMaxChars(providerPrefix: string, model: string): number {
 }
 
 /**
+ * config.json `embedding` block — the middle layer of the documented
+ * env > config.json > default precedence chain (same contract the `llm`
+ * block already has via ServerConfig). `loadConfigSafe` merges the file
+ * over `defaultMassaAiConfig`, whose embedding defaults are aligned with
+ * the literal defaults below, so an absent block resolves to identical
+ * values and only a user-set block changes behavior. The block's fields
+ * only overlay the entry matching its `provider`; explicit env vars still
+ * win every field they set.
+ */
+const fileEmbedding = loadConfigSafe().embedding;
+
+/**
+ * Which provider gets priority 1: EMBEDDING_PROVIDER env > config.json
+ * `embedding.provider` > "ollama". Compared against each entry below.
+ */
+const selectedProvider =
+  process.env.EMBEDDING_PROVIDER || fileEmbedding?.provider || "ollama";
+
+/** The file block, but only when it targets the given provider. */
+const fileFor = (provider: string) =>
+  fileEmbedding?.provider === provider ? fileEmbedding : undefined;
+
+/**
+ * Names an entry below can be selected by. A selection outside this set
+ * (e.g. `provider: "cohere"` in config.json) would otherwise fall through
+ * to the ollama default silently — the exact lie the file layer exists to
+ * end — so it is warned once at module load. Logged to stderr (the shared
+ * logger never writes stdout), safe under a stdio MCP server.
+ */
+const SELECTABLE_PROVIDERS = new Set([
+  "ollama",
+  "mistral",
+  "google",
+  "openai",
+  "vercel",
+  "litellm",
+  "custom",
+  "transformers",
+  "local",
+]);
+if (!SELECTABLE_PROVIDERS.has(selectedProvider)) {
+  logger.warn(
+    `[EmbeddingConfig] selected provider "${selectedProvider}" has no runtime entry — falling back to priority order`,
+    { source: process.env.EMBEDDING_PROVIDER ? "EMBEDDING_PROVIDER env" : "config.json embedding.provider" },
+  );
+}
+
+/**
  * Provider configurations sorted by priority
  *
  * Priority order (default):
@@ -128,30 +177,33 @@ export function getMaxChars(providerPrefix: string, model: string): number {
  * 2. Mistral Text (general purpose, good quality) - ENABLED
  * 3. Mistral Code (specialized for code) - ENABLED
  * 4. Google (API key required) - ENABLED if GOOGLE_API_KEY is set
- * 
- * Override with EMBEDDING_PROVIDER env var:
+ * 5. OpenAI (API key required) - ENABLED if OPENAI_API_KEY or config.json key is set
+ *
+ * Provider selection: EMBEDDING_PROVIDER env var > config.json
+ * `embedding.provider` > ollama:
  * - EMBEDDING_PROVIDER=google - Force Google
  * - EMBEDDING_PROVIDER=ollama - Force Ollama
  * - EMBEDDING_PROVIDER=mistral - Force Mistral
- * 
+ *
  * Rate Limiting (all providers):
  * Set provider-specific vars (e.g., GOOGLE_EMBEDDING_RPM) or generic vars (e.g., EMBEDDING_RPM)
- * 
+ *
  * DISABLED (no API keys configured):
- * - OpenAI (no API key)
  * - Cohere (no API key)
  */
 export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
   // === ENABLED PROVIDERS ===
 
   google: (() => {
-    const model = process.env.GOOGLE_EMBEDDING_MODEL || "gemini-embedding-001";
+    const file = fileFor("google");
+    const model = process.env.GOOGLE_EMBEDDING_MODEL || file?.model || "gemini-embedding-001";
     return {
       provider: "google",
       model,
-      apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY,
-      dimensions: 3072,
-      priority: process.env.EMBEDDING_PROVIDER === "google" ? 1 : 10,
+      apiKey:
+        process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY || file?.apiKey,
+      dimensions: file?.dimensions ?? 3072,
+      priority: selectedProvider === "google" ? 1 : 10,
       timeout: 60000,
       maxRetries: 3,
       maxChars: getMaxChars("GOOGLE", model),
@@ -167,7 +219,7 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
       apiKey: process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_AI_GATEWAY_API_KEY,
       baseURL: process.env.VERCEL_AI_GATEWAY_URL,
       dimensions: Number(process.env.VERCEL_EMBEDDING_DIMENSIONS || "4096"),
-      priority: process.env.EMBEDDING_PROVIDER === "vercel" ? 1 : 20,
+      priority: selectedProvider === "vercel" ? 1 : 20,
       timeout: 60000,
       maxRetries: 3,
       maxChars: getMaxChars("VERCEL", model),
@@ -176,13 +228,16 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
   })(),
 
   ollama: (() => {
-    const model = process.env.OLLAMA_EMBEDDING_MODEL || "qwen3-embedding:8b";
+    const file = fileFor("ollama");
+    const model = process.env.OLLAMA_EMBEDDING_MODEL || file?.model || "qwen3-embedding:4b";
     return {
       provider: "ollama",
       model,
-      baseURL: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
-      dimensions: Number(process.env.OLLAMA_EMBEDDING_DIMENSIONS || "4096"),
-      priority: process.env.EMBEDDING_PROVIDER === "ollama" || !process.env.EMBEDDING_PROVIDER ? 1 : 50, // Highest priority by default
+      baseURL: process.env.OLLAMA_BASE_URL || file?.baseURL || "http://localhost:11434",
+      dimensions: process.env.OLLAMA_EMBEDDING_DIMENSIONS
+        ? Number(process.env.OLLAMA_EMBEDDING_DIMENSIONS)
+        : (file?.dimensions ?? 2560),
+      priority: selectedProvider === "ollama" ? 1 : 50, // Highest priority by default (selectedProvider falls back to ollama)
       timeout: 300000, // 5 minutes (local can be slow on first run)
       maxRetries: 2,
       maxChars: getMaxChars("OLLAMA", model),
@@ -191,13 +246,14 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
   })(),
 
   mistralText: (() => {
-    const model = process.env.MISTRAL_TEXT_EMBEDDING_MODEL || "mistral-embed";
+    const file = fileFor("mistral");
+    const model = process.env.MISTRAL_TEXT_EMBEDDING_MODEL || file?.model || "mistral-embed";
     return {
       provider: "mistral",
       model,
-      apiKey: process.env.MISTRAL_API_KEY,
-      dimensions: 1024,
-      priority: process.env.EMBEDDING_PROVIDER === "mistral" ? 1 : 2, // Fallback to Mistral if Ollama is unavailable
+      apiKey: process.env.MISTRAL_API_KEY || file?.apiKey,
+      dimensions: file?.dimensions ?? 1024,
+      priority: selectedProvider === "mistral" ? 1 : 2, // Fallback to Mistral if Ollama is unavailable
       timeout: 60000,
       maxRetries: 3,
       maxChars: getMaxChars("MISTRAL", model),
@@ -210,9 +266,9 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
     return {
       provider: "mistral",
       model,
-      apiKey: process.env.MISTRAL_API_KEY,
+      apiKey: process.env.MISTRAL_API_KEY || fileFor("mistral")?.apiKey,
       dimensions: 1536, // Default, can go up to 3072
-      priority: process.env.EMBEDDING_PROVIDER === "mistral" ? 1 : 3,
+      priority: selectedProvider === "mistral" ? 1 : 3,
       timeout: 60000,
       maxRetries: 3,
       maxChars: getMaxChars("MISTRAL", model),
@@ -227,7 +283,7 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
       apiKey: process.env.LITELLM_API_KEY,
       baseURL: process.env.LITELLM_BASE_URL,
       dimensions: Number(process.env.LITELLM_EMBEDDING_DIMENSIONS || "1024"),
-      priority: process.env.EMBEDDING_PROVIDER === "litellm" ? 1 : 15,
+      priority: selectedProvider === "litellm" ? 1 : 15,
       timeout: Number(process.env.LITELLM_EMBEDDING_TIMEOUT || "60000"),
       maxRetries: 3,
       maxChars: getMaxChars("LITELLM", model),
@@ -243,7 +299,7 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
       apiKey: process.env.CUSTOM_API_KEY,
       baseURL: process.env.CUSTOM_EMBEDDING_BASE_URL,
       dimensions: Number(process.env.CUSTOM_EMBEDDING_DIMENSIONS || "1536"),
-      priority: process.env.EMBEDDING_PROVIDER === "custom" ? 1 : 100,
+      priority: selectedProvider === "custom" ? 1 : 100,
       timeout: Number(process.env.CUSTOM_EMBEDDING_TIMEOUT || "60000"),
       maxRetries: 3,
       maxChars: getMaxChars("CUSTOM", model),
@@ -269,7 +325,7 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
       dimensions: Number(
         process.env.TRANSFORMERS_EMBEDDING_DIMENSIONS || "384",
       ),
-      priority: process.env.EMBEDDING_PROVIDER === "transformers" ? 1 : 100,
+      priority: selectedProvider === "transformers" ? 1 : 100,
       timeout: 300000, // 5 minutes (first-run model download can be slow)
       maxRetries: 1,
       maxChars: getMaxChars("TRANSFORMERS", model),
@@ -291,7 +347,7 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
       dimensions: Number(
         process.env.TRANSFORMERS_EMBEDDING_DIMENSIONS || "384",
       ),
-      priority: process.env.EMBEDDING_PROVIDER === "local" ? 1 : 100,
+      priority: selectedProvider === "local" ? 1 : 100,
       timeout: 300000,
       maxRetries: 1,
       maxChars: getMaxChars("TRANSFORMERS", model),
@@ -299,19 +355,31 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
     };
   })(),
 
-  // === DISABLED PROVIDERS (uncomment and configure to enable) ===
-  
-  /*
+  /**
+   * OpenAI — activated by the config.json `embedding` block (the block's
+   * provider union has always named "openai" while no runtime entry existed,
+   * so a `provider: "openai"` config silently fell through to Ollama) or by
+   * OPENAI_API_KEY. Skipped by `hasApiKey` when neither supplies a key.
+   */
+  openai: (() => {
+    const file = fileFor("openai");
+    const model = process.env.OPENAI_EMBEDDING_MODEL || file?.model || "text-embedding-3-small";
+    return {
+      provider: "openai",
+      model,
+      apiKey: process.env.OPENAI_API_KEY || file?.apiKey,
+      dimensions: file?.dimensions ?? 1536,
+      priority: selectedProvider === "openai" ? 1 : 10,
+      timeout: 60000,
+      maxRetries: 3,
+      maxChars: getMaxChars("OPENAI", model),
+      rateLimits: getRateLimits("OPENAI"),
+    };
+  })(),
 
-  openai: {
-    provider: "openai",
-    model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
-    apiKey: process.env.OPENAI_API_KEY,
-    dimensions: 1536,
-    priority: 10,
-    timeout: 60000, // 60 seconds
-    maxRetries: 3,
-  },
+  // === DISABLED PROVIDERS (uncomment and configure to enable) ===
+
+  /*
 
   cohere: {
     provider: "cohere",

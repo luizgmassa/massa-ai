@@ -372,7 +372,7 @@ DATABASE_URL=${db_url}
 
 # ── Embeddings (Ollama - local, free) ────────────────────────
 OLLAMA_BASE_URL=${ollama_url}
-OLLAMA_EMBEDDING_MODEL=qwen3-embedding:8b
+OLLAMA_EMBEDDING_MODEL=qwen3-embedding:4b
 OLLAMA_EMBEDDING_DIMENSIONS=4096
 
 # ── Optional: Cloud embedding providers ─────────────────────

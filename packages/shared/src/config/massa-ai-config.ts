@@ -211,11 +211,16 @@ export const defaultMassaAiConfig: MassaAiConfig = {
   database: {
     url: "",
   },
+  // Aligned with the literal defaults in core's services/embeddings/config.ts
+  // (the ollama entry). loadConfig merges this block under a user config.json,
+  // and core consumes the merged block as the env > config.json > default
+  // middle layer — so an absent user block must resolve to the same values the
+  // env-only path defaults to, or the merge itself would change behavior.
   embedding: {
     provider: "ollama",
-    model: "nomic-embed-text:latest",
+    model: "qwen3-embedding:4b",
     baseURL: "http://localhost:11434",
-    dimensions: 768,
+    dimensions: 2560,
   },
   compression: {
     defaultStrategy: "code_structure",

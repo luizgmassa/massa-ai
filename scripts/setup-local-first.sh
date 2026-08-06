@@ -154,7 +154,7 @@ print('yes' if any(search in m for m in models) else 'no')
 echo ""
 echo -e "${BOLD}[2/6] Pulling embedding models...${NC}"
 
-EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:8b}"
+EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:4b}"
 
 # Check if model is already available
 MODEL_EXISTS="$(ollama_model_exists "$EMBEDDING_MODEL")"

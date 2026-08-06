@@ -51,7 +51,7 @@ Commands:
 Examples:
   massa-ai-config init
   massa-ai-config init --mistral your-api-key
-  massa-ai-config use ollama --model qwen3-embedding:8b
+  massa-ai-config use ollama --model qwen3-embedding:4b
   massa-ai-config use mistral --api-key your-key
   massa-ai-config set embedding.dimensions 1024
   massa-ai-config recover my-project --path /home/user/renamed-dir
@@ -205,7 +205,7 @@ export async function runCli(argv: string[]): Promise<number> {
     if (provider === "ollama") {
       config.embedding = {
         provider: "ollama",
-        model: (options.model as string) || "qwen3-embedding:8b",
+        model: (options.model as string) || "qwen3-embedding:4b",
         baseURL: (options["base-url"] as string) || "http://localhost:11434",
         dimensions: 768,
       };
