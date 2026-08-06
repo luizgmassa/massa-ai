@@ -66,6 +66,58 @@ bun skills/massa-ai/scripts/lessons.ts --root . list --status confirmed [--scope
 | `quarantined` | A confirmed lesson penalized ≥`quarantine_threshold` times (failed when applied) |
 | **pruned** | A `candidate` that never recurred within `window_days` (default 45) |
 
+## Trust Ramp and Quality-Metric Trend (Advisory)
+
+Two additional append-only record kinds accumulate in `.specs/lessons.json` beside
+lessons: reviewer-feedback records (`data.reviews`) and quality-metric snapshots
+(`data.metrics`). Both are derived state — `lessons.ts` computes streaks, trusted
+flags, and trend verdicts at read time from the event log; there is no cached
+`streak`/`trusted` flag anywhere in the store, so there is no invalidation step,
+and demotion is emergent: a `major` record simply caps the trailing streak window
+the next time the log is read.
+
+### Categories
+
+A review category is a free-form kebab-case label supplied at record time (e.g.
+`installer`, `admin-ui`) — the same convention as the existing `--scope` flag.
+There is no fixed taxonomy; the label is whatever the recording agent or user
+chooses.
+
+### Feedback levels
+
+- `none` — no reviewer feedback; extends the category's streak.
+- `minor` — a small correction; also extends the streak.
+- `major` — resets the category's streak to 0 and demotes a trusted category
+  back to untrusted.
+
+### Trust threshold
+
+`trust_threshold` (default 30) is the number of consecutive `none`/`minor`
+records a category needs before `trust status` marks it `trusted`. The
+comparison is `>=`: a streak sitting exactly at the threshold is trusted.
+
+### Advisory-only scope
+
+Trust status governs reading depth only — how closely a human scrutinizes a
+diff before approving it. It never governs, gates, or substitutes for per-PR
+merge approval: `references/implementation-delivery.md`'s "Approval for one PR
+does not carry to the next" clause is unaffected by any trust state.
+
+### Commands
+
+```bash
+bun skills/massa-ai/scripts/lessons.ts --root . review add --category <kebab> --feedback none|minor|major --source <ref>
+bun skills/massa-ai/scripts/lessons.ts --root . trust status [--category <kebab>]
+bun skills/massa-ai/scripts/lessons.ts --root . metrics add --feature <slug> --result PASS|FAIL --fix-iterations <n> --surviving-mutants <n> --acs-total <n> --acs-covered <n>
+bun skills/massa-ai/scripts/lessons.ts --root . metrics trend
+```
+
+`trust status` with no `--category` lists every category with its streak,
+total review count, and trusted state; an empty store reports
+`(no review records)`, exit 0. `metrics trend` prints every snapshot
+oldest-first followed by `trend: improving|stable|degrading`, or
+`trend: insufficient data` when fewer than two snapshots exist — both exit 0.
+
 ## No-Script Fallback
 
 If `lessons.ts` is unavailable or cannot run, record `Lessons: skipped - script unavailable` in the validation report or evidence gate, keep the raw signal in the report, and do not hand-edit `lessons.json`. A future run with the script can import the validated signal.

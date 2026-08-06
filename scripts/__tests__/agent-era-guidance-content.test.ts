@@ -23,6 +23,11 @@ function readAgentCharter(agentName: string): string {
   return readFileSync(resolve(REPO_ROOT, "skills", "agents", agentName, "SKILL.md"), "utf-8");
 }
 
+/** Collapses whitespace runs (including line wraps) to a single space, for phrases that may span a hard-wrapped source line. */
+function norm(text: string): string {
+  return text.replace(/\s+/g, " ");
+}
+
 // ---------------------------------------------------------------------------
 // AEH-01/02: code-quality-audit.md split/size leads (T3)
 // ---------------------------------------------------------------------------
@@ -237,5 +242,52 @@ describe("feature.md: AC capture precedes implementation, verification checks ca
 
   test("verification step checks outcomes against the captured acceptance criteria", () => {
     expect(content).toContain("check outcomes against the captured acceptance criteria from step 11");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AEH-03: references/lessons.md trust-ramp and metrics policy (T12)
+// ---------------------------------------------------------------------------
+
+describe("references/lessons.md: trust-ramp and metrics policy (AEH-03)", () => {
+  const content = readSkill("references/lessons.md");
+  const flat = norm(content);
+
+  test("categories are free-form kebab labels, same convention as --scope", () => {
+    expect(content).toContain("free-form kebab-case label");
+    expect(flat).toContain("same convention as the existing `--scope` flag");
+  });
+
+  test("feedback levels: none/minor extend streak, major resets and demotes", () => {
+    expect(content).toContain("`none` — no reviewer feedback; extends the category's streak.");
+    expect(content).toContain("`minor` — a small correction; also extends the streak.");
+    expect(flat).toContain("`major` — resets the category's streak to 0 and demotes a trusted category");
+  });
+
+  test("trust_threshold default 30, comparison is >=", () => {
+    expect(content).toContain("`trust_threshold` (default 30)");
+    expect(flat).toContain("The comparison is `>=`: a streak sitting exactly at the threshold is trusted.");
+  });
+
+  test("advisory-only meaning: reading depth, never merge approval", () => {
+    expect(content).toContain("Trust status governs reading depth only");
+    expect(flat).toContain("never governs, gates, or substitutes for per-PR merge approval");
+    expect(flat).toContain('"Approval for one PR does not carry to the next" clause');
+  });
+
+  test("the four commands are documented with the exact implemented CLI syntax", () => {
+    expect(content).toContain(
+      "bun skills/massa-ai/scripts/lessons.ts --root . review add --category <kebab> --feedback none|minor|major --source <ref>",
+    );
+    expect(content).toContain("bun skills/massa-ai/scripts/lessons.ts --root . trust status [--category <kebab>]");
+    expect(content).toContain(
+      "bun skills/massa-ai/scripts/lessons.ts --root . metrics add --feature <slug> --result PASS|FAIL --fix-iterations <n> --surviving-mutants <n> --acs-total <n> --acs-covered <n>",
+    );
+    expect(content).toContain("bun skills/massa-ai/scripts/lessons.ts --root . metrics trend");
+  });
+
+  test("derived-state note: no cached flags, demotion is emergent", () => {
+    expect(content).toContain("Both are derived state");
+    expect(flat).toContain("there is no cached `streak`/`trusted` flag anywhere in the store");
   });
 });
