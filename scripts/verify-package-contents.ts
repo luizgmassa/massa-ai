@@ -57,6 +57,17 @@ interface PackageExpectation {
   name: string;
   /** Exact set of top-level entries `npm pack` must produce (package.json included). */
   requiredTopLevel: string[];
+  /**
+   * Full in-package paths (no "package/" prefix) that must appear as real tar
+   * entries when the generated workflow-command bundles are present (WFC-09).
+   * `requiredTopLevel` only checks the directory NAME shipped (e.g. "commands"
+   * / "skills" / "command") — a directory that ships empty, or with only its
+   * pre-existing quick-command files, would still satisfy that check. This
+   * closes that gap: `debug` is the same cross-host sentinel workflow
+   * `scripts/__tests__/workflow-command-check.test.ts` already uses, so every
+   * host's generated artifact for it is a stable, always-present name.
+   */
+  requiredGeneratedEntries?: string[];
 }
 
 export const EXPECTED_PACKAGES: readonly PackageExpectation[] = [
@@ -90,7 +101,10 @@ export const EXPECTED_PACKAGES: readonly PackageExpectation[] = [
     // it in publish.yml's artifact list AND package.json#files, an npm-only user's
     // installer has nothing to switch to (same defect class this gate was built for:
     // a declared glob that the artifact list silently never uploads).
-    requiredTopLevel: ["dist", "agents", "agent-profiles", "package.json"],
+    requiredTopLevel: ["dist", "agents", "agent-profiles", "command", "package.json"],
+    // "debug" is a generated workflow command (skills/massa-ai/workflows/debug.md);
+    // opencode's variant is prefixed massa-ai- (no per-host namespace there).
+    requiredGeneratedEntries: ["command/massa-ai-debug.md"],
   },
   // apps/{claude,codex,cursor}-plugin (PDO-10, PDO-25) have NO dist/ — their entire
   // publishable surface is static source, so requiredTopLevel is exactly each
@@ -99,16 +113,19 @@ export const EXPECTED_PACKAGES: readonly PackageExpectation[] = [
     dir: "apps/claude-plugin",
     name: "@massa-ai/claude-plugin",
     requiredTopLevel: ["agents", "agent-profiles", "commands", "hooks", "skills", "install.sh", "README.md", ".claude-plugin", "package.json"],
+    requiredGeneratedEntries: ["commands/debug.md"],
   },
   {
     dir: "apps/codex-plugin",
     name: "@massa-ai/codex-plugin",
     requiredTopLevel: ["agents", "agent-profiles", "hooks", "skills", "install.sh", "README.md", ".codex-plugin", "package.json"],
+    requiredGeneratedEntries: ["skills/debug.md"],
   },
   {
     dir: "apps/cursor-plugin",
     name: "@massa-ai/cursor-plugin",
     requiredTopLevel: ["agents", "agent-profiles", "hooks", "skills", "install.sh", "README.md", ".cursor-plugin", "package.json"],
+    requiredGeneratedEntries: ["skills/debug/SKILL.md"],
   },
 ];
 
@@ -242,10 +259,21 @@ export function topLevelEntries(entries: readonly string[]): Set<string> {
   return top;
 }
 
+export function fullEntries(entries: readonly string[]): Set<string> {
+  const full = new Set<string>();
+  for (const entry of entries) {
+    const withoutPrefix = entry.replace(/^package\//, "").replace(/\/$/, "");
+    if (!withoutPrefix) continue;
+    full.add(withoutPrefix);
+  }
+  return full;
+}
+
 interface PackageResult {
   pkg: PackageExpectation;
   missing: string[];
   unexpected: string[];
+  missingGenerated: string[];
   ok: boolean;
 }
 
@@ -253,7 +281,24 @@ export function diffInventory(pkg: PackageExpectation, actual: Set<string>): Pac
   const expected = new Set(pkg.requiredTopLevel);
   const missing = [...expected].filter((entry) => !actual.has(entry)).sort();
   const unexpected = [...actual].filter((entry) => !expected.has(entry)).sort();
-  return { pkg, missing, unexpected, ok: missing.length === 0 && unexpected.length === 0 };
+  return {
+    pkg,
+    missing,
+    unexpected,
+    missingGenerated: [],
+    ok: missing.length === 0 && unexpected.length === 0,
+  };
+}
+
+// Full-path check (WFC-09/T11): requiredTopLevel only sees the directory NAME
+// a package ships (e.g. "commands"), which a pack that shipped that directory
+// empty — or with only its pre-existing quick-command files — would still
+// satisfy. `fullEntries` is the exact tar entry set with the npm "package/"
+// prefix stripped, so a declared `requiredGeneratedEntries` path is checked
+// as a real file, not an inferred directory member.
+export function checkGeneratedEntries(pkg: PackageExpectation, fullEntries: Set<string>): string[] {
+  if (!pkg.requiredGeneratedEntries) return [];
+  return pkg.requiredGeneratedEntries.filter((entry) => !fullEntries.has(entry)).sort();
 }
 
 function formatResult(result: PackageResult): string {
@@ -262,10 +307,13 @@ function formatResult(result: PackageResult): string {
   }
   const lines = [`  FAIL  ${result.pkg.name} (${result.pkg.dir})`];
   if (result.missing.length > 0) {
-    lines.push(`          missing:    ${result.missing.join(", ")}`);
+    lines.push(`          missing:            ${result.missing.join(", ")}`);
   }
   if (result.unexpected.length > 0) {
-    lines.push(`          unexpected: ${result.unexpected.join(", ")}`);
+    lines.push(`          unexpected:         ${result.unexpected.join(", ")}`);
+  }
+  if (result.missingGenerated.length > 0) {
+    lines.push(`          missing generated:  ${result.missingGenerated.join(", ")}`);
   }
   return lines.join("\n");
 }
@@ -291,7 +339,10 @@ export function verifyPackageContents(): PackageResult[] {
 
       const entries = tarEntries(tarball);
       const actual = topLevelEntries(entries);
-      results.push(diffInventory(pkg, actual));
+      const result = diffInventory(pkg, actual);
+      result.missingGenerated = checkGeneratedEntries(pkg, fullEntries(entries));
+      result.ok = result.ok && result.missingGenerated.length === 0;
+      results.push(result);
     }
     return results;
   } finally {

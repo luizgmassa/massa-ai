@@ -130,6 +130,7 @@ jobs:
             apps/opencode-plugin/dist
             apps/opencode-plugin/agents
             apps/opencode-plugin/agent-profiles
+            apps/opencode-plugin/command
             apps/opencode-plugin/package.json
             apps/claude-plugin/agents
             apps/claude-plugin/agent-profiles
