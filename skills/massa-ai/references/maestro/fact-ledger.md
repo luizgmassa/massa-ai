@@ -11,6 +11,8 @@ Use before making Maestro claims. Defines source authority, fact tags, local tra
 
 If sources conflict, prefer `official-doc` for product behavior and `live-help` for installed CLI syntax. Mention version drift when `live-help` differs from docs.
 
+This Authority Order is the Maestro instantiation of `references/knowledge-verification-chain.md` — `live-help` supersedes generic lookup for installed CLI facts; do not layer the generic chain on top of it.
+
 ## Fact Tag Rules
 
 Every normative statement in Maestro workflows, reports, or implementation notes must carry a source class in the agent's working notes:

@@ -32,6 +32,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Spec-driven parity across the 13 other implementation workflows.** The 8
+  harness capabilities that existed only in `spec-driven.md` — canonical
+  artifact persistence, mandatory independent verification (author ≠ verifier),
+  the discrimination sensor, deterministic delivery gates, blast-radius
+  authority scoping, the Knowledge Verification Chain, the brownfield
+  onboarding minimum bar, and the bounded 3-iteration fix→re-verify loop — now
+  reach all 9 `*-fix` workflows plus `debug`/`feature`/`general`/`refactor`
+  (each bumped to 1.2.0). Mechanics live in shared references, not restated
+  per workflow: new `references/{knowledge-verification-chain,
+  discrimination-sensor,artifact-persistence}.md`, a relocated
+  `references/brownfield-mapping.md` with an anchored Minimum Bar,
+  `verification-ladder.md`'s tier-gated Independent Verification Mandate
+  (security-fix unconditional) + Bounded Fix→Re-verify Loop, and
+  `audit-report-io.md`'s Fix Closure Report Contract
+  (`audits/<family>/<YYYY-MM-DD <family>-fix-closure>.md`, excluded from
+  latest-report selection). Two deterministic gates back it:
+  `skills/massa-ai/scripts/check_fix_closure.ts` (new; every selected finding
+  needs a terminal-status closure row with real evidence) and
+  `check_specs_delivered.ts --kind feature|quick|debug|refactor` (default
+  byte-identical to the old behavior — the pyts-golden corpus is unchanged).
 - **Generated workflow slash commands (40 at merge), one per `skills/massa-ai/workflows/**/*.md`,
   across all four plugins.** Every massa-ai workflow is now directly invocable —
   `/massa-ai:debug` / `/massa-ai-debug` (Claude Code marketplace / file route),

@@ -26,7 +26,13 @@
  * --root.
  *
  * Usage:
- *   bun skills/massa-ai/scripts/check_specs_delivered.ts <feature> [--root DIR]
+ *   bun skills/massa-ai/scripts/check_specs_delivered.ts <feature> [--root DIR] [--kind KIND]
+ *
+ * --kind selects the artifact shape gated (default `feature`, byte-identical
+ * to the historical behavior): `quick` gates .specs/quick/<slug>/
+ * TASK.md+SUMMARY.md, `debug` gates .specs/debug/<slug>/REPORT.md, `refactor`
+ * gates .specs/refactors/<slug>/CHARACTERIZATION.md (+ present PLAN/SENSOR).
+ * Non-feature kinds do not require the project STATE files.
  *
  * Exit codes: 0 all required paths clean + tracked, 1 a required path is dirty,
  *             untracked, or not tracked on HEAD (paths named), 2 usage/git error.
@@ -45,6 +51,25 @@ const STATE_FILES = [
   join(".specs", "HANDOFF.md"),
   join(".specs", "project", "FEATURES.json"),
 ];
+
+interface KindConfig {
+  /** Slug parent dir under .specs/, e.g. ["features"]. */
+  dir: string[];
+  required: string[];
+  optional: string[];
+  /** Whether the project STATE files are part of the gate. */
+  stateFiles: boolean;
+}
+
+// `feature` is the default and must stay byte-identical to the historical
+// behavior (frozen pyts-golden corpus). The non-feature kinds gate the light
+// workflows' durable artifacts and do NOT require the project STATE files.
+const KINDS: Record<string, KindConfig> = {
+  feature: { dir: ["features"], required: FEATURE_REQUIRED, optional: FEATURE_OPTIONAL, stateFiles: true },
+  quick: { dir: ["quick"], required: ["TASK.md", "SUMMARY.md"], optional: [], stateFiles: false },
+  debug: { dir: ["debug"], required: ["REPORT.md"], optional: [], stateFiles: false },
+  refactor: { dir: ["refactors"], required: ["CHARACTERIZATION.md"], optional: ["PLAN.md", "SENSOR.md"], stateFiles: false },
+};
 
 /** Mirrors Python's str.splitlines(): universal newline split, no trailing empty element. */
 function splitLines(text: string): string[] {
@@ -92,39 +117,41 @@ function trackedOnHead(root: string): Set<string> {
   return new Set(splitLines(out));
 }
 
-function resolveFeatureDir(root: string, feature: string): string {
+function resolveFeatureDir(root: string, feature: string, kind: KindConfig): string {
   if (isAbsolute(feature) || feature.includes(sep)) {
     return resolve(feature);
   }
-  return join(root, ".specs", "features", feature);
+  return join(root, ".specs", ...kind.dir, feature);
 }
 
 /** Repo-root-relative, '/'-separated paths this feature must have tracked. */
-function requiredPaths(root: string, feature: string): string[] {
-  const fdir = resolveFeatureDir(root, feature);
+function requiredPaths(root: string, feature: string, kind: KindConfig): string[] {
+  const fdir = resolveFeatureDir(root, feature, kind);
   const fdirRel = relative(root, fdir);
-  const paths = FEATURE_REQUIRED.map((name) => join(fdirRel, name));
+  const paths = kind.required.map((name) => join(fdirRel, name));
   if (existsSync(fdir) && statSync(fdir).isDirectory()) {
-    for (const name of FEATURE_OPTIONAL) {
+    for (const name of kind.optional) {
       const candidate = join(fdir, name);
       if (existsSync(candidate) && statSync(candidate).isFile()) {
         paths.push(join(fdirRel, name));
       }
     }
   }
-  paths.push(...STATE_FILES);
+  if (kind.stateFiles) {
+    paths.push(...STATE_FILES);
+  }
   return paths.map((p) => p.split(sep).join("/"));
 }
 
 /** Return { errors, checked }. errors empty = pass. */
-function check(root: string, feature: string): { errors: string[]; checked: string[] } {
+function check(root: string, feature: string, kind: KindConfig): { errors: string[]; checked: string[] } {
   const errors: string[] = [];
 
   for (const ln of porcelainDirtyPaths(root)) {
     errors.push(`uncommitted/untracked under .specs/: ${ln.trim()}`);
   }
 
-  const paths = requiredPaths(root, feature);
+  const paths = requiredPaths(root, feature, kind);
   const tracked = trackedOnHead(root);
   for (const p of paths) {
     if (!tracked.has(p)) {
@@ -135,21 +162,27 @@ function check(root: string, feature: string): { errors: string[]; checked: stri
   return { errors, checked: paths };
 }
 
-const USAGE = "usage: check_specs_delivered.ts [-h] [--root ROOT] feature";
+const USAGE = "usage: check_specs_delivered.ts [-h] [--root ROOT] [--kind KIND] feature";
 const HELP = `${USAGE}
 
 Gate: .specs/ artifacts committed on the branch before PR (GATE-02).
 
 positional arguments:
-  feature      Feature slug under <root>/.specs/features/, or a direct path
+  feature      Slug under the kind's .specs/ directory, or a direct path
 
 options:
   -h, --help   show this help message and exit
-  --root ROOT  Project root containing .specs/ (default: current dir)`;
+  --root ROOT  Project root containing .specs/ (default: current dir)
+  --kind KIND  One of: ${Object.keys(KINDS).join(", ")} (default: feature)
+               feature  .specs/features/<slug>/  spec.md (+ present phase files) + project STATE files
+               quick    .specs/quick/<slug>/     TASK.md + SUMMARY.md
+               debug    .specs/debug/<slug>/     REPORT.md
+               refactor .specs/refactors/<slug>/ CHARACTERIZATION.md (+ present PLAN.md/SENSOR.md)`;
 
 interface Args {
   feature: string;
   root: string;
+  kind: string;
 }
 
 function printUsageError(msg: string): void {
@@ -158,6 +191,7 @@ function printUsageError(msg: string): void {
 
 function parseArgs(argv: string[]): Args | null {
   let root = ".";
+  let kind = "feature";
   const positionals: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
@@ -169,6 +203,14 @@ function parseArgs(argv: string[]): Args | null {
       root = argv[++i]!;
     } else if (a.startsWith("--root=")) {
       root = a.slice("--root=".length);
+    } else if (a === "--kind") {
+      if (i + 1 >= argv.length) {
+        printUsageError("argument --kind: expected one argument");
+        return null;
+      }
+      kind = argv[++i]!;
+    } else if (a.startsWith("--kind=")) {
+      kind = a.slice("--kind=".length);
     } else if (a === "-h" || a === "--help") {
       console.log(HELP);
       process.exit(0);
@@ -187,7 +229,11 @@ function parseArgs(argv: string[]): Args | null {
     printUsageError(`unrecognized arguments: ${positionals.slice(1).join(" ")}`);
     return null;
   }
-  return { feature: positionals[0]!, root };
+  if (!(kind in KINDS)) {
+    printUsageError(`argument --kind: invalid choice: '${kind}' (choose from ${Object.keys(KINDS).join(", ")})`);
+    return null;
+  }
+  return { feature: positionals[0]!, root, kind };
 }
 
 function main(argv: string[]): number {
@@ -195,7 +241,7 @@ function main(argv: string[]): number {
   if (args === null) return 2;
   const root = resolve(args.root);
 
-  const { errors, checked } = check(root, args.feature);
+  const { errors, checked } = check(root, args.feature, KINDS[args.kind]!);
 
   for (const e of errors) console.log(`  ERROR ${e}`);
   console.log(`\ncheck_specs_delivered: checked ${checked.length} path(s):`);

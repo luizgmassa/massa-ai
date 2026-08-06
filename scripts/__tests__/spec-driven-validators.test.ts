@@ -840,6 +840,109 @@ describe("check_specs_delivered.py (T6, GATE-02 AC1-2)", () => {
   });
 });
 
+describe("check_specs_delivered --kind (light-workflow artifact gates)", () => {
+  function writeKindFile(root: string, rel: string, content: string): void {
+    const full = join(root, rel);
+    mkdirSync(join(full, ".."), { recursive: true });
+    writeFileSync(full, content, "utf-8");
+  }
+
+  test("--kind quick: TASK.md + SUMMARY.md tracked exits 0, no STATE files required", () => {
+    const root = makeTempRoot("delivered-quick");
+    initGitRepo(root);
+    writeKindFile(root, join(".specs", "quick", "001-fix-typo", "TASK.md"), "# Quick 001\n");
+    writeKindFile(root, join(".specs", "quick", "001-fix-typo", "SUMMARY.md"), "# Quick 001\n");
+    commitAll(root, "init");
+    const r = runPy(CHECK_SPECS_DELIVERED, ["001-fix-typo", "--root", root, "--kind", "quick"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("checked 2 path(s)");
+    expect(r.stdout).toContain("001-fix-typo/TASK.md");
+    expect(r.stdout).toContain("001-fix-typo/SUMMARY.md");
+    expect(r.stdout).not.toContain("STATE.md");
+  });
+
+  test("--kind quick: missing SUMMARY.md exits 1, names the path", () => {
+    const root = makeTempRoot("delivered-quick-missing");
+    initGitRepo(root);
+    writeKindFile(root, join(".specs", "quick", "001-fix-typo", "TASK.md"), "# Quick 001\n");
+    commitAll(root, "init");
+    const r = runPy(CHECK_SPECS_DELIVERED, ["001-fix-typo", "--root", root, "--kind", "quick"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("not tracked on HEAD");
+    expect(r.stdout).toContain("SUMMARY.md");
+  });
+
+  test("--kind debug: REPORT.md tracked exits 0", () => {
+    const root = makeTempRoot("delivered-debug");
+    initGitRepo(root);
+    writeKindFile(root, join(".specs", "debug", "login-crash", "REPORT.md"), "# Debug Report\n");
+    commitAll(root, "init");
+    const r = runPy(CHECK_SPECS_DELIVERED, ["login-crash", "--root", root, "--kind", "debug"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("checked 1 path(s)");
+    expect(r.stdout).toContain("login-crash/REPORT.md");
+  });
+
+  test("--kind debug: slug with no REPORT.md exits 1, names the path", () => {
+    const root = makeTempRoot("delivered-debug-missing");
+    initGitRepo(root);
+    // Repo has a commit but the debug slug was never written.
+    writeKindFile(root, "README.md", "# x\n");
+    commitAll(root, "init");
+    const r = runPy(CHECK_SPECS_DELIVERED, ["login-crash", "--root", root, "--kind", "debug"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("not tracked on HEAD");
+    expect(r.stdout).toContain("login-crash/REPORT.md");
+  });
+
+  test("--kind refactor: CHARACTERIZATION.md required; PLAN/SENSOR required only when present", () => {
+    const root = makeTempRoot("delivered-refactor");
+    initGitRepo(root);
+    writeKindFile(root, join(".specs", "refactors", "split-service", "CHARACTERIZATION.md"), "# Char\n");
+    writeKindFile(root, join(".specs", "refactors", "split-service", "SENSOR.md"), "# Sensor\n");
+    commitAll(root, "init");
+    const r = runPy(CHECK_SPECS_DELIVERED, ["split-service", "--root", root, "--kind", "refactor"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("checked 2 path(s)");
+    expect(r.stdout).toContain("split-service/CHARACTERIZATION.md");
+    expect(r.stdout).toContain("split-service/SENSOR.md");
+    expect(r.stdout).not.toContain("split-service/PLAN.md");
+  });
+
+  test("--kind refactor: untracked SENSOR.md exits 1 (porcelain check still applies)", () => {
+    const root = makeTempRoot("delivered-refactor-dirty");
+    initGitRepo(root);
+    writeKindFile(root, join(".specs", "refactors", "split-service", "CHARACTERIZATION.md"), "# Char\n");
+    commitAll(root, "init");
+    writeKindFile(root, join(".specs", "refactors", "split-service", "SENSOR.md"), "# Sensor\n"); // never added
+    const r = runPy(CHECK_SPECS_DELIVERED, ["split-service", "--root", root, "--kind", "refactor"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("uncommitted/untracked under .specs/");
+    expect(r.stdout).toContain("SENSOR.md");
+  });
+
+  test("--kind feature is the default: omitting --kind matches --kind feature exactly", () => {
+    const root = makeTempRoot("delivered-kind-default");
+    initGitRepo(root);
+    writeFeatureFile(root, "my-feature", "spec.md", "# Spec\n");
+    writeStateFiles(root);
+    commitAll(root, "init");
+    const rDefault = runPy(CHECK_SPECS_DELIVERED, ["my-feature", "--root", root]);
+    const rExplicit = runPy(CHECK_SPECS_DELIVERED, ["my-feature", "--root", root, "--kind", "feature"]);
+    expect(rDefault.exitCode).toBe(0);
+    expect(rExplicit.exitCode).toBe(0);
+    expect(rExplicit.stdout).toBe(rDefault.stdout);
+  });
+
+  test("an unknown --kind is a usage error (exit 2)", () => {
+    const root = makeTempRoot("delivered-kind-bad");
+    initGitRepo(root);
+    const r = runPy(CHECK_SPECS_DELIVERED, ["x", "--root", root, "--kind", "nonsense"]);
+    expect(r.exitCode).toBe(2);
+    expect(r.stderr).toContain("invalid choice: 'nonsense'");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // FT4: validate_tasks.py parses letter-prefixed task ids (IT2-01 closure)
 // ---------------------------------------------------------------------------

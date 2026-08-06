@@ -3,7 +3,7 @@ name: implementation-fix
 description: "Executes confirmed findings from a saved implementation audit report; the saved audits/implementation report is the source of truth, not chat summaries."
 license: MIT
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 ### Implementation Fix
@@ -12,7 +12,7 @@ Execute confirmed findings from a saved implementation audit markdown report onl
 
 Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
+Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate; one go-ahead spans through PR creation only, not force-push, deploy, or merge) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
 **Isolation Gate — before the first file edit:** execute `references/implementation-delivery.md` Stage 0–1 now (fetch base, create the worktree + branch, work inside it) and record the worktree path + branch — or one of Stage 1's two legal skip reasons, verbatim — before any repository mutation.
 
@@ -27,7 +27,10 @@ Do not execute from chat summaries, inline review comments, remembered findings,
    - `references/verification-ladder.md` before non-trivial edits.
    - `references/naming-standards.md` before introducing, renaming, or preserving identifiers as part of a finding fix.
    - `references/context-firewall.md` before large diffs, logs, snapshots, reports, or broad searches.
-   - `references/agent-orchestration.md` only for high-risk findings, disjoint implementation slices, or independent verification.
+   - `references/discrimination-sensor.md` before closing any finding at the tiers the verification-ladder's Independent Verification Mandate names.
+   - `references/knowledge-verification-chain.md` when a finding's fix depends on external library/API behavior not already verified this session.
+   - `references/brownfield-mapping.md` (Minimum Bar only) for Standard+ findings when recall returns no hit for the target and no gate command is derivable from the report's evidence.
+   - `references/agent-orchestration.md` for high-risk findings or disjoint implementation slices; the mandated verification-agent dispatch below is carved out of this trigger by agent-orchestration's Independent Verification Exception and always attempts dispatch at its own tier gate.
 3. `recall` -> load prior implementation audit decisions, known regressions, architecture/security boundaries, accepted exceptions, testing conventions, and reusable verification recipes for the target.
 4. Select the report with an explicit execution focus:
    - Establish report selector, target focus, and optional source-qualified finding IDs before selecting a report.
@@ -68,17 +71,6 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 > - memory: suggest-only; main agent persists reusable patterns
 > - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
-> - trigger: high-risk, security, public-contract, or multi-file fix
-> - scope: the fixed finding's behavior, contracts, tests, and report claim closure
-> - permissions: read-only
-> - inputs: the finding, the applied fix, the verification suggestion, and validation assets
-> - sensors: deterministic command per lens (tests, import checks, security checks) and report claim closure
-> - output: confirmed/disproven closure verdict with evidence
-> - firewall: raw test output/logs summarized
-> - memory: suggest-only; main agent persists reusable verification recipes
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
-
     Never run parallel writers against shared files or contracts.
 
 > **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
@@ -93,8 +85,20 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
 > - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-11. Verify each completed finding with the Mandatory Verification Fix Gate from `references/verification-ladder.md`: run the report's Verification Suggestion or an equivalent deterministic command/artifact check, then run focused tests, build, lint, type, static, or runtime checks relevant to the source lens. Reinspect tests, fixtures, snapshots, types, specs, public contracts, and touched identifiers so validation assets were not weakened and names follow `references/naming-standards.md`. A finding cannot be marked `fixed` when a target-relevant command or artifact check exists but was not attempted; if verification cannot run, mark it `blocked`, `deferred`, or `skipped` with an allowed skipped-check reason.
-12. Produce a closure matrix with finding ID, source lens, status (`fixed`, `deferred`, `blocked`, `skipped`), changed files, command/artifact, result, skipped reason or `none`, highest Verification Ladder level reached, validation assets protected, residual risk, and exact next step for deferred or blocked findings.
+> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> - trigger: an `Area/PREFIX-N` finding's closure meets the verification-ladder's Independent Verification Mandate tier gate — Standard+/Spec-driven size or any high/critical-severity finding
+> - scope: the closed `Area/PREFIX-N` finding's fix diff, its source-lens claim, and the validation assets the fix touches
+> - permissions: read-only
+> - inputs: the source-qualified finding ID, the applied fix diff, the report's Verification Suggestion, and the pending closure-matrix row
+> - sensors: the deterministic command/artifact named in the closure row for that lens; discrimination sensor per `references/discrimination-sensor.md` (the code under the closed finding's claim)
+> - output: confirmed/disproven closure verdict per `Area/PREFIX-N` row, ladder level reached, residual risk
+> - firewall: raw test/build output and diffs summarized to verdict plus evidence pointers
+> - memory: suggest-only; main agent persists implementation-closure verification outcomes
+> - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of each closed Area/PREFIX-N row against this output contract and record the skipped-delegation reason
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
+
+11. Verify each completed finding with the Mandatory Verification Fix Gate from `references/verification-ladder.md`: run the report's Verification Suggestion or an equivalent deterministic command/artifact check, then run focused tests, build, lint, type, static, or runtime checks relevant to the source lens. At the tiers the ladder's Independent Verification Mandate names, also run the Discrimination Sensor (`references/discrimination-sensor.md`) against the code under the closed finding's claim; a surviving mutant marks that closure row `blocked` (not `fixed`) and emits the `surviving_mutant` lessons signal. Reinspect tests, fixtures, snapshots, types, specs, public contracts, and touched identifiers so validation assets were not weakened and names follow `references/naming-standards.md`. A finding cannot be marked `fixed` when a target-relevant command or artifact check exists but was not attempted; if verification cannot run, mark it `blocked`, `deferred`, or `skipped` with an allowed skipped-check reason. The fix→re-verify cycle is capped at the ladder's 3-iteration limit per finding — distinct from the preamble's two-consecutive-failed-fixes breaker above, which fires on edit attempts inside a single iteration and routes to `references/root-cause-scripts.md` rather than closing a finding `blocked`.
+12. Persist the closure evidence as the Fix Closure Report defined in `references/audit-report-io.md` (Fix Closure Report Contract), at `audits/implementation/<YYYY-MM-DD implementation-fix-closure>.md`, one row per selected finding keyed by its source-qualified `Area/PREFIX-N` ID: status (`fixed`, `deferred`, `blocked`, `skipped`), changed files, command/artifact, result, skipped reason or `none`, discrimination sensor verdict, independent verifier verdict, highest Verification Ladder level reached, validation assets protected, residual risk, and exact next step for deferred or blocked findings. Run `bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family implementation` before Propose/Evidence Gate; a non-zero exit blocks closure. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 13. If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
 14. Persist only reusable root-cause patterns, approved remediation exceptions, durable architecture/security/requirements decisions, or project-specific verification recipes after Importance Calibration. Use `workflow:implementation-fix` and required project/session/entity/memory tags.
@@ -113,3 +117,6 @@ User asks: "Fix Security/SEC-2 from audits/implementation/2026-06-15 implementat
 1. Read the exact report and validate `Security/SEC-2` against current source.
 2. Apply security-fix methods only to that finding.
 3. Preserve all other findings for later execution.
+
+<!-- validator anchors: "Fix Closure Report defined in `references/audit-report-io.md`", "audits/implementation/<YYYY-MM-DD implementation-fix-closure>.md", "bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family implementation", "discrimination sensor per `references/discrimination-sensor.md`", "surviving_mutant` lessons signal", "graceful degradation preserved", "Independent Verification Exception", "brownfield-mapping.md` (Minimum Bar only)" -->
+

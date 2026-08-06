@@ -136,7 +136,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
 > - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
     - The verification-agent re-derives coverage independently using evidence-or-zero and does not inherit the author's mental model.
-   - The fix → re-verify loop is capped at 3 iterations before escalating to `Blocked`.
+   - The fix → re-verify loop is bounded by the Bounded Fix→Re-verify Loop rule in `references/verification-ladder.md` (cap reached → `Blocked`).
    - Distill lesson signals through `references/lessons.md` when validation produces grounded reusable failures.
 7. Before the delivery chain's Propose stage (PR creation), write and commit `.specs/project/STATE.md`, `.specs/HANDOFF.md`, and `.specs/project/FEATURES.json` on the branch — not merely "after meaningful progress" during Execute, but committed before `gh pr create`. **Deterministic backing (run it, do not eyeball it):** `bun skills/massa-ai/scripts/check_specs_delivered.ts <feature> [--root .]` — a non-zero exit blocks Propose (see `references/implementation-delivery.md` stage 3.5 and GATE-02). If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved). Record decisions, blockers, handoff, and completion evidence per `references/spec-driven/memory.md`'s write triggers.
 8. When the user splits planning and implementation across clean chats, resume from the canonical `.specs/` artifacts — `.specs/project/STATE.md`, `.specs/project/FEATURES.json`, `.specs/HANDOFF.md`, and the feature's phase files. This workflow owns the spec phase contracts on both sides of the split; there is no separate save/load procedure.
@@ -164,32 +164,15 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
 - Validation command unavailable: record the missing command/tool in `validation.md` and mark `Blocked`.
 - Discrimination sensor cannot be made safely reversible: mark `Blocked` unless the verification-agent can prove equivalent discrimination with an existing deterministic mutation fixture.
 - Validation conflict: stop for user resolution when a validation asset conflicts with an approved specification.
-- Fix loop exceeds 3 iterations: stop with `Blocked`, preserve evidence, and ask for direction.
+- Fix loop reaches the `references/verification-ladder.md` cap: stop with `Blocked`, preserve evidence, and ask for direction.
 
 ## Knowledge Verification Chain
 
-When researching, designing, or making any technical decision, follow this chain in strict order. Never skip steps.
-
-```
-Step 1: Codebase → existing code, conventions, patterns already in use
-Step 2: Project docs (leads, not truth) → README, docs/, inline comments, .specs/project/STATE.md (Decisions) — verify against current source before relying
-Step 3: Context7 MCP → resolve library ID, then query for current API/patterns
-Step 4: Web search → official docs, reputable sources, community patterns
-Step 5: Flag as uncertain → "I'm not certain about X — here's my reasoning, but verify"
-```
-
-- If a chain step's tool is unavailable (Context7 MCP not registered, no web
-  access), record it as a skipped sensor with its reason and continue to the next
-  step. An unavailable step is skipped, never silently treated as answered.
-- Never skip to Step 5 if Steps 1-4 are available.
-- Step 5 is always flagged uncertain — never presented as fact.
-- Never assume or fabricate. If no answer is found, say "I don't know" or "I couldn't find documentation for this". Uncertainty is always preferable to fabrication; invented APIs/patterns cause cascading failures across design → tasks → implementation.
+When researching, designing, or making any technical decision, follow the 5-step chain in `references/knowledge-verification-chain.md` in strict order — codebase, project docs, Context7 MCP, web search, then flag-as-uncertain. Never skip steps, record an unavailable step as a skipped sensor with its reason, and never present Step 5 output as fact.
 
 ## Brownfield Onboarding — 7-Doc Codebase Mapping
 
-When the spec-driven work targets a codebase the agent has not yet mapped (brownfield, new repo, or cold project), derive the 7-doc codebase map from `references/spec-driven/brownfield-mapping.md` before Specify closes — not busywork, each doc feeds a downstream phase.
-
-Minimum bar: derive at least **`CONCERNS.md`** (risk surface — drives risk-domain escalation and validation focus) and **`TESTING.md`** (gate derivation — exact commands the Execute gate will run). If time or access is constrained, these two are non-negotiable; the other five are derived as the work needs them. Record the map under `.specs/features/<slug>/` (or the project onboarding dir) and confirm it against current source, not memory or external summaries.
+When the spec-driven work targets a codebase the agent has not yet mapped (brownfield, new repo, or cold project), derive the 7-doc codebase map from `references/brownfield-mapping.md` before Specify closes — not busywork, each doc feeds a downstream phase. That reference's **Minimum Bar** (CONCERNS.md + TESTING.md non-negotiable) applies; record the map under `.specs/features/<slug>/` per its output-path rule.
 
 ## Commands
 

@@ -71,9 +71,15 @@ If cleanup cannot be guaranteed, isolate test data and record residual risk.
 - changed files
 - command/artifact evidence
 - skipped reason or `none`
-- JUnit/artifact paths
+- JUnit/artifact paths — cite the **on-disk** JUnit report path and artifact directory the run actually produced, never a remembered or expected path
 - validation assets protected
 - residual risk
+
+## Discrimination Sensor (Flow Mutation)
+
+The Maestro instantiation of `references/discrimination-sensor.md`: mutate a **scratch copy** of the flow under the claim being verified — perturb a selector (point it at a wrong element) or an assertion (invert or change its expected value) — and confirm the run fails. A run that still passes with a perturbed selector/assertion is not discriminating for that behavior.
+
+Deviation from the generic tier table, stated on purpose: device-backed runs are expensive, so the sensor is a **single lightweight mutation only** — the ≥5-mutation P0 tier does not apply to Maestro flows. Record killed/survived and restore the scratch per the shared reference's isolation rules.
 
 ## Routing Boundaries
 

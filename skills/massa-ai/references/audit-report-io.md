@@ -75,6 +75,8 @@ In Plan Mode, do not write report files. Return the proposed canonical path and 
 
 In Default mode, write the canonical report unless acting as a child lens returning compact findings to implementation audit.
 
+The same rule covers Fix Closure Reports: in Plan Mode, return the proposed closure path and complete closure content instead of writing the file.
+
 ## Single-Lens Report Contract
 
 ```md
@@ -530,11 +532,58 @@ Implementation reports must preserve the exact parent scope packet and source-qu
 
 When implementation-audit uses SonarQube MCP, preserve the MCP availability result, project key or skipped-check reason, quality gate status when available, tool names used, and summarized issue/security-hotspot/measure evidence in Scope And Evidence. Sonar-derived findings are executable only after they are normalized to existing source-qualified IDs for Architecture, Correctness/Bugs, Code Quality, Security, or Tests; unmapped SonarQube output remains evidence only and does not enter Execution Handoff.
 
+## Fix Closure Report Contract
+
+Every `*-fix` workflow persists its closure evidence as a Fix Closure Report, a sibling of the audit report it closes:
+
+```text
+audits/<family>/<YYYY-MM-DD <family>-fix-closure>.md
+```
+
+`<family>` is the source report's directory (`architecture`, `bugs`, `code-quality`, `security`, `requirements`, `tests`, `maestro`, `mobile-figma`, `implementation`). Same local-date and same-day suffix rules as audit reports. Closure reports are output artifacts, **never** audit-report input: any filename containing `-fix-closure` is excluded from latest-report selection.
+
+Required header lines (same metadata style as audit reports):
+
+```md
+# <Family> Fix Closure
+
+Date: <YYYY-MM-DD>
+Workflow: <family>-fix
+ProjectId: <projectId>
+WorkflowSessionId: <workflowSessionId>
+Source Report: <exact path of the audit report consumed>
+Finding Selector: <all | explicit finding IDs>
+```
+
+Then a `## Closure Matrix` with one row per selected finding:
+
+```md
+## Closure Matrix
+
+| Finding ID | Status | Changed Files | Command/Artifact | Result | Skipped Reason | Discrimination Sensor | Independent Verifier | Ladder Level | Validation Assets Protected | Residual Risk | Next Step |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+```
+
+Row rules:
+
+- **Finding ID**: verbatim from the source report (`PREFIX-N`, or `Area/PREFIX-N` for implementation reports).
+- **Status**: `fixed | blocked | deferred | skipped` — terminal statuses only; a selected finding with no row is an incomplete closure.
+- **Command/Artifact** and **Result**: the deterministic evidence per the Mandatory Verification Fix Gate. A `fixed` row must carry a real command/artifact and result — never an unfilled `<placeholder>`, `TBD`, or empty cell.
+- **Skipped Reason**: `none` or one allowed skipped-check reason.
+- **Discrimination Sensor**: killed/survived summary per `references/discrimination-sensor.md`, or `not available — <reason>`.
+- **Independent Verifier**: verdict plus dispatch-or-fallback record per the verification-ladder Independent Verification Mandate.
+- **Next Step**: required for `blocked` and `deferred` rows.
+
+Family-specific extras (extra columns, parsed by header name, appended after the standard set): requirements adds `Linked .specs/ Requirement ID`; maestro and mobile-figma add `JUnit Report`, `Artifact Directory`, and `Device/Platform`.
+
+Deterministic backing (run it, do not eyeball it): `bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family <family>` — a non-zero exit blocks Propose and the Evidence Gate. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
+
 ## Execution Report Input
 
 Execution workflows read a saved markdown report before changing code. Establish:
 
 - Report selector: exact path, `latest`, or omitted.
+- Delivery authorization is scoped **per execution run** (the report + finding selector named at Execute start), not per finding — one go-ahead covers every selected finding's local commits through PR creation. Force-push, deploy, and merge stay separately gated per `references/implementation-delivery.md` Stage 3/7.
 - Target focus: module, flow, files/globs, branch comparison, commit range, PR target, symbol/class/function, feature/screen, modified files, or explicit whole-repository target.
 - Finding selector: optional workflow IDs or source-qualified implementation IDs.
 
@@ -542,6 +591,7 @@ If a path is supplied, use it and validate it against any stated focus. For `lat
 
 Select the latest matching report by:
 
+0. Exclude any filename containing `-fix-closure` — closure reports are outputs, not audit reports.
 1. Highest `YYYY-MM-DD` parsed from matching filenames.
 2. Most recent mtime as tie-breaker.
 3. Lexicographically last path if still tied.

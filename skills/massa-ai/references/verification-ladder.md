@@ -46,6 +46,22 @@ Every `*-fix` workflow must execute this gate for each selected finding or coher
 - Reinspect validation assets after changes and record that tests, specs, fixtures, snapshots, benchmarks, public contracts, and generated baselines were not weakened unless the user explicitly requested that validation-asset change.
 - Closure evidence must include command/artifact, result, skipped reason or `none`, highest Verification Ladder level reached, validation assets protected, and residual risk.
 
+### Independent Verification Mandate (author ≠ verifier)
+
+- At **Standard+ or Spec-driven size, or for any high/critical-severity finding**, dispatching `massa-ai-verification-agent` is **mandatory** before closure — the author must not be the sole verifier of their own work. At Quick size, the subagent hop may be skipped, but the check itself is never skipped: run a standalone fresh-eyes re-check (re-read the finding/ACs, changed files, tests, and diff from scratch) against the same output contract.
+- **Exception — `security-fix` dispatches the verifier unconditionally** for every finding closed `fixed`, at every tier.
+- Fallback discipline: when the subagent is unavailable (not registered, spawning forbidden), run the standalone fresh-eyes re-check from scratch and record the skipped-delegation reason in closure evidence.
+- Reviewer + verifier both dispatching at Standard+ is intentional cost, mirroring spec-driven's always-on pair — not accidental duplication.
+
+### Discrimination Sensor
+
+At the same tiers as the mandate above (and unconditionally for security-fix `fixed` closures at Standard+/critical), run the sensor from `references/discrimination-sensor.md` against the code under the claim being verified. A surviving mutant means the verification cannot discriminate: the claim is not proven.
+
+### Bounded Fix→Re-verify Loop
+
+- The fix → re-verify cycle is capped at **3 verification iterations** per finding or feature. After 3 unsuccessful iterations, stop with `Blocked` (fix workflows: closure row `blocked`), preserve the evidence collected, and ask the user for direction.
+- This is a *verification-cycle* counter, independent of two other counters: the *edit-attempt* breaker ("two consecutive failed fixes on one symptom → load `references/root-cause-scripts.md`") fires *inside* a single iteration and neither consumes nor resets it; and `references/implementation-delivery.md` Stage 6's CI-repair cap is a third, post-push loop with its own count.
+
 ## Ladder
 
 Use the cheapest sufficient evidence first:

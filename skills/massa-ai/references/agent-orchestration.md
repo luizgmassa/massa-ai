@@ -79,6 +79,10 @@ Plan Challenge `plan-critic` is a standing policy exception to the normal dispat
 
 For all other roles, preserve the normal delegation gates above.
 
+## Independent Verification Exception (fix workflows + Standard+ light-workflow tiers)
+
+The Independent Verification Mandate in `references/verification-ladder.md` is a second standing policy exception, parallel to the Plan Challenge one: when a `*-fix` workflow closes a finding, or a light workflow (`debug`, `feature`, `general`, `refactor`) completes Standard+ work, always attempt the `massa-ai-verification-agent` dispatch when subagent tooling is available and platform policy permits spawning — it does not need to satisfy the ordinary dispatch triggers (file count, module count, explicit user delegation). Base packet-quality requirements still apply, and the mandate's own tier gates, security-fix unconditional rule, and fresh-eyes fallback live in that ladder section, not here.
+
 ## Name Resolution
 
 Charters live at `skills/agents/<role>/SKILL.md`. Hosts register every charter

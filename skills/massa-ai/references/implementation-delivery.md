@@ -61,9 +61,12 @@ worktree was never provisioned is an environment failure; say so rather than
 reporting it as a code failure.
 
 **Phased work — one branch per Phase/Wave.** When the work is phased (sourced
-from `workflows/ticket.md`, a spec-driven `tasks.md` with Phases/Waves, or a TDD
-PR-group table), create **one branch per Phase/Wave**, not one branch per task
-and not one branch for the whole feature. Name the branch with the phase's Jira
+from `workflows/ticket.md`, a spec-driven `tasks.md` with Phases/Waves, a TDD
+PR-group table, or a `references/pr-task-fix.md` PR-group split), create
+**one branch per Phase/Wave**, not one branch per task
+and not one branch for the whole feature. All Phases/PR groups of one feature
+share that feature's single Stage 3 delivery authorization — one go-ahead
+covers every group's commits, pushes, and PR creation. Name the branch with the phase's Jira
 Task key, e.g. `feat/<PHASE-KEY>-<slug>` (so `feat/SA-100-phase-1-search-split`
 for phase SA-100). The phase key comes from `workflows/ticket.md` or the user.
 Each Task inside the phase is then one atomic commit on that branch, prefixed
@@ -88,6 +91,8 @@ One explicit delivery authorization per feature, obtained before implementation 
 Between Push and Propose, all feature `.specs/` artifacts (`spec/context/design/tasks/validation` as applicable), `.specs/project/STATE.md`, `.specs/HANDOFF.md`, and `.specs/project/FEATURES.json` must be updated and committed on the branch. **Deterministic backing (run it, do not eyeball it):** `bun skills/massa-ai/scripts/check_specs_delivered.ts <feature> [--root .]` — a non-zero exit blocks Propose. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
 **Nominal path: this stage should never fire.** The feature's own close-out task (the last task before delivery — see `workflows/spec-driven.md` step 7) commits `.specs/` updates **before** the first push, so stage 3.5's remediation is a defensive fallback for the rare case something slipped through, not the normal place `.specs/` gets committed. On failure: commit the missing `.specs/` updates (a `docs(specs):`-type commit is normal), push, re-run this stage. No commits may land between the close-out commit and PR creation.
+
+**Kind variants.** `check_specs_delivered.ts` takes `--kind feature|quick|debug|refactor` (default `feature`, the behavior above): `quick` gates `.specs/quick/<slug>/` `TASK.md`+`SUMMARY.md`, `debug` gates `.specs/debug/<slug>/REPORT.md`, `refactor` gates `.specs/refactors/<slug>/CHARACTERIZATION.md` (plus `PLAN.md`/`SENSOR.md` when present) — none of the non-feature kinds require the project STATE files. The fix-family analogue of this stage is `bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family <family>` (Fix Closure Report Contract in `references/audit-report-io.md`). Neither gate fires for a workflow run with no durable artifact in scope.
 
 ### Stage 4 — propose carries the phase key prefix
 
