@@ -404,3 +404,29 @@ describe("massa-ai-reviewer dispatch block: fix workflows batch 1 (T16, AEH-06)"
     });
   }
 });
+
+const FIX_WORKFLOW_BATCH_2_TARGETS: ReviewerDispatchTarget[] = [
+  "workflows/tests/tests-fix.md",
+  "workflows/implementation/implementation-fix.md",
+  "workflows/maestro/maestro-fix.md",
+  "workflows/mobile-figma/mobile-figma-fix.md",
+].map((file) => ({ file, scope: "the fix's diff surface and its task/AC context" }));
+
+describe("massa-ai-reviewer dispatch block: fix workflows batch 2 (T17, AEH-06)", () => {
+  for (const target of FIX_WORKFLOW_BATCH_2_TARGETS) {
+    test(`${target.file} carries the reviewer dispatch block with fallback and persona bullets`, () => {
+      expectReviewerDispatchBlock(target);
+    });
+  }
+
+  test("all 14 wired workflows carry the reviewer dispatch block (count sensor)", () => {
+    const allTargets = [
+      ...IMPLEMENTING_WORKFLOW_TARGETS,
+      ...FIX_WORKFLOW_BATCH_1_TARGETS,
+      ...FIX_WORKFLOW_BATCH_2_TARGETS,
+    ];
+    expect(allTargets.length).toBe(14);
+    const withBlock = allTargets.filter(({ file }) => readSkill(file).includes(REVIEWER_DISPATCH_HEADER));
+    expect(withBlock.length).toBe(14);
+  });
+});
