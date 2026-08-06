@@ -24,7 +24,7 @@
  * ```
  */
 
-import { EmbeddingProvider, createProvider } from "./provider.js";
+import { EmbeddingProvider, DimensionMismatchError, createProvider } from "./provider.js";
 import { withCache } from "./cached-provider.js";
 import type { EmbeddingCacheStore } from "../cache/embedding-cache-contract.js";
 import { createEmbeddingCache } from "../cache/embedding-cache-factory.js";
@@ -81,18 +81,31 @@ export interface CreateProviderOptions {
 }
 
 /**
- * Try to create a provider from configuration
- * Returns null if provider is not available or configured
+ * Result of a single provider-creation attempt. `provider` is set only on
+ * success; `dimensionMismatch` is set only when the health check failed
+ * specifically because the model's output length did not match the
+ * configured `dimensions` (see `DimensionMismatchError`) — every other
+ * failure cause (no API key, unreachable service, malformed response)
+ * leaves it `undefined`.
+ */
+interface ProviderAttempt {
+  provider: EmbeddingProvider | null;
+  dimensionMismatch?: DimensionMismatchError;
+}
+
+/**
+ * Try to create a provider from configuration.
+ * `provider` is null if the provider is not available or configured.
  */
 async function tryCreateProvider(
   config: EmbeddingProviderConfig,
   providerId: string,
   skipHealthCheck: boolean,
-): Promise<EmbeddingProvider | null> {
+): Promise<ProviderAttempt> {
   // Check if API key is available (if needed)
   if (!hasApiKey(providerId)) {
     logger.debug(`[${providerId}] Skipping: No API key configured`);
-    return null;
+    return { provider: null };
   }
 
   // Create provider
@@ -103,14 +116,33 @@ async function tryCreateProvider(
     const available = await provider.isAvailable();
     if (!available) {
       logger.debug(`[${providerId}] Health check failed`);
-      return null;
+      return { provider: null, dimensionMismatch: provider.lastDimensionMismatch };
     }
   }
 
   logger.info(
     `[${providerId}] Provider ready (model: ${config.model}, dimensions: ${config.dimensions})`,
   );
-  return provider;
+  return { provider };
+}
+
+/**
+ * Log the remediation-bearing ERROR and produce the error to throw when the
+ * configured embedding provider fails its health check on a dimension
+ * mismatch. Shared by both selection paths in `createEmbeddingProvider` so
+ * the message stays identical regardless of how the provider was chosen.
+ */
+function refuseOnDimensionMismatch(
+  providerId: string,
+  mismatch: DimensionMismatchError,
+): never {
+  logger.error(
+    `[${providerId}] Configured embedding provider failed with a dimension mismatch — refusing to ` +
+      `fall through to another provider (that would silently degrade retrieval quality). ` +
+      `configured dimensions ${mismatch.expected} ≠ model output ${mismatch.got} — fix ` +
+      "`embedding.dimensions` in config.json or OLLAMA_EMBEDDING_DIMENSIONS to match the model actually pulled.",
+  );
+  throw mismatch;
 }
 
 /**
@@ -145,10 +177,22 @@ export async function createEmbeddingProvider(
     for (const [id, config] of providers) {
       logger.debug(`Trying provider: ${id} (priority: ${config.priority})`);
 
-      baseProvider = await tryCreateProvider(config, id, skipHealthCheck);
-      if (baseProvider) {
+      const attempt = await tryCreateProvider(config, id, skipHealthCheck);
+      if (attempt.provider) {
+        baseProvider = attempt.provider;
         logger.info(`Selected provider: ${id}`);
         break;
+      }
+
+      // The configured provider (priority 1 — the one EMBEDDING_PROVIDER /
+      // config.json `embedding.provider` selected) failing on a dimension
+      // mismatch is not a "try the next provider" situation: silently
+      // falling through here is exactly how a stale `embedding.dimensions`
+      // beside a re-pulled model used to degrade to the 384d transformers.js
+      // fallback without anyone noticing. Any other failure (unreachable
+      // service, no API key) keeps today's fallback behavior.
+      if (config.priority === 1 && attempt.dimensionMismatch) {
+        refuseOnDimensionMismatch(id, attempt.dimensionMismatch);
       }
     }
 
@@ -171,11 +215,22 @@ export async function createEmbeddingProvider(
       throw new Error(`Unknown provider: ${requestedProvider}`);
     }
 
-    baseProvider = await tryCreateProvider(
+    const attempt = await tryCreateProvider(
       config,
       requestedProvider,
       skipHealthCheck,
     );
+
+    // An explicitly requested provider has no fallback chain to protect —
+    // but a dimension mismatch here is the same silent-degrade risk (a
+    // caller that catches the generic "not available" error and retries
+    // with 'auto' would otherwise land on the same stale-config problem),
+    // so surface the distinguishable error here too.
+    if (attempt.dimensionMismatch) {
+      refuseOnDimensionMismatch(requestedProvider, attempt.dimensionMismatch);
+    }
+
+    baseProvider = attempt.provider;
 
     if (!baseProvider) {
       throw new Error(
@@ -202,8 +257,11 @@ export async function createEmbeddingProvider(
 /**
  * Create all available providers (for testing/comparison)
  *
- * Returns an array of all providers that pass health checks.
- * Useful for benchmarking or testing multiple providers.
+ * Returns an array of all providers that pass health checks. This is a
+ * diagnostic/benchmarking enumeration, not the production selection chain —
+ * it intentionally does NOT apply the dimension-mismatch refusal in
+ * `createEmbeddingProvider`, so one misconfigured provider never aborts the
+ * scan of the rest.
  */
 export async function createAllProviders(
   options: { cache?: boolean; skipHealthCheck?: boolean } = {},
@@ -214,7 +272,8 @@ export async function createAllProviders(
   const results: EmbeddingProvider[] = [];
 
   for (const [id, config] of providers) {
-    const provider = await tryCreateProvider(config, id, skipHealthCheck);
+    const attempt = await tryCreateProvider(config, id, skipHealthCheck);
+    const provider = attempt.provider;
     if (provider) {
       if (enableCache) {
         const cache = createEmbeddingCache(provider.id, provider.model);

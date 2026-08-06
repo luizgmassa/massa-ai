@@ -522,6 +522,23 @@ model VectorDocument4096 {
   @@map("vector_documents_4096d")
 }
 
+// 2560-dimension table (qwen3-embedding:4b) with binary quantization for HNSW indexing.
+// pgvector HNSW supports any dimension on bit columns (bit_hamming_ops).
+// Search strategy: Phase 1 ANN on embedding_bq → Phase 2 exact cosine re-rank on embedding.
+model VectorDocument2560 {
+  id          String                       @id
+  projectId   String                       @map("project_id")
+  content     String
+  metadata    Json                         @default("{}")
+  embedding   Unsupported("vector(2560)")?
+  embeddingBq Unsupported("bit(2560)")?   @map("embedding_bq")
+  createdAt   DateTime                     @default(now()) @map("created_at")
+  updatedAt   DateTime                     @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@map("vector_documents_2560d")
+}
+
 // ========================================
 // Index Jobs (Phase 1, T9 — PG parity for the job store)
 // Runtime state for async indexing jobs. PostgreSQL-canonical via PgStore

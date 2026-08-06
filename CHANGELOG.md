@@ -7,8 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`scripts/reembed-stale-memories.ts`** — one-off backfill that re-embeds
+  `memories` rows whose stored embedding no longer matches the configured
+  embedding dimensions (`embedding.byteLength / 4 !== dimensions`, since
+  embeddings are stored as raw Float32 bytes). Needed after the dimension-pin
+  fix below: rows embedded before the fix stay at their old dimensionality
+  until re-embedded, and are invisible to cosine search against the new one
+  until then. `--dry-run`, `--batch-size`, and `--dimensions` (override
+  auto-detection) flags; the row-selection predicate
+  (`isEmbeddingStale`/`selectStaleMemoryRows`) is exported and unit-tested
+  independently of the database and the embedding provider.
+
 ### Fixed
 
+- **Embedding provider selection silently degraded to the 384d
+  transformers.js fallback on a dimension mismatch instead of failing loudly.**
+  `AISDKEmbeddingProvider.isAvailable()` treated "model responded with the
+  wrong dimension count" (a stale `embedding.dimensions` beside a re-pulled
+  model, e.g. `qwen3-embedding:4b` at 2560d configured as 4096d) the same as
+  any other health-check failure and fell through the priority chain — for
+  the *configured* provider, that fallthrough silently landed on the 384d
+  local MiniLM provider, producing real-looking embeddings at the wrong
+  dimensionality with nothing in the logs naming the cause. `provider.ts` now
+  tags this failure class distinctly (`DimensionMismatchError`, carried on
+  `EmbeddingProvider.lastDimensionMismatch`); `services/embeddings/index.ts`'s
+  selection chain (`createEmbeddingProvider`) logs an ERROR with remediation
+  text and refuses to fall through to another provider when the *configured*
+  (priority-1) provider hits this failure class — an unreachable service or a
+  missing API key still falls back exactly as before. `createAllProviders`
+  (a diagnostic/benchmarking enumeration, not the production selection chain)
+  intentionally keeps enumerating every provider rather than aborting on one
+  mismatch. Regression tests: `embeddings-provider.test.ts` (mismatch tagging,
+  cleared-on-recovery, not tagged for unreachable failures) and the new
+  `embeddings-selection-chain.test.ts` (observed RED against the pre-fix
+  selection-chain logic — it silently resolved to the transformers.js
+  fallback instead of throwing — before the fix; a same-priority-1
+  fallback-provider mismatch does not abort the chain).
+- **Missing real migration for `vector_documents_2560d`** (the
+  qwen3-embedding:4b table) — only the on-demand `createFallbackTable` safety
+  net existed. New migration `20260806120000_add_vector_2560_bq` mirrors
+  `20260413200000_add_vector_4096_bq` (binary-quantized `embedding_bq bit(2560)`
+  column + HNSW `bit_hamming_ops` index, since 2560 > pgvector's 2000-dim
+  float HNSW limit) and a matching `VectorDocument2560` Prisma model. PG-gated
+  integration test (`vector-2560-migration-pg.test.ts`, throwaway-database
+  pattern) asserts the table, both column types, the project-id index, and
+  the HNSW index all exist after applying every migration in order.
 - **`setup-local-first.sh` skipped pulling a requested Ollama model whenever a
   sibling tag was installed.** `ollama_model_exists` stripped the tag before
   matching (`search="${1%%:*}"`), so an installed `qwen3-embedding:8b` made
