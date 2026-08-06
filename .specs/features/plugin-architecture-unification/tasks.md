@@ -7,7 +7,34 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/plugin-architecture-unification/design.md`
-**Status**: Draft
+**Status**: Done — see Execution Results
+
+## Execution Results (2026-08-05)
+
+Branch `spec/plugin-architecture-unification`; specs commit `f0d84a7e`; merge of
+origin/main (v1.29.0) at `bb3e90bf` with the CHANGELOG conflict resolved (folded
+entries stay under `[Unreleased]`).
+
+| Task | Commit | Gate evidence |
+| ---- | ------ | ------------- |
+| T1 | `0a81f85d` (main thread — merge mechanics prohibited for workers) | cursor 15/0, opencode 24/0, single-writer 36/0 |
+| T2 | `7efd1633` (Batch 1 worker) | single-writer 57/0 (was 36); red-first: 39p/7f pre-change |
+| T3 | `4f198e82` (Batch 1) | opencode suite 27/0 (was 24); red-first: 24p/3f + 54p/3f pre-change |
+| T4 | `251621ec` (Batch 1) | helper smoke-tested all hosts; suite coverage merged-forward to T5 |
+| T5 | `3b1a5642` (Batch 1) | plugin-auto-install 201/0 (was 174); red-first: 187p/14f pre-change |
+| T6 | `c9aee7c3` (Batch 1) | cursor suite 25/0 (was 15); red-first: 17p/8f pre-change |
+| T7 | `fca8e995` (Batch 2 worker) | opencode build clean + 125/0; importer population 1 (index.test.ts only) |
+| T8 | `3fb8c44c` (Batch 2) | ADR 0002 + AD-017 row in canonical Decisions table (duplicate heading noted) |
+| T9 | `dc18ed30` (Batch 2) | sweep pop 33 → 15 files fixed / 6 historical / 12 not-a-claim; re-run 0 live; parity 88/0 |
+| T10 | `186bbd12` (Batch 2 — CHANGELOG half; state files orchestrator-owned) | full chain exit 0: lint 0, test:plugins 119/0, test:scripts 1455/0 + all shell suites |
+| Fix-1 | `8376dee6` (main thread) | validation gap 1: 2 live `in-process profile tool` rows retired (class pop 142) |
+
+Deviations: T10 split (worker CHANGELOG+gates / orchestrator state files); T9
+additionally repaired 3 suites left stale by Batch 1's own behavior changes
+(`test-install-agents-json.sh` 66/0, `install-state-plugin-version.test.ts`,
+`test-model-profile-installer-opencode-cursor.sh` 33/0) plus the latent
+`00.harness.smoke.test.ts` EXPECTED_TOOLS 52→54 gap. Both batch workers ran as
+`general-purpose` agents (massa-ai-builder type unregistered this session).
 
 ---
 

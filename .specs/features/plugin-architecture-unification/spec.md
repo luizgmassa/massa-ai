@@ -130,25 +130,25 @@ Prior uncommitted work on branch `fix/harness-cursor-agents-opencode-plugin` (Cu
 
 | Requirement ID | Story | Phase | Status |
 | -------------- | ----- | ----- | ------ |
-| PAU-01 | P1 OpenCode tools | Design | Pending |
-| PAU-02 | P1 OpenCode tools | Design | Pending |
-| PAU-03 | P1 OpenCode tools | Design | Pending |
-| PAU-04 | P1 OpenCode tools | Design | Pending |
-| PAU-05 | P1 Harness skip | Design | Pending |
-| PAU-06 | P1 Harness skip | Design | Pending |
-| PAU-07 | P1 Harness skip | Design | Pending |
-| PAU-08 | P1 Cursor dedupe | Design | Pending |
-| PAU-09 | P1 Cursor dedupe | Design | Pending |
-| PAU-10 | P1 Cursor dedupe | Design | Pending |
-| PAU-11 | P1 Cursor dedupe | Design | Pending |
-| PAU-12 | P1 Hooks-only + ADR | Design | Pending |
-| PAU-13 | P1 Hooks-only + ADR | Design | Pending |
-| PAU-14 | P1 Hooks-only + ADR | Design | Pending |
-| PAU-15 | P2 Fold prior work | Design | Pending |
-| PAU-16 | P2 Delivery hygiene | Design | Pending |
-| PAU-17 | P2 Delivery hygiene | Design | Pending |
+| PAU-01 | P1 OpenCode tools | Execute | Verified |
+| PAU-02 | P1 OpenCode tools | Execute | Verified |
+| PAU-03 | P1 OpenCode tools | Execute | Verified |
+| PAU-04 | P1 OpenCode tools | Execute | Verified |
+| PAU-05 | P1 Harness skip | Execute | Verified |
+| PAU-06 | P1 Harness skip | Execute | Verified |
+| PAU-07 | P1 Harness skip | Execute | Verified |
+| PAU-08 | P1 Cursor dedupe | Execute | Verified |
+| PAU-09 | P1 Cursor dedupe | Execute | Verified |
+| PAU-10 | P1 Cursor dedupe | Execute | Verified |
+| PAU-11 | P1 Cursor dedupe | Execute | Verified |
+| PAU-12 | P1 Hooks-only + ADR | Execute | Verified |
+| PAU-13 | P1 Hooks-only + ADR | Execute | Verified |
+| PAU-14 | P1 Hooks-only + ADR | Execute | Verified |
+| PAU-15 | P2 Fold prior work | Execute | Verified |
+| PAU-16 | P2 Delivery hygiene | Execute | Verified |
+| PAU-17 | P2 Delivery hygiene | Execute | Verified |
 
-**Coverage:** 17 total, 0 mapped to tasks (Tasks phase pending), 0 unmapped after Tasks.
+**Coverage:** 17 total, 17 mapped to tasks, 0 unmapped. All Verified (validation.md PASS, iteration 2, 2026-08-05).
 
 ## Implicit-Requirement Sweep (Large — every dimension resolved)
 

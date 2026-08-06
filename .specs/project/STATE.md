@@ -1,6 +1,41 @@
 # massa-ai Spec State
 
-## Current — Untracked Generated Bundles (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 7/7 mutations after fix loop 1; PR next; merge = user decision)
+## Current — Plugin Architecture Unification (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 6/6 mutations, fix loop iteration 2; PR next; merge = user decision)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-plugin-architecture-unification` ·
+  workflow: spec-driven (Large) · branch `spec/plugin-architecture-unification` from
+  `96ee1850`, origin/main (v1.29.0) merged at `bb3e90bf` (CHANGELOG conflict resolved).
+- Scope (user decisions 2026-08-05): AD-017 "plugins deliver, MCP serves tools, hooks
+  observe" — (1) OpenCode installer registers MCP alongside plugin (54 tools; the
+  plugin-presence skip in install-agents.sh removed; uninstall leaves the MCP entry,
+  PAU-03 user-confirmed); (2) harness skip-current gated on per-host on-disk sentinel
+  (route-keyed presence probe, reinstall bias); (3) Cursor prefers the Claude-bridge
+  load (installed_plugins.json + enabledPlugins probe, installRoute bridge|local,
+  local fallback, hooks fire once); (4) OpenCode plugin hooks-only (14 in-process
+  tools removed; hybrid subset rejected). Folded baseline: cursor flat agents,
+  opencode real copy, install-skills cursor warning (session
+  debug-harness-install-cursor-opencode). Single PR (user decision).
+- Contract: `.specs/features/plugin-architecture-unification/{spec,design,tasks,context}.md`
+  — `4 Phases = 10 Tasks`, 2 general-purpose batch workers (massa-ai-builder type
+  unregistered this session) + T1/state in main thread. Commits `f0d84a7e` (specs),
+  `0a81f85d` (T1) .. `186bbd12` (T10), fix `8376dee6`. Plan Challenge: standalone
+  fresh-eyes pre-mortem (critic agent unavailable) — F1 bridge-probe surface + F2
+  live-shape fixtures + F3 specs-commit sequencing folded; F4 stale-local-MCP accepted.
+- Validation (author ≠ verifier): FAIL iteration 1 (PAU-14 gap — "in-process profile
+  tool" phrase outside the sweep literal list, CLAUDE.md:368 + FEATURES.md:527) →
+  fix `8376dee6` (class enumerated, pop 142) → PASS 17/17 ACs, 6/6 mutations killed,
+  gates green (single-writer 57/0, plugin-auto-install 201/0, cursor 25/0, opencode
+  27/0 + 125/0, parity 88/0, lint 0, test:plugins 119/0, test:scripts 1455/0).
+  Verifier independently re-derived the sweep (184-row superset, 0 live). L-021
+  recorded by verifier. Known post-merge user actions: machine repair commands
+  staged in the session final report (live ~/.cursor + ~/.config/opencode re-run).
+- Deviations recorded: T10 split (worker CHANGELOG+gates / orchestrator state files);
+  T9 repaired 3 suites left stale by Batch 1 behavior changes + latent
+  00.harness.smoke EXPECTED_TOOLS 52→54 gap; FEATURES.json untracked-generated-bundles
+  status closed to complete (was stale in-progress after PR #73 merge).
+- massa-ai MCP server used this session (recall only); .specs/ files canonical.
+
+## Previous — Untracked Generated Bundles (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 7/7 mutations after fix loop 1; merged as PR #73 @ `40ec631a`, released v1.29.0)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-untracked-generated-bundles` ·
   workflow: spec-driven (Large) · persona: AI Engineer · branch
