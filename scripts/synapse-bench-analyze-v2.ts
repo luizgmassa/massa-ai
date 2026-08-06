@@ -249,7 +249,7 @@ function batchSummary(rows: Row[]): void {
 
 function latencyDeltas(rows: Row[], baseline: string): void {
   const grouped = new Map<string, number[]>();
-  const key = (b: string, q: string) => `${b} ${q}`;
+  const key = (b: string, q: string) => `${b}\x00${q}`;
   for (const r of rows) {
     if (r.ok === true) {
       const k = key(String(r.batch), String(r.query));
@@ -257,12 +257,12 @@ function latencyDeltas(rows: Row[], baseline: string): void {
       grouped.get(k)!.push(getFloat(r, "duration_ms", "wall_ms"));
     }
   }
-  const batches = [...new Set([...grouped.keys()].map((k) => k.split(" ")[0]!))].sort();
+  const batches = [...new Set([...grouped.keys()].map((k) => k.split("\x00")[0]!))].sort();
   const queriesByBatch = new Map<string, Map<string, number>>();
   for (const b of batches) {
     const m = new Map<string, number>();
     for (const [k, v] of grouped) {
-      const [bb, q] = k.split(" ") as [string, string];
+      const [bb, q] = k.split("\x00") as [string, string];
       if (bb === b) m.set(q, mean(v));
     }
     queriesByBatch.set(b, m);
@@ -283,8 +283,8 @@ function latencyDeltas(rows: Row[], baseline: string): void {
 function rankDeltas(rows: Row[], baseline: string): void {
   const byBqr = new Map<string, Row>();
   const byBq = new Map<string, Row[]>();
-  const keyBqr = (b: string, q: string, rep: number) => `${b} ${q} ${rep}`;
-  const keyBq = (b: string, q: string) => `${b} ${q}`;
+  const keyBqr = (b: string, q: string, rep: number) => `${b}\x00${q}\x00${rep}`;
+  const keyBq = (b: string, q: string) => `${b}\x00${q}`;
   for (const r of rows) {
     if (r.ok === true) {
       const b = String(r.batch);
@@ -297,7 +297,7 @@ function rankDeltas(rows: Row[], baseline: string): void {
     }
   }
 
-  const batches = [...new Set([...byBqr.keys()].map((k) => k.split(" ")[0]!))].sort();
+  const batches = [...new Set([...byBqr.keys()].map((k) => k.split("\x00")[0]!))].sort();
   const out: Cell[][] = [];
   for (const b of batches) {
     if (b === baseline) continue;
@@ -305,13 +305,13 @@ function rankDeltas(rows: Row[], baseline: string): void {
     const j10: number[] = [];
     let commonPairs = 0;
     const queriesForBatch = (target: string) =>
-      new Set([...byBq.keys()].filter((k) => k.startsWith(`${target} `)).map((k) => k.split(" ")[1]!));
+      new Set([...byBq.keys()].filter((k) => k.startsWith(`${target}\x00`)).map((k) => k.split("\x00")[1]!));
     const commonQueries = [...queriesForBatch(b)].filter((q) => queriesForBatch(baseline).has(q));
     for (const q of commonQueries) {
       const baseReps = [...byBqr.keys()]
-        .filter((k) => k.startsWith(`${baseline} ${q} `))
-        .map((k) => Number(k.split(" ")[2]));
-      const targetReps = [...byBqr.keys()].filter((k) => k.startsWith(`${b} ${q} `)).map((k) => Number(k.split(" ")[2]));
+        .filter((k) => k.startsWith(`${baseline}\x00${q}\x00`))
+        .map((k) => Number(k.split("\x00")[2]));
+      const targetReps = [...byBqr.keys()].filter((k) => k.startsWith(`${b}\x00${q}\x00`)).map((k) => Number(k.split("\x00")[2]));
       const reps = [...new Set(baseReps)].filter((rep) => targetReps.includes(rep)).sort((a, c) => a - c);
       let pairs: [Row, Row][];
       if (reps.length) {
@@ -336,7 +336,7 @@ function rankDeltas(rows: Row[], baseline: string): void {
 
 function stability(rows: Row[]): void {
   const byBq = new Map<string, Row[]>();
-  const key = (b: string, q: string) => `${b} ${q}`;
+  const key = (b: string, q: string) => `${b}\x00${q}`;
   for (const r of rows) {
     if (r.ok === true) {
       const k = key(String(r.batch), String(r.query));
@@ -347,7 +347,7 @@ function stability(rows: Row[]): void {
   const byBatch = new Map<string, [number, number][]>();
   for (const [k, rs] of byBq) {
     if (rs.length < 2) continue;
-    const batch = k.split(" ")[0]!;
+    const batch = k.split("\x00")[0]!;
     const vals5: number[] = [];
     const vals10: number[] = [];
     for (let i = 0; i < rs.length; i++) {
@@ -414,7 +414,7 @@ function goldenMetrics(rows: Row[], goldenPath: string | null): void {
 
 function slowQueries(rows: Row[], topN: number): void {
   const byBq = new Map<string, number[]>();
-  const key = (b: string, q: string) => `${b} ${q}`;
+  const key = (b: string, q: string) => `${b}\x00${q}`;
   for (const r of rows) {
     if (r.ok === true) {
       const k = key(String(r.batch), String(r.query));
@@ -424,7 +424,7 @@ function slowQueries(rows: Row[], topN: number): void {
   }
   const items: { row: Cell[]; sortKey: number }[] = [];
   for (const [k, vals] of byBq) {
-    const [batch, query] = k.split(" ") as [string, string];
+    const [batch, query] = k.split("\x00") as [string, string];
     const sortKey = pct(vals, 0.95);
     items.push({ row: [batch, query.slice(0, 64), int(vals.length), mean(vals), sortKey], sortKey });
   }

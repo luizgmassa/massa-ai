@@ -38,6 +38,8 @@ export interface EventMap {
     filesIndexed: number;
     chunksIndexed: number;
     symbolsIndexed: number;
+    /** Per-file load failures the run completed in spite of (0 = clean). */
+    errors: number;
     durationMs: number;
     activatedGraphGenerationId: string;
   };

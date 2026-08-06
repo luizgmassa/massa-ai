@@ -17,6 +17,7 @@ import { createHash } from "crypto";
 import ignoreModule from "ignore";
 import { config, logger } from "@massa-ai/shared";
 import { getSymbolRepository } from "../../../data/symbol/symbol-repository-factory.js";
+import { stripNul } from "../../../kernel/sanitize/strip-nul.js";
 import type { EtlStageContext, DiscoveredFile } from "../stage-context.js";
 import {
   buildExtensionGlob,
@@ -202,7 +203,9 @@ export class DiscoverStage {
 
     try {
       const stat = await fs.stat(absolutePath);
-      const content = await fs.readFile(absolutePath, "utf-8");
+      // Strip NULs before hashing so the stored hash matches the stored
+      // (NUL-free) content — PostgreSQL text/jsonb columns reject 0x00.
+      const content = stripNul(await fs.readFile(absolutePath, "utf-8"));
       const contentHash = createHash("sha256").update(content).digest("hex");
 
       let needsReparse = forceReindex;
