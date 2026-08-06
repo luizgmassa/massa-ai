@@ -524,8 +524,9 @@ schema conformance, and profile selection).
 (`packages/shared/src/profile-switch/`, published in `@massa-ai/shared`), fronted by
 MCP tools (`profile_list`, `profile_set`), a `profile list|show|set <name> [--host <h>]
 [--dry-run]` subcommand in both `massa-ai-config` CLIs (mcp-client, opencode-plugin),
-an OpenCode in-process `profile` tool, and a Claude skill (`skills/profile/`,
-`/massa-ai:profile`). Every registry profile ships pre-rendered per host inside the
+and a Claude skill (`skills/profile/`, `/massa-ai:profile`). The former OpenCode
+in-process `profile` tool was retired with the plugin's tool surface (AD-017) —
+OpenCode switches via the MCP pair or its `massa-ai-config` CLI. Every registry profile ships pre-rendered per host inside the
 plugin bundle (`agent-profiles/<profile>/`, sibling of `agents/`); switching copies the
 chosen profile's already-built files over the installed active agent set — offline, on
 an npm-only install, no resolver or repo checkout involved.

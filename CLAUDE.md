@@ -365,8 +365,9 @@ pre-rendered per host (`agent-profiles/<profile>/`, sibling of `agents/`, genera
 alongside the default `agents/` set); one switch engine
 (`packages/shared/src/profile-switch/`) copies a chosen variant over the installed
 active agent files, fronted by MCP tools (`profile_list`/`profile_set`), both
-`massa-ai-config profile list|show|set` CLIs, the OpenCode in-process `profile` tool,
-and the Claude `skills/profile/` skill. A host session restart is always required
+`massa-ai-config profile list|show|set` CLIs, and the Claude `skills/profile/` skill
+(the OpenCode in-process `profile` tool was retired with the rest of the in-process
+tool surface — AD-017; OpenCode switches via the MCP pair or its `massa-ai-config` CLI). A host session restart is always required
 after a switch — no host supports per-agent runtime indirection (unchanged from the
 registry's own finding); see `.specs/features/model-profile-switching/spec.md`.
 
