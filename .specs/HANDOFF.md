@@ -1,4 +1,39 @@
-# Handoff — untracked-generated-bundles (VALIDATED PASS; PR #73 open, CI 14/14 green; merge = user decision)
+# Handoff — workflow-commands (VALIDATED PASS; PR next — creation authorized this session, merge = user decision)
+
+Session `spec-workflow-commands` · workflow spec-driven (Large) · branch
+`spec/workflow-commands` from main @ `1906a04e` (v1.29.0), worktree
+`.claude/worktrees/workflow-commands`. Contract:
+`.specs/features/workflow-commands/{spec,design,tasks,validation}.md`.
+
+## Objective
+
+Per-workflow slash commands on all four hosts (e.g. `/massa-ai:debug`): 38
+generated commands per host from the workflow inventory, Approach A (flat
+host-native files + body ownership marker `<!-- massa-ai:generated
+workflow-command -->`), marker-scoped prune/`--check`, installer delivery
+including the new OpenCode `command/` surface, AD-018.
+
+## State
+
+- Commits: `783878c0` specs → T1–T12 (`7397b77b`, `b627dfe1`, `341a1fb9`,
+  `29012d02`, `1a27e86a`, `18f47381`, `2c6625c9`, `d43a944e`, `1b317cc3`,
+  `c76cafc5`, `be589404`, `1169c8d9`) → `b6189483` validation fix → state files.
+- Validation: PASS iteration 2 of 3 — 14/14 ACs, 8/8 mutations killed, gates
+  green (test:scripts 1519/0 + 21 shell suites, test:plugins 120/0, lint 0,
+  both generators `--check` clean). Iteration-1 gap: gitignore negation removal
+  undetectable via `git check-ignore` on tracked paths → text-lock sensor +
+  behavioral star representatives (`b6189483`).
+- Parked sibling `spec/plugin-architecture-unification` (AD-017, validated,
+  unpushed) touches the same generator/installers — conflicts expected at
+  whichever merges second (user-accepted 2026-08-05).
+
+## Next Step
+
+Push branch + `gh pr create` (authorized at Execute start), CI watch. Merge =
+user decision. Post-merge on this machine: `bash scripts/install-harness.sh`
+re-run delivers the 38 commands to installed hosts.
+
+## Previous handoff — untracked-generated-bundles (merged as PR #73 @ `40ec631a`, released v1.29.0)
 
 Previous handoffs closed: registry-cleanup-skill-imports merged as PR #72 @
 `724ad02d` (main).

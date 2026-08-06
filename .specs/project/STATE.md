@@ -1,6 +1,41 @@
 # massa-ai Spec State
 
-## Current — Untracked Generated Bundles (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 7/7 mutations after fix loop 1; PR next; merge = user decision)
+## Current — Workflow Commands (**VALIDATED PASS 2026-08-06** — 14/14 WFC ACs, 8/8 mutations killed, fix loop iteration 2; PR next; merge = user decision)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-workflow-commands` · workflow:
+  spec-driven (Large) · branch `spec/workflow-commands` from main @ `1906a04e`
+  (v1.29.0), worktree `.claude/worktrees/workflow-commands`. Parked sibling:
+  `spec/plugin-architecture-unification` (validated, unpushed — user decision
+  2026-08-05: branch from main, conflict risk in generator/installers accepted).
+- Scope (user decisions 2026-08-05): per-workflow commands on all four hosts
+  (e.g. `/massa-ai:debug`) — all 38 workflows, generated from inventory scan;
+  Approach A: flat host-native files (claude `commands/<stem>.md`, codex
+  `skills/<stem>.md`, cursor `skills/<stem>/SKILL.md`, opencode
+  `command/massa-ai-<stem>.md` via new `extraManagedRoots` entry), body
+  ownership marker `<!-- massa-ai:generated workflow-command -->`,
+  marker-scoped prune/`--check`, gitignore star + 6 static quick negations per
+  shared dir (AD-018). OpenCode dirname resolved pre-Execute: binary discovery
+  glob `{command,commands}/**/*.md` (v1.18.14, probed 2026-08-05).
+- Contract: `.specs/features/workflow-commands/{spec,design,tasks,validation}.md`
+  — `4 Phases = 13 Tasks`, 2 massa-ai-builder batch workers + T13/state in main
+  thread. Commits `783878c0` (specs), `7397b77b`..`1169c8d9` (T1–T12),
+  `b6189483` (validation fix). Plan Challenge: full gate, massa-ai-plan-critic
+  pre-mortem — F1 opencode-dirname-early-commit (resolved by pre-Execute binary
+  probe), F2 lock-sequencing (T5/T6 moved before T4's full gate), F3
+  reserved-root collision guard — all folded.
+- Validation (author ≠ verifier): FAIL iteration 1 (surviving mutant — gitignore
+  negation removal invisible; `git check-ignore` reports a tracked path as
+  not-ignored regardless of pattern) → fix `b6189483` (text-lock + behavioral
+  star representatives, both observed red) → PASS 14/14 ACs, 8/8 mutations
+  (6 families + 2 adjacent probes), gates green (lint 0, both `--check` clean,
+  test:scripts 1519/0 + 21 shell suites, test:plugins 120/0), validate_state
+  exit 0. Batch-2 collateral absorbed by T7 (shell scenarios 4/7 scan-derived
+  counts); T9 fixed pre-existing cursor `profile` exclusion leak; T11 recorded
+  deviation: publish.yml artifact-list sync (mandated by its header contract).
+  Known pre-existing gap recorded: opencode plugin ships no README.
+- massa-ai MCP server used this session (recall + remember); .specs/ files canonical.
+
+## Previous — Untracked Generated Bundles (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 7/7 mutations after fix loop 1; merged as PR #73 @ `40ec631a`, released v1.29.0)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-untracked-generated-bundles` ·
   workflow: spec-driven (Large) · persona: AI Engineer · branch
@@ -3241,6 +3276,7 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 | AD-005 (amendment 2026-07-21, native-runtime-rebaseline) | active; patch SHA `e79aec7b...` unchanged; only the Bun pin moves | Patch SHA `e79aec7b96eb8114e85ebcb90f0a8b12076bcd8aa08c09bb88929621e1c1446d` unchanged under Bun 1.3.14. Immutable owners, same-tree reset, install-guard, C++20 `binding.gyp`, 33-language manifest, versioned FQN codec, lazy grammar pool, embedded Vue/Markdown all unchanged (FROZEN contract). | 33+33 parses, 27+27 modules, 10 sensors, RSS -188 KB (Codespace) / +589 KB (macOS) < 16 MiB on both platforms under 1.3.14 |
 | AD-006 (amendment 2026-07-21, native-runtime-rebaseline) | active; parser pool contract unchanged; only the Bun pin moves | Parser pool (capacity 4/max 32, timeout 5s/max 60s), cursor-before-tree cleanup, non-empty-success guarantee all unchanged under Bun 1.3.14. | 10 behavior sensors PASS on both platforms; RSS stress gate PASS (100 cycles, median delta well within 16 MiB) under 1.3.14 |
 | AD-016 | active (untracked-generated-bundles, 2026-08-05) | Generated plugin bundles under `apps/*-plugin` (managed skill roots, `agents/`, `agent-profiles/`, generated hook copies, `opencode-config.cjs` mirror) are untracked build output; generation-on-demand is the contract; any new consumer (workflow, script, test entry point) must chain `bun run generate:artifacts` ahead of itself. | Cold-path evidence in validation.md; workflow-generation-order sensor; pre-script chain |
+| AD-018 | active (workflow-commands, 2026-08-06; AD-017 reserved by the parked plugin-architecture-unification branch) | Workflow command surface is generated from the workflow inventory (one command per `skills/massa-ai/workflows/**/*.md` stem, per host); ownership boundary inside shared host dirs is the body marker `<!-- massa-ai:generated workflow-command -->` (marker-scoped prune/check; hand-authored quick files carry no marker), dedicated managed root elsewhere (opencode `command/`); command bodies are explicit-route dispatch into the massa-ai router only — never a second routing path. | design.md Tech Decisions; workflow-command-{entries,emit,check,parity} sensors; validation.md iterations 1–2 |
 
 ## Progress
 
