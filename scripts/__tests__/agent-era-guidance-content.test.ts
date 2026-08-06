@@ -19,6 +19,10 @@ function readSkill(relPath: string): string {
   return readFileSync(resolve(REPO_ROOT, "skills", "massa-ai", relPath), "utf-8");
 }
 
+function readAgentCharter(agentName: string): string {
+  return readFileSync(resolve(REPO_ROOT, "skills", "agents", agentName, "SKILL.md"), "utf-8");
+}
+
 // ---------------------------------------------------------------------------
 // AEH-01/02: code-quality-audit.md split/size leads (T3)
 // ---------------------------------------------------------------------------
@@ -176,5 +180,22 @@ describe("tests-fix.md: variation finding fix method (AEH-04)", () => {
       "Variation: add varied-input cases (bounds, parameter changes)",
     );
     expect(content).toContain("never add a second copy of the fixture example");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AEH-04/09: test-engineer/SKILL.md five error classes and variation design (T9)
+// ---------------------------------------------------------------------------
+
+describe("test-engineer/SKILL.md: five error classes and variation test design (AEH-04, AEH-09)", () => {
+  const content = readAgentCharter("test-engineer");
+
+  test("mission names the five error classes", () => {
+    expect(content).toContain("business-logic errors, code no test touched, hardcoded-example brittleness, built-the-wrong-thing, and drift over time");
+  });
+
+  test("responsibilities include variation/property-style test design, library-neutral", () => {
+    expect(content).toContain("Design variation/property-style test cases");
+    expect(content).toContain("technique-level, library-neutral");
   });
 });

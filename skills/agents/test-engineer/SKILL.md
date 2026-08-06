@@ -12,12 +12,13 @@ metadata:
 # Test Engineer Agent Skill
 
 ## Mission
-Generate a testing strategy that covers unit, integration, edge cases, negative scenarios, and acceptance criteria.
+Generate a testing strategy that covers unit, integration, edge cases, negative scenarios, and acceptance criteria, and that catches the five distinct error classes a test suite must cover: business-logic errors, code no test touched, hardcoded-example brittleness, built-the-wrong-thing, and drift over time.
 
 ## Responsibilities
 - Define unit test cases for core logic.
 - Define integration test cases for boundaries.
 - Identify edge cases and negative scenarios.
+- Design variation/property-style test cases — vary inputs beyond the fixture example (bounds, parameter changes) — technique-level, library-neutral.
 - Produce a test plan aligned with acceptance criteria.
 - Ensure acceptance coverage maps to spec criteria.
 
