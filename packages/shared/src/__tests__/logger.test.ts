@@ -6,10 +6,16 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 // ── Config mock (resilient: handles all keys any utils module may call,
 //    so cross-file mock contamination cannot throw) ──
-let configState: { level: string; enableMetrics: boolean } = { level: "info", enableMetrics: false };
+let configState: { level: string; enableMetrics: boolean; file?: string } = {
+  level: "info",
+  enableMetrics: false,
+};
 let configGetShouldThrow = false;
 let securityState = { sanitizeInputs: true, maxInputLength: 100000 };
 let rateLimitState = { requestsPerMinute: 60, tokensPerMinute: 100000 };
@@ -259,6 +265,61 @@ describe("Logger", () => {
       expect(typeof logger.info).toBe("function");
       expect(typeof logger.warn).toBe("function");
       expect(typeof logger.error).toBe("function");
+    });
+  });
+
+  describe("file sink (opt-in, additive)", () => {
+    let tmpDir: string;
+    let logFile: string;
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "massa-ai-logger-test-"));
+      logFile = path.join(tmpDir, "massa-ai.log");
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    test("sink off (file undefined): stderr-only regression, no file created", () => {
+      configState = { level: "info", enableMetrics: false };
+      loggerInstance.info("no sink configured");
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      expect(fs.existsSync(logFile)).toBe(false);
+    });
+
+    test("sink on: file receives the line AND stderr is unchanged", () => {
+      configState = { level: "info", enableMetrics: false, file: logFile };
+      loggerInstance.info("hello sink");
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      const errOut = errSpy.mock.calls[0][0] as string;
+      expect(errOut).toContain("hello sink");
+
+      const fileContent = fs.readFileSync(logFile, "utf-8");
+      expect(fileContent).toContain("hello sink");
+      // File content is the identical formatted line stderr received.
+      expect(fileContent.trimEnd()).toBe(errOut);
+    });
+
+    test("sink on: multiple writes append rather than overwrite", () => {
+      configState = { level: "info", enableMetrics: false, file: logFile };
+      loggerInstance.info("first line");
+      loggerInstance.warn("second line");
+      const fileContent = fs.readFileSync(logFile, "utf-8");
+      const lines = fileContent.trimEnd().split("\n");
+      expect(lines).toHaveLength(2);
+      expect(lines[0]).toContain("first line");
+      expect(lines[1]).toContain("second line");
+    });
+
+    test("sink on but path unwritable: does not throw and stderr still emits", () => {
+      configState = {
+        level: "info",
+        enableMetrics: false,
+        file: path.join(tmpDir, "no-such-dir", "nested", "massa-ai.log"),
+      };
+      expect(() => loggerInstance.info("resilient")).not.toThrow();
+      expect(errSpy).toHaveBeenCalledTimes(1);
     });
   });
 });

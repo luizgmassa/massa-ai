@@ -11,6 +11,7 @@ export { IndexManager } from "./search/index-manager.js";
 export {
   SearchServiceError,
   getSearchDiagnostics,
+  projectNotIndexed,
   recordSearchDegradation,
   recordSearchFailure,
   resetSearchDiagnosticsForTests,
@@ -23,6 +24,10 @@ export type {
   SearchDiagnostic,
   SearchFailureCode,
 } from "../kernel/search-diagnostics.js";
+
+// Kernel sanitize leaf — {name, message} log-safe error summaries.
+export { safeErrorSummary } from "../kernel/sanitize/safe-error-summary.js";
+export type { SafeErrorSummary } from "../kernel/sanitize/safe-error-summary.js";
 
 // Orchestration — the five controllers AS-01 retired out of the old layer.
 //

@@ -11,6 +11,7 @@ import { ContextualSearchRLM } from "./contextual-search-rlm.js";
 import { eventBus } from "../events/event-bus.js";
 import { LLMJudgeReranker } from "./reranker.js";
 import type { SearchDegradation } from "../../kernel/search-diagnostics.js";
+import { projectNotIndexed } from "../../kernel/search-diagnostics.js";
 import { minimatch } from "minimatch";
 import { validateFilters } from "./filter-validation.js";
 import type { FilterDowngrade } from "./filter-validation.js";
@@ -164,7 +165,10 @@ export class SearchController {
       projectPath,
     );
     if (!admission.admitted) {
-      throw new Error(admission.error ?? `Project '${projectId}' is not indexed`);
+      throw projectNotIndexed(
+        projectId,
+        admission.error ?? `Project '${projectId}' is not indexed`,
+      );
     }
     const staleWarning = admission.stale ?? null;
 

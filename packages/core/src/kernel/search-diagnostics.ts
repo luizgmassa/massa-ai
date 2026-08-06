@@ -1,6 +1,7 @@
 export type SearchFailureCode =
   | "SEARCH_BACKEND_UNAVAILABLE"
-  | "STORE_CORRUPTION";
+  | "STORE_CORRUPTION"
+  | "PROJECT_NOT_INDEXED";
 
 export type SearchDegradationCode =
   | "QUERY_UNDERSTANDING_UNAVAILABLE"
@@ -63,12 +64,13 @@ export class SearchServiceError extends Error {
   constructor(
     readonly code: SearchFailureCode,
     readonly component: string,
-    options?: { cause?: unknown; statusCode?: number },
+    options?: { cause?: unknown; statusCode?: number; message?: string },
   ) {
     super(
-      code === "STORE_CORRUPTION"
-        ? "Stored data is invalid"
-        : "A required search backend is unavailable",
+      options?.message ??
+        (code === "STORE_CORRUPTION"
+          ? "Stored data is invalid"
+          : "A required search backend is unavailable"),
       options?.cause === undefined ? undefined : { cause: options.cause },
     );
     this.name = "SearchServiceError";
@@ -95,6 +97,22 @@ export function storeCorruption(
         cause,
         statusCode: 500,
       });
+}
+
+/**
+ * A project has no index metadata yet — distinct from a degraded backend
+ * (503) or corrupt stored data (500): the caller's request is well-formed,
+ * the resource just doesn't exist. Maps to 404 via the middleware's existing
+ * `instanceof SearchServiceError` branch.
+ */
+export function projectNotIndexed(
+  projectId: string,
+  message: string,
+): SearchServiceError {
+  return new SearchServiceError("PROJECT_NOT_INDEXED", projectId, {
+    message,
+    statusCode: 404,
+  });
 }
 
 export function recordSearchDegradation(

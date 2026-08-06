@@ -232,6 +232,8 @@ export interface ServerConfig {
   logging: {
     level: "debug" | "info" | "warn" | "error";
     enableMetrics: boolean;
+    /** Optional absolute path to additionally append log lines to (opt-in). */
+    file?: string;
   };
 
   // Synapse — cognitive modulation layer (focus, retention, prioritization, speed).
@@ -852,6 +854,8 @@ export const defaultConfig: ServerConfig = {
       process.env.ENABLE_METRICS === "true" ||
       (process.env.ENABLE_METRICS === undefined &&
         !!fileConfig.logging?.enableMetrics),
+    // env > config.json, matching `level`'s precedence above (AD-010).
+    file: process.env.MASSA_AI_LOG_FILE || fileConfig.logging?.file || undefined,
   },
 
   synapse: {

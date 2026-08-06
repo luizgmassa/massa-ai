@@ -7,8 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Opt-in logger file sink.** `packages/shared/src/utils/logger.ts` now
+  additionally appends every log line to a file when `MASSA_AI_LOG_FILE` (env,
+  wins) or config `logging.file` is set — stderr behavior is unchanged either
+  way, and stdout is never touched (the stdio MCP protocol invariant). Sync
+  append, no rotation (v1). `MASSA_AI_LOG_FILE` is added to `turbo.json`'s
+  `passThroughEnv` (AD-010).
+
 ### Fixed
 
+- **Tools-api error responses carried no HTTP status signal for three failure
+  classes.** `apps/tools-api/src/middleware/error.ts` now maps an unmatched
+  route (`code === "NOT_FOUND"`) to 404 instead of falling through to 500, and
+  a search against an unindexed project now throws a typed
+  `SearchServiceError` (`PROJECT_NOT_INDEXED`, new
+  `packages/core/src/kernel/search-diagnostics.ts` factory
+  `projectNotIndexed`) that the middleware's existing `instanceof
+  SearchServiceError` branch maps to 404 with the original actionable message
+  — previously a plain `Error`, silently swallowed into a 200 `{success:false}`
+  tool envelope. `apps/tools-api/src/routes/file.ts`'s `/read` route now sets
+  404 for ENOENT/no-such-file failures and 400 for ambiguous-path,
+  containment-violation, and other failures, instead of always returning 200.
+  The error-log line also now carries `path`, `method`, and a credential-scrubbed
+  message (new `packages/core/src/kernel/sanitize/safe-error-summary.ts`,
+  reusing `credential-scrub.ts`) via the shared logger instead of
+  `console.error`; the same helper replaces two hand-rolled
+  `(sanitized)`-suffixed log lines in `kernel/alias-resolver.ts` and
+  `services/hooks/attribution-resolver.ts` that previously dropped the error
+  message entirely rather than scrubbing it.
 - **`setup-local-first.sh` skipped pulling a requested Ollama model whenever a
   sibling tag was installed.** `ollama_model_exists` stripped the tag before
   matching (`search="${1%%:*}"`), so an installed `qwen3-embedding:8b` made
