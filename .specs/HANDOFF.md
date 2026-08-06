@@ -1,4 +1,64 @@
-# Handoff — plugin-architecture-unification (VALIDATED PASS; PR #74 open, CI 14/14 green; merge = user decision)
+# Handoff — pr-review-workflow (VALIDATED PASS 2026-08-05 — 26/26 ACs, 5/5 mutations killed; push/PR = user decision)
+
+Previous handoffs closed: untracked-generated-bundles merged as PR #73 @
+`40ec631a`, released v1.29.0 (its full handoff is preserved below as Previous);
+registry-cleanup-skill-imports merged as PR #72 @ `724ad02d` (main).
+
+Session `spec-pr-review-workflow` · workflow spec-driven (Large) · massa-ai MCP
+not used this session (no recall hits needed beyond CLAUDE.md/.specs context);
+`.specs/` files canonical. Contract files:
+`.specs/features/pr-review-workflow/{spec,design,tasks}.md` (+ `validation.md`
+at T6).
+
+## Objective
+
+New routed workflow `pr-review`: six-dimension hosted PR (Pull Request) /
+MR (Merge Request) review — security, requirements/DoD, test coverage,
+architecture, regression/hallucination, performance — posting inline comments
+plus one consolidated summary through `gh` (GitHub) or `glab` (GitLab).
+Adapted from the TLC pr-review skill (CC-BY-4.0, github.com/augusto-dmh) with
+massa-ai roster dispatches, orchestrator-posts channel discipline, `.specs/`
+requirements Track B, and freshness-gated index retrieval. GitLab command
+surface researched against official docs (citations in design.md D1); stable
+`glab api` Discussions/Notes endpoints are the contract.
+
+## State
+
+- Branch `spec/pr-review-workflow` from origin/main @ `1906a04e` (v1.29.0).
+  Commits: `55ed20e2` specs (Plan Challenge F1–F5 folded) → `18e0dbe6` T1
+  workflow file (17,424 B) → T2 router registration (SKILL.md 20,091 B of
+  21,000 ceiling) → T3 count locks 38→39 + complement 22→23 (observed
+  red→green) → T4 CHANGELOG → this state commit (T6 partial).
+- Gates green: `generate:artifacts` + `--check` no drift; integrity (6 new
+  dispatch-block parses: audit-specialist + reviewer, persona clause present) +
+  duplication + parity + size 81/0; doc-paths 0 misses; lint 0; both count
+  suites 50/0; `test:scripts` 1451/4 — the 4 fails are the documented
+  `.claude/worktrees/` needle-anchor contamination (3 sibling checkouts
+  duplicate `const DAMPING = 0.85;`; CI authoritative, same class as the
+  workflow-metadata-headers AC5 amendment).
+- validate_state: 51 pre-existing errors on origin/main baseline (scratch
+  worktree, measured 2026-08-05); this feature contributes 0; T6 gate amended
+  accordingly in tasks.md.
+- Plan Challenge (full pre_mortem, massa-ai-plan-critic subagent): F1
+  consolidation check recorded as design D2b (six dispatches stand); F2 live
+  read-only dry run executed on GitHub PR #73 (identity, metadata + head SHA,
+  diff, changed files, comment inventory — all resolve), glab side
+  skipped-with-reason (`glab` not installed on this machine); F3 numeric 80%
+  confidence gate reworded qualitative; F4 accepted; F5 measured.
+
+## Next Step
+
+Done through T6: independent validation PASS (26/26 ACs, 5/5 mutations killed,
+0 gaps — `.specs/features/pr-review-workflow/validation.md`); FEATURES.json
+status `complete`. Remaining: push `spec/pr-review-workflow` + open the PR —
+the user's decision (outward-facing; not taken unattended). CHANGELOG entry
+present, so the merge gate is satisfied without the `no-changelog` label. No
+installed-machine actions needed — the workflow ships with the skills bundles
+on the next release/install.
+
+---
+
+# Previous — Handoff — plugin-architecture-unification (VALIDATED PASS; merged as PR #74 @ `46e7af97`)
 
 Previous handoffs closed: untracked-generated-bundles merged as PR #73 @
 `40ec631a` (main, released v1.29.0).

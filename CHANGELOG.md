@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`pr-review` workflow** — six-dimension hosted code review for GitHub Pull
+  Requests (`gh`) and GitLab Merge Requests (`glab`), adapted from the TLC
+  `pr-review` skill (CC-BY-4.0, github.com/augusto-dmh). One host command map
+  (identity, metadata/`diff_refs`, diff, changed files, paginated discussion
+  inventory, added-line-anchored inline comments, thread replies, summary) with
+  every GitLab command verified against official CLI/API documentation; the
+  stable `glab api` Discussions/Notes endpoints are the contract (the
+  experimental `glab mr note` inline flags are noted only as an alternative).
+  Review dimensions run as read-only massa-ai roster dispatches in two waves
+  (`massa-ai-audit-specialist` lenses security/requirements/architecture/
+  performance + a coverage-scoped performance dispatch, `massa-ai-reviewer` for
+  regression/hallucination); subagents never touch the host — the orchestrator
+  posts, dedupes (±3 lines), replies `[RESOLVED]`, and assembles one
+  consolidated summary. Integrates budgeted `recall`, freshness-gated index
+  retrieval (`project_map`/`get_architecture`/`impact_analysis`), and
+  `.specs/` acceptance criteria as a requirements source. Registered in the
+  router (table row + target-type precedence clause); workflow count locks move
+  38 → 39, read-only complement 22 → 23. Comment-only by contract: approve/
+  request-changes/merge commands on both hosts are named forbidden.
 ### Changed
 
 - **AD-017: plugins deliver, MCP serves tools, hooks observe.** The OpenCode

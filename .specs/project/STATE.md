@@ -1,6 +1,48 @@
 # massa-ai Spec State
 
-## Current — Plugin Architecture Unification (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 6/6 mutations, fix loop iteration 2; PR #74 open, CI 14/14 green; merge = user decision)
+## Current — PR Review Workflow (**VALIDATED PASS 2026-08-05** — 26/26 ACs, 5/5 mutations killed, iteration 1; push/PR = user decision)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-pr-review-workflow` ·
+  workflow: spec-driven (Large) · branch `spec/pr-review-workflow` from
+  origin/main @ `1906a04e` (v1.29.0).
+- Scope (user-directed 2026-08-05): new routed workflow `pr-review` adapting the
+  TLC pr-review skill (CC-BY-4.0, github.com/augusto-dmh) — six-dimension hosted
+  PR/MR review posting inline comments + one consolidated summary, GitHub `gh` +
+  GitLab `glab`, massa-ai roster dispatches (audit-specialist ×5 by lens incl.
+  coverage-under-performance per tests-audit precedent, reviewer for regression),
+  orchestrator-posts channel discipline, `.specs/` as requirements Track B,
+  freshness-gated index retrieval. glab commands verified against official
+  GitLab CLI/API docs by a research subagent (citations in design.md D1); stable
+  `glab api` Discussions/Notes endpoints are the contract, experimental
+  `glab mr note` inline flags noted only as alternative.
+- Contract: `.specs/features/pr-review-workflow/{spec,design,tasks}.md` —
+  `2 Phases = 6 Tasks`, inline execution (batch worker declined: one dominant
+  prose file, sequential deps). Plan Challenge full pre_mortem
+  (massa-ai-plan-critic): F1 consolidation check recorded (D2b, six dispatches
+  stand), F2 live read-only dry run added (gh side executed against PR #73:
+  identity/metadata/diff/files/comments all resolve; glab skipped-with-reason —
+  not installed), F3 80% confidence gate → qualitative bar, F4 accepted
+  (read-only classification with outward posting), F5 byte ceiling measured.
+- Commits: `55ed20e2` (specs) `18e0dbe6` (T1 workflow file, 17,424 B)
+  `T2` router row + tier-3 clause (SKILL.md 20,091 B ≤ 21,000)
+  `T3` count locks 38→39 + complement 22→23 (observed red→green)
+  `T4` CHANGELOG. Gates: generate:artifacts --check no drift; integrity +
+  duplication + parity + size 81/0; doc-paths 0 misses; lint 0; test:scripts
+  1451/4 — the 4 fails are the documented `.claude/worktrees/` needle-anchor
+  contamination class (3 sibling checkouts duplicate `const DAMPING = 0.85;`;
+  same class as workflow-metadata-headers AC5 amendment; CI authoritative).
+- Validation (author ≠ verifier, iteration 1 of 3): PASS — 26/26 lettered ACs
+  (17 structural via verifier-owned gate runs, 9 prose via clause quotes),
+  5/5 discrimination mutations killed (count-lock revert, persona-line delete,
+  intake-line delete, multiline frontmatter description, bare-role rename; all
+  restores cp-based and diff-verified — never git checkout), 6 suites 131/0,
+  parity no drift, doc-paths 0 misses, check_specs_delivered 0. Verifier note:
+  a YAML folded-scalar mutation variant was correctly non-red (folding removes
+  the newline pre-parse) and was redone as a literal block scalar — real red.
+  validation.md carries the validate_state-parseable Summary/Result shape.
+- Next: push + PR (user decision, outward-facing; not taken unattended).
+
+## Previous — Plugin Architecture Unification (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 6/6 mutations, fix loop iteration 2; merged as PR #74 @ `46e7af97`)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-plugin-architecture-unification` ·
   workflow: spec-driven (Large) · branch `spec/plugin-architecture-unification` from

@@ -924,7 +924,7 @@
       "id": "plugin-architecture-unification",
       "slug": "plugin-architecture-unification",
       "title": "AD-017: plugins deliver, MCP serves tools, hooks observe — OpenCode MCP re-registration, sentinel-gated harness skip, Cursor bridge dedupe, hooks-only OpenCode plugin",
-      "status": "in-progress",
+      "status": "complete",
       "created": "2026-08-05",
       "depends_on": [],
       "artifacts": [
@@ -933,8 +933,26 @@
         "tasks.md",
         "context.md",
         "validation.md"
-      ]
+      ],
+      "notes": "Merged as PR #74 @ 46e7af97 (status flipped from in-progress during the pr-review-workflow main merge)."
+    },
+    {
+      "id": "pr-review-workflow",
+      "slug": "pr-review-workflow",
+      "title": "PR Review Workflow — six-dimension hosted GitHub PR / GitLab MR review posting inline findings + consolidated summary via gh/glab, massa-ai roster dispatches, .specs/ requirements integration",
+      "status": "complete",
+      "created": "2026-08-05",
+      "workflow": "spec-driven",
+      "branch": "spec/pr-review-workflow",
+      "depends_on": [],
+      "artifacts": [
+        "spec.md",
+        "design.md",
+        "tasks.md",
+        "validation.md"
+      ],
+      "notes": "VALIDATED PASS 2026-08-05 (independent verifier, author != verifier): 26/26 lettered ACs, 5/5 discrimination mutations killed (0 survivors), 6 suites 131/0 on verifier-owned runs, parity no drift, SKILL.md 20091 B. test:scripts 1451/4 — 4 fails are the .claude/worktrees needle-anchor contamination class, CI authoritative. Push/PR = user decision."
     }
   ],
-  "active_feature": "plugin-architecture-unification"
+  "active_feature": "pr-review-workflow"
 }
