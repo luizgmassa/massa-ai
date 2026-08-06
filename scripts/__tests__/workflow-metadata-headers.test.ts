@@ -110,7 +110,9 @@ function checkFile(abs: string): FileCheck {
 
   // license — MIT is the repo default; CC-BY-4.0 is allowed for imported
   // third-party content that must keep its own attribution (skill-architect).
-  const ALLOWED_LICENSES = ["MIT", "CC-BY-4.0"];
+  // Apache-2.0 is allowed for content adapted from Apache-2.0 upstreams
+  // (discovery, from anthropics/knowledge-work-plugins).
+  const ALLOWED_LICENSES = ["MIT", "CC-BY-4.0", "Apache-2.0"];
   if (typeof fm.license !== "string" || !ALLOWED_LICENSES.includes(fm.license)) {
     errors.push(
       `license: expected one of ${JSON.stringify(ALLOWED_LICENSES)}, got ${JSON.stringify(fm.license)}`,
