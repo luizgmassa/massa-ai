@@ -919,7 +919,27 @@
       "created": "2026-08-05",
       "description": "Stop tracking generated plugin bundles; generate at pack/install/CI time",
       "dependencies": []
+    },
+    {
+      "id": "agent-era-harness-upgrades",
+      "slug": "agent-era-harness-upgrades",
+      "title": "Agent-Era Harness Upgrades — lessons.ts trust ramp + metric trend, massa-ai-reviewer dispatch in 14 workflows, tests five-gate error-class model + tests lens, feature-workflow AC anchor, code-quality/refactor/coding-guidelines agent-read-aware rewrites",
+      "status": "in-progress",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/agent-era-harness-upgrades",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/agent-era-harness-upgrades/spec.md",
+      "design": ".specs/features/agent-era-harness-upgrades/design.md",
+      "tasks": ".specs/features/agent-era-harness-upgrades/tasks.md",
+      "created": "2026-08-05",
+      "dependencies": []
     }
   ],
-  "active_feature": "untracked-generated-bundles"
+  "active_feature": "agent-era-harness-upgrades"
 }
