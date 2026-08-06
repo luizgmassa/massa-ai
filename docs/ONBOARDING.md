@@ -33,7 +33,7 @@ sessions, and costs less to run.
 | **Runtime** | **Bun 1.3.14** — *not* Node. Node exists only as a `node-gyp` build helper for native tree-sitter grammars. |
 | **Backend** | **PostgreSQL 17 + pgvector, exclusively.** There is no SQLite path. |
 | **ORM** | Prisma |
-| **Embeddings** | Ollama, `qwen3-embedding:8b` (4096-dim) |
+| **Embeddings** | Ollama, `qwen3-embedding:4b` (2560-dim) |
 | **REST** | Elysia on :3333 — Swagger at `/swagger`, Web UI at `/ui` |
 | **MCP** | stdio server exposing 54 tools |
 | **Monorepo** | Turborepo; workspaces `packages/*` + `apps/*` |

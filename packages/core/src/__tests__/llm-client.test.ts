@@ -14,7 +14,8 @@
  * `ai` / `@ai-sdk/openai` (the network layer) are mocked.
  */
 
-import { describe, test, expect, beforeEach, mock } from "bun:test";
+import { describe, test, expect, beforeEach, mock, spyOn } from "bun:test";
+import { logger } from "@massa-ai/shared";
 
 let generateShouldThrow: string | null = null;
 let generateObjectShouldThrow: string | null = null;
@@ -58,6 +59,7 @@ import {
   _extractJsonObject,
   _checkJsonSchemaSupport,
   _wrapFetchDisableThink,
+  _isAbortOrTimeoutError,
 } from "../services/memory/llm-client.js";
 import { z } from "zod";
 
@@ -682,5 +684,56 @@ describe("llm-client — llmObject catch-block reasoning recovery", () => {
     const res = await llmObject("hello", sampleSchema);
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/plain error/);
+  });
+});
+
+describe("llm-client — abort/timeout skips reasoning recovery (#7 noise fix)", () => {
+  beforeEach(() => {
+    _setLlmEnabledForTesting(true);
+    _setJsonSchemaSupportedForTesting(false);
+  });
+
+  test("_isAbortOrTimeoutError classifies abort/timeout shapes and cause chains", () => {
+    expect(
+      _isAbortOrTimeoutError(new DOMException("The operation timed out.", "TimeoutError")),
+    ).toBe(true);
+    expect(
+      _isAbortOrTimeoutError(new DOMException("The operation was aborted.", "AbortError")),
+    ).toBe(true);
+    // SDK retry wrappers surface the text without the DOMException name.
+    expect(_isAbortOrTimeoutError(new Error("The operation timed out."))).toBe(true);
+    const wrapped = new Error("request failed");
+    (wrapped as any).cause = new DOMException("The operation timed out.", "TimeoutError");
+    expect(_isAbortOrTimeoutError(wrapped)).toBe(true);
+    expect(_isAbortOrTimeoutError(new Error("Response did not match schema"))).toBe(false);
+    expect(_isAbortOrTimeoutError(undefined)).toBe(false);
+  });
+
+  test("llmObject timeout degrades WITHOUT the reasoning-recovery warning pair", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateObjectShouldThrow = "The operation timed out.";
+      const res = await llmObject("hello", sampleSchema);
+      expect(res.ok).toBe(false);
+      const warned = warnSpy.mock.calls.map((c) => String(c[0]));
+      expect(warned).not.toContain("llm reasoning-recovery empty");
+      // The honest degradation signal must stay.
+      expect(warned).toContain("llmObject failed — degrading to non-LLM path");
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  test("a non-timeout throw still reaches the #7 safety net (gate direction)", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateObjectShouldThrow = "No object generated: could not parse the response.";
+      const res = await llmObject("hello", sampleSchema);
+      expect(res.ok).toBe(false);
+      const warned = warnSpy.mock.calls.map((c) => String(c[0]));
+      expect(warned).toContain("llm reasoning-recovery empty");
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

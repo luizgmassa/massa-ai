@@ -47,7 +47,7 @@ bun install
 # 2. Setup (100% offline with Ollama)
 ./scripts/setup-local-first.sh
 # - Installs/starts Ollama
-# - Pulls qwen3-embedding:8b (embeddings, 4096 dims), qwen2.5:7b-instruct (default LLM),
+# - Pulls qwen3-embedding:4b (embeddings, 2560 dims), qwen2.5:7b-instruct (default LLM),
 #   and qwen2.5-coder:7b (code-oriented LLM sites)
 # - Creates .env with defaults
 # - Runs bun run diagnose to validate the stack
@@ -578,7 +578,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 ollama serve
 
 # Pull models
-ollama pull qwen3-embedding:8b    # embeddings (4096 dims)
+ollama pull qwen3-embedding:4b    # embeddings (2560 dims)
 ollama pull qwen2.5:7b-instruct   # default LLM (consolidation, salience, handoff, query rewrite, HyDE)
 ollama pull qwen2.5-coder:7b      # code-oriented LLM sites (bootstrap seed, reranker, code compression)
 ```
@@ -638,7 +638,7 @@ falls back to its rule-based path.
 > above.
 
 > **Embeddings note:** The config default embedding model is `nomic-embed-text:latest`
-> (see `massa-ai-config.ts`). `qwen3-embedding:8b` (4096d) gives stronger recall
+> (see `massa-ai-config.ts`). `qwen3-embedding:4b` (2560d) balances recall and on-device speed
 > than `nomic-embed-text` or `bge-m3` but is slower — bulk indexing a large corpus
 > takes minutes. Override via `OLLAMA_EMBEDDING_MODEL` or config `embedding.model`.
 > Switch to `bge-m3` (1024d) for speed if its recall quality is sufficient.

@@ -15,7 +15,7 @@ const checkAll = mock(async (): Promise<any> => ({
   },
 }));
 const checkOllama = mock(async () => ({ available: true, baseUrl: "http://x" }));
-const getOllamaModels = mock(async () => ["qwen3-embedding:8b", "qwen2.5:7b-instruct"]);
+const getOllamaModels = mock(async () => ["qwen3-embedding:4b", "qwen2.5:7b-instruct"]);
 let dataDir: any = "/data";
 
 mock.module("@massa-ai/core", () => {
@@ -128,8 +128,8 @@ describe("GET /api/v1/system/ollama", () => {
   test("returns ollama status + models + configured model", async () => {
     const res = await get("/api/v1/system/ollama");
     expect(res.json.available).toBe(true);
-    expect(res.json.models).toEqual(["qwen3-embedding:8b", "qwen2.5:7b-instruct"]);
-    expect(res.json.configuredModel).toBe("qwen3-embedding:8b");
+    expect(res.json.models).toEqual(["qwen3-embedding:4b", "qwen2.5:7b-instruct"]);
+    expect(res.json.configuredModel).toBe("qwen3-embedding:4b");
     expect(res.json.baseUrl).toBe("http://localhost:11434");
   });
 });
