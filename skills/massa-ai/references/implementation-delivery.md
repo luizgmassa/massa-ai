@@ -46,6 +46,15 @@ The only two legal skip reasons:
 Record the skip reason verbatim in the completion report. Any other reason is a
 protocol violation, not a shortcut.
 
+**Record the isolation evidence immediately after creation:** the worktree path
+and branch name go into the session status the moment Stage 1 completes, and
+every subsequent edit happens under that path. **Never switch branches in a
+checkout another session may share** — two sessions sharing one checkout can
+move each other's HEAD mid-run and land commits on the wrong branch (recorded
+incident, `.specs/project/STATE.md` 2026-08-05). This is a cross-**session**
+rule; the cross-**subagent** git-safety rule for concurrently-dispatched agents
+is owned by `references/agent-orchestration.md` and is not restated here.
+
 Set up the worktree's dependencies before the first gate — a fresh worktree has
 no `node_modules`, no `dist`, and no `.env`. A gate that fails only because the
 worktree was never provisioned is an environment failure; say so rather than
