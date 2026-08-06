@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Agent-Era Harness Upgrades (Execute in progress — Batches A+B (T1-T14) + Batch C (T15-T19) committed; PR not yet opened)
+## Current — Agent-Era Harness Upgrades (**VALIDATED PASS 2026-08-06** — 28/28 ACs, 8/8 mutants killed; PR #76 open; file-size thresholds amended ~500/~600 by user @ `eb23dd0a`; main v1.30.0 merged in; merge authorized, CI watch)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-agent-era-harness-upgrades` ·
   workflow: spec-driven (Large) · branch `spec/agent-era-harness-upgrades` from
@@ -41,7 +41,85 @@
   tasks landed) — carried forward here unchanged, not reopened by Batch C.
 - massa-ai MCP server not used this session; `.specs/` files canonical.
 
-## Previous — Untracked Generated Bundles (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 7/7 mutations after fix loop 1; PR next; merge = user decision)
+## Previous — PR Review Workflow (**VALIDATED PASS 2026-08-05** — 26/26 ACs, 5/5 mutations killed; merged as PR #75 @ `d2e7a43b`, released v1.30.0)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-pr-review-workflow` ·
+  workflow: spec-driven (Large) · branch `spec/pr-review-workflow` from
+  origin/main @ `1906a04e` (v1.29.0).
+- Scope (user-directed 2026-08-05): new routed workflow `pr-review` adapting the
+  TLC pr-review skill (CC-BY-4.0, github.com/augusto-dmh) — six-dimension hosted
+  PR/MR review posting inline comments + one consolidated summary, GitHub `gh` +
+  GitLab `glab`, massa-ai roster dispatches (audit-specialist ×5 by lens incl.
+  coverage-under-performance per tests-audit precedent, reviewer for regression),
+  orchestrator-posts channel discipline, `.specs/` as requirements Track B,
+  freshness-gated index retrieval. glab commands verified against official
+  GitLab CLI/API docs by a research subagent (citations in design.md D1); stable
+  `glab api` Discussions/Notes endpoints are the contract, experimental
+  `glab mr note` inline flags noted only as alternative.
+- Contract: `.specs/features/pr-review-workflow/{spec,design,tasks}.md` —
+  `2 Phases = 6 Tasks`, inline execution (batch worker declined: one dominant
+  prose file, sequential deps). Plan Challenge full pre_mortem
+  (massa-ai-plan-critic): F1 consolidation check recorded (D2b, six dispatches
+  stand), F2 live read-only dry run added (gh side executed against PR #73:
+  identity/metadata/diff/files/comments all resolve; glab skipped-with-reason —
+  not installed), F3 80% confidence gate → qualitative bar, F4 accepted
+  (read-only classification with outward posting), F5 byte ceiling measured.
+- Commits: `55ed20e2` (specs) `18e0dbe6` (T1 workflow file, 17,424 B)
+  `T2` router row + tier-3 clause (SKILL.md 20,091 B ≤ 21,000)
+  `T3` count locks 38→39 + complement 22→23 (observed red→green)
+  `T4` CHANGELOG. Gates: generate:artifacts --check no drift; integrity +
+  duplication + parity + size 81/0; doc-paths 0 misses; lint 0; test:scripts
+  1451/4 — the 4 fails are the documented `.claude/worktrees/` needle-anchor
+  contamination class (3 sibling checkouts duplicate `const DAMPING = 0.85;`;
+  same class as workflow-metadata-headers AC5 amendment; CI authoritative).
+- Validation (author ≠ verifier, iteration 1 of 3): PASS — 26/26 lettered ACs
+  (17 structural via verifier-owned gate runs, 9 prose via clause quotes),
+  5/5 discrimination mutations killed (count-lock revert, persona-line delete,
+  intake-line delete, multiline frontmatter description, bare-role rename; all
+  restores cp-based and diff-verified — never git checkout), 6 suites 131/0,
+  parity no drift, doc-paths 0 misses, check_specs_delivered 0. Verifier note:
+  a YAML folded-scalar mutation variant was correctly non-red (folding removes
+  the newline pre-parse) and was redone as a literal block scalar — real red.
+  validation.md carries the validate_state-parseable Summary/Result shape.
+- Next: push + PR (user decision, outward-facing; not taken unattended).
+
+## Previous — Plugin Architecture Unification (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 6/6 mutations, fix loop iteration 2; merged as PR #74 @ `46e7af97`)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-plugin-architecture-unification` ·
+  workflow: spec-driven (Large) · branch `spec/plugin-architecture-unification` from
+  `96ee1850`, origin/main (v1.29.0) merged at `bb3e90bf` (CHANGELOG conflict resolved).
+- Scope (user decisions 2026-08-05): AD-017 "plugins deliver, MCP serves tools, hooks
+  observe" — (1) OpenCode installer registers MCP alongside plugin (54 tools; the
+  plugin-presence skip in install-agents.sh removed; uninstall leaves the MCP entry,
+  PAU-03 user-confirmed); (2) harness skip-current gated on per-host on-disk sentinel
+  (route-keyed presence probe, reinstall bias); (3) Cursor prefers the Claude-bridge
+  load (installed_plugins.json + enabledPlugins probe, installRoute bridge|local,
+  local fallback, hooks fire once); (4) OpenCode plugin hooks-only (14 in-process
+  tools removed; hybrid subset rejected). Folded baseline: cursor flat agents,
+  opencode real copy, install-skills cursor warning (session
+  debug-harness-install-cursor-opencode). Single PR (user decision).
+- Contract: `.specs/features/plugin-architecture-unification/{spec,design,tasks,context}.md`
+  — `4 Phases = 10 Tasks`, 2 general-purpose batch workers (massa-ai-builder type
+  unregistered this session) + T1/state in main thread. Commits `f0d84a7e` (specs),
+  `0a81f85d` (T1) .. `186bbd12` (T10), fix `8376dee6`. Plan Challenge: standalone
+  fresh-eyes pre-mortem (critic agent unavailable) — F1 bridge-probe surface + F2
+  live-shape fixtures + F3 specs-commit sequencing folded; F4 stale-local-MCP accepted.
+- Validation (author ≠ verifier): FAIL iteration 1 (PAU-14 gap — "in-process profile
+  tool" phrase outside the sweep literal list, CLAUDE.md:368 + FEATURES.md:527) →
+  fix `8376dee6` (class enumerated, pop 142) → PASS 17/17 ACs, 6/6 mutations killed,
+  gates green (single-writer 57/0, plugin-auto-install 201/0, cursor 25/0, opencode
+  27/0 + 125/0, parity 88/0, lint 0, test:plugins 119/0, test:scripts 1455/0).
+  Verifier independently re-derived the sweep (184-row superset, 0 live). L-021
+  recorded by verifier. Known post-merge user actions: machine repair commands
+  staged in the session final report (live ~/.cursor + ~/.config/opencode re-run).
+- Post-PR: coverage floor caught index.ts at 88.93% after the hooks-only slimming → `c1334397` (coverage to 99.63%, MASSA_AI_REINDEX_DEBOUNCE_MS knob + turbo passthrough) and `7aef1eba` (closed a LATENT real-config pollution race: config-cli-profile's module-scope require froze CONFIG_DIR before any scratch XDG existed, so CI suites initialized the runner's real ~/.config/massa-ai — also the mechanism behind the build job's api-key flake; every shared/config importer now pulls env-setup first, verified zero writes under a scratch HOME). One coverage run also died in runner bunx-cache corruption (infra, rerun green). Main-checkout branch moved mid-session to a sibling session's branch — delivery continued from worktree .claude/worktrees/pau.
+- Deviations recorded: T10 split (worker CHANGELOG+gates / orchestrator state files);
+  T9 repaired 3 suites left stale by Batch 1 behavior changes + latent
+  00.harness.smoke EXPECTED_TOOLS 52→54 gap; FEATURES.json untracked-generated-bundles
+  status closed to complete (was stale in-progress after PR #73 merge).
+- massa-ai MCP server used this session (recall only); .specs/ files canonical.
+
+## Previous — Untracked Generated Bundles (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 7/7 mutations after fix loop 1; merged as PR #73 @ `40ec631a`, released v1.29.0)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-untracked-generated-bundles` ·
   workflow: spec-driven (Large) · persona: AI Engineer · branch
@@ -3282,6 +3360,7 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 | AD-005 (amendment 2026-07-21, native-runtime-rebaseline) | active; patch SHA `e79aec7b...` unchanged; only the Bun pin moves | Patch SHA `e79aec7b96eb8114e85ebcb90f0a8b12076bcd8aa08c09bb88929621e1c1446d` unchanged under Bun 1.3.14. Immutable owners, same-tree reset, install-guard, C++20 `binding.gyp`, 33-language manifest, versioned FQN codec, lazy grammar pool, embedded Vue/Markdown all unchanged (FROZEN contract). | 33+33 parses, 27+27 modules, 10 sensors, RSS -188 KB (Codespace) / +589 KB (macOS) < 16 MiB on both platforms under 1.3.14 |
 | AD-006 (amendment 2026-07-21, native-runtime-rebaseline) | active; parser pool contract unchanged; only the Bun pin moves | Parser pool (capacity 4/max 32, timeout 5s/max 60s), cursor-before-tree cleanup, non-empty-success guarantee all unchanged under Bun 1.3.14. | 10 behavior sensors PASS on both platforms; RSS stress gate PASS (100 cycles, median delta well within 16 MiB) under 1.3.14 |
 | AD-016 | active (untracked-generated-bundles, 2026-08-05) | Generated plugin bundles under `apps/*-plugin` (managed skill roots, `agents/`, `agent-profiles/`, generated hook copies, `opencode-config.cjs` mirror) are untracked build output; generation-on-demand is the contract; any new consumer (workflow, script, test entry point) must chain `bun run generate:artifacts` ahead of itself. | Cold-path evidence in validation.md; workflow-generation-order sensor; pre-script chain |
+| AD-017 | active (plugin-architecture-unification, 2026-08-05) | **Plugins deliver, MCP serves tools, hooks observe.** A plugin is a delivery vehicle for agents/skills/hooks/host wiring, never a tool-serving mechanism; the MCP server registered by `scripts/install-agents.sh` (single writer) is the one canonical tool surface (54 tools); hooks are host-native and always on; in-process tools are never a coverage mechanism. Closes three defects: OpenCode's installer removed its own MCP entry as "redundant," leaving OpenCode users 14 of 54 tools; Cursor 3.14 double-loads massa-ai (local plugin copy + Claude-marketplace bridge), risking double hook firing; the harness plugin phase trusted `install-state.json` version records with no on-disk check, so an external wipe of installed artifacts (observed live 2026-08-05, marker `~/.cursor/projects/.agent-data-cleanup-2026-08-05`) reported `skip-current` forever with zero artifacts present. Implemented: OpenCode installer delegates MCP registration to the single writer instead of removing it (uninstall leaves the MCP entry — plugin lifecycle ≠ tool-surface lifecycle); harness `skip-current` now requires an on-disk per-host sentinel, gated on the recorded `installRoute`; Cursor installer prefers the Claude-bridge load path with local install as fallback, hooks fire exactly once; the OpenCode plugin's 14 in-process tools are removed, event handlers kept (OpenCode has no external hook surface). Rejected alternatives: a hybrid in-process hot-path tool subset (depended on unverified OpenCode per-server tool-disable config); preferring the local Cursor copy over the bridge (an installer cannot suppress host bridge behavior; the local copy is the one thing fully within this project's control). | `docs/adr/0002-plugins-deliver-mcp-serves-tools-hooks-observe.md`, `apps/opencode-plugin/src/index.ts`, `scripts/install-agents.sh` |
 
 ## Progress
 

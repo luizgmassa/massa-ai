@@ -94,12 +94,19 @@ bun run build                             # produces apps/opencode-plugin/dist/i
 bash apps/opencode-plugin/install.sh --user
 ```
 
-That symlinks `~/.config/opencode/plugins/massa-ai/index.js` at the repo's
-`dist/index.js` (so `bun run build` keeps it current), adds
+That installs `~/.config/opencode/plugins/massa-ai/index.js` as a real copy of
+the repo's `dist/index.js` (re-run the installer after `bun run build` to
+refresh it — a symlink here used to go dead whenever the gitignored `dist/`
+vanished, and OpenCode skips an unresolvable local plugin silently), adds
 `"./plugins/massa-ai/index.js"` to the `plugin` array of `opencode.json`, and
-symlinks the 17 specialist agents into `~/.config/opencode/agents/`. Because the
-plugin registers its tools in-process, the installer then drops the redundant
-OpenCode `mcp` entry via `scripts/install-agents.sh --agent opencode --uninstall`.
+symlinks the 17 specialist agents into `~/.config/opencode/agents/`. The plugin
+is hooks-only (AD-017: plugins deliver, MCP serves tools, hooks observe) — it
+registers zero in-process tools, so the installer delegates MCP registration to
+`scripts/install-agents.sh --agent opencode`, giving you all 54 MCP tools
+alongside the lifecycle hooks. Uninstalling the plugin (`install.sh
+--uninstall`) removes only the plugin file and its config entry; the MCP entry
+stays (`bash scripts/install-agents.sh --agent opencode --uninstall` removes it
+separately).
 
 **Install as an npm package (alternative):**
 
@@ -171,7 +178,7 @@ backup + `_massaAiOwned` marker — user hooks are always preserved.
 | **Claude Code** | `bash apps/claude-plugin/install.sh --user` | 5 | 6 slash commands + 17 subagent specialists + hooks into `settings.json` | No |
 | **Codex** | `bash apps/codex-plugin/install.sh --user` | 6 | 6 skills + 17 subagent specialists (TOML to `~/.codex/agents/`) + hooks into `hooks.json` + MCP into `~/.codex/config.toml` | Yes — run `/hooks` in Codex |
 | **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + MCP into `~/.cursor/mcp.json` + 17 subagent specialists | No |
-| **OpenCode** | `bash apps/opencode-plugin/install.sh --user` | 6 (in-process) | 14 in-process tools + lifecycle handlers + 17 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
+| **OpenCode** | `bash apps/opencode-plugin/install.sh --user` | 6 (in-process) | MCP into `opencode.json`/`opencode.jsonc` (54 tools) + lifecycle handlers + 17 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
 
 Claude Code and Codex additionally support their **native plugin managers**,
 which is what makes massa-ai visible in `/plugin` and `/plugins`:
@@ -255,14 +262,17 @@ MCP config; the plugin installers call it for you (`--agent claude-code` /
 and running the installer directly cannot double-register. MCP is always
 registered at **user** scope, even for a `--project` plugin install.
 
-OpenCode is the one exception: the plugin registers 14 tools in-process, so
-`install-agents.sh` skips the OpenCode MCP entry when `opencode.json` lists the
-plugin in any of its three accepted forms — the npm package name
-(`@massa-ai/opencode-plugin`), the local path (`./plugins/massa-ai/index.js`), or
-the bare dir name (`massa-ai`) — and still writes it for users without the
-plugin. Since the harness runs MCP *before* plugins, the OpenCode plugin
-installer removes that entry itself once it has registered, by delegating back to
-`install-agents.sh`.
+OpenCode is no longer an exception (AD-017): `install-agents.sh` always writes
+its MCP entry, regardless of which form `opencode.json` lists the plugin in —
+the npm package name (`@massa-ai/opencode-plugin`), the local path
+(`./plugins/massa-ai/index.js`), or the bare dir name (`massa-ai`). The
+OpenCode plugin is hooks-only and registers zero in-process tools; its
+installer delegates MCP registration to `install-agents.sh --agent opencode`
+on every install (mirroring the Codex delegation pattern), so OpenCode users
+get all 54 MCP tools rather than a 14-tool in-process subset. Uninstalling the
+plugin does not remove the MCP entry — plugin lifecycle and MCP tool-surface
+lifecycle are independent; remove the entry with
+`bash scripts/install-agents.sh --agent opencode --uninstall` if wanted.
 
 **17 subagent specialists:** all four plugins ship the 17 massa-ai
 sub-agent specialists (investigator, planner, builder, reviewer,
@@ -528,7 +538,7 @@ restore_checkpoint { checkpointId: "<cp-id>" }
 
 ## Available Tools
 
-52 tools total, grouped by category: Indexing & Search, Symbol Graph, Code
+54 tools total, grouped by category: Indexing & Search, Symbol Graph, Code
 Execution (Sandbox), Memory & Lifecycle, Synapse (Cognitive Layer), Passive
 Capture, Project Bootstrap, Cross-session Handoffs, Auto-improvement
 (Proposals), and Checkpoints.
@@ -536,12 +546,12 @@ Capture, Project Bootstrap, Cross-session Handoffs, Auto-improvement
 The current roster fits in one MCP `tools/list` page (pagination via
 `nextCursor` activates over 100 tools).
 
-**See [FEATURES.md](./FEATURES.md#mcp-server-52-tools) for the complete tool
+**See [FEATURES.md](./FEATURES.md#mcp-server-54-tools) for the complete tool
 roster** with required/optional params for every tool.
 
 ### Workflow integration
 
-The massa-ai workflow skill (`skills/massa-ai/`) references all 52 tools
+The massa-ai workflow skill (`skills/massa-ai/`) references all 54 tools
 by their canonical un-prefixed names. Each workflow adopts the tools that
 materially benefit its flow — e.g. `spec-driven` and `long-session` use
 checkpoints for task save/resume; `debug` uses `trace_path` for call-path
@@ -920,7 +930,7 @@ and config CLI commands.**
 
 massa-ai/
 ├── apps/
-│   ├── mcp-client/           # MCP Server (stdio) — 52 tools
+│   ├── mcp-client/           # MCP Server (stdio) — 54 tools
 │   ├── tools-api/            # REST API (port 3333) + Web UI at /ui
 │   ├── web-ui/               # Read-only memory/search/handoff/checkpoint browser
 │   ├── claude-plugin/        # Claude Code plugin (slash commands + subagent + hooks)

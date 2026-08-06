@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 22,
+  "next_id": 23,
   "lessons": [
     {
       "id": "L-001",
@@ -452,6 +452,25 @@
     },
     {
       "id": "L-021",
+      "key": "ac_gap::a scripted doc sweep s literal list only catches the phrases it names grep for the removed capability s own name e g the tool s identifier not just count mechanism phrases the spec called out or a stale claim survives outside the named literal set",
+      "text": "A scripted doc-sweep's literal list only catches the phrases it names; grep for the removed capability's own name (e.g. the tool's identifier), not just count/mechanism phrases the spec called out, or a stale claim survives outside the named literal set.",
+      "signal": "ac_gap",
+      "scope": "project",
+      "status": "candidate",
+      "features": [
+        "plugin-architecture-unification"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        ".specs/features/plugin-architecture-unification/validation.md (project)"
+      ],
+      "created": "2026-08-06T00:16:21Z",
+      "last_seen": "2026-08-06T00:16:21Z",
+      "confidence": 0.62
+    },
+    {
+      "id": "L-022",
       "key": "ac_gap::measure a gate s baseline before pinning its exit code in a done when validate skill ts exits 1 on all 17 charters pre existing",
       "text": "Measure a gate's baseline before pinning its exit code in a Done-when: validate_skill.ts exits 1 on all 17 charters pre-existing",
       "signal": "ac_gap",
@@ -465,8 +484,8 @@
       "evidence": [
         "tasks.md T9/T10 Done-when (spec-authoring)"
       ],
-      "created": "2026-08-06T01:45:13Z",
-      "last_seen": "2026-08-06T01:45:13Z",
+      "created": "2026-08-06T02:19:27Z",
+      "last_seen": "2026-08-06T02:19:27Z",
       "project": "massa-ai",
       "session": "spec-agent-era-harness-upgrades",
       "workflow": "spec-driven",
@@ -484,7 +503,7 @@
       "survivingMutants": 0,
       "acsTotal": 28,
       "acsCovered": 28,
-      "recordedAt": "2026-08-06T01:45:13Z"
+      "recordedAt": "2026-08-06T02:19:27Z"
     }
   ]
 }

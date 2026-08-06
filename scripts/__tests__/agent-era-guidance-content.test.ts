@@ -173,6 +173,15 @@ describe("tests-audit.md: five-gate error-class model, variation and trend senso
   });
 });
 
+describe("pr-review.md: coverage dimension uses the dedicated tests lens (AEH-08 reconciliation)", () => {
+  const content = readSkill("workflows/pr-review.md");
+
+  test("coverage dimension dispatches lens: tests, not coverage-under-performance", () => {
+    expect(content).toContain("| 5 | Test coverage | `massa-ai-audit-specialist` | `lens: tests`");
+    expect(content).not.toContain("the charter's lens set has no `tests` lens");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // AEH-04: tests-fix.md variation fix method (T8)
 // ---------------------------------------------------------------------------
