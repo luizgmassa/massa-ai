@@ -4,9 +4,11 @@ Slug: `discovery-workflow` · Session: `spec-discovery-workflow` · Workflow: sp
 (Medium/Large — full artifacts by pr-review-workflow precedent) · Branch:
 `spec/discovery-workflow` stacked on `spec/pr-review-workflow` @ `975a020d`.
 
-Source base: `/Users/luizmassa/Downloads/product-brainstorming.md` — a user-supplied
-product-brainstorming skill document (frontmatter name `product-brainstorming`,
-no license or attribution header; read in full 2026-08-05, 274 lines).
+Source base: `/Users/luizmassa/Downloads/product-brainstorming.md` — the
+`product-brainstorming` skill from `anthropics/knowledge-work-plugins`
+(Apache-2.0; provenance established 2026-08-05 by unique-phrase web search per
+Plan Challenge F3 — the file itself carries no license header; read in full,
+274 lines).
 
 ## Problem Statement
 
@@ -35,17 +37,24 @@ PRD (Product Requirements Document) through the existing `to-prd` workflow.
 
 ## Assumptions & Open Questions
 
-- A1 (accepted): branch is stacked on `spec/pr-review-workflow` @ `975a020d`
-  rather than origin/main — both features edit the same three contended
-  surfaces (SKILL.md router table, two count-lock tests, CHANGELOG); stacking
-  makes the count locks 39→40 monotonic instead of conflicting. Consequence:
-  this PR merges after pr-review-workflow (user sequencing decision at merge
-  time).
-- A2 (accepted): the source document is user-supplied with no license or
-  attribution header; the workflow file records provenance as "adapted from a
-  user-supplied product-brainstorming skill document (2026-08-05)" and ships
-  under the repo's standard MIT frontmatter. No external attribution is
-  invented (contrast: pr-review's CC-BY-4.0 base had a known upstream).
+- A1 (accepted, amended per Plan Challenge F1/F2): branch is stacked on
+  `spec/pr-review-workflow` @ `975a020d` rather than origin/main — both
+  features edit the same three contended surfaces (SKILL.md router table, two
+  count-lock tests, CHANGELOG); stacking makes the count locks 39→40
+  monotonic instead of conflicting. Measured 2026-08-05 (critic): the base
+  branch has no remote and no PR yet, so the merge path is explicit, not
+  implied — discovery's eventual PR must either target
+  `base=spec/pr-review-workflow` or wait until pr-review-workflow merges to
+  main; opening either PR remains the user's decision. Open-PR sweep
+  (`gh pr list --state open`, 2026-08-05): PR #74
+  (spec/plugin-architecture-unification) also touches SKILL.md and
+  CHANGELOG.md — verified no line-level collision (different SKILL.md region;
+  CHANGELOG lands under different headings).
+- A2 (resolved by measurement, was an assumption): the source is the
+  `product-brainstorming` skill from `anthropics/knowledge-work-plugins`,
+  Apache-2.0 (GitHub API, 2026-08-05). The workflow ships
+  `license: Apache-2.0` frontmatter plus an attribution line naming the
+  upstream repo — the same pattern pr-review used for its CC-BY-4.0 base.
 - A3 (accepted): discovery is a read-only conversation workflow — it joins the
   read-only complement (no `implementation-delivery.md` reference), like
   `exploration`, `to-prd`, and `the-fool`.
@@ -79,15 +88,17 @@ PRD (Product Requirements Document) through the existing `to-prd` workflow.
 ### DSC-01 — Workflow file
 
 `skills/massa-ai/workflows/discovery.md` exists with Agent Skills frontmatter
-(name `discovery`, double-quoted single-line description, `license: MIT`,
-`metadata.version: "1.0.0"`) that parses under `Bun.YAML.parse`.
+(name `discovery`, double-quoted single-line description,
+`license: Apache-2.0`, `metadata.version: "1.0.0"`) that parses under
+`Bun.YAML.parse`.
 
 - AC1: The file contains the literal `references/project-context.md` intake
   line (universal-intake gate).
 - AC2: The file does not contain the string
   `references/implementation-delivery.md` (read-only complement membership).
-- AC3: The file carries a provenance line naming the user-supplied
-  product-brainstorming base document and date.
+- AC3: The file carries an attribution line naming the upstream
+  `product-brainstorming` skill, `anthropics/knowledge-work-plugins`, and
+  Apache-2.0.
 
 ### DSC-02 — Router registration
 

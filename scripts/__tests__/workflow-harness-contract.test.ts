@@ -36,7 +36,7 @@ const WORKFLOWS_DIR = path.join(SKILL_DIR, "workflows");
 const REFERENCES_DIR = path.join(SKILL_DIR, "references");
 
 /** Total workflow files expected after the overhaul removed three routes. */
-const EXPECTED_WORKFLOW_COUNT = 39;
+const EXPECTED_WORKFLOW_COUNT = 40;
 
 /**
  * The workflows that mutate the repository. These, and only these, carry the
@@ -251,9 +251,9 @@ describe("delivery scope: only mutating workflows carry the delivery contract", 
     expect(leaked).toEqual([]);
   });
 
-  test("the read-only complement is exactly 23 workflows", async () => {
+  test("the read-only complement is exactly 24 workflows", async () => {
     const all = await listWorkflows();
-    expect(all.length - IMPLEMENTATION_WORKFLOWS.length).toBe(23);
+    expect(all.length - IMPLEMENTATION_WORKFLOWS.length).toBe(24);
   });
 });
 
