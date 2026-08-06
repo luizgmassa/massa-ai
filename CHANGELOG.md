@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+### Added
+
+- **`lessons.ts` review-feedback trust ramp and metric-snapshot trend
+  commands.** `review add --category --feedback none|minor|major --source`
+  appends to `data.reviews`; `trust status` derives a per-category trailing
+  streak (`trusted` at `trust_threshold`, default 30, comparison `>=`; a
+  `major` record resets the streak to 0 and demotes) via lazy
+  `ensureRampFields`, never touched by `load()`, so legacy stores load clean
+  with an empty trust view. `metrics add` (enum + non-negative-integer
+  validated) appends a `PASS|FAIL` + `fix-iterations` + `surviving-mutants` +
+  `acs-total`/`acs-covered` snapshot to `data.metrics`; `metrics trend`
+  compares the last two snapshots on a scalar score
+  (`FAIL*100 + mutants*10 + fixIters + uncoveredACs`) and reports
+  improving/stable/degrading, or `insufficient data` under two snapshots.
+  Both surfaces are documented in `references/lessons.md`; the human-review
+  stage of `references/implementation-delivery.md` reports the change's
+  category trust status as advisory reading-depth context only — the per-PR
+  merge-approval clause is unchanged.
+- **`massa-ai-reviewer` dispatch wired into 14 workflows.** `feature.md`,
+  `spec-driven.md` (Execute step 6, before the verification-agent dispatch),
+  `general.md`, `debug.md`, `refactor.md`, and the 9 `*-fix.md` workflows
+  each gain a post-implementation, pre-verification read-only reviewer
+  dispatch block (fallback: standalone fresh-eyes review when the subagent
+  is unavailable) per `references/agent-orchestration.md`'s format; existing
+  verification gates are unchanged.
+- **Tests lens on `audit-specialist` and a five-gate error-class model in
+  `tests-audit.md`.** The audit-specialist lens table gains a `tests` row
+  (coverage, regression protection, assertion quality, variation) routing to
+  `workflows/tests/tests-audit.md`; `tests-audit.md` gains a five-row
+  gate/error-class table (unit→logic, coverage→holes, variation→brittleness,
+  AC-mapping→wrong-thing, trend→drift), a variation sensor (flags
+  single-fixture-example coverage), and a trend sensor reading
+  `lessons.ts metrics trend`; the dispatch lens `performance` no longer
+  files coverage findings — they route to `tests`. `tests-fix.md` gains a
+  matching variation fix method (varied-input cases, never a second copy of
+  the fixture example) and `test-engineer`'s charter mission now names the
+  five error classes plus variation/property-style test design.
+- **Feature-workflow AC anchor.** `feature.md` gains a pre-implementation
+  step capturing 1-5 testable acceptance criteria (or referencing an
+  existing spec artifact), and its verification step checks outcomes
+  against those captured ACs instead of only a generic verification recipe.
+- **Metric-snapshot recording in the validate reference.** `references/spec-driven/validate.md`
+  gains a mandatory post-validation step recording the run's snapshot via
+  `lessons.ts metrics add`.
+
+### Changed
+
+- **Code-quality and refactor split/extraction guidance rewritten to be
+  agent-read-aware.** `code-quality-audit.md` and `code-quality-fix.md`
+  replace the split-on-"does more than one thing"/size-alone lead with a
+  discoverability-or-change-risk criterion (split only when the result
+  yields an externally-findable named unit or measurably reduces change
+  risk); static leads in `code-quality-audit.md` gain multi-subject-file and
+  >~600-line flags with an explicit no-flag-below-bound guard.
+  `refactor.md` step 8 now names extract-for-findability (an
+  externally-searchable named unit) as the primary extraction payoff.
+- **`coding-guidelines.md` gains a "File shape for agent readers" section**
+  stating the read-mechanics guidance explicitly (one-subject files up to
+  ~500 lines are fine, over ~600 must be flagged for splitting — a
+  working-context-headroom bound, amended by user from the initial
+  ~1000/~2000 — one subject split
+  across N files costs N reads with per-hop loss) and framing it as read
+  mechanics, not module depth, citing `architecture-deepening-lens.md`'s
+  Rejected Framings rather than restating them.
+
 ## [1.31.0] - 2026-08-06
 
 ### Added

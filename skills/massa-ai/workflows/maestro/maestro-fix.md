@@ -62,6 +62,19 @@ Reject direct use without a saved `audits/maestro/<YYYY-MM-DD maestro-audit.md>`
    - Replace brittle selectors with stable selectors, accessibility labels, or test IDs already present.
    - Keep setup/teardown explicit, idempotent, and isolated.
    - Protect existing flows, subflows, fixtures, snapshots, baselines, report consumers, and CI commands unless the audit finding explicitly scopes them.
+
+> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> - trigger: implementation complete, before the verification gate — never optional
+> - scope: the fix's diff surface and its task/AC context
+> - permissions: read-only
+> - inputs: diff, acceptance context, recalled code-quality conventions
+> - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
+> - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
+> - firewall: summarized findings only, never raw diff dumps
+> - memory: suggest-only; main agent persists
+> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
+
 9. Use strict harness sensors:
    - If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`

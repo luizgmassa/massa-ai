@@ -971,7 +971,27 @@
         "validation.md"
       ],
       "notes": "VALIDATED PASS 2026-08-05 (independent verifier, author != verifier): 15/15 lettered ACs, 4/4 discrimination mutations killed (0 survivors, hash-verified restores), named suites 131/0 + parity no drift + SKILL.md 20293 B + doc-paths 0 misses + lint 0 on verifier-owned re-runs; observed-red 39/23 reproduced in a scratch worktree at 231a9357. test:scripts 1451/4 — 4 fails are the .claude/worktrees needle-anchor contamination class, CI authoritative. Push/PR = user decision; see STATE for the c4b4d6cb shared-checkout incident repair (fast-forward spec/pr-review-workflow first)."
+    },
+    {
+      "id": "agent-era-harness-upgrades",
+      "slug": "agent-era-harness-upgrades",
+      "title": "Agent-Era Harness Upgrades — lessons.ts trust ramp + metric trend, massa-ai-reviewer dispatch in 14 workflows, tests five-gate error-class model + tests lens, feature-workflow AC anchor, code-quality/refactor/coding-guidelines agent-read-aware rewrites (file-size ~500/~600 per user amendment)",
+      "status": "in-progress",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/agent-era-harness-upgrades",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/agent-era-harness-upgrades/spec.md",
+      "design": ".specs/features/agent-era-harness-upgrades/design.md",
+      "tasks": ".specs/features/agent-era-harness-upgrades/tasks.md",
+      "created": "2026-08-05",
+      "dependencies": []
     }
   ],
-  "active_feature": "discovery-workflow"
+  "active_feature": "agent-era-harness-upgrades"
 }

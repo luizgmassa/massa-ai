@@ -1,6 +1,48 @@
 # massa-ai Spec State
 
-## Current — Discovery Workflow (**VALIDATED PASS 2026-08-05** — 15/15 ACs, 4/4 mutations killed; push/PR = user decision)
+## Current — Agent-Era Harness Upgrades (**VALIDATED PASS 2026-08-06** — 28/28 ACs, 8/8 mutants killed; PR #76 open; file-size thresholds amended ~500/~600 by user @ `eb23dd0a`; main v1.30.0 + PR #77 merged in; merge authorized, CI watch)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-agent-era-harness-upgrades` ·
+  workflow: spec-driven (Large) · branch `spec/agent-era-harness-upgrades` from
+  `main` @ `40ec631a` (post PR #73 merge).
+- Scope (AEH-01..10): `lessons.ts review add`/`trust status`
+  trust-ramp (per-category streak, `trust_threshold` default 30, `>=`
+  comparison, `major` resets+demotes, legacy stores load clean) and
+  `metrics add`/`metrics trend` (scalar score, improving/stable/degrading,
+  `insufficient data` under two snapshots); code-quality/refactor/
+  coding-guidelines rewrites to a discoverability-or-change-risk split
+  criterion and an agent-read-aware file-shape section; tests-audit
+  five-gate error-class model + variation/trend sensors + tests lens on
+  audit-specialist + test-engineer five-class mission; feature-workflow AC
+  capture/anchor; `massa-ai-reviewer` dispatch wired into 14 workflows
+  (5 implementing + 9 fix); generated-bundle regeneration gates (AD-016).
+- Contract: `.specs/features/agent-era-harness-upgrades/{spec,design,tasks}.md`
+  — `6 Phases = 19 Tasks`. Batch A+B (T1-T14) committed prior to this batch.
+  Batch C (this batch, T15-T19): T15 `377b654a` (5 implementing workflows),
+  T16 `2cf7d3fc` (5 fix workflows batch 1), T17 `9f7a4718` (4 fix workflows
+  batch 2, 14-file count sensor), T18 no commit (gates only — `bun install`,
+  `generate:artifacts` + `--check`, parity suites, lint, full gate all green,
+  no tracked drift), T19 this commit (CHANGELOG + state artifacts).
+- Gates (Batch C): quick gate 106/0 after T17 (up from 96/0 at T15 as the new
+  T16/T17 dispatch-block sensors landed); `skills-harness-integrity.test.ts`
+  held at 32/0 through T15/T16/T17 (unchanged count — it asserts aggregate
+  invariants, not a per-block count); full gate (quick + pyts-golden +
+  spec-driven-validators) 205/0; parity suites (`skill-artifact-parity` +
+  `subagent-parity`) 88/0; `bun run lint` (oxlint) exit 0;
+  `generate:artifacts --check` exit 0 with zero tracked-file drift.
+- `bun install` in this worktree (no prior `node_modules/`) completed native
+  tree-sitter builds (`.node` addons present for `tree-sitter`,
+  `tree-sitter-clojure-orchard`, `tree-sitter-dart`, `tree-sitter-erlang`) —
+  did not hit the documented Node 25/macOS arm64 node-gyp failure this run.
+- SPEC_DEVIATION: `tasks.md` T9/T10 Done-when literally reads
+  "`validate_skill.ts` exits 0"; re-baselined during Batches A+B to "no NEW
+  failures" because `description_has_negative_scope` fails pre-existing on
+  all 17 charters at the `origin/main` baseline (measured before those
+  tasks landed) — carried forward here unchanged, not reopened by Batch C.
+- massa-ai MCP server not used this session; `.specs/` files canonical.
+
+## Previous — PR Review Workflow (**VALIDATED PASS 2026-08-05** — 26/26 ACs, 5/5 mutations killed; merged as PR #75 @ `d2e7a43b`, released v1.30.0)
+## Previous — Discovery Workflow (**VALIDATED PASS 2026-08-05** — 15/15 ACs, 4/4 mutations killed; merged as PR #77 @ `eeef4f4e`)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-discovery-workflow` ·
   workflow: spec-driven (full artifacts by pr-review precedent) · branch

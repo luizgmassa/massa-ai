@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 22,
+  "next_id": 23,
   "lessons": [
     {
       "id": "L-001",
@@ -468,6 +468,42 @@
       "created": "2026-08-06T00:16:21Z",
       "last_seen": "2026-08-06T00:16:21Z",
       "confidence": 0.62
+    },
+    {
+      "id": "L-022",
+      "key": "ac_gap::measure a gate s baseline before pinning its exit code in a done when validate skill ts exits 1 on all 17 charters pre existing",
+      "text": "Measure a gate's baseline before pinning its exit code in a Done-when: validate_skill.ts exits 1 on all 17 charters pre-existing",
+      "signal": "ac_gap",
+      "scope": "spec-authoring",
+      "status": "candidate",
+      "features": [
+        "agent-era-harness-upgrades"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "tasks.md T9/T10 Done-when (spec-authoring)"
+      ],
+      "created": "2026-08-06T02:19:27Z",
+      "last_seen": "2026-08-06T02:19:27Z",
+      "project": "massa-ai",
+      "session": "spec-agent-era-harness-upgrades",
+      "workflow": "spec-driven",
+      "entity": "agent-era-harness-upgrades",
+      "confidence": 0.62
+    }
+  ],
+  "trust_threshold": 30,
+  "reviews": [],
+  "metrics": [
+    {
+      "feature": "agent-era-harness-upgrades",
+      "result": "PASS",
+      "fixLoopIterations": 0,
+      "survivingMutants": 0,
+      "acsTotal": 28,
+      "acsCovered": 28,
+      "recordedAt": "2026-08-06T02:19:27Z"
     }
   ]
 }

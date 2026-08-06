@@ -1,4 +1,61 @@
-# Handoff — discovery-workflow (VALIDATED PASS 2026-08-05 — 15/15 ACs, 4/4 mutations killed; push/PR = user decision)
+# Handoff — agent-era-harness-upgrades (VALIDATED PASS 2026-08-06 — 28/28 ACs, 8/8 mutants; PR #76 open, main v1.30.0 merged, merge authorized pending CI green)
+
+Previous handoffs closed: untracked-generated-bundles (PR #73 open at the time
+of this handoff, CI 14/14 green; merge remains the user's decision — see
+Previous section below).
+
+Session `spec-agent-era-harness-upgrades` · workflow spec-driven (Large) ·
+branch `spec/agent-era-harness-upgrades` from `main` @ `40ec631a` (post PR #73
+merge). massa-ai MCP server not used this session; `.specs/` files canonical.
+Contract files: `.specs/features/agent-era-harness-upgrades/{spec,design,tasks}.md`.
+
+## Objective
+
+Implement `agent-era-harness-upgrades` (AEH-01..10): `lessons.ts` trust-ramp
+(`review add`/`trust status`) and metrics (`metrics add`/`metrics trend`)
+commands; code-quality/refactor/coding-guidelines rewrites to an
+agent-read-aware discoverability-or-change-risk split criterion and a file-shape
+section; tests-audit five-gate error-class model + variation/trend sensors +
+tests lens; feature-workflow AC capture/anchor; `massa-ai-reviewer` dispatch
+wired into 14 workflows (5 implementing + 9 fix); gates and delivery artifacts.
+
+## State
+
+- `6 Phases = 19 Tasks`. Batches A+B (T1-T14, lessons.ts ramp engine, code-shape
+  guidance, testing surfaces, spec anchor and policy prose) committed prior to
+  this handoff.
+- Batch C (this handoff, T15-T19): T15 `377b654a` (reviewer dispatch in 5
+  implementing workflows, including spec-driven.md Execute step 6 placement
+  immediately before the existing verification-agent block, which stays
+  intact); T16 `2cf7d3fc` (reviewer dispatch in bugs-fix/code-quality-fix/
+  architecture-fix/security-fix/requirements-fix); T17 `9f7a4718` (reviewer
+  dispatch in tests-fix/implementation-fix/maestro-fix/mobile-figma-fix, plus
+  the 14-file count sensor); T18 no commit — gates only (`bun install`,
+  `generate:artifacts` + `--check`, parity suites, `bun run lint`, full gate
+  all green, zero tracked-file drift); T19 this commit (CHANGELOG + FEATURES.json
+  + STATE.md + HANDOFF.md).
+- Every new sensor in `agent-era-guidance-content.test.ts` for T15-T17 was
+  mutation-verified: apply -> observed red -> revert byte-identical (diff
+  confirmed) -> green, before being trusted.
+- `skills-harness-integrity.test.ts` held at 32 pass / 0 fail through T15,
+  T16, and T17 (it asserts aggregate dispatch-block invariants — including
+  the mandatory `persona:` bullet on every block — not a per-block count, so
+  it does not grow with new blocks).
+- SPEC_DEVIATION: T9/T10's literal Done-when reads `validate_skill.ts` exits
+  0; re-baselined during Batches A+B to "no NEW failures" because
+  `description_has_negative_scope` fails pre-existing on all 17 agent charters
+  at the `origin/main` baseline (re-measured during this handoff: all 17
+  charters under `skills/agents/*/SKILL.md` still fail `validate_skill.ts`
+  with that same check, unrelated to this feature's edits).
+
+## Next Step
+
+Push the branch, open a PR, and run independent validation (verification-agent,
+author != verifier) before merge. `check_specs_delivered.ts` result for this
+feature is recorded in the T19 commit; merge remains the user's decision.
+
+# Previous — Handoff — pr-review-workflow (VALIDATED PASS; merged as PR #75 @ `d2e7a43b`, released v1.30.0)
+# Previous — Handoff — discovery-workflow (VALIDATED PASS; merged as PR #77 @ `eeef4f4e`)
 
 Previous handoff: pr-review-workflow VALIDATED PASS (preserved below as
 Previous). Cross-session incident: its T6 commit `c4b4d6cb` landed on THIS
@@ -77,7 +134,7 @@ not used this session (no recall hits needed beyond CLAUDE.md/.specs context);
 `.specs/features/pr-review-workflow/{spec,design,tasks}.md` (+ `validation.md`
 at T6).
 
-## Objective
+### Objective
 
 New routed workflow `pr-review`: six-dimension hosted PR (Pull Request) /
 MR (Merge Request) review — security, requirements/DoD, test coverage,
@@ -89,7 +146,7 @@ requirements Track B, and freshness-gated index retrieval. GitLab command
 surface researched against official docs (citations in design.md D1); stable
 `glab api` Discussions/Notes endpoints are the contract.
 
-## State
+### State
 
 - Branch `spec/pr-review-workflow` from origin/main @ `1906a04e` (v1.29.0).
   Commits: `55ed20e2` specs (Plan Challenge F1–F5 folded) → `18e0dbe6` T1
@@ -113,7 +170,7 @@ surface researched against official docs (citations in design.md D1); stable
   skipped-with-reason (`glab` not installed on this machine); F3 numeric 80%
   confidence gate reworded qualitative; F4 accepted; F5 measured.
 
-## Next Step
+### Next Step
 
 Done through T6: independent validation PASS (26/26 ACs, 5/5 mutations killed,
 0 gaps — `.specs/features/pr-review-workflow/validation.md`); FEATURES.json

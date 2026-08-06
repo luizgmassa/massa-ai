@@ -16,6 +16,18 @@ Not to write, run, or fix test findings as the main task — route to `workflows
 
 Findings-only: do not edit code unless the user separately asks for fixes.
 
+### Gate / Error-Class Model
+
+Five gates, five distinct error classes. A green gate elsewhere never substitutes for a missing one — each row below is a gap this audit checks for independently:
+
+| Gate | Error class caught |
+| --- | --- |
+| Unit | Business-logic errors |
+| Coverage | Code no test touched |
+| Variation | Hardcoded-example brittleness |
+| Acceptance-criteria mapping | Built-the-wrong-thing |
+| Quality-metric trend | Drift over time |
+
 1. Resolve/reuse `workflowSessionId`: `test-audit-[entity]`
 2. Load shared references:
    - `references/codebase-investigation.md`
@@ -46,7 +58,7 @@ Findings-only: do not edit code unless the user separately asks for fixes.
 > - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, or independent verification of high-impact finding
 > - scope: the tests audit target — test files, fixtures, harnesses, coverage
 > - permissions: read-only
-> - inputs: shared scope packet; `lens: performance` (test coverage is under the performance lens); recalled testing conventions, flaky tests, known regressions
+> - inputs: shared scope packet; `lens: tests`; recalled testing conventions, flaky tests, known regressions
 > - sensors: map behavior to tests; check missing tests for new branches, error paths, async logic, migrations; fixture health, assertion quality, flakiness root-cause
 > - output: findings with missing/weak coverage type, location, evidence, regression risk, severity, simplest test direction, deterministic sensor, verification suggestion
 > - firewall: raw diffs/logs/search output summarized, not returned raw
@@ -54,6 +66,8 @@ Findings-only: do not edit code unless the user separately asks for fixes.
 > - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
     - Map changed or targeted behavior to existing tests, fixtures, mocks, and deterministic harnesses.
+   - Variation check: flag tests exercising only the single fixture example where input bounds or parameters can vary — hardcoded-example brittleness the unit gate cannot see.
+   - Trend check: read `bun skills/massa-ai/scripts/lessons.ts --root . metrics trend` and report the direction (improving, stable, degrading) when two or more snapshots exist; report `insufficient data` otherwise.
    - Check missing tests for new branches, error paths, auth/validation/persistence changes, async or race-prone logic, migrations, public contracts, and recalled bug patterns.
    - For mobile scopes, check KMP shared and platform-specific `actual` tests, Android/iOS harnesses, native bridge payload coverage, permissions, lifecycle, offline sync, deep links, push/background flows, UI snapshots/screenshots, device-matrix assumptions, and platform parity claims from `references/mobile-context.md`.
    - Check weak assertions, tests that only assert implementation details, fixture drift, nondeterminism, hidden network/time/filesystem dependencies, skipped tests, and weakened snapshots.

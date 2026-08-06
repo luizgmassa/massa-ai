@@ -52,11 +52,25 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
    - Fixture drift: repair fixtures/builders to match current contracts while keeping them minimal and explicit.
    - Flakiness: prove root cause first; control time, randomness, async scheduling, filesystem, network, and global state with deterministic seams.
    - Missing sensor: add or document the focused command needed to prove the regression cannot recur.
+   - Variation: add varied-input cases (bounds, parameter changes) that exercise the behavior beyond the fixture example — never add a second copy of the fixture example.
    - Mobile coverage: prefer KMP/shared tests before device loops when the behavior is shared; use Android/iOS harnesses, bridge contract tests, screenshot/snapshot checks, lifecycle or permission simulations, and parity validation when the report finding requires them.
 9. Guard validation assets:
    - Never weaken assertions only to make the suite pass.
    - Do not delete coverage, snapshots, fixtures, or benchmarks unless the audit report explicitly calls them obsolete and behavior remains protected elsewhere.
    - Prefer production-code changes only when required to expose a deterministic seam or fix a real bug found while writing the audited test.
+
+> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> - trigger: implementation complete, before the verification gate — never optional
+> - scope: the fix's diff surface and its task/AC context
+> - permissions: read-only
+> - inputs: diff, acceptance context, recalled code-quality conventions
+> - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
+> - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
+> - firewall: summarized findings only, never raw diff dumps
+> - memory: suggest-only; main agent persists
+> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
+
 10. Use strict harness sensors:
    - Never rely on AI subjective evaluation.
    - If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
