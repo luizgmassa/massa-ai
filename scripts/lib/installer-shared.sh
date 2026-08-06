@@ -240,6 +240,113 @@ installer_host_detected() {
   return 1
 }
 
+# ── Plugin sentinel probe ────────────────────────────────────
+# Why: install-harness.sh's plan phase (skip-current) trusts install-state.json's
+#      recorded plugin version without checking disk — an external wipe of the
+#      installed artifacts (observed live 2026-08-05: ~/.cursor/agents +
+#      plugins/local/massa-ai deleted minutes after install) then reports
+#      skip-current forever with zero artifacts on disk. This probe is the
+#      fix: one read-only existence check per host, against a surface that
+#      host actually reads, keyed on the recorded installRoute for the one
+#      host (claude) whose routes point at different surfaces.
+# Impacts: PAU-05 (skip-current requires the sentinel), PAU-06 (absent →
+#          reinstall, naming the missing sentinel).
+# Test: bash scripts/tests/test-plugin-auto-install.sh — T5 wires the harness
+#       gating that calls this helper; it is unreachable by any suite until
+#       then (co-location rule: the helper and its caller land as sequential
+#       commits, and the gap between them is the observed-red window).
+
+# installer_plugin_route <runner> <state_file> <host>
+# Echoes platforms[host].installRoute, or nothing when absent/unparsable/
+# missing — tolerant reader mirroring installer_plugin_versions exactly
+# (unknown route is "no route recorded", not a probe failure).
+installer_plugin_route() {
+  local runner="$1" state_file="$2" host="$3"
+  [ -f "$state_file" ] || return 0
+  "$runner" - "$state_file" "$host" <<'NODE'
+const fs = require("fs");
+const [, , file, host] = process.argv;
+let raw = "";
+try { raw = fs.readFileSync(file, "utf8"); } catch { process.exit(0); }
+let data;
+try {
+  data = JSON.parse(raw);
+} catch {
+  process.exit(0);
+}
+const platforms = data && typeof data === "object" && !Array.isArray(data) ? data.platforms : null;
+const rec = platforms && typeof platforms === "object" && !Array.isArray(platforms) ? platforms[host] : null;
+const route = rec && typeof rec === "object" && typeof rec.installRoute === "string" ? rec.installRoute : "";
+if (route) process.stdout.write(route);
+NODE
+}
+
+# installer_plugin_sentinel_present <host> <target_home> <state_file>
+# 0 = the host's installed-artifact sentinel exists on disk; 1 = absent,
+# including any parse/route-lookup failure or an empty target_home (mirrors
+# installer_host_detected: an empty home never fabricates a match) — the
+# probe's failure bias is always "reinstall", never a false "skip". Unknown
+# host → return 2. Read-only; performs no writes.
+#
+# Sentinel table (design.md "Sentinel table (A1)"):
+#   claude    route=marketplace → ~/.claude/plugins/installed_plugins.json
+#                                  exists and lists massa-ai
+#   claude    route=file | ""   → glob ~/.claude/agents/massa-ai-*.md non-empty
+#   codex     (single route)    → glob ~/.codex/agents/massa-ai-*.toml
+#                                  non-empty — confirmed live against a
+#                                  sandboxed `apps/codex-plugin/install.sh
+#                                  --user` run (e.g.
+#                                  massa-ai-architecture-specialist.toml,
+#                                  massa-ai-builder.toml)
+#   cursor    (bridge|local|"") → glob ~/.cursor/agents/massa-ai-*.md
+#                                  non-empty — written by both branches
+#   opencode  (single route)    → ~/.config/opencode/plugins/massa-ai/index.js
+#                                  is a regular file (never a symlink)
+installer_plugin_sentinel_present() {
+  local host="$1" target_home="$2" state_file="$3"
+  local glob_path f
+
+  case "$host" in
+    claude|codex|cursor|opencode) ;;
+    *) return 2 ;;
+  esac
+
+  [ -n "$target_home" ] || return 1
+
+  case "$host" in
+    claude)
+      local runner route
+      route=""
+      if runner="$(installer_detect_runner)"; then
+        route="$(installer_plugin_route "$runner" "$state_file" "$host" 2>/dev/null)"
+      fi
+      if [ "$route" = "marketplace" ]; then
+        local registry="${target_home}/.claude/plugins/installed_plugins.json"
+        [ -f "$registry" ] || return 1
+        grep -q '"massa-ai@' "$registry" 2>/dev/null || return 1
+        return 0
+      fi
+      glob_path="${target_home}/.claude/agents/massa-ai-*.md"
+      ;;
+    codex)
+      glob_path="${target_home}/.codex/agents/massa-ai-*.toml"
+      ;;
+    cursor)
+      glob_path="${target_home}/.cursor/agents/massa-ai-*.md"
+      ;;
+    opencode)
+      local plugin_js="${target_home}/.config/opencode/plugins/massa-ai/index.js"
+      [ -f "$plugin_js" ] && [ ! -L "$plugin_js" ]
+      return $?
+      ;;
+  esac
+
+  for f in $glob_path; do
+    [ -e "$f" ] && return 0
+  done
+  return 1
+}
+
 # installer_bundle_version <package_json>
 # Echoes the top-level "version" of a package.json via sed — no runner needed,
 # so the harness can gate before runner-dependent work starts.

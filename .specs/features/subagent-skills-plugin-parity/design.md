@@ -139,7 +139,7 @@ graph TD
 | --- | --- |
 | Claude Code agent discovery | Files at `~/.claude/agents/massa-ai-*.md` (user) or `.claude/agents/` (project); frontmatter `name`/`description`/`tools`/`model`/`effort` |
 | Codex agent discovery | Files at `~/.codex/agents/massa-ai-*.toml` (user) or `.codex/agents/` (project); TOML `name`/`description`/`developer_instructions`/`model`/`model_reasoning_effort`/`sandbox_mode` |
-| Cursor agent discovery | Files inside plugin dir `~/.cursor/plugins/massa-ai/agents/massa-ai-*.md` (auto-discovered); same frontmatter as Claude |
+| Cursor agent discovery | Files at `~/.cursor/agents/massa-ai-*.md` (user) or `.cursor/agents/` (project), flat; same frontmatter as Claude. *(Corrected 2026-08-05, debug-harness-install-cursor-opencode: Cursor never scans the plugin dir — the original "auto-discovered from plugin dir" claim was disproven against cursor.com/docs/subagents.)* |
 | OpenCode agent discovery | Files at `~/.config/opencode/agents/massa-ai-*.md` (user) or `.opencode/agents/` (project); frontmatter `description`/`mode: subagent`/`model`/`reasoningEffort`/`permission`/`metadata` |
 | `install-agents.ts` | Extend hint print in `ClaudeCodeWriter.apply()` (`:306`), `OpenCodeWriter.apply()` (`:349`), and add `CodexWriter.apply()` + `CursorWriter.apply()` subagent hints |
 | Root `install.sh` menu | `install_plugins_menu()` per-tool branches already invoke the installers; the installers' own output carries the "+ 12 subagent specialists" line |

@@ -37,7 +37,7 @@ done
 
 echo ""
 echo "Scenario 3: every plugin installer delegates to install-agents.sh"
-for pair in "claude:claude-code" "codex:codex" "cursor:cursor"; do
+for pair in "claude:claude-code" "codex:codex" "cursor:cursor" "opencode:opencode"; do
   host="${pair%%:*}"; agent="${pair##*:}"
   SRC="$(cat "$PROJECT_ROOT/apps/${host}-plugin/install.sh")"
   assert_contains "${host}: calls scripts/install-agents.sh" "$SRC" "scripts/install-agents.sh"
@@ -46,7 +46,7 @@ done
 
 echo ""
 echo "Scenario 4: the old 'skip MCP' advice is gone everywhere"
-for host in claude codex cursor; do
+for host in claude codex cursor opencode; do
   SRC="$(cat "$PROJECT_ROOT/apps/${host}-plugin/install.sh")"
   assert_not_contains "${host}: no 'skip MCP' advice" "$SRC" "skip MCP"
   assert_not_contains "${host}: no 'skip this install-agents step' advice" "$SRC" "skip this install-agents step"
@@ -113,5 +113,70 @@ const c = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 process.stdout.write(String(Object.keys(c.mcpServers || {}).filter((k) => k === "massa-ai").length));
 NODE
 )" "1"
+
+echo ""
+echo "Scenario 11: install-agents.sh writes the opencode MCP entry regardless of plugin listing form (PAU-02)"
+for form in npm local bare; do
+  H11="$ROOT/h11-$form"; mkdir -p "$H11/.config/opencode"
+  case "$form" in
+    npm)   PLUGIN_LISTING='"@massa-ai/opencode-plugin"' ;;
+    local) PLUGIN_LISTING='"./plugins/massa-ai/index.js"' ;;
+    bare)  PLUGIN_LISTING='"massa-ai"' ;;
+  esac
+  printf '{"plugin": [%s]}\n' "$PLUGIN_LISTING" > "$H11/.config/opencode/opencode.json"
+  OUT11="$(bash "$PROJECT_ROOT/scripts/install-agents.sh" --agent opencode --target "$H11" --yes 2>&1)"
+  RC11=$?
+  assert_eq "$form form: install-agents.sh exits 0" "$RC11" "0"
+  assert_eq "$form form: mcp.massa-ai entry written" \
+    "$("$RUNNER" - "$H11/.config/opencode/opencode.json" <<'NODE'
+const fs = require("fs");
+const c = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+process.stdout.write(String(Boolean(c.mcp && c.mcp["massa-ai"])));
+NODE
+)" "true"
+  assert_not_contains "$form form: no skip message printed" "$OUT11" "skipped: @massa-ai/opencode-plugin"
+done
+
+echo ""
+echo "Scenario 12: install-agents.sh header no longer claims the opencode presence skip"
+assert_not_contains "installer header: no opencode-skip claim" "$AGENTS_SRC" "OpenCode MCP registration is skipped when"
+
+echo ""
+echo "Scenario 13: opencode plugin install registers exactly one MCP entry; uninstall preserves it (PAU-01, PAU-03, PAU-04)"
+OPENCODE_SRC="$(cat "$PROJECT_ROOT/apps/opencode-plugin/install.sh")"
+# Distinguishes an actual reachable invocation (which always carried --yes) from
+# printed user-facing guidance recommending the same command by hand.
+assert_not_contains "opencode: install path never calls --agent opencode --uninstall" "$OPENCODE_SRC" "--agent opencode --uninstall --yes"
+
+H13="$ROOT/h13"; mkdir -p "$H13"
+OUT13="$(HOME="$H13" bash "$PROJECT_ROOT/apps/opencode-plugin/install.sh" --user 2>&1)"
+RC13=$?
+assert_eq "opencode plugin install exits 0" "$RC13" "0"
+CFG13="$H13/.config/opencode/opencode.jsonc"
+assert_file "opencode.jsonc written" "$CFG13"
+assert_eq "exactly one massa-ai mcp entry after install" \
+  "$("$RUNNER" - "$CFG13" <<'NODE'
+const fs = require("fs");
+const c = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+process.stdout.write(String(Boolean(c.mcp && c.mcp["massa-ai"])));
+NODE
+)" "true"
+
+HOME="$H13" bash "$PROJECT_ROOT/apps/opencode-plugin/install.sh" --uninstall >/dev/null 2>&1
+assert_eq "MCP entry survives opencode plugin uninstall" \
+  "$("$RUNNER" - "$CFG13" <<'NODE'
+const fs = require("fs");
+const c = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+process.stdout.write(String(Boolean(c.mcp && c.mcp["massa-ai"])));
+NODE
+)" "true"
+assert_eq "opencode plugin entry removed by uninstall" \
+  "$("$RUNNER" - "$CFG13" <<'NODE'
+const fs = require("fs");
+const c = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const plugins = Array.isArray(c.plugin) ? c.plugin : [];
+process.stdout.write(String(plugins.includes("./plugins/massa-ai/index.js")));
+NODE
+)" "false"
 
 summary "MCP single writer"
