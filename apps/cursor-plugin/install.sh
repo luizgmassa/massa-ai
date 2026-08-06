@@ -458,16 +458,18 @@ mkdir -p "$PLUGIN_DIR/.cursor-plugin" "$PLUGIN_DIR/skills" "$PLUGIN_DIR/hooks" "
 cp "$SCRIPT_DIR/.cursor-plugin/plugin.json" "$PLUGIN_DIR/.cursor-plugin/plugin.json"
 vecho "  + .cursor-plugin/plugin.json"
 
-# Copy the 6 host-command skills (each in a subdirectory: skills/<name>/SKILL.md).
-# massa-ai/, persona-router/, and agents/ are the PDO-06 harness bundle, not a
-# Cursor command skill — they are installed separately, into the shared
-# harness skills directory (see "Skills bundling" below), not into this
-# plugin-cache skills/ tree.
+# Copy the host-command skills (each in a subdirectory: skills/<name>/SKILL.md),
+# quick + generated workflow commands alike. massa-ai/, persona-router/,
+# agents/, and profile/ are the PDO-06 harness bundle, not a Cursor command
+# skill — they are installed separately, into the shared harness skills
+# directory (see "Skills bundling" below), not into this plugin-cache
+# skills/ tree. `profile` was missing from this exclusion pre-fix, which
+# leaked it into the command-skill cache mislabeled as `/profile`.
 skill_count=0
 for src in "$SCRIPT_DIR/skills/"*/SKILL.md; do
   name="$(basename "$(dirname "$src")")"
   case "$name" in
-    massa-ai|persona-router|agents) continue ;;
+    massa-ai|persona-router|agents|profile) continue ;;
   esac
   mkdir -p "$PLUGIN_DIR/skills/$name"
   cp "$src" "$PLUGIN_DIR/skills/$name/SKILL.md"

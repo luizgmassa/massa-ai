@@ -312,6 +312,140 @@ describe("cursor-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
   });
 });
 
+// ── T9: generated workflow-command delivery + exclusion-list audit ──────────
+describe("cursor-plugin generated workflow-command delivery (T9, WFC-08)", () => {
+  const QUICK_STEM_NAMES = ["def", "find", "graph", "index", "map", "status"];
+  const RESERVED_BUNDLE_ROOTS = ["massa-ai", "persona-router", "agents", "profile"];
+
+  async function sourceStemDirs(): Promise<string[]> {
+    const skillsDir = path.join(REPO_ROOT, "apps/cursor-plugin/skills");
+    const entries = await fs.readdir(skillsDir, { withFileTypes: true });
+    const stems: string[] = [];
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      if (RESERVED_BUNDLE_ROOTS.includes(e.name)) continue;
+      if (await pathExists(path.join(skillsDir, e.name, "SKILL.md"))) {
+        stems.push(e.name);
+      }
+    }
+    return stems;
+  }
+
+  test("install delivers every command-skill stem dir (quick + generated), scan-derived count", async () => {
+    const sourceStems = await sourceStemDirs();
+    const generatedStems = sourceStems.filter((s) => !QUICK_STEM_NAMES.includes(s));
+    // Sanity: workflow commands must actually be generated for this test to
+    // discriminate anything (bun run generate:artifacts ran via pretest:plugins).
+    expect(generatedStems.length).toBeGreaterThan(0);
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const installedSkillsDir = path.join(tmp, ".cursor/plugins/local/massa-ai/skills");
+    const installedStems = (
+      await fs.readdir(installedSkillsDir, { withFileTypes: true })
+    )
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
+    expect(installedStems.sort()).toEqual(sourceStems.sort());
+
+    // Spot-check: a generated stem's SKILL.md carries the ownership marker
+    // and reaches the installed copy byte-identical to source.
+    const sampleStem = generatedStems[0]!;
+    const sourceBody = await fs.readFile(
+      path.join(REPO_ROOT, "apps/cursor-plugin/skills", sampleStem, "SKILL.md"),
+      "utf8",
+    );
+    expect(sourceBody).toContain("<!-- massa-ai:generated workflow-command -->");
+    const installedBody = await fs.readFile(
+      path.join(installedSkillsDir, sampleStem, "SKILL.md"),
+      "utf8",
+    );
+    expect(installedBody).toBe(sourceBody);
+  });
+
+  test("WFC-08 audit fix: profile/ (harness bundle) is excluded from the command-skill copy, never mislabeled as a command", async () => {
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    const installedSkillsDir = path.join(tmp, ".cursor/plugins/local/massa-ai/skills");
+    expect(await pathExists(path.join(installedSkillsDir, "profile"))).toBe(false);
+    // massa-ai/persona-router/agents already asserted absent elsewhere; profile
+    // was the pre-existing gap (design.md Risks table) — this is its regression
+    // guard. Observed red before the install.sh exclusion-list fix: profile/
+    // WAS present in installedSkillsDir (leaked, mislabeled as a command skill).
+    for (const reserved of ["massa-ai", "persona-router", "agents"]) {
+      expect(await pathExists(path.join(installedSkillsDir, reserved))).toBe(false);
+    }
+  });
+
+  test("delivery is source-driven, not a fixed list: a stem excluded from the bundle is not installed", async () => {
+    // Mirrors the UGB-06 tarball-shaped-install pattern: copy the plugin into
+    // a scratch tree, then remove one generated workflow-command stem dir
+    // from the scratch bundle before installing from it.
+    const sourceStems = await sourceStemDirs();
+    const excluded = sourceStems.find((s) => !QUICK_STEM_NAMES.includes(s));
+    expect(excluded).toBeDefined();
+
+    const pkgRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "mt-cursor-stem-exclude-"),
+    );
+    try {
+      const pkgDir = path.join(pkgRoot, "apps", "cursor-plugin");
+      await fs.cp(path.join(REPO_ROOT, "apps/cursor-plugin"), pkgDir, {
+        recursive: true,
+        filter: (src) => !/[\\/](node_modules|\.turbo|coverage)($|[\\/])/.test(src),
+      });
+      await fs.rm(path.join(pkgDir, "skills", excluded!), {
+        recursive: true,
+        force: true,
+      });
+      await fs.mkdir(path.join(pkgRoot, "scripts", "lib"), { recursive: true });
+      await fs.copyFile(
+        path.join(REPO_ROOT, "scripts/banner.sh"),
+        path.join(pkgRoot, "scripts/banner.sh"),
+      );
+      await fs.copyFile(
+        path.join(REPO_ROOT, "scripts/lib/installer-shared.sh"),
+        path.join(pkgRoot, "scripts/lib/installer-shared.sh"),
+      );
+
+      const res = spawnSync("bash", [path.join(pkgDir, "install.sh"), "--user"], {
+        encoding: "utf8",
+        env: { ...process.env, HOME: tmp },
+        cwd: pkgDir,
+        timeout: 30000,
+      });
+      expect(res.status).toBe(0);
+
+      const installedSkillsDir = path.join(tmp, ".cursor/plugins/local/massa-ai/skills");
+      const installedStems = (
+        await fs.readdir(installedSkillsDir, { withFileTypes: true })
+      )
+        .filter((e) => e.isDirectory())
+        .map((e) => e.name);
+      expect(installedStems).not.toContain(excluded);
+      expect(installedStems.sort()).toEqual(
+        sourceStems.filter((s) => s !== excluded).sort(),
+      );
+    } finally {
+      await fs.rm(pkgRoot, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  test("uninstall removes the owned set only: whole plugin dir gone (generated + quick stem dirs together)", async () => {
+    runInstall(["--user"], { HOME: tmp });
+    const installedSkillsDir = path.join(tmp, ".cursor/plugins/local/massa-ai/skills");
+    expect(await pathExists(installedSkillsDir)).toBe(true);
+
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(await pathExists(installedSkillsDir)).toBe(false);
+    expect(
+      await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai")),
+    ).toBe(false);
+  });
+});
+
 // ── T7: generated-bundle contract (design Component 4 / UGB-05..08) ─────────
 describe("cursor-plugin generated-bundle contract (T7, UGB-05..08)", () => {
   function isNoise(p: string): boolean {
