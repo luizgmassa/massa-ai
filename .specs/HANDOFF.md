@@ -1,4 +1,4 @@
-# Handoff — worktree-isolation-gate (implemented 2026-08-06; validation pending; push/PR = user decision)
+# Handoff — worktree-isolation-gate (VALIDATED PASS 2026-08-06 — 6/6 ACs, 3/3 mutations killed, iteration 1; push/PR = user decision)
 
 Session `spec-worktree-isolation-gate` · workflow spec-driven (Medium) · branch
 `spec/worktree-isolation-gate` from origin/main @ v1.32.0 (`5c66e813`) ·
@@ -26,9 +26,12 @@ PreToolUse registered); efficacy accepted-risk recorded in spec Assumptions
 
 Commits: specs `11d93062` → T1 Stage 1 paragraph → T2 sensor (red-by-design
 commit) → T3 gate lines (16 files, 67/0, duplication excess 483 ≤ 483 @ w4,
-zero headroom untouched) → T4 CHANGELOG → T5 close-out (this commit). Gates
-all green in worktree incl. `generate:artifacts --check` no drift. Next:
-verification-agent → validation.md, then push/PR on user go-ahead.
+zero headroom untouched) → T4 CHANGELOG → T5 close-out → `a8360f18` AC4
+Stage 1 sensor (validation iteration 1: verifier's scratch mutation proved the
+coverage-matrix-claimed sensor was never written; fixed, observed red, killed
+on re-injection) → validation.md PASS committed. Gates all green in worktree
+incl. `generate:artifacts --check` no drift; validate_state exit 0. Next:
+push/PR on user go-ahead.
 
 ## Previous — agent-era-harness-upgrades (VALIDATED PASS 2026-08-06 — 28/28 ACs, 8/8 mutants; PR #76 open, main v1.30.0 merged, merge authorized pending CI green)
 

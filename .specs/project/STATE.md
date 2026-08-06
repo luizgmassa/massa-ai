@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — Worktree Isolation Gate (implemented 2026-08-06; validation pending; push/PR = user decision)
+## Current — Worktree Isolation Gate (**VALIDATED PASS 2026-08-06** — 6/6 ACs, 3/3 mutations killed, iteration 1; push/PR = user decision)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-worktree-isolation-gate` ·
   workflow: spec-driven (Medium) · branch `spec/worktree-isolation-gate` from
@@ -37,8 +37,15 @@
   agents).
 - massa-ai MCP not consulted this session (recall unavailable); `.specs/`
   files canonical.
-- Next: T5 close-out — FEATURES.json entry, HANDOFF, check_specs_delivered,
-  verification-agent → validation.md; push/PR = user decision.
+- Validation (independent verifier, author ≠ verifier, iteration 1 of 3 —
+  closed): 6/6 ACs; 3 mutations, 3/3 killed. Pass-1 survivor was real: the
+  coverage matrix claimed a Stage 1 sensor T2 never wrote (AC4); fixed
+  `a8360f18` (observed red in scratch, copy-count verified), re-injected pass 2,
+  killed, porcelain byte-identical before/after. Verifier gates: 68/0
+  harness-contract, validate_state exit 0. Lesson class: a tasks.md
+  coverage-matrix row naming a sensor is a claim to falsify, not trust.
+- Next: push/PR = user decision (branch `spec/worktree-isolation-gate`, 8
+  commits ahead of origin/main).
 
 ## Previous — Agent-Era Harness Upgrades (**VALIDATED PASS 2026-08-06** — 28/28 ACs, 8/8 mutants killed; PR #76 open; file-size thresholds amended ~500/~600 by user @ `eb23dd0a`; main v1.30.0 + PR #77 merged in; merge authorized, CI watch)
 
