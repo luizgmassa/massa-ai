@@ -213,3 +213,29 @@ describe("audit-specialist/SKILL.md: tests lens row (AEH-08)", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// AEH-07: feature.md AC capture and AC-anchored verification (T11)
+// ---------------------------------------------------------------------------
+
+describe("feature.md: AC capture precedes implementation, verification checks captured ACs (AEH-07)", () => {
+  const content = readSkill("workflows/feature.md");
+
+  test("AC-capture step present, capturing 1-5 testable ACs or referencing an existing spec artifact", () => {
+    expect(content).toContain(
+      "Capture 1-5 testable acceptance criteria in the conversation before implementation starts, or reference an existing spec artifact",
+    );
+  });
+
+  test("AC-capture step precedes the implementation step", () => {
+    const acCaptureIdx = content.indexOf("Capture 1-5 testable acceptance criteria");
+    const implementIdx = content.indexOf("Implement the feature by PR group");
+    expect(acCaptureIdx).toBeGreaterThan(-1);
+    expect(implementIdx).toBeGreaterThan(-1);
+    expect(acCaptureIdx).toBeLessThan(implementIdx);
+  });
+
+  test("verification step checks outcomes against the captured acceptance criteria", () => {
+    expect(content).toContain("check outcomes against the captured acceptance criteria from step 11");
+  });
+});

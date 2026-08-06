@@ -39,15 +39,16 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - Include a focused naming review when the feature introduces or renames identifiers. New names should use domain or precise role vocabulary, and public/persisted names should not change without explicit compatibility handling.
 9. For mobile features, capture the mobile context packet, choose shared vs platform-specific boundaries, state platform parity expectations, and include the cheapest relevant mobile verification sensor from `references/mobile-context.md`
 10. Use `references/agent-orchestration.md` only for isolated implementation slices or independent verification
-11. Implement the feature by PR group when `references/pr-task-fix.md` applies:
+11. Capture 1-5 testable acceptance criteria in the conversation before implementation starts, or reference an existing spec artifact (e.g. `.specs/features/<slug>/spec.md`) when one already states them. These captured acceptance criteria are the anchor the verification step below checks outcomes against.
+12. Implement the feature by PR group when `references/pr-task-fix.md` applies:
    - Order non-breaking groups by Data, Domain, then Presentation/Navigation, mapping those labels to repository boundaries when needed.
    - Validate each group with the verification recipe before committing.
    - Invoke `workflows/commit.md` for each verified group; do not duplicate commit staging, message, audit-exclusion, or Jira-prefix rules in this workflow.
    - When every group has a confirmed Jira key, follow the optional stacked branch flow in `references/pr-task-fix.md` (Jira-Key Stacked Branches).
-12. Run the verification recipe and report skipped checks explicitly. If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
+13. Run the verification recipe and check outcomes against the captured acceptance criteria from step 11, not only against a generic verification recipe; report skipped checks explicitly. If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
-13. At completion, persist (run the scoring rubric from `references/decision-engine.md` for each):
+14. At completion, persist (run the scoring rubric from `references/decision-engine.md` for each):
    - Design decisions made via `remember` as scored `decision` memories
    - New patterns introduced via `remember` as scored `pattern` memories
    - Trade-offs accepted via `remember` as scored `conversation` memories
-14. Complete the Evidence Gate from `references/evidence-gate.md`
+15. Complete the Evidence Gate from `references/evidence-gate.md`
