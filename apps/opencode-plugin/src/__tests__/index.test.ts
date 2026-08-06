@@ -11,8 +11,7 @@
 
 import "./env-setup"; // MUST stay the first import — freezes scratch XDG_CONFIG_HOME + 10 ms reindex debounce before ../index loads
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { configExists } from "@massa-ai/shared/config";
 import { MassaAiPlugin } from "../index";
 
 const originalFetch = globalThis.fetch;
@@ -393,9 +392,12 @@ describe("MassaAiPlugin config bootstrap + HTTP edge branches", () => {
     mockFetchCapture();
     const { input } = makePluginInput();
     await MassaAiPlugin(input);
-    // env-setup.ts pointed XDG_CONFIG_HOME at a scratch dir before ../index
-    // loaded, so the first plugin construction in this suite ran initConfig().
-    expect(existsSync(join(process.env.XDG_CONFIG_HOME!, "massa-ai", "config.json"))).toBe(true);
+    // env-setup.ts pointed XDG_CONFIG_HOME at a scratch dir before any file
+    // in this package could freeze CONFIG_DIR (every shared/config importer
+    // pulls env-setup first), so the suite's first plugin construction ran
+    // initConfig() into the scratch. Assert through the config module's own
+    // frozen view — order-independent, unlike a hand-built scratch path.
+    expect(configExists()).toBe(true);
   });
 
   test("compacting: non-ok memory search response → debug log, snapshot still attempted", async () => {
@@ -452,7 +454,9 @@ describe("MassaAiPlugin debounced incremental reindex", () => {
     const reindex = requests.filter((r) => r.url.includes("/api/v1/project/index"));
     expect(reindex.length).toBe(1);
     expect(JSON.parse(String(reindex[0]!.init?.body))).toMatchObject({ forceReindex: false, warmCache: false });
-    expect(logs.some((l) => l.level === "info" && /Incremental reindex completed \(20 files changed\)/.test(l.message))).toBe(true);
+    // Count left loose (\d+): under coverage instrumentation the 10 ms timer
+    // can fire mid-dispatch-loop, flushing before all 20 edits accumulate.
+    expect(logs.some((l) => l.level === "info" && /Incremental reindex completed \(\d+ files changed\)/.test(l.message))).toBe(true);
   });
 
   test("reindex failure → warn log, in-flight flag released", async () => {

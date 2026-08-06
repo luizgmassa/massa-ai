@@ -1,3 +1,4 @@
+import "./env-setup"; // FIRST import — freezes scratch XDG_CONFIG_HOME before ../config-cli pins CONFIG_DIR
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, rmSync, readdirSync } from "fs";
 import { tmpdir } from "os";
