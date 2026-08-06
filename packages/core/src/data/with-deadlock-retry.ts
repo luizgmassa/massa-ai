@@ -3,10 +3,17 @@
  *
  * A full-repository ETL Load writes many files concurrently (batch of 10),
  * each in its own transaction, while a separate 30s loop renews the graph
- * generation lease. These two writers lock overlapping generation-scoped rows
- * and occasionally form a lock cycle: PostgreSQL detects it (SQLSTATE 40P01)
- * and aborts one transaction as the deadlock victim. Serialization conflicts
- * (40001/40P02) are the same class of transient, retriable failure.
+ * generation lease. The cycle mechanism is FK-implicit locking: every
+ * symbol_* table FKs to workspaces(project_id), so a per-file write takes
+ * FOR UPDATE on its graph_generations row first and then an implicit
+ * FOR KEY SHARE on the workspaces row when its inserts fire (generation →
+ * workspace). A lease method locking workspace-first forms an AB-BA cycle
+ * with any in-flight writer; PostgreSQL detects it (SQLSTATE 40P01) and
+ * aborts one transaction as the deadlock victim. The lease methods now lock
+ * generation-first to match (begin() is the documented workspace-first
+ * exception), leaving retry as the safety net for the residual begin()
+ * window. Serialization conflicts (40001/40P02) are the same class of
+ * transient, retriable failure.
  *
  * The aborted transaction is NOT a data problem — it never committed. Every
  * Load write is idempotent (generation-scoped upserts / ON CONFLICT /

@@ -36,7 +36,14 @@ export class GraphGenerationCoordinator {
   async begin(input: BeginGraphBuildInput): Promise<GraphGenerationLease> {
     const deadline = Date.now() + GRAPH_GENERATION_LEASE_TTL_MS;
     for (;;) {
-      const outcome = await this.repository.begin({ ...input, leaseTtlMs: GRAPH_GENERATION_LEASE_TTL_MS });
+      // begin keeps the workspace-first lock order (it must read the pending
+      // pointer before locking a generation), so an expired-lease takeover can
+      // still race a straggling file writer. Retriable and idempotent: a
+      // deadlock victim never committed.
+      const outcome = await withDeadlockRetry(
+        () => this.repository.begin({ ...input, leaseTtlMs: GRAPH_GENERATION_LEASE_TTL_MS }),
+        { operation: "graph_generation.begin", maxAttempts: 5 },
+      );
       if (outcome.status === "acquired") return outcome.lease;
       if (outcome.status === "stale_active") {
         throw new Error(`graph_generation_stale_active:${outcome.activeGenerationId ?? "none"}`);
@@ -52,13 +59,18 @@ export class GraphGenerationCoordinator {
     // abort the whole index run. Retry — the renewal is idempotent.
     const outcome = await withDeadlockRetry(
       () => this.repository.heartbeat(lease, GRAPH_GENERATION_LEASE_TTL_MS),
-      { operation: "graph_generation.heartbeat", maxAttempts: 3 },
+      { operation: "graph_generation.heartbeat", maxAttempts: 5 },
     );
     if (outcome.status !== "renewed") throw new Error("graph_generation_lease_lost");
   }
 
   async activate(lease: GraphGenerationLease): Promise<Extract<ActivateGraphGenerationOutcome, { status: "activated" }>> {
-    const completeness = await this.repository.complete(lease);
+    // Both transitions are status-guarded ('pending'-only) and roll back fully
+    // on a deadlock abort, so retrying re-runs them from a clean state.
+    const completeness = await withDeadlockRetry(
+      () => this.repository.complete(lease),
+      { operation: "graph_generation.complete", maxAttempts: 5 },
+    );
     if (completeness.status === "incomplete") {
       throw new Error(`graph_generation_incomplete:${completeness.reasons.join(",")}`);
     }
@@ -67,7 +79,10 @@ export class GraphGenerationCoordinator {
       throw new Error(`graph_generation_stale_active:${completeness.activeGenerationId ?? "none"}`);
     }
 
-    const activation = await this.repository.activate(lease);
+    const activation = await withDeadlockRetry(
+      () => this.repository.activate(lease),
+      { operation: "graph_generation.activate", maxAttempts: 5 },
+    );
     if (activation.status === "activated") return activation;
     if (activation.status === "incomplete") {
       throw new Error(`graph_generation_incomplete:${activation.reasons.join(",")}`);
@@ -77,7 +92,12 @@ export class GraphGenerationCoordinator {
   }
 
   async abort(lease: GraphGenerationLease, reason: string): Promise<void> {
-    const outcome = await this.repository.abort(lease, reason);
+    // Idempotent: the 'pending'-guarded UPDATE and child deletes roll back
+    // fully on a deadlock abort; a retry redoes them or reports lease_lost.
+    const outcome = await withDeadlockRetry(
+      () => this.repository.abort(lease, reason),
+      { operation: "graph_generation.abort", maxAttempts: 5 },
+    );
     if (outcome.status === "lease_lost") throw new Error("graph_generation_lease_lost_during_abort");
   }
 
