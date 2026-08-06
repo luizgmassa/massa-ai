@@ -237,6 +237,47 @@ describe("delivery scope: only mutating workflows carry the delivery contract", 
     });
   }
 
+  // Isolation Gate (worktree-isolation-gate): the explicit action line, not just
+  // the load clause above it. Per-file loop so deleting the line from any single
+  // workflow flips exactly one assertion.
+  for (const rel of IMPLEMENTATION_WORKFLOWS) {
+    test(`${rel} carries the Isolation Gate action line`, async () => {
+      const body = await readWorkflow(rel);
+      expect(body).toContain("**Isolation Gate — before the first file edit:**");
+    });
+  }
+
+  test("read-only workflows do NOT carry the Isolation Gate line", async () => {
+    const impl = new Set<string>(IMPLEMENTATION_WORKFLOWS);
+    const leaked: string[] = [];
+    for (const rel of await listWorkflows()) {
+      if (impl.has(rel)) continue;
+      if ((await readWorkflow(rel)).includes("Isolation Gate — before the first file edit")) {
+        leaked.push(rel);
+      }
+    }
+    expect(leaked).toEqual([]);
+  });
+
+  test("the Isolation Gate line is byte-identical in all 16 workflows and names its mechanism", async () => {
+    // Single-source discipline: the policy lives in implementation-delivery.md;
+    // the per-workflow line only invokes it. Drift between copies, or a rewrite
+    // that keeps the label but drops Stage 0–1 / evidence recording, fails here.
+    const lines = new Set<string>();
+    for (const rel of IMPLEMENTATION_WORKFLOWS) {
+      const line = (await readWorkflow(rel))
+        .split("\n")
+        .find((l) => l.includes("Isolation Gate — before the first file edit"));
+      expect(line).toBeDefined();
+      lines.add(line!);
+    }
+    expect(lines.size).toBe(1);
+    const [gate] = [...lines];
+    expect(gate).toContain("`references/implementation-delivery.md` Stage 0–1");
+    expect(gate).toContain("record the worktree path + branch");
+    expect(gate).toContain("two legal skip reasons, verbatim");
+  });
+
   test("read-only workflows do NOT load the delivery reference", async () => {
     const impl = new Set<string>(IMPLEMENTATION_WORKFLOWS);
     const leaked: string[] = [];
@@ -285,6 +326,15 @@ describe("invariants: the references still encode the decisions that were made",
     const body = await readReference("implementation-delivery.md");
     expect(body).toMatch(/no\s+size\s+exemption/i);
     expect(body).toMatch(/only two legal skip reasons/i);
+  });
+
+  test("implementation-delivery.md Stage 1 records isolation evidence and forbids shared-checkout branch switches", async () => {
+    // AC4 (worktree-isolation-gate): the cross-session rule the Isolation Gate
+    // line invokes. Distinct from agent-orchestration.md's cross-subagent rule.
+    const body = await readReference("implementation-delivery.md");
+    expect(body).toContain("Record the isolation evidence immediately after creation");
+    expect(body).toMatch(/Never switch branches in a\s+checkout another session may share/i);
+    expect(body).toMatch(/cross-\*\*session\*\*/);
   });
 
   test("implementation-delivery.md documents the gh-absent degraded path", async () => {

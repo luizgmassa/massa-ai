@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Explicit Isolation Gate line in all 16 implementation workflows.** Each
+  workflow that mutates the repository (`feature`, `debug`, `refactor`,
+  `general`, `design`, `maestro`, `spec-driven`, and the nine `*-fix`
+  workflows) now carries one identical action line directly after its
+  delivery-clause paragraph: execute `references/implementation-delivery.md`
+  Stage 0–1 (create the worktree + branch) **before the first file edit** and
+  record the worktree path + branch — or one of Stage 1's two legal skip
+  reasons, verbatim. Policy text stays single-sourced in the reference, which
+  additionally gains the cross-session rule: record isolation evidence
+  immediately after creation and never switch branches in a checkout another
+  session may share (motivated by the recorded 2026-08-05 shared-checkout
+  incident; distinct from `agent-orchestration.md`'s cross-subagent git-safety
+  rule). `workflow-harness-contract.test.ts` enforces per-file presence,
+  absence from read-only workflows, and byte-identical wording naming the
+  mechanism. Hook-level blocking was evaluated and deferred: the hook binary's
+  contract is observation-only ("never blocks the agent").
+
 ## [1.34.0] - 2026-08-06
 
 ### Added
