@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **38 generated workflow slash commands, one per `skills/massa-ai/workflows/**/*.md`,
+  across all four plugins.** Every massa-ai workflow is now directly invocable —
+  `/massa-ai:debug` / `/massa-ai-debug` (Claude Code marketplace / file route),
+  `$debug` (Codex), an auto-loaded `skills/debug/SKILL.md` (Cursor), and
+  `/massa-ai-debug` (OpenCode) — instead of only the 6 hand-authored quick
+  commands (`map`/`index`/`find`/`def`/`graph`/`status`). Generated alongside
+  those quick commands by the existing `bun run generate:artifacts`
+  entrypoint, gitignored build output (AD-016) carrying a body ownership
+  marker (`<!-- massa-ai:generated workflow-command -->`) so prune and
+  `--check` can share Claude's `commands/` and Codex/Cursor's `skills/`
+  directories with hand-authored files safely. OpenCode gains a new
+  `command/` managed root and a dedicated installer delivery + owned-prefix
+  uninstall section. Claude's file-route uninstall is hardened to glob the
+  installed directory by the `massa-ai-` prefix rather than deriving removals
+  from the source bundle, which previously left owned commands behind
+  whenever the bundle was absent or stale at uninstall time. See
+  [Workflow Commands](./FEATURES.md#workflow-commands-38-generated-slash-commands)
+  for the full per-host reference.
+
 ## [1.29.0] - 2026-08-05
 
 ### Changed

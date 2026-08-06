@@ -15,6 +15,8 @@ Skills (invocable via Codex `$` mentions):
 | `graph` | Reference graph (who calls / imports / extends) |
 | `status` | Workspaces health + search analytics |
 
+Plus 38 generated workflow commands, one per massa-ai workflow (`$debug`, etc.) — see [Workflow Commands](../../FEATURES.md#workflow-commands-38-generated-slash-commands) in the root feature reference for the full naming table.
+
 MCP server: `massa-ai` (`npx @massa-ai/mcp-client` with `MASSA_AI_API_URL`) — registered into `~/.codex/config.toml` by `scripts/install-agents.sh`, which this installer calls for you. That script is the single writer of host MCP config; the plugin ships no `.mcp.json`.
 
 Hooks: 6 Codex lifecycle events wired to the shared `massa-ai-hook` binary (fire-and-forget POSTs to the tools-api):
