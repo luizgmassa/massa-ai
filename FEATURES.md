@@ -1224,7 +1224,7 @@ process environment at boot, so they do not appear in `~/.config/massa-ai/config
 
 | Provider | Model | Cost | Quality |
 |----------|-------|------|---------|
-| **Ollama** (default) | qwen3-embedding:8b (also bge-m3) | Free | Good-Excellent |
+| **Ollama** (default) | qwen3-embedding:4b (also bge-m3) | Free | Good-Excellent |
 | **Mistral** | mistral-embed, codestral-embed | $$ | Great |
 | **OpenAI** | text-embedding-3-small | $$ | Great |
 

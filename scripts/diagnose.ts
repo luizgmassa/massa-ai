@@ -15,7 +15,7 @@
  *
  * Environment variables:
  *   OLLAMA_BASE_URL           - Ollama API URL (default: http://localhost:11434)
- *   OLLAMA_EMBEDDING_MODEL    - Model to test (default: qwen3-embedding:8b)
+ *   OLLAMA_EMBEDDING_MODEL    - Model to test (default: qwen3-embedding:4b)
  *   DATABASE_URL              - Required PostgreSQL connection string
  */
 import { spawn } from "bun";
@@ -115,7 +115,7 @@ async function detectOllamaUrl(candidates: string[]): Promise<{ url: string; dat
 
 async function checkOllama(): Promise<boolean> {
   const envUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-  const modelName = process.env.OLLAMA_EMBEDDING_MODEL || "qwen3-embedding:8b";
+  const modelName = process.env.OLLAMA_EMBEDDING_MODEL || "qwen3-embedding:4b";
   let ok = true;
   let resolvedUrl = envUrl;
 

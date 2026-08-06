@@ -119,7 +119,7 @@ fi
 # ---- Writing ----------------------------------------------------------------
 
 DATABASE_URL="postgresql://massa_ai:pw@localhost:5432/massa_ai"
-EMBEDDING_MODEL="qwen3-embedding:8b"
+EMBEDDING_MODEL="qwen3-embedding:4b"
 OLLAMA_URL="http://localhost:11434"
 LLM_MODEL="qwen3:8b"
 CODE_MODEL="qwen3-coder:30b"
