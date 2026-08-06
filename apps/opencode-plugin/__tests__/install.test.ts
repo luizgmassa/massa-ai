@@ -691,6 +691,153 @@ describe("opencode-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
   });
 });
 
+// ── T10: generated workflow-command delivery (design Component 4, WFC-08/12) ─
+describe("opencode-plugin generated workflow-command delivery (T10, WFC-08/12)", () => {
+  async function sourceCommandFiles(): Promise<string[]> {
+    const dir = path.join(REPO_ROOT, "apps/opencode-plugin/command");
+    return (await fs.readdir(dir)).filter((f) => f.startsWith("massa-ai-") && f.endsWith(".md"));
+  }
+
+  test("install delivers every command/massa-ai-*.md source file to ~/.config/opencode/command/", async () => {
+    const sourceFiles = await sourceCommandFiles();
+    // Sanity: workflow commands must actually be generated for this test to
+    // discriminate anything (bun run generate:artifacts ran via pretest:plugins).
+    expect(sourceFiles.length).toBeGreaterThan(0);
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const installedDir = path.join(tmp, ".config/opencode/command");
+    const installedFiles = await fs.readdir(installedDir);
+    expect(installedFiles.sort()).toEqual(sourceFiles.sort());
+
+    // Spot-check: content carries the ownership marker and is byte-identical
+    // to source (copy, not symlink — no per-profile variant concept here).
+    const sample = sourceFiles[0]!;
+    const sourceBody = await fs.readFile(
+      path.join(REPO_ROOT, "apps/opencode-plugin/command", sample),
+      "utf8",
+    );
+    expect(sourceBody).toContain("<!-- massa-ai:generated workflow-command -->");
+    const installedBody = await fs.readFile(path.join(installedDir, sample), "utf8");
+    expect(installedBody).toBe(sourceBody);
+    expect(await isSymlink(path.join(installedDir, sample))).toBe(false);
+  });
+
+  test("no other files in the target command/ dir are touched by install", async () => {
+    const configDir = path.join(tmp, ".config/opencode");
+    const commandDir = path.join(configDir, "command");
+    await fs.mkdir(commandDir, { recursive: true });
+    await fs.writeFile(path.join(commandDir, "my-own-command.md"), "user command content");
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    expect(
+      await fs.readFile(path.join(commandDir, "my-own-command.md"), "utf8"),
+    ).toBe("user command content");
+  });
+
+  test("delivery is source-driven, not a fixed list: a command excluded from the bundle is not installed", async () => {
+    // Mirrors the UGB-06 tarball-shaped-install pattern: copy the plugin into
+    // a scratch tree, then remove one generated workflow command from the
+    // scratch bundle before installing from it.
+    const sourceFiles = await sourceCommandFiles();
+    const excluded = sourceFiles[0]!;
+
+    const pkgRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "mt-opencode-command-exclude-"),
+    );
+    try {
+      const pkgDir = path.join(pkgRoot, "apps", "opencode-plugin");
+      await fs.cp(path.join(REPO_ROOT, "apps/opencode-plugin"), pkgDir, {
+        recursive: true,
+        filter: (src) => !/[\\/](node_modules|\.turbo|coverage)($|[\\/])/.test(src),
+      });
+      await fs.rm(path.join(pkgDir, "command", excluded));
+      await fs.mkdir(path.join(pkgRoot, "scripts"), { recursive: true });
+      await fs.copyFile(
+        path.join(REPO_ROOT, "scripts/banner.sh"),
+        path.join(pkgRoot, "scripts/banner.sh"),
+      );
+
+      const res = spawnSync("bash", [path.join(pkgDir, "install.sh"), "--user"], {
+        encoding: "utf8",
+        env: { ...process.env, HOME: tmp },
+        cwd: pkgDir,
+        timeout: 30000,
+      });
+      expect(res.status).toBe(0);
+
+      const installedDir = path.join(tmp, ".config/opencode/command");
+      const installedFiles = await fs.readdir(installedDir);
+      expect(installedFiles).not.toContain(excluded);
+      expect(installedFiles.sort()).toEqual(
+        sourceFiles.filter((f) => f !== excluded).sort(),
+      );
+    } finally {
+      await fs.rm(pkgRoot, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  test("uninstall removes exactly massa-ai-*.md from command/, preserving a user command with a different name", async () => {
+    runInstall(["--user"], { HOME: tmp });
+    const commandDir = path.join(tmp, ".config/opencode/command");
+    expect(await pathExists(commandDir)).toBe(true);
+
+    // A user command without the massa-ai- prefix must survive uninstall.
+    const userCommand = path.join(commandDir, "my-own-command.md");
+    await fs.writeFile(userCommand, "user command content");
+
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const remaining = await fs.readdir(commandDir);
+    expect(remaining.filter((f) => f.startsWith("massa-ai-"))).toHaveLength(0);
+    expect(remaining).toEqual(["my-own-command.md"]);
+    expect(await fs.readFile(userCommand, "utf8")).toBe("user command content");
+  });
+
+  test("uninstall removes owned commands even when the source bundle is absent (mirrors T7's claude-plugin hardening)", async () => {
+    runInstall(["--user"], { HOME: tmp });
+    const commandDir = path.join(tmp, ".config/opencode/command");
+    const delivered = await fs.readdir(commandDir);
+    expect(delivered.length).toBeGreaterThan(0);
+
+    const pkgRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "mt-opencode-uninstall-nobundle-"),
+    );
+    try {
+      const pkgDir = path.join(pkgRoot, "apps", "opencode-plugin");
+      await fs.cp(path.join(REPO_ROOT, "apps/opencode-plugin"), pkgDir, {
+        recursive: true,
+        filter: (src) => !/[\\/](node_modules|\.turbo|coverage)($|[\\/])/.test(src),
+      });
+      await fs.rm(path.join(pkgDir, "command"), { recursive: true, force: true });
+      await fs.mkdir(path.join(pkgRoot, "scripts"), { recursive: true });
+      await fs.copyFile(
+        path.join(REPO_ROOT, "scripts/banner.sh"),
+        path.join(pkgRoot, "scripts/banner.sh"),
+      );
+
+      const res = spawnSync("bash", [path.join(pkgDir, "install.sh"), "--uninstall"], {
+        encoding: "utf8",
+        env: { ...process.env, HOME: tmp },
+        cwd: pkgDir,
+        timeout: 30000,
+      });
+      expect(res.status).toBe(0);
+
+      const remaining = (await pathExists(commandDir))
+        ? (await fs.readdir(commandDir)).filter((f) => f.startsWith("massa-ai-"))
+        : [];
+      expect(remaining).toHaveLength(0);
+    } finally {
+      await fs.rm(pkgRoot, { recursive: true, force: true });
+    }
+  }, 30_000);
+});
+
 // ── T8: generated-bundle contract (design Component 4 / UGB-05..08) ─────────
 describe("opencode-plugin generated-bundle contract (T8, UGB-05..08)", () => {
   function isNoise(p: string): boolean {

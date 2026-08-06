@@ -486,6 +486,126 @@ describe("claude-plugin generated-bundle contract (T5, UGB-05..08)", () => {
     }
   }, 30_000);
 
+  test("T7 (WFC-08,12): file-route uninstall removes owned commands by installed-prefix even when the bundle is absent", async () => {
+    // Deliver a full install first (44 = 6 quick + generated workflow commands).
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+    const commandsDir = path.join(tmp, ".claude/commands");
+    const delivered = (await fs.readdir(commandsDir)).filter((f) =>
+      f.startsWith("massa-ai-"),
+    );
+    expect(delivered.length).toBeGreaterThan(6); // 6 quick + generated workflow commands
+
+    // Simulate the bundle-absent state that is normal under AD-016 (generated
+    // artifacts are untracked, so a checkout that never ran generate:artifacts
+    // — or a stale/partial one — has no apps/claude-plugin/commands/ to
+    // source-derive removals from). Copy the plugin into a scratch tree that
+    // mirrors the repo's relative layout (mirrors the UGB-06 tarball test
+    // above), then delete its commands/ bundle before uninstalling.
+    const pkgRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "mt-claude-uninstall-nobundle-"),
+    );
+    try {
+      const pkgDir = path.join(pkgRoot, "apps", "claude-plugin");
+      await fs.cp(path.join(REPO_ROOT, "apps/claude-plugin"), pkgDir, {
+        recursive: true,
+        filter: (src) => !isNoise(src),
+      });
+      await fs.rm(path.join(pkgDir, "commands"), {
+        recursive: true,
+        force: true,
+      });
+      await fs.mkdir(path.join(pkgRoot, "scripts", "lib"), {
+        recursive: true,
+      });
+      await fs.copyFile(
+        path.join(REPO_ROOT, "scripts/banner.sh"),
+        path.join(pkgRoot, "scripts/banner.sh"),
+      );
+      await fs.copyFile(
+        path.join(REPO_ROOT, "scripts/lib/installer-shared.sh"),
+        path.join(pkgRoot, "scripts/lib/installer-shared.sh"),
+      );
+
+      const uninstallRes = spawnSync(
+        "bash",
+        [path.join(pkgDir, "install.sh"), "--uninstall"],
+        {
+          encoding: "utf8",
+          env: {
+            MASSA_AI_SKIP_PLUGIN_REGISTRY: "1",
+            ...process.env,
+            HOME: tmp,
+          },
+          cwd: pkgDir,
+          timeout: 30000,
+        },
+      );
+      expect(uninstallRes.status).toBe(0);
+
+      // Owned-prefix glob against the INSTALLED directory removes every
+      // massa-ai-* command regardless of what the (now-absent) source bundle
+      // contains. Pre-hardening, the source-basename loop left all of them
+      // in place — observed 44/44 remaining before this fix, 0/44 after.
+      const remaining = (await fs.readdir(commandsDir)).filter((f) =>
+        f.startsWith("massa-ai-"),
+      );
+      expect(remaining).toHaveLength(0);
+    } finally {
+      await fs.rm(pkgRoot, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  test("T7: marketplace route never copies commands (served in place by the bundle)", async () => {
+    // No MASSA_AI_SKIP_PLUGIN_REGISTRY override — instead stub a `claude` CLI
+    // on PATH that satisfies register_claude_plugin's success path: every
+    // subcommand exits 0, and `plugin install` writes the registry file
+    // claude_plugin_registered checks for, so register_claude_plugin (and
+    // therefore PLUGIN_ROUTE=1) succeeds deterministically regardless of
+    // whether a real claude CLI is on this machine (mirrors Scenario 6/7 of
+    // scripts/tests/test-plugin-registry-registration.sh, but self-contained
+    // rather than CLI-presence-gated).
+    const stubDir = path.join(tmp, "stubbin");
+    await fs.mkdir(stubDir, { recursive: true });
+    const stubClaude = path.join(stubDir, "claude");
+    await fs.writeFile(
+      stubClaude,
+      [
+        "#!/bin/sh",
+        'if [ "$1" = "plugin" ] && [ "$2" = "install" ]; then',
+        '  mkdir -p "$HOME/.claude/plugins"',
+        '  echo \'{"massa-ai@massa-ai": true}\' > "$HOME/.claude/plugins/installed_plugins.json"',
+        "fi",
+        "exit 0",
+        "",
+      ].join("\n"),
+    );
+    await fs.chmod(stubClaude, 0o755);
+    // A real marketplace manifest must exist for register_claude_plugin to
+    // proceed past its own guard.
+    expect(
+      await pathExists(
+        path.join(REPO_ROOT, ".claude-plugin/marketplace.json"),
+      ),
+    ).toBe(true);
+
+    const res = spawnSync("bash", [INSTALL_SH, "--user"], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        HOME: tmp,
+        PATH: `${stubDir}:${process.env.PATH ?? ""}`,
+      },
+      cwd: REPO_ROOT,
+      timeout: 30000,
+    });
+    expect(res.status).toBe(0);
+    // Plugin route: commands are served from the bundle in place, never
+    // copied into ~/.claude/commands/.
+    const commandsDir = path.join(tmp, ".claude/commands");
+    expect(await pathExists(commandsDir)).toBe(false);
+  });
+
   test("UGB-07: missing bun in a repo-checkout context exits non-zero before any host-config mutation", async () => {
     const pathNoBun = await pathWithoutBun();
     const res = spawnSync("bash", [INSTALL_SH, "--user"], {

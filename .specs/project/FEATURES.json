@@ -976,10 +976,11 @@
       "id": "agent-era-harness-upgrades",
       "slug": "agent-era-harness-upgrades",
       "title": "Agent-Era Harness Upgrades — lessons.ts trust ramp + metric trend, massa-ai-reviewer dispatch in 14 workflows, tests five-gate error-class model + tests lens, feature-workflow AC anchor, code-quality/refactor/coding-guidelines agent-read-aware rewrites (file-size ~500/~600 per user amendment)",
-      "status": "in-progress",
+      "status": "complete",
       "priority": "P1",
       "workflow": "spec-driven",
       "branch": "spec/agent-era-harness-upgrades",
+      "notes": "Merged (main released v1.31.0/v1.32.0 with its entries); status flipped from stale in-progress during the workflow-commands main merge.",
       "phases": {
         "specify": true,
         "design": true,
@@ -991,7 +992,15 @@
       "tasks": ".specs/features/agent-era-harness-upgrades/tasks.md",
       "created": "2026-08-05",
       "dependencies": []
+    },
+    {
+      "id": "workflow-commands",
+      "slug": "workflow-commands",
+      "status": "in-progress",
+      "created": "2026-08-05",
+      "description": "Per-workflow slash commands on all four hosts (e.g. /massa-ai:debug), generated from the workflow inventory",
+      "dependencies": []
     }
   ],
-  "active_feature": "agent-era-harness-upgrades"
+  "active_feature": "workflow-commands"
 }

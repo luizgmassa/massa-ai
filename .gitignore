@@ -74,3 +74,30 @@ apps/*-plugin/agent-profiles/
 apps/codex-plugin/hooks/massa-ai-hook
 apps/cursor-plugin/hooks/massa-ai-hook
 apps/opencode-plugin/lib/opencode-config.cjs
+
+# Generated workflow commands (regenerate via `bun run generate:artifacts`).
+# Star + 6 static negations per shared directory keeps the hand-authored
+# quick commands (def/find/graph/index/map/status) tracked while ignoring
+# every marker-bearing generated file beside them (workflow-commands AD-018).
+apps/claude-plugin/commands/*.md
+!apps/claude-plugin/commands/def.md
+!apps/claude-plugin/commands/find.md
+!apps/claude-plugin/commands/graph.md
+!apps/claude-plugin/commands/index.md
+!apps/claude-plugin/commands/map.md
+!apps/claude-plugin/commands/status.md
+apps/codex-plugin/skills/*.md
+!apps/codex-plugin/skills/def.md
+!apps/codex-plugin/skills/find.md
+!apps/codex-plugin/skills/graph.md
+!apps/codex-plugin/skills/index.md
+!apps/codex-plugin/skills/map.md
+!apps/codex-plugin/skills/status.md
+apps/cursor-plugin/skills/*/SKILL.md
+!apps/cursor-plugin/skills/def/SKILL.md
+!apps/cursor-plugin/skills/find/SKILL.md
+!apps/cursor-plugin/skills/graph/SKILL.md
+!apps/cursor-plugin/skills/index/SKILL.md
+!apps/cursor-plugin/skills/map/SKILL.md
+!apps/cursor-plugin/skills/status/SKILL.md
+apps/opencode-plugin/command/

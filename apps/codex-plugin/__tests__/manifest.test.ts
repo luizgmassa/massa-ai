@@ -6,6 +6,10 @@
  * - .codex-plugin/plugin.json has name, version, description, string skills,
  *   and an interface block — matching the shape Codex's plugin UI renders
  * - 6 skills/*.md files exist (map, index, find, def, graph, status)
+ * - `skills/` holds exactly those 6 marker-free hand-authored files plus one
+ *   marker-bearing generated file per live workflow (widened, workflow-commands
+ *   T5, WFC-11) — the population lock a plain "6 named files exist" check
+ *   could never catch drift in, since it never enumerated the directory
  * - hooks/hooks.json has exactly 6 event keys, each with an owned entry in
  *   Codex's nested matcher-group shape
  * - no plugin-local .mcp.json and no manifest "mcp" pointer — MCP is owned
@@ -13,9 +17,10 @@
  * - hooks/massa-ai-hook symlink resolves to the claude-plugin binary
  */
 
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeAll } from "bun:test";
 import { promises as fs } from "fs";
 import path from "path";
+import { collectWorkflowCommandEntries, WORKFLOW_COMMAND_MARKER } from "../../../scripts/lib/workflow-commands.ts";
 
 const PLUGIN_ROOT = path.resolve(import.meta.dir, "..");
 const REPO_ROOT = path.resolve(PLUGIN_ROOT, "../..");
@@ -23,6 +28,17 @@ const CLAUDE_PLUGIN_BIN = path.resolve(
   REPO_ROOT,
   "apps/claude-plugin/hooks/massa-ai-hook.ts",
 );
+
+beforeAll(async () => {
+  const sentinel = path.join(PLUGIN_ROOT, "skills/debug.md");
+  try {
+    await fs.access(sentinel);
+  } catch {
+    throw new Error(
+      `Generated workflow-command bundle missing at ${sentinel} — run 'bun run generate:artifacts' first.`,
+    );
+  }
+});
 
 async function readJson(p: string): Promise<Record<string, unknown>> {
   return JSON.parse(await fs.readFile(p, "utf8"));
@@ -83,6 +99,31 @@ describe("codex-plugin manifest (T5 / CPX-01,03,04,05)", () => {
       expect(content).toContain("description:");
       expect(content).toContain("allowed-tools:");
     }
+  });
+
+  test("skills/ holds exactly the 6 hand-authored marker-free quick files plus one marker-bearing generated file per live workflow (widened, WFC-11)", async () => {
+    const skillsDir = path.join(PLUGIN_ROOT, "skills");
+    const mdFiles = (await fs.readdir(skillsDir, { withFileTypes: true }))
+      .filter((e) => e.isFile() && e.name.endsWith(".md"))
+      .map((e) => e.name);
+
+    const quickFiles: string[] = [];
+    const generatedFiles: string[] = [];
+    for (const name of mdFiles) {
+      const content = await fs.readFile(path.join(skillsDir, name), "utf8");
+      if (content.includes(WORKFLOW_COMMAND_MARKER)) {
+        generatedFiles.push(name);
+      } else {
+        quickFiles.push(name);
+      }
+    }
+
+    const expectedQuick = ["map", "index", "find", "def", "graph", "status"].map((n) => `${n}.md`);
+    expect(quickFiles.sort()).toEqual(expectedQuick.sort());
+
+    const liveEntries = await collectWorkflowCommandEntries();
+    expect(generatedFiles.length).toBe(liveEntries.length);
+    expect(generatedFiles.sort()).toEqual(liveEntries.map((e) => `${e.stem}.md`).sort());
   });
 
   test("hooks/hooks.json contains exactly 6 event keys (nested under hooks), each with an owned entry", async () => {

@@ -15,6 +15,8 @@ Skills (auto-loaded from `skills/<name>/SKILL.md`):
 | `graph` | Reference graph (who calls / imports / extends) |
 | `status` | Workspaces health + search analytics |
 
+Plus 40 generated workflow commands, one per massa-ai workflow, each auto-loaded the same way (`skills/debug/SKILL.md`, etc.) — see [Workflow Commands](../../FEATURES.md#workflow-commands-generated-slash-commands) in the root feature reference for the full naming table.
+
 MCP server: `massa-ai` (`npx @massa-ai/mcp-client` with `MASSA_AI_API_URL`) — registered into `~/.cursor/mcp.json` by `scripts/install-agents.sh`, which this installer calls for you. That script is the single writer of host MCP config; the plugin ships no `mcp.json`.
 
 Subagent: `massa-ai-navigator` — a code exploration specialist that queries the massa-ai semantic index before falling back to file reads.

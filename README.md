@@ -180,6 +180,12 @@ backup + `_massaAiOwned` marker — user hooks are always preserved.
 | **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + MCP into `~/.cursor/mcp.json` + 17 subagent specialists | No |
 | **OpenCode** | `bash apps/opencode-plugin/install.sh --user` | 6 (in-process) | MCP into `opencode.json`/`opencode.jsonc` (54 tools) + lifecycle handlers + 17 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
 
+Each plugin also ships generated slash commands — one per massa-ai workflow (40 today)
+(`/massa-ai:debug`, `$debug`, etc., naming varies by host) — alongside the 6
+quick commands in the table above; see
+[Workflow Commands](./FEATURES.md#workflow-commands-generated-slash-commands)
+in the feature reference for the full per-host naming table.
+
 Claude Code and Codex additionally support their **native plugin managers**,
 which is what makes massa-ai visible in `/plugin` and `/plugins`:
 

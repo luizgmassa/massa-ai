@@ -43,8 +43,14 @@ import { promises as fs } from "fs";
 import path from "path";
 import { tmpdir } from "os";
 import { HOSTS, capabilitiesFor, type Host, type HostCapabilities } from "./lib/host-capabilities.ts";
+import {
+  collectWorkflowCommandEntries,
+  WORKFLOW_COMMAND_MARKER,
+  type WorkflowCommandEntry,
+} from "./lib/workflow-commands.ts";
 
 export { HOSTS, type Host };
+export { collectWorkflowCommandEntries, WORKFLOW_COMMAND_MARKER };
 
 // ── Paths ───────────────────────────────────────────────────────────────────
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -266,6 +272,127 @@ async function pruneManagedRoots(
   }
 }
 
+// ── Workflow commands (T2, WFC-01..06) ──────────────────────────────────────
+//
+// Claude/Codex/Cursor emit generated commands into a directory that ALSO
+// holds hand-authored quick-command files (commands/ or skills/), so their
+// ownership boundary is the body marker, not directory-root membership —
+// managedRootsFor()/pruneManagedRoots() must never own these paths (a
+// reserved-root collision on the stem itself is already ruled out by T1's
+// collectWorkflowCommandEntries() guard). OpenCode's command/ directory has
+// no hand-authored siblings at all, so it rides the ordinary
+// extraManagedRoots directory-root mechanism instead (see host-capabilities.ts).
+type MarkerScopedShape = "flat-md" | "subdir-skill-md";
+
+const SHARED_WORKFLOW_HOST_DIRS: Partial<Record<Host, { rel: string; shape: MarkerScopedShape }>> = {
+  claude: { rel: "commands", shape: "flat-md" },
+  codex: { rel: "skills", shape: "flat-md" },
+  cursor: { rel: "skills", shape: "subdir-skill-md" },
+};
+
+/** Marker-scoped prune candidates directly inside `dirAbs` — one level only,
+ *  never recursive, so a managed subdirectory sibling (skills/massa-ai/) is
+ *  structurally out of reach regardless of its own content. */
+async function markerScopedCandidates(
+  dirAbs: string,
+  shape: MarkerScopedShape,
+): Promise<{ relPath: string; absPath: string }[]> {
+  let entries;
+  try {
+    entries = await fs.readdir(dirAbs, { withFileTypes: true });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw err;
+  }
+  const candidates: { relPath: string; absPath: string }[] = [];
+  if (shape === "flat-md") {
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.endsWith(".md")) {
+        candidates.push({ relPath: entry.name, absPath: path.join(dirAbs, entry.name) });
+      }
+    }
+  } else {
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        candidates.push({
+          relPath: path.posix.join(entry.name, "SKILL.md"),
+          absPath: path.join(dirAbs, entry.name, "SKILL.md"),
+        });
+      }
+    }
+  }
+  return candidates;
+}
+
+/**
+ * Deletes every candidate under `dirAbs` whose content carries
+ * WORKFLOW_COMMAND_MARKER — a stale artifact of a since-deleted workflow.
+ * Hand-authored files (def.md, skills/def/SKILL.md, ...) never carry the
+ * marker and are structurally unprunable by this function.
+ * Test: bun test scripts/__tests__/workflow-command-emit.test.ts
+ */
+async function pruneMarkerScopedWorkflowCommands(dirAbs: string, shape: MarkerScopedShape): Promise<void> {
+  const candidates = await markerScopedCandidates(dirAbs, shape);
+  for (const candidate of candidates) {
+    let content: string;
+    try {
+      content = await fs.readFile(candidate.absPath, "utf8");
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw err;
+    }
+    if (!content.includes(WORKFLOW_COMMAND_MARKER)) continue;
+    await fs.rm(candidate.absPath, { force: true });
+    if (shape === "subdir-skill-md") {
+      // skills/<stem>/ becomes empty once its only file (SKILL.md) is gone —
+      // remove the now-empty stem directory too.
+      const stemDir = path.dirname(candidate.absPath);
+      const remaining = await fs.readdir(stemDir).catch(() => ["non-empty-sentinel"]);
+      if (remaining.length === 0) await fs.rmdir(stemDir).catch(() => undefined);
+    }
+  }
+}
+
+/** Writes one generated command file per workflow entry for a shared-dir
+ *  host (claude/codex/cursor); returns the count emitted. Marker-scoped
+ *  prune runs first so a deleted workflow's stale artifact never survives. */
+async function emitSharedWorkflowCommands(
+  host: Host,
+  targetRoot: string,
+  entries: readonly WorkflowCommandEntry[],
+): Promise<number> {
+  const target = SHARED_WORKFLOW_HOST_DIRS[host];
+  if (!target) return 0;
+  const dirAbs = path.join(targetRoot, target.rel);
+  await pruneMarkerScopedWorkflowCommands(dirAbs, target.shape);
+
+  for (const entry of entries) {
+    const destPath =
+      target.shape === "subdir-skill-md"
+        ? path.join(dirAbs, entry.stem, "SKILL.md")
+        : path.join(dirAbs, `${entry.stem}.md`);
+    await fs.mkdir(path.dirname(destPath), { recursive: true });
+    await fs.writeFile(destPath, entry.sharedBody);
+  }
+  return entries.length;
+}
+
+/** Writes OpenCode's `command/massa-ai-<stem>.md` variant. The directory
+ *  itself was already wholesale-pruned by pruneManagedRoots() above (via
+ *  extraManagedRoots) — no marker scoping needed on this host. */
+async function emitOpencodeWorkflowCommands(
+  targetRoot: string,
+  entries: readonly WorkflowCommandEntry[],
+): Promise<number> {
+  const dirAbs = path.join(targetRoot, "command");
+  for (const entry of entries) {
+    const destPath = path.join(dirAbs, `massa-ai-${entry.stem}.md`);
+    await fs.mkdir(path.dirname(destPath), { recursive: true });
+    await fs.writeFile(destPath, entry.opencodeBody);
+  }
+  return entries.length;
+}
+
 /**
  * `hosts` (default `HOSTS`) and `capsLookup` (default the real
  * capabilitiesFor()) are the seam XP-06 AC-2's fixture-host test drives:
@@ -273,19 +400,27 @@ async function pruneManagedRoots(
  * root and the hook-binary copy are both decided from the table, not from a
  * literal host-name comparison. Only 2 production call sites (main, runCheck
  * below), both in this file — no external call-site contract to preserve.
+ *
+ * `onHostEmitted`, if supplied, is invoked once per host with that host's own
+ * emitted-file count (T2, print-population-per-host) — kept as a callback
+ * rather than widening the return type so every existing call site (tests
+ * included) that reads emitAll()'s resolved value as a bare total keeps working.
  */
 export async function emitAll(
   targetRoots: Record<string, string>,
   hosts: readonly string[] = HOSTS,
   capsLookup: CapsLookup = REAL_CAPS_LOOKUP,
+  onHostEmitted?: (host: string, count: number) => void,
 ): Promise<number> {
   const skillEntries = await collectSkillEntries();
   const opencodeLibEntries = await collectOpencodeLibEntries();
   const hookBinaryEntries = await collectHookBinaryEntries();
   const hookHosts = hookBinaryHosts(hosts, capsLookup);
+  const workflowCommandEntries = await collectWorkflowCommandEntries();
 
   let total = 0;
   for (const host of hosts) {
+    let hostTotal = 0;
     // Prune-before-emit (UGB-04): must run before any copy below so a stale
     // file from a deleted source never survives regeneration.
     await pruneManagedRoots(targetRoots[host]!, host, hookBinaryEntries, capsLookup);
@@ -293,6 +428,7 @@ export async function emitAll(
     const skillsDest = path.join(targetRoots[host]!, "skills");
     await copyEntries(skillEntries, skillsDest);
     total += skillEntries.length;
+    hostTotal += skillEntries.length;
 
     // "lib" is opencode's vendored opencode-config.cjs copy today; whether a
     // host gets it is now table-driven (extraManagedRoots), not a literal
@@ -301,6 +437,7 @@ export async function emitAll(
       const libDest = path.join(targetRoots[host]!, "lib");
       await copyEntries(opencodeLibEntries, libDest);
       total += opencodeLibEntries.length;
+      hostTotal += opencodeLibEntries.length;
     }
 
     if (hookHosts.includes(host)) {
@@ -310,7 +447,20 @@ export async function emitAll(
         await fs.chmod(path.join(hooksDest, ...entry.relPath.split("/")), HOOK_BINARY_MODE);
       }
       total += hookBinaryEntries.length;
+      hostTotal += hookBinaryEntries.length;
     }
+
+    if (host in SHARED_WORKFLOW_HOST_DIRS) {
+      const count = await emitSharedWorkflowCommands(host as Host, targetRoots[host]!, workflowCommandEntries);
+      total += count;
+      hostTotal += count;
+    } else if (capsLookup(host)?.extraManagedRoots.includes("command")) {
+      const count = await emitOpencodeWorkflowCommands(targetRoots[host]!, workflowCommandEntries);
+      total += count;
+      hostTotal += count;
+    }
+
+    onHostEmitted?.(host, hostTotal);
   }
   return total;
 }
@@ -352,6 +502,56 @@ async function diffManagedRoot(
   return { root: label, missing, unexpected, modified };
 }
 
+/**
+ * Marker-scoped counterpart to diffManagedRoot() (T3, WFC-07): the
+ * checked-in side is filtered to marker-bearing candidates only, so the
+ * hand-authored quick-command siblings living in the same directory
+ * (def.md, skills/def/SKILL.md, ...) never register as `unexpected`. The
+ * generated side needs no filtering — everything emitSharedWorkflowCommands()
+ * writes already carries the marker (T2) — but is filtered anyway,
+ * defensively, so this function's correctness never depends on that
+ * invariant holding in the caller.
+ * Test: bun test scripts/__tests__/workflow-command-check.test.ts
+ */
+async function diffMarkerScopedWorkflowCommands(
+  generatedRoot: string,
+  checkedInRoot: string,
+  shape: MarkerScopedShape,
+  label: string,
+): Promise<RootDiff> {
+  async function markerScopedInventory(dirAbs: string): Promise<Map<string, Buffer>> {
+    const out = new Map<string, Buffer>();
+    for (const candidate of await markerScopedCandidates(dirAbs, shape)) {
+      let buf: Buffer;
+      try {
+        buf = await fs.readFile(candidate.absPath);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw err;
+      }
+      if (!buf.toString("utf8").includes(WORKFLOW_COMMAND_MARKER)) continue;
+      out.set(candidate.relPath, buf);
+    }
+    return out;
+  }
+
+  const [generated, checkedIn] = await Promise.all([
+    markerScopedInventory(generatedRoot),
+    markerScopedInventory(checkedInRoot),
+  ]);
+
+  const missing = [...generated.keys()].filter((r) => !checkedIn.has(r)).sort();
+  const unexpected = [...checkedIn.keys()].filter((r) => !generated.has(r)).sort();
+  const modified: string[] = [];
+  for (const [rel, gBuf] of generated) {
+    const cBuf = checkedIn.get(rel);
+    if (cBuf && !gBuf.equals(cBuf)) modified.push(rel);
+  }
+  modified.sort();
+
+  return { root: label, missing, unexpected, modified };
+}
+
 export async function runCheck(): Promise<number> {
   const tmp = await fs.mkdtemp(path.join(tmpdir(), "massa-ai-skill-gen-"));
   try {
@@ -378,6 +578,32 @@ export async function runCheck(): Promise<number> {
         for (const f of diff.missing) console.error(`  + ${f} (missing — regenerate and commit)`);
         for (const f of diff.unexpected) console.error(`  - ${f} (unexpected — stale file, source was likely deleted)`);
         for (const f of diff.modified) console.error(`  M ${f} (content differs from source)`);
+      }
+
+      // Workflow commands (T3, WFC-07): marker-scoped, not a directory-root
+      // walk — commands/ (claude) and skills/ (codex, cursor) also hold the
+      // 6 hand-authored quick-command files, which a plain diffManagedRoot()
+      // would wrongly flag as `unexpected`. OpenCode's command/ root has no
+      // hand-authored siblings and already flows through the managedRootsFor
+      // loop above via extraManagedRoots.
+      const workflowTarget = SHARED_WORKFLOW_HOST_DIRS[host];
+      if (workflowTarget) {
+        const generatedRoot = path.join(tmpRoots[host], workflowTarget.rel);
+        const checkedInRoot = path.join(pluginRoot(host), workflowTarget.rel);
+        const label = `${host}-plugin/${workflowTarget.rel} (workflow commands)`;
+        const diff = await diffMarkerScopedWorkflowCommands(
+          generatedRoot,
+          checkedInRoot,
+          workflowTarget.shape,
+          label,
+        );
+        if (diff.missing.length > 0 || diff.unexpected.length > 0 || diff.modified.length > 0) {
+          drift = true;
+          console.error(`[${label}] drift detected:`);
+          for (const f of diff.missing) console.error(`  + ${f} (missing — regenerate and commit)`);
+          for (const f of diff.unexpected) console.error(`  - ${f} (unexpected — stale file, source was likely deleted)`);
+          for (const f of diff.modified) console.error(`  M ${f} (content differs from source)`);
+        }
       }
 
       // hooks/massa-ai-hook lives beside hand-maintained hooks.json, so this is
@@ -424,8 +650,14 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     return runCheck();
   }
   const targetRoots = Object.fromEntries(HOSTS.map((h) => [h, pluginRoot(h)])) as Record<Host, string>;
-  const total = await emitAll(targetRoots);
+  const perHost: Record<string, number> = {};
+  const total = await emitAll(targetRoots, HOSTS, REAL_CAPS_LOOKUP, (host, count) => {
+    perHost[host] = count;
+  });
   console.log(`Emitted ${total} skill-bundle files across ${HOSTS.length} hosts.`);
+  for (const host of HOSTS) {
+    console.log(`  ${host}: ${perHost[host] ?? 0} files (incl. workflow commands)`);
+  }
   return 0;
 }
 

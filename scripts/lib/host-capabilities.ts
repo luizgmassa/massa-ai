@@ -150,8 +150,12 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     forwardsUnknownFrontmatter: true,
     // No shared hook binary — OpenCode uses in-process handlers (src/index.ts).
     hookBinaryDelivery: "none",
-    // managedRootsFor's opencode branch: the vendored opencode-config.cjs copy.
-    extraManagedRoots: ["lib"],
+    // managedRootsFor's opencode branch: the vendored opencode-config.cjs
+    // copy, plus the generated workflow-command directory (T2/WFC-02) — a
+    // wholly-generated root with no hand-authored siblings on this host, so
+    // it rides the plain directory-root prune/check machinery instead of
+    // the marker-scoped mechanism the three shared-directory hosts need.
+    extraManagedRoots: ["lib", "command"],
     sessionStartStdoutDelivered: null,
     // Same README citation as claude.
     handoffInjectionPoint: null,

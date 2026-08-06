@@ -5,6 +5,9 @@
  * criteria (CRS-01, CRS-03, CRS-04, CRS-05, CRS-06, CRS-08):
  * - 7 events in hooks/hooks.json including sessionStart + preCompact (historical gap fix)
  * - 6 skills/<name>/SKILL.md files exist
+ * - `skills/` holds exactly those 6 marker-free hand-authored stem dirs plus
+ *   one marker-bearing generated stem dir per live workflow (widened,
+ *   workflow-commands T6, WFC-11)
  * - agents/massa-ai-navigator.md exists
  * - mcp.json declares the massa-ai MCP server (npx @massa-ai/mcp-client)
  * - .cursor-plugin/plugin.json has name and version
@@ -12,9 +15,14 @@
  * - directory layout matches vscode.cursor.plugins.registerPath auto-discovery
  */
 
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeAll } from "bun:test";
 import { promises as fs } from "fs";
 import path from "path";
+import {
+  collectWorkflowCommandEntries,
+  WORKFLOW_COMMAND_MARKER,
+  RESERVED_BUNDLE_ROOTS,
+} from "../../../scripts/lib/workflow-commands.ts";
 
 const PLUGIN_ROOT = path.resolve(import.meta.dir, "..");
 const REPO_ROOT = path.resolve(PLUGIN_ROOT, "../..");
@@ -26,6 +34,17 @@ const CLAUDE_PLUGIN_BIN = path.resolve(
 async function readJson(p: string): Promise<Record<string, unknown>> {
   return JSON.parse(await fs.readFile(p, "utf8"));
 }
+
+beforeAll(async () => {
+  const sentinel = path.join(PLUGIN_ROOT, "skills/debug/SKILL.md");
+  try {
+    await fs.access(sentinel);
+  } catch {
+    throw new Error(
+      `Generated workflow-command bundle missing at ${sentinel} — run 'bun run generate:artifacts' first.`,
+    );
+  }
+});
 
 describe("cursor-plugin manifest (T10 / CRS-01,03,04,05,06,08)", () => {
   test("hooks/hooks.json contains 7 events including sessionStart + preCompact (historical gap fix)", async () => {
@@ -71,6 +90,38 @@ describe("cursor-plugin manifest (T10 / CRS-01,03,04,05,06,08)", () => {
       expect(content).toContain("description:");
       expect(content).toContain("allowed-tools:");
     }
+  });
+
+  test("skills/ holds exactly the 6 hand-authored marker-free quick stem dirs plus one marker-bearing generated stem dir per live workflow (widened, WFC-11)", async () => {
+    const skillsDir = path.join(PLUGIN_ROOT, "skills");
+    const reserved = new Set<string>(RESERVED_BUNDLE_ROOTS);
+    const stemDirs = (await fs.readdir(skillsDir, { withFileTypes: true }))
+      .filter((e) => e.isDirectory() && !reserved.has(e.name))
+      .map((e) => e.name);
+
+    const quickStems: string[] = [];
+    const generatedStems: string[] = [];
+    for (const stem of stemDirs) {
+      const skillMd = path.join(skillsDir, stem, "SKILL.md");
+      let content: string;
+      try {
+        content = await fs.readFile(skillMd, "utf8");
+      } catch {
+        continue; // not a stem dir this lock is scoped to (e.g. nested agents/)
+      }
+      if (content.includes(WORKFLOW_COMMAND_MARKER)) {
+        generatedStems.push(stem);
+      } else {
+        quickStems.push(stem);
+      }
+    }
+
+    const expectedQuick = ["map", "index", "find", "def", "graph", "status"];
+    expect(quickStems.sort()).toEqual(expectedQuick.sort());
+
+    const liveEntries = await collectWorkflowCommandEntries();
+    expect(generatedStems.length).toBe(liveEntries.length);
+    expect(generatedStems.sort()).toEqual(liveEntries.map((e) => e.stem).sort());
   });
 
   test("agents/massa-ai-navigator.md exists", async () => {

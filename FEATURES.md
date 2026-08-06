@@ -16,6 +16,7 @@ Every feature in massa-ai, what it does, why it exists, and how to use it.
 - [Persistent Memory](#persistent-memory)
 - [Passive Capture (Hooks)](#passive-capture-hooks)
 - [Plugins (4-Tool Parity)](#plugins-4-tool-parity)
+- [Workflow Commands (Generated Slash Commands)](#workflow-commands-generated-slash-commands)
 - [Model Profile Switching](#model-profile-switching)
 - [Workflow Tools (52-Tool Adoption)](#workflow-tools-52-tool-adoption)
 - [Bootstrap](#bootstrap)
@@ -331,6 +332,34 @@ OpenCode is no longer an exception (AD-017): `install-agents.sh` always writes t
 Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/plugins/massa-ai/` and `~/.cursor/plugins/massa-ai/`. Neither was a host read path; reinstalling a plugin removes the stale file.
 
 **Spec:** `.specs/features/codex-cursor-plugin-parity/`
+
+---
+
+## Workflow Commands (Generated Slash Commands)
+
+**What:** massa-ai generates one host-native slash command per workflow skill under `skills/massa-ai/workflows/**/*.md` (40 at last count, scan-derived — never hardcoded). Every workflow the massa-ai router can dispatch becomes directly invocable, skipping the router's own classification step for the explicit case.
+
+**Why:** Without a dedicated command, invoking a specific workflow (e.g. `debug`, `tdd`, `security-audit`) means describing intent in prose and trusting the router's classifier. A generated command makes the choice explicit and one keystroke away, on every host, for every workflow — not just the 6 hand-authored "quick" commands (`map`/`index`/`find`/`def`/`graph`/`status`).
+
+**Command body:** every generated command loads the massa-ai router skill (dedupe-guarded), then routes to its named workflow under routing precedence 1 (explicit route) — it never re-classifies — and passes the invocation's arguments verbatim as the task description; the workflow's own intake gathers detail when the arguments are empty.
+
+**Per-host invocation:**
+
+| Host | Installed path | Invocation |
+|------|-----------------|------------|
+| Claude Code (marketplace route, `/plugin install`) | served in place from the bundle's `commands/<stem>.md` | `/massa-ai:<stem>` (e.g. `/massa-ai:debug`) |
+| Claude Code (file route) | `~/.claude/commands/massa-ai-<stem>.md` | `/massa-ai-<stem>` |
+| Codex | `~/.codex/plugins/massa-ai/skills/<stem>.md` | `$<stem>` (Codex `$`-mention, same convention as the 6 quick skills) |
+| Cursor | `~/.cursor/plugins/local/massa-ai/skills/<stem>/SKILL.md` | auto-loaded skill, invoked via Cursor's skill picker |
+| OpenCode | `~/.config/opencode/command/massa-ai-<stem>.md` | `/massa-ai-<stem>` |
+
+**Generation:** part of the same `bun run generate:artifacts` entrypoint that emits skills/agents/hooks — scanned from `skills/massa-ai/workflows/**/*.md`, validated fail-loud (unique stem, no collision with the 6 quick-command names or the reserved bundle roots `massa-ai`/`persona-router`/`profile`/`agents`, charset `^[a-z0-9][a-z0-9-]*$`), and rendered per host: one byte-identical template for Claude/Codex/Cursor, a minimal-frontmatter variant for OpenCode (unknown frontmatter keys are forwarded to the model provider there, so only `description:` ships).
+
+**Ownership + drift:** generated files carry a body marker (`<!-- massa-ai:generated workflow-command -->`) and are gitignored build output (AD-016) — regenerate with `bun run generate:artifacts` after a `git pull` in a checkout, same as the rest of the plugin bundles (see "Generation prerequisite" in the [README](./README.md#plugin-bundles-4-tool-parity)). The marker is what lets prune and `--check` share Claude's `commands/` and Codex/Cursor's `skills/` directories safely with the hand-authored quick commands, which never carry it; `bun scripts/generate-skill-artifacts.ts --check` flags any drift (stale, missing, or modified) same as it does for every other generated surface.
+
+**Delivery:** rides the existing installer copy loops on Claude/Codex/Cursor — their `commands/`/`skills/` scans already ship whatever the bundle contains. OpenCode's installer has a dedicated copy-in / owned-prefix-glob-uninstall section for `command/`, mirroring the pattern Claude's file-route uninstall uses for its own owned commands.
+
+**Spec:** `.specs/features/workflow-commands/`
 
 ---
 

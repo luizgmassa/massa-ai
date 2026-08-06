@@ -24,8 +24,10 @@ import { join, resolve } from "node:path";
 
 import {
   EXPECTED_PACKAGES,
+  checkGeneratedEntries,
   diffInventory,
   extractArtifactPaths,
+  fullEntries,
   pathsForPackage,
   topLevelEntries,
   verifyPackageContents,
@@ -98,6 +100,10 @@ describe("extractArtifactPaths", () => {
     // apps/opencode-plugin/agents is the PDO-26 fix: without it, the staged-copy this
     // script reproduces cannot see the 17 agent charters declared in package.json#files.
     expect(paths).toContain("apps/opencode-plugin/agents");
+    // apps/opencode-plugin/command (T11, WFC-09): package.json#files declares
+    // "command/*.md" — same PDO-26 defect shape as agents/ if this artifact
+    // path were ever dropped from publish.yml while the files glob stayed.
+    expect(paths).toContain("apps/opencode-plugin/command");
   });
 });
 
@@ -203,6 +209,53 @@ describe("topLevelEntries", () => {
       rmSync(tmp, { recursive: true, force: true });
     }
   }, 30_000);
+});
+
+// ── fullEntries ───────────────────────────────────────────────────────────────
+
+describe("fullEntries", () => {
+  test("strips the npm package/ prefix and keeps the full in-package path (not just the top segment)", () => {
+    const entries = [
+      "package/commands/",
+      "package/commands/debug.md",
+      "package/commands/adr.md",
+      "package/package.json",
+    ];
+    expect(fullEntries(entries)).toEqual(
+      new Set(["commands", "commands/debug.md", "commands/adr.md", "package.json"]),
+    );
+  });
+});
+
+// ── checkGeneratedEntries (T11, WFC-09) ──────────────────────────────────────
+
+describe("checkGeneratedEntries", () => {
+  const pkg = {
+    dir: "apps/example-plugin",
+    name: "@massa-ai/example-plugin",
+    requiredTopLevel: ["command", "package.json"],
+    requiredGeneratedEntries: ["command/massa-ai-debug.md"],
+  };
+
+  test("passes silently when a package declares no requiredGeneratedEntries", () => {
+    const bare = { dir: "x", name: "@massa-ai/x", requiredTopLevel: ["dist"] };
+    expect(checkGeneratedEntries(bare, new Set(["dist"]))).toEqual([]);
+  });
+
+  test("passes when the declared generated entry is a real tar entry", () => {
+    const actual = new Set(["command", "command/massa-ai-debug.md", "package.json"]);
+    expect(checkGeneratedEntries(pkg, actual)).toEqual([]);
+  });
+
+  test("fails when the top-level directory name ships but is empty of the generated member — the exact gap requiredTopLevel alone cannot see", () => {
+    // "command" is present as a top-level entry (would pass diffInventory), but the
+    // one file inside it that must be there is absent — the shape a generator that
+    // silently emits into the wrong per-host branch would produce.
+    const actualEmptyDir = new Set(["command", "package.json"]);
+    expect(checkGeneratedEntries(pkg, actualEmptyDir)).toEqual([
+      "command/massa-ai-debug.md",
+    ]);
+  });
 });
 
 // ── EXPECTED_PACKAGES sanity ─────────────────────────────────────────────────
