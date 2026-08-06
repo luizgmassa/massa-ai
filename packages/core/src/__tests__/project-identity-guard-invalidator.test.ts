@@ -74,7 +74,7 @@ mock.module("../kernel/db-connection.js", () => ({
 
 // FROZEN explicit expectation (review-driven: deriving this from
 // STATIC_DIRECT_STORES would mirror the implementation and pass green if a
-// registry entry were deleted). 22 mutable direct stores + operation_log
+// registry entry were deleted). 23 mutable direct stores + operation_log
 // (guarded so NEW audit rows resolve aliases; history is never rewritten).
 const EXPECTED_GUARDED_TABLES = [
   "memories",
@@ -99,6 +99,7 @@ const EXPECTED_GUARDED_TABLES = [
   "search_analytics",
   "search_events",
   "synapse_sessions",
+  "managed_runs",
   "operation_log",
 ] as const;
 const EXPECTED_SKIPPED_TABLES = ["project_identity_operations"] as const;
