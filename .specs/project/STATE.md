@@ -1,6 +1,6 @@
 # massa-ai Spec State
 
-## Current — PR Review Workflow (Execute T1–T5 complete 2026-08-05; T6 validation in flight)
+## Current — PR Review Workflow (**VALIDATED PASS 2026-08-05** — 26/26 ACs, 5/5 mutations killed, iteration 1; push/PR = user decision)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-pr-review-workflow` ·
   workflow: spec-driven (Large) · branch `spec/pr-review-workflow` from
@@ -31,8 +31,16 @@
   1451/4 — the 4 fails are the documented `.claude/worktrees/` needle-anchor
   contamination class (3 sibling checkouts duplicate `const DAMPING = 0.85;`;
   same class as workflow-metadata-headers AC5 amendment; CI authoritative).
-- Next: T6 — FEATURES.json entry, HANDOFF rotation, check_specs_delivered,
-  independent verification-agent → validation.md; push/PR = user decision.
+- Validation (author ≠ verifier, iteration 1 of 3): PASS — 26/26 lettered ACs
+  (17 structural via verifier-owned gate runs, 9 prose via clause quotes),
+  5/5 discrimination mutations killed (count-lock revert, persona-line delete,
+  intake-line delete, multiline frontmatter description, bare-role rename; all
+  restores cp-based and diff-verified — never git checkout), 6 suites 131/0,
+  parity no drift, doc-paths 0 misses, check_specs_delivered 0. Verifier note:
+  a YAML folded-scalar mutation variant was correctly non-red (folding removes
+  the newline pre-parse) and was redone as a literal block scalar — real red.
+  validation.md carries the validate_state-parseable Summary/Result shape.
+- Next: push + PR (user decision, outward-facing; not taken unattended).
 
 ## Previous — Untracked Generated Bundles (**VALIDATED PASS 2026-08-05** — 17/17 ACs, 7/7 mutations after fix loop 1; merged as PR #73, released v1.29.0)
 

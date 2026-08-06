@@ -1,4 +1,4 @@
-# Handoff — pr-review-workflow (Execute complete through T5; T6 validation in flight; push/PR = user decision)
+# Handoff — pr-review-workflow (VALIDATED PASS 2026-08-05 — 26/26 ACs, 5/5 mutations killed; push/PR = user decision)
 
 Previous handoffs closed: untracked-generated-bundles merged as PR #73 @
 `40ec631a`, released v1.29.0 (its full handoff is preserved below as Previous);
@@ -48,11 +48,13 @@ surface researched against official docs (citations in design.md D1); stable
 
 ## Next Step
 
-T6 close-out: independent verification-agent (author ≠ verifier) →
-`.specs/features/pr-review-workflow/validation.md`; flip FEATURES.json status
-on PASS; final state commit. Then push + PR are the user's decision
-(outward-facing; not taken unattended). No installed-machine actions needed —
-the workflow ships with the skills bundles on the next release/install.
+Done through T6: independent validation PASS (26/26 ACs, 5/5 mutations killed,
+0 gaps — `.specs/features/pr-review-workflow/validation.md`); FEATURES.json
+status `complete`. Remaining: push `spec/pr-review-workflow` + open the PR —
+the user's decision (outward-facing; not taken unattended). CHANGELOG entry
+present, so the merge gate is satisfied without the `no-changelog` label. No
+installed-machine actions needed — the workflow ships with the skills bundles
+on the next release/install.
 
 ---
 

@@ -157,16 +157,16 @@ recorded).
 
 | Requirement ID | Story | Phase | Status |
 | --- | --- | --- | --- |
-| PRW-01 | P1 | Design | Pending |
-| PRW-02 | P1 | Design | Pending |
-| PRW-03 | P1 | Design | Pending |
-| PRW-04 | P1 | Design | Pending |
-| PRW-05 | P1 | Design | Pending |
-| PRW-06 | P2 | Design | Pending |
-| PRW-07 | P3 | Design | Pending |
-| PRW-08 | P1 | Design | Pending |
-| PRW-09 | Gate | Design | Pending |
-| PRW-10 | P2 | Design | Pending |
+| PRW-01 | P1 | Execute | Verified |
+| PRW-02 | P1 | Execute | Verified |
+| PRW-03 | P1 | Execute | Verified |
+| PRW-04 | P1 | Execute | Verified |
+| PRW-05 | P1 | Execute | Verified |
+| PRW-06 | P2 | Execute | Verified |
+| PRW-07 | P3 | Execute | Verified |
+| PRW-08 | P1 | Execute | Verified |
+| PRW-09 | Gate | Execute | Verified |
+| PRW-10 | P2 | Execute | Verified |
 
 **ID format:** `PRW-[NUMBER]` with lettered acceptance criteria.
 
