@@ -579,11 +579,15 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
     merge_settings_hooks "$SETTINGS_JSON" "uninstall"
     echo "  - removed massa-ai hook entries from $SETTINGS_JSON"
   fi
-  # Remove owned command files
+  # Remove owned command files. Prefix-glob against the INSTALLED directory,
+  # not the source bundle: deriving removals from $SCRIPT_DIR/commands/*.md
+  # misses installed copies whenever the bundle is absent or stale at
+  # uninstall time (normal under AD-016 — generated artifacts are untracked).
+  # The massa-ai- prefix is the ownership marker, same as the agents loop below.
   if [[ -d "$TARGET/commands" ]]; then
-    for src in "$SCRIPT_DIR/commands/"*.md; do
-      name="$(basename "$src" .md)"
-      rm -f "$TARGET/commands/massa-ai-${name}.md"
+    for f in "$TARGET/commands/"massa-ai-*.md; do
+      [[ -f "$f" ]] || continue
+      rm -f "$f"
     done
     echo "  - removed massa-ai-* commands from $TARGET/commands/"
   fi
