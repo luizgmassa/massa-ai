@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.0] - 2026-08-06
+
 ### Added
 
 - **Explicit Isolation Gate line in all 16 implementation workflows.** Each
