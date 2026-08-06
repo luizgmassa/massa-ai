@@ -105,8 +105,9 @@ function extractDescription(raw: string): string | null {
 
 /** Escapes a value for embedding inside a double-quoted YAML scalar
  *  (`description: "..."`). skill-architect.md's own description contains
- *  literal double quotes, so this is not a theoretical case. */
-function escapeYamlDoubleQuoted(value: string): string {
+ *  literal double quotes, so this is not a theoretical case. Exported so
+ *  tests assert against this exact escaping instead of re-implementing it. */
+export function escapeYamlDoubleQuoted(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 

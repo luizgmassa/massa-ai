@@ -14,6 +14,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import {
   collectWorkflowCommandEntries,
+  escapeYamlDoubleQuoted,
   WORKFLOW_COMMAND_MARKER,
   QUICK_COMMAND_NAMES,
 } from "../lib/workflow-commands.ts";
@@ -175,7 +176,7 @@ describe("workflow-command parity — description sourced from workflow frontmat
         path.join(REPO_ROOT, "apps/claude-plugin/commands", `${stem}.md`),
         "utf8",
       );
-      expect(claudeBody).toContain(expectedDescription.replace(/"/g, '\\"'));
+      expect(claudeBody).toContain(escapeYamlDoubleQuoted(expectedDescription));
     }
   });
 });
