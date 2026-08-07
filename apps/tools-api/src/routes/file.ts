@@ -17,10 +17,27 @@ function getReadFileTool(): ReadFileTool {
   return readFileTool;
 }
 
+/**
+ * `ReadFileTool.handle()` returns `{success:false, error: string}` with no
+ * structured error code — classify by message shape. ENOENT/no-such-file is
+ * the resource-doesn't-exist case (404); ambiguous-path, containment
+ * violations, and everything else are client-request problems (400).
+ */
+function classifyReadFileFailureStatus(message: string | undefined): number {
+  if (message && /ENOENT|no such file/i.test(message)) {
+    return 404;
+  }
+  return 400;
+}
+
 export const fileRoutes = new Elysia({ prefix: "/api/v1/file" }).post(
   "/read",
-  async ({ body }) => {
-    return await getReadFileTool().handle(body);
+  async ({ body, set }) => {
+    const result = await getReadFileTool().handle(body);
+    if (result.success === false) {
+      set.status = classifyReadFileFailureStatus(result.error);
+    }
+    return result;
   },
   {
     body: t.Object({

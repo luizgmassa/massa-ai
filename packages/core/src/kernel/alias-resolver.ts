@@ -25,6 +25,7 @@
 
 import { logger } from "@massa-ai/shared";
 import { getPgPool } from "./db-connection.js";
+import { safeErrorSummary } from "./sanitize/safe-error-summary.js";
 
 /** Minimal query surface (pg Pool/PoolClient both satisfy it). */
 export interface AliasResolverQuerier {
@@ -90,9 +91,10 @@ export class ProjectIdentityAliasResolver {
     } catch (error) {
       // Fail-open: proceed with the original ID. No negative-cache write, so
       // the next writer retries the lookup instead of riding a transient.
-      logger.warn("[project-identity] alias resolution failed; using original id (sanitized)", {
-        name: error instanceof Error ? error.name : "unknown",
-      });
+      logger.warn(
+        "[project-identity] alias resolution failed; using original id",
+        safeErrorSummary(error),
+      );
       return projectId;
     }
   }

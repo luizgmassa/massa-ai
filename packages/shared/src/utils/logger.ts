@@ -4,6 +4,7 @@
  * Structured logging with levels and metadata support
  */
 
+import fs from 'node:fs';
 import { ILogger } from '../types/interfaces.js';
 import { config } from '../config/index.js';
 
@@ -17,6 +18,7 @@ export enum LogLevel {
 export class Logger implements ILogger {
   private _level?: LogLevel;
   private _enableMetrics?: boolean;
+  private _logFilePath?: string;
   private _initialized = false;
 
   constructor() {
@@ -29,13 +31,18 @@ export class Logger implements ILogger {
   private ensureInitialized(): void {
     if (!this._initialized) {
       try {
-        const configLevel = config.get('logging').level;
-        this._level = this.parseLogLevel(configLevel);
-        this._enableMetrics = config.get('logging').enableMetrics;
+        const loggingConfig = config.get('logging');
+        this._level = this.parseLogLevel(loggingConfig.level);
+        this._enableMetrics = loggingConfig.enableMetrics;
+        // env > config.json precedence is already resolved by config/index.ts
+        // (mirrors `level`'s MASSA_AI_LOG_FILE/LOG_LEVEL handling), so this is
+        // a plain read.
+        this._logFilePath = loggingConfig.file;
       } catch {
         // Fallback if config is not available yet
         this._level = LogLevel.INFO;
         this._enableMetrics = false;
+        this._logFilePath = undefined;
       }
       this._initialized = true;
     }
@@ -49,6 +56,11 @@ export class Logger implements ILogger {
   private get enableMetrics(): boolean {
     this.ensureInitialized();
     return this._enableMetrics!;
+  }
+
+  private get logFilePath(): string | undefined {
+    this.ensureInitialized();
+    return this._logFilePath;
   }
 
   /**
@@ -85,12 +97,24 @@ export class Logger implements ILogger {
   }
 
   /**
-   * Write log message to stderr
-   * All logs (DEBUG, INFO, WARN, ERROR) go to stderr.
-   * Stdout must remain pristine for stdio MCP protocol (pure JSON-RPC).
+   * Write log message to stderr, and additionally to a file when the opt-in
+   * sink (MASSA_AI_LOG_FILE env or config `logging.file`) is configured.
+   * All logs (DEBUG, INFO, WARN, ERROR) go to stderr, unconditionally and
+   * unchanged. Stdout must remain pristine for stdio MCP protocol (pure
+   * JSON-RPC) — the file sink never touches stdout.
    */
   private write(message: string, _level: LogLevel): void {
     console.error(message);
+    const filePath = this.logFilePath;
+    if (filePath) {
+      try {
+        // Sync append, v1: no rotation. A broken/unwritable path must not
+        // crash logging or ever fall back to stdout.
+        fs.appendFileSync(filePath, message + '\n');
+      } catch {
+        // Best-effort sink; stderr above already carried the line.
+      }
+    }
   }
 
   debug(message: string, meta?: Record<string, unknown>): void {

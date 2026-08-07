@@ -5,13 +5,20 @@
  */
 
 import { Elysia } from "elysia";
-import { SearchServiceError } from "@massa-ai/core";
+import { SearchServiceError, safeErrorSummary } from "@massa-ai/core";
+import { logger } from "@massa-ai/shared";
 
 export const errorHandler = new Elysia({ name: "error-handler" }).onError(
-  ({ code, error, set }) => {
-    console.error("[massa-ai-api] Request failed", {
-      name: error instanceof Error ? error.name : "UnknownError",
+  ({ code, error, set, path, request }) => {
+    // No raw Error object passed to the logger: logger.error() would embed its
+    // unscrubbed `error.message` verbatim. safeErrorSummary() is the only
+    // source of the message field here, so credential-shaped substrings never
+    // reach the log sink.
+    logger.error("[massa-ai-api] Request failed", undefined, {
+      ...safeErrorSummary(error),
       code,
+      path,
+      method: request.method,
     });
 
     if (error instanceof SearchServiceError) {
@@ -36,6 +43,19 @@ export const errorHandler = new Elysia({ name: "error-handler" }).onError(
         error: {
           code: "INVALID_REQUEST",
           message: "The request failed validation",
+        },
+      };
+    }
+
+    // Unmatched route (framework code) — distinct from a 500 so clients can
+    // tell "nothing here" from "the server broke".
+    if (code === "NOT_FOUND") {
+      set.status = 404;
+      return {
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: "Route not found",
         },
       };
     }
