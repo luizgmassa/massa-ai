@@ -37,6 +37,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `(sanitized)`-suffixed log lines in `kernel/alias-resolver.ts` and
   `services/hooks/attribution-resolver.ts` that previously dropped the error
   message entirely rather than scrubbing it.
+
+## [1.35.1] - 2026-08-07
+
+### Fixed
+
+- **Full-repository indexing deadlocked against its own lease heartbeat
+  (SQLSTATE 40P01).** Every `symbol_*` table FKs to `workspaces(project_id)`,
+  so a per-file generation write holds `FOR UPDATE` on its `graph_generations`
+  row and then takes an implicit `FOR KEY SHARE` on the `workspaces` row when
+  its inserts fire — generation → workspace order. The lease methods
+  (`heartbeat`/`complete`/`activate`/`abort`) locked workspace-first, forming
+  an AB-BA cycle with any in-flight file writer; on a 679-file index the 30 s
+  heartbeat racing 10-wide load batches aborted 2 of 3 runs mid-flight. The
+  four lease methods now lock generation-first to match the writers' implicit
+  order; `begin()` keeps workspace-first (it must read the pending pointer
+  before knowing which generation to lock — a narrow, documented residual
+  window) and the coordinator now wraps `begin`/`complete`/`activate`/`abort`
+  in `withDeadlockRetry` (all idempotent-on-retry) with heartbeat retries
+  raised 3 → 5. Reproduction suite:
+  `packages/core/src/__tests__/graph-generation-deadlock-pg.test.ts`
+  (`RUN_GRAPH_GENERATION_DEADLOCK=1`, dedicated-database gated like its
+  lifecycle sibling) hammers a continuous heartbeat against 10-wide
+  `writeFileGeneration` batches on a real PostgreSQL — observed red with 9
+  deadlocks in ~2 s on the pre-fix lock order, green 3/3 after.
+
 - **`setup-local-first.sh` skipped pulling a requested Ollama model whenever a
   sibling tag was installed.** `ollama_model_exists` stripped the tag before
   matching (`search="${1%%:*}"`), so an installed `qwen3-embedding:8b` made
