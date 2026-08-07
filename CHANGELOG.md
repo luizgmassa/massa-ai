@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.0] - 2026-08-07
+
 ### Changed
 
 - **Per-file load errors no longer fail an index run — the ETL completes with
