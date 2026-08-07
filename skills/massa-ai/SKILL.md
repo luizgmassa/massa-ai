@@ -292,6 +292,7 @@ Load only when a selected workflow asks for them:
 - `references/mobile-diagnosis.md`
 - `references/figma-pre-analysis.md`
 - `references/figma-wiring.md`
+- `references/design-implementation.md`
 - `references/mobile-figma-matcher/`
 - `references/lessons.md`
 - `references/naming-standards.md`
