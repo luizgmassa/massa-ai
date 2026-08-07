@@ -38,6 +38,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `services/hooks/attribution-resolver.ts` that previously dropped the error
   message entirely rather than scrubbing it.
 
+## [1.36.0] - 2026-08-07
+
+### Changed
+
+- **Per-file load errors no longer fail an index run — the ETL completes with
+  warnings.** Previously any per-file Load failure aborted the whole run after
+  all the work was done (`ETL completed with N file errors`), leaving the
+  workspace in `error` even though the surviving files were fully indexed. The
+  pipeline now logs a warning, proceeds to graph activation, marks the job
+  `completed`, and surfaces the failures: `LoadResult.fileErrors` (capped at
+  50 entries; `errors` remains the true total) is threaded into the job
+  result, and the `indexing:completed` event payload gains an `errors` field.
+  **Consumers that inferred success from the absence of `indexing:failed`
+  should now read `errors` on the completed event/job result.** Hard parse
+  failures are unaffected — the `graph_generation_incomplete` activation gate
+  still blocks activation independently.
+
+### Fixed
+
+- **File content containing NUL bytes (`0x00`) broke indexing writes.**
+  PostgreSQL text/jsonb columns reject NUL, so a single binary-ish source file
+  failed its Load write. New kernel leaf
+  `packages/core/src/kernel/sanitize/strip-nul.ts` strips NULs at the single
+  ETL read site (discover, before content-hashing, so stored hashes match
+  stored content). Deliberately not `shared/utils/sanitizer.ts`, which strips
+  the whole control-char range including newlines/tabs. Also rewrites the 19
+  literal NUL bytes in `scripts/synapse-bench-analyze-v2.ts` to `\x00`
+  escapes (byte-identical runtime strings).
+
 ## [1.35.1] - 2026-08-07
 
 ### Fixed
