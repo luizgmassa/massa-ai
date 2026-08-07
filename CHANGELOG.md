@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`AttributionResolver.resolve()`'s fail-open catch now scrubs the error message
+  instead of dropping it** — the last hand-rolled "(sanitized)" log site left behind
+  by the `safeErrorSummary` adoption (which converted `kernel/alias-resolver.ts` and
+  `PgWorkspaceRootProvider.listRoots`). The warn now carries the credential-scrubbed
+  `{name, message}` summary, so attribution failures keep their debugging signal
+  without risking a credential leak.
+
 ## [1.39.0] - 2026-08-07
 
 ### Added
