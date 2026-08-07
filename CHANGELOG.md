@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`architecture-map.test.ts` intra-suite race
+  (`graph_generation_workspace_missing:p4d4-arch-map` on Coverage)** — the suite's
+  `beforeEach`/`afterEach` fired the async `clearProject` (a
+  `DELETE FROM workspaces`) from sync arrow hooks without awaiting it, so the
+  DELETE kept running as a floating promise while the next case's ETL run was
+  already mid-`begin()`; when the stalled DELETE's scan executed after that case's
+  `markIndexing` upsert committed, it removed the fresh workspace row and
+  `lockWorkspace`'s `SELECT … FOR UPDATE` threw. The un-awaited call also made the
+  hooks' `try/catch` dead code. Both hooks now await `clearProject`;
+  `trace-path.test.ts` carried the identical hook shape and gets the same fix.
+
 ## [1.39.0] - 2026-08-07
 
 ### Added
