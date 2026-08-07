@@ -46,9 +46,12 @@ export async function lockOwnedPendingGeneration(
   tx: TransactionClient,
   lease: GraphGenerationLease,
 ): Promise<boolean> {
-  // Lock only the generation row. T11 activation locks workspace then waits on
-  // this row, so it cannot cut over while a file transaction is committing.
-  // Taking the workspace lock after this lock would invert T11's order.
+  // Lock only the generation row; the workspaces row is read without an
+  // explicit lock. The file write still takes an implicit FOR KEY SHARE on
+  // workspaces when its symbol_* inserts fire (FK), so the effective order is
+  // generation → workspace — the same order every lease method uses
+  // (heartbeat/complete/activate/abort lock generation-first; begin is the
+  // documented workspace-first exception, covered by retry).
   const generations = await tx.$queryRaw<Array<Omit<GenerationWriteLockRow,
     "pending_graph_generation_id" | "graph_lease_token" | "graph_lease_expires_at" |
     "active_graph_generation_id" | "live">>>`

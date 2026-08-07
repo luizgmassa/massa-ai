@@ -176,6 +176,11 @@ export class GraphGenerationRepositoryPg implements GraphGenerationRepository {
     const generationId = randomUUID();
     const leaseToken = randomUUID();
     return getPrismaClient().$transaction(async (tx) => {
+      // Workspace-first, unlike every other lease method: begin must read
+      // workspace.pending_graph_generation_id before it knows which generation
+      // row to lock. Its generation branch only fires on an expired lease, so
+      // the residual AB-BA window against file writers is narrow; the
+      // coordinator wraps begin in withDeadlockRetry for that case.
       const workspace = await lockWorkspace(tx, input.projectId);
       if (workspace.active_graph_generation_id !== input.expectedActiveGenerationId) {
         return { status: "stale_active", activeGenerationId: workspace.active_graph_generation_id };
@@ -241,8 +246,12 @@ export class GraphGenerationRepositoryPg implements GraphGenerationRepository {
   async heartbeat(lease: GraphGenerationLease, leaseTtlMs: number): Promise<HeartbeatGraphGenerationOutcome> {
     const ttl = validateTtl(leaseTtlMs);
     return getPrismaClient().$transaction(async (tx) => {
-      const workspace = await lockWorkspace(tx, lease.projectId);
+      // Generation-first: per-file writers hold FOR UPDATE on the generation
+      // row when their symbol_* inserts take the implicit FOR KEY SHARE on
+      // the workspaces row (FK). Locking workspace-first here forms an AB-BA
+      // cycle with any in-flight writer (40P01).
       const generation = await lockGeneration(tx, lease.projectId, lease.generationId);
+      const workspace = await lockWorkspace(tx, lease.projectId);
       if (!leaseMatches(workspace, generation, lease)) return { status: "lease_lost" };
       const renewed = await tx.$queryRaw<Array<{ lease_expires_at: Date }>>`
         UPDATE graph_generations SET lease_expires_at = clock_timestamp() + (${ttl} * interval '1 millisecond')
@@ -264,8 +273,9 @@ export class GraphGenerationRepositoryPg implements GraphGenerationRepository {
 
   async complete(lease: GraphGenerationLease): Promise<CompleteGraphGenerationOutcome> {
     return getPrismaClient().$transaction(async (tx) => {
-      const workspace = await lockWorkspace(tx, lease.projectId);
+      // Generation-first — see heartbeat() for the lock-order rationale.
       const generation = await lockGeneration(tx, lease.projectId, lease.generationId);
+      const workspace = await lockWorkspace(tx, lease.projectId);
       if (!leaseMatches(workspace, generation, lease)) return { status: "lease_lost" };
       const live = await tx.$queryRaw<Array<{ live: boolean }>>`
         SELECT (${workspace.graph_lease_expires_at}::timestamp > clock_timestamp()
@@ -295,8 +305,9 @@ export class GraphGenerationRepositoryPg implements GraphGenerationRepository {
 
   async activate(lease: GraphGenerationLease): Promise<ActivateGraphGenerationOutcome> {
     return getPrismaClient().$transaction(async (tx) => {
-      const workspace = await lockWorkspace(tx, lease.projectId);
+      // Generation-first — see heartbeat() for the lock-order rationale.
       const generation = await lockGeneration(tx, lease.projectId, lease.generationId);
+      const workspace = await lockWorkspace(tx, lease.projectId);
       if (!leaseMatches(workspace, generation, lease)) return { status: "lease_lost" };
       if (workspace.active_graph_generation_id !== generation!.expected_active_id) {
         return { status: "stale_active", activeGenerationId: workspace.active_graph_generation_id };
@@ -345,8 +356,9 @@ export class GraphGenerationRepositoryPg implements GraphGenerationRepository {
   async abort(lease: GraphGenerationLease, reason: string): Promise<AbortGraphGenerationOutcome> {
     const failureReason = boundedText(reason, "reason", MAX_FAILURE_REASON);
     return getPrismaClient().$transaction(async (tx) => {
-      const workspace = await lockWorkspace(tx, lease.projectId);
+      // Generation-first — see heartbeat() for the lock-order rationale.
       const generation = await lockGeneration(tx, lease.projectId, lease.generationId);
+      const workspace = await lockWorkspace(tx, lease.projectId);
       if (!leaseMatches(workspace, generation, lease)) return { status: "lease_lost" };
       const live = await tx.$queryRaw<Array<{ live: boolean }>>`
         SELECT (${workspace.graph_lease_expires_at}::timestamp > clock_timestamp()
