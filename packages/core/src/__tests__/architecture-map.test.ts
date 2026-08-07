@@ -527,16 +527,22 @@ async function makeTempProject(files: Record<string, string>): Promise<string> {
 describeNative("getProjectMap enriched fields (fixture pipeline)", () => {
   const repo = getSymbolRepository();
 
-  beforeEach(() => {
+  // clearProject is async (DELETE FROM workspaces). The hooks MUST await it:
+  // as a floating promise its DELETE can land between the next case's
+  // markIndexing upsert and begin()'s lockWorkspace SELECT, which then throws
+  // graph_generation_workspace_missing (Coverage run 31193777485). An
+  // unawaited call also makes the try/catch dead — a rejection could never
+  // reach it.
+  beforeEach(async () => {
     try {
-      repo.clearProject(TEST_PROJECT);
+      await repo.clearProject(TEST_PROJECT);
     } catch {
       /* PostgreSQL-only / mocked repo: best-effort */
     }
   });
-  afterEach(() => {
+  afterEach(async () => {
     try {
-      repo.clearProject(TEST_PROJECT);
+      await repo.clearProject(TEST_PROJECT);
     } catch {
       /* noop */
     }

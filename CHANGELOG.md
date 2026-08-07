@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the ten runtime binaries with 1 s-sleep stubs on `PATH` (exact CI signature), green
   after the seam under the same shadowing. Production callers are unchanged and still
   probe live.
+- **`architecture-map.test.ts` intra-suite race
+  (`graph_generation_workspace_missing:p4d4-arch-map` on Coverage)** — the suite's
+  `beforeEach`/`afterEach` fired the async `clearProject` (a
+  `DELETE FROM workspaces`) from sync arrow hooks without awaiting it, so the
+  DELETE kept running as a floating promise while the next case's ETL run was
+  already mid-`begin()`; when the stalled DELETE's scan executed after that case's
+  `markIndexing` upsert committed, it removed the fresh workspace row and
+  `lockWorkspace`'s `SELECT … FOR UPDATE` threw. The un-awaited call also made the
+  hooks' `try/catch` dead code. Both hooks now await `clearProject`;
+  `trace-path.test.ts` carried the identical hook shape and gets the same fix.
 
 ## [1.40.0] - 2026-08-07
 
@@ -75,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prints the parsed population (files scanned, rows parsed) beside the
   verdict, and exits non-zero when any Number row is unwired or when the
   figma directory exists but zero rows were parsed.
+>>>>>>> origin/main
 >>>>>>> origin/main
 
 ## [1.39.0] - 2026-08-07

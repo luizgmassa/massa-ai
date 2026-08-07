@@ -74,16 +74,20 @@ const FIXTURE: Record<string, string> = {
 describeNative("trace_path", () => {
   const repo = getSymbolRepository();
 
-  beforeEach(() => {
+  // clearProject is async (DELETE FROM workspaces). The hooks MUST await it —
+  // a floating DELETE can land between the next case's markIndexing upsert and
+  // begin()'s lockWorkspace SELECT (graph_generation_workspace_missing); see
+  // architecture-map.test.ts, which hit exactly that on Coverage.
+  beforeEach(async () => {
     try {
-      repo.clearProject(TEST_PROJECT);
+      await repo.clearProject(TEST_PROJECT);
     } catch {
       /* PostgreSQL-only / best-effort */
     }
   });
-  afterEach(() => {
+  afterEach(async () => {
     try {
-      repo.clearProject(TEST_PROJECT);
+      await repo.clearProject(TEST_PROJECT);
     } catch {
       /* noop */
     }
