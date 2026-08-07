@@ -3,7 +3,7 @@ name: spec-driven
 description: "Use this workflow for explicit spec-driven requests and broad, ambiguous, migration-heavy, or cross-boundary delivery needing requirements-through-verification control."
 license: MIT
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 ### Spec-Driven
@@ -97,6 +97,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
    - Capture stable requirement IDs, testable acceptance criteria, edge cases, and explicit out-of-scope items.
    - Run `references/spec-driven/discuss.md` inside Specify when gray areas, implicit requirements, persistence/state, external calls, auth, payments, concurrency, or state transitions affect behavior.
    - For Android, iOS, or KMP Compose Multiplatform UI work, run the optional design-source intake gate from `references/mobile-context.md` (Design-Source Intake Gate).
+   - WHERE one or more Figma links or node IDs are supplied for this work (any platform), lazily load `references/figma-pre-analysis.md`, `references/figma-wiring.md`, and `references/design-implementation.md` before Design/Tasks close; mobile targets additionally keep the Design-Source Intake Gate above.
    - Apply the Requirement Closure Gate: every open requirement question is resolved with the user or recorded as an accepted assumption before execution begins.
 **Reuse Scan — before writing new implementation code:** run the mandatory reuse scan per `references/code-reuse-scan.md` (separate read-only subagents; the reuse map's use/extend/new decisions are consumed before new code is planned or written) — or record its inline-fallback reason, verbatim.
 
