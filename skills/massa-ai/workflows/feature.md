@@ -3,7 +3,7 @@ name: feature
 description: "Use this workflow to add a new capability, screen, command, integration, or user-facing improvement with clear intent; route broken behavior to debug and broad work to spec-driven."
 license: MIT
 metadata:
-  version: "1.2.0"
+  version: "1.4.0"
 ---
 
 ### 🟡 Feature
@@ -17,6 +17,8 @@ Before the first repository mutation, load `references/implementation-delivery.m
 **Isolation Gate — before the first file edit:** execute `references/implementation-delivery.md` Stage 0–1 now (fetch base, create the worktree + branch, work inside it) and record the worktree path + branch — or one of Stage 1's two legal skip reasons, verbatim — before any repository mutation.
 
 1. Resolve/reuse `projectId` and `workflowSessionId` (`feature-[entity]`)
+**Reuse Scan — before writing new implementation code:** run the mandatory reuse scan per `references/code-reuse-scan.md` (separate read-only subagents; the reuse map's use/extend/new decisions are consumed before new code is planned or written) — or record its inline-fallback reason, verbatim.
+
 2. `recall` → load prior decisions and patterns for this area
    - Use the default recall budget: `limit <= 3`, `minImportance >= 0.7`, and `types=["critical","decision","pattern"]` unless the feature needs broader memory discovery.
    - Recall is context only and must not load or reconstruct canonical artifact state.
@@ -30,6 +32,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - `references/lessons.md` when `.specs/lessons.json` exists, to load confirmed project lessons before sizing
    - `references/knowledge-verification-chain.md` when the feature depends on an external library or API whose behavior is not already established from this codebase, running the 5-step chain (codebase → project docs → Context7 → web → flag-uncertain) before relying on that dependency's behavior
    - `references/brownfield-mapping.md` (Minimum Bar only — CONCERNS.md + TESTING.md) when the feature touches an area this codebase does not already document; the full onboarding need stays the existing route-to-`workflows/spec-driven.md` boundary stated above for broad, ambiguous, or cross-boundary work, not a new escalation here
+   - `references/figma-pre-analysis.md`, `references/figma-wiring.md`, and `references/design-implementation.md`, lazily, WHERE one or more Figma links or node IDs are supplied for this feature (any platform) — before PR-group decomposition in step 5
 4. For Android, iOS, KMP Compose Multiplatform UI, or work whose target matches the enumerated mobile-context trigger set (KMP, iOS, Android, native bridges, mobile lifecycle, offline/sync, permissions, push/background behavior, local persistence, or backend-mobile contracts), run the design-source intake gate from `references/mobile-context.md` (Design-Source Intake Gate) before implementation.
 5. Size the task before implementation:
    - Use the exact Quick, Standard, and Spec-driven thresholds in `references/verification-ladder.md`.

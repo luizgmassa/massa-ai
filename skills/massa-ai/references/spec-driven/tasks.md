@@ -50,6 +50,8 @@ Use only when the TLC v3 flow includes Tasks. The output is the `.specs/features
 
 Read `.specs/features/<slug>/design.md` before creating tasks.
 
+WHERE Figma ingestion is enabled, consume the reuse map from `references/code-reuse-scan.md` for the wired implementation work, and fill each task's Task(s) ID column in the relevant `.specs/<type>/<slug>/figma/*.md` wiring table per `references/figma-wiring.md`. Before presenting tasks (step 5 below), run that reference's unused-Number gate — stop and report any unwired Number to the user before Execute proceeds.
+
 ### 1.5. Generate the Test Coverage Matrix (ALWAYS)
 
 This step ALWAYS runs — there is no precondition. Decide which of two paths to take, then generate the two sections below.

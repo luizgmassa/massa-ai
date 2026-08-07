@@ -16,6 +16,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `{name, message}` summary, so attribution failures keep their debugging signal
   without risking a credential leak.
 
+## [1.40.0] - 2026-08-07
+
+### Added
+
+- **Mandatory pre-implementation reuse scan across the 16 implementation
+  workflows** (`references/code-reuse-scan.md`) — every workflow that plans or
+  writes new implementation code now directs a mandatory reuse scan, run in
+  separate read-only investigator-class subagents, before that code is
+  written; the scan's reuse map (candidate element -> location ->
+  use/extend/new decision) is consumed rather than skipped, with an
+  evidence-or-zero empty result and a recorded inline-fallback reason when
+  subagent spawning is unavailable. In `spec-driven`, the scan lands after
+  Specify closes and before Design/Tasks.
+- **English-only naming rule** (`references/naming-standards.md`) — a new
+  `## Language` rule block requires new or renamed identifiers, classes,
+  methods, screens, components, attributes, and implementation-facing
+  artifact names to be in English, converting any non-English source term
+  (Portuguese as the primary case) before implementing, while preserving
+  existing public contracts and persisted names. All 16 implementation
+  workflows now load this reference.
+- **Figma node-id wiring for `spec-driven` and `feature`**
+  (`references/figma-wiring.md`) — WHERE one or more Figma links or node IDs
+  are supplied (any platform), the workflow creates one figma file per
+  supplied link under `.specs/<type>/<slug>/figma/NN-<link-slug>.md` with a
+  13-category wiring table (Number, Figma node id(s), Category, Spec(s) ID,
+  Task(s) ID, Design(s) ID, Explanation, Notes); specs wire high-level
+  categories (Structure, Behavior / Prototype, Flows) and tasks/designs wire
+  the remaining low-level categories to concrete codebase elements. Any
+  unwired Number stops the workflow and asks the user for direction before
+  Execute. `references/figma-pre-analysis.md`'s two-stage protocol gained
+  conditional pointers for per-link file creation (Stage 1) and wiring-table
+  population (Stage 2); `spec-driven`'s specify/design/tasks/execute phase
+  guides gained matching wiring hooks, and Execute retrieves each task's
+  wired node IDs through Figma MCP before implementing.
+- **Design-workflow direction abstraction** (`references/design-implementation.md`)
+  — the design workflow's implementation directions (Target Surface Packet,
+  Figma Evidence / Screenshot Context Packet, Design-To-Code Mapping Matrix,
+  coherent-slice implementation rules, per-slice verification) moved into a
+  shared reference that `workflows/design.md` still loads for its direct
+  route (behavior unchanged) and that `spec-driven`/`feature` also load,
+  lazily, under Figma ingestion — one normative copy instead of a second one
+  duplicated into the implementation workflows.
+- **`skills/massa-ai/scripts/validate_figma_wiring.ts`** — deterministic
+  backing for the Figma wiring unused-Number stop rule: parses every wiring
+  table under `.specs/<type>/<slug>/figma/*.md` for a given slug, always
+  prints the parsed population (files scanned, rows parsed) beside the
+  verdict, and exits non-zero when any Number row is unwired or when the
+  figma directory exists but zero rows were parsed.
+
 ## [1.39.0] - 2026-08-07
 
 ### Added
