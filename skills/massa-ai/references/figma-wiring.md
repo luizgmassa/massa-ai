@@ -96,8 +96,8 @@ Execute until it passes. If any figma-file Number remains unwired to every
 spec, task, and design item at that point, stop, report the unused Numbers
 to the user, and ask for direction with alternatives and recommendations
 before Execute proceeds. Do not silently drop or auto-wire an unused row.
-Read each figma file's table directly to run this check until a deterministic
-backing script is named here.
+
+**Deterministic backing (run it, do not eyeball it):** `bun skills/massa-ai/scripts/validate_figma_wiring.ts <slug> [--root .] [--type features|quick|debug|refactors]` parses every wiring table for the slug, always prints the parsed population (files scanned, rows parsed) beside the verdict, and exits non-zero when any Number row is unwired or when the figma directory exists but zero rows were parsed. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
 ## Execute Retrieval Protocol
 
