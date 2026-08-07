@@ -73,6 +73,10 @@ Overview of how components interact. Use mermaid diagrams when helpful.
 
 **CRITICAL**: What existing code can we leverage? This saves tokens and reduces errors.
 
+Consume the reuse map produced per `references/code-reuse-scan.md` here — do not re-run the scan unless this design touches a code area the map did not cover.
+
+WHERE Figma ingestion is enabled, fill this design's Design(s) ID column in the relevant `.specs/<type>/<slug>/figma/*.md` wiring table per `references/figma-wiring.md`, for the low-level categories (Components, Visual effects, Tokens / Theming, Typography, Content, Assets, States, Spatial, Semantics, Mappings) this design covers.
+
 Flag any concerns found here per step 1.5 into `## Risks & Concerns`.
 
 ### 4. Define Components and Interfaces
