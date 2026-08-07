@@ -3,7 +3,7 @@ name: mobile-figma-fix
 description: "Fixes confirmed MFM-prefixed findings from a saved mobile Figma audit report; the saved audit report is the source of truth, not screenshots or chat summaries."
 license: MIT
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 ### Mobile Figma Fix
@@ -17,6 +17,8 @@ Before the first repository mutation, load `references/implementation-delivery.m
 **Isolation Gate — before the first file edit:** execute `references/implementation-delivery.md` Stage 0–1 now (fetch base, create the worktree + branch, work inside it) and record the worktree path + branch — or one of Stage 1's two legal skip reasons, verbatim — before any repository mutation.
 
 Do not execute from chat summaries, screenshots alone, remembered findings, or an unsaved comparison table. The saved `audits/mobile-figma/<YYYY-MM-DD mobile-figma-audit>.md` report is the source of truth. Route fresh comparison work to `mobile-figma-audit`.
+**Reuse Scan — before writing new implementation code:** run the mandatory reuse scan per `references/code-reuse-scan.md` (separate read-only subagents; the reuse map's use/extend/new decisions are consumed before new code is planned or written) — or record its inline-fallback reason, verbatim.
+
 
 1. Resolve/reuse `workflowSessionId`: `mobile-figma-fix-[entity]`.
 2. Load shared references:
@@ -24,6 +26,7 @@ Do not execute from chat summaries, screenshots alone, remembered findings, or a
    - `references/mobile-figma-matcher/core.md` for Figma, assets, mapping, Maestro, matrix, and claim contracts.
    - `references/figma-pre-analysis.md` when the findings span multiple Figma links or nodes — run its two-stage sequential retrieval protocol for the re-read.
    - `references/lessons.md` to load confirmed project lessons
+   - `references/naming-standards.md` before introducing or renaming identifiers, screens, components, attributes, or implementation-facing names (English-conversion rule applies)
    - `references/mobile-context.md` for mobile boundary and verification guidance.
    - `references/audit-report-io.md` before any source or validation-asset edit.
    - `references/audit-scope.md` and `references/codebase-investigation.md` for freshness and current source.

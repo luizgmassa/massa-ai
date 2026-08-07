@@ -157,6 +157,14 @@ After requirements close, decide the remaining phases:
 
 ---
 
+## Figma Wiring And English Naming
+
+WHERE Figma ingestion is enabled for this feature, wire each authored spec item that maps to a high-level category (Structure, Behavior / Prototype, Flows) to its figma file + Number per `references/figma-wiring.md` before presenting the spec for confirmation.
+
+Apply the English-conversion rule from `references/naming-standards.md` to every identifier, requirement name, and artifact-facing term before writing `spec.md` — convert any non-English source term before it reaches this artifact.
+
+---
+
 ## Template: `.specs/features/<slug>/spec.md`
 
 ```markdown

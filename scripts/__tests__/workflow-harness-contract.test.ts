@@ -510,3 +510,150 @@ describe("roster: nothing advertises a specialist count other than 17", () => {
     }
   });
 });
+
+// ── 7. Reuse scan mandate, uniform across implementation workflows ────────
+//
+// .specs/features/workflow-reuse-naming-figma/ — REUSE-02, GATE-01, GATE-05.
+// Committed red-by-design (T5, worktree-isolation-gate T2 precedent): the
+// canonical action line does not exist in any of the 16 files yet — T6 lands
+// it in the same session and turns this group green.
+
+describe("reuse scan: uniform mandate across the 16 implementation workflows", () => {
+  /** The uniform action line every implementation workflow must carry verbatim. */
+  const REUSE_SCAN_MARKER = "**Reuse Scan — before writing new implementation code:**";
+  const REUSE_SCAN_LINE =
+    "**Reuse Scan — before writing new implementation code:** run the mandatory reuse scan per `references/code-reuse-scan.md` (separate read-only subagents; the reuse map's use/extend/new decisions are consumed before new code is planned or written) — or record its inline-fallback reason, verbatim.";
+
+  for (const rel of IMPLEMENTATION_WORKFLOWS) {
+    test(`${rel} carries the Reuse Scan action line`, async () => {
+      const body = await readWorkflow(rel);
+      expect(body).toContain(REUSE_SCAN_LINE);
+    });
+  }
+
+  test("the Reuse Scan action line is byte-identical in all 16 workflows", async () => {
+    const lines = new Set<string>();
+    for (const rel of IMPLEMENTATION_WORKFLOWS) {
+      const line = (await readWorkflow(rel))
+        .split("\n")
+        .find((l) => l.includes(REUSE_SCAN_MARKER));
+      expect(line).toBeDefined();
+      lines.add(line!);
+    }
+    expect(lines.size).toBe(1);
+  });
+});
+
+// ── 8. Naming-standards load, present in every implementation workflow ────
+//
+// REUSE-independent (NAME-02, GATE-01, GATE-05). Committed red-by-design:
+// 11 of the 16 files are missing the literal today (measured directly by
+// grep against the live tree ahead of writing this assertion — the design
+// doc's own evidence undercounted this at 10; spec-driven.md was also
+// missing the literal in its own file body, not merely "via refs"). T6 adds
+// the load bullet to all 11 and turns this group green.
+
+describe("naming standards: loaded by every implementation workflow", () => {
+  for (const rel of IMPLEMENTATION_WORKFLOWS) {
+    test(`${rel} loads references/naming-standards.md`, async () => {
+      const body = await readWorkflow(rel);
+      expect(body).toContain("references/naming-standards.md");
+    });
+  }
+});
+
+// ── 9. New references for reuse scan, Figma wiring, design abstraction ────
+//
+// REUSE-01, FIGMA-01..08, ABST-01. Green from T1-T3; no red-by-design here.
+
+describe("new references exist on disk", () => {
+  const NEW_REFERENCES = [
+    "code-reuse-scan.md",
+    "figma-wiring.md",
+    "design-implementation.md",
+  ] as const;
+
+  for (const name of NEW_REFERENCES) {
+    test(`references/${name} exists`, async () => {
+      expect(await exists(path.join(REFERENCES_DIR, name))).toBe(true);
+    });
+  }
+});
+
+// ── 10. Hook-chain ordering, guarded to activate once Phase 2 lands ───────
+//
+// design D11a / plan-critic F1: presence-only sensors cannot catch a future
+// reorder or drop of the hook chain. These two assertions are written ahead
+// of the hooks they check (Phase 2, T7-T10) so they pass vacuously today and
+// bite the moment those hooks land, rather than being added only after the
+// fact where they could not have caught a first-pass mistake. REUSE-03 +
+// FIGMA-02/03.
+
+describe("hook-chain ordering (guarded — activates when Phase 2 hook markers land)", () => {
+  test("figma-pre-analysis.md's Stage 1 figma-wiring pointer indexes before its Stage 2 pointer, once both exist", async () => {
+    const body = await readReference("figma-pre-analysis.md");
+    const stage1Start = body.indexOf("## Stage 1");
+    const stage2Start = body.indexOf("## Stage 2");
+    expect(stage1Start).toBeGreaterThan(-1);
+    expect(stage2Start).toBeGreaterThan(stage1Start);
+
+    const stage1Section = body.slice(stage1Start, stage2Start);
+    const stage2Section = body.slice(stage2Start);
+    const stage1Pointer = stage1Section.indexOf("references/figma-wiring.md");
+    const stage2Pointer = stage2Section.indexOf("references/figma-wiring.md");
+    if (stage1Pointer === -1 || stage2Pointer === -1) {
+      // T10 has not landed the conditional per-link-file / wiring-table
+      // pointers yet; this activates once both stage sections reference
+      // figma-wiring.md.
+      return;
+    }
+    // Pointer IDENTITY, not just containment: each stage's pointer must be
+    // the pointer that belongs to that stage. Stage 1 owns per-link file
+    // creation; Stage 2 owns wiring-table population. A content swap of the
+    // two pointer paragraphs (each still containing the figma-wiring.md
+    // literal) must fail here.
+    expect(stage1Section).toContain("create one file per supplied Figma link");
+    expect(stage1Section).not.toContain("wiring table as that slice's retrieval");
+    expect(stage2Section).toContain("wiring table");
+    expect(stage2Section).not.toContain("create one file per supplied Figma link");
+  });
+
+  test("naming-standards.md keeps its Language rule block (NAME-01 content sensor)", async () => {
+    const body = await readReference("naming-standards.md");
+    expect(body).toContain("## Language");
+    expect(body).toMatch(/Convert any non-English source term to English/);
+    expect(body).toMatch(/Portuguese is the primary case/);
+  });
+
+  test("the spec-driven design phase guide carries the English-conversion clause (NAME-03)", async () => {
+    const body = await readReference("spec-driven/design.md");
+    expect(body).toContain("English-conversion rule from `references/naming-standards.md`");
+  });
+
+  test("spec-driven phase-guide hooks stay pointers, not restated tables, once Phase 2 lands them", async () => {
+    const PHASE_GUIDES = [
+      "spec-driven/specify.md",
+      "spec-driven/design.md",
+      "spec-driven/tasks.md",
+      "spec-driven/execute.md",
+    ] as const;
+
+    for (const rel of PHASE_GUIDES) {
+      const body = await readReference(rel);
+      if (!body.includes("references/figma-wiring.md")) continue; // T8 not landed yet
+      expect(body).not.toContain("| Number | Figma node id(s) |");
+    }
+  });
+
+  test("spec-driven.md's reuse-scan clause indexes after the Specify step and before the Design/Tasks decision steps (REUSE-03)", async () => {
+    const body = await readWorkflow("spec-driven.md");
+    const specifyStep = body.indexOf("Run `Specify` with `references/spec-driven/specify.md`");
+    const reuseClause = body.indexOf("references/code-reuse-scan.md");
+    const designDecision = body.indexOf("Decide whether `Design` is required");
+    const tasksDecision = body.indexOf("Decide whether `Tasks` is required");
+    expect(specifyStep).toBeGreaterThan(-1);
+    expect(reuseClause).toBeGreaterThan(specifyStep);
+    expect(designDecision).toBeGreaterThan(reuseClause);
+    expect(tasksDecision).toBeGreaterThan(designDecision);
+  });
+});

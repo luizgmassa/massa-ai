@@ -81,6 +81,8 @@ Success: [how to verify]
 
 Load `references/naming-standards.md` before writing or changing identifiers; use meaningful domain or precise role names.
 
+WHERE this task has wired Figma node IDs, retrieve them through Figma MCP and implement per `references/figma-wiring.md`'s Execute Retrieval Protocol before writing code — never from memory of an earlier read. Apply the English-conversion rule from `references/naming-standards.md` to every new or renamed identifier this task introduces.
+
 Ask the MCP and skill question when tool choice can change correctness or verification.
 
 ### 4. Write Tests (derived from spec, not from implementation)
