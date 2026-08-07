@@ -631,4 +631,16 @@ describe("hook-chain ordering (guarded — activates when Phase 2 hook markers l
       expect(body).not.toContain("| Number | Figma node id(s) |");
     }
   });
+
+  test("spec-driven.md's reuse-scan clause indexes after the Specify step and before the Design/Tasks decision steps (REUSE-03)", async () => {
+    const body = await readWorkflow("spec-driven.md");
+    const specifyStep = body.indexOf("Run `Specify` with `references/spec-driven/specify.md`");
+    const reuseClause = body.indexOf("references/code-reuse-scan.md");
+    const designDecision = body.indexOf("Decide whether `Design` is required");
+    const tasksDecision = body.indexOf("Decide whether `Tasks` is required");
+    expect(specifyStep).toBeGreaterThan(-1);
+    expect(reuseClause).toBeGreaterThan(specifyStep);
+    expect(designDecision).toBeGreaterThan(reuseClause);
+    expect(tasksDecision).toBeGreaterThan(designDecision);
+  });
 });
