@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { describeNative } from "./_helpers/native-skip.js";
 import { EtlPipeline } from "../services/etl/pipeline.js";
-import { indexJobTracker } from "../services/jobs/index-job-tracker.js";
 import { resetParserReadinessForTests } from "../services/structural/parser-readiness.js";
 import { LANGUAGE_MANIFEST } from "../services/structural/language-manifest.js";
 import { grammarArtifactKey } from "../services/structural/grammar-loaders.js";
@@ -162,24 +161,9 @@ describeNative("EtlPipeline per-project run queue", () => {
     expect((EtlPipeline as any).runTails.size).toBe(0);
   });
 
-  test("a partial ETL result marks the job failed instead of completed", async () => {
-    const job = indexJobTracker.createJob("partial", "/tmp");
-    indexJobTracker.updateStatus(job.jobId, "running");
-
-    pipeline.discover.run = async () => [];
-    pipeline.parse.run = async () => [];
-    pipeline.resolve.run = async () => [];
-    pipeline.load.run = async () => ({
-      filesLoaded: 0,
-      chunksLoaded: 0,
-      symbolsLoaded: 0,
-      errors: 1,
-    });
-
-    await expect(
-      pipeline.run({ projectId: "partial", projectPath: "/tmp", jobId: job.jobId }),
-    ).rejects.toThrow("ETL completed with 1 file error");
-    expect(indexJobTracker.getJob(job.jobId)?.status).toBe("failed");
-    expect(indexJobTracker.getJob(job.jobId)?.error).toBe("ETL completed with 1 file error");
-  });
+  // A partial ETL result (per-file load errors) no longer fails the run — it
+  // completes with warnings. That contract (job completed, `errors` +
+  // `fileErrors` surfaced, `indexing:completed` carries the count) is covered
+  // by etl-complete-with-warnings.test.ts, which stubs the activation-path
+  // seams this queue-focused suite deliberately lacks.
 });
