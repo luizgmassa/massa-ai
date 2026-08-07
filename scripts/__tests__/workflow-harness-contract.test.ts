@@ -607,14 +607,27 @@ describe("hook-chain ordering (guarded — activates when Phase 2 hook markers l
       // figma-wiring.md.
       return;
     }
-    // Both pointers exist inside their own stage's section, and Stage 1's
-    // heading was already confirmed to precede Stage 2's above — so a
-    // pointer found in stage1Section is structurally before one found in
-    // stage2Section. A future edit that MOVES the Stage 2 pointer text into
-    // the Stage 1 section (dropping its conditionality or duplicating it
-    // earlier) is still caught by the per-stage containment check below.
-    expect(stage1Section.includes("references/figma-wiring.md")).toBe(true);
-    expect(stage2Section.includes("references/figma-wiring.md")).toBe(true);
+    // Pointer IDENTITY, not just containment: each stage's pointer must be
+    // the pointer that belongs to that stage. Stage 1 owns per-link file
+    // creation; Stage 2 owns wiring-table population. A content swap of the
+    // two pointer paragraphs (each still containing the figma-wiring.md
+    // literal) must fail here.
+    expect(stage1Section).toContain("create one file per supplied Figma link");
+    expect(stage1Section).not.toContain("wiring table as that slice's retrieval");
+    expect(stage2Section).toContain("wiring table");
+    expect(stage2Section).not.toContain("create one file per supplied Figma link");
+  });
+
+  test("naming-standards.md keeps its Language rule block (NAME-01 content sensor)", async () => {
+    const body = await readReference("naming-standards.md");
+    expect(body).toContain("## Language");
+    expect(body).toMatch(/Convert any non-English source term to English/);
+    expect(body).toMatch(/Portuguese is the primary case/);
+  });
+
+  test("the spec-driven design phase guide carries the English-conversion clause (NAME-03)", async () => {
+    const body = await readReference("spec-driven/design.md");
+    expect(body).toContain("English-conversion rule from `references/naming-standards.md`");
   });
 
   test("spec-driven phase-guide hooks stay pointers, not restated tables, once Phase 2 lands them", async () => {
