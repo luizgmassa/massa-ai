@@ -3,7 +3,7 @@ name: implementation-fix
 description: "Executes confirmed findings from a saved implementation audit report; the saved audits/implementation report is the source of truth, not chat summaries."
 license: MIT
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 ### Implementation Fix
@@ -17,6 +17,8 @@ Before the first repository mutation, load `references/implementation-delivery.m
 **Isolation Gate — before the first file edit:** execute `references/implementation-delivery.md` Stage 0–1 now (fetch base, create the worktree + branch, work inside it) and record the worktree path + branch — or one of Stage 1's two legal skip reasons, verbatim — before any repository mutation.
 
 Do not execute from chat summaries, inline review comments, remembered findings, or old PR audit reports. The saved `audits/implementation/<YYYY-MM-DD implementation-audit.md>` report is the source of truth. Route fresh findings work to `workflows/implementation/implementation-audit.md`.
+**Reuse Scan — before writing new implementation code:** run the mandatory reuse scan per `references/code-reuse-scan.md` (separate read-only subagents; the reuse map's use/extend/new decisions are consumed before new code is planned or written) — or record its inline-fallback reason, verbatim.
+
 
 1. Resolve/reuse `workflowSessionId`: `implementation-fix-[entity]`.
 2. Load shared references:

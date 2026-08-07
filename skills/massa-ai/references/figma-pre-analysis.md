@@ -45,6 +45,12 @@ Its output is a compact packet:
 The main agent reviews the proposal, adjusts slice boundaries if project
 knowledge contradicts them, and records the final partition before Stage 2.
 
+WHERE the parent workflow is `spec-driven` or `feature` with Figma ingestion
+enabled, create one file per supplied Figma link under
+`.specs/<type>/<slug>/figma/NN-<link-slug>.md` per the per-link file template
+in `references/figma-wiring.md`, before Stage 2 begins. Audit, fix, and
+`design` parent routes are unaffected by this pointer.
+
 ## Stage 2 — Sequential Retrieval (N subagents, one at a time)
 
 The main agent orchestrates the retrieval subagents **strictly sequentially —
@@ -60,6 +66,11 @@ never in parallel**. For each slice, in the recorded order:
 Sequential dispatch is a hard rule, not a tuning choice: it respects Figma MCP
 session/rate limits, and it is what lets slice N+1 reuse what slice N learned.
 Retrieval subagents never spawn further subagents.
+
+WHERE Figma ingestion is enabled per `references/figma-wiring.md`, populate
+each completed slice's Number, Figma node id(s), Category, Explanation, and
+Notes rows into its link's figma file wiring table as that slice's retrieval
+completes.
 
 ## Fallback
 

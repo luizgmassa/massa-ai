@@ -1,4 +1,32 @@
-# Handoff — worktree-isolation-gate (VALIDATED PASS 2026-08-06 — 6/6 ACs, 3/3 mutations killed, iteration 1; push/PR = user decision)
+# Handoff — workflow-reuse-naming-figma (VALIDATED PASS 2026-08-07 — 23/23 ACs, 7/7 mutations killed, iteration 2; push/PR authorized, merge = user decision)
+
+Session `spec-workflow-reuse-naming-figma` · workflow spec-driven (Large) ·
+branch `spec/workflow-reuse-naming-figma` from origin/main @ v1.39.0
+(`64649e6e`) · worktree `/Users/luizmassa/Projects/massa-ai-wt-workflow-reuse-figma`.
+Contract: `.specs/features/workflow-reuse-naming-figma/{spec,design,tasks,validation}.md`.
+
+## Objective — workflow-reuse-naming-figma
+
+Three user directives for the implementation-workflow class: mandatory
+subagent reuse scan (all 16, post-Specify pre-Design/Tasks in spec-driven);
+English-only naming conversion (any non-English → English); Figma node-id
+wiring for spec-driven/feature on any platform (per-link figma files, 8-column
+wiring table, 13 categories, tiered spec/task/design wiring, unused-Number stop
+backed by validate_figma_wiring.ts, Figma-MCP execute retrieval), with the
+design workflow's directions abstracted into design-implementation.md for
+lazy reuse. AD-019 records the class-wide directive shape.
+
+## State — workflow-reuse-naming-figma
+
+17 commits `d79af5ed`..close-out: specs → T1–T6 (refs, naming rule, sensor
+red 28 → green, 16-file insertion delta 0) → T7–T12 (enablement, hooks,
+validator, CHANGELOG; test:scripts 1690/0) → f9da6703 ordering sensor →
+59a4dcd1/68c7b840 validation gap fixes. Validation iteration 2 PASS. Gates:
+harness-contract 109/0, duplication 474 ≤ 483 @ w4, parity 23/0,
+validate_state exit 0. Open: PROC-01 design-workflow disposition (user call);
+push/PR next.
+
+# Previous — Handoff — worktree-isolation-gate (VALIDATED PASS 2026-08-06 — 6/6 ACs, 3/3 mutations killed, iteration 1; push/PR = user decision)
 
 Session `spec-worktree-isolation-gate` · workflow spec-driven (Medium) · branch
 `spec/worktree-isolation-gate` from origin/main @ v1.32.0 (`5c66e813`) ·

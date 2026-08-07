@@ -256,7 +256,7 @@ describe("fail-open behavior (HAR-09)", () => {
     expect(out).toEqual({ projectId: "junk", source: "verbatim" });
   });
 
-  test("warn output is sanitized (logger spy: error name only, no cwd/caller/SQL)", async () => {
+  test("warn output is sanitized (logger spy: no cwd/caller/SQL) and retains the scrubbed message", async () => {
     const spy = spyOn(logger, "warn").mockImplementation(() => {});
     try {
       const r = resolver({ roots: failingProvider() });
@@ -267,9 +267,34 @@ describe("fail-open behavior (HAR-09)", () => {
         const serialized = JSON.stringify(call);
         expect(serialized).not.toContain("/secret/path");
         expect(serialized).not.toContain("secret-caller");
-        expect(serialized).not.toContain("db down");
         expect(serialized).not.toContain("SELECT");
       }
+      // Scrubbed-not-dropped: the clean provider message survives into the meta.
+      expect(JSON.stringify(spy.mock.calls)).toContain("db down");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("resolve() catch scrubs the error message instead of dropping it", async () => {
+    const spy = spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      const secret = "abcdefghijklmnopqrstuvwxyz0123456789";
+      const r = resolver({
+        roots: {
+          listRoots: async () => {
+            throw new Error(`roots lookup failed with Authorization: Bearer ${secret}`);
+          },
+        },
+      });
+      const out = await r.resolve({ callerProjectId: "caller-x", cwd: "/y" });
+      expect(out).toEqual({ projectId: "caller-x", source: "verbatim" });
+      expect(spy).toHaveBeenCalled();
+      const serialized = JSON.stringify(spy.mock.calls);
+      expect(serialized).not.toContain(secret);
+      expect(serialized).toContain("[REDACTED:bearer]");
+      // Not dropped: the safe residue of the message is retained.
+      expect(serialized).toContain("roots lookup failed");
     } finally {
       spy.mockRestore();
     }
