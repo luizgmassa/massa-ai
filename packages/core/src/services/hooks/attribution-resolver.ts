@@ -191,9 +191,10 @@ export class AttributionResolver implements AttributionResolverLike {
       // 4. verbatim — fail-open.
       return { projectId: caller, source: "verbatim" };
     } catch (error) {
-      logger.warn("[hook-attribution] resolution failed; using caller id (sanitized)", {
-        name: error instanceof Error ? error.name : "unknown",
-      });
+      logger.warn(
+        "[hook-attribution] resolution failed; using caller id",
+        safeErrorSummary(error),
+      );
       return { projectId: caller, source: "verbatim" };
     }
   }
