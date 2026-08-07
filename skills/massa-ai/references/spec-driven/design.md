@@ -83,6 +83,8 @@ Flag any concerns found here per step 1.5 into `## Risks & Concerns`.
 
 Each component: Purpose, Location, Interfaces, Dependencies, What it reuses.
 
+Apply the English-conversion rule from `references/naming-standards.md` to every component, interface, method, and data-model name before it is written into `design.md` — convert any non-English source term to English before it reaches this artifact.
+
 ### 5. Define Data Models
 
 If the feature involves data, define models before implementation.
