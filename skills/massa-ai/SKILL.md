@@ -281,6 +281,7 @@ Load only when a selected workflow asks for them:
 
 - `references/agent-orchestration.md`
 - `references/subagent-design.md`
+- `references/code-reuse-scan.md`
 - `references/adr-authoring.md`
 - `references/audit-scope.md`
 - `references/audit-report-io.md`
