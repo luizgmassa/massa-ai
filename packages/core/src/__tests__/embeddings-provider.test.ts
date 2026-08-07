@@ -8,6 +8,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import {
   AISDKEmbeddingProvider,
+  DimensionMismatchError,
   createProvider,
 } from "../services/embeddings/provider.js";
 import type { EmbeddingProviderConfig } from "../services/embeddings/config.js";
@@ -250,6 +251,58 @@ describe("AISDKEmbeddingProvider", () => {
       "wrong-dims",
     );
     expect(await provider.isAvailable()).toBe(false);
+  });
+
+  test("isAvailable on wrong dimensions tags lastDimensionMismatch with expected/got", async () => {
+    let callCount = 0;
+    globalThis.fetch = mock(() => {
+      callCount++;
+      if (callCount === 1) return Promise.resolve(new Response("ok", { status: 200 }));
+      // Configured for 2560 (qwen3-embedding:4b) but a stale-config model
+      // returns 4096 — the exact repro shape for the silent-fallback defect.
+      return Promise.resolve(
+        new Response(JSON.stringify({ embeddings: [Array(4096).fill(0.5)] }), { status: 200 }),
+      );
+    }) as typeof fetch;
+    const provider = new AISDKEmbeddingProvider(
+      makeConfig({ provider: "ollama", dimensions: 2560, maxRetries: 0, timeout: 5000 }),
+      "dim-mismatch",
+    );
+    expect(await provider.isAvailable()).toBe(false);
+    expect(provider.lastDimensionMismatch).toBeInstanceOf(DimensionMismatchError);
+    expect(provider.lastDimensionMismatch?.providerId).toBe("dim-mismatch");
+    expect(provider.lastDimensionMismatch?.expected).toBe(2560);
+    expect(provider.lastDimensionMismatch?.got).toBe(4096);
+  });
+
+  test("isAvailable clears a stale lastDimensionMismatch once the model responds correctly", async () => {
+    let callCount = 0;
+    globalThis.fetch = mock(() => {
+      callCount++;
+      if (callCount <= 2) return Promise.resolve(new Response("ok", { status: 200 }));
+      return Promise.resolve(
+        new Response(JSON.stringify({ embeddings: [[1, 2, 3, 4]] }), { status: 200 }),
+      );
+    }) as typeof fetch;
+    const provider = new AISDKEmbeddingProvider(
+      makeConfig({ provider: "ollama", dimensions: 4, maxRetries: 0, timeout: 5000 }),
+      "recovers",
+    );
+    // Manually seed a stale mismatch from a hypothetical earlier call.
+    (provider as unknown as { lastDimensionMismatch: unknown }).lastDimensionMismatch =
+      new DimensionMismatchError("recovers", 4, 3);
+    expect(await provider.isAvailable()).toBe(true);
+    expect(provider.lastDimensionMismatch).toBeUndefined();
+  });
+
+  test("isAvailable does not tag lastDimensionMismatch when Ollama is unreachable", async () => {
+    globalThis.fetch = mock(() => Promise.reject(new Error("offline"))) as typeof fetch;
+    const provider = new AISDKEmbeddingProvider(
+      makeConfig({ provider: "ollama", dimensions: 4, maxRetries: 0, timeout: 5000 }),
+      "unreachable-untagged",
+    );
+    expect(await provider.isAvailable()).toBe(false);
+    expect(provider.lastDimensionMismatch).toBeUndefined();
   });
 
   test("truncateText truncates long text", () => {

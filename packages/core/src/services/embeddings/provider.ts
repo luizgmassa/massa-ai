@@ -63,6 +63,41 @@ export interface EmbeddingProvider {
 
   /** Get provider configuration */
   getConfig(): EmbeddingProviderConfig;
+
+  /**
+   * Structured detail of the most recent `isAvailable()` failure, populated
+   * only when the cause was a dimension mismatch between the configured
+   * `dimensions` and the length the model actually returned. Cleared at the
+   * start of every `isAvailable()` call, and left `undefined` for any other
+   * failure cause (unreachable service, invalid API key, malformed response,
+   * etc.) — that distinction is what lets the selection chain in
+   * `services/embeddings/index.ts` refuse to silently fall through to a
+   * lower-dimension fallback provider instead of quietly degrading.
+   */
+  lastDimensionMismatch?: DimensionMismatchError;
+}
+
+/**
+ * Raised (as a structured, catchable class) when a provider's `isAvailable()`
+ * health check receives a well-formed embedding whose length does not match
+ * the provider's configured `dimensions`. This is never thrown by
+ * `isAvailable()` itself (which still returns `false` per its `Promise<boolean>`
+ * contract) — it is attached to `EmbeddingProvider.lastDimensionMismatch` so
+ * callers that need to distinguish "model responded with the wrong shape"
+ * from every other unavailability cause (offline service, bad credentials,
+ * garbage response) can do so, then optionally throw it themselves.
+ */
+export class DimensionMismatchError extends Error {
+  constructor(
+    public readonly providerId: string,
+    public readonly expected: number,
+    public readonly got: number,
+  ) {
+    super(
+      `[${providerId}] Embedding dimension mismatch: configured dimensions ${expected} but the model returned ${got}`,
+    );
+    this.name = "DimensionMismatchError";
+  }
 }
 
 /**
@@ -153,6 +188,9 @@ export class AISDKEmbeddingProvider implements EmbeddingProvider {
   public readonly id: string;
   public readonly model: string;
   public readonly dimensions: number;
+
+  /** See `EmbeddingProvider.lastDimensionMismatch`. Reset at the top of every `isAvailable()` call. */
+  public lastDimensionMismatch: DimensionMismatchError | undefined;
 
   private readonly providerType:
     | "openai"
@@ -667,6 +705,7 @@ export class AISDKEmbeddingProvider implements EmbeddingProvider {
    * - Service is responding
    */
   async isAvailable(): Promise<boolean> {
+    this.lastDimensionMismatch = undefined;
     try {
       // Ollama: fast connectivity pre-check (2s timeout) to avoid
       // blocking for minutes when service is offline
@@ -700,6 +739,17 @@ export class AISDKEmbeddingProvider implements EmbeddingProvider {
 
       // Validate embedding format
       if (!Array.isArray(embedding) || embedding.length !== this.dimensions) {
+        // Only tag this as a dimension mismatch when the model actually
+        // returned a well-formed array of the wrong length — a non-array
+        // response is a different failure class (malformed/garbage
+        // response) and keeps today's generic fallback behavior.
+        if (Array.isArray(embedding)) {
+          this.lastDimensionMismatch = new DimensionMismatchError(
+            this.id,
+            this.dimensions,
+            embedding.length,
+          );
+        }
         logger.error(
           `[${this.id}] Invalid embedding dimensions`,
           undefined,
