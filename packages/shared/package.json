@@ -1,6 +1,6 @@
 {
   "name": "@massa-ai/shared",
-  "version": "1.40.0",
+  "version": "1.40.1",
   "author": "luizgmassa",
   "type": "module",
   "main": "dist/index.js",
