@@ -178,12 +178,15 @@ export function detectRuntimes(deps?: DetectDeps): RuntimeMap {
 
 /**
  * Human-readable summary of detected runtimes (for diagnostics / tool output).
+ *
+ * `deps` is a test seam — production callers omit it. Without it, every
+ * present runtime costs a live `<cmd> --version` subprocess.
  */
-export function getRuntimeSummary(runtimes: RuntimeMap): string {
+export function getRuntimeSummary(runtimes: RuntimeMap, deps?: DetectDeps): string {
   const lines: string[] = [];
   const fmt = (label: string, cmd: string | null): string =>
     cmd
-      ? `  ${label.padEnd(11)} ${cmd} (${getVersion(cmd)})`
+      ? `  ${label.padEnd(11)} ${cmd} (${getVersion(cmd, ["--version"], deps)})`
       : `  ${label.padEnd(11)} not available`;
   lines.push(fmt("JavaScript:", runtimes.javascript));
   lines.push(fmt("TypeScript:", runtimes.typescript));

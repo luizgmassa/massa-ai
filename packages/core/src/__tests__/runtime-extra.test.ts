@@ -48,9 +48,15 @@ const EMPTY_RUNTIMES: RuntimeMap = {
   r: null,
 };
 
+// The unit under test is the summary's formatting, so version probing is
+// injected: without the seam every present runtime costs a live `--version`
+// subprocess (10 with FULL_RUNTIMES), which breaches the 5 s budget on a
+// loaded CI host — bun then kills the in-flight probe as a "dangling process".
+const SUMMARY_DEPS: DetectDeps = { getVersion: () => "vX.test" };
+
 describe("getRuntimeSummary", () => {
   test("includes all runtimes when present", () => {
-    const summary = getRuntimeSummary(FULL_RUNTIMES);
+    const summary = getRuntimeSummary(FULL_RUNTIMES, SUMMARY_DEPS);
     expect(summary).toContain("JavaScript:");
     expect(summary).toContain("node");
     expect(summary).toContain("TypeScript:");
@@ -65,10 +71,12 @@ describe("getRuntimeSummary", () => {
     expect(summary).toContain("PHP:");
     expect(summary).toContain("Perl:");
     expect(summary).toContain("R:");
+    // The injected seam is actually threaded through to getVersion.
+    expect(summary).toContain("(vX.test)");
   });
 
   test("shows 'not available' for missing runtimes", () => {
-    const summary = getRuntimeSummary(EMPTY_RUNTIMES);
+    const summary = getRuntimeSummary(EMPTY_RUNTIMES, SUMMARY_DEPS);
     expect(summary).toContain("JavaScript:");
     expect(summary).toContain("not available");
     expect(summary).toContain("TypeScript:");
