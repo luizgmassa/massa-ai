@@ -1022,7 +1022,29 @@
       "dependencies": [],
       "validation": ".specs/features/worktree-isolation-gate/validation.md",
       "notes": "VALIDATED PASS 2026-08-06 (independent verifier, author != verifier, iteration 1 of 3): 6/6 ACs, 3/3 discrimination mutations killed (pass-1 survivor was the AC4 Stage 1 sensor the coverage matrix claimed but never wrote — fixed a8360f18, re-injected, killed). Gates: harness-contract 68/0, duplication excess 483 <= 483 @ w4, integrity 32/0, venue-parity 21/0, generate:artifacts --check clean, validate_state exit 0. Push/PR = user decision."
+    },
+    {
+      "id": "workflow-reuse-naming-figma",
+      "slug": "workflow-reuse-naming-figma",
+      "title": "Workflow Reuse-Scan, English Naming, Figma Wiring — mandatory subagent reuse scan in all 16 implementation workflows (post-Specify pre-Design/Tasks in spec-driven); English-only naming conversion rule; per-link Figma wiring tables (8 columns, 13 categories) for spec-driven/feature on any platform with validate_figma_wiring.ts backing and Figma-MCP execute retrieval; design workflow directions abstracted to design-implementation.md",
+      "status": "complete",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/worktree-isolation-gate",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/worktree-isolation-gate/spec.md",
+      "design": ".specs/features/worktree-isolation-gate/design.md",
+      "tasks": ".specs/features/worktree-isolation-gate/tasks.md",
+      "created": "2026-08-06",
+      "dependencies": [],
+      "validation": ".specs/features/worktree-isolation-gate/validation.md",
+      "notes": "VALIDATED PASS 2026-08-06 (independent verifier, author != verifier, iteration 1 of 3): 6/6 ACs, 3/3 discrimination mutations killed (pass-1 survivor was the AC4 Stage 1 sensor the coverage matrix claimed but never wrote — fixed a8360f18, re-injected, killed). Gates: harness-contract 68/0, duplication excess 483 <= 483 @ w4, integrity 32/0, venue-parity 21/0, generate:artifacts --check clean, validate_state exit 0. Push/PR = user decision."
     }
   ],
-  "active_feature": "worktree-isolation-gate"
+  "active_feature": "workflow-reuse-naming-figma"
 }
