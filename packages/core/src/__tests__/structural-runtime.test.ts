@@ -405,5 +405,9 @@ describeNative("structural runtime outcomes and lifetime", () => {
     const early = median(rss.slice(20, 40));
     const late = median(rss.slice(80, 100));
     expect(late).toBeLessThanOrEqual(early + 16 * 1024 * 1024);
-  });
+    // 100 native parses + 100 forced GC cycles is real work: ~1 s on a dev
+    // machine, 5.1-5.7 s on a loaded CI runner — the default 5 s budget makes
+    // runner load look like an RSS regression (observed twice on main,
+    // 2026-08-07). Explicit budget per the established slow-test idiom.
+  }, 30_000);
 });
