@@ -67,4 +67,44 @@ describe("POST /api/v1/file/read", () => {
     const res = await post({ projectId: "p" });
     expect(res.status).toBe(422);
   });
+
+  describe("failure status mapping", () => {
+    test("ENOENT-shaped failure -> 404", async () => {
+      readHandle.mockImplementationOnce(() => ({
+        success: false,
+        error: "Failed to read file: ENOENT: no such file or directory, open 'src/missing.ts'",
+      }));
+      const res = await post({ filePath: "src/missing.ts" });
+      expect(res.status).toBe(404);
+      expect(res.json).toEqual({
+        success: false,
+        error: "Failed to read file: ENOENT: no such file or directory, open 'src/missing.ts'",
+      });
+    });
+
+    test("ambiguous-path failure -> 400", async () => {
+      readHandle.mockImplementationOnce(() => ({
+        success: false,
+        error:
+          "Relative filePath requires a projectId (to resolve against the workspace) or an absolute path.",
+      }));
+      const res = await post({ filePath: "a.ts" });
+      expect(res.status).toBe(400);
+    });
+
+    test("containment-violation failure -> 400", async () => {
+      readHandle.mockImplementationOnce(() => ({
+        success: false,
+        error: 'read_file path containment: "/etc/passwd" is outside the allowed roots.',
+      }));
+      const res = await post({ filePath: "/etc/passwd" });
+      expect(res.status).toBe(400);
+    });
+
+    test("success:true response keeps default 200 status", async () => {
+      readHandle.mockImplementationOnce(() => ({ success: true, data: { lines: 1 } }));
+      const res = await post({ filePath: "src/a.ts" });
+      expect(res.status).toBe(200);
+    });
+  });
 });

@@ -253,7 +253,12 @@ describe("createProjectIdentityService", () => {
       // Apply may still fail (e.g. target already exists) — the point is to
       // exercise the default acquire + wrapPgClient transaction methods.
     }
-    // Cleanup.
+    // Cleanup. With managed_runs registered, the rename now actually SUCCEEDS
+    // and leaves an alias row targeting the renamed workspace; its FK to
+    // workspaces(project_id) is ON DELETE RESTRICT, so the alias (and its
+    // operation row) must go before the workspaces rows.
+    await prisma.$executeRaw`DELETE FROM project_identity_aliases WHERE retired_project_id = 'cov-pi-tx-source' OR target_project_id IN ('cov-pi-tx-source', 'cov-pi-tx-target')`;
+    await prisma.$executeRaw`DELETE FROM projects WHERE project_id IN ('cov-pi-tx-source', 'cov-pi-tx-target')`;
     await prisma.$executeRaw`DELETE FROM workspaces WHERE project_id IN ('cov-pi-tx-source', 'cov-pi-tx-target')`;
   });
 

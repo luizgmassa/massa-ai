@@ -54,6 +54,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   integration test (`vector-2560-migration-pg.test.ts`, throwaway-database
   pattern) asserts the table, both column types, the project-id index, and
   the HNSW index all exist after applying every migration in order.
+
+## [1.38.0] - 2026-08-07
+
+### Added
+
+- **Checkpoint-purge default scheduled job.** Wires the existing
+  `PgCheckpointStore.purgeExpired()` (already-expired `task_checkpoints` rows
+  only) into `services/scheduler/scheduler-defaults.ts` as job kind
+  `checkpoint-purge`. Default-disabled, following the same per-kind
+  enable/interval env pattern as the sibling default jobs:
+  `MASSA_AI_SCHEDULER_CHECKPOINT_PURGE_ENABLED` (master switch still applies)
+  and `MASSA_AI_SCHEDULER_CHECKPOINT_PURGE_INTERVAL_MS` (default 1 hour). No
+  behavior changes for a deployment that does not opt in.
+
+### Fixed
+
+- **`managed_runs` was unregistered in the project-identity registry,
+  hard-breaking rename/merge (`PROJECT_IDENTITY_UNKNOWN_STORAGE`) for any
+  indexed project with managed_runs rows.** `packages/core/src/kernel/registry.ts`
+  `STATIC_DIRECT_STORES` now carries a `managed_runs` entry
+  (`identityColumn: "project_id"`, `mutable: true`), so
+  `directStorePolicy`/`isKnownRegistryTable` — and therefore the rename/merge
+  rewrite path and the identity-guard trigger installer — cover the table like
+  every other project-scoped store. The frozen `EXPECTED_GUARDED_TABLES` list
+  in `project-identity-guard-invalidator.test.ts` is updated accordingly (an
+  intentional forcing function, not derived from the registry). A new
+  schema-vs-registry completeness test
+  (`project-identity-registry-schema-completeness.test.ts`) regexes
+  `prisma/schema.prisma` for every model carrying a `@map("project_id")`
+  column and asserts each resolved table is known to the registry or on an
+  explicit exclusion list, so the next new project-scoped table cannot
+  silently repeat this gap.
+
+## [1.37.0] - 2026-08-07
+
+### Added
+
+- **Opt-in logger file sink.** `packages/shared/src/utils/logger.ts` now
+  additionally appends every log line to a file when `MASSA_AI_LOG_FILE` (env,
+  wins) or config `logging.file` is set — stderr behavior is unchanged either
+  way, and stdout is never touched (the stdio MCP protocol invariant). Sync
+  append, no rotation (v1). `MASSA_AI_LOG_FILE` is added to `turbo.json`'s
+  `passThroughEnv` (AD-010).
+
+### Fixed
+
+- **Tools-api error responses carried no HTTP status signal for three failure
+  classes.** `apps/tools-api/src/middleware/error.ts` now maps an unmatched
+  route (`code === "NOT_FOUND"`) to 404 instead of falling through to 500, and
+  a search against an unindexed project now throws a typed
+  `SearchServiceError` (`PROJECT_NOT_INDEXED`, new
+  `packages/core/src/kernel/search-diagnostics.ts` factory
+  `projectNotIndexed`) that the middleware's existing `instanceof
+  SearchServiceError` branch maps to 404 with the original actionable message
+  — previously a plain `Error`, silently swallowed into a 200 `{success:false}`
+  tool envelope. `apps/tools-api/src/routes/file.ts`'s `/read` route now sets
+  404 for ENOENT/no-such-file failures and 400 for ambiguous-path,
+  containment-violation, and other failures, instead of always returning 200.
+  The error-log line also now carries `path`, `method`, and a credential-scrubbed
+  message (new `packages/core/src/kernel/sanitize/safe-error-summary.ts`,
+  reusing `credential-scrub.ts`) via the shared logger instead of
+  `console.error`; the same helper replaces two hand-rolled
+  `(sanitized)`-suffixed log lines in `kernel/alias-resolver.ts` and
+  `services/hooks/attribution-resolver.ts` that previously dropped the error
+  message entirely rather than scrubbing it.
+
+## [1.36.0] - 2026-08-07
+
+### Changed
+
+- **Per-file load errors no longer fail an index run — the ETL completes with
+  warnings.** Previously any per-file Load failure aborted the whole run after
+  all the work was done (`ETL completed with N file errors`), leaving the
+  workspace in `error` even though the surviving files were fully indexed. The
+  pipeline now logs a warning, proceeds to graph activation, marks the job
+  `completed`, and surfaces the failures: `LoadResult.fileErrors` (capped at
+  50 entries; `errors` remains the true total) is threaded into the job
+  result, and the `indexing:completed` event payload gains an `errors` field.
+  **Consumers that inferred success from the absence of `indexing:failed`
+  should now read `errors` on the completed event/job result.** Hard parse
+  failures are unaffected — the `graph_generation_incomplete` activation gate
+  still blocks activation independently.
+
+### Fixed
+
+- **File content containing NUL bytes (`0x00`) broke indexing writes.**
+  PostgreSQL text/jsonb columns reject NUL, so a single binary-ish source file
+  failed its Load write. New kernel leaf
+  `packages/core/src/kernel/sanitize/strip-nul.ts` strips NULs at the single
+  ETL read site (discover, before content-hashing, so stored hashes match
+  stored content). Deliberately not `shared/utils/sanitizer.ts`, which strips
+  the whole control-char range including newlines/tabs. Also rewrites the 19
+  literal NUL bytes in `scripts/synapse-bench-analyze-v2.ts` to `\x00`
+  escapes (byte-identical runtime strings).
+
 ## [1.35.1] - 2026-08-07
 
 ### Fixed

@@ -35,7 +35,12 @@ export interface LoadResult {
   chunksLoaded: number;
   symbolsLoaded: number;
   errors: number;
+  /** Per-file failure detail, capped at {@link MAX_FILE_ERRORS}; `errors` is the true total. */
+  fileErrors: Array<{ filePath: string; error: string }>;
 }
+
+/** Cap on recorded per-file error details — `errors` still counts every failure. */
+export const MAX_FILE_ERRORS = 50;
 
 export type LoadMode = "all" | "structural" | "semantic";
 
@@ -158,6 +163,7 @@ export class LoadStage {
     let chunksLoaded = 0;
     let symbolsLoaded = 0;
     let errors = 0;
+    const fileErrors: LoadResult["fileErrors"] = [];
     let processedSinceStart = 0; // files that actually ran (not skipped) — for ETA rate
     let lastEtaLogAt = 0;
 
@@ -252,6 +258,12 @@ export class LoadStage {
           } catch (err) {
             errors++;
             processedSinceStart++;
+            if (fileErrors.length < MAX_FILE_ERRORS) {
+              fileErrors.push({
+                filePath: file.file.relativePath,
+                error: (err as Error).message,
+              });
+            }
             if (emitLifecycle) ctx.emit({
               type: "file_error",
               stage: "load",
@@ -334,7 +346,7 @@ export class LoadStage {
         : 0,
     });
 
-    return { filesLoaded, chunksLoaded, symbolsLoaded, errors };
+    return { filesLoaded, chunksLoaded, symbolsLoaded, errors, fileErrors };
   }
 
   /** Insert identical chunks into both semantic and lexical stores. */

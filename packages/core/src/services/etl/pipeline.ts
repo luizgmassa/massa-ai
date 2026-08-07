@@ -444,10 +444,17 @@ export class EtlPipeline {
       if (managedRunLeaseLost) throw managedRunLeaseLost;
       stageTimings.load = Math.round(performance.now() - st4);
 
+      // Per-file load errors are warnings, not run failures: the run proceeds
+      // to activation and completes. Hard parse failures still block
+      // activation via the graph_generation_incomplete gate — that check is
+      // independent of this one.
       if (loadResult.errors > 0) {
-        throw new Error(
-          `ETL completed with ${loadResult.errors} file error${loadResult.errors === 1 ? "" : "s"}`,
-        );
+        logger.warn("EtlPipeline: completed with file errors", {
+          projectId,
+          jobId,
+          errors: loadResult.errors,
+          fileErrors: (loadResult.fileErrors ?? []).slice(0, 10),
+        });
       }
 
       const activationSnapshot = await abortable(this.discover.run(ctx, { forceReindex, includeTests: include_tests }), graphAbortController.signal);
@@ -527,6 +534,7 @@ export class EtlPipeline {
         filesIndexed: result.filesIndexed,
         chunksIndexed: result.chunksIndexed,
         errors: result.errors,
+        fileErrors: loadResult.fileErrors ?? [],
         duration: durationMs,
         activatedGraphGenerationId: result.activatedGraphGenerationId,
         parserDiagnostics: result.parserDiagnostics,
@@ -538,6 +546,7 @@ export class EtlPipeline {
         filesIndexed: result.filesIndexed,
         chunksIndexed: result.chunksIndexed,
         symbolsIndexed: result.symbolsIndexed,
+        errors: result.errors,
         durationMs,
         activatedGraphGenerationId: result.activatedGraphGenerationId,
       });

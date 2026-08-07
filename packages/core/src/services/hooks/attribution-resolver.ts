@@ -29,6 +29,7 @@ import { logger } from "@massa-ai/shared";
 import { getPgPool } from "../../kernel/db-connection.js";
 import type { AttributionSource } from "../../data/memory/observation-contract.js";
 import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
+import { safeErrorSummary } from "../../kernel/sanitize/safe-error-summary.js";
 import { SessionPinStore } from "./session-pin-store.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -120,9 +121,10 @@ export class PgWorkspaceRootProvider implements WorkspaceRootProvider {
       this.cache = { roots, expiresAt: this.now() + PROVIDER_TTL_MS };
       return roots;
     } catch (error) {
-      logger.warn("[hook-attribution] workspace roots lookup failed; containment disabled (sanitized)", {
-        name: error instanceof Error ? error.name : "unknown",
-      });
+      logger.warn(
+        "[hook-attribution] workspace roots lookup failed; containment disabled",
+        safeErrorSummary(error),
+      );
       return [];
     } finally {
       if (timer) clearTimeout(timer);
