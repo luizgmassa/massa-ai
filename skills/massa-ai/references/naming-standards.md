@@ -28,6 +28,16 @@ Code vocabulary is evidence, not truth. When business intent is inferred only fr
 - When a rename is the fix, update all call sites, docs, tests, fixtures, snapshots, and generated examples that form the contract; do not weaken validation assets to hide drift.
 - Avoid fabricated domain terms. If no meaningful name is supported by evidence, choose the most precise technical role name and leave the domain uncertainty explicit in the plan, TDD, or audit.
 
+## Language
+
+All new or renamed identifiers, classes, methods, screens, components,
+attributes, and implementation-facing artifact names are written in English.
+Convert any non-English source term to English before implementing —
+Portuguese is the primary case, but the rule covers any non-English source
+language. Preserve existing public contracts, persisted fields, and external
+names unless compatibility handling is explicitly in scope, per the
+public-contract clause above.
+
 ## Workflow Use
 
 - Feature, spec-driven execution, and implementation execution use this before writing or changing identifiers.
