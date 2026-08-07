@@ -50,6 +50,12 @@ export interface MassaAiConfig {
   logging: {
     level: "debug" | "info" | "warn" | "error";
     enableMetrics: boolean;
+    /**
+     * Optional absolute path to additionally append log lines to. Opt-in;
+     * unset means stderr-only (unchanged default behavior). Overridden by
+     * MASSA_AI_LOG_FILE (env > config, matching the `level` precedence).
+     */
+    file?: string;
   };
   // Keys below mirror the runtime ServerConfig declarations (index.ts) so the
   // interface describes what the loader/runtime actually produces. See

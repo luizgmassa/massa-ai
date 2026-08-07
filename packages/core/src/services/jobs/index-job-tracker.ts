@@ -27,6 +27,8 @@ export interface IndexJob {
     filesIndexed: number;
     chunksIndexed: number;
     errors: number;
+    /** Per-file load failure detail (capped upstream); `errors` is the true total. */
+    fileErrors?: Array<{ filePath: string; error: string }>;
     duration: number;
   } & Partial<ActiveGraphDiagnostics<string>>;
   error?: string;
@@ -377,6 +379,7 @@ export class IndexJobTracker {
           filesIndexed: r?.filesIndexed ?? 0,
           chunksIndexed: r?.chunksIndexed ?? 0,
           symbolsIndexed: 0,
+          errors: r?.errors ?? 0,
           durationMs: r?.duration ?? 0,
           activatedGraphGenerationId: r?.activatedGraphGenerationId ?? "",
         });

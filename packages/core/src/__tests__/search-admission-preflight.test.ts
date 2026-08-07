@@ -3,6 +3,7 @@ import { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js
 import { SearchController } from "../services/search/search-controller.js";
 import { SearchProjectTool } from "../tools/search_project.js";
 import { SearchCodeTool } from "../tools/search_code.js";
+import { SearchServiceError } from "../kernel/search-diagnostics.js";
 
 /**
  * M10 — search admission preflight.
@@ -81,7 +82,12 @@ function freshController(search: ContextualSearchRLM): SearchController {
 }
 
 describe("search admission preflight (M10)", () => {
-  test("Tier 1: unindexed project → success:false with /not indexed/, search NOT called", async () => {
+  test("Tier 1: unindexed project → throws typed PROJECT_NOT_INDEXED, search NOT called", async () => {
+    // Track 4: admission failure is now a typed SearchServiceError (statusCode
+    // 404) rather than a generic Error swallowed into {success:false} — see
+    // search_project.ts's own `instanceof SearchServiceError` rethrow, which
+    // preserves the typed error so HTTP/MCP transports can distinguish a
+    // "project doesn't exist yet" 404 from an ordinary tool-level failure.
     const search = createSearch();
     markInitialized(search);
     const { calls } = attachIndexManagerMock(search, { hasIndex: false });
@@ -97,21 +103,29 @@ describe("search admission preflight (M10)", () => {
     const tool = Object.create(SearchProjectTool.prototype) as SearchProjectTool;
     (tool as any).controller = controller;
 
-    const response = await tool.handle({
-      query: "anything",
-      projectId: "proj",
-      format: "json",
-    });
+    let caught: unknown;
+    try {
+      await tool.handle({
+        query: "anything",
+        projectId: "proj",
+        format: "json",
+      });
+    } catch (error) {
+      caught = error;
+    }
 
-    expect(response.success).toBe(false);
-    expect((response as any).error).toMatch(/not indexed/);
+    expect(caught).toBeInstanceOf(SearchServiceError);
+    const typed = caught as SearchServiceError;
+    expect(typed.code).toBe("PROJECT_NOT_INDEXED");
+    expect(typed.statusCode).toBe(404);
+    expect(typed.message).toMatch(/not indexed/);
     expect(searchReached).toBe(false);
     expect(calls.getIndexMetadata).toBe(1);
     // Tier 2 must not run when metadata is missing.
     expect(calls.isIndexStale).toBe(0);
   });
 
-  test("Tier 1: search_code path also hard-fails on unindexed (parity)", async () => {
+  test("Tier 1: search_code path hard-fails on unindexed too (search_code.ts catches the typed error and swallows it to success:false, unlike search_project's own rethrow above)", async () => {
     const search = createSearch();
     markInitialized(search);
     attachIndexManagerMock(search, { hasIndex: false });
