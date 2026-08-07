@@ -21,10 +21,12 @@
  *                          clock.
  *   auto-improve         → autoImproveJob.runOnce(projectId)
  *   observation-bridge   → observationConsolidationJob.runOnce(projectId)
+ *   checkpoint-purge     → CheckpointManager.getInstance().purgeExpired()
  *
  * IMPORTANT: the scheduler must NEVER trigger indexing jobs (OOM risk per
- * project memory). Only memory/decay/consolidation/auto-improve/observation
- * jobs are registered here.
+ * project memory). Only memory/decay/consolidation/auto-improve/observation/
+ * checkpoint-purge jobs are registered here — checkpoint-purge is a bounded
+ * DELETE of already-expired rows, not an indexing job.
  */
 
 import { logger } from "@massa-ai/shared";
@@ -86,6 +88,15 @@ export const DEFAULT_SCHEDULED_JOBS: DefaultJobDef[] = [
     defaultEnabled: false,
     enableEnvVar: "MASSA_AI_SCHEDULER_OBSERVATION_BRIDGE_ENABLED",
     intervalEnvVar: "MASSA_AI_SCHEDULER_OBSERVATION_BRIDGE_INTERVAL_MS",
+  },
+  {
+    id: "scheduled-checkpoint-purge",
+    name: "Checkpoint Purge (clock)",
+    jobKind: "checkpoint-purge",
+    schedule: { type: "interval", intervalMs: ONE_HOUR },
+    defaultEnabled: false,
+    enableEnvVar: "MASSA_AI_SCHEDULER_CHECKPOINT_PURGE_ENABLED",
+    intervalEnvVar: "MASSA_AI_SCHEDULER_CHECKPOINT_PURGE_INTERVAL_MS",
   },
 ];
 
@@ -191,6 +202,16 @@ export function registerDefaultJobs(scheduler: Scheduler): void {
     const projectId =
       (job.payload?.projectId as string | undefined) ?? "default";
     await observationConsolidationJob.runOnce(projectId);
+  });
+
+  scheduler.registerHandler("checkpoint-purge", async () => {
+    // Reuse the existing checkpoint store's purgeExpired() (already-expired
+    // rows only — a bounded DELETE, not a full-table scan of live data).
+    const { CheckpointManager } = await import(
+      "../checkpoint/checkpoint-manager.js"
+    );
+    const count = CheckpointManager.getInstance().purgeExpired();
+    logger.info("Scheduled checkpoint purge completed", { count });
   });
 
   // ── Default job definitions ───────────────────────────────────────────────

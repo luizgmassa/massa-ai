@@ -44,6 +44,7 @@ export const STATIC_DIRECT_STORES: Readonly<Record<string, DirectStorePolicy>> =
   search_analytics: { storeId: "search_analytics", identityColumn: "project_id", mutable: true },
   search_events: { storeId: "search_events", identityColumn: "project_id", mutable: true },
   synapse_sessions: { storeId: "synapse_sessions", identityColumn: "workspace_id", mutable: true },
+  managed_runs: { storeId: "managed_runs", identityColumn: "project_id", mutable: true },
   // Historical identity records are deliberately inventoried but never rewritten.
   operation_log: { storeId: "operation_log", identityColumn: "project_id", mutable: false },
   project_identity_operations: {

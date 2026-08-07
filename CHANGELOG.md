@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Checkpoint-purge default scheduled job.** Wires the existing
+  `PgCheckpointStore.purgeExpired()` (already-expired `task_checkpoints` rows
+  only) into `services/scheduler/scheduler-defaults.ts` as job kind
+  `checkpoint-purge`. Default-disabled, following the same per-kind
+  enable/interval env pattern as the sibling default jobs:
+  `MASSA_AI_SCHEDULER_CHECKPOINT_PURGE_ENABLED` (master switch still applies)
+  and `MASSA_AI_SCHEDULER_CHECKPOINT_PURGE_INTERVAL_MS` (default 1 hour). No
+  behavior changes for a deployment that does not opt in.
+
+### Fixed
+
+- **`managed_runs` was unregistered in the project-identity registry,
+  hard-breaking rename/merge (`PROJECT_IDENTITY_UNKNOWN_STORAGE`) for any
+  indexed project with managed_runs rows.** `packages/core/src/kernel/registry.ts`
+  `STATIC_DIRECT_STORES` now carries a `managed_runs` entry
+  (`identityColumn: "project_id"`, `mutable: true`), so
+  `directStorePolicy`/`isKnownRegistryTable` — and therefore the rename/merge
+  rewrite path and the identity-guard trigger installer — cover the table like
+  every other project-scoped store. The frozen `EXPECTED_GUARDED_TABLES` list
+  in `project-identity-guard-invalidator.test.ts` is updated accordingly (an
+  intentional forcing function, not derived from the registry). A new
+  schema-vs-registry completeness test
+  (`project-identity-registry-schema-completeness.test.ts`) regexes
+  `prisma/schema.prisma` for every model carrying a `@map("project_id")`
+  column and asserts each resolved table is known to the registry or on an
+  explicit exclusion list, so the next new project-scoped table cannot
+  silently repeat this gap.
+
 ## [1.37.0] - 2026-08-07
 
 ### Added
