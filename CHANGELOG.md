@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   literal NUL bytes in `scripts/synapse-bench-analyze-v2.ts` to `\x00`
   escapes (byte-identical runtime strings).
 
+## [1.35.1] - 2026-08-07
+
+### Fixed
+
 - **Full-repository indexing deadlocked against its own lease heartbeat
   (SQLSTATE 40P01).** Every `symbol_*` table FKs to `workspaces(project_id)`,
   so a per-file generation write holds `FOR UPDATE` on its `graph_generations`
