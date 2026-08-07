@@ -3,7 +3,7 @@ name: feature
 description: "Use this workflow to add a new capability, screen, command, integration, or user-facing improvement with clear intent; route broken behavior to debug and broad work to spec-driven."
 license: MIT
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 ### 🟡 Feature
@@ -17,6 +17,8 @@ Before the first repository mutation, load `references/implementation-delivery.m
 **Isolation Gate — before the first file edit:** execute `references/implementation-delivery.md` Stage 0–1 now (fetch base, create the worktree + branch, work inside it) and record the worktree path + branch — or one of Stage 1's two legal skip reasons, verbatim — before any repository mutation.
 
 1. Resolve/reuse `projectId` and `workflowSessionId` (`feature-[entity]`)
+**Reuse Scan — before writing new implementation code:** run the mandatory reuse scan per `references/code-reuse-scan.md` (separate read-only subagents; the reuse map's use/extend/new decisions are consumed before new code is planned or written) — or record its inline-fallback reason, verbatim.
+
 2. `recall` → load prior decisions and patterns for this area
    - Use the default recall budget: `limit <= 3`, `minImportance >= 0.7`, and `types=["critical","decision","pattern"]` unless the feature needs broader memory discovery.
    - Recall is context only and must not load or reconstruct canonical artifact state.

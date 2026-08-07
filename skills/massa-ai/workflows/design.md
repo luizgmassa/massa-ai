@@ -3,7 +3,7 @@ name: design
 description: "Implements or updates a concrete mobile UI from structured Figma evidence or screenshots when no saved audit report exists; route comparisons to mobile-figma-audit."
 license: MIT
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 ### Design
@@ -17,9 +17,11 @@ Before the first repository mutation, load `references/implementation-delivery.m
 **Isolation Gate — before the first file edit:** execute `references/implementation-delivery.md` Stage 0–1 now (fetch base, create the worktree + branch, work inside it) and record the worktree path + branch — or one of Stage 1's two legal skip reasons, verbatim — before any repository mutation.
 
 Not for Flutter, React Native, web UI, generic Figma exploration, variable-only queries, or MCP troubleshooting.
+**Reuse Scan — before writing new implementation code:** run the mandatory reuse scan per `references/code-reuse-scan.md` (separate read-only subagents; the reuse map's use/extend/new decisions are consumed before new code is planned or written) — or record its inline-fallback reason, verbatim.
+
 
 1. Resolve/reuse `workflowSessionId`: `design-[entity]`.
-2. Load `references/mobile-figma-matcher/repository-detection.md`, `references/mobile-figma-matcher/core.md`, `references/mobile-context.md`, `references/codebase-investigation.md`, and `references/verification-ladder.md`. When Figma links or node IDs are provided, load `references/figma-pre-analysis.md` and run its two-stage sequential retrieval protocol before building the Figma Evidence Packet. Load `references/context-firewall.md` before large design/runtime artifacts and `references/synapse-policy.md` when repeated massa-ai searches are expected.
+2. Load `references/mobile-figma-matcher/repository-detection.md`, `references/mobile-figma-matcher/core.md`, `references/mobile-context.md`, `references/codebase-investigation.md`, `references/verification-ladder.md`, and `references/naming-standards.md` (before introducing or renaming identifiers, screens, components, attributes, or implementation-facing names — English-conversion rule applies). When Figma links or node IDs are provided, load `references/figma-pre-analysis.md` and run its two-stage sequential retrieval protocol before building the Figma Evidence Packet. Load `references/context-firewall.md` before large design/runtime artifacts and `references/synapse-policy.md` when repeated massa-ai searches are expected.
 3. `recall` -> load current component conventions, design-system rules, approved platform/accessibility deviations, prior Figma mappings, asset pipelines, and reusable render recipes. Memory is context, not proof.
 4. Require a concrete feature/module target plus at least one design source: readable Figma node/selection or supplied screenshots. Resolve required visual and interactive states plus a requirements source for behavior not represented in the design source. Ask only when target ownership, runtime platforms, platform-frame mappings, or screenshot authority stay ambiguous after source inspection.
 5. Follow `references/design-implementation.md` for the Target Surface Packet, the Figma Evidence / Screenshot Context Packet, the Design-To-Code Mapping Matrix, sizing and the verification recipe, coherent-slice implementation rules, per-slice verification, completion criteria, and the completion report — the single normative copy of this direction set, shared with `spec-driven`/`feature` under Figma ingestion.

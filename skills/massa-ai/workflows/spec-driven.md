@@ -3,7 +3,7 @@ name: spec-driven
 description: "Use this workflow for explicit spec-driven requests and broad, ambiguous, migration-heavy, or cross-boundary delivery needing requirements-through-verification control."
 license: MIT
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 ### Spec-Driven
@@ -88,6 +88,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
    - Load `references/context-firewall.md` before broad source inspection, generated reports, external research, or verbose tool output.
    - Keep the loaded context budget under the `references/spec-driven/context-limits.md` target; summarize or narrow before loading bulky artifacts.
    - Use `references/spec-driven/code-analysis.md` when source inspection needs structural search or tool fallback.
+   - Load `references/naming-standards.md` before introducing or renaming identifiers, screens, components, attributes, or implementation-facing names (English-conversion rule applies).
    - Load current canonical artifacts from `.specs/` files: `.specs/project/FEATURES.json`, `.specs/project/STATE.md`, `.specs/HANDOFF.md`, existing `.specs/features/<slug>/` phase artifacts, lessons, and project source. Current repository source and approved `.specs/` artifacts override stale memory, old handoff notes, external summaries, debug exports, or unapproved generated plans.
    - `search` only counts as codebase evidence when it is fresh for the current repository path and commit/worktree state, or when the result is confirmed against source files read in this session.
    - Load confirmed project lessons through `references/lessons.md` when `.specs/lessons.json` exists:
@@ -97,6 +98,8 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
    - Run `references/spec-driven/discuss.md` inside Specify when gray areas, implicit requirements, persistence/state, external calls, auth, payments, concurrency, or state transitions affect behavior.
    - For Android, iOS, or KMP Compose Multiplatform UI work, run the optional design-source intake gate from `references/mobile-context.md` (Design-Source Intake Gate).
    - Apply the Requirement Closure Gate: every open requirement question is resolved with the user or recorded as an accepted assumption before execution begins.
+**Reuse Scan — before writing new implementation code:** run the mandatory reuse scan per `references/code-reuse-scan.md` (separate read-only subagents; the reuse map's use/extend/new decisions are consumed before new code is planned or written) — or record its inline-fallback reason, verbatim.
+
 4. Decide whether `Design` is required. If yes, run `references/spec-driven/design.md`, including its deterministic validation before presenting `design.md` for confirmation; if no, record why the skip is valid. When Design is skipped and a design concern appears later, stop and create `design.md` before continuing.
 5. Decide whether `Tasks` is required. If yes, run `references/spec-driven/tasks.md`; if no, list the inline atomic execution steps before editing. If the inline list reveals more than 5 steps or complex dependencies, stop and create `tasks.md` — the Tasks phase was wrongly skipped (safety valve).
 6. Run `Execute` with `references/spec-driven/execute.md`.
