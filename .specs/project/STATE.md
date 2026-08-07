@@ -36,8 +36,12 @@
 - Validation (independent verifier, author ≠ verifier): iteration 1 FAIL (4 gaps
   — 2 sensor holes, 1 missing design-guide clause, 1 sequencing reclass);
   iteration 2 PASS 23/23 ACs, 7/7 mutations killed, 197/0 gates.
-- Next: push + PR (authorized); merge = separate user decision; PROC-01
-  design-workflow disposition question to user.
+- PROC-01 resolved (user, 2026-08-07): design workflow KEPT as-is — thin
+  delegating route retained for direct UI-slice work; rejected: absorb-&-retire
+  (breaking /massa-ai:design command surface + gate/population edits for no
+  present gain), demote-to-alias (marginal over current delegation).
+  Re-evaluate after real usage of the Figma-enabled paths.
+- Next: PR #90 open, CI 14/14 green; merge = separate user decision.
 
 ## Previous — Worktree Isolation Gate (**VALIDATED PASS 2026-08-06** — 6/6 ACs, 3/3 mutations killed, iteration 1; push/PR = user decision)
 
