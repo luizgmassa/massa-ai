@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`runtime-extra.test.ts` CI flake ("includes all runtimes when present" failing at
+  ~5045 ms with `killed 1 dangling process`)** — the test was not the pure string
+  test it looked like: `getRuntimeSummary` runs a live `<cmd> --version` subprocess
+  per present runtime, so the fully-populated fixture cost 10 serial probes, which
+  breach the 5 s per-test budget on a loaded Coverage runner — bun then kills the
+  in-flight probe as a "dangling process". `getRuntimeSummary` now takes the same
+  optional `DetectDeps` test seam as `detectRuntimes`, and the summary tests inject
+  `getVersion`, spawning nothing. Reproduced deterministically red-first by shadowing
+  the ten runtime binaries with 1 s-sleep stubs on `PATH` (exact CI signature), green
+  after the seam under the same shadowing. Production callers are unchanged and still
+  probe live.
+
 ## [1.39.0] - 2026-08-07
 
 ### Added
