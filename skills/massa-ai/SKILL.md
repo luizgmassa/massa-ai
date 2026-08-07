@@ -281,6 +281,7 @@ Load only when a selected workflow asks for them:
 
 - `references/agent-orchestration.md`
 - `references/subagent-design.md`
+- `references/code-reuse-scan.md`
 - `references/adr-authoring.md`
 - `references/audit-scope.md`
 - `references/audit-report-io.md`
@@ -290,6 +291,8 @@ Load only when a selected workflow asks for them:
 - `references/mobile-context.md`
 - `references/mobile-diagnosis.md`
 - `references/figma-pre-analysis.md`
+- `references/figma-wiring.md`
+- `references/design-implementation.md`
 - `references/mobile-figma-matcher/`
 - `references/lessons.md`
 - `references/naming-standards.md`

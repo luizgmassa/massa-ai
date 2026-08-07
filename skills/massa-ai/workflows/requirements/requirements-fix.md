@@ -3,7 +3,7 @@ name: requirements-fix
 description: "Executes fixes from a saved requirements audit report; not for findings-only review or broad feature design when acceptance criteria are missing."
 license: MIT
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 ### Requirements Fix
@@ -17,10 +17,13 @@ Before the first repository mutation, load `references/implementation-delivery.m
 **Isolation Gate — before the first file edit:** execute `references/implementation-delivery.md` Stage 0–1 now (fetch base, create the worktree + branch, work inside it) and record the worktree path + branch — or one of Stage 1's two legal skip reasons, verbatim — before any repository mutation.
 
 Not for findings-only requirements review — route to `workflows/requirements/requirements-audit.md`. Not for broad feature design when acceptance criteria are missing — route to `workflows/spec-driven.md`.
+**Reuse Scan — before writing new implementation code:** run the mandatory reuse scan per `references/code-reuse-scan.md` (separate read-only subagents; the reuse map's use/extend/new decisions are consumed before new code is planned or written) — or record its inline-fallback reason, verbatim.
+
 
 1. Resolve/reuse `workflowSessionId`: `requirements-fix-[entity]`
 2. Load shared references:
    - `references/audit-report-io.md` before any code change
+   - `references/naming-standards.md` before introducing or renaming identifiers, screens, components, attributes, or implementation-facing names (English-conversion rule applies)
    - `references/lessons.md` to load confirmed project lessons
    - `references/codebase-investigation.md` before changing unfamiliar requirement flows
    - `references/verification-ladder.md` before non-trivial edits

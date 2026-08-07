@@ -3,7 +3,7 @@ name: code-quality-fix
 description: "Executes fixes from a saved code quality audit report; not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, or overengineering analysis."
 license: MIT
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 ### Code Quality Fix
@@ -17,6 +17,8 @@ Before the first repository mutation, load `references/implementation-delivery.m
 **Isolation Gate — before the first file edit:** execute `references/implementation-delivery.md` Stage 0–1 now (fetch base, create the worktree + branch, work inside it) and record the worktree path + branch — or one of Stage 1's two legal skip reasons, verbatim — before any repository mutation.
 
 Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or overengineering analysis — route to `workflows/code-quality/code-quality-audit.md`.
+**Reuse Scan — before writing new implementation code:** run the mandatory reuse scan per `references/code-reuse-scan.md` (separate read-only subagents; the reuse map's use/extend/new decisions are consumed before new code is planned or written) — or record its inline-fallback reason, verbatim.
+
 
 1. Resolve/reuse `workflowSessionId`: `code-quality-fix-[entity]`
 2. Load shared references:

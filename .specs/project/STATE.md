@@ -1,6 +1,49 @@
 # massa-ai Spec State
 
-## Current — Worktree Isolation Gate (**VALIDATED PASS 2026-08-06** — 6/6 ACs, 3/3 mutations killed, iteration 1; push/PR = user decision)
+## Current — Workflow Reuse-Scan, English Naming, Figma Wiring (**VALIDATED PASS 2026-08-07** — 23/23 ACs, 7/7 mutations killed, iteration 2; close-out this commit; push/PR authorized)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-workflow-reuse-naming-figma` ·
+  workflow: spec-driven (Large) · branch `spec/workflow-reuse-naming-figma` from
+  origin/main @ v1.39.0 (`64649e6e`), worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-workflow-reuse-figma` (isolated).
+- Scope (user decisions 2026-08-07): (1) mandatory subagent reuse scan in all 16
+  implementation workflows (user chose full enforced class over the 13 listed),
+  ordered post-Specify pre-Design/Tasks in spec-driven; (2) English-only naming
+  (any non-English → English, Portuguese primary case) in naming-standards.md +
+  loaded by all 16; (3) Figma node-id wiring for spec-driven/feature on ANY
+  platform (user chose over mobile-gated): per-link `.specs/<type>/<slug>/figma/`
+  files, 8-column wiring table, 13 categories, specs=high-level /
+  tasks-designs=low-level tiering, unused-Number stop backed by
+  `validate_figma_wiring.ts`, Execute Figma-MCP retrieval; design workflow
+  directions abstracted to `design-implementation.md` (design.md delegates,
+  invariants byte-frozen); design-workflow disposition = PROC-01 user decision,
+  pending.
+- Contract: `.specs/features/workflow-reuse-naming-figma/{spec,design,tasks,validation}.md`
+  — `2 Phases = 13 Tasks`, 2 massa-ai-builder batch workers + T13/state in main
+  thread. Plan Challenge full pre_mortem: F1 ordering+wiring sensors folded, F2
+  duplication premise corrected twice (critic 226@w5 vs enforced 474@w4 — window
+  dialect), F3 pre-edit evidence, F4 red-lifetime bound, F5 CONTRIBUTING 3–5 N/A.
+- Commits: `d79af5ed` specs → T1–T6 `1bbd4e49`..`bcd26bf2` (refs + naming rule +
+  sensor red-by-design 28 → green 106/106; scratch naive-placement delta +8
+  measured/reverted, D2 placement delta 0) → T7–T12 `a1df51ed`..`b1b1e602`
+  (enablement + hooks + validate_figma_wiring + CHANGELOG; full test:scripts
+  1690/0 + 21 shell suites) → `f9da6703` REUSE-03 ordering sensor →
+  `59a4dcd1`/`68c7b840` validation gap fixes (NAME-03 design leg, Language-block
+  + stage-pointer-identity sensors, each observed red).
+- Gates: workflow-harness-contract 109/0; duplication excess 474 ≤ 483 @ w4 (9
+  headroom, ceiling untouched); metadata headers 40; doc-paths; integrity;
+  parity 23/0; validate_{spec,design,tasks,state} exit 0.
+- Validation (independent verifier, author ≠ verifier): iteration 1 FAIL (4 gaps
+  — 2 sensor holes, 1 missing design-guide clause, 1 sequencing reclass);
+  iteration 2 PASS 23/23 ACs, 7/7 mutations killed, 197/0 gates.
+- PROC-01 resolved (user, 2026-08-07): design workflow KEPT as-is — thin
+  delegating route retained for direct UI-slice work; rejected: absorb-&-retire
+  (breaking /massa-ai:design command surface + gate/population edits for no
+  present gain), demote-to-alias (marginal over current delegation).
+  Re-evaluate after real usage of the Figma-enabled paths.
+- Next: PR #90 open, CI 14/14 green; merge = separate user decision.
+
+## Previous — Worktree Isolation Gate (**VALIDATED PASS 2026-08-06** — 6/6 ACs, 3/3 mutations killed, iteration 1; push/PR = user decision)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-worktree-isolation-gate` ·
   workflow: spec-driven (Medium) · branch `spec/worktree-isolation-gate` from
@@ -3501,6 +3544,7 @@ Replace regex structural extraction with pinned native Tree-sitter grammars and 
 | AD-016 | active (untracked-generated-bundles, 2026-08-05) | Generated plugin bundles under `apps/*-plugin` (managed skill roots, `agents/`, `agent-profiles/`, generated hook copies, `opencode-config.cjs` mirror) are untracked build output; generation-on-demand is the contract; any new consumer (workflow, script, test entry point) must chain `bun run generate:artifacts` ahead of itself. | Cold-path evidence in validation.md; workflow-generation-order sensor; pre-script chain |
 | AD-017 | active (plugin-architecture-unification, 2026-08-05) | **Plugins deliver, MCP serves tools, hooks observe.** A plugin is a delivery vehicle for agents/skills/hooks/host wiring, never a tool-serving mechanism; the MCP server registered by `scripts/install-agents.sh` (single writer) is the one canonical tool surface (54 tools); hooks are host-native and always on; in-process tools are never a coverage mechanism. Closes three defects: OpenCode's installer removed its own MCP entry as "redundant," leaving OpenCode users 14 of 54 tools; Cursor 3.14 double-loads massa-ai (local plugin copy + Claude-marketplace bridge), risking double hook firing; the harness plugin phase trusted `install-state.json` version records with no on-disk check, so an external wipe of installed artifacts (observed live 2026-08-05, marker `~/.cursor/projects/.agent-data-cleanup-2026-08-05`) reported `skip-current` forever with zero artifacts present. Implemented: OpenCode installer delegates MCP registration to the single writer instead of removing it (uninstall leaves the MCP entry — plugin lifecycle ≠ tool-surface lifecycle); harness `skip-current` now requires an on-disk per-host sentinel, gated on the recorded `installRoute`; Cursor installer prefers the Claude-bridge load path with local install as fallback, hooks fire exactly once; the OpenCode plugin's 14 in-process tools are removed, event handlers kept (OpenCode has no external hook surface). Rejected alternatives: a hybrid in-process hot-path tool subset (depended on unverified OpenCode per-server tool-disable config); preferring the local Cursor copy over the bridge (an installer cannot suppress host bridge behavior; the local copy is the one thing fully within this project's control). | `docs/adr/0002-plugins-deliver-mcp-serves-tools-hooks-observe.md`, `apps/opencode-plugin/src/index.ts`, `scripts/install-agents.sh` |
 | AD-018 | active (workflow-commands, 2026-08-06) | Workflow command surface is generated from the workflow inventory (one command per `skills/massa-ai/workflows/**/*.md` stem, per host); ownership boundary inside shared host dirs is the body marker `<!-- massa-ai:generated workflow-command -->` (marker-scoped prune/check; hand-authored quick files carry no marker), dedicated managed root elsewhere (opencode `command/`); command bodies are explicit-route dispatch into the massa-ai router only — never a second routing path. | design.md Tech Decisions; workflow-command-{entries,emit,check,parity} sensors; validation.md iterations 1–2 |
+| AD-019 | active (workflow-reuse-naming-figma, 2026-08-07) | **Class-wide implementation-workflow directives ship as one normative reference + a pointer/action line per workflow + harness-contract assertions (presence; byte-uniformity where the line is identical; ordering where sequence matters; content sensors for normative rule blocks); optional-capability directives get lazy-load WHERE-enabled seams so non-enabled runs pay no context.** Delivered instances: `code-reuse-scan.md` (mandatory reuse scan, all 16), `naming-standards.md` `## Language` (English-only conversion), `figma-wiring.md` + `design-implementation.md` (Figma ingestion, spec-driven/feature only) with `validate_figma_wiring.ts` deterministic backing. | `.specs/features/workflow-reuse-naming-figma/{design,validation}.md`; workflow-harness-contract groups incl. hook-chain ordering + content sensors |
 
 ## Progress
 

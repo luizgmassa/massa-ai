@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 23,
+  "next_id": 24,
   "lessons": [
     {
       "id": "L-001",
@@ -491,6 +491,25 @@
       "workflow": "spec-driven",
       "entity": "agent-era-harness-upgrades",
       "confidence": 0.62
+    },
+    {
+      "id": "L-023",
+      "key": "surviving_mutant::a normative rule block needs a content sensor on its own text workflows path citation presence checks sense the pointer not the rule two iteration 1 mutants language block delete stage pointer swap survived a 355 test sweep that way",
+      "text": "A normative rule block needs a content sensor on its own text; workflows' path-citation presence checks sense the pointer, not the rule — two iteration-1 mutants (Language-block delete, stage-pointer swap) survived a 355-test sweep that way.",
+      "signal": "surviving_mutant",
+      "scope": "",
+      "status": "candidate",
+      "features": [
+        "workflow-reuse-naming-figma"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        ".specs/features/workflow-reuse-naming-figma/validation.md"
+      ],
+      "created": "2026-08-07T19:10:07Z",
+      "last_seen": "2026-08-07T19:10:07Z",
+      "confidence": 0.53
     }
   ],
   "trust_threshold": 30,
