@@ -131,20 +131,20 @@ Where: `apps/web-ui/src/static/app.js` (existing, extend `wireViewHandlers` + ne
 
 Depends on: T3
 
-- [ ] Add `state.registryOverlay` (init from `source.overlay` on registry view load), `state.registryDirty`.
+- [x] Add `state.registryOverlay` (init from `source.overlay` on registry view load), `state.registryDirty`.
   - **F2 fold:** Do NOT re-initialize `state.registryOverlay` on every render — only on first load or after a successful Save/Clear. Add `state.registryLoaded` guard. Add a `beforeunload` handler when `state.registryDirty` is true that prompts "You have unsaved registry changes. Leave anyway?".
-- [ ] Wire cell edits (`registry-model`, `registry-effort`) on `change` event → update `state.registryOverlay.profiles[profile].hosts[host][tier]` → set `registryDirty=true` → update unsaved indicator.
-- [ ] Wire `registry-hostDefault` / `registry-workflowTier` on `change` → update overlay → dirty.
-- [ ] Add `handleRegistryAddProfile()`: `prompt` for name + description → init profile with null model/effort for all {host,tier} → add to overlay → re-render.
-- [ ] Add `handleRegistryDuplicateProfile()`: `prompt` for new name → copy selected profile's grid → add → re-render.
-- [ ] Add `handleRegistryDeleteProfile()`: `prompt` for name → set `_delete:true` → re-render (moves to tombstoned).
-- [ ] Wire `registry-restore` → remove `_delete` → re-render.
-- [ ] Add `handleRegistrySaveOverlay()`: `confirm(...)` → PUT `state.registryOverlay` → on success: banner + reset `registryDirty=false` + re-render with new source; on 400: banner with all violations.
-- [ ] Add `handleRegistryClearOverlay()`: `confirm(...)` → DELETE `/api/v1/model-registry/overlay` → banner → re-render with builtin.
-- [ ] Wire all in `wireViewHandlers()`.
-- [ ] Add unsaved-changes indicator to `renderModelRegistry` output (or a wrapper) when `state.registryDirty`.
-- [ ] **F6 fold (mid-task gate):** after wiring cell edits + add/duplicate/delete/restore (in-memory mutations), run `bun test apps/web-ui/src/__tests__/admin-handlers.test.ts` for those cases BEFORE wiring save/clear. Checkpoint within the task.
-- [ ] Test in `admin-handlers.test.ts`:
+- [x] Wire cell edits (`registry-model`, `registry-effort`) on `change` event → update `state.registryOverlay.profiles[profile].hosts[host][tier]` → set `registryDirty=true` → update unsaved indicator.
+- [x] Wire `registry-hostDefault` / `registry-workflowTier` on `change` → update overlay → dirty.
+- [x] Add `handleRegistryAddProfile()`: `prompt` for name + description → init profile with null model/effort for all {host,tier} → add to overlay → re-render.
+- [x] Add `handleRegistryDuplicateProfile()`: `prompt` for new name → copy selected profile's grid → add → re-render.
+- [x] Add `handleRegistryDeleteProfile()`: `prompt` for name → set `_delete:true` → re-render (moves to tombstoned).
+- [x] Wire `registry-restore` → remove `_delete` → re-render.
+- [x] Add `handleRegistrySaveOverlay()`: `confirm(...)` → PUT `state.registryOverlay` → on success: banner + reset `registryDirty=false` + re-render with new source; on 400: banner with all violations.
+- [x] Add `handleRegistryClearOverlay()`: `confirm(...)` → DELETE `/api/v1/model-registry/overlay` → banner → re-render with builtin.
+- [x] Wire all in `wireViewHandlers()`.
+- [x] Add unsaved-changes indicator to `renderModelRegistry` output (or a wrapper) when `state.registryDirty`.
+- [x] **F6 fold (mid-task gate):** after wiring cell edits + add/duplicate/delete/restore (in-memory mutations), run `bun test apps/web-ui/src/__tests__/admin-handlers.test.ts` for those cases BEFORE wiring save/clear. Checkpoint within the task.
+- [x] Test in `admin-handlers.test.ts`:
   - Cell edit updates `state.registryOverlay` + sets dirty.
   - Add profile: mock prompt → name, assert profile added to overlay + grid.
   - Delete profile: mock prompt → name, assert `_delete:true` set + profile in tombstoned.

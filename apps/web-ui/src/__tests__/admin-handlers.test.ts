@@ -453,3 +453,270 @@ describe("handleProfileSwitch — confirm + POST + banner (PROFSW-01..04)", () =
     expect(request).not.toHaveBeenCalled();
   });
 });
+
+// ── Registry in-memory overlay state + CRUD (REGWIRE-01..06) ────────────────
+
+const SAMPLE_OVERLAY_SOURCE = {
+  registry: {
+    version: 1, tiers: ["light", "standard", "deep"],
+    hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
+    workflowTiers: { search: "standard" },
+    profiles: {
+      balanced: { description: "b", hosts: { claude: { light: { model: "m-l", effort: "low" }, standard: { model: "m-s", effort: "medium" }, deep: { model: "m-d", effort: "high" } } } },
+    },
+  },
+  source: {
+    builtin: {},
+    overlay: { profiles: { balanced: { description: "overlay b" } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] },
+    tombstoned: ["old-profile"],
+  },
+};
+
+function makeRegistryCtx(overrides: Partial<any> = {}): any {
+  const ctx = makeCtx({
+    state: { registryOverlay: null, registryDirty: false, registryLoaded: false },
+    ...overrides,
+  });
+  return ctx;
+}
+
+describe("initRegistryOverlay — lazy init with guard (F2 fold)", () => {
+  it("initializes registryOverlay from source.overlay on first load", () => {
+    const ctx = makeRegistryCtx();
+    initRegistryOverlay(ctx, SAMPLE_OVERLAY_SOURCE.source);
+    expect(ctx.state.registryOverlay).toBeDefined();
+    expect(ctx.state.registryOverlay.profiles).toBeDefined();
+    expect(ctx.state.registryLoaded).toBe(true);
+  });
+
+  it("does NOT re-initialize when registryLoaded is already true (F2 fold)", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { custom: {} } }, registryDirty: true, registryLoaded: true } });
+    initRegistryOverlay(ctx, SAMPLE_OVERLAY_SOURCE.source);
+    // overlay should still be the custom one, not overwritten
+    expect(ctx.state.registryOverlay.profiles.custom).toBeDefined();
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("initializes with empty overlay structure when source.overlay is null", () => {
+    const ctx = makeRegistryCtx();
+    initRegistryOverlay(ctx, { overlay: null, tombstoned: [], builtin: {} });
+    expect(ctx.state.registryOverlay).toBeDefined();
+    expect(ctx.state.registryOverlay.profiles).toEqual({});
+  });
+});
+
+describe("handleRegistryCellEdit — in-memory cell edit (REGWIRE-01)", () => {
+  it("updates model field in overlay + sets dirty", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { balanced: { hosts: { claude: { light: { model: "m-l", effort: "low" } } } } } }, registryDirty: false, registryLoaded: true } });
+    handleRegistryCellEdit(ctx, "balanced", "claude", "light", "model", "new-model");
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.light.model).toBe("new-model");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("updates effort field in overlay + sets dirty", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { balanced: { hosts: { claude: { light: { model: "m-l", effort: "low" } } } } } }, registryDirty: false, registryLoaded: true } });
+    handleRegistryCellEdit(ctx, "balanced", "claude", "light", "effort", "high");
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.light.effort).toBe("high");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+});
+
+describe("handleRegistryHostDefaultEdit — hostDefaults edit (REGWIRE-02)", () => {
+  it("updates hostDefault in overlay + sets dirty", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, hostDefaults: { claude: "balanced" } }, registryDirty: false, registryLoaded: true } });
+    handleRegistryHostDefaultEdit(ctx, "claude", "work");
+    expect(ctx.state.registryOverlay.hostDefaults.claude).toBe("work");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+});
+
+describe("handleRegistryWorkflowTierEdit — workflowTiers edit (REGWIRE-02)", () => {
+  it("updates workflowTier in overlay + sets dirty", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, workflowTiers: { search: "standard" } }, registryDirty: false, registryLoaded: true } });
+    handleRegistryWorkflowTierEdit(ctx, "search", "deep");
+    expect(ctx.state.registryOverlay.workflowTiers.search).toBe("deep");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+});
+
+describe("handleRegistryAddProfile — add profile via prompt (REGWIRE-03)", () => {
+  const origPrompt = (globalThis as any).prompt;
+  afterEach(() => { (globalThis as any).prompt = origPrompt; });
+
+  it("adds a new profile with null model/effort for all host/tier combos", () => {
+    (globalThis as any).prompt = mock((msg: string) => {
+      if (msg.toLowerCase().includes("name")) return "custom";
+      if (msg.toLowerCase().includes("description")) return "a custom profile";
+      return null;
+    });
+    const ctx = makeRegistryCtx({
+      state: {
+        registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] },
+        registryDirty: false, registryLoaded: true,
+      },
+    });
+    handleRegistryAddProfile(ctx);
+    expect(ctx.state.registryOverlay.profiles.custom).toBeDefined();
+    expect(ctx.state.registryOverlay.profiles.custom.description).toBe("a custom profile");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("does nothing when prompt returns null/empty name", () => {
+    (globalThis as any).prompt = mock(() => null);
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {} }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAddProfile(ctx);
+    expect(Object.keys(ctx.state.registryOverlay.profiles)).toHaveLength(0);
+    expect(ctx.state.registryDirty).toBe(false);
+  });
+});
+
+describe("handleRegistryDuplicateProfile — duplicate via prompt (REGWIRE-04)", () => {
+  const origPrompt = (globalThis as any).prompt;
+  afterEach(() => { (globalThis as any).prompt = origPrompt; });
+
+  it("copies selected profile grid to a new name", () => {
+    (globalThis as any).prompt = mock(() => "work-copy");
+    const ctx = makeRegistryCtx({
+      state: {
+        registryOverlay: { profiles: { balanced: { hosts: { claude: { light: { model: "m", effort: "low" } } } } } },
+        registryDirty: false, registryLoaded: true,
+      },
+    });
+    handleRegistryDuplicateProfile(ctx);
+    expect(ctx.state.registryOverlay.profiles["work-copy"]).toBeDefined();
+    expect(ctx.state.registryOverlay.profiles["work-copy"].hosts.claude.light.model).toBe("m");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+});
+
+describe("handleRegistryDeleteProfile — delete + tombstone (REGWIRE-05)", () => {
+  const origPrompt = (globalThis as any).prompt;
+  afterEach(() => { (globalThis as any).prompt = origPrompt; });
+
+  it("sets _delete:true on existing profile", () => {
+    (globalThis as any).prompt = mock(() => "balanced");
+    const ctx = makeRegistryCtx({
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} } } }, registryDirty: false, registryLoaded: true },
+    });
+    handleRegistryDeleteProfile(ctx);
+    expect(ctx.state.registryOverlay.profiles.balanced._delete).toBe(true);
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+});
+
+describe("handleRegistryRestore — remove tombstone (REGWIRE-06)", () => {
+  it("removes _delete flag from a tombstoned profile", () => {
+    const ctx = makeRegistryCtx({
+      state: { registryOverlay: { profiles: { balanced: { _delete: true, hosts: {} } } }, registryDirty: true, registryLoaded: true },
+    });
+    handleRegistryRestore(ctx, "balanced");
+    expect(ctx.state.registryOverlay.profiles.balanced._delete).toBeUndefined();
+  });
+});
+
+// ── Registry save/clear overlay (REGWIRE-07..13) ─────────────────────────────
+
+describe("handleRegistrySaveOverlay — confirm + PUT + dirty reset (REGWIRE-07..10)", () => {
+  const origConfirm = (globalThis as any).confirm;
+  afterEach(() => { (globalThis as any).confirm = origConfirm; });
+
+  it("shows confirm naming the overlay file path (REGWIRE-07)", async () => {
+    (globalThis as any).confirm = mock(() => false);
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true } });
+    await handleRegistrySaveOverlay(ctx);
+    const msg = (globalThis as any).confirm.mock.calls[0][0] as string;
+    expect(msg.toLowerCase()).toContain("overlay");
+    expect(msg.toLowerCase()).toContain("validat");
+  });
+
+  it("PUTs the full in-memory overlay on confirm (REGWIRE-08)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: true, data: { registry: {}, source: { overlay: { profiles: { balanced: {} } } } } }));
+    const ctx = makeRegistryCtx({
+      api: { request },
+      state: { registryOverlay: { profiles: { balanced: { description: "x" } } }, registryDirty: true, registryLoaded: true },
+    });
+    await handleRegistrySaveOverlay(ctx);
+    expect(request).toHaveBeenCalled();
+    const call = request.mock.calls[0];
+    expect(call[0]).toBe("/api/v1/model-registry");
+    expect(call[1].method).toBe("PUT");
+    expect(call[1].body.profiles.balanced.description).toBe("x");
+  });
+
+  it("resets registryDirty + reloads overlay on success (REGWIRE-09)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: true, data: { registry: {}, source: { overlay: { profiles: { balanced: { description: "saved" } }, builtin: {}, tombstoned: [] } } } }));
+    const render = mock(() => {});
+    const ctx = makeRegistryCtx({
+      api: { request }, render,
+      state: { registryOverlay: { profiles: { balanced: { description: "x" } } }, registryDirty: true, registryLoaded: true },
+    });
+    await handleRegistrySaveOverlay(ctx);
+    expect(ctx.state.registryDirty).toBe(false);
+    expect(ctx.state.registryLoaded).toBe(false); // reset so render re-inits from new source
+    expect(render).toHaveBeenCalled();
+  });
+
+  it("shows error banner with all violations on 400 (REGWIRE-10)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: false, error: "validation failed", details: ["profiles.foo missing tier 'standard'", "hostDefaults.bar unknown profile"] }));
+    const ctx = makeRegistryCtx({
+      api: { request },
+      state: { registryOverlay: { profiles: { foo: {} } }, registryDirty: true, registryLoaded: true },
+    });
+    await handleRegistrySaveOverlay(ctx);
+    expect(ctx.root.children[0].textContent).toContain("missing tier 'standard'");
+    expect(ctx.root.children[0].textContent).toContain("hostDefaults.bar unknown profile");
+    // dirty stays true on error
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("cancel (confirm=false) sends no PUT", async () => {
+    (globalThis as any).confirm = mock(() => false);
+    const request = mock(async () => ({ success: true }));
+    const ctx = makeRegistryCtx({ api: { request }, state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true } });
+    await handleRegistrySaveOverlay(ctx);
+    expect(request).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleRegistryClearOverlay — confirm + DELETE (REGWIRE-11, REGWIRE-12)", () => {
+  const origConfirm = (globalThis as any).confirm;
+  afterEach(() => { (globalThis as any).confirm = origConfirm; });
+
+  it("shows confirm warning about overlay deletion + revert to builtin (REGWIRE-11)", async () => {
+    (globalThis as any).confirm = mock(() => false);
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {} }, registryDirty: false, registryLoaded: true } });
+    await handleRegistryClearOverlay(ctx);
+    const msg = (globalThis as any).confirm.mock.calls[0][0] as string;
+    expect(msg.toLowerCase()).toContain("built-in");
+    expect(msg.toLowerCase()).toContain("delete");
+  });
+
+  it("DELETEs /api/v1/model-registry/overlay on confirm (REGWIRE-12)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: true, data: { registry: {}, source: { overlay: null, builtin: {}, tombstoned: [] } } }));
+    const render = mock(() => {});
+    const ctx = makeRegistryCtx({
+      api: { request }, render,
+      state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true },
+    });
+    await handleRegistryClearOverlay(ctx);
+    expect(request).toHaveBeenCalled();
+    const call = request.mock.calls[0];
+    expect(call[0]).toBe("/api/v1/model-registry/overlay");
+    expect(call[1].method).toBe("DELETE");
+    // overlay reset to builtin
+    expect(ctx.state.registryLoaded).toBe(false);
+    expect(render).toHaveBeenCalled();
+  });
+
+  it("cancel sends no DELETE", async () => {
+    (globalThis as any).confirm = mock(() => false);
+    const request = mock(async () => ({ success: true }));
+    const ctx = makeRegistryCtx({ api: { request }, state: { registryOverlay: { profiles: {} }, registryDirty: false, registryLoaded: true } });
+    await handleRegistryClearOverlay(ctx);
+    expect(request).not.toHaveBeenCalled();
+  });
+});

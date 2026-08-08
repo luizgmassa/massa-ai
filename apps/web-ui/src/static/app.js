@@ -1024,6 +1024,7 @@ export function renderModelRegistry(data, opts) {
   const source = payload.source || {};
   const overlayError = payload.overlayError;
   const writeMode = opts && opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
+  const unsaved = opts && opts.unsaved ? ' <span class="badge" style="background:rgba(245,158,11,0.15);color:#92400e;">unsaved changes</span>' : "";
 
   const profiles = registry.profiles || {};
   const profileNames = Object.keys(profiles);
@@ -1149,7 +1150,7 @@ export function renderModelRegistry(data, opts) {
     : "";
 
   return (
-    '<section class="view"><h2>Model Registry</h2>' +
+    '<section class="view"><h2>Model Registry</h2>' + unsaved +
     overlayBanner +
     grid +
     '<div class="registry-hostDefaults"><h3>Host Defaults</h3>' + hostDefaultsRows + "</div>" +
@@ -1365,7 +1366,7 @@ export function renderProfilesView(profilesData, registryData, opts) {
 
   let body;
   if (tab === "registry") {
-    body = renderModelRegistry(registryData, { writeMode });
+    body = renderModelRegistry(registryData, { writeMode, unsaved: opts.unsaved });
   } else {
     body = renderProfiles(profilesData, { writeMode });
   }
@@ -1404,6 +1405,129 @@ export async function handleProfileSwitch(ctx, profile, host) {
     ctx.render();
   } catch (e) {
     showBanner(ctx.root, "error", "Switch failed: " + String((e && e.message) || e));
+  }
+}
+
+// ── Registry in-memory overlay state + CRUD (Component 3) ───────────────────
+// F2 fold: registryLoaded guard prevents re-init on every render. beforeunload
+// guard when dirty (added in startApp).
+
+export function initRegistryOverlay(ctx, source) {
+  if (ctx.state.registryLoaded) return;
+  const overlay = (source && source.overlay) || null;
+  ctx.state.registryOverlay = overlay
+    ? JSON.parse(JSON.stringify(overlay))
+    : { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: [] };
+  ctx.state.registryDirty = false;
+  ctx.state.registryLoaded = true;
+}
+
+export function handleRegistryCellEdit(ctx, profile, host, tier, field, value) {
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {} };
+  if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
+  if (!ctx.state.registryOverlay.profiles[profile]) ctx.state.registryOverlay.profiles[profile] = { hosts: {} };
+  if (!ctx.state.registryOverlay.profiles[profile].hosts) ctx.state.registryOverlay.profiles[profile].hosts = {};
+  if (!ctx.state.registryOverlay.profiles[profile].hosts[host]) ctx.state.registryOverlay.profiles[profile].hosts[host] = {};
+  if (!ctx.state.registryOverlay.profiles[profile].hosts[host][tier]) ctx.state.registryOverlay.profiles[profile].hosts[host][tier] = { model: null, effort: null };
+  ctx.state.registryOverlay.profiles[profile].hosts[host][tier][field] = value || null;
+  ctx.state.registryDirty = true;
+}
+
+export function handleRegistryHostDefaultEdit(ctx, host, value) {
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {} };
+  if (!ctx.state.registryOverlay.hostDefaults) ctx.state.registryOverlay.hostDefaults = {};
+  ctx.state.registryOverlay.hostDefaults[host] = value;
+  ctx.state.registryDirty = true;
+}
+
+export function handleRegistryWorkflowTierEdit(ctx, workflow, value) {
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, workflowTiers: {} };
+  if (!ctx.state.registryOverlay.workflowTiers) ctx.state.registryOverlay.workflowTiers = {};
+  ctx.state.registryOverlay.workflowTiers[workflow] = value;
+  ctx.state.registryDirty = true;
+}
+
+export function handleRegistryAddProfile(ctx) {
+  const name = prompt("New profile name:");
+  if (!name || !name.trim()) return;
+  const description = prompt("Description (optional):") || "";
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: [] };
+  const tiers = ctx.state.registryOverlay.tiers || ["light", "standard", "deep"];
+  const hosts = {};
+  for (const h of REGISTRY_HOSTS) {
+    hosts[h] = {};
+    for (const t of tiers) hosts[h][t] = { model: null, effort: null };
+  }
+  ctx.state.registryOverlay.profiles[name.trim()] = { description, hosts };
+  ctx.state.registryDirty = true;
+  ctx.render();
+}
+
+export function handleRegistryDuplicateProfile(ctx) {
+  const newName = prompt("New profile name (copy of selected):");
+  if (!newName || !newName.trim()) return;
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {} };
+  const existing = ctx.state.registryOverlay.profiles || {};
+  const firstKey = Object.keys(existing)[0];
+  if (!firstKey) return;
+  const copy = JSON.parse(JSON.stringify(existing[firstKey]));
+  ctx.state.registryOverlay.profiles[newName.trim()] = copy;
+  ctx.state.registryDirty = true;
+  ctx.render();
+}
+
+export function handleRegistryDeleteProfile(ctx) {
+  const name = prompt("Profile name to delete:");
+  if (!name || !name.trim()) return;
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {} };
+  if (!ctx.state.registryOverlay.profiles[name.trim()]) return;
+  ctx.state.registryOverlay.profiles[name.trim()]._delete = true;
+  ctx.state.registryDirty = true;
+  ctx.render();
+}
+
+export function handleRegistryRestore(ctx, profile) {
+  if (!ctx.state.registryOverlay || !ctx.state.registryOverlay.profiles) return;
+  const p = ctx.state.registryOverlay.profiles[profile];
+  if (!p) return;
+  delete p._delete;
+  ctx.state.registryDirty = true;
+  ctx.render();
+}
+
+export async function handleRegistrySaveOverlay(ctx) {
+  if (!confirm("Save registry overlay? Validates and writes to ~/.config/massa-ai/model-profiles.json.")) return;
+  try {
+    const res = await ctx.api.request("/api/v1/model-registry", { method: "PUT", body: ctx.state.registryOverlay });
+    if (res && res.success === false) {
+      const details = res.details ? res.details.join("; ") : (res.error || "Save failed.");
+      showBanner(ctx.root, "error", "Save failed: " + details);
+      return;
+    }
+    showBanner(ctx.root, "success", "Registry overlay saved.");
+    // Reset loaded guard so next render re-inits from the new source.overlay.
+    ctx.state.registryLoaded = false;
+    ctx.state.registryDirty = false;
+    ctx.render();
+  } catch (e) {
+    showBanner(ctx.root, "error", "Save failed: " + String((e && e.message) || e));
+  }
+}
+
+export async function handleRegistryClearOverlay(ctx) {
+  if (!confirm("Reset to built-in? This deletes the overlay file and reverts to the builtin registry.")) return;
+  try {
+    const res = await ctx.api.request("/api/v1/model-registry/overlay", { method: "DELETE" });
+    if (res && res.success === false) {
+      showBanner(ctx.root, "error", "Clear failed: " + (res.error || "unknown"));
+      return;
+    }
+    showBanner(ctx.root, "success", "Overlay cleared. Registry reverted to built-in.");
+    ctx.state.registryLoaded = false;
+    ctx.state.registryDirty = false;
+    ctx.render();
+  } catch (e) {
+    showBanner(ctx.root, "error", "Clear failed: " + String((e && e.message) || e));
   }
 }
 
@@ -1532,14 +1656,19 @@ function startApp(opts) {
       } else if (state.view === "profiles") {
         const profilesRes = await api.request("/api/v1/profiles");
         const registryRes = await api.request("/api/v1/model-registry");
+        const registryData = (registryRes && registryRes.data) || { registry: {}, source: {} };
+        const ctxObj = { api, root, state, render, doc };
+        initRegistryOverlay(ctxObj, registryData.source);
         root.innerHTML = renderProfilesView(
           (profilesRes && profilesRes.data) || { hosts: [] },
-          (registryRes && registryRes.data) || { registry: {}, source: {} },
-          { profilesTab: state.profilesTab || "switch", writeMode: isWriteModeEnabled() },
+          registryData,
+          { profilesTab: state.profilesTab || "switch", writeMode: isWriteModeEnabled(), unsaved: state.registryDirty },
         );
       } else if (state.view === "model-registry") {
         const data = await api.request("/api/v1/model-registry");
-        root.innerHTML = renderModelRegistry((data && data.data) || { registry: {}, source: {} }, { writeMode: isWriteModeEnabled() });
+        const ctxObj = { api, root, state, render, doc };
+        initRegistryOverlay(ctxObj, (data && data.data && data.data.source) || {});
+        root.innerHTML = renderModelRegistry((data && data.data) || { registry: {}, source: {} }, { writeMode: isWriteModeEnabled(), unsaved: state.registryDirty });
       }
     } catch (e) {
       root.innerHTML = '<div class="error">Connection error: ' + escapeHtml(String(e.message || e)) + "</div>";
@@ -1690,6 +1819,44 @@ function startApp(opts) {
         if (!profile) return;
         handleProfileSwitch(ctx, profile, host);
       });
+    });
+    // admin-portal-enhancements: registry in-memory CRUD + save/clear
+    root.querySelectorAll('[data-action="registry-model"], [data-action="registry-effort"]').forEach((el) => {
+      el.addEventListener("change", () => {
+        handleRegistryCellEdit(ctx, el.dataset.profile, el.dataset.host, el.dataset.tier, el.dataset.action === "registry-model" ? "model" : "effort", el.value);
+      });
+    });
+    root.querySelectorAll('[data-action="registry-hostDefault"]').forEach((el) => {
+      el.addEventListener("change", () => {
+        handleRegistryHostDefaultEdit(ctx, el.dataset.host, el.value);
+      });
+    });
+    root.querySelectorAll('[data-action="registry-workflowTier"]').forEach((el) => {
+      el.addEventListener("change", () => {
+        handleRegistryWorkflowTierEdit(ctx, el.dataset.workflow, el.value);
+      });
+    });
+    root.querySelector('[data-action="registry-add-profile"]')?.addEventListener("click", () => {
+      handleRegistryAddProfile(ctx);
+    });
+    root.querySelector('[data-action="registry-duplicate-profile"]')?.addEventListener("click", () => {
+      handleRegistryDuplicateProfile(ctx);
+    });
+    root.querySelector('[data-action="registry-delete-profile"]')?.addEventListener("click", () => {
+      handleRegistryDeleteProfile(ctx);
+    });
+    root.querySelectorAll('[data-action="registry-restore"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const profile = btn.dataset.profile;
+        if (!profile) return;
+        handleRegistryRestore(ctx, profile);
+      });
+    });
+    root.querySelector('[data-action="registry-save-overlay"]')?.addEventListener("click", () => {
+      handleRegistrySaveOverlay(ctx);
+    });
+    root.querySelector('[data-action="registry-clear-overlay"]')?.addEventListener("click", () => {
+      handleRegistryClearOverlay(ctx);
     });
   }
 
@@ -1873,6 +2040,17 @@ function startApp(opts) {
 
   refreshProjectsForSelect().finally(render);
 
+  // F2 fold: beforeunload guard when registry has unsaved changes.
+  if (typeof window !== "undefined") {
+    window.addEventListener("beforeunload", (ev) => {
+      if (state.registryDirty) {
+        ev.preventDefault();
+        ev.returnValue = "You have unsaved registry changes. Leave anyway?";
+        return ev.returnValue;
+      }
+    });
+  }
+
   // SSE: subscribe to /api/v1/events for real-time updates (Wave 7 T10)
   if (typeof EventSource !== "undefined") {
     try {
@@ -1926,6 +2104,16 @@ const MASSA_AI_UI = {
   renderProfilesView,
   handleProfilesTabSwitch,
   handleProfileSwitch,
+  initRegistryOverlay,
+  handleRegistryCellEdit,
+  handleRegistryHostDefaultEdit,
+  handleRegistryWorkflowTierEdit,
+  handleRegistryAddProfile,
+  handleRegistryDuplicateProfile,
+  handleRegistryDeleteProfile,
+  handleRegistryRestore,
+  handleRegistrySaveOverlay,
+  handleRegistryClearOverlay,
   MEMORY_TYPES,
   MEMORY_LEVELS,
   CHECKPOINTS_LIST_BODY,
