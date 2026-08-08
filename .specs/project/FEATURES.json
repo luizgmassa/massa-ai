@@ -1104,7 +1104,9 @@
       "tasks": ".specs/features/registry-help-dropdown-workflow-tiers/tasks.md",
       "validation": ".specs/features/registry-help-dropdown-workflow-tiers/validation.md",
       "created": "2026-08-08",
-      "depends_on": ["admin-portal-ui-fixes"],
+      "depends_on": [
+        "admin-portal-ui-fixes"
+      ],
       "notes": "VALIDATED PASS 2026-08-08: T7-T10 (4 ACs REG-01..04). 4/4 ACs, 3/3 mutations killed. web-ui 298 pass, scripts 113 pass, generator --check exit 0. Design: Option A3 (no generator changes; UI + validation only). Push/PR = user decision."
     },
     {
@@ -1125,7 +1127,29 @@
       "tasks": ".specs/features/admin-portal-enhancements/tasks.md",
       "created": "2026-08-08",
       "notes": "EXECUTE COMPLETE 2026-08-08: T1-T9, 9 task commits on spec/admin-portal-enhancements (2 planning + 9 task). Inline execution (sub-agents unavailable). 51 ACs across 3 phases = 9 tasks. Plan Challenge full gate 7 findings all folded (F1-F7). Per-task gates green: model-registry-stream 7, web-ui 220->278, type-check 6/6, test:plugins 135/0. New backend route POST /api/v1/model-registry/regenerate-stream (SSE). Frontend: showBanner, config save/reveal confirm, profiles tab switcher, registry in-memory overlay CRUD + save/clear, regenerate streaming, index progress + poll fallback, CSS design system. Validation pending (verification-agent dispatch). Push/PR = user decision."
+    },
+    {
+      "id": "config-capture-reveal-field-guides",
+      "slug": "config-capture-reveal-field-guides",
+      "title": "Config Tab: Capture Policy indicator, reveal real values, per-section field guides",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "spec/admin-portal-ui-fixes",
+      "spec": ".specs/features/config-capture-reveal-field-guides/spec.md",
+      "tasks": ".specs/features/config-capture-reveal-field-guides/tasks.md",
+      "validation": ".specs/features/config-capture-reveal-field-guides/validation.md",
+      "created": "2026-08-08",
+      "depends_on": [
+        "admin-portal-ui-fixes"
+      ],
+      "notes": "VALIDATED PASS 2026-08-08: T11-T14 (3 ACs CFG-01..03). 3/3 ACs, 3/3 mutations killed. web-ui 307 pass, tools-api config 14 pass, type-check 6/6, lint 0. New GET /api/v1/config/reveal endpoint. Push/PR = user decision."
     }
   ],
-  "active_feature": "registry-help-dropdown-workflow-tiers"
+  "active_feature": "config-capture-reveal-field-guides"
 }
