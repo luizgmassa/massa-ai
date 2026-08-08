@@ -67,9 +67,49 @@ massa-ai system from a single web surface has no such surface.
 | Regenerate runs `generate-subagent-artifacts.ts` as a child process | Route spawns the script; does not switch profiles automatically (switching is a separate explicit call) | Regeneration creates variant directories; switching is a distinct action | y |
 | Corrupted overlay never throws at load time | Loader logs a warning and falls back to the built-in registry; GET route surfaces `overlayError` | A bad user overlay must not break the running server | y |
 | `FORBIDDEN_MUTATING_PATHS` removed in favor of allow-list | The UI may call any `/api/v1/*` route with the injected key; the read-only test is updated/removed | Admin portal intentionally calls mutating paths; trust is the gate, not a path blocklist | y |
-| Checkpoint repository has a delete method (to verify) | If `@massa-ai/core` checkpoint repository lacks `delete(id)`, add `deleteById(id)` + `DeleteCheckpointTool` wrapper | Spec flags this as an implementation-time verification gap (Further Notes) | y (assumed addable) |
+| Checkpoint repository has a delete method (to verify) | If `@massa-ai/core` checkpoint repository lacks `delete(id)`, add `deleteById(id)` + `DeleteCheckpointTool` wrapper | Spec flags this as an implementation-time verification gap (Further Notes). Verified during Design: `deleteCheckpoint(id)` EXISTS at `packages/core/src/services/checkpoint/checkpoint-store-pg.ts:358` (mirror-sync, durable-async). Only route + optional tool wrapper are new. | y (verified) |
+| Checkpoint delete durability is mirror-sync, not durable-await | The new delete route returns `{ok:true}` on mirror-hit; the DB delete is async. A server restart before the durable delete completes could re-show the row. | Solo operator, low concurrency; the list route reads the mirror too, so the view is consistent within a session. Cross-restart edge is an accepted V1 limitation (Plan Challenge F4). | y |
+| Concurrent overlay edits are last-writer-wins | Two browser tabs editing the overlay concurrently: the second save overwrites the first. No ETag/version in V1. | Solo operator, low risk; matches the shallow-merge decision (Plan Challenge F6). | y |
 
 **Open questions:** none — all resolved or logged above.
+
+---
+
+## Plan Challenge Record (full gate, pre-mortem)
+
+Plan Challenge full gate run (spec-driven + security + >5 files). The
+`massa-ai-plan-critic` subagent was unavailable (model lookup failed at
+dispatch); per policy, a strict standalone fresh-eyes critique was run
+against the same output contract. Six findings, all folded:
+
+- **F1 (critical)** — `isWriteModeEnabled` default-ON reads the API-key meta
+  tag via `document.querySelector`, which is `null` under `bun test`. The
+  existing `write-mode.test.ts:147` "returns false by default" may stay green
+  by accident (no DOM → no meta tag → false), leaving the trusted default-ON
+  path unverified. **Fold:** Tasks coverage matrix includes a trusted-meta-tag
+  fixture test (fake `document` with the meta tag → `isWriteModeEnabled()===true`).
+- **F2** — `savePartialConfig` hand-written validation guards must mirror all
+  ~60 `MassaAiConfig` fields; a missing guard writes a bad value silently.
+  **Fold:** Tasks include a per-section validation test (at least one bad
+  value per section); the verifier's discrimination sensor probes a guard
+  deletion.
+- **F3** — `generate-subagent-artifacts.ts` read-path split (`--check` keeps
+  `loadRegistry` builtin; runtime switches to `loadEffectiveRegistry`). A
+  wrong branch silently validates the overlay at build-time OR silently
+  generates builtin-only at runtime (overlay edits look successful but have
+  no effect). **Fold:** Tasks include a generate-path sensor test: set an
+  overlay, run non-`--check` generation, assert a regenerated file reflects
+  the overlay model; plus `--check` still passes with the same overlay.
+- **F4** — Checkpoint delete is mirror-sync, durable-async (route returns
+  `{ok:true}` before the DB row is gone). **Fold:** documented as an accepted
+  assumption above (CHKP row); route JSDoc notes the async durability.
+- **F5** — Removing `FORBIDDEN_MUTATING_PATHS` could break a test the glob
+  missed (the `app.js:8-12` comment names `web-ui-readonly.test.ts`). **Fold:**
+  the removal task runs a pre-removal repo-wide sweep (`rg -l
+  "FORBIDDEN_MUTATING_PATHS\|web-ui-readonly"`) with the population printed in
+  the commit body before deleting the export.
+- **F6** — Concurrent overlay PUTs are last-writer-wins (no ETag/version).
+  **Fold:** documented as an accepted assumption above.
 
 ---
 
