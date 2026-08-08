@@ -1212,7 +1212,12 @@ function truncate(s, n) {
 }
 
 function errorBlock(data) {
-  const msg = (data && data.error) || "Request failed.";
+  const raw = (data && data.error) || "Request failed.";
+  const msg = typeof raw === "string"
+    ? raw
+    : (raw && typeof raw === "object" && (raw.message || raw.code))
+      ? [raw.code, raw.message].filter(Boolean).join(": ")
+      : JSON.stringify(raw);
   return '<div class="error">' + escapeHtml(msg) + "</div>";
 }
 

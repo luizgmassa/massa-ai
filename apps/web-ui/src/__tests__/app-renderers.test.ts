@@ -97,6 +97,13 @@ describe("renderSearch", () => {
     expect(html).toContain("boom");
   });
 
+  it("shows error block on object error (live API shape)", () => {
+    const html = renderSearch({ success: false, error: { code: "NOT_FOUND", message: "Route not found" } }, { query: "q" });
+    expect(html).toContain("NOT_FOUND");
+    expect(html).toContain("Route not found");
+    expect(html).not.toContain("[object Object]");
+  });
+
   it("shows no-results message", () => {
     const html = renderSearch({ data: { results: [] } }, { query: "q" });
     expect(html).toContain("No results");
@@ -155,6 +162,12 @@ describe("renderCheckpoints", () => {
   it("shows error on failed/null data", () => {
     expect(renderCheckpoints(null)).toContain("Request failed");
     expect(renderCheckpoints({ success: false, error: "nope" })).toContain("nope");
+  });
+
+  it("shows error on object error (live API shape)", () => {
+    const html = renderCheckpoints({ success: false, error: { code: "NOT_FOUND", message: "Route not found" } });
+    expect(html).toContain("Route not found");
+    expect(html).not.toContain("[object Object]");
   });
 
   it("shows empty state", () => {
@@ -223,6 +236,12 @@ describe("renderMemoryBrowser edge cases", () => {
   it("shows error block on failed data", () => {
     const html = renderMemoryBrowser({ success: false, error: "denied" }, {});
     expect(html).toContain("denied");
+  });
+
+  it("shows error block on object error (live API shape)", () => {
+    const html = renderMemoryBrowser({ success: false, error: { code: "NOT_FOUND", message: "Route not found" } }, {});
+    expect(html).toContain("Route not found");
+    expect(html).not.toContain("[object Object]");
   });
 
   it("shows empty memories message", () => {
