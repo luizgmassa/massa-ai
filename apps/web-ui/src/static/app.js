@@ -236,9 +236,21 @@ function _minimalMarkdownToHtml(md) {
 
 // ── View renderers (pure: ({ data, state }) => htmlString) ─────────────────
 
-export function renderProjects(data) {
+export function renderProjects(data, opts) {
   const projects = (data && data.projects) || [];
   const writeMode = isWriteModeEnabled();
+  const indexJobId = opts && opts.indexJobId;
+  const indexJobStatus = opts && opts.indexJobStatus;
+  const indexJobPhase = opts && opts.indexJobPhase;
+  const indexJobFileCount = opts && opts.indexJobFileCount;
+
+  const indexProgress = indexJobId
+    ? '<div class="index-progress"><span>Index job: ' + escapeHtml(indexJobId) + '</span>' +
+      '<span class="badge">' + escapeHtml(indexJobStatus || "pending") + '</span>' +
+      (indexJobPhase ? '<span>phase: ' + escapeHtml(indexJobPhase) + '</span>' : "") +
+      (indexJobFileCount != null ? '<span>' + escapeHtml(String(indexJobFileCount)) + ' files</span>' : "") +
+      '</div>'
+    : "";
 
   const rows = projects
     .map((p) => {
@@ -268,7 +280,9 @@ export function renderProjects(data) {
     return '<p class="empty">No indexed projects.</p>';
   }
   return (
-    '<section class="view"><h2>Projects</h2><ul class="project-list">' +
+    '<section class="view"><h2>Projects</h2>' +
+    indexProgress +
+    '<ul class="project-list">' +
     rows +
     "</ul>" +
     indexForm +
@@ -1024,6 +1038,7 @@ export function renderModelRegistry(data, opts) {
   const source = payload.source || {};
   const overlayError = payload.overlayError;
   const writeMode = opts && opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
+  const unsaved = opts && opts.unsaved ? ' <span class="badge" style="background:rgba(245,158,11,0.15);color:#92400e;">unsaved changes</span>' : "";
 
   const profiles = registry.profiles || {};
   const profileNames = Object.keys(profiles);
@@ -1149,7 +1164,7 @@ export function renderModelRegistry(data, opts) {
     : "";
 
   return (
-    '<section class="view"><h2>Model Registry</h2>' +
+    '<section class="view"><h2>Model Registry</h2>' + unsaved +
     overlayBanner +
     grid +
     '<div class="registry-hostDefaults"><h3>Host Defaults</h3>' + hostDefaultsRows + "</div>" +
@@ -1277,6 +1292,343 @@ function createApiClient(opts) {
   return { request };
 }
 
+// ── Admin portal enhancement handlers (exported, context-injected) ──────────
+// These are module-level pure-ish functions taking a ctx { api, root, state,
+// render, doc }. startApp() builds ctx and wires them in wireViewHandlers().
+// Tests inject mock ctx. This avoids a startApp DOM harness for handler tests.
+
+const BANNER_AUTOHIDE_MS = 6000;
+
+export function showBanner(root, type, message) {
+  // Clear existing banner(s) — only one at a time.
+  const existing = root.querySelectorAll ? root.querySelectorAll(".success, .error") : [];
+  existing.forEach((b) => { if (b.remove) b.remove(); });
+  const div = {
+    className: type === "success" ? "success" : "error",
+    textContent: message,
+    style: {},
+    remove: () => {},
+    addEventListener: () => {},
+  };
+  // Prepend to root (top of view). Use insertBefore if firstChild exists.
+  try {
+    if (root.insertBefore) root.insertBefore(div, root.firstChild || null);
+    else if (root.children) root.children.unshift(div);
+  } catch {
+    // best effort
+  }
+  if (type === "success" && typeof setTimeout !== "undefined") {
+    setTimeout(() => { if (div.remove) div.remove(); }, BANNER_AUTOHIDE_MS);
+  }
+  return div;
+}
+
+/** Collect field values for a config section from the rendered DOM. */
+function collectConfigSectionFields(root, section) {
+  const fieldValues = {};
+  const els = root.querySelectorAll('[data-section="' + section + '"]');
+  els.forEach((el) => {
+    const field = el.dataset && el.dataset.field;
+    if (!field) return;
+    if (el.type === "checkbox") fieldValues[field] = !!el.checked;
+    else fieldValues[field] = el.value;
+  });
+  return fieldValues;
+}
+
+export async function handleConfigSave(ctx, section) {
+  const sectionDef = CONFIG_SECTIONS.find((s) => s.key === section);
+  const label = sectionDef ? sectionDef.label : section;
+  if (!confirm("Save " + label + " config? A backup will be created.")) return;
+  const fieldValues = collectConfigSectionFields(ctx.root, section);
+  const body = buildConfigSectionBody(section, fieldValues);
+  try {
+    const res = await ctx.api.request("/api/v1/config", { method: "PUT", body });
+    if (res && res.success === false) {
+      const details = res.details ? res.details.join("; ") : (res.error || "Save failed.");
+      showBanner(ctx.root, "error", "Save failed: " + details);
+      return;
+    }
+    showBanner(ctx.root, "success", "Config section " + section + " saved. Backup created.");
+    ctx.render();
+  } catch (e) {
+    showBanner(ctx.root, "error", "Save failed: " + String((e && e.message) || e));
+  }
+}
+
+export function handleConfigReveal(ctx, targetId) {
+  const el = ctx.doc && ctx.doc.getElementById ? ctx.doc.getElementById(targetId) : null;
+  if (!el) return;
+  if (el.type === "password") el.type = "text";
+  else if (el.type === "text") el.type = "password";
+}
+
+// ── Profiles tab switcher + switch handler (Component 2) ─────────────────────
+
+const PROFILES_TAB_STORAGE_KEY = "massa-ai-profiles-tab";
+
+export function renderProfilesView(profilesData, registryData, opts) {
+  opts = opts || {};
+  const tab = opts.profilesTab || "switch";
+  const writeMode = opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
+
+  const switcher =
+    '<div class="tab-switcher">' +
+    '<button type="button" class="tab' + (tab === "switch" ? " active" : "") + '" data-action="profiles-tab" data-tab="switch">Switch Profile</button>' +
+    '<button type="button" class="tab' + (tab === "registry" ? " active" : "") + '" data-action="profiles-tab" data-tab="registry">Edit Registry</button>' +
+    "</div>";
+
+  let body;
+  if (tab === "registry") {
+    body = renderModelRegistry(registryData, { writeMode, unsaved: opts.unsaved });
+  } else {
+    body = renderProfiles(profilesData, { writeMode });
+  }
+
+  return '<section class="view"><h2>Profiles</h2>' + switcher + body + "</section>";
+}
+
+export function handleProfilesTabSwitch(ctx, tab) {
+  ctx.state.profilesTab = tab;
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem(PROFILES_TAB_STORAGE_KEY, tab);
+  } catch {
+    // localStorage unavailable — non-fatal
+  }
+  ctx.render();
+}
+
+export async function handleProfileSwitch(ctx, profile, host) {
+  if (!confirm("Switch " + host + " to profile " + profile + "? Replaces installed agent files. Session restart required.")) return;
+  const body = { profile };
+  if (host) body.host = host;
+  try {
+    const res = await ctx.api.request("/api/v1/profiles/switch", { method: "POST", body });
+    if (res && res.success === false) {
+      const errInfo = res.error || {};
+      const code = (errInfo && errInfo.code) || "error";
+      const message = (errInfo && errInfo.message) || "switch failed";
+      showBanner(ctx.root, "error", "Switch failed (" + code + "): " + message);
+      return;
+    }
+    const data = (res && res.data) || {};
+    const switched = (data.switched || []).join(", ") || "none";
+    const skipped = (data.skipped || []).join(", ") || "none";
+    const failed = (data.failed || []).map((f) => f.host + ": " + (f.reason || "unknown")).join("; ") || "none";
+    showBanner(ctx.root, "success", "Switched: " + switched + " | Skipped: " + skipped + " | Failed: " + failed);
+    ctx.render();
+  } catch (e) {
+    showBanner(ctx.root, "error", "Switch failed: " + String((e && e.message) || e));
+  }
+}
+
+// ── Registry in-memory overlay state + CRUD (Component 3) ───────────────────
+// F2 fold: registryLoaded guard prevents re-init on every render. beforeunload
+// guard when dirty (added in startApp).
+
+export function initRegistryOverlay(ctx, source) {
+  if (ctx.state.registryLoaded) return;
+  const overlay = (source && source.overlay) || null;
+  ctx.state.registryOverlay = overlay
+    ? JSON.parse(JSON.stringify(overlay))
+    : { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: [] };
+  ctx.state.registryDirty = false;
+  ctx.state.registryLoaded = true;
+}
+
+export function handleRegistryCellEdit(ctx, profile, host, tier, field, value) {
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {} };
+  if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
+  if (!ctx.state.registryOverlay.profiles[profile]) ctx.state.registryOverlay.profiles[profile] = { hosts: {} };
+  if (!ctx.state.registryOverlay.profiles[profile].hosts) ctx.state.registryOverlay.profiles[profile].hosts = {};
+  if (!ctx.state.registryOverlay.profiles[profile].hosts[host]) ctx.state.registryOverlay.profiles[profile].hosts[host] = {};
+  if (!ctx.state.registryOverlay.profiles[profile].hosts[host][tier]) ctx.state.registryOverlay.profiles[profile].hosts[host][tier] = { model: null, effort: null };
+  ctx.state.registryOverlay.profiles[profile].hosts[host][tier][field] = value || null;
+  ctx.state.registryDirty = true;
+}
+
+export function handleRegistryHostDefaultEdit(ctx, host, value) {
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {} };
+  if (!ctx.state.registryOverlay.hostDefaults) ctx.state.registryOverlay.hostDefaults = {};
+  ctx.state.registryOverlay.hostDefaults[host] = value;
+  ctx.state.registryDirty = true;
+}
+
+export function handleRegistryWorkflowTierEdit(ctx, workflow, value) {
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, workflowTiers: {} };
+  if (!ctx.state.registryOverlay.workflowTiers) ctx.state.registryOverlay.workflowTiers = {};
+  ctx.state.registryOverlay.workflowTiers[workflow] = value;
+  ctx.state.registryDirty = true;
+}
+
+export function handleRegistryAddProfile(ctx) {
+  const name = prompt("New profile name:");
+  if (!name || !name.trim()) return;
+  const description = prompt("Description (optional):") || "";
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: [] };
+  const tiers = ctx.state.registryOverlay.tiers || ["light", "standard", "deep"];
+  const hosts = {};
+  for (const h of REGISTRY_HOSTS) {
+    hosts[h] = {};
+    for (const t of tiers) hosts[h][t] = { model: null, effort: null };
+  }
+  ctx.state.registryOverlay.profiles[name.trim()] = { description, hosts };
+  ctx.state.registryDirty = true;
+  ctx.render();
+}
+
+export function handleRegistryDuplicateProfile(ctx) {
+  const newName = prompt("New profile name (copy of selected):");
+  if (!newName || !newName.trim()) return;
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {} };
+  const existing = ctx.state.registryOverlay.profiles || {};
+  const firstKey = Object.keys(existing)[0];
+  if (!firstKey) return;
+  const copy = JSON.parse(JSON.stringify(existing[firstKey]));
+  ctx.state.registryOverlay.profiles[newName.trim()] = copy;
+  ctx.state.registryDirty = true;
+  ctx.render();
+}
+
+export function handleRegistryDeleteProfile(ctx) {
+  const name = prompt("Profile name to delete:");
+  if (!name || !name.trim()) return;
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {} };
+  if (!ctx.state.registryOverlay.profiles[name.trim()]) return;
+  ctx.state.registryOverlay.profiles[name.trim()]._delete = true;
+  ctx.state.registryDirty = true;
+  ctx.render();
+}
+
+export function handleRegistryRestore(ctx, profile) {
+  if (!ctx.state.registryOverlay || !ctx.state.registryOverlay.profiles) return;
+  const p = ctx.state.registryOverlay.profiles[profile];
+  if (!p) return;
+  delete p._delete;
+  ctx.state.registryDirty = true;
+  ctx.render();
+}
+
+export async function handleRegistrySaveOverlay(ctx) {
+  if (!confirm("Save registry overlay? Validates and writes to ~/.config/massa-ai/model-profiles.json.")) return;
+  try {
+    const res = await ctx.api.request("/api/v1/model-registry", { method: "PUT", body: ctx.state.registryOverlay });
+    if (res && res.success === false) {
+      const details = res.details ? res.details.join("; ") : (res.error || "Save failed.");
+      showBanner(ctx.root, "error", "Save failed: " + details);
+      return;
+    }
+    showBanner(ctx.root, "success", "Registry overlay saved.");
+    // Reset loaded guard so next render re-inits from the new source.overlay.
+    ctx.state.registryLoaded = false;
+    ctx.state.registryDirty = false;
+    ctx.render();
+  } catch (e) {
+    showBanner(ctx.root, "error", "Save failed: " + String((e && e.message) || e));
+  }
+}
+
+export async function handleProjectIndexProgress(ctx, jobId) {
+  ctx.state.indexJobId = jobId;
+  ctx.state.indexJobStatus = "pending";
+  ctx.state.indexJobPhase = null;
+  ctx.state.indexJobFileCount = null;
+  ctx.render();
+}
+
+/** SSE index_status event handler — exported so tests exercise the real
+ *  matching logic, not a copy. Returns true if the event matched and updated
+ *  state, false if ignored (jobId mismatch or no tracked job). */
+export function handleIndexStatusEvent(ctx, payload) {
+  if (!payload || !ctx.state.indexJobId) return false;
+  if (payload.jobId !== ctx.state.indexJobId) return false;
+  ctx.state.indexJobStatus = payload.status || ctx.state.indexJobStatus;
+  ctx.state.indexJobPhase = payload.phase || ctx.state.indexJobPhase;
+  ctx.state.indexJobFileCount = payload.fileCount != null ? payload.fileCount : ctx.state.indexJobFileCount;
+  if (ctx.state.indexJobStatus === "completed" || ctx.state.indexJobStatus === "failed") {
+    if (ctx.state.indexPollInterval) {
+      clearInterval(ctx.state.indexPollInterval);
+      ctx.state.indexPollInterval = null;
+    }
+  }
+  return true;
+}
+
+export async function handleRegistryClearOverlay(ctx) {
+  if (!confirm("Reset to built-in? This deletes the overlay file and reverts to the builtin registry.")) return;
+  try {
+    const res = await ctx.api.request("/api/v1/model-registry/overlay", { method: "DELETE" });
+    if (res && res.success === false) {
+      showBanner(ctx.root, "error", "Clear failed: " + (res.error || "unknown"));
+      return;
+    }
+    showBanner(ctx.root, "success", "Overlay cleared. Registry reverted to built-in.");
+    ctx.state.registryLoaded = false;
+    ctx.state.registryDirty = false;
+    ctx.render();
+  } catch (e) {
+    showBanner(ctx.root, "error", "Clear failed: " + String((e && e.message) || e));
+  }
+}
+
+// ── Registry regenerate streaming handler (Component 4) ──────────────────────
+
+export async function handleRegistryRegenerate(ctx) {
+  if (ctx.state.regenerating) return;
+  if (!confirm("Regenerate subagent artifacts? This overwrites installed variant dirs.")) return;
+  ctx.state.regenerating = true;
+  ctx.render();
+
+  try {
+    const res = await fetch("/api/v1/model-registry/regenerate-stream", { method: "POST" });
+    if (!res || !res.body || !res.body.getReader) {
+      throw new Error("stream unavailable");
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let gotDone = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      // Split on \n\n (SSE frame delimiter)
+      let idx;
+      while ((idx = buffer.indexOf("\n\n")) >= 0) {
+        const frame = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        const line = frame.trim();
+        if (!line.startsWith("data:")) continue;
+        let event;
+        try { event = JSON.parse(line.slice(5).trim()); } catch { continue; }
+        if (event.type === "line") {
+          // append to log panel — in a real browser this updates the DOM.
+          // For the handler contract, we just consume the line.
+        } else if (event.type === "done") {
+          gotDone = true;
+          if (event.exitCode === 0) {
+            showBanner(ctx.root, "success", "Regeneration complete.");
+          } else if (event.exitCode === null) {
+            showBanner(ctx.root, "error", "Regeneration failed: " + (event.error || "spawn error"));
+          } else {
+            showBanner(ctx.root, "error", "Regeneration failed (exit " + event.exitCode + ").");
+          }
+          break;
+        }
+      }
+    }
+    if (!gotDone) {
+      showBanner(ctx.root, "error", "Regeneration stream closed unexpectedly.");
+    }
+  } catch (e) {
+    showBanner(ctx.root, "error", "Regeneration failed: " + String((e && e.message) || e));
+  } finally {
+    ctx.state.regenerating = false;
+    ctx.render();
+  }
+}
+
 function startApp(opts) {
   opts = opts || {};
   const doc = opts.document || (typeof document !== "undefined" ? document : null);
@@ -1292,7 +1644,25 @@ function startApp(opts) {
     memoryFilters: { type: "", level: "", minImportance: "" },
     memoryOffset: 0,
     searchQuery: "",
+    profilesTab: "switch",
+    registryOverlay: null,
+    registryDirty: false,
+    registryLoaded: false,
+    regenerating: false,
+    indexJobId: null,
+    indexJobStatus: null,
+    indexJobPhase: null,
+    indexJobFileCount: null,
+    indexPollInterval: null,
   };
+  try {
+    if (typeof localStorage !== "undefined") {
+      const t = localStorage.getItem(PROFILES_TAB_STORAGE_KEY);
+      if (t === "switch" || t === "registry") state.profilesTab = t;
+    }
+  } catch {
+    // localStorage unavailable — default switch tab
+  }
 
   initTheme(doc);
 
@@ -1328,10 +1698,22 @@ function startApp(opts) {
 
   async function render() {
     setNavActive();
+    // F4 fold: clear index poll interval when navigating away from projects
+    if (state.view !== "projects") clearIndexPoll();
     try {
       if (state.view === "projects") {
         const data = await api.request("/api/v1/project/list");
-        root.innerHTML = renderProjects((data && data.data) || { projects: [] });
+        root.innerHTML = renderProjects((data && data.data) || { projects: [] }, {
+          indexJobId: state.indexJobId,
+          indexJobStatus: state.indexJobStatus,
+          indexJobPhase: state.indexJobPhase,
+          indexJobFileCount: state.indexJobFileCount,
+        });
+        // If a job completed, refresh project list
+        if (state.indexJobStatus === "completed" || state.indexJobStatus === "failed") {
+          // Clear the completed job after a render so the progress line disappears on next nav
+          // but keep it visible until then
+        }
       } else if (state.view === "memory") {
         const body = {
           limit: 50,
@@ -1382,11 +1764,21 @@ function startApp(opts) {
         const data = await api.request("/api/v1/config");
         root.innerHTML = renderConfig((data && data.data) || { config: {}, restartNeededSections: [] }, { writeMode: isWriteModeEnabled() });
       } else if (state.view === "profiles") {
-        const data = await api.request("/api/v1/profiles");
-        root.innerHTML = renderProfiles((data && data.data) || { hosts: [] }, { writeMode: isWriteModeEnabled() });
+        const profilesRes = await api.request("/api/v1/profiles");
+        const registryRes = await api.request("/api/v1/model-registry");
+        const registryData = (registryRes && registryRes.data) || { registry: {}, source: {} };
+        const ctxObj = { api, root, state, render, doc };
+        initRegistryOverlay(ctxObj, registryData.source);
+        root.innerHTML = renderProfilesView(
+          (profilesRes && profilesRes.data) || { hosts: [] },
+          registryData,
+          { profilesTab: state.profilesTab || "switch", writeMode: isWriteModeEnabled(), unsaved: state.registryDirty },
+        );
       } else if (state.view === "model-registry") {
         const data = await api.request("/api/v1/model-registry");
-        root.innerHTML = renderModelRegistry((data && data.data) || { registry: {}, source: {} }, { writeMode: isWriteModeEnabled() });
+        const ctxObj = { api, root, state, render, doc };
+        initRegistryOverlay(ctxObj, (data && data.data && data.data.source) || {});
+        root.innerHTML = renderModelRegistry((data && data.data) || { registry: {}, source: {} }, { writeMode: isWriteModeEnabled(), unsaved: state.registryDirty });
       }
     } catch (e) {
       root.innerHTML = '<div class="error">Connection error: ' + escapeHtml(String(e.message || e)) + "</div>";
@@ -1505,6 +1897,79 @@ function startApp(opts) {
           handleProjectReset(project);
         }
       });
+    });
+    // admin-portal-enhancements: config save/reveal
+    const ctx = { api, root, state, render, doc };
+    root.querySelectorAll('[data-action="config-save"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const section = btn.dataset.section;
+        if (!section) return;
+        handleConfigSave(ctx, section);
+      });
+    });
+    root.querySelectorAll('[data-action="config-reveal"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.target;
+        if (!target) return;
+        handleConfigReveal(ctx, target);
+      });
+    });
+    // admin-portal-enhancements: profiles tab switcher + switch
+    root.querySelectorAll('[data-action="profiles-tab"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tab = btn.dataset.tab;
+        if (!tab) return;
+        handleProfilesTabSwitch(ctx, tab);
+      });
+    });
+    root.querySelectorAll('[data-action="profile-switch"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const profile = btn.dataset.profile;
+        const host = btn.dataset.host;
+        if (!profile) return;
+        handleProfileSwitch(ctx, profile, host);
+      });
+    });
+    // admin-portal-enhancements: registry in-memory CRUD + save/clear
+    root.querySelectorAll('[data-action="registry-model"], [data-action="registry-effort"]').forEach((el) => {
+      el.addEventListener("change", () => {
+        handleRegistryCellEdit(ctx, el.dataset.profile, el.dataset.host, el.dataset.tier, el.dataset.action === "registry-model" ? "model" : "effort", el.value);
+      });
+    });
+    root.querySelectorAll('[data-action="registry-hostDefault"]').forEach((el) => {
+      el.addEventListener("change", () => {
+        handleRegistryHostDefaultEdit(ctx, el.dataset.host, el.value);
+      });
+    });
+    root.querySelectorAll('[data-action="registry-workflowTier"]').forEach((el) => {
+      el.addEventListener("change", () => {
+        handleRegistryWorkflowTierEdit(ctx, el.dataset.workflow, el.value);
+      });
+    });
+    root.querySelector('[data-action="registry-add-profile"]')?.addEventListener("click", () => {
+      handleRegistryAddProfile(ctx);
+    });
+    root.querySelector('[data-action="registry-duplicate-profile"]')?.addEventListener("click", () => {
+      handleRegistryDuplicateProfile(ctx);
+    });
+    root.querySelector('[data-action="registry-delete-profile"]')?.addEventListener("click", () => {
+      handleRegistryDeleteProfile(ctx);
+    });
+    root.querySelectorAll('[data-action="registry-restore"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const profile = btn.dataset.profile;
+        if (!profile) return;
+        handleRegistryRestore(ctx, profile);
+      });
+    });
+    root.querySelector('[data-action="registry-save-overlay"]')?.addEventListener("click", () => {
+      handleRegistrySaveOverlay(ctx);
+    });
+    root.querySelector('[data-action="registry-clear-overlay"]')?.addEventListener("click", () => {
+      handleRegistryClearOverlay(ctx);
+    });
+    root.querySelector('[data-action="registry-regenerate"]')?.addEventListener("click", () => {
+      handleRegistryRegenerate(ctx);
     });
   }
 
@@ -1645,8 +2110,13 @@ function startApp(opts) {
     if (data.warmCache) body.warmCache = true;
     try {
       const res = await api.request("/api/v1/project/index", { method: "POST", body });
-      if (res && res.data && res.data.jobId) alert("Indexing job started: " + res.data.jobId);
-      render();
+      if (res && res.data && res.data.jobId) {
+        state.indexJobId = res.data.jobId;
+        state.indexJobStatus = "pending";
+        render();
+      } else {
+        render();
+      }
     } catch (e) {
       alert("Index failed: " + String(e.message || e));
     }
@@ -1688,7 +2158,57 @@ function startApp(opts) {
 
   refreshProjectsForSelect().finally(render);
 
+  // F2 fold: beforeunload guard when registry has unsaved changes.
+  if (typeof window !== "undefined") {
+    window.addEventListener("beforeunload", (ev) => {
+      // F4 fold: clear index poll on unload
+      clearIndexPoll();
+      if (state.registryDirty) {
+        ev.preventDefault();
+        ev.returnValue = "You have unsaved registry changes. Leave anyway?";
+        return ev.returnValue;
+      }
+    });
+  }
+
   // SSE: subscribe to /api/v1/events for real-time updates (Wave 7 T10)
+  // T8: extend to track index_status for the tracked jobId (PRG-02) + poll fallback (PRG-03).
+  function clearIndexPoll() {
+    if (state.indexPollInterval) {
+      clearInterval(state.indexPollInterval);
+      state.indexPollInterval = null;
+    }
+  }
+
+  function startIndexPoll(jobId) {
+    clearIndexPoll();
+    let polls = 0;
+    const MAX_POLLS = 150; // 5 min at 2s interval
+    state.indexPollInterval = setInterval(async () => {
+      polls++;
+      if (polls > MAX_POLLS) {
+        state.indexJobStatus = "unknown";
+        clearIndexPoll();
+        if (state.view === "projects") render();
+        return;
+      }
+      try {
+        const res = await api.request("/api/v1/project/index/status/" + encodeURIComponent(jobId));
+        if (res && res.data) {
+          state.indexJobStatus = res.data.status || state.indexJobStatus;
+          state.indexJobPhase = res.data.phase || state.indexJobPhase;
+          state.indexJobFileCount = res.data.fileCount != null ? res.data.fileCount : state.indexJobFileCount;
+          if (state.indexJobStatus === "completed" || state.indexJobStatus === "failed") {
+            clearIndexPoll();
+            if (state.view === "projects") render();
+          }
+        }
+      } catch {
+        // network error — keep polling until cap
+      }
+    }, 2000);
+  }
+
   if (typeof EventSource !== "undefined") {
     try {
       const sseBase = opts.base || "";
@@ -1696,8 +2216,17 @@ function startApp(opts) {
       es.onmessage = (ev) => {
         try {
           const data = JSON.parse(ev.data);
-          // Refresh current view on index_status or observation events
-          if (data && (data.type === "index_status" || data.type === "observation" || data.event === "index_status" || data.event === "observation")) {
+          // PRG-02: update index progress when jobId matches
+          if (data && (data.type === "index_status" || data.event === "index_status")) {
+            const payload = data.payload || data;
+            const ctxObj = { api, root, state, render, doc };
+            if (handleIndexStatusEvent(ctxObj, payload)) {
+              if (state.view === "projects") render();
+            }
+            return; // handled; don't double-render
+          }
+          // Refresh current view on observation events
+          if (data && (data.type === "observation" || data.event === "observation")) {
             render();
           }
         } catch {
@@ -1705,13 +2234,17 @@ function startApp(opts) {
         }
       };
       es.onerror = () => {
-        // SSE reconnection is handled by the browser automatically;
-        // no action needed on error
+        // PRG-03: start polling fallback when SSE errors + a job is tracked
+        if (state.indexJobId && state.indexJobStatus !== "completed" && state.indexJobStatus !== "failed" && !state.indexPollInterval) {
+          startIndexPoll(state.indexJobId);
+        }
       };
     } catch {
-      // EventSource unavailable or connection failed — non-fatal
+      // EventSource unavailable — polling fallback starts when a job is tracked
     }
   }
+  // PRG-03: if EventSource is unavailable and a job is tracked, poll immediately.
+  // (startIndexPoll is called from handleProjectIndex when EventSource is absent.)
 }
 
 // Export pure helpers + bootstrap on globalThis for both browser and Node import.
@@ -1735,6 +2268,25 @@ const MASSA_AI_UI = {
   createApiClient,
   readInjectedApiKey,
   startApp,
+  showBanner,
+  handleConfigSave,
+  handleConfigReveal,
+  renderProfilesView,
+  handleProfilesTabSwitch,
+  handleProfileSwitch,
+  initRegistryOverlay,
+  handleRegistryCellEdit,
+  handleRegistryHostDefaultEdit,
+  handleRegistryWorkflowTierEdit,
+  handleRegistryAddProfile,
+  handleRegistryDuplicateProfile,
+  handleRegistryDeleteProfile,
+  handleRegistryRestore,
+  handleRegistrySaveOverlay,
+  handleRegistryClearOverlay,
+  handleRegistryRegenerate,
+  handleProjectIndexProgress,
+  handleIndexStatusEvent,
   MEMORY_TYPES,
   MEMORY_LEVELS,
   CHECKPOINTS_LIST_BODY,

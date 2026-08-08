@@ -1,6 +1,38 @@
 # massa-ai Spec State
 
-## Current — Admin Portal Full CRUD Web UI (**EXECUTE COMPLETE 2026-08-07** — T1-T15, 15 commits; validation pending; push/PR authorized)
+## Current — Admin Portal Enhancements (**EXECUTE COMPLETE 2026-08-08** — T1-T9, 9 commits; validation pending; push/PR = user decision)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-admin-portal-enhancements` ·
+  workflow: spec-driven (Medium) · branch `spec/admin-portal-enhancements` from
+  `main` @ `cb2ca3d9` (PR #92 merge), worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-admin-portal-enhancements` (isolated).
+- Scope: wire the handlers the prior `admin-portal` feature (PR #92) left dead,
+  style the ~20 new CSS classes, add confirm-on-all-edits, success/failure
+  banners, real-time progress (SSE for regenerate, SSE+poll for index), and
+  surface the registry editor as a Profiles sub-tab. One new backend route
+  (`POST /api/v1/model-registry/regenerate-stream`); rest is frontend (app.js,
+  styles.css) + tests.
+- Contract: `.specs/features/admin-portal-enhancements/{spec,design,tasks,plan-challenge}.md`
+  — `3 Phases = 9 Tasks`, inline execution (sub-agents unavailable this session).
+  Plan Challenge full gate, standalone fresh-eyes (critic agent unavailable):
+  7 findings F1-F7 all folded. F1 Elysia streaming Response pattern, F2
+  registryLoaded guard + beforeunload, F4 indexPollInterval cleanup, F5
+  --accent-tint static rgba baseline, F6 mid-task gate.
+- Commits: 2 planning (`cef2e736` spec+design+tasks, `2dc5dfab` plan-challenge)
+  + 9 task (`d5ff1e7` T1 stream route, `edbb984` T2 register, `bca9b29` T3 CSS,
+  `0b3e2b5` T4 banner+config handlers, `0e14cde` T5 tab+switch, `3469e3b` T6
+  registry CRUD, `6269814` T7 regenerate streaming, `84ff10a` T8 index progress,
+  T9 this commit).
+- Gates per task: T1 model-registry-stream 7/0; T2 type-check 6/6 +
+  test:plugins 135/0; T3 web-ui 220/0; T4 web-ui 231/0; T5 web-ui 243/0;
+  T6 web-ui 263/0 (F6 mid-task 35/0); T7 web-ui 270/0; T8 web-ui 278/0.
+  T9 full gate: test:scripts 1697/4 (4 pre-existing on base cb2ca3d9 —
+  Tree-sitter cold-process Prisma + lint-test, not from this feature), lint 0,
+  type-check 6/6, test:plugins 135/0, check_specs_delivered 0.
+- Next: dispatch verification-agent (author ≠ verifier) → write validation.md →
+  validate_state.ts exit 0 → push/PR = user decision.
+
+## Previous — Admin Portal Full CRUD Web UI (**VALIDATED PASS 2026-08-07** — T1-T15, 15 commits; PR #92 merged)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-admin-portal` · workflow:
   spec-driven (Large) · branch `spec/admin-portal` from origin/main @

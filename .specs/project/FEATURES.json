@@ -1067,7 +1067,26 @@
       ],
       "created": "2026-08-07",
       "notes": "EXECUTE COMPLETE 2026-08-07: T1-T15, 15 task commits on spec/admin-portal (5 planning + 15 task). Inline execution (sub-agents unavailable this session). 61 ACs across 5 phases. Per-task gates green: write-mode 23, web-ui 132->220, config-forms 32, app-renderers 74, registry-editor 31, model-profiles 48, generate:artifacts --check exit 0, type-check green. Validation pending (standalone fresh-eyes fallback). Push/PR authorized; merge = user decision."
+    },
+    {
+      "id": "admin-portal-enhancements",
+      "slug": "admin-portal-enhancements",
+      "title": "Admin Portal Enhancements — handlers, styling, confirm, progress UX, registry sub-tab",
+      "status": "execute-complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "spec/admin-portal-enhancements",
+      "spec": ".specs/features/admin-portal-enhancements/spec.md",
+      "design": ".specs/features/admin-portal-enhancements/design.md",
+      "tasks": ".specs/features/admin-portal-enhancements/tasks.md",
+      "created": "2026-08-08",
+      "notes": "EXECUTE COMPLETE 2026-08-08: T1-T9, 9 task commits on spec/admin-portal-enhancements (2 planning + 9 task). Inline execution (sub-agents unavailable). 51 ACs across 3 phases = 9 tasks. Plan Challenge full gate 7 findings all folded (F1-F7). Per-task gates green: model-registry-stream 7, web-ui 220->278, type-check 6/6, test:plugins 135/0. New backend route POST /api/v1/model-registry/regenerate-stream (SSE). Frontend: showBanner, config save/reveal confirm, profiles tab switcher, registry in-memory overlay CRUD + save/clear, regenerate streaming, index progress + poll fallback, CSS design system. Validation pending (verification-agent dispatch). Push/PR = user decision."
     }
   ],
-  "active_feature": "admin-portal"
+  "active_feature": "admin-portal-enhancements"
 }
