@@ -1389,7 +1389,7 @@ function createApiClient(opts) {
     }
     return await res.text();
   }
-  return { request };
+  return { request, authHeaders: () => (apiKey ? { "x-api-key": apiKey } : {}) };
 }
 
 // ── Admin portal enhancement handlers (exported, context-injected) ──────────
@@ -1543,21 +1543,74 @@ export async function handleProfileSwitch(ctx, profile, host) {
 // ── Registry in-memory overlay state + CRUD (Component 3) ───────────────────
 // F2 fold: registryLoaded guard prevents re-init on every render. beforeunload
 // guard when dirty (added in startApp).
+//
+// BUG FIX: The original implementation seeded the overlay from source.overlay
+// only (the user's saved overlay file). When no overlay existed, the in-memory
+// overlay started empty — so editing a builtin profile cell created a partial
+// overlay with just that one cell. On save, mergeOverlayForValidation replaced
+// the ENTIRE builtin profile with that single cell, which then failed
+// validation (missing tiers, missing hosts, broken hostDefaults).
+//
+// Fix: seed the in-memory overlay from the EFFECTIVE (merged) registry so every
+// profile, host, tier, hostDefault, and workflowTier is present. The overlay
+// sent to the server now contains full profiles, and the shallow per-profile
+// merge in mergeOverlayForValidation produces a valid result.
 
-export function initRegistryOverlay(ctx, source) {
+export function initRegistryOverlay(ctx, registry, source) {
   if (ctx.state.registryLoaded) return;
-  const overlay = (source && source.overlay) || null;
-  ctx.state.registryOverlay = overlay
-    ? JSON.parse(JSON.stringify(overlay))
-    : { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: [] };
+  const reg = registry || {};
+  const src = source || {};
+  const overlayData = src.overlay || null;
+
+  // Start from a deep copy of the effective registry (builtin + any saved
+  // overlay). Strip the _delete flag from any tombstoned profiles so the
+  // in-memory copy is clean (tombstones are re-applied on delete).
+  const seed = JSON.parse(JSON.stringify(reg));
+  if (seed.profiles) {
+    for (const p of Object.keys(seed.profiles)) {
+      if (seed.profiles[p] && seed.profiles[p]._delete) {
+        delete seed.profiles[p]._delete;
+      }
+    }
+  }
+
+  ctx.state.registryOverlay = {
+    profiles: seed.profiles || {},
+    hostDefaults: seed.hostDefaults || {},
+    workflowTiers: seed.workflowTiers || {},
+    tiers: seed.tiers || ["light", "standard", "deep"],
+  };
+  void overlayData; // retained for API compat; not needed for seeding
   ctx.state.registryDirty = false;
   ctx.state.registryLoaded = true;
 }
 
+/** Build the display registry = server registry merged with in-memory overlay.
+ *  This makes add/duplicate/delete/restore visible immediately (before save),
+ *  instead of requiring a save+reload cycle. The renderer reads from this. */
+export function mergeRegistryForDisplay(serverData, overlay) {
+  const base = (serverData && serverData.registry) || {};
+  if (!overlay || !overlay.profiles) return serverData || { registry: {}, source: {} };
+  const merged = JSON.parse(JSON.stringify(base));
+  merged.tiers = overlay.tiers || merged.tiers || ["light", "standard", "deep"];
+  merged.hostDefaults = overlay.hostDefaults || merged.hostDefaults || {};
+  merged.workflowTiers = overlay.workflowTiers || merged.workflowTiers || {};
+  // Merge profiles: skip _delete tombstones, keep everything else from overlay
+  merged.profiles = merged.profiles || {};
+  for (const [key, val] of Object.entries(overlay.profiles)) {
+    if (val && val._delete === true) {
+      delete merged.profiles[key];
+    } else {
+      merged.profiles[key] = val;
+    }
+  }
+  return { registry: merged, source: (serverData && serverData.source) || {} };
+}
+
 export function handleRegistryCellEdit(ctx, profile, host, tier, field, value) {
-  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {} };
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
-  if (!ctx.state.registryOverlay.profiles[profile]) ctx.state.registryOverlay.profiles[profile] = { hosts: {} };
+  if (!ctx.state.registryOverlay.profiles[profile]) ctx.state.registryOverlay.profiles[profile] = { description: profile, hosts: {} };
   if (!ctx.state.registryOverlay.profiles[profile].hosts) ctx.state.registryOverlay.profiles[profile].hosts = {};
   if (!ctx.state.registryOverlay.profiles[profile].hosts[host]) ctx.state.registryOverlay.profiles[profile].hosts[host] = {};
   if (!ctx.state.registryOverlay.profiles[profile].hosts[host][tier]) ctx.state.registryOverlay.profiles[profile].hosts[host][tier] = { model: null, effort: null };
@@ -1618,38 +1671,69 @@ export function handleRegistryWorkflowTierRemove(ctx, workflow) {
 export function handleRegistryAddProfile(ctx) {
   const name = prompt("New profile name:");
   if (!name || !name.trim()) return;
-  const description = prompt("Description (optional):") || "";
-  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: [] };
+  const trimmed = name.trim();
+  if (ctx.state.registryOverlay && ctx.state.registryOverlay.profiles && ctx.state.registryOverlay.profiles[trimmed]) {
+    alert('Profile "' + trimmed + '" already exists.');
+    return;
+  }
+  const description = prompt("Description (optional — defaults to profile name):") || trimmed;
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   const tiers = ctx.state.registryOverlay.tiers || ["light", "standard", "deep"];
   const hosts = {};
   for (const h of REGISTRY_HOSTS) {
     hosts[h] = {};
     for (const t of tiers) hosts[h][t] = { model: null, effort: null };
   }
-  ctx.state.registryOverlay.profiles[name.trim()] = { description, hosts };
+  ctx.state.registryOverlay.profiles[trimmed] = { description, hosts };
   ctx.state.registryDirty = true;
   ctx.render();
 }
 
 export function handleRegistryDuplicateProfile(ctx) {
-  const newName = prompt("New profile name (copy of selected):");
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
+  if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
+  const existing = ctx.state.registryOverlay.profiles;
+  const keys = Object.keys(existing).filter((k) => !existing[k] || !existing[k]._delete);
+  if (keys.length === 0) {
+    alert("No profiles available to duplicate. Add a profile first.");
+    return;
+  }
+  const sourceName = prompt("Source profile to duplicate:\n\nAvailable: " + keys.join(", "));
+  if (!sourceName || !sourceName.trim()) return;
+  const src = sourceName.trim();
+  if (!existing[src]) {
+    alert('Profile "' + src + '" not found. Available: ' + keys.join(", "));
+    return;
+  }
+  const newName = prompt("New profile name (copy of " + src + "):");
   if (!newName || !newName.trim()) return;
-  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {} };
-  const existing = ctx.state.registryOverlay.profiles || {};
-  const firstKey = Object.keys(existing)[0];
-  if (!firstKey) return;
-  const copy = JSON.parse(JSON.stringify(existing[firstKey]));
+  if (existing[newName.trim()]) {
+    alert('Profile "' + newName.trim() + '" already exists.');
+    return;
+  }
+  const copy = JSON.parse(JSON.stringify(existing[src]));
+  delete copy._delete;
   ctx.state.registryOverlay.profiles[newName.trim()] = copy;
   ctx.state.registryDirty = true;
   ctx.render();
 }
 
 export function handleRegistryDeleteProfile(ctx) {
-  const name = prompt("Profile name to delete:");
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
+  if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
+  const existing = ctx.state.registryOverlay.profiles;
+  const keys = Object.keys(existing).filter((k) => !existing[k] || !existing[k]._delete);
+  if (keys.length === 0) {
+    alert("No profiles available to delete.");
+    return;
+  }
+  const name = prompt("Profile name to delete:\n\nAvailable: " + keys.join(", "));
   if (!name || !name.trim()) return;
-  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {} };
-  if (!ctx.state.registryOverlay.profiles[name.trim()]) return;
-  ctx.state.registryOverlay.profiles[name.trim()]._delete = true;
+  if (!existing[name.trim()]) {
+    alert('Profile "' + name.trim() + '" not found. Available: ' + keys.join(", "));
+    return;
+  }
+  existing[name.trim()]._delete = true;
   ctx.state.registryDirty = true;
   ctx.render();
 }
@@ -1734,7 +1818,8 @@ export async function handleRegistryRegenerate(ctx) {
   ctx.render();
 
   try {
-    const res = await fetch("/api/v1/model-registry/regenerate-stream", { method: "POST" });
+    const headers = (ctx.api && ctx.api.authHeaders) ? ctx.api.authHeaders() : {};
+    const res = await fetch("/api/v1/model-registry/regenerate-and-install-stream", { method: "POST", headers });
     if (!res || !res.body || !res.body.getReader) {
       throw new Error("stream unavailable");
     }
@@ -1742,6 +1827,7 @@ export async function handleRegistryRegenerate(ctx) {
     const decoder = new TextDecoder();
     let buffer = "";
     let gotDone = false;
+    const installResults = { switched: [], skipped: [], failed: [] };
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1759,10 +1845,18 @@ export async function handleRegistryRegenerate(ctx) {
         if (event.type === "line") {
           // append to log panel — in a real browser this updates the DOM.
           // For the handler contract, we just consume the line.
+        } else if (event.type === "install") {
+          if (event.status === "switched") installResults.switched.push(event.host + " → " + event.profile);
+          else if (event.status === "skipped") installResults.skipped.push(event.host);
+          else if (event.status === "failed") installResults.failed.push(event.host + ": " + (event.error || "unknown"));
         } else if (event.type === "done") {
           gotDone = true;
           if (event.exitCode === 0) {
-            showBanner(ctx.root, "success", "Regeneration complete.");
+            var parts = ["Regeneration complete."];
+            if (installResults.switched.length > 0) parts.push("Installed: " + installResults.switched.join(", "));
+            if (installResults.skipped.length > 0) parts.push("Skipped: " + installResults.skipped.join(", "));
+            if (installResults.failed.length > 0) parts.push("Failed: " + installResults.failed.join("; "));
+            showBanner(ctx.root, "success", parts.join(" "));
           } else if (event.exitCode === null) {
             showBanner(ctx.root, "error", "Regeneration failed: " + (event.error || "spawn error"));
           } else {
@@ -1926,17 +2020,20 @@ function startApp(opts) {
         const registryRes = await api.request("/api/v1/model-registry");
         const registryData = (registryRes && registryRes.success !== false && registryRes.data) || { registry: {}, source: {}, _error: registryRes && registryRes.error };
         const ctxObj = { api, root, state, render, doc };
-        initRegistryOverlay(ctxObj, registryData.source);
+        initRegistryOverlay(ctxObj, registryData.registry, registryData.source);
+        const displayData = mergeRegistryForDisplay(registryData, state.registryOverlay);
         root.innerHTML = renderProfilesView(
           (profilesRes && profilesRes.data) || { hosts: [] },
-          registryData,
+          displayData,
           { profilesTab: state.profilesTab || "switch", writeMode: isWriteModeEnabled(), unsaved: state.registryDirty },
         );
       } else if (state.view === "model-registry") {
         const data = await api.request("/api/v1/model-registry");
         const ctxObj = { api, root, state, render, doc };
-        initRegistryOverlay(ctxObj, (data && data.data && data.data.source) || {});
-        root.innerHTML = renderModelRegistry((data && data.data) || { registry: {}, source: {} }, { writeMode: isWriteModeEnabled(), unsaved: state.registryDirty });
+        const regData = (data && data.data) || { registry: {}, source: {} };
+        initRegistryOverlay(ctxObj, regData.registry, regData.source);
+        const displayData = mergeRegistryForDisplay(regData, state.registryOverlay);
+        root.innerHTML = renderModelRegistry(displayData, { writeMode: isWriteModeEnabled(), unsaved: state.registryDirty });
       }
     } catch (e) {
       root.innerHTML = '<div class="error">Connection error: ' + escapeHtml(String(e.message || e)) + "</div>";
@@ -2469,6 +2566,7 @@ const MASSA_AI_UI = {
   handleProfilesTabSwitch,
   handleProfileSwitch,
   initRegistryOverlay,
+  mergeRegistryForDisplay,
   handleRegistryCellEdit,
   handleRegistryHostDefaultEdit,
   handleRegistryWorkflowTierEdit,

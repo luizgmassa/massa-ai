@@ -53,6 +53,28 @@ mock.module("@massa-ai/shared/config", () => {
   return { ...actual, configDir: (...args: unknown[]) => configDir(...args) };
 });
 
+// ── Mock @massa-ai/shared listProfiles + switchProfile for the auto-install step ──
+const listProfilesMock = mock((..._args: unknown[]): unknown => ({
+  hosts: [
+    { host: "claude", installed: true, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] },
+    { host: "opencode", installed: true, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] },
+  ],
+}));
+const switchProfileMock = mock((..._args: unknown[]): unknown => ({
+  profile: "balanced",
+  dryRun: false,
+  hosts: [{ host: "claude", status: "switched" }, { host: "opencode", status: "switched" }],
+  restartRequired: true,
+}));
+mock.module("@massa-ai/shared", () => {
+  const actual = require("@massa-ai/shared");
+  return {
+    ...actual,
+    listProfiles: (...args: unknown[]) => listProfilesMock(...args),
+    switchProfile: (...args: unknown[]) => switchProfileMock(...args),
+  };
+});
+
 // ── Mock child_process: capture spawnSync (blocking route, REGEN-08) + spawn (stream) ──
 const child_process = require("child_process");
 const spawnSyncMock = mock((..._args: unknown[]): any => ({ exitCode: 0, stdout: "", stderr: "" }));
@@ -230,7 +252,7 @@ describe("POST /api/v1/model-registry/regenerate-stream — SSE line emission (R
     expect(killed).toBe(true);
   });
 
-  test("emits no line events for empty stdout/stderr but still emits done exit 0", async () => {
+  test("emits done exit 0 with install line when stdout/stderr empty", async () => {
     spawnMock.mockImplementationOnce(() => makeFakeChild({
       stdoutLines: [],
       stderrLines: [],
@@ -240,11 +262,85 @@ describe("POST /api/v1/model-registry/regenerate-stream — SSE line emission (R
     const res = await postStream("/api/v1/model-registry/regenerate-stream");
     expect(res.status).toBe(200);
     const events = parseSseEvents(res.text);
-    const lineEvents = events.filter((e) => e.type === "line");
     const doneEvents = events.filter((e) => e.type === "done");
-    expect(lineEvents.length).toBe(0);
     expect(doneEvents.length).toBe(1);
     expect(doneEvents[0].exitCode).toBe(0);
+  });
+});
+
+describe("POST /api/v1/model-registry/regenerate-and-install-stream — auto-install after regenerate", () => {
+  beforeEach(() => {
+    listProfilesMock.mockClear();
+    switchProfileMock.mockClear();
+  });
+
+  test("emits install events + calls switchProfile after successful regeneration", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({
+      stdoutLines: ["Generating..."],
+      exitCode: 0,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    expect(res.status).toBe(200);
+    const events = parseSseEvents(res.text);
+    const installEvents = events.filter((e) => e.type === "install");
+    const doneEvents = events.filter((e) => e.type === "done");
+
+    expect(installEvents.length).toBeGreaterThanOrEqual(1);
+    expect(installEvents.some((e) => e.status === "switched")).toBe(true);
+    expect(listProfilesMock).toHaveBeenCalled();
+    expect(switchProfileMock).toHaveBeenCalled();
+    expect(doneEvents.length).toBe(1);
+    expect(doneEvents[0].exitCode).toBe(0);
+  });
+
+  test("does NOT install when generator fails (non-zero exit)", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({
+      stdoutLines: [],
+      exitCode: 1,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    expect(res.status).toBe(200);
+    const events = parseSseEvents(res.text);
+    const installEvents = events.filter((e) => e.type === "install");
+    const done = events.find((e) => e.type === "done");
+
+    expect(installEvents.length).toBe(0);
+    expect(listProfilesMock).not.toHaveBeenCalled();
+    expect(done!.exitCode).toBe(1);
+  });
+
+  test("install phase handles switchProfile errors gracefully", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({
+      stdoutLines: [],
+      exitCode: 0,
+    }));
+    switchProfileMock.mockImplementation(() => {
+      throw new Error("install failure");
+    });
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    expect(res.status).toBe(200);
+    const events = parseSseEvents(res.text);
+    const installEvents = events.filter((e) => e.type === "install");
+    const done = events.find((e) => e.type === "done");
+
+    expect(installEvents.some((e) => e.status === "failed")).toBe(true);
+    expect(done!.exitCode).toBe(0);
+  });
+
+  test("deprecated /regenerate-stream alias also auto-installs", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({
+      stdoutLines: [],
+      exitCode: 0,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-stream");
+    expect(res.status).toBe(200);
+    const events = parseSseEvents(res.text);
+    const installEvents = events.filter((e) => e.type === "install");
+    expect(installEvents.length).toBeGreaterThanOrEqual(1);
   });
 });
 

@@ -1,12 +1,16 @@
 /**
  * SSE streaming regenerate route (Component 4 — REGEN-01..08).
  *
- *   POST /api/v1/model-registry/regenerate-stream
+ *   POST /api/v1/model-registry/regenerate-and-install-stream
+ *   POST /api/v1/model-registry/regenerate-stream   (deprecated alias, same behavior)
  *
  * Spawns `bun scripts/generate-subagent-artifacts.ts` with child_process.spawn
- * (non-blocking), pipes stdout/stderr line-by-line to an SSE stream, and emits
- * a terminal `done` event with the exit code. The existing blocking
- * `/regenerate` route (spawnSync) is unchanged for API compatibility.
+ * (non-blocking), pipes stdout/stderr line-by-line to an SSE stream. After
+ * the generator succeeds (exit 0), automatically calls `switchProfile` for
+ * every detected host to reinstall the active profile's agents from the
+ * freshly generated variant dirs. Emits install events as SSE
+ * `data: {"type":"install","host":"...","status":"switched|skipped|failed",...}`
+ * frames, then a terminal `done` event with the exit code.
  *
  * Streaming pattern follows events.ts exactly: return
  * `new Response(new ReadableStream({ start, cancel }), { headers })`. Do NOT
@@ -20,6 +24,7 @@ import { Elysia } from "elysia";
 import path from "path";
 import { spawn } from "child_process";
 import { configDir } from "@massa-ai/shared/config";
+import { listProfiles, switchProfile, type Host } from "@massa-ai/shared";
 
 const GENERATE_SCRIPT = path.resolve(
   import.meta.dirname,
@@ -35,11 +40,46 @@ function sseFrame(data: Record<string, unknown>): Uint8Array {
   return encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
 }
 
+/** Install the active profile's agents for every detected host after
+ *  regeneration. Emits one `install` SSE event per host, then returns. */
+function installActiveProfiles(controller: ReadableStreamDefaultController<Uint8Array>, closedRef: { closed: boolean }): void {
+  try {
+    const inventory = listProfiles();
+    for (const hostEntry of inventory.hosts) {
+      if (closedRef.closed) return;
+      const host = hostEntry.host as Host;
+      if (!hostEntry.installed || !hostEntry.activeProfile) {
+        if (!closedRef.closed) {
+          controller.enqueue(sseFrame({ type: "install", host, status: "skipped", reason: "not installed or no active profile" }));
+        }
+        continue;
+      }
+      try {
+        const report = switchProfile({ profile: hostEntry.activeProfile, host });
+        const switched = (report.hosts || []).filter((h: any) => h.status === "switched").map((h: any) => h.host).join(", ") || "none";
+        const skipped = (report.hosts || []).filter((h: any) => h.status === "skipped").map((h: any) => `${h.host} (${h.reason || "unknown"})`).join(", ") || "none";
+        const failed = (report.hosts || []).filter((h: any) => h.status === "failed").map((h: any) => `${h.host} (${h.reason || "unknown"})`).join(", ") || "none";
+        if (!closedRef.closed) {
+          controller.enqueue(sseFrame({ type: "install", host, status: "switched", profile: hostEntry.activeProfile, switched, skipped, failed }));
+        }
+      } catch (e) {
+        if (!closedRef.closed) {
+          controller.enqueue(sseFrame({ type: "install", host, status: "failed", error: (e as Error).message }));
+        }
+      }
+    }
+  } catch (e) {
+    if (!closedRef.closed) {
+      controller.enqueue(sseFrame({ type: "install", status: "error", error: `install phase failed: ${(e as Error).message}` }));
+    }
+  }
+}
+
 export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-registry" }).post(
-  "/regenerate-stream",
+  "/regenerate-and-install-stream",
   () => {
     let child: ReturnType<typeof spawn> | null = null;
-    let closed = false;
+    const closedRef = { closed: false };
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -55,12 +95,12 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
             error: `spawn failed: ${(e as Error).message}`,
           }));
           controller.close();
-          closed = true;
+          closedRef.closed = true;
           return;
         }
 
         const emitLine = (streamName: "stdout" | "stderr", chunk: Buffer) => {
-          if (closed) return;
+          if (closedRef.closed) return;
           const text = chunk.toString();
           const lines = text.split("\n");
           for (const line of lines) {
@@ -68,7 +108,7 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
             try {
               controller.enqueue(sseFrame({ type: "line", stream: streamName, text: line }));
             } catch {
-              closed = true;
+              closedRef.closed = true;
               return;
             }
           }
@@ -78,8 +118,8 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
         child.stderr?.on("data", (chunk: Buffer) => emitLine("stderr", chunk));
 
         child.on("error", (e: Error) => {
-          if (closed) return;
-          closed = true;
+          if (closedRef.closed) return;
+          closedRef.closed = true;
           try {
             controller.enqueue(sseFrame({ type: "done", exitCode: null, error: `spawn error: ${e.message}` }));
             controller.close();
@@ -89,8 +129,18 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
         });
 
         child.on("close", (code: number | null) => {
-          if (closed) return;
-          closed = true;
+          if (closedRef.closed) return;
+          // After successful generation, auto-install agents to active dirs.
+          if (code === 0) {
+            try {
+              controller.enqueue(sseFrame({ type: "line", stream: "stdout", text: "Installing regenerated agents to active directories..." }));
+            } catch {
+              closedRef.closed = true;
+              return;
+            }
+            installActiveProfiles(controller, closedRef);
+          }
+          closedRef.closed = true;
           try {
             controller.enqueue(sseFrame({ type: "done", exitCode: code }));
             controller.close();
@@ -100,7 +150,7 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
         });
       },
       cancel() {
-        closed = true;
+        closedRef.closed = true;
         try {
           child?.kill();
         } catch {
@@ -121,9 +171,111 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
   {
     detail: {
       tags: ["model-registry"],
-      summary: "Regenerate subagent artifacts (streaming SSE)",
+      summary: "Regenerate subagent artifacts + auto-install to active dirs (streaming SSE)",
       description:
-        "Spawns `bun scripts/generate-subagent-artifacts.ts` with child_process.spawn (non-blocking). Pipes stdout/stderr line-by-line as SSE `data: {\"type\":\"line\",\"stream\":\"stdout|stderr\",\"text\":\"...\"}` events, then a terminal `data: {\"type\":\"done\",\"exitCode\":<n>}` event. On spawn failure emits `done` with `exitCode:null` + `error`. The existing blocking POST /regenerate route stays for API compatibility.",
+        "Spawns `bun scripts/generate-subagent-artifacts.ts` with child_process.spawn (non-blocking). Pipes stdout/stderr line-by-line as SSE. After the generator succeeds (exit 0), calls switchProfile for every detected host to reinstall the active profile's agents from the freshly generated variant dirs. Emits `install` events per host, then a terminal `done` event with the exit code.",
+    },
+  },
+)
+// Deprecated alias — same behavior, kept for backward compat with older UI.
+.post(
+  "/regenerate-stream",
+  () => {
+    let child: ReturnType<typeof spawn> | null = null;
+    const closedRef = { closed: false };
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        try {
+          child = spawn("bun", [GENERATE_SCRIPT], {
+            env: { ...process.env },
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+        } catch (e) {
+          controller.enqueue(sseFrame({
+            type: "done",
+            exitCode: null,
+            error: `spawn failed: ${(e as Error).message}`,
+          }));
+          controller.close();
+          closedRef.closed = true;
+          return;
+        }
+
+        const emitLine = (streamName: "stdout" | "stderr", chunk: Buffer) => {
+          if (closedRef.closed) return;
+          const text = chunk.toString();
+          const lines = text.split("\n");
+          for (const line of lines) {
+            if (line.length === 0) continue;
+            try {
+              controller.enqueue(sseFrame({ type: "line", stream: streamName, text: line }));
+            } catch {
+              closedRef.closed = true;
+              return;
+            }
+          }
+        };
+
+        child.stdout?.on("data", (chunk: Buffer) => emitLine("stdout", chunk));
+        child.stderr?.on("data", (chunk: Buffer) => emitLine("stderr", chunk));
+
+        child.on("error", (e: Error) => {
+          if (closedRef.closed) return;
+          closedRef.closed = true;
+          try {
+            controller.enqueue(sseFrame({ type: "done", exitCode: null, error: `spawn error: ${e.message}` }));
+            controller.close();
+          } catch {
+            // already closed
+          }
+        });
+
+        child.on("close", (code: number | null) => {
+          if (closedRef.closed) return;
+          if (code === 0) {
+            try {
+              controller.enqueue(sseFrame({ type: "line", stream: "stdout", text: "Installing regenerated agents to active directories..." }));
+            } catch {
+              closedRef.closed = true;
+              return;
+            }
+            installActiveProfiles(controller, closedRef);
+          }
+          closedRef.closed = true;
+          try {
+            controller.enqueue(sseFrame({ type: "done", exitCode: code }));
+            controller.close();
+          } catch {
+            // already closed
+          }
+        });
+      },
+      cancel() {
+        closedRef.closed = true;
+        try {
+          child?.kill();
+        } catch {
+          // best effort
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+      },
+    });
+  },
+  {
+    detail: {
+      tags: ["model-registry"],
+      summary: "Regenerate subagent artifacts + auto-install (streaming SSE, deprecated alias)",
+      description:
+        "Alias for POST /regenerate-and-install-stream. Kept for backward compat with older UI versions.",
     },
   },
 );
