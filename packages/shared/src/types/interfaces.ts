@@ -155,7 +155,15 @@ export interface IVectorStore {
   // Statistics and metadata
   getStats(projectId?: string): Promise<VectorStoreStats>;
   listProjects(): Promise<ProjectInfo[]>;
-  
+  /**
+   * List projects across every embedding-dimension table, for the route-level fallback
+   * when `listProjects()` throws an embedding-dimension-mismatch error (APCR-02.4). Declared
+   * here so callers depend on the interface rather than an `(store as any)` cast plus an
+   * optional-call default, which previously turned every other error class into a silent
+   * empty list.
+   */
+  listAllProjectsAcrossDimensions(): Promise<ProjectInfo[]>;
+
   // Health and lifecycle
   healthCheck(): Promise<boolean>;
   close(): Promise<void>;

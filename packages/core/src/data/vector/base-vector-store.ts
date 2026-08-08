@@ -228,6 +228,7 @@ export abstract class BaseVectorStore implements IVectorStore {
   abstract getCollection(name: string): Promise<any>; // IVectorCollection
   abstract getStats(projectId?: string): Promise<VectorStoreStats>;
   abstract listProjects(): Promise<ProjectInfo[]>;
+  abstract listAllProjectsAcrossDimensions(): Promise<ProjectInfo[]>;
   abstract healthCheck(): Promise<boolean>;
   abstract close(): Promise<void>;
 }
