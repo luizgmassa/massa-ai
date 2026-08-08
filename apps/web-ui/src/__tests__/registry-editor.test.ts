@@ -183,6 +183,24 @@ describe("renderModelRegistry — hostDefaults + workflowTiers (REG-08, REG-09)"
     expect(html).toContain("standard");
     expect(html).toContain("deep");
   });
+
+  it("renders Add Workflow Tier button when write mode on (REG-03)", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain('data-action="registry-workflowTier-add"');
+    expect(html).toContain("Add Workflow Tier");
+  });
+
+  it("renders Remove button per workflow tier row when write mode on (REG-03)", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain('data-action="registry-workflowTier-remove"');
+    expect(html).toContain('data-workflow="search"');
+  });
+
+  it("hides Add + Remove workflow tier buttons when write mode off", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
+    expect(html).not.toContain('data-action="registry-workflowTier-add"');
+    expect(html).not.toContain('data-action="registry-workflowTier-remove"');
+  });
 });
 
 describe("renderModelRegistry — action buttons (REG-10, REG-13, REG-14, REG-15)", () => {

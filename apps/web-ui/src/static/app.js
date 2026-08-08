@@ -1048,6 +1048,21 @@ const UI_HOST_EFFORT_ENUM = {
 
 const REGISTRY_HOSTS = ["claude", "codex", "cursor", "opencode"];
 
+/** Frontend copy of the live workflow inventory (basenames from
+ *  skills/massa-ai/workflows/ - all .md files). Kept in sync manually; the
+ *  frontend cannot import from scripts/lib. Used by the Workflow Tiers picker. */
+const WORKFLOW_STEMS = [
+  "adr", "architecture-audit", "architecture-fix", "bugs-audit", "bugs-fix",
+  "code-quality-audit", "code-quality-fix", "commit", "debug", "design",
+  "discovery", "exploration", "feature", "furps-refinement", "general",
+  "implementation-audit", "implementation-fix", "judge-with-debate",
+  "long-session", "maestro", "maestro-audit", "maestro-fix",
+  "mobile-figma-audit", "mobile-figma-fix", "onboarding", "pr-review",
+  "refactor", "requirements-audit", "requirements-fix", "rfc",
+  "security-audit", "security-fix", "skill-architect", "spec-driven",
+  "tdd", "tests-audit", "tests-fix", "the-fool", "ticket", "to-prd",
+];
+
 /**
  * Model-registry editor renderer. Renders a grid (rows = {host, tier} pairs,
  * columns = profiles, cells = {model, effort}). Marks overlay-sourced cells.
@@ -1156,11 +1171,18 @@ export function renderModelRegistry(data, opts) {
       const sel = t === current ? " selected" : "";
       return '<option value="' + escapeHtml(t) + '"' + sel + ">" + escapeHtml(t) + "</option>";
     }).join("");
+    const rmBtn = writeMode
+      ? ' <button type="button" class="btn-delete" data-action="registry-workflowTier-remove" data-workflow="' + escapeHtml(wf) + '" style="padding:0.1rem 0.4rem;font-size:0.75rem;">Remove</button>'
+      : "";
     return (
       '<div class="config-field"><label>' + escapeHtml(wf) + "</label>" +
-      '<select data-action="registry-workflowTier" data-workflow="' + escapeHtml(wf) + '"' + (writeMode ? "" : " disabled") + ">" + tierOpts + "</select></div>"
+      '<select data-action="registry-workflowTier" data-workflow="' + escapeHtml(wf) + '"' + (writeMode ? "" : " disabled") + ">" + tierOpts + "</select>" + rmBtn + "</div>"
     );
   }).join("");
+
+  const addWorkflowTierBtn = writeMode
+    ? '<div class="registry-actions"><button type="button" data-action="registry-workflowTier-add">Add Workflow Tier</button></div>'
+    : "";
 
   // Profile management: add / duplicate / delete / restore
   const profileActions = writeMode
@@ -1212,7 +1234,7 @@ export function renderModelRegistry(data, opts) {
     overlayBanner +
     grid +
     '<div class="registry-hostDefaults"><h3>Host Defaults</h3>' + hostDefaultsRows + "</div>" +
-    '<div class="registry-workflowTiers"><h3>Workflow Tiers</h3>' + workflowTiersRows + "</div>" +
+    '<div class="registry-workflowTiers"><h3>Workflow Tiers</h3>' + workflowTiersRows + addWorkflowTierBtn + "</div>" +
     profileActions +
     tombstonedList +
     actionButtons +
@@ -1509,6 +1531,42 @@ export function handleRegistryWorkflowTierEdit(ctx, workflow, value) {
   if (!ctx.state.registryOverlay.workflowTiers) ctx.state.registryOverlay.workflowTiers = {};
   ctx.state.registryOverlay.workflowTiers[workflow] = value;
   ctx.state.registryDirty = true;
+}
+
+export function handleRegistryWorkflowTierAdd(ctx) {
+  const existing = (ctx.state.registryOverlay && ctx.state.registryOverlay.workflowTiers) || {};
+  const available = WORKFLOW_STEMS.filter((s) => !Object.prototype.hasOwnProperty.call(existing, s));
+  if (available.length === 0) {
+    alert("All known workflow stems already have a tier. Remove one first or enter a custom name.");
+    return;
+  }
+  const name = prompt("Workflow name (pick from the list or type a custom name):\n\nAvailable: " + available.join(", "));
+  if (!name || !name.trim()) return;
+  const wf = name.trim();
+  if (Object.prototype.hasOwnProperty.call(existing, wf)) {
+    alert('Workflow "' + wf + '" already has a tier. Edit it instead.');
+    return;
+  }
+  const tiers = (ctx.state.registryOverlay && ctx.state.registryOverlay.tiers) || ["light", "standard", "deep"];
+  const tier = prompt("Tier (one of: " + tiers.join(", ") + "):");
+  if (!tier || !tier.trim()) return;
+  if (!tiers.includes(tier.trim())) {
+    alert('Tier "' + tier.trim() + '" is not one of ' + tiers.join(", ") + ".");
+    return;
+  }
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, workflowTiers: {} };
+  if (!ctx.state.registryOverlay.workflowTiers) ctx.state.registryOverlay.workflowTiers = {};
+  ctx.state.registryOverlay.workflowTiers[wf] = tier.trim();
+  ctx.state.registryDirty = true;
+  ctx.render();
+}
+
+export function handleRegistryWorkflowTierRemove(ctx, workflow) {
+  if (!ctx.state.registryOverlay) return;
+  if (!ctx.state.registryOverlay.workflowTiers) return;
+  delete ctx.state.registryOverlay.workflowTiers[workflow];
+  ctx.state.registryDirty = true;
+  ctx.render();
 }
 
 export function handleRegistryAddProfile(ctx) {
@@ -2028,6 +2086,14 @@ function startApp(opts) {
         handleRegistryWorkflowTierEdit(ctx, el.dataset.workflow, el.value);
       });
     });
+    root.querySelector('[data-action="registry-workflowTier-add"]')?.addEventListener("click", () => {
+      handleRegistryWorkflowTierAdd(ctx);
+    });
+    root.querySelectorAll('[data-action="registry-workflowTier-remove"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        handleRegistryWorkflowTierRemove(ctx, btn.dataset.workflow);
+      });
+    });
     root.querySelector('[data-action="registry-add-profile"]')?.addEventListener("click", () => {
       handleRegistryAddProfile(ctx);
     });
@@ -2360,6 +2426,8 @@ const MASSA_AI_UI = {
   handleRegistryCellEdit,
   handleRegistryHostDefaultEdit,
   handleRegistryWorkflowTierEdit,
+  handleRegistryWorkflowTierAdd,
+  handleRegistryWorkflowTierRemove,
   handleRegistryAddProfile,
   handleRegistryDuplicateProfile,
   handleRegistryDeleteProfile,

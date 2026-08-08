@@ -19,6 +19,8 @@ const {
   handleRegistryCellEdit,
   handleRegistryHostDefaultEdit,
   handleRegistryWorkflowTierEdit,
+  handleRegistryWorkflowTierAdd,
+  handleRegistryWorkflowTierRemove,
   handleRegistryAddProfile,
   handleRegistryDuplicateProfile,
   handleRegistryDeleteProfile,
@@ -39,6 +41,8 @@ const {
   handleRegistryCellEdit: (ctx: any, profile: string, host: string, tier: string, field: string, value: string) => void;
   handleRegistryHostDefaultEdit: (ctx: any, host: string, value: string) => void;
   handleRegistryWorkflowTierEdit: (ctx: any, workflow: string, value: string) => void;
+  handleRegistryWorkflowTierAdd: (ctx: any) => void;
+  handleRegistryWorkflowTierRemove: (ctx: any, workflow: string) => void;
   handleRegistryAddProfile: (ctx: any) => void;
   handleRegistryDuplicateProfile: (ctx: any) => void;
   handleRegistryDeleteProfile: (ctx: any) => void;
@@ -528,6 +532,86 @@ describe("handleRegistryWorkflowTierEdit — workflowTiers edit (REGWIRE-02)", (
     handleRegistryWorkflowTierEdit(ctx, "search", "deep");
     expect(ctx.state.registryOverlay.workflowTiers.search).toBe("deep");
     expect(ctx.state.registryDirty).toBe(true);
+  });
+});
+
+describe("handleRegistryWorkflowTierAdd — add workflow tier (REG-03)", () => {
+  const origPrompt = (globalThis as any).prompt;
+  const origAlert = (globalThis as any).alert;
+  afterEach(() => { (globalThis as any).prompt = origPrompt; (globalThis as any).alert = origAlert; });
+
+  it("adds a new workflow tier to the overlay + sets dirty + re-renders", () => {
+    let calls = 0;
+    (globalThis as any).prompt = mock((_msg: string) => {
+      calls++;
+      if (calls === 1) return "spec-driven";
+      if (calls === 2) return "deep";
+      return null;
+    });
+    const ctx = makeRegistryCtx({
+      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
+    });
+    handleRegistryWorkflowTierAdd(ctx);
+    expect(ctx.state.registryOverlay.workflowTiers["spec-driven"]).toBe("deep");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("rejects duplicate workflow name", () => {
+    (globalThis as any).alert = mock(() => {});
+    (globalThis as any).prompt = mock(() => "search");
+    const ctx = makeRegistryCtx({
+      state: { registryOverlay: { profiles: {}, workflowTiers: { search: "standard" }, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
+    });
+    handleRegistryWorkflowTierAdd(ctx);
+    expect((globalThis as any).alert).toHaveBeenCalled();
+    expect(ctx.state.registryDirty).toBe(false);
+  });
+
+  it("rejects invalid tier", () => {
+    (globalThis as any).alert = mock(() => {});
+    let calls = 0;
+    (globalThis as any).prompt = mock(() => {
+      calls++;
+      if (calls === 1) return "debug";
+      if (calls === 2) return "titanic";
+      return null;
+    });
+    const ctx = makeRegistryCtx({
+      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
+    });
+    handleRegistryWorkflowTierAdd(ctx);
+    expect((globalThis as any).alert).toHaveBeenCalled();
+    expect(ctx.state.registryOverlay.workflowTiers["debug"]).toBeUndefined();
+  });
+
+  it("does nothing when prompt cancelled", () => {
+    (globalThis as any).prompt = mock(() => null);
+    const ctx = makeRegistryCtx({
+      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
+    });
+    handleRegistryWorkflowTierAdd(ctx);
+    expect(Object.keys(ctx.state.registryOverlay.workflowTiers)).toEqual([]);
+    expect(ctx.state.registryDirty).toBe(false);
+  });
+});
+
+describe("handleRegistryWorkflowTierRemove — remove workflow tier (REG-03)", () => {
+  it("removes a workflow tier from the overlay + sets dirty + re-renders", () => {
+    const ctx = makeRegistryCtx({
+      state: { registryOverlay: { profiles: {}, workflowTiers: { search: "standard", index: "light" }, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
+    });
+    handleRegistryWorkflowTierRemove(ctx, "search");
+    expect(ctx.state.registryOverlay.workflowTiers.search).toBeUndefined();
+    expect(ctx.state.registryOverlay.workflowTiers.index).toBe("light");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("no-ops when overlay has no workflowTiers", () => {
+    const ctx = makeRegistryCtx({
+      state: { registryOverlay: { profiles: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
+    });
+    handleRegistryWorkflowTierRemove(ctx, "search");
+    expect(ctx.state.registryDirty).toBe(false);
   });
 });
 
