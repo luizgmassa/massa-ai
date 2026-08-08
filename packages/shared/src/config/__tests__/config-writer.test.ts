@@ -1,6 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import fs from "fs";
-import os from "os";
 import path from "path";
 
 import {
@@ -125,7 +124,7 @@ describe("config-writer: restartNeededSections", () => {
 
 describe("config-writer: savePartialConfig validation", () => {
   test("rejects bad embedding provider enum", () => {
-    const { exitCode, stdout, stderr } = runWriter(
+    const { exitCode, stdout } = runWriter(
       "bad-provider",
       `
       import { savePartialConfig } from ${JSON.stringify(WRITER)};

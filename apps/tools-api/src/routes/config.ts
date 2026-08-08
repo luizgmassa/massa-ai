@@ -1,7 +1,6 @@
 import { Elysia, t } from "elysia";
 import {
   loadConfig,
-  defaultMassaAiConfig,
   savePartialConfig,
   maskSensitive,
   restartNeededSections,

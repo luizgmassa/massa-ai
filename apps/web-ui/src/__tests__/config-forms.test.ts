@@ -2,13 +2,12 @@ import { describe, it, expect } from "bun:test";
 
 const mod = await import("../static/app.js");
 const UI = (globalThis as any).MASSA_AI_UI || {};
-const { renderConfig, buildConfigSectionBody, isWriteModeEnabled } = {
+const { renderConfig, buildConfigSectionBody } = {
   ...mod,
   ...UI,
 } as {
   renderConfig: (data: unknown, opts?: { writeMode?: boolean }) => string;
   buildConfigSectionBody: (sectionKey: string, fieldValues: Record<string, unknown>) => Record<string, unknown>;
-  isWriteModeEnabled: () => boolean;
 };
 
 const SAMPLE_CONFIG_DATA = {
