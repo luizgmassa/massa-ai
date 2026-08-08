@@ -835,3 +835,150 @@ describe("renderProfiles — profile switcher (PROF-01, PROF-02)", () => {
     expect(card).not.toContain('data-action="profile-switch"');
   });
 });
+
+// ── Create/delete forms for existing CRUD APIs (T13) ────────────────────────
+
+describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", () => {
+  const origWriteMode = (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+  const origDocument = (globalThis as any).document;
+  const origLocalStorage = (globalThis as any).localStorage;
+
+  afterEach(() => {
+    if (origWriteMode !== undefined) (globalThis as any).MASSA_AI_WEB_WRITE_MODE = origWriteMode;
+    else delete (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+    if (origDocument !== undefined) (globalThis as any).document = origDocument;
+    else delete (globalThis as any).document;
+    if (origLocalStorage !== undefined) (globalThis as any).localStorage = origLocalStorage;
+    else delete (globalThis as any).localStorage;
+  });
+
+  function enableWrite() {
+    delete (globalThis as any).document;
+    delete (globalThis as any).localStorage;
+    (globalThis as any).MASSA_AI_WEB_WRITE_MODE = true;
+  }
+  function disableWrite() {
+    delete (globalThis as any).document;
+    delete (globalThis as any).localStorage;
+    (globalThis as any).MASSA_AI_WEB_WRITE_MODE = false;
+  }
+
+  describe("memory create form (MEM-02)", () => {
+    it("renders create-memory form when write mode on", () => {
+      enableWrite();
+      const data = { data: { memories: [{ id: "m1", type: "code", level: 1, importance: 0.8, content: "x" }], total: 1, limit: 50, offset: 0 } };
+      const html = renderMemoryBrowser(data, { filters: {} });
+      expect(html).toContain("Create Memory");
+      expect(html).toContain('data-action="memory-create"');
+      expect(html).toContain('data-form="memory-create"');
+      expect(html).toContain('data-create="content"');
+      expect(html).toContain('data-create="type"');
+      expect(html).toContain('data-create="importance"');
+      expect(html).toContain('data-create="tags"');
+      expect(html).toContain('data-create="projectId"');
+    });
+
+    it("hides create-memory form when write mode off", () => {
+      disableWrite();
+      const data = { data: { memories: [{ id: "m1", type: "code", level: 1, importance: 0.8, content: "x" }], total: 1, limit: 50, offset: 0 } };
+      const html = renderMemoryBrowser(data, { filters: {} });
+      expect(html).not.toContain("Create Memory");
+      expect(html).not.toContain('data-action="memory-create"');
+    });
+  });
+
+  describe("handoff create + cancel (HAND-02, HAND-04)", () => {
+    it("renders create-handoff form when write mode on + project selected", () => {
+      enableWrite();
+      const data = { data: { pending: [] } };
+      const html = renderHandoffs(data, { project: "proj-1" });
+      expect(html).toContain("Create Handoff");
+      expect(html).toContain('data-action="handoff-create"');
+      expect(html).toContain('data-create="projectId"');
+      expect(html).toContain('data-create="summary"');
+      expect(html).toContain('data-create="targetAgent"');
+      expect(html).toContain('data-create="openQuestions"');
+      expect(html).toContain('data-create="nextSteps"');
+      expect(html).toContain('data-create="files"');
+    });
+
+    it("renders accept + cancel buttons on pending handoffs when write mode on", () => {
+      enableWrite();
+      const data = { data: { pending: [{ id: "h1", targetAgent: "orchestrator", status: "open", summary: "test" }] } };
+      const html = renderHandoffs(data, { project: "proj-1" });
+      expect(html).toContain('data-action="handoff-accept"');
+      expect(html).toContain('data-action="handoff-cancel"');
+      expect(html).toContain('data-id="h1"');
+    });
+
+    it("hides create + accept/cancel when write mode off", () => {
+      disableWrite();
+      const data = { data: { pending: [{ id: "h1", targetAgent: "x", status: "open", summary: "y" }] } };
+      const html = renderHandoffs(data, { project: "proj-1" });
+      expect(html).not.toContain("Create Handoff");
+      expect(html).not.toContain('data-action="handoff-accept"');
+      expect(html).not.toContain('data-action="handoff-cancel"');
+    });
+  });
+
+  describe("checkpoint create + delete (CHKP-02, CHKP-04)", () => {
+    it("renders create-checkpoint form when write mode on", () => {
+      enableWrite();
+      const data = { success: true, data: { checkpoints: [{ id: "c1", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };
+      const html = renderCheckpoints(data);
+      expect(html).toContain("Create Checkpoint");
+      expect(html).toContain('data-action="checkpoint-create"');
+      expect(html).toContain('data-create="taskId"');
+      expect(html).toContain('data-create="description"');
+      expect(html).toContain('data-create="status"');
+      expect(html).toContain('data-create="progressPercent"');
+      expect(html).toContain('data-create="checkpointType"');
+    });
+
+    it("renders delete button on checkpoint rows when write mode on", () => {
+      enableWrite();
+      const data = { success: true, data: { checkpoints: [{ id: "c1", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };
+      const html = renderCheckpoints(data);
+      expect(html).toContain('data-action="checkpoint-delete"');
+      expect(html).toContain('data-id="c1"');
+    });
+
+    it("hides create + delete when write mode off", () => {
+      disableWrite();
+      const data = { success: true, data: { checkpoints: [{ id: "c1", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };
+      const html = renderCheckpoints(data);
+      expect(html).not.toContain("Create Checkpoint");
+      expect(html).not.toContain('data-action="checkpoint-delete"');
+    });
+  });
+
+  describe("project index + reset (PROJ-02, PROJ-04)", () => {
+    it("renders index-project form when write mode on", () => {
+      enableWrite();
+      const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
+      const html = renderProjects(data);
+      expect(html).toContain("Index Project");
+      expect(html).toContain('data-action="project-index"');
+      expect(html).toContain('data-create="projectPath"');
+      expect(html).toContain('data-create="projectId"');
+      expect(html).toContain('data-create="forceReindex"');
+      expect(html).toContain('data-create="warmCache"');
+    });
+
+    it("renders reset button on project rows when write mode on", () => {
+      enableWrite();
+      const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
+      const html = renderProjects(data);
+      expect(html).toContain('data-action="project-reset"');
+      expect(html).toContain('data-project="p1"');
+    });
+
+    it("hides index form + reset button when write mode off", () => {
+      disableWrite();
+      const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
+      const html = renderProjects(data);
+      expect(html).not.toContain("Index Project");
+      expect(html).not.toContain('data-action="project-reset"');
+    });
+  });
+});

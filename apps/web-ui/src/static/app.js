@@ -238,22 +238,41 @@ function _minimalMarkdownToHtml(md) {
 
 export function renderProjects(data) {
   const projects = (data && data.projects) || [];
-  if (projects.length === 0) {
-    return '<p class="empty">No indexed projects.</p>';
-  }
+  const writeMode = isWriteModeEnabled();
+
   const rows = projects
     .map((p) => {
       const id = escapeHtml(p.projectId || p.id || "");
       const count = p.documentCount ?? p.docCount ?? "";
       const meta =
         count !== "" ? ' <span class="muted">(' + escapeHtml(String(count)) + " docs)</span>" : "";
-      return "<li>" + escapeHtml(id) + meta + "</li>";
+      const resetBtn = writeMode
+        ? ' <button type="button" class="btn-delete" data-action="project-reset" data-project="' + id + '">reset</button>'
+        : "";
+      return "<li>" + escapeHtml(id) + meta + resetBtn + "</li>";
     })
     .join("");
+
+  const indexForm = writeMode
+    ? '<div class="create-form">' +
+      "<h3>Index Project</h3>" +
+      '<div class="form-field"><label>projectPath</label><input type="text" data-create="projectPath" data-form="project-index" /></div>' +
+      '<div class="form-field"><label>projectId (optional)</label><input type="text" data-create="projectId" data-form="project-index" /></div>' +
+      '<div class="form-field"><label><input type="checkbox" data-create="forceReindex" data-form="project-index" /> forceReindex</label></div>' +
+      '<div class="form-field"><label><input type="checkbox" data-create="warmCache" data-form="project-index" /> warmCache</label></div>' +
+      '<button type="button" data-action="project-index">Index</button>' +
+      "</div>"
+    : "";
+
+  if (projects.length === 0 && !writeMode) {
+    return '<p class="empty">No indexed projects.</p>';
+  }
   return (
     '<section class="view"><h2>Projects</h2><ul class="project-list">' +
     rows +
-    "</ul></section>"
+    "</ul>" +
+    indexForm +
+    "</section>"
   );
 }
 
@@ -358,11 +377,26 @@ export function renderMemoryBrowser(data, state) {
     (offset + limit >= total ? " disabled" : "") +
     ">next</button></div>";
 
+  const createForm = writeMode
+    ? '<div class="create-form">' +
+      "<h3>Create Memory</h3>" +
+      '<div class="form-field"><label>content</label><textarea data-create="content" data-form="memory-create"></textarea></div>' +
+      '<div class="form-field"><label>type</label><select data-create="type" data-form="memory-create">' +
+      MEMORY_TYPES.map((t) => '<option value="' + t + '">' + t + "</option>").join("") +
+      "</select></div>" +
+      '<div class="form-field"><label>importance (0-1)</label><input type="number" min="0" max="1" step="0.1" data-create="importance" data-form="memory-create" value="0.5" /></div>' +
+      '<div class="form-field"><label>tags (comma-separated)</label><input type="text" data-create="tags" data-form="memory-create" /></div>' +
+      '<div class="form-field"><label>projectId</label><input type="text" data-create="projectId" data-form="memory-create" /></div>' +
+      '<button type="button" data-action="memory-create">Create</button>' +
+      "</div>"
+    : "";
+
   return (
     '<section class="view"><h2>Memory</h2>' +
     filterBar +
     body +
     pager +
+    createForm +
     "</section>"
   );
 }
@@ -412,6 +446,7 @@ export function renderSearch(data, state) {
 export function renderHandoffs(data, state) {
   state = state || {};
   const project = state.project || "";
+  const writeMode = isWriteModeEnabled();
   if (!project) {
     return (
       '<section class="view"><h2>Handoffs</h2>' +
@@ -423,11 +458,32 @@ export function renderHandoffs(data, state) {
   }
   const payload = data.data || data;
   const pending = (payload && payload.pending) || [];
-  if (pending.length === 0) {
+
+  const createForm = writeMode
+    ? '<div class="create-form">' +
+      "<h3>Create Handoff</h3>" +
+      '<div class="form-field"><label>projectId</label><input type="text" data-create="projectId" data-form="handoff-create" value="' + escapeHtml(project) + '" /></div>' +
+      '<div class="form-field"><label>summary</label><input type="text" data-create="summary" data-form="handoff-create" /></div>' +
+      '<div class="form-field"><label>targetAgent (optional)</label><input type="text" data-create="targetAgent" data-form="handoff-create" /></div>' +
+      '<div class="form-field"><label>openQuestions (comma-separated)</label><input type="text" data-create="openQuestions" data-form="handoff-create" /></div>' +
+      '<div class="form-field"><label>nextSteps (comma-separated)</label><input type="text" data-create="nextSteps" data-form="handoff-create" /></div>' +
+      '<div class="form-field"><label>files (comma-separated)</label><input type="text" data-create="files" data-form="handoff-create" /></div>' +
+      '<button type="button" data-action="handoff-create">Create</button>' +
+      "</div>"
+    : "";
+
+  if (pending.length === 0 && !writeMode) {
     return '<section class="view"><h2>Handoffs</h2><p class="empty">No pending handoffs.</p></section>';
   }
   const rows = pending
     .map((h) => {
+      const id = escapeHtml(h.id || "");
+      const actions = writeMode
+        ? '<div class="actions-cell">' +
+          '<button type="button" class="btn-approve" data-action="handoff-accept" data-id="' + id + '">accept</button> ' +
+          '<button type="button" class="btn-delete" data-action="handoff-cancel" data-id="' + id + '">cancel</button>' +
+          "</div>"
+        : "";
       return (
         '<div class="card">' +
         "<div><strong>" +
@@ -441,11 +497,12 @@ export function renderHandoffs(data, state) {
         "<div class=\"muted\">" +
         escapeHtml(h.id || "") +
         "</div>" +
+        actions +
         "</div>"
       );
     })
     .join("");
-  return '<section class="view"><h2>Handoffs</h2>' + rows + "</section>";
+  return '<section class="view"><h2>Handoffs</h2>' + rows + createForm + "</section>";
 }
 
 export function renderProposals(data, state) {
@@ -499,6 +556,7 @@ export function renderProposals(data, state) {
 }
 
 export function renderCheckpoints(data) {
+  const writeMode = isWriteModeEnabled();
   if (!data || data.success === false) {
     return '<section class="view"><h2>Checkpoints</h2>' + errorBlock(data) + "</section>";
   }
@@ -514,13 +572,36 @@ export function renderCheckpoints(data) {
       "</section>"
     );
   }
-  if (rows.length === 0) {
+
+  const createForm = writeMode
+    ? '<div class="create-form">' +
+      "<h3>Create Checkpoint</h3>" +
+      '<div class="form-field"><label>taskId</label><input type="text" data-create="taskId" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>description</label><input type="text" data-create="description" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>status</label><select data-create="status" data-form="checkpoint-create"><option>pending</option><option>in_progress</option><option>completed</option><option>failed</option><option>paused</option></select></div>' +
+      '<div class="form-field"><label>progressPercent</label><input type="number" min="0" max="100" data-create="progressPercent" data-form="checkpoint-create" value="0" /></div>' +
+      '<div class="form-field"><label>currentStep</label><input type="text" data-create="currentStep" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>totalSteps</label><input type="number" data-create="totalSteps" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>completedSteps</label><input type="number" data-create="completedSteps" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>checkpointType</label><select data-create="checkpointType" data-form="checkpoint-create"><option>manual</option><option>milestone</option></select></div>' +
+      '<button type="button" data-action="checkpoint-create">Create</button>' +
+      "</div>"
+    : "";
+
+  if (rows.length === 0 && !writeMode) {
     return '<section class="view"><h2>Checkpoints</h2><p class="empty">No checkpoints.</p></section>';
   }
+  const actionCol = writeMode ? "<th>actions</th>" : "";
   const body =
-    '<table class="grid"><thead><tr><th>task</th><th>type</th><th>status</th><th>description</th></tr></thead><tbody>' +
+    '<table class="grid"><thead><tr><th>task</th><th>type</th><th>status</th><th>description</th>' + actionCol + '</tr></thead><tbody>' +
     rows
       .map((c) => {
+        const id = escapeHtml(c.id || c.checkpointId || "");
+        const actions = writeMode
+          ? '<td class="actions-cell">' +
+            '<button type="button" class="btn-delete" data-action="checkpoint-delete" data-id="' + id + '" data-task="' + escapeHtml(c.taskId || "") + '">delete</button>' +
+            "</td>"
+          : "";
         return (
           "<tr>" +
           "<td>" +
@@ -535,12 +616,13 @@ export function renderCheckpoints(data) {
           '<td class="content-cell">' +
           escapeHtml(c.description || "") +
           "</td>" +
+          actions +
           "</tr>"
         );
       })
       .join("") +
     "</tbody></table>";
-  return '<section class="view"><h2>Checkpoints</h2>' + body + "</section>";
+  return '<section class="view"><h2>Checkpoints</h2>' + body + createForm + "</section>";
 }
 
 // ── Admin portal view stubs (renderers land in T10-T12) ────────────────────
@@ -1373,6 +1455,69 @@ function startApp(opts) {
     root.querySelector('[data-action="search-run"]')?.addEventListener("click", () => {
       render();
     });
+    // write mode: memory create
+    root.querySelector('[data-action="memory-create"]')?.addEventListener("click", () => {
+      handleMemoryCreate();
+    });
+    // write mode: handoff create/accept/cancel
+    root.querySelector('[data-action="handoff-create"]')?.addEventListener("click", () => {
+      handleHandoffCreate();
+    });
+    root.querySelectorAll('[data-action="handoff-accept"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        if (!id) return;
+        handleHandoffAction(id, "accept");
+      });
+    });
+    root.querySelectorAll('[data-action="handoff-cancel"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        if (!id) return;
+        if (confirm("Cancel handoff " + id + "? This cannot be undone.")) {
+          handleHandoffAction(id, "cancel");
+        }
+      });
+    });
+    // write mode: checkpoint create/delete
+    root.querySelector('[data-action="checkpoint-create"]')?.addEventListener("click", () => {
+      handleCheckpointCreate();
+    });
+    root.querySelectorAll('[data-action="checkpoint-delete"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        const task = btn.dataset.task || "";
+        if (!id) return;
+        if (confirm("Delete checkpoint " + id + " (task: " + task + ")? This cannot be undone.")) {
+          handleCheckpointDelete(id);
+        }
+      });
+    });
+    // write mode: project index/reset
+    root.querySelector('[data-action="project-index"]')?.addEventListener("click", () => {
+      handleProjectIndex();
+    });
+    root.querySelectorAll('[data-action="project-reset"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const project = btn.dataset.project;
+        if (!project) return;
+        if (confirm("Reset project " + project + "? This deletes vectors/symbols/memories. This cannot be undone.")) {
+          handleProjectReset(project);
+        }
+      });
+    });
+  }
+
+  function collectFormData(formName) {
+    const data = {};
+    root.querySelectorAll('[data-form="' + formName + '"]').forEach((el) => {
+      const key = el.dataset.create;
+      if (!key) return;
+      if (el.type === "checkbox") data[key] = el.checked;
+      else if (el.type === "number") data[key] = el.value === "" ? undefined : Number(el.value);
+      else data[key] = el.value;
+    });
+    return data;
   }
 
   async function handleMemoryEdit(id) {
@@ -1409,6 +1554,113 @@ function startApp(opts) {
       render();
     } catch (e) {
       alert(action + " failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleMemoryCreate() {
+    const data = collectFormData("memory-create");
+    if (!data.content) { alert("Content is required."); return; }
+    if (data.importance !== undefined && (data.importance < 0 || data.importance > 1)) {
+      alert("Importance must be between 0 and 1.");
+      return;
+    }
+    const body = {
+      content: data.content,
+      type: data.type || "conversation",
+      importance: data.importance !== undefined ? data.importance : 0.5,
+    };
+    if (data.tags) body.tags = String(data.tags).split(",").map((s) => s.trim()).filter(Boolean);
+    if (data.projectId) body.projectId = data.projectId;
+    try {
+      await api.request("/api/v1/memory/store", { method: "POST", body });
+      render();
+    } catch (e) {
+      alert("Create failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleHandoffCreate() {
+    const data = collectFormData("handoff-create");
+    if (!data.projectId) { alert("Project ID is required."); return; }
+    if (!data.summary) { alert("Summary is required."); return; }
+    const body = { projectId: data.projectId, summary: data.summary };
+    if (data.targetAgent) body.targetAgent = data.targetAgent;
+    if (data.openQuestions) body.openQuestions = String(data.openQuestions).split(",").map((s) => s.trim()).filter(Boolean);
+    if (data.nextSteps) body.nextSteps = String(data.nextSteps).split(",").map((s) => s.trim()).filter(Boolean);
+    if (data.files) body.files = String(data.files).split(",").map((s) => s.trim()).filter(Boolean);
+    try {
+      await api.request("/api/v1/handoff/begin", { method: "POST", body });
+      render();
+    } catch (e) {
+      alert("Create failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleHandoffAction(id, action) {
+    try {
+      await api.request("/api/v1/handoff/" + action, { method: "POST", body: { id } });
+      render();
+    } catch (e) {
+      alert(action + " failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleCheckpointCreate() {
+    const data = collectFormData("checkpoint-create");
+    if (!data.taskId) { alert("Task ID is required."); return; }
+    if (!data.description) { alert("Description is required."); return; }
+    const body = {
+      taskId: data.taskId,
+      description: data.description,
+      status: data.status || "pending",
+      checkpointType: data.checkpointType || "manual",
+    };
+    if (data.progressPercent !== undefined) body.progressPercent = data.progressPercent;
+    if (data.currentStep) body.currentStep = data.currentStep;
+    if (data.totalSteps !== undefined) body.totalSteps = data.totalSteps;
+    if (data.completedSteps !== undefined) body.completedSteps = data.completedSteps;
+    try {
+      await api.request("/api/v1/checkpoints/create", { method: "POST", body });
+      render();
+    } catch (e) {
+      alert("Create failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleCheckpointDelete(id) {
+    try {
+      await api.request("/api/v1/checkpoints/delete", { method: "POST", body: { id } });
+      render();
+    } catch (e) {
+      alert("Delete failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleProjectIndex() {
+    const data = collectFormData("project-index");
+    if (!data.projectPath) { alert("Project path is required."); return; }
+    const body = { projectPath: data.projectPath };
+    if (data.projectId) body.projectId = data.projectId;
+    if (data.forceReindex) body.forceReindex = true;
+    if (data.warmCache) body.warmCache = true;
+    try {
+      const res = await api.request("/api/v1/project/index", { method: "POST", body });
+      if (res && res.data && res.data.jobId) alert("Indexing job started: " + res.data.jobId);
+      render();
+    } catch (e) {
+      alert("Index failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleProjectReset(project) {
+    try {
+      await api.request("/api/v1/project/reset", {
+        method: "POST",
+        body: { projectId: project, clearVectors: true, clearSymbols: true, clearMemories: true },
+      });
+      render();
+    } catch (e) {
+      alert("Reset failed: " + String(e.message || e));
     }
   }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "bun:test";
 
-const { markdownToHtml, isWriteModeEnabled, renderMemoryBrowser, renderProposals } = await import("../static/app.js");
+const { markdownToHtml, isWriteModeEnabled, renderMemoryBrowser, renderProposals, renderHandoffs, renderCheckpoints, renderProjects } = await import("../static/app.js");
 
 describe("markdown rendering (marked + DOMPurify)", () => {
   describe("minimal fallback renderer", () => {
@@ -268,5 +268,76 @@ describe("write mode gating", () => {
     const html = renderProposals(data, { project: "test-project" });
     expect(html).not.toContain('data-action="proposal-approve"');
     expect(html).not.toContain('data-action="proposal-reject"');
+  });
+});
+
+// ── T13: create/delete forms render correct fields (MEM-02, HAND-02, CHKP-02, PROJ-02/04) ──
+
+describe("T13 create/delete forms render correct fields when trusted", () => {
+  const originalWriteMode = (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+  const originalDocument = (globalThis as any).document;
+  const originalLocalStorage = (globalThis as any).localStorage;
+
+  afterEach(() => {
+    if (originalWriteMode !== undefined) (globalThis as any).MASSA_AI_WEB_WRITE_MODE = originalWriteMode;
+    else delete (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+    if (originalDocument !== undefined) (globalThis as any).document = originalDocument;
+    else delete (globalThis as any).document;
+    if (originalLocalStorage !== undefined) (globalThis as any).localStorage = originalLocalStorage;
+    else delete (globalThis as any).localStorage;
+  });
+
+  function trustedOn() {
+    delete (globalThis as any).localStorage;
+    (globalThis as any).document = {
+      querySelector(sel: string) {
+        if (sel === 'meta[name="massa-ai-api-key"]') {
+          return { getAttribute(name: string) { return name === "content" ? "trusted-key" : null; } };
+        }
+        return null;
+      },
+    };
+  }
+
+  it("memory create form fields present when trusted (MEM-02)", () => {
+    trustedOn();
+    const data = { data: { memories: [], total: 0, limit: 50, offset: 0 } };
+    const html = renderMemoryBrowser(data, { filters: {} });
+    expect(html).toContain('data-form="memory-create"');
+    expect(html).toContain('data-create="content"');
+    expect(html).toContain('data-create="type"');
+    expect(html).toContain('data-create="importance"');
+  });
+
+  it("memory delete button visible when trusted (MEM-04)", () => {
+    trustedOn();
+    const data = { data: { memories: [{ id: "m-trust", type: "code", level: 1, importance: 0.8, content: "x" }], total: 1, limit: 50, offset: 0 } };
+    const html = renderMemoryBrowser(data, { filters: {} });
+    expect(html).toContain('data-action="memory-delete"');
+    expect(html).toContain('data-id="m-trust"');
+  });
+
+  it("handoff create form + cancel button visible when trusted (HAND-02, HAND-04)", () => {
+    trustedOn();
+    const data = { data: { pending: [{ id: "h-trust", targetAgent: "x", status: "open", summary: "s" }] } };
+    const html = renderHandoffs(data, { project: "p" });
+    expect(html).toContain('data-action="handoff-create"');
+    expect(html).toContain('data-action="handoff-cancel"');
+    expect(html).toContain('data-id="h-trust"');
+  });
+
+  it("checkpoint create + delete buttons visible when trusted (CHKP-02, CHKP-04)", () => {
+    trustedOn();
+    const data = { success: true, data: { checkpoints: [{ id: "c-trust", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };
+    const html = renderCheckpoints(data);
+    expect(html).toContain('data-action="checkpoint-create"');
+    expect(html).toContain('data-action="checkpoint-delete"');
+  });
+
+  it("project index + reset buttons visible when trusted (PROJ-02, PROJ-04)", () => {
+    trustedOn();
+    const html = renderProjects({ projects: [{ projectId: "p-trust", documentCount: 5 }] });
+    expect(html).toContain('data-action="project-index"');
+    expect(html).toContain('data-action="project-reset"');
   });
 });

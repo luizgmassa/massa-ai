@@ -406,12 +406,12 @@ CHKP-05 decision: store is directly reachable via `CheckpointManager.getInstance
 - Skill: NONE
 
 **Done when**:
-- [ ] Create forms render correct fields for memory/handoff/checkpoint/project
-- [ ] Delete buttons render when write-mode on (memory/handoff/checkpoint)
-- [ ] Destructive ops show `confirm()` dialog naming entity + action
-- [ ] Success/error feedback after each write; view refreshes
-- [ ] `bun test apps/web-ui/src/__tests__/` passes (extend app-renderers + write-mode: create-form fields, delete buttons visible when trusted, confirm gating)
-- [ ] `bun run type-check` passes
+- [x] Create forms render correct fields for memory/handoff/checkpoint/project
+- [x] Delete buttons render when write-mode on (memory/handoff/checkpoint)
+- [x] Destructive ops show `confirm()` dialog naming entity + action
+- [x] Success/error feedback after each write; view refreshes
+- [x] `bun test apps/web-ui/src/__tests__/` passes (extend app-renderers + write-mode: create-form fields, delete buttons visible when trusted, confirm gating)
+- [x] `bun run type-check` passes
 
 **Tests**: unit (create/delete forms)
 **Gate**: quick
