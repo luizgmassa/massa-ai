@@ -17,6 +17,7 @@ const identityPreview = mock(async () => ({ dryRun: true, planHash: "x" }));
 const identityApply = mock(async () => ({ dryRun: false, operationId: "op" }));
 
 const vectorProjects = mock(async (): Promise<any[]> => [{ projectId: "p1", documentCount: 3 }]);
+const vectorAllProjects = mock(async (): Promise<any[]> => []);
 const vectorDelete = mock(async () => 5);
 const keywordDelete = mock(async () => 2);
 const cacheInvalidate = mock(async () => 1);
@@ -38,6 +39,7 @@ mock.module("@massa-ai/core", () => {
     createProjectIdentityService: () => ({ preview: identityPreview, apply: identityApply }),
     getVectorStore: async () => ({
       listProjects: vectorProjects,
+      listAllProjectsAcrossDimensions: vectorAllProjects,
       deleteByProject: vectorDelete,
     }),
     getKeywordSearch: () => ({ deleteByProject: keywordDelete }),
@@ -85,13 +87,27 @@ describe("GET /api/v1/project/list", () => {
     expect(res.json.data.total).toBe(2);
   });
 
-  test("returns failure envelope on error", async () => {
+  test("falls back to listAllProjectsAcrossDimensions when listProjects throws", async () => {
     vectorProjects.mockImplementationOnce(async () => {
       throw new Error("store down");
     });
+    vectorAllProjects.mockImplementationOnce(async () => [{ projectId: "fallback-p", documentCount: 5 }]);
+    const res = await req("GET", "/api/v1/project/list");
+    expect(res.status).toBe(200);
+    expect(res.json.success).toBe(true);
+    expect(res.json.data.projects[0].projectId).toBe("fallback-p");
+  });
+
+  test("returns failure envelope when both listProjects and fallback throw", async () => {
+    vectorProjects.mockImplementationOnce(async () => {
+      throw new Error("store down");
+    });
+    vectorAllProjects.mockImplementationOnce(async () => {
+      throw new Error("db unreachable");
+    });
     const res = await req("GET", "/api/v1/project/list");
     expect(res.json.success).toBe(false);
-    expect(res.json.error).toBe("store down");
+    expect(res.json.error).toBe("db unreachable");
   });
 });
 
