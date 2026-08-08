@@ -71,18 +71,18 @@ describe("renderProjects", () => {
     expect(renderProjects(null)).toContain("No indexed projects");
   });
 
-  it("renders project rows with doc counts", () => {
+  it("renders project rows in a grid table with doc counts", () => {
     const html = renderProjects({ projects: [{ projectId: "p1", documentCount: 5 }, { id: "p2", docCount: 3 }] });
+    expect(html).toContain("grid");
     expect(html).toContain("p1");
-    expect(html).toContain("5 docs");
+    expect(html).toContain("5");
     expect(html).toContain("p2");
-    expect(html).toContain("3 docs");
+    expect(html).toContain("3");
   });
 
   it("omits doc count when absent", () => {
     const html = renderProjects({ projects: [{ projectId: "p3" }] });
     expect(html).toContain("p3");
-    expect(html).not.toContain("docs");
   });
 });
 
@@ -714,6 +714,19 @@ describe("admin portal nav + footer + routing (T9)", () => {
     expect(html).toContain("balanced");
     expect(html).toContain("work");
     expect(html).toContain("active");
+  });
+
+  it("renderProfiles shows installed with marketplace message when no variant profiles (UIC-05)", () => {
+    const html = renderProfiles({ hosts: [{ host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.41.0", availableProfiles: [] }] }, { writeMode: false });
+    expect(html).toContain("claude");
+    expect(html).not.toContain("Not installed");
+    expect(html).toContain("marketplace");
+  });
+
+  it("renderProfiles shows Not installed when installed is false", () => {
+    const html = renderProfiles({ hosts: [{ host: "cursor", installed: false, skipped: true, skipReason: "skipped", activeProfile: null, bundleVersion: null, availableProfiles: [] }] }, { writeMode: false });
+    expect(html).toContain("cursor");
+    expect(html).toContain("skipped");
   });
 
   it("renderProfiles stub renders empty state when no profiles", () => {

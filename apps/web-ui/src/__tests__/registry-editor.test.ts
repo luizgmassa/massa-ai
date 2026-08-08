@@ -231,6 +231,12 @@ describe("renderModelRegistry — overlay error + empty state (REG-16)", () => {
     const html = renderModelRegistry({}, { writeMode: true });
     expect(html).toContain("No profiles");
   });
+
+  it("shows registry error message when _error present (UIC-06)", () => {
+    const html = renderModelRegistry({ registry: { profiles: {} }, source: {}, _error: "Route not found" }, { writeMode: true });
+    expect(html).toContain("Registry load error");
+    expect(html).toContain("Route not found");
+  });
 });
 
 describe("renderModelRegistry — cell inputs", () => {

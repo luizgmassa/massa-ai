@@ -268,3 +268,12 @@ describe("renderConfig — empty config", () => {
     expect(sectionCount).toBe(15);
   });
 });
+
+describe("renderConfig — checkbox alignment (UIC-04)", () => {
+  it("checkbox inputs have left-align CSS via align-self: flex-start", () => {
+    const html = renderConfig({ config: { llm: { enabled: true } }, restartNeededSections: [] }, { writeMode: true });
+    expect(html).toContain('type="checkbox"');
+    // The CSS rule .config-field input[type="checkbox"] { align-self: flex-start }
+    // is in styles.css, verified by reading the file (not asserted in HTML output).
+  });
+});

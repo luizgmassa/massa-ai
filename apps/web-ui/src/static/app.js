@@ -252,19 +252,6 @@ export function renderProjects(data, opts) {
       '</div>'
     : "";
 
-  const rows = projects
-    .map((p) => {
-      const id = escapeHtml(p.projectId || p.id || "");
-      const count = p.documentCount ?? p.docCount ?? "";
-      const meta =
-        count !== "" ? ' <span class="muted">(' + escapeHtml(String(count)) + " docs)</span>" : "";
-      const resetBtn = writeMode
-        ? ' <button type="button" class="btn-delete" data-action="project-reset" data-project="' + id + '">reset</button>'
-        : "";
-      return "<li>" + escapeHtml(id) + meta + resetBtn + "</li>";
-    })
-    .join("");
-
   const indexForm = writeMode
     ? '<div class="create-form">' +
       "<h3>Index Project</h3>" +
@@ -277,14 +264,40 @@ export function renderProjects(data, opts) {
     : "";
 
   if (projects.length === 0 && !writeMode) {
-    return '<p class="empty">No indexed projects.</p>';
+    return '<section class="view"><h2>Projects</h2>' + indexProgress + '<p class="empty">No indexed projects.</p></section>';
   }
+
+  const actionCol = writeMode ? "<th>actions</th>" : "";
+  const body =
+    '<table class="grid"><thead><tr><th>project</th><th>docs</th>' + actionCol + '</tr></thead><tbody>' +
+    projects
+      .map((p) => {
+        const id = escapeHtml(p.projectId || p.id || "");
+        const count = p.documentCount ?? p.docCount ?? "";
+        const actions = writeMode
+          ? '<td class="actions-cell">' +
+            '<button type="button" class="btn-delete" data-action="project-reset" data-project="' + id + '">reset</button>' +
+            "</td>"
+          : "";
+        return (
+          "<tr>" +
+          "<td>" +
+          escapeHtml(id) +
+          "</td>" +
+          "<td>" +
+          (count !== "" ? escapeHtml(String(count)) : "") +
+          "</td>" +
+          actions +
+          "</tr>"
+        );
+      })
+      .join("") +
+    "</tbody></table>";
+
   return (
     '<section class="view"><h2>Projects</h2>' +
     indexProgress +
-    '<ul class="project-list">' +
-    rows +
-    "</ul>" +
+    body +
     indexForm +
     "</section>"
   );
@@ -613,6 +626,7 @@ export function renderCheckpoints(data) {
         const id = escapeHtml(c.id || c.checkpointId || "");
         const actions = writeMode
           ? '<td class="actions-cell">' +
+            '<button type="button" class="btn-edit" data-action="checkpoint-edit" data-id="' + id + '" data-task="' + escapeHtml(c.taskId || "") + '" data-status="' + escapeHtml(c.status || "") + '" data-type="' + escapeHtml(c.type || c.checkpointType || "") + '" data-description="' + escapeHtml(c.description || "") + '" data-progress="' + escapeHtml(String(c.progressPercent ?? "")) + '" data-step="' + escapeHtml(c.currentStep || "") + '" data-total="' + escapeHtml(String(c.totalSteps ?? "")) + '" data-completed="' + escapeHtml(String(c.completedSteps ?? "")) + '" data-checkpoint-type="' + escapeHtml(c.checkpointType || c.type || "") + '">edit</button> ' +
             '<button type="button" class="btn-delete" data-action="checkpoint-delete" data-id="' + id + '" data-task="' + escapeHtml(c.taskId || "") + '">delete</button>' +
             "</td>"
           : "";
@@ -974,10 +988,19 @@ export function renderProfiles(data, opts) {
       );
     }
 
-    if (!installed || available.length === 0) {
+    if (!installed) {
       return (
         '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
         "<h3>" + escapeHtml(hostName) + "</h3> <p class=\"muted\">Not installed.</p>" +
+        "</div>"
+      );
+    }
+
+    if (available.length === 0) {
+      return (
+        '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
+        "<h3>" + escapeHtml(hostName) + "</h3>" +
+        '<p class="muted">Installed (marketplace route — no variant profiles available). Use MASSA_AI_MODEL_PROFILE + regenerate for profile switching.</p>' +
         "</div>"
       );
     }
@@ -1048,9 +1071,13 @@ export function renderModelRegistry(data, opts) {
   const overlayProfiles = (source.overlay && source.overlay.profiles) || {};
   const tombstoned = source.tombstoned || [];
 
-  if (profileNames.length === 0 && !overlayError) {
+  if (profileNames.length === 0 && !overlayError && !payload._error) {
     return '<section class="view"><h2>Model Registry</h2><p class="empty">No profiles in registry.</p></section>';
   }
+
+  const registryError = payload._error
+    ? '<div class="error">Registry load error: ' + escapeHtml(typeof payload._error === "string" ? payload._error : JSON.stringify(payload._error)) + "</div>"
+    : "";
 
   const overlayBanner = overlayError
     ? '<div class="error">Overlay error: ' + escapeHtml(overlayError) + " (showing builtin)</div>"
@@ -1165,6 +1192,7 @@ export function renderModelRegistry(data, opts) {
 
   return (
     '<section class="view"><h2>Model Registry</h2>' + unsaved +
+    registryError +
     overlayBanner +
     grid +
     '<div class="registry-hostDefaults"><h3>Host Defaults</h3>' + hostDefaultsRows + "</div>" +
@@ -1762,11 +1790,15 @@ function startApp(opts) {
         root.innerHTML = renderDashboard(data);
       } else if (state.view === "config") {
         const data = await api.request("/api/v1/config");
-        root.innerHTML = renderConfig((data && data.data) || { config: {}, restartNeededSections: [] }, { writeMode: isWriteModeEnabled() });
+        if (data && data.success === false) {
+          root.innerHTML = '<section class="view"><h2>Config</h2>' + errorBlock(data) + "</section>";
+        } else {
+          root.innerHTML = renderConfig((data && data.data) || { config: {}, restartNeededSections: [] }, { writeMode: isWriteModeEnabled() });
+        }
       } else if (state.view === "profiles") {
         const profilesRes = await api.request("/api/v1/profiles");
         const registryRes = await api.request("/api/v1/model-registry");
-        const registryData = (registryRes && registryRes.data) || { registry: {}, source: {} };
+        const registryData = (registryRes && registryRes.success !== false && registryRes.data) || { registry: {}, source: {}, _error: registryRes && registryRes.error };
         const ctxObj = { api, root, state, render, doc };
         initRegistryOverlay(ctxObj, registryData.source);
         root.innerHTML = renderProfilesView(
@@ -1871,9 +1903,37 @@ function startApp(opts) {
         }
       });
     });
-    // write mode: checkpoint create/delete
+    // write mode: checkpoint create/edit/delete
     root.querySelector('[data-action="checkpoint-create"]')?.addEventListener("click", () => {
       handleCheckpointCreate();
+    });
+    root.querySelectorAll('[data-action="checkpoint-edit"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const taskId = btn.dataset.task || "";
+        const status = btn.dataset.status || "pending";
+        const checkpointType = btn.dataset.checkpointType || btn.dataset.type || "manual";
+        const description = btn.dataset.description || "";
+        const progress = btn.dataset.progress || "0";
+        const step = btn.dataset.step || "";
+        const total = btn.dataset.total || "";
+        const completed = btn.dataset.completed || "";
+        const form = root.querySelector('[data-form="checkpoint-create"]');
+        if (!form) return;
+        const setField = (name, value) => {
+          const el = form.querySelector('[data-create="' + name + '"]');
+          if (el) el.value = value;
+        };
+        setField("taskId", taskId);
+        setField("status", status);
+        setField("checkpointType", checkpointType);
+        setField("description", description);
+        setField("progressPercent", progress);
+        setField("currentStep", step);
+        setField("totalSteps", total);
+        setField("completedSteps", completed);
+        const header = form.querySelector("h3");
+        if (header) header.textContent = "Edit Checkpoint (create new to save)";
+      });
     });
     root.querySelectorAll('[data-action="checkpoint-delete"]').forEach((btn) => {
       btn.addEventListener("click", () => {
