@@ -1,39 +1,19 @@
 /**
- * massa-ai Web UI — app.js (read-only memory/search browser).
+ * massa-ai Web UI — app.js (admin portal).
  *
  * Single source for the pure helpers (markdownToHtml, view renderers, theme
  * helpers). The browser-init block is guarded by `typeof document !==
  * "undefined"` so the same file can be imported under bun:test without a DOM.
  *
- * READ-ONLY: this file contains NO call to any mutating endpoint. The
- * ALLOWED_MUTATING_PATHS list below is the exhaustive list of mutating paths;
- * web-ui-readonly.test.ts asserts none of them appear as a fetch target in this
- * source.
+ * Admin portal: write operations are gated by isWriteModeEnabled() (default ON
+ * for trusted local callers with the massa-ai-api-key meta tag). Any
+ * /api/v1/* route is callable with the injected key; trust is the gate, not a
+ * path blocklist.
  */
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
 import { renderDashboard, fetchDashboardData } from "./dashboard.js";
-
-/** Exhaustive list of mutating API paths the UI must NEVER call. */
-export const FORBIDDEN_MUTATING_PATHS = [
-  "/memory/store",
-  "/memory/update",
-  "/memory/delete",
-  "/handoff/begin",
-  "/handoff/accept",
-  "/handoff/cancel",
-  "/checkpoints/create",
-  "/checkpoints/restore",
-  "/proposal/approve",
-  "/proposal/reject",
-  "/project/reset",
-  "/project/index",
-  "/project/upload-and-index",
-  "/hook",
-  "/hook/batch",
-  "/bootstrap",
-];
 
 export const MEMORY_TYPES = ["critical", "conversation", "code", "decision", "pattern"];
 
@@ -58,8 +38,24 @@ export const CHECKPOINTS_LIST_BODY = { limit: 50, format: "json" };
 
 const THEME_STORAGE_KEY = "massa-ai-ui-theme";
 
-/** Check if write mode is enabled (MASSA_AI_WEB_WRITE_MODE=true). Default off. */
+/**
+ * Check if write mode is enabled.
+ *
+ * Default is ON when the caller is trusted (the massa-ai-api-key meta tag is
+ * present in the document, injected by the server for local callers). The
+ * MASSA_AI_WEB_WRITE_MODE env flag and the localStorage massa-ai-write-mode
+ * value remain as explicit opt-out escape hatches and are checked BEFORE the
+ * trusted-caller default so an operator can force write-mode off even when the
+ * tag is present.
+ */
 export function isWriteModeEnabled() {
+  if (typeof globalThis !== "undefined" && globalThis.MASSA_AI_WEB_WRITE_MODE === false) return false;
+  try {
+    if (localStorage.getItem("massa-ai-write-mode") === "false") return false;
+  } catch {
+    // localStorage unavailable (test/Node without DOM) — fall through
+  }
+  if (readInjectedApiKey(typeof document !== "undefined" ? document : null)) return true;
   if (typeof globalThis !== "undefined" && globalThis.MASSA_AI_WEB_WRITE_MODE === true) return true;
   try {
     return localStorage.getItem("massa-ai-write-mode") === "true";
@@ -938,7 +934,6 @@ const MASSA_AI_UI = {
   createApiClient,
   readInjectedApiKey,
   startApp,
-  FORBIDDEN_MUTATING_PATHS,
   MEMORY_TYPES,
   MEMORY_LEVELS,
   CHECKPOINTS_LIST_BODY,

@@ -280,12 +280,12 @@ CHKP-05 decision: store is directly reachable via `CheckpointManager.getInstance
 - Skill: NONE
 
 **Done when**:
-- [ ] `isWriteModeEnabled()` returns true when meta tag present (trusted); false when env/localStorage opt-out
-- [ ] F1 trusted-meta-tag fixture test added to `write-mode.test.ts` (fake `document` with `massa-ai-api-key` meta → `isWriteModeEnabled()===true`); existing opt-out tests updated (default is now ON-when-trusted, not unconditionally false)
-- [ ] `FORBIDDEN_MUTATING_PATHS` export + comment block removed; pre-removal sweep population in commit body
-- [ ] Header comment updated to "Admin portal"
-- [ ] `bun test apps/web-ui/src/__tests__/write-mode.test.ts` passes
-- [ ] `bun run type-check` passes
+- [x] `isWriteModeEnabled()` returns true when meta tag present (trusted); false when env/localStorage opt-out
+- [x] F1 trusted-meta-tag fixture test added to `write-mode.test.ts` (fake `document` with `massa-ai-api-key` meta → `isWriteModeEnabled()===true`); existing opt-out tests updated (default is now ON-when-trusted, not unconditionally false)
+- [x] `FORBIDDEN_MUTATING_PATHS` export + comment block removed; pre-removal sweep population in commit body
+- [x] Header comment updated to "Admin portal"
+- [x] `bun test apps/web-ui/src/__tests__/write-mode.test.ts` passes
+- [x] `bun run type-check` passes
 
 **Tests**: unit (write-mode + FORBIDDEN removal)
 **Gate**: quick
