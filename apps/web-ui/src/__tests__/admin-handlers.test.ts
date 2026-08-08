@@ -312,3 +312,144 @@ describe("handleConfigReveal — toggle input type (CFG-06)", () => {
     expect(input.type).toBe("password");
   });
 });
+
+// ── Profiles tab switcher + switch handler (PROFTAB-01..05, PROFSW-01..04) ───
+
+const SAMPLE_PROFILES_DATA = {
+  hosts: [
+    { host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.40.1", availableProfiles: ["balanced", "work"] },
+  ],
+};
+const SAMPLE_REGISTRY_DATA = {
+  registry: {
+    version: 1, tiers: ["light", "standard", "deep"],
+    hostDefaults: { claude: "balanced" }, workflowTiers: {},
+    profiles: { balanced: { description: "b", hosts: { claude: { light: { model: "m", effort: "low" } } } } },
+  },
+  source: { builtin: {}, overlay: null, tombstoned: [] },
+};
+
+describe("renderProfilesView — tab switcher (PROFTAB-01..03, DS-05)", () => {
+  it("renders both tabs (Switch Profile / Edit Registry)", () => {
+    const html = renderProfilesView(SAMPLE_PROFILES_DATA, SAMPLE_REGISTRY_DATA, { profilesTab: "switch", writeMode: true });
+    expect(html).toContain("tab-switcher");
+    expect(html).toContain("Switch Profile");
+    expect(html).toContain("Edit Registry");
+  });
+
+  it("renders the switch profile sub-view when tab=switch (PROFTAB-02)", () => {
+    const html = renderProfilesView(SAMPLE_PROFILES_DATA, SAMPLE_REGISTRY_DATA, { profilesTab: "switch", writeMode: true });
+    expect(html).toContain("profile-card");
+    expect(html).toContain("balanced");
+  });
+
+  it("renders the registry sub-view when tab=registry (PROFTAB-03)", () => {
+    const html = renderProfilesView(SAMPLE_PROFILES_DATA, SAMPLE_REGISTRY_DATA, { profilesTab: "registry", writeMode: true });
+    expect(html).toContain("registry-grid");
+    expect(html).toContain("Model Registry");
+  });
+
+  it("marks the active tab with .active class (DS-05)", () => {
+    const html = renderProfilesView(SAMPLE_PROFILES_DATA, SAMPLE_REGISTRY_DATA, { profilesTab: "registry", writeMode: true });
+    // the registry tab button should carry the active class
+    const regTabIdx = html.indexOf("Edit Registry");
+    // class attribute precedes the text — search the button element backwards
+    const buttonStart = html.lastIndexOf("<button", regTabIdx);
+    expect(html.slice(buttonStart, regTabIdx)).toContain("active");
+  });
+
+  it("defaults to switch tab when profilesTab not provided (PROFTAB edge — first visit)", () => {
+    const html = renderProfilesView(SAMPLE_PROFILES_DATA, SAMPLE_REGISTRY_DATA, { writeMode: true });
+    expect(html).toContain("profile-card");
+  });
+});
+
+describe("handleProfilesTabSwitch — tab persistence (PROFTAB-05)", () => {
+  const origLocalStorage = (globalThis as any).localStorage;
+  let stored: Record<string, string> = {};
+
+  beforeEach(() => {
+    stored = {};
+    (globalThis as any).localStorage = {
+      getItem: (k: string) => stored[k] || null,
+      setItem: (k: string, v: string) => { stored[k] = v; },
+      removeItem: (k: string) => { delete stored[k]; },
+    };
+  });
+  afterEach(() => {
+    (globalThis as any).localStorage = origLocalStorage;
+  });
+
+  it("sets state.profilesTab and persists to localStorage", () => {
+    const ctx = makeCtx({ state: { profilesTab: "switch" } });
+    handleProfilesTabSwitch(ctx, "registry");
+    expect(ctx.state.profilesTab).toBe("registry");
+    expect(stored["massa-ai-profiles-tab"]).toBe("registry");
+  });
+
+  it("calls render after switching tab", () => {
+    const render = mock(() => {});
+    const ctx = makeCtx({ state: { profilesTab: "switch" }, render });
+    handleProfilesTabSwitch(ctx, "registry");
+    expect(render).toHaveBeenCalled();
+  });
+});
+
+describe("handleProfileSwitch — confirm + POST + banner (PROFSW-01..04)", () => {
+  const origConfirm = (globalThis as any).confirm;
+  afterEach(() => { (globalThis as any).confirm = origConfirm; });
+
+  it("shows confirm naming host + profile + restart warning (PROFSW-01)", async () => {
+    (globalThis as any).confirm = mock(() => false);
+    const ctx = makeCtx();
+    await handleProfileSwitch(ctx, "work", "claude");
+    expect((globalThis as any).confirm).toHaveBeenCalled();
+    const msg = (globalThis as any).confirm.mock.calls[0][0] as string;
+    expect(msg).toContain("claude");
+    expect(msg).toContain("work");
+    expect(msg.toLowerCase()).toContain("restart");
+  });
+
+  it("POSTs /api/v1/profiles/switch with {profile, host} on confirm (PROFSW-02)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: true, data: { switched: ["claude"], skipped: [], failed: [] } }));
+    const ctx = makeCtx({ api: { request } });
+    await handleProfileSwitch(ctx, "work", "claude");
+    expect(request).toHaveBeenCalled();
+    const call = request.mock.calls[0];
+    expect(call[0]).toBe("/api/v1/profiles/switch");
+    expect(call[1].method).toBe("POST");
+    expect(call[1].body.profile).toBe("work");
+    expect(call[1].body.host).toBe("claude");
+  });
+
+  it("shows success banner with per-host results on 200 (PROFSW-03)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: true, data: { switched: ["claude"], skipped: ["cursor"], failed: [{ host: "codex", reason: "no dir" }] } }));
+    const render = mock(() => {});
+    const ctx = makeCtx({ api: { request }, render });
+    await handleProfileSwitch(ctx, "work", "claude");
+    expect(render).toHaveBeenCalled();
+    const banner = ctx.root.children[0];
+    expect(banner.textContent).toContain("claude");
+    expect(banner.textContent).toContain("cursor");
+    expect(banner.textContent).toContain("codex");
+  });
+
+  it("shows error banner with code + message on switch error (PROFSW-04)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: false, error: { code: "UnknownProfileError", message: "profile 'work' not found" } }));
+    const ctx = makeCtx({ api: { request } });
+    await handleProfileSwitch(ctx, "work", "claude");
+    expect(ctx.root.children[0].textContent).toContain("UnknownProfileError");
+    expect(ctx.root.children[0].textContent).toContain("not found");
+  });
+
+  it("cancel (confirm=false) sends no POST", async () => {
+    (globalThis as any).confirm = mock(() => false);
+    const request = mock(async () => ({ success: true }));
+    const ctx = makeCtx({ api: { request } });
+    await handleProfileSwitch(ctx, "work", "claude");
+    expect(request).not.toHaveBeenCalled();
+  });
+});

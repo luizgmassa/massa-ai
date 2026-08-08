@@ -1348,6 +1348,65 @@ export function handleConfigReveal(ctx, targetId) {
   else if (el.type === "text") el.type = "password";
 }
 
+// ── Profiles tab switcher + switch handler (Component 2) ─────────────────────
+
+const PROFILES_TAB_STORAGE_KEY = "massa-ai-profiles-tab";
+
+export function renderProfilesView(profilesData, registryData, opts) {
+  opts = opts || {};
+  const tab = opts.profilesTab || "switch";
+  const writeMode = opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
+
+  const switcher =
+    '<div class="tab-switcher">' +
+    '<button type="button" class="tab' + (tab === "switch" ? " active" : "") + '" data-action="profiles-tab" data-tab="switch">Switch Profile</button>' +
+    '<button type="button" class="tab' + (tab === "registry" ? " active" : "") + '" data-action="profiles-tab" data-tab="registry">Edit Registry</button>' +
+    "</div>";
+
+  let body;
+  if (tab === "registry") {
+    body = renderModelRegistry(registryData, { writeMode });
+  } else {
+    body = renderProfiles(profilesData, { writeMode });
+  }
+
+  return '<section class="view"><h2>Profiles</h2>' + switcher + body + "</section>";
+}
+
+export function handleProfilesTabSwitch(ctx, tab) {
+  ctx.state.profilesTab = tab;
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem(PROFILES_TAB_STORAGE_KEY, tab);
+  } catch {
+    // localStorage unavailable — non-fatal
+  }
+  ctx.render();
+}
+
+export async function handleProfileSwitch(ctx, profile, host) {
+  if (!confirm("Switch " + host + " to profile " + profile + "? Replaces installed agent files. Session restart required.")) return;
+  const body = { profile };
+  if (host) body.host = host;
+  try {
+    const res = await ctx.api.request("/api/v1/profiles/switch", { method: "POST", body });
+    if (res && res.success === false) {
+      const errInfo = res.error || {};
+      const code = (errInfo && errInfo.code) || "error";
+      const message = (errInfo && errInfo.message) || "switch failed";
+      showBanner(ctx.root, "error", "Switch failed (" + code + "): " + message);
+      return;
+    }
+    const data = (res && res.data) || {};
+    const switched = (data.switched || []).join(", ") || "none";
+    const skipped = (data.skipped || []).join(", ") || "none";
+    const failed = (data.failed || []).map((f) => f.host + ": " + (f.reason || "unknown")).join("; ") || "none";
+    showBanner(ctx.root, "success", "Switched: " + switched + " | Skipped: " + skipped + " | Failed: " + failed);
+    ctx.render();
+  } catch (e) {
+    showBanner(ctx.root, "error", "Switch failed: " + String((e && e.message) || e));
+  }
+}
+
 function startApp(opts) {
   opts = opts || {};
   const doc = opts.document || (typeof document !== "undefined" ? document : null);
@@ -1363,7 +1422,25 @@ function startApp(opts) {
     memoryFilters: { type: "", level: "", minImportance: "" },
     memoryOffset: 0,
     searchQuery: "",
+    profilesTab: "switch",
+    registryOverlay: null,
+    registryDirty: false,
+    registryLoaded: false,
+    regenerating: false,
+    indexJobId: null,
+    indexJobStatus: null,
+    indexJobPhase: null,
+    indexJobFileCount: null,
+    indexPollInterval: null,
   };
+  try {
+    if (typeof localStorage !== "undefined") {
+      const t = localStorage.getItem(PROFILES_TAB_STORAGE_KEY);
+      if (t === "switch" || t === "registry") state.profilesTab = t;
+    }
+  } catch {
+    // localStorage unavailable — default switch tab
+  }
 
   initTheme(doc);
 
@@ -1453,8 +1530,13 @@ function startApp(opts) {
         const data = await api.request("/api/v1/config");
         root.innerHTML = renderConfig((data && data.data) || { config: {}, restartNeededSections: [] }, { writeMode: isWriteModeEnabled() });
       } else if (state.view === "profiles") {
-        const data = await api.request("/api/v1/profiles");
-        root.innerHTML = renderProfiles((data && data.data) || { hosts: [] }, { writeMode: isWriteModeEnabled() });
+        const profilesRes = await api.request("/api/v1/profiles");
+        const registryRes = await api.request("/api/v1/model-registry");
+        root.innerHTML = renderProfilesView(
+          (profilesRes && profilesRes.data) || { hosts: [] },
+          (registryRes && registryRes.data) || { registry: {}, source: {} },
+          { profilesTab: state.profilesTab || "switch", writeMode: isWriteModeEnabled() },
+        );
       } else if (state.view === "model-registry") {
         const data = await api.request("/api/v1/model-registry");
         root.innerHTML = renderModelRegistry((data && data.data) || { registry: {}, source: {} }, { writeMode: isWriteModeEnabled() });
@@ -1591,6 +1673,22 @@ function startApp(opts) {
         const target = btn.dataset.target;
         if (!target) return;
         handleConfigReveal(ctx, target);
+      });
+    });
+    // admin-portal-enhancements: profiles tab switcher + switch
+    root.querySelectorAll('[data-action="profiles-tab"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tab = btn.dataset.tab;
+        if (!tab) return;
+        handleProfilesTabSwitch(ctx, tab);
+      });
+    });
+    root.querySelectorAll('[data-action="profile-switch"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const profile = btn.dataset.profile;
+        const host = btn.dataset.host;
+        if (!profile) return;
+        handleProfileSwitch(ctx, profile, host);
       });
     });
   }
@@ -1825,6 +1923,9 @@ const MASSA_AI_UI = {
   showBanner,
   handleConfigSave,
   handleConfigReveal,
+  renderProfilesView,
+  handleProfilesTabSwitch,
+  handleProfileSwitch,
   MEMORY_TYPES,
   MEMORY_LEVELS,
   CHECKPOINTS_LIST_BODY,

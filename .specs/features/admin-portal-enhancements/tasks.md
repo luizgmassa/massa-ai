@@ -109,13 +109,13 @@ Where: `apps/web-ui/src/static/app.js` (existing, extend `renderProfiles` + `wir
 
 Depends on: T3
 
-- [ ] Add `state.profilesTab` (default `"switch"`), loaded from `localStorage massa-ai-profiles-tab`.
-- [ ] Extend `renderProfiles` (or add a wrapper) to emit a `.tab-switcher` with two `.tab` buttons; render the switcher sub-view or the registry sub-view based on `state.profilesTab`.
-- [ ] Wire tab clicks in `wireViewHandlers()`: set `state.profilesTab`, persist to localStorage, re-render.
-- [ ] Add `handleProfileSwitch(profile, host)` handler: `confirm(...)` → POST `/api/v1/profiles/switch` with `{ profile, host }` → banner with per-host results → re-render.
+- [x] Add `state.profilesTab` (default `"switch"`), loaded from `localStorage massa-ai-profiles-tab`.
+- [x] Extend `renderProfiles` (or add a wrapper) to emit a `.tab-switcher` with two `.tab` buttons; render the switcher sub-view or the registry sub-view based on `state.profilesTab`.
+- [x] Wire tab clicks in `wireViewHandlers()`: set `state.profilesTab`, persist to localStorage, re-render.
+- [x] Add `handleProfileSwitch(profile, host)` handler: `confirm(...)` → POST `/api/v1/profiles/switch` with `{ profile, host }` → banner with per-host results → re-render.
   - On error, banner shows error code + message.
-- [ ] Wire `[data-action="profile-switch"]` in `wireViewHandlers()`.
-- [ ] Test in `admin-handlers.test.ts`:
+- [x] Wire `[data-action="profile-switch"]` in `wireViewHandlers()`.
+- [x] Test in `admin-handlers.test.ts`:
   - Tab switcher renders both tabs; clicking "Edit Registry" sets `state.profilesTab="registry"`.
   - Tab persists in localStorage.
   - Profile switch: mock confirm → true, mock POST → success with per-host results, assert banner shows results.
