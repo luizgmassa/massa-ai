@@ -21,12 +21,13 @@ import path from "path";
 import { spawn } from "child_process";
 import { configDir } from "@massa-ai/shared/config";
 
-const OVERLAY_PATH = path.join(configDir("massa-ai"), "model-profiles.json");
-void OVERLAY_PATH;
 const GENERATE_SCRIPT = path.resolve(
   import.meta.dirname,
   "../../../../scripts/generate-subagent-artifacts.ts",
 );
+// configDir import is needed so mock.module can intercept @massa-ai/shared/config
+// in tests (the route shares the mock surface with model-registry.ts).
+void configDir;
 
 const encoder = new TextEncoder();
 

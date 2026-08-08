@@ -58,13 +58,21 @@ const child_process = require("child_process");
 const spawnSyncMock = mock((..._args: unknown[]): any => ({ exitCode: 0, stdout: "", stderr: "" }));
 
 /** Builds a fake child process matching the EventEmitter shape the route expects:
- *  stdout/stderr are { on(data, cb) }, child emits "close" with an exit code. */
+ *  stdout/stderr are { on(data, cb) }, child emits "close" with an exit code.
+ *  `errorEvent` fires the "error" listener with an Error (distinct from
+ *  `spawnError` which throws at spawn time). */
 function makeFakeChild(opts: {
   stdoutLines?: string[];
   stderrLines?: string[];
   exitCode: number | null;
   spawnError?: Error | null;
-}): { stdout: { on: (ev: string, cb: (d: Buffer) => void) => void }; stderr: { on: (ev: string, cb: (d: Buffer) => void) => void }; on: (ev: string, cb: (code: number | null) => void) => void; kill: () => boolean } {
+  errorEvent?: Error | null;
+}): {
+  stdout: { on: (ev: string, cb: (d: Buffer) => void) => void };
+  stderr: { on: (ev: string, cb: (d: Buffer) => void) => void };
+  on: (ev: string, cb: (code: number | null) => void) => void;
+  kill: () => boolean;
+} {
   const stream = (lines: string[] | undefined, _key: string) => ({
     on(event: string, cb: (d: Buffer) => void) {
       if (event !== "data") return;
@@ -75,8 +83,8 @@ function makeFakeChild(opts: {
     stdout: stream(opts.stdoutLines, "stdout"),
     stderr: stream(opts.stderrLines, "stderr"),
     on(event: string, cb: (code: number | null) => void) {
-      if (event === "error" && opts.spawnError) {
-        queueMicrotask(() => cb(null as unknown as number));
+      if (event === "error" && opts.errorEvent) {
+        queueMicrotask(() => cb(opts.errorEvent as unknown as number));
         return;
       }
       if (event === "close") {
@@ -183,6 +191,60 @@ describe("POST /api/v1/model-registry/regenerate-stream — SSE line emission (R
     expect(done).toBeDefined();
     expect(done!.exitCode).toBeNull();
     expect(done!.error).toContain("ENOENT");
+  });
+
+  test("emits done with exitCode null + error on child error event (not spawn failure)", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({
+      stdoutLines: ["starting..."],
+      exitCode: null,
+      errorEvent: new Error("child process error: SIGSEGV"),
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-stream");
+    expect(res.status).toBe(200);
+    const events = parseSseEvents(res.text);
+    const done = events.find((e) => e.type === "done");
+    expect(done).toBeDefined();
+    expect(done!.exitCode).toBeNull();
+    expect(done!.error).toContain("spawn error");
+    expect(done!.error).toContain("SIGSEGV");
+  });
+
+  test("cancel hook kills the child on client disconnect", async () => {
+    let killed = false;
+    spawnMock.mockImplementationOnce(() => {
+      const child = makeFakeChild({ stdoutLines: [], exitCode: 0 });
+      return {
+        ...child,
+        kill() { killed = true; return true; },
+      };
+    });
+
+    const res = await app.handle(new Request("http://localhost/api/v1/model-registry/regenerate-stream", { method: "POST" }));
+    expect(res.status).toBe(200);
+    expect(res.body).toBeDefined();
+    // Cancel the stream reader — triggers the ReadableStream cancel hook
+    const reader = res.body!.getReader();
+    await reader.cancel();
+    // The cancel hook should have called child.kill()
+    expect(killed).toBe(true);
+  });
+
+  test("emits no line events for empty stdout/stderr but still emits done exit 0", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({
+      stdoutLines: [],
+      stderrLines: [],
+      exitCode: 0,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-stream");
+    expect(res.status).toBe(200);
+    const events = parseSseEvents(res.text);
+    const lineEvents = events.filter((e) => e.type === "line");
+    const doneEvents = events.filter((e) => e.type === "done");
+    expect(lineEvents.length).toBe(0);
+    expect(doneEvents.length).toBe(1);
+    expect(doneEvents[0].exitCode).toBe(0);
   });
 });
 
