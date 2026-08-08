@@ -64,7 +64,7 @@ Gate: `bun run type-check && bun run test:plugins`
 
 Where: `apps/web-ui/src/static/styles.css` (existing, append-only)
 
-- [ ] Append to `apps/web-ui/src/static/styles.css`:
+- [x] Append to `apps/web-ui/src/static/styles.css`:
   - `.config-section`, `.config-section-header`, `.config-fields`, `.config-field`, `.save-btn`, `.reveal-btn` (DS-01).
   - `.profile-host`, `.profile-cards`, `.profile-card`, `.switch-btn` (DS-02).
   - `.registry-grid`, `.registry-cell`, `.overlay-sourced`, `.cell-empty`, `.registry-actions`, `.registry-action-buttons`, `.registry-hostDefaults`, `.registry-workflowTiers`, `.tombstoned`, `.tombstoned-item`, `.overlay-badge` (DS-03).
@@ -74,7 +74,7 @@ Where: `apps/web-ui/src/static/styles.css` (existing, append-only)
   - `.index-progress` (DS-07).
   - `.badge` base + `.restart-badge` (amber), `.active-badge` (green) variants.
   - All rules use existing CSS variables; no hardcoded colors. **F5 fold:** Define `--accent-tint: rgba(37, 99, 235, 0.08)` in `:root` and `--accent-tint: rgba(96, 165, 250, 0.12)` in `[data-theme="dark"]`; use `background: var(--accent-tint)` as the baseline rule for `.overlay-sourced` (static rgba IS the rule, `color-mix` is optional progressive enhancement).
-- [ ] Verify no existing CSS rule is overridden destructively (append-only).
+- [x] Verify no existing CSS rule is overridden destructively (append-only).
 
 Tests: `bun test apps/web-ui` (existing renderer tests assert classes in HTML, not CSS rules — must remain green)
 
