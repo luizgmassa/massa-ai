@@ -3,7 +3,7 @@ name: to-prd
 description: "Turn the current conversation into a PRD. Use when the user asks to create, synthesize, or convert existing discussion and codebase context into a Product Requirements Document without another interview. Do NOT use for implementation plans, architecture design docs, RFCs, TDDs, or discovery interviews that require new product questioning."
 license: MIT
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 ### To-PRD (Conversation → Product Requirements Document)
@@ -16,7 +16,7 @@ Load `references/project-context.md` (intake sweep) before the first substantive
 
 ## Definitions
 
-The PRD uses a small set of fixed terms. Each resolves to exactly one shape, so a PRD is testable and traceable from conversation to validation.
+The PRD uses a small set of fixed terms. Each resolves to exactly one shape, so a PRD is testable and traceable from conversation to validation. The canonical definitions of **EARS** (Easy Approach to Requirements Syntax) and the **Implicit-Requirement Dimensions** rubric live in `references/spec-driven/specify.md`; this workflow references them rather than duplicating them. The definitions below are PRD-specific or carry PRD-specific extensions.
 
 ### PRD (Product Requirements Document)
 
@@ -38,34 +38,13 @@ Each user story carries a priority that determines delivery order.
 
 Each story MUST be independently testable — you can implement and demo just that story.
 
-### EARS (Easy Approach to Requirements Syntax)
+### EARS
 
-Every acceptance criterion is written in EARS, which resolves to exactly one pattern. Choose the pattern that fits the requirement; never force everything into a single shape.
-
-| Pattern | Keyword | Template | Use for |
-| ------- | ------- | -------- | ------- |
-| Ubiquitous | (none) | The [system] SHALL [response] | Always-on invariants and constraints |
-| Event-driven | WHEN | WHEN [trigger] THEN the [system] SHALL [response] | A response to a discrete trigger |
-| State-driven | WHILE | WHILE [state] the [system] SHALL [response] | Behavior that holds during a state |
-| Optional-feature | WHERE | WHERE [feature is present] the [system] SHALL [response] | Behavior gated behind an optional capability or flag |
-| Unwanted-behavior | IF / THEN | IF [undesired condition] THEN the [system] SHALL [response] | Errors, failures, invalid input, timeouts |
-| Complex | combination | WHILE [state], WHEN [trigger] the [system] SHALL [response] | Richer behavior combining the above |
+Every acceptance criterion is written in EARS (Easy Approach to Requirements Syntax), which resolves to exactly one of six patterns: Ubiquitous, Event-driven (WHEN), State-driven (WHILE), Optional-feature (WHERE), Unwanted-behavior (IF/THEN), and Complex (combination). **See `references/spec-driven/specify.md` §EARS for the canonical patterns table** — choose the pattern that fits the requirement; never force everything into a single shape.
 
 ### Implicit-Requirement Dimensions
 
-The canonical rubric for requirements that are easy to miss. Apply the sweep below before the PRD closes so a dimension is never silently dropped.
-
-| Dimension | What to cover |
-| --------- | ------------- |
-| Input validation & bounds | Limits, formats, sanitization |
-| Failure / partial-failure states | Timeouts, partial saves, rollbacks |
-| Idempotency / retry / duplicate handling | Safe retries, dedup keys |
-| Auth boundaries & rate limits | Who can call what, throttle rules |
-| Concurrency / ordering | Race conditions, ordering guarantees |
-| Data lifecycle / expiry | TTL, archival, deletion |
-| Observability | Logging, metrics, tracing hooks |
-| External-dependency failure | Circuit breakers, fallbacks |
-| State-transition integrity | Valid transitions, guards |
+The canonical rubric for requirements that are easy to miss covers nine dimensions: input validation & bounds, failure/partial-failure states, idempotency/retry/duplicate handling, auth boundaries & rate limits, concurrency/ordering, data lifecycle/expiry, observability, external-dependency failure, and state-transition integrity. **See `references/spec-driven/specify.md` §Implicit-Requirement Dimensions for the canonical table.** Apply the sweep before the PRD closes so a dimension is never silently dropped.
 
 ### Seam
 
@@ -107,7 +86,7 @@ Write the PRD from the conversation context and codebase understanding already i
 
 ### 4. Implicit-Requirement Sweep
 
-Before the PRD closes, check each Implicit-Requirement Dimension above and either produce a requirement, an accepted assumption, an explicit out-of-scope row, or an `N/A because <reason>` entry. This prevents inventing requirements to fill the checklist while ensuring no dimension is silently dropped. Bound the sweep to THIS feature's scope; never add requirements outside the feature boundary.
+Before the PRD closes, check each Implicit-Requirement Dimension (see `references/spec-driven/specify.md` for the canonical rubric) and either produce a requirement, an accepted assumption, an explicit out-of-scope row, or an `N/A because <reason>` entry. This prevents inventing requirements to fill the checklist while ensuring no dimension is silently dropped. Bound the sweep to THIS feature's scope; never add requirements outside the feature boundary.
 
 ### 5. Requirement Closure Gate (Before Confirm)
 
@@ -145,126 +124,13 @@ Apply the English-conversion rule from `references/naming-standards.md` to every
 
 ## PRD Template
 
+Start from the `spec.md` template in `references/spec-driven/specify.md` (the "Template: `.specs/features/<slug>/spec.md`" section near the end of that file). That template covers Problem Statement, Goals, Out of Scope, Assumptions & Open Questions, User Stories (P1/P2/P3 with EARS ACs), Edge Cases, Requirement Traceability, and Success Criteria — all structurally identical to what a PRD needs. The PRD template below extends that base with three to-prd-specific additions and one modification.
+
+**Modification to the base template's Problem Statement:** phrase it from the user's perspective — the problem the user is facing, not just the system gap.
+
+**Add the following three sections after Success Criteria:**
+
 ````markdown
-# [Feature Name] PRD
-
-**Slug:** [feature-slug]
-
-## Problem Statement
-
-[Describe the problem in 2-3 sentences. What pain point are we solving? Why now? From the user's perspective.]
-
-## Goals
-
-- [ ] [Primary goal with measurable outcome]
-- [ ] [Secondary goal with measurable outcome]
-
-## Out of Scope
-
-Explicitly excluded. Documented to prevent scope creep.
-
-| Feature     | Reason         |
-| ----------- | -------------- |
-| [Feature X] | [Why excluded] |
-| [Feature Y] | [Why excluded] |
-
----
-
-## Assumptions & Open Questions
-
-Every ambiguity is resolved or recorded here — nothing is left silently unclear.
-
-| Assumption / decision | Chosen default  | Rationale | Confirmed? |
-| --------------------- | --------------- | --------- | ---------- |
-| [ambiguity]           | [what we'll do] | [why]     | [y/n]      |
-
-**Open questions:** none — all resolved or logged above (required before the PRD is confirmed).
-
----
-
-## User Stories
-
-### P1: [Story Title] ⭐ MVP
-
-**User Story**: As a [role], I want [capability] so that [benefit].
-
-**Why P1**: [Why this is critical for MVP]
-
-**Acceptance Criteria** (each line is one EARS pattern):
-
-1. WHEN [user action/event] THEN system SHALL [expected behavior]  <!-- event-driven -->
-2. IF [invalid input / failure] THEN system SHALL [graceful handling]  <!-- unwanted-behavior -->
-3. WHILE [state holds] system SHALL [behavior during that state]  <!-- state-driven -->
-4. The system SHALL [always-on invariant]  <!-- ubiquitous -->
-
-**Independent Test**: [How to verify this story works alone - e.g., "Can demo by doing X and seeing Y"]
-
----
-
-### P2: [Story Title]
-
-**User Story**: As a [role], I want [capability] so that [benefit].
-
-**Why P2**: [Why this isn't MVP but important]
-
-**Acceptance Criteria**:
-
-1. WHEN [event] THEN system SHALL [behavior]
-2. WHEN [event] THEN system SHALL [behavior]
-
-**Independent Test**: [How to verify]
-
----
-
-### P3: [Story Title]
-
-**User Story**: As a [role], I want [capability] so that [benefit].
-
-**Why P3**: [Why this is nice-to-have]
-
-**Acceptance Criteria**:
-
-1. WHEN [event] THEN system SHALL [behavior]
-
----
-
-## Edge Cases
-
-Edge cases are usually unwanted-behavior (IF/THEN) or boundary (WHEN) criteria:
-
-- IF [error scenario] THEN system SHALL [graceful handling]
-- IF [unexpected input] THEN system SHALL [validation response]
-- WHEN [boundary condition] THEN system SHALL [behavior]
-
----
-
-## Requirement Traceability
-
-Each requirement gets a unique ID for tracking across design, tasks, and validation.
-
-| Requirement ID | Story       | Phase  | Status  |
-| -------------- | ----------- | ------ | ------- |
-| [FEAT]-01      | P1: [Story] | Design | Pending |
-| [FEAT]-02      | P1: [Story] | Design | Pending |
-| [FEAT]-03      | P2: [Story] | -      | Pending |
-
-**ID format:** `[CATEGORY]-[NUMBER]` (e.g., `AUTH-01`, `CART-03`, `NOTIF-02`)
-
-**Status values:** Pending → In Design → In Tasks → Implementing → Verified
-
-**Coverage:** X total, Y mapped to tasks, Z unmapped ⚠️
-
----
-
-## Success Criteria
-
-How we know the feature is successful:
-
-- [ ] [Measurable outcome - e.g., "User can complete X in < 2 minutes"]
-- [ ] [Measurable outcome - e.g., "Zero errors in Y scenario"]
-
----
-
 ## Implementation Decisions
 
 A list of implementation decisions that were made. This can include:
