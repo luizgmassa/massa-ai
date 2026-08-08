@@ -1,6 +1,28 @@
 # massa-ai Spec State
 
-## Current — Admin Portal UI Fixes (**EXECUTE COMPLETE 2026-08-08** — T1-T6, 2 commits; validation pending; push/PR = user decision)
+## Current — Registry Help, Opencode Dropdown, Workflow Tiers (**VALIDATED PASS 2026-08-08** — T7-T10, 4 commits; push/PR = user decision)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-admin-portal-ui-fixes` ·
+  workflow: spec-driven (Medium) · branch `spec/admin-portal-ui-fixes` from
+  `main` @ `20eb9325`.
+- Scope: 3 registry editor enhancements on the admin-portal-ui-fixes branch:
+  (1) help section explaining 6 action buttons (REG-01); (2) opencode effort
+  text input → dropdown constrained to [low, medium, high, max] (REG-02);
+  (3) workflow tiers UI add/remove with workflow-name picker from live
+  inventory (REG-03); (4) generator --check validates workflowTiers (REG-04,
+  pre-existing, verified no regression).
+- Contract: `.specs/features/registry-help-dropdown-workflow-tiers/{spec,tasks,validation}.md`
+  — 1 Phase = 4 Tasks, inline execution (sub-agents unavailable). Design
+  skipped (Option A3: no generator changes; UI + validation only).
+- Commits: `7b76fcb` spec+tasks, `1d656e7` help section, `3ca6f20` opencode
+  dropdown, `e23b983` workflow tiers UI. Plus `fd50d2f` errorBlock fix (prior
+  turn, live API object-error rendering).
+- Gates: web-ui 298 pass (13 new, 0 fail), scripts 113 pass (model-profiles +
+  subagent-parity), type-check 6/6, lint 0, generator --check exit 0.
+- Validation: PASS — 4/4 ACs evidenced, 3/3 mutations killed (0 survivors).
+- Next: push/PR = user decision.
+
+## Previous — Admin Portal UI Fixes (**VALIDATED PASS 2026-08-08** — T1-T6, 4 commits; push/PR = user decision)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-admin-portal-ui-fixes` ·
   workflow: spec-driven (Medium) · branch `spec/admin-portal-ui-fixes` from

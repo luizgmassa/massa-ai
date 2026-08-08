@@ -1071,8 +1071,8 @@
     {
       "id": "admin-portal-ui-fixes",
       "slug": "admin-portal-ui-fixes",
-      "title": "Admin Portal UI Fixes — consistent CSS for action buttons/forms, Projects grid table, Checkpoints Edit button, Config checkbox alignment, Profiles marketplace install detection, Edit Registry error display",
-      "status": "execute-complete",
+      "title": "Admin Portal UI Fixes — consistent CSS for action buttons/forms, Projects grid table, Checkpoints Edit button, Config checkbox alignment, Profiles marketplace install detection, Edit Registry error display, errorBlock object-error rendering",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
@@ -1083,8 +1083,29 @@
       "branch": "spec/admin-portal-ui-fixes",
       "spec": ".specs/features/admin-portal-ui-fixes/spec.md",
       "tasks": ".specs/features/admin-portal-ui-fixes/tasks.md",
+      "validation": ".specs/features/admin-portal-ui-fixes/validation.md",
       "created": "2026-08-08",
-      "notes": "EXECUTE COMPLETE 2026-08-08: T1-T6, 2 commits on spec/admin-portal-ui-fixes (1 planning + 1 task). Inline execution (sub-agents unavailable). 6 ACs (UIC-01..06). Per-task gates green: web-ui 282 pass (4 new, 0 fail), type-check 6/6, lint 0. Design skipped (CSS + render function fixes only). Validation pending (verification-agent dispatch). Push/PR = user decision."
+      "notes": "VALIDATED PASS 2026-08-08: T1-T6 (6 ACs UIC-01..06) + errorBlock object-error fix. 6/6 ACs, 3/4 mutations killed (1 CSS-only not unit-testable). web-ui 285 pass. Push/PR = user decision."
+    },
+    {
+      "id": "registry-help-dropdown-workflow-tiers",
+      "slug": "registry-help-dropdown-workflow-tiers",
+      "title": "Registry Help, Opencode Dropdown, and Workflow Tiers — help section for 6 buttons, opencode effort dropdown constrained to low/medium/high/max, workflow tiers UI add/remove with live workflow-name picker",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "spec/admin-portal-ui-fixes",
+      "spec": ".specs/features/registry-help-dropdown-workflow-tiers/spec.md",
+      "tasks": ".specs/features/registry-help-dropdown-workflow-tiers/tasks.md",
+      "validation": ".specs/features/registry-help-dropdown-workflow-tiers/validation.md",
+      "created": "2026-08-08",
+      "depends_on": ["admin-portal-ui-fixes"],
+      "notes": "VALIDATED PASS 2026-08-08: T7-T10 (4 ACs REG-01..04). 4/4 ACs, 3/3 mutations killed. web-ui 298 pass, scripts 113 pass, generator --check exit 0. Design: Option A3 (no generator changes; UI + validation only). Push/PR = user decision."
     },
     {
       "id": "admin-portal-enhancements",
@@ -1106,5 +1127,5 @@
       "notes": "EXECUTE COMPLETE 2026-08-08: T1-T9, 9 task commits on spec/admin-portal-enhancements (2 planning + 9 task). Inline execution (sub-agents unavailable). 51 ACs across 3 phases = 9 tasks. Plan Challenge full gate 7 findings all folded (F1-F7). Per-task gates green: model-registry-stream 7, web-ui 220->278, type-check 6/6, test:plugins 135/0. New backend route POST /api/v1/model-registry/regenerate-stream (SSE). Frontend: showBanner, config save/reveal confirm, profiles tab switcher, registry in-memory overlay CRUD + save/clear, regenerate streaming, index progress + poll fallback, CSS design system. Validation pending (verification-agent dispatch). Push/PR = user decision."
     }
   ],
-  "active_feature": "admin-portal-ui-fixes"
+  "active_feature": "registry-help-dropdown-workflow-tiers"
 }
