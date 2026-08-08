@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.41.0] - 2026-08-08
+
 ### Added
 
 - **Admin Portal Enhancements — handlers, styling, confirm, progress UX,
@@ -30,6 +32,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   split (runtime reads the overlay-merged effective registry; --check stays
   on the builtin). 15 tasks across 5 phases, 61 acceptance criteria. See
   `.specs/features/admin-portal/`.
+
+### Changed
+
+- **`to-prd` workflow now follows the spec-driven pattern** —
+  `skills/massa-ai/workflows/to-prd.md` rewritten so the PRD it produces is
+  structurally consistent with a feature spec from `spec-driven` Specify.
+  Adds PRD-specific Definitions (PRD scope, Requirement ID
+  `[CATEGORY]-NN`, Priority P1/P2/P3, Seam) and references the canonical
+  EARS patterns table and Implicit-Requirement Dimensions rubric from
+  `references/spec-driven/specify.md` instead of duplicating them. Required
+  Sections list mirrors Specify (Problem Statement, Goals, Out of Scope,
+  Assumptions & Open Questions, User Stories with P1/P2/P3 + EARS ACs +
+  IDs, Edge Cases, Requirement Traceability, Success Criteria, plus to-prd's
+  own Implementation/Testing Decisions and Further Notes). Synthesize-only
+  Process (Explore → Seams → Synthesize, no interview → Dimensions sweep →
+  Requirement Closure Gate → deterministic backing via `validate_spec.ts` →
+  English naming). Directions (one behavior per AC, SHALL mandatory,
+  concrete values, ID stability). PRD template extends the `spec.md`
+  template from Specify with three to-prd-specific additions rather than
+  duplicating the shared sections. Version bumped 1.0.0 → 1.2.0. Read-only
+  workflow unchanged in scope; gate tests green (workflow-harness-contract +
+  workflow-metadata-headers + skills-duplication-metric, 130 pass / 0 fail;
+  excess 478 ≤ ceiling 483).
 
 ## [1.40.1] - 2026-08-07
 
