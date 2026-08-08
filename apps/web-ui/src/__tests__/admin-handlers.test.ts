@@ -1097,6 +1097,36 @@ describe("handleRegistryRegenerate — streaming SSE (REGEN-01..06)", () => {
     expect(ctx.state.regenerating).toBe(false);
   });
 
+  it("does NOT render a success banner when exitCode is 0 but a host install failed (APCR-06.6)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const sseChunks = [
+      'data: {"type":"install","host":"claude","status":"switched","profile":"balanced","switched":"claude","skipped":"none","unsupported":"none","failed":"none"}\n\n',
+      'data: {"type":"install","host":"codex","status":"failed","profile":"balanced","switched":"none","skipped":"none","unsupported":"none","failed":"codex (locked)"}\n\n',
+      'data: {"type":"done","exitCode":0}\n\n',
+    ];
+    (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
+    const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
+    await handleRegistryRegenerate(ctx);
+    const banner = ctx.root.children[0];
+    expect(banner.className).not.toBe("success");
+    expect(banner.textContent).toContain("codex");
+  });
+
+  it("classifies an unsupported install as its own class, not folded into skipped (APCR-06.7)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const sseChunks = [
+      'data: {"type":"install","host":"cursor","status":"unsupported","profile":"balanced","switched":"none","skipped":"none","unsupported":"cursor (bundle has no variants)","failed":"none"}\n\n',
+      'data: {"type":"done","exitCode":0}\n\n',
+    ];
+    (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
+    const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
+    await handleRegistryRegenerate(ctx);
+    const banner = ctx.root.children[0];
+    expect(banner.className).not.toBe("success");
+    expect(banner.textContent.toLowerCase()).toContain("unsupported");
+    expect(banner.textContent).not.toContain("Skipped: cursor");
+  });
+
   it("shows failure banner on done with non-zero exit (REGEN-05)", async () => {
     (globalThis as any).confirm = mock(() => true);
     const sseChunks = [

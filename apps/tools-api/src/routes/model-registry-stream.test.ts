@@ -330,6 +330,93 @@ describe("POST /api/v1/model-registry/regenerate-and-install-stream — auto-ins
     expect(done!.exitCode).toBe(0);
   });
 
+  test("an all-failed report emits status:\"failed\", not \"switched\" (APCR-06.2)", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+    listProfilesMock.mockImplementationOnce(() => ({
+      hosts: [{ host: "claude", installed: true, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] }],
+    }));
+    switchProfileMock.mockImplementationOnce(() => ({
+      profile: "balanced",
+      dryRun: false,
+      hosts: [{ host: "claude", status: "failed", reason: "route refused" }],
+      restartRequired: false,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    const install = events.find((e) => e.type === "install");
+    expect(install).toBeDefined();
+    expect(install!.status).toBe("failed");
+  });
+
+  test("an all-skipped report emits status:\"skipped\" (APCR-06.3)", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+    listProfilesMock.mockImplementationOnce(() => ({
+      hosts: [{ host: "claude", installed: true, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] }],
+    }));
+    switchProfileMock.mockImplementationOnce(() => ({
+      profile: "balanced",
+      dryRun: false,
+      hosts: [{ host: "claude", status: "skipped", reason: "already current" }],
+      restartRequired: false,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    const install = events.find((e) => e.type === "install");
+    expect(install).toBeDefined();
+    expect(install!.status).toBe("skipped");
+  });
+
+  test("an all-unsupported report emits status:\"unsupported\" and it appears in the detail strings, never folded into \"skipped\" (APCR-06.7)", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+    listProfilesMock.mockImplementationOnce(() => ({
+      hosts: [{ host: "claude", installed: true, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] }],
+    }));
+    switchProfileMock.mockImplementationOnce(() => ({
+      profile: "balanced",
+      dryRun: false,
+      hosts: [{ host: "claude", status: "unsupported", reason: "bundle has no variants — upgrade plugin" }],
+      restartRequired: false,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    const install = events.find((e) => e.type === "install");
+    expect(install).toBeDefined();
+    expect(install!.status).toBe("unsupported");
+    expect(install!.unsupported as string).toContain("claude");
+    expect(install!.skipped).toBe("none");
+  });
+
+  test("a mixed report emits switched and retains every status bucket's detail string (APCR-06.1/.4)", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+    listProfilesMock.mockImplementationOnce(() => ({
+      hosts: [{ host: "claude", installed: true, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] }],
+    }));
+    switchProfileMock.mockImplementationOnce(() => ({
+      profile: "balanced",
+      dryRun: false,
+      hosts: [
+        { host: "claude", status: "switched" },
+        { host: "codex", status: "skipped", reason: "already current" },
+        { host: "cursor", status: "unsupported", reason: "bundle has no variants" },
+        { host: "opencode", status: "failed", reason: "locked" },
+      ],
+      restartRequired: true,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    const install = events.find((e) => e.type === "install");
+    expect(install).toBeDefined();
+    expect(install!.status).toBe("switched");
+    expect(install!.switched as string).toContain("claude");
+    expect(install!.skipped as string).toContain("codex");
+    expect(install!.unsupported as string).toContain("cursor");
+    expect(install!.failed as string).toContain("opencode");
+  });
+
   test("deprecated /regenerate-stream alias also auto-installs", async () => {
     spawnMock.mockImplementationOnce(() => makeFakeChild({
       stdoutLines: [],

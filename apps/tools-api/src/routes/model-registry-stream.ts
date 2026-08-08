@@ -24,7 +24,14 @@ import { Elysia } from "elysia";
 import path from "path";
 import { spawn } from "child_process";
 import { configDir } from "@massa-ai/shared/config";
-import { listProfiles, switchProfile, type Host } from "@massa-ai/shared";
+import {
+  listProfiles,
+  switchProfile,
+  reportSucceeded,
+  type Host,
+  type HostSwitchStatus,
+  type SwitchReport,
+} from "@massa-ai/shared";
 
 const GENERATE_SCRIPT = path.resolve(
   import.meta.dirname,
@@ -38,6 +45,23 @@ const encoder = new TextEncoder();
 
 function sseFrame(data: Record<string, unknown>): Uint8Array {
   return encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+/**
+ * Derive the emitted install status from the switch report's actual host
+ * outcomes (APCR-06), instead of the report merely *returning* — a report in
+ * which every host failed used to still emit `status:"switched"`. Reuses
+ * `reportSucceeded` for the switched/skipped success boundary rather than
+ * re-deriving it (design D-4): switched if any host switched, else failed if
+ * any host failed, else unsupported if any host is unsupported, else skipped.
+ */
+function deriveInstallStatus(report: SwitchReport): HostSwitchStatus {
+  if (report.hosts.some((h) => h.status === "switched")) return "switched";
+  // No host switched. `reportSucceeded` is true here exactly when every remaining host is
+  // "skipped" (it would be false if any were "failed" or "unsupported") — reused rather than
+  // hand-rolling the same every-host check.
+  if (reportSucceeded(report)) return "skipped";
+  return report.hosts.some((h) => h.status === "failed") ? "failed" : "unsupported";
 }
 
 /** Install the active profile's agents for every detected host after
@@ -56,11 +80,13 @@ function installActiveProfiles(controller: ReadableStreamDefaultController<Uint8
       }
       try {
         const report = switchProfile({ profile: hostEntry.activeProfile, host });
+        const status = deriveInstallStatus(report);
         const switched = (report.hosts || []).filter((h: any) => h.status === "switched").map((h: any) => h.host).join(", ") || "none";
         const skipped = (report.hosts || []).filter((h: any) => h.status === "skipped").map((h: any) => `${h.host} (${h.reason || "unknown"})`).join(", ") || "none";
+        const unsupported = (report.hosts || []).filter((h: any) => h.status === "unsupported").map((h: any) => `${h.host} (${h.reason || "unknown"})`).join(", ") || "none";
         const failed = (report.hosts || []).filter((h: any) => h.status === "failed").map((h: any) => `${h.host} (${h.reason || "unknown"})`).join(", ") || "none";
         if (!closedRef.closed) {
-          controller.enqueue(sseFrame({ type: "install", host, status: "switched", profile: hostEntry.activeProfile, switched, skipped, failed }));
+          controller.enqueue(sseFrame({ type: "install", host, status, profile: hostEntry.activeProfile, switched, skipped, unsupported, failed }));
         }
       } catch (e) {
         if (!closedRef.closed) {

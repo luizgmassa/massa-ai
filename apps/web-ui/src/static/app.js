@@ -1834,7 +1834,7 @@ export async function handleRegistryRegenerate(ctx) {
     const decoder = new TextDecoder();
     let buffer = "";
     let gotDone = false;
-    const installResults = { switched: [], skipped: [], failed: [] };
+    const installResults = { switched: [], skipped: [], unsupported: [], failed: [] };
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1853,21 +1853,35 @@ export async function handleRegistryRegenerate(ctx) {
           // append to log panel — in a real browser this updates the DOM.
           // For the handler contract, we just consume the line.
         } else if (event.type === "install") {
+          // Classify by the server-derived status (APCR-06), not merely by
+          // the event's presence — a failed/unsupported host must never land
+          // in the success bucket. "unsupported" is its own class, never
+          // folded into "skipped" (APCR-06.7).
           if (event.status === "switched") installResults.switched.push(event.host + " → " + event.profile);
           else if (event.status === "skipped") installResults.skipped.push(event.host);
-          else if (event.status === "failed") installResults.failed.push(event.host + ": " + (event.error || "unknown"));
+          else if (event.status === "unsupported") installResults.unsupported.push(event.unsupported || event.host);
+          else if (event.status === "failed") installResults.failed.push(event.host + ": " + (event.error || event.failed || "unknown"));
         } else if (event.type === "done") {
           gotDone = true;
-          if (event.exitCode === 0) {
+          // APCR-06.6: the generator can exit 0 while at least one host's
+          // install failed or was unsupported — that is not a success.
+          var hadInstallProblems = installResults.failed.length > 0 || installResults.unsupported.length > 0;
+          if (event.exitCode === 0 && !hadInstallProblems) {
             var parts = ["Regeneration complete."];
             if (installResults.switched.length > 0) parts.push("Installed: " + installResults.switched.join(", "));
             if (installResults.skipped.length > 0) parts.push("Skipped: " + installResults.skipped.join(", "));
-            if (installResults.failed.length > 0) parts.push("Failed: " + installResults.failed.join("; "));
             showBanner(ctx.root, "success", parts.join(" "));
           } else if (event.exitCode === null) {
             showBanner(ctx.root, "error", "Regeneration failed: " + (event.error || "spawn error"));
-          } else {
+          } else if (event.exitCode !== 0) {
             showBanner(ctx.root, "error", "Regeneration failed (exit " + event.exitCode + ").");
+          } else {
+            var errParts = ["Regeneration complete, but not every host installed."];
+            if (installResults.switched.length > 0) errParts.push("Installed: " + installResults.switched.join(", "));
+            if (installResults.skipped.length > 0) errParts.push("Skipped: " + installResults.skipped.join(", "));
+            if (installResults.unsupported.length > 0) errParts.push("Unsupported: " + installResults.unsupported.join("; "));
+            if (installResults.failed.length > 0) errParts.push("Failed: " + installResults.failed.join("; "));
+            showBanner(ctx.root, "error", errParts.join(" "));
           }
           break;
         }
