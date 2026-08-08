@@ -1,4 +1,6 @@
 import { describe, it, expect, afterEach } from "bun:test";
+import fs from "fs";
+import path from "path";
 
 const mod = await import("../static/app.js");
 const UI = (globalThis as any).MASSA_AI_UI || {};
@@ -10,11 +12,16 @@ const {
   renderCheckpoints,
   renderMemoryBrowser,
   renderProposals,
+  renderConfig,
+  renderProfiles,
   initTheme,
   toggleTheme,
   createApiClient,
   startApp,
 } = { ...mod, ...UI };
+
+const STATIC_DIR = path.resolve(import.meta.dir, "../static");
+const INDEX_HTML = fs.readFileSync(path.join(STATIC_DIR, "index.html"), "utf8");
 
 describe("markdown fallback renderer edge cases", () => {
   it("transitions from ordered list to unordered list", () => {
@@ -660,5 +667,95 @@ describe("startApp", () => {
     expect(sseInstances.length).toBe(1);
     expect(sseInstances[0].url).toContain("/api/v1/events");
     delete (globalThis as any).EventSource;
+  });
+});
+
+// ── Admin portal nav + footer + viewFromHash + dispatch stubs (T9) ──────────
+
+describe("admin portal nav + footer + routing (T9)", () => {
+  it("index.html has Config and Profiles nav items after Dashboard", () => {
+    const navMatch = INDEX_HTML.match(/<nav class="nav">([\s\S]*?)<\/nav>/);
+    expect(navMatch).not.toBeNull();
+    const nav = navMatch![1];
+    const dashboardIdx = nav.indexOf("#/dashboard");
+    const configIdx = nav.indexOf("#/config");
+    const profilesIdx = nav.indexOf("#/profiles");
+    expect(dashboardIdx).toBeGreaterThan(-1);
+    expect(configIdx).toBeGreaterThan(dashboardIdx);
+    expect(profilesIdx).toBeGreaterThan(configIdx);
+  });
+
+  it("index.html footer text is 'Admin portal · served by the massa-ai Tools API'", () => {
+    expect(INDEX_HTML).toContain("Admin portal");
+    expect(INDEX_HTML).toContain("served by the massa-ai Tools API");
+    expect(INDEX_HTML).not.toContain("Read-only");
+  });
+
+  it("index.html brand says admin portal, not memory browser", () => {
+    expect(INDEX_HTML).toContain("admin portal");
+    expect(INDEX_HTML).not.toContain("memory browser");
+  });
+
+  it("renderConfig stub renders without error and shows restart badge when present", () => {
+    const html = renderConfig({ config: { logging: { level: "info" } }, restartNeededSections: ["llm"] });
+    expect(html).toContain("Config");
+    expect(html).toContain("restart needed");
+    expect(html).toContain("llm");
+  });
+
+  it("renderConfig stub renders empty restart badge when no restart sections", () => {
+    const html = renderConfig({ config: {}, restartNeededSections: [] });
+    expect(html).toContain("Config");
+    expect(html).not.toContain("restart needed");
+  });
+
+  it("renderProfiles stub renders profile cards with active marked", () => {
+    const html = renderProfiles({ profiles: ["balanced", "work"], active: "balanced" });
+    expect(html).toContain("balanced");
+    expect(html).toContain("work");
+    expect(html).toContain("active");
+  });
+
+  it("renderProfiles stub renders empty state when no profiles", () => {
+    const html = renderProfiles({ profiles: [], active: "" });
+    expect(html).toContain("No profiles");
+  });
+
+  it("viewFromHash allow-list includes config and profiles (dispatch stubs route without error)", async () => {
+    // Drive startApp with a hash pointing at config; the dispatch stub must
+    // call GET /api/v1/config and render renderConfig output without throwing.
+    const { doc } = makeFakeDom();
+    (globalThis as any).location = { hash: "#/config" };
+    const calls: string[] = [];
+    globalThis.fetch = (async (url: string) => {
+      calls.push(String(url));
+      return {
+        headers: { get: () => "application/json" },
+        json: async () => ({ success: true, data: { config: { logging: { level: "info" } }, restartNeededSections: [] } }),
+      };
+    }) as unknown as typeof fetch;
+    startApp({ document: doc, base: "" });
+    await new Promise((r) => setTimeout(r, 60));
+    expect(calls.some((u) => u.includes("/api/v1/config"))).toBe(true);
+    expect(doc.getElementById("app").innerHTML).toContain("Config");
+    delete (globalThis as any).location;
+  });
+
+  it("viewFromHash allow-list includes profiles (dispatch stub routes without error)", async () => {
+    const { doc } = makeFakeDom();
+    (globalThis as any).location = { hash: "#/profiles" };
+    const calls: string[] = [];
+    globalThis.fetch = (async (url: string) => {
+      calls.push(String(url));
+      return {
+        headers: { get: () => "application/json" },
+        json: async () => ({ success: true, data: { profiles: ["balanced"], active: "balanced" } }),
+      };
+    }) as unknown as typeof fetch;
+    startApp({ document: doc, base: "" });
+    await new Promise((r) => setTimeout(r, 60));
+    expect(calls.some((u) => u.includes("/api/v1/profiles"))).toBe(true);
+    expect(doc.getElementById("app").innerHTML).toContain("Profiles");
+    delete (globalThis as any).location;
   });
 });

@@ -543,6 +543,54 @@ export function renderCheckpoints(data) {
   return '<section class="view"><h2>Checkpoints</h2>' + body + "</section>";
 }
 
+// ── Admin portal view stubs (renderers land in T10-T12) ────────────────────
+
+/**
+ * Config view renderer stub. T10 replaces this with the 15-sectioned form UI.
+ * Reads GET /api/v1/config → { config, restartNeededSections }.
+ */
+export function renderConfig(data) {
+  const payload = data || {};
+  const config = payload.config || {};
+  const restart = payload.restartNeededSections || [];
+  const restartBadge = restart.length
+    ? ' <span class="badge">restart needed: ' + escapeHtml(restart.join(", ")) + "</span>"
+    : "";
+  return (
+    '<section class="view"><h2>Config' + restartBadge + "</h2>" +
+    '<p class="muted">Config form loads in T10.</p>' +
+    '<pre class="config-preview">' + escapeHtml(JSON.stringify(config, null, 2)) + "</pre>" +
+    "</section>"
+  );
+}
+
+/**
+ * Profiles view renderer stub. T11 replaces this with the profile switcher UI.
+ * Reads GET /api/v1/profiles → { profiles, active }.
+ */
+export function renderProfiles(data) {
+  const payload = data || {};
+  const profiles = payload.profiles || [];
+  const active = payload.active || "";
+  const cards = profiles
+    .map((p) => {
+      const isActive = p === active || (p && p.name === active);
+      const name = typeof p === "string" ? p : (p && p.name) || "";
+      return (
+        '<div class="card' + (isActive ? " active" : "") + '">' +
+        "<h3>" + escapeHtml(name) + "</h3>" +
+        (isActive ? '<span class="badge">active</span>' : "") +
+        "</div>"
+      );
+    })
+    .join("");
+  return (
+    '<section class="view"><h2>Profiles</h2>' +
+    (cards || '<p class="empty">No profiles.</p>') +
+    "</section>"
+  );
+}
+
 // ── Helpers used by renderers ──────────────────────────────────────────────
 
 function truncate(s, n) {
@@ -688,7 +736,7 @@ function startApp(opts) {
   }
   function viewFromHash(h) {
     const name = (h || "").replace(/^#\/?/, "");
-    return ["projects", "memory", "search", "handoffs", "proposals", "checkpoints", "dashboard"].includes(name)
+    return ["projects", "memory", "search", "handoffs", "proposals", "checkpoints", "dashboard", "config", "profiles"].includes(name)
       ? name
       : "projects";
   }
@@ -760,6 +808,12 @@ function startApp(opts) {
       } else if (state.view === "dashboard") {
         const data = await fetchDashboardData(api);
         root.innerHTML = renderDashboard(data);
+      } else if (state.view === "config") {
+        const data = await api.request("/api/v1/config");
+        root.innerHTML = renderConfig((data && data.data) || { config: {}, restartNeededSections: [] });
+      } else if (state.view === "profiles") {
+        const data = await api.request("/api/v1/profiles");
+        root.innerHTML = renderProfiles((data && data.data) || { profiles: [], active: "" });
       }
     } catch (e) {
       root.innerHTML = '<div class="error">Connection error: ' + escapeHtml(String(e.message || e)) + "</div>";
@@ -928,6 +982,8 @@ const MASSA_AI_UI = {
   renderProposals,
   renderCheckpoints,
   renderDashboard,
+  renderConfig,
+  renderProfiles,
   initTheme,
   toggleTheme,
   isWriteModeEnabled,

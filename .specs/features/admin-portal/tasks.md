@@ -305,12 +305,12 @@ CHKP-05 decision: store is directly reachable via `CheckpointManager.getInstance
 - Skill: NONE
 
 **Done when**:
-- [ ] "Config" + "Profiles" nav items present after "Dashboard"
-- [ ] `viewFromHash` allows `config` + `profiles`
-- [ ] Footer text updated
-- [ ] Dispatch stubs route to (empty) config/profiles views without error
-- [ ] `bun test apps/web-ui/src/__tests__/` passes (extend route-contract / app-renderers with nav + footer assertions)
-- [ ] `bun run type-check` passes
+- [x] "Config" + "Profiles" nav items present after "Dashboard"
+- [x] `viewFromHash` allows `config` + `profiles`
+- [x] Footer text updated
+- [x] Dispatch stubs route to (empty) config/profiles views without error
+- [x] `bun test apps/web-ui/src/__tests__/` passes (extend route-contract / app-renderers with nav + footer assertions)
+- [x] `bun run type-check` passes
 
 **Tests**: unit (nav + routing)
 **Gate**: quick
