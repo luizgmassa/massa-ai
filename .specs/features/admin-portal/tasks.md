@@ -153,10 +153,10 @@ T14 → T15
 - Skill: NONE
 
 **Done when**:
-- [ ] `savePartialConfig`/`maskSensitive`/`restartNeededSections` importable from `@massa-ai/shared/config`
-- [ ] `loadEffectiveRegistry`/`OverlayData`/`OverlayProfile` importable from `scripts/lib/model-profiles.ts`
-- [ ] No import-time side effects (test imports the module under a scratch XDG dir)
-- [ ] `bun run type-check` passes
+- [x] `savePartialConfig`/`maskSensitive`/`restartNeededSections` importable from `@massa-ai/shared/config`
+- [x] `loadEffectiveRegistry`/`OverlayData`/`OverlayProfile` importable from `scripts/lib/model-profiles.ts`
+- [x] No import-time side effects (test imports the module under a scratch XDG dir)
+- [x] `bun run type-check` passes
 
 **Tests**: none (build gate — re-export only)
 **Gate**: build
