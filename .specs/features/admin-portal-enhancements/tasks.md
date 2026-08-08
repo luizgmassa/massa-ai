@@ -50,9 +50,9 @@ Where: `apps/tools-api/src/index.ts` (existing, one-line import + `.use()`)
 
 Depends on: T1
 
-- [ ] Verify `apps/tools-api/src/index.ts` imports and `.use()`s the new route.
-- [ ] Run `bun run type-check` (6 tsc projects) — must be green.
-- [ ] Run `bun run test:plugins` — must be green (no plugin regression).
+- [x] Verify `apps/tools-api/src/index.ts` imports and `.use()`s the new route.
+- [x] Run `bun run type-check` (6 tsc projects) — must be green.
+- [x] Run `bun run test:plugins` — must be green (no plugin regression).
 
 Tests: `bun run type-check` (6 tsc projects green); `bun run test:plugins` (no regression)
 

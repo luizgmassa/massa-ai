@@ -44,6 +44,7 @@ import { dashboardRoutes } from "./routes/dashboard.js";
 import { profileRoutes } from "./routes/profiles.js";
 import { configRoutes } from "./routes/config.js";
 import { modelRegistryRoutes } from "./routes/model-registry.js";
+import { modelRegistryStreamRoutes } from "./routes/model-registry-stream.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
 import { getHealthChecker, searchSessionHook, coRetrievalHook } from "@massa-ai/core";
@@ -148,6 +149,7 @@ const app = new Elysia({ adapter: node() })
   .use(profileRoutes)
   .use(configRoutes)
   .use(modelRegistryRoutes)
+  .use(modelRegistryStreamRoutes)
   .get("/health", () => buildHealthResponse(getParserReadiness()));
 
 // SEC-01: resolve (and if necessary provision) the API key BEFORE the port
