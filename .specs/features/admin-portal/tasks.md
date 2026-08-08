@@ -230,14 +230,14 @@ CHKP-05 decision: store is directly reachable via `CheckpointManager.getInstance
 - Skill: NONE
 
 **Done when**:
-- [ ] GET returns merged registry + source + `overlayError?` (200 on overlay corruption)
-- [ ] PUT validates merged → 400 + all violations on failure
-- [ ] PUT writes atomically to XDG overlay path
-- [ ] DELETE overlay removes the file, returns builtin registry
-- [ ] regenerate spawns the script, returns success/failure
-- [ ] Route registered in `index.ts`
-- [ ] `bun test apps/tools-api/src/routes/model-registry.test.ts` passes (new: GET merged + attribution, GET overlay-corrupted 200, PUT valid, PUT invalid 400, DELETE removes overlay, regenerate success/failure with mocked child_process)
-- [ ] `bun run type-check` passes
+- [x] GET returns merged registry + source + `overlayError?` (200 on overlay corruption)
+- [x] PUT validates merged → 400 + all violations on failure
+- [x] PUT writes atomically to XDG overlay path
+- [x] DELETE overlay removes the file, returns builtin registry
+- [x] regenerate spawns the script, returns success/failure
+- [x] Route registered in `index.ts`
+- [x] `bun test apps/tools-api/src/routes/model-registry.test.ts` passes (new: GET merged + attribution, GET overlay-corrupted 200, PUT valid, PUT invalid 400, DELETE removes overlay, regenerate success/failure with mocked child_process)
+- [x] `bun run type-check` passes
 
 **Tests**: integration (model-registry routes)
 **Gate**: route
