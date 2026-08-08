@@ -26,7 +26,7 @@ route must exist). T9 depends on all.
 
 Where: `apps/tools-api/src/routes/model-registry-stream.ts` (new), `apps/tools-api/src/routes/model-registry-stream.test.ts` (new)
 
-- [ ] Create `apps/tools-api/src/routes/model-registry-stream.ts` with a single
+- [x] Create `apps/tools-api/src/routes/model-registry-stream.ts` with a single
   `POST /regenerate-stream` route that:
   - Sets `Content-Type: text/event-stream` + `X-Accel-Buffering: no`.
   - Uses `child_process.spawn("bun", [GENERATE_SCRIPT], { env: { ...process.env }, stdio: ["pipe","pipe","pipe"] })`.
@@ -35,7 +35,7 @@ Where: `apps/tools-api/src/routes/model-registry-stream.ts` (new), `apps/tools-a
   - On spawn error, emits `data: {"type":"done","exitCode":null,"error":"..."}\n\n` and ends.
   - Reuses the `GENERATE_SCRIPT` path + `profilesLib()` lazy pattern from `model-registry.ts`.
   - **F1 fold:** Follow the exact `events.ts` pattern: `return new Response(new ReadableStream({ start, cancel }), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no" } })`. Do NOT use `set.headers` for streaming. The `cancel` hook must `child.kill()` so a client disconnect does not orphan the spawn.
-- [ ] Create `apps/tools-api/src/routes/model-registry-stream.test.ts`:
+- [x] Create `apps/tools-api/src/routes/model-registry-stream.test.ts`:
   - Mock `spawn` to emit a stdout line, a stderr line, then close with exit 0 → assert SSE chunks.
   - Mock `spawn` to error → assert `done` with `exitCode:null,error`.
   - Assert the existing blocking `/regenerate` route is unchanged (REGEN-SSE-08).
