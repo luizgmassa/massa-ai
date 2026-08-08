@@ -530,6 +530,56 @@ pre code {
   font-size: 0.8rem;
 }
 
+/* DS-registry: help section */
+.registry-help {
+  margin: 1rem 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  overflow: hidden;
+}
+.registry-help > summary {
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--accent);
+  user-select: none;
+}
+.registry-help[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+.registry-help-body {
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.registry-help-body h4 {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.85rem;
+  color: var(--fg);
+}
+.registry-help-body dl {
+  margin: 0;
+}
+.registry-help-body dt {
+  font-weight: 600;
+  margin-top: 0.5rem;
+  color: var(--accent);
+}
+.registry-help-body dd {
+  margin: 0.15rem 0 0 1rem;
+}
+.registry-help-body p {
+  margin: 0.4rem 0;
+}
+.registry-help-body code {
+  background: var(--bg-code);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.82rem;
+}
+
 /* DS-04: success + error banners */
 .success {
   padding: 0.75rem 1rem;

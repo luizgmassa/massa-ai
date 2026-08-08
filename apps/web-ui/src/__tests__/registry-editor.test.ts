@@ -266,3 +266,36 @@ describe("renderModelRegistry — defaults writeMode", () => {
     expect(html).not.toContain('data-action="registry-save-overlay"');
   });
 });
+
+describe("renderModelRegistry — help section (REG-01)", () => {
+  it("renders a collapsible details help section", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain("<details");
+    expect(html).toContain('class="registry-help"');
+    expect(html).toContain("<summary>?</summary>");
+  });
+
+  it("explains all six action buttons", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain("Add Profile");
+    expect(html).toContain("Duplicate Profile");
+    expect(html).toContain("Delete Profile");
+    expect(html).toContain("Save Overlay");
+    expect(html).toContain("Regenerate Artifacts");
+    expect(html).toContain("Reset to Built-in");
+  });
+
+  it("help section appears after action buttons", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    const actionIdx = html.indexOf('data-action="registry-clear-overlay"');
+    const helpIdx = html.indexOf('class="registry-help"');
+    expect(actionIdx).toBeGreaterThan(-1);
+    expect(helpIdx).toBeGreaterThan(actionIdx);
+  });
+
+  it("renders help section in read mode too (buttons absent, help present)", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
+    expect(html).toContain("<details");
+    expect(html).toContain("Button Guide");
+  });
+});

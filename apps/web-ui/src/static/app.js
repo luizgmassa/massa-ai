@@ -1190,6 +1190,22 @@ export function renderModelRegistry(data, opts) {
       "</div>"
     : "";
 
+  const helpSection = '<details class="registry-help"><summary>?</summary>' +
+    '<div class="registry-help-body">' +
+    '<h4>Button Guide</h4>' +
+    '<dl>' +
+    '<dt>Add Profile</dt><dd>Creates a new profile with a name you choose. Prompts for a profile name and optional description. The new profile starts with null model/effort cells for all hosts and tiers.</dd>' +
+    '<dt>Duplicate Profile</dt><dd>Copies an existing profile (you choose which) to a new name. Prompts for the source profile and the new name. Useful for creating a variant of an existing profile without re-entering all cells.</dd>' +
+    '<dt>Delete Profile</dt><dd>Removes a profile from the overlay. Prompts for the profile name. If the profile exists in the builtin registry, it is tombstoned (restorable via the Deleted section). If it is overlay-only, it is removed entirely.</dd>' +
+    '<dt>Save Overlay</dt><dd>Persists all unsaved overlay changes (profile cells, host defaults, workflow tiers, add/duplicate/delete) to <code>~/.config/massa-ai/model-profiles.json</code>. Asks for confirmation before writing. The builtin registry is never modified.</dd>' +
+    '<dt>Regenerate Artifacts</dt><dd>Re-runs <code>generate-subagent-artifacts.ts</code> to rebuild all host agent files from the current effective registry. Streams progress via SSE. Use after changing model/effort assignments so the installed agents reflect the new values.</dd>' +
+    '<dt>Reset to Built-in (clear overlay)</dt><dd>Deletes the user overlay file, reverting to the builtin registry. Asks for confirmation. All overlay-only profiles, cell overrides, host default changes, and workflow tiers are lost. Tombstoned profiles are restored.</dd>' +
+    '</dl>' +
+    '<h4>Workflow Tiers</h4>' +
+    '<p>The Workflow Tiers section maps a workflow name to a tier, overriding the charter default for agents dispatched under that workflow. The builtin registry ships with no workflow tier overrides. Add one (e.g., <code>spec-driven &rarr; deep</code>) to pin a heavier model tier for a specific workflow.</p>' +
+    '</div>' +
+    '</details>';
+
   return (
     '<section class="view"><h2>Model Registry</h2>' + unsaved +
     registryError +
@@ -1200,6 +1216,7 @@ export function renderModelRegistry(data, opts) {
     profileActions +
     tombstonedList +
     actionButtons +
+    helpSection +
     "</section>"
   );
 }
