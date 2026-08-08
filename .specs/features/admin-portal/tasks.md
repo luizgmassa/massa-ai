@@ -100,14 +100,14 @@ T14 → T15
 - Skill: NONE
 
 **Done when**:
-- [ ] `config-writer.ts` exports `savePartialConfig`, `maskSensitive`, `restartNeededSections`
-- [ ] Validation rejects bad type, bad enum, out-of-range number per section (returns `details[]`, never throws on validation)
-- [ ] Backup file `config.json.bak.<ts>` created before write
-- [ ] Atomic temp+rename via existing `saveConfig`
-- [ ] Masked sentinel `"***"` preserves existing value
-- [ ] Module never reads/writes at import time
-- [ ] `bun test packages/shared/src/config/__tests__/` passes (new `config-writer.test.ts`: per-section validation bad-value cases, backup, atomic, masked-sentinel, restart sections)
-- [ ] `bun run type-check` passes
+- [x] `config-writer.ts` exports `savePartialConfig`, `maskSensitive`, `restartNeededSections`
+- [x] Validation rejects bad type, bad enum, out-of-range number per section (returns `details[]`, never throws on validation)
+- [x] Backup file `config.json.bak.<ts>` created before write
+- [x] Atomic temp+rename via existing `saveConfig`
+- [x] Masked sentinel `"***"` preserves existing value
+- [x] Module never reads/writes at import time
+- [x] `bun test packages/shared/src/config/__tests__/` passes (new `config-writer.test.ts`: per-section validation bad-value cases, backup, atomic, masked-sentinel, restart sections)
+- [x] `bun run type-check` passes
 
 **Tests**: unit (shared config writer)
 **Gate**: shared-config
