@@ -456,12 +456,12 @@ CHKP-05 decision: store is directly reachable via `CheckpointManager.getInstance
 - Skill: NONE
 
 **Done when**:
-- [ ] CHANGELOG entry added
-- [ ] STATE.md Current section updated (admin portal)
-- [ ] HANDOFF.md updated
-- [ ] FEATURES.json status → complete, phases marked
-- [ ] `bun skills/massa-ai/scripts/check_specs_delivered.ts admin-portal --root .` exit 0
-- [ ] Committed on `spec/admin-portal`
+- [x] CHANGELOG entry added
+- [x] STATE.md Current section updated (admin portal)
+- [x] HANDOFF.md updated
+- [x] FEATURES.json status → complete, phases marked
+- [x] `bun skills/massa-ai/scripts/check_specs_delivered.ts admin-portal --root .` exit 0
+- [x] Committed on `spec/admin-portal`
 
 **Tests**: none (close-out)
 **Gate**: build

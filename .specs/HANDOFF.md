@@ -1,4 +1,52 @@
-# Handoff — workflow-reuse-naming-figma (VALIDATED PASS 2026-08-07 — 23/23 ACs, 7/7 mutations killed, iteration 2; push/PR authorized, merge = user decision)
+# Handoff — admin-portal (EXECUTE COMPLETE 2026-08-07 — T1-T15, 15 commits; validation pending; push/PR authorized, merge = user decision)
+
+Session `spec-admin-portal` · workflow spec-driven (Large) · branch
+`spec/admin-portal` from origin/main @ `01edc737` (v1.40.1) · worktree
+`/Users/luizmassa/Projects/massa-ai-wt-admin-portal` (isolated). massa-ai MCP
+not used this session (sub-agents unavailable — host caches frontmatter at
+session start); `.specs/` files canonical. Contract:
+`.specs/features/admin-portal/{spec,design,tasks}.md`.
+
+## Objective — admin-portal
+
+Elevate `apps/web-ui` from read-only to a full admin portal. Backend: config
+GET/PUT with masking + validation + backup + atomic write (`savePartialConfig`),
+checkpoint delete route (store-direct), model-registry overlay CRUD routes
+(GET/PUT/DELETE/regenerate), `loadEffectiveRegistry` (overlay merge + tombstone
++ fallback). Frontend: write-mode default ON for trusted callers,
+FORBIDDEN_MUTATING_PATHS removal, Config + Profiles nav, config 15-sectioned
+forms, profiles switcher, model-registry grid editor, create/delete forms for
+memory/handoff/checkpoint/project. Script: generate-subagent-artifacts
+read-path split (runtime → effective, --check → builtin).
+
+## State — admin-portal
+
+- 5 planning commits + 15 task commits on `spec/admin-portal`:
+  `a3f6f230` spec → `15340adb` EARS → `dcaef0f4` design → `648061b5` tasks →
+  `35f9f9c6` Plan Challenge → T1-T7 (`2ed2592b`..`ce64f78c`) backend →
+  T8 `78ef2553` write-mode + FORBIDDEN removal → T9 `f37c73b8` nav + routing →
+  T10 `783936fb` config forms → T11 `ec9c8533` profiles switcher →
+  T12 `9283112c` registry editor → T13 `0a606f7f` create/delete forms →
+  T14 `2e02e38a` generate read-path split → T15 this commit (close-out).
+- Gates per task all green: write-mode 23, web-ui 132→220, config-forms 32,
+  app-renderers 74, registry-editor 31, model-profiles 48, generate:artifacts
+  --check exit 0, type-check green throughout.
+- Key implementation decisions: savePartialConfig in packages/shared
+  (no import-time side effects); loadEffectiveRegistry in scripts/lib (overlay
+  shallow merge + tombstone + fallback); tools-api model-registry route uses
+  lazy require() (file outside rootDir); checkpoint delete calls store directly
+  (no tool wrapper); isWriteModeEnabled defaults ON when trusted meta tag
+  present (env/localStorage opt-out checked first); renderConfig 15 declarative
+  section definitions; renderModelRegistry grid with UI_HOST_EFFORT_ENUM copy;
+  generate-subagent-artifacts main() reads loadEffectiveRegistry (runtime),
+  runCheck stays on loadRegistry (builtin).
+- Next: final gate matrix (test:scripts + test:plugins + lint + type-check +
+  generate:artifacts --check) → independent validation (standalone fresh-eyes
+  fallback, author ≠ verifier) → write validation.md → validate_state.ts exit 0
+  → git push -u origin spec/admin-portal → gh pr create --base main. Merge =
+  separate explicit user go-ahead.
+
+# Previous — Handoff — workflow-reuse-naming-figma (VALIDATED PASS 2026-08-07 — 23/23 ACs, 7/7 mutations killed, iteration 2; push/PR authorized, merge = user decision)
 
 Session `spec-workflow-reuse-naming-figma` · workflow spec-driven (Large) ·
 branch `spec/workflow-reuse-naming-figma` from origin/main @ v1.39.0
