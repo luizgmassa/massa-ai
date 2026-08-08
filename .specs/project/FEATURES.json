@@ -1149,7 +1149,33 @@
         "admin-portal-ui-fixes"
       ],
       "notes": "VALIDATED PASS 2026-08-08: T11-T14 (3 ACs CFG-01..03). 3/3 ACs, 3/3 mutations killed. web-ui 307 pass, tools-api config 14 pass, type-check 6/6, lint 0. New GET /api/v1/config/reveal endpoint. Push/PR = user decision."
+    },
+    {
+      "id": "admin-portal-correctness-repair",
+      "slug": "admin-portal-correctness-repair",
+      "title": "Admin Portal Correctness Repair — 8 correctness defects, 2 security issues, 1 dedupe, 5 state drifts from v1.41.0+v1.42.0",
+      "status": "tasks-complete",
+      "priority": "P0",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": false
+      },
+      "branch": "fix/admin-portal-correctness-repair",
+      "spec": ".specs/features/admin-portal-correctness-repair/spec.md",
+      "design": ".specs/features/admin-portal-correctness-repair/design.md",
+      "tasks": ".specs/features/admin-portal-correctness-repair/tasks.md",
+      "created": "2026-08-08",
+      "depends_on": [
+        "admin-portal",
+        "admin-portal-enhancements",
+        "admin-portal-ui-fixes",
+        "registry-help-dropdown-workflow-tiers",
+        "config-capture-reveal-field-guides"
+      ],
+      "notes": "PLANNED 2026-08-08: 3 Phases = 11 Tasks (APCR-01..11), audit of 66 commits cb2ca3d9~1..HEAD. 5 audit mechanisms re-verified and amended (A1 Docker runs src/index.ts not dist, fails on missing scripts/; A2 saveConfig is temp+rename atomic, backups measure 600/600/644; A3 DB-down reaches the outer catch; A4 Q4 narrowed not closed; A5 startup warning already fires). Design found the REG-03 workflow-tier-remove regression deep merge would have caused — resolved with a null tombstone. Plan Challenge full gate (pre_mortem + red_team): 9 findings, 5 folded as new ACs (APCR-01.9/.10, 03.5, 06.6/.7, 08.2). Execution: 2 batch workers. Push/PR = user decision."
     }
   ],
-  "active_feature": "config-capture-reveal-field-guides"
+  "active_feature": "admin-portal-correctness-repair"
 }
