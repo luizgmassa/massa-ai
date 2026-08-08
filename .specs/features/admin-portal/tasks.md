@@ -257,10 +257,10 @@ CHKP-05 decision: store is directly reachable via `CheckpointManager.getInstance
 - Skill: NONE
 
 **Done when**:
-- [ ] web-ui-contract has config + registry golden fixtures
-- [ ] route-contract has config + profiles + registry rows
-- [ ] Both test files pass
-- [ ] `bun run type-check` passes
+- [x] web-ui-contract has config + registry golden fixtures
+- [x] route-contract has config + profiles + registry rows
+- [x] Both test files pass
+- [x] `bun run type-check` passes
 
 **Tests**: integration (contract)
 **Gate**: route

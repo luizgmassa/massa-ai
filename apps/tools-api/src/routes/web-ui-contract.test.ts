@@ -115,3 +115,82 @@ describe("checkpoints list shape matches the Web UI golden fixture", () => {
     expect(typeof json.data).toBe("string");
   });
 });
+
+// ── Config GET golden fixture contract ───────────────────────────────────────
+
+describe("config GET shape matches the Web UI golden fixture", () => {
+  const CONFIG_FIXTURE_PATH = path.join(
+    import.meta.dir,
+    "..",
+    "..",
+    "..",
+    "web-ui",
+    "src",
+    "__tests__",
+    "fixtures",
+    "config-get.json",
+  );
+
+  test("fixture exists and has the expected top-level shape", () => {
+    const fixture = JSON.parse(fs.readFileSync(CONFIG_FIXTURE_PATH, "utf8")) as any;
+    expect(fixture.success).toBe(true);
+    expect(fixture.data.config).toBeDefined();
+    expect(fixture.data.restartNeededSections).toBeDefined();
+  });
+
+  test("fixture masks all four sensitive fields to '***'", () => {
+    const fixture = JSON.parse(fs.readFileSync(CONFIG_FIXTURE_PATH, "utf8")) as any;
+    const cfg = fixture.data.config;
+    expect(cfg.security.apiKey).toBe("***");
+    expect(cfg.llm.apiKey).toBe("***");
+    expect(cfg.embedding.apiKey).toBe("***");
+    expect(cfg.database.url).toBe("***");
+  });
+
+  test("fixture restartNeededSections is an array of known section names", () => {
+    const fixture = JSON.parse(fs.readFileSync(CONFIG_FIXTURE_PATH, "utf8")) as any;
+    const sections = fixture.data.restartNeededSections as string[];
+    expect(Array.isArray(sections)).toBe(true);
+    const validSections = ["database", "embedding", "llm", "security"];
+    for (const s of sections) {
+      expect(validSections).toContain(s);
+    }
+  });
+});
+
+// ── Model-registry GET golden fixture contract ───────────────────────────────
+
+describe("model-registry GET shape matches the Web UI golden fixture", () => {
+  const REGISTRY_FIXTURE_PATH = path.join(
+    import.meta.dir,
+    "..",
+    "..",
+    "..",
+    "web-ui",
+    "src",
+    "__tests__",
+    "fixtures",
+    "model-registry-get.json",
+  );
+
+  test("fixture exists and has the expected top-level shape", () => {
+    const fixture = JSON.parse(fs.readFileSync(REGISTRY_FIXTURE_PATH, "utf8")) as any;
+    expect(fixture.success).toBe(true);
+    expect(fixture.data.registry).toBeDefined();
+    expect(fixture.data.source).toBeDefined();
+  });
+
+  test("fixture source has builtin, overlay, and tombstoned", () => {
+    const fixture = JSON.parse(fs.readFileSync(REGISTRY_FIXTURE_PATH, "utf8")) as any;
+    expect(fixture.data.source.builtin).toBeDefined();
+    expect(fixture.data.source.overlay).not.toBeUndefined();
+    expect(Array.isArray(fixture.data.source.tombstoned)).toBe(true);
+  });
+
+  test("fixture registry has version, tiers, profiles", () => {
+    const fixture = JSON.parse(fs.readFileSync(REGISTRY_FIXTURE_PATH, "utf8")) as any;
+    expect(fixture.data.registry.version).toBe(1);
+    expect(Array.isArray(fixture.data.registry.tiers)).toBe(true);
+    expect(fixture.data.registry.profiles).toBeDefined();
+  });
+});

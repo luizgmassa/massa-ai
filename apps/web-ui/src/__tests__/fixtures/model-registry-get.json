@@ -1,0 +1,64 @@
+{
+  "success": true,
+  "data": {
+    "registry": {
+      "version": 1,
+      "tiers": ["light", "standard", "deep"],
+      "hostDefaults": {
+        "claude": "balanced",
+        "codex": "balanced",
+        "cursor": "balanced",
+        "opencode": "balanced"
+      },
+      "workflowTiers": {},
+      "profiles": {
+        "balanced": {
+          "description": "balanced profile",
+          "hosts": {
+            "claude": {
+              "light": { "model": "haiku", "effort": "low" },
+              "standard": { "model": "sonnet", "effort": "medium" },
+              "deep": { "model": "opus", "effort": "max" }
+            },
+            "codex": {
+              "light": { "model": "gpt-5", "effort": "low" },
+              "standard": { "model": "gpt-5", "effort": "medium" },
+              "deep": { "model": "gpt-5", "effort": "high" }
+            },
+            "cursor": {
+              "light": { "model": null, "effort": null },
+              "standard": { "model": null, "effort": null },
+              "deep": { "model": null, "effort": null }
+            },
+            "opencode": {
+              "light": { "model": "qwen", "effort": "low" },
+              "standard": { "model": "qwen", "effort": "medium" },
+              "deep": { "model": "qwen", "effort": "high" }
+            }
+          }
+        }
+      }
+    },
+    "source": {
+      "builtin": {
+        "version": 1,
+        "tiers": ["light", "standard", "deep"],
+        "hostDefaults": {
+          "claude": "balanced",
+          "codex": "balanced",
+          "cursor": "balanced",
+          "opencode": "balanced"
+        },
+        "workflowTiers": {},
+        "profiles": {
+          "balanced": {
+            "description": "balanced profile",
+            "hosts": {}
+          }
+        }
+      },
+      "overlay": null,
+      "tombstoned": []
+    }
+  }
+}
