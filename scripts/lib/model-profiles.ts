@@ -64,16 +64,20 @@ export interface Registry {
 //            (`claude-opus-5[effort=high]`), so an effort is only meaningful when a
 //            model id is pinned. Bracket syntax on `inherit` is undocumented.
 //            https://cursor.com/docs/subagents.md
-//   opencode reasoningEffort is a generic provider pass-through, not an enumerable
-//            field. opencode.ai/docs/models documents enums for Anthropic/OpenAI/Google
-//            but names no value for the `opencode-go` provider, so this cannot be
-//            enumerated without inventing evidence. Any non-empty string is accepted.
+//   opencode reasoningEffort is a generic provider pass-through. opencode.ai/docs/models
+//            documents enums for Anthropic/OpenAI/Google providers; the opencode-go
+//            provider's values were initially unenumerated. The shipped registry only
+//            uses "high" and "max" (all opencode-go entries), and the user requested a
+//            constrained dropdown for UI consistency. The enum below is the union of
+//            standard tier names used across the registry, accepting the trade-off that
+//            a future provider may need a value outside this list (which would then be
+//            a validation error to be added to the enum, not a silent pass-through).
 //            https://opencode.ai/docs/agents/
 export const HOST_EFFORT_ENUM: Readonly<Record<Host, readonly string[] | null>> = {
   claude: ["low", "medium", "high", "xhigh", "max"],
   codex: ["minimal", "low", "medium", "high", "xhigh"],
   cursor: [],
-  opencode: null,
+  opencode: ["low", "medium", "high", "max"],
 };
 
 // ── Errors ──────────────────────────────────────────────────────────────────
@@ -299,7 +303,7 @@ export function effortViolation(
     }
     return null; // rendered as [effort=...] on the id
   }
-  if (enumFor === null) return null; // opencode: provider pass-through, not enumerable
+  if (enumFor === null) return null; // no enum for this host (none currently; was opencode)
   if (enumFor.length === 0) return `${where}.effort must be null for host "${host}"`;
   if (!enumFor.includes(effort)) {
     return `${where}.effort ${JSON.stringify(effort)} is not one of ${enumFor.join(", ")} for host "${host}"`;

@@ -352,11 +352,19 @@ describe("model-profiles: fail-loud validation (MPR-R5)", () => {
     );
   });
 
-  test("opencode effort is a provider pass-through, so any non-empty string is legal", () => {
+  test("opencode effort is constrained to the documented enum", () => {
     const b = baseRegistry();
-    (b.profiles as any).p1.hosts.opencode.deep.effort = "some-provider-specific-value";
-    expect(() => validateRegistry(b)).not.toThrow();
-    // ...but empty string is still rejected.
+    // Valid values pass.
+    for (const e of ["low", "medium", "high", "max"]) {
+      (b.profiles as any).p1.hosts.opencode.deep.effort = e;
+      expect(() => validateRegistry(b)).not.toThrow();
+    }
+    // A value outside the enum is rejected.
+    expectViolation(
+      (x) => ((x.profiles as any).p1.hosts.opencode.deep.effort = "some-provider-specific-value"),
+      "is not one of low, medium, high, max for host \"opencode\"",
+    );
+    // Empty string is still rejected.
     expectViolation(
       (x) => ((x.profiles as any).p1.hosts.opencode.deep.effort = ""),
       "must be a non-empty string or null",
@@ -505,8 +513,8 @@ describe("model-profiles: host effort enums match the cited docs", () => {
   test("cursor has no effort key at all", () => {
     expect(HOST_EFFORT_ENUM.cursor).toEqual([]);
   });
-  test("opencode is a non-enumerable provider pass-through", () => {
-    expect(HOST_EFFORT_ENUM.opencode).toBeNull();
+  test("opencode effort enum is constrained to low/medium/high/max", () => {
+    expect(HOST_EFFORT_ENUM.opencode).toEqual(["low", "medium", "high", "max"]);
   });
 });
 

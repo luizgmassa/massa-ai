@@ -107,10 +107,12 @@ describe("renderModelRegistry — effort enum constraint (REG-03)", () => {
     expect(html).toContain("minimal");
   });
 
-  it("renders text input for opencode effort (non-enumerable)", () => {
+  it("renders dropdown for opencode effort (constrained enum)", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain('data-host="opencode"');
-    expect(html).toContain('data-type="text"');
+    expect(html).toContain('data-type="enum"');
+    expect(html).toContain('value="max"');
+    expect(html).toContain('value="high"');
   });
 
   it("renders n/a for cursor effort (empty enum)", () => {

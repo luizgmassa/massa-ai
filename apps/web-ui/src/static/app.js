@@ -1043,7 +1043,7 @@ const UI_HOST_EFFORT_ENUM = {
   claude: ["low", "medium", "high", "xhigh", "max"],
   codex: ["minimal", "low", "medium", "high", "xhigh"],
   cursor: [],
-  opencode: null,
+  opencode: ["low", "medium", "high", "max"],
 };
 
 const REGISTRY_HOSTS = ["claude", "codex", "cursor", "opencode"];

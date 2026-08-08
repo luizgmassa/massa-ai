@@ -466,12 +466,14 @@ restated independently.
 | Claude Code | `model:` — a model alias, a full model ID, or `inherit` | `effort:` key | `low` `medium` `high` `xhigh` `max` | [sub-agents](https://code.claude.com/docs/en/sub-agents.md) |
 | Codex | `model =` — a bare model slug | `model_reasoning_effort =` key | `minimal` `low` `medium` `high` `xhigh` | [config-reference](https://learn.chatgpt.com/docs/config-file/config-reference) |
 | Cursor | `model:` — `inherit` or a model **ID**, with optional bracket parameters | bracket parameter on the model value; there is no effort key | *(none — must be unset)* | [subagents](https://cursor.com/docs/subagents.md) |
-| OpenCode | `model:` — `provider/model-id` | `reasoningEffort` — generic provider pass-through | any non-empty string | [agents](https://opencode.ai/docs/agents/) |
+| OpenCode | `model:` — `provider/model-id` | `reasoningEffort` — generic provider pass-through | `low` `medium` `high` `max` | [agents](https://opencode.ai/docs/agents/) |
 
 Codex has no `max` level, unlike Claude — the asymmetry that makes a single shared effort enum
-wrong. OpenCode's column is a deliberate hole: the mechanism is documented, but its docs name no
-value enum for every provider, so narrowing it would be a behaviour change with no evidence
-behind it.
+wrong. OpenCode's column was a deliberate hole (the mechanism was documented, but its docs named
+no value enum for every provider). The shipped registry only ever uses `high` and `max` for
+opencode-go entries, so the enum was narrowed to `low` `medium` `high` `max` for UI consistency
+and build-time validation, accepting the trade-off that a future provider needing another value
+would be a validation error to add, not a silent pass-through.
 
 Two hosts reject more than they ignore. Cursor's schema is exactly `name`, `description`,
 `model`, `readonly`, `is_background` — `readonly: true` is its only permission mechanism, and
