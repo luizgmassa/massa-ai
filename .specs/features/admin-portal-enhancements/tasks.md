@@ -34,6 +34,7 @@ Where: `apps/tools-api/src/routes/model-registry-stream.ts` (new), `apps/tools-a
   - On `child.on("close", code)`, emits `data: {"type":"done","exitCode":code}\n\n` and ends.
   - On spawn error, emits `data: {"type":"done","exitCode":null,"error":"..."}\n\n` and ends.
   - Reuses the `GENERATE_SCRIPT` path + `profilesLib()` lazy pattern from `model-registry.ts`.
+  - **F1 fold:** Follow the exact `events.ts` pattern: `return new Response(new ReadableStream({ start, cancel }), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no" } })`. Do NOT use `set.headers` for streaming. The `cancel` hook must `child.kill()` so a client disconnect does not orphan the spawn.
 - [ ] Create `apps/tools-api/src/routes/model-registry-stream.test.ts`:
   - Mock `spawn` to emit a stdout line, a stderr line, then close with exit 0 → assert SSE chunks.
   - Mock `spawn` to error → assert `done` with `exitCode:null,error`.
@@ -72,7 +73,7 @@ Where: `apps/web-ui/src/static/styles.css` (existing, append-only)
   - `.regenerate-log` (monospace, `--bg-code`, max-height, overflow-y) (DS-06).
   - `.index-progress` (DS-07).
   - `.badge` base + `.restart-badge` (amber), `.active-badge` (green) variants.
-  - All rules use existing CSS variables; no hardcoded colors. Provide `--accent-tint` fallback for `color-mix`.
+  - All rules use existing CSS variables; no hardcoded colors. **F5 fold:** Define `--accent-tint: rgba(37, 99, 235, 0.08)` in `:root` and `--accent-tint: rgba(96, 165, 250, 0.12)` in `[data-theme="dark"]`; use `background: var(--accent-tint)` as the baseline rule for `.overlay-sourced` (static rgba IS the rule, `color-mix` is optional progressive enhancement).
 - [ ] Verify no existing CSS rule is overridden destructively (append-only).
 
 Tests: `bun test apps/web-ui` (existing renderer tests assert classes in HTML, not CSS rules — must remain green)
@@ -131,6 +132,7 @@ Where: `apps/web-ui/src/static/app.js` (existing, extend `wireViewHandlers` + ne
 Depends on: T3
 
 - [ ] Add `state.registryOverlay` (init from `source.overlay` on registry view load), `state.registryDirty`.
+  - **F2 fold:** Do NOT re-initialize `state.registryOverlay` on every render — only on first load or after a successful Save/Clear. Add `state.registryLoaded` guard. Add a `beforeunload` handler when `state.registryDirty` is true that prompts "You have unsaved registry changes. Leave anyway?".
 - [ ] Wire cell edits (`registry-model`, `registry-effort`) on `change` event → update `state.registryOverlay.profiles[profile].hosts[host][tier]` → set `registryDirty=true` → update unsaved indicator.
 - [ ] Wire `registry-hostDefault` / `registry-workflowTier` on `change` → update overlay → dirty.
 - [ ] Add `handleRegistryAddProfile()`: `prompt` for name + description → init profile with null model/effort for all {host,tier} → add to overlay → re-render.
@@ -141,6 +143,7 @@ Depends on: T3
 - [ ] Add `handleRegistryClearOverlay()`: `confirm(...)` → DELETE `/api/v1/model-registry/overlay` → banner → re-render with builtin.
 - [ ] Wire all in `wireViewHandlers()`.
 - [ ] Add unsaved-changes indicator to `renderModelRegistry` output (or a wrapper) when `state.registryDirty`.
+- [ ] **F6 fold (mid-task gate):** after wiring cell edits + add/duplicate/delete/restore (in-memory mutations), run `bun test apps/web-ui/src/__tests__/admin-handlers.test.ts` for those cases BEFORE wiring save/clear. Checkpoint within the task.
 - [ ] Test in `admin-handlers.test.ts`:
   - Cell edit updates `state.registryOverlay` + sets dirty.
   - Add profile: mock prompt → name, assert profile added to overlay + grid.
@@ -191,6 +194,7 @@ Depends on: T3
 - [ ] Extend `renderProjects()` to prepend a `.index-progress` line when `state.indexJobId` is set (jobId, status badge, phase, file count).
 - [ ] Extend the SSE `es.onmessage` block: if `data.type==="index_status"` and `data.jobId===state.indexJobId`, update `state.indexJobStatus/Phase/FileCount` and re-render (if current view is projects).
 - [ ] Add polling fallback: if `EventSource` unavailable or on `es.onerror`, start `setInterval(2000)` calling `GET /api/v1/project/index/status/<jobId>`; update state; stop on `completed`/`failed`; cap at 150 polls (5 min).
+  - **F4 fold:** Store the interval ID in `state.indexPollInterval`. Clear it in three places: (1) on terminal status; (2) at the top of `render()` when `state.view !== "projects"`; (3) on `beforeunload`.
 - [ ] On `completed`: refresh project list.
 - [ ] On `failed`: progress line shows "failed" + error.
 - [ ] Test in `admin-handlers.test.ts`:
