@@ -902,6 +902,10 @@ export function renderConfig(data, opts) {
   const cards = CONFIG_SECTIONS.map((section) => {
     const isRestart = restartSet.has(section.key);
     const badge = isRestart ? ' <span class="badge restart-badge">restart needed</span>' : "";
+    const sectionConfig = section.key === "dataDir" ? config[section.key] : config[section.key];
+    const notConfiguredNote = (section.key === "capturePolicy" && sectionConfig === undefined)
+      ? '<div class="config-info-note">Not configured &mdash; using built-in defaults (DEFAULT_POLICY from the capture-policy pure module)</div>'
+      : "";
     const fieldsHtml = section.fields.map((field) => {
       const value = getConfigFieldValue(config, section.key, field.name);
       return renderConfigField(section.key, field, value);
@@ -912,6 +916,7 @@ export function renderConfig(data, opts) {
     return (
       '<div class="config-section" data-section="' + section.key + '">' +
       '<h3 class="config-section-header">' + escapeHtml(section.label) + badge + "</h3>" +
+      notConfiguredNote +
       '<div class="config-fields">' + fieldsHtml + "</div>" +
       saveBtn +
       "</div>"

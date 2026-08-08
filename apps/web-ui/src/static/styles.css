@@ -347,6 +347,45 @@ pre code {
   width: auto;
   margin: 0;
 }
+.config-info-note {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 0.4rem 0.75rem;
+  margin: 0.5rem 0;
+  font-size: 0.82rem;
+  color: var(--fg-muted, inherit);
+  font-style: italic;
+}
+.config-field-guide {
+  margin: 0.75rem 0 0;
+  border-top: 1px dashed var(--border);
+  padding-top: 0.5rem;
+}
+.config-field-guide > summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--accent);
+  user-select: none;
+}
+.config-field-guide-body {
+  padding: 0.5rem 0 0.25rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.config-field-guide-body dl {
+  margin: 0;
+}
+.config-field-guide-body dt {
+  font-weight: 600;
+  margin-top: 0.4rem;
+  color: var(--fg);
+}
+.config-field-guide-body dd {
+  margin: 0.1rem 0 0 1rem;
+  color: var(--fg-muted, inherit);
+}
 .save-btn {
   background: var(--accent);
   color: #fff;

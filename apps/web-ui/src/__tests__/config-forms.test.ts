@@ -273,7 +273,22 @@ describe("renderConfig — checkbox alignment (UIC-04)", () => {
   it("checkbox inputs have left-align CSS via align-self: flex-start", () => {
     const html = renderConfig({ config: { llm: { enabled: true } }, restartNeededSections: [] }, { writeMode: true });
     expect(html).toContain('type="checkbox"');
-    // The CSS rule .config-field input[type="checkbox"] { align-self: flex-start }
-    // is in styles.css, verified by reading the file (not asserted in HTML output).
+  });
+});
+
+describe("renderConfig — capturePolicy not-configured indicator (CFG-01)", () => {
+  it("shows not-configured note when capturePolicy absent", () => {
+    const html = renderConfig({ config: { database: { url: "x" } }, restartNeededSections: [] }, { writeMode: true });
+    expect(html).toContain("config-info-note");
+    expect(html).toContain("Not configured");
+    expect(html).toContain("DEFAULT_POLICY");
+  });
+
+  it("does not show not-configured note when capturePolicy present", () => {
+    const html = renderConfig({
+      config: { capturePolicy: { maxMatchWork: 100, maxIgnorePatterns: 50, rules: [] } },
+      restartNeededSections: [],
+    }, { writeMode: true });
+    expect(html).not.toContain("config-info-note");
   });
 });
