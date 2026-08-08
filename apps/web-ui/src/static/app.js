@@ -1460,8 +1460,13 @@ export async function handleConfigReveal(ctx, targetId, section, field) {
   const el = ctx.doc && ctx.doc.getElementById ? ctx.doc.getElementById(targetId) : null;
   if (!el) return;
   if (el.type === "text" && el.dataset.revealed === "true") {
+    // Hide: mask the display only (type back to password). Do NOT overwrite
+    // el.value with the literal "***" sentinel — on a field whose real
+    // stored value is empty, that fabricates a submittable value that used
+    // to be persisted verbatim as the real secret (F7/APCR-05). Leaving
+    // el.value untouched also preserves an edit the operator made while the
+    // field was revealed, instead of silently discarding it.
     el.type = "password";
-    el.value = "***";
     el.dataset.revealed = "";
     return;
   }

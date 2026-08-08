@@ -304,7 +304,7 @@ describe("handleConfigReveal — toggle input type + fetch real value (CFG-06, C
     expect(input.type).toBe("text");
   });
 
-  it("toggles text back to password on second call", async () => {
+  it("toggles text back to password on second call, without fabricating a '***' value (APCR-05.4)", async () => {
     const input: MockElement = { dataset: { id: "config-database-url", revealed: "true" }, type: "text", value: "real-val", addEventListener: () => {}, querySelectorAll: () => [], querySelector: () => null, insertBefore: (n) => n, remove: () => {} };
     const ctx = makeCtx({
       rootChildren: [input],
@@ -312,8 +312,23 @@ describe("handleConfigReveal — toggle input type + fetch real value (CFG-06, C
     });
     await handleConfigReveal(ctx, "config-database-url");
     expect(input.type).toBe("password");
-    expect(input.value).toBe("***");
+    // The real fetched value is preserved (masked visually by type=password),
+    // never overwritten with the literal "***" sentinel — a field whose real
+    // stored value was empty used to leave a submittable "***" that the old
+    // server bug persisted verbatim as the secret (F7).
+    expect(input.value).toBe("real-val");
     expect(input.dataset.revealed).toBe("");
+  });
+
+  it("hiding a revealed EMPTY field leaves no submittable '***' sentinel (APCR-05.4)", async () => {
+    const input: MockElement = { dataset: { id: "config-security-apiKey", revealed: "true" }, type: "text", value: "", addEventListener: () => {}, querySelectorAll: () => [], querySelector: () => null, insertBefore: (n) => n, remove: () => {} };
+    const ctx = makeCtx({
+      rootChildren: [input],
+      doc: { getElementById: mock(() => input) },
+    });
+    await handleConfigReveal(ctx, "config-security-apiKey");
+    expect(input.type).toBe("password");
+    expect(input.value).not.toBe("***");
   });
 
   it("fetches real value from reveal endpoint (CFG-02)", async () => {
@@ -331,7 +346,7 @@ describe("handleConfigReveal — toggle input type + fetch real value (CFG-06, C
     expect(input.dataset.revealed).toBe("true");
   });
 
-  it("toggles back to password + restores mask on second call after fetch", async () => {
+  it("toggles back to password on second call after fetch, keeping the fetched value", async () => {
     const input: MockElement = { dataset: { id: "config-database-url", revealed: "true" }, type: "text", value: "postgres://real", addEventListener: () => {}, querySelectorAll: () => [], querySelector: () => null, insertBefore: (n) => n, remove: () => {} };
     const ctx = makeCtx({
       rootChildren: [input],
@@ -339,7 +354,7 @@ describe("handleConfigReveal — toggle input type + fetch real value (CFG-06, C
     });
     await handleConfigReveal(ctx, "config-database-url", "database", "url");
     expect(input.type).toBe("password");
-    expect(input.value).toBe("***");
+    expect(input.value).toBe("postgres://real");
   });
 });
 

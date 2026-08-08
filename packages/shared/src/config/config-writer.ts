@@ -30,22 +30,30 @@ export function restartNeededSections(config: MassaAiConfig): string[] {
   });
 }
 
+/**
+ * Restore (or drop) a `"***"` mask-sentinel submission for each of the four sensitive
+ * fields, regardless of whether the currently stored value is truthy (APCR-05). The prior
+ * `&& current.X` truthy guard meant a field whose stored value was empty or absent left the
+ * submitted literal `"***"` untouched, which then persisted to config.json as the real
+ * secret (F7). Always restoring `current.X` — even when it is `""` or `undefined` — means
+ * the mask sentinel can never survive into the saved config.
+ */
 function applyMaskedSentinel(
   partial: Partial<MassaAiConfig>,
   current: MassaAiConfig,
 ): Partial<MassaAiConfig> {
   const result: Partial<MassaAiConfig> = JSON.parse(JSON.stringify(partial));
-  if (result.security?.apiKey === MASK_SENTINEL && current.security?.apiKey) {
-    result.security.apiKey = current.security.apiKey;
+  if (result.security?.apiKey === MASK_SENTINEL) {
+    result.security.apiKey = current.security?.apiKey ?? "";
   }
-  if (result.llm?.apiKey === MASK_SENTINEL && current.llm?.apiKey) {
-    result.llm.apiKey = current.llm.apiKey;
+  if (result.llm?.apiKey === MASK_SENTINEL) {
+    result.llm.apiKey = current.llm?.apiKey ?? "";
   }
-  if (result.embedding?.apiKey === MASK_SENTINEL && current.embedding?.apiKey) {
-    result.embedding.apiKey = current.embedding.apiKey;
+  if (result.embedding?.apiKey === MASK_SENTINEL) {
+    result.embedding.apiKey = current.embedding?.apiKey ?? "";
   }
-  if (result.database?.url === MASK_SENTINEL && current.database?.url) {
-    result.database.url = current.database.url;
+  if (result.database?.url === MASK_SENTINEL) {
+    result.database.url = current.database?.url ?? "";
   }
   return result;
 }

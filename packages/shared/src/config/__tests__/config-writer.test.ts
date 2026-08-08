@@ -369,6 +369,141 @@ describe("config-writer: masked sentinel preserves existing value", () => {
   });
 });
 
+describe("config-writer: masked sentinel against an empty stored value (APCR-05, F7)", () => {
+  test("security.apiKey = '***' against an absent stored key does not persist the literal sentinel", () => {
+    // defaultMassaAiConfig.security carries no apiKey at all.
+    const { exitCode: seedExit } = runWriter(
+      "seed-empty-security",
+      `
+      import { saveConfig } from ${JSON.stringify(LOADER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+      saveConfig(defaultMassaAiConfig);
+      `,
+    );
+    expect(seedExit).toBe(0);
+
+    const { exitCode, stdout } = runWriter(
+      "sentinel-empty-security",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      const result = savePartialConfig({
+        security: { apiKey: "***", corsOrigins: [] },
+      });
+      if (result.success) {
+        console.log(JSON.stringify({ success: true, apiKey: result.config.security?.apiKey }));
+      } else {
+        console.log(JSON.stringify({ success: false, details: result.details }));
+      }
+      `,
+    );
+    expect(exitCode).toBe(0);
+    const out = JSON.parse(stdout);
+    expect(out.success).toBe(true);
+    expect(out.apiKey).not.toBe("***");
+  });
+
+  test("llm.apiKey = '***' against an empty stored key does not persist the literal sentinel", () => {
+    const { exitCode: seedExit } = runWriter(
+      "seed-empty-llm",
+      `
+      import { saveConfig } from ${JSON.stringify(LOADER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+      saveConfig({ ...defaultMassaAiConfig, llm: { ...defaultMassaAiConfig.llm, apiKey: "" } });
+      `,
+    );
+    expect(seedExit).toBe(0);
+
+    const { exitCode, stdout } = runWriter(
+      "sentinel-empty-llm",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+
+      const result = savePartialConfig({
+        llm: { ...defaultMassaAiConfig.llm, apiKey: "***" },
+      });
+      if (result.success) {
+        console.log(JSON.stringify({ success: true, apiKey: result.config.llm?.apiKey }));
+      } else {
+        console.log(JSON.stringify({ success: false, details: result.details }));
+      }
+      `,
+    );
+    expect(exitCode).toBe(0);
+    const out = JSON.parse(stdout);
+    expect(out.success).toBe(true);
+    expect(out.apiKey).not.toBe("***");
+  });
+
+  test("embedding.apiKey = '***' against an absent stored key does not persist the literal sentinel", () => {
+    // defaultMassaAiConfig.embedding carries no apiKey at all.
+    const { exitCode: seedExit } = runWriter(
+      "seed-empty-embedding",
+      `
+      import { saveConfig } from ${JSON.stringify(LOADER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+      saveConfig(defaultMassaAiConfig);
+      `,
+    );
+    expect(seedExit).toBe(0);
+
+    const { exitCode, stdout } = runWriter(
+      "sentinel-empty-embedding",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+
+      const result = savePartialConfig({
+        embedding: { ...defaultMassaAiConfig.embedding, apiKey: "***" },
+      });
+      if (result.success) {
+        console.log(JSON.stringify({ success: true, apiKey: result.config.embedding?.apiKey }));
+      } else {
+        console.log(JSON.stringify({ success: false, details: result.details }));
+      }
+      `,
+    );
+    expect(exitCode).toBe(0);
+    const out = JSON.parse(stdout);
+    expect(out.success).toBe(true);
+    expect(out.apiKey).not.toBe("***");
+  });
+
+  test("database.url = '***' against the empty default url does not persist the literal sentinel", () => {
+    // defaultMassaAiConfig.database.url defaults to "" — the exact shape the audit
+    // named: a save with security.apiKey = "***" against a current value of "" is the
+    // Independent Test's fixture.
+    const { exitCode: seedExit } = runWriter(
+      "seed-empty-database",
+      `
+      import { saveConfig } from ${JSON.stringify(LOADER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+      saveConfig(defaultMassaAiConfig);
+      `,
+    );
+    expect(seedExit).toBe(0);
+
+    const { exitCode, stdout } = runWriter(
+      "sentinel-empty-database",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      const result = savePartialConfig({
+        database: { url: "***" },
+      });
+      if (result.success) {
+        console.log(JSON.stringify({ success: true, url: result.config.database?.url }));
+      } else {
+        console.log(JSON.stringify({ success: false, details: result.details }));
+      }
+      `,
+    );
+    expect(exitCode).toBe(0);
+    const out = JSON.parse(stdout);
+    expect(out.success).toBe(true);
+    expect(out.url).not.toBe("***");
+  });
+});
+
 describe("config-writer: import-time safety", () => {
   test("module never reads or writes at import time", () => {
     const { exitCode, stdout, stderr } = runWriter(
