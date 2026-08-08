@@ -916,6 +916,169 @@ export function renderProfiles(data, opts) {
   return '<section class="view"><h2>Profiles</h2>' + cards + "</section>";
 }
 
+// ── Model-registry editor (T12 — REG-01..18 UI side) ────────────────────────
+
+/** Frontend copy of HOST_EFFORT_ENUM (scripts/lib/model-profiles.ts:71).
+ *  Kept in sync manually; the frontend cannot import from scripts/lib. */
+const UI_HOST_EFFORT_ENUM = {
+  claude: ["low", "medium", "high", "xhigh", "max"],
+  codex: ["minimal", "low", "medium", "high", "xhigh"],
+  cursor: [],
+  opencode: null,
+};
+
+const REGISTRY_HOSTS = ["claude", "codex", "cursor", "opencode"];
+
+/**
+ * Model-registry editor renderer. Renders a grid (rows = {host, tier} pairs,
+ * columns = profiles, cells = {model, effort}). Marks overlay-sourced cells.
+ * Effort constrained to HOST_EFFORT_ENUM per host. Add/duplicate/delete/restore
+ * profile flows, hostDefaults + workflowTiers editable, regenerate +
+ * clear-overlay + save-overlay buttons.
+ */
+export function renderModelRegistry(data, opts) {
+  const payload = data || {};
+  const registry = payload.registry || {};
+  const source = payload.source || {};
+  const overlayError = payload.overlayError;
+  const writeMode = opts && opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
+
+  const profiles = registry.profiles || {};
+  const profileNames = Object.keys(profiles);
+  const tiers = registry.tiers || [];
+  const hostDefaults = registry.hostDefaults || {};
+  const workflowTiers = registry.workflowTiers || {};
+  const overlayProfiles = (source.overlay && source.overlay.profiles) || {};
+  const tombstoned = source.tombstoned || [];
+
+  if (profileNames.length === 0 && !overlayError) {
+    return '<section class="view"><h2>Model Registry</h2><p class="empty">No profiles in registry.</p></section>';
+  }
+
+  const overlayBanner = overlayError
+    ? '<div class="error">Overlay error: ' + escapeHtml(overlayError) + " (showing builtin)</div>"
+    : "";
+
+  // Build rows = {host, tier} pairs
+  const rows = [];
+  for (const host of REGISTRY_HOSTS) {
+    for (const tier of tiers) {
+      rows.push({ host, tier });
+    }
+  }
+
+  // Grid header: profile names as columns
+  const headerCells = profileNames.map((p) => {
+    const isOverlay = Object.prototype.hasOwnProperty.call(overlayProfiles, p);
+    const overlayMark = isOverlay ? ' <span class="badge overlay-badge">overlay</span>' : "";
+    return "<th>" + escapeHtml(p) + overlayMark + "</th>";
+  }).join("");
+
+  // Grid body: rows = {host, tier}, cells = {model, effort}
+  const bodyRows = rows.map((row) => {
+    const cells = profileNames.map((profileName) => {
+      const profile = profiles[profileName];
+      if (!profile || !profile.hosts) return '<td class="cell-empty">—</td>';
+      const hostMap = profile.hosts[row.host];
+      if (!hostMap) return '<td class="cell-empty">—</td>';
+      const cell = hostMap[row.tier];
+      if (!cell) return '<td class="cell-empty">—</td>';
+      const model = cell.model || "";
+      const effort = cell.effort || "";
+      const isOverlay = Object.prototype.hasOwnProperty.call(overlayProfiles, profileName);
+      const overlayClass = isOverlay ? " overlay-sourced" : "";
+      const effortOptions = UI_HOST_EFFORT_ENUM[row.host];
+      let effortInput;
+      if (effortOptions && effortOptions.length > 0) {
+        const opts2 = effortOptions.map((e) => {
+          const sel = e === effort ? " selected" : "";
+          return '<option value="' + escapeHtml(e) + '"' + sel + ">" + escapeHtml(e) + "</option>";
+        }).join("");
+        effortInput = '<select data-action="registry-effort" data-profile="' + escapeHtml(profileName) + '" data-host="' + escapeHtml(row.host) + '" data-tier="' + escapeHtml(row.tier) + '" data-type="enum"' + (writeMode ? "" : " disabled") + ">" + opts2 + "</select>";
+      } else if (effortOptions === null) {
+        effortInput = '<input type="text" data-action="registry-effort" data-profile="' + escapeHtml(profileName) + '" data-host="' + escapeHtml(row.host) + '" data-tier="' + escapeHtml(row.tier) + '" value="' + escapeHtml(effort) + '" data-type="text"' + (writeMode ? "" : " disabled") + " />";
+      } else {
+        effortInput = '<span class="muted">n/a</span>';
+      }
+      const modelInput = writeMode
+        ? '<input type="text" data-action="registry-model" data-profile="' + escapeHtml(profileName) + '" data-host="' + escapeHtml(row.host) + '" data-tier="' + escapeHtml(row.tier) + '" value="' + escapeHtml(model) + '" />'
+        : '<span>' + escapeHtml(model || "—") + "</span>";
+      return '<td class="registry-cell' + overlayClass + '">' + modelInput + effortInput + "</td>";
+    }).join("");
+    return "<tr><th>" + escapeHtml(row.host) + " / " + escapeHtml(row.tier) + "</th>" + cells + "</tr>";
+  }).join("");
+
+  const grid =
+    '<table class="registry-grid"><thead><tr><th>host / tier</th>' + headerCells + "</tr></thead><tbody>" + bodyRows + "</tbody></table>";
+
+  // hostDefaults editor
+  const hostDefaultsRows = REGISTRY_HOSTS.map((host) => {
+    const current = hostDefaults[host] || "";
+    const opts2 = profileNames.map((p) => {
+      const sel = p === current ? " selected" : "";
+      return '<option value="' + escapeHtml(p) + '"' + sel + ">" + escapeHtml(p) + "</option>";
+    }).join("");
+    return (
+      '<div class="config-field"><label>' + escapeHtml(host) + "</label>" +
+      '<select data-action="registry-hostDefault" data-host="' + escapeHtml(host) + '"' + (writeMode ? "" : " disabled") + ">" + opts2 + "</select></div>"
+    );
+  }).join("");
+
+  // workflowTiers editor
+  const workflowTierNames = Object.keys(workflowTiers);
+  const workflowTiersRows = workflowTierNames.map((wf) => {
+    const current = workflowTiers[wf] || "";
+    const tierOpts = tiers.map((t) => {
+      const sel = t === current ? " selected" : "";
+      return '<option value="' + escapeHtml(t) + '"' + sel + ">" + escapeHtml(t) + "</option>";
+    }).join("");
+    return (
+      '<div class="config-field"><label>' + escapeHtml(wf) + "</label>" +
+      '<select data-action="registry-workflowTier" data-workflow="' + escapeHtml(wf) + '"' + (writeMode ? "" : " disabled") + ">" + tierOpts + "</select></div>"
+    );
+  }).join("");
+
+  // Profile management: add / duplicate / delete / restore
+  const profileActions = writeMode
+    ? '<div class="registry-actions">' +
+      '<button type="button" data-action="registry-add-profile">Add Profile</button>' +
+      '<button type="button" data-action="registry-duplicate-profile">Duplicate Profile</button>' +
+      '<button type="button" data-action="registry-delete-profile">Delete Profile</button>' +
+      "</div>"
+    : "";
+
+  const tombstonedList = tombstoned.length
+    ? '<div class="tombstoned"><h4>Deleted (restorable)</h4>' +
+      tombstoned.map((p) => {
+        const restoreBtn = writeMode
+          ? ' <button type="button" data-action="registry-restore" data-profile="' + escapeHtml(p) + '">Restore</button>'
+          : "";
+        return '<div class="tombstoned-item" data-tombstoned="' + escapeHtml(p) + '">' + escapeHtml(p) + restoreBtn + "</div>";
+      }).join("") +
+      "</div>"
+    : "";
+
+  const actionButtons = writeMode
+    ? '<div class="registry-action-buttons">' +
+      '<button type="button" data-action="registry-save-overlay">Save Overlay</button>' +
+      '<button type="button" data-action="registry-regenerate">Regenerate Artifacts</button>' +
+      '<button type="button" data-action="registry-clear-overlay">Reset to Built-in (clear overlay)</button>' +
+      "</div>"
+    : "";
+
+  return (
+    '<section class="view"><h2>Model Registry</h2>' +
+    overlayBanner +
+    grid +
+    '<div class="registry-hostDefaults"><h3>Host Defaults</h3>' + hostDefaultsRows + "</div>" +
+    '<div class="registry-workflowTiers"><h3>Workflow Tiers</h3>' + workflowTiersRows + "</div>" +
+    profileActions +
+    tombstonedList +
+    actionButtons +
+    "</section>"
+  );
+}
+
 // ── Helpers used by renderers ──────────────────────────────────────────────
 
 function truncate(s, n) {
@@ -1061,7 +1224,7 @@ function startApp(opts) {
   }
   function viewFromHash(h) {
     const name = (h || "").replace(/^#\/?/, "");
-    return ["projects", "memory", "search", "handoffs", "proposals", "checkpoints", "dashboard", "config", "profiles"].includes(name)
+    return ["projects", "memory", "search", "handoffs", "proposals", "checkpoints", "dashboard", "config", "profiles", "model-registry"].includes(name)
       ? name
       : "projects";
   }
@@ -1139,6 +1302,9 @@ function startApp(opts) {
       } else if (state.view === "profiles") {
         const data = await api.request("/api/v1/profiles");
         root.innerHTML = renderProfiles((data && data.data) || { hosts: [] }, { writeMode: isWriteModeEnabled() });
+      } else if (state.view === "model-registry") {
+        const data = await api.request("/api/v1/model-registry");
+        root.innerHTML = renderModelRegistry((data && data.data) || { registry: {}, source: {} }, { writeMode: isWriteModeEnabled() });
       }
     } catch (e) {
       root.innerHTML = '<div class="error">Connection error: ' + escapeHtml(String(e.message || e)) + "</div>";
@@ -1310,6 +1476,7 @@ const MASSA_AI_UI = {
   renderConfig,
   buildConfigSectionBody,
   renderProfiles,
+  renderModelRegistry,
   initTheme,
   toggleTheme,
   isWriteModeEnabled,

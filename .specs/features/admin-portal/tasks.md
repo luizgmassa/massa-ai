@@ -379,14 +379,14 @@ CHKP-05 decision: store is directly reachable via `CheckpointManager.getInstance
 - Skill: NONE
 
 **Done when**:
-- [ ] Grid renders all profiles as columns, `{host,tier}` as rows, cells `{model,effort}`
-- [ ] Overlay-sourced cells marked
-- [ ] Effort select constrained per host (`HOST_EFFORT_ENUM`)
-- [ ] Add/duplicate/delete/restore profile flows work
-- [ ] hostDefaults + workflowTiers editable
-- [ ] Regenerate + clear-overlay + save-overlay buttons present and wired
-- [ ] `bun test apps/web-ui/src/__tests__/registry-editor.test.ts` passes (new: grid render, overlay mark, effort constraint, add/duplicate/delete/restore, save full overlay)
-- [ ] `bun run type-check` passes
+- [x] Grid renders all profiles as columns, `{host,tier}` as rows, cells `{model,effort}`
+- [x] Overlay-sourced cells marked
+- [x] Effort select constrained per host (`HOST_EFFORT_ENUM`)
+- [x] Add/duplicate/delete/restore profile flows work
+- [x] hostDefaults + workflowTiers editable
+- [x] Regenerate + clear-overlay + save-overlay buttons present and wired
+- [x] `bun test apps/web-ui/src/__tests__/registry-editor.test.ts` passes (new: grid render, overlay mark, effort constraint, add/duplicate/delete/restore, save full overlay)
+- [x] `bun run type-check` passes
 
 **Tests**: unit (registry editor)
 **Gate**: quick
