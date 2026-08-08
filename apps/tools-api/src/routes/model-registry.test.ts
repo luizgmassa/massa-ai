@@ -219,6 +219,34 @@ describe("POST /api/v1/model-registry/regenerate", () => {
     expect(res.json.success).toBe(false);
     expect(res.json.error).toContain("regeneration failed");
   });
+
+  test("500 when spawnSync throws (regenerate exception branch)", async () => {
+    spawnSyncMock.mockImplementationOnce(() => {
+      throw new Error("spawn EACCES");
+    });
+
+    const res = await post("/api/v1/model-registry/regenerate");
+    expect(res.status).toBe(500);
+    expect(res.json.success).toBe(false);
+    expect(res.json.error).toContain("regeneration error");
+  });
+});
+
+describe("PUT /api/v1/model-registry — non-validation error re-throw", () => {
+  test("500 when a non-RegistryValidationError is thrown by validateRegistry", async () => {
+    validateRegistry.mockImplementationOnce(() => {
+      throw new TypeError("unexpected");
+    });
+
+    const res = await app.handle(
+      new Request("http://localhost/api/v1/model-registry", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ profiles: {} }),
+      }),
+    );
+    expect(res.status).toBe(500);
+  });
 });
 
 // ── Real socket: auth gate (AD-011) ──────────────────────────────────────────
