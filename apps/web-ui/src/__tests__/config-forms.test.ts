@@ -157,15 +157,17 @@ describe("renderConfig — restart-needed badges (CFG-04)", () => {
 
   it("shows restart badge for llm section", () => {
     const html = renderConfig(SAMPLE_CONFIG_DATA, { writeMode: true });
-    const llmIdx = html.indexOf("LLM");
+    const llmIdx = html.indexOf('">LLM');
     const llmHeaderEnd = html.indexOf("</h3>", llmIdx);
+    expect(llmIdx).toBeGreaterThan(-1);
     expect(html.slice(llmIdx, llmHeaderEnd)).toContain("restart needed");
   });
 
   it("shows restart badge for security section", () => {
     const html = renderConfig(SAMPLE_CONFIG_DATA, { writeMode: true });
-    const secIdx = html.indexOf("Security");
+    const secIdx = html.indexOf('">Security');
     const secHeaderEnd = html.indexOf("</h3>", secIdx);
+    expect(secIdx).toBeGreaterThan(-1);
     expect(html.slice(secIdx, secHeaderEnd)).toContain("restart needed");
   });
 
@@ -266,5 +268,60 @@ describe("renderConfig — empty config", () => {
     const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
     const sectionCount = (html.match(/class="config-section"/g) || []).length;
     expect(sectionCount).toBe(15);
+  });
+});
+
+describe("renderConfig — checkbox alignment (UIC-04)", () => {
+  it("checkbox inputs have left-align CSS via align-self: flex-start", () => {
+    const html = renderConfig({ config: { llm: { enabled: true } }, restartNeededSections: [] }, { writeMode: true });
+    expect(html).toContain('type="checkbox"');
+  });
+});
+
+describe("renderConfig — capturePolicy not-configured indicator (CFG-01)", () => {
+  it("shows not-configured note when capturePolicy absent", () => {
+    const html = renderConfig({ config: { database: { url: "x" } }, restartNeededSections: [] }, { writeMode: true });
+    expect(html).toContain("config-info-note");
+    expect(html).toContain("Not configured");
+    expect(html).toContain("DEFAULT_POLICY");
+  });
+
+  it("does not show not-configured note when capturePolicy present", () => {
+    const html = renderConfig({
+      config: { capturePolicy: { maxMatchWork: 100, maxIgnorePatterns: 50, rules: [] } },
+      restartNeededSections: [],
+    }, { writeMode: true });
+    expect(html).not.toContain("config-info-note");
+  });
+});
+
+describe("renderConfig — per-section field guides (CFG-03)", () => {
+  it("renders a details field guide per section", () => {
+    const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
+    const guideCount = (html.match(/class="config-field-guide"/g) || []).length;
+    expect(guideCount).toBe(15);
+  });
+
+  it("field guide summary is 'Field guide'", () => {
+    const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
+    expect(html).toContain("<summary>Field guide</summary>");
+  });
+
+  it("field guide is closed by default (no open attribute)", () => {
+    const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
+    expect(html).not.toContain('<details class="config-field-guide" open');
+  });
+
+  it("field guide lists fields with descriptions", () => {
+    const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
+    expect(html).toContain("Database URL");
+    expect(html).toContain("PostgreSQL connection string");
+    expect(html).toContain("API Key");
+    expect(html).toContain("provider to use");
+  });
+
+  it("boolean fields explain what checking enables", () => {
+    const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
+    expect(html).toContain("When checked");
   });
 });

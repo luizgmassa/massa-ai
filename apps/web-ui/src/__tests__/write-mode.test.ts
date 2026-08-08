@@ -326,11 +326,13 @@ describe("T13 create/delete forms render correct fields when trusted", () => {
     expect(html).toContain('data-id="h-trust"');
   });
 
-  it("checkpoint create + delete buttons visible when trusted (CHKP-02, CHKP-04)", () => {
+  it("checkpoint create + edit + delete buttons visible when trusted (CHKP-02, CHKP-04, UIC-03)", () => {
     trustedOn();
     const data = { success: true, data: { checkpoints: [{ id: "c-trust", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };
     const html = renderCheckpoints(data);
     expect(html).toContain('data-action="checkpoint-create"');
+    expect(html).toContain('data-action="checkpoint-edit"');
+    expect(html).toContain('class="btn-edit"');
     expect(html).toContain('data-action="checkpoint-delete"');
   });
 

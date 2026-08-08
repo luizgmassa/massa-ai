@@ -666,8 +666,7 @@ describe("subagent parity — FEATURES.md doc-drift (MPR-R11)", () => {
       const documented = backticked(row[3]!);
       const enumeration = HOST_EFFORT_ENUM[host!];
       if (enumeration === null) {
-        // OpenCode: documented mechanism, deliberately no value enum. Must say so, and
-        // must not smuggle in a made-up list.
+        // No host currently has a null enum (opencode was narrowed to a list).
         expect(documented).toEqual([]);
         expect(row[3]).toContain("any non-empty string");
       } else {

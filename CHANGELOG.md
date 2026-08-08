@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Admin Portal UI Fixes + Registry Enhancements + Config Tab Fixes.**
+  Three spec-driven features on one branch:
+  (1) UI consistency fixes — missing CSS classes for action buttons/forms,
+  Projects tab grid table, Checkpoints Edit button, Config checkbox
+  alignment, Profiles marketplace install detection, Edit Registry error
+  display, `errorBlock` object-error rendering for live API shapes;
+  (2) Registry editor enhancements — help section explaining 6 action
+  buttons, opencode effort dropdown constrained to `[low, medium, high, max]`,
+  workflow tiers UI add/remove with workflow-name picker from the live
+  inventory (40 stems);
+  (3) Config tab fixes — Capture Policy "not configured (using built-in
+  defaults)" indicator, reveal button fetches real sensitive value from new
+  `GET /api/v1/config/reveal` endpoint, per-section field guides for all 15
+  config sections. Project `/list` route gains a cross-dimension fallback
+  that queries all `vector_documents_*d` tables when the current embedding
+  model dimension doesn't match the config. 13 ACs across 3 features,
+  all validated PASS.
+
 ## [1.41.0] - 2026-08-08
 
 ### Added

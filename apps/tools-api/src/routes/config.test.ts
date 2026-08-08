@@ -166,6 +166,48 @@ describe("PUT /api/v1/config", () => {
   });
 });
 
+describe("GET /api/v1/config/reveal", () => {
+  test("200 + unmasked value for database.url", async () => {
+    loadConfig.mockImplementationOnce(() => ({
+      database: { url: "postgres://real-url" },
+    }));
+    const res = await get("/api/v1/config/reveal?section=database&field=url");
+    expect(res.status).toBe(200);
+    expect(res.json.success).toBe(true);
+    expect(res.json.data.section).toBe("database");
+    expect(res.json.data.field).toBe("url");
+    expect(res.json.data.value).toBe("postgres://real-url");
+  });
+
+  test("200 + unmasked value for llm.apiKey", async () => {
+    loadConfig.mockImplementationOnce(() => ({
+      llm: { apiKey: "real-llm-key" },
+    }));
+    const res = await get("/api/v1/config/reveal?section=llm&field=apiKey");
+    expect(res.status).toBe(200);
+    expect(res.json.data.value).toBe("real-llm-key");
+  });
+
+  test("400 when section/field is not sensitive", async () => {
+    const res = await get("/api/v1/config/reveal?section=logging&field=level");
+    expect(res.status).toBe(400);
+    expect(res.json.success).toBe(false);
+    expect(res.json.error).toContain("not a sensitive field");
+  });
+
+  test("422 when section or field missing (Elysia validation)", async () => {
+    const res = await get("/api/v1/config/reveal?section=database");
+    expect(res.status).toBe(422);
+  });
+
+  test("returns empty string when field is absent in config", async () => {
+    loadConfig.mockImplementationOnce(() => ({ database: {} }));
+    const res = await get("/api/v1/config/reveal?section=database&field=url");
+    expect(res.status).toBe(200);
+    expect(res.json.data.value).toBe("");
+  });
+});
+
 // ── Real socket: auth gate (AD-011) ──────────────────────────────────────────
 
 import { authMiddleware, __setAuthKeyForTests } from "../middleware/auth.js";

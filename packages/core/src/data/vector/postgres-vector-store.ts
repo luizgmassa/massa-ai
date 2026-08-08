@@ -716,6 +716,64 @@ export class PostgresVectorStore extends BaseVectorStore {
     }));
   }
 
+  /**
+   * Get a pool without the embedding dimension check (for dimension-agnostic
+   * queries like listAllProjectsAcrossDimensions). Creates one if needed.
+   */
+  private async getPool(): Promise<Pool> {
+    if (this.pool) return this.pool;
+    const pg = await import('pg');
+    const PgPool = (pg.default as any)?.Pool ?? (pg as any).Pool;
+    const poolConfig: PoolConfig = {
+      connectionString: this.config.connectionString,
+      max: this.config.poolSize,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    };
+    this.pool = new PgPool(poolConfig) as Pool;
+    return this.pool;
+  }
+
+  /**
+   * List projects across ALL dimension tables (vector_documents_*d).
+   * Bypasses ensureInitialized() so it works even when the current embedding
+   * model dimension doesn't match the config. Merges counts from all tables.
+   */
+  async listAllProjectsAcrossDimensions(): Promise<ProjectInfo[]> {
+    const pool = await this.getPool();
+
+    const { rows: tables } = await pool.query(`
+      SELECT tablename FROM pg_tables
+      WHERE tablename = 'vector_documents'
+         OR tablename ~ '^vector_documents_[0-9]+d$'
+      ORDER BY tablename
+    `);
+
+    if (tables.length === 0) return [];
+
+    const unionParts = tables.map((t: any) =>
+      `SELECT project_id, COUNT(*)::int AS doc_count, MAX(updated_at) AS last_updated, SUM(LENGTH(content))::bigint AS total_size FROM ${t.tablename} WHERE id NOT LIKE '_metadata:%' GROUP BY project_id`
+    ).join(' UNION ALL ');
+
+    const { rows } = await pool.query(`
+      SELECT project_id,
+             SUM(doc_count)::int AS doc_count,
+             MAX(last_updated) AS last_updated,
+             SUM(total_size)::bigint AS total_size
+      FROM (${unionParts}) AS merged
+      GROUP BY project_id
+      ORDER BY last_updated DESC
+    `);
+
+    return rows.map((row: any) => ({
+      projectId: row.project_id,
+      projectPath: null,
+      documentCount: parseInt(row.doc_count),
+      totalSize: parseInt(row.total_size ?? '0'),
+      lastIndexed: row.last_updated?.toISOString() ?? null,
+    }));
+  }
+
   // ── Misc ───────────────────────────────────────────────────────────────────
 
   /**

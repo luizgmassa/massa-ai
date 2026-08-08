@@ -71,18 +71,18 @@ describe("renderProjects", () => {
     expect(renderProjects(null)).toContain("No indexed projects");
   });
 
-  it("renders project rows with doc counts", () => {
+  it("renders project rows in a grid table with doc counts", () => {
     const html = renderProjects({ projects: [{ projectId: "p1", documentCount: 5 }, { id: "p2", docCount: 3 }] });
+    expect(html).toContain("grid");
     expect(html).toContain("p1");
-    expect(html).toContain("5 docs");
+    expect(html).toContain("5");
     expect(html).toContain("p2");
-    expect(html).toContain("3 docs");
+    expect(html).toContain("3");
   });
 
   it("omits doc count when absent", () => {
     const html = renderProjects({ projects: [{ projectId: "p3" }] });
     expect(html).toContain("p3");
-    expect(html).not.toContain("docs");
   });
 });
 
@@ -95,6 +95,13 @@ describe("renderSearch", () => {
   it("shows error block on failed data", () => {
     const html = renderSearch({ success: false, error: "boom" }, { query: "q" });
     expect(html).toContain("boom");
+  });
+
+  it("shows error block on object error (live API shape)", () => {
+    const html = renderSearch({ success: false, error: { code: "NOT_FOUND", message: "Route not found" } }, { query: "q" });
+    expect(html).toContain("NOT_FOUND");
+    expect(html).toContain("Route not found");
+    expect(html).not.toContain("[object Object]");
   });
 
   it("shows no-results message", () => {
@@ -155,6 +162,12 @@ describe("renderCheckpoints", () => {
   it("shows error on failed/null data", () => {
     expect(renderCheckpoints(null)).toContain("Request failed");
     expect(renderCheckpoints({ success: false, error: "nope" })).toContain("nope");
+  });
+
+  it("shows error on object error (live API shape)", () => {
+    const html = renderCheckpoints({ success: false, error: { code: "NOT_FOUND", message: "Route not found" } });
+    expect(html).toContain("Route not found");
+    expect(html).not.toContain("[object Object]");
   });
 
   it("shows empty state", () => {
@@ -223,6 +236,12 @@ describe("renderMemoryBrowser edge cases", () => {
   it("shows error block on failed data", () => {
     const html = renderMemoryBrowser({ success: false, error: "denied" }, {});
     expect(html).toContain("denied");
+  });
+
+  it("shows error block on object error (live API shape)", () => {
+    const html = renderMemoryBrowser({ success: false, error: { code: "NOT_FOUND", message: "Route not found" } }, {});
+    expect(html).toContain("Route not found");
+    expect(html).not.toContain("[object Object]");
   });
 
   it("shows empty memories message", () => {
@@ -716,6 +735,21 @@ describe("admin portal nav + footer + routing (T9)", () => {
     expect(html).toContain("active");
   });
 
+  it("renderProfiles shows installed with marketplace message when no variant profiles (UIC-05)", () => {
+    const html = renderProfiles({ hosts: [{ host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.41.0", availableProfiles: [] }] }, { writeMode: false });
+    expect(html).toContain("claude");
+    expect(html).not.toContain("Not installed");
+    expect(html).toContain("marketplace");
+    expect(html).toContain("MASSA_AI_MODEL_PROFILE");
+    expect(html).toContain("Regenerate Artifacts");
+  });
+
+  it("renderProfiles shows Not installed when installed is false", () => {
+    const html = renderProfiles({ hosts: [{ host: "cursor", installed: false, skipped: true, skipReason: "skipped", activeProfile: null, bundleVersion: null, availableProfiles: [] }] }, { writeMode: false });
+    expect(html).toContain("cursor");
+    expect(html).toContain("skipped");
+  });
+
   it("renderProfiles stub renders empty state when no profiles", () => {
     const html = renderProfiles({ hosts: [] }, { writeMode: false });
     expect(html).toContain("No profiles");
@@ -977,8 +1011,27 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
       disableWrite();
       const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
       const html = renderProjects(data);
-      expect(html).not.toContain("Index Project");
       expect(html).not.toContain('data-action="project-reset"');
+      expect(html).not.toContain('data-create="projectPath"');
+    });
+
+    it("renders field helper section with Index Project guide", () => {
+      enableWrite();
+      const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
+      const html = renderProjects(data);
+      expect(html).toContain("<details");
+      expect(html).toContain("Index Project");
+      expect(html).toContain("projectPath");
+      expect(html).toContain("forceReindex");
+      expect(html).toContain("warmCache");
+    });
+
+    it("renders field helper in read mode too", () => {
+      disableWrite();
+      const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
+      const html = renderProjects(data);
+      expect(html).toContain("<details");
+      expect(html).toContain("Embedding Dimension Note");
     });
   });
 });

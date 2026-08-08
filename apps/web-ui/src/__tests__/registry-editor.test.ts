@@ -107,10 +107,12 @@ describe("renderModelRegistry — effort enum constraint (REG-03)", () => {
     expect(html).toContain("minimal");
   });
 
-  it("renders text input for opencode effort (non-enumerable)", () => {
+  it("renders dropdown for opencode effort (constrained enum)", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain('data-host="opencode"');
-    expect(html).toContain('data-type="text"');
+    expect(html).toContain('data-type="enum"');
+    expect(html).toContain('value="max"');
+    expect(html).toContain('value="high"');
   });
 
   it("renders n/a for cursor effort (empty enum)", () => {
@@ -181,6 +183,24 @@ describe("renderModelRegistry — hostDefaults + workflowTiers (REG-08, REG-09)"
     expect(html).toContain("standard");
     expect(html).toContain("deep");
   });
+
+  it("renders Add Workflow Tier button when write mode on (REG-03)", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain('data-action="registry-workflowTier-add"');
+    expect(html).toContain("Add Workflow Tier");
+  });
+
+  it("renders Remove button per workflow tier row when write mode on (REG-03)", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain('data-action="registry-workflowTier-remove"');
+    expect(html).toContain('data-workflow="search"');
+  });
+
+  it("hides Add + Remove workflow tier buttons when write mode off", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
+    expect(html).not.toContain('data-action="registry-workflowTier-add"');
+    expect(html).not.toContain('data-action="registry-workflowTier-remove"');
+  });
 });
 
 describe("renderModelRegistry — action buttons (REG-10, REG-13, REG-14, REG-15)", () => {
@@ -231,6 +251,12 @@ describe("renderModelRegistry — overlay error + empty state (REG-16)", () => {
     const html = renderModelRegistry({}, { writeMode: true });
     expect(html).toContain("No profiles");
   });
+
+  it("shows registry error message when _error present (UIC-06)", () => {
+    const html = renderModelRegistry({ registry: { profiles: {} }, source: {}, _error: "Route not found" }, { writeMode: true });
+    expect(html).toContain("Registry load error");
+    expect(html).toContain("Route not found");
+  });
 });
 
 describe("renderModelRegistry — cell inputs", () => {
@@ -258,5 +284,38 @@ describe("renderModelRegistry — defaults writeMode", () => {
     delete (globalThis as any).localStorage;
     const html = renderModelRegistry(SAMPLE_REGISTRY);
     expect(html).not.toContain('data-action="registry-save-overlay"');
+  });
+});
+
+describe("renderModelRegistry — help section (REG-01)", () => {
+  it("renders a collapsible details help section", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain("<details");
+    expect(html).toContain('class="registry-help"');
+    expect(html).toContain("<summary>?</summary>");
+  });
+
+  it("explains all six action buttons", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain("Add Profile");
+    expect(html).toContain("Duplicate Profile");
+    expect(html).toContain("Delete Profile");
+    expect(html).toContain("Save Overlay");
+    expect(html).toContain("Regenerate Artifacts");
+    expect(html).toContain("Reset to Built-in");
+  });
+
+  it("help section appears after action buttons", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    const actionIdx = html.indexOf('data-action="registry-clear-overlay"');
+    const helpIdx = html.indexOf('class="registry-help"');
+    expect(actionIdx).toBeGreaterThan(-1);
+    expect(helpIdx).toBeGreaterThan(actionIdx);
+  });
+
+  it("renders help section in read mode too (buttons absent, help present)", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
+    expect(html).toContain("<details");
+    expect(html).toContain("Button Guide");
   });
 });

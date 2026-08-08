@@ -252,19 +252,6 @@ export function renderProjects(data, opts) {
       '</div>'
     : "";
 
-  const rows = projects
-    .map((p) => {
-      const id = escapeHtml(p.projectId || p.id || "");
-      const count = p.documentCount ?? p.docCount ?? "";
-      const meta =
-        count !== "" ? ' <span class="muted">(' + escapeHtml(String(count)) + " docs)</span>" : "";
-      const resetBtn = writeMode
-        ? ' <button type="button" class="btn-delete" data-action="project-reset" data-project="' + id + '">reset</button>'
-        : "";
-      return "<li>" + escapeHtml(id) + meta + resetBtn + "</li>";
-    })
-    .join("");
-
   const indexForm = writeMode
     ? '<div class="create-form">' +
       "<h3>Index Project</h3>" +
@@ -277,15 +264,56 @@ export function renderProjects(data, opts) {
     : "";
 
   if (projects.length === 0 && !writeMode) {
-    return '<p class="empty">No indexed projects.</p>';
+    return '<section class="view"><h2>Projects</h2>' + indexProgress + '<p class="empty">No indexed projects.</p></section>';
   }
+
+  const actionCol = writeMode ? "<th>actions</th>" : "";
+  const body =
+    '<table class="grid"><thead><tr><th>project</th><th>docs</th>' + actionCol + '</tr></thead><tbody>' +
+    projects
+      .map((p) => {
+        const id = escapeHtml(p.projectId || p.id || "");
+        const count = p.documentCount ?? p.docCount ?? "";
+        const actions = writeMode
+          ? '<td class="actions-cell">' +
+            '<button type="button" class="btn-delete" data-action="project-reset" data-project="' + id + '">reset</button>' +
+            "</td>"
+          : "";
+        return (
+          "<tr>" +
+          "<td>" +
+          escapeHtml(id) +
+          "</td>" +
+          "<td>" +
+          (count !== "" ? escapeHtml(String(count)) : "") +
+          "</td>" +
+          actions +
+          "</tr>"
+        );
+      })
+      .join("") +
+    "</tbody></table>";
+
   return (
     '<section class="view"><h2>Projects</h2>' +
     indexProgress +
-    '<ul class="project-list">' +
-    rows +
-    "</ul>" +
+    body +
     indexForm +
+    '<details class="registry-help"><summary>?</summary>' +
+    '<div class="registry-help-body">' +
+    '<h4>Index Project</h4>' +
+    '<dl>' +
+    '<dt>projectPath</dt><dd>Absolute path to the project directory to index. Must be a git repository or a directory with source files.</dd>' +
+    '<dt>projectId</dt><dd>Unique identifier for the project. Defaults to the directory basename. Used to scope all indexed data (memories, search, symbols).</dd>' +
+    '<dt>forceReindex</dt><dd>When checked, re-indexes all files even if they have not changed since the last index. Use after changing embedding models or when the index is corrupted.</dd>' +
+    '<dt>warmCache</dt><dd>When checked, pre-warms the search cache after indexing. Speeds up the first search query but adds time to the indexing process.</dd>' +
+    '</dl>' +
+    '<h4>Project Table</h4>' +
+    '<p>The table lists all indexed projects with their document count. Use the reset button to remove all indexed data for a project (vectors, keywords, symbols). This is irreversible.</p>' +
+    '<h4>Embedding Dimension Note</h4>' +
+    '<p>If a project is missing from the list, the current embedding model dimension may not match the dimension used when the project was indexed. Check the Embedding section in Config for the correct dimensions value, or reindex the project.</p>' +
+    '</div>' +
+    '</details>' +
     "</section>"
   );
 }
@@ -613,6 +641,7 @@ export function renderCheckpoints(data) {
         const id = escapeHtml(c.id || c.checkpointId || "");
         const actions = writeMode
           ? '<td class="actions-cell">' +
+            '<button type="button" class="btn-edit" data-action="checkpoint-edit" data-id="' + id + '" data-task="' + escapeHtml(c.taskId || "") + '" data-status="' + escapeHtml(c.status || "") + '" data-type="' + escapeHtml(c.type || c.checkpointType || "") + '" data-description="' + escapeHtml(c.description || "") + '" data-progress="' + escapeHtml(String(c.progressPercent ?? "")) + '" data-step="' + escapeHtml(c.currentStep || "") + '" data-total="' + escapeHtml(String(c.totalSteps ?? "")) + '" data-completed="' + escapeHtml(String(c.completedSteps ?? "")) + '" data-checkpoint-type="' + escapeHtml(c.checkpointType || c.type || "") + '">edit</button> ' +
             '<button type="button" class="btn-delete" data-action="checkpoint-delete" data-id="' + id + '" data-task="' + escapeHtml(c.taskId || "") + '">delete</button>' +
             "</td>"
           : "";
@@ -655,174 +684,174 @@ const CONFIG_SECTIONS = [
   {
     key: "database",
     label: "Database",
-    fields: [{ name: "url", type: "text", label: "Database URL", sensitive: true }],
+    fields: [{ name: "url", type: "text", label: "Database URL", sensitive: true, guide: "PostgreSQL connection string (e.g., postgresql://user:pass@host:5432/db). Changing this requires a server restart." }],
   },
   {
     key: "embedding",
     label: "Embedding",
     fields: [
-      { name: "provider", type: "enum", label: "Provider", enum: ["ollama", "mistral", "openai", "google", "cohere"] },
-      { name: "model", type: "text", label: "Model" },
-      { name: "baseURL", type: "text", label: "Base URL" },
-      { name: "apiKey", type: "text", label: "API Key", sensitive: true },
-      { name: "dimensions", type: "number", label: "Dimensions" },
+      { name: "provider", type: "enum", label: "Provider", enum: ["ollama", "mistral", "openai", "google", "cohere"], guide: "Which embedding provider to use. Ollama runs locally; others are cloud APIs." },
+      { name: "model", type: "text", label: "Model", guide: "The embedding model name (e.g., qwen3-embedding:4b for Ollama)." },
+      { name: "baseURL", type: "text", label: "Base URL", guide: "Base URL for the embedding API. For Ollama, typically http://localhost:11434." },
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for cloud providers. Not needed for Ollama. Changing this requires a restart." },
+      { name: "dimensions", type: "number", label: "Dimensions", guide: "Embedding vector dimension. Must match the model's output dimension (e.g., 4096 for qwen3-embedding:4b)." },
     ],
   },
   {
     key: "compression",
     label: "Compression",
     fields: [
-      { name: "defaultStrategy", type: "text", label: "Default Strategy" },
-      { name: "minTokensForCompression", type: "number", label: "Min Tokens" },
-      { name: "targetCompressionRatio", type: "number", label: "Target Ratio (0-1)" },
-      { name: "prompt", type: "text", label: "Prompt (optional)" },
+      { name: "defaultStrategy", type: "text", label: "Default Strategy", guide: "Compression strategy: code_structure, conversation_summary, semantic_dedup, or hierarchical." },
+      { name: "minTokensForCompression", type: "number", label: "Min Tokens", guide: "Minimum token count to trigger compression. Below this, content is kept verbatim." },
+      { name: "targetCompressionRatio", type: "number", label: "Target Ratio (0-1)", guide: "Target compression ratio (0.7 = reduce to 70% of original)." },
+      { name: "prompt", type: "text", label: "Prompt (optional)", guide: "Custom LLM prompt for compression. When empty, uses the built-in default." },
     ],
   },
   {
     key: "impact",
     label: "Impact Analysis",
-    fields: [{ name: "bfsCteEnabled", type: "boolean", label: "BFS CTE Enabled" }],
+    fields: [{ name: "bfsCteEnabled", type: "boolean", label: "BFS CTE Enabled", guide: "When checked, impact analysis uses a PostgreSQL recursive CTE for BFS traversal. Faster on large graphs but requires PostgreSQL 17+." }],
   },
   {
     key: "capturePolicy",
     label: "Capture Policy",
     fields: [
-      { name: "maxMatchWork", type: "number", label: "Max Match Work" },
-      { name: "maxIgnorePatterns", type: "number", label: "Max Ignore Patterns" },
-      { name: "rules", type: "string[]", label: "Rules (JSON)" },
+      { name: "maxMatchWork", type: "number", label: "Max Match Work", guide: "Maximum glob match operations before bailing. Default: 100000." },
+      { name: "maxIgnorePatterns", type: "number", label: "Max Ignore Patterns", guide: "Maximum ignore patterns allowed. Default: 1024." },
+      { name: "rules", type: "string[]", label: "Rules (JSON)", guide: "Capture rules as JSON array of {pattern, disposition: Keep|Drop|MetadataOnly}. When absent, the built-in DEFAULT_POLICY applies." },
     ],
   },
   {
     key: "cache",
     label: "Cache",
     fields: [
-      { name: "enabled", type: "boolean", label: "Enabled" },
-      { name: "l1MaxSizeMB", type: "number", label: "L1 Max Size (MB)" },
-      { name: "l2MaxSizeMB", type: "number", label: "L2 Max Size (MB)" },
-      { name: "defaultTTLSeconds", type: "number", label: "Default TTL (s)" },
+      { name: "enabled", type: "boolean", label: "Enabled", guide: "When checked, enables the two-level cache (L1 in-memory, L2 disk)." },
+      { name: "l1MaxSizeMB", type: "number", label: "L1 Max Size (MB)", guide: "Maximum L1 (in-memory) cache size in megabytes." },
+      { name: "l2MaxSizeMB", type: "number", label: "L2 Max Size (MB)", guide: "Maximum L2 (disk) cache size in megabytes." },
+      { name: "defaultTTLSeconds", type: "number", label: "Default TTL (s)", guide: "Default time-to-live for cache entries in seconds." },
     ],
   },
   {
     key: "dataDir",
     label: "Data Directory",
-    fields: [{ name: "dataDir", type: "text", label: "Data Directory" }],
+    fields: [{ name: "dataDir", type: "text", label: "Data Directory", guide: "Base directory for massa-ai data files (checkpoints, exports, etc.)." }],
   },
   {
     key: "logging",
     label: "Logging",
     fields: [
-      { name: "level", type: "enum", label: "Level", enum: ["debug", "info", "warn", "error"] },
-      { name: "enableMetrics", type: "boolean", label: "Enable Metrics" },
-      { name: "file", type: "text", label: "Log File (optional)" },
+      { name: "level", type: "enum", label: "Level", enum: ["debug", "info", "warn", "error"], guide: "Log verbosity level. debug is most verbose; error is least." },
+      { name: "enableMetrics", type: "boolean", label: "Enable Metrics", guide: "When checked, emits structured metrics events for monitoring." },
+      { name: "file", type: "text", label: "Log File (optional)", guide: "Path to a log file. When empty, logs go to stdout only." },
     ],
   },
   {
     key: "search",
     label: "Search",
     fields: [
-      { name: "autoReindexMaxFiles", type: "number", label: "Auto Reindex Max Files" },
-      { name: "queryUnderstanding.enabled", type: "boolean", label: "Query Understanding Enabled" },
-      { name: "queryUnderstanding.hydeEnabled", type: "boolean", label: "HyDE Enabled" },
-      { name: "queryUnderstanding.cacheTtlMs", type: "number", label: "QU Cache TTL (ms)" },
-      { name: "queryUnderstanding.cacheMaxSize", type: "number", label: "QU Cache Max Size" },
-      { name: "rerank.enabled", type: "boolean", label: "Rerank Enabled" },
-      { name: "rerank.rerankWindow", type: "number", label: "Rerank Window" },
+      { name: "autoReindexMaxFiles", type: "number", label: "Auto Reindex Max Files", guide: "Maximum file count to auto-reindex without prompting. Above this, manual reindex is required." },
+      { name: "queryUnderstanding.enabled", type: "boolean", label: "Query Understanding Enabled", guide: "When checked, rewrites user queries using LLM for better retrieval." },
+      { name: "queryUnderstanding.hydeEnabled", type: "boolean", label: "HyDE Enabled", guide: "When checked, generates hypothetical document embeddings (HyDE) to improve query matching." },
+      { name: "queryUnderstanding.cacheTtlMs", type: "number", label: "QU Cache TTL (ms)", guide: "Time-to-live for query understanding cache entries in milliseconds." },
+      { name: "queryUnderstanding.cacheMaxSize", type: "number", label: "QU Cache Max Size", guide: "Maximum number of cached query understanding results." },
+      { name: "rerank.enabled", type: "boolean", label: "Rerank Enabled", guide: "When checked, applies a reranker to search results for improved relevance." },
+      { name: "rerank.rerankWindow", type: "number", label: "Rerank Window", guide: "Number of top results to consider for reranking." },
     ],
   },
   {
     key: "llm",
     label: "LLM",
     fields: [
-      { name: "enabled", type: "boolean", label: "Enabled" },
-      { name: "baseUrl", type: "text", label: "Base URL" },
-      { name: "apiKey", type: "text", label: "API Key", sensitive: true },
-      { name: "model", type: "text", label: "Model" },
-      { name: "codeModel", type: "text", label: "Code Model" },
-      { name: "temperature", type: "number", label: "Temperature" },
-      { name: "maxOutputTokens", type: "number", label: "Max Output Tokens" },
-      { name: "timeoutMs", type: "number", label: "Timeout (ms)" },
-      { name: "disableThink", type: "boolean", label: "Disable Think" },
+      { name: "enabled", type: "boolean", label: "Enabled", guide: "When checked, enables LLM-powered features (consolidation, query understanding, compression)." },
+      { name: "baseUrl", type: "text", label: "Base URL", guide: "Base URL for the LLM API (e.g., http://localhost:11434/v1 for Ollama OpenAI-compatible endpoint)." },
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for the LLM provider. Not needed for local Ollama. Changing this requires a restart." },
+      { name: "model", type: "text", label: "Model", guide: "Primary LLM model name (e.g., qwen2.5:7b-instruct)." },
+      { name: "codeModel", type: "text", label: "Code Model", guide: "Model used for code-related tasks. When empty, falls back to the primary model." },
+      { name: "temperature", type: "number", label: "Temperature", guide: "Sampling temperature (0 = deterministic, 1 = creative). Typically 0.2 for tasks." },
+      { name: "maxOutputTokens", type: "number", label: "Max Output Tokens", guide: "Maximum tokens the LLM can generate in a single response." },
+      { name: "timeoutMs", type: "number", label: "Timeout (ms)", guide: "Request timeout in milliseconds. Increase for slow models." },
+      { name: "disableThink", type: "boolean", label: "Disable Think", guide: "When checked, disables thinking/reasoning mode in models that support it (faster, cheaper)." },
     ],
   },
   {
     key: "memory",
     label: "Memory",
     fields: [
-      { name: "decay.lambda", type: "number", label: "Decay Lambda" },
-      { name: "decay.sigma", type: "number", label: "Decay Sigma" },
-      { name: "decay.mu", type: "number", label: "Decay Mu" },
-      { name: "decay.coldThreshold", type: "number", label: "Decay Cold Threshold" },
-      { name: "bootstrap.enabled", type: "boolean", label: "Bootstrap Enabled" },
-      { name: "bootstrap.maxSeedMemories", type: "number", label: "Bootstrap Max Seeds" },
-      { name: "bootstrap.centralityLimit", type: "number", label: "Bootstrap Centrality Limit" },
-      { name: "bootstrap.gitLogLimit", type: "number", label: "Bootstrap Git Log Limit" },
-      { name: "bootstrap.refreshEnabled", type: "boolean", label: "Bootstrap Refresh" },
-      { name: "autoImprove.enabled", type: "boolean", label: "Auto Improve Enabled" },
-      { name: "autoImprove.reviewGate", type: "boolean", label: "Auto Improve Review Gate" },
-      { name: "autoImprove.minObservations", type: "number", label: "Auto Improve Min Observations" },
-      { name: "autoImprove.minIntervalMs", type: "number", label: "Auto Improve Min Interval (ms)" },
-      { name: "autoImprove.maxWindow", type: "number", label: "Auto Improve Max Window" },
-      { name: "autoImprove.minQueryHits", type: "number", label: "Auto Improve Min Query Hits" },
-      { name: "autoImprove.minFileHits", type: "number", label: "Auto Improve Min File Hits" },
-      { name: "autoImprove.minFixHits", type: "number", label: "Auto Improve Min Fix Hits" },
-      { name: "autoImportance.enabled", type: "boolean", label: "Auto Importance Enabled" },
+      { name: "decay.lambda", type: "number", label: "Decay Lambda", guide: "Exponential decay rate for memory importance over time." },
+      { name: "decay.sigma", type: "number", label: "Decay Sigma", guide: "Decay bandwidth — controls how quickly memories lose relevance." },
+      { name: "decay.mu", type: "number", label: "Decay Mu", guide: "Decay midpoint — the time at which importance is halved." },
+      { name: "decay.coldThreshold", type: "number", label: "Decay Cold Threshold", guide: "Importance score below which a memory is considered 'cold' and eligible for consolidation." },
+      { name: "bootstrap.enabled", type: "boolean", label: "Bootstrap Enabled", guide: "When checked, seeds initial memories from the repo on first use." },
+      { name: "bootstrap.maxSeedMemories", type: "number", label: "Bootstrap Max Seeds", guide: "Maximum number of memories to seed during bootstrap." },
+      { name: "bootstrap.centralityLimit", type: "number", label: "Bootstrap Centrality Limit", guide: "Number of top central files to include in bootstrap." },
+      { name: "bootstrap.gitLogLimit", type: "number", label: "Bootstrap Git Log Limit", guide: "Number of recent git commits to analyze during bootstrap." },
+      { name: "bootstrap.refreshEnabled", type: "boolean", label: "Bootstrap Refresh", guide: "When checked, periodically re-runs bootstrap to capture new repo changes." },
+      { name: "autoImprove.enabled", type: "boolean", label: "Auto Improve Enabled", guide: "When checked, the auto-improvement loop detects patterns and proposes memory optimizations." },
+      { name: "autoImprove.reviewGate", type: "boolean", label: "Auto Improve Review Gate", guide: "When checked, auto-improvement proposals require human review before applying. When unchecked, eligible proposals auto-apply." },
+      { name: "autoImprove.minObservations", type: "number", label: "Auto Improve Min Observations", guide: "Minimum observations required before a pattern is proposed." },
+      { name: "autoImprove.minIntervalMs", type: "number", label: "Auto Improve Min Interval (ms)", guide: "Minimum time between auto-improvement runs in milliseconds." },
+      { name: "autoImprove.maxWindow", type: "number", label: "Auto Improve Max Window", guide: "Maximum number of recent observations to consider per run." },
+      { name: "autoImprove.minQueryHits", type: "number", label: "Auto Improve Min Query Hits", guide: "Minimum repeated query hits to trigger a pattern proposal." },
+      { name: "autoImprove.minFileHits", type: "number", label: "Auto Improve Min File Hits", guide: "Minimum repeated file access hits to trigger a proposal." },
+      { name: "autoImprove.minFixHits", type: "number", label: "Auto Improve Min Fix Hits", guide: "Minimum repeated fix patterns to trigger a proposal." },
+      { name: "autoImportance.enabled", type: "boolean", label: "Auto Importance Enabled", guide: "When checked, automatically scores memory importance based on access patterns." },
     ],
   },
   {
     key: "hooks",
     label: "Hooks",
     fields: [
-      { name: "enabled", type: "boolean", label: "Enabled" },
-      { name: "maxPayloadBytes", type: "number", label: "Max Payload Bytes" },
-      { name: "queue.maxPending", type: "number", label: "Queue Max Pending" },
-      { name: "bridge.enabled", type: "boolean", label: "Bridge Enabled" },
-      { name: "bridge.minObservations", type: "number", label: "Bridge Min Observations" },
-      { name: "bridge.minIntervalMs", type: "number", label: "Bridge Min Interval (ms)" },
-      { name: "bridge.maxWindow", type: "number", label: "Bridge Max Window" },
+      { name: "enabled", type: "boolean", label: "Enabled", guide: "When checked, enables passive lifecycle hook capture (session start/end, tool use events)." },
+      { name: "maxPayloadBytes", type: "number", label: "Max Payload Bytes", guide: "Maximum payload size for hook events. Larger payloads are truncated." },
+      { name: "queue.maxPending", type: "number", label: "Queue Max Pending", guide: "Maximum pending hook events in the processing queue." },
+      { name: "bridge.enabled", type: "boolean", label: "Bridge Enabled", guide: "When checked, bridges captured observations into durable memories via consolidation." },
+      { name: "bridge.minObservations", type: "number", label: "Bridge Min Observations", guide: "Minimum observations required before a bridge consolidation runs." },
+      { name: "bridge.minIntervalMs", type: "number", label: "Bridge Min Interval (ms)", guide: "Minimum time between bridge consolidation runs in milliseconds." },
+      { name: "bridge.maxWindow", type: "number", label: "Bridge Max Window", guide: "Maximum number of observations to consider per bridge run." },
     ],
   },
   {
     key: "synapse",
     label: "Synapse",
     fields: [
-      { name: "enabled", type: "boolean", label: "Enabled" },
-      { name: "inhibition.diversityPenalty.enabled", type: "boolean", label: "Diversity Penalty" },
-      { name: "inhibition.diversityPenalty.threshold", type: "number", label: "DP Threshold" },
-      { name: "inhibition.diversityPenalty.lambda", type: "number", label: "DP Lambda" },
-      { name: "inhibition.temporalInhibition.enabled", type: "boolean", label: "Temporal Inhibition" },
-      { name: "inhibition.temporalInhibition.penaltyAgeMs", type: "number", label: "TI Penalty Age (ms)" },
-      { name: "inhibition.temporalInhibition.penalty", type: "number", label: "TI Penalty" },
-      { name: "inhibition.confidenceGate.enabled", type: "boolean", label: "Confidence Gate" },
-      { name: "inhibition.confidenceGate.thresholds.specific", type: "number", label: "CG Specific" },
-      { name: "inhibition.confidenceGate.thresholds.focused", type: "number", label: "CG Focused" },
-      { name: "inhibition.confidenceGate.thresholds.broad", type: "number", label: "CG Broad" },
-      { name: "scoring.attention.enabled", type: "boolean", label: "Attention Scoring" },
-      { name: "scoring.attention.rerankWindow", type: "number", label: "Attention Rerank Window" },
-      { name: "scoring.attention.recencyHalfLifeMs", type: "number", label: "Recency Half Life (ms)" },
-      { name: "scoring.attention.semanticScale", type: "number", label: "Semantic Scale" },
-      { name: "metacognition.enabled", type: "boolean", label: "Metacognition" },
-      { name: "metacognition.lowConfidenceThreshold", type: "number", label: "Low Confidence Threshold" },
-      { name: "metacognition.definitiveTopScore", type: "number", label: "Definitive Top Score" },
-      { name: "metacognition.definitiveGap", type: "number", label: "Definitive Gap" },
-      { name: "buffer.enabled", type: "boolean", label: "Buffer Enabled" },
-      { name: "buffer.maxSize", type: "number", label: "Buffer Max Size" },
-      { name: "buffer.ttlMs", type: "number", label: "Buffer TTL (ms)" },
-      { name: "buffer.hitBoost", type: "number", label: "Buffer Hit Boost" },
-      { name: "buffer.matchThreshold", type: "number", label: "Buffer Match Threshold" },
+      { name: "enabled", type: "boolean", label: "Enabled", guide: "When checked, enables the Synapse cognitive modulation layer (task alignment, working memory, inhibition)." },
+      { name: "inhibition.diversityPenalty.enabled", type: "boolean", label: "Diversity Penalty", guide: "When checked, penalizes search results that are too similar to already-seen items." },
+      { name: "inhibition.diversityPenalty.threshold", type: "number", label: "DP Threshold", guide: "Similarity threshold above which the diversity penalty applies." },
+      { name: "inhibition.diversityPenalty.lambda", type: "number", label: "DP Lambda", guide: "Strength of the diversity penalty." },
+      { name: "inhibition.temporalInhibition.enabled", type: "boolean", label: "Temporal Inhibition", guide: "When checked, suppresses recently-seen items from appearing again too soon." },
+      { name: "inhibition.temporalInhibition.penaltyAgeMs", type: "number", label: "TI Penalty Age (ms)", guide: "Time window in milliseconds during which a recently-seen item is penalized." },
+      { name: "inhibition.temporalInhibition.penalty", type: "number", label: "TI Penalty", guide: "Penalty score applied to recently-seen items." },
+      { name: "inhibition.confidenceGate.enabled", type: "boolean", label: "Confidence Gate", guide: "When checked, filters search results by confidence thresholds." },
+      { name: "inhibition.confidenceGate.thresholds.specific", type: "number", label: "CG Specific", guide: "Confidence threshold for specific (high-relevance) results." },
+      { name: "inhibition.confidenceGate.thresholds.focused", type: "number", label: "CG Focused", guide: "Confidence threshold for focused (medium-relevance) results." },
+      { name: "inhibition.confidenceGate.thresholds.broad", type: "number", label: "CG Broad", guide: "Confidence threshold for broad (low-relevance) results." },
+      { name: "scoring.attention.enabled", type: "boolean", label: "Attention Scoring", guide: "When checked, applies attention-based scoring (recency, semantic, task alignment) to search results." },
+      { name: "scoring.attention.rerankWindow", type: "number", label: "Attention Rerank Window", guide: "Number of top results to rerank using attention scoring." },
+      { name: "scoring.attention.recencyHalfLifeMs", type: "number", label: "Recency Half Life (ms)", guide: "Half-life for recency decay in attention scoring." },
+      { name: "scoring.attention.semanticScale", type: "number", label: "Semantic Scale", guide: "Scaling factor for the semantic similarity component in attention scoring." },
+      { name: "metacognition.enabled", type: "boolean", label: "Metacognition", guide: "When checked, enables metacognitive monitoring (confidence assessment of search results)." },
+      { name: "metacognition.lowConfidenceThreshold", type: "number", label: "Low Confidence Threshold", guide: "Score below which a result is flagged as low-confidence." },
+      { name: "metacognition.definitiveTopScore", type: "number", label: "Definitive Top Score", guide: "Score above which a result is considered definitively relevant." },
+      { name: "metacognition.definitiveGap", type: "number", label: "Definitive Gap", guide: "Minimum gap between top and second result to declare a definitive match." },
+      { name: "buffer.enabled", type: "boolean", label: "Buffer Enabled", guide: "When checked, enables the working-memory buffer for cross-search continuity." },
+      { name: "buffer.maxSize", type: "number", label: "Buffer Max Size", guide: "Maximum number of entries in the working-memory buffer." },
+      { name: "buffer.ttlMs", type: "number", label: "Buffer TTL (ms)", guide: "Time-to-live for working-memory buffer entries in milliseconds." },
+      { name: "buffer.hitBoost", type: "number", label: "Buffer Hit Boost", guide: "Score boost applied to results that hit the working-memory buffer." },
+      { name: "buffer.matchThreshold", type: "number", label: "Buffer Match Threshold", guide: "Similarity threshold for a buffer hit." },
     ],
   },
   {
     key: "handoffs",
     label: "Handoffs",
-    fields: [{ name: "enabled", type: "boolean", label: "Enabled" }],
+    fields: [{ name: "enabled", type: "boolean", label: "Enabled", guide: "When checked, enables cross-session handoffs (structured summaries left for a later agent to discover)." }],
   },
   {
     key: "security",
     label: "Security",
     fields: [
-      { name: "apiKey", type: "text", label: "API Key", sensitive: true },
-      { name: "corsOrigins", type: "string[]", label: "CORS Origins" },
-      { name: "allowedExtensions", type: "string[]", label: "Allowed Extensions" },
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key required on every request except /health, /swagger, and /ui. Auto-provisioned on first start. Changing this requires a restart." },
+      { name: "corsOrigins", type: "string[]", label: "CORS Origins", guide: "Comma-separated list of allowed CORS origins. Empty means no CORS." },
+      { name: "allowedExtensions", type: "string[]", label: "Allowed Extensions", guide: "Comma-separated list of file extensions allowed for indexing." },
     ],
   },
 ];
@@ -867,7 +896,7 @@ function renderConfigField(sectionKey, field, value) {
 
   let revealBtn = "";
   if (isSensitive) {
-    revealBtn = ' <button type="button" class="reveal-btn" data-action="config-reveal" data-target="' + fieldId + '">reveal</button>';
+    revealBtn = ' <button type="button" class="reveal-btn" data-action="config-reveal" data-target="' + fieldId + '" data-section="' + sectionKey + '" data-field="' + field.name + '">reveal</button>';
   }
 
   return (
@@ -888,6 +917,10 @@ export function renderConfig(data, opts) {
   const cards = CONFIG_SECTIONS.map((section) => {
     const isRestart = restartSet.has(section.key);
     const badge = isRestart ? ' <span class="badge restart-badge">restart needed</span>' : "";
+    const sectionConfig = section.key === "dataDir" ? config[section.key] : config[section.key];
+    const notConfiguredNote = (section.key === "capturePolicy" && sectionConfig === undefined)
+      ? '<div class="config-info-note">Not configured &mdash; using built-in defaults (DEFAULT_POLICY from the capture-policy pure module)</div>'
+      : "";
     const fieldsHtml = section.fields.map((field) => {
       const value = getConfigFieldValue(config, section.key, field.name);
       return renderConfigField(section.key, field, value);
@@ -895,11 +928,20 @@ export function renderConfig(data, opts) {
     const saveBtn = writeMode
       ? '<button type="button" class="save-btn" data-action="config-save" data-section="' + section.key + '">Save</button>'
       : "";
+    const guideEntries = section.fields.filter((f) => f.guide).map((f) => {
+      return "<dt>" + escapeHtml(f.label) + "</dt><dd>" + escapeHtml(f.guide) + "</dd>";
+    }).join("");
+    const fieldGuide = guideEntries
+      ? '<details class="config-field-guide"><summary>Field guide</summary>' +
+        '<div class="config-field-guide-body"><dl>' + guideEntries + "</dl></div></details>"
+      : "";
     return (
       '<div class="config-section" data-section="' + section.key + '">' +
       '<h3 class="config-section-header">' + escapeHtml(section.label) + badge + "</h3>" +
+      notConfiguredNote +
       '<div class="config-fields">' + fieldsHtml + "</div>" +
       saveBtn +
+      fieldGuide +
       "</div>"
     );
   }).join("");
@@ -974,10 +1016,19 @@ export function renderProfiles(data, opts) {
       );
     }
 
-    if (!installed || available.length === 0) {
+    if (!installed) {
       return (
         '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
         "<h3>" + escapeHtml(hostName) + "</h3> <p class=\"muted\">Not installed.</p>" +
+        "</div>"
+      );
+    }
+
+    if (available.length === 0) {
+      return (
+        '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
+        "<h3>" + escapeHtml(hostName) + "</h3>" +
+        '<p class="muted">Installed via marketplace (no per-profile variant directories). To switch profiles, set <code>MASSA_AI_MODEL_PROFILE</code> and run Regenerate Artifacts in Edit Registry.</p>' +
         "</div>"
       );
     }
@@ -1020,10 +1071,25 @@ const UI_HOST_EFFORT_ENUM = {
   claude: ["low", "medium", "high", "xhigh", "max"],
   codex: ["minimal", "low", "medium", "high", "xhigh"],
   cursor: [],
-  opencode: null,
+  opencode: ["low", "medium", "high", "max"],
 };
 
 const REGISTRY_HOSTS = ["claude", "codex", "cursor", "opencode"];
+
+/** Frontend copy of the live workflow inventory (basenames from
+ *  skills/massa-ai/workflows/ - all .md files). Kept in sync manually; the
+ *  frontend cannot import from scripts/lib. Used by the Workflow Tiers picker. */
+const WORKFLOW_STEMS = [
+  "adr", "architecture-audit", "architecture-fix", "bugs-audit", "bugs-fix",
+  "code-quality-audit", "code-quality-fix", "commit", "debug", "design",
+  "discovery", "exploration", "feature", "furps-refinement", "general",
+  "implementation-audit", "implementation-fix", "judge-with-debate",
+  "long-session", "maestro", "maestro-audit", "maestro-fix",
+  "mobile-figma-audit", "mobile-figma-fix", "onboarding", "pr-review",
+  "refactor", "requirements-audit", "requirements-fix", "rfc",
+  "security-audit", "security-fix", "skill-architect", "spec-driven",
+  "tdd", "tests-audit", "tests-fix", "the-fool", "ticket", "to-prd",
+];
 
 /**
  * Model-registry editor renderer. Renders a grid (rows = {host, tier} pairs,
@@ -1048,9 +1114,13 @@ export function renderModelRegistry(data, opts) {
   const overlayProfiles = (source.overlay && source.overlay.profiles) || {};
   const tombstoned = source.tombstoned || [];
 
-  if (profileNames.length === 0 && !overlayError) {
+  if (profileNames.length === 0 && !overlayError && !payload._error) {
     return '<section class="view"><h2>Model Registry</h2><p class="empty">No profiles in registry.</p></section>';
   }
+
+  const registryError = payload._error
+    ? '<div class="error">Registry load error: ' + escapeHtml(typeof payload._error === "string" ? payload._error : JSON.stringify(payload._error)) + "</div>"
+    : "";
 
   const overlayBanner = overlayError
     ? '<div class="error">Overlay error: ' + escapeHtml(overlayError) + " (showing builtin)</div>"
@@ -1129,11 +1199,18 @@ export function renderModelRegistry(data, opts) {
       const sel = t === current ? " selected" : "";
       return '<option value="' + escapeHtml(t) + '"' + sel + ">" + escapeHtml(t) + "</option>";
     }).join("");
+    const rmBtn = writeMode
+      ? ' <button type="button" class="btn-delete" data-action="registry-workflowTier-remove" data-workflow="' + escapeHtml(wf) + '" style="padding:0.1rem 0.4rem;font-size:0.75rem;">Remove</button>'
+      : "";
     return (
       '<div class="config-field"><label>' + escapeHtml(wf) + "</label>" +
-      '<select data-action="registry-workflowTier" data-workflow="' + escapeHtml(wf) + '"' + (writeMode ? "" : " disabled") + ">" + tierOpts + "</select></div>"
+      '<select data-action="registry-workflowTier" data-workflow="' + escapeHtml(wf) + '"' + (writeMode ? "" : " disabled") + ">" + tierOpts + "</select>" + rmBtn + "</div>"
     );
   }).join("");
+
+  const addWorkflowTierBtn = writeMode
+    ? '<div class="registry-actions"><button type="button" data-action="registry-workflowTier-add">Add Workflow Tier</button></div>'
+    : "";
 
   // Profile management: add / duplicate / delete / restore
   const profileActions = writeMode
@@ -1163,15 +1240,33 @@ export function renderModelRegistry(data, opts) {
       "</div>"
     : "";
 
+  const helpSection = '<details class="registry-help"><summary>?</summary>' +
+    '<div class="registry-help-body">' +
+    '<h4>Button Guide</h4>' +
+    '<dl>' +
+    '<dt>Add Profile</dt><dd>Creates a new profile with a name you choose. Prompts for a profile name and optional description. The new profile starts with null model/effort cells for all hosts and tiers.</dd>' +
+    '<dt>Duplicate Profile</dt><dd>Copies an existing profile (you choose which) to a new name. Prompts for the source profile and the new name. Useful for creating a variant of an existing profile without re-entering all cells.</dd>' +
+    '<dt>Delete Profile</dt><dd>Removes a profile from the overlay. Prompts for the profile name. If the profile exists in the builtin registry, it is tombstoned (restorable via the Deleted section). If it is overlay-only, it is removed entirely.</dd>' +
+    '<dt>Save Overlay</dt><dd>Persists all unsaved overlay changes (profile cells, host defaults, workflow tiers, add/duplicate/delete) to <code>~/.config/massa-ai/model-profiles.json</code>. Asks for confirmation before writing. The builtin registry is never modified.</dd>' +
+    '<dt>Regenerate Artifacts</dt><dd>Re-runs <code>generate-subagent-artifacts.ts</code> to rebuild all host agent files from the current effective registry. Streams progress via SSE. Use after changing model/effort assignments so the installed agents reflect the new values.</dd>' +
+    '<dt>Reset to Built-in (clear overlay)</dt><dd>Deletes the user overlay file, reverting to the builtin registry. Asks for confirmation. All overlay-only profiles, cell overrides, host default changes, and workflow tiers are lost. Tombstoned profiles are restored.</dd>' +
+    '</dl>' +
+    '<h4>Workflow Tiers</h4>' +
+    '<p>The Workflow Tiers section maps a workflow name to a tier, overriding the charter default for agents dispatched under that workflow. The builtin registry ships with no workflow tier overrides. Add one (e.g., <code>spec-driven &rarr; deep</code>) to pin a heavier model tier for a specific workflow.</p>' +
+    '</div>' +
+    '</details>';
+
   return (
     '<section class="view"><h2>Model Registry</h2>' + unsaved +
+    registryError +
     overlayBanner +
     grid +
     '<div class="registry-hostDefaults"><h3>Host Defaults</h3>' + hostDefaultsRows + "</div>" +
-    '<div class="registry-workflowTiers"><h3>Workflow Tiers</h3>' + workflowTiersRows + "</div>" +
+    '<div class="registry-workflowTiers"><h3>Workflow Tiers</h3>' + workflowTiersRows + addWorkflowTierBtn + "</div>" +
     profileActions +
     tombstonedList +
     actionButtons +
+    helpSection +
     "</section>"
   );
 }
@@ -1184,7 +1279,12 @@ function truncate(s, n) {
 }
 
 function errorBlock(data) {
-  const msg = (data && data.error) || "Request failed.";
+  const raw = (data && data.error) || "Request failed.";
+  const msg = typeof raw === "string"
+    ? raw
+    : (raw && typeof raw === "object" && (raw.message || raw.code))
+      ? [raw.code, raw.message].filter(Boolean).join(": ")
+      : JSON.stringify(raw);
   return '<div class="error">' + escapeHtml(msg) + "</div>";
 }
 
@@ -1356,11 +1456,29 @@ export async function handleConfigSave(ctx, section) {
   }
 }
 
-export function handleConfigReveal(ctx, targetId) {
+export async function handleConfigReveal(ctx, targetId, section, field) {
   const el = ctx.doc && ctx.doc.getElementById ? ctx.doc.getElementById(targetId) : null;
   if (!el) return;
-  if (el.type === "password") el.type = "text";
-  else if (el.type === "text") el.type = "password";
+  if (el.type === "text" && el.dataset.revealed === "true") {
+    el.type = "password";
+    el.value = "***";
+    el.dataset.revealed = "";
+    return;
+  }
+  if (!ctx.api || !section || !field) {
+    if (el.type === "password") el.type = "text";
+    return;
+  }
+  try {
+    const res = await ctx.api.request("/api/v1/config/reveal?section=" + encodeURIComponent(section) + "&field=" + encodeURIComponent(field));
+    if (res && res.success !== false && res.data) {
+      el.value = res.data.value || "";
+      el.type = "text";
+      el.dataset.revealed = "true";
+    }
+  } catch {
+    if (el.type === "password") el.type = "text";
+  }
 }
 
 // ── Profiles tab switcher + switch handler (Component 2) ─────────────────────
@@ -1459,6 +1577,42 @@ export function handleRegistryWorkflowTierEdit(ctx, workflow, value) {
   if (!ctx.state.registryOverlay.workflowTiers) ctx.state.registryOverlay.workflowTiers = {};
   ctx.state.registryOverlay.workflowTiers[workflow] = value;
   ctx.state.registryDirty = true;
+}
+
+export function handleRegistryWorkflowTierAdd(ctx) {
+  const existing = (ctx.state.registryOverlay && ctx.state.registryOverlay.workflowTiers) || {};
+  const available = WORKFLOW_STEMS.filter((s) => !Object.prototype.hasOwnProperty.call(existing, s));
+  if (available.length === 0) {
+    alert("All known workflow stems already have a tier. Remove one first or enter a custom name.");
+    return;
+  }
+  const name = prompt("Workflow name (pick from the list or type a custom name):\n\nAvailable: " + available.join(", "));
+  if (!name || !name.trim()) return;
+  const wf = name.trim();
+  if (Object.prototype.hasOwnProperty.call(existing, wf)) {
+    alert('Workflow "' + wf + '" already has a tier. Edit it instead.');
+    return;
+  }
+  const tiers = (ctx.state.registryOverlay && ctx.state.registryOverlay.tiers) || ["light", "standard", "deep"];
+  const tier = prompt("Tier (one of: " + tiers.join(", ") + "):");
+  if (!tier || !tier.trim()) return;
+  if (!tiers.includes(tier.trim())) {
+    alert('Tier "' + tier.trim() + '" is not one of ' + tiers.join(", ") + ".");
+    return;
+  }
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, workflowTiers: {} };
+  if (!ctx.state.registryOverlay.workflowTiers) ctx.state.registryOverlay.workflowTiers = {};
+  ctx.state.registryOverlay.workflowTiers[wf] = tier.trim();
+  ctx.state.registryDirty = true;
+  ctx.render();
+}
+
+export function handleRegistryWorkflowTierRemove(ctx, workflow) {
+  if (!ctx.state.registryOverlay) return;
+  if (!ctx.state.registryOverlay.workflowTiers) return;
+  delete ctx.state.registryOverlay.workflowTiers[workflow];
+  ctx.state.registryDirty = true;
+  ctx.render();
 }
 
 export function handleRegistryAddProfile(ctx) {
@@ -1762,11 +1916,15 @@ function startApp(opts) {
         root.innerHTML = renderDashboard(data);
       } else if (state.view === "config") {
         const data = await api.request("/api/v1/config");
-        root.innerHTML = renderConfig((data && data.data) || { config: {}, restartNeededSections: [] }, { writeMode: isWriteModeEnabled() });
+        if (data && data.success === false) {
+          root.innerHTML = '<section class="view"><h2>Config</h2>' + errorBlock(data) + "</section>";
+        } else {
+          root.innerHTML = renderConfig((data && data.data) || { config: {}, restartNeededSections: [] }, { writeMode: isWriteModeEnabled() });
+        }
       } else if (state.view === "profiles") {
         const profilesRes = await api.request("/api/v1/profiles");
         const registryRes = await api.request("/api/v1/model-registry");
-        const registryData = (registryRes && registryRes.data) || { registry: {}, source: {} };
+        const registryData = (registryRes && registryRes.success !== false && registryRes.data) || { registry: {}, source: {}, _error: registryRes && registryRes.error };
         const ctxObj = { api, root, state, render, doc };
         initRegistryOverlay(ctxObj, registryData.source);
         root.innerHTML = renderProfilesView(
@@ -1871,9 +2029,37 @@ function startApp(opts) {
         }
       });
     });
-    // write mode: checkpoint create/delete
+    // write mode: checkpoint create/edit/delete
     root.querySelector('[data-action="checkpoint-create"]')?.addEventListener("click", () => {
       handleCheckpointCreate();
+    });
+    root.querySelectorAll('[data-action="checkpoint-edit"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const taskId = btn.dataset.task || "";
+        const status = btn.dataset.status || "pending";
+        const checkpointType = btn.dataset.checkpointType || btn.dataset.type || "manual";
+        const description = btn.dataset.description || "";
+        const progress = btn.dataset.progress || "0";
+        const step = btn.dataset.step || "";
+        const total = btn.dataset.total || "";
+        const completed = btn.dataset.completed || "";
+        const form = root.querySelector('[data-form="checkpoint-create"]');
+        if (!form) return;
+        const setField = (name, value) => {
+          const el = form.querySelector('[data-create="' + name + '"]');
+          if (el) el.value = value;
+        };
+        setField("taskId", taskId);
+        setField("status", status);
+        setField("checkpointType", checkpointType);
+        setField("description", description);
+        setField("progressPercent", progress);
+        setField("currentStep", step);
+        setField("totalSteps", total);
+        setField("completedSteps", completed);
+        const header = form.querySelector("h3");
+        if (header) header.textContent = "Edit Checkpoint (create new to save)";
+      });
     });
     root.querySelectorAll('[data-action="checkpoint-delete"]').forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -1911,7 +2097,7 @@ function startApp(opts) {
       btn.addEventListener("click", () => {
         const target = btn.dataset.target;
         if (!target) return;
-        handleConfigReveal(ctx, target);
+        handleConfigReveal(ctx, target, btn.dataset.section, btn.dataset.field);
       });
     });
     // admin-portal-enhancements: profiles tab switcher + switch
@@ -1944,6 +2130,14 @@ function startApp(opts) {
     root.querySelectorAll('[data-action="registry-workflowTier"]').forEach((el) => {
       el.addEventListener("change", () => {
         handleRegistryWorkflowTierEdit(ctx, el.dataset.workflow, el.value);
+      });
+    });
+    root.querySelector('[data-action="registry-workflowTier-add"]')?.addEventListener("click", () => {
+      handleRegistryWorkflowTierAdd(ctx);
+    });
+    root.querySelectorAll('[data-action="registry-workflowTier-remove"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        handleRegistryWorkflowTierRemove(ctx, btn.dataset.workflow);
       });
     });
     root.querySelector('[data-action="registry-add-profile"]')?.addEventListener("click", () => {
@@ -2278,6 +2472,8 @@ const MASSA_AI_UI = {
   handleRegistryCellEdit,
   handleRegistryHostDefaultEdit,
   handleRegistryWorkflowTierEdit,
+  handleRegistryWorkflowTierAdd,
+  handleRegistryWorkflowTierRemove,
   handleRegistryAddProfile,
   handleRegistryDuplicateProfile,
   handleRegistryDeleteProfile,
