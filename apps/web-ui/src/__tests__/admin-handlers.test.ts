@@ -720,3 +720,131 @@ describe("handleRegistryClearOverlay — confirm + DELETE (REGWIRE-11, REGWIRE-1
     expect(request).not.toHaveBeenCalled();
   });
 });
+
+// ── Registry regenerate streaming handler (REGEN-01..07) ────────────────────
+
+/** Builds a fake fetch Response with a ReadableStream body emitting SSE chunks. */
+function makeSseResponse(chunks: string[]): { ok: boolean; status: number; headers: Map<string, string>; body: { getReader: () => any } } {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      for (const chunk of chunks) {
+        controller.enqueue(encoder.encode(chunk));
+      }
+      controller.close();
+    },
+  });
+  return {
+    ok: true,
+    status: 200,
+    headers: new Map([["content-type", "text/event-stream"]]),
+    body: stream,
+  };
+}
+
+describe("handleRegistryRegenerate — streaming SSE (REGEN-01..06)", () => {
+  const origConfirm = (globalThis as any).confirm;
+  const origFetch = (globalThis as any).fetch;
+  const origSetTimeout = (globalThis as any).setTimeout;
+
+  beforeEach(() => {
+    (globalThis as any).setTimeout = (cb: () => void, _ms: number) => { cb(); return 0 as any; };
+  });
+  afterEach(() => {
+    (globalThis as any).confirm = origConfirm;
+    (globalThis as any).fetch = origFetch;
+    (globalThis as any).setTimeout = origSetTimeout;
+  });
+
+  it("shows confirm before calling regenerate-stream (REGEN-01)", async () => {
+    (globalThis as any).confirm = mock(() => false);
+    const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
+    await handleRegistryRegenerate(ctx);
+    expect((globalThis as any).confirm).toHaveBeenCalled();
+    const msg = (globalThis as any).confirm.mock.calls[0][0] as string;
+    expect(msg.toLowerCase()).toContain("regenerate");
+    expect(msg.toLowerCase()).toContain("overwrite");
+  });
+
+  it("cancel (confirm=false) sends no fetch", async () => {
+    (globalThis as any).confirm = mock(() => false);
+    const fetchMock = mock(async () => makeSseResponse([]));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
+    await handleRegistryRegenerate(ctx);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("fetches regenerate-stream on confirm + shows success banner on done exit 0 (REGEN-02, REGEN-05)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const sseChunks = [
+      'data: {"type":"line","stream":"stdout","text":"Generating claude agents..."}\n\n',
+      'data: {"type":"line","stream":"stdout","text":"Done."}\n\n',
+      'data: {"type":"done","exitCode":0}\n\n',
+    ];
+    (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
+    const render = mock(() => {});
+    const ctx = makeRegistryCtx({ render, state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
+    await handleRegistryRegenerate(ctx);
+    expect((globalThis as any).fetch).toHaveBeenCalled();
+    // success banner shows completion message
+    expect(ctx.root.children[0].textContent).toContain("complete");
+    expect(ctx.state.regenerating).toBe(false);
+  });
+
+  it("shows failure banner on done with non-zero exit (REGEN-05)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const sseChunks = [
+      'data: {"type":"line","stream":"stderr","text":"fatal error"}\n\n',
+      'data: {"type":"done","exitCode":1}\n\n',
+    ];
+    (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
+    const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
+    await handleRegistryRegenerate(ctx);
+    expect(ctx.root.children[0].textContent).toContain("failed");
+  });
+
+  it("shows failure banner on spawn failure (done with exitCode null + error) (REGEN-07)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const sseChunks = [
+      'data: {"type":"done","exitCode":null,"error":"spawn ENOENT"}\n\n',
+    ];
+    (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
+    const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
+    await handleRegistryRegenerate(ctx);
+    expect(ctx.root.children[0].textContent).toContain("ENOENT");
+  });
+
+  it("disables Regenerate button while running (REGEN-06) via state.regenerating guard", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    let resolveStream: () => void;
+    const pendingStream = new Promise<void>((r) => { resolveStream = r; });
+    const slowStream = new ReadableStream({
+      start(controller) {
+        // emit nothing until resolved
+        pendingStream.then(() => {
+          controller.enqueue(new TextEncoder().encode('data: {"type":"done","exitCode":0}\n\n'));
+          controller.close();
+        });
+      },
+    });
+    const slowResponse = { ok: true, status: 200, headers: new Map([["content-type", "text/event-stream"]]), body: slowStream };
+    (globalThis as any).fetch = mock(async () => slowResponse);
+    const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
+    const regenPromise = handleRegistryRegenerate(ctx);
+    // While running, state.regenerating should be true
+    expect(ctx.state.regenerating).toBe(true);
+    resolveStream!();
+    await regenPromise;
+    expect(ctx.state.regenerating).toBe(false);
+  });
+
+  it("shows error banner on fetch failure (network)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    (globalThis as any).fetch = mock(async () => { throw new Error("network down"); });
+    const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
+    await handleRegistryRegenerate(ctx);
+    expect(ctx.root.children[0].textContent).toContain("network down");
+    expect(ctx.state.regenerating).toBe(false);
+  });
+});

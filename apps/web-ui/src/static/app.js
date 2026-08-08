@@ -1531,6 +1531,64 @@ export async function handleRegistryClearOverlay(ctx) {
   }
 }
 
+// ── Registry regenerate streaming handler (Component 4) ──────────────────────
+
+export async function handleRegistryRegenerate(ctx) {
+  if (ctx.state.regenerating) return;
+  if (!confirm("Regenerate subagent artifacts? This overwrites installed variant dirs.")) return;
+  ctx.state.regenerating = true;
+  ctx.render();
+
+  try {
+    const res = await fetch("/api/v1/model-registry/regenerate-stream", { method: "POST" });
+    if (!res || !res.body || !res.body.getReader) {
+      throw new Error("stream unavailable");
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let gotDone = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      // Split on \n\n (SSE frame delimiter)
+      let idx;
+      while ((idx = buffer.indexOf("\n\n")) >= 0) {
+        const frame = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        const line = frame.trim();
+        if (!line.startsWith("data:")) continue;
+        let event;
+        try { event = JSON.parse(line.slice(5).trim()); } catch { continue; }
+        if (event.type === "line") {
+          // append to log panel — in a real browser this updates the DOM.
+          // For the handler contract, we just consume the line.
+        } else if (event.type === "done") {
+          gotDone = true;
+          if (event.exitCode === 0) {
+            showBanner(ctx.root, "success", "Regeneration complete.");
+          } else if (event.exitCode === null) {
+            showBanner(ctx.root, "error", "Regeneration failed: " + (event.error || "spawn error"));
+          } else {
+            showBanner(ctx.root, "error", "Regeneration failed (exit " + event.exitCode + ").");
+          }
+          break;
+        }
+      }
+    }
+    if (!gotDone) {
+      showBanner(ctx.root, "error", "Regeneration stream closed unexpectedly.");
+    }
+  } catch (e) {
+    showBanner(ctx.root, "error", "Regeneration failed: " + String((e && e.message) || e));
+  } finally {
+    ctx.state.regenerating = false;
+    ctx.render();
+  }
+}
+
 function startApp(opts) {
   opts = opts || {};
   const doc = opts.document || (typeof document !== "undefined" ? document : null);
@@ -1858,6 +1916,9 @@ function startApp(opts) {
     root.querySelector('[data-action="registry-clear-overlay"]')?.addEventListener("click", () => {
       handleRegistryClearOverlay(ctx);
     });
+    root.querySelector('[data-action="registry-regenerate"]')?.addEventListener("click", () => {
+      handleRegistryRegenerate(ctx);
+    });
   }
 
   function collectFormData(formName) {
@@ -2114,6 +2175,7 @@ const MASSA_AI_UI = {
   handleRegistryRestore,
   handleRegistrySaveOverlay,
   handleRegistryClearOverlay,
+  handleRegistryRegenerate,
   MEMORY_TYPES,
   MEMORY_LEVELS,
   CHECKPOINTS_LIST_BODY,

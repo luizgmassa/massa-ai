@@ -164,7 +164,7 @@ Where: `apps/web-ui/src/static/app.js` (existing, extend `wireViewHandlers` + ne
 
 Depends on: T1, T3
 
-- [ ] Add `handleRegistryRegenerate()` handler: `confirm(...)` → if confirmed:
+- [x] Add `handleRegistryRegenerate()` handler: `confirm(...)` → if confirmed:
   - Set `state.regenerating=true`; disable button; set label "regenerating…".
   - Show `.regenerate-log` panel.
   - `fetch("/api/v1/model-registry/regenerate-stream", { method:"POST", headers:{...,"content-type":"application/json"} })`.
@@ -173,8 +173,8 @@ Depends on: T1, T3
   - `type:"done"` → success banner (exitCode 0) or failure banner (non-zero/null + error) → re-enable button → re-render.
   - On fetch error → error banner → re-enable.
   - Guard with `state.regenerating` to prevent double-trigger.
-- [ ] Wire `[data-action="registry-regenerate"]` in `wireViewHandlers()`.
-- [ ] Test in `admin-handlers.test.ts`:
+- [x] Wire `[data-action="registry-regenerate"]` in `wireViewHandlers()`.
+- [x] Test in `admin-handlers.test.ts`:
   - Confirm → true: mock `fetch` returning a `ReadableStream` with a line event + done event → assert log panel updated + success banner.
   - Confirm → true: mock `fetch` returning done with exitCode 1 → assert failure banner.
   - Confirm → false: assert no fetch.
