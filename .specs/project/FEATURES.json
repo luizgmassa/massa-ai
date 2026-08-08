@@ -1044,7 +1044,27 @@
       "dependencies": [],
       "validation": ".specs/features/worktree-isolation-gate/validation.md",
       "notes": "VALIDATED PASS 2026-08-06 (independent verifier, author != verifier, iteration 1 of 3): 6/6 ACs, 3/3 discrimination mutations killed (pass-1 survivor was the AC4 Stage 1 sensor the coverage matrix claimed but never wrote — fixed a8360f18, re-injected, killed). Gates: harness-contract 68/0, duplication excess 483 <= 483 @ w4, integrity 32/0, venue-parity 21/0, generate:artifacts --check clean, validate_state exit 0. Push/PR = user decision."
+    },
+    {
+      "id": "admin-portal",
+      "slug": "admin-portal",
+      "title": "Admin Portal — Full CRUD Web UI: config GET/PUT, checkpoint delete, model-profile registry overlay CRUD, write-mode default ON for trusted local callers",
+      "status": "in_progress",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/admin-portal",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/admin-portal/spec.md",
+      "depends_on": [
+        "phase-8-web-ui"
+      ],
+      "created": "2026-08-07"
     }
   ],
-  "active_feature": "workflow-reuse-naming-figma"
+  "active_feature": "admin-portal"
 }

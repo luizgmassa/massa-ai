@@ -1,757 +1,561 @@
-# Admin Portal — Full CRUD Web UI (spec)
+# Admin Portal — Full CRUD Web UI Specification
 
-Slug: `admin-portal`. Workflow: `to-prd` (synthesized from discovery session
-`discovery-admin-portal`). Branch: `main`.
+Slug: `admin-portal`. Workflow: `spec-driven`. Branch: `spec/admin-portal`.
+Synthesized from discovery session `discovery-admin-portal` (PRD → spec conversion).
 
 ## Problem Statement
 
 The massa-ai web UI at `/ui` is read-only — it can browse memories, projects,
 handoffs, proposals, checkpoints, and dashboard metrics, but cannot create,
-edit, or delete any of them. Every mutation today requires firing `curl`
-commands or MCP tool calls against the Tools API. There is also no way to view
-or edit `config.json` (`~/.config/massa-ai/config.json`) from the browser — the
-config drives database connections, embedding models, LLM endpoints, API keys,
-memory decay, hooks, Synapse, and every feature toggle, but it is invisible in
-the UI. Finally, the agent harness model-profile registry
-(`skills/model-profiles.json`) — which maps each `{profile, host, tier}` triple
-to a `{model, effort}` pair for every agent across Claude, Codex, Cursor, and
-OpenCode — is a build-time artifact with no runtime CRUD surface: editing it
-means opening the file in an editor, regenerating host variants via a script,
-then switching. A solo local operator who wants to manage the entire massa-ai
-system from a single web surface has no such surface.
+edit, or delete any of them. Every mutation today requires `curl` commands or
+MCP tool calls against the Tools API. There is no way to view or edit
+`config.json` (`~/.config/massa-ai/config.json`) from the browser, despite it
+driving database connections, embedding models, LLM endpoints, API keys,
+memory decay, hooks, Synapse, and every feature toggle. The agent harness
+model-profile registry (`skills/model-profiles.json`) — which maps each
+`{profile, host, tier}` triple to a `{model, effort}` pair for every agent
+across Claude, Codex, Cursor, and OpenCode — is a build-time artifact with no
+runtime CRUD surface. A solo local operator who wants to manage the entire
+massa-ai system from a single web surface has no such surface.
 
-## Solution
+## Goals
 
-Elevate the existing `apps/web-ui` static bundle (served at `/ui/*` by the
-Tools API) from a read-only browser to a full admin portal. The portal provides
-create, read, update, and delete operations for projects, memories, handoffs,
-proposals, checkpoints, all massa-ai configuration sections, and the
-model-profile registry. Write operations are enabled by default for trusted
-local callers (the existing `isTrustedWebUiCaller` model already injects the
-API key into the page for local requests). A sectioned form UI with typed
-inputs and schema validation covers all 15 config sections. The model-profile
-registry is managed through a user-level overlay
-(`~/.config/massa-ai/model-profiles.json`) that merges over the built-in
-`skills/model-profiles.json` — product source is never mutated at runtime.
-Destructive operations use a confirm-and-go pattern (confirmation dialog, no
-dry-run). A solo local operator can manage the entire massa-ai system without
-leaving the browser.
+- [ ] Elevate `apps/web-ui` from read-only browser to full admin portal with
+  CRUD for projects, memories, handoffs, proposals, checkpoints, all 15 config
+  sections, and the model-profile registry.
+- [ ] Write-mode defaults ON for trusted local callers; destructive operations
+  use a confirm-and-go pattern.
+- [ ] Zero new build step — preserve the existing zero-build vanilla
+  HTML/CSS/JS approach (no SPA framework).
+- [ ] All new routes behind the existing `authMiddleware`; sensitive fields
+  masked; config writes atomic with backup.
+- [ ] Model-profile registry managed via a user-level overlay
+  (`~/.config/massa-ai/model-profiles.json`) that merges over the built-in
+  `skills/model-profiles.json`; product source never mutated at runtime.
+
+## Out of Scope
+
+| Feature | Reason |
+| --- | --- |
+| Multi-operator / remote access with real auth (JWT, sessions, RBAC) | Solo local operator model uses existing `isTrustedWebUiCaller` + API-key injection. Remote admin requires a separate security design. |
+| Config hot-reload without restart | V1 marks restart-needed sections; does not re-read config.json into the running server after write. |
+| Config diff / rollback history (browsable) | V1 creates a single `.bak.<timestamp>` backup per write. Browsable history is future work. |
+| Bulk operations (bulk delete memories, bulk reindex, bulk approve proposals) | V1 is one-at-a-time. |
+| Audit log viewer | Operation log repository has no UI. Future "Audit" view. |
+| Config import/export (download/upload config file) | V1 is form-edit only. |
+| Config schema auto-generation from TypeScript | V1 hard-codes form field definitions from the known `MassaAiConfig` shape. |
+| Project delete (vs reset) | No "delete project" API exists; `reset` with all three clear flags is closest. True project-delete is out of scope. |
+| Proposal creation (manual) | Proposals are auto-generated by the auto-improve loop. |
+| Checkpoint update (vs restore) | Checkpoints are immutable snapshots. Editing a saved checkpoint is out of scope — create a new one. |
+| Deep merge of registry overlay | V1 uses shallow merge — an overlay profile replaces the entire built-in profile. Deep merge is future work. |
+| Registry overlay versioning / history | V1 writes the overlay atomically with no backup. Browsable history is future. |
+| Registry export/import | V1 is grid-edit only. |
+| Custom tier names (dedicated UI flow) | V1 supports built-in `light`, `standard`, `deep` tiers unless the overlay replaces the entire `tiers` array. A UI flow for adding/renaming tiers is future. |
+
+---
+
+## Assumptions & Open Questions
+
+| Assumption / decision | Chosen default | Rationale | Confirmed? |
+| --- | --- | --- | --- |
+| Trusted-caller trust model is the gate (not an env flag) | Write-mode defaults ON when `isTrustedWebUiCaller` returns true (API key meta tag present); `MASSA_AI_WEB_WRITE_MODE=false` and `localStorage` override remain as opt-out escape hatches | Solo local operator; existing trust model already injects the API key for local requests | y |
+| Confirm-and-go (no dry-run) for destructive ops | `confirm()` dialog naming the entity and action before delete/reset/cancel/clear | Simpler UX; solo operator accepts the risk; no bulk blast radius in V1 | y |
+| Config write does not hot-reload the running server | In-memory `config` singleton keeps its load-time value; restart picks up new config; `restartNeededSections` badge surfaces this | V1 avoids the complexity of safe hot-reload of a running server's config singleton | y |
+| Restart-needed sections hard-coded | `["database", "embedding", "llm", "security"]` | These are read at startup. Future enhancement could track per-field read timing dynamically. | y |
+| Model-profile overlay is shallow merge per profile key | An overlay profile replaces the entire built-in profile (all hosts, all tiers); tombstone `{ "_delete": true }` removes a built-in profile | Simple, predictable, no server-side merge ambiguity | y |
+| Overlay write is full-replace (not deep-merge with existing overlay) | The request body IS the new overlay; UI reads current overlay, applies edit, sends full result | Matches the shallow merge decision; avoids server-side overlay merge ambiguity | y |
+| Regenerate runs `generate-subagent-artifacts.ts` as a child process | Route spawns the script; does not switch profiles automatically (switching is a separate explicit call) | Regeneration creates variant directories; switching is a distinct action | y |
+| Corrupted overlay never throws at load time | Loader logs a warning and falls back to the built-in registry; GET route surfaces `overlayError` | A bad user overlay must not break the running server | y |
+| `FORBIDDEN_MUTATING_PATHS` removed in favor of allow-list | The UI may call any `/api/v1/*` route with the injected key; the read-only test is updated/removed | Admin portal intentionally calls mutating paths; trust is the gate, not a path blocklist | y |
+| Checkpoint repository has a delete method (to verify) | If `@massa-ai/core` checkpoint repository lacks `delete(id)`, add `deleteById(id)` + `DeleteCheckpointTool` wrapper | Spec flags this as an implementation-time verification gap (Further Notes) | y (assumed addable) |
+
+**Open questions:** none — all resolved or logged above.
+
+---
 
 ## User Stories
 
-### Memory Management
+### P1: Memory Management ⭐ MVP
 
-1. As a solo operator, I want to view all memories in a filterable, paginated
-   table, so that I can browse what the system has stored.
-2. As a solo operator, I want to create a new memory from a form (content,
-   type, importance, tags, project scope), so that I can manually add a fact or
-   decision without an MCP call.
-3. As a solo operator, I want to edit a memory's content, importance, and tags
-   inline, so that I can correct stale or inaccurate memories.
-4. As a solo operator, I want to delete a memory with a confirmation dialog, so
-   that I can remove obsolete or sensitive entries.
-5. As a solo operator, I want the memory table to show type, level, importance,
-   and truncated content, so that I can scan many memories quickly.
-6. As a solo operator, I want to filter memories by type, level, and minimum
-   importance, so that I can narrow to relevant subsets.
-7. As a solo operator, I want to paginate through large memory sets, so that the
-   page stays responsive even with hundreds of entries.
+**User Story**: As a solo operator, I want to view, create, edit, and delete
+memories in a filterable, paginated table, so that I can manage what the
+system stores without MCP calls.
 
-### Project Management
+**Why P1**: Memory CRUD is the most common mutation; existing APIs
+(`memory_store`, `memory_update`, `memory_delete`) already exist — only the
+UI surface is missing.
 
-8. As a solo operator, I want to view all indexed projects with their document
-   counts, so that I can see what is indexed.
-9. As a solo operator, I want to index a new project by entering its absolute
-   path and optional project ID, so that I can add a codebase to the search
-   index from the browser.
-10. As a solo operator, I want to trigger a force-reindex on an existing
-    project, so that I can refresh a stale index after significant code changes.
-11. As a solo operator, I want to reset (wipe) a project's vectors, symbols,
-    and/or memories with a confirmation dialog, so that I can cleanly remove a
-    project's data.
-12. As a solo operator, I want to rename a project identity, so that I can fix a
-    misnamed project ID without re-indexing from scratch.
-13. As a solo operator, I want to merge one project identity into another, so
-    that I can consolidate duplicate or split project entries.
-14. As a solo operator, I want to see the indexing job status after triggering
-    an index or reindex, so that I know when it completes.
+**Acceptance Criteria** (each line is one EARS pattern):
 
-### Handoff Management
+1. WHEN the operator navigates to the Memory view THEN the system SHALL render a paginated table of memories showing type, level, importance, and truncated content. <!-- event-driven -->
+2. WHEN the operator applies a filter by type, level, or minimum importance THEN the system SHALL display only memories matching all filter predicates. <!-- event-driven -->
+3. WHEN the operator opens the create-memory form and submits valid content, type, importance (0–1), tags, and projectId THEN the system SHALL create the memory via the existing memory-store API and re-render the table with the new entry. <!-- event-driven -->
+4. WHEN the operator edits a memory's content, importance, or tags inline and saves THEN the system SHALL update the memory via the existing memory-update API and re-render the row. <!-- event-driven -->
+5. WHEN the operator clicks delete on a memory THEN the system SHALL show a confirmation dialog naming the memory ID and content preview. <!-- event-driven -->
+6. IF the operator confirms the delete dialog THEN the system SHALL delete the memory via the existing memory-delete API, remove the row, and show success feedback. <!-- unwanted-behavior -->
+7. WHEN the memory set exceeds the page size THEN the system SHALL paginate and the page SHALL remain responsive with hundreds of entries. <!-- event-driven -->
 
-15. As a solo operator, I want to view pending handoffs for a selected project,
-    so that I can see cross-session handoffs waiting to be accepted.
-16. As a solo operator, I want to create a new handoff (project ID, summary,
-    target agent, open questions, next steps, files), so that I can leave a
-    structured handoff for a future session.
-17. As a solo operator, I want to accept an open handoff, so that I can mark it
-    as picked up.
-18. As a solo operator, I want to cancel (expire) an open handoff with a
-    confirmation dialog, so that I can remove a stale handoff.
+**Independent Test**: Open Memory view, create a memory, verify it appears, edit it, delete it (confirm), verify it disappears.
 
-### Proposal Management
+**Requirement IDs**: MEM-01 (view+filter+paginate), MEM-02 (create), MEM-03 (edit), MEM-04 (delete with confirm).
 
-19. As a solo operator, I want to view pending auto-improvement proposals for a
-    selected project, so that I can review what the auto-improve loop generated.
-20. As a solo operator, I want to approve a proposal, so that its memory edit is
-    applied and the proposal is flipped to approved.
-21. As a solo operator, I want to reject a proposal, so that it is closed
-    without applying.
+---
 
-### Checkpoint Management
+### P1: Project Management ⭐ MVP
 
-22. As a solo operator, I want to view saved checkpoints in a table, so that I
-    can see task progress snapshots.
-23. As a solo operator, I want to create a new checkpoint (task ID, description,
-    status, progress, current step, etc.), so that I can manually save task
-    state.
-24. As a solo operator, I want to restore a checkpoint, so that I can resume a
-    task from a saved snapshot.
-25. As a solo operator, I want to delete a checkpoint with a confirmation
-    dialog, so that I can clean up obsolete checkpoints.
+**User Story**: As a solo operator, I want to view indexed projects, index
+new projects, trigger force-reindex, reset project data, rename and merge
+project identities, and see indexing job status.
 
-### Config Management
+**Why P1**: Project lifecycle management is core to operating the search
+index; all APIs already exist (`index_project`, `reindex`, `reset_project`,
+`rename_project`, `merge_projects`, `index_status`).
 
-26. As a solo operator, I want to view the current config.json in a sectioned
-    form UI, so that I can see every setting without reading a file.
-27. As a solo operator, I want to edit the embedding configuration (provider,
-    model, base URL, dimensions) in a form, so that I can switch embedding
-    models.
-28. As a solo operator, I want to edit the LLM configuration (enabled, base URL,
-    API key, model, code model, temperature, max output tokens, timeout,
-    disable-think) in a form, so that I can switch LLM backends.
-29. As a solo operator, I want to edit the memory configuration (decay
-    parameters, bootstrap settings, auto-improve settings, auto-importance) in a
-    form, so that I can tune memory behavior.
-30. As a solo operator, I want to edit the hooks configuration (enabled, max
-    payload bytes, queue max pending, bridge settings) in a form, so that I can
-    control lifecycle capture.
-31. As a solo operator, I want to edit the search configuration (auto-reindex
-    cap, query understanding, rerank) in a form, so that I can tune search
-    quality.
-32. As a solo operator, I want to edit the compression configuration (default
-    strategy, min tokens, target ratio, prompt) in a form, so that I can control
-    context compression behavior.
-33. As a solo operator, I want to edit the cache configuration (enabled, L1/L2
-    max sizes, default TTL) in a form, so that I can tune cache behavior.
-34. As a solo operator, I want to edit the Synapse configuration (enabled,
-    inhibition, scoring, metacognition, buffer) in a form, so that I can tune
-    cognitive modulation.
-35. As a solo operator, I want to edit the handoffs configuration (enabled) in a
-    form, so that I can toggle cross-session handoffs.
-36. As a solo operator, I want to edit the security configuration (API key, CORS
-    origins, allowed extensions) in a form, so that I can manage access control.
-37. As a solo operator, I want to edit the logging configuration (level, enable
-    metrics, log file) in a form, so that I can control observability.
-38. As a solo operator, I want to edit the data directory path in a form, so
-    that I can relocate the massa-ai data store.
-39. As a solo operator, I want to edit the impact analysis configuration
-    (BFS-CTE enabled) in a form, so that I can toggle the CTE-backed impact
-    query.
-40. As a solo operator, I want to edit the capture policy (rules with pattern +
-    disposition, max match work, max ignore patterns) in a form, so that I can
-    control which files the indexer captures.
-41. As a solo operator, I want to see a "restart required" badge on config
-    sections whose changes cannot hot-reload, so that I know when a restart is
-    needed.
-42. As a solo operator, I want to save config changes with schema validation,
-    so that a bad value is rejected before it can brick the server.
-43. As a solo operator, I want a backup of the previous config.json to be
-    created automatically before each save, so that I can recover from a bad
-    edit.
-44. As a solo operator, I want sensitive fields (API keys, database URL) to be
-    masked in the form by default with a reveal toggle, so that shoulder-surfing
-    risk is reduced.
+**Acceptance Criteria**:
 
-### Profiles
+1. WHEN the operator navigates to the Projects view THEN the system SHALL render all indexed projects with their document counts. <!-- event-driven -->
+2. WHEN the operator submits the index-project form (projectPath, optional projectId, forceReindex, warmCache) THEN the system SHALL call the existing index-project API and show the returned job ID. <!-- event-driven -->
+3. WHEN the operator clicks force-reindex on an existing project THEN the system SHALL call the reindex API and surface the indexing job status. <!-- event-driven -->
+4. WHEN the operator clicks reset on a project THEN the system SHALL show a confirmation dialog with checkboxes for clearVectors, clearSymbols, clearMemories. <!-- event-driven -->
+5. IF the operator confirms the reset dialog THEN the system SHALL call the reset-project API with the selected flags and show success feedback. <!-- unwanted-behavior -->
+6. WHEN the operator submits a rename-project form (sourceProjectId, targetProjectId) THEN the system SHALL call the rename-project API and refresh the project list. <!-- event-driven -->
+7. WHEN the operator submits a merge-project form (sourceProjectId, targetProjectId) THEN the system SHALL call the merge-project API and refresh the project list. <!-- event-driven -->
+8. WHEN an index or reindex is triggered THEN the system SHALL poll or receive the indexing job status and display completion. <!-- event-driven -->
 
-45. As a solo operator, I want to view the available model profiles, so that I
-    can see which profiles are shipped.
-46. As a solo operator, I want to switch the installed agents to a different
-    profile, so that I can change the model configuration across hosts.
+**Independent Test**: Open Projects view, index a small project, verify job status, force-reindex, reset with all flags (confirm).
 
-### Model-Profile Registry
+**Requirement IDs**: PROJ-01 (view), PROJ-02 (index), PROJ-03 (force-reindex + status), PROJ-04 (reset with confirm), PROJ-05 (rename), PROJ-06 (merge).
 
-47. As a solo operator, I want to view the effective model-profile registry
-    (all profiles, all hosts, all tiers, all `{model, effort}` pairs) in a grid,
-    so that I can see what model and effort each agent tier resolves to per
-    host per profile.
-48. As a solo operator, I want to see which registry entries come from the
-    built-in registry vs the user overlay, so that I can distinguish shipped
-    defaults from my customizations.
-49. As a solo operator, I want to add a new profile (name + description), so
-    that I can define a custom model/effort spread without editing the built-in
-    registry.
-50. As a solo operator, I want to edit a profile's `{model, effort}` pairs
-    per host per tier in a grid, so that I can fine-tune which model and effort
-    each tier uses for each host.
-51. As a solo operator, I want to edit a profile's description, so that I can
-    document what the profile is for.
-52. As a solo operator, I want to duplicate an existing profile as a starting
-    point for a new one, so that I do not have to re-enter every cell from
-    scratch.
-53. As a solo operator, I want to delete a profile (with confirmation), so
-    that I can remove a custom profile I no longer need.
-54. As a solo operator, I want to restore a deleted profile (remove the
-    tombstone from the overlay), so that I can undo a deletion while the
-    overlay still exists.
-55. As a solo operator, I want to edit `hostDefaults` (which profile each host
-    defaults to), so that I can change the default profile per host.
-56. As a solo operator, I want to edit `workflowTiers` (which tier each
-    workflow uses), so that I can map workflows to tiers.
-57. As a solo operator, I want to validate my edits against the registry
-    schema before saving, so that a bad effort value or missing tier is caught
-    before it can break the build.
-58. As a solo operator, I want to regenerate the host variant artifacts after
-    editing the registry, so that a new profile's on-disk variant directories
-    exist before I switch to it.
-59. As a solo operator, I want to clear the entire user overlay (reset to
-    built-in only), so that I can start fresh from the shipped registry.
-60. As a solo operator, I want the model and effort inputs to be validated
-    against the host's effort enum (claude: low|medium|high|xhigh|max, codex:
-    minimal|low|medium|high|xhigh, cursor: effort must be null when model is
-    null, opencode: any non-empty string), so that I cannot enter an effort a
-    host will reject.
+---
 
-### General UX
+### P1: Handoff Management ⭐ MVP
 
-61. As a solo operator, I want write operations (create, edit, delete, approve,
-    reject, reset, switch, regenerate) to be enabled by default when I access
-    the portal from the local machine, so that I do not need to set an
-    environment variable.
-62. As a solo operator, I want destructive operations (delete memory, reset
-    project, cancel handoff, delete checkpoint, delete profile, clear overlay)
-    to show a confirmation dialog before executing, so that I do not
-    accidentally destroy data.
-63. As a solo operator, I want success and error feedback after every write
-    operation, so that I know whether the action succeeded.
-64. As a solo operator, I want the existing read-only views (Projects, Memory,
-    Search, Handoffs, Proposals, Checkpoints, Dashboard) to continue working
-    unchanged, so that the upgrade does not break existing browsing.
-65. As a solo operator, I want the dark-mode toggle and markdown rendering to
-    continue working, so that the existing UX is preserved.
-66. As a solo operator, I want a "Config" navigation item, so that I can reach
-    the config editor from the main nav.
-67. As a solo operator, I want a "Profiles" navigation item, so that I can reach
-    the profile switcher and model-profile registry editor from the main nav.
-68. As a solo operator, I want the page to refresh its data after a write
-    operation completes, so that I see the updated state immediately.
-69. As a solo operator, I want the existing SSE real-time updates to continue
-    working, so that data refreshes when indexing or observations occur.
+**User Story**: As a solo operator, I want to view pending handoffs, create new
+handoffs, accept open handoffs, and cancel (expire) open handoffs.
 
-## Implementation Decisions
+**Why P1**: Cross-session handoff CRUD; all APIs exist (`handoff_begin`,
+`handoff_accept`, `handoff_cancel`, `handoff_list_pending`).
+
+**Acceptance Criteria**:
+
+1. WHEN the operator selects a project in the Handoffs view THEN the system SHALL render pending handoffs for that project via the existing handoff-list-pending API. <!-- event-driven -->
+2. WHEN the operator submits the create-handoff form (projectId, summary, targetAgent, openQuestions, nextSteps, files) THEN the system SHALL call the handoff-begin API and refresh the pending list. <!-- event-driven -->
+3. WHEN the operator clicks accept on an open handoff THEN the system SHALL call the handoff-accept API and remove the handoff from the pending list. <!-- event-driven -->
+4. WHEN the operator clicks cancel on an open handoff THEN the system SHALL show a confirmation dialog naming the handoff ID and summary. <!-- event-driven -->
+5. IF the operator confirms the cancel dialog THEN the system SHALL call the handoff-cancel API and remove the handoff from the pending list. <!-- unwanted-behavior -->
+
+**Independent Test**: Open Handoffs view, create a handoff, verify it appears pending, accept it (verify removed), create another, cancel it (confirm, verify removed).
+
+**Requirement IDs**: HAND-01 (list pending), HAND-02 (create), HAND-03 (accept), HAND-04 (cancel with confirm).
+
+---
+
+### P1: Proposal Management ⭐ MVP
+
+**User Story**: As a solo operator, I want to view pending auto-improvement
+proposals, approve them, and reject them.
+
+**Why P1**: Review-gate CRUD; all APIs exist (`list_proposals`,
+`approve_proposal`, `reject_proposal`).
+
+**Acceptance Criteria**:
+
+1. WHEN the operator selects a project in the Proposals view THEN the system SHALL render pending proposals for that project via the existing list-proposals API. <!-- event-driven -->
+2. WHEN the operator clicks approve on a proposal THEN the system SHALL call the approve-proposal API, flip the proposal to approved, and refresh the list. <!-- event-driven -->
+3. WHEN the operator clicks reject on a proposal THEN the system SHALL call the reject-proposal API and remove the proposal from the pending list. <!-- event-driven -->
+
+**Independent Test**: Open Proposals view, approve a pending proposal (verify approved), reject another (verify removed).
+
+**Requirement IDs**: PROP-01 (list pending), PROP-02 (approve), PROP-03 (reject).
+
+---
+
+### P1: Checkpoint Management ⭐ MVP
+
+**User Story**: As a solo operator, I want to view, create, restore, and delete
+checkpoints.
+
+**Why P1**: Task-progress snapshot CRUD; create/restore/list APIs exist
+(`create_checkpoint`, `restore_checkpoint`, `list_checkpoints`); delete is a
+new API route.
+
+**Acceptance Criteria**:
+
+1. WHEN the operator navigates to the Checkpoints view THEN the system SHALL render saved checkpoints in a table via the existing list-checkpoints API. <!-- event-driven -->
+2. WHEN the operator submits the create-checkpoint form (taskId, description, status, progressPercent, currentStep, totalSteps, completedSteps, checkpointType) THEN the system SHALL call the existing create-checkpoint API and refresh the table. <!-- event-driven -->
+3. WHEN the operator clicks restore on a checkpoint THEN the system SHALL call the existing restore-checkpoint API and show the restored task state. <!-- event-driven -->
+4. WHEN the operator clicks delete on a checkpoint THEN the system SHALL show a confirmation dialog naming the checkpoint ID and task ID. <!-- event-driven -->
+5. IF the operator confirms the delete dialog THEN the system SHALL call `POST /api/v1/checkpoints/delete` and remove the checkpoint row. <!-- unwanted-behavior -->
+6. IF the `@massa-ai/core` checkpoint repository lacks a delete method THEN the system SHALL add a `deleteById(id)` method and a `DeleteCheckpointTool` wrapper for MCP parity. <!-- unwanted-behavior -->
+
+**Independent Test**: Open Checkpoints view, create a checkpoint (verify appears), restore it (verify state), delete it (confirm, verify removed).
+
+**Requirement IDs**: CHKP-01 (list), CHKP-02 (create), CHKP-03 (restore), CHKP-04 (delete with confirm + new route), CHKP-05 (repository delete gap).
+
+---
+
+### P1: Config Management ⭐ MVP
+
+**User Story**: As a solo operator, I want to view the current config.json in a
+sectioned form UI, edit all 15 config sections with schema validation, see
+restart-required badges, get automatic backups, and have sensitive fields
+masked.
+
+**Why P1**: Config is invisible in the UI today; 15 sections, ~60 fields; the
+config loader has no write path (new `saveConfig`).
+
+**Acceptance Criteria**:
+
+1. WHEN the operator navigates to the Config view THEN the system SHALL render 15 collapsible section cards with typed form inputs (text, number, boolean checkbox, enum select, string array list). <!-- event-driven -->
+2. WHEN the operator opens the Config view THEN the client SHALL call `GET /api/v1/config` and render the returned config with sensitive fields (`security.apiKey`, `llm.apiKey`, `embedding.apiKey`, `database.url`) masked. <!-- event-driven -->
+3. WHEN the operator saves a config section THEN the client SHALL send only that section to `PUT /api/v1/config` as a partial update. <!-- event-driven -->
+4. IF a config section contains a field that cannot hot-reload THEN the system SHALL display a "restart required" badge for that section. <!-- state-driven -->
+5. IF the operator submits a config section with an invalid value (wrong type, invalid enum, out-of-range number) THEN the server SHALL reject the update with a 400 status and validation details. <!-- unwanted-behavior -->
+6. WHEN the server accepts a config PUT THEN the server SHALL create a backup `config.json.bak.<ISO-timestamp>` before writing, merge the partial update (shallow per top-level key), and write atomically (temp file + rename). <!-- event-driven -->
+7. IF a sensitive field comes back as the masked sentinel `"***"` THEN the server SHALL preserve the existing value (no change). <!-- unwanted-behavior -->
+8. WHEN the operator toggles the reveal control on a sensitive field THEN the UI SHALL show the actual value for that field. <!-- event-driven -->
+9. WHERE a config section's change requires a server restart (`database`, `embedding`, `llm`, `security`) the system SHALL mark it in `restartNeededSections`. <!-- optional-feature -->
+10. The system SHALL not update the running server's in-memory `config` singleton after a config write; a restart picks up the new config. <!-- ubiquitous -->
+
+**Independent Test**: Open Config view, verify 15 sections + masked secrets + restart badges, edit a non-restart section (e.g. logging.level), save, verify backup created, edit a restart section (e.g. llm.model), save, verify restart badge persists, submit an invalid value, verify 400 rejection.
+
+**Requirement IDs**: CFG-01 (view + 15 sections), CFG-02 (GET masking), CFG-03 (PUT partial per section), CFG-04 (restart badges), CFG-05 (validation reject 400), CFG-06 (backup + atomic write), CFG-07 (masked sentinel preserved), CFG-08 (reveal toggle), CFG-09 (restartNeededSections list), CFG-10 (no hot-reload).
+
+---
+
+### P1: Profiles Switching ⭐ MVP
+
+**User Story**: As a solo operator, I want to view available model profiles and
+switch the installed agents to a different profile.
+
+**Why P1**: Profile switching already has an API (`profile_set` /
+`POST /api/v1/profiles/switch`); only the UI surface is missing.
+
+**Acceptance Criteria**:
+
+1. WHEN the operator navigates to the Profiles view THEN the system SHALL call `GET /api/v1/profiles` and render available profiles with the current active profile marked. <!-- event-driven -->
+2. WHEN the operator clicks Switch on a profile THEN the system SHALL call `POST /api/v1/profiles/switch` and render per-host switch results. <!-- event-driven -->
+
+**Independent Test**: Open Profiles view, verify current active profile marked, click Switch on another profile, verify per-host results.
+
+**Requirement IDs**: PROF-01 (list + active), PROF-02 (switch).
+
+---
+
+### P1: Model-Profile Registry Editor ⭐ MVP
+
+**User Story**: As a solo operator, I want to view the effective model-profile
+registry, distinguish built-in vs overlay entries, add/edit/duplicate/delete
+profiles, restore deleted profiles, edit hostDefaults and workflowTiers,
+validate against the registry schema, regenerate artifacts, and clear the
+overlay.
+
+**Why P1**: The registry is a build-time artifact with no runtime CRUD
+surface; overlay CRUD + regeneration is the core admin capability.
+
+**Acceptance Criteria**:
+
+1. WHEN the operator opens the registry editor sub-view THEN the client SHALL call `GET /api/v1/model-registry` and render a grid (rows = `{host, tier}` pairs, columns = profiles, cells = `{model, effort}`). <!-- event-driven -->
+2. WHEN the registry response includes `source.overlay.profiles` THEN the UI SHALL mark cells whose profile key exists in the overlay as customizations. <!-- event-driven -->
+3. WHEN the operator edits a cell `{model, effort}` THEN the effort input SHALL be constrained to the host's effort enum (claude: low|medium|high|xhigh|max; codex: minimal|low|medium|high|xhigh; cursor: effort null when model null; opencode: any non-empty string). <!-- state-driven -->
+4. WHEN the operator adds a new profile (name + description) THEN the UI SHALL initialize the profile with `model: null, effort: null` for every `{host, tier}`. <!-- event-driven -->
+5. WHEN the operator duplicates a profile THEN the UI SHALL copy the existing profile's full grid into a new profile with a new name. <!-- event-driven -->
+6. WHEN the operator deletes a profile THEN the UI SHALL add a tombstone `{ "_delete": true }` to the in-memory overlay, remove the profile from the grid, and show it in a "Deleted (restorable)" list. <!-- event-driven -->
+7. WHEN the operator restores a tombstoned profile THEN the UI SHALL remove the tombstone from the in-memory overlay and re-add the profile to the grid. <!-- event-driven -->
+8. WHEN the operator edits hostDefaults THEN the UI SHALL provide a per-host select listing available profiles. <!-- event-driven -->
+9. WHEN the operator edits workflowTiers THEN the UI SHALL provide a per-workflow select listing available tiers (`light`, `standard`, `deep`). <!-- event-driven -->
+10. WHEN the operator clicks Save Overlay THEN the client SHALL send the full in-memory overlay to `PUT /api/v1/model-registry`. <!-- event-driven -->
+11. IF the merged registry (builtin + overlay) fails `validateRegistry()` THEN the server SHALL reject the PUT with 400 and all violations collected. <!-- unwanted-behavior -->
+12. WHEN the server accepts the overlay PUT THEN the server SHALL write atomically (temp + rename) to `~/.config/massa-ai/model-profiles.json`. <!-- event-driven -->
+13. WHEN the operator clicks Regenerate Artifacts THEN the client SHALL call `POST /api/v1/model-registry/regenerate` and show a spinner until the script completes, then success/failure. <!-- event-driven -->
+14. WHEN the operator clicks Reset to Built-in (clear overlay) THEN the system SHALL show a confirmation dialog. <!-- event-driven -->
+15. IF the operator confirms the clear-overlay dialog THEN the client SHALL call `DELETE /api/v1/model-registry/overlay` and the server SHALL delete the overlay file and return the builtin registry. <!-- unwanted-behavior -->
+16. IF the overlay file is corrupted (invalid JSON or schema violation) THEN the `loadEffectiveRegistry()` loader SHALL log a warning, fall back to the built-in registry, and the GET route SHALL surface `overlayError` without failing (200 status). <!-- unwanted-behavior -->
+17. WHEN `loadEffectiveRegistry()` merges the overlay over the built-in THEN tombstoned profiles (`_delete: true`) SHALL be removed from the effective registry and listed in `source.tombstoned`. <!-- event-driven -->
+18. WHEN the regenerate route runs THEN the server SHALL spawn `generate-subagent-artifacts.ts` as a child process and report success or failure. <!-- event-driven -->
+
+**Independent Test**: Open Profiles → registry editor, verify grid renders + overlay-sourced cells marked, edit a cell (effort constrained), add a profile, duplicate a profile, delete a profile (verify restore list), restore it, edit hostDefaults, save overlay (verify 200), submit invalid effort (verify 400), regenerate artifacts (verify success), clear overlay (confirm, verify builtin-only).
+
+**Requirement IDs**: REG-01 (GET grid), REG-02 (overlay attribution), REG-03 (effort enum constraint), REG-04 (add profile), REG-05 (duplicate), REG-06 (delete + tombstone), REG-07 (restore), REG-08 (hostDefaults edit), REG-09 (workflowTiers edit), REG-10 (save overlay PUT), REG-11 (validation reject 400), REG-12 (atomic write), REG-13 (regenerate), REG-14 (clear overlay confirm), REG-15 (clear overlay DELETE), REG-16 (corrupted overlay fallback), REG-17 (tombstone merge semantics), REG-18 (regenerate child process).
+
+---
+
+### P1: General UX ⭐ MVP
+
+**User Story**: As a solo operator, I want write-mode enabled by default for
+trusted local callers, confirmation dialogs for destructive operations,
+success/error feedback after every write, existing read-only views preserved,
+dark mode + markdown preserved, Config and Profiles nav items, data refresh
+after writes, and SSE real-time updates preserved.
+
+**Why P1**: The upgrade must not break existing browsing; write-mode must be
+discoverable and safe.
+
+**Acceptance Criteria**:
+
+1. WHEN the page has the `massa-ai-api-key` meta tag (trusted local caller) THEN the system SHALL enable write operations (create, edit, delete, approve, reject, reset, switch, regenerate) by default. <!-- state-driven -->
+2. WHERE the `MASSA_AI_WEB_WRITE_MODE=false` env flag or `localStorage` override is set THEN the system SHALL disable write operations. <!-- optional-feature -->
+3. WHEN the operator triggers a destructive operation (delete memory, reset project, cancel handoff, delete checkpoint, delete profile, clear overlay) THEN the system SHALL show a `confirm()` dialog naming the entity and action before executing. <!-- event-driven -->
+4. WHEN a write operation completes THEN the system SHALL show success or error feedback and refresh the affected view's data. <!-- event-driven -->
+5. WHEN the operator navigates to existing views (Projects, Memory, Search, Handoffs, Proposals, Checkpoints, Dashboard) THEN the system SHALL continue rendering them unchanged. <!-- ubiquitous -->
+6. The system SHALL preserve the existing dark-mode toggle and markdown rendering. <!-- ubiquitous -->
+7. WHEN the operator views the navigation bar THEN the system SHALL include "Config" and "Profiles" items after "Dashboard". <!-- event-driven -->
+8. WHEN the operator views the footer THEN the system SHALL display "Admin portal · served by the massa-ai Tools API" (replacing "Read-only"). <!-- event-driven -->
+9. The `viewFromHash` allow-list SHALL include `"config"` and `"profiles"`. <!-- ubiquitous -->
+10. WHEN the page receives an SSE event for indexing or observations THEN the system SHALL continue refreshing real-time data. <!-- event-driven -->
+11. The `FORBIDDEN_MUTATING_PATHS` blocklist SHALL be removed and replaced with an allow-list approach (any `/api/v1/*` route callable with the injected key). <!-- ubiquitous -->
+
+**Independent Test**: Load the portal from localhost (verify write buttons visible), set `localStorage massa-ai-write-mode=false` (verify write buttons hidden), trigger a delete (verify confirm dialog), complete a write (verify feedback + refresh), verify existing views still work, verify dark mode toggle, verify Config + Profiles nav items, verify footer text, verify SSE updates still fire.
+
+**Requirement IDs**: UX-01 (write-mode default ON), UX-02 (env/localStorage opt-out), UX-03 (destructive confirm), UX-04 (feedback + refresh), UX-05 (existing views preserved), UX-06 (dark mode + markdown), UX-07 (nav items), UX-08 (footer text), UX-09 (viewFromHash allow-list), UX-10 (SSE preserved), UX-11 (remove FORBIDDEN_MUTATING_PATHS).
+
+---
+
+## Edge Cases
+
+Edge cases (usually unwanted-behavior IF/THEN or boundary WHEN):
+
+- IF the config PUT receives a partial section missing a required field THEN the server SHALL reject with 400 and name the missing field.
+- IF the config PUT receives an enum value outside the allowed set (e.g. `logging.level` not one of 4 levels) THEN the server SHALL reject with 400.
+- IF the config PUT receives a numeric field out of range (e.g. `temperature` non-number, `targetCompressionRatio` outside 0–1) THEN the server SHALL reject with 400.
+- IF the config GET is called when config.json does not exist THEN the server SHALL return defaults with a warning.
+- IF the model-registry GET is called when the overlay file does not exist THEN the server SHALL return `registry = builtin`, `overlay = null`, `tombstoned = []`.
+- IF the model-registry GET is called when the overlay is corrupted JSON THEN the server SHALL return `registry = builtin`, `overlay = null`, `overlayError = "<message>"` with 200 status.
+- IF the model-registry PUT receives an overlay whose merged result fails validation THEN the server SHALL return 400 with all violations (never partially apply).
+- IF the regenerate route's child process exits non-zero THEN the server SHALL return `{ success: false, error: "..." }`.
+- IF the checkpoint delete route is called with a non-existent ID THEN the server SHALL return `{ success: false, error: "not found" }`.
+- IF the rename or merge project API is called with a non-existent source ID THEN the server SHALL return the upstream error.
+- IF a memory create is submitted with importance outside 0–1 THEN the client SHALL validate before submit and block.
+- IF two concurrent config PUTs race THEN the atomic write (temp + rename) SHALL ensure the last writer wins and no partial write persists.
+- IF the trusted-caller check fails (remote access) THEN the page SHALL NOT inject the API key and write operations SHALL be unavailable.
+- WHEN the overlay profile has `_delete: true` on a profile key absent from the built-in THEN the tombstone SHALL be a no-op (no error, profile stays absent from effective registry).
+
+---
+
+## Requirement Traceability
+
+Each requirement gets a unique ID for tracking across design, tasks, and validation.
+
+| Requirement ID | Story | Phase | Status |
+| --- | --- | --- | --- |
+| MEM-01 | Memory Management | Design | Pending |
+| MEM-02 | Memory Management | Design | Pending |
+| MEM-03 | Memory Management | Design | Pending |
+| MEM-04 | Memory Management | Design | Pending |
+| PROJ-01 | Project Management | Design | Pending |
+| PROJ-02 | Project Management | Design | Pending |
+| PROJ-03 | Project Management | Design | Pending |
+| PROJ-04 | Project Management | Design | Pending |
+| PROJ-05 | Project Management | Design | Pending |
+| PROJ-06 | Project Management | Design | Pending |
+| HAND-01 | Handoff Management | Design | Pending |
+| HAND-02 | Handoff Management | Design | Pending |
+| HAND-03 | Handoff Management | Design | Pending |
+| HAND-04 | Handoff Management | Design | Pending |
+| PROP-01 | Proposal Management | Design | Pending |
+| PROP-02 | Proposal Management | Design | Pending |
+| PROP-03 | Proposal Management | Design | Pending |
+| CHKP-01 | Checkpoint Management | Design | Pending |
+| CHKP-02 | Checkpoint Management | Design | Pending |
+| CHKP-03 | Checkpoint Management | Design | Pending |
+| CHKP-04 | Checkpoint Management | Design | Pending |
+| CHKP-05 | Checkpoint Management | Design | Pending |
+| CFG-01 | Config Management | Design | Pending |
+| CFG-02 | Config Management | Design | Pending |
+| CFG-03 | Config Management | Design | Pending |
+| CFG-04 | Config Management | Design | Pending |
+| CFG-05 | Config Management | Design | Pending |
+| CFG-06 | Config Management | Design | Pending |
+| CFG-07 | Config Management | Design | Pending |
+| CFG-08 | Config Management | Design | Pending |
+| CFG-09 | Config Management | Design | Pending |
+| CFG-10 | Config Management | Design | Pending |
+| PROF-01 | Profiles Switching | Design | Pending |
+| PROF-02 | Profiles Switching | Design | Pending |
+| REG-01 | Model-Profile Registry Editor | Design | Pending |
+| REG-02 | Model-Profile Registry Editor | Design | Pending |
+| REG-03 | Model-Profile Registry Editor | Design | Pending |
+| REG-04 | Model-Profile Registry Editor | Design | Pending |
+| REG-05 | Model-Profile Registry Editor | Design | Pending |
+| REG-06 | Model-Profile Registry Editor | Design | Pending |
+| REG-07 | Model-Profile Registry Editor | Design | Pending |
+| REG-08 | Model-Profile Registry Editor | Design | Pending |
+| REG-09 | Model-Profile Registry Editor | Design | Pending |
+| REG-10 | Model-Profile Registry Editor | Design | Pending |
+| REG-11 | Model-Profile Registry Editor | Design | Pending |
+| REG-12 | Model-Profile Registry Editor | Design | Pending |
+| REG-13 | Model-Profile Registry Editor | Design | Pending |
+| REG-14 | Model-Profile Registry Editor | Design | Pending |
+| REG-15 | Model-Profile Registry Editor | Design | Pending |
+| REG-16 | Model-Profile Registry Editor | Design | Pending |
+| REG-17 | Model-Profile Registry Editor | Design | Pending |
+| REG-18 | Model-Profile Registry Editor | Design | Pending |
+| UX-01 | General UX | Design | Pending |
+| UX-02 | General UX | Design | Pending |
+| UX-03 | General UX | Design | Pending |
+| UX-04 | General UX | Design | Pending |
+| UX-05 | General UX | Design | Pending |
+| UX-06 | General UX | Design | Pending |
+| UX-07 | General UX | Design | Pending |
+| UX-08 | General UX | Design | Pending |
+| UX-09 | General UX | Design | Pending |
+| UX-10 | General UX | Design | Pending |
+| UX-11 | General UX | Design | Pending |
+
+**ID format:** `[CATEGORY]-[NUMBER]` (e.g. `MEM-01`, `CFG-03`, `REG-11`)
+
+**Status values:** Pending → In Design → In Tasks → Implementing → Verified
+
+**Coverage:** 61 total, 61 mapped to stories, 0 unmapped.
+
+---
+
+## Success Criteria
+
+How we know the feature is successful:
+
+- [ ] A solo operator can manage all massa-ai entities (memories, projects, handoffs, proposals, checkpoints) from the browser without `curl` or MCP calls.
+- [ ] All 15 config sections are viewable and editable in sectioned forms with schema validation and automatic backups.
+- [ ] The model-profile registry is fully manageable (view, add, edit, duplicate, delete, restore, validate, regenerate, clear) via the overlay.
+- [ ] Write-mode defaults ON for trusted local callers with confirmation dialogs on all destructive operations.
+- [ ] Existing read-only views, dark mode, markdown rendering, and SSE updates continue working unchanged.
+- [ ] All new routes sit behind the existing `authMiddleware`; sensitive fields are masked in config GET.
+- [ ] Zero new build step — vanilla HTML/CSS/JS approach preserved.
+- [ ] All test suites (existing extended + new) pass green; no existing test weakened or deleted to pass.
+
+---
+
+## Verification Approach
+
+- **External behavior, not implementation details.** Tests assert HTTP response shapes, rendered HTML, and API call bodies — never internal function calls or module state.
+- **Existing test seams extended** (`app-renderers.test.ts`, `write-mode.test.ts`, `route-contract.test.ts`, `web-ui-contract.test.ts`, `model-profiles.test.ts`) plus **new test files** (`config.test.ts`, `config-forms.test.ts`, `model-registry.test.ts`, `registry-editor.test.ts`) per the Testing Decisions in the original PRD.
+- **Gate commands** (per Tasks phase): `bun run test:scripts`, `bun run lint`, `bun run type-check`, `bun run test:plugins`, `generate:artifacts --check`.
+- **Independent validation** (author ≠ verifier) per the spec-driven Execute contract: verification-agent re-derives coverage, runs the discrimination sensor, and writes `validation.md`.
+
+---
+
+## Implementation Decisions (from PRD — carried forward)
 
 ### Architecture
 
 - **Single web-ui bundle**: The admin portal is the existing `apps/web-ui`
-  static bundle (`index.html`, `styles.css`, `app.js`, `dashboard.js`) served at
-  `/ui/*`. No separate `/admin` app. The existing zero-build vanilla
+  static bundle (`index.html`, `styles.css`, `app.js`, `dashboard.js`) served
+  at `/ui/*`. No separate `/admin` app. The existing zero-build vanilla
   HTML/CSS/JS approach is preserved — no SPA framework, no build step.
-- **Write-mode default ON for trusted local callers**: The existing
-  `isTrustedWebUiCaller` check (local IP) determines trust. When trusted, the
-  server injects the API key into the page's `<meta>` tag, and the client sends
-  it as `x-api-key` on every request. Write operations are rendered
-  unconditionally for trusted callers. The `MASSA_AI_WEB_WRITE_MODE` env flag
-  and `localStorage` override remain as escape hatches but are no longer the
-  default gate — trust is the gate.
-- **Confirm-and-go pattern**: Destructive operations (delete memory, reset
-  project, cancel handoff, delete checkpoint) use `confirm()` dialogs with a
-  clear message naming the entity and action. No dry-run pattern for V1 —
-  simpler UX, solo operator accepts the risk.
-- **Sectioned config forms**: Each of the 15 config sections gets its own
-  collapsible form card with typed inputs (text, number, boolean checkbox,
-  enum select, string array list). A "Save" button per section sends a
-  partial-update `PUT /api/v1/config` with only the changed section.
 
 ### Backend — New API Routes
 
-1. **`GET /api/v1/config`** — Returns the current config.json as a JSON object,
-   with sensitive fields (`security.apiKey`, `llm.apiKey`, `embedding.apiKey`,
-   `database.url`) masked (e.g. `"***"`). Also returns a `restartNeededSections`
-   array indicating which sections contain fields that cannot hot-reload.
-   - Auth: standard `x-api-key` gate (not in `PUBLIC_PATHS`).
-   - Response shape: `{ success: true, data: { config: MassaAiConfig, restartNeededSections: string[] } }`
-
+1. **`GET /api/v1/config`** — Returns the current config.json with sensitive
+   fields masked and `restartNeededSections`.
+   - Response: `{ success: true, data: { config: MassaAiConfig, restartNeededSections: string[] } }`
 2. **`PUT /api/v1/config`** — Accepts a partial config object (one or more
-   top-level sections). Validates each provided section against the
-   `MassaAiConfig` TypeScript interface at runtime (type-check + range-check).
-   On validation failure, returns `{ success: false, error: "validation failed", details: [...] }`
-   with 400 status. On success: backs up the current config.json to
-   `config.json.bak.<timestamp>`, merges the partial update into the full
-   config, writes atomically (temp file + rename), and returns the updated
-   config with updated `restartNeededSections`.
-   - Auth: standard `x-api-key` gate.
-   - Atomic write: write to `config.json.tmp.<pid>`, then `fs.rename` to
-     `config.json`.
-   - Backup: copy current `config.json` to `config.json.bak.<ISO-timestamp>`
-     before writing.
-   - Restart-needed sections: `database`, `embedding`, `llm`, `security` (V1
-     marks these as restart-required; all other sections are marked
-     "applies on next request" but V1 does not implement hot-reload — the
-     in-memory `config` object is not re-read after write).
-
-3. **`POST /api/v1/checkpoints/delete`** — Deletes a checkpoint by ID. Thin
-   wrapper over a new `DeleteCheckpointTool` (or direct repository call if the
-   checkpoint repository exposes a delete method).
-   - Auth: standard `x-api-key` gate.
-   - Body: `{ id: string, projectId?: string }`.
-   - Response: `{ success: true, data: { ok: true } }` or
-     `{ success: false, error: "..." }`.
-
-4. **`GET /api/v1/model-registry`** — Returns the effective model-profile
-   registry: the built-in `skills/model-profiles.json` merged with the user
-   overlay `~/.config/massa-ai/model-profiles.json` (when present). The
-   response distinguishes which entries originate from the built-in registry
-   vs the user overlay, so the UI can mark customizations. Tombstone-deleted
-   profiles are absent from the effective registry but listed in a separate
-   `overlay` section for restore.
-   - Auth: standard `x-api-key` gate.
-   - Response shape:
-     `{ success: true, data: { registry: Registry, source: { builtin: Registry, overlay: OverlayData | null, tombstoned: string[] } } }`
-     where `OverlayData` is the raw overlay file content (including
-     tombstones), and `Registry` is the merged effective result.
-   - On overlay parse failure: returns `registry = builtin`, `overlay = null`,
-     `overlayError: "<message>"` (200 status — a bad overlay is a warning, not
-     an error that blocks the view).
-
-5. **`PUT /api/v1/model-registry`** — Accepts a full overlay object (the
-   complete `~/.config/massa-ai/model-profiles.json` content to write).
-   Validates the merged result (builtin + overlay) against `validateRegistry()`
-   from `scripts/lib/model-profiles.ts`. On validation failure, returns
-   `{ success: false, error: "validation failed", details: [...] }` with 400
-   status. On success: writes the overlay atomically (temp + rename) to
-   `~/.config/massa-ai/model-profiles.json` and returns the updated effective
+   top-level sections). Validates against `MassaAiConfig` shape. On success:
+   backs up to `config.json.bak.<timestamp>`, merges shallowly, writes
+   atomically (temp + rename), returns updated config + `restartNeededSections`.
+3. **`POST /api/v1/checkpoints/delete`** — Deletes a checkpoint by ID. Body:
+   `{ id: string, projectId?: string }`.
+4. **`GET /api/v1/model-registry`** — Returns the effective registry (builtin
+   merged with overlay) plus `source: { builtin, overlay, tombstoned }`. On
+   overlay parse failure: `registry = builtin`, `overlay = null`,
+   `overlayError: "<message>"` (200 status).
+5. **`PUT /api/v1/model-registry`** — Accepts the full overlay object. Validates
+   the merged result via `validateRegistry()`. Writes atomically to
+   `~/.config/massa-ai/model-profiles.json`. Returns the updated effective
    registry.
-   - Auth: standard `x-api-key` gate.
-   - Body: the full overlay object — `{ profiles?, hostDefaults?, workflowTiers?, tiers? }`
-     with any tombstones (`{ "_delete": true }` on a profile key).
-   - Validation: merge overlay over builtin, run `validateRegistry()` on the
-     merged result. Violations are collected and returned together (same
-     contract as the existing validator — all violations at once).
-   - Atomic write: write to `model-profiles.json.tmp.<pid>`, then `fs.rename`.
-
-6. **`POST /api/v1/model-registry/regenerate`** — Triggers
-   `scripts/generate-subagent-artifacts.ts` to regenerate the host variant
-   directories from the effective registry. Returns when the script completes
-   (or a timeout, since generation may take a few seconds). The route runs the
-   script as a child process with the same `MASSA_AI_MODEL_PROFILE` resolution
-   the script uses internally.
-   - Auth: standard `x-api-key` gate.
-   - Response: `{ success: true, data: { regenerated: true } }` on success, or
-     `{ success: false, error: "..." }` on script failure.
-   - The route does NOT switch profiles automatically — regeneration creates
-     the variant directories; switching is a separate explicit call to
-     `POST /api/v1/profiles/switch`.
-
+6. **`POST /api/v1/model-registry/regenerate`** — Spawns
+   `generate-subagent-artifacts.ts` as a child process. Does not switch
+   profiles automatically.
 7. **`DELETE /api/v1/model-registry/overlay`** — Deletes the user overlay file
-   entirely, resetting to built-in only. Does NOT require a body. Returns the
-   updated effective registry (which is now the builtin alone).
-   - Auth: standard `x-api-key` gate.
-   - Response: `{ success: true, data: { registry: Registry } }`.
+   entirely, resetting to built-in only. Returns the builtin registry.
+
+All new routes sit behind the existing `authMiddleware` (not in `PUBLIC_PATHS`).
 
 ### Backend — Config Write-Through
 
-The `@massa-ai/shared` config loader (`packages/shared/src/config/`) is
-currently read-only — `config.get(key)` exists but `config.set()` does not. A
-new `saveConfig(partial: Partial<MassaAiConfig>)` function will be added to
-`packages/shared/src/config/config-loader.ts` (or a new
-`config-writer.ts` module) that:
-
-- Reads the current config.json from the XDG config path.
-- Merges the partial update (shallow merge per top-level key — replacing a
-  section replaces the whole section, not deep-merge).
-- Validates the merged result against the `MassaAiConfig` shape (runtime
-  type-check: required fields present, correct types, enum values valid,
-  numeric ranges within bounds).
-- Writes atomically (temp + rename).
-- Returns the merged config.
-
-The `config` singleton's in-memory state is NOT updated by `saveConfig` in V1 —
-the running server keeps its load-time config. A restart picks up the new
-config. This is documented in the restart-needed badges.
+New `saveConfig(partial: Partial<MassaAiConfig>)` in `packages/shared/src/config/`
+(or a new `config-writer.ts` module): reads current config.json, merges shallowly
+per top-level key, validates, writes atomically (temp + rename), returns merged
+config. The in-memory `config` singleton is NOT updated by `saveConfig` in V1.
 
 ### Backend — Model-Profile Registry Overlay
 
-The built-in registry (`skills/model-profiles.json`) is product source and is
-never written by the API. A user-level overlay
-(`~/.config/massa-ai/model-profiles.json`) merges over it at load time. The
-overlay is the only file the API writes.
-
-**Loader change** (`scripts/lib/model-profiles.ts` `loadRegistry()`):
-The existing `loadRegistry()` reads only the built-in registry path. A new
-`loadEffectiveRegistry()` function will:
-1. Call the existing `loadRegistry(builtinPath)` to load and validate the
-   built-in registry (fails as today if the built-in is missing or invalid —
-   that is a product bug, not a user error).
-2. Read `~/.config/massa-ai/model-profiles.json` if present (via the XDG config
-   path, resolved the same way `config.json` is). On read/parse failure, log a
-   warning and fall back to the built-in alone — a bad overlay never throws.
-3. Merge the overlay over the built-in registry:
-   - `profiles`: merge per-key. If the overlay profile has `_delete: true`,
-     remove the built-in profile from the effective registry. Otherwise,
-     replace the entire built-in profile with the overlay profile (shallow —
-     the whole profile object, all hosts, all tiers).
-   - `hostDefaults`: if present in the overlay, replace the entire
-     `hostDefaults` object.
-   - `workflowTiers`: if present in the overlay, replace the entire
-     `workflowTiers` object.
-   - `tiers`: if present in the overlay, replace the entire `tiers` array.
-4. Run `validateRegistry()` on the merged result. If validation fails, log
-   the violations and fall back to the built-in alone (the overlay is broken —
-   do not serve an invalid effective registry).
-
-**Tombstone semantics** — a profile with `{ "_delete": true }` in the overlay:
-- Is removed from the effective registry during merge.
-- Is listed in the `source.tombstoned` array of the `GET /model-registry`
-  response so the UI can offer a "restore" action (which removes the tombstone
-  from the overlay).
-- Cannot be restored by simply re-adding the profile to the overlay — the
-  tombstone must be explicitly removed first (or the profile re-defined in the
-  override).
-
-**Overlay write path** — the `PUT /api/v1/model-registry` route receives the
-complete overlay object and writes it to
-`~/.config/massa-ai/model-profiles.json` atomically. It does NOT deep-merge
-the incoming overlay with the existing overlay — the request body IS the new
-overlay. The UI is responsible for reading the current overlay, applying the
-user's edit, and sending the full result. This matches the "shallow" merge
-decision: simple, predictable, no server-side merge ambiguity.
-
-### Frontend — New Views
-
-4. **Config view** (`#/config`): Renders 15 collapsible section cards. Each
-   card has a form generated from the config section's fields. Inputs are
-   typed: `string` → text input, `number` → number input, `boolean` → checkbox,
-   `enum` → select dropdown, `string[]` → comma-separated or tag-list input,
-   nested objects → sub-groups. Sensitive fields are masked with a reveal
-   toggle. Each card has a "Save" button that sends only that section to
-   `PUT /api/v1/config`. Sections in `restartNeededSections` show a badge.
-
-5. **Profiles view** (`#/profiles`): Two sub-views. The first sub-view calls
-   `GET /api/v1/profiles` to list available profiles. Shows the current active
-   profile (from the response). A "Switch" button per profile calls
-   `POST /api/v1/profiles/switch`. Shows per-host switch results. The second
-   sub-view is the model-profile registry editor (below).
-
-6. **Model-profile registry editor** (sub-view within `#/profiles`): Calls
-   `GET /api/v1/model-registry` to fetch the effective registry plus the
-   overlay source. Renders a grid: rows = `{host, tier}` pairs, columns =
-   profiles, cells = `{model, effort}`. Cells originating from the overlay are
-   visually marked (e.g. a dot or highlight) so the user can see which entries
-   are customizations. Tombstoned profiles show a "restore" button. The editor
-   supports:
-   - **Edit cell**: click a cell to edit `{model, effort}`. Effort input is a
-     select constrained to the host's effort enum (`HOST_EFFORT_ENUM`). Model
-     input is free text. Validation runs client-side on blur.
-   - **Add profile**: a form with name + description. The new profile is
-     initialized with `model: null, effort: null` for every `{host, tier}`
-     (inherit) — the user then edits cells.
-   - **Duplicate profile**: copies an existing profile's full grid into a new
-     profile with a new name.
-   - **Delete profile**: adds a tombstone `{ "_delete": true }` to the overlay.
-     Confirm dialog. The profile disappears from the grid but appears in a
-     "Deleted (restorable)" list until the overlay is saved.
-   - **Restore profile**: removes the tombstone from the overlay. The built-in
-     profile reappears in the grid.
-   - **Edit hostDefaults**: a per-host select (claude, codex, cursor, opencode)
-     listing available profiles.
-   - **Edit workflowTiers**: a per-workflow select listing available tiers
-     (`light`, `standard`, `deep`). The workflow list comes from the registry's
-     known workflows (currently empty — the UI allows adding new workflow
-     names).
-   - **Regenerate**: a "Regenerate Artifacts" button calls
-     `POST /api/v1/model-registry/regenerate`. Shows a spinner while running
-     and success/failure on completion.
-   - **Clear overlay**: a "Reset to Built-in" button calls
-     `DELETE /api/v1/model-registry/overlay`. Confirm dialog.
-   - **Save**: all edits are staged in the UI's in-memory overlay model. A
-     "Save Overlay" button sends the full overlay to
-     `PUT /api/v1/model-registry`. Validation errors from the server are
-     shown inline.
+New `loadEffectiveRegistry()` in `scripts/lib/model-profiles.ts`: reads builtin
+via existing `loadRegistry()`, reads overlay from the XDG config path, merges
+(per-profile shallow; tombstone `_delete: true` removes a built-in profile),
+validates the merged result, falls back to builtin on overlay failure. The
+existing `loadRegistry()` stays unchanged (build gate still validates the
+built-in alone).
 
 ### Frontend — Write-Mode Activation
 
-7. **`isWriteModeEnabled()` refactor**: Change the default from `false` to
-   `true` when the page has the `massa-ai-api-key` meta tag (i.e. the caller is
-   trusted). The `MASSA_AI_WEB_WRITE_MODE=false` env flag and
-   `localStorage.setItem("massa-ai-write-mode", "false")` remain as opt-out
-   escape hatches. The `FORBIDDEN_MUTATING_PATHS` list is replaced with an
-   allow-list approach: the UI may call any `/api/v1/*` route with the injected
-   key.
+`isWriteModeEnabled()` refactor: default ON when the `massa-ai-api-key` meta
+tag is present (trusted caller). `MASSA_AI_WEB_WRITE_MODE=false` and
+`localStorage` remain opt-out. `FORBIDDEN_MUTATING_PATHS` removed in favor of
+an allow-list approach (any `/api/v1/*` route callable with the injected key).
 
-8. **Create forms**: Each entity type gets a "Create" button that opens a form
-   (inline or modal). Forms use the same vanilla HTML pattern as the existing
-   filter bars — no new dependencies.
-   - Memory create: content (textarea), type (select), importance (number
-     0–1), tags (comma-separated), projectId (from the project selector).
-   - Handoff create: summary (textarea), targetAgent (text), openQuestions
-     (one-per-line), nextSteps (one-per-line), files (one-per-line). projectId
-     from selector.
-   - Checkpoint create: taskId (text), description (textarea), status (select:
-     pending/in_progress/completed/failed/paused), progressPercent (number
-     0–100), currentStep (text), totalSteps (number), completedSteps (number),
-     checkpointType (select: manual/milestone).
-   - Project index: projectPath (text), projectId (text, optional), forceReindex
-     (checkbox), warmCache (checkbox).
+### Frontend — New Views
 
-9. **Delete buttons**: Checkpoints get a delete button per row (with confirm).
-   Projects get a reset button (with confirm, and checkboxes for
-   clearVectors/clearSymbols/clearMemories). Handoffs get a cancel button per
-   card (with confirm).
-
-10. **Feedback**: After every write operation, the view re-renders. On error, an
-    alert or inline error message is shown (the existing pattern uses `alert()`
-    for write failures).
-
-### Frontend — Navigation
-
-11. **Nav items**: Add "Config" and "Profiles" to the nav bar after
-    "Dashboard". "Profiles" contains both the profile-switcher sub-view and
-    the model-profile registry editor sub-view, toggled by a tab or sub-nav
-    within the view. Update the `viewFromHash` allow-list to include `"config"`
-    and `"profiles"`. Update the footer text from "Read-only" to "Admin portal ·
-    served by the massa-ai Tools API".
+- **Config view** (`#/config`): 15 collapsible section cards, typed inputs,
+  masked sensitive fields with reveal toggle, per-section Save.
+- **Profiles view** (`#/profiles`): two sub-views — profile switcher + model
+  registry editor (grid: rows=`{host, tier}`, columns=profiles,
+  cells=`{model, effort}`, overlay-sourced cells marked, tombstoned restorable).
 
 ### Security
 
-- All new routes (`GET /api/v1/config`, `PUT /api/v1/config`,
-  `POST /api/v1/checkpoints/delete`, `GET /api/v1/model-registry`,
-  `PUT /api/v1/model-registry`, `POST /api/v1/model-registry/regenerate`,
-  `DELETE /api/v1/model-registry/overlay`) sit behind the existing
-  `authMiddleware` (not in `PUBLIC_PATHS`).
-- The config GET masks sensitive fields in the response. The config PUT
-  accepts masked values as "no change" — if a sensitive field comes back as
-  `"***"`, the writer preserves the existing value.
-- The existing `/ui` path stays in `PUBLIC_PATHS` (the shell must load without
-  a key), but every `/api/v1/*` call still requires the key.
-- Config write does not change the running server's API key — the
-  `configuredApiKey` variable in `auth.ts` is set at `initAuth()` time and is
-  not re-read. A key change requires a restart (shown in restart-needed badge).
-- The model-registry overlay write path writes only to
-  `~/.config/massa-ai/model-profiles.json` (user-owned, XDG config). It never
-  writes to the product repo's `skills/model-profiles.json`. The regenerate
-  route runs `generate-subagent-artifacts.ts` as a child process — it writes
-  to `~/.claude/massa-ai/agent-profiles/` etc. (host variant directories), not
-  to the repo.
-- A corrupted overlay (invalid JSON, schema violation) never throws at load
-  time — the loader logs a warning and falls back to the built-in registry.
-  The GET route surfaces `overlayError` so the UI can show the user what is
-  wrong.
+- All new routes behind `authMiddleware`.
+- Config GET masks sensitive fields; config PUT treats masked sentinel `"***"`
+  as "no change".
+- Model-registry overlay writes only to `~/.config/massa-ai/model-profiles.json`
+  (user-owned, XDG config); never writes to the product repo's
+  `skills/model-profiles.json`.
+- Corrupted overlay never throws at load time; loader falls back to builtin;
+  GET route surfaces `overlayError`.
 
 ### Schema / Validation
 
-- Runtime validation for `PUT /api/v1/config` uses Elysia's `t.Object` body
-  schema with optional top-level keys, each matching the `MassaAiConfig`
-  section shape. Validation covers: required fields within each provided
-  section, type correctness, enum values (e.g. `embedding.provider` must be one
-  of the 5 providers, `logging.level` must be one of 4 levels), and numeric
-  ranges (e.g. `temperature` is a number, `targetCompressionRatio` is 0–1).
-- No Zod or external schema library is introduced for config validation —
-  Elysia's built-in `t.*` validators (already used by every existing route)
-  cover the validation needs.
-- Runtime validation for `PUT /api/v1/model-registry` reuses the existing
-  `validateRegistry()` from `scripts/lib/model-profiles.ts`. The route merges
-  the incoming overlay over the built-in registry and runs the validator on
-  the merged result — the same validator the build gate uses, so a registry
-  that passes the API also passes the build. Violations are collected and
-  returned together (the validator's existing "all violations at once"
-  contract).
-- Client-side validation for the registry editor uses the `HOST_EFFORT_ENUM`
-  map (re-exported from `scripts/lib/model-profiles.ts` or duplicated in the
-  frontend) to constrain effort selects per host before the save round-trip.
+- `PUT /api/v1/config` uses Elysia's `t.Object` body schema with optional
+  top-level keys matching each `MassaAiConfig` section shape. No Zod or
+  external schema library introduced.
+- `PUT /api/v1/model-registry` reuses the existing `validateRegistry()` from
+  `scripts/lib/model-profiles.ts` — the same validator the build gate uses.
+- Client-side effort validation uses `HOST_EFFORT_ENUM` per host before the
+  save round-trip.
 
-## Testing Decisions
-
-### Testing Philosophy
-
-Test external behavior, not implementation details. Every test asserts what
-the user sees (HTTP response shape, rendered HTML, API call body) — never
-internal function calls or module state. The existing test suites follow this
-pattern: `app-renderers.test.ts` feeds fixtures to renderers and asserts HTML
-output; `route-contract.test.ts` pins the UI to golden API responses;
-`web-ui-contract.test.ts` pins the API to the same golden response.
-
-### Test Seams (existing — preferred)
-
-1. **`apps/web-ui/src/__tests__/app-renderers.test.ts`** — Pure renderer tests.
-   Extend with: `renderConfigSection()` renders form inputs for each field type;
-   `renderProfiles()` renders profile cards with switch buttons; the
-   `renderModelRegistry()` renderer renders the profile×host×tier grid with
-   overlay-sourced cells marked; create-form renderers produce the correct
-   form fields.
-2. **`apps/web-ui/src/__tests__/write-mode.test.ts`** — Write-mode gating tests.
-   Extend with: write-mode defaults ON when API key meta tag is present; delete
-   buttons render for checkpoints when write-mode on; create buttons render for
-   all entity types when write-mode on; registry grid cells are editable when
-   write-mode on.
-3. **`apps/web-ui/src/__tests__/route-contract.test.ts`** — UI ↔ API contract
-   tests. Extend with: config view sends `GET /api/v1/config` and renders the
-   response; config save sends `PUT /api/v1/config` with the correct section
-   body; profiles view sends `GET /api/v1/profiles` and renders the response;
-   registry view sends `GET /api/v1/model-registry` and renders the grid;
-   registry save sends `PUT /api/v1/model-registry` with the correct overlay
-   body.
-4. **`apps/tools-api/src/routes/web-ui-contract.test.ts`** — API route contract
-   tests. Extend with: `GET /api/v1/config` returns masked sensitive fields and
-   `restartNeededSections`; `PUT /api/v1/config` validates and rejects bad
-   input; `POST /api/v1/checkpoints/delete` deletes and returns success;
-   `GET /api/v1/model-registry` returns the effective registry with source
-   attribution; `PUT /api/v1/model-registry` validates and rejects bad input.
-5. **`apps/tools-api/src/routes/*.test.ts`** — Per-route unit tests. Add
-   `config.test.ts` (GET masking, PUT validation, backup, atomic write) and
-   extend `checkpoints.test.ts` with delete coverage. Add
-   `model-registry.test.ts` (GET returns merged registry + source attribution +
-   overlay error surfacing; PUT validates merged result via
-   `validateRegistry()` and rejects violations; PUT writes atomically;
-   DELETE removes the overlay file; regenerate runs the script and returns
-   success/failure).
-6. **`apps/web-ui/src/__tests__/index.test.ts`** — Package entrypoint marker.
-   No change needed.
-7. **`scripts/__tests__/model-profiles.test.ts`** — Existing registry loader
-   tests. Extend with: `loadEffectiveRegistry()` merges overlay over builtin;
-   tombstones remove profiles from the effective registry; a corrupted overlay
-   falls back to builtin without throwing; validation failure on the merged
-   result falls back to builtin.
-
-### Test Seams (new — if needed)
-
-8. **`apps/tools-api/src/routes/config.test.ts`** — New file for config route
-   tests: GET returns masked secrets, PUT validates and rejects bad input, PUT
-   creates backup before writing, PUT writes atomically, PUT preserves masked
-   sensitive fields.
-9. **`apps/web-ui/src/__tests__/config-forms.test.ts`** — New file for config
-   form renderer tests: each section renders the correct field types, sensitive
-   fields are masked with reveal toggle, save button sends the correct partial
-   body.
-10. **`apps/tools-api/src/routes/model-registry.test.ts`** — New file for
-    model-registry route tests: GET returns merged registry with source
-    attribution, GET surfaces overlay errors without failing, PUT validates
-    the merged result and rejects violations, PUT writes atomically to the XDG
-    path, DELETE removes the overlay and returns the builtin registry,
-    regenerate spawns the script and reports success/failure.
-11. **`apps/web-ui/src/__tests__/registry-editor.test.ts`** — New file for the
-    registry grid editor renderer tests: grid renders all profiles as columns
-    and `{host, tier}` pairs as rows, overlay-sourced cells are marked,
-    tombstoned profiles appear in the restore list, effort selects are
-    constrained per host, save sends the full overlay body.
-
-### Prior Art
-
-- `apps/web-ui/src/__tests__/write-mode.test.ts:136-191` — the existing
-  write-mode gating tests are the direct template for the new create/delete
-  button visibility tests.
-- `apps/tools-api/src/routes/memory.test.ts` — the memory route tests are the
-  template for the config route tests (mock repository, assert response shape).
-- `apps/tools-api/src/routes/web-ui-contract.test.ts` — the golden-fixture
-  contract test is the template for the config contract test.
-- `scripts/__tests__/model-profiles.test.ts` — the existing registry validator
-  tests are the template for the overlay merge + fallback tests.
-- `apps/tools-api/src/routes/profiles.test.ts` — the existing profile-switch
-  route tests are the template for the model-registry route tests (mock
-  `loadEffectiveRegistry`, assert response shape).
-
-## Out of Scope
-
-- **Multi-operator / remote access with real auth**: JWT, sessions, RBAC. The
-  solo local operator model uses the existing `isTrustedWebUiCaller` + API-key
-  injection. Remote admin requires a separate security design.
-- **Config hot-reload without restart**: V1 marks restart-needed sections and
-  does not re-read config.json into the running server after a write. Hot-reload
-  is a future enhancement.
-- **Config diff / rollback history**: V1 creates a single `.bak.<timestamp>`
-  backup before each write. A browsable history with diff and one-click rollback
-  is future work.
-- **Bulk operations**: Bulk delete memories, bulk reindex projects, bulk approve
-  proposals. V1 is one-at-a-time.
-- **Audit log viewer**: The operation log repository exists but has no UI. A
-  future "Audit" view could surface it.
-- **Config import/export**: Download config.json as a file, upload a config
-  file. V1 is form-edit only.
-- **Config schema auto-generation from TypeScript**: V1 hard-codes the form
-  field definitions in `app.js` from the known `MassaAiConfig` shape. A future
-  enhancement could generate forms from the TypeScript interface via reflection.
-- **Project delete (vs reset)**: There is no "delete project" API — `reset` with
-  all three clear flags is the closest. A true project-delete (removing the
-  project from `listProjects`) is not in scope.
-- **Proposal creation**: Proposals are auto-generated by the auto-improve loop.
-  Manual creation is not in scope.
-- **Checkpoint update (vs restore)**: Checkpoints are immutable snapshots.
-  Editing a saved checkpoint is not in scope — create a new one instead.
-- **Deep merge of registry overlay**: V1 uses shallow merge — a profile in the
-  overlay replaces the entire built-in profile. Deep merge (patching a single
-  `{host, tier}` entry without redefining the whole profile) is future work.
-- **Registry overlay versioning / history**: V1 writes the overlay atomically
-  with no backup. A browsable history of overlay changes with diff and
-  rollback is future work.
-- **Registry export/import**: Download the overlay as a file, upload an
-  overlay file. V1 is grid-edit only.
-- **Custom tier names**: V1 supports only the built-in `light`, `standard`,
-  `deep` tiers unless the overlay replaces the entire `tiers` array. A UI
-  flow for adding/renaming tiers is future work (the `tiers` field is editable
-  in the overlay but not surfaced as a dedicated UI affordance in V1).
+---
 
 ## Further Notes
 
-- **Relationship to existing specs**: This PRD extends `.specs/features/phase-8-web-ui`
-  (the original read-only web-ui) and `.specs/features/wave-7-hygiene-ui-process`
-  (which spec'd write-mode + SSE + markdown). The original Phase 8 spec was
-  explicitly read-only with a `R8-READONLY-01` acceptance criterion asserting no
-  mutating path is reachable. This PRD supersedes that constraint — the
-  read-only guarantee is replaced by a trusted-caller write-mode guarantee.
-- **Relationship to `FORBIDDEN_MUTATING_PATHS`**: The existing
-  `app.js:19-36` exports a `FORBIDDEN_MUTATING_PATHS` list and
-  `web-ui-readonly.test.ts` (if it exists) asserts none of them appear as a
-  fetch target. The read-only test must be updated or removed — the admin
-  portal intentionally calls these paths.
-- **Config section field count**: The 15 sections contain approximately 60
-  individual fields. The form generation is the largest single piece of
-  frontend work. To keep the zero-build vanilla JS approach, form field
-  definitions will be declarative objects in `app.js` (one object per section,
-  listing field name, type, label, and validation constraints).
-- **Checkpoint delete backend gap**: The `@massa-ai/core` checkpoint
-  repository may or may not expose a `delete(id)` method. This must be verified
-  during implementation — if the repository lacks delete, a new
-  `deleteById(id)` method must be added to the repository and a
-  `DeleteCheckpointTool` wrapper created for MCP parity.
-- **Config write-through backend gap**: The `@massa-ai/shared` config loader
-  has no write path. The `saveConfig()` function is new surface and must be
-  added to `packages/shared/src/config/`. It must handle the XDG path
-  resolution, atomic write, and backup — and it must not be called at module
+- **Relationship to existing specs**: extends `.specs/features/phase-8-web-ui`
+  (original read-only web-ui) and `.specs/features/wave-7-hygiene-ui-process`
+  (write-mode + SSE + markdown). The original Phase 8 `R8-READONLY-01` AC is
+  superseded — read-only guarantee replaced by a trusted-caller write-mode
+  guarantee.
+- **`FORBIDDEN_MUTATING_PATHS`**: `app.js:19-36` exports this list and any
+  read-only test must be updated or removed — the admin portal intentionally
+  calls these paths.
+- **Config section field count**: 15 sections, ~60 fields. Form field
+  definitions are declarative objects in `app.js` (one object per section:
+  field name, type, label, validation constraints).
+- **Checkpoint delete backend gap**: `@massa-ai/core` checkpoint repository may
+  not expose `delete(id)` — if missing, add `deleteById(id)` + a
+  `DeleteCheckpointTool` wrapper for MCP parity.
+- **Config write-through backend gap**: `@massa-ai/shared` config loader has
+  no write path. `saveConfig()` is new surface; must not be called at module
   import time (same lesson as `resolveApiKey()` — import-time side effects on
   config.json are a hazard for tests).
 - **Restart-needed sections**: V1 hard-codes `["database", "embedding", "llm",
-  "security"]` as restart-required. A future enhancement could track which
-  config values are read at startup vs per-request and compute this
+  "security"]`. Future enhancement could track per-field read timing
   dynamically.
-- **Registry overlay loader gap**: `scripts/lib/model-profiles.ts`
-  `loadRegistry()` reads only the built-in path. A new
-  `loadEffectiveRegistry()` function must be added that reads the user
-  overlay from the XDG config path
-  (`~/.config/massa-ai/model-profiles.json`), merges it over the built-in
-  registry with shallow-per-profile + tombstone semantics, and falls back to
-  the built-in alone on overlay parse/validation failure. The existing
-  `loadRegistry()` stays unchanged (the build gate still validates the
-  built-in alone); `loadEffectiveRegistry()` is the new entry point for
-  runtime reads.
-- **Registry regenerate gap**: `POST /api/v1/model-registry/regenerate`
-  runs `scripts/generate-subagent-artifacts.ts` as a child process. The
-  script resolves the registry via `loadRegistry()` (built-in only) today —
-  it must be updated to call `loadEffectiveRegistry()` so regenerated
-  variants reflect the overlay. The script also resolves the profile via
-  `selectProfile()` / `MASSA_AI_MODEL_PROFILE`; the regenerate route does
-  not pass a profile flag (it regenerates all profiles the effective registry
-  defines).
-- **Overlay source attribution**: The `GET /api/v1/model-registry` response
-  includes both the merged `registry` and the `source` object (builtin +
-  overlay + tombstoned). The UI uses `source.overlay.profiles` to mark
-  overlay-sourced cells. A cell is overlay-sourced when its profile key
-  exists in `source.overlay.profiles` (and is not a tombstone). A profile
-  absent from the overlay but present in the effective registry is
-  built-in-sourced. This attribution is computed by the UI from the source
-  data — the API does not annotate individual cells.
-- **`generate-subagent-artifacts.ts` interface**: The regenerate route must
-  inspect the script's CLI interface to determine how to invoke it as a
-  child process (arguments, env vars, exit codes). If the script does not
-  support a non-interactive mode or requires arguments the route cannot
-  supply, the route may need to call the script's exported functions
-  directly (if the script is importable from the API's runtime) rather than
-  spawning a child process. This must be verified during implementation.
+- **Registry overlay loader gap**: `loadEffectiveRegistry()` is the new entry
+  point for runtime reads; `loadRegistry()` (built-in only) stays for the build
+  gate.
+- **Registry regenerate gap**: `generate-subagent-artifacts.ts` must be
+  updated to call `loadEffectiveRegistry()` so regenerated variants reflect
+  the overlay.
+- **Overlay source attribution**: computed by the UI from `source.overlay`;
+  the API does not annotate individual cells.
+- **`generate-subagent-artifacts.ts` interface**: the regenerate route must
+  inspect the script's CLI interface to determine how to invoke it as a child
+  process. If non-interactive mode is unsupported, the route may call the
+  script's exported functions directly (if importable from the API runtime).
