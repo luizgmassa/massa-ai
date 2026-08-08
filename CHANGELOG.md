@@ -18,6 +18,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on the builtin). 15 tasks across 5 phases, 61 acceptance criteria. See
   `.specs/features/admin-portal/`.
 
+### Changed
+
+- **`to-prd` workflow now follows the spec-driven pattern** —
+  `skills/massa-ai/workflows/to-prd.md` rewritten so the PRD it produces is
+  structurally consistent with a feature spec from `spec-driven` Specify.
+  Adds Definitions (PRD, Requirement ID `[CATEGORY]-NN`, Priority P1/P2/P3,
+  EARS patterns table, Implicit-Requirement Dimensions, Seam), Required
+  Sections (Problem Statement, Goals, Out of Scope, Assumptions & Open
+  Questions, User Stories with P1/P2/P3 + EARS ACs + IDs, Edge Cases,
+  Requirement Traceability, Success Criteria, plus to-prd's own
+  Implementation/Testing Decisions and Further Notes), a synthesize-only
+  Process (Explore → Seams → Synthesize, no interview → Dimensions sweep →
+  Requirement Closure Gate → deterministic backing via `validate_spec.ts` →
+  English naming), Directions (one behavior per AC, SHALL mandatory,
+  concrete values, ID stability), and an expanded PRD template matching the
+  `spec.md` shape. Version bumped 1.0.0 → 1.1.0. Read-only workflow unchanged
+  in scope; gate tests green (workflow-harness-contract +
+  workflow-metadata-headers, 110 pass / 0 fail).
+
 ## [1.40.1] - 2026-08-07
 
 ### Fixed
