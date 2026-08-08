@@ -749,18 +749,24 @@ export class PostgresVectorStore extends BaseVectorStore {
   async listAllProjectsAcrossDimensions(): Promise<ProjectInfo[]> {
     const pool = await this.getPool();
 
+    // schemaname = current_schema() (APCR-04.1): without it, an identically-named table in
+    // another schema is UNION ALL'd in and double-counted.
     const { rows: tables } = await pool.query(`
-      SELECT tablename FROM pg_tables
-      WHERE tablename = 'vector_documents'
-         OR tablename ~ '^vector_documents_[0-9]+d$'
+      SELECT schemaname, tablename FROM pg_tables
+      WHERE schemaname = current_schema()
+        AND (tablename = 'vector_documents' OR tablename ~ '^vector_documents_[0-9]+d$')
       ORDER BY tablename
     `);
 
     if (tables.length === 0) return [];
 
-    const unionParts = tables.map((t: any) =>
-      `SELECT project_id, COUNT(*)::int AS doc_count, MAX(updated_at) AS last_updated, SUM(LENGTH(content))::bigint AS total_size FROM ${t.tablename} WHERE id NOT LIKE '_metadata:%' GROUP BY project_id`
-    ).join(' UNION ALL ');
+    // Quoted, schema-qualified identifiers (APCR-04.2): an unqualified name resolves via
+    // search_path at execution time, which can read a different table than the one just
+    // enumerated.
+    const unionParts = tables.map((t: any) => {
+      const qualified = `"${t.schemaname}"."${t.tablename}"`;
+      return `SELECT project_id, COUNT(*)::int AS doc_count, MAX(updated_at) AS last_updated, SUM(LENGTH(content))::bigint AS total_size FROM ${qualified} WHERE id NOT LIKE '_metadata:%' GROUP BY project_id`;
+    }).join(' UNION ALL ');
 
     const { rows } = await pool.query(`
       SELECT project_id,

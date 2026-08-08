@@ -22,17 +22,19 @@ let poolConstructCount = 0;
 let connectCallCount = 0;
 let endCallCount = 0;
 let connectShouldThrow = false;
+let capturedSql: string[] = [];
 
 type QueryImpl = (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }>;
 
 let queryImpl: QueryImpl = async (sql: string) => {
-  if (sql.includes("pg_tables")) return { rows: [{ tablename: "vector_documents_768d" }] };
+  if (sql.includes("pg_tables")) return { rows: [{ schemaname: "public", tablename: "vector_documents_768d" }] };
   if (sql.includes("pg_indexes")) return { rows: [{ indexname: "idx_vector_documents_768d_embedding" }] };
   return { rows: [] };
 };
 
 class FakeClient {
   async query(sql: string, params?: unknown[]) {
+    capturedSql.push(sql);
     return queryImpl(sql, params);
   }
   release() {
@@ -50,6 +52,7 @@ class FakePool {
     return new FakeClient();
   }
   async query(sql: string, params?: unknown[]) {
+    capturedSql.push(sql);
     return queryImpl(sql, params);
   }
   async end() {
@@ -82,8 +85,9 @@ beforeEach(() => {
   connectCallCount = 0;
   endCallCount = 0;
   connectShouldThrow = false;
+  capturedSql = [];
   queryImpl = async (sql: string) => {
-    if (sql.includes("pg_tables")) return { rows: [{ tablename: "vector_documents_768d" }] };
+    if (sql.includes("pg_tables")) return { rows: [{ schemaname: "public", tablename: "vector_documents_768d" }] };
     if (sql.includes("pg_indexes")) return { rows: [{ indexname: "idx_vector_documents_768d_embedding" }] };
     return { rows: [] };
   };
@@ -135,5 +139,71 @@ describe("PostgresVectorStore — one pool per store instance (APCR-03)", () => 
     connectShouldThrow = true;
     const store = makeStore();
     await expect(store.listProjects()).rejects.toThrow("connection refused");
+  });
+});
+
+describe("PostgresVectorStore — schema-qualified table enumeration (APCR-04)", () => {
+  test("the pg_tables scan filters on schemaname = current_schema() and the UNION ALL uses quoted, schema-qualified identifiers", async () => {
+    // Two dimension tables in the current schema, so the generated SQL
+    // actually contains "UNION ALL" (Array.join with one element does not).
+    queryImpl = async (sql: string) => {
+      if (sql.includes("FROM pg_tables")) {
+        return {
+          rows: [
+            { schemaname: "public", tablename: "vector_documents_768d" },
+            { schemaname: "public", tablename: "vector_documents_1536d" },
+          ],
+        };
+      }
+      return { rows: [] };
+    };
+
+    const store = makeStore();
+    await store.listAllProjectsAcrossDimensions();
+
+    const tableScan = capturedSql.find((sql) => sql.includes("FROM pg_tables"));
+    expect(tableScan).toBeDefined();
+    expect(tableScan).toContain("schemaname = current_schema()");
+
+    const mergedQuery = capturedSql.find((sql) => sql.includes("AS merged"));
+    expect(mergedQuery).toBeDefined();
+    expect(mergedQuery).toContain("UNION ALL");
+    expect(mergedQuery).toContain('"public"."vector_documents_768d"');
+    expect(mergedQuery).toContain('"public"."vector_documents_1536d"');
+  });
+
+  test("a two-schema fixture is not double-counted — only the current schema's rows are summed", async () => {
+    // Two schemas each hold an identically-named dimension table. Only the
+    // "public" row is `current_schema()`; the "other_schema" one must never
+    // reach the UNION ALL.
+    queryImpl = async (sql: string) => {
+      if (sql.includes("FROM pg_tables")) {
+        // The fake ignores the WHERE clause and returns exactly what the
+        // real filtered query would: one row, from the current schema only.
+        return { rows: [{ schemaname: "public", tablename: "vector_documents_768d" }] };
+      }
+      if (sql.includes("AS merged")) {
+        return {
+          rows: [{ project_id: "p1", doc_count: 3, last_updated: new Date("2026-01-01"), total_size: "300" }],
+        };
+      }
+      return { rows: [] };
+    };
+
+    const store = makeStore();
+    const projects = await store.listAllProjectsAcrossDimensions();
+
+    expect(projects).toHaveLength(1);
+    expect(projects[0]!.documentCount).toBe(3);
+
+    const mergedQuery = capturedSql.find((sql) => sql.includes("AS merged"));
+    expect(mergedQuery).toBeDefined();
+    // No "UNION ALL" at all — exactly one SELECT feeds the merge, because
+    // only one row (the current schema's) came back from the pg_tables scan.
+    // The other schema's identically-named table never reached the generated
+    // SQL.
+    expect(mergedQuery).not.toContain("UNION ALL");
+    expect(mergedQuery).toContain('"public"."vector_documents_768d"');
+    expect(mergedQuery).not.toContain("other_schema");
   });
 });
