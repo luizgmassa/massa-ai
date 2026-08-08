@@ -204,6 +204,18 @@ export const EXCLUSIONS: ReadonlyArray<{ file: string; reason: string }> = [
     file: "packages/shared/src/env.ts",
     reason: "config->env seeding branches are only reachable once the config layer's frozen CONFIG_DIR is set from a parent process",
   },
+  {
+    // Added by admin-portal (2026-08-08). Same blind-spot class as api-key.ts
+    // above: every config-writer test goes through the `runIsolated` subprocess
+    // harness because `CONFIG_DIR` is frozen at the config layer's first import
+    // and an in-process test cannot re-point it. Bun's coverage does not cross a
+    // process boundary, so the subject measures ~3% while being one of the
+    // better-tested files in the repo (138 assertions across 32 tests). Driving
+    // it in-process would defeat the isolation that stops these tests writing
+    // into the developer's real `~/.config`.
+    file: "packages/shared/src/config/config-writer.ts",
+    reason: "measurement blind spot — fully tested through the runIsolated subprocess harness, which Bun coverage cannot see",
+  },
 ];
 
 interface CoverageUnit {

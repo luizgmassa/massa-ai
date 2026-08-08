@@ -1,4 +1,6 @@
 import { describe, it, expect, afterEach } from "bun:test";
+import fs from "fs";
+import path from "path";
 
 const mod = await import("../static/app.js");
 const UI = (globalThis as any).MASSA_AI_UI || {};
@@ -10,11 +12,16 @@ const {
   renderCheckpoints,
   renderMemoryBrowser,
   renderProposals,
+  renderConfig,
+  renderProfiles,
   initTheme,
   toggleTheme,
   createApiClient,
   startApp,
 } = { ...mod, ...UI };
+
+const STATIC_DIR = path.resolve(import.meta.dir, "../static");
+const INDEX_HTML = fs.readFileSync(path.join(STATIC_DIR, "index.html"), "utf8");
 
 describe("markdown fallback renderer edge cases", () => {
   it("transitions from ordered list to unordered list", () => {
@@ -660,5 +667,318 @@ describe("startApp", () => {
     expect(sseInstances.length).toBe(1);
     expect(sseInstances[0].url).toContain("/api/v1/events");
     delete (globalThis as any).EventSource;
+  });
+});
+
+// ── Admin portal nav + footer + viewFromHash + dispatch stubs (T9) ──────────
+
+describe("admin portal nav + footer + routing (T9)", () => {
+  it("index.html has Config and Profiles nav items after Dashboard", () => {
+    const navMatch = INDEX_HTML.match(/<nav class="nav">([\s\S]*?)<\/nav>/);
+    expect(navMatch).not.toBeNull();
+    const nav = navMatch![1];
+    const dashboardIdx = nav.indexOf("#/dashboard");
+    const configIdx = nav.indexOf("#/config");
+    const profilesIdx = nav.indexOf("#/profiles");
+    expect(dashboardIdx).toBeGreaterThan(-1);
+    expect(configIdx).toBeGreaterThan(dashboardIdx);
+    expect(profilesIdx).toBeGreaterThan(configIdx);
+  });
+
+  it("index.html footer text is 'Admin portal · served by the massa-ai Tools API'", () => {
+    expect(INDEX_HTML).toContain("Admin portal");
+    expect(INDEX_HTML).toContain("served by the massa-ai Tools API");
+    expect(INDEX_HTML).not.toContain("Read-only");
+  });
+
+  it("index.html brand says admin portal, not memory browser", () => {
+    expect(INDEX_HTML).toContain("admin portal");
+    expect(INDEX_HTML).not.toContain("memory browser");
+  });
+
+  it("renderConfig stub renders without error and shows restart badge when present", () => {
+    const html = renderConfig({ config: { logging: { level: "info" } }, restartNeededSections: ["llm"] });
+    expect(html).toContain("Config");
+    expect(html).toContain("restart needed");
+    expect(html).toContain("llm");
+  });
+
+  it("renderConfig stub renders empty restart badge when no restart sections", () => {
+    const html = renderConfig({ config: {}, restartNeededSections: [] });
+    expect(html).toContain("Config");
+    expect(html).not.toContain("restart needed");
+  });
+
+  it("renderProfiles stub renders profile cards with active marked", () => {
+    const html = renderProfiles({ hosts: [{ host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced", "work"] }] }, { writeMode: false });
+    expect(html).toContain("balanced");
+    expect(html).toContain("work");
+    expect(html).toContain("active");
+  });
+
+  it("renderProfiles stub renders empty state when no profiles", () => {
+    const html = renderProfiles({ hosts: [] }, { writeMode: false });
+    expect(html).toContain("No profiles");
+  });
+
+  it("viewFromHash allow-list includes config and profiles (dispatch stubs route without error)", async () => {
+    // Drive startApp with a hash pointing at config; the dispatch stub must
+    // call GET /api/v1/config and render renderConfig output without throwing.
+    const { doc } = makeFakeDom();
+    (globalThis as any).location = { hash: "#/config" };
+    const calls: string[] = [];
+    globalThis.fetch = (async (url: string) => {
+      calls.push(String(url));
+      return {
+        headers: { get: () => "application/json" },
+        json: async () => ({ success: true, data: { config: { logging: { level: "info" } }, restartNeededSections: [] } }),
+      };
+    }) as unknown as typeof fetch;
+    startApp({ document: doc, base: "" });
+    await new Promise((r) => setTimeout(r, 60));
+    expect(calls.some((u) => u.includes("/api/v1/config"))).toBe(true);
+    expect(doc.getElementById("app").innerHTML).toContain("Config");
+    delete (globalThis as any).location;
+  });
+
+  it("viewFromHash allow-list includes profiles (dispatch stub routes without error)", async () => {
+    const { doc } = makeFakeDom();
+    (globalThis as any).location = { hash: "#/profiles" };
+    const calls: string[] = [];
+    globalThis.fetch = (async (url: string) => {
+      calls.push(String(url));
+      return {
+        headers: { get: () => "application/json" },
+        json: async () => ({ success: true, data: { hosts: [{ host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] }] } }),
+      };
+    }) as unknown as typeof fetch;
+    startApp({ document: doc, base: "" });
+    await new Promise((r) => setTimeout(r, 60));
+    expect(calls.some((u) => u.includes("/api/v1/profiles"))).toBe(true);
+    expect(doc.getElementById("app").innerHTML).toContain("Profiles");
+    delete (globalThis as any).location;
+  });
+});
+
+// ── Profiles view renderer (T11 — PROF-01, PROF-02) ────────────────────────
+
+describe("renderProfiles — profile switcher (PROF-01, PROF-02)", () => {
+  const SAMPLE_PROFILES = {
+    hosts: [
+      { host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.40.1", availableProfiles: ["balanced", "work", "cheap"] },
+      { host: "codex", installed: true, skipped: false, skipReason: null, activeProfile: "work", bundleVersion: "1.40.1", availableProfiles: ["balanced", "work"] },
+      { host: "cursor", installed: false, skipped: true, skipReason: "no variant dir", activeProfile: null, bundleVersion: null, availableProfiles: [] },
+    ],
+  };
+
+  it("renders profile cards per host with active marked (PROF-01)", () => {
+    const html = renderProfiles(SAMPLE_PROFILES, { writeMode: true });
+    expect(html).toContain("claude");
+    expect(html).toContain("codex");
+    expect(html).toContain("balanced");
+    expect(html).toContain("work");
+    expect(html).toContain("active");
+  });
+
+  it("marks active profile with active badge, no Switch button on active", () => {
+    const html = renderProfiles(SAMPLE_PROFILES, { writeMode: true });
+    expect(html).toContain("active-badge");
+    const claudeSection = html.split('data-host="claude"')[1] || "";
+    expect(claudeSection).toContain("active-badge");
+  });
+
+  it("renders Switch button for non-active profiles when write mode on (PROF-02)", () => {
+    const html = renderProfiles(SAMPLE_PROFILES, { writeMode: true });
+    expect(html).toContain('data-action="profile-switch"');
+    expect(html).toContain('data-profile="work"');
+    expect(html).toContain('data-profile="cheap"');
+    expect(html).toContain('data-host="claude"');
+  });
+
+  it("hides Switch buttons when write mode off", () => {
+    const html = renderProfiles(SAMPLE_PROFILES, { writeMode: false });
+    expect(html).not.toContain('data-action="profile-switch"');
+  });
+
+  it("shows skipped badge for skipped hosts", () => {
+    const html = renderProfiles(SAMPLE_PROFILES, { writeMode: true });
+    expect(html).toContain("cursor");
+    expect(html).toContain("skipped");
+    expect(html).toContain("no variant dir");
+  });
+
+  it("shows bundle version badge when present", () => {
+    const html = renderProfiles(SAMPLE_PROFILES, { writeMode: false });
+    expect(html).toContain("1.40.1");
+  });
+
+  it("renders empty state when no hosts", () => {
+    const html = renderProfiles({ hosts: [] }, { writeMode: true });
+    expect(html).toContain("No profiles");
+  });
+
+  it("defaults writeMode to isWriteModeEnabled() when not passed", () => {
+    delete (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+    delete (globalThis as any).document;
+    delete (globalThis as any).localStorage;
+    const html = renderProfiles(SAMPLE_PROFILES);
+    expect(html).not.toContain('data-action="profile-switch"');
+  });
+
+  it("renders only active badge (no Switch) for active profile", () => {
+    const html = renderProfiles(SAMPLE_PROFILES, { writeMode: true });
+    const claudeIdx = html.indexOf('data-host="claude"');
+    const balancedIdx = html.indexOf("balanced", claudeIdx);
+    const cardEnd = html.indexOf("</div>", balancedIdx);
+    const card = html.slice(balancedIdx - 50, cardEnd);
+    expect(card).toContain("active-badge");
+    expect(card).not.toContain('data-action="profile-switch"');
+  });
+});
+
+// ── Create/delete forms for existing CRUD APIs (T13) ────────────────────────
+
+describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", () => {
+  const origWriteMode = (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+  const origDocument = (globalThis as any).document;
+  const origLocalStorage = (globalThis as any).localStorage;
+
+  afterEach(() => {
+    if (origWriteMode !== undefined) (globalThis as any).MASSA_AI_WEB_WRITE_MODE = origWriteMode;
+    else delete (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+    if (origDocument !== undefined) (globalThis as any).document = origDocument;
+    else delete (globalThis as any).document;
+    if (origLocalStorage !== undefined) (globalThis as any).localStorage = origLocalStorage;
+    else delete (globalThis as any).localStorage;
+  });
+
+  function enableWrite() {
+    delete (globalThis as any).document;
+    delete (globalThis as any).localStorage;
+    (globalThis as any).MASSA_AI_WEB_WRITE_MODE = true;
+  }
+  function disableWrite() {
+    delete (globalThis as any).document;
+    delete (globalThis as any).localStorage;
+    (globalThis as any).MASSA_AI_WEB_WRITE_MODE = false;
+  }
+
+  describe("memory create form (MEM-02)", () => {
+    it("renders create-memory form when write mode on", () => {
+      enableWrite();
+      const data = { data: { memories: [{ id: "m1", type: "code", level: 1, importance: 0.8, content: "x" }], total: 1, limit: 50, offset: 0 } };
+      const html = renderMemoryBrowser(data, { filters: {} });
+      expect(html).toContain("Create Memory");
+      expect(html).toContain('data-action="memory-create"');
+      expect(html).toContain('data-form="memory-create"');
+      expect(html).toContain('data-create="content"');
+      expect(html).toContain('data-create="type"');
+      expect(html).toContain('data-create="importance"');
+      expect(html).toContain('data-create="tags"');
+      expect(html).toContain('data-create="projectId"');
+    });
+
+    it("hides create-memory form when write mode off", () => {
+      disableWrite();
+      const data = { data: { memories: [{ id: "m1", type: "code", level: 1, importance: 0.8, content: "x" }], total: 1, limit: 50, offset: 0 } };
+      const html = renderMemoryBrowser(data, { filters: {} });
+      expect(html).not.toContain("Create Memory");
+      expect(html).not.toContain('data-action="memory-create"');
+    });
+  });
+
+  describe("handoff create + cancel (HAND-02, HAND-04)", () => {
+    it("renders create-handoff form when write mode on + project selected", () => {
+      enableWrite();
+      const data = { data: { pending: [] } };
+      const html = renderHandoffs(data, { project: "proj-1" });
+      expect(html).toContain("Create Handoff");
+      expect(html).toContain('data-action="handoff-create"');
+      expect(html).toContain('data-create="projectId"');
+      expect(html).toContain('data-create="summary"');
+      expect(html).toContain('data-create="targetAgent"');
+      expect(html).toContain('data-create="openQuestions"');
+      expect(html).toContain('data-create="nextSteps"');
+      expect(html).toContain('data-create="files"');
+    });
+
+    it("renders accept + cancel buttons on pending handoffs when write mode on", () => {
+      enableWrite();
+      const data = { data: { pending: [{ id: "h1", targetAgent: "orchestrator", status: "open", summary: "test" }] } };
+      const html = renderHandoffs(data, { project: "proj-1" });
+      expect(html).toContain('data-action="handoff-accept"');
+      expect(html).toContain('data-action="handoff-cancel"');
+      expect(html).toContain('data-id="h1"');
+    });
+
+    it("hides create + accept/cancel when write mode off", () => {
+      disableWrite();
+      const data = { data: { pending: [{ id: "h1", targetAgent: "x", status: "open", summary: "y" }] } };
+      const html = renderHandoffs(data, { project: "proj-1" });
+      expect(html).not.toContain("Create Handoff");
+      expect(html).not.toContain('data-action="handoff-accept"');
+      expect(html).not.toContain('data-action="handoff-cancel"');
+    });
+  });
+
+  describe("checkpoint create + delete (CHKP-02, CHKP-04)", () => {
+    it("renders create-checkpoint form when write mode on", () => {
+      enableWrite();
+      const data = { success: true, data: { checkpoints: [{ id: "c1", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };
+      const html = renderCheckpoints(data);
+      expect(html).toContain("Create Checkpoint");
+      expect(html).toContain('data-action="checkpoint-create"');
+      expect(html).toContain('data-create="taskId"');
+      expect(html).toContain('data-create="description"');
+      expect(html).toContain('data-create="status"');
+      expect(html).toContain('data-create="progressPercent"');
+      expect(html).toContain('data-create="checkpointType"');
+    });
+
+    it("renders delete button on checkpoint rows when write mode on", () => {
+      enableWrite();
+      const data = { success: true, data: { checkpoints: [{ id: "c1", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };
+      const html = renderCheckpoints(data);
+      expect(html).toContain('data-action="checkpoint-delete"');
+      expect(html).toContain('data-id="c1"');
+    });
+
+    it("hides create + delete when write mode off", () => {
+      disableWrite();
+      const data = { success: true, data: { checkpoints: [{ id: "c1", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };
+      const html = renderCheckpoints(data);
+      expect(html).not.toContain("Create Checkpoint");
+      expect(html).not.toContain('data-action="checkpoint-delete"');
+    });
+  });
+
+  describe("project index + reset (PROJ-02, PROJ-04)", () => {
+    it("renders index-project form when write mode on", () => {
+      enableWrite();
+      const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
+      const html = renderProjects(data);
+      expect(html).toContain("Index Project");
+      expect(html).toContain('data-action="project-index"');
+      expect(html).toContain('data-create="projectPath"');
+      expect(html).toContain('data-create="projectId"');
+      expect(html).toContain('data-create="forceReindex"');
+      expect(html).toContain('data-create="warmCache"');
+    });
+
+    it("renders reset button on project rows when write mode on", () => {
+      enableWrite();
+      const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
+      const html = renderProjects(data);
+      expect(html).toContain('data-action="project-reset"');
+      expect(html).toContain('data-project="p1"');
+    });
+
+    it("hides index form + reset button when write mode off", () => {
+      disableWrite();
+      const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
+      const html = renderProjects(data);
+      expect(html).not.toContain("Index Project");
+      expect(html).not.toContain('data-action="project-reset"');
+    });
   });
 });

@@ -82,4 +82,77 @@ describe("checkpoint routes delegate to core tools", () => {
     expect(json.success).toBe(false);
     expect(json.error).toBeTruthy();
   });
+
+  test("POST /delete on a non-existent ID returns 404 {success:false, error:'not found'}", async () => {
+    const res = await checkpointRoutes.handle(
+      new Request("http://localhost/api/v1/checkpoints/delete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "nonexistent-id-xyz" }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    const json = (await res.json()) as { success: boolean; error: string };
+    expect(json.success).toBe(false);
+    expect(json.error).toBe("not found");
+  });
+
+  test("POST /delete on an existing checkpoint returns 200 {success:true, data:{ok:true}}", async () => {
+    // First create a checkpoint to delete
+    const createJson = await post("/api/v1/checkpoints/create", {
+      taskId: "task-delete-test",
+      description: "checkpoint to delete",
+      format: "json",
+    });
+    expect(createJson.success).toBe(true);
+    const created = createJson.data as any;
+    const checkpointId = created?.checkpointId ?? created?.id ?? created?.checkpoint?.id;
+    expect(checkpointId).toBeTruthy();
+
+    const res = await checkpointRoutes.handle(
+      new Request("http://localhost/api/v1/checkpoints/delete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: checkpointId }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { success: boolean; data: { ok: boolean } };
+    expect(json.success).toBe(true);
+    expect(json.data.ok).toBe(true);
+  });
+
+  test("POST /delete on an already-deleted ID returns 404", async () => {
+    // Delete the same checkpoint again — should 404
+    const createJson = await post("/api/v1/checkpoints/create", {
+      taskId: "task-delete-twice",
+      description: "checkpoint to delete twice",
+      format: "json",
+    });
+    const created = createJson.data as any;
+    const checkpointId = created?.checkpointId ?? created?.id ?? created?.checkpoint?.id;
+
+    // First delete
+    const res1 = await checkpointRoutes.handle(
+      new Request("http://localhost/api/v1/checkpoints/delete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: checkpointId }),
+      }),
+    );
+    expect(res1.status).toBe(200);
+
+    // Second delete — should 404
+    const res2 = await checkpointRoutes.handle(
+      new Request("http://localhost/api/v1/checkpoints/delete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: checkpointId }),
+      }),
+    );
+    expect(res2.status).toBe(404);
+    const json2 = (await res2.json()) as { success: boolean; error: string };
+    expect(json2.success).toBe(false);
+    expect(json2.error).toBe("not found");
+  });
 });

@@ -14,6 +14,7 @@ import {
   CreateCheckpointTool,
   RestoreCheckpointTool,
 } from "@massa-ai/core";
+import { CheckpointManager } from "@massa-ai/core/services";
 import { logger } from "@massa-ai/shared";
 import { Elysia, t } from "elysia";
 
@@ -40,6 +41,15 @@ function getRestoreCheckpointTool(): RestoreCheckpointTool {
     restoreCheckpointTool = new RestoreCheckpointTool();
   }
   return restoreCheckpointTool;
+}
+
+let checkpointManager: CheckpointManager | null = null;
+
+function getCheckpointManager(): CheckpointManager {
+  if (!checkpointManager) {
+    checkpointManager = CheckpointManager.getInstance();
+  }
+  return checkpointManager;
 }
 
 export const checkpointRoutes = new Elysia({ prefix: "/api/v1/checkpoints" })
@@ -165,6 +175,49 @@ export const checkpointRoutes = new Elysia({ prefix: "/api/v1/checkpoints" })
         summary: "Restore checkpoint",
         description:
           "Restore a saved checkpoint and return its state plus integrity checks.",
+      },
+    },
+  )
+  .post(
+    "/delete",
+    /**
+     * Delete a checkpoint by ID. The store's `deleteCheckpoint` is
+     * mirror-sync: the in-memory mirror is updated synchronously and the
+     * durable PG delete is chained asynchronously. The route returns `{ok:true}`
+     * on a mirror-hit (the row is gone from the mirror immediately); a
+     * subsequent list reads the same mirror, so the view is consistent within
+     * a session. A server restart before the durable delete completes could
+     * re-show the row (accepted V1 limitation, Plan Challenge F4).
+     */
+    ({ body, set }) => {
+      try {
+        const { id } = body as { id: string };
+        const existed = getCheckpointManager().deleteCheckpoint(id);
+        if (!existed) {
+          set.status = 404;
+          return { success: false as const, error: "not found" };
+        }
+        set.status = 200;
+        return { success: true as const, data: { ok: true } };
+      } catch (error) {
+        logger.error("Failed to delete checkpoint", error as Error);
+        set.status = 500;
+        return {
+          success: false as const,
+          error: `Checkpoint service error: ${(error as Error).message}`,
+        };
+      }
+    },
+    {
+      body: t.Object({
+        id: t.String({ description: "Checkpoint ID to delete" }),
+        projectId: t.Optional(t.String({ description: "Project ID (unused, for API parity)" })),
+      }),
+      detail: {
+        tags: ["checkpoint"],
+        summary: "Delete checkpoint by ID",
+        description:
+          "Deletes a checkpoint. Returns 200 {ok:true} on mirror-hit, 404 on non-existent ID, 500 on store error. Mirror-sync: the in-memory mirror is updated immediately; the durable PG delete is async (Plan Challenge F4 — a restart before the durable delete completes could re-show the row).",
       },
     },
   );

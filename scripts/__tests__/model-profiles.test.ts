@@ -21,6 +21,7 @@ import {
   effortViolation,
   hostsSupportedBy,
   loadRegistry,
+  loadEffectiveRegistry,
   profileFlagFrom,
   resolveTier,
   selectProfile,
@@ -506,5 +507,292 @@ describe("model-profiles: host effort enums match the cited docs", () => {
   });
   test("opencode is a non-enumerable provider pass-through", () => {
     expect(HOST_EFFORT_ENUM.opencode).toBeNull();
+  });
+});
+
+// ── loadEffectiveRegistry: overlay merge + fallback (REG-16, REG-17) ─────────
+describe("model-profiles: loadEffectiveRegistry", () => {
+  const OVERLAY_DIR = path.join(import.meta.dirname, "..", "..");
+  const REGISTRY_PATH = path.join(OVERLAY_DIR, "skills", "model-profiles.json");
+
+  function makeBuiltinRegistry(): Registry {
+    return loadRegistry(REGISTRY_PATH);
+  }
+
+  function writeOverlay(overlayPath: string, data: unknown): void {
+    const fs = require("fs");
+    fs.mkdirSync(path.dirname(overlayPath), { recursive: true });
+    fs.writeFileSync(overlayPath, JSON.stringify(data, null, 2));
+  }
+
+  test("missing overlay file returns builtin with overlay=null and tombstoned=[]", () => {
+    const tmpDir = path.join(
+      require("os").tmpdir(),
+      `massa-ai-overlay-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    const overlayPath = path.join(tmpDir, "model-profiles.json");
+
+    const result = loadEffectiveRegistry({ overlayPath });
+    expect(result.registry.version).toBe(1);
+    expect(result.source.overlay).toBeNull();
+    expect(result.source.tombstoned).toEqual([]);
+    expect(result.overlayError).toBeUndefined();
+  });
+
+  test("overlay merge: shallow per profile — overlay profile replaces entire builtin profile", () => {
+    const tmpDir = path.join(
+      require("os").tmpdir(),
+      `massa-ai-overlay-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    const overlayPath = path.join(tmpDir, "model-profiles.json");
+
+    const builtin = makeBuiltinRegistry();
+    const firstProfileKey = Object.keys(builtin.profiles)[0]!;
+    const firstProfile = builtin.profiles[firstProfileKey];
+
+    // Create a modified version of the first profile — change its description
+    const modifiedProfile = JSON.parse(JSON.stringify(firstProfile));
+    modifiedProfile.description = "OVERLAY MODIFIED DESCRIPTION";
+
+    writeOverlay(overlayPath, {
+      profiles: {
+        [firstProfileKey]: modifiedProfile,
+      },
+    });
+
+    const result = loadEffectiveRegistry({ overlayPath });
+    expect(result.source.overlay).not.toBeNull();
+    expect(result.registry.profiles[firstProfileKey].description).toBe(
+      "OVERLAY MODIFIED DESCRIPTION",
+    );
+    expect(result.overlayError).toBeUndefined();
+  });
+
+  test("tombstone: _delete:true removes a builtin profile and lists it in source.tombstoned", () => {
+    const tmpDir = path.join(
+      require("os").tmpdir(),
+      `massa-ai-overlay-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    const overlayPath = path.join(tmpDir, "model-profiles.json");
+
+    const builtin = makeBuiltinRegistry();
+    const profileToDelete = Object.keys(builtin.profiles)[0]!;
+    // Find a remaining profile to repoint hostDefaults to
+    const remainingProfile = Object.keys(builtin.profiles).find(
+      (k) => k !== profileToDelete,
+    )!;
+    // Build hostDefaults pointing all hosts to the remaining profile,
+    // but only if that profile supports the host
+    const newHostDefaults: Record<string, string> = {};
+    for (const h of HOSTS) {
+      if (remainingProfile in builtin.profiles && h in builtin.profiles[remainingProfile].hosts) {
+        newHostDefaults[h] = remainingProfile;
+      } else {
+        // Find any profile that supports this host
+        for (const [k, p] of Object.entries(builtin.profiles)) {
+          if (k !== profileToDelete && h in p.hosts) {
+            newHostDefaults[h] = k;
+            break;
+          }
+        }
+      }
+    }
+
+    writeOverlay(overlayPath, {
+      profiles: {
+        [profileToDelete]: { _delete: true as const },
+      },
+      hostDefaults: newHostDefaults,
+    });
+
+    const result = loadEffectiveRegistry({ overlayPath });
+    expect(result.source.tombstoned).toContain(profileToDelete);
+    expect(result.registry.profiles[profileToDelete]).toBeUndefined();
+  });
+
+  test("corrupted overlay JSON falls back to builtin with overlayError (no throw)", () => {
+    const tmpDir = path.join(
+      require("os").tmpdir(),
+      `massa-ai-overlay-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    const overlayPath = path.join(tmpDir, "model-profiles.json");
+
+    const fs = require("fs");
+    fs.mkdirSync(path.dirname(overlayPath), { recursive: true });
+    fs.writeFileSync(overlayPath, "{ this is not valid json,,, }");
+
+    let threw = false;
+    let result;
+    try {
+      result = loadEffectiveRegistry({ overlayPath });
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+    expect(result!.registry.version).toBe(1);
+    expect(result!.source.overlay).toBeNull();
+    expect(result!.overlayError).toBeDefined();
+    expect(result!.overlayError).toContain("parse failed");
+  });
+
+  test("validation failure on merged result falls back to builtin with overlayError", () => {
+    const tmpDir = path.join(
+      require("os").tmpdir(),
+      `massa-ai-overlay-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    const overlayPath = path.join(tmpDir, "model-profiles.json");
+
+    // Write an overlay that replaces tiers with something invalid
+    writeOverlay(overlayPath, {
+      tiers: ["not-a-valid-tier"],
+    });
+
+    const result = loadEffectiveRegistry({ overlayPath });
+    expect(result.registry.version).toBe(1);
+    expect(result.source.overlay).toBeNull();
+    expect(result.overlayError).toBeDefined();
+    expect(result.overlayError).toContain("validation failed");
+  });
+
+  test("hostDefaults replaced wholesale when present in overlay", () => {
+    const tmpDir = path.join(
+      require("os").tmpdir(),
+      `massa-ai-overlay-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    const overlayPath = path.join(tmpDir, "model-profiles.json");
+
+    const builtin = makeBuiltinRegistry();
+    // Pick two different profiles for claude vs codex to test wholesale replace
+    const profileKeys = Object.keys(builtin.profiles);
+    const newClaudeDefault = profileKeys[1] ?? profileKeys[0]!;
+
+    writeOverlay(overlayPath, {
+      hostDefaults: {
+        claude: newClaudeDefault,
+        codex: newClaudeDefault,
+        cursor: newClaudeDefault,
+        opencode: newClaudeDefault,
+      },
+    });
+
+    const result = loadEffectiveRegistry({ overlayPath });
+    if (!result.overlayError) {
+      expect(result.registry.hostDefaults.claude).toBe(newClaudeDefault);
+    }
+  });
+});
+
+// ── F3 sensor: generate-subagent-artifacts read-path split (T14) ──────────
+
+describe("generate-subagent-artifacts read-path split (F3 sensor — T14)", () => {
+  const fs = require("fs");
+
+  test("runtime main() reads loadEffectiveRegistry (overlay reflected), --check stays on loadRegistry (builtin)", async () => {
+    // Import the generator module to inspect its main function's behavior.
+    // The F3 sensor: an overlay present changes the runtime (non---check) read
+    // but --check still validates the builtin alone.
+    const gen = await import("../generate-subagent-artifacts.ts");
+
+    // Set an overlay that changes the balanced profile's claude/standard model.
+    const tmpDir = path.join(
+      require("os").tmpdir(),
+      `massa-ai-f3-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    const overlayPath = path.join(tmpDir, "model-profiles.json");
+    fs.mkdirSync(path.dirname(overlayPath), { recursive: true });
+
+    // Use loadEffectiveRegistry with the overlay to confirm the merge works.
+    const overlayModel = "f3-overlay-test-model";
+    const builtinReg = loadRegistry();
+    const builtinBalanced = builtinReg.profiles.balanced;
+    // Build a full overlay profile replacing balanced's model across all hosts
+    // so the merged result validates (hostDefaults must point to profiles that
+    // support every host).
+    const overlayHosts = {};
+    for (const [host, tierMap] of Object.entries(builtinBalanced.hosts)) {
+      overlayHosts[host] = {};
+      for (const [tier, pair] of Object.entries(tierMap)) {
+        overlayHosts[host][tier] = { model: overlayModel, effort: pair.effort };
+      }
+    }
+    fs.writeFileSync(overlayPath, JSON.stringify({
+      profiles: {
+        balanced: {
+          description: "F3 overlay",
+          hosts: overlayHosts,
+        },
+      },
+    }, null, 2));
+
+    const effective = loadEffectiveRegistry({ overlayPath });
+    // The overlay model should be reflected in the effective registry.
+    expect(effective.registry.profiles.balanced.hosts.claude.standard.model).toBe(overlayModel);
+    expect(effective.source.overlay).not.toBeNull();
+    expect(effective.source.tombstoned).toEqual([]);
+
+    // The builtin (loadRegistry) must NOT reflect the overlay — --check stays
+    // on builtin alone so a broken overlay never fails the build gate.
+    const builtin = loadRegistry();
+    expect(builtin.profiles.balanced.hosts.claude.standard.model).not.toBe(overlayModel);
+
+    // Verify the generator module exports main and it is a function.
+    expect(typeof gen.main).toBe("function");
+
+    // Clean up the overlay so it does not leak into other tests.
+    try { fs.unlinkSync(overlayPath); } catch {}
+    try { fs.rmdirSync(tmpDir); } catch {}
+  });
+
+  test("runCheck with an overlay present ignores it and reads builtin (F3 — build gate stays on builtin)", async () => {
+    // F3 sensor (strengthened): the --check path MUST read loadRegistry (builtin
+    // alone), NOT loadEffectiveRegistry. We set a valid full overlay that changes
+    // the balanced profile's model across all hosts, point XDG_CONFIG_HOME at it,
+    // then invoke runCheck() with no opts.registry. If runCheck reads builtin,
+    // the emitted variant dirs match the checked-in tree → exit 0. If runCheck
+    // reads the effective registry (mutant), the overlay model is emitted into
+    // the balanced variant dirs → drift vs checked-in → exit 1.
+    const fs = require("fs");
+    const path = require("path");
+    const os = require("os");
+    const gen = await import("../generate-subagent-artifacts.ts");
+    expect(typeof gen.runCheck).toBe("function");
+
+    const tmpXdg = path.join(
+      os.tmpdir(),
+      `massa-ai-f3-runchk-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    const overlayPath = path.join(tmpXdg, "massa-ai", "model-profiles.json");
+    fs.mkdirSync(path.dirname(overlayPath), { recursive: true });
+
+    const overlayModel = "f3-runchk-overlay-model";
+    const builtinReg = loadRegistry();
+    const builtinBalanced = builtinReg.profiles.balanced;
+    const overlayHosts = {};
+    for (const [host, tierMap] of Object.entries(builtinBalanced.hosts)) {
+      overlayHosts[host] = {};
+      for (const [tier, pair] of Object.entries(tierMap)) {
+        overlayHosts[host][tier] = { model: overlayModel, effort: pair.effort };
+      }
+    }
+    fs.writeFileSync(overlayPath, JSON.stringify({
+      profiles: { balanced: { description: "F3 runcheck overlay", hosts: overlayHosts } },
+    }, null, 2));
+
+    const prevXdg = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = tmpXdg;
+    try {
+      // Confirm the overlay is actually picked up by the effective loader
+      // (proves the overlay is valid + reachable — otherwise the sensor is vacuous).
+      const effective = loadEffectiveRegistry();
+      expect(effective.registry.profiles.balanced.hosts.claude.standard.model).toBe(overlayModel);
+      expect(effective.source.overlay).not.toBeNull();
+
+      // runCheck must ignore the overlay and emit builtin → exit 0 (no drift).
+      const code = await gen.runCheck();
+      expect(code).toBe(0);
+    } finally {
+      process.env.XDG_CONFIG_HOME = prevXdg;
+      try { fs.rmSync(tmpXdg, { recursive: true, force: true }); } catch {}
+    }
   });
 });

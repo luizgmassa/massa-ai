@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Admin Portal — full CRUD web UI** for the massa-ai system. Elevates the
+  existing `apps/web-ui` from read-only to an admin portal with config
+  GET/PUT, checkpoint delete, model-profile registry overlay CRUD, create/
+  delete forms for memory/handoff/checkpoint/project, write-mode default ON
+  for trusted local callers, and the generate-subagent-artifacts read-path
+  split (runtime reads the overlay-merged effective registry; --check stays
+  on the builtin). 15 tasks across 5 phases, 61 acceptance criteria. See
+  `.specs/features/admin-portal/`.
+
 ## [1.40.1] - 2026-08-07
 
 ### Fixed

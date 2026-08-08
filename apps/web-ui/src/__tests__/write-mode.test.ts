@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "bun:test";
 
-const { markdownToHtml, isWriteModeEnabled, renderMemoryBrowser, renderProposals } = await import("../static/app.js");
+const { markdownToHtml, isWriteModeEnabled, renderMemoryBrowser, renderProposals, renderHandoffs, renderCheckpoints, renderProjects } = await import("../static/app.js");
 
 describe("markdown rendering (marked + DOMPurify)", () => {
   describe("minimal fallback renderer", () => {
@@ -135,6 +135,8 @@ describe("markdown rendering (marked + DOMPurify)", () => {
 
 describe("write mode gating", () => {
   const originalWriteMode = (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+  const originalDocument = (globalThis as any).document;
+  const originalLocalStorage = (globalThis as any).localStorage;
 
   afterEach(() => {
     if (originalWriteMode !== undefined) {
@@ -142,20 +144,93 @@ describe("write mode gating", () => {
     } else {
       delete (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
     }
+    if (originalDocument !== undefined) {
+      (globalThis as any).document = originalDocument;
+    } else {
+      delete (globalThis as any).document;
+    }
+    if (originalLocalStorage !== undefined) {
+      (globalThis as any).localStorage = originalLocalStorage;
+    } else {
+      delete (globalThis as any).localStorage;
+    }
   });
 
-  it("isWriteModeEnabled returns false by default", () => {
+  it("isWriteModeEnabled returns false by default when no trusted meta tag and no opt-in", () => {
+    delete (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+    delete (globalThis as any).document;
+    delete (globalThis as any).localStorage;
+    expect(isWriteModeEnabled()).toBe(false);
+  });
+
+  it("isWriteModeEnabled returns true when MASSA_AI_WEB_WRITE_MODE=true (force-on seam)", () => {
+    delete (globalThis as any).document;
+    delete (globalThis as any).localStorage;
+    (globalThis as any).MASSA_AI_WEB_WRITE_MODE = true;
+    expect(isWriteModeEnabled()).toBe(true);
+  });
+
+  it("isWriteModeEnabled returns true when trusted meta tag present (F1 default-ON)", () => {
+    delete (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+    delete (globalThis as any).localStorage;
+    (globalThis as any).document = {
+      querySelector(sel: string) {
+        if (sel === 'meta[name="massa-ai-api-key"]') {
+          return { getAttribute(name: string) { return name === "content" ? "test-key-123" : null; } };
+        }
+        return null;
+      },
+    };
+    expect(isWriteModeEnabled()).toBe(true);
+  });
+
+  it("isWriteModeEnabled returns false when MASSA_AI_WEB_WRITE_MODE=false overrides trusted tag (opt-out)", () => {
+    (globalThis as any).document = {
+      querySelector(sel: string) {
+        if (sel === 'meta[name="massa-ai-api-key"]') {
+          return { getAttribute(name: string) { return name === "content" ? "test-key-123" : null; } };
+        }
+        return null;
+      },
+    };
+    delete (globalThis as any).localStorage;
+    (globalThis as any).MASSA_AI_WEB_WRITE_MODE = false;
+    expect(isWriteModeEnabled()).toBe(false);
+  });
+
+  it("isWriteModeEnabled returns false when localStorage massa-ai-write-mode=false overrides trusted tag (opt-out)", () => {
+    (globalThis as any).document = {
+      querySelector(sel: string) {
+        if (sel === 'meta[name="massa-ai-api-key"]') {
+          return { getAttribute(name: string) { return name === "content" ? "test-key-123" : null; } };
+        }
+        return null;
+      },
+    };
+    (globalThis as any).localStorage = {
+      getItem(key: string) { return key === "massa-ai-write-mode" ? "false" : null; },
+      setItem() {},
+      removeItem() {},
+    };
     delete (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
     expect(isWriteModeEnabled()).toBe(false);
   });
 
-  it("isWriteModeEnabled returns true when MASSA_AI_WEB_WRITE_MODE=true", () => {
-    (globalThis as any).MASSA_AI_WEB_WRITE_MODE = true;
+  it("isWriteModeEnabled returns true when localStorage massa-ai-write-mode=true without trusted tag", () => {
+    delete (globalThis as any).document;
+    (globalThis as any).localStorage = {
+      getItem(key: string) { return key === "massa-ai-write-mode" ? "true" : null; },
+      setItem() {},
+      removeItem() {},
+    };
+    delete (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
     expect(isWriteModeEnabled()).toBe(true);
   });
 
   it("renderMemoryBrowser hides edit/delete buttons when write mode off", () => {
     delete (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+    delete (globalThis as any).document;
+    delete (globalThis as any).localStorage;
     const data = { data: { memories: [{ id: "mem-1", type: "code", level: 1, importance: 0.8, content: "test" }], total: 1, limit: 50, offset: 0 } };
     const html = renderMemoryBrowser(data, { filters: {} });
     expect(html).not.toContain('data-action="memory-edit"');
@@ -164,6 +239,8 @@ describe("write mode gating", () => {
   });
 
   it("renderMemoryBrowser shows edit/delete buttons when write mode on", () => {
+    delete (globalThis as any).document;
+    delete (globalThis as any).localStorage;
     (globalThis as any).MASSA_AI_WEB_WRITE_MODE = true;
     const data = { data: { memories: [{ id: "mem-1", type: "code", level: 1, importance: 0.8, content: "test" }], total: 1, limit: 50, offset: 0 } };
     const html = renderMemoryBrowser(data, { filters: {} });
@@ -173,6 +250,8 @@ describe("write mode gating", () => {
   });
 
   it("renderProposals shows approve/reject buttons when write mode on", () => {
+    delete (globalThis as any).document;
+    delete (globalThis as any).localStorage;
     (globalThis as any).MASSA_AI_WEB_WRITE_MODE = true;
     const data = { data: { proposals: [{ id: "prop-1", type: "edit", status: "pending", description: "test proposal" }] } };
     const html = renderProposals(data, { project: "test-project" });
@@ -183,9 +262,82 @@ describe("write mode gating", () => {
 
   it("renderProposals hides approve/reject buttons when write mode off", () => {
     delete (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+    delete (globalThis as any).document;
+    delete (globalThis as any).localStorage;
     const data = { data: { proposals: [{ id: "prop-1", type: "edit", status: "pending", description: "test proposal" }] } };
     const html = renderProposals(data, { project: "test-project" });
     expect(html).not.toContain('data-action="proposal-approve"');
     expect(html).not.toContain('data-action="proposal-reject"');
+  });
+});
+
+// ── T13: create/delete forms render correct fields (MEM-02, HAND-02, CHKP-02, PROJ-02/04) ──
+
+describe("T13 create/delete forms render correct fields when trusted", () => {
+  const originalWriteMode = (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+  const originalDocument = (globalThis as any).document;
+  const originalLocalStorage = (globalThis as any).localStorage;
+
+  afterEach(() => {
+    if (originalWriteMode !== undefined) (globalThis as any).MASSA_AI_WEB_WRITE_MODE = originalWriteMode;
+    else delete (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+    if (originalDocument !== undefined) (globalThis as any).document = originalDocument;
+    else delete (globalThis as any).document;
+    if (originalLocalStorage !== undefined) (globalThis as any).localStorage = originalLocalStorage;
+    else delete (globalThis as any).localStorage;
+  });
+
+  function trustedOn() {
+    delete (globalThis as any).localStorage;
+    (globalThis as any).document = {
+      querySelector(sel: string) {
+        if (sel === 'meta[name="massa-ai-api-key"]') {
+          return { getAttribute(name: string) { return name === "content" ? "trusted-key" : null; } };
+        }
+        return null;
+      },
+    };
+  }
+
+  it("memory create form fields present when trusted (MEM-02)", () => {
+    trustedOn();
+    const data = { data: { memories: [], total: 0, limit: 50, offset: 0 } };
+    const html = renderMemoryBrowser(data, { filters: {} });
+    expect(html).toContain('data-form="memory-create"');
+    expect(html).toContain('data-create="content"');
+    expect(html).toContain('data-create="type"');
+    expect(html).toContain('data-create="importance"');
+  });
+
+  it("memory delete button visible when trusted (MEM-04)", () => {
+    trustedOn();
+    const data = { data: { memories: [{ id: "m-trust", type: "code", level: 1, importance: 0.8, content: "x" }], total: 1, limit: 50, offset: 0 } };
+    const html = renderMemoryBrowser(data, { filters: {} });
+    expect(html).toContain('data-action="memory-delete"');
+    expect(html).toContain('data-id="m-trust"');
+  });
+
+  it("handoff create form + cancel button visible when trusted (HAND-02, HAND-04)", () => {
+    trustedOn();
+    const data = { data: { pending: [{ id: "h-trust", targetAgent: "x", status: "open", summary: "s" }] } };
+    const html = renderHandoffs(data, { project: "p" });
+    expect(html).toContain('data-action="handoff-create"');
+    expect(html).toContain('data-action="handoff-cancel"');
+    expect(html).toContain('data-id="h-trust"');
+  });
+
+  it("checkpoint create + delete buttons visible when trusted (CHKP-02, CHKP-04)", () => {
+    trustedOn();
+    const data = { success: true, data: { checkpoints: [{ id: "c-trust", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };
+    const html = renderCheckpoints(data);
+    expect(html).toContain('data-action="checkpoint-create"');
+    expect(html).toContain('data-action="checkpoint-delete"');
+  });
+
+  it("project index + reset buttons visible when trusted (PROJ-02, PROJ-04)", () => {
+    trustedOn();
+    const html = renderProjects({ projects: [{ projectId: "p-trust", documentCount: 5 }] });
+    expect(html).toContain('data-action="project-index"');
+    expect(html).toContain('data-action="project-reset"');
   });
 });

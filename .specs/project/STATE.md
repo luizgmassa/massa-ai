@@ -1,6 +1,40 @@
 # massa-ai Spec State
 
-## Current — Workflow Reuse-Scan, English Naming, Figma Wiring (**VALIDATED PASS 2026-08-07** — 23/23 ACs, 7/7 mutations killed, iteration 2; close-out this commit; push/PR authorized)
+## Current — Admin Portal Full CRUD Web UI (**EXECUTE COMPLETE 2026-08-07** — T1-T15, 15 commits; validation pending; push/PR authorized)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-admin-portal` · workflow:
+  spec-driven (Large) · branch `spec/admin-portal` from origin/main @
+  `01edc737` (v1.40.1), worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-admin-portal` (isolated).
+- Scope: elevate `apps/web-ui` from read-only to full admin portal. Backend:
+  config GET/PUT with masking + validation + backup + atomic write
+  (`savePartialConfig`), checkpoint delete route (store-direct), model-registry
+  overlay CRUD routes (GET/PUT/DELETE/regenerate), `loadEffectiveRegistry`
+  (overlay merge + tombstone + fallback). Frontend: write-mode default ON for
+  trusted callers, FORBIDDEN_MUTATING_PATHS removal, Config + Profiles nav,
+  config 15-sectioned forms, profiles switcher, model-registry grid editor,
+  create/delete forms for memory/handoff/checkpoint/project. Script:
+  generate-subagent-artifacts read-path split (runtime → effective, --check →
+  builtin).
+- Contract: `.specs/features/admin-portal/{spec,design,tasks}.md` — 5 Phases =
+  15 Tasks, inline execution (sub-agents unavailable this session — host caches
+  agent frontmatter at session start). Plan Challenge full gate F1-F6 folded
+  into Assumptions.
+- Commits: 5 planning (`a3f6f230` spec, `15340adb` EARS conversion,
+  `dcaef0f4` design, `648061b5` tasks, `35f9f9c6` Plan Challenge) + 7 backend
+  (T1-T7: `2ed2592b`..`ce64f78c`) + 8 frontend/script (T8-T15:
+  `78ef2553`..T15 this commit).
+- Gates per task: T8 write-mode 23 pass; T9 web-ui 132 pass; T10 config-forms
+  32 pass; T11 app-renderers 74 pass; T12 registry-editor 31 pass; T13 web-ui
+  220 pass; T14 model-profiles 48 pass + generate:artifacts --check exit 0;
+  T15 check_specs_delivered (this commit). Full type-check green throughout.
+- Next: run final gate matrix (test:scripts + test:plugins + lint + type-check
+  + generate:artifacts --check) → independent validation (standalone
+  fresh-eyes fallback, author ≠ verifier) → write validation.md →
+  validate_state.ts exit 0 → git push -u origin spec/admin-portal →
+  gh pr create --base main. Merge = separate explicit user go-ahead.
+
+## Previous — Workflow Reuse-Scan, English Naming, Figma Wiring (**VALIDATED PASS 2026-08-07** — 23/23 ACs, 7/7 mutations killed, iteration 2; close-out this commit; push/PR authorized)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-workflow-reuse-naming-figma` ·
   workflow: spec-driven (Large) · branch `spec/workflow-reuse-naming-figma` from

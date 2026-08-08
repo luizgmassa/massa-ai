@@ -18,8 +18,9 @@
  * without node_modules.
  */
 
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import path from "path";
+import { configDir } from "../../packages/shared/src/config/xdg.ts";
 
 // ── Hosts ───────────────────────────────────────────────────────────────────
 export const HOSTS = ["claude", "codex", "cursor", "opencode"] as const;
@@ -413,4 +414,137 @@ export function countRegistryFacts(registry: Registry): number {
     for (const hostMap of Object.values(p.hosts)) n += Object.keys(hostMap).length;
   }
   return n;
+}
+
+// ── Effective registry (builtin + overlay) ──────────────────────────────────
+
+export interface OverlayProfile {
+  readonly description?: string;
+  readonly hosts?: { readonly [host: string]: HostTierMap };
+  readonly _delete?: true;
+}
+
+export interface OverlayData {
+  readonly profiles?: Record<string, OverlayProfile>;
+  readonly hostDefaults?: Record<string, string>;
+  readonly workflowTiers?: Record<string, string>;
+  readonly tiers?: string[];
+}
+
+export interface EffectiveRegistryResult {
+  readonly registry: Registry;
+  readonly source: {
+    readonly builtin: Registry;
+    readonly overlay: OverlayData | null;
+    readonly tombstoned: string[];
+  };
+  readonly overlayError?: string;
+}
+
+function isOverlayProfile(v: unknown): v is OverlayProfile {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+export function loadEffectiveRegistry(opts?: {
+  readonly overlayPath?: string;
+}): EffectiveRegistryResult {
+  const builtin = loadRegistry(DEFAULT_REGISTRY_PATH);
+  const overlayPath =
+    opts?.overlayPath ?? path.join(configDir("massa-ai"), "model-profiles.json");
+
+  if (!existsSync(overlayPath)) {
+    return {
+      registry: builtin,
+      source: { builtin, overlay: null, tombstoned: [] },
+    };
+  }
+
+  let overlayRaw: unknown;
+  try {
+    const text = readFileSync(overlayPath, "utf8");
+    overlayRaw = JSON.parse(text);
+  } catch (e) {
+    console.warn(`[massa-ai] Overlay parse failure at ${overlayPath}: ${(e as Error).message}`);
+    return {
+      registry: builtin,
+      source: { builtin, overlay: null, tombstoned: [] },
+      overlayError: `overlay parse failed: ${(e as Error).message}`,
+    };
+  }
+
+  if (!isPlainObject(overlayRaw)) {
+    console.warn(`[massa-ai] Overlay at ${overlayPath} is not an object`);
+    return {
+      registry: builtin,
+      source: { builtin, overlay: null, tombstoned: [] },
+      overlayError: "overlay root is not an object",
+    };
+  }
+
+  const overlay = overlayRaw as OverlayData;
+
+  const merged = mergeOverlay(builtin, overlay);
+
+  try {
+    const validated = validateRegistry(merged);
+    return {
+      registry: validated,
+      source: {
+        builtin,
+        overlay,
+        tombstoned: collectTombstoned(builtin, overlay),
+      },
+    };
+  } catch (e) {
+    console.warn(`[massa-ai] Overlay merge validation failed: ${(e as Error).message}`);
+    return {
+      registry: builtin,
+      source: { builtin, overlay: null, tombstoned: [] },
+      overlayError: `overlay validation failed: ${(e as Error).message}`,
+    };
+  }
+}
+
+function collectTombstoned(builtin: Registry, overlay: OverlayData): string[] {
+  if (!overlay.profiles) return [];
+  const tombstoned: string[] = [];
+  for (const [key, val] of Object.entries(overlay.profiles)) {
+    if (isOverlayProfile(val) && val._delete === true && key in builtin.profiles) {
+      tombstoned.push(key);
+    }
+  }
+  return tombstoned;
+}
+
+function mergeOverlay(builtin: Registry, overlay: OverlayData): Record<string, unknown> {
+  const result: Record<string, unknown> = JSON.parse(JSON.stringify(builtin));
+
+  if (overlay.tiers) {
+    result.tiers = [...overlay.tiers];
+  }
+
+  if (overlay.hostDefaults) {
+    result.hostDefaults = { ...overlay.hostDefaults };
+  }
+
+  if (overlay.workflowTiers) {
+    result.workflowTiers = { ...overlay.workflowTiers };
+  }
+
+  if (overlay.profiles) {
+    const profiles = result.profiles as Record<string, unknown>;
+    for (const [key, val] of Object.entries(overlay.profiles)) {
+      if (!isOverlayProfile(val)) continue;
+      if (val._delete === true) {
+        delete profiles[key];
+        continue;
+      }
+      const { _delete: _unused, ...profileData } = val;
+      void _unused;
+      profiles[key] = profileData;
+    }
+    result.profiles = profiles;
+  }
+
+  return result;
 }

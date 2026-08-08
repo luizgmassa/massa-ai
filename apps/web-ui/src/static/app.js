@@ -1,39 +1,19 @@
 /**
- * massa-ai Web UI — app.js (read-only memory/search browser).
+ * massa-ai Web UI — app.js (admin portal).
  *
  * Single source for the pure helpers (markdownToHtml, view renderers, theme
  * helpers). The browser-init block is guarded by `typeof document !==
  * "undefined"` so the same file can be imported under bun:test without a DOM.
  *
- * READ-ONLY: this file contains NO call to any mutating endpoint. The
- * ALLOWED_MUTATING_PATHS list below is the exhaustive list of mutating paths;
- * web-ui-readonly.test.ts asserts none of them appear as a fetch target in this
- * source.
+ * Admin portal: write operations are gated by isWriteModeEnabled() (default ON
+ * for trusted local callers with the massa-ai-api-key meta tag). Any
+ * /api/v1/* route is callable with the injected key; trust is the gate, not a
+ * path blocklist.
  */
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
 import { renderDashboard, fetchDashboardData } from "./dashboard.js";
-
-/** Exhaustive list of mutating API paths the UI must NEVER call. */
-export const FORBIDDEN_MUTATING_PATHS = [
-  "/memory/store",
-  "/memory/update",
-  "/memory/delete",
-  "/handoff/begin",
-  "/handoff/accept",
-  "/handoff/cancel",
-  "/checkpoints/create",
-  "/checkpoints/restore",
-  "/proposal/approve",
-  "/proposal/reject",
-  "/project/reset",
-  "/project/index",
-  "/project/upload-and-index",
-  "/hook",
-  "/hook/batch",
-  "/bootstrap",
-];
 
 export const MEMORY_TYPES = ["critical", "conversation", "code", "decision", "pattern"];
 
@@ -58,8 +38,24 @@ export const CHECKPOINTS_LIST_BODY = { limit: 50, format: "json" };
 
 const THEME_STORAGE_KEY = "massa-ai-ui-theme";
 
-/** Check if write mode is enabled (MASSA_AI_WEB_WRITE_MODE=true). Default off. */
+/**
+ * Check if write mode is enabled.
+ *
+ * Default is ON when the caller is trusted (the massa-ai-api-key meta tag is
+ * present in the document, injected by the server for local callers). The
+ * MASSA_AI_WEB_WRITE_MODE env flag and the localStorage massa-ai-write-mode
+ * value remain as explicit opt-out escape hatches and are checked BEFORE the
+ * trusted-caller default so an operator can force write-mode off even when the
+ * tag is present.
+ */
 export function isWriteModeEnabled() {
+  if (typeof globalThis !== "undefined" && globalThis.MASSA_AI_WEB_WRITE_MODE === false) return false;
+  try {
+    if (localStorage.getItem("massa-ai-write-mode") === "false") return false;
+  } catch {
+    // localStorage unavailable (test/Node without DOM) — fall through
+  }
+  if (readInjectedApiKey(typeof document !== "undefined" ? document : null)) return true;
   if (typeof globalThis !== "undefined" && globalThis.MASSA_AI_WEB_WRITE_MODE === true) return true;
   try {
     return localStorage.getItem("massa-ai-write-mode") === "true";
@@ -242,22 +238,41 @@ function _minimalMarkdownToHtml(md) {
 
 export function renderProjects(data) {
   const projects = (data && data.projects) || [];
-  if (projects.length === 0) {
-    return '<p class="empty">No indexed projects.</p>';
-  }
+  const writeMode = isWriteModeEnabled();
+
   const rows = projects
     .map((p) => {
       const id = escapeHtml(p.projectId || p.id || "");
       const count = p.documentCount ?? p.docCount ?? "";
       const meta =
         count !== "" ? ' <span class="muted">(' + escapeHtml(String(count)) + " docs)</span>" : "";
-      return "<li>" + escapeHtml(id) + meta + "</li>";
+      const resetBtn = writeMode
+        ? ' <button type="button" class="btn-delete" data-action="project-reset" data-project="' + id + '">reset</button>'
+        : "";
+      return "<li>" + escapeHtml(id) + meta + resetBtn + "</li>";
     })
     .join("");
+
+  const indexForm = writeMode
+    ? '<div class="create-form">' +
+      "<h3>Index Project</h3>" +
+      '<div class="form-field"><label>projectPath</label><input type="text" data-create="projectPath" data-form="project-index" /></div>' +
+      '<div class="form-field"><label>projectId (optional)</label><input type="text" data-create="projectId" data-form="project-index" /></div>' +
+      '<div class="form-field"><label><input type="checkbox" data-create="forceReindex" data-form="project-index" /> forceReindex</label></div>' +
+      '<div class="form-field"><label><input type="checkbox" data-create="warmCache" data-form="project-index" /> warmCache</label></div>' +
+      '<button type="button" data-action="project-index">Index</button>' +
+      "</div>"
+    : "";
+
+  if (projects.length === 0 && !writeMode) {
+    return '<p class="empty">No indexed projects.</p>';
+  }
   return (
     '<section class="view"><h2>Projects</h2><ul class="project-list">' +
     rows +
-    "</ul></section>"
+    "</ul>" +
+    indexForm +
+    "</section>"
   );
 }
 
@@ -362,11 +377,26 @@ export function renderMemoryBrowser(data, state) {
     (offset + limit >= total ? " disabled" : "") +
     ">next</button></div>";
 
+  const createForm = writeMode
+    ? '<div class="create-form">' +
+      "<h3>Create Memory</h3>" +
+      '<div class="form-field"><label>content</label><textarea data-create="content" data-form="memory-create"></textarea></div>' +
+      '<div class="form-field"><label>type</label><select data-create="type" data-form="memory-create">' +
+      MEMORY_TYPES.map((t) => '<option value="' + t + '">' + t + "</option>").join("") +
+      "</select></div>" +
+      '<div class="form-field"><label>importance (0-1)</label><input type="number" min="0" max="1" step="0.1" data-create="importance" data-form="memory-create" value="0.5" /></div>' +
+      '<div class="form-field"><label>tags (comma-separated)</label><input type="text" data-create="tags" data-form="memory-create" /></div>' +
+      '<div class="form-field"><label>projectId</label><input type="text" data-create="projectId" data-form="memory-create" /></div>' +
+      '<button type="button" data-action="memory-create">Create</button>' +
+      "</div>"
+    : "";
+
   return (
     '<section class="view"><h2>Memory</h2>' +
     filterBar +
     body +
     pager +
+    createForm +
     "</section>"
   );
 }
@@ -416,6 +446,7 @@ export function renderSearch(data, state) {
 export function renderHandoffs(data, state) {
   state = state || {};
   const project = state.project || "";
+  const writeMode = isWriteModeEnabled();
   if (!project) {
     return (
       '<section class="view"><h2>Handoffs</h2>' +
@@ -427,11 +458,32 @@ export function renderHandoffs(data, state) {
   }
   const payload = data.data || data;
   const pending = (payload && payload.pending) || [];
-  if (pending.length === 0) {
+
+  const createForm = writeMode
+    ? '<div class="create-form">' +
+      "<h3>Create Handoff</h3>" +
+      '<div class="form-field"><label>projectId</label><input type="text" data-create="projectId" data-form="handoff-create" value="' + escapeHtml(project) + '" /></div>' +
+      '<div class="form-field"><label>summary</label><input type="text" data-create="summary" data-form="handoff-create" /></div>' +
+      '<div class="form-field"><label>targetAgent (optional)</label><input type="text" data-create="targetAgent" data-form="handoff-create" /></div>' +
+      '<div class="form-field"><label>openQuestions (comma-separated)</label><input type="text" data-create="openQuestions" data-form="handoff-create" /></div>' +
+      '<div class="form-field"><label>nextSteps (comma-separated)</label><input type="text" data-create="nextSteps" data-form="handoff-create" /></div>' +
+      '<div class="form-field"><label>files (comma-separated)</label><input type="text" data-create="files" data-form="handoff-create" /></div>' +
+      '<button type="button" data-action="handoff-create">Create</button>' +
+      "</div>"
+    : "";
+
+  if (pending.length === 0 && !writeMode) {
     return '<section class="view"><h2>Handoffs</h2><p class="empty">No pending handoffs.</p></section>';
   }
   const rows = pending
     .map((h) => {
+      const id = escapeHtml(h.id || "");
+      const actions = writeMode
+        ? '<div class="actions-cell">' +
+          '<button type="button" class="btn-approve" data-action="handoff-accept" data-id="' + id + '">accept</button> ' +
+          '<button type="button" class="btn-delete" data-action="handoff-cancel" data-id="' + id + '">cancel</button>' +
+          "</div>"
+        : "";
       return (
         '<div class="card">' +
         "<div><strong>" +
@@ -445,11 +497,12 @@ export function renderHandoffs(data, state) {
         "<div class=\"muted\">" +
         escapeHtml(h.id || "") +
         "</div>" +
+        actions +
         "</div>"
       );
     })
     .join("");
-  return '<section class="view"><h2>Handoffs</h2>' + rows + "</section>";
+  return '<section class="view"><h2>Handoffs</h2>' + rows + createForm + "</section>";
 }
 
 export function renderProposals(data, state) {
@@ -503,6 +556,7 @@ export function renderProposals(data, state) {
 }
 
 export function renderCheckpoints(data) {
+  const writeMode = isWriteModeEnabled();
   if (!data || data.success === false) {
     return '<section class="view"><h2>Checkpoints</h2>' + errorBlock(data) + "</section>";
   }
@@ -518,13 +572,36 @@ export function renderCheckpoints(data) {
       "</section>"
     );
   }
-  if (rows.length === 0) {
+
+  const createForm = writeMode
+    ? '<div class="create-form">' +
+      "<h3>Create Checkpoint</h3>" +
+      '<div class="form-field"><label>taskId</label><input type="text" data-create="taskId" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>description</label><input type="text" data-create="description" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>status</label><select data-create="status" data-form="checkpoint-create"><option>pending</option><option>in_progress</option><option>completed</option><option>failed</option><option>paused</option></select></div>' +
+      '<div class="form-field"><label>progressPercent</label><input type="number" min="0" max="100" data-create="progressPercent" data-form="checkpoint-create" value="0" /></div>' +
+      '<div class="form-field"><label>currentStep</label><input type="text" data-create="currentStep" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>totalSteps</label><input type="number" data-create="totalSteps" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>completedSteps</label><input type="number" data-create="completedSteps" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>checkpointType</label><select data-create="checkpointType" data-form="checkpoint-create"><option>manual</option><option>milestone</option></select></div>' +
+      '<button type="button" data-action="checkpoint-create">Create</button>' +
+      "</div>"
+    : "";
+
+  if (rows.length === 0 && !writeMode) {
     return '<section class="view"><h2>Checkpoints</h2><p class="empty">No checkpoints.</p></section>';
   }
+  const actionCol = writeMode ? "<th>actions</th>" : "";
   const body =
-    '<table class="grid"><thead><tr><th>task</th><th>type</th><th>status</th><th>description</th></tr></thead><tbody>' +
+    '<table class="grid"><thead><tr><th>task</th><th>type</th><th>status</th><th>description</th>' + actionCol + '</tr></thead><tbody>' +
     rows
       .map((c) => {
+        const id = escapeHtml(c.id || c.checkpointId || "");
+        const actions = writeMode
+          ? '<td class="actions-cell">' +
+            '<button type="button" class="btn-delete" data-action="checkpoint-delete" data-id="' + id + '" data-task="' + escapeHtml(c.taskId || "") + '">delete</button>' +
+            "</td>"
+          : "";
         return (
           "<tr>" +
           "<td>" +
@@ -539,12 +616,549 @@ export function renderCheckpoints(data) {
           '<td class="content-cell">' +
           escapeHtml(c.description || "") +
           "</td>" +
+          actions +
           "</tr>"
         );
       })
       .join("") +
     "</tbody></table>";
-  return '<section class="view"><h2>Checkpoints</h2>' + body + "</section>";
+  return '<section class="view"><h2>Checkpoints</h2>' + body + createForm + "</section>";
+}
+
+// ── Admin portal view stubs (renderers land in T10-T12) ────────────────────
+
+/**
+ * Config view renderer. Renders 15 collapsible section cards from the
+ * GET /api/v1/config response. Each card generated from declarative field
+ * definitions. Sensitive fields masked (type=password) with reveal toggle.
+ * Sections in restartNeededSections show a badge. Per-section Save sends
+ * only that section to PUT /api/v1/config.
+ */
+
+const SENSITIVE_FIELDS = new Set(["database.url", "embedding.apiKey", "llm.apiKey", "security.apiKey"]);
+
+const CONFIG_SECTIONS = [
+  {
+    key: "database",
+    label: "Database",
+    fields: [{ name: "url", type: "text", label: "Database URL", sensitive: true }],
+  },
+  {
+    key: "embedding",
+    label: "Embedding",
+    fields: [
+      { name: "provider", type: "enum", label: "Provider", enum: ["ollama", "mistral", "openai", "google", "cohere"] },
+      { name: "model", type: "text", label: "Model" },
+      { name: "baseURL", type: "text", label: "Base URL" },
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true },
+      { name: "dimensions", type: "number", label: "Dimensions" },
+    ],
+  },
+  {
+    key: "compression",
+    label: "Compression",
+    fields: [
+      { name: "defaultStrategy", type: "text", label: "Default Strategy" },
+      { name: "minTokensForCompression", type: "number", label: "Min Tokens" },
+      { name: "targetCompressionRatio", type: "number", label: "Target Ratio (0-1)" },
+      { name: "prompt", type: "text", label: "Prompt (optional)" },
+    ],
+  },
+  {
+    key: "impact",
+    label: "Impact Analysis",
+    fields: [{ name: "bfsCteEnabled", type: "boolean", label: "BFS CTE Enabled" }],
+  },
+  {
+    key: "capturePolicy",
+    label: "Capture Policy",
+    fields: [
+      { name: "maxMatchWork", type: "number", label: "Max Match Work" },
+      { name: "maxIgnorePatterns", type: "number", label: "Max Ignore Patterns" },
+      { name: "rules", type: "string[]", label: "Rules (JSON)" },
+    ],
+  },
+  {
+    key: "cache",
+    label: "Cache",
+    fields: [
+      { name: "enabled", type: "boolean", label: "Enabled" },
+      { name: "l1MaxSizeMB", type: "number", label: "L1 Max Size (MB)" },
+      { name: "l2MaxSizeMB", type: "number", label: "L2 Max Size (MB)" },
+      { name: "defaultTTLSeconds", type: "number", label: "Default TTL (s)" },
+    ],
+  },
+  {
+    key: "dataDir",
+    label: "Data Directory",
+    fields: [{ name: "dataDir", type: "text", label: "Data Directory" }],
+  },
+  {
+    key: "logging",
+    label: "Logging",
+    fields: [
+      { name: "level", type: "enum", label: "Level", enum: ["debug", "info", "warn", "error"] },
+      { name: "enableMetrics", type: "boolean", label: "Enable Metrics" },
+      { name: "file", type: "text", label: "Log File (optional)" },
+    ],
+  },
+  {
+    key: "search",
+    label: "Search",
+    fields: [
+      { name: "autoReindexMaxFiles", type: "number", label: "Auto Reindex Max Files" },
+      { name: "queryUnderstanding.enabled", type: "boolean", label: "Query Understanding Enabled" },
+      { name: "queryUnderstanding.hydeEnabled", type: "boolean", label: "HyDE Enabled" },
+      { name: "queryUnderstanding.cacheTtlMs", type: "number", label: "QU Cache TTL (ms)" },
+      { name: "queryUnderstanding.cacheMaxSize", type: "number", label: "QU Cache Max Size" },
+      { name: "rerank.enabled", type: "boolean", label: "Rerank Enabled" },
+      { name: "rerank.rerankWindow", type: "number", label: "Rerank Window" },
+    ],
+  },
+  {
+    key: "llm",
+    label: "LLM",
+    fields: [
+      { name: "enabled", type: "boolean", label: "Enabled" },
+      { name: "baseUrl", type: "text", label: "Base URL" },
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true },
+      { name: "model", type: "text", label: "Model" },
+      { name: "codeModel", type: "text", label: "Code Model" },
+      { name: "temperature", type: "number", label: "Temperature" },
+      { name: "maxOutputTokens", type: "number", label: "Max Output Tokens" },
+      { name: "timeoutMs", type: "number", label: "Timeout (ms)" },
+      { name: "disableThink", type: "boolean", label: "Disable Think" },
+    ],
+  },
+  {
+    key: "memory",
+    label: "Memory",
+    fields: [
+      { name: "decay.lambda", type: "number", label: "Decay Lambda" },
+      { name: "decay.sigma", type: "number", label: "Decay Sigma" },
+      { name: "decay.mu", type: "number", label: "Decay Mu" },
+      { name: "decay.coldThreshold", type: "number", label: "Decay Cold Threshold" },
+      { name: "bootstrap.enabled", type: "boolean", label: "Bootstrap Enabled" },
+      { name: "bootstrap.maxSeedMemories", type: "number", label: "Bootstrap Max Seeds" },
+      { name: "bootstrap.centralityLimit", type: "number", label: "Bootstrap Centrality Limit" },
+      { name: "bootstrap.gitLogLimit", type: "number", label: "Bootstrap Git Log Limit" },
+      { name: "bootstrap.refreshEnabled", type: "boolean", label: "Bootstrap Refresh" },
+      { name: "autoImprove.enabled", type: "boolean", label: "Auto Improve Enabled" },
+      { name: "autoImprove.reviewGate", type: "boolean", label: "Auto Improve Review Gate" },
+      { name: "autoImprove.minObservations", type: "number", label: "Auto Improve Min Observations" },
+      { name: "autoImprove.minIntervalMs", type: "number", label: "Auto Improve Min Interval (ms)" },
+      { name: "autoImprove.maxWindow", type: "number", label: "Auto Improve Max Window" },
+      { name: "autoImprove.minQueryHits", type: "number", label: "Auto Improve Min Query Hits" },
+      { name: "autoImprove.minFileHits", type: "number", label: "Auto Improve Min File Hits" },
+      { name: "autoImprove.minFixHits", type: "number", label: "Auto Improve Min Fix Hits" },
+      { name: "autoImportance.enabled", type: "boolean", label: "Auto Importance Enabled" },
+    ],
+  },
+  {
+    key: "hooks",
+    label: "Hooks",
+    fields: [
+      { name: "enabled", type: "boolean", label: "Enabled" },
+      { name: "maxPayloadBytes", type: "number", label: "Max Payload Bytes" },
+      { name: "queue.maxPending", type: "number", label: "Queue Max Pending" },
+      { name: "bridge.enabled", type: "boolean", label: "Bridge Enabled" },
+      { name: "bridge.minObservations", type: "number", label: "Bridge Min Observations" },
+      { name: "bridge.minIntervalMs", type: "number", label: "Bridge Min Interval (ms)" },
+      { name: "bridge.maxWindow", type: "number", label: "Bridge Max Window" },
+    ],
+  },
+  {
+    key: "synapse",
+    label: "Synapse",
+    fields: [
+      { name: "enabled", type: "boolean", label: "Enabled" },
+      { name: "inhibition.diversityPenalty.enabled", type: "boolean", label: "Diversity Penalty" },
+      { name: "inhibition.diversityPenalty.threshold", type: "number", label: "DP Threshold" },
+      { name: "inhibition.diversityPenalty.lambda", type: "number", label: "DP Lambda" },
+      { name: "inhibition.temporalInhibition.enabled", type: "boolean", label: "Temporal Inhibition" },
+      { name: "inhibition.temporalInhibition.penaltyAgeMs", type: "number", label: "TI Penalty Age (ms)" },
+      { name: "inhibition.temporalInhibition.penalty", type: "number", label: "TI Penalty" },
+      { name: "inhibition.confidenceGate.enabled", type: "boolean", label: "Confidence Gate" },
+      { name: "inhibition.confidenceGate.thresholds.specific", type: "number", label: "CG Specific" },
+      { name: "inhibition.confidenceGate.thresholds.focused", type: "number", label: "CG Focused" },
+      { name: "inhibition.confidenceGate.thresholds.broad", type: "number", label: "CG Broad" },
+      { name: "scoring.attention.enabled", type: "boolean", label: "Attention Scoring" },
+      { name: "scoring.attention.rerankWindow", type: "number", label: "Attention Rerank Window" },
+      { name: "scoring.attention.recencyHalfLifeMs", type: "number", label: "Recency Half Life (ms)" },
+      { name: "scoring.attention.semanticScale", type: "number", label: "Semantic Scale" },
+      { name: "metacognition.enabled", type: "boolean", label: "Metacognition" },
+      { name: "metacognition.lowConfidenceThreshold", type: "number", label: "Low Confidence Threshold" },
+      { name: "metacognition.definitiveTopScore", type: "number", label: "Definitive Top Score" },
+      { name: "metacognition.definitiveGap", type: "number", label: "Definitive Gap" },
+      { name: "buffer.enabled", type: "boolean", label: "Buffer Enabled" },
+      { name: "buffer.maxSize", type: "number", label: "Buffer Max Size" },
+      { name: "buffer.ttlMs", type: "number", label: "Buffer TTL (ms)" },
+      { name: "buffer.hitBoost", type: "number", label: "Buffer Hit Boost" },
+      { name: "buffer.matchThreshold", type: "number", label: "Buffer Match Threshold" },
+    ],
+  },
+  {
+    key: "handoffs",
+    label: "Handoffs",
+    fields: [{ name: "enabled", type: "boolean", label: "Enabled" }],
+  },
+  {
+    key: "security",
+    label: "Security",
+    fields: [
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true },
+      { name: "corsOrigins", type: "string[]", label: "CORS Origins" },
+      { name: "allowedExtensions", type: "string[]", label: "Allowed Extensions" },
+    ],
+  },
+];
+
+function getConfigFieldValue(config, sectionKey, fieldName) {
+  if (sectionKey === "dataDir") return config[sectionKey] || "";
+  const section = config[sectionKey];
+  if (!section) return undefined;
+  const parts = fieldName.split(".");
+  let val = section;
+  for (const p of parts) {
+    val = val && typeof val === "object" ? val[p] : undefined;
+  }
+  return val;
+}
+
+function renderConfigField(sectionKey, field, value) {
+  const fieldId = "config-" + sectionKey + "-" + field.name.replace(/\./g, "-");
+  const inputName = "config-" + sectionKey + "-" + field.name;
+  const isSensitive = field.sensitive || SENSITIVE_FIELDS.has(sectionKey + "." + field.name);
+  const displayValue = value === undefined || value === null ? "" : String(value);
+
+  let inputHtml;
+  if (field.type === "boolean") {
+    const checked = value === true ? " checked" : "";
+    inputHtml = '<input type="checkbox" id="' + fieldId + '" name="' + inputName + '"' + checked + ' data-section="' + sectionKey + '" data-field="' + field.name + '" data-type="boolean" />';
+  } else if (field.type === "enum") {
+    const options = (field.enum || []).map((opt) => {
+      const sel = opt === value ? " selected" : "";
+      return '<option value="' + escapeHtml(opt) + '"' + sel + ">" + escapeHtml(opt) + "</option>";
+    }).join("");
+    inputHtml = '<select id="' + fieldId + '" name="' + inputName + '" data-section="' + sectionKey + '" data-field="' + field.name + '" data-type="enum">' + options + "</select>";
+  } else if (field.type === "number") {
+    inputHtml = '<input type="number" id="' + fieldId + '" name="' + inputName + '" value="' + escapeHtml(displayValue) + '" data-section="' + sectionKey + '" data-field="' + field.name + '" data-type="number" step="any" />';
+  } else if (field.type === "string[]") {
+    const arrVal = Array.isArray(value) ? value.join(", ") : displayValue;
+    inputHtml = '<input type="text" id="' + fieldId + '" name="' + inputName + '" value="' + escapeHtml(arrVal) + '" data-section="' + sectionKey + '" data-field="' + field.name + '" data-type="string[]" placeholder="comma-separated" />';
+  } else {
+    const inputType = isSensitive ? "password" : "text";
+    inputHtml = '<input type="' + inputType + '" id="' + fieldId + '" name="' + inputName + '" value="' + escapeHtml(displayValue) + '" data-section="' + sectionKey + '" data-field="' + field.name + '" data-type="text" />';
+  }
+
+  let revealBtn = "";
+  if (isSensitive) {
+    revealBtn = ' <button type="button" class="reveal-btn" data-action="config-reveal" data-target="' + fieldId + '">reveal</button>';
+  }
+
+  return (
+    '<div class="config-field">' +
+    '<label for="' + fieldId + '">' + escapeHtml(field.label) + "</label>" +
+    inputHtml + revealBtn +
+    "</div>"
+  );
+}
+
+export function renderConfig(data, opts) {
+  const payload = data || {};
+  const config = payload.config || {};
+  const restart = payload.restartNeededSections || [];
+  const writeMode = opts && opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
+  const restartSet = new Set(restart);
+
+  const cards = CONFIG_SECTIONS.map((section) => {
+    const isRestart = restartSet.has(section.key);
+    const badge = isRestart ? ' <span class="badge restart-badge">restart needed</span>' : "";
+    const fieldsHtml = section.fields.map((field) => {
+      const value = getConfigFieldValue(config, section.key, field.name);
+      return renderConfigField(section.key, field, value);
+    }).join("");
+    const saveBtn = writeMode
+      ? '<button type="button" class="save-btn" data-action="config-save" data-section="' + section.key + '">Save</button>'
+      : "";
+    return (
+      '<div class="config-section" data-section="' + section.key + '">' +
+      '<h3 class="config-section-header">' + escapeHtml(section.label) + badge + "</h3>" +
+      '<div class="config-fields">' + fieldsHtml + "</div>" +
+      saveBtn +
+      "</div>"
+    );
+  }).join("");
+
+  return '<section class="view"><h2>Config</h2>' + cards + "</section>";
+}
+
+function setByPath(obj, dottedPath, value) {
+  const parts = dottedPath.split(".");
+  let cur = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (!cur[parts[i]] || typeof cur[parts[i]] !== "object") cur[parts[i]] = {};
+    cur = cur[parts[i]];
+  }
+  cur[parts[parts.length - 1]] = value;
+}
+
+export function buildConfigSectionBody(sectionKey, fieldValues) {
+  const sectionDef = CONFIG_SECTIONS.find((s) => s.key === sectionKey);
+  if (!sectionDef) return {};
+
+  if (sectionKey === "dataDir") {
+    return { dataDir: fieldValues.dataDir || "" };
+  }
+
+  const nested = {};
+  for (const field of sectionDef.fields) {
+    const raw = fieldValues[field.name];
+    let val = raw;
+    if (field.type === "number") {
+      val = raw === "" || raw === undefined ? undefined : Number(raw);
+    } else if (field.type === "boolean") {
+      val = raw === true || raw === "true" || raw === "on";
+    } else if (field.type === "string[]") {
+      val = raw && typeof raw === "string"
+        ? raw.split(",").map((s) => s.trim()).filter(Boolean)
+        : Array.isArray(raw) ? raw : [];
+    }
+    if (val !== undefined) setByPath(nested, field.name, val);
+  }
+  return { [sectionKey]: nested };
+}
+
+/**
+ * Profiles view renderer. Reads GET /api/v1/profiles → { hosts: HostProfileState[] }.
+ * Renders profile cards grouped by host with active marked, plus a Switch button
+ * per profile calling POST /api/v1/profiles/switch when write mode is on.
+ */
+export function renderProfiles(data, opts) {
+  const payload = data || {};
+  const hosts = payload.hosts || [];
+  const writeMode = opts && opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
+
+  if (hosts.length === 0) {
+    return '<section class="view"><h2>Profiles</h2><p class="empty">No profiles.</p></section>';
+  }
+
+  const cards = hosts.map((hostState) => {
+    const hostName = hostState.host || "unknown";
+    const installed = hostState.installed;
+    const skipped = hostState.skipped;
+    const activeProfile = hostState.activeProfile;
+    const available = hostState.availableProfiles || [];
+    const version = hostState.bundleVersion;
+
+    if (skipped) {
+      return (
+        '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
+        "<h3>" + escapeHtml(hostName) + ' <span class="badge muted">skipped</span></h3>' +
+        '<p class="muted">' + escapeHtml(hostState.skipReason || "skipped") + "</p>" +
+        "</div>"
+      );
+    }
+
+    if (!installed || available.length === 0) {
+      return (
+        '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
+        "<h3>" + escapeHtml(hostName) + "</h3> <p class=\"muted\">Not installed.</p>" +
+        "</div>"
+      );
+    }
+
+    const profileCards = available.map((profile) => {
+      const isActive = profile === activeProfile;
+      const switchBtn = writeMode && !isActive
+        ? '<button type="button" class="switch-btn" data-action="profile-switch" data-profile="' + escapeHtml(profile) + '" data-host="' + escapeHtml(hostName) + '">Switch</button>'
+        : isActive
+          ? '<span class="badge active-badge">active</span>'
+          : "";
+      return (
+        '<div class="profile-card' + (isActive ? " active" : "") + '" data-profile="' + escapeHtml(profile) + '">' +
+        "<h4>" + escapeHtml(profile) + "</h4>" +
+        switchBtn +
+        "</div>"
+      );
+    }).join("");
+
+    const versionBadge = version
+      ? ' <span class="badge muted">v' + escapeHtml(version) + "</span>"
+      : "";
+
+    return (
+      '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
+      "<h3>" + escapeHtml(hostName) + versionBadge + "</h3>" +
+      '<div class="profile-cards">' + profileCards + "</div>" +
+      "</div>"
+    );
+  }).join("");
+
+  return '<section class="view"><h2>Profiles</h2>' + cards + "</section>";
+}
+
+// ── Model-registry editor (T12 — REG-01..18 UI side) ────────────────────────
+
+/** Frontend copy of HOST_EFFORT_ENUM (scripts/lib/model-profiles.ts:71).
+ *  Kept in sync manually; the frontend cannot import from scripts/lib. */
+const UI_HOST_EFFORT_ENUM = {
+  claude: ["low", "medium", "high", "xhigh", "max"],
+  codex: ["minimal", "low", "medium", "high", "xhigh"],
+  cursor: [],
+  opencode: null,
+};
+
+const REGISTRY_HOSTS = ["claude", "codex", "cursor", "opencode"];
+
+/**
+ * Model-registry editor renderer. Renders a grid (rows = {host, tier} pairs,
+ * columns = profiles, cells = {model, effort}). Marks overlay-sourced cells.
+ * Effort constrained to HOST_EFFORT_ENUM per host. Add/duplicate/delete/restore
+ * profile flows, hostDefaults + workflowTiers editable, regenerate +
+ * clear-overlay + save-overlay buttons.
+ */
+export function renderModelRegistry(data, opts) {
+  const payload = data || {};
+  const registry = payload.registry || {};
+  const source = payload.source || {};
+  const overlayError = payload.overlayError;
+  const writeMode = opts && opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
+
+  const profiles = registry.profiles || {};
+  const profileNames = Object.keys(profiles);
+  const tiers = registry.tiers || [];
+  const hostDefaults = registry.hostDefaults || {};
+  const workflowTiers = registry.workflowTiers || {};
+  const overlayProfiles = (source.overlay && source.overlay.profiles) || {};
+  const tombstoned = source.tombstoned || [];
+
+  if (profileNames.length === 0 && !overlayError) {
+    return '<section class="view"><h2>Model Registry</h2><p class="empty">No profiles in registry.</p></section>';
+  }
+
+  const overlayBanner = overlayError
+    ? '<div class="error">Overlay error: ' + escapeHtml(overlayError) + " (showing builtin)</div>"
+    : "";
+
+  // Build rows = {host, tier} pairs
+  const rows = [];
+  for (const host of REGISTRY_HOSTS) {
+    for (const tier of tiers) {
+      rows.push({ host, tier });
+    }
+  }
+
+  // Grid header: profile names as columns
+  const headerCells = profileNames.map((p) => {
+    const isOverlay = Object.prototype.hasOwnProperty.call(overlayProfiles, p);
+    const overlayMark = isOverlay ? ' <span class="badge overlay-badge">overlay</span>' : "";
+    return "<th>" + escapeHtml(p) + overlayMark + "</th>";
+  }).join("");
+
+  // Grid body: rows = {host, tier}, cells = {model, effort}
+  const bodyRows = rows.map((row) => {
+    const cells = profileNames.map((profileName) => {
+      const profile = profiles[profileName];
+      if (!profile || !profile.hosts) return '<td class="cell-empty">—</td>';
+      const hostMap = profile.hosts[row.host];
+      if (!hostMap) return '<td class="cell-empty">—</td>';
+      const cell = hostMap[row.tier];
+      if (!cell) return '<td class="cell-empty">—</td>';
+      const model = cell.model || "";
+      const effort = cell.effort || "";
+      const isOverlay = Object.prototype.hasOwnProperty.call(overlayProfiles, profileName);
+      const overlayClass = isOverlay ? " overlay-sourced" : "";
+      const effortOptions = UI_HOST_EFFORT_ENUM[row.host];
+      let effortInput;
+      if (effortOptions && effortOptions.length > 0) {
+        const opts2 = effortOptions.map((e) => {
+          const sel = e === effort ? " selected" : "";
+          return '<option value="' + escapeHtml(e) + '"' + sel + ">" + escapeHtml(e) + "</option>";
+        }).join("");
+        effortInput = '<select data-action="registry-effort" data-profile="' + escapeHtml(profileName) + '" data-host="' + escapeHtml(row.host) + '" data-tier="' + escapeHtml(row.tier) + '" data-type="enum"' + (writeMode ? "" : " disabled") + ">" + opts2 + "</select>";
+      } else if (effortOptions === null) {
+        effortInput = '<input type="text" data-action="registry-effort" data-profile="' + escapeHtml(profileName) + '" data-host="' + escapeHtml(row.host) + '" data-tier="' + escapeHtml(row.tier) + '" value="' + escapeHtml(effort) + '" data-type="text"' + (writeMode ? "" : " disabled") + " />";
+      } else {
+        effortInput = '<span class="muted">n/a</span>';
+      }
+      const modelInput = writeMode
+        ? '<input type="text" data-action="registry-model" data-profile="' + escapeHtml(profileName) + '" data-host="' + escapeHtml(row.host) + '" data-tier="' + escapeHtml(row.tier) + '" value="' + escapeHtml(model) + '" />'
+        : '<span>' + escapeHtml(model || "—") + "</span>";
+      return '<td class="registry-cell' + overlayClass + '">' + modelInput + effortInput + "</td>";
+    }).join("");
+    return "<tr><th>" + escapeHtml(row.host) + " / " + escapeHtml(row.tier) + "</th>" + cells + "</tr>";
+  }).join("");
+
+  const grid =
+    '<table class="registry-grid"><thead><tr><th>host / tier</th>' + headerCells + "</tr></thead><tbody>" + bodyRows + "</tbody></table>";
+
+  // hostDefaults editor
+  const hostDefaultsRows = REGISTRY_HOSTS.map((host) => {
+    const current = hostDefaults[host] || "";
+    const opts2 = profileNames.map((p) => {
+      const sel = p === current ? " selected" : "";
+      return '<option value="' + escapeHtml(p) + '"' + sel + ">" + escapeHtml(p) + "</option>";
+    }).join("");
+    return (
+      '<div class="config-field"><label>' + escapeHtml(host) + "</label>" +
+      '<select data-action="registry-hostDefault" data-host="' + escapeHtml(host) + '"' + (writeMode ? "" : " disabled") + ">" + opts2 + "</select></div>"
+    );
+  }).join("");
+
+  // workflowTiers editor
+  const workflowTierNames = Object.keys(workflowTiers);
+  const workflowTiersRows = workflowTierNames.map((wf) => {
+    const current = workflowTiers[wf] || "";
+    const tierOpts = tiers.map((t) => {
+      const sel = t === current ? " selected" : "";
+      return '<option value="' + escapeHtml(t) + '"' + sel + ">" + escapeHtml(t) + "</option>";
+    }).join("");
+    return (
+      '<div class="config-field"><label>' + escapeHtml(wf) + "</label>" +
+      '<select data-action="registry-workflowTier" data-workflow="' + escapeHtml(wf) + '"' + (writeMode ? "" : " disabled") + ">" + tierOpts + "</select></div>"
+    );
+  }).join("");
+
+  // Profile management: add / duplicate / delete / restore
+  const profileActions = writeMode
+    ? '<div class="registry-actions">' +
+      '<button type="button" data-action="registry-add-profile">Add Profile</button>' +
+      '<button type="button" data-action="registry-duplicate-profile">Duplicate Profile</button>' +
+      '<button type="button" data-action="registry-delete-profile">Delete Profile</button>' +
+      "</div>"
+    : "";
+
+  const tombstonedList = tombstoned.length
+    ? '<div class="tombstoned"><h4>Deleted (restorable)</h4>' +
+      tombstoned.map((p) => {
+        const restoreBtn = writeMode
+          ? ' <button type="button" data-action="registry-restore" data-profile="' + escapeHtml(p) + '">Restore</button>'
+          : "";
+        return '<div class="tombstoned-item" data-tombstoned="' + escapeHtml(p) + '">' + escapeHtml(p) + restoreBtn + "</div>";
+      }).join("") +
+      "</div>"
+    : "";
+
+  const actionButtons = writeMode
+    ? '<div class="registry-action-buttons">' +
+      '<button type="button" data-action="registry-save-overlay">Save Overlay</button>' +
+      '<button type="button" data-action="registry-regenerate">Regenerate Artifacts</button>' +
+      '<button type="button" data-action="registry-clear-overlay">Reset to Built-in (clear overlay)</button>' +
+      "</div>"
+    : "";
+
+  return (
+    '<section class="view"><h2>Model Registry</h2>' +
+    overlayBanner +
+    grid +
+    '<div class="registry-hostDefaults"><h3>Host Defaults</h3>' + hostDefaultsRows + "</div>" +
+    '<div class="registry-workflowTiers"><h3>Workflow Tiers</h3>' + workflowTiersRows + "</div>" +
+    profileActions +
+    tombstonedList +
+    actionButtons +
+    "</section>"
+  );
 }
 
 // ── Helpers used by renderers ──────────────────────────────────────────────
@@ -692,7 +1306,7 @@ function startApp(opts) {
   }
   function viewFromHash(h) {
     const name = (h || "").replace(/^#\/?/, "");
-    return ["projects", "memory", "search", "handoffs", "proposals", "checkpoints", "dashboard"].includes(name)
+    return ["projects", "memory", "search", "handoffs", "proposals", "checkpoints", "dashboard", "config", "profiles", "model-registry"].includes(name)
       ? name
       : "projects";
   }
@@ -764,6 +1378,15 @@ function startApp(opts) {
       } else if (state.view === "dashboard") {
         const data = await fetchDashboardData(api);
         root.innerHTML = renderDashboard(data);
+      } else if (state.view === "config") {
+        const data = await api.request("/api/v1/config");
+        root.innerHTML = renderConfig((data && data.data) || { config: {}, restartNeededSections: [] }, { writeMode: isWriteModeEnabled() });
+      } else if (state.view === "profiles") {
+        const data = await api.request("/api/v1/profiles");
+        root.innerHTML = renderProfiles((data && data.data) || { hosts: [] }, { writeMode: isWriteModeEnabled() });
+      } else if (state.view === "model-registry") {
+        const data = await api.request("/api/v1/model-registry");
+        root.innerHTML = renderModelRegistry((data && data.data) || { registry: {}, source: {} }, { writeMode: isWriteModeEnabled() });
       }
     } catch (e) {
       root.innerHTML = '<div class="error">Connection error: ' + escapeHtml(String(e.message || e)) + "</div>";
@@ -832,6 +1455,69 @@ function startApp(opts) {
     root.querySelector('[data-action="search-run"]')?.addEventListener("click", () => {
       render();
     });
+    // write mode: memory create
+    root.querySelector('[data-action="memory-create"]')?.addEventListener("click", () => {
+      handleMemoryCreate();
+    });
+    // write mode: handoff create/accept/cancel
+    root.querySelector('[data-action="handoff-create"]')?.addEventListener("click", () => {
+      handleHandoffCreate();
+    });
+    root.querySelectorAll('[data-action="handoff-accept"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        if (!id) return;
+        handleHandoffAction(id, "accept");
+      });
+    });
+    root.querySelectorAll('[data-action="handoff-cancel"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        if (!id) return;
+        if (confirm("Cancel handoff " + id + "? This cannot be undone.")) {
+          handleHandoffAction(id, "cancel");
+        }
+      });
+    });
+    // write mode: checkpoint create/delete
+    root.querySelector('[data-action="checkpoint-create"]')?.addEventListener("click", () => {
+      handleCheckpointCreate();
+    });
+    root.querySelectorAll('[data-action="checkpoint-delete"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        const task = btn.dataset.task || "";
+        if (!id) return;
+        if (confirm("Delete checkpoint " + id + " (task: " + task + ")? This cannot be undone.")) {
+          handleCheckpointDelete(id);
+        }
+      });
+    });
+    // write mode: project index/reset
+    root.querySelector('[data-action="project-index"]')?.addEventListener("click", () => {
+      handleProjectIndex();
+    });
+    root.querySelectorAll('[data-action="project-reset"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const project = btn.dataset.project;
+        if (!project) return;
+        if (confirm("Reset project " + project + "? This deletes vectors/symbols/memories. This cannot be undone.")) {
+          handleProjectReset(project);
+        }
+      });
+    });
+  }
+
+  function collectFormData(formName) {
+    const data = {};
+    root.querySelectorAll('[data-form="' + formName + '"]').forEach((el) => {
+      const key = el.dataset.create;
+      if (!key) return;
+      if (el.type === "checkbox") data[key] = el.checked;
+      else if (el.type === "number") data[key] = el.value === "" ? undefined : Number(el.value);
+      else data[key] = el.value;
+    });
+    return data;
   }
 
   async function handleMemoryEdit(id) {
@@ -868,6 +1554,113 @@ function startApp(opts) {
       render();
     } catch (e) {
       alert(action + " failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleMemoryCreate() {
+    const data = collectFormData("memory-create");
+    if (!data.content) { alert("Content is required."); return; }
+    if (data.importance !== undefined && (data.importance < 0 || data.importance > 1)) {
+      alert("Importance must be between 0 and 1.");
+      return;
+    }
+    const body = {
+      content: data.content,
+      type: data.type || "conversation",
+      importance: data.importance !== undefined ? data.importance : 0.5,
+    };
+    if (data.tags) body.tags = String(data.tags).split(",").map((s) => s.trim()).filter(Boolean);
+    if (data.projectId) body.projectId = data.projectId;
+    try {
+      await api.request("/api/v1/memory/store", { method: "POST", body });
+      render();
+    } catch (e) {
+      alert("Create failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleHandoffCreate() {
+    const data = collectFormData("handoff-create");
+    if (!data.projectId) { alert("Project ID is required."); return; }
+    if (!data.summary) { alert("Summary is required."); return; }
+    const body = { projectId: data.projectId, summary: data.summary };
+    if (data.targetAgent) body.targetAgent = data.targetAgent;
+    if (data.openQuestions) body.openQuestions = String(data.openQuestions).split(",").map((s) => s.trim()).filter(Boolean);
+    if (data.nextSteps) body.nextSteps = String(data.nextSteps).split(",").map((s) => s.trim()).filter(Boolean);
+    if (data.files) body.files = String(data.files).split(",").map((s) => s.trim()).filter(Boolean);
+    try {
+      await api.request("/api/v1/handoff/begin", { method: "POST", body });
+      render();
+    } catch (e) {
+      alert("Create failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleHandoffAction(id, action) {
+    try {
+      await api.request("/api/v1/handoff/" + action, { method: "POST", body: { id } });
+      render();
+    } catch (e) {
+      alert(action + " failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleCheckpointCreate() {
+    const data = collectFormData("checkpoint-create");
+    if (!data.taskId) { alert("Task ID is required."); return; }
+    if (!data.description) { alert("Description is required."); return; }
+    const body = {
+      taskId: data.taskId,
+      description: data.description,
+      status: data.status || "pending",
+      checkpointType: data.checkpointType || "manual",
+    };
+    if (data.progressPercent !== undefined) body.progressPercent = data.progressPercent;
+    if (data.currentStep) body.currentStep = data.currentStep;
+    if (data.totalSteps !== undefined) body.totalSteps = data.totalSteps;
+    if (data.completedSteps !== undefined) body.completedSteps = data.completedSteps;
+    try {
+      await api.request("/api/v1/checkpoints/create", { method: "POST", body });
+      render();
+    } catch (e) {
+      alert("Create failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleCheckpointDelete(id) {
+    try {
+      await api.request("/api/v1/checkpoints/delete", { method: "POST", body: { id } });
+      render();
+    } catch (e) {
+      alert("Delete failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleProjectIndex() {
+    const data = collectFormData("project-index");
+    if (!data.projectPath) { alert("Project path is required."); return; }
+    const body = { projectPath: data.projectPath };
+    if (data.projectId) body.projectId = data.projectId;
+    if (data.forceReindex) body.forceReindex = true;
+    if (data.warmCache) body.warmCache = true;
+    try {
+      const res = await api.request("/api/v1/project/index", { method: "POST", body });
+      if (res && res.data && res.data.jobId) alert("Indexing job started: " + res.data.jobId);
+      render();
+    } catch (e) {
+      alert("Index failed: " + String(e.message || e));
+    }
+  }
+
+  async function handleProjectReset(project) {
+    try {
+      await api.request("/api/v1/project/reset", {
+        method: "POST",
+        body: { projectId: project, clearVectors: true, clearSymbols: true, clearMemories: true },
+      });
+      render();
+    } catch (e) {
+      alert("Reset failed: " + String(e.message || e));
     }
   }
 
@@ -932,13 +1725,16 @@ const MASSA_AI_UI = {
   renderProposals,
   renderCheckpoints,
   renderDashboard,
+  renderConfig,
+  buildConfigSectionBody,
+  renderProfiles,
+  renderModelRegistry,
   initTheme,
   toggleTheme,
   isWriteModeEnabled,
   createApiClient,
   readInjectedApiKey,
   startApp,
-  FORBIDDEN_MUTATING_PATHS,
   MEMORY_TYPES,
   MEMORY_LEVELS,
   CHECKPOINTS_LIST_BODY,

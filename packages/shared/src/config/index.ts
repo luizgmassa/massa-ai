@@ -1103,6 +1103,11 @@ export {
   migrateDataDirOnce,
 } from "./config-loader";
 
+export { savePartialConfig, maskSensitive, restartNeededSections } from "./config-writer";
+export type { SavePartialConfigResult } from "./config-writer";
+
+export { configDir } from "./xdg";
+
 // Tools API key resolution + first-start provisioning (SEC-01). resolveApiKey
 // WRITES on the provisioning path, so callers invoke it explicitly at startup;
 // it is never reached by importing this module.
