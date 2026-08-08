@@ -47,16 +47,10 @@ const {
   handleRegistryRegenerate: (ctx: any) => Promise<void>;
   handleProjectIndexProgress: (ctx: any, jobId: string) => void;
   initRegistryOverlay: (ctx: any, source: any) => void;
-  renderProfilesView: (data: any, opts?: any) => string;
+  renderProfilesView: (profilesData: any, registryData: any, opts?: any) => string;
 };
 
 // ── Mock helpers ─────────────────────────────────────────────────────────────
-
-interface MockInput {
-  type: string;
-  value: string;
-  dataset: Record<string, string>;
-}
 
 interface MockElement {
   dataset: Record<string, string>;
@@ -128,10 +122,7 @@ function makeRoot(children: MockElement[] = []): MockRoot {
       });
       return all[0] || null;
     },
-    insertBefore: (node: MockElement, ref: MockElement | null) => {
-      bannerChildren.unshift(node);
-      return node;
-    },
+    insertBefore: (node: MockElement, _ref: MockElement | null) => { bannerChildren.unshift(node); return node; },
     removeChild: (node: MockElement) => {
       const idx = bannerChildren.indexOf(node);
       if (idx >= 0) bannerChildren.splice(idx, 1);
@@ -182,7 +173,6 @@ describe("showBanner — success/error banners (DS-04)", () => {
     showBanner(root, "success", "first");
     showBanner(root, "error", "second");
     // only one banner at a time — the success should be replaced by error
-    const banners = root.children.filter((c) => c.textContent);
     // After clear + insert, the newest is the error
     expect(root.children[0].textContent).toContain("second");
   });
@@ -210,7 +200,7 @@ describe("handleConfigSave — confirm + PUT + banner (CFG-01..05)", () => {
     });
     await handleConfigSave(ctx, "logging");
     expect((globalThis as any).confirm).toHaveBeenCalled();
-    const msg = (globalThis as any).confirm.mock.calls[0][0] as string;
+    const msg = ((globalThis as any).confirm.mock.calls[0] as any[])[0] as string;
     expect(msg.toLowerCase()).toContain("logging");
   });
 
@@ -225,7 +215,7 @@ describe("handleConfigSave — confirm + PUT + banner (CFG-01..05)", () => {
     });
     await handleConfigSave(ctx, "logging");
     expect(request).toHaveBeenCalled();
-    const call = request.mock.calls[0];
+    const call = request.mock.calls[0] as any[];
     expect(call[0]).toBe("/api/v1/config");
     expect(call[1].method).toBe("PUT");
   });
@@ -404,7 +394,7 @@ describe("handleProfileSwitch — confirm + POST + banner (PROFSW-01..04)", () =
     const ctx = makeCtx();
     await handleProfileSwitch(ctx, "work", "claude");
     expect((globalThis as any).confirm).toHaveBeenCalled();
-    const msg = (globalThis as any).confirm.mock.calls[0][0] as string;
+    const msg = ((globalThis as any).confirm.mock.calls[0] as any[])[0] as string;
     expect(msg).toContain("claude");
     expect(msg).toContain("work");
     expect(msg.toLowerCase()).toContain("restart");
@@ -416,7 +406,7 @@ describe("handleProfileSwitch — confirm + POST + banner (PROFSW-01..04)", () =
     const ctx = makeCtx({ api: { request } });
     await handleProfileSwitch(ctx, "work", "claude");
     expect(request).toHaveBeenCalled();
-    const call = request.mock.calls[0];
+    const call = request.mock.calls[0] as any[];
     expect(call[0]).toBe("/api/v1/profiles/switch");
     expect(call[1].method).toBe("POST");
     expect(call[1].body.profile).toBe("work");
@@ -624,7 +614,7 @@ describe("handleRegistrySaveOverlay — confirm + PUT + dirty reset (REGWIRE-07.
     (globalThis as any).confirm = mock(() => false);
     const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true } });
     await handleRegistrySaveOverlay(ctx);
-    const msg = (globalThis as any).confirm.mock.calls[0][0] as string;
+    const msg = ((globalThis as any).confirm.mock.calls[0] as any[])[0] as string;
     expect(msg.toLowerCase()).toContain("overlay");
     expect(msg.toLowerCase()).toContain("validat");
   });
@@ -638,7 +628,7 @@ describe("handleRegistrySaveOverlay — confirm + PUT + dirty reset (REGWIRE-07.
     });
     await handleRegistrySaveOverlay(ctx);
     expect(request).toHaveBeenCalled();
-    const call = request.mock.calls[0];
+    const call = request.mock.calls[0] as any[];
     expect(call[0]).toBe("/api/v1/model-registry");
     expect(call[1].method).toBe("PUT");
     expect(call[1].body.profiles.balanced.description).toBe("x");
@@ -689,7 +679,7 @@ describe("handleRegistryClearOverlay — confirm + DELETE (REGWIRE-11, REGWIRE-1
     (globalThis as any).confirm = mock(() => false);
     const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {} }, registryDirty: false, registryLoaded: true } });
     await handleRegistryClearOverlay(ctx);
-    const msg = (globalThis as any).confirm.mock.calls[0][0] as string;
+    const msg = ((globalThis as any).confirm.mock.calls[0] as any[])[0] as string;
     expect(msg.toLowerCase()).toContain("built-in");
     expect(msg.toLowerCase()).toContain("delete");
   });
@@ -704,7 +694,7 @@ describe("handleRegistryClearOverlay — confirm + DELETE (REGWIRE-11, REGWIRE-1
     });
     await handleRegistryClearOverlay(ctx);
     expect(request).toHaveBeenCalled();
-    const call = request.mock.calls[0];
+    const call = request.mock.calls[0] as any[];
     expect(call[0]).toBe("/api/v1/model-registry/overlay");
     expect(call[1].method).toBe("DELETE");
     // overlay reset to builtin
@@ -761,7 +751,7 @@ describe("handleRegistryRegenerate — streaming SSE (REGEN-01..06)", () => {
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
     await handleRegistryRegenerate(ctx);
     expect((globalThis as any).confirm).toHaveBeenCalled();
-    const msg = (globalThis as any).confirm.mock.calls[0][0] as string;
+    const msg = ((globalThis as any).confirm.mock.calls[0] as any[])[0] as string;
     expect(msg.toLowerCase()).toContain("regenerate");
     expect(msg.toLowerCase()).toContain("overwrite");
   });

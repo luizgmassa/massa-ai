@@ -215,15 +215,15 @@ Where: `.specs/project/STATE.md`, `.specs/project/FEATURES.json`, `.specs/HANDOF
 
 Depends on: T1, T2, T3, T4, T5, T6, T7, T8
 
-- [ ] Run `bun run test:scripts` (all web-ui + tools-api + scripts tests) — green.
-- [ ] Run `bun run lint` (oxlint) — exit 0.
-- [ ] Run `bun run type-check` (6 tsc projects) — green.
-- [ ] Run `bun run test:plugins` — green.
-- [ ] Update `.specs/project/STATE.md` — move `admin-portal` to Previous, add `admin-portal-enhancements` as Current.
-- [ ] Update `.specs/project/FEATURES.json` — add `admin-portal-enhancements` entry, set `active_feature`.
-- [ ] Update `.specs/HANDOFF.md`.
-- [ ] Update `CHANGELOG.md` under `[Unreleased]` → `### Added` (streaming regenerate route, confirm-on-all-edits, success/failure banners, index progress, registry sub-tab, design-system styling).
-- [ ] Run `bun skills/massa-ai/scripts/check_specs_delivered.ts admin-portal-enhancements --root .` — exit 0.
+- [x] Run `bun run test:scripts` (all web-ui + tools-api + scripts tests) — green.
+- [x] Run `bun run lint` (oxlint) — exit 0.
+- [x] Run `bun run type-check` (6 tsc projects) — green.
+- [x] Run `bun run test:plugins` — green.
+- [x] Update `.specs/project/STATE.md` — move `admin-portal` to Previous, add `admin-portal-enhancements` as Current.
+- [x] Update `.specs/project/FEATURES.json` — add `admin-portal-enhancements` entry, set `active_feature`.
+- [x] Update `.specs/HANDOFF.md`.
+- [x] Update `CHANGELOG.md` under `[Unreleased]` → `### Added` (streaming regenerate route, confirm-on-all-edits, success/failure banners, index progress, registry sub-tab, design-system styling).
+- [x] Run `bun skills/massa-ai/scripts/check_specs_delivered.ts admin-portal-enhancements --root .` — exit 0.
 
 Tests: full gate matrix (test:scripts, lint, type-check, test:plugins) + check_specs_delivered exit 0
 

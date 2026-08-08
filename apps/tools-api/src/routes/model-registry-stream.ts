@@ -21,20 +21,8 @@ import path from "path";
 import { spawn } from "child_process";
 import { configDir } from "@massa-ai/shared/config";
 
-// scripts/lib is outside tools-api's rootDir and is not copied into the
-// production Docker image. Dynamic require with non-literal path keeps it
-// external for the bundler. Lazy: resolved on first call so mock.module() in
-// tests can intercept before this runs. Same pattern as model-registry.ts.
-let _profilesLib: Record<string, unknown> | null = null;
-function profilesLib(): Record<string, unknown> {
-  if (!_profilesLib) {
-    const libPath = ["..", "..", "..", "..", "scripts", "lib", "model-profiles.ts"].join("/");
-    _profilesLib = (typeof require === "function" ? require : (globalThis as any).require)(libPath);
-  }
-  return _profilesLib!;
-}
-
 const OVERLAY_PATH = path.join(configDir("massa-ai"), "model-profiles.json");
+void OVERLAY_PATH;
 const GENERATE_SCRIPT = path.resolve(
   import.meta.dirname,
   "../../../../scripts/generate-subagent-artifacts.ts",

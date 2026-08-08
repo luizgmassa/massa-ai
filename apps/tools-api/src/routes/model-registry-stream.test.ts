@@ -65,8 +65,7 @@ function makeFakeChild(opts: {
   exitCode: number | null;
   spawnError?: Error | null;
 }): { stdout: { on: (ev: string, cb: (d: Buffer) => void) => void }; stderr: { on: (ev: string, cb: (d: Buffer) => void) => void }; on: (ev: string, cb: (code: number | null) => void) => void; kill: () => boolean } {
-  const handlers: Record<string, Array<(arg: any) => void>> = {};
-  const stream = (lines: string[] | undefined, key: string) => ({
+  const stream = (lines: string[] | undefined, _key: string) => ({
     on(event: string, cb: (d: Buffer) => void) {
       if (event !== "data") return;
       if (lines) for (const line of lines) cb(Buffer.from(line + "\n"));

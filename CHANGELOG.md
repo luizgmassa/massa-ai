@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Admin Portal Enhancements — handlers, styling, confirm, progress UX,
+  registry sub-tab.** Wires every `data-action` the Config, Profiles, and Model
+  Registry renderers emit to real handlers with confirm-on-all-edits (config
+  save, profile switch, registry overlay save, regenerate, clear overlay).
+  Success/failure banners after every edit (auto-hide 6s on success). Real-time
+  progress: registry regeneration streams live stdout/stderr via a new
+  `POST /api/v1/model-registry/regenerate-stream` SSE route (non-blocking
+  `child_process.spawn`); project indexing tracks jobId via existing SSE +
+  polling fallback. Model-registry editor surfaced as a sub-tab inside the
+  Profiles view (persisted in localStorage). CSS design system extended to
+  ~20 new view classes. 51 acceptance criteria across 3 phases = 9 tasks. See
+  `.specs/features/admin-portal-enhancements/`.
+
 - **Admin Portal — full CRUD web UI** for the massa-ai system. Elevates the
   existing `apps/web-ui` from read-only to an admin portal with config
   GET/PUT, checkpoint delete, model-profile registry overlay CRUD, create/
