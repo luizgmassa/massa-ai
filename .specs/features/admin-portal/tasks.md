@@ -176,14 +176,14 @@ T14 → T15
 - Skill: NONE
 
 **Done when**:
-- [ ] `GET /api/v1/config` returns masked config + restartNeededSections
-- [ ] `GET` when config.json absent returns defaults + warning
-- [ ] `PUT` with valid section → 200 + updated masked config
-- [ ] `PUT` with invalid value → 400 + `details`
-- [ ] `PUT` with masked sentinel `"***"` preserves existing value
-- [ ] Route registered in `index.ts`
-- [ ] `bun test apps/tools-api/src/routes/config.test.ts` passes (new: GET masking, GET missing-config, PUT valid, PUT invalid 400, masked sentinel)
-- [ ] `bun run type-check` passes
+- [x] `GET /api/v1/config` returns masked config + restartNeededSections
+- [x] `GET` when config.json absent returns defaults + warning
+- [x] `PUT` with valid section → 200 + updated masked config
+- [x] `PUT` with invalid value → 400 + `details`
+- [x] `PUT` with masked sentinel `"***"` preserves existing value
+- [x] Route registered in `index.ts`
+- [x] `bun test apps/tools-api/src/routes/config.test.ts` passes (new: GET masking, GET missing-config, PUT valid, PUT invalid 400, masked sentinel)
+- [x] `bun run type-check` passes
 
 **Tests**: integration (tools-api config route)
 **Gate**: route

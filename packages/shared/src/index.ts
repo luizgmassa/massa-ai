@@ -39,6 +39,10 @@ export {
   ApiKeyProvisioningError,
   type ResolvedApiKey,
   type ApiKeySource,
+  savePartialConfig,
+  maskSensitive,
+  restartNeededSections,
+  type SavePartialConfigResult,
 } from "./config/index.js";
 
 // Model-profile switch engine
