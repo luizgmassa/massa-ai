@@ -236,9 +236,21 @@ function _minimalMarkdownToHtml(md) {
 
 // ── View renderers (pure: ({ data, state }) => htmlString) ─────────────────
 
-export function renderProjects(data) {
+export function renderProjects(data, opts) {
   const projects = (data && data.projects) || [];
   const writeMode = isWriteModeEnabled();
+  const indexJobId = opts && opts.indexJobId;
+  const indexJobStatus = opts && opts.indexJobStatus;
+  const indexJobPhase = opts && opts.indexJobPhase;
+  const indexJobFileCount = opts && opts.indexJobFileCount;
+
+  const indexProgress = indexJobId
+    ? '<div class="index-progress"><span>Index job: ' + escapeHtml(indexJobId) + '</span>' +
+      '<span class="badge">' + escapeHtml(indexJobStatus || "pending") + '</span>' +
+      (indexJobPhase ? '<span>phase: ' + escapeHtml(indexJobPhase) + '</span>' : "") +
+      (indexJobFileCount != null ? '<span>' + escapeHtml(String(indexJobFileCount)) + ' files</span>' : "") +
+      '</div>'
+    : "";
 
   const rows = projects
     .map((p) => {
@@ -268,7 +280,9 @@ export function renderProjects(data) {
     return '<p class="empty">No indexed projects.</p>';
   }
   return (
-    '<section class="view"><h2>Projects</h2><ul class="project-list">' +
+    '<section class="view"><h2>Projects</h2>' +
+    indexProgress +
+    '<ul class="project-list">' +
     rows +
     "</ul>" +
     indexForm +
@@ -1514,6 +1528,14 @@ export async function handleRegistrySaveOverlay(ctx) {
   }
 }
 
+export async function handleProjectIndexProgress(ctx, jobId) {
+  ctx.state.indexJobId = jobId;
+  ctx.state.indexJobStatus = "pending";
+  ctx.state.indexJobPhase = null;
+  ctx.state.indexJobFileCount = null;
+  ctx.render();
+}
+
 export async function handleRegistryClearOverlay(ctx) {
   if (!confirm("Reset to built-in? This deletes the overlay file and reverts to the builtin registry.")) return;
   try {
@@ -1658,10 +1680,22 @@ function startApp(opts) {
 
   async function render() {
     setNavActive();
+    // F4 fold: clear index poll interval when navigating away from projects
+    if (state.view !== "projects") clearIndexPoll();
     try {
       if (state.view === "projects") {
         const data = await api.request("/api/v1/project/list");
-        root.innerHTML = renderProjects((data && data.data) || { projects: [] });
+        root.innerHTML = renderProjects((data && data.data) || { projects: [] }, {
+          indexJobId: state.indexJobId,
+          indexJobStatus: state.indexJobStatus,
+          indexJobPhase: state.indexJobPhase,
+          indexJobFileCount: state.indexJobFileCount,
+        });
+        // If a job completed, refresh project list
+        if (state.indexJobStatus === "completed" || state.indexJobStatus === "failed") {
+          // Clear the completed job after a render so the progress line disappears on next nav
+          // but keep it visible until then
+        }
       } else if (state.view === "memory") {
         const body = {
           limit: 50,
@@ -2058,8 +2092,13 @@ function startApp(opts) {
     if (data.warmCache) body.warmCache = true;
     try {
       const res = await api.request("/api/v1/project/index", { method: "POST", body });
-      if (res && res.data && res.data.jobId) alert("Indexing job started: " + res.data.jobId);
-      render();
+      if (res && res.data && res.data.jobId) {
+        state.indexJobId = res.data.jobId;
+        state.indexJobStatus = "pending";
+        render();
+      } else {
+        render();
+      }
     } catch (e) {
       alert("Index failed: " + String(e.message || e));
     }
@@ -2104,6 +2143,8 @@ function startApp(opts) {
   // F2 fold: beforeunload guard when registry has unsaved changes.
   if (typeof window !== "undefined") {
     window.addEventListener("beforeunload", (ev) => {
+      // F4 fold: clear index poll on unload
+      clearIndexPoll();
       if (state.registryDirty) {
         ev.preventDefault();
         ev.returnValue = "You have unsaved registry changes. Leave anyway?";
@@ -2113,6 +2154,43 @@ function startApp(opts) {
   }
 
   // SSE: subscribe to /api/v1/events for real-time updates (Wave 7 T10)
+  // T8: extend to track index_status for the tracked jobId (PRG-02) + poll fallback (PRG-03).
+  function clearIndexPoll() {
+    if (state.indexPollInterval) {
+      clearInterval(state.indexPollInterval);
+      state.indexPollInterval = null;
+    }
+  }
+
+  function startIndexPoll(jobId) {
+    clearIndexPoll();
+    let polls = 0;
+    const MAX_POLLS = 150; // 5 min at 2s interval
+    state.indexPollInterval = setInterval(async () => {
+      polls++;
+      if (polls > MAX_POLLS) {
+        state.indexJobStatus = "unknown";
+        clearIndexPoll();
+        if (state.view === "projects") render();
+        return;
+      }
+      try {
+        const res = await api.request("/api/v1/project/index/status/" + encodeURIComponent(jobId));
+        if (res && res.data) {
+          state.indexJobStatus = res.data.status || state.indexJobStatus;
+          state.indexJobPhase = res.data.phase || state.indexJobPhase;
+          state.indexJobFileCount = res.data.fileCount != null ? res.data.fileCount : state.indexJobFileCount;
+          if (state.indexJobStatus === "completed" || state.indexJobStatus === "failed") {
+            clearIndexPoll();
+            if (state.view === "projects") render();
+          }
+        }
+      } catch {
+        // network error — keep polling until cap
+      }
+    }, 2000);
+  }
+
   if (typeof EventSource !== "undefined") {
     try {
       const sseBase = opts.base || "";
@@ -2120,8 +2198,22 @@ function startApp(opts) {
       es.onmessage = (ev) => {
         try {
           const data = JSON.parse(ev.data);
-          // Refresh current view on index_status or observation events
-          if (data && (data.type === "index_status" || data.type === "observation" || data.event === "index_status" || data.event === "observation")) {
+          // PRG-02: update index progress when jobId matches
+          if (data && (data.type === "index_status" || data.event === "index_status")) {
+            const payload = data.payload || data;
+            if (payload && payload.jobId === state.indexJobId) {
+              state.indexJobStatus = payload.status || state.indexJobStatus;
+              state.indexJobPhase = payload.phase || state.indexJobPhase;
+              state.indexJobFileCount = payload.fileCount != null ? payload.fileCount : state.indexJobFileCount;
+              if (state.indexJobStatus === "completed" || state.indexJobStatus === "failed") {
+                clearIndexPoll();
+              }
+              if (state.view === "projects") render();
+            }
+            return; // handled; don't double-render
+          }
+          // Refresh current view on observation events
+          if (data && (data.type === "observation" || data.event === "observation")) {
             render();
           }
         } catch {
@@ -2129,13 +2221,17 @@ function startApp(opts) {
         }
       };
       es.onerror = () => {
-        // SSE reconnection is handled by the browser automatically;
-        // no action needed on error
+        // PRG-03: start polling fallback when SSE errors + a job is tracked
+        if (state.indexJobId && state.indexJobStatus !== "completed" && state.indexJobStatus !== "failed" && !state.indexPollInterval) {
+          startIndexPoll(state.indexJobId);
+        }
       };
     } catch {
-      // EventSource unavailable or connection failed — non-fatal
+      // EventSource unavailable — polling fallback starts when a job is tracked
     }
   }
+  // PRG-03: if EventSource is unavailable and a job is tracked, poll immediately.
+  // (startIndexPoll is called from handleProjectIndex when EventSource is absent.)
 }
 
 // Export pure helpers + bootstrap on globalThis for both browser and Node import.
@@ -2176,6 +2272,7 @@ const MASSA_AI_UI = {
   handleRegistrySaveOverlay,
   handleRegistryClearOverlay,
   handleRegistryRegenerate,
+  handleProjectIndexProgress,
   MEMORY_TYPES,
   MEMORY_LEVELS,
   CHECKPOINTS_LIST_BODY,

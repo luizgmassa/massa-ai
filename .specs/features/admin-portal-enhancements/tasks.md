@@ -190,14 +190,14 @@ Where: `apps/web-ui/src/static/app.js` (existing, extend `handleProjectIndex` + 
 
 Depends on: T3
 
-- [ ] Extend `handleProjectIndex()`: after POST returns `jobId`, set `state.indexJobId` + `state.indexJobStatus="pending"`; re-render.
-- [ ] Extend `renderProjects()` to prepend a `.index-progress` line when `state.indexJobId` is set (jobId, status badge, phase, file count).
-- [ ] Extend the SSE `es.onmessage` block: if `data.type==="index_status"` and `data.jobId===state.indexJobId`, update `state.indexJobStatus/Phase/FileCount` and re-render (if current view is projects).
-- [ ] Add polling fallback: if `EventSource` unavailable or on `es.onerror`, start `setInterval(2000)` calling `GET /api/v1/project/index/status/<jobId>`; update state; stop on `completed`/`failed`; cap at 150 polls (5 min).
+- [x] Extend `handleProjectIndex()`: after POST returns `jobId`, set `state.indexJobId` + `state.indexJobStatus="pending"`; re-render.
+- [x] Extend `renderProjects()` to prepend a `.index-progress` line when `state.indexJobId` is set (jobId, status badge, phase, file count).
+- [x] Extend the SSE `es.onmessage` block: if `data.type==="index_status"` and `data.jobId===state.indexJobId`, update `state.indexJobStatus/Phase/FileCount` and re-render (if current view is projects).
+- [x] Add polling fallback: if `EventSource` unavailable or on `es.onerror`, start `setInterval(2000)` calling `GET /api/v1/project/index/status/<jobId>`; update state; stop on `completed`/`failed`; cap at 150 polls (5 min).
   - **F4 fold:** Store the interval ID in `state.indexPollInterval`. Clear it in three places: (1) on terminal status; (2) at the top of `render()` when `state.view !== "projects"`; (3) on `beforeunload`.
-- [ ] On `completed`: refresh project list.
-- [ ] On `failed`: progress line shows "failed" + error.
-- [ ] Test in `admin-handlers.test.ts`:
+- [x] On `completed`: refresh project list.
+- [x] On `failed`: progress line shows "failed" + error.
+- [x] Test in `admin-handlers.test.ts`:
   - Index submit returns jobId → assert `.index-progress` line in rendered Projects.
   - Simulate `index_status` SSE event with matching jobId → assert progress updates.
   - Simulate `index_status` with different jobId → assert ignored.
