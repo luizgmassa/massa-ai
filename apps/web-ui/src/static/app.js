@@ -1277,6 +1277,77 @@ function createApiClient(opts) {
   return { request };
 }
 
+// ── Admin portal enhancement handlers (exported, context-injected) ──────────
+// These are module-level pure-ish functions taking a ctx { api, root, state,
+// render, doc }. startApp() builds ctx and wires them in wireViewHandlers().
+// Tests inject mock ctx. This avoids a startApp DOM harness for handler tests.
+
+const BANNER_AUTOHIDE_MS = 6000;
+
+export function showBanner(root, type, message) {
+  // Clear existing banner(s) — only one at a time.
+  const existing = root.querySelectorAll ? root.querySelectorAll(".success, .error") : [];
+  existing.forEach((b) => { if (b.remove) b.remove(); });
+  const div = {
+    className: type === "success" ? "success" : "error",
+    textContent: message,
+    style: {},
+    remove: () => {},
+    addEventListener: () => {},
+  };
+  // Prepend to root (top of view). Use insertBefore if firstChild exists.
+  try {
+    if (root.insertBefore) root.insertBefore(div, root.firstChild || null);
+    else if (root.children) root.children.unshift(div);
+  } catch {
+    // best effort
+  }
+  if (type === "success" && typeof setTimeout !== "undefined") {
+    setTimeout(() => { if (div.remove) div.remove(); }, BANNER_AUTOHIDE_MS);
+  }
+  return div;
+}
+
+/** Collect field values for a config section from the rendered DOM. */
+function collectConfigSectionFields(root, section) {
+  const fieldValues = {};
+  const els = root.querySelectorAll('[data-section="' + section + '"]');
+  els.forEach((el) => {
+    const field = el.dataset && el.dataset.field;
+    if (!field) return;
+    if (el.type === "checkbox") fieldValues[field] = !!el.checked;
+    else fieldValues[field] = el.value;
+  });
+  return fieldValues;
+}
+
+export async function handleConfigSave(ctx, section) {
+  const sectionDef = CONFIG_SECTIONS.find((s) => s.key === section);
+  const label = sectionDef ? sectionDef.label : section;
+  if (!confirm("Save " + label + " config? A backup will be created.")) return;
+  const fieldValues = collectConfigSectionFields(ctx.root, section);
+  const body = buildConfigSectionBody(section, fieldValues);
+  try {
+    const res = await ctx.api.request("/api/v1/config", { method: "PUT", body });
+    if (res && res.success === false) {
+      const details = res.details ? res.details.join("; ") : (res.error || "Save failed.");
+      showBanner(ctx.root, "error", "Save failed: " + details);
+      return;
+    }
+    showBanner(ctx.root, "success", "Config section " + section + " saved. Backup created.");
+    ctx.render();
+  } catch (e) {
+    showBanner(ctx.root, "error", "Save failed: " + String((e && e.message) || e));
+  }
+}
+
+export function handleConfigReveal(ctx, targetId) {
+  const el = ctx.doc && ctx.doc.getElementById ? ctx.doc.getElementById(targetId) : null;
+  if (!el) return;
+  if (el.type === "password") el.type = "text";
+  else if (el.type === "text") el.type = "password";
+}
+
 function startApp(opts) {
   opts = opts || {};
   const doc = opts.document || (typeof document !== "undefined" ? document : null);
@@ -1504,6 +1575,22 @@ function startApp(opts) {
         if (confirm("Reset project " + project + "? This deletes vectors/symbols/memories. This cannot be undone.")) {
           handleProjectReset(project);
         }
+      });
+    });
+    // admin-portal-enhancements: config save/reveal
+    const ctx = { api, root, state, render, doc };
+    root.querySelectorAll('[data-action="config-save"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const section = btn.dataset.section;
+        if (!section) return;
+        handleConfigSave(ctx, section);
+      });
+    });
+    root.querySelectorAll('[data-action="config-reveal"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.target;
+        if (!target) return;
+        handleConfigReveal(ctx, target);
       });
     });
   }
@@ -1735,6 +1822,9 @@ const MASSA_AI_UI = {
   createApiClient,
   readInjectedApiKey,
   startApp,
+  showBanner,
+  handleConfigSave,
+  handleConfigReveal,
   MEMORY_TYPES,
   MEMORY_LEVELS,
   CHECKPOINTS_LIST_BODY,

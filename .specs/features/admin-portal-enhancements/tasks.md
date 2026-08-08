@@ -86,14 +86,14 @@ Where: `apps/web-ui/src/static/app.js` (existing, extend `wireViewHandlers`), `a
 
 Depends on: T3
 
-- [ ] Add `showBanner(type, message)` to `app.js`: clears prior banner, inserts `.success` or `.error` div at top of `#app`, auto-hides success after 6s.
-- [ ] Add `handleConfigSave(section)` handler: `confirm(...)` → collect fields → `buildConfigSectionBody` → PUT `/api/v1/config` → banner on result → re-render on success.
+- [x] Add `showBanner(type, message)` to `app.js`: clears prior banner, inserts `.success` or `.error` div at top of `#app`, auto-hides success after 6s.
+- [x] Add `handleConfigSave(section)` handler: `confirm(...)` → collect fields → `buildConfigSectionBody` → PUT `/api/v1/config` → banner on result → re-render on success.
   - Collect field values: `root.querySelectorAll('[data-section="' + section + '"]')` → read each `[data-field]` + `[data-type]`.
   - On 400, parse `data.details` and list all in the error banner.
   - On cancel, no-op (form retains edits).
-- [ ] Add `handleConfigReveal(targetId)` handler: toggle `input.type` between `password` and `text`.
-- [ ] Wire both in `wireViewHandlers()`: `root.querySelectorAll('[data-action="config-save"]')` and `[data-action="config-reveal"]`.
-- [ ] Test `apps/web-ui/src/__tests__/admin-handlers.test.ts`:
+- [x] Add `handleConfigReveal(targetId)` handler: toggle `input.type` between `password` and `text`.
+- [x] Wire both in `wireViewHandlers()`: `root.querySelectorAll('[data-action="config-save"]')` and `[data-action="config-reveal"]`.
+- [x] Test `apps/web-ui/src/__tests__/admin-handlers.test.ts`:
   - Config save: mock confirm → true, mock `api.request` → success, assert PUT called with body containing the section.
   - Config save 400: mock → 400 with details, assert `.error` banner contains all details.
   - Config save cancel: mock confirm → false, assert no `api.request` call.
