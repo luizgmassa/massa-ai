@@ -330,12 +330,12 @@ CHKP-05 decision: store is directly reachable via `CheckpointManager.getInstance
 - Skill: NONE
 
 **Done when**:
-- [ ] `renderConfig` renders 15 sections with typed inputs
-- [ ] Sensitive fields masked + reveal toggle works
-- [ ] Restart-needed sections show a badge
-- [ ] Per-section Save sends the correct partial body
-- [ ] `bun test apps/web-ui/src/__tests__/config-forms.test.ts` passes (new: each section field types, sensitive masking + reveal, save partial body)
-- [ ] `bun run type-check` passes
+- [x] `renderConfig` renders 15 sections with typed inputs
+- [x] Sensitive fields masked + reveal toggle works
+- [x] Restart-needed sections show a badge
+- [x] Per-section Save sends the correct partial body
+- [x] `bun test apps/web-ui/src/__tests__/config-forms.test.ts` passes (new: each section field types, sensitive masking + reveal, save partial body)
+- [x] `bun run type-check` passes
 
 **Tests**: unit (config forms)
 **Gate**: quick

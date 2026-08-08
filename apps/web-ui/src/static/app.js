@@ -546,22 +546,305 @@ export function renderCheckpoints(data) {
 // ── Admin portal view stubs (renderers land in T10-T12) ────────────────────
 
 /**
- * Config view renderer stub. T10 replaces this with the 15-sectioned form UI.
- * Reads GET /api/v1/config → { config, restartNeededSections }.
+ * Config view renderer. Renders 15 collapsible section cards from the
+ * GET /api/v1/config response. Each card generated from declarative field
+ * definitions. Sensitive fields masked (type=password) with reveal toggle.
+ * Sections in restartNeededSections show a badge. Per-section Save sends
+ * only that section to PUT /api/v1/config.
  */
-export function renderConfig(data) {
+
+const SENSITIVE_FIELDS = new Set(["database.url", "embedding.apiKey", "llm.apiKey", "security.apiKey"]);
+
+const CONFIG_SECTIONS = [
+  {
+    key: "database",
+    label: "Database",
+    fields: [{ name: "url", type: "text", label: "Database URL", sensitive: true }],
+  },
+  {
+    key: "embedding",
+    label: "Embedding",
+    fields: [
+      { name: "provider", type: "enum", label: "Provider", enum: ["ollama", "mistral", "openai", "google", "cohere"] },
+      { name: "model", type: "text", label: "Model" },
+      { name: "baseURL", type: "text", label: "Base URL" },
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true },
+      { name: "dimensions", type: "number", label: "Dimensions" },
+    ],
+  },
+  {
+    key: "compression",
+    label: "Compression",
+    fields: [
+      { name: "defaultStrategy", type: "text", label: "Default Strategy" },
+      { name: "minTokensForCompression", type: "number", label: "Min Tokens" },
+      { name: "targetCompressionRatio", type: "number", label: "Target Ratio (0-1)" },
+      { name: "prompt", type: "text", label: "Prompt (optional)" },
+    ],
+  },
+  {
+    key: "impact",
+    label: "Impact Analysis",
+    fields: [{ name: "bfsCteEnabled", type: "boolean", label: "BFS CTE Enabled" }],
+  },
+  {
+    key: "capturePolicy",
+    label: "Capture Policy",
+    fields: [
+      { name: "maxMatchWork", type: "number", label: "Max Match Work" },
+      { name: "maxIgnorePatterns", type: "number", label: "Max Ignore Patterns" },
+      { name: "rules", type: "string[]", label: "Rules (JSON)" },
+    ],
+  },
+  {
+    key: "cache",
+    label: "Cache",
+    fields: [
+      { name: "enabled", type: "boolean", label: "Enabled" },
+      { name: "l1MaxSizeMB", type: "number", label: "L1 Max Size (MB)" },
+      { name: "l2MaxSizeMB", type: "number", label: "L2 Max Size (MB)" },
+      { name: "defaultTTLSeconds", type: "number", label: "Default TTL (s)" },
+    ],
+  },
+  {
+    key: "dataDir",
+    label: "Data Directory",
+    fields: [{ name: "dataDir", type: "text", label: "Data Directory" }],
+  },
+  {
+    key: "logging",
+    label: "Logging",
+    fields: [
+      { name: "level", type: "enum", label: "Level", enum: ["debug", "info", "warn", "error"] },
+      { name: "enableMetrics", type: "boolean", label: "Enable Metrics" },
+      { name: "file", type: "text", label: "Log File (optional)" },
+    ],
+  },
+  {
+    key: "search",
+    label: "Search",
+    fields: [
+      { name: "autoReindexMaxFiles", type: "number", label: "Auto Reindex Max Files" },
+      { name: "queryUnderstanding.enabled", type: "boolean", label: "Query Understanding Enabled" },
+      { name: "queryUnderstanding.hydeEnabled", type: "boolean", label: "HyDE Enabled" },
+      { name: "queryUnderstanding.cacheTtlMs", type: "number", label: "QU Cache TTL (ms)" },
+      { name: "queryUnderstanding.cacheMaxSize", type: "number", label: "QU Cache Max Size" },
+      { name: "rerank.enabled", type: "boolean", label: "Rerank Enabled" },
+      { name: "rerank.rerankWindow", type: "number", label: "Rerank Window" },
+    ],
+  },
+  {
+    key: "llm",
+    label: "LLM",
+    fields: [
+      { name: "enabled", type: "boolean", label: "Enabled" },
+      { name: "baseUrl", type: "text", label: "Base URL" },
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true },
+      { name: "model", type: "text", label: "Model" },
+      { name: "codeModel", type: "text", label: "Code Model" },
+      { name: "temperature", type: "number", label: "Temperature" },
+      { name: "maxOutputTokens", type: "number", label: "Max Output Tokens" },
+      { name: "timeoutMs", type: "number", label: "Timeout (ms)" },
+      { name: "disableThink", type: "boolean", label: "Disable Think" },
+    ],
+  },
+  {
+    key: "memory",
+    label: "Memory",
+    fields: [
+      { name: "decay.lambda", type: "number", label: "Decay Lambda" },
+      { name: "decay.sigma", type: "number", label: "Decay Sigma" },
+      { name: "decay.mu", type: "number", label: "Decay Mu" },
+      { name: "decay.coldThreshold", type: "number", label: "Decay Cold Threshold" },
+      { name: "bootstrap.enabled", type: "boolean", label: "Bootstrap Enabled" },
+      { name: "bootstrap.maxSeedMemories", type: "number", label: "Bootstrap Max Seeds" },
+      { name: "bootstrap.centralityLimit", type: "number", label: "Bootstrap Centrality Limit" },
+      { name: "bootstrap.gitLogLimit", type: "number", label: "Bootstrap Git Log Limit" },
+      { name: "bootstrap.refreshEnabled", type: "boolean", label: "Bootstrap Refresh" },
+      { name: "autoImprove.enabled", type: "boolean", label: "Auto Improve Enabled" },
+      { name: "autoImprove.reviewGate", type: "boolean", label: "Auto Improve Review Gate" },
+      { name: "autoImprove.minObservations", type: "number", label: "Auto Improve Min Observations" },
+      { name: "autoImprove.minIntervalMs", type: "number", label: "Auto Improve Min Interval (ms)" },
+      { name: "autoImprove.maxWindow", type: "number", label: "Auto Improve Max Window" },
+      { name: "autoImprove.minQueryHits", type: "number", label: "Auto Improve Min Query Hits" },
+      { name: "autoImprove.minFileHits", type: "number", label: "Auto Improve Min File Hits" },
+      { name: "autoImprove.minFixHits", type: "number", label: "Auto Improve Min Fix Hits" },
+      { name: "autoImportance.enabled", type: "boolean", label: "Auto Importance Enabled" },
+    ],
+  },
+  {
+    key: "hooks",
+    label: "Hooks",
+    fields: [
+      { name: "enabled", type: "boolean", label: "Enabled" },
+      { name: "maxPayloadBytes", type: "number", label: "Max Payload Bytes" },
+      { name: "queue.maxPending", type: "number", label: "Queue Max Pending" },
+      { name: "bridge.enabled", type: "boolean", label: "Bridge Enabled" },
+      { name: "bridge.minObservations", type: "number", label: "Bridge Min Observations" },
+      { name: "bridge.minIntervalMs", type: "number", label: "Bridge Min Interval (ms)" },
+      { name: "bridge.maxWindow", type: "number", label: "Bridge Max Window" },
+    ],
+  },
+  {
+    key: "synapse",
+    label: "Synapse",
+    fields: [
+      { name: "enabled", type: "boolean", label: "Enabled" },
+      { name: "inhibition.diversityPenalty.enabled", type: "boolean", label: "Diversity Penalty" },
+      { name: "inhibition.diversityPenalty.threshold", type: "number", label: "DP Threshold" },
+      { name: "inhibition.diversityPenalty.lambda", type: "number", label: "DP Lambda" },
+      { name: "inhibition.temporalInhibition.enabled", type: "boolean", label: "Temporal Inhibition" },
+      { name: "inhibition.temporalInhibition.penaltyAgeMs", type: "number", label: "TI Penalty Age (ms)" },
+      { name: "inhibition.temporalInhibition.penalty", type: "number", label: "TI Penalty" },
+      { name: "inhibition.confidenceGate.enabled", type: "boolean", label: "Confidence Gate" },
+      { name: "inhibition.confidenceGate.thresholds.specific", type: "number", label: "CG Specific" },
+      { name: "inhibition.confidenceGate.thresholds.focused", type: "number", label: "CG Focused" },
+      { name: "inhibition.confidenceGate.thresholds.broad", type: "number", label: "CG Broad" },
+      { name: "scoring.attention.enabled", type: "boolean", label: "Attention Scoring" },
+      { name: "scoring.attention.rerankWindow", type: "number", label: "Attention Rerank Window" },
+      { name: "scoring.attention.recencyHalfLifeMs", type: "number", label: "Recency Half Life (ms)" },
+      { name: "scoring.attention.semanticScale", type: "number", label: "Semantic Scale" },
+      { name: "metacognition.enabled", type: "boolean", label: "Metacognition" },
+      { name: "metacognition.lowConfidenceThreshold", type: "number", label: "Low Confidence Threshold" },
+      { name: "metacognition.definitiveTopScore", type: "number", label: "Definitive Top Score" },
+      { name: "metacognition.definitiveGap", type: "number", label: "Definitive Gap" },
+      { name: "buffer.enabled", type: "boolean", label: "Buffer Enabled" },
+      { name: "buffer.maxSize", type: "number", label: "Buffer Max Size" },
+      { name: "buffer.ttlMs", type: "number", label: "Buffer TTL (ms)" },
+      { name: "buffer.hitBoost", type: "number", label: "Buffer Hit Boost" },
+      { name: "buffer.matchThreshold", type: "number", label: "Buffer Match Threshold" },
+    ],
+  },
+  {
+    key: "handoffs",
+    label: "Handoffs",
+    fields: [{ name: "enabled", type: "boolean", label: "Enabled" }],
+  },
+  {
+    key: "security",
+    label: "Security",
+    fields: [
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true },
+      { name: "corsOrigins", type: "string[]", label: "CORS Origins" },
+      { name: "allowedExtensions", type: "string[]", label: "Allowed Extensions" },
+    ],
+  },
+];
+
+function getConfigFieldValue(config, sectionKey, fieldName) {
+  if (sectionKey === "dataDir") return config[sectionKey] || "";
+  const section = config[sectionKey];
+  if (!section) return undefined;
+  const parts = fieldName.split(".");
+  let val = section;
+  for (const p of parts) {
+    val = val && typeof val === "object" ? val[p] : undefined;
+  }
+  return val;
+}
+
+function renderConfigField(sectionKey, field, value) {
+  const fieldId = "config-" + sectionKey + "-" + field.name.replace(/\./g, "-");
+  const inputName = "config-" + sectionKey + "-" + field.name;
+  const isSensitive = field.sensitive || SENSITIVE_FIELDS.has(sectionKey + "." + field.name);
+  const displayValue = value === undefined || value === null ? "" : String(value);
+
+  let inputHtml;
+  if (field.type === "boolean") {
+    const checked = value === true ? " checked" : "";
+    inputHtml = '<input type="checkbox" id="' + fieldId + '" name="' + inputName + '"' + checked + ' data-section="' + sectionKey + '" data-field="' + field.name + '" data-type="boolean" />';
+  } else if (field.type === "enum") {
+    const options = (field.enum || []).map((opt) => {
+      const sel = opt === value ? " selected" : "";
+      return '<option value="' + escapeHtml(opt) + '"' + sel + ">" + escapeHtml(opt) + "</option>";
+    }).join("");
+    inputHtml = '<select id="' + fieldId + '" name="' + inputName + '" data-section="' + sectionKey + '" data-field="' + field.name + '" data-type="enum">' + options + "</select>";
+  } else if (field.type === "number") {
+    inputHtml = '<input type="number" id="' + fieldId + '" name="' + inputName + '" value="' + escapeHtml(displayValue) + '" data-section="' + sectionKey + '" data-field="' + field.name + '" data-type="number" step="any" />';
+  } else if (field.type === "string[]") {
+    const arrVal = Array.isArray(value) ? value.join(", ") : displayValue;
+    inputHtml = '<input type="text" id="' + fieldId + '" name="' + inputName + '" value="' + escapeHtml(arrVal) + '" data-section="' + sectionKey + '" data-field="' + field.name + '" data-type="string[]" placeholder="comma-separated" />';
+  } else {
+    const inputType = isSensitive ? "password" : "text";
+    inputHtml = '<input type="' + inputType + '" id="' + fieldId + '" name="' + inputName + '" value="' + escapeHtml(displayValue) + '" data-section="' + sectionKey + '" data-field="' + field.name + '" data-type="text" />';
+  }
+
+  let revealBtn = "";
+  if (isSensitive) {
+    revealBtn = ' <button type="button" class="reveal-btn" data-action="config-reveal" data-target="' + fieldId + '">reveal</button>';
+  }
+
+  return (
+    '<div class="config-field">' +
+    '<label for="' + fieldId + '">' + escapeHtml(field.label) + "</label>" +
+    inputHtml + revealBtn +
+    "</div>"
+  );
+}
+
+export function renderConfig(data, opts) {
   const payload = data || {};
   const config = payload.config || {};
   const restart = payload.restartNeededSections || [];
-  const restartBadge = restart.length
-    ? ' <span class="badge">restart needed: ' + escapeHtml(restart.join(", ")) + "</span>"
-    : "";
-  return (
-    '<section class="view"><h2>Config' + restartBadge + "</h2>" +
-    '<p class="muted">Config form loads in T10.</p>' +
-    '<pre class="config-preview">' + escapeHtml(JSON.stringify(config, null, 2)) + "</pre>" +
-    "</section>"
-  );
+  const writeMode = opts && opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
+  const restartSet = new Set(restart);
+
+  const cards = CONFIG_SECTIONS.map((section) => {
+    const isRestart = restartSet.has(section.key);
+    const badge = isRestart ? ' <span class="badge restart-badge">restart needed</span>' : "";
+    const fieldsHtml = section.fields.map((field) => {
+      const value = getConfigFieldValue(config, section.key, field.name);
+      return renderConfigField(section.key, field, value);
+    }).join("");
+    const saveBtn = writeMode
+      ? '<button type="button" class="save-btn" data-action="config-save" data-section="' + section.key + '">Save</button>'
+      : "";
+    return (
+      '<div class="config-section" data-section="' + section.key + '">' +
+      '<h3 class="config-section-header">' + escapeHtml(section.label) + badge + "</h3>" +
+      '<div class="config-fields">' + fieldsHtml + "</div>" +
+      saveBtn +
+      "</div>"
+    );
+  }).join("");
+
+  return '<section class="view"><h2>Config</h2>' + cards + "</section>";
+}
+
+function setByPath(obj, dottedPath, value) {
+  const parts = dottedPath.split(".");
+  let cur = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (!cur[parts[i]] || typeof cur[parts[i]] !== "object") cur[parts[i]] = {};
+    cur = cur[parts[i]];
+  }
+  cur[parts[parts.length - 1]] = value;
+}
+
+export function buildConfigSectionBody(sectionKey, fieldValues) {
+  const sectionDef = CONFIG_SECTIONS.find((s) => s.key === sectionKey);
+  if (!sectionDef) return {};
+
+  if (sectionKey === "dataDir") {
+    return { dataDir: fieldValues.dataDir || "" };
+  }
+
+  const nested = {};
+  for (const field of sectionDef.fields) {
+    const raw = fieldValues[field.name];
+    let val = raw;
+    if (field.type === "number") {
+      val = raw === "" || raw === undefined ? undefined : Number(raw);
+    } else if (field.type === "boolean") {
+      val = raw === true || raw === "true" || raw === "on";
+    } else if (field.type === "string[]") {
+      val = raw && typeof raw === "string"
+        ? raw.split(",").map((s) => s.trim()).filter(Boolean)
+        : Array.isArray(raw) ? raw : [];
+    }
+    if (val !== undefined) setByPath(nested, field.name, val);
+  }
+  return { [sectionKey]: nested };
 }
 
 /**
@@ -810,7 +1093,7 @@ function startApp(opts) {
         root.innerHTML = renderDashboard(data);
       } else if (state.view === "config") {
         const data = await api.request("/api/v1/config");
-        root.innerHTML = renderConfig((data && data.data) || { config: {}, restartNeededSections: [] });
+        root.innerHTML = renderConfig((data && data.data) || { config: {}, restartNeededSections: [] }, { writeMode: isWriteModeEnabled() });
       } else if (state.view === "profiles") {
         const data = await api.request("/api/v1/profiles");
         root.innerHTML = renderProfiles((data && data.data) || { profiles: [], active: "" });
@@ -983,6 +1266,7 @@ const MASSA_AI_UI = {
   renderCheckpoints,
   renderDashboard,
   renderConfig,
+  buildConfigSectionBody,
   renderProfiles,
   initTheme,
   toggleTheme,
