@@ -355,11 +355,11 @@ CHKP-05 decision: store is directly reachable via `CheckpointManager.getInstance
 - Skill: NONE
 
 **Done when**:
-- [ ] `renderProfiles` renders profile cards with active marked
-- [ ] Switch button calls `POST /api/v1/profiles/switch`
-- [ ] Per-host results rendered
-- [ ] `bun test apps/web-ui/src/__tests__/app-renderers.test.ts` passes (extend: profiles render + switch button)
-- [ ] `bun run type-check` passes
+- [x] `renderProfiles` renders profile cards with active marked
+- [x] Switch button calls `POST /api/v1/profiles/switch`
+- [x] Per-host results rendered
+- [x] `bun test apps/web-ui/src/__tests__/app-renderers.test.ts` passes (extend: profiles render + switch button)
+- [x] `bun run type-check` passes
 
 **Tests**: unit (profiles renderer)
 **Gate**: quick

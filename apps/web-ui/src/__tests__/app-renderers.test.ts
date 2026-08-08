@@ -710,14 +710,14 @@ describe("admin portal nav + footer + routing (T9)", () => {
   });
 
   it("renderProfiles stub renders profile cards with active marked", () => {
-    const html = renderProfiles({ profiles: ["balanced", "work"], active: "balanced" });
+    const html = renderProfiles({ hosts: [{ host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced", "work"] }] }, { writeMode: false });
     expect(html).toContain("balanced");
     expect(html).toContain("work");
     expect(html).toContain("active");
   });
 
   it("renderProfiles stub renders empty state when no profiles", () => {
-    const html = renderProfiles({ profiles: [], active: "" });
+    const html = renderProfiles({ hosts: [] }, { writeMode: false });
     expect(html).toContain("No profiles");
   });
 
@@ -749,7 +749,7 @@ describe("admin portal nav + footer + routing (T9)", () => {
       calls.push(String(url));
       return {
         headers: { get: () => "application/json" },
-        json: async () => ({ success: true, data: { profiles: ["balanced"], active: "balanced" } }),
+        json: async () => ({ success: true, data: { hosts: [{ host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] }] } }),
       };
     }) as unknown as typeof fetch;
     startApp({ document: doc, base: "" });
@@ -757,5 +757,81 @@ describe("admin portal nav + footer + routing (T9)", () => {
     expect(calls.some((u) => u.includes("/api/v1/profiles"))).toBe(true);
     expect(doc.getElementById("app").innerHTML).toContain("Profiles");
     delete (globalThis as any).location;
+  });
+});
+
+// ── Profiles view renderer (T11 — PROF-01, PROF-02) ────────────────────────
+
+describe("renderProfiles — profile switcher (PROF-01, PROF-02)", () => {
+  const SAMPLE_PROFILES = {
+    hosts: [
+      { host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.40.1", availableProfiles: ["balanced", "work", "cheap"] },
+      { host: "codex", installed: true, skipped: false, skipReason: null, activeProfile: "work", bundleVersion: "1.40.1", availableProfiles: ["balanced", "work"] },
+      { host: "cursor", installed: false, skipped: true, skipReason: "no variant dir", activeProfile: null, bundleVersion: null, availableProfiles: [] },
+    ],
+  };
+
+  it("renders profile cards per host with active marked (PROF-01)", () => {
+    const html = renderProfiles(SAMPLE_PROFILES, { writeMode: true });
+    expect(html).toContain("claude");
+    expect(html).toContain("codex");
+    expect(html).toContain("balanced");
+    expect(html).toContain("work");
+    expect(html).toContain("active");
+  });
+
+  it("marks active profile with active badge, no Switch button on active", () => {
+    const html = renderProfiles(SAMPLE_PROFILES, { writeMode: true });
+    expect(html).toContain("active-badge");
+    const claudeSection = html.split('data-host="claude"')[1] || "";
+    expect(claudeSection).toContain("active-badge");
+  });
+
+  it("renders Switch button for non-active profiles when write mode on (PROF-02)", () => {
+    const html = renderProfiles(SAMPLE_PROFILES, { writeMode: true });
+    expect(html).toContain('data-action="profile-switch"');
+    expect(html).toContain('data-profile="work"');
+    expect(html).toContain('data-profile="cheap"');
+    expect(html).toContain('data-host="claude"');
+  });
+
+  it("hides Switch buttons when write mode off", () => {
+    const html = renderProfiles(SAMPLE_PROFILES, { writeMode: false });
+    expect(html).not.toContain('data-action="profile-switch"');
+  });
+
+  it("shows skipped badge for skipped hosts", () => {
+    const html = renderProfiles(SAMPLE_PROFILES, { writeMode: true });
+    expect(html).toContain("cursor");
+    expect(html).toContain("skipped");
+    expect(html).toContain("no variant dir");
+  });
+
+  it("shows bundle version badge when present", () => {
+    const html = renderProfiles(SAMPLE_PROFILES, { writeMode: false });
+    expect(html).toContain("1.40.1");
+  });
+
+  it("renders empty state when no hosts", () => {
+    const html = renderProfiles({ hosts: [] }, { writeMode: true });
+    expect(html).toContain("No profiles");
+  });
+
+  it("defaults writeMode to isWriteModeEnabled() when not passed", () => {
+    delete (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
+    delete (globalThis as any).document;
+    delete (globalThis as any).localStorage;
+    const html = renderProfiles(SAMPLE_PROFILES);
+    expect(html).not.toContain('data-action="profile-switch"');
+  });
+
+  it("renders only active badge (no Switch) for active profile", () => {
+    const html = renderProfiles(SAMPLE_PROFILES, { writeMode: true });
+    const claudeIdx = html.indexOf('data-host="claude"');
+    const balancedIdx = html.indexOf("balanced", claudeIdx);
+    const cardEnd = html.indexOf("</div>", balancedIdx);
+    const card = html.slice(balancedIdx - 50, cardEnd);
+    expect(card).toContain("active-badge");
+    expect(card).not.toContain('data-action="profile-switch"');
   });
 });

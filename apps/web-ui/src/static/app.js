@@ -848,30 +848,72 @@ export function buildConfigSectionBody(sectionKey, fieldValues) {
 }
 
 /**
- * Profiles view renderer stub. T11 replaces this with the profile switcher UI.
- * Reads GET /api/v1/profiles → { profiles, active }.
+ * Profiles view renderer. Reads GET /api/v1/profiles → { hosts: HostProfileState[] }.
+ * Renders profile cards grouped by host with active marked, plus a Switch button
+ * per profile calling POST /api/v1/profiles/switch when write mode is on.
  */
-export function renderProfiles(data) {
+export function renderProfiles(data, opts) {
   const payload = data || {};
-  const profiles = payload.profiles || [];
-  const active = payload.active || "";
-  const cards = profiles
-    .map((p) => {
-      const isActive = p === active || (p && p.name === active);
-      const name = typeof p === "string" ? p : (p && p.name) || "";
+  const hosts = payload.hosts || [];
+  const writeMode = opts && opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
+
+  if (hosts.length === 0) {
+    return '<section class="view"><h2>Profiles</h2><p class="empty">No profiles.</p></section>';
+  }
+
+  const cards = hosts.map((hostState) => {
+    const hostName = hostState.host || "unknown";
+    const installed = hostState.installed;
+    const skipped = hostState.skipped;
+    const activeProfile = hostState.activeProfile;
+    const available = hostState.availableProfiles || [];
+    const version = hostState.bundleVersion;
+
+    if (skipped) {
       return (
-        '<div class="card' + (isActive ? " active" : "") + '">' +
-        "<h3>" + escapeHtml(name) + "</h3>" +
-        (isActive ? '<span class="badge">active</span>' : "") +
+        '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
+        "<h3>" + escapeHtml(hostName) + ' <span class="badge muted">skipped</span></h3>' +
+        '<p class="muted">' + escapeHtml(hostState.skipReason || "skipped") + "</p>" +
         "</div>"
       );
-    })
-    .join("");
-  return (
-    '<section class="view"><h2>Profiles</h2>' +
-    (cards || '<p class="empty">No profiles.</p>') +
-    "</section>"
-  );
+    }
+
+    if (!installed || available.length === 0) {
+      return (
+        '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
+        "<h3>" + escapeHtml(hostName) + "</h3> <p class=\"muted\">Not installed.</p>" +
+        "</div>"
+      );
+    }
+
+    const profileCards = available.map((profile) => {
+      const isActive = profile === activeProfile;
+      const switchBtn = writeMode && !isActive
+        ? '<button type="button" class="switch-btn" data-action="profile-switch" data-profile="' + escapeHtml(profile) + '" data-host="' + escapeHtml(hostName) + '">Switch</button>'
+        : isActive
+          ? '<span class="badge active-badge">active</span>'
+          : "";
+      return (
+        '<div class="profile-card' + (isActive ? " active" : "") + '" data-profile="' + escapeHtml(profile) + '">' +
+        "<h4>" + escapeHtml(profile) + "</h4>" +
+        switchBtn +
+        "</div>"
+      );
+    }).join("");
+
+    const versionBadge = version
+      ? ' <span class="badge muted">v' + escapeHtml(version) + "</span>"
+      : "";
+
+    return (
+      '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
+      "<h3>" + escapeHtml(hostName) + versionBadge + "</h3>" +
+      '<div class="profile-cards">' + profileCards + "</div>" +
+      "</div>"
+    );
+  }).join("");
+
+  return '<section class="view"><h2>Profiles</h2>' + cards + "</section>";
 }
 
 // ── Helpers used by renderers ──────────────────────────────────────────────
@@ -1096,7 +1138,7 @@ function startApp(opts) {
         root.innerHTML = renderConfig((data && data.data) || { config: {}, restartNeededSections: [] }, { writeMode: isWriteModeEnabled() });
       } else if (state.view === "profiles") {
         const data = await api.request("/api/v1/profiles");
-        root.innerHTML = renderProfiles((data && data.data) || { profiles: [], active: "" });
+        root.innerHTML = renderProfiles((data && data.data) || { hosts: [] }, { writeMode: isWriteModeEnabled() });
       }
     } catch (e) {
       root.innerHTML = '<div class="error">Connection error: ' + escapeHtml(String(e.message || e)) + "</div>";
