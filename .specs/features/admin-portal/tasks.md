@@ -127,13 +127,13 @@ T14 → T15
 - Skill: NONE
 
 **Done when**:
-- [ ] `loadEffectiveRegistry` exported; `OverlayData` + `OverlayProfile` types exported
-- [ ] Overlay merge: shallow per profile; tombstone removes from effective + lists in `source.tombstoned`
-- [ ] Corrupted overlay JSON → builtin + `overlayError`, no throw
-- [ ] Validation failure on merged result → builtin + `overlayError`, no throw
-- [ ] Missing overlay file → `{ registry: builtin, overlay: null, tombstoned: [] }`
-- [ ] `bun test scripts/__tests__/model-profiles.test.ts` passes (extend: overlay merge, tombstone, corrupted fallback, validation-failure fallback)
-- [ ] `bun run type-check` passes
+- [x] `loadEffectiveRegistry` exported; `OverlayData` + `OverlayProfile` types exported
+- [x] Overlay merge: shallow per profile; tombstone removes from effective + lists in `source.tombstoned`
+- [x] Corrupted overlay JSON → builtin + `overlayError`, no throw
+- [x] Validation failure on merged result → builtin + `overlayError`, no throw
+- [x] Missing overlay file → `{ registry: builtin, overlay: null, tombstoned: [] }`
+- [x] `bun test scripts/__tests__/model-profiles.test.ts` passes (extend: overlay merge, tombstone, corrupted fallback, validation-failure fallback)
+- [x] `bun run type-check` passes
 
 **Tests**: unit (model-profiles effective loader)
 **Gate**: scripts
