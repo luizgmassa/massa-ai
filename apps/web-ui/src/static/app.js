@@ -1536,6 +1536,24 @@ export async function handleProjectIndexProgress(ctx, jobId) {
   ctx.render();
 }
 
+/** SSE index_status event handler — exported so tests exercise the real
+ *  matching logic, not a copy. Returns true if the event matched and updated
+ *  state, false if ignored (jobId mismatch or no tracked job). */
+export function handleIndexStatusEvent(ctx, payload) {
+  if (!payload || !ctx.state.indexJobId) return false;
+  if (payload.jobId !== ctx.state.indexJobId) return false;
+  ctx.state.indexJobStatus = payload.status || ctx.state.indexJobStatus;
+  ctx.state.indexJobPhase = payload.phase || ctx.state.indexJobPhase;
+  ctx.state.indexJobFileCount = payload.fileCount != null ? payload.fileCount : ctx.state.indexJobFileCount;
+  if (ctx.state.indexJobStatus === "completed" || ctx.state.indexJobStatus === "failed") {
+    if (ctx.state.indexPollInterval) {
+      clearInterval(ctx.state.indexPollInterval);
+      ctx.state.indexPollInterval = null;
+    }
+  }
+  return true;
+}
+
 export async function handleRegistryClearOverlay(ctx) {
   if (!confirm("Reset to built-in? This deletes the overlay file and reverts to the builtin registry.")) return;
   try {
@@ -2201,13 +2219,8 @@ function startApp(opts) {
           // PRG-02: update index progress when jobId matches
           if (data && (data.type === "index_status" || data.event === "index_status")) {
             const payload = data.payload || data;
-            if (payload && payload.jobId === state.indexJobId) {
-              state.indexJobStatus = payload.status || state.indexJobStatus;
-              state.indexJobPhase = payload.phase || state.indexJobPhase;
-              state.indexJobFileCount = payload.fileCount != null ? payload.fileCount : state.indexJobFileCount;
-              if (state.indexJobStatus === "completed" || state.indexJobStatus === "failed") {
-                clearIndexPoll();
-              }
+            const ctxObj = { api, root, state, render, doc };
+            if (handleIndexStatusEvent(ctxObj, payload)) {
               if (state.view === "projects") render();
             }
             return; // handled; don't double-render
@@ -2273,6 +2286,7 @@ const MASSA_AI_UI = {
   handleRegistryClearOverlay,
   handleRegistryRegenerate,
   handleProjectIndexProgress,
+  handleIndexStatusEvent,
   MEMORY_TYPES,
   MEMORY_LEVELS,
   CHECKPOINTS_LIST_BODY,

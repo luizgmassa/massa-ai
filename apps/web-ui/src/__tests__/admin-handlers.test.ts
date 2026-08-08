@@ -27,6 +27,7 @@ const {
   handleRegistryClearOverlay,
   handleRegistryRegenerate,
   handleProjectIndexProgress,
+  handleIndexStatusEvent,
   initRegistryOverlay,
   renderProfilesView,
 } = { ...mod, ...UI } as {
@@ -45,7 +46,8 @@ const {
   handleRegistrySaveOverlay: (ctx: any) => Promise<void>;
   handleRegistryClearOverlay: (ctx: any) => Promise<void>;
   handleRegistryRegenerate: (ctx: any) => Promise<void>;
-  handleProjectIndexProgress: (ctx: any, jobId: string) => void;
+  handleProjectIndexProgress: (ctx: any, jobId: string) => Promise<void>;
+  handleIndexStatusEvent: (ctx: any, payload: any) => boolean;
   initRegistryOverlay: (ctx: any, source: any) => void;
   renderProfilesView: (profilesData: any, registryData: any, opts?: any) => string;
 };
@@ -860,15 +862,9 @@ describe("handleProjectIndexProgress — jobId + status line (PRG-01, PRG-06)", 
 describe("SSE index_status matching (PRG-02)", () => {
   it("updates progress when jobId matches", () => {
     const ctx = makeCtx({ state: { indexJobId: "job-123", indexJobStatus: "pending", indexJobPhase: null, indexJobFileCount: null, view: "projects" } });
-    // Simulate an index_status SSE event for the tracked jobId
     const sseEvent = { type: "index_status", jobId: "job-123", phase: "embedding", fileCount: 42, status: "running" };
-    // The handler is embedded in the SSE onmessage block; we test the update logic directly.
-    // Since the update logic is inline in startApp, we verify the contract: matching jobId updates state.
-    if (sseEvent.jobId === ctx.state.indexJobId) {
-      ctx.state.indexJobStatus = sseEvent.status;
-      ctx.state.indexJobPhase = sseEvent.phase;
-      ctx.state.indexJobFileCount = sseEvent.fileCount;
-    }
+    const matched = handleIndexStatusEvent(ctx, sseEvent);
+    expect(matched).toBe(true);
     expect(ctx.state.indexJobStatus).toBe("running");
     expect(ctx.state.indexJobPhase).toBe("embedding");
     expect(ctx.state.indexJobFileCount).toBe(42);
@@ -877,11 +873,8 @@ describe("SSE index_status matching (PRG-02)", () => {
   it("ignores index_status for a different jobId (PRG-02 edge)", () => {
     const ctx = makeCtx({ state: { indexJobId: "job-123", indexJobStatus: "pending", indexJobPhase: null, indexJobFileCount: null, view: "projects" } });
     const sseEvent = { type: "index_status", jobId: "other-job", phase: "embedding", fileCount: 42, status: "running" };
-    if (sseEvent.jobId === ctx.state.indexJobId) {
-      ctx.state.indexJobStatus = sseEvent.status;
-      ctx.state.indexJobPhase = sseEvent.phase;
-      ctx.state.indexJobFileCount = sseEvent.fileCount;
-    }
+    const matched = handleIndexStatusEvent(ctx, sseEvent);
+    expect(matched).toBe(false);
     expect(ctx.state.indexJobStatus).toBe("pending");
     expect(ctx.state.indexJobPhase).toBeNull();
   });
