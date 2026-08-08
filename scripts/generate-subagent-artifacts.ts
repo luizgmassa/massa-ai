@@ -19,6 +19,7 @@ import { tmpdir } from "os";
 import {
   hostsSupportedBy,
   loadRegistry,
+  loadEffectiveRegistry,
   profileFlagFrom,
   resolveTier,
   selectProfile,
@@ -711,7 +712,17 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   if (check) {
     return runCheck(opts);
   }
-  const profiles = await emitAll(HOST_DIRS, opts);
+  // Runtime generation reads the effective registry (builtin + overlay merged)
+  // so regenerated variants reflect the operator's overlay. The --check path
+  // stays on loadRegistry (builtin alone) so a broken overlay never fails the
+  // build gate (REG-13, REG-18 generate-side, T14 F3).
+  const effective = loadEffectiveRegistry();
+  const registry = effective.registry;
+  if (effective.overlayError) {
+    console.warn(`Warning: overlay error — ${effective.overlayError} (using builtin)`);
+  }
+  const runtimeOpts: EmitOptions = { ...opts, registry };
+  const profiles = await emitAll(HOST_DIRS, runtimeOpts);
   const hostCount = Object.keys(HOST_DIRS).length;
   const total = SPECIALIST_NAMES.length * hostCount;
   console.log(
@@ -726,7 +737,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   // Variant trees (design.md Component 1, MPS-01): every profile a host supports,
   // pre-rendered under agent-profiles/<profile>/ — independent of --profile/env,
   // which only picks the ACTIVE profile above.
-  const variantProfiles = await emitVariants(PLUGIN_ROOT_DIRS, { registry: opts.registry });
+  const variantProfiles = await emitVariants(PLUGIN_ROOT_DIRS, { registry });
   let variantTotal = 0;
   for (const [host, ps] of Object.entries(variantProfiles)) {
     variantTotal += ps.length * SPECIALIST_NAMES.length;

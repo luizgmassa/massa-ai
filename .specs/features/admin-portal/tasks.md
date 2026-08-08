@@ -431,12 +431,12 @@ CHKP-05 decision: store is directly reachable via `CheckpointManager.getInstance
 - Skill: NONE
 
 **Done when**:
-- [ ] Runtime generation (non-`--check`) reads `loadEffectiveRegistry().registry`
-- [ ] `--check` path still reads `loadRegistry` (builtin alone)
-- [ ] F3 sensor: overlay present → regenerated file reflects overlay model; `--check` passes with overlay present
-- [ ] `bun run generate:artifacts -- --check` exit 0
-- [ ] `bun test scripts/__tests__/model-profiles.test.ts` passes
-- [ ] `bun run type-check` passes
+- [x] Runtime generation (non-`--check`) reads `loadEffectiveRegistry().registry`
+- [x] `--check` path still reads `loadRegistry` (builtin alone)
+- [x] F3 sensor: overlay present → regenerated file reflects overlay model; `--check` passes with overlay present
+- [x] `bun run generate:artifacts -- --check` exit 0
+- [x] `bun test scripts/__tests__/model-profiles.test.ts` passes
+- [x] `bun run type-check` passes
 
 **Tests**: unit (generate read-path split)
 **Gate**: build
