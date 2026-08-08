@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.41.0] - 2026-08-08
+
 ### Added
 
 - **Admin Portal — full CRUD web UI** for the massa-ai system. Elevates the
