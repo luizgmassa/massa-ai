@@ -4,13 +4,18 @@ import path from "path";
 import { spawnSync } from "child_process";
 import { configDir } from "@massa-ai/shared/config";
 
-// scripts/lib is outside tools-api's rootDir, so we use a runtime require
-// instead of a static import. Bun resolves this at runtime. Lazy: resolved
-// on first call, so mock.module() in tests can intercept before this runs.
+// scripts/lib is outside tools-api's rootDir and is not copied into the
+// production Docker image (only apps/ + packages/ are). We use a dynamic
+// require with a non-literal path so the bundler (bun build) treats it as
+// external and leaves it for runtime resolution. In the deployed image the
+// route is not exercised (admin-portal is a local-operator surface); locally
+// and in tests the path resolves to the dev checkout. Lazy: resolved on first
+// call, so mock.module() in tests can intercept before this runs.
 let _profilesLib: Record<string, unknown> | null = null;
 function profilesLib(): Record<string, unknown> {
   if (!_profilesLib) {
-    _profilesLib = require("../../../../scripts/lib/model-profiles.ts");
+    const libPath = ["..", "..", "..", "..", "scripts", "lib", "model-profiles.ts"].join("/");
+    _profilesLib = (typeof require === "function" ? require : (globalThis as any).require)(libPath);
   }
   return _profilesLib!;
 }
