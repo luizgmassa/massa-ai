@@ -743,22 +743,56 @@ describe("generate-subagent-artifacts read-path split (F3 sensor — T14)", () =
     try { fs.rmdirSync(tmpDir); } catch {}
   });
 
-  test("main() with --check does not read the overlay (F3 — build gate stays on builtin)", async () => {
-    // The --check path must call loadRegistry (builtin alone), NOT
-    // loadEffectiveRegistry. We verify by checking that the generator's
-    // runCheck function exists and is separate from the runtime path.
+  test("runCheck with an overlay present ignores it and reads builtin (F3 — build gate stays on builtin)", async () => {
+    // F3 sensor (strengthened): the --check path MUST read loadRegistry (builtin
+    // alone), NOT loadEffectiveRegistry. We set a valid full overlay that changes
+    // the balanced profile's model across all hosts, point XDG_CONFIG_HOME at it,
+    // then invoke runCheck() with no opts.registry. If runCheck reads builtin,
+    // the emitted variant dirs match the checked-in tree → exit 0. If runCheck
+    // reads the effective registry (mutant), the overlay model is emitted into
+    // the balanced variant dirs → drift vs checked-in → exit 1.
+    const fs = require("fs");
+    const path = require("path");
+    const os = require("os");
     const gen = await import("../generate-subagent-artifacts.ts");
-    expect(typeof gen.main).toBe("function");
-    expect(typeof gen.emitAll).toBe("function");
-    expect(typeof gen.emitVariants).toBe("function");
+    expect(typeof gen.runCheck).toBe("function");
 
-    // The emitAll/emitVariants functions accept opts.registry, so the caller
-    // (main vs runCheck) controls which registry is used. main() for runtime
-    // passes loadEffectiveRegistry().registry; runCheck passes loadRegistry().
-    const builtin = loadRegistry();
-    const effective = loadEffectiveRegistry();
-    // When no overlay exists, effective.registry equals builtin.
-    expect(effective.registry.profiles.balanced).toBeDefined();
-    expect(builtin.profiles.balanced).toBeDefined();
+    const tmpXdg = path.join(
+      os.tmpdir(),
+      `massa-ai-f3-runchk-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    const overlayPath = path.join(tmpXdg, "massa-ai", "model-profiles.json");
+    fs.mkdirSync(path.dirname(overlayPath), { recursive: true });
+
+    const overlayModel = "f3-runchk-overlay-model";
+    const builtinReg = loadRegistry();
+    const builtinBalanced = builtinReg.profiles.balanced;
+    const overlayHosts = {};
+    for (const [host, tierMap] of Object.entries(builtinBalanced.hosts)) {
+      overlayHosts[host] = {};
+      for (const [tier, pair] of Object.entries(tierMap)) {
+        overlayHosts[host][tier] = { model: overlayModel, effort: pair.effort };
+      }
+    }
+    fs.writeFileSync(overlayPath, JSON.stringify({
+      profiles: { balanced: { description: "F3 runcheck overlay", hosts: overlayHosts } },
+    }, null, 2));
+
+    const prevXdg = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = tmpXdg;
+    try {
+      // Confirm the overlay is actually picked up by the effective loader
+      // (proves the overlay is valid + reachable — otherwise the sensor is vacuous).
+      const effective = loadEffectiveRegistry();
+      expect(effective.registry.profiles.balanced.hosts.claude.standard.model).toBe(overlayModel);
+      expect(effective.source.overlay).not.toBeNull();
+
+      // runCheck must ignore the overlay and emit builtin → exit 0 (no drift).
+      const code = await gen.runCheck();
+      expect(code).toBe(0);
+    } finally {
+      process.env.XDG_CONFIG_HOME = prevXdg;
+      try { fs.rmSync(tmpXdg, { recursive: true, force: true }); } catch {}
+    }
   });
 });
