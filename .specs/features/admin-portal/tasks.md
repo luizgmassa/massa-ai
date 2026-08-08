@@ -203,12 +203,14 @@ T14 → T15
 - Skill: NONE
 
 **Done when**:
-- [ ] `POST /api/v1/checkpoints/delete` with existing ID → 200 `{ ok:true }`
-- [ ] Non-existent ID → 404 `{ error:"not found" }`
-- [ ] Store error → 500 `{ error }`
-- [ ] JSDoc notes the mirror-sync/async-durability (F4 accepted assumption)
-- [ ] `bun test apps/tools-api/src/routes/checkpoints.test.ts` passes (extend: delete existing, delete non-existent, delete store-error)
-- [ ] `bun run type-check` passes
+- [x] `POST /api/v1/checkpoints/delete` with existing ID → 200 `{ ok:true }`
+- [x] Non-existent ID → 404 `{ error:"not found" }`
+- [x] Store error → 500 `{ error }`
+- [x] JSDoc notes the mirror-sync/async-durability (F4 accepted assumption)
+- [x] `bun test apps/tools-api/src/routes/checkpoints.test.ts` passes (extend: delete existing, delete non-existent, delete store-error)
+- [x] `bun run type-check` passes
+
+CHKP-05 decision: store is directly reachable via `CheckpointManager.getInstance().deleteCheckpoint(id)` — no `DeleteCheckpointTool` wrapper added (MCP parity not needed for route-only access).
 
 **Tests**: integration (checkpoint delete route)
 **Gate**: route
